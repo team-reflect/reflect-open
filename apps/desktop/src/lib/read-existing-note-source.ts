@@ -22,5 +22,5 @@ export async function readExistingNoteSource(path: string, generation: number): 
       return liveContent
     }
   }
-  return readNote(path, generation)
+  return await readNote(path, generation)
 }

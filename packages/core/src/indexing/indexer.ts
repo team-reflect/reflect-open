@@ -393,7 +393,7 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
 export async function syncIndex(options: IndexPassOptions): Promise<void> {
   const stamped = await getIndexMeta(PROJECTION_VERSION_KEY)
   if (stamped === String(PROJECTION_VERSION)) {
-    return reconcileIndex(options)
+    return await reconcileIndex(options)
   }
   // Loud on purpose: a rebuild is expected once per projection bump or fresh
   // graph. Seeing this on *every* open means the stamp (or the whole index
@@ -402,7 +402,7 @@ export async function syncIndex(options: IndexPassOptions): Promise<void> {
   console.warn(
     `index: stored projection version ${stamped === null ? 'none' : `"${stamped}"`} ≠ ${PROJECTION_VERSION} — full rebuild`,
   )
-  return rebuildIndex(options)
+  return await rebuildIndex(options)
 }
 
 /**

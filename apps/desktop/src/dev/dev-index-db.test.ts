@@ -72,7 +72,7 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
 }
 
 async function openDb(): Promise<DevIndexDb> {
-  return createDevIndexDb()
+  return await createDevIndexDb()
 }
 
 interface CapturedQuery {

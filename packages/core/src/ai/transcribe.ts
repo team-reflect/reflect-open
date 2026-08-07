@@ -67,8 +67,8 @@ export interface TranscriptionRequest {
  */
 export async function transcribeAudio(request: TranscriptionRequest): Promise<string> {
   return request.provider === 'openai'
-    ? transcribeWithOpenAi(request)
-    : transcribeWithGemini(request)
+    ? await transcribeWithOpenAi(request)
+    : await transcribeWithGemini(request)
 }
 
 /** `audio/webm;codecs=opus` → `audio/webm` — parameters confuse provider sniffing. */

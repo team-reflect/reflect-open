@@ -93,7 +93,7 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
     ],
     queryFn: async () => {
       if (!useHybrid) {
-        return searchWithFilters(parsed)
+        return await searchWithFilters(parsed)
       }
       // Adapt RetrievalHit → PaletteHit: semantic chunk text rides in
       // the snippet slot (dailies fall back to their ISO-titled row — the

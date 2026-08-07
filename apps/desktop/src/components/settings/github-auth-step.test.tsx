@@ -36,7 +36,7 @@ async function renderCodeView(): Promise<void> {
   fakeKeychain()
   mockFlow.mockImplementation(async (options) => {
     options.onCode({ userCode: 'ABCD-1234', verificationUri: 'https://github.com/login/device' })
-    return new Promise(() => {}) // polling stays in flight
+    return await new Promise(() => {}) // polling stays in flight
   })
   await render(<GithubAuthStep onAuthed={vi.fn()} />)
   await userEvent.click(page.getByRole('button', { name: 'Sign in with GitHub' }))

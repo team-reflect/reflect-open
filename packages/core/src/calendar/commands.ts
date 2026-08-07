@@ -79,7 +79,7 @@ export type CalendarEvent = z.infer<typeof calendarEventSchema>
 
 /** The current calendar permission state (never prompts). */
 export async function calendarAuthorizationStatus(): Promise<CalendarAuthorizationStatus> {
-  return call('calendar_authorization_status', {}, calendarAuthorizationStatusSchema)
+  return await call('calendar_authorization_status', {}, calendarAuthorizationStatusSchema)
 }
 
 /**
@@ -89,12 +89,12 @@ export async function calendarAuthorizationStatus(): Promise<CalendarAuthorizati
  * System Settings → Privacy & Security → Calendars instead.
  */
 export async function requestCalendarAccess(): Promise<boolean> {
-  return call('calendar_request_access', {}, z.boolean())
+  return await call('calendar_request_access', {}, z.boolean())
 }
 
 /** Every event calendar on this Mac, across all accounts. */
 export async function listCalendars(): Promise<CalendarInfo[]> {
-  return call('calendar_list_calendars', {}, z.array(calendarInfoSchema))
+  return await call('calendar_list_calendars', {}, z.array(calendarInfoSchema))
 }
 
 /**
@@ -108,7 +108,11 @@ export async function listCalendarEvents(
   end: number,
   calendarIds: string[],
 ): Promise<CalendarEvent[]> {
-  return call('calendar_list_events', { start, end, calendarIds }, z.array(calendarEventSchema))
+  return await call(
+    'calendar_list_events',
+    { start, end, calendarIds },
+    z.array(calendarEventSchema),
+  )
 }
 
 /**

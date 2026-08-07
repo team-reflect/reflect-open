@@ -11,8 +11,8 @@ async function freshModule(
 ): Promise<typeof import('./mobile-boot-warm')> {
   vi.resetModules()
   const core = await import('@reflect/core')
-  core.setBridge({ invoke: async (command) => invoke(command), listen: async () => () => {} })
-  return import('./mobile-boot-warm')
+  core.setBridge({ invoke: async (command) => await invoke(command), listen: async () => () => {} })
+  return await import('./mobile-boot-warm')
 }
 
 const STORAGE = {

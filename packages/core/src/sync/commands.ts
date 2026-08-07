@@ -78,7 +78,7 @@ export type PushOutcome = z.infer<typeof pushOutcomeSchema>
 
 /** Snapshot the backup repository (cheap, no network). */
 export async function gitStatus(generation: number): Promise<GitStatus> {
-  return call('git_status', { generation }, gitStatusSchema)
+  return await call('git_status', { generation }, gitStatusSchema)
 }
 
 /**
@@ -92,7 +92,7 @@ export async function gitSetup(
   branch: string | null,
   generation: number,
 ): Promise<GitStatus> {
-  return call('git_setup', { remoteUrl, branch, generation }, gitStatusSchema)
+  return await call('git_setup', { remoteUrl, branch, generation }, gitStatusSchema)
 }
 
 /**
@@ -100,7 +100,7 @@ export async function gitSetup(
  * its history stay; the machine-level GitHub credential is untouched.
  */
 export async function gitDisconnect(generation: number): Promise<GitStatus> {
-  return call('git_disconnect', { generation }, gitStatusSchema)
+  return await call('git_disconnect', { generation }, gitStatusSchema)
 }
 
 /**
@@ -119,12 +119,12 @@ export async function gitCommitAll(
   fallbackMessage: string,
   generation: number,
 ): Promise<CommitOutcome> {
-  return call('git_commit_all', { message: fallbackMessage, generation }, commitOutcomeSchema)
+  return await call('git_commit_all', { message: fallbackMessage, generation }, commitOutcomeSchema)
 }
 
 /** Fetch `origin`; returns ahead/behind for the current branch. */
 export async function gitFetch(token: string | null, generation: number): Promise<RemoteDelta> {
-  return call('git_fetch', { token, generation }, remoteDeltaSchema)
+  return await call('git_fetch', { token, generation }, remoteDeltaSchema)
 }
 
 /**
@@ -133,10 +133,10 @@ export async function gitFetch(token: string | null, generation: number): Promis
  * the markers into `Needs review` flags.
  */
 export async function gitMergeRemote(generation: number): Promise<MergeOutcome> {
-  return call('git_merge_remote', { generation }, mergeOutcomeSchema)
+  return await call('git_merge_remote', { generation }, mergeOutcomeSchema)
 }
 
 /** Push to `origin`; rejections come back as data, not thrown errors. */
 export async function gitPush(token: string | null, generation: number): Promise<PushOutcome> {
-  return call('git_push', { token, generation }, pushOutcomeSchema)
+  return await call('git_push', { token, generation }, pushOutcomeSchema)
 }

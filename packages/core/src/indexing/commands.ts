@@ -14,7 +14,7 @@ const voidSchema = z.null()
  * never mutate a newly-opened index.
  */
 export async function openIndex(): Promise<number> {
-  return call('index_open', {}, z.number())
+  return await call('index_open', {}, z.number())
 }
 
 /** Apply one note's projection in a single Rust transaction (for `generation`). */
@@ -136,7 +136,7 @@ export type ReconcileScan = z.infer<typeof reconcileScanSchema>
  * `generation` reports an empty scan.
  */
 export async function reconcileScan(generation: number): Promise<ReconcileScan> {
-  return call('index_reconcile_scan', { generation }, reconcileScanSchema)
+  return await call('index_reconcile_scan', { generation }, reconcileScanSchema)
 }
 
 /** One {@link touchIndexedNotes} entry: re-stamp `path`'s stored mtime. */

@@ -84,7 +84,7 @@ describe('useAudioRecorder', () => {
     })
     expect(result.current.elapsedMs).toBe(3000)
 
-    const recording = await act(async () => result.current.stop())
+    const recording = await act(async () => await result.current.stop())
     expect(recording).not.toBeNull()
     expect(recording?.mimeType).toBe('audio/mp4')
     expect(recording?.durationMs).toBe(3000)
@@ -126,7 +126,7 @@ describe('useAudioRecorder', () => {
     act(() => {
       vi.advanceTimersByTime(200)
     })
-    const recording = await act(async () => result.current.stop())
+    const recording = await act(async () => await result.current.stop())
     expect(recording).toBeNull()
     expect(result.current.status).toBe('idle')
   })
@@ -256,7 +256,7 @@ describe('useAudioRecorder', () => {
     const [first, second] = await act(async () => {
       const racingStop = result.current.stop()
       const racingStopTwin = result.current.stop()
-      return Promise.all([racingStop, racingStopTwin])
+      return await Promise.all([racingStop, racingStopTwin])
     })
 
     expect(FakeMediaRecorder.instances[0]!.stopCalls).toBe(1)
@@ -274,7 +274,7 @@ describe('useAudioRecorder', () => {
     // Simulate an external stop landing first (a racing cancel).
     FakeMediaRecorder.instances[0]!.state = 'inactive'
 
-    const recording = await act(async () => result.current.stop())
+    const recording = await act(async () => await result.current.stop())
 
     expect(recording).toBeNull()
     expect(FakeMediaRecorder.instances[0]!.stopCalls).toBe(0)

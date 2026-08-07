@@ -27,7 +27,9 @@ export type AssetVerdict = 'send' | 'skip-unreferenced' | 'skip-private'
  */
 export async function classifyAsset(assetPath: string, generation: number): Promise<AssetVerdict> {
   const candidates = await assetReferencingNotePaths(assetPath)
-  return classifyAssetFromNotes(assetPath, candidates, (notePath) => readNote(notePath, generation))
+  return await classifyAssetFromNotes(assetPath, candidates, (notePath) =>
+    readNote(notePath, generation),
+  )
 }
 
 /**

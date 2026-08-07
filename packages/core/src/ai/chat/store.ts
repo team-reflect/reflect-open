@@ -193,7 +193,7 @@ export async function deleteChatConversation(id: string, generation: number): Pr
 
 /** The most recently active conversations, newest first. */
 export async function listChatConversations(limit = 50): Promise<ChatConversation[]> {
-  return db
+  return await db
     .selectFrom('chatConversations')
     .select(['id', 'title', 'createdMs', 'updatedMs'])
     .orderBy('updatedMs', 'desc')

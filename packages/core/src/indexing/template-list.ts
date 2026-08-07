@@ -17,7 +17,7 @@ export interface TemplateEntry {
 
 /** Every template in the graph, A→Z by folded title (matching v1's menu order). */
 export async function listTemplates(): Promise<TemplateEntry[]> {
-  return db
+  return await db
     .selectFrom('notes')
     .where('kind', '=', 'template')
     .select(['path', 'title', 'mtime'])

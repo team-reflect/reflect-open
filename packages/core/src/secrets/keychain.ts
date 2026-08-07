@@ -22,7 +22,7 @@ export async function setSecret(name: string, value: string): Promise<void> {
 
 /** Read the secret stored under `name`, or `null` when none exists. */
 export async function getSecret(name: string): Promise<string | null> {
-  return call('secret_get', { name }, secretSchema)
+  return await call('secret_get', { name }, secretSchema)
 }
 
 /** Remove the secret stored under `name` (a missing entry is not an error). */

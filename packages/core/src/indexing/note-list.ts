@@ -188,7 +188,7 @@ export interface NoteTagFacet {
  * displayed with one deterministic casing.
  */
 export async function listNoteTags(): Promise<NoteTagFacet[]> {
-  return db
+  return await db
     .selectFrom('tags')
     .innerJoin('notes', 'notes.path', 'tags.notePath')
     .where('notes.kind', '=', 'note')

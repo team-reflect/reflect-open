@@ -409,7 +409,7 @@ describe('rewriteLinksForTitleChange stable-target displays', () => {
     const resolve = io.resolve
     io.resolve = async (target) => {
       resolveCalls.push(target)
-      return resolve(target)
+      return await resolve(target)
     }
 
     await rewriteLinksForTitleChange({

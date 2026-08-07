@@ -154,7 +154,7 @@ export async function chunkNote(
 
   // Only the note's final chunk merges — mid-note section tails keep their
   // historical shape, so existing chunk hashes (and the re-embed skip) hold.
-  return mergeRuntTail(chunks, (from, to) => source.slice(from, to))
+  return await mergeRuntTail(chunks, (from, to) => source.slice(from, to))
 }
 
 /** `assets/graphs/q4.png` → `q4.png` — the chunk heading for an asset body. */

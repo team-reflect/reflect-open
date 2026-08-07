@@ -95,7 +95,7 @@ export async function listenForFocusedNoteMenuCommands(
   if (!isTauri()) {
     return () => {}
   }
-  return getCurrentWebviewWindow().listen<unknown>(FOCUSED_NOTE_MENU_EVENT, ({ payload }) => {
+  return await getCurrentWebviewWindow().listen<unknown>(FOCUSED_NOTE_MENU_EVENT, ({ payload }) => {
     const command = FocusedNoteMenuCommandSchema.safeParse(payload)
     if (command.success) {
       dispatch(command.data)

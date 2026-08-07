@@ -173,7 +173,7 @@ export async function resolveOrCreateNoteWithTitle(
 
   // On a lost claim, re-resolve both projections before considering a
   // suffix: the winner may be the note this link meant.
-  return claimNotePathForSlug(
+  return await claimNotePathForSlug(
     slugForTitle(title),
     newNoteSource(title, body),
     generation,

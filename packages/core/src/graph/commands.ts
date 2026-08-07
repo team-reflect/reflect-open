@@ -24,7 +24,7 @@ const voidSchema = z.null()
 
 /** Open an existing graph at `path` (ensures the standard layout exists). */
 export async function openGraph(path: string): Promise<GraphInfo> {
-  return call('graph_open', { path }, graphInfoSchema)
+  return await call('graph_open', { path }, graphInfoSchema)
 }
 
 /**
@@ -43,7 +43,7 @@ export async function openNoteWindow(deepLink: string): Promise<void> {
  * one-shot deep link the window was created for. Errors when no graph is open.
  */
 export async function windowBootstrap(): Promise<WindowBootstrap> {
-  return call('window_bootstrap', {}, windowBootstrapSchema)
+  return await call('window_bootstrap', {}, windowBootstrapSchema)
 }
 
 /**
@@ -58,7 +58,7 @@ export async function closeNoteWindows(): Promise<void> {
 
 /** Create a new graph at `path` and open it. */
 export async function createGraph(path: string): Promise<GraphInfo> {
-  return call('graph_create', { path }, graphInfoSchema)
+  return await call('graph_create', { path }, graphInfoSchema)
 }
 
 /**
@@ -75,7 +75,7 @@ export async function importReflectV1Zip(
   path: string,
   generation: number,
 ): Promise<GraphImportSummary> {
-  return call('graph_import_reflect_v1_zip', { path, generation }, graphImportSummarySchema)
+  return await call('graph_import_reflect_v1_zip', { path, generation }, graphImportSummarySchema)
 }
 
 /** Event name the running import emits {@link GraphImportProgress} ticks on. */
@@ -123,7 +123,7 @@ export function markReflectV1ImportOwnWrites(summary: GraphImportSummary): void 
  * span a graph switch must pin every read; UI reads of the open graph omit it.
  */
 export async function readNote(path: string, generation?: number): Promise<string> {
-  return call('note_read', { path, generation }, z.string())
+  return await call('note_read', { path, generation }, z.string())
 }
 
 const localNoteReadSchema = z.discriminatedUnion('kind', [
@@ -144,7 +144,7 @@ export type LocalNoteRead = z.infer<typeof localNoteReadSchema>
  * Missing files still reject with `notFound`, exactly like {@link readNote}.
  */
 export async function readNoteLocal(path: string, generation?: number): Promise<LocalNoteRead> {
-  return call('note_read_local', { path, generation }, localNoteReadSchema)
+  return await call('note_read_local', { path, generation }, localNoteReadSchema)
 }
 
 /**
@@ -200,7 +200,7 @@ export async function writeAsset(
  * would resolve against the new graph's same-named file.
  */
 export async function readAsset(path: string, generation: number): Promise<string> {
-  return call('asset_read', { path, generation }, z.string())
+  return await call('asset_read', { path, generation }, z.string())
 }
 
 /**
@@ -223,7 +223,7 @@ export async function readAssetBinary(
  * The read throws `notFound` while nothing is cached.
  */
 export async function readTranscriptCache(name: string, generation: number): Promise<string> {
-  return call('transcript_cache_read', { name, generation }, z.string())
+  return await call('transcript_cache_read', { name, generation }, z.string())
 }
 
 export async function writeTranscriptCache(
@@ -268,7 +268,7 @@ export async function revealAsset(path: string, generation: number): Promise<voi
  * for the same reason as {@link readAsset}.
  */
 export async function listDir(dir: string, generation: number): Promise<FileMeta[]> {
-  return call('dir_list', { dir, generation }, z.array(fileMetaSchema))
+  return await call('dir_list', { dir, generation }, z.array(fileMetaSchema))
 }
 
 /**
@@ -276,7 +276,7 @@ export async function listDir(dir: string, generation: number): Promise<FileMeta
  * filesystem directly — unlike an index lookup, this can't lag the watcher.
  */
 export async function noteExists(path: string): Promise<boolean> {
-  return call('note_exists', { path }, z.boolean())
+  return await call('note_exists', { path }, z.boolean())
 }
 
 /** Send a note to the OS trash (recoverable; pinned to `generation`). */
@@ -290,7 +290,7 @@ export async function deleteNote(path: string, generation: number): Promise<void
  * folders. `generation` pins the listing like {@link readNote}'s.
  */
 export async function listFiles(generation?: number): Promise<FileMeta[]> {
-  return call('list_files', { generation }, z.array(fileMetaSchema))
+  return await call('list_files', { generation }, z.array(fileMetaSchema))
 }
 
 /**
@@ -298,7 +298,7 @@ export async function listFiles(generation?: number): Promise<FileMeta[]> {
  * cached catalog as {@link listFiles}.
  */
 export async function listAttachments(generation?: number): Promise<FileMeta[]> {
-  return call('list_attachments', { generation }, z.array(fileMetaSchema))
+  return await call('list_attachments', { generation }, z.array(fileMetaSchema))
 }
 
 const vaultScanStatsSchema = z.object({
@@ -315,7 +315,7 @@ export type VaultScanStats = z.infer<typeof vaultScanStatsSchema>
  * so "why isn't my file showing up" stays diagnosable.
  */
 export async function vaultScanStats(generation?: number): Promise<VaultScanStats> {
-  return call('vault_scan_stats', { generation }, vaultScanStatsSchema)
+  return await call('vault_scan_stats', { generation }, vaultScanStatsSchema)
 }
 
 /**
@@ -333,12 +333,12 @@ export async function captureHostRegister(): Promise<void> {
  * `generation` like every background-pass read.
  */
 export async function captureInboxList(generation: number): Promise<FileMeta[]> {
-  return call('capture_inbox_list', { generation }, z.array(fileMetaSchema))
+  return await call('capture_inbox_list', { generation }, z.array(fileMetaSchema))
 }
 
 /** Read one spooled envelope's JSON text by spool filename (e.g. `<id>.json`). */
 export async function captureInboxRead(name: string, generation: number): Promise<string> {
-  return call('capture_inbox_read', { name, generation }, z.string())
+  return await call('capture_inbox_read', { name, generation }, z.string())
 }
 
 /**
@@ -367,7 +367,7 @@ export async function captureInboxRemove(name: string, generation: number): Prom
  * called by the mobile capture controller before every drain pass.
  */
 export async function captureSharedInboxRelay(generation: number): Promise<number> {
-  return call('capture_shared_inbox_relay', { generation }, z.number())
+  return await call('capture_shared_inbox_relay', { generation }, z.number())
 }
 
 /**
@@ -397,7 +397,7 @@ export async function promoteCaptureScreenshot(
  * Returns a base64-encoded normalized JPEG, or `null` when unavailable.
  */
 export async function captureLinkPreview(url: string): Promise<string | null> {
-  return call('capture_link_preview', { url }, z.string().nullable())
+  return await call('capture_link_preview', { url }, z.string().nullable())
 }
 
 /**
@@ -406,12 +406,12 @@ export async function captureLinkPreview(url: string): Promise<string | null> {
  * webview's own HTTP capability. The privacy gate runs before any call here.
  */
 export async function captureMetaFetch(url: string): Promise<string> {
-  return call('capture_meta_fetch', { url }, z.string())
+  return await call('capture_meta_fetch', { url }, z.string())
 }
 
 /** The recently-opened graphs, newest first. */
 export async function recentGraphs(): Promise<RecentGraph[]> {
-  return call('recent_graphs', {}, z.array(recentGraphSchema))
+  return await call('recent_graphs', {}, z.array(recentGraphSchema))
 }
 
 /** Drop a graph from the recents list (by root path). */

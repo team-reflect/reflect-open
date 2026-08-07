@@ -286,9 +286,9 @@ async function resolveReference(
     if (asPath !== null) {
       return asPath
     }
-    return resolveBareKey(reference.key, generation)
+    return await resolveBareKey(reference.key, generation)
   }
-  return resolveBareKey(reference.key, generation)
+  return await resolveBareKey(reference.key, generation)
 }
 
 /**
@@ -304,7 +304,7 @@ export async function resolveExistingWikiTarget(
   const reference = wikiNoteReference(target)
   return reference === null
     ? { kind: 'missing' }
-    : resolveReference(reference, sourcePath, generation)
+    : await resolveReference(reference, sourcePath, generation)
 }
 
 /** Resolve a standard Markdown note href from the note that contains it. */
@@ -316,5 +316,5 @@ export async function resolveExistingMarkdownTarget(
   const reference = markdownNoteReference(sourcePath, href)
   return reference === null
     ? { kind: 'missing' }
-    : resolveReference(reference, sourcePath, generation)
+    : await resolveReference(reference, sourcePath, generation)
 }

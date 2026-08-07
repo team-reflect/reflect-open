@@ -66,7 +66,7 @@ export interface PinnedNote {
  * the point of pinning: the list must not reshuffle as notes are edited.
  */
 export async function getPinnedNotes(): Promise<PinnedNote[]> {
-  return db
+  return await db
     .selectFrom('notes')
     .where('isPinned', '=', 1)
     .where('kind', '!=', 'template')
@@ -123,7 +123,7 @@ export interface ConflictedNote {
 
 /** Every note whose file carries sync conflict markers, ordered by path. */
 export async function getConflictedNotes(): Promise<ConflictedNote[]> {
-  return db
+  return await db
     .selectFrom('notes')
     .where('hasConflict', '=', 1)
     .select(['path', 'title'])

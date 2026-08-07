@@ -19,7 +19,7 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 
 beforeEach(() => dailyDatesInRange.mockReset())
-afterEach(async () => cleanup())
+afterEach(async () => await cleanup())
 
 describe('useDailyNoteDates', () => {
   it('keeps previous markers while a new range loads', async () => {

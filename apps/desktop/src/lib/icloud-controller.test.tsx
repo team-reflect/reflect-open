@@ -71,7 +71,7 @@ beforeEach(() => {
             throw scripted
           }
           if (scripted === 'hang') {
-            return new Promise((resolve) => {
+            return await new Promise((resolve) => {
               releaseScan = () =>
                 resolve({ changed: [], needsReview: [], deferred: [], autoResolved: 0 })
             })

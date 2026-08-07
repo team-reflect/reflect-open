@@ -100,7 +100,7 @@ function gateInvokes(match: (command: string, args: Record<string, unknown>) => 
     if (match(command, args)) {
       await gate
     }
-    return ungated?.(command, args)
+    return await ungated?.(command, args)
   })
   return release
 }
@@ -813,7 +813,7 @@ describe('useNoteDocument', () => {
         if (command === 'note_write') {
           disk = (args as { contents: string }).contents
           writes.push(disk)
-          return new Promise<null>((resolve) => {
+          return await new Promise<null>((resolve) => {
             resolveWrite = () => resolve(null)
           })
         }
@@ -857,7 +857,7 @@ describe('useNoteDocument', () => {
           writes.push(disk)
           writeCount += 1
           if (writeCount === 1) {
-            return new Promise<null>((resolve) => {
+            return await new Promise<null>((resolve) => {
               resolveWrite = () => resolve(null)
             })
           }

@@ -160,5 +160,5 @@ export async function ensurePersonNote(
   if (resolution.kind !== 'missing') {
     return resolution
   }
-  return resolveOrCreateNoteWithTitle(input.title, input.generation, input.body)
+  return await resolveOrCreateNoteWithTitle(input.title, input.generation, input.body)
 }

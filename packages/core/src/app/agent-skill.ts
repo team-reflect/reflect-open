@@ -26,7 +26,7 @@ export type AgentSkillStatus = z.infer<typeof agentSkillStatusSchema>
 
 /** The open graph's agent-skill install status. Read-only. */
 export async function agentSkillStatus(): Promise<AgentSkillStatus> {
-  return call('skill_status', {}, agentSkillStatusSchema)
+  return await call('skill_status', {}, agentSkillStatusSchema)
 }
 
 /**
@@ -34,10 +34,10 @@ export async function agentSkillStatus(): Promise<AgentSkillStatus> {
  * Generation-pinned like every mutating command; rejects `conflict` files.
  */
 export async function agentSkillInstall(generation: number): Promise<AgentSkillStatus> {
-  return call('skill_install', { generation }, agentSkillStatusSchema)
+  return await call('skill_install', { generation }, agentSkillStatusSchema)
 }
 
 /** Remove the open graph's managed skill file. Rejects `conflict` files. */
 export async function agentSkillUninstall(generation: number): Promise<AgentSkillStatus> {
-  return call('skill_uninstall', { generation }, agentSkillStatusSchema)
+  return await call('skill_uninstall', { generation }, agentSkillStatusSchema)
 }

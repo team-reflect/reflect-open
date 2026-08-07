@@ -97,7 +97,9 @@ export async function resolveMeetingAttendeeTargets(
   attendees: readonly MeetingAttendee[],
   lookupContacts: boolean,
 ): Promise<ResolvedMeetingAttendee[]> {
-  return Promise.all(attendees.map((attendee) => resolveMeetingAttendee(attendee, lookupContacts)))
+  return await Promise.all(
+    attendees.map((attendee) => resolveMeetingAttendee(attendee, lookupContacts)),
+  )
 }
 
 /**

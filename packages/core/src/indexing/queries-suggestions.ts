@@ -92,7 +92,7 @@ export async function suggestWikiLinkTargets(
     return { suggestions: [], claimedTargetKeys: [], queryReadsAsDate: false }
   }
   const result = await queryWikiTargetCandidates(query, dateGen)
-  return verifyWikiSuggestionAddresses(
+  return await verifyWikiSuggestionAddresses(
     result.candidates,
     result.candidateTargetKeys,
     limit,

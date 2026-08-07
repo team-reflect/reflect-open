@@ -131,7 +131,7 @@ describe('PublishedUrlSection', () => {
 
   it('surfaces copy failures through the operations status', async () => {
     const url = 'https://gist.github.com/alex/g1'
-    stubClipboard(vi.fn(async () => Promise.reject(new Error('Document is not focused'))))
+    stubClipboard(vi.fn(async () => await Promise.reject(new Error('Document is not focused'))))
     useNoteRow.mockReturnValue(noteRow({ gistUrl: url }))
 
     const view = await renderSection()

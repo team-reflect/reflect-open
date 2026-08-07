@@ -43,7 +43,7 @@ async function awaitTerminalStatus(initial: EmbedStatus): Promise<EmbedStatus> {
   if (initial.status === 'ready' || initial.status === 'failed') {
     return initial
   }
-  return new Promise((resolve) => {
+  return await new Promise((resolve) => {
     let unlisten: (() => void) | null = null
     let settled = false
     const settle = (status: EmbedStatus): void => {

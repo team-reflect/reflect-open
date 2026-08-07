@@ -42,7 +42,7 @@ function installFakeBridge(): { invoked: string[] } {
           }
           return accessGranted
         case 'calendar_list_calendars':
-          return calendarsResponse()
+          return await calendarsResponse()
         default:
           return null
       }

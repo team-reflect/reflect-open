@@ -213,7 +213,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
       }
     })()
     stopSettledRef.current = settled
-    return settled
+    return await settled
   }, [stopRecorder, pipeline])
   useEffect(() => {
     stopAndSaveRef.current = () => void stopAndSave()

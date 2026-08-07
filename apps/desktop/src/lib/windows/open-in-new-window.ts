@@ -49,7 +49,7 @@ export async function openRouteInNewWindow(route: Route): Promise<boolean> {
   if (link === null) {
     return false
   }
-  return openWindowFor(link)
+  return await openWindowFor(link)
 }
 
 /**
@@ -66,13 +66,13 @@ export async function openDeepLinkInNewWindow(href: string): Promise<boolean> {
   if (link === null || link.kind === 'capture') {
     return false
   }
-  return openWindowFor(href)
+  return await openWindowFor(href)
 }
 
 async function openWindowFor(link: string): Promise<boolean> {
   const pending = pendingWindowOpens.get(link)
   if (pending !== undefined) {
-    return pending
+    return await pending
   }
 
   const opening = (async (): Promise<boolean> => {
@@ -90,5 +90,5 @@ async function openWindowFor(link: string): Promise<boolean> {
       pendingWindowOpens.delete(link)
     }
   })
-  return opening
+  return await opening
 }

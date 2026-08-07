@@ -210,7 +210,7 @@ describe('focused note menu dispatch', () => {
     const dispatch = vi.fn()
     setMenuCommandDispatch(dispatch)
     getAllWebviewWindows.mockResolvedValue([
-      { label: 'closing', isFocused: vi.fn(async () => Promise.reject(new Error('closed'))) },
+      { label: 'closing', isFocused: vi.fn(async () => await Promise.reject(new Error('closed'))) },
       { label: 'note-1', isFocused: vi.fn(async () => true) },
     ])
 

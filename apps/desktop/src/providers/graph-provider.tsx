@@ -388,7 +388,7 @@ export function GraphProvider({
         setError(errorMessage(err))
         return false
       }
-      return openRecent(root)
+      return await openRecent(root)
     },
     [openRecent],
   )

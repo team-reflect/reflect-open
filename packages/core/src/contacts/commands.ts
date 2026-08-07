@@ -47,7 +47,7 @@ export type ContactMatch = z.infer<typeof contactMatchSchema>
 
 /** The current Contacts permission state. Never prompts. */
 export async function contactsAuthorizationStatus(): Promise<ContactsAuthorization> {
-  return call('contacts_authorization_status', {}, contactsAuthorizationSchema)
+  return await call('contacts_authorization_status', {}, contactsAuthorizationSchema)
 }
 
 /**
@@ -55,12 +55,12 @@ export async function contactsAuthorizationStatus(): Promise<ContactsAuthorizati
  * decided) and report whether access is granted.
  */
 export async function requestContactsAccess(): Promise<boolean> {
-  return call('contacts_request_access', {}, z.boolean())
+  return await call('contacts_request_access', {}, z.boolean())
 }
 
 /** Unified contacts with an email address matching `email`. */
 export async function lookupContactsByEmail(email: string): Promise<ContactMatch[]> {
-  return call('contacts_lookup_by_email', { email }, z.array(contactMatchSchema))
+  return await call('contacts_lookup_by_email', { email }, z.array(contactMatchSchema))
 }
 
 /**
@@ -69,5 +69,5 @@ export async function lookupContactsByEmail(email: string): Promise<ContactMatch
  * exact-match policy through `matchContactForTitle`.
  */
 export async function lookupContactsByName(name: string): Promise<ContactMatch[]> {
-  return call('contacts_lookup_by_name', { name }, z.array(contactMatchSchema))
+  return await call('contacts_lookup_by_name', { name }, z.array(contactMatchSchema))
 }

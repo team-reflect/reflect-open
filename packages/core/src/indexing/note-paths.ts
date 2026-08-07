@@ -32,7 +32,7 @@ async function pathTaken(path: string): Promise<boolean> {
   if (row !== undefined) {
     return true
   }
-  return noteExists(path)
+  return await noteExists(path)
 }
 
 /**
@@ -73,7 +73,7 @@ export async function availableTemplatePath(
   slug: string,
   taken: (path: string) => Promise<boolean> = pathTaken,
 ): Promise<string> {
-  return probeNotePath(slug, taken, null, templatePath)
+  return await probeNotePath(slug, taken, null, templatePath)
 }
 
 /**
@@ -87,7 +87,7 @@ export async function templateSlugPathForTitle(
   title: string,
   taken: (candidate: string) => Promise<boolean> = pathTaken,
 ): Promise<string> {
-  return probeNotePath(slugForTitle(title), taken, path, templatePath)
+  return await probeNotePath(slugForTitle(title), taken, path, templatePath)
 }
 
 /**
@@ -101,5 +101,5 @@ export async function slugPathForTitle(
   title: string,
   taken: (candidate: string) => Promise<boolean> = pathTaken,
 ): Promise<string> {
-  return probeNotePath(slugForTitle(title), taken, path)
+  return await probeNotePath(slugForTitle(title), taken, path)
 }

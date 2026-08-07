@@ -11,7 +11,7 @@ const voidSchema = z.null()
  * come back fully defaulted, never as an error.
  */
 export async function loadSettings(): Promise<Settings> {
-  return call('settings_load', {}, settingsSchema)
+  return await call('settings_load', {}, settingsSchema)
 }
 
 /**

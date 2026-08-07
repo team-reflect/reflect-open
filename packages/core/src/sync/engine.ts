@@ -244,7 +244,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       // landing mid-cycle must still get its fetch+merge, not be downgraded
       // to a push-only pass.
       rerunMode = rerunMode === 'full' || mode === 'full' ? 'full' : 'push'
-      return running
+      return await running
     }
     running = (async () => {
       const remoteChangeTasks: Promise<void>[] = []
@@ -287,7 +287,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         }
       }
     })()
-    return running
+    return await running
   }
 
   async function cycle(
@@ -339,7 +339,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   /** Merge fetched changes and start any changed-file notification. */
   async function merge(remoteChanges: (changes: ChangedFile[]) => void): Promise<{ kind: string }> {
-    return step(gitMergeRemote(options.generation), (outcome) => {
+    return await step(gitMergeRemote(options.generation), (outcome) => {
       // The command may already have rewritten files before suspension. Fan
       // those changes out before the boundary gate stops subsequent Git work.
       if (outcome.changedFiles.length > 0) {

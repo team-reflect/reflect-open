@@ -117,7 +117,7 @@ async function titleHasNote(title: string): Promise<boolean> {
   if (resolution.kind === 'resolved') {
     return true
   }
-  return noteExists(notePath(slugForTitle(title)))
+  return await noteExists(notePath(slugForTitle(title)))
 }
 
 /**
