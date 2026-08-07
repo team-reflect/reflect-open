@@ -70,6 +70,41 @@ describe('dev bridge index_reconcile_scan', () => {
   })
 })
 
+describe('dev bridge desktop boot surface', () => {
+  it('answers the desktop chooser and workspace queries with honest stand-ins', async () => {
+    const files = createDevFileStore({
+      'notes/one.md': '# One',
+      'notes/two.md': '# Two',
+    })
+    const bridge = createDevBridge({
+      platform: 'desktop',
+      files,
+      index: await createDevIndexDb(),
+    })
+
+    const recents = (await bridge.invoke('recent_graphs', {})) as Array<Record<string, unknown>>
+    expect(recents).toHaveLength(1)
+    expect(recents[0]).toMatchObject({ root: '/dev-graph', name: 'Dev Graph' })
+    expect(recents[0]!['openedMs']).toEqual(expect.any(Number))
+
+    await expect(bridge.invoke('icloud_status', {})).resolves.toEqual({
+      available: false,
+      documentsRoot: null,
+      existingGraphRoots: [],
+    })
+    await expect(bridge.invoke('embed_status', {})).resolves.toEqual({
+      status: 'failed',
+      message: 'embeddings are unavailable in browser dev',
+    })
+    await expect(bridge.invoke('vault_scan_stats', { generation: 1 })).resolves.toEqual({
+      notes: 2,
+      attachments: 0,
+      skipped: 0,
+    })
+    await expect(bridge.invoke('list_attachments', { generation: 1 })).resolves.toEqual([])
+  })
+})
+
 describe('dev bridge background task parity', () => {
   it('reports native background assertions as unavailable and accepts cleanup', async () => {
     const bridge = createDevBridge({
