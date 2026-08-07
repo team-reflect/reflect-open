@@ -45,7 +45,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 // A browser-mode module mock materializes value exports once, so this file
 // keeps the flag statically true; the platform-hidden test lives in
 // `sync-section-non-macos.test.tsx`.
-vi.mock('@/lib/platform', () => ({ isMacosDesktop: true }))
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: true, isNativeShell: () => true }))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: graph.current, openRecent: graph.openRecent }),
 }))

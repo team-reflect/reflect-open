@@ -19,7 +19,7 @@ const openNoteFindForPath = vi.hoisted(() => vi.fn(() => true))
 const findNextInNote = vi.hoisted(() => vi.fn())
 const findPreviousInNote = vi.hoisted(() => vi.fn())
 
-vi.mock('@/lib/platform', () => ({ isMacosDesktop: true }))
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: true, isNativeShell: () => false }))
 vi.mock('@/providers/note-find-provider', () => ({
   useNoteFindActions: () => ({
     openForPath: openNoteFindForPath,

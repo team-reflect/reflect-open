@@ -13,6 +13,10 @@ const sync = vi.hoisted(() => ({
 }))
 vi.mock('@/providers/sync-provider', () => ({ useSync: () => sync }))
 vi.mock('@tauri-apps/plugin-http', () => ({ fetch: vi.fn() }))
+vi.mock('@/lib/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/platform')>()),
+  isNativeShell: () => true,
+}))
 vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn() }))
 const httpFetch = vi.mocked(tauriFetch)
 const openedUrls = vi.mocked(openUrl)

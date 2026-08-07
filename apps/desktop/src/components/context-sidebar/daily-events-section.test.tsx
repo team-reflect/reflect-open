@@ -9,7 +9,7 @@ import { DailyEventsSection } from './daily-events-section'
 
 // The calendar queries only run in the macOS desktop webview; the test
 // browser is not it either, so the platform check is mocked on.
-vi.mock('@/lib/platform', () => ({ isMacosDesktop: true }))
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: true, isNativeShell: () => true }))
 
 // The add-meeting dialog reads the write generation from the graph provider.
 vi.mock('@/providers/graph-provider', () => ({
