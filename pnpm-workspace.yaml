@@ -12,10 +12,6 @@ allowBuilds:
 
 dedupePeers: true
 
-# Temporary while @meowdown/* points at pkg.pr.new snapshots: the snapshot
-# tarballs reference each other by URL. Remove with the next meowdown release.
-blockExoticSubdeps: false
-
 strictPeerDependencies: true
 
 ignoreWorkspaceRootCheck: true

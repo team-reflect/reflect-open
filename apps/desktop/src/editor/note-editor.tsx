@@ -395,7 +395,15 @@ export function NoteEditor({
     // Touch surfaces deliver the tap's `touchend` instead of a click —
     // meowdown cancels it so iOS WebKit can't focus the editor (and raise
     // the keyboard) under the opening lightbox.
-    ({ src, alt, event }: { src: string; alt: string; event: MouseEvent | TouchEvent }) => {
+    ({
+      src,
+      alt,
+      event,
+    }: {
+      src: string
+      alt: string
+      event: MouseEvent | TouchEvent | KeyboardEvent
+    }) => {
       const displayUrl = resolveImageUrlRef.current?.(src) ?? null
       if (displayUrl === null) {
         return
