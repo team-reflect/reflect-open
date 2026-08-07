@@ -9,6 +9,7 @@ import { WindowDragRegion } from '@/components/window-drag-region'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useMainWindowEffect } from '@/hooks/use-main-window-effect'
 import { startDeepLinkListener } from '@/lib/deep-links/intake'
+import { isNativeShell } from '@/lib/platform'
 import { trackSubscriptions } from '@/lib/subscriptions'
 import { GraphProvider } from '@/providers/graph-provider'
 import { SidebarWidthEffect } from '@/providers/sidebar-width'
@@ -28,7 +29,7 @@ export function DesktopRoot(): ReactElement {
   // (in-note `reflect://` clicks still work — `dispatchDeepLink` and the
   // handler are per-webview state).
   useMainWindowEffect(() => {
-    if (!hasBridge()) {
+    if (!isNativeShell()) {
       return
     }
     startDeepLinkListener().catch((cause: unknown) => {

@@ -1,10 +1,5 @@
-import {
-  closeNoteWindows,
-  errorMessage,
-  hasBridge,
-  isMobilePlatform,
-  type AppPlatform,
-} from '@reflect/core'
+import { closeNoteWindows, errorMessage, isMobilePlatform, type AppPlatform } from '@reflect/core'
+import { isNativeShell } from '@/lib/platform'
 
 /**
  * Close every note window before a graph switch or delete replaces the
@@ -16,7 +11,7 @@ import {
  * browser dev, where secondary windows don't exist.
  */
 export async function closeSecondaryWindows(platform: AppPlatform): Promise<void> {
-  if (isMobilePlatform(platform) || !hasBridge()) {
+  if (isMobilePlatform(platform) || !isNativeShell()) {
     return
   }
   try {

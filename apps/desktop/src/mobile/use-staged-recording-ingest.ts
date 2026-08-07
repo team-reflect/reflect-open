@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { hasBridge } from '@reflect/core'
 import { z } from 'zod'
+import { isNativeShell } from '@/lib/platform'
 import {
   claimStagedPath,
   isStagedPathClaimed,
@@ -38,7 +38,7 @@ export function useStagedRecordingIngest(
 ): void {
   const scanningRef = useRef(false)
   useEffect(() => {
-    if (!hasBridge()) {
+    if (!isNativeShell()) {
       return
     }
     let disposed = false

@@ -1,5 +1,5 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { hasBridge } from '@reflect/core'
+import { isNativeShell } from '@/lib/platform'
 
 /**
  * Set this webview's OS window title. Best-effort and shell-only: browser
@@ -8,7 +8,7 @@ import { hasBridge } from '@reflect/core'
  * ⌘-backtick cycling can tell N note windows apart.
  */
 export function setWindowTitle(title: string): void {
-  if (!hasBridge()) {
+  if (!isNativeShell()) {
     return
   }
   try {
