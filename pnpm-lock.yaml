@@ -287,8 +287,8 @@ importers:
         specifier: ^3.0.12
         version: 3.0.16(zod@4.4.3)
       '@meowdown/markdown':
-        specifier: ^0.64.3
-        version: 0.64.3
+        specifier: ^0.65.0
+        version: 0.65.0
       '@reflect/db':
         specifier: workspace:*
         version: link:../db
@@ -1129,9 +1129,6 @@ packages:
 
   '@meowdown/core@0.65.0':
     resolution: {integrity: sha512-FYT7RgyGI3If2osFGMxP+VF6XRa1VXtdbc+y/YFxAM4IypyNkRbGefv+YA2rYEtnUYwtI/SLARQZM40cwmedMA==}
-
-  '@meowdown/markdown@0.64.3':
-    resolution: {integrity: sha512-IX2yhOpGH6HPpplHTD5xsppRWF2ujBFkUnf1SGRnTaP9P+SZ0+gDG+UaNL+Gj2pJQwodtFnCpFwAyJP5yAkrzg==}
 
   '@meowdown/markdown@0.65.0':
     resolution: {integrity: sha512-E0h1sxdr9BlTU7PFtm0lwIsOclwYkYzg+VGGbJjHHCB/00/EvruzhzYFYW2OSA4YslHSAadH5CWqoecvlWp1qQ==}
@@ -7403,11 +7400,6 @@ snapshots:
       - supports-color
       - y-prosemirror
       - yjs
-
-  '@meowdown/markdown@0.64.3':
-    dependencies:
-      '@lezer/common': 1.5.2
-      '@lezer/markdown': 1.7.2
 
   '@meowdown/markdown@0.65.0':
     dependencies:
