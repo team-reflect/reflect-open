@@ -12,6 +12,7 @@
 //! [`calendar`] (read-only Apple Calendar access),
 //! [`contacts`] (live Apple Contacts lookups),
 //! [`menu`] (the macOS app menu, incl. Paste and Match Style),
+//! `text_checker` (the macOS webview's spell-check defaults),
 //! [`error`] (the shared error contract).
 
 mod background_task;
@@ -34,6 +35,8 @@ mod recents;
 mod secrets;
 mod settings;
 mod skill;
+#[cfg(target_os = "macos")]
+mod text_checker;
 mod windows;
 
 // The watcher and the embedding runtime are desktop capabilities (Plan 19):
@@ -124,6 +127,11 @@ fn init_tracing() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     init_tracing();
+
+    // Ordering: before the first webview is created (see the module docs).
+    #[cfg(target_os = "macos")]
+    text_checker::apply_defaults_once();
+
     let builder = tauri::Builder::default();
 
     // Single-instance must be the first plugin so a second launch is caught
