@@ -13,19 +13,11 @@ const getNote = vi.hoisted(() => vi.fn())
 const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
 const toggleNotePrivate = vi.hoisted(() => vi.fn(async () => true))
 const deleteOpenNote = vi.hoisted(() => vi.fn(async () => {}))
-const joinPath = vi.hoisted(() => vi.fn(async (root: string, path: string) => `${root}/${path}`))
-const operationDone = vi.hoisted(() => vi.fn())
 const operationFail = vi.hoisted(() => vi.fn())
 const startOperation = vi.hoisted(() =>
-  vi.fn(() => ({ progress: vi.fn(), done: operationDone, fail: operationFail })),
+  vi.fn(() => ({ progress: vi.fn(), done: vi.fn(), fail: operationFail })),
 )
 const isApplePlatform = vi.hoisted(() => vi.fn(() => false))
-const useGraph = vi.hoisted(() =>
-  vi.fn<() => { graph: { root: string; name: string; generation: number } | null }>(() => ({
-    graph: { root: '/g', name: 'g', generation: 7 },
-  })),
-)
-vi.mock('@tauri-apps/api/path', () => ({ join: joinPath }))
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
@@ -40,7 +32,9 @@ vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
 vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
 vi.mock('@/lib/note-delete', () => ({ deleteOpenNote }))
 vi.mock('@/lib/operations', () => ({ startOperation }))
-vi.mock('@/providers/graph-provider', () => ({ useGraph }))
+vi.mock('@/providers/graph-provider', () => ({
+  useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 7 } }),
+}))
 
 async function renderSection(path: string, showTrash = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -64,25 +58,12 @@ beforeEach(() => {
   toggleNotePrivate.mockReset().mockResolvedValue(true)
   deleteOpenNote.mockReset().mockResolvedValue(undefined)
   startOperation.mockClear()
-  joinPath.mockReset().mockImplementation(async (root, path) => `${root}/${path}`)
-  operationDone.mockClear()
   operationFail.mockClear()
   isApplePlatform.mockReturnValue(false)
-  useGraph.mockReset().mockReturnValue({
-    graph: { root: '/g', name: 'g', generation: 7 },
-  })
-  Reflect.deleteProperty(navigator, 'clipboard')
 })
 
 function noteRow(path: string, isPrivate: boolean, title = 'A') {
   return { path, title, dailyDate: null, isPrivate }
-}
-
-function stubClipboard(writeText: (text: string) => Promise<void>): void {
-  Object.defineProperty(navigator, 'clipboard', {
-    value: { writeText },
-    configurable: true,
-  })
 }
 
 describe('NoteActionsSection pin toggle', () => {
@@ -213,71 +194,6 @@ describe('NoteActionsSection deep-link action', () => {
   it('does not offer Copy deep link in note actions', async () => {
     const view = await renderSection('notes/a.md')
     expect(view.getByRole('button', { name: /Copy deep link/ }).query()).toBeNull()
-    await view.unmount()
-  })
-})
-
-describe('NoteActionsSection copy-path action', () => {
-  it('copies the absolute path of a regular note', async () => {
-    const writeText = vi.fn(async () => {})
-    stubClipboard(writeText)
-    const view = await renderSection('notes/a.md')
-
-    await userEvent.click(view.getByRole('button', { name: 'Copy note path' }))
-
-    await vi.waitFor(() => expect(joinPath).toHaveBeenCalledWith('/g', 'notes/a.md'))
-    expect(writeText).toHaveBeenCalledWith('/g/notes/a.md')
-    expect(startOperation).toHaveBeenCalledWith('Note path copied')
-    expect(operationDone).toHaveBeenCalled()
-    await view.unmount()
-  })
-
-  it('copies the absolute path of a daily note', async () => {
-    const writeText = vi.fn(async () => {})
-    stubClipboard(writeText)
-    const view = await renderSection('daily/2026-06-10.md')
-
-    await userEvent.click(view.getByRole('button', { name: 'Copy note path' }))
-
-    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('/g/daily/2026-06-10.md'))
-    await view.unmount()
-  })
-
-  it('surfaces clipboard failures through the operations status', async () => {
-    stubClipboard(vi.fn(async () => await Promise.reject(new Error('Document is not focused'))))
-    const view = await renderSection('notes/a.md')
-
-    await userEvent.click(view.getByRole('button', { name: 'Copy note path' }))
-
-    await vi.waitFor(() => expect(startOperation).toHaveBeenCalledWith('Copying note path'))
-    expect(operationFail).toHaveBeenCalledWith('Document is not focused')
-    await view.unmount()
-  })
-
-  it('surfaces path-resolution failures through the operations status', async () => {
-    joinPath.mockRejectedValueOnce(new Error('Path unavailable'))
-    stubClipboard(vi.fn(async () => {}))
-    const view = await renderSection('notes/a.md')
-
-    await userEvent.click(view.getByRole('button', { name: 'Copy note path' }))
-
-    await vi.waitFor(() => expect(startOperation).toHaveBeenCalledWith('Copying note path'))
-    expect(operationFail).toHaveBeenCalledWith('Path unavailable')
-    await view.unmount()
-  })
-
-  it('reports when no graph is open', async () => {
-    useGraph.mockReturnValue({ graph: null })
-    const writeText = vi.fn(async () => {})
-    stubClipboard(writeText)
-    const view = await renderSection('notes/a.md')
-
-    await userEvent.click(view.getByRole('button', { name: 'Copy note path' }))
-
-    expect(startOperation).toHaveBeenCalledWith('Copying note path')
-    expect(operationFail).toHaveBeenCalledWith('No graph is open')
-    expect(joinPath).not.toHaveBeenCalled()
-    expect(writeText).not.toHaveBeenCalled()
     await view.unmount()
   })
 })

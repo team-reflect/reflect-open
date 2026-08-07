@@ -27,6 +27,7 @@ function contextFor(notePath: string | null, generation: number | null): Command
     switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
     generation: () => generation,
+    graphRoot: () => '/g',
     openPalette: vi.fn(),
     openShortcuts: vi.fn(),
     openTemplatePicker: vi.fn(),

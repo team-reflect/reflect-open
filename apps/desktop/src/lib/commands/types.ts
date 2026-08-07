@@ -44,6 +44,8 @@ export interface CommandContext {
    * `graph.generation` instead; no current command needs that one.
    */
   generation: () => number | null
+  /** Absolute root of the open graph, or null when none is open. */
+  graphRoot: () => string | null
   /** Open the ⌘K palette (optionally pre-filled). */
   openPalette: (query?: string) => void
   /** Open the ⌘/ shortcuts cheat-sheet. */
