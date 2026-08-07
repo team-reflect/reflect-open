@@ -16,7 +16,7 @@
   },
   "devDependencies": {
     "@ocavue/tsconfig": "^0.7.1",
-    "@types/better-sqlite3": "^7.6.13",
+    "@types/better-sqlite3": "^9.6.0",
     "better-sqlite3": "^12.11.1",
     "kysely-codegen": "^0.20.0",
     "sqlite-vec": "^0.1.9",
