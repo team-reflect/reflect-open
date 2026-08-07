@@ -173,7 +173,7 @@ importers:
         specifier: 3.53.0-build1
         version: 3.53.0-build1
       '@tailwindcss/vite':
-        specifier: ^4.3.1
+        specifier: ^4.3.3
         version: 4.3.3(vite@8.2.0)
       '@tauri-apps/cli':
         specifier: ^2.11.4
@@ -200,7 +200,7 @@ importers:
         specifier: ^4.16.0
         version: 4.16.0(supports-color@7.2.0)(typescript@6.0.3)
       tailwindcss:
-        specifier: ^4.3.1
+        specifier: ^4.3.3
         version: 4.3.3
       typescript:
         specifier: ~6.0.3
@@ -246,7 +246,7 @@ importers:
         version: 4.4.3
     devDependencies:
       '@tailwindcss/vite':
-        specifier: ^4.3.1
+        specifier: ^4.3.3
         version: 4.3.3(vite@8.2.0)
       '@types/react':
         specifier: ^19.2.17
@@ -258,7 +258,7 @@ importers:
         specifier: ^1.2.2
         version: 1.2.2(@rolldown/plugin-babel@0.2.3)(babel-plugin-react-compiler@1.0.0)(vite@8.2.0)(wxt@0.20.27)
       tailwindcss:
-        specifier: ^4.3.1
+        specifier: ^4.3.3
         version: 4.3.3
       typescript:
         specifier: ~6.0.3
