@@ -42,6 +42,8 @@ export function parseDeepLink(raw: string): DeepLink | null {
     }
     case 'note':
       return argument === '' ? null : { kind: 'openNote', target: argument }
+    case 'preview':
+      return previewOpenLink(url, argument)
     case 'append':
       return captureLink('append', url, argument)
     case 'checkbox':
@@ -104,4 +106,17 @@ function captureLink(capture: TextCaptureKind, url: URL, argument: string): Deep
     return null
   }
   return { kind: 'capture', capture, text }
+}
+
+/**
+ * The resident-preview link: `preview/open?path=<graph-relative note path>`
+ * (percent-decoded by `searchParams`). Any other path remainder or a missing
+ * or empty `path` rejects — the grammar names exactly one shape.
+ */
+function previewOpenLink(url: URL, argument: string): DeepLink | null {
+  if (argument !== 'open') {
+    return null
+  }
+  const path = url.searchParams.get('path')
+  return path !== null && path.length > 0 ? { kind: 'preview', path } : null
 }

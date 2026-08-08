@@ -7,6 +7,7 @@ import { NoteContextSidebar } from '@/components/context-sidebar/note-context-si
 import type { ContextSidebarTarget } from '@/components/context-sidebar/sidebar-route'
 import { EmbeddingsSync } from '@/components/embeddings-sync'
 import { NoteFindBar } from '@/components/note-find-bar'
+import { PreviewContextSidebar } from '@/components/preview/preview-context-sidebar'
 import { RouteContent } from '@/components/route-content'
 import { ShortcutsDialog } from '@/components/shortcuts-dialog'
 import { Sidebar } from '@/components/sidebar/sidebar'
@@ -14,6 +15,7 @@ import { SidebarResizeHandle } from '@/components/sidebar-resize-handle'
 import { TemplateCreateDialog } from '@/components/templates/template-create-dialog'
 import { TemplatePicker } from '@/components/templates/template-picker'
 import { useDailyContextTarget } from '@/providers/focused-daily-provider'
+import { usePreviewPanel } from '@/providers/preview-panel-provider'
 import { useSidebar } from '@/providers/sidebar-provider'
 import { useAppShortcuts } from '@/routing/app-shortcuts'
 
@@ -49,12 +51,22 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
   // In the daily stream the route stays put while focus moves between days, so
   // the panel follows the focused day and snaps back on navigation.
   const contextTarget = useDailyContextTarget()
+  // An open preview panel replaces the route's context sidebar — it is the
+  // user's explicit focus (a PDF/note opened from a link), and navigation
+  // clears it (PreviewPanelProvider) so the route's panel returns.
+  const { target: previewTarget, close: closePreview } = usePreviewPanel()
 
   return (
     <AppShell
       sidebar={collapsed ? undefined : <Sidebar graph={graph} context={commandContext} />}
       sidebarEdge={<SidebarResizeHandle panel="workspace" />}
-      context={collapsed ? undefined : contextSidebarFor(contextTarget)}
+      context={
+        collapsed ? undefined : previewTarget !== null ? (
+          <PreviewContextSidebar target={previewTarget} onClose={closePreview} />
+        ) : (
+          contextSidebarFor(contextTarget)
+        )
+      }
       contextEdge={<SidebarResizeHandle panel="context" />}
     >
       <div className="relative flex h-full flex-col">

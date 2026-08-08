@@ -14,6 +14,12 @@ export interface DeepLinkIo {
   /** `GraphInfo.generation` — pins the capture spool to the issuing graph. */
   generation: number
   /**
+   * Open a note's resident preview in the preview panel (a
+   * `reflect://preview/open` link). Synchronous — the target is app-local UI,
+   * not a navigation — so unlike {@link navigate} it needs no staleness gate.
+   */
+  openPreview: (path: string) => void
+  /**
    * Whether the graph session or navigation intent changed while the handler
    * awaited. Note resolution queries whichever index is open when it runs, so
    * a stale result must be dropped, never navigated — it may name a homonym
@@ -87,7 +93,11 @@ export async function handleDeepLink(url: string, io: DeepLinkIo): Promise<void>
         return
       }
       startOperation(label).done()
+      return
     }
+    case 'preview':
+      io.openPreview(link.path)
+      return
   }
 }
 

@@ -38,10 +38,12 @@ import {
   type LightboxImage,
 } from '@/editor/image-lightbox'
 import { isOpenableExternalUrl } from '@/editor/open-external-link'
-import { isTouchEditorSurface } from '@/lib/platform-surface'
-import { useLightboxTransition } from '@/editor/use-lightbox-transition'
+import { parsePdfHref } from '@/lib/annotations/pdf-href'
 import { isDeepLinkUrl } from '@/lib/deep-links/parse'
 import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link'
+import { isTouchEditorSurface } from '@/lib/platform-surface'
+import { useSetPreviewPanelTarget } from '@/providers/preview-panel-provider'
+import { useLightboxTransition } from '@/editor/use-lightbox-transition'
 import { cn } from '@/lib/utils'
 
 type WikilinkHoverRenderer = (hit: WikilinkHoverHit) => ReactNode | Promise<ReactNode>
@@ -259,6 +261,10 @@ export function NoteEditor({
 }: NoteEditorProps): ReactElement {
   const innerRef = useRef<EditorHandle>(null)
   const followDeepLink = useFollowDeepLink()
+  // The stable preview-panel setter: the editor only opens the panel, so
+  // consuming the setter context — not the value — keeps it out of the
+  // target-change re-renders.
+  const setPreviewPanelTarget = useSetPreviewPanelTarget()
 
   // Latest callbacks, read through refs so a changing prop identity never
   // rebuilds meowdown's extensions (the uncontrolled-editor contract).
@@ -345,6 +351,19 @@ export function NoteEditor({
     // The event may also be the Mod-Enter key press that followed the link
     // (meowdown ≥0.33).
     ({ href, event }: { href: string; event: MouseEvent | KeyboardEvent }) => {
+      // A graph-relative `assets/….pdf` link — optionally `#page=N`-targeted,
+      // the annotation lane's migration links — opens in the in-app PDF
+      // preview panel (annotation-aware) instead of the OS asset opener.
+      const pdfHref = parsePdfHref(href)
+      if (pdfHref !== null) {
+        event.preventDefault()
+        setPreviewPanelTarget({
+          kind: 'pdf',
+          assetPath: pdfHref.path,
+          ...(pdfHref.page !== undefined ? { page: pdfHref.page } : {}),
+        })
+        return
+      }
       // A graph-relative `assets/…` href (an attachment link) opens through
       // the generation-pinned asset command, never the URL opener — which
       // would receive a meaningless relative string.
@@ -374,7 +393,7 @@ export function NoteEditor({
         console.error('open link failed:', errorMessage(cause))
       })
     },
-    [followDeepLink],
+    [followDeepLink, setPreviewPanelTarget],
   )
   // A file pill is a claimed link, so a click on it routes exactly like a
   // link click: `assets/…` through the asset opener, anything else through

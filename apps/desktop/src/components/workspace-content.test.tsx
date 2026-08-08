@@ -14,6 +14,10 @@ const workspaceState = vi.hoisted<WorkspaceState>(() => ({
   target: { kind: 'daily', date: '2026-07-11' },
 }))
 
+const previewPanelState = vi.hoisted(() => ({
+  target: null as { kind: string; assetPath?: string; page?: number; path?: string } | null,
+}))
+
 vi.mock('@/components/command-palette/command-palette', () => ({
   CommandPalette: () => null,
 }))
@@ -27,6 +31,13 @@ vi.mock('@/components/context-sidebar/note-context-sidebar', () => ({
 }))
 vi.mock('@/components/embeddings-sync', () => ({ EmbeddingsSync: () => null }))
 vi.mock('@/components/note-find-bar', () => ({ NoteFindBar: () => null }))
+// Implemented by the parallel preview lane; a mock keeps this suite green
+// until `preview-context-sidebar` lands.
+vi.mock('@/components/preview/preview-context-sidebar', () => ({
+  PreviewContextSidebar: ({ target }: { target: unknown }) => (
+    <div data-testid="preview-context">{JSON.stringify(target)}</div>
+  ),
+}))
 vi.mock('@/components/route-content', () => ({ RouteContent: () => <div>Route content</div> }))
 vi.mock('@/components/shortcuts-dialog', () => ({ ShortcutsDialog: () => null }))
 vi.mock('@/components/sidebar/sidebar', () => ({
@@ -38,6 +49,13 @@ vi.mock('@/components/templates/template-create-dialog', () => ({
 vi.mock('@/components/templates/template-picker', () => ({ TemplatePicker: () => null }))
 vi.mock('@/providers/focused-daily-provider', () => ({
   useDailyContextTarget: () => workspaceState.target,
+}))
+vi.mock('@/providers/preview-panel-provider', () => ({
+  usePreviewPanel: () => ({
+    target: previewPanelState.target,
+    open: vi.fn(),
+    close: vi.fn(),
+  }),
 }))
 vi.mock('@/providers/sidebar-provider', () => ({
   useSidebar: () => ({ collapsed: workspaceState.collapsed, toggleSidebar: vi.fn() }),
@@ -59,6 +77,7 @@ const GRAPH: GraphInfo = { root: '/notes', name: 'Notes', generation: 1 }
 beforeEach(async () => {
   workspaceState.collapsed = false
   workspaceState.target = { kind: 'daily', date: '2026-07-11' }
+  previewPanelState.target = null
   // The context sidebar is `hidden lg:block`, so it only renders on a
   // desktop-width viewport.
   await page.viewport(1280, 800)
@@ -94,6 +113,29 @@ describe('WorkspaceContent', () => {
 
     workspaceState.collapsed = true
     await view.rerender(<WorkspaceContent graph={GRAPH} />)
+    expect(view.getByRole('complementary', { name: 'Context' }).query()).toBeNull()
+  })
+
+  it('replaces the route context sidebar with the preview panel while a target is open', async () => {
+    previewPanelState.target = { kind: 'pdf', assetPath: 'assets/paper.pdf', page: 3 }
+    const view = await render(<WorkspaceContent graph={GRAPH} />)
+
+    expect(view.getByTestId('preview-context').element().textContent).toBe(
+      JSON.stringify({ kind: 'pdf', assetPath: 'assets/paper.pdf', page: 3 }),
+    )
+    expect(view.getByTestId('daily-context').query()).toBeNull()
+
+    previewPanelState.target = null
+    await view.rerender(<WorkspaceContent graph={GRAPH} />)
+    expect(view.getByTestId('daily-context').element().textContent).toBe('2026-07-11')
+    expect(view.getByTestId('preview-context').query()).toBeNull()
+  })
+
+  it('hides the preview panel alongside the rest of the context region when collapsed', async () => {
+    previewPanelState.target = { kind: 'note', path: 'notes/project.md' }
+    workspaceState.collapsed = true
+    const view = await render(<WorkspaceContent graph={GRAPH} />)
+
     expect(view.getByRole('complementary', { name: 'Context' }).query()).toBeNull()
   })
 })

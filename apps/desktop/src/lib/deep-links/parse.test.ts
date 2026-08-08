@@ -71,6 +71,25 @@ describe('parseDeepLink', () => {
     })
   })
 
+  it('parses resident-preview links from an encoded or raw graph-relative path', () => {
+    expect(parseDeepLink('reflect://preview/open?path=notes%2Ffoo.md')).toEqual({
+      kind: 'preview',
+      path: 'notes/foo.md',
+    })
+    expect(parseDeepLink('reflect://preview/open?path=notes/foo.md')).toEqual({
+      kind: 'preview',
+      path: 'notes/foo.md',
+    })
+  })
+
+  it('rejects malformed resident-preview links', () => {
+    expect(parseDeepLink('reflect://preview')).toBeNull()
+    expect(parseDeepLink('reflect://preview/open')).toBeNull()
+    expect(parseDeepLink('reflect://preview/open?path=')).toBeNull()
+    expect(parseDeepLink('reflect://preview/other?path=notes%2Ffoo.md')).toBeNull()
+    expect(parseDeepLink('reflect://preview/open?target=notes%2Ffoo.md')).toBeNull()
+  })
+
   it('rejects an empty note target and malformed percent-encoding', () => {
     expect(parseDeepLink('reflect://note')).toBeNull()
     expect(parseDeepLink('reflect://note/')).toBeNull()

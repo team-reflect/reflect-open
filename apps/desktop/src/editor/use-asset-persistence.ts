@@ -32,6 +32,16 @@ const EXTENSION_BY_MIME: Record<string, string> = {
 }
 
 /**
+ * Strip a trailing `#fragment` / `?query` off a graph-relative reference, so a
+ * page-targeted PDF link (`assets/x.pdf#page=3`) vets, displays, and opens as
+ * the bare `assets/x.pdf` — never a path the Rust asset commands can't
+ * resolve. Every consumer of {@link isSafeAssetSource} inherits the fix.
+ */
+function stripLocationSuffix(sourcePath: string): string {
+  return sourcePath.split('#')[0]!.split('?')[0]!
+}
+
+/**
  * True for a graph-relative `assets/…` path with no traversal segments. The
  * Rust shell already guards every *write* against traversal; this guards
  * *display and open* resolution so a crafted `assets/../…` reference in note
@@ -39,10 +49,11 @@ const EXTENSION_BY_MIME: Record<string, string> = {
  * in depth).
  */
 function isSafeAssetSource(sourcePath: string): boolean {
-  if (!sourcePath.startsWith('assets/') || sourcePath.includes('\\')) {
+  const path = stripLocationSuffix(sourcePath)
+  if (!path.startsWith('assets/') || path.includes('\\')) {
     return false
   }
-  return sourcePath
+  return path
     .split('/')
     .every((segment, index) =>
       index === 0

@@ -1,6 +1,11 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["**/*.md", "**/*.gen.*", "**/schema.json"],
+  "ignorePatterns": [
+    "**/*.md",
+    "**/*.gen.*",
+    "**/schema.json",
+    "apps/desktop/public/pdf.worker.min.mjs"
+  ],
   "singleQuote": true,
   "semi": false
 }

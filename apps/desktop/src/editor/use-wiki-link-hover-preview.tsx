@@ -1,8 +1,8 @@
 import { useCallback, type ReactNode } from 'react'
 import type { WikilinkHoverHit } from '@meowdown/core'
-import { resolveExistingWikiTarget, splitFrontmatter, type DateFormat } from '@reflect/core'
+import { resolveExistingWikiTarget, type DateFormat } from '@reflect/core'
 import { WikiLinkHoverPreview } from '@/components/wiki-link-hover-preview'
-import { readExistingNoteSource } from '@/lib/read-existing-note-source'
+import { resolveNotePreviewBody } from '@/lib/resolve-note-preview-body'
 
 interface WikiLinkHoverPreviewOptions {
   generation: number | null
@@ -62,11 +62,11 @@ export function useWikiLinkHoverPreview({
         if (resolution.kind !== 'resolved') {
           return null
         }
-        const source = await readExistingNoteSource(resolution.path, generation)
+        const preview = await resolveNotePreviewBody(resolution.path, generation)
         return (
           <WikiLinkHoverPreview
             path={resolution.path}
-            markdown={splitFrontmatter(source).body}
+            markdown={preview.body}
             dateFormat={dateFormat}
             resolveImageUrl={resolvePreviewImageUrl}
           />

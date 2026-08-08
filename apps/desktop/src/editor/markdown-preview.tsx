@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
+import type { LinkClickPayload } from '@meowdown/core'
 import { MarkdownView } from '@meowdown/react'
 import { useOpenExternalLink } from '@/editor/open-external-link'
 import { cn } from '@/lib/utils'
@@ -26,6 +27,14 @@ interface MarkdownPreviewProps {
    */
   onWikiLinkClick?: (target: string, event?: MouseEvent | KeyboardEvent) => void
   /**
+   * Intercept a rendered link click, replacing the default handling (the OS
+   * opener for external URLs; scheme-less and asset hrefs are no-ops). The
+   * handler owns forwarding what it doesn't consume — the resident preview
+   * routes PDF and note links into the panel and defers the rest to
+   * {@link useOpenExternalLink}.
+   */
+  onLinkClick?: (href: string, event: MouseEvent | KeyboardEvent) => void
+  /**
    * Whether rendered links, images, and task checkboxes can be activated
    * (default true). A passive preview renders no anchors, focusable controls,
    * or remote embeds.
@@ -39,18 +48,21 @@ export function MarkdownPreview({
   content,
   resolveImageUrl,
   onWikiLinkClick,
+  onLinkClick,
   interactive = true,
   className,
 }: MarkdownPreviewProps): ReactElement {
   const openExternalLink = useOpenExternalLink()
-  // The resolver and click handler are read through refs so a changing prop
+  // The resolver and click handlers are read through refs so a changing prop
   // never gives MarkdownView a new callback identity (which would re-render its
   // whole tree).
   const resolveRef = useRef(resolveImageUrl)
   const navigateRef = useRef(onWikiLinkClick)
+  const linkClickRef = useRef(onLinkClick)
   useEffect(() => {
     resolveRef.current = resolveImageUrl
     navigateRef.current = onWikiLinkClick
+    linkClickRef.current = onLinkClick
   })
 
   // Hosts either always pass the handler (chat) or never do (palette
@@ -68,6 +80,21 @@ export function MarkdownPreview({
       navigateRef.current?.(payload.target, payload.event),
     [],
   )
+  // A link click suppresses the default navigation and goes to the host's
+  // handler when one is provided (the resident preview's panel routing);
+  // otherwise it keeps the current behavior — the OS opener. Stable identity
+  // so MarkdownView never re-renders its tree on a prop change.
+  const onLinkClickStable = useCallback(
+    (payload: LinkClickPayload) => {
+      if (linkClickRef.current !== undefined) {
+        payload.event.preventDefault()
+        linkClickRef.current(payload.href, payload.event)
+        return
+      }
+      openExternalLink(payload)
+    },
+    [openExternalLink],
+  )
 
   return (
     <MarkdownView
@@ -75,7 +102,7 @@ export function MarkdownPreview({
       markMode="hide"
       interactive={interactive}
       resolveImageUrl={resolveImageUrlStable}
-      {...(interactive ? { onLinkClick: openExternalLink } : {})}
+      {...(interactive ? { onLinkClick: onLinkClickStable } : {})}
       {...(navigates ? { onWikilinkClick: onWikilinkClickStable } : {})}
       className={cn('reflect-editor', className)}
     />

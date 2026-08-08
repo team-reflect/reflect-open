@@ -23,9 +23,10 @@ const operationHandle = {
   dismiss: vi.fn(),
 }
 const navigate = vi.fn()
+const openPreview = vi.fn()
 
 function handle(url: string) {
-  return handleDeepLink(url, { navigate, generation: 3 })
+  return handleDeepLink(url, { navigate, generation: 3, openPreview })
 }
 
 beforeEach(() => {
@@ -89,6 +90,7 @@ describe('handleDeepLink', () => {
     const pending = handleDeepLink('reflect://note/Project%20X', {
       navigate,
       generation: 3,
+      openPreview,
       isStale: () => stale,
     })
 
@@ -112,6 +114,7 @@ describe('handleDeepLink', () => {
     const pending = handleDeepLink('reflect://note/Project%20X', {
       navigate,
       generation: 3,
+      openPreview,
       isStale: () => stale,
     })
     stale = true
@@ -178,5 +181,14 @@ describe('handleDeepLink', () => {
     expect(operationHandle.done).not.toHaveBeenCalled()
     expect(startOperationMock).toHaveBeenCalledWith('Saving capture')
     expect(operationHandle.fail).toHaveBeenCalled()
+  })
+
+  it('opens the resident preview for a preview link without navigating', async () => {
+    await handle('reflect://preview/open?path=notes%2Ffoo.md')
+
+    expect(openPreview).toHaveBeenCalledWith('notes/foo.md')
+    expect(navigate).not.toHaveBeenCalled()
+    expect(resolveMock).not.toHaveBeenCalled()
+    expect(startOperationMock).not.toHaveBeenCalled()
   })
 })
