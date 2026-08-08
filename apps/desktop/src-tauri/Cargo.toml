@@ -115,6 +115,7 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
   "NSEvent",
   "NSMenu",
   "NSMenuItem",
+  "NSWorkspace",
 ] }
 
 # Apple Contacts integration (`contacts.rs`): live CNContactStore lookups on
