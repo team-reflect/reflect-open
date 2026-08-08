@@ -136,6 +136,7 @@ export {
   createNoteIfAbsent,
   writeAsset,
   readAsset,
+  readAssetBinary,
   openAsset,
   revealAsset,
   listDir,
@@ -158,6 +159,8 @@ export {
   captureMetaFetch,
   captureSharedInboxRelay,
   promoteCaptureScreenshot,
+  readAnnotations,
+  writeAnnotations,
 } from '../graph/commands'
 export { createAsset, importAsset } from '../graph/assets'
 export { assetFileName } from '../graph/asset-names'
