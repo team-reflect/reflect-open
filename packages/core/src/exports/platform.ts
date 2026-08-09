@@ -6,6 +6,7 @@ export {
   type Unlisten,
 } from '../ipc/bridge'
 export { call, callBinary } from '../ipc/invoke'
+export { type PluginSubscription } from '../ipc/plugin'
 export {
   getAppVersion,
   getAppPlatform,
