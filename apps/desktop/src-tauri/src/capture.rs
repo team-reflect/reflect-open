@@ -526,6 +526,9 @@ pub async fn capture_link_preview(app: tauri::AppHandle, url: String) -> AppResu
 /// 2 MiB keeps whole pages of that shape, with margin for head growth,
 /// while still bounding what this command buffers and ships over IPC.
 const META_FETCH_MAX_BYTES: usize = 2 * 1024 * 1024;
+// Compile-time floor: below 2x the measured ~690 KiB offsets, the scrape
+// silently parses zero metadata on YouTube and the bug returns.
+const _: () = assert!(META_FETCH_MAX_BYTES >= 1_400_000);
 const META_FETCH_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// The meta fetch presents as a mainstream browser navigation: sites that
@@ -650,15 +653,6 @@ mod tests {
             classify_fetch_status(url, StatusCode::FORBIDDEN),
             Some(AppError::Io { .. })
         ));
-    }
-
-    #[test]
-    fn meta_fetch_cap_clears_measured_youtube_metadata_offsets() {
-        // Measured 2026-08 with browser headers and identity encoding: YouTube
-        // watch pages put <title>/og:title at ~686-691 KiB and close <head> at
-        // ~697 KiB. Keep at least 2x that, or the scrape silently parses zero
-        // metadata there and the AI leg fabricates titles from the thumbnail.
-        assert!(META_FETCH_MAX_BYTES >= 1_400_000);
     }
 
     #[test]
