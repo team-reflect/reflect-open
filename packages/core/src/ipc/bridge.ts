@@ -1,12 +1,14 @@
 /**
- * The pluggable transport between `@reflect/core` and the native shell.
+ * The pluggable transport between `@reflect/core` and its host backend.
  *
  * `@reflect/core` is platform-agnostic: nothing in this package imports
- * `@tauri-apps/*`. A host installs a bridge once at startup — the desktop app
+ * `@tauri-apps/*`. A host installs a bridge at startup — the desktop app
  * adapts Tauri's `invoke`/`listen` (see `apps/desktop/src/lib/tauri-bridge.ts`),
- * tests install in-memory fakes via {@link setBridge}, and future hosts (the
- * CLI, Plan 14) either bring their own transport or skip IPC entirely and read
- * the index directly.
+ * plain-browser dev installs the in-memory dev bridge
+ * (`apps/desktop/src/dev/`), and tests install fakes via {@link setBridge}.
+ * A bridge answering commands does NOT imply a native shell: gates that need
+ * real plugins, custom URL schemes, or OS windows use the desktop app's
+ * `isNativeShell()` instead of {@link hasBridge}.
  */
 
 /** Tears down a subscription created by {@link IpcBridge.listen}. */
@@ -34,19 +36,45 @@ export interface IpcBridge {
 
 let activeBridge: IpcBridge | null = null
 
+/** Notified on every {@link setBridge}, so UI layers can re-read {@link hasBridge}. */
+const changeListeners = new Set<() => void>()
+
 /**
- * Install the process-wide bridge (or remove it with `null`). Call once at
- * startup, before any command binding runs.
+ * Install the process-wide bridge (or remove it with `null`), then notify
+ * {@link subscribeBridgeChanges} subscribers. The Tauri bridge installs
+ * before the first render; the browser dev bridge installs asynchronously
+ * after it, which is why UI gates must subscribe rather than sample once.
  */
 export function setBridge(bridge: IpcBridge | null): void {
   activeBridge = bridge
+  for (const listener of changeListeners) {
+    listener()
+  }
 }
 
 /**
- * True when a bridge is installed — i.e. a native shell is reachable. UI code
- * uses this to gate native-only features (e.g. the file watcher) in
- * environments like browser dev where no shell exists.
- * REVIEW: FIX the comment/docs in this file and related files
+ * Subscribe to bridge installs/removals; returns the unsubscribe function.
+ * The `useSyncExternalStore`-shaped companion to {@link hasBridge} — the
+ * desktop app's `useHasBridge()` hook builds on this pair so React gates
+ * re-render when the (possibly async) install lands.
+ */
+export function subscribeBridgeChanges(listener: () => void): Unlisten {
+  changeListeners.add(listener)
+  return () => {
+    changeListeners.delete(listener)
+  }
+}
+
+/**
+ * True when a bridge is installed — i.e. IPC commands can be answered. True
+ * in the real shell AND in browser dev once the in-memory dev bridge
+ * installs, so this means "data is reachable", never "a native shell
+ * exists" (that question is the desktop app's `isNativeShell()`). React
+ * render scope must not sample this directly (the answer would go stale
+ * when the dev bridge installs asynchronously) — components use
+ * `useHasBridge()`, which subscribes via {@link subscribeBridgeChanges}.
+ * Imperative code (event handlers, controllers) keeps calling this at its
+ * own call time.
  */
 export function hasBridge(): boolean {
   return activeBridge !== null
@@ -54,9 +82,9 @@ export function hasBridge(): boolean {
 
 /**
  * True when the installed bridge has the raw-binary transport ({@link
- * IpcBridge.invokeBinary}) — i.e. a real native shell, not the browser-dev
- * in-memory bridge. Callers use this to choose streamed binary asset IO over
- * the base64 JSON fallback.
+ * IpcBridge.invokeBinary}) — the real shell has it, the browser-dev
+ * in-memory bridge does not. Callers use this to choose streamed binary
+ * asset IO over the base64 JSON fallback.
  */
 export function hasBinaryIpc(): boolean {
   return activeBridge !== null && activeBridge.invokeBinary !== undefined

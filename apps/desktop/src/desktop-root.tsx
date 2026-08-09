@@ -1,5 +1,5 @@
 import { useEffect, type ReactElement } from 'react'
-import { hasBridge, subscribeNoteMoved } from '@reflect/core'
+import { subscribeNoteMoved } from '@reflect/core'
 import { App } from '@/app'
 import { followHealedMove } from '@/editor/move-note'
 import { OperationsStatus } from '@/components/operations-status'
@@ -7,6 +7,7 @@ import { UpdateToast } from '@/components/update-toast'
 import { Toaster } from '@/components/ui/sonner'
 import { WindowDragRegion } from '@/components/window-drag-region'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { useHasBridge } from '@/hooks/use-has-bridge'
 import { useMainWindowEffect } from '@/hooks/use-main-window-effect'
 import { startDeepLinkListener } from '@/lib/deep-links/intake'
 import { isNativeShell } from '@/lib/platform'
@@ -21,6 +22,7 @@ import { UpdateProvider } from '@/providers/update-provider'
  * chooser/workspace app — none of which exist on mobile.
  */
 export function DesktopRoot(): ReactElement {
+  const bridgeReady = useHasBridge()
   // Deep-link intake starts with the surface, not the workspace: a
   // `reflect://` URL that launched the app (or arrived on the graph chooser)
   // buffers in `intake.ts` until a graph opens. Browser dev has no plugin.
@@ -43,7 +45,7 @@ export function DesktopRoot(): ReactElement {
   // window also followed in-process; the echo is idempotent (the session no
   // longer matches `from`, and re-routing an absent entry is a no-op).
   useEffect(() => {
-    if (!hasBridge()) {
+    if (!bridgeReady) {
       return
     }
     const subscriptions = trackSubscriptions()
@@ -51,7 +53,7 @@ export function DesktopRoot(): ReactElement {
     return () => {
       subscriptions.disposeAll()
     }
-  }, [])
+  }, [bridgeReady])
 
   return (
     <UpdateProvider>

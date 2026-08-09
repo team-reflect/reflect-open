@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react'
 import { getAppPlatform, hasBridge, isMobilePlatform, type AppPlatform } from '@reflect/core'
+import { useHasBridge } from '@/hooks/use-has-bridge'
 import { warmMobileStorage } from '@/lib/mobile-boot-warm'
 
 const DesktopRoot = lazy(() =>
@@ -70,8 +71,8 @@ function readDevPlatformOverride(): DevPlatformOverride | null {
  * `pnpm dev` in a browser gets the desktop tree over the dev bridge by
  * default — an un-flagged tab boots into a seeded, workable graph instead of
  * a bridgeless empty chooser. Whether a *real* shell is present is decided at
- * the call site via `hasBridge()`: the Tauri bridge installs before the first
- * render, so a bridge at mount time means Tauri, not this harness.
+ * the call site via the bridge state: the Tauri bridge installs before the
+ * first render, so a bridge at mount time means Tauri, not this harness.
  */
 function devBridgePlatform(): AppPlatform | null {
   if (!import.meta.env.DEV || devPlatformOverride === 'none') {
@@ -89,20 +90,23 @@ function devBridgePlatform(): AppPlatform | null {
  * bridgeless). Dev builds only — production always has the Tauri bridge.
  */
 export function PlatformRoot(): ReactElement {
+  // This component drives the install itself, so it reads the reactive value
+  // once per render rather than sampling `hasBridge()` mid-render.
+  const bridgeReady = useHasBridge()
   // Hold the blank frame while the dev bridge chunk loads in plain-browser
   // dev; render the desktop tree directly when bridgeless (`?platform=none`,
   // production-in-browser). With a bridge, resolve the real platform.
   const [platform, setPlatform] = useState<AppPlatform | null>(() => {
-    if (devBridgePlatform() !== null && !hasBridge()) {
+    if (devBridgePlatform() !== null && !bridgeReady) {
       return null
     }
-    return hasBridge() ? null : 'desktop'
+    return bridgeReady ? null : 'desktop'
   })
 
   useEffect(() => {
     let active = true
     const devPlatform = devBridgePlatform()
-    if (devPlatform !== null && !hasBridge()) {
+    if (devPlatform !== null && !bridgeReady) {
       void import('@/dev/install-dev-bridge')
         .then(async (module) => {
           await module.installDevBridge(devPlatform)
@@ -122,7 +126,7 @@ export function PlatformRoot(): ReactElement {
         active = false
       }
     }
-    if (!hasBridge()) {
+    if (!bridgeReady) {
       return
     }
     void resolveAppPlatform().then((resolved) => {
@@ -133,7 +137,7 @@ export function PlatformRoot(): ReactElement {
     return () => {
       active = false
     }
-  }, [])
+  }, [bridgeReady])
 
   if (platform === null) {
     return <div className="h-screen w-screen" />

@@ -1,6 +1,6 @@
 import { useId, useState, type ReactElement, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { hasBridge, icloudStatus } from '@reflect/core'
+import { icloudStatus } from '@reflect/core'
 import { Cloud, Folder, FolderPlus } from 'lucide-react'
 import { getIsComposing } from '@meowdown/core'
 import { InlineAlert } from '@/components/inline-alert'
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { useGraphColors } from '@/hooks/use-graph-colors'
+import { useHasBridge } from '@/hooks/use-has-bridge'
 import { cleanGraphName, graphNameFromRoot, isGraphNameTaken } from '@/lib/graph-names'
 import { ICLOUD_STATUS_QUERY_KEY } from '@/lib/query-client'
 import { graphColorCss } from '@/lib/graph-colors'
@@ -201,10 +202,11 @@ function IcloudCard({
   const [typedName, setTypedName] = useState<string | null>(null)
   const [busy, setBusy] = useState<IcloudBusy>(null)
   const nameId = useId()
+  const bridgeReady = useHasBridge()
   const { data: status } = useQuery({
     queryKey: ICLOUD_STATUS_QUERY_KEY,
     queryFn: icloudStatus,
-    enabled: hasBridge(),
+    enabled: bridgeReady,
   })
 
   const pending = busy !== null

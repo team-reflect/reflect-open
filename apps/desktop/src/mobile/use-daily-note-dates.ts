@@ -1,16 +1,18 @@
 import { useMemo } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { dailyDatesInRange, hasBridge } from '@reflect/core'
+import { dailyDatesInRange } from '@reflect/core'
+import { useHasBridge } from '@/hooks/use-has-bridge'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
 /** Indexed daily-note dates in an inclusive range, ready for calendar lookup. */
 export function useDailyNoteDates(start: string, end: string): ReadonlySet<string> {
   const { graph } = useGraph()
+  const bridgeReady = useHasBridge()
   const { data } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'dailyDates', start, end],
     queryFn: () => dailyDatesInRange(start, end),
-    enabled: hasBridge() && graph !== null,
+    enabled: bridgeReady && graph !== null,
     placeholderData: keepPreviousData,
   })
 

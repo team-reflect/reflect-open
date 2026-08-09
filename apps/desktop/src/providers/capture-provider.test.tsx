@@ -17,7 +17,12 @@ const hasBridge = vi.hoisted(() => vi.fn(() => true))
 const isMobileSurface = vi.hoisted(() => vi.fn(() => false))
 
 vi.mock('@/lib/capture-controller', () => ({ createCaptureController }))
-vi.mock('@reflect/core', () => ({ captureHostRegister, captureSharedInboxRelay, hasBridge }))
+vi.mock('@reflect/core', () => ({
+  captureHostRegister,
+  captureSharedInboxRelay,
+  hasBridge,
+  subscribeBridgeChanges: () => () => {},
+}))
 vi.mock('@/lib/platform-surface', () => ({ isMobileSurface }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({

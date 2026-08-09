@@ -5,13 +5,13 @@ import {
   conflictMarkerBlockCount,
   conflictMarkerLabels,
   getNote,
-  hasBridge,
   readNote,
 } from '@reflect/core'
 import { CONFLICT_SIDE_DOT } from '@/components/conflict-note-view'
 import { InlineAlert } from '@/components/inline-alert'
 import { Button } from '@/components/ui/button'
 import { useConflictResolution } from '@/hooks/use-conflict-resolution'
+import { useHasBridge } from '@/hooks/use-has-bridge'
 import { isMobileSurface } from '@/lib/platform-surface'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
@@ -49,10 +49,11 @@ export function SyncConflictNotice({
 }: SyncConflictNoticeProps): ReactElement | null {
   const { graph } = useGraph()
   const { busy, error, resolve } = useConflictResolution(path)
+  const bridgeReady = useHasBridge()
   const { data } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, 'note-conflict', graph?.root, path],
     queryFn: async () => (await getNote(path)) ?? null,
-    enabled: hasBridge() && graph !== null,
+    enabled: bridgeReady && graph !== null,
   })
   const hasConflict = data?.hasConflict === true
   // The iCloud sweep labels marker sides with real device names (or the two
@@ -69,7 +70,7 @@ export function SyncConflictNotice({
         blocks: conflictMarkerBlockCount(source),
       }
     },
-    enabled: hasBridge() && graph !== null && hasConflict,
+    enabled: bridgeReady && graph !== null && hasConflict,
   })
 
   if (data == null || !hasConflict || graph === null) {

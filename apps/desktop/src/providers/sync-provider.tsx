@@ -7,7 +7,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { hasBridge, ReflectError, type GithubRepoRef, type GraphInfo } from '@reflect/core'
+import { ReflectError, type GithubRepoRef, type GraphInfo } from '@reflect/core'
 import {
   createBackupController,
   type BackupController,
@@ -15,6 +15,7 @@ import {
   type ConnectExistingResult,
 } from '@/lib/backup-controller'
 import { createIcloudController, isICloudRoot } from '@/lib/icloud-controller'
+import { useHasBridge } from '@/hooks/use-has-bridge'
 import { useMainWindowEffect } from '@/hooks/use-main-window-effect'
 import { isMobileSurface } from '@/lib/platform-surface'
 import { useGraph } from '@/providers/graph-provider'
@@ -75,8 +76,9 @@ export function SyncProvider({ graph, children }: SyncProviderProps): ReactEleme
   // the metadata-query watch, debounced conflict sweeps, and shadow-base
   // bookkeeping. Same per-(graph, index session) shape as the backup
   // controller; a graph outside iCloud mounts nothing.
+  const bridgeReady = useHasBridge()
   useMainWindowEffect(() => {
-    if (!hasBridge() || !isICloudRoot(graph.root)) {
+    if (!bridgeReady || !isICloudRoot(graph.root)) {
       return
     }
     const icloud = createIcloudController({
@@ -88,7 +90,7 @@ export function SyncProvider({ graph, children }: SyncProviderProps): ReactEleme
     return () => {
       icloud.dispose()
     }
-  }, [graph, indexGeneration])
+  }, [bridgeReady, graph, indexGeneration])
 
   const backup = useSyncExternalStore(
     controller?.subscribe ?? (() => () => {}),

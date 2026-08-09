@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { hasBridge, isDaily, listNotes, listNoteTags } from '@reflect/core'
+import { isDaily, listNotes, listNoteTags } from '@reflect/core'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useHasBridge } from '@/hooks/use-has-bridge'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { allNotesQueryKey, allNotesTagsQueryKey } from '@/lib/notes/all-notes-query'
 import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
@@ -52,8 +53,8 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   // The surface, so the keyboard shortcuts can scope to it (and focus it on mount).
   const rootRef = useRef<HTMLDivElement>(null)
 
-  // REVIEW: DO NOT CALL hasBridge() directly in this and in any React component. add a new hook useHasBridge() that returns a boolean and call that instead. useHasBridge should call useSyncExternalStore to subscribe to changes in the bridge state. This will ensure that the component re-renders when the bridge state changes.
-  const enabled = hasBridge() && graph !== null
+  const bridgeReady = useHasBridge()
+  const enabled = bridgeReady && graph !== null
 
   const { data: notes } = useQuery({
     queryKey: allNotesQueryKey(graph?.root, tag),
