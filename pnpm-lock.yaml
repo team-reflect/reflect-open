@@ -28,13 +28,13 @@ importers:
         specifier: ^0.61.0
         version: 0.61.0
       oxlint:
-        specifier: ^1.71.0
+        specifier: ^1.73.0
         version: 1.75.0
       simple-git-hooks:
         specifier: ^2.13.1
         version: 2.13.1
       turbo:
-        specifier: ^2.10.0
+        specifier: ^2.10.4
         version: 2.10.6
       typescript:
         specifier: ~6.0.3
@@ -79,13 +79,13 @@ importers:
         specifier: workspace:*
         version: link:../../packages/utils
       '@sentry/react':
-        specifier: ^10.64.0
+        specifier: ^10.65.0
         version: 10.67.0(react@19.2.8)
       '@shadcn/react':
         specifier: ^0.2.1
         version: 0.2.1(@types/react@19.2.18)(react@19.2.8)
       '@tanstack/react-query':
-        specifier: ^5.101.1
+        specifier: ^5.101.2
         version: 5.101.4(react@19.2.8)
       '@tauri-apps/api':
         specifier: ^2.11.1
@@ -133,7 +133,7 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
       react-hook-form:
-        specifier: ^7.80.0
+        specifier: ^7.81.0
         version: 7.82.0(react@19.2.8)
       sonner:
         specifier: ^2.0.7
@@ -164,7 +164,7 @@ importers:
         specifier: 3.6.2
         version: 3.6.2
       '@sentry/vite-plugin':
-        specifier: ^5.3.0
+        specifier: ^5.4.0
         version: 5.4.0(supports-color@7.2.0)
       '@sqlite.org/sqlite-wasm':
         specifier: 3.53.0-build1
@@ -186,13 +186,13 @@ importers:
         version: 6.0.5(@rolldown/plugin-babel@0.2.3)(babel-plugin-react-compiler@1.0.0)(vite@8.2.0)
       '@vitest/browser-playwright':
         specifier: ^4.1.10
-        version: 4.1.10(playwright@1.61.1)(vite@8.2.0)(vitest@4.1.10)
+        version: 4.1.10(playwright@1.62.1)(vite@8.2.0)(vitest@4.1.10)
       babel-plugin-react-compiler:
         specifier: ^1.0.0
         version: 1.0.0
       playwright:
-        specifier: ^1.61.1
-        version: 1.61.1
+        specifier: ^1.62.1
+        version: 1.62.1
       shadcn:
         specifier: ^4.16.0
         version: 4.16.0(supports-color@7.2.0)(typescript@6.0.3)
@@ -316,10 +316,10 @@ importers:
         version: 0.7.1
       '@vitest/browser-playwright':
         specifier: ^4.1.10
-        version: 4.1.10(playwright@1.61.1)(vite@8.2.0)(vitest@4.1.10)
+        version: 4.1.10(playwright@1.62.1)(vite@8.2.0)(vitest@4.1.10)
       playwright:
-        specifier: ^1.61.1
-        version: 1.61.1
+        specifier: ^1.62.1
+        version: 1.62.1
       sqlite-vec:
         specifier: ^0.1.9
         version: 0.1.9
@@ -4943,14 +4943,14 @@ packages:
     resolution: {integrity: sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA==}
     engines: {node: '>=8'}
 
-  playwright-core@1.61.1:
-    resolution: {integrity: sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg==}
-    engines: {node: '>=18'}
+  playwright-core@1.62.1:
+    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
+    engines: {node: '>=20'}
     hasBin: true
 
-  playwright@1.61.1:
-    resolution: {integrity: sha512-DWnY5o3YbLWK4GovuAVwpqL+1VwGNdUGrRr++8j8PtQQzvAVZUIMjKQ90fY689sEJZJBbZVw1rXaOKSTitkzPQ==}
-    engines: {node: '>=18'}
+  playwright@1.62.1:
+    resolution: {integrity: sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg==}
+    engines: {node: '>=20'}
     hasBin: true
 
   pluralize@8.0.0:
@@ -8538,11 +8538,11 @@ snapshots:
       '@rolldown/plugin-babel': 0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.2.2)(vite@8.2.0)
       babel-plugin-react-compiler: 1.0.0
 
-  '@vitest/browser-playwright@4.1.10(playwright@1.61.1)(vite@8.2.0)(vitest@4.1.10)':
+  '@vitest/browser-playwright@4.1.10(playwright@1.62.1)(vite@8.2.0)(vitest@4.1.10)':
     dependencies:
       '@vitest/browser': 4.1.10(vite@8.2.0)(vitest@4.1.10)
       '@vitest/mocker': 4.1.10(vite@8.2.0)
-      playwright: 1.61.1
+      playwright: 1.62.1
       tinyrainbow: 3.1.0
       vitest: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(vite@8.2.0)
     transitivePeerDependencies:
@@ -11350,11 +11350,11 @@ snapshots:
     dependencies:
       find-up: 3.0.0
 
-  playwright-core@1.61.1: {}
+  playwright-core@1.62.1: {}
 
-  playwright@1.61.1:
+  playwright@1.62.1:
     dependencies:
-      playwright-core: 1.61.1
+      playwright-core: 1.62.1
     optionalDependencies:
       fsevents: 2.3.2
 
@@ -12565,7 +12565,7 @@ snapshots:
 
   vitest-browser-commands@0.2.1(@vitest/browser-playwright@4.1.10)(vitest@4.1.10):
     optionalDependencies:
-      '@vitest/browser-playwright': 4.1.10(playwright@1.61.1)(vite@8.2.0)(vitest@4.1.10)
+      '@vitest/browser-playwright': 4.1.10(playwright@1.62.1)(vite@8.2.0)(vitest@4.1.10)
       vitest: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(vite@8.2.0)
 
   vitest-browser-react@2.2.0(@types/react-dom@19.2.4)(@types/react@19.2.18)(react-dom@19.2.8)(react@19.2.8)(vitest@4.1.10):
@@ -12609,7 +12609,7 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
       '@types/node': 24.13.3
-      '@vitest/browser-playwright': 4.1.10(playwright@1.61.1)(vite@8.2.0)(vitest@4.1.10)
+      '@vitest/browser-playwright': 4.1.10(playwright@1.62.1)(vite@8.2.0)(vitest@4.1.10)
     transitivePeerDependencies:
       - msw
 
