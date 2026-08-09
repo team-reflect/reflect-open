@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.4...v0.9.0-beta.5) (2026-08-09)
+
+
+### Bug Fixes
+
+* press `Mod-Enter` on a selected backlink opens it in a new window ([#1071](https://github.com/team-reflect/reflect-open/issues/1071)) ([42e4cf6](https://github.com/team-reflect/reflect-open/commit/42e4cf641ff7c8be5918c853da959ba61961d559))
+
 ## [0.9.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta.4...v0.9.0-beta.4) (2026-08-09)
 
 
