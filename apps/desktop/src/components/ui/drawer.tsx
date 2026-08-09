@@ -13,7 +13,7 @@ interface DrawerContextProps {
 const DrawerContext = React.createContext<DrawerContextProps | null>(null)
 
 function useDrawer(): DrawerContextProps {
-  const context = React.useContext(DrawerContext)
+  const context = React.use(DrawerContext)
 
   if (!context) {
     throw new Error('useDrawer must be used within a Drawer.')
@@ -44,7 +44,7 @@ function Drawer({
   )
 
   return (
-    <DrawerContext.Provider value={contextValue}>
+    <DrawerContext value={contextValue}>
       <DrawerPrimitive.Root
         data-slot="drawer"
         modal={modal}
@@ -52,7 +52,7 @@ function Drawer({
         swipeDirection={swipeDirection}
         {...props}
       />
-    </DrawerContext.Provider>
+    </DrawerContext>
   )
 }
 
