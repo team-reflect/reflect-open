@@ -12,7 +12,6 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import * as sqliteVec from 'sqlite-vec'
 
