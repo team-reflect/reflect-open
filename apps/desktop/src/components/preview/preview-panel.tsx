@@ -4,18 +4,24 @@ import { errorMessage, isAppError, splitFrontmatter } from '@reflect/core'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MarkdownPreview } from '@/editor/markdown-preview'
+import { useOpenExternalLink } from '@/editor/open-external-link'
 import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { useBacklinkNavigation } from '@/hooks/use-backlink-navigation'
 import { annotationReference } from '@/lib/annotations/annotation-reference'
+import { parsePdfHref } from '@/lib/annotations/pdf-href'
 import { extractRegionText } from '@/lib/annotations/pdf-region-text'
-import { selectionToHighlight } from '@/lib/annotations/pdf-selection'
+import type { PdfTextItemLike } from '@/lib/annotations/pdf-region-text'
+import { normalizedSelectionRects, selectionToHighlight } from '@/lib/annotations/pdf-selection'
 import { usePdfAnnotations, type AnnotationItem } from '@/lib/annotations/annotations-store'
 import { startOperation } from '@/lib/operations'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { readExistingNoteSource } from '@/lib/read-existing-note-source'
 import { useGraph } from '@/providers/graph-provider'
 import { usePdfSession } from '@/providers/pdf-session-provider'
-import type { PreviewPanelTarget } from '@/providers/preview-panel-provider'
+import {
+  useSetPreviewPanelTarget,
+  type PreviewPanelTarget,
+} from '@/providers/preview-panel-provider'
 import { AnnotationSection } from './annotation-section'
 import {
   DEFAULT_ANNOTATION_COLOR,
@@ -144,23 +150,48 @@ function PdfPreview({ target, onClose }: PdfPreviewProps): ReactElement {
       if (page === null) {
         return
       }
-      const highlight = selectionToHighlight(
-        {
-          collapsed: selection.isCollapsed,
-          getClientRects: () => range.getClientRects(),
-          toString: () => selection.toString(),
-        },
-        {
-          getBoundingClientRect: () => page.getBoundingClientRect(),
-          getAttribute: (name) => page.getAttribute(name),
-        },
-      )
-      if (highlight === null) {
+      const pageRect = page.getBoundingClientRect()
+      if (pageRect.right <= pageRect.left || pageRect.bottom <= pageRect.top) {
         return
       }
-      addAnnotation({ ...highlight, type: 'text', color })
-      // Clear the selection so a second capture in a row starts fresh.
-      selection.removeAllRanges()
+      const pageNumber = Number(page.getAttribute('data-page-number'))
+      if (!Number.isSafeInteger(pageNumber) || pageNumber < 1) {
+        return
+      }
+      // The browser's selection rects can drift from the canvas glyphs when
+      // pdf.js substitutes a font, so they only hit-test; the annotation rects
+      // come from pdf.js's own text coordinates in createTextHighlight.
+      const selectionRects = normalizedSelectionRects(range.getClientRects(), pageRect)
+      if (selectionRects.length === 0) {
+        return
+      }
+      void createTextHighlight(pageNumber - 1, selectionRects, selection)
+    }
+    const createTextHighlight = async (
+      pageIndex: number,
+      selectionRects: readonly NormalizedRect[],
+      selection: Selection,
+    ): Promise<void> => {
+      const doc = session.pdfDocument
+      if (doc === null) {
+        return
+      }
+      try {
+        const page = await doc.getPage(pageIndex + 1)
+        const content = await page.getTextContent()
+        const viewport = page.getViewport({ scale: 1 })
+        const textItems = content.items.filter((textItem) => 'str' in textItem) as PdfTextItemLike[]
+        const highlight = selectionToHighlight(selectionRects, textItems, viewport, pageIndex)
+        if (highlight === null) {
+          return
+        }
+        addAnnotation({ ...highlight, type: 'text', color })
+        // Clear the selection so a second capture in a row starts fresh.
+        selection.removeAllRanges()
+      } catch {
+        // A failed read (document destroyed mid-selection, etc.) drops the
+        // capture rather than surfacing an error for a selection gesture.
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     document.addEventListener('mouseup', onMouseUp)
@@ -299,6 +330,8 @@ function NotePreview({ path, onClose }: NotePreviewProps): ReactElement {
   const generation = graph?.generation ?? null
   const { resolveImageUrl } = useAssetPersistence(generation)
   const { onWikilinkClick } = useBacklinkNavigation()
+  const setPreviewPanelTarget = useSetPreviewPanelTarget()
+  const openExternalLink = useOpenExternalLink()
   const { data, isError } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'preview-note', path],
     queryFn: () => {
@@ -309,6 +342,26 @@ function NotePreview({ path, onClose }: NotePreviewProps): ReactElement {
     },
     enabled: generation !== null,
   })
+
+  // PDF links inside the note body open the in-app PDF preview panel (the
+  // annotation lane's migration links); every other link keeps the default
+  // OS-opener behavior.
+  const onLinkClick = useCallback(
+    (href: string, event: MouseEvent | KeyboardEvent): void => {
+      const pdfHref = parsePdfHref(href)
+      if (pdfHref !== null) {
+        event.preventDefault()
+        setPreviewPanelTarget({
+          kind: 'pdf',
+          assetPath: pdfHref.path,
+          ...(pdfHref.page !== undefined ? { page: pdfHref.page } : {}),
+        })
+        return
+      }
+      openExternalLink({ href, event })
+    },
+    [openExternalLink, setPreviewPanelTarget],
+  )
 
   const body = data === null || data === undefined ? null : splitFrontmatter(data).body
   const title = path.split('/').pop()?.replace(/\.md$/i, '') ?? path
@@ -323,6 +376,7 @@ function NotePreview({ path, onClose }: NotePreviewProps): ReactElement {
       <MarkdownPreview
         content={body}
         resolveImageUrl={resolveImageUrl}
+        onLinkClick={onLinkClick}
         onWikiLinkClick={(target, event) => {
           if (event !== undefined) {
             onWikilinkClick({ target, event })

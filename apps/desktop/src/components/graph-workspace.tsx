@@ -69,9 +69,10 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
                                     import's single face. */}
                                 {isMainWindow() ? (
                                   <V1ImportProvider graph={graph}>
-                                    {/* 侧栏堆栈（文档面板 ⇄ PDF 面板）与 PDF
-                                        session 的提供者：同时包住主列分栏面板
-                                        与 context 侧栏。 */}
+                                    {/* The sidebar stack (document panel ⇄
+                                        PDF panel) and PDF session providers
+                                        wrap both the split pane and the
+                                        context aside. */}
                                     <PdfSidebarViewProvider>
                                       <PdfSessionProvider>
                                         <WorkspaceContent graph={graph} />

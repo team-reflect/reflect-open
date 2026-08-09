@@ -21,9 +21,16 @@ export function annotationReference(assetPath: string, item: AnnotationItem): st
   // Escape markdown special characters once, so they cannot close the link
   // label early.
   const title = rawTitle.replaceAll(/[\\[\]]/g, (c) => `\\${c}`)
-  // The path must be URL-encoded (matching the migration links: spaces →
-  // %20, CJK percent-encoded) — a markdown link target with raw spaces fails
-  // to parse and renders as plain text; parsePdfHref decodes it back to the
-  // on-disk path when clicked.
-  return `[${title}](${encodeURI(assetPath)}#page=${page})`
+  // Encode each path segment with encodeURIComponent (joined by the literal
+  // `/`), never the whole path with encodeURI — encodeURI keeps `#` and `?`,
+  // and a `#` in a filename would split the href at the wrong place (the
+  // fragment must stay the `#page=N` we append). Parentheses are additionally
+  // escaped: encodeURIComponent leaves them, but a `)` in a link target would
+  // close the markdown link early. parsePdfHref decodes the segments back to
+  // the on-disk path when clicked.
+  const encodedPath = assetPath
+    .split('/')
+    .map((segment) => encodeURIComponent(segment).replaceAll('(', '%28').replaceAll(')', '%29'))
+    .join('/')
+  return `[${title}](${encodedPath}#page=${page})`
 }

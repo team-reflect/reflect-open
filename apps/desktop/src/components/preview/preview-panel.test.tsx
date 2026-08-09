@@ -29,6 +29,40 @@ const annotationsState = vi.hoisted(() => ({
   addAnnotation: vi.fn(),
   removeAnnotation: vi.fn(),
 }))
+const sessionState = vi.hoisted(() => ({
+  session: {
+    viewer: null,
+    // The text-highlight capture reads pdf.js's own text coordinates.
+    pdfDocument: {
+      getPage: vi.fn(async () => ({
+        getTextContent: async () => ({
+          items: [
+            {
+              str: 'Some selected words',
+              transform: [1, 0, 0, 1, 15, 180],
+              width: 280,
+              height: 12,
+              hasEOL: false,
+            },
+          ],
+        }),
+        getViewport: () => ({
+          width: 300,
+          height: 200,
+          convertToViewportRectangle: (r: number[]) => [
+            r[0] ?? 0,
+            200 - (r[3] ?? 0),
+            r[2] ?? 0,
+            200 - (r[1] ?? 0),
+          ],
+        }),
+      })),
+    },
+    assetPath: null,
+  },
+  register: vi.fn(),
+  clear: vi.fn(),
+}))
 vi.mock('@/lib/annotations/annotations-store', () => ({
   usePdfAnnotations: () => ({
     annotations: [],
@@ -39,11 +73,7 @@ vi.mock('@/lib/annotations/annotations-store', () => ({
   }),
 }))
 vi.mock('@/providers/pdf-session-provider', () => ({
-  usePdfSession: () => ({
-    session: { viewer: null, pdfDocument: null, assetPath: null },
-    register: vi.fn(),
-    clear: vi.fn(),
-  }),
+  usePdfSession: () => sessionState,
 }))
 // The annotation list's height resize reads settings.
 vi.mock('@/providers/settings-provider', () => ({
@@ -209,7 +239,8 @@ describe('PdfPreview annotation-mode shortcuts', () => {
 
     document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
 
-    expect(annotationsState.addAnnotation).toHaveBeenCalledTimes(1)
+    // The capture reads pdf.js's text content asynchronously.
+    await vi.waitFor(() => expect(annotationsState.addAnnotation).toHaveBeenCalledTimes(1))
     const created = annotationsState.addAnnotation.mock.calls[0]?.[0] as
       | {
           pageIndex: number

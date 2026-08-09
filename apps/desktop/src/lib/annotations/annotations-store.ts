@@ -78,11 +78,17 @@ export interface UsePdfAnnotationsResult {
 /** Debounce window between the last edit and the sidecar write. */
 export const ANNOTATION_WRITE_DEBOUNCE_MS = 500
 
-/** Pending debounced write: the timer plus the (path, generation) it was scheduled for. */
+/**
+ * Pending debounced write: the timer, the (path, generation) it targets, and
+ * the serialized snapshot taken at schedule time — so the flush (timer or
+ * cleanup) writes exactly the state of the last edit, never a later reset or
+ * a stale live merge.
+ */
 interface PendingWrite {
   timer: ReturnType<typeof setTimeout>
   path: string
   generation: number
+  content: string
 }
 
 /**
@@ -112,11 +118,17 @@ export function usePdfAnnotations(
   // eslint-disable-next-line react-hooks/refs
   annotationsRef.current = annotations
   const pendingRef = useRef<PendingWrite | null>(null)
+  // Writes land one at a time, in dispatch order: a slow earlier write can
+  // never resolve after a later one and overwrite its newer state.
+  const writeChain = useRef<Promise<void>>(Promise.resolve())
 
   const persist = useCallback((path: string, content: string, generation: number): void => {
-    void writeAnnotations(path, content, generation).catch((cause: unknown) => {
-      console.error('write annotations failed:', cause)
-    })
+    writeChain.current = writeChain.current
+      .catch(() => {})
+      .then(() => writeAnnotations(path, content, generation))
+      .catch((cause: unknown) => {
+        console.error('write annotations failed:', cause)
+      })
   }, [])
 
   const scheduleWrite = useCallback((): void => {
@@ -128,19 +140,22 @@ export function usePdfAnnotations(
     if (pendingRef.current !== null) {
       clearTimeout(pendingRef.current.timer)
     }
+    // Serialize at schedule time: the flush writes the state as of this edit —
+    // every subsequent edit re-schedules with a fresh snapshot, so the fired
+    // write always carries the latest state, and the key-change cleanup flushes
+    // the same snapshot instead of reading a possibly-reset live ref.
+    const content = JSON.stringify({
+      version: 1,
+      path,
+      annotations: annotationsRef.current,
+    } satisfies AnnotationFile)
     pendingRef.current = {
       path,
       generation,
+      content,
       timer: setTimeout(() => {
         pendingRef.current = null
-        // Merge the local state at fire time — every edit since the timer was
-        // scheduled lands in this one write (last-write-wins by construction).
-        const file: AnnotationFile = {
-          version: 1,
-          path,
-          annotations: annotationsRef.current,
-        }
-        persist(path, JSON.stringify(file), generation)
+        persist(path, content, generation)
       }, ANNOTATION_WRITE_DEBOUNCE_MS),
     }
   }, [persist])
@@ -189,8 +204,8 @@ export function usePdfAnnotations(
   // Flush a pending write before the PDF or graph session changes (and on
   // unmount), so the last edit never evaporates with the panel — and a timer
   // for the old PDF can never fire after the new one's load replaced the
-  // state. The cleanup runs before the load effect's body, so `annotationsRef`
-  // still holds the old PDF's edits when it lands.
+  // state. The flush writes the snapshot captured at schedule time, never the
+  // live `annotationsRef` (which the key-change reset may have emptied).
   useEffect(() => {
     return () => {
       const pending = pendingRef.current
@@ -199,17 +214,15 @@ export function usePdfAnnotations(
       }
       clearTimeout(pending.timer)
       pendingRef.current = null
-      const file: AnnotationFile = {
-        version: 1,
-        path: pending.path,
-        annotations: annotationsRef.current,
-      }
-      persist(pending.path, JSON.stringify(file), pending.generation)
+      persist(pending.path, pending.content, pending.generation)
     }
   }, [pdfPath, generation, persist])
 
   const mutate = useCallback(
     (next: AnnotationItem[]): void => {
+      // Keep the ref in step with the edit synchronously — the schedule-time
+      // snapshot below reads it before the commit's ref-update effect runs.
+      annotationsRef.current = next
       setAnnotations(next)
       scheduleWrite()
     },

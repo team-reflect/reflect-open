@@ -80,9 +80,14 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
   }, [previewTarget?.kind, applyTarget])
 
   const routeContext = contextSidebarFor(contextTarget)
-  const pdfPanelOpen = view === 'pdf' && previewTarget?.kind === 'pdf'
+  // The PDF panel takes the context slot while the stack is on it. On a route
+  // with no document panel (search/settings), "back to document" has nothing
+  // to go back to, so the PDF panel stays — otherwise it would be unreachable
+  // (there is no "Enter PDF panel" entry without the document panel).
+  const pdfPanelOpen =
+    (view === 'pdf' || routeContext === undefined) && previewTarget?.kind === 'pdf'
   const pdfContextBlock = pdfPanelOpen ? (
-    <ErrorBoundary fallback={previewPanelFallback}>
+    <ErrorBoundary key={previewTarget.assetPath} fallback={previewPanelFallback}>
       <PdfSidebarBlock assetPath={previewTarget.assetPath} />
     </ErrorBoundary>
   ) : null
@@ -102,10 +107,10 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
       <div className="relative flex h-full flex-col">
         <div className="min-h-0 flex-1">
           {/* The note pane and the preview pane share the main column as a
-              vertical split; the pane appears only while a target is open and
-              never below a breakpoint — it is the user's explicit focus. The
-              editor keeps its EDITOR_MIN_WIDTH_PX reserve via the resize
-              budget (use-sidebar-resize), not via CSS here. */}
+              vertical split; the pane appears only while a target is open —
+              the user's explicit focus, with no responsive hiding. The editor
+              keeps its EDITOR_MIN_WIDTH_PX reserve via the resize budget
+              (use-sidebar-resize), not via CSS here. */}
           <div className="flex h-full min-h-0">
             <div className="min-w-0 flex-1">
               <RouteContent />
@@ -118,7 +123,14 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
               >
                 <SidebarResizeHandle panel="preview" />
                 <div className="h-full overflow-hidden">
-                  <ErrorBoundary fallback={previewPanelFallback}>
+                  {/* Keyed by the target so a crashed preview resets when the
+                      user switches to another PDF/note. */}
+                  <ErrorBoundary
+                    key={
+                      previewTarget.kind === 'pdf' ? previewTarget.assetPath : previewTarget.path
+                    }
+                    fallback={previewPanelFallback}
+                  >
                     <PreviewPanel target={previewTarget} onClose={closePreview} />
                   </ErrorBoundary>
                 </div>

@@ -28,13 +28,25 @@ export function decodeAssetHref(href: string): string {
  * Parse a rendered link href as a graph-relative PDF address:
  * `assets/…pdf`, matched case-insensitively, with an optional `#page=N`
  * (1-based) fragment. Returns null for anything the shape doesn't name — a
- * non-PDF asset, a relative link outside `assets/`, a URL with a scheme, or a
- * fragment that isn't a page target. The path is URL-decoded to its on-disk
- * form and keeps its authored casing; only the *match* is case-insensitive.
+ * non-PDF asset, a relative link outside `assets/`, a URL with a scheme, a
+ * fragment that isn't a page target, a second `#` (an ambiguous address), or
+ * a `..` path segment (an encoded `%2e%2e` could walk out of the graph's
+ * assets directory). The path is URL-decoded to its on-disk form and keeps
+ * its authored casing; only the *match* is case-insensitive.
  */
 export function parsePdfHref(href: string): PdfLinkRef | null {
-  const [rawPath, fragment] = href.split('#')
-  const path = decodeAssetHref(rawPath!.split('?')[0]!)
+  const parts = href.split('#')
+  if (parts.length > 2) {
+    return null
+  }
+  const rawPath = parts[0] ?? ''
+  const fragment = parts[1]
+  const path = decodeAssetHref(rawPath.split('?')[0] ?? '')
+  // Segment-level check: any `..` segment (raw or percent-encoded) could
+  // traverse out of the assets directory, so it is rejected outright.
+  if (path.split('/').includes('..')) {
+    return null
+  }
   if (!/^assets\/.+\.pdf$/i.test(path)) {
     return null
   }

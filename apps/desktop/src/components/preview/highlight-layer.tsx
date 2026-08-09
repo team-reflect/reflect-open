@@ -30,6 +30,17 @@ const RECT_CLASS = 'reflect-annotation-rect'
 /** Smaller drags (as a fraction of the page) are treated as misclicks. */
 const MIN_NORMALIZED_SIZE = 0.01
 
+/** In-flight drag-creation gestures by wrapper, so they can be aborted. */
+const activeDrags = new Map<HTMLElement, AbortController>()
+
+/** Abort every in-flight drag (the layer unmounted, or wrappers were evicted). */
+function abortAllDrags(): void {
+  for (const controller of activeDrags.values()) {
+    controller.abort()
+  }
+  activeDrags.clear()
+}
+
 interface Point {
   x: number
   y: number
@@ -106,6 +117,14 @@ type LatestProps = HighlightLayerProps & {
  */
 export function HighlightLayer(props: HighlightLayerProps): ReactElement | null {
   const { viewer } = usePdfViewer()
+  // In-flight drag-creation gestures, keyed by their wrapper: aborted when the
+  // layer unmounts or the wrapper leaves the DOM (pdf.js page eviction), so a
+  // `pointerup` that never arrives cannot leak the window listeners.
+  useEffect(() => {
+    return () => {
+      abortAllDrags()
+    }
+  }, [])
   // Right-click on an annotation rect selects it and opens the context menu
   // at the cursor; the rects are raw DOM, so the handler reads the freshest
   // implementation through latest.
@@ -182,6 +201,14 @@ function syncOverlays(
   viewer: import('pdfjs-dist/legacy/web/pdf_viewer.mjs').PDFViewer,
   latest: MutableRefObject<LatestProps>,
 ): void {
+  // pdf.js evicts pages (buffered pages re-render their children): abort any
+  // drag whose wrapper is gone, so the window listeners cannot leak.
+  for (const [wrapper, controller] of activeDrags) {
+    if (!wrapper.isConnected) {
+      controller.abort()
+      activeDrags.delete(wrapper)
+    }
+  }
   const view = viewer.viewer
   if (view === null) {
     return
@@ -272,18 +299,31 @@ function startDrag(
     preview.style.width = percent(right - left)
     preview.style.height = percent(bottom - top)
   }
-  const onUp = (): void => {
-    window.removeEventListener('pointermove', onMove)
-    window.removeEventListener('pointerup', onUp)
+  // The window listeners are scoped to a signal so an aborted gesture
+  // (pointercancel, a page eviction, or the layer unmounting) removes them
+  // even when `pointerup` never arrives.
+  const controller = new AbortController()
+  activeDrags.set(wrapper, controller)
+  const cleanup = (): void => {
+    activeDrags.delete(wrapper)
+    controller.abort()
     preview.remove()
+  }
+  const onUp = (): void => {
+    cleanup()
     const [left, top, right, bottom] = normalizedRectFromPoints(start, end)
     if (right - left < MIN_NORMALIZED_SIZE || bottom - top < MIN_NORMALIZED_SIZE) {
       return
     }
     latest.current.onAdd(pageNumber - 1, [left, top, right, bottom])
   }
-  window.addEventListener('pointermove', onMove)
-  window.addEventListener('pointerup', onUp)
+  const onCancel = (): void => {
+    // A cancelled gesture (touch takeover, page teardown) never commits.
+    cleanup()
+  }
+  window.addEventListener('pointermove', onMove, { signal: controller.signal })
+  window.addEventListener('pointerup', onUp, { signal: controller.signal })
+  window.addEventListener('pointercancel', onCancel, { signal: controller.signal })
 }
 
 function createRectElement(

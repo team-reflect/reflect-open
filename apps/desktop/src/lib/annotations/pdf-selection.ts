@@ -1,16 +1,26 @@
 /**
  * Convert a text selection inside a pdf.js `.page` into the payload for a
- * text-type annotation. The rects live in the same normalized display space
- * as the highlight layer (0–1 fractions of the page, top-left origin, y
- * growing down); the text content is the selection's string with control
- * characters and whitespace runs cleaned up.
+ * text-type annotation.
  *
- * The extractor takes structural stand-ins for the Range and the `.page`
- * element so the coordinate math is testable without a DOM.
+ * The browser's selection rectangles (from `Range.getClientRects()`) only
+ * hit-test: the pdf.js text layer's spans are laid out by the browser's font
+ * metrics, which can drift from the canvas glyphs when a font is substituted,
+ * making the selection rects narrower than the text. The annotation rects
+ * therefore come from pdf.js's own text coordinates
+ * ({@link textItemNormalizedRect}) — the same source that rasterized the
+ * canvas — so they always align with the glyphs. The rects live in the
+ * normalized display space (0–1 fractions of the page, top-left origin, y
+ * growing down), and the text is the hit items' strings in reading order with
+ * control characters and whitespace runs cleaned up.
  */
 
-/** A normalized annotation rectangle, `[left, top, right, bottom]` in 0–1. */
-export type NormalizedRect = [number, number, number, number]
+import {
+  rectsOverlap,
+  textItemNormalizedRect,
+  type NormalizedRect,
+  type PdfTextItemLike,
+  type PdfViewportLike,
+} from './pdf-region-text'
 
 /** A client-space (viewport) rectangle. */
 export interface RectLike {
@@ -20,22 +30,7 @@ export interface RectLike {
   bottom: number
 }
 
-/** The Range/Selection bits the extractor reads. */
-export interface SelectionLike {
-  /** Whether the selection is a collapsed caret rather than a range. */
-  collapsed: boolean
-  /** Per-line client rectangles of the selection, like `Range.getClientRects()`. */
-  getClientRects(): Iterable<RectLike>
-  toString(): string
-}
-
-/** The `.page` element bits the extractor reads. */
-export interface PageElementLike {
-  getBoundingClientRect(): RectLike
-  getAttribute(name: 'data-page-number'): string | null
-}
-
-/** The extracted payload: 0-based page, normalized rects, cleaned text. */
+/** The extracted payload: 0-based page, per-line normalized rects, cleaned text. */
 export interface SelectionHighlight {
   pageIndex: number
   rects: NormalizedRect[]
@@ -49,9 +44,10 @@ function clamp01(value: number): number {
 /**
  * Normalize each per-line client rect against the page's rect (viewport →
  * page-local fractions), dropping degenerate (zero-area) or fully-outside
- * rects and clamping the rest into the page.
+ * rects and clamping the rest into the page. These are the hit-test shapes;
+ * the annotation rects come from pdf.js's own text coordinates.
  */
-function normalizedSelectionRects(
+export function normalizedSelectionRects(
   clientRects: Iterable<RectLike>,
   pageRect: RectLike,
 ): NormalizedRect[] {
@@ -75,45 +71,70 @@ function normalizedSelectionRects(
 
 /**
  * Strip control characters (PDF text can carry them) into spaces, collapse
- * whitespace runs, and trim the edges — the highlight text an annotation row
- * shows.
+ * whitespace runs, and trim the edges. Newlines survive — a multi-line
+ * selection's text keeps its line breaks — with the spaces around them folded
+ * away.
  */
 function normalizedSelectionText(raw: string): string {
   let cleaned = ''
   for (const char of raw) {
     const code = char.charCodeAt(0)
-    cleaned += code < 0x20 || code === 0x7f ? ' ' : char
+    cleaned += char === '\n' ? char : code < 0x20 || code === 0x7f ? ' ' : char
   }
-  return cleaned.replaceAll(/\s+/g, ' ').trim()
+  return cleaned
+    .replaceAll(/[^\S\n]+/g, ' ')
+    .replaceAll(' \n', '\n')
+    .replaceAll('\n ', '\n')
+    .trim()
 }
 
 /**
- * Build the text-annotation payload from a selection over a pdf page, or null
- * when there is nothing to highlight: a collapsed caret, empty text, a page
- * element without a valid page number, or no usable rects.
+ * Merge the hit items' bboxes into one rect per visual line (items whose
+ * vertical ranges overlap), spanning the union — a selection over a run of
+ * words becomes one highlight box per line.
+ */
+function mergeIntoLines(rects: NormalizedRect[]): NormalizedRect[] {
+  const sorted = [...rects].sort((a, b) => a[1] - b[1] || a[0] - b[0])
+  const lines: NormalizedRect[] = []
+  for (const rect of sorted) {
+    const last = lines[lines.length - 1]
+    if (last !== undefined && rect[1] < last[3]) {
+      last[0] = Math.min(last[0], rect[0])
+      last[2] = Math.max(last[2], rect[2])
+      last[3] = Math.max(last[3], rect[3])
+    } else {
+      lines.push([...rect])
+    }
+  }
+  return lines
+}
+
+/**
+ * Build the text-annotation payload from the browser selection rects and the
+ * page's own text content, or null when nothing was selected: no hit items,
+ * or no usable text. `pageIndex` is the 0-based page the selection sits on.
  */
 export function selectionToHighlight(
-  selection: SelectionLike,
-  page: PageElementLike,
+  selectionRects: readonly NormalizedRect[],
+  textItems: readonly PdfTextItemLike[],
+  viewport: PdfViewportLike,
+  pageIndex: number,
 ): SelectionHighlight | null {
-  if (selection.collapsed) {
+  const normalizedItems = textItems
+    .filter((item) => item.str !== '')
+    .map((item) => ({ item, rect: textItemNormalizedRect(item, viewport) }))
+  const hitItems = normalizedItems.filter(({ rect }) =>
+    selectionRects.some((selectionRect) => rectsOverlap(selectionRect, rect)),
+  )
+  if (hitItems.length === 0) {
     return null
   }
-  const text = normalizedSelectionText(selection.toString())
+  const rects = mergeIntoLines(hitItems.map(({ rect }) => rect))
+  const text = normalizedSelectionText(
+    hitItems.map(({ item }) => item.str + (item.hasEOL === true ? '\n' : '')).join(' '),
+  )
   if (text === '') {
     return null
   }
-  const pageNumber = Number(page.getAttribute('data-page-number'))
-  if (!Number.isSafeInteger(pageNumber) || pageNumber < 1) {
-    return null
-  }
-  const pageRect = page.getBoundingClientRect()
-  if (pageRect.right <= pageRect.left || pageRect.bottom <= pageRect.top) {
-    return null
-  }
-  const rects = normalizedSelectionRects(selection.getClientRects(), pageRect)
-  if (rects.length === 0) {
-    return null
-  }
-  return { pageIndex: pageNumber - 1, rects, text }
+  return { pageIndex, rects, text }
 }

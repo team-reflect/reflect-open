@@ -110,11 +110,12 @@ async function jumpToDestination(
 /**
  * The PDF panel on top of the sidebar stack while the user reads a PDF: the
  * filename header, a "PDF actions" section with the way back to the document
- * panel, the clickable outline, and one thumbnail per page. All three sections
- * are the same {@link SidebarSection} the document panel uses (sessionStorage
- * persistence, quiet headers), and the panel flows as plain block content —
- * no flex/scroll wrappers that could hide a section. The whole panel carries
- * the temporary `bg-accent/5` tint so it reads as a disposable surface next to
+ * panel (a plain {@link SidebarSection}, like the document panel's), and the
+ * Outline/Pages sections — the {@link PdfSection} variants, which share the
+ * SidebarSection look but flex their content to fill the panel's remaining
+ * height and reset to a per-open preset. The panel is a flex column filling
+ * the whole context sidebar (`h-full`), and the whole panel carries the
+ * temporary `bg-accent/5` tint so it reads as a disposable surface next to
  * the permanent document context. Renders nothing until a session matching
  * `assetPath` exists, so a stale session never shows the previous PDF's
  * contents under a new filename.

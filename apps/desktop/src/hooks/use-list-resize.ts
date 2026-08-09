@@ -195,6 +195,26 @@ export function useListHeightResize(): ListHeightResize {
     [heightAt, applyHeight, commitHeight],
   )
 
+  // A cancelled gesture (touch interruption, scroll takeover) never commits:
+  // the drag state and chrome are cleared and the variable reverts to the
+  // persisted height, so the list is not left at an abandoned in-drag value.
+  const cancel = useCallback(
+    (event: ReactPointerEvent<HTMLElement>): void => {
+      const drag = dragRef.current
+      if (drag === null || drag.pointerId !== event.pointerId) {
+        return
+      }
+      dragRef.current = null
+      if (drag.activated) {
+        activeListHeightDrags.delete(LIST_HEIGHT_VARIABLE)
+        syncDragChrome()
+        applyHeight(settingsHeightRef.current)
+      }
+      setDragHeight(null)
+    },
+    [applyHeight],
+  )
+
   const onDoubleClick = useCallback((): void => {
     applyHeight(ANNOTATION_LIST_HEIGHT_RANGE.fallback)
     commitHeight(ANNOTATION_LIST_HEIGHT_RANGE.fallback)
@@ -276,7 +296,7 @@ export function useListHeightResize(): ListHeightResize {
       onPointerDown,
       onPointerMove,
       onPointerUp: release,
-      onPointerCancel: release,
+      onPointerCancel: cancel,
       onDoubleClick,
       onKeyDown,
     },

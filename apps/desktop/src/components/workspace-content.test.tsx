@@ -6,6 +6,7 @@ import type { GraphInfo } from '@reflect/core'
 import type { ContextSidebarTarget } from '@/components/context-sidebar/sidebar-route'
 import { PdfSessionProvider } from '@/providers/pdf-session-provider'
 import { PdfSidebarViewProvider } from '@/providers/pdf-sidebar-view-provider'
+import type { PreviewPanelTarget } from '@/providers/preview-panel-provider'
 
 interface WorkspaceState {
   collapsed: boolean
@@ -18,7 +19,7 @@ const workspaceState = vi.hoisted<WorkspaceState>(() => ({
 }))
 
 const previewPanelState = vi.hoisted(() => ({
-  target: null as { kind: string; assetPath?: string; page?: number; path?: string } | null,
+  target: null as PreviewPanelTarget | null,
 }))
 
 vi.mock('@/components/command-palette/command-palette', () => ({
@@ -34,8 +35,7 @@ vi.mock('@/components/context-sidebar/note-context-sidebar', () => ({
 }))
 vi.mock('@/components/embeddings-sync', () => ({ EmbeddingsSync: () => null }))
 vi.mock('@/components/note-find-bar', () => ({ NoteFindBar: () => null }))
-// Implemented by the parallel preview lane; a mock keeps this suite green
-// until `preview-panel` lands.
+// A stub keeps this suite independent of the preview lane's internals.
 vi.mock('@/components/preview/preview-panel', () => ({
   PreviewPanel: ({ target }: { target: unknown }) => (
     <div data-testid="preview-panel-content">{JSON.stringify(target)}</div>

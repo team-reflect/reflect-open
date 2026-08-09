@@ -62,6 +62,13 @@ describe('parsePdfHref', () => {
     expect(parsePdfHref('assets/paper.pdf#foo')).toBeNull()
   })
 
+  it('rejects a second fragment and traversal path segments', () => {
+    expect(parsePdfHref('assets/paper.pdf#page=1#extra')).toBeNull()
+    expect(parsePdfHref('assets/../etc/paper.pdf')).toBeNull()
+    expect(parsePdfHref('assets/%2e%2e/etc/paper.pdf')).toBeNull()
+    expect(parsePdfHref('assets/%2e%2e/%2e%2e/out.pdf#page=2')).toBeNull()
+  })
+
   it('rejects empty hrefs', () => {
     expect(parsePdfHref('')).toBeNull()
   })

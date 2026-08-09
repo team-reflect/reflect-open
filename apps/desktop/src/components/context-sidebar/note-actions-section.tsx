@@ -45,13 +45,18 @@ export function NoteActionsSection({
   const isPrivate = noteRow?.isPrivate ?? false
   const { applyOptimisticPin, invalidateOptimisticPin } = useOptimisticPinToggle(path, noteRow)
 
-  // PDF 会话激活时（预览目标是 PDF 且文档已加载），提供一个通往侧栏堆栈
-  // 顶层 PDF 面板的入口。行布局与 NoteToggleAction 对齐（等宽圆角行、20px
-  // 图标容器、正文文字）；bg-accent/5 与 accent 色图标呼应 PDF 面板的临时色调。
+  // When the PDF session is active (the preview target is a PDF, its document
+  // is loaded, and the session belongs to that same asset), offer the entry
+  // into the sidebar stack's top PDF panel. The row layout matches
+  // NoteToggleAction (full-width rounded row, 20px icon container, body
+  // text); bg-accent/5 and the accent icon echo the PDF panel's temporary tint.
   const { session } = usePdfSession()
   const { enterPdf } = usePdfSidebarView()
   const { target: previewTarget } = usePreviewPanel()
-  const pdfSessionActive = previewTarget?.kind === 'pdf' && session.pdfDocument !== null
+  const pdfSessionActive =
+    previewTarget?.kind === 'pdf' &&
+    session.pdfDocument !== null &&
+    session.assetPath === previewTarget.assetPath
 
   return (
     <SidebarSection storageKey="note-actions" title="Note actions">

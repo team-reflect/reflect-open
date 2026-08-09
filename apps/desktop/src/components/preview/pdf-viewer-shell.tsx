@@ -8,7 +8,6 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { createPortal } from 'react-dom'
 import {
   ChevronLeft,
   ChevronRight,
@@ -32,6 +31,7 @@ import 'pdfjs-dist/legacy/web/pdf_viewer.css'
 import './pdf-viewer-overrides.css'
 import { errorMessage, readAssetBinary } from '@reflect/core'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 import { usePdfSession } from '@/providers/pdf-session-provider'
@@ -368,42 +368,54 @@ export function PdfViewerShell({
           )}
         </div>
         <div className="relative min-h-0 flex-1 bg-surface-sunken">
+          {/* The container stays mounted on a load failure (the error overlays
+              it) so the load effect's refs remain valid — otherwise a retry on
+              the same instance (a graph-session bump) would bail on null refs
+              and never load. */}
+          <div ref={containerRef} className="absolute inset-0 overflow-auto">
+            <div ref={viewerElementRef} className="pdfViewer" />
+          </div>
           {error !== null ? (
-            <div className="p-3 text-xs text-destructive" role="alert">
-              {error}
+            <div className="absolute inset-0 overflow-auto bg-surface-sunken p-3">
+              <div className="p-3 text-xs text-destructive" role="alert">
+                {error}
+              </div>
             </div>
-          ) : (
-            <div ref={containerRef} className="absolute inset-0 overflow-auto">
-              <div ref={viewerElementRef} className="pdfViewer" />
-            </div>
-          )}
+          ) : null}
         </div>
         {children}
       </div>
-      {fullscreen
-        ? createPortal(
-            // The fullscreen overlay: WKWebView/WebView2 lack the HTML
-            // Fullscreen API, so a fixed layer covering the whole window
-            // simulates it. A fresh PdfViewerShell is mounted recursively
-            // (same assetPath, starting at the current page) instead of
-            // re-homing the panel's pdf.js instance — the annotation layers
-            // and containers are bound to the panel's DOM, and moving them
-            // would misplace coordinates; the cost is one extra document
-            // render, destroyed on exit.
-            <div
-              role="dialog"
-              aria-label="PDF fullscreen"
-              className="fixed inset-0 z-50 flex flex-col bg-surface text-text"
-            >
-              <PdfViewerShell
-                assetPath={assetPath}
-                initialPage={currentPage}
-                chrome={<PageChrome fullscreen onClose={() => setFullscreen(false)} />}
-              />
-            </div>,
-            document.body,
-          )
-        : null}
+      {fullscreen ? (
+        // The fullscreen overlay: WKWebView/WebView2 lack the HTML Fullscreen
+        // API, so the shared shadcn Dialog (focus trap, aria-modal, Escape)
+        // is styled into a full-window surface. A fresh PdfViewerShell is
+        // mounted recursively (same assetPath, starting at the current page)
+        // instead of re-homing the panel's pdf.js instance — the annotation
+        // layers and containers are bound to the panel's DOM, and moving them
+        // would misplace coordinates; the cost is one extra document render,
+        // destroyed on exit.
+        <Dialog
+          open={fullscreen}
+          onOpenChange={(next) => {
+            if (!next) {
+              setFullscreen(false)
+            }
+          }}
+        >
+          <DialogContent
+            showCloseButton={false}
+            aria-label="PDF fullscreen"
+            overlayClassName="bg-surface"
+            className="fixed inset-0 top-0 left-0 z-50 flex h-full w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none bg-surface p-0 text-text ring-0 outline-none sm:max-w-none"
+          >
+            <PdfViewerShell
+              assetPath={assetPath}
+              initialPage={currentPage}
+              chrome={<PageChrome fullscreen onClose={() => setFullscreen(false)} />}
+            />
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </PdfViewerContext>
   )
 }

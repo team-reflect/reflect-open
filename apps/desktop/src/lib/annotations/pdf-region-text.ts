@@ -1,12 +1,61 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import type { AnnotationItem } from './annotations-store'
 
+/** A normalized annotation rectangle, `[left, top, right, bottom]` in 0–1. */
+export type NormalizedRect = [number, number, number, number]
+
+/** A pdf.js text item, narrowed to the bits the coordinate math needs. */
+export interface PdfTextItemLike {
+  str: string
+  transform: readonly number[]
+  width: number
+  height: number
+  hasEOL?: boolean
+}
+
+/** A page viewport at any scale: sizes for normalization, the rect mapper. */
+export interface PdfViewportLike {
+  width: number
+  height: number
+  convertToViewportRectangle(rect: readonly number[]): readonly number[]
+}
+
 /**
- * Whether a normalized rectangle (0–1, display coordinates: top-left origin,
- * y growing down — the same space as the annotation rects) has positive
- * overlap with another.
+ * A text item's bbox in the normalized 0–1 display space (top-left origin,
+ * y growing down — the same space as the annotation rects), from its
+ * transform and the page viewport.
+ *
+ * Coordinate math: a text item's transform is `[a, b, c, d, e, f]`; the
+ * baseline starts at `(e, f)` in PDF user space and runs `width` along x with
+ * `height` of font height (PDF y grows up), so its bbox is
+ * `[e, f, e + width, f + height]`. `convertToViewportRectangle` maps that to
+ * display pixels; dividing by the viewport size yields the 0–1 fractions,
+ * independent of the render scale.
  */
-function overlaps(a: readonly number[], b: readonly number[]): boolean {
+export function textItemNormalizedRect(
+  item: PdfTextItemLike,
+  viewport: PdfViewportLike,
+): NormalizedRect {
+  const [, , , , e, f] = item.transform
+  const [x1, y1, x2, y2] = viewport.convertToViewportRectangle([
+    e ?? 0,
+    f ?? 0,
+    (e ?? 0) + item.width,
+    (f ?? 0) + item.height,
+  ])
+  return [
+    (x1 ?? 0) / viewport.width,
+    (y1 ?? 0) / viewport.height,
+    (x2 ?? 0) / viewport.width,
+    (y2 ?? 0) / viewport.height,
+  ]
+}
+
+/**
+ * Whether two normalized rectangles (0–1, display coordinates) have positive
+ * overlap.
+ */
+export function rectsOverlap(a: readonly number[], b: readonly number[]): boolean {
   const overlapX = Math.min(a[2] ?? 0, b[2] ?? 0) - Math.max(a[0] ?? 0, b[0] ?? 0)
   const overlapY = Math.min(a[3] ?? 0, b[3] ?? 0) - Math.max(a[1] ?? 0, b[1] ?? 0)
   return overlapX > 0 && overlapY > 0
@@ -15,16 +64,8 @@ function overlaps(a: readonly number[], b: readonly number[]): boolean {
 /**
  * Extract the PDF text covered by a border annotation's rect: read the page's
  * text layer, convert each text item's bbox to the same normalized display
- * coordinates as the annotation (PDF user space → viewport, y flipped like the
- * highlight layer), and intersect with the rect; matching items join in
- * reading order.
- *
- * Coordinate math: a text item's transform is `[a, b, c, d, e, f]`; the
- * baseline starts at `(e, f)` in PDF user space and runs `width` along x with
- * `height` of font height (PDF y grows up), so its bbox is
- * `[e, f, e + width, f + height]`. `convertToViewportRectangle` maps that to
- * display pixels; dividing by the viewport size yields the 0–1 fractions,
- * independent of the render scale.
+ * coordinates as the annotation, and intersect with the rect; matching items
+ * join in reading order.
  *
  * Returns null when nothing overlaps or the read fails (the caller decides
  * the status-line feedback).
@@ -52,20 +93,7 @@ export async function extractRegionText(
     if (!('str' in textItem) || textItem.str === '') {
       continue
     }
-    const [, , , , e, f] = textItem.transform
-    const [x1, y1, x2, y2] = viewport.convertToViewportRectangle([
-      e,
-      f,
-      e + textItem.width,
-      f + textItem.height,
-    ])
-    const normalized = [
-      x1 / viewport.width,
-      y1 / viewport.height,
-      x2 / viewport.width,
-      y2 / viewport.height,
-    ]
-    if (overlaps(rect, normalized)) {
+    if (rectsOverlap(rect, textItemNormalizedRect(textItem, viewport))) {
       matched.push(textItem.str + (textItem.hasEOL === true ? '\n' : ''))
     }
   }

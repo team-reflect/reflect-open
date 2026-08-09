@@ -95,9 +95,30 @@ export async function handleDeepLink(url: string, io: DeepLinkIo): Promise<void>
       startOperation(label).done()
       return
     }
-    case 'preview':
-      io.openPreview(link.path)
+    case 'preview': {
+      // The path comes from an untrusted URL; resolve it like a note target
+      // so only indexed note paths preview — a `../../` traversal names no
+      // indexed note and is rejected instead of reaching the file reader.
+      let path: string | null
+      try {
+        path = await resolveNoteTarget(link.path)
+      } catch (cause) {
+        if (io.isStale?.() === true) {
+          return
+        }
+        startOperation('Opening preview').fail(errorMessage(cause))
+        return
+      }
+      if (io.isStale?.() === true) {
+        return
+      }
+      if (path === null) {
+        startOperation('Opening preview').fail(`Note not found: ${truncate(link.path)}`)
+        return
+      }
+      io.openPreview(path)
       return
+    }
   }
 }
 

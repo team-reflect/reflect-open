@@ -46,7 +46,13 @@ describe('annotationReference', () => {
         item({ pageIndex: 14 }),
       ),
     ).toBe(
-      '[A Tour of C++ 2nd Edition In-Depth Series-20221006164454-p9l6vxe - p15 - A key claim](assets/A%20Tour%20of%20C++%202nd%20Edition%20In-Depth%20Series-20221006164454-p9l6vxe.pdf#page=15)',
+      '[A Tour of C++ 2nd Edition In-Depth Series-20221006164454-p9l6vxe - p15 - A key claim](assets/A%20Tour%20of%20C%2B%2B%202nd%20Edition%20In-Depth%20Series-20221006164454-p9l6vxe.pdf#page=15)',
+    )
+  })
+
+  it('encodes # ? and parens per segment so the fragment stays the page target', () => {
+    expect(annotationReference('assets/a#b?c(d).pdf', item({ text: '' }))).toBe(
+      '[a#b?c(d) - p1](assets/a%23b%3Fc%28d%29.pdf#page=1)',
     )
   })
 

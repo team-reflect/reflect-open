@@ -62,6 +62,8 @@ vi.mock('@/providers/pdf-sidebar-view-provider', () => ({
 beforeEach(() => {
   window.sessionStorage.clear()
   sidebarViewState.backToDocument.mockReset()
+  // The shared viewer's page carries over between tests otherwise.
+  sessionState.session.viewer.currentPageNumber = 1
 })
 
 afterEach(() => {
@@ -170,8 +172,9 @@ describe('PdfSidebarBlock', () => {
     expect(sessionState.session.pdfDocument.getPageIndex).toHaveBeenCalledWith({ num: 5, gen: 0 })
 
     // A bookmark without a dest is disabled; clicking it jumps nowhere.
-    const chapter = page.getByRole('button', { name: 'Chapter 1' }).element()
-    expect(chapter?.getAttribute('disabled')).not.toBeNull()
+    await expect
+      .element(page.getByRole('button', { name: 'Chapter 1' }))
+      .toHaveAttribute('disabled')
   })
 
   it('renders one clickable thumbnail per page and jumps on a click', async () => {
