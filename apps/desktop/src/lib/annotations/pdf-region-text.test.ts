@@ -70,6 +70,33 @@ describe('extractRegionText', () => {
     await expect(extractRegionText(doc as never, item({}))).resolves.toBeNull()
   })
 
+  it('normalizes viewport corners that real pdf.js returns unsorted', async () => {
+    // Real `PageViewport.convertToViewportRectangle` applies the y-flip to the
+    // two corners and returns the raw transformed points — `[left, bottom,
+    // right, top]` order (the top-left corner in PDF space is the bottom in
+    // display space). Regression: the rect math must not assume sorted output.
+    const unsortedPage = {
+      getTextContent: async () => ({
+        items: [
+          { str: 'Hello', transform: [1, 0, 0, 1, 60, 150], width: 30, height: 12, hasEOL: false },
+        ],
+      }),
+      getViewport: () => ({
+        width: 300,
+        height: 200,
+        convertToViewportRectangle: (r: number[]) => [
+          r[0] ?? 0,
+          200 - (r[1] ?? 0),
+          r[2] ?? 0,
+          200 - (r[3] ?? 0),
+        ],
+      }),
+    }
+    await expect(extractRegionText(docMock(unsortedPage) as never, item({}))).resolves.toBe(
+      'Hello',
+    )
+  })
+
   it('returns null for a missing rect or a failing page read', async () => {
     await expect(extractRegionText(docMock({}) as never, item({ rects: [] }))).resolves.toBeNull()
     await expect(

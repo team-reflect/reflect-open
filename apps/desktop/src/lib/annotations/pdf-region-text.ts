@@ -31,23 +31,34 @@ export interface PdfViewportLike {
  * `[e, f, e + width, f + height]`. `convertToViewportRectangle` maps that to
  * display pixels; dividing by the viewport size yields the 0–1 fractions,
  * independent of the render scale.
+ *
+ * The viewport transform flips y (PDF user space origin is bottom-left), so
+ * `convertToViewportRectangle` returns the *raw* transformed corners —
+ * `[left, bottom, right, top]` order, not sorted. The min/max normalization
+ * below rebuilds a proper top-left-origin rect regardless of the corner
+ * ordering, which is what keeps the hit-testing and region-text extraction
+ * aligned with the rendered glyphs.
  */
 export function textItemNormalizedRect(
   item: PdfTextItemLike,
   viewport: PdfViewportLike,
 ): NormalizedRect {
   const [, , , , e, f] = item.transform
-  const [x1, y1, x2, y2] = viewport.convertToViewportRectangle([
+  const [rx1, ry1, rx2, ry2] = viewport.convertToViewportRectangle([
     e ?? 0,
     f ?? 0,
     (e ?? 0) + item.width,
     (f ?? 0) + item.height,
   ])
+  const left = Math.min(rx1 ?? 0, rx2 ?? 0)
+  const right = Math.max(rx1 ?? 0, rx2 ?? 0)
+  const top = Math.min(ry1 ?? 0, ry2 ?? 0)
+  const bottom = Math.max(ry1 ?? 0, ry2 ?? 0)
   return [
-    (x1 ?? 0) / viewport.width,
-    (y1 ?? 0) / viewport.height,
-    (x2 ?? 0) / viewport.width,
-    (y2 ?? 0) / viewport.height,
+    left / viewport.width,
+    top / viewport.height,
+    right / viewport.width,
+    bottom / viewport.height,
   ]
 }
 
