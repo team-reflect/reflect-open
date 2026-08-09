@@ -2,7 +2,6 @@ import {
   errorMessage,
   getNote,
   getPinnedNotes,
-  hasBridge,
   randomNotePath,
   toggleDevtools,
   untitledNotePath,
@@ -14,6 +13,7 @@ import { runGistPublish } from '@/lib/note-gist'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
 import { startOperation } from '@/lib/operations'
+import { isNativeShell } from '@/lib/platform'
 import { rebuildIndexVisibly } from '@/lib/rebuild-index'
 import { openRouteInNewWindow } from '@/lib/windows/open-in-new-window'
 import { routeForPath, type Route } from '@/routing/route'
@@ -386,7 +386,7 @@ const APP_COMMANDS: AppCommand[] = [
     // bridge. Errors are swallowed: a debug affordance never interrupts the user.
     keybinding: 'Mod-Shift-i',
     run: async () => {
-      if (!hasBridge()) {
+      if (!isNativeShell()) {
         return
       }
       try {

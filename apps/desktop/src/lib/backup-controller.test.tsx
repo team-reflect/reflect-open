@@ -13,6 +13,10 @@ import { createBackupController, type BackupState } from './backup-controller'
 // providerFetch routes GitHub API calls through the Tauri HTTP plugin
 // whenever a bridge is set — which it is in every test here.
 vi.mock('@tauri-apps/plugin-http', () => ({ fetch: vi.fn() }))
+vi.mock('@/lib/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/platform')>()),
+  isNativeShell: () => true,
+}))
 const httpFetch = vi.mocked(tauriFetch)
 
 afterEach(() => {

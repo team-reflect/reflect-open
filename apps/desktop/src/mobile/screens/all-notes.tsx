@@ -3,7 +3,6 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { ChevronLeft, FileText, SearchX } from 'lucide-react'
 import {
   foldTag,
-  hasBridge,
   listNoteTags,
   parseHighlights,
   searchWithFilters,
@@ -12,6 +11,7 @@ import {
 } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { FilterBar } from '@/mobile/search-filters/filter-bar'
 import {
@@ -80,7 +80,8 @@ export function MobileAllNotes({
 }: MobileAllNotesProps): ReactElement {
   const { graph } = useGraph()
   const { navigate, back, arrivalSeq, arrivalFocusEditor } = useRouter()
-  const enabled = hasBridge() && graph !== null
+  const bridgeReady = useBridgeReady()
+  const enabled = bridgeReady && graph !== null
 
   // The All-tab double-tap (`focusEditor` arrivals) lands in the search bar,
   // the tab's capture surface — the daily double-tap's All-flavored twin.

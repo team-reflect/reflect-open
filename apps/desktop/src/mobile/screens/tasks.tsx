@@ -1,9 +1,10 @@
 import { useDeferredValue, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Archive, CircleCheck, Plus, SlidersHorizontal } from 'lucide-react'
-import { getCompletedTasks, getOpenTasks, hasBridge, type OpenTask } from '@reflect/core'
+import { getCompletedTasks, getOpenTasks, type OpenTask } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { taskKey } from '@/lib/tasks/task-identity'
 import { useTaskFilters } from '@/lib/tasks/task-filters'
@@ -51,7 +52,8 @@ export function MobileTasks(): ReactElement {
   // Whether the current sheet visit should open with the editor focused
   // (keyboard up) — set per visit: true for "+"-added tasks, false for row taps.
   const [autoFocusEditor, setAutoFocusEditor] = useState(false)
-  const enabled = hasBridge() && graph !== null
+  const bridgeReady = useBridgeReady()
+  const enabled = bridgeReady && graph !== null
 
   // The Tasks-tab double-tap lands in the tab's capture surface: its live
   // search filter, selected so a replacement query can start immediately.

@@ -4,7 +4,6 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
   contactLinkSuggestions,
   foldKey,
-  hasBridge,
   isContactsReadable,
   suggestWikiTargets,
   type MeetingAttendee,
@@ -17,6 +16,7 @@ import {
   buildAutocompleteEntries,
   type AutocompleteEntry,
 } from '@/editor/wiki-autocomplete-entries'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
@@ -82,6 +82,7 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   const anchorRef = useRef<HTMLInputElement>(null)
   const deferredQuery = useDeferredValue(query)
   const searchTerm = deferredQuery.trim()
+  const bridgeReady = useBridgeReady()
 
   const {
     data: fetched,
@@ -114,7 +115,7 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
         },
       )
     },
-    enabled: hasBridge() && graph !== null && searchTerm !== '',
+    enabled: bridgeReady && graph !== null && searchTerm !== '',
     // Typing re-keys the query as the deferred value settles; holding the
     // previous rows avoids the list flashing closed between keystrokes.
     placeholderData: keepPreviousData,

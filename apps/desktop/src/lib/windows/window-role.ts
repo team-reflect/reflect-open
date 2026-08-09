@@ -1,5 +1,5 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { hasBridge } from '@reflect/core'
+import { isNativeShell } from '@/lib/platform'
 
 /**
  * Which window this webview is: the main window (the config-declared `main`
@@ -13,17 +13,16 @@ import { hasBridge } from '@reflect/core'
  * through this predicate so the ownership rule lives in one place.
  */
 export function isMainWindow(): boolean {
-  if (!hasBridge()) {
-    return true // plain-browser dev: one window, no native shell
+  if (!isNativeShell()) {
+    return true // no Tauri window metadata (browser dev, tests): one window
   }
   try {
     return getCurrentWindow().label === 'main'
   } catch (cause) {
-    // A bridge without Tauri window metadata: the jsdom test harness and the
-    // ?platform=ios browser harness. Both are single-window — main. In a real
-    // Tauri webview the internals are injected before any script runs, so
-    // this can't fire there; warn loudly in case that assumption ever breaks
-    // (a misclassified note window would boot the main-window singletons).
+    // In a real Tauri webview the internals are injected before any script
+    // runs, so this can't fire; warn loudly in case that assumption ever
+    // breaks (a misclassified note window would boot the main-window
+    // singletons).
     console.warn('window label unavailable; assuming the main window:', cause)
     return true
   }

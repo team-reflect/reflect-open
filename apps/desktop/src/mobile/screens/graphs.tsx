@@ -1,9 +1,10 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
-import { errorMessage, hasBridge, mobileStorage, type MobileStorageKind } from '@reflect/core'
+import { errorMessage, mobileStorage, type MobileStorageKind } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { Spinner } from '@/components/ui/spinner'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { graphNameFromRoot } from '@/lib/graph-names'
 import { NewGraphDrawer } from '@/mobile/new-graph-drawer'
 import { MobileScreenHeader } from '@/mobile/screen-header'
@@ -29,10 +30,11 @@ export function MobileGraphs(): ReactElement {
   const [switchError, setSwitchError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
 
+  const bridgeReady = useBridgeReady()
   const { data: storage } = useQuery({
     queryKey: ['mobile-storage'],
     queryFn: mobileStorage,
-    enabled: hasBridge(),
+    enabled: bridgeReady,
     refetchOnMount: 'always',
   })
 

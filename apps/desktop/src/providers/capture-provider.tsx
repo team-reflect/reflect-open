@@ -2,10 +2,10 @@ import { useEffect, useRef, type ReactElement, type ReactNode } from 'react'
 import {
   captureHostRegister,
   captureSharedInboxRelay,
-  hasBridge,
   type AiProvidersState,
   type GraphInfo,
 } from '@reflect/core'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useMainWindowEffect } from '@/hooks/use-main-window-effect'
 import { createCaptureController } from '@/lib/capture-controller'
 import { isMobileSurface } from '@/lib/platform-surface'
@@ -47,6 +47,7 @@ export function CaptureProvider({ graph, children }: CaptureProviderProps): Reac
 
   // One drain per app: a secondary note window running its own would race
   // the main window's over the same spooled envelopes.
+  const bridgeReady = useBridgeReady()
   useMainWindowEffect(() => {
     const mobile = isMobileSurface()
     const controller = createCaptureController({
@@ -65,7 +66,7 @@ export function CaptureProvider({ graph, children }: CaptureProviderProps): Reac
     // "host not found" with install guidance on its side. Mobile has no host
     // process at all: the share extension finds the App Group inbox itself.
     const registered =
-      hasBridge() && !mobile
+      bridgeReady && !mobile
         ? captureHostRegister().catch((cause: unknown) => {
             console.error('capture host registration failed:', cause)
           })
@@ -76,7 +77,7 @@ export function CaptureProvider({ graph, children }: CaptureProviderProps): Reac
     return () => {
       controller.dispose()
     }
-  }, [graph.generation])
+  }, [bridgeReady, graph.generation])
 
   return <>{children}</>
 }

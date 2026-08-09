@@ -19,7 +19,7 @@ const runCopyDeepLink = vi.hoisted(() => vi.fn(async () => undefined))
 const runCopyNotePath = vi.hoisted(() => vi.fn(async () => undefined))
 const getNote = vi.hoisted(() => vi.fn<() => Promise<NoteRow | undefined>>(async () => undefined))
 const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async () => []))
-const hasBridge = vi.hoisted(() => vi.fn(() => true))
+const isNativeShell = vi.hoisted(() => vi.fn(() => true))
 const toggleDevtools = vi.hoisted(() => vi.fn(async () => undefined))
 const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 const operationFail = vi.hoisted(() => vi.fn())
@@ -34,6 +34,10 @@ vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
 vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
 vi.mock('@/lib/note-deep-link', () => ({ runCopyDeepLink }))
 vi.mock('@/lib/note-copy-path', () => ({ runCopyNotePath }))
+vi.mock('@/lib/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/platform')>()),
+  isNativeShell,
+}))
 vi.mock('@/lib/windows/open-in-new-window', () => ({ openRouteInNewWindow }))
 vi.mock('@/lib/operations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/operations')>()),
@@ -46,7 +50,6 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   embedStatus,
   getNote,
   getPinnedNotes,
-  hasBridge,
   toggleDevtools,
 }))
 
@@ -402,7 +405,7 @@ describe('app commands', () => {
   })
 
   it('dev.toggleDevtools toggles the inspector through the native shell', async () => {
-    hasBridge.mockReturnValue(true)
+    isNativeShell.mockReturnValue(true)
     toggleDevtools.mockClear()
     const { context } = fakeContext()
     await command('dev.toggleDevtools').run(context)
@@ -410,12 +413,12 @@ describe('app commands', () => {
   })
 
   it('dev.toggleDevtools no-ops without a native shell (plain-browser dev)', async () => {
-    hasBridge.mockReturnValue(false)
+    isNativeShell.mockReturnValue(false)
     toggleDevtools.mockClear()
     const { context } = fakeContext()
     await expect(command('dev.toggleDevtools').run(context)).resolves.toBeUndefined()
     expect(toggleDevtools).not.toHaveBeenCalled()
-    hasBridge.mockReturnValue(true)
+    isNativeShell.mockReturnValue(true)
   })
 
   it('semantic.enable persists the opt-in through the context capability', async () => {

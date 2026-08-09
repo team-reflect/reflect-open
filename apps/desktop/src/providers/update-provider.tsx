@@ -7,8 +7,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { hasBridge } from '@reflect/core'
 import { useMainWindowEffect } from '@/hooks/use-main-window-effect'
+import { isNativeShell } from '@/lib/platform'
 import {
   createUpdateController,
   type UpdateController,
@@ -49,7 +49,7 @@ interface UpdateProviderProps {
  * any graph is open.
  */
 export function UpdateProvider({ children, autoCheck }: UpdateProviderProps): ReactElement {
-  const supported = hasBridge()
+  const supported = isNativeShell()
   const resolvedAutoCheck = autoCheck ?? (supported && !import.meta.env.DEV)
   const [controller, setController] = useState<UpdateController | null>(null)
 

@@ -7,7 +7,7 @@ import { SettingsProvider } from '@/providers/settings-provider'
 import { CalendarIntegrationField } from './calendar-integration-field'
 
 // The section renders only in the macOS desktop webview; jsdom is neither.
-vi.mock('@/lib/platform', () => ({ isMacosDesktop: true }))
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: true, isNativeShell: () => true }))
 
 const openUrl = vi.hoisted(() => vi.fn<(url: string) => Promise<void>>(async () => {}))
 vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl }))

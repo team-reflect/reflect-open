@@ -28,6 +28,7 @@ import {
 import { setBackupFlusher } from '@/lib/backup-flush'
 import { invalidateGithubAuth } from '@/lib/github-auth-state'
 import { startOperation } from '@/lib/operations'
+import { isNativeShell } from '@/lib/platform'
 import { isMobileSurface } from '@/lib/platform-surface'
 import { providerFetch } from '@/lib/provider-fetch'
 import { throttledInvalidateIndexQueries } from '@/lib/query-client'
@@ -258,7 +259,9 @@ export function createBackupController(options: BackupControllerOptions): Backup
    * happened not to come up would be the worse trade.
    */
   async function startLocalHistory(initialized: boolean): Promise<void> {
-    if (isMobileSurface()) {
+    // Real git on a real folder — a shell capability the browser-dev bridge
+    // honestly lacks, so don't start (and noisily fail) the commit loop there.
+    if (isMobileSurface() || !isNativeShell()) {
       return
     }
     try {

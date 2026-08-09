@@ -29,6 +29,7 @@ import {
   type ChatTurn,
   type GraphInfo,
 } from '@reflect/core'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { toChatAttachment, type ChatAttachment } from '@/lib/chat-attachments'
 import { todayIso } from '@/lib/dates'
 import { isMobileSurface } from '@/lib/platform-surface'
@@ -69,6 +70,7 @@ interface ChatProviderProps {
 export function ChatProvider({ graph, children }: ChatProviderProps): ReactElement {
   const { settings, updateSettings } = useSettings()
   const { indexGeneration } = useGraph()
+  const bridgeReady = useBridgeReady()
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
@@ -151,6 +153,8 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   const persistTurn = useCallback(
     (conversation: ChatConversation, turn: ChatTurn, createdMs: number) => {
       const generation = generationRef.current
+      // Call-time check on purpose — saves fire from user actions, so they
+      // read the live bridge state instead of a captured render value.
       if (
         !hasBridge() ||
         generation === null ||
@@ -181,7 +185,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   // stays in the history). Guarded against races: by the time the rows
   // arrive the user may have started typing into the fresh conversation.
   useEffect(() => {
-    if (!hasBridge() || indexGeneration === null) {
+    if (!bridgeReady || indexGeneration === null) {
       return
     }
     const session = sessionRef.current
@@ -205,7 +209,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
     return () => {
       active = false
     }
-  }, [indexGeneration])
+  }, [bridgeReady, indexGeneration])
 
   const send = useCallback(
     async (text: string): Promise<void> => {

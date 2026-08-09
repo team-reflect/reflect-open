@@ -77,6 +77,8 @@ export function useEditorAutocomplete(): EditorAutocomplete {
 
   const onWikilinkSearch = useCallback(
     async (query: string): Promise<WikilinkItem[]> => {
+      // Call-time check on purpose: search handlers run on user action, so
+      // they read the live bridge state instead of a captured one.
       if (!hasBridge() || graph === null) {
         return []
       }

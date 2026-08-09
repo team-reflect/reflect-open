@@ -4,12 +4,12 @@ import {
   errorMessage,
   getConflictedNotes,
   getDuplicateNoteIds,
-  hasBridge,
   icloudAdoptGraph,
   icloudPendingCount,
   icloudStatus,
 } from '@reflect/core'
 import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { SettingsField } from '@/components/settings/field'
 import { Button } from '@/components/ui/button'
 import {
@@ -79,7 +79,7 @@ export function IcloudSettingsField(): ReactElement | null {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const bridgeAvailable = hasBridge()
+  const bridgeAvailable = useBridgeReady()
   const hosted = graph !== null && isICloudRoot(graph.root)
   const { data: status } = useQuery({
     queryKey: ICLOUD_STATUS_QUERY_KEY,

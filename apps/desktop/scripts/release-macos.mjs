@@ -35,7 +35,7 @@ import {
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { pathToFileURL } from 'node:url'
 
 const KEYCHAIN_SERVICE = 'reflect-notary'
 const UPDATER_KEYCHAIN_SERVICE = 'reflect-updater'

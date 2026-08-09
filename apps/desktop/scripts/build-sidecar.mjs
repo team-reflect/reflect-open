@@ -10,8 +10,7 @@
 
 import { execFileSync, execSync } from 'node:child_process'
 import { copyFileSync, mkdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 
 const platform = process.env.TAURI_ENV_PLATFORM ?? ''
 if (platform === 'ios' || platform === 'android') {

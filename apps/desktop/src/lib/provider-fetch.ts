@@ -1,5 +1,5 @@
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
-import { hasBridge } from '@reflect/core'
+import { isNativeShell } from '@/lib/platform'
 
 /**
  * The transport for direct app → AI-provider calls (BYOK, Plan 10). Inside
@@ -21,7 +21,7 @@ import { hasBridge } from '@reflect/core'
  * empty value an explicit removal).
  */
 export function providerFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  if (!hasBridge()) {
+  if (!isNativeShell()) {
     return fetch(input, init)
   }
   const headers = new Headers(init?.headers)

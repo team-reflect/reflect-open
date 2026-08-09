@@ -89,6 +89,8 @@ vi.mock('@tauri-apps/api/core', () => ({
   ),
 }))
 
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: false, isNativeShell: () => true }))
+
 vi.mock('@/lib/transcription-reconciler', () => ({
   createTranscriptionReconciler,
 }))

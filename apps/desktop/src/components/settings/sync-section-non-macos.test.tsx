@@ -9,7 +9,7 @@ import { SyncSection } from './sync-section'
 // A browser-mode module mock materializes value exports once, so the
 // platform-hidden behavior needs its own file with the flag statically false
 // (see `sync-section.test.tsx` for the macOS suite).
-vi.mock('@/lib/platform', () => ({ isMacosDesktop: false }))
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: false, isNativeShell: () => true }))
 
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),

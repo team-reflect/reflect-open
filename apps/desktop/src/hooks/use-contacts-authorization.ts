@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { contactsAuthorizationStatus, hasBridge, type ContactsAuthorization } from '@reflect/core'
+import { contactsAuthorizationStatus, type ContactsAuthorization } from '@reflect/core'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 
 /**
  * One shared query for the Contacts permission state, consumed by the
@@ -13,10 +14,11 @@ export const CONTACTS_AUTHORIZATION_QUERY_KEY = ['contacts', 'authorization'] as
 
 /** The Contacts permission state, or `null` while the first read is in flight. */
 export function useContactsAuthorization(): ContactsAuthorization | null {
+  const bridgeReady = useBridgeReady()
   const { data } = useQuery({
     queryKey: CONTACTS_AUTHORIZATION_QUERY_KEY,
     queryFn: () => contactsAuthorizationStatus(),
-    enabled: hasBridge(),
+    enabled: bridgeReady,
   })
   return data ?? null
 }
