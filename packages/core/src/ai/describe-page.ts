@@ -124,8 +124,8 @@ function describePrompt(request: DescribePageRequest): string {
     lines.push(`Extracted page text: ${request.contentText.slice(0, MAX_CONTENT_TEXT_CHARS)}`)
   }
   lines.push(
-    'Ground both fields in the extracted page text when present, and the screenshot when one is attached.',
-    'title: the page\'s own title cleaned up for display — drop the site name, separators, and SEO clutter; keep the page\'s language and its plain wording. The captured title may not describe the page at all: share sheets often supply boilerplate ("See this Instagram post by @user"), a bare domain, or message text — in that case build the title from the meta title, page text, or screenshot instead of keeping it. Never invent an editorial retitle; when the captured title already describes the page cleanly, return it unchanged.',
+    'Ground both fields in the extracted page text when present, and the screenshot when one is attached. State only what those inputs show: recognizing the site, a show, or a person in the screenshot is not knowing which page this is.',
+    "title: the page's own title cleaned up for display — drop the site name, separators, and SEO clutter; keep the page's language and its plain wording. The captured title may not describe the page at all: share sheets often supply boilerplate (\"See this Instagram post by @user\"), a bare domain, or message text — in that case rebuild the title only from text you can actually quote: the meta title, the page text, or words readable in the screenshot. When none of those contain the page's title, return null for the title; a specific-sounding guess is worse than none. Never invent an editorial retitle; when the captured title already describes the page cleanly, return it unchanged.",
     'description: one or two plain sentences describing the page — no preamble, no markdown.',
   )
   return lines.join('\n')
