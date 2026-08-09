@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react'
 import type { WikilinkClickHandler } from '@meowdown/core'
 import { BacklinkSnippet } from '@/components/backlink-snippet'
 import type { BacklinkSource } from '@/lib/group-backlinks'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
+import type { ModClickEvent } from '@/lib/windows/open-in-new-window'
 
 interface BacklinkSourceGroupProps {
   source: BacklinkSource
@@ -18,7 +18,7 @@ interface BacklinkSourceGroupProps {
    * Open the source note (the panel wires this to the router). The click
    * event rides along so ⌘-click can open a new window.
    */
-  onOpen: (path: string, event?: NewWindowClickEvent) => void
+  onOpen: (path: string, event?: ModClickEvent) => void
   /** Navigate a clicked `[[wiki link]]` inside a snippet to its target. */
   onWikilinkClick: WikilinkClickHandler
   /** Resolve `![…](…)` sources inside a snippet to displayable URLs. */

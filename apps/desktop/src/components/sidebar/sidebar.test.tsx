@@ -288,7 +288,7 @@ describe('Sidebar', () => {
     const { view } = await renderSidebar()
     const roadmap = view.getByRole('button', { name: 'Roadmap' })
 
-    await roadmap.click({ modifiers: ['Meta'] })
+    await roadmap.click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({

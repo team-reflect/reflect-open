@@ -3,7 +3,7 @@ import type { ConflictedNote } from '@reflect/core'
 import { ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
-import { isNewWindowClick } from '@/lib/windows/open-in-new-window'
+import { isModEvent } from '@meowdown/core'
 
 interface ConflictedNoteLinksProps {
   readonly notes: readonly ConflictedNote[]
@@ -25,7 +25,7 @@ function ConflictedNoteLink({ note }: ConflictedNoteLinkProps): ReactElement {
         onClick={(event) =>
           navigateNoteLink({
             target: { kind: 'note', path: note.path },
-            openInNewWindow: isNewWindowClick(event),
+            openInNewWindow: isModEvent(event),
           })
         }
       >

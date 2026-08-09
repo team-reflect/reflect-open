@@ -403,7 +403,7 @@ describe('NoteEditor link opening', () => {
     openDeepLinkInNewWindow.mockResolvedValue(true)
     await render(<NoteEditor initialContent="[note](reflect://note/abc123) here" />)
 
-    await pmRoot.getByRole('link').click({ modifiers: ['Meta'] })
+    await pmRoot.getByRole('link').click({ modifiers: ['ControlOrMeta'] })
     await vi.waitFor(() => {
       expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/abc123')
     })
@@ -414,7 +414,7 @@ describe('NoteEditor link opening', () => {
     openDeepLinkInNewWindow.mockResolvedValue(false)
     await render(<NoteEditor initialContent="[append](reflect://append?text=hi) here" />)
 
-    await pmRoot.getByRole('link').click({ modifiers: ['Meta'] })
+    await pmRoot.getByRole('link').click({ modifiers: ['ControlOrMeta'] })
     await vi.waitFor(() => {
       expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://append?text=hi')
     })

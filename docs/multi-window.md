@@ -57,14 +57,14 @@ It targets `CommandContext.notePath()`, so the focused day in the daily stream
 and an ordinary routed note both open through the same mechanism described
 below. The command is also exposed in the native Window menu.
 
-1. A modifier click, or a Cmd/Ctrl+Enter press on a selected link unit, asks
-   for a new window. Each UI boundary turns its own gesture into the explicit
-   `openInNewWindow` flag the navigation chain carries: plain DOM rows apply
-   the mouse convention (`isNewWindowClick`), and editor follows combine
-   meowdown's `mod` flag with it (`followWantsNewWindow`). `mod` is the
-   platform modifier held beyond the follow's own trigger, so a caret follow
-   (which since meowdown 0.65 fires only with the caret strictly inside a
-   tag or Markdown link, never merely touching a unit's edge) reports false.
+1. A mod-click (the platform's mod key: Cmd on Apple, Ctrl elsewhere), or a
+   Mod+Enter press on a selected link unit, asks for a new window. Each UI
+   boundary turns its own gesture into the explicit `openInNewWindow` flag
+   the navigation chain carries, and one definition backs them all:
+   meowdown's `isModEvent` reads plain DOM row clicks, and the editor's own
+   `mod` follow flag comes from the same helper (a caret follow, which since
+   meowdown 0.65 fires only with the caret strictly inside a tag or
+   Markdown link, consumed its mod key as the trigger and reports false).
    The flag then resolves the target as usual. Resolved note
    references share `useNoteLinkNavigation`, which applies the convention and
    delegates to `openRouteInNewWindow`; raw in-note links use

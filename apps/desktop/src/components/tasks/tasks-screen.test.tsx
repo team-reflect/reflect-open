@@ -437,7 +437,10 @@ describe('TasksScreen', () => {
     ])
     const view = await renderScreen()
 
-    fireEvent.click(await view.findByRole('button', { name: 'Project' }), { metaKey: true })
+    fireEvent.click(await view.findByRole('button', { name: 'Project' }), {
+      metaKey: true,
+      ctrlKey: true,
+    })
 
     await waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({
@@ -456,7 +459,10 @@ describe('TasksScreen', () => {
     ])
     const view = await renderScreen()
 
-    fireEvent.click(await view.findByRole('button', { name: 'Project' }), { metaKey: true })
+    fireEvent.click(await view.findByRole('button', { name: 'Project' }), {
+      metaKey: true,
+      ctrlKey: true,
+    })
 
     await waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({

@@ -28,7 +28,7 @@ function reportUnavailableNoteTitle(title: string): void {
  * unresolved titles are a no-op.
  *
  * An `openInNewWindow` request (a ⌘-click or a spare-`mod` keyboard follow,
- * decided at the editor boundary by `followWantsNewWindow`) opens the
+ * decided at the editor boundary from meowdown's `mod` flag) opens the
  * resolved target in a secondary note window instead, falling back to
  * in-window navigation whenever the surface can't (browser dev, mobile), so
  * the request never makes a link do nothing.

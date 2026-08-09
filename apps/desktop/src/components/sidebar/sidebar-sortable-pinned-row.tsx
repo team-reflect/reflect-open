@@ -15,7 +15,7 @@ import { useSettings } from '@/providers/settings-provider'
 import { routeForPath, routesEqual } from '@/routing/route'
 import { useRouter } from '@/routing/router'
 import { SidebarPinnedRowPreview } from './sidebar-pinned-row-preview'
-import { isNewWindowClick } from '@/lib/windows/open-in-new-window'
+import { isModEvent } from '@meowdown/core'
 
 interface SidebarSortablePinnedRowProps {
   note: PinnedNote
@@ -77,7 +77,7 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
         ref={setNodeRef}
         type="button"
         style={style}
-        onClick={(event) => navigateNoteLink({ target, openInNewWindow: isNewWindowClick(event) })}
+        onClick={(event) => navigateNoteLink({ target, openInNewWindow: isModEvent(event) })}
         onContextMenu={handleContextMenu}
         aria-current={active ? 'page' : undefined}
         className="block w-full"

@@ -30,7 +30,7 @@ describe('BacklinkSourceGroup', () => {
     const onOpen = vi.fn<OnOpen>()
     await mount(onOpen)
 
-    await page.getByRole('button', { name: 'Source Note' }).click({ modifiers: ['Meta'] })
+    await page.getByRole('button', { name: 'Source Note' }).click({ modifiers: ['ControlOrMeta'] })
 
     expect(onOpen).toHaveBeenCalledTimes(1)
     const [path, event] = onOpen.mock.calls[0]!

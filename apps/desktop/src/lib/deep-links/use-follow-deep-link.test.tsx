@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { type FollowDeepLink, useFollowDeepLink } from './use-follow-deep-link'
-import { isNewWindowClick } from '@/lib/windows/open-in-new-window'
+import { isModEvent } from '@meowdown/core'
 
 const dispatchDeepLink = vi.hoisted(() => vi.fn())
 const openDeepLinkInNewWindow = vi.hoisted(() => vi.fn<(href: string) => Promise<boolean>>())
@@ -28,7 +28,7 @@ function Host(): ReactElement {
       onClick={(event) =>
         openNoteLink({
           target: { kind: 'note', path: 'notes/newer-link.md' },
-          openInNewWindow: isNewWindowClick(event),
+          openInNewWindow: isModEvent(event),
         })
       }
     >
@@ -120,7 +120,7 @@ describe('useFollowDeepLink', () => {
     modifierClick()
     expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/older')
     await view.getByRole('button', { name: 'Open newer note link' }).click({
-      modifiers: ['Meta'],
+      modifiers: ['ControlOrMeta'],
     })
     await vi.waitFor(() => expect(openRouteInNewWindow).toHaveBeenCalledTimes(1))
     finishOpen(false)
@@ -141,7 +141,7 @@ describe('useFollowDeepLink', () => {
     modifierClick()
     expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/older')
     await view.getByRole('button', { name: 'Open newer note link' }).click({
-      modifiers: ['Meta'],
+      modifiers: ['ControlOrMeta'],
     })
     await vi.waitFor(() => expect(openRouteInNewWindow).toHaveBeenCalledTimes(1))
     rejectOpen(new Error('window creation failed'))

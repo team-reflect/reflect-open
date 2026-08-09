@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, type ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
 import { useOpenExternalLink } from '@/editor/open-external-link'
 import { cn } from '@/lib/utils'
-import { followWantsNewWindow } from '@/lib/windows/open-in-new-window'
 
 /**
  * A read-only rendering of note markdown via @meowdown/react's `<MarkdownView>`
@@ -66,10 +65,7 @@ export function MarkdownPreview({
   )
   const onWikilinkClickStable = useCallback(
     (payload: { target: string; event: MouseEvent | KeyboardEvent; mod: boolean }) =>
-      navigateRef.current?.({
-        target: payload.target,
-        openInNewWindow: followWantsNewWindow(payload),
-      }),
+      navigateRef.current?.({ target: payload.target, openInNewWindow: payload.mod }),
     [],
   )
 

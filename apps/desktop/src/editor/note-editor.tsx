@@ -43,7 +43,6 @@ import { useLightboxTransition } from '@/editor/use-lightbox-transition'
 import { isDeepLinkUrl } from '@/lib/deep-links/parse'
 import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link'
 import { cn } from '@/lib/utils'
-import { followWantsNewWindow } from '@/lib/windows/open-in-new-window'
 
 type WikilinkHoverRenderer = (hit: WikilinkHoverHit) => ReactNode | Promise<ReactNode>
 
@@ -327,10 +326,7 @@ export function NoteEditor({
 
   const handleWikilinkClick = useCallback(
     (payload: { target: string; event: MouseEvent | KeyboardEvent; mod: boolean }) =>
-      onWikiLinkClickRef.current?.({
-        target: payload.target,
-        openInNewWindow: followWantsNewWindow(payload),
-      }),
+      onWikiLinkClickRef.current?.({ target: payload.target, openInNewWindow: payload.mod }),
     [],
   )
   const handleTagClick = useCallback(
@@ -348,8 +344,7 @@ export function NoteEditor({
   const handleLinkClick = useCallback(
     // The event may also be the Mod-Enter key press that followed the link
     // (meowdown ≥0.33).
-    ({ href, event, mod }: { href: string; event: MouseEvent | KeyboardEvent; mod: boolean }) => {
-      const openInNewWindow = followWantsNewWindow({ event, mod })
+    ({ href, mod }: { href: string; event: MouseEvent | KeyboardEvent; mod: boolean }) => {
       // A graph-relative `assets/…` href (an attachment link) opens through
       // the generation-pinned asset command, never the URL opener — which
       // would receive a meaningless relative string.
@@ -366,13 +361,13 @@ export function NoteEditor({
       // *addressing* link to a new window instead; a declined open (capture link, browser dev)
       // degrades to the normal dispatch.
       if (isDeepLinkUrl(href)) {
-        followDeepLink({ href, openInNewWindow })
+        followDeepLink({ href, openInNewWindow: mod })
         return
       }
       if (!isOpenableExternalUrl(href)) {
         // A scheme-less local href is a note link; the host resolves it
         // against this note's own directory.
-        onNoteLinkClickRef.current?.({ href, openInNewWindow })
+        onNoteLinkClickRef.current?.({ href, openInNewWindow: mod })
         return
       }
       void openUrl(href).catch((cause) => {

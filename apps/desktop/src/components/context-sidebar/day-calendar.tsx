@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 import { useRouter } from '@/routing/router'
-import { isNewWindowClick } from '@/lib/windows/open-in-new-window'
+import { isModEvent } from '@meowdown/core'
 
 interface DayCalendarProps {
   /** The day the sidebar describes (highlighted as selected). */
@@ -141,7 +141,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
                     onClick={(event) =>
                       navigateNoteLink({
                         target: { kind: 'daily', date: cell.date },
-                        openInNewWindow: isNewWindowClick(event),
+                        openInNewWindow: isModEvent(event),
                       })
                     }
                     className={cn(

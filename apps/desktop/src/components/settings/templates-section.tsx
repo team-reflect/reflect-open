@@ -21,7 +21,7 @@ import { useGraph } from '@/providers/graph-provider'
 import { useNoteTemplates } from '@/providers/note-templates-provider'
 import { SettingsField } from './field'
 import { SettingsSection } from './section'
-import { isNewWindowClick } from '@/lib/windows/open-in-new-window'
+import { isModEvent } from '@meowdown/core'
 
 /**
  * Note templates (docs/porting/note-templates.md): the `templates/` folder as
@@ -56,7 +56,7 @@ export function TemplatesSection(): ReactElement {
                   onClick={(event) =>
                     navigateNoteLink({
                       target: { kind: 'note', path: template.path },
-                      openInNewWindow: isNewWindowClick(event),
+                      openInNewWindow: isModEvent(event),
                     })
                   }
                   className="min-w-0 flex-1 text-left"

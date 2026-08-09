@@ -2,7 +2,7 @@ import { memo, type MouseEvent, type ReactElement } from 'react'
 import type { NoteListEntry } from '@reflect/core'
 import { formatRecencyLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
+import type { ModClickEvent } from '@/lib/windows/open-in-new-window'
 import { useSettings } from '@/providers/settings-provider'
 
 /**
@@ -22,7 +22,7 @@ interface AllNotesRowProps {
   /** Indicator click: toggle this row (Shift extends a range) — V1's check gutter. */
   onToggle: (path: string, event: Pick<MouseEvent, 'shiftKey'>) => void
   /** Open the note (subject click / double-click). */
-  onOpen: (path: string, event?: NewWindowClickEvent) => void
+  onOpen: (path: string, event?: ModClickEvent) => void
 }
 
 /**

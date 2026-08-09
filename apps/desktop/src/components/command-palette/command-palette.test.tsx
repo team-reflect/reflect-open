@@ -199,7 +199,7 @@ describe('CommandPalette', () => {
     const { view } = await renderPalette('rust')
     const result = view.getByText('Rust Notes')
 
-    await result.click({ modifiers: ['Meta'] })
+    await result.click({ modifiers: ['ControlOrMeta'] })
 
     expect(view.getByTestId('palette-overlay').query()).toBeNull()
     expect(openRouteInNewWindow).toHaveBeenCalledTimes(1)
@@ -220,7 +220,7 @@ describe('CommandPalette', () => {
     const { view } = await renderPalette('rust')
     const result = view.getByText('Rust Notes')
 
-    await result.click({ modifiers: ['Meta'] })
+    await result.click({ modifiers: ['ControlOrMeta'] })
 
     expect(view.getByTestId('palette-overlay').query()).toBeNull()
     await expect.element(view.getByTestId('route')).toHaveTextContent('notes/rust.md')

@@ -164,7 +164,7 @@ describe('SimilarNotesSection', () => {
     ])
     const view = await renderSimilar('daily/2026-06-09.md')
 
-    await view.getByRole('button', { name: 'Gardening' }).click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: 'Gardening' }).click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({

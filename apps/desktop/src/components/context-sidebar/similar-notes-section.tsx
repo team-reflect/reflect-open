@@ -4,7 +4,7 @@ import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { useSimilarNotes } from '@/lib/use-similar-notes'
 import { routeForPath } from '@/routing/route'
 import { SidebarSection } from './sidebar-section'
-import { isNewWindowClick } from '@/lib/windows/open-in-new-window'
+import { isModEvent } from '@meowdown/core'
 
 interface SimilarNotesSectionProps {
   /** Graph-relative path of the note whose semantic neighbors to show. */
@@ -40,7 +40,7 @@ export function SimilarNotesSection({ path }: SimilarNotesSectionProps): ReactEl
               onClick={(event) =>
                 navigateNoteLink({
                   target: routeForPath(hit.path),
-                  openInNewWindow: isNewWindowClick(event),
+                  openInNewWindow: isModEvent(event),
                 })
               }
               className="flex w-full items-center space-x-1 rounded-md px-3 py-1 leading-5 text-text-secondary transition-colors duration-100 hover:bg-surface-hover hover:text-text"

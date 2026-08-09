@@ -19,6 +19,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { ChatProvider, useChatSession } from '@/providers/chat-provider'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { ChatScreen } from './chat-screen'
+import { isModEvent } from '@meowdown/core'
 
 /**
  * The chat view over a faked engine: the provider stack and screen are real,
@@ -113,9 +114,7 @@ vi.mock('@/editor/markdown-preview', () => ({
           <button
             key={target}
             type="button"
-            onClick={(event) =>
-              onWikiLinkClick?.({ target, openInNewWindow: event.metaKey || event.ctrlKey })
-            }
+            onClick={(event) => onWikiLinkClick?.({ target, openInNewWindow: isModEvent(event) })}
           >
             Open {target}
           </button>
@@ -337,8 +336,12 @@ describe('ChatScreen', () => {
     const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'open the source notes{Enter}')
-    await view.getByRole('button', { name: 'Atlas', exact: true }).click({ modifiers: ['Meta'] })
-    await view.getByRole('button', { name: 'Brief', exact: true }).click({ modifiers: ['Meta'] })
+    await view
+      .getByRole('button', { name: 'Atlas', exact: true })
+      .click({ modifiers: ['ControlOrMeta'] })
+    await view
+      .getByRole('button', { name: 'Brief', exact: true })
+      .click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() =>
       expect(openRouteInNewWindow.mock.calls).toEqual([
@@ -378,7 +381,7 @@ describe('ChatScreen', () => {
     const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'what should I open?{Enter}')
-    await view.getByRole('button', { name: 'Open Atlas' }).click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: 'Open Atlas' }).click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({

@@ -13,40 +13,14 @@ import type { Route } from '@/routing/route'
  * modifier can never make a link do nothing.
  */
 
-/** The modifier shape shared by native and React synthetic mouse events. */
-export interface NewWindowClickEvent {
+/** The modifier fields meowdown's `isModEvent` reads off a link-like control's click. */
+export interface ModClickEvent {
   metaKey: boolean
   ctrlKey: boolean
-  type: string
 }
 
 /** Coalesce double-clicks before the shell has registered its content-addressed window label. */
 const pendingWindowOpens = new Map<string, Promise<boolean>>()
-
-/**
- * Whether a mouse click asked for a new window (⌘-click; ctrl-click off
- * mac). Keyboard events always answer false: a keyboard follow's intent is
- * meowdown's `mod` flag, combined in {@link followWantsNewWindow}. UI
- * boundaries turn their gesture into the explicit `openInNewWindow` flag
- * that the navigation chain carries.
- */
-export function isNewWindowClick(event: NewWindowClickEvent | undefined): boolean {
-  if (event === undefined || event.type.startsWith('key')) {
-    return false
-  }
-  return event.metaKey || event.ctrlKey
-}
-
-/**
- * The new-window intent of a meowdown follow: the `mod` flag (the platform
- * modifier held beyond the follow's own trigger), or a modifier mouse click.
- */
-export function followWantsNewWindow(payload: {
-  event: NewWindowClickEvent
-  mod: boolean
-}): boolean {
-  return payload.mod || isNewWindowClick(payload.event)
-}
 
 /**
  * Open `route` in a secondary note window. False — never a throw — when this
