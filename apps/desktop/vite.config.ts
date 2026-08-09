@@ -9,6 +9,8 @@ import babel from '@rolldown/plugin-babel'
 
 const host: string | undefined = process.env.TAURI_DEV_HOST
 
+console.log("host",host)
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -65,13 +67,6 @@ export default defineConfig({
     port: 1420,
     strictPort: true,
     host: host || false,
-    ...(host
-      ? {
-          protocol: 'ws',
-          host,
-          port: 1421,
-        }
-      : {}),
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ['**/src-tauri/**'],
