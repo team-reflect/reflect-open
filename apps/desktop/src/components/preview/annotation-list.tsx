@@ -13,9 +13,10 @@ interface AnnotationListProps {
 const FLASH_MS = 700
 
 /**
- * The sidebar's annotation index, grouped by page. Clicking a row selects the
+ * The annotation index, grouped by page. Clicking a row selects the
  * annotation (the highlight layer draws it emphasized), jumps the viewer to
- * its page, and pulses the row briefly.
+ * its page, and pulses the row briefly. The scroll container and fixed height
+ * live in the surrounding {@link AnnotationSection} — this renders the rows.
  */
 export function AnnotationList({
   annotations,
@@ -64,7 +65,7 @@ export function AnnotationList({
   pages.sort(([a], [b]) => a - b)
 
   return (
-    <div className="min-h-0 shrink-0 max-h-52 overflow-y-auto border-t border-border">
+    <div className="min-h-0">
       {pages.length === 0 ? (
         <p className="px-3.5 py-3 text-xs text-text-muted italic">No annotations yet</p>
       ) : (

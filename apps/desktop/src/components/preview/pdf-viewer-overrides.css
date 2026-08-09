@@ -1,0 +1,17 @@
+/*
+ * pdf.js 的 `.page` 假定 `box-sizing: content-box`：`--page-border`（默认
+ * 9px 透明边框）位于内容盒之外，canvas 与文本层都按完整页面尺寸对齐。本应用
+ * 的 Tailwind preflight 把全局 `box-sizing` 设为 `border-box`，边框反过来吃掉
+ * 内容盒——`.canvasWrapper canvas` 的 `width:100%` 缩到内容盒（页面减 18px），
+ * 而文本层仍按 `calc(var(--scale-factor) * 页宽)` 保持全尺寸；两者原点相同但
+ * 尺寸不同，span 按全尺寸百分比定位、canvas 字形按缩小后的尺寸渲染，选区高亮
+ * 相对文字产生随距离放大的错位（用户报告的垂直位移）。
+ *
+ * 修复：恢复 content-box 语义（pdf.js 的假设），并去掉页边框（分栏面板的紧凑
+ * 布局不需要标准阅读器的页间隔）。该文件在 `pdf_viewer.css` 之后引入，同选择器
+ * 优先级下按源顺序覆盖。
+ */
+.pdfViewer .page {
+  box-sizing: content-box;
+  border: none;
+}

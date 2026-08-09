@@ -216,7 +216,9 @@ body {
   .reflect-chat-message,
   .reflect-chat-message *,
   .reflect-protected-note,
-  .reflect-protected-note * {
+  .reflect-protected-note *,
+  .textLayer,
+  .textLayer * {
     -webkit-user-select: text;
     user-select: text;
     -webkit-touch-callout: default;

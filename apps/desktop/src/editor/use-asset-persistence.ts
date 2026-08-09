@@ -11,6 +11,7 @@ import {
   type FileMeta,
 } from '@reflect/core'
 import { formatBytes } from '@/lib/format-bytes'
+import { decodeAssetHref } from '@/lib/annotations/pdf-href'
 import { startOperation } from '@/lib/operations'
 
 /**
@@ -156,8 +157,9 @@ export function useAssetPersistence(generation: number | null, path?: string): A
       if (/^https?:\/\//.test(src)) {
         return src
       }
-      if (generation !== null && isSafeAssetSource(src)) {
-        return convertFileSrc(`${generation}/${src}`, 'reflect-asset')
+      const path = decodeAssetHref(src)
+      if (generation !== null && isSafeAssetSource(path)) {
+        return convertFileSrc(`${generation}/${path}`, 'reflect-asset')
       }
       return null
     },
@@ -166,8 +168,9 @@ export function useAssetPersistence(generation: number | null, path?: string): A
 
   const resolveAssetOpenPath = useCallback(
     (src: string): string | null => {
-      if (generation !== null && isSafeAssetSource(src)) {
-        return src
+      const path = decodeAssetHref(src)
+      if (generation !== null && isSafeAssetSource(path)) {
+        return path
       }
       return null
     },

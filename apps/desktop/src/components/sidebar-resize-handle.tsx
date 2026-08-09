@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 const PANEL_LABELS: Record<ResizableSidebarPanel, string> = {
   workspace: 'Resize sidebar',
   context: 'Resize context panel',
+  preview: 'Resize preview panel',
 }
 
 interface SidebarResizeHandleProps {
@@ -16,9 +17,10 @@ interface SidebarResizeHandleProps {
 }
 
 /**
- * The draggable divider on a sidebar's inner edge: an 8px invisible hit strip
+ * The draggable divider on a panel's inner edge — an AppShell aside or the
+ * resident preview pane inside the main column: an 8px invisible hit strip
  * whose 2px edge line fades in on a lingered hover, while dragging, and on
- * keyboard focus — at rest the aside's hairline border stays the only chrome.
+ * keyboard focus — at rest the panel's hairline border stays the only chrome.
  * The states follow the design system's restraint rules: hover is a quiet
  * grey wash (border-strong at 60% — dark mode lands on V1's exact .03 hover
  * opacity) revealed only after the slow-motion delay, so mouse traffic past

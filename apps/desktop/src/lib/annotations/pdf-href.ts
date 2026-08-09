@@ -10,16 +10,31 @@ export interface PdfLinkRef {
 }
 
 /**
+ * Decode a URL-encoded graph-relative path (`%20`, `%E4%B8%AD`…) back to its
+ * on-disk form. Migration-produced links and rendered hrefs can carry
+ * percent-encoding for spaces and non-ASCII characters, while the file
+ * commands resolve literal paths — the decoded form is the canonical one.
+ * Malformed sequences fall back to the raw string rather than throwing.
+ */
+export function decodeAssetHref(href: string): string {
+  try {
+    return decodeURIComponent(href)
+  } catch {
+    return href
+  }
+}
+
+/**
  * Parse a rendered link href as a graph-relative PDF address:
  * `assets/…pdf`, matched case-insensitively, with an optional `#page=N`
  * (1-based) fragment. Returns null for anything the shape doesn't name — a
  * non-PDF asset, a relative link outside `assets/`, a URL with a scheme, or a
- * fragment that isn't a page target. The path keeps its authored casing; only
- * the *match* is case-insensitive.
+ * fragment that isn't a page target. The path is URL-decoded to its on-disk
+ * form and keeps its authored casing; only the *match* is case-insensitive.
  */
 export function parsePdfHref(href: string): PdfLinkRef | null {
   const [rawPath, fragment] = href.split('#')
-  const path = rawPath!.split('?')[0]!
+  const path = decodeAssetHref(rawPath!.split('?')[0]!)
   if (!/^assets\/.+\.pdf$/i.test(path)) {
     return null
   }

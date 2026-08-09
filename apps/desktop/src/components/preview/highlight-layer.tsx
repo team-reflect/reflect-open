@@ -1,6 +1,14 @@
-import { useEffect, useRef, type MutableRefObject, type ReactElement } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+  type ReactElement,
+} from 'react'
 import type { AnnotationItem } from '@/lib/annotations/annotations-store'
 import type { AnnotationTool } from './annotation-toolbar'
+import { AnnotationContextMenu, type AnnotationMenuAnchor } from './annotation-context-menu'
 import { usePdfViewer } from './pdf-viewer-shell'
 
 /**
@@ -68,10 +76,19 @@ interface HighlightLayerProps {
   onSelect: (id: string) => void
   /** Called with a completed normalized rect in drag-create mode. */
   onAdd: (pageIndex: number, rect: NormalizedRect) => void
+  /** The context menu's "copy text" action, wired by the panel. */
+  onCopyText: (item: AnnotationItem) => void
+  /** The context menu's "copy reference" action, wired by the panel. */
+  onCopyReference: (item: AnnotationItem) => void
+  /** The context menu's "delete" action, wired by the panel. */
+  onRemove: (id: string) => void
 }
 
 /** The props shape drag handlers and observers need to read live. */
-type LatestProps = HighlightLayerProps
+type LatestProps = HighlightLayerProps & {
+  /** Right-click on a rect: select it and open the menu at the cursor. */
+  onRectContextMenu: (item: AnnotationItem, event: MouseEvent) => void
+}
 
 /**
  * The self-drawn annotation overlay for the pdf.js viewer. pdf.js's
@@ -89,11 +106,21 @@ type LatestProps = HighlightLayerProps
  */
 export function HighlightLayer(props: HighlightLayerProps): ReactElement | null {
   const { viewer } = usePdfViewer()
+  // 右键标注矩形 = 选中 + 在光标处打开上下文菜单；矩形是手动 DOM，处理函数
+  // 通过 latest 读取最新实现。
+  const [menu, setMenu] = useState<AnnotationMenuAnchor | null>(null)
+  const handleRectContextMenu = useCallback(
+    (item: AnnotationItem, event: MouseEvent): void => {
+      props.onSelect(item.id)
+      setMenu({ x: event.clientX, y: event.clientY, item })
+    },
+    [props.onSelect],
+  )
   // Drag handlers and the observer run outside React's render; they read the
   // freshest props through this ref instead of closing over a stale render.
-  const latest = useRef<LatestProps>(props)
+  const latest = useRef<LatestProps>({ ...props, onRectContextMenu: handleRectContextMenu })
   useEffect(() => {
-    latest.current = props
+    latest.current = { ...props, onRectContextMenu: handleRectContextMenu }
   })
 
   useEffect(() => {
@@ -139,7 +166,15 @@ export function HighlightLayer(props: HighlightLayerProps): ReactElement | null 
     }
   }, [viewer])
 
-  return null
+  return (
+    <AnnotationContextMenu
+      anchor={menu}
+      onClose={() => setMenu(null)}
+      onCopyText={props.onCopyText}
+      onCopyReference={props.onCopyReference}
+      onRemove={props.onRemove}
+    />
+  )
 }
 
 function syncOverlays(
@@ -289,6 +324,10 @@ function createRectElement(
   }
   element.addEventListener('click', () => {
     latest.current.onSelect(item.id)
+  })
+  element.addEventListener('contextmenu', (event) => {
+    event.preventDefault()
+    latest.current.onRectContextMenu(item, event)
   })
   return element
 }

@@ -1,6 +1,7 @@
 import { useEffect, type ReactElement } from 'react'
 import { hasBridge, subscribeNoteMoved } from '@reflect/core'
 import { App } from '@/app'
+import { ErrorBoundary } from '@/components/error-boundary'
 import { followHealedMove } from '@/editor/move-note'
 import { OperationsStatus } from '@/components/operations-status'
 import { UpdateToast } from '@/components/update-toast'
@@ -58,7 +59,9 @@ export function DesktopRoot(): ReactElement {
         <TooltipProvider>
           <SidebarWidthEffect />
           <WindowDragRegion />
-          <App />
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
           <Toaster />
           <OperationsStatus />
           <UpdateToast />

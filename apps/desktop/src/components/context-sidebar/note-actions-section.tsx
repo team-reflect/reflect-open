@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { Lock } from 'lucide-react'
+import { FileText, Lock } from 'lucide-react'
 import { PinIcon } from '@/components/icons/pin-icon'
 import { useNoteRow } from '@/hooks/use-note-row'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes'
@@ -7,6 +7,9 @@ import { keybindingFor } from '@/lib/commands/app-commands'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
 import { useOptimisticPinToggle } from '@/lib/notes/use-optimistic-pin-toggle'
+import { usePdfSession } from '@/providers/pdf-session-provider'
+import { usePdfSidebarView } from '@/providers/pdf-sidebar-view-provider'
+import { usePreviewPanel } from '@/providers/preview-panel-provider'
 import { NoteGistAction } from './note-gist-action'
 import { NoteTrashAction } from './note-trash-action'
 import { NoteToggleAction } from './note-toggle-action'
@@ -42,8 +45,28 @@ export function NoteActionsSection({
   const isPrivate = noteRow?.isPrivate ?? false
   const { applyOptimisticPin, invalidateOptimisticPin } = useOptimisticPinToggle(path, noteRow)
 
+  // PDF 会话激活时（预览目标是 PDF 且文档已加载），提供一个通往侧栏堆栈
+  // 顶层 PDF 面板的入口。行布局与 NoteToggleAction 对齐（等宽圆角行、20px
+  // 图标容器、正文文字）；bg-accent/5 与 accent 色图标呼应 PDF 面板的临时色调。
+  const { session } = usePdfSession()
+  const { enterPdf } = usePdfSidebarView()
+  const { target: previewTarget } = usePreviewPanel()
+  const pdfSessionActive = previewTarget?.kind === 'pdf' && session.pdfDocument !== null
+
   return (
     <SidebarSection storageKey="note-actions" title="Note actions">
+      {pdfSessionActive ? (
+        <button
+          type="button"
+          onClick={enterPdf}
+          className="group relative flex w-full items-center space-x-2 rounded-lg bg-accent/5 px-3 py-2 text-start transition-colors duration-100 hover:bg-surface-hover"
+        >
+          <span className="flex h-5 w-5 flex-none items-center justify-center text-accent">
+            <FileText aria-hidden className="size-4" />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs font-medium">Deepdive PDF</span>
+        </button>
+      ) : null}
       <NoteToggleAction
         path={path}
         indexActive={isPinned}

@@ -411,6 +411,25 @@ export function NoteEditor({
     // meowdown cancels it so iOS WebKit can't focus the editor (and raise
     // the keyboard) under the opening lightbox.
     ({ src, alt, event }: { src: string; alt: string; event: MouseEvent | TouchEvent }) => {
+      // 迁移后的 SiYuan 图片标注是「PDF 链接包图片」的形态
+      // （[![…](img)](assets/…pdf#page=N)）；点击应像 SiYuan 一样跳到 PDF
+      // 预览的对应页，而不是打开图片灯箱。meowdown 的图片点击拦截先于链接
+      // 导航，所以在这里分支。
+      if (event.target instanceof HTMLElement) {
+        const anchor = event.target.closest('a[href]')
+        if (anchor !== null) {
+          const pdfHref = parsePdfHref(anchor.getAttribute('href') ?? '')
+          if (pdfHref !== null) {
+            event.preventDefault()
+            setPreviewPanelTarget({
+              kind: 'pdf',
+              assetPath: pdfHref.path,
+              ...(pdfHref.page !== undefined ? { page: pdfHref.page } : {}),
+            })
+            return
+          }
+        }
+      }
       const displayUrl = resolveImageUrlRef.current?.(src) ?? null
       if (displayUrl === null) {
         return
@@ -431,7 +450,7 @@ export function NoteEditor({
         transitionName: IMAGE_LIGHTBOX_TRANSITION_NAME,
       })
     },
-    [openLightbox],
+    [openLightbox, setPreviewPanelTarget],
   )
   const handleOpenLightboxImage = useCallback((image: LightboxImage) => {
     if (image.openPath !== null && image.openImage !== null) {

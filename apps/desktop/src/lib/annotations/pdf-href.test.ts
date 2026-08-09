@@ -27,6 +27,23 @@ describe('parsePdfHref', () => {
     })
   })
 
+  it('decodes percent-encoded spaces and non-ASCII characters to on-disk paths', () => {
+    expect(parsePdfHref('assets/A%20Tour%20of%20C%2B%2B.pdf#page=15')).toEqual({
+      path: 'assets/A Tour of C++.pdf',
+      page: 15,
+    })
+    expect(parsePdfHref('assets/%E7%AE%80%E5%8E%86-%E9%99%88%E6%98%9F.pdf')).toEqual({
+      path: 'assets/简历-陈星.pdf',
+    })
+  })
+
+  it('falls back to the raw path for malformed percent sequences', () => {
+    expect(parsePdfHref('assets/100%zz.pdf#page=2')).toEqual({
+      path: 'assets/100%zz.pdf',
+      page: 2,
+    })
+  })
+
   it('rejects non-PDF assets', () => {
     expect(parsePdfHref('assets/notes.docx')).toBeNull()
     expect(parsePdfHref('assets/cat.png#page=2')).toBeNull()

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { MousePointer, SquareDashed, Trash2, X } from 'lucide-react'
+import { MousePointer, PanelBottomClose, PanelBottomOpen, SquareDashed, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -32,14 +32,19 @@ interface AnnotationToolbarProps {
   /** Id of the annotation selected in the list/layer; null disables delete. */
   selectedId: string | null
   onDeleteSelected: () => void
-  onClose: () => void
+  /** Whether the annotation list below is collapsed to just this row. */
+  collapsed: boolean
+  /** Collapse/expand the list; never closes the panel. */
+  onToggleCollapsed: () => void
 }
 
 /**
  * The annotation tools row under the PDF viewer: browse/draw mode switch, the
- * color palette for new annotations, delete-selected, and the panel's close
- * button. Styled to match the context sidebar chrome (`text-text`,
- * `border-border`, quiet icon buttons) rather than inventing a new surface.
+ * color palette for new annotations, delete-selected, and the list's
+ * collapse/expand toggle. The trailing button only folds the annotation list —
+ * closing the whole panel lives in the viewer's own chrome (the page toolbar's
+ * X). Styled to match the context sidebar chrome (`text-text`, `border-border`,
+ * quiet icon buttons) rather than inventing a new surface.
  */
 export function AnnotationToolbar({
   mode,
@@ -48,16 +53,17 @@ export function AnnotationToolbar({
   onColorChange,
   selectedId,
   onDeleteSelected,
-  onClose,
+  collapsed,
+  onToggleCollapsed,
 }: AnnotationToolbarProps): ReactElement {
   return (
     <div className="flex shrink-0 items-center gap-1 border-t border-border px-1.5 py-1">
       <Button
         variant={mode === 'browse' ? 'secondary' : 'ghost'}
         size="icon-sm"
-        aria-label="Browse"
+        aria-label="Browse (v)"
         aria-pressed={mode === 'browse'}
-        title="Browse"
+        title="Browse (v)"
         onClick={() => onModeChange('browse')}
       >
         <MousePointer />
@@ -65,9 +71,9 @@ export function AnnotationToolbar({
       <Button
         variant={mode === 'create' ? 'secondary' : 'ghost'}
         size="icon-sm"
-        aria-label="Draw rectangle"
+        aria-label="Draw rectangle (r)"
         aria-pressed={mode === 'create'}
-        title="Draw rectangle"
+        title="Draw rectangle (r)"
         onClick={() => onModeChange('create')}
       >
         <SquareDashed />
@@ -108,11 +114,12 @@ export function AnnotationToolbar({
         variant="ghost"
         size="icon-sm"
         className="ml-auto"
-        aria-label="Close preview"
-        title="Close preview"
-        onClick={onClose}
+        aria-label={collapsed ? 'Expand annotation list' : 'Collapse annotation list'}
+        aria-pressed={!collapsed}
+        title={collapsed ? 'Expand annotation list' : 'Collapse annotation list'}
+        onClick={onToggleCollapsed}
       >
-        <X />
+        {collapsed ? <PanelBottomOpen /> : <PanelBottomClose />}
       </Button>
     </div>
   )

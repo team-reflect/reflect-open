@@ -13,6 +13,8 @@ describe('settingsSchema', () => {
       editorFullWidth: false,
       sidebarWidth: 260,
       contextSidebarWidth: 320,
+      previewPanelWidth: 380,
+      annotationListHeight: 180,
       semanticSearchEnabled: false,
       describeAssets: true,
       transcriptionFormat: true,
@@ -43,6 +45,8 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.editorFullWidth).toBe(false)
     expect(DEFAULT_SETTINGS.sidebarWidth).toBe(260)
     expect(DEFAULT_SETTINGS.contextSidebarWidth).toBe(320)
+    expect(DEFAULT_SETTINGS.previewPanelWidth).toBe(380)
+    expect(DEFAULT_SETTINGS.annotationListHeight).toBe(180)
     expect(DEFAULT_SETTINGS.semanticSearchEnabled).toBe(false)
     expect(DEFAULT_SETTINGS.describeAssets).toBe(true)
     expect(DEFAULT_SETTINGS.transcriptionFormat).toBe(true)
@@ -96,6 +100,10 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ sidebarWidth: 480 }).sidebarWidth).toBe(480)
     expect(settingsSchema.parse({ contextSidebarWidth: 360 }).contextSidebarWidth).toBe(360)
     expect(settingsSchema.parse({ contextSidebarWidth: 240 }).contextSidebarWidth).toBe(240)
+    expect(settingsSchema.parse({ previewPanelWidth: 400 }).previewPanelWidth).toBe(400)
+    expect(settingsSchema.parse({ previewPanelWidth: 380 }).previewPanelWidth).toBe(380)
+    expect(settingsSchema.parse({ annotationListHeight: 200 }).annotationListHeight).toBe(200)
+    expect(settingsSchema.parse({ annotationListHeight: 180 }).annotationListHeight).toBe(180)
     expect(settingsSchema.parse({ theme: 'dark' }).theme).toBe('dark')
     expect(settingsSchema.parse({ theme: 'light' }).theme).toBe('light')
     expect(settingsSchema.parse({ theme: 'system' }).theme).toBe('system')
@@ -174,6 +182,14 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ contextSidebarWidth: 'wide' }).contextSidebarWidth).toBe(320)
     expect(settingsSchema.parse({ contextSidebarWidth: 100 }).contextSidebarWidth).toBe(240)
     expect(settingsSchema.parse({ contextSidebarWidth: 9000 }).contextSidebarWidth).toBe(480)
+    expect(settingsSchema.parse({ previewPanelWidth: 'wide' }).previewPanelWidth).toBe(380)
+    expect(settingsSchema.parse({ previewPanelWidth: 100 }).previewPanelWidth).toBe(320)
+    expect(settingsSchema.parse({ previewPanelWidth: 9000 }).previewPanelWidth).toBe(720)
+    expect(settingsSchema.parse({ previewPanelWidth: 400.4 }).previewPanelWidth).toBe(400)
+    expect(settingsSchema.parse({ annotationListHeight: 'short' }).annotationListHeight).toBe(180)
+    expect(settingsSchema.parse({ annotationListHeight: 50 }).annotationListHeight).toBe(120)
+    expect(settingsSchema.parse({ annotationListHeight: 900 }).annotationListHeight).toBe(480)
+    expect(settingsSchema.parse({ annotationListHeight: 200.4 }).annotationListHeight).toBe(200)
     expect(settingsSchema.parse({ theme: 'sepia' }).theme).toBe('system')
     expect(settingsSchema.parse({ theme: 7 }).theme).toBe('system')
     expect(settingsSchema.parse({ timeFormat: '36h' }).timeFormat).toBe('12h')
@@ -223,6 +239,8 @@ describe('settingsSchema', () => {
       editorFullWidth: false,
       sidebarWidth: 260,
       contextSidebarWidth: 320,
+      previewPanelWidth: 380,
+      annotationListHeight: 180,
       semanticSearchEnabled: false,
       describeAssets: true,
       transcriptionFormat: true,

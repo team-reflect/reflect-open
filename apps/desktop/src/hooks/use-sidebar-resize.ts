@@ -7,8 +7,10 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import {
+  ANNOTATION_LIST_HEIGHT_RANGE,
   clampSidebarWidth,
   CONTEXT_SIDEBAR_WIDTH_RANGE,
+  PREVIEW_PANEL_WIDTH_RANGE,
   SIDEBAR_WIDTH_RANGE,
   type SidebarWidthRange,
 } from '@reflect/core'
@@ -32,18 +34,19 @@ export const EDITOR_MIN_WIDTH_PX = 360
 const CONTEXT_BREAKPOINT_PX = 1024
 
 /** Which resizable AppShell panel a handle controls. */
-export type ResizableSidebarPanel = 'workspace' | 'context'
+export type ResizableSidebarPanel = 'workspace' | 'context' | 'preview'
 
 /** DOM ids of the AppShell asides, for the separators' `aria-controls`. */
 export const SIDEBAR_PANEL_IDS: Record<ResizableSidebarPanel, string> = {
   workspace: 'workspace-sidebar',
   context: 'context-sidebar',
+  preview: 'preview-panel',
 }
 
 interface PanelSpec {
   /** The window edge the panel hugs — decides which drag direction widens it. */
   readonly side: 'left' | 'right'
-  readonly settingsKey: 'sidebarWidth' | 'contextSidebarWidth'
+  readonly settingsKey: 'sidebarWidth' | 'contextSidebarWidth' | 'previewPanelWidth'
   /** The root CSS variable the AppShell's width class reads. */
   readonly cssVariable: string
   readonly range: SidebarWidthRange
@@ -65,6 +68,17 @@ const PANEL_SPECS: Record<ResizableSidebarPanel, PanelSpec> = {
     cssVariable: '--context-sidebar-width',
     range: CONTEXT_SIDEBAR_WIDTH_RANGE,
     otherAsideLabel: 'Workspace',
+  },
+  // Not an AppShell aside: the preview pane sits inside the workspace's main
+  // column, beside the note pane. Its drag room is measured from its own
+  // container (see gestureCap), never the AppShell, so otherAsideLabel is
+  // unused here.
+  preview: {
+    side: 'right',
+    settingsKey: 'previewPanelWidth',
+    cssVariable: '--preview-panel-width',
+    range: PREVIEW_PANEL_WIDTH_RANGE,
+    otherAsideLabel: 'Context',
   },
 }
 
@@ -105,6 +119,47 @@ export function effectiveSidebarWidths(
   }
 }
 
+/**
+ * The preview pane's rendered width: its preference clamped into range, then
+ * capped so the note pane keeps its {@link EDITOR_MIN_WIDTH_PX} reserve after
+ * the two rails take their share — the pane never shrinks below its range
+ * minimum, so on a truly tiny window the editor gives way instead, matching
+ * the rails' own behavior. The rails' *rendered* widths (already viewport-
+ * scaled) are the input, so a window that squeezed the rails counts exactly
+ * what they render, and the context rail only counts where CSS actually shows
+ * it (below the `lg` breakpoint the aside is hidden and the pane inherits the
+ * whole main column).
+ */
+export function effectivePreviewPanelWidth(
+  viewportWidth: number,
+  workspaceWidth: number,
+  contextWidth: number,
+  preferred: number,
+): number {
+  const preview = clampSidebarWidth(PREVIEW_PANEL_WIDTH_RANGE, preferred)
+  const contextVisible = viewportWidth >= CONTEXT_BREAKPOINT_PX
+  const rails = workspaceWidth + (contextVisible ? contextWidth : 0)
+  const available = Math.floor(viewportWidth - EDITOR_MIN_WIDTH_PX - rails)
+  return Math.max(PREVIEW_PANEL_WIDTH_RANGE.min, Math.min(preview, available))
+}
+
+/** The PDF viewport's reserve: the annotation list never takes this away. */
+export const PDF_VIEWER_MIN_HEIGHT_PX = 160
+
+/**
+ * The annotation list's rendered height: its preference clamped into range,
+ * then capped so the PDF viewport keeps its {@link PDF_VIEWER_MIN_HEIGHT_PX}
+ * reserve out of the window's height. The list never shrinks below its range
+ * minimum, so on a truly short window the PDF viewport gives way instead,
+ * matching the rails' own behavior. Both the resize drag's room and the
+ * rendered height derive from this one formula, keeping them in step.
+ */
+export function effectiveAnnotationListHeight(viewportHeight: number, preferred: number): number {
+  const clamped = clampSidebarWidth(ANNOTATION_LIST_HEIGHT_RANGE, preferred)
+  const available = Math.floor(viewportHeight - PDF_VIEWER_MIN_HEIGHT_PX)
+  return Math.max(ANNOTATION_LIST_HEIGHT_RANGE.min, Math.min(clamped, available))
+}
+
 interface DragState {
   pointerId: number
   startX: number
@@ -127,17 +182,28 @@ interface DragState {
 export const activeSidebarWidthDrags = new Set<string>()
 
 /**
+ * The annotation list's height variable while its *activated* drag is in
+ * flight — the same suppress-the-hydration contract as
+ * {@link activeSidebarWidthDrags}, tracked separately so the two axes'
+ * gestures never clear each other.
+ */
+export const activeListHeightDrags = new Set<'--annotation-list-height'>()
+
+/**
  * While a drag is live the cursor must read `col-resize` everywhere (pointer
  * capture routes events to the handle but does not pin the cursor) and text
  * selection must not paint across the panes the pointer sweeps. The chrome is
- * shared across handles: it follows {@link activeSidebarWidthDrags}, so
- * ending one rail's drag while a second pointer still holds the other rail
- * keeps it in place.
+ * shared across handles: it follows {@link activeSidebarWidthDrags} and
+ * {@link activeListHeightDrags}, so ending one pane's drag while a second
+ * pointer still holds another keeps it in place. A width drag wins the cursor
+ * over a height drag when both are live (different pointers) — the rare
+ * overlap picks the vertical affordance.
  */
-function syncDragChrome(): void {
+export function syncDragChrome(): void {
   const style = document.documentElement.style
-  if (activeSidebarWidthDrags.size > 0) {
-    style.setProperty('cursor', 'col-resize')
+  const widthActive = activeSidebarWidthDrags.size > 0
+  if (widthActive || activeListHeightDrags.size > 0) {
+    style.setProperty('cursor', widthActive ? 'col-resize' : 'row-resize')
     style.setProperty('user-select', 'none')
     style.setProperty('-webkit-user-select', 'none')
   } else {
@@ -165,18 +231,20 @@ export interface SidebarResize {
 }
 
 /**
- * Drag-to-resize for one AppShell sidebar. While the pointer moves, the width
+ * Drag-to-resize for one resizable pane — an AppShell sidebar or the resident
+ * preview pane inside the main column. While the pointer moves, the width
  * is written straight to the panel's CSS variable — no settings churn and no
  * app-wide re-renders at pointer rate; the clamped result commits to the
  * settings document once on release (or per keystroke for the keyboard path),
  * and only when it actually changed. Drags and keystrokes rebase on the
- * rail's *rendered* width and clamp to the room the viewport actually has
- * (see {@link effectiveSidebarWidths}), so the divider always tracks the
+ * pane's *rendered* width and clamp to the room the viewport actually has
+ * (see {@link effectiveSidebarWidths} and
+ * {@link effectivePreviewPanelWidth}), so the divider always tracks the
  * pointer and an against-the-wall gesture is a no-op rather than a silent
  * rewrite of the saved preference. Double-click restores the fresh-install
  * width, the macOS divider convention. Arrow keys move the divider itself,
  * following ARIA separator semantics: ArrowRight widens the left panel but
- * narrows the right one; Home/End jump to the rail's minimum/maximum.
+ * narrows the right one; Home/End jump to the pane's minimum/maximum.
  */
 export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
   const { side, settingsKey, cssVariable, range, otherAsideLabel } = PANEL_SPECS[panel]
@@ -202,8 +270,10 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
     (width: number): void => {
       if (settingsKey === 'sidebarWidth') {
         updateSettings({ sidebarWidth: width })
-      } else {
+      } else if (settingsKey === 'contextSidebarWidth') {
         updateSettings({ contextSidebarWidth: width })
+      } else {
+        updateSettings({ previewPanelWidth: width })
       }
     },
     [settingsKey, updateSettings],
@@ -224,16 +294,25 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
 
   // The widest a gesture may make this rail right now: its range max, capped
   // by the viewport minus the note pane's reserve and the other rail's
-  // rendered width (zero when that rail is hidden or absent).
+  // rendered width (zero when that rail is hidden or absent). The preview
+  // pane measures its own split container instead — it is not an AppShell
+  // aside, and its room is exactly what the main column has left after the
+  // note pane's reserve.
   const gestureCap = useCallback(
     (handle: HTMLElement): number => {
+      if (panel === 'preview') {
+        const container = handle.parentElement?.parentElement
+        const containerWidth = container?.getBoundingClientRect().width ?? window.innerWidth
+        const available = Math.floor(containerWidth - EDITOR_MIN_WIDTH_PX)
+        return Math.min(range.max, Math.max(range.min, available))
+      }
       const shell = handle.parentElement?.parentElement
       const other = shell?.querySelector(`aside[aria-label="${CSS.escape(otherAsideLabel)}"]`)
       const otherWidth = other?.getBoundingClientRect().width ?? 0
       const available = Math.floor(window.innerWidth - EDITOR_MIN_WIDTH_PX - otherWidth)
       return Math.min(range.max, Math.max(range.min, available))
     },
-    [otherAsideLabel, range],
+    [panel, otherAsideLabel, range],
   )
 
   const widthAt = useCallback(
@@ -391,14 +470,26 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
     }
   }, [])
 
-  const effective = effectiveSidebarWidths(
+  // The preview pane's rendered width depends on what the two rails actually
+  // render (they scale to the viewport first), so derive the rails, then the
+  // pane from them; the rails report their own effective widths directly.
+  const rails = effectiveSidebarWidths(
     viewportWidth,
     settings.sidebarWidth,
     settings.contextSidebarWidth,
   )
+  const effective =
+    panel === 'preview'
+      ? effectivePreviewPanelWidth(
+          viewportWidth,
+          rails.workspace,
+          rails.context,
+          settings.previewPanelWidth,
+        )
+      : rails[panel]
 
   return {
-    width: dragWidth ?? effective[panel],
+    width: dragWidth ?? effective,
     range,
     dragging: dragWidth !== null,
     handlers: {

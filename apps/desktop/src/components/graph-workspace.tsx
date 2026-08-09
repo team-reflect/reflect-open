@@ -13,6 +13,8 @@ import { ChatProvider } from '@/providers/chat-provider'
 import { DeepLinkProvider } from '@/providers/deep-link-provider'
 import { NoteFindProvider } from '@/providers/note-find-provider'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider'
+import { PdfSessionProvider } from '@/providers/pdf-session-provider'
+import { PdfSidebarViewProvider } from '@/providers/pdf-sidebar-view-provider'
 import { PreviewPanelProvider } from '@/providers/preview-panel-provider'
 import { ShortcutsProvider } from '@/providers/shortcuts-provider'
 import { SidebarProvider } from '@/providers/sidebar-provider'
@@ -67,7 +69,14 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
                                     import's single face. */}
                                 {isMainWindow() ? (
                                   <V1ImportProvider graph={graph}>
-                                    <WorkspaceContent graph={graph} />
+                                    {/* 侧栏堆栈（文档面板 ⇄ PDF 面板）与 PDF
+                                        session 的提供者：同时包住主列分栏面板
+                                        与 context 侧栏。 */}
+                                    <PdfSidebarViewProvider>
+                                      <PdfSessionProvider>
+                                        <WorkspaceContent graph={graph} />
+                                      </PdfSessionProvider>
+                                    </PdfSidebarViewProvider>
                                   </V1ImportProvider>
                                 ) : (
                                   <NoteWindowContent />
