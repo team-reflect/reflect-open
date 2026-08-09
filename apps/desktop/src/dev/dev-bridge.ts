@@ -77,7 +77,7 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
 
   async function invoke(command: string, args: Record<string, unknown>): Promise<unknown> {
     if (command.startsWith('plugin:')) {
-      return plugins.invoke(command, args)
+      return await plugins.invoke(command, args)
     }
     switch (command) {
       case 'app_version':

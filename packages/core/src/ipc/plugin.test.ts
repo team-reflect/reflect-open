@@ -86,7 +86,9 @@ describe('definePluginEvent', () => {
   it('delivers validated payloads and drops malformed ones', async () => {
     const { handlers } = bridgeWithPluginEvents()
     const seen: number[] = []
-    const subscription = subscribeDemo((payload) => seen.push(payload.n))
+    const subscription = subscribeDemo((payload) => {
+      seen.push(payload.n)
+    })
     await subscription.ready
 
     handlers.get('demo:demoEvent')?.({ n: 1 })
@@ -99,8 +101,12 @@ describe('definePluginEvent', () => {
     const { handlers, listenPlugin } = bridgeWithPluginEvents()
     const first: number[] = []
     const second: number[] = []
-    const one = subscribeDemo((payload) => first.push(payload.n))
-    const two = subscribeDemo((payload) => second.push(payload.n))
+    const one = subscribeDemo((payload) => {
+      first.push(payload.n)
+    })
+    const two = subscribeDemo((payload) => {
+      second.push(payload.n)
+    })
     await Promise.all([one.ready, two.ready])
     expect(listenPlugin).toHaveBeenCalledTimes(1)
 
@@ -116,22 +122,24 @@ describe('definePluginEvent', () => {
     const gate = new Promise<void>((resolve) => {
       release = resolve
     })
-    let captured: ((payload: unknown) => void) | null = null
+    const handlers = new Map<string, (payload: unknown) => void>()
     setBridge({
       invoke: async () => null,
       listen: async () => () => {},
-      listenPlugin: async (_plugin, _event, handler) => {
+      listenPlugin: async (plugin, event, handler) => {
         await gate
-        captured = handler
+        handlers.set(`${plugin}:${event}`, handler)
       },
     })
 
     const seen: number[] = []
-    const subscription = subscribeDemo((payload) => seen.push(payload.n))
+    const subscription = subscribeDemo((payload) => {
+      seen.push(payload.n)
+    })
     subscription.unlisten()
     release()
     await subscription.ready
-    captured?.({ n: 3 })
+    handlers.get('demo:demoEvent')?.({ n: 3 })
     expect(seen).toEqual([])
   })
 
@@ -147,7 +155,9 @@ describe('definePluginEvent', () => {
     await expect(subscribeDemo(() => {}).ready).rejects.toThrow('webview teardown')
 
     const seen: number[] = []
-    const subscription = subscribeDemo((payload) => seen.push(payload.n))
+    const subscription = subscribeDemo((payload) => {
+      seen.push(payload.n)
+    })
     await subscription.ready
     handlers.get('demo:demoEvent')?.({ n: 5 })
     expect(seen).toEqual([5])

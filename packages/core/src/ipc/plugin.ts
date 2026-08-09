@@ -42,8 +42,13 @@ export function definePluginCommands<Commands extends Record<string, PluginComma
   command: Name,
   args: SchemaInput<Commands[Name]['args']>,
 ) => Promise<SchemaOutput<Commands[Name]['result']>> {
-  return async (command, args) => {
-    const spec = commands[command]
+  return async <Name extends keyof Commands & string>(
+    command: Name,
+    args: SchemaInput<Commands[Name]['args']>,
+  ): Promise<SchemaOutput<Commands[Name]['result']>> => {
+    // `Name` is `keyof Commands`, so the lookup can't miss; the constraint's
+    // index signature just hides that from the checker.
+    const spec = commands[command]!
     // Inside the generic body the indexed schema types are opaque; `call`
     // validates with the exact runtime schema, so the assertion only restates
     // what the contract already guarantees.
@@ -113,8 +118,7 @@ export function definePluginEvent<Payload>(
           if (!parsed.success) {
             return
           }
-          // Snapshot: a handler may unsubscribe (or subscribe) mid-delivery.
-          for (const handler of [...handlers]) {
+          for (const handler of handlers) {
             handler(parsed.data)
           }
         })

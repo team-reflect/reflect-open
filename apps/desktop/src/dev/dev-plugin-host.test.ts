@@ -38,8 +38,12 @@ describe('dev plugin host', () => {
   it('emits recordingLevel while recording and recordingStopped at the cap', async () => {
     const levels: unknown[] = []
     const stops: unknown[] = []
-    host.listen('recording', 'recordingLevel', (payload) => levels.push(payload))
-    host.listen('recording', 'recordingStopped', (payload) => stops.push(payload))
+    host.listen('recording', 'recordingLevel', (payload) => {
+      levels.push(payload)
+    })
+    host.listen('recording', 'recordingStopped', (payload) => {
+      stops.push(payload)
+    })
 
     await host.invoke('plugin:recording|start_recording', { request: { maxDurationMs: 1000 } })
     vi.advanceTimersByTime(500)
@@ -56,7 +60,9 @@ describe('dev plugin host', () => {
 
   it('holds a queued action until actions_ready and retires it on action_performed', async () => {
     const actions: unknown[] = []
-    host.listen('recording', 'nativeAction', (payload) => actions.push(payload))
+    host.listen('recording', 'nativeAction', (payload) => {
+      actions.push(payload)
+    })
 
     host.queueAction('recordAudio')
     expect(actions).toEqual([])
