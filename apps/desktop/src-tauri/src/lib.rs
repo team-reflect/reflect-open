@@ -231,6 +231,9 @@ pub fn run() {
     #[cfg(mobile)]
     let builder = builder.plugin(tauri_plugin_recording::init());
 
+    #[cfg(target_os = "ios")]
+    let builder = builder.plugin(tauri_plugin_iap::init());
+
     // The main window starts hidden (`visible: false`); desktop reveals it
     // from the page-load hook above after restoring geometry, but mobile has
     // no window-state plugin, so show it here or the UI would never appear.

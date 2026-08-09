@@ -1,9 +1,10 @@
 import { useId, useState, type ReactElement } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   aiProvider,
   aiProviderRequiresApiKey,
   errorMessage,
+  iapRestorePurchases,
   listNotes,
   normalizeChatSystemPrompt,
   type AiPrompt,
@@ -22,6 +23,7 @@ import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer'
 import { AiPromptDrawer } from '@/mobile/ai-prompt-drawer'
 import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer'
 import { PRIVACY_POLICY_URL } from '@/mobile/ai-provider-consent'
+import { TERMS_OF_USE_URL } from '@/mobile/paywall-screen'
 import { ChatSystemPromptDrawer } from '@/mobile/chat-system-prompt-drawer'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer'
 import { MobileScreenHeader } from '@/mobile/screen-header'
@@ -34,6 +36,7 @@ import {
   SettingsValueRow,
   type SegmentedOption,
 } from '@/mobile/settings-list'
+import { ENTITLEMENT_QUERY_KEY, useEntitlement } from '@/mobile/use-entitlement'
 import { useMobileSyncStatus } from '@/mobile/use-sync-status'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -71,7 +74,21 @@ const TEXT_SIZE_OPTIONS: readonly SegmentedOption<EditorTextSize>[] = [
  */
 export function MobileSettings(): ReactElement {
   const { back, canBack, navigate } = useRouter()
-  const { graph, mobileStorageKind } = useGraph()
+  const { graph, mobileStorageKind, platform } = useGraph()
+  const isIos = platform === 'ios'
+  const entitlement = useEntitlement(isIos)
+  const queryClient = useQueryClient()
+  const [restorePending, setRestorePending] = useState(false)
+
+  const handleRestore = async (): Promise<void> => {
+    setRestorePending(true)
+    try {
+      await iapRestorePurchases()
+      await queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY })
+    } finally {
+      setRestorePending(false)
+    }
+  }
   const { settings, updateSettings } = useSettings()
   const version = useAppVersion()
   const sync = useSyncContext()
@@ -281,6 +298,34 @@ export function MobileSettings(): ReactElement {
                   onPress={() => void disconnect()}
                 />
               ) : null}
+            </SettingsGroup>
+          ) : null}
+
+          {isIos ? (
+            <SettingsGroup header="Subscription">
+              <SettingsValueRow
+                label="Plan"
+                value={entitlement.status === 'entitled' ? 'Reflect Pro' : 'Free'}
+              />
+              <SettingsActionRow
+                label="Manage Subscription"
+                onPress={() => {
+                  void openUrl('https://apps.apple.com/account/subscriptions').catch(() => {})
+                }}
+              />
+              <SettingsActionRow
+                label="Restore Purchases"
+                pending={restorePending}
+                onPress={() => {
+                  void handleRestore()
+                }}
+              />
+              <SettingsActionRow
+                label="Terms of Use"
+                onPress={() => {
+                  void openUrl(TERMS_OF_USE_URL).catch(() => {})
+                }}
+              />
             </SettingsGroup>
           ) : null}
 

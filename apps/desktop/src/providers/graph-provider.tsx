@@ -51,6 +51,7 @@ export type GraphStatus = 'loading' | 'choosing' | 'opening' | 'ready'
  * {@link MobileGraphBoot}, whose hook owns it.
  */
 interface GraphContextValue extends MobileGraphBoot {
+  platform: AppPlatform
   status: GraphStatus
   graph: GraphInfo | null
   recents: RecentGraph[]
@@ -527,6 +528,7 @@ export function GraphProvider({
 
   const value = useMemo<GraphContextValue>(
     () => ({
+      platform,
       status,
       graph,
       recents,
@@ -547,6 +549,7 @@ export function GraphProvider({
       refreshIndex,
     }),
     [
+      platform,
       status,
       graph,
       recents,

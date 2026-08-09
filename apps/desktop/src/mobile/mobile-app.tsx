@@ -3,9 +3,11 @@ import { installBackgroundFlush } from '@/lib/background-flush'
 import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider'
 import { MobileErrorBoundary } from '@/mobile/mobile-error-boundary'
 import { MobileOnboardingScreen } from '@/mobile/onboarding-screen'
+import { PaywallScreen } from '@/mobile/paywall-screen'
 import { MobileShell } from '@/mobile/mobile-shell'
 import { MobileStatusLayer } from '@/mobile/status-layer'
 import { RecordingDrawer } from '@/mobile/recording-drawer'
+import { useEntitlement } from '@/mobile/use-entitlement'
 import { useICloudRefresh } from '@/mobile/use-icloud-refresh'
 import { useKeyboardCaretReveal, useKeyboardHeightVar } from '@/mobile/use-keyboard'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics'
@@ -28,7 +30,11 @@ import { RouterProvider } from '@/routing/router'
  * checkbox-haptic listener mount here so they cover every screen's editors.
  */
 export function MobileApp(): ReactElement {
-  const { status, graph, error, needsOnboarding } = useGraph()
+  const { status, graph, error, needsOnboarding, platform } = useGraph()
+  const isIos = platform === 'ios'
+  // Non-iOS (Android, browser-dev without StoreKit) never queries:
+  // `enabled: false` keeps the hook idle and the gate open.
+  const entitlement = useEntitlement(isIos)
   useKeyboardHeightVar()
   useKeyboardCaretReveal()
   useTaskCheckboxHaptics()
@@ -45,7 +51,17 @@ export function MobileApp(): ReactElement {
     return installBackgroundFlush()
   }, [])
 
-  if (status === 'ready' && graph) {
+  // Paid gate (iOS only, after onboarding). Blocks the ready branch below;
+  // 'loading' falls through to the bottom loading screen instead of flashing
+  // either the app or the paywall. StoreKit answers from its local
+  // transaction cache, so 'loading' is brief.
+  const gateBlocked = isIos && entitlement.status !== 'entitled'
+
+  if (gateBlocked && entitlement.status === 'locked') {
+    return <PaywallScreen />
+  }
+
+  if (status === 'ready' && graph && !gateBlocked) {
     return (
       <MobileErrorBoundary>
         <RouterProvider key={graph.root}>
