@@ -8,6 +8,33 @@ export {
 export { call, callBinary } from '../ipc/invoke'
 export { type PluginSubscription } from '../ipc/plugin'
 export {
+  actionPerformed,
+  actionsReady,
+  cancelRecording,
+  deleteStaged,
+  listStaged,
+  readStaged,
+  recordingStatus,
+  startRecording,
+  stopRecording,
+  subscribeNativeAction,
+  subscribeRecordingLevel,
+  subscribeRecordingStopped,
+  type NativeActionEvent,
+  type RecordingLevelEvent,
+  type RecordingStatus,
+  type RecordingStopResponse,
+  type RecordingStoppedEvent,
+  type StagedRecordingFile,
+  type StartRecordingOptions,
+} from '../ipc/recording-plugin'
+export {
+  currentKeyboardState,
+  impactLight,
+  subscribeKeyboardChange,
+  type KeyboardState,
+} from '../ipc/keyboard-plugin'
+export {
   getAppVersion,
   getAppPlatform,
   isMobilePlatform,
