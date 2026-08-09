@@ -9,12 +9,7 @@ import {
 } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Archive, CalendarClock, List, Search } from 'lucide-react'
-import {
-  getCompletedTasks,
-  getOpenTasks,
-  type OpenTask,
-  type TaskGroup,
-} from '@reflect/core'
+import { getCompletedTasks, getOpenTasks, type OpenTask, type TaskGroup } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'

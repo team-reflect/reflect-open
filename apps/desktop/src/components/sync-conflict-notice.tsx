@@ -1,12 +1,7 @@
 import type { ReactElement, ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { GitMerge } from 'lucide-react'
-import {
-  conflictMarkerBlockCount,
-  conflictMarkerLabels,
-  getNote,
-  readNote,
-} from '@reflect/core'
+import { conflictMarkerBlockCount, conflictMarkerLabels, getNote, readNote } from '@reflect/core'
 import { CONFLICT_SIDE_DOT } from '@/components/conflict-note-view'
 import { InlineAlert } from '@/components/inline-alert'
 import { Button } from '@/components/ui/button'
