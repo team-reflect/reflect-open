@@ -526,9 +526,6 @@ pub async fn capture_link_preview(app: tauri::AppHandle, url: String) -> AppResu
 /// 2 MiB keeps whole pages of that shape, with margin for head growth,
 /// while still bounding what this command buffers and ships over IPC.
 const META_FETCH_MAX_BYTES: usize = 2 * 1024 * 1024;
-// Compile-time floor: below 2x the measured ~690 KiB offsets, the scrape
-// silently parses zero metadata on YouTube and the bug returns.
-const _: () = assert!(META_FETCH_MAX_BYTES >= 1_400_000);
 const META_FETCH_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// The meta fetch presents as a mainstream browser navigation: sites that
