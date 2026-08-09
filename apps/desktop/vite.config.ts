@@ -9,8 +9,6 @@ import babel from '@rolldown/plugin-babel'
 
 const host: string | undefined = process.env.TAURI_DEV_HOST
 
-console.log("host",host)
-
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
