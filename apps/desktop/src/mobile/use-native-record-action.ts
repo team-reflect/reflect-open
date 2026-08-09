@@ -1,6 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { addPluginListener, invoke } from '@tauri-apps/api/core'
-import { z } from 'zod'
+import {
+  actionPerformed,
+  actionsReady,
+  subscribeNativeAction,
+  type PluginSubscription,
+} from '@reflect/core'
 import { isNativeShell } from '@/lib/platform'
 import { nativeRecordingStatus, stopActiveRecording } from '@/mobile/use-native-audio-recorder'
 import type { StagedRecordingInput } from '@/mobile/use-staged-recording-ingest'
@@ -21,8 +25,6 @@ import type { StagedRecordingInput } from '@/mobile/use-staged-recording-ingest'
  * The ordering is the point of the single effect: a queued "record"
  * delivered at `actions_ready` can never race the reconcile's stop.
  */
-
-const nativeActionSchema = z.object({ action: z.string() })
 
 /**
  * How long the recording UI must survive before a delivered native action is
@@ -53,7 +55,7 @@ export function useNativeRecordAction(options: UseNativeRecordActionOptions): vo
     }
     let disposed = false
     let confirmTimer: ReturnType<typeof setTimeout> | null = null
-    let unlisten: (() => void) | null = null
+    let subscription: PluginSubscription | null = null
     void (async () => {
       try {
         const status = await nativeRecordingStatus()
@@ -75,35 +77,33 @@ export function useNativeRecordAction(options: UseNativeRecordActionOptions): vo
       if (disposed) {
         return
       }
-      try {
-        const listener = await addPluginListener('recording', 'nativeAction', (raw: unknown) => {
-          const parsed = nativeActionSchema.safeParse(raw)
-          if (disposed || !parsed.success || parsed.data.action !== 'recordAudio') {
-            return
-          }
-          void startRef.current()
-          // A repeat delivery (double widget open, or a re-`deliverPendingAction`
-          // while the action is still queued) restarts the confirm window
-          // against the latest start — otherwise an earlier timer could
-          // confirm before this start's UI has survived its full window.
-          if (confirmTimer !== null) {
-            clearTimeout(confirmTimer)
-          }
-          // Confirmation is about delivery, not success — a mic-denied start
-          // still confirms, or the queue would re-surface the same failure
-          // every launch.
-          confirmTimer = setTimeout(() => {
-            void invoke('plugin:recording|action_performed').catch((cause: unknown) => {
-              console.warn('confirming a native action failed:', cause)
-            })
-          }, ACTION_CONFIRM_DELAY_MS)
-        })
-        if (disposed) {
-          void listener.unregister()
+      subscription = subscribeNativeAction((event) => {
+        if (event.action !== 'recordAudio') {
           return
         }
-        unlisten = () => void listener.unregister()
-        await invoke('plugin:recording|actions_ready')
+        void startRef.current()
+        // A repeat delivery (double widget open, or a re-`deliverPendingAction`
+        // while the action is still queued) restarts the confirm window
+        // against the latest start — otherwise an earlier timer could
+        // confirm before this start's UI has survived its full window.
+        if (confirmTimer !== null) {
+          clearTimeout(confirmTimer)
+        }
+        // Confirmation is about delivery, not success — a mic-denied start
+        // still confirms, or the queue would re-surface the same failure
+        // every launch.
+        confirmTimer = setTimeout(() => {
+          void actionPerformed().catch((cause: unknown) => {
+            console.warn('confirming a native action failed:', cause)
+          })
+        }, ACTION_CONFIRM_DELAY_MS)
+      })
+      try {
+        await subscription.ready
+        if (disposed) {
+          return
+        }
+        await actionsReady()
       } catch (cause) {
         console.error('the native-action handshake is unavailable:', cause)
       }
@@ -113,7 +113,7 @@ export function useNativeRecordAction(options: UseNativeRecordActionOptions): vo
       if (confirmTimer !== null) {
         clearTimeout(confirmTimer)
       }
-      unlisten?.()
+      subscription?.unlisten()
     }
   }, [enqueueStaged])
 }

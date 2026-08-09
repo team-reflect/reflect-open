@@ -1,6 +1,7 @@
 import { act, useState, type ReactElement, type ReactNode } from 'react'
 import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setBridge } from '@reflect/core'
 import type {
   AiProvidersState,
   AudioMemoIdentity,
@@ -15,15 +16,15 @@ const captureAudioMemo = vi.hoisted(() =>
   vi.fn<(input: CaptureAudioMemoInput) => Promise<CaptureAudioMemoOutcome>>(),
 )
 const failOperation = vi.hoisted(() => vi.fn<(message: string) => void>())
-const invoke = vi.hoisted(() => vi.fn<(command: string, args?: unknown) => Promise<unknown>>())
+const invoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise<unknown>>()
 
 /** Captured plugin-event handlers, keyed by event name, dispatchable per test. */
-const pluginEvents = vi.hoisted(() => ({
+const pluginEvents = {
   handlers: new Map<string, (payload: unknown) => void>(),
   emit(event: string, payload: unknown): void {
     pluginEvents.handlers.get(event)?.(payload)
   },
-}))
+}
 
 /** Fake reconciler lifecycle — the pipeline is only a shim over it. */
 const reconcilerControls = vi.hoisted(() => {
@@ -76,17 +77,6 @@ const stagedControls = vi.hoisted(() => ({
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   captureAudioMemo,
-  hasBridge: () => true,
-}))
-
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke,
-  addPluginListener: vi.fn(
-    async (_plugin: string, event: string, handler: (payload: unknown) => void) => {
-      pluginEvents.handlers.set(event, handler)
-      return { unregister: vi.fn() }
-    },
-  ),
 }))
 
 vi.mock('@/lib/platform', () => ({ isMacosDesktop: false, isNativeShell: () => true }))
@@ -218,13 +208,30 @@ beforeEach(() => {
     transcriptionFormat: true,
   }
   captureAudioMemo.mockResolvedValue({ ok: true, memo: MEMO })
-  invoke.mockResolvedValue({ files: [] })
+  // Void plugin commands answer null (their z.null() contract); only the
+  // orphan scan's list_staged has a payload by default.
+  invoke.mockImplementation(async (command: string) =>
+    command === 'plugin:recording|list_staged' ? { files: [] } : null,
+  )
   pluginEvents.handlers.clear()
+  // A fresh bridge object per test: the shared plugin-event registration in
+  // core is keyed by bridge identity, so reusing one object would leak
+  // listeners across tests.
+  setBridge({
+    invoke,
+    listen: async () => () => {},
+    listenPlugin: async (_plugin, event, handler) => {
+      pluginEvents.handlers.set(event, handler)
+    },
+  })
   reconcilerControls.fake.getTranscribing.mockReturnValue(false)
   reconcilerControls.listeners.clear()
 })
 
-afterEach(cleanup)
+afterEach(async () => {
+  await cleanup()
+  setBridge(null)
+})
 
 describe('MobileAudioMemoProvider', () => {
   it('toggle records with the drawer open, then stops, captures, and deletes the staged file', async () => {
@@ -455,14 +462,14 @@ describe('MobileAudioMemoProvider', () => {
 
   it('foregrounding re-runs the orphan scan', async () => {
     await renderHook(() => useMobileAudioMemo(), { wrapper })
-    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('plugin:recording|list_staged'))
+    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('plugin:recording|list_staged', {}))
     invoke.mockClear()
 
     await act(async () => {
       document.dispatchEvent(new Event('visibilitychange'))
     })
 
-    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('plugin:recording|list_staged'))
+    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('plugin:recording|list_staged', {}))
   })
 
   it('a recording that outlived its JS is stopped and saved on mount', async () => {
@@ -508,7 +515,7 @@ describe('MobileAudioMemoProvider', () => {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(0)
       })
-      expect(invoke).toHaveBeenCalledWith('plugin:recording|actions_ready')
+      expect(invoke).toHaveBeenCalledWith('plugin:recording|actions_ready', {})
 
       await act(async () => {
         pluginEvents.emit('nativeAction', { action: 'recordAudio' })
@@ -519,11 +526,11 @@ describe('MobileAudioMemoProvider', () => {
 
       // Confirmation waits until the recording UI has survived presentation —
       // a crash in that window must leave the action queued for next launch.
-      expect(invoke).not.toHaveBeenCalledWith('plugin:recording|action_performed')
+      expect(invoke).not.toHaveBeenCalledWith('plugin:recording|action_performed', {})
       await act(async () => {
         await vi.advanceTimersByTimeAsync(2000)
       })
-      expect(invoke).toHaveBeenCalledWith('plugin:recording|action_performed')
+      expect(invoke).toHaveBeenCalledWith('plugin:recording|action_performed', {})
     } finally {
       vi.useRealTimers()
     }
@@ -543,7 +550,7 @@ describe('MobileAudioMemoProvider', () => {
       })
 
       expect(recorderControls.startSpy).not.toHaveBeenCalled()
-      expect(invoke).not.toHaveBeenCalledWith('plugin:recording|action_performed')
+      expect(invoke).not.toHaveBeenCalledWith('plugin:recording|action_performed', {})
     } finally {
       vi.useRealTimers()
     }

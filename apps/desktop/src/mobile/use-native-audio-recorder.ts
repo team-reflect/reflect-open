@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { addPluginListener, invoke } from '@tauri-apps/api/core'
-import { base64ToBytes } from '@reflect/core'
-import { z } from 'zod'
+import {
+  base64ToBytes,
+  cancelRecording,
+  deleteStaged,
+  errorMessage,
+  readStaged,
+  recordingStatus,
+  startRecording,
+  stopRecording,
+  subscribeRecordingLevel,
+  subscribeRecordingStopped,
+  type RecordingStoppedEvent,
+} from '@reflect/core'
 
 /**
  * The mobile counterpart of `use-audio-recorder.ts`: the same
@@ -68,21 +78,6 @@ export interface UseNativeAudioRecorderValue {
   cancel: () => Promise<void>
 }
 
-const stopResponseSchema = z.object({
-  path: z.string(),
-  durationMs: z.number(),
-  modifiedMs: z.number(),
-})
-const recordingStatusSchema = z.object({ recording: z.boolean(), elapsedMs: z.number() })
-const readStagedSchema = z.object({ base64: z.string() })
-const levelEventSchema = z.object({ level: z.number(), elapsedMs: z.number() })
-const stoppedEventSchema = z.object({
-  path: z.string(),
-  durationMs: z.number(),
-  modifiedMs: z.number(),
-  reason: z.string(),
-})
-
 /**
  * Staged files a live flow (a stop in flight, a queued capture) already owns.
  * The orphan scan consults this so a file can never be ingested twice — once
@@ -109,21 +104,18 @@ export function isStagedPathClaimed(path: string): boolean {
 
 /** True when the native recorder rejected `start` because access was denied. */
 export function isMicDeniedError(cause: unknown): boolean {
-  return typeof cause === 'string'
-    ? cause.includes('denied')
-    : cause instanceof Error && cause.message.includes('denied')
+  return errorMessage(cause).includes('denied')
 }
 
 /** Read a staged recording back as the pipeline's blob. */
 export async function readStagedRecording(path: string): Promise<Blob> {
-  const raw = await invoke('plugin:recording|read_staged', { request: { path } })
-  const { base64 } = readStagedSchema.parse(raw)
+  const base64 = await readStaged(path)
   return new Blob([base64ToBytes(base64)], { type: NATIVE_RECORDING_MIME })
 }
 
 /** Remove a staged recording once its bytes are durable in the graph. */
 export async function deleteStagedRecording(path: string): Promise<void> {
-  await invoke('plugin:recording|delete_staged', { request: { path } })
+  await deleteStaged(path)
 }
 
 /**
@@ -134,8 +126,7 @@ export async function nativeRecordingStatus(): Promise<{
   recording: boolean
   elapsedMs: number
 }> {
-  const raw = await invoke('plugin:recording|recording_status')
-  return recordingStatusSchema.parse(raw)
+  return await recordingStatus()
 }
 
 /**
@@ -146,8 +137,7 @@ export async function nativeRecordingStatus(): Promise<{
  * the race — its `recordingStopped` event delivers the memo instead).
  */
 export async function stopActiveRecording(): Promise<NativeRecorderResult | null> {
-  const raw = await invoke('plugin:recording|stop_recording')
-  const { path, durationMs, modifiedMs } = stopResponseSchema.parse(raw)
+  const { path, durationMs, modifiedMs } = await stopRecording()
   claimStagedPath(path)
   if (durationMs < MIN_DURATION_MS) {
     await deleteStagedRecording(path).catch(() => {})
@@ -213,79 +203,53 @@ export function useNativeAudioRecorder(
   // events are ignored unless recording, and a native stop must be heard even
   // if it lands between renders.
   useEffect(() => {
-    let disposed = false
-    const unlisteners: Array<() => void> = []
-    void (async () => {
-      try {
-        const levelListener = await addPluginListener(
-          'recording',
-          'recordingLevel',
-          (raw: unknown) => {
-            const parsed = levelEventSchema.safeParse(raw)
-            if (parsed.success && statusRef.current === 'recording') {
-              setLevel(parsed.data.level)
-              setElapsedMs(parsed.data.elapsedMs)
-            }
-          },
-        )
-        const stoppedListener = await addPluginListener(
-          'recording',
-          'recordingStopped',
-          (raw: unknown) => {
-            const parsed = stoppedEventSchema.safeParse(raw)
-            if (!parsed.success) {
-              return
-            }
-            setStatusBoth('idle')
-            const { path, durationMs, modifiedMs } = parsed.data
-            claimStagedPath(path)
-            void (async () => {
-              if (durationMs < MIN_DURATION_MS) {
-                await deleteStagedRecording(path).catch(() => {})
-                releaseStagedPath(path)
-                optionsRef.current.onNativeStop(null)
-                return
-              }
-              try {
-                const blob = await readStagedRecording(path)
-                optionsRef.current.onNativeStop({
-                  blob,
-                  mimeType: NATIVE_RECORDING_MIME,
-                  durationMs,
-                  stagedPath: path,
-                  recordedAt: new Date(modifiedMs),
-                })
-              } catch (cause) {
-                // Reading it back failed — leave the file staged (released,
-                // so the orphan scan ingests it on the next launch or
-                // foreground instead). Still notify the host so the recording
-                // UI closes: the recorder is already idle, and leaving the
-                // drawer open would strand it.
-                releaseStagedPath(path)
-                console.error('reading a native-stopped recording failed:', cause)
-                optionsRef.current.onNativeStop(null)
-              }
-            })()
-          },
-        )
-        if (disposed) {
-          void levelListener.unregister()
-          void stoppedListener.unregister()
+    const handleStopped = (event: RecordingStoppedEvent): void => {
+      setStatusBoth('idle')
+      const { path, durationMs, modifiedMs } = event
+      claimStagedPath(path)
+      void (async () => {
+        if (durationMs < MIN_DURATION_MS) {
+          await deleteStagedRecording(path).catch(() => {})
+          releaseStagedPath(path)
+          optionsRef.current.onNativeStop(null)
           return
         }
-        unlisteners.push(
-          () => void levelListener.unregister(),
-          () => void stoppedListener.unregister(),
-        )
-      } catch (cause) {
+        try {
+          const blob = await readStagedRecording(path)
+          optionsRef.current.onNativeStop({
+            blob,
+            mimeType: NATIVE_RECORDING_MIME,
+            durationMs,
+            stagedPath: path,
+            recordedAt: new Date(modifiedMs),
+          })
+        } catch (cause) {
+          // Reading it back failed — leave the file staged (released,
+          // so the orphan scan ingests it on the next launch or
+          // foreground instead). Still notify the host so the recording
+          // UI closes: the recorder is already idle, and leaving the
+          // drawer open would strand it.
+          releaseStagedPath(path)
+          console.error('reading a native-stopped recording failed:', cause)
+          optionsRef.current.onNativeStop(null)
+        }
+      })()
+    }
+    const levelSubscription = subscribeRecordingLevel((event) => {
+      if (statusRef.current === 'recording') {
+        setLevel(event.level)
+        setElapsedMs(event.elapsedMs)
+      }
+    })
+    const stoppedSubscription = subscribeRecordingStopped(handleStopped)
+    void Promise.all([levelSubscription.ready, stoppedSubscription.ready]).catch(
+      (cause: unknown) => {
         console.error('recording plugin events unavailable:', cause)
-      }
-    })()
+      },
+    )
     return () => {
-      disposed = true
-      for (const unlisten of unlisteners.splice(0)) {
-        unlisten()
-      }
+      levelSubscription.unlisten()
+      stoppedSubscription.unlisten()
     }
   }, [setStatusBoth])
 
@@ -295,9 +259,7 @@ export function useNativeAudioRecorder(
     }
     setStatusBoth('requesting')
     try {
-      await invoke('plugin:recording|start_recording', {
-        request: { maxDurationMs: optionsRef.current.maxDurationMs },
-      })
+      await startRecording({ maxDurationMs: optionsRef.current.maxDurationMs })
     } catch (cause) {
       setStatusBoth('idle')
       throw cause
@@ -333,7 +295,7 @@ export function useNativeAudioRecorder(
   const cancel = useCallback(async (): Promise<void> => {
     // Also aborts a pending permission request natively (start-session bump).
     try {
-      await invoke('plugin:recording|cancel_recording')
+      await cancelRecording()
     } finally {
       setStatusBoth('idle')
     }
