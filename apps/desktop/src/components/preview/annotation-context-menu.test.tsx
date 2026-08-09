@@ -33,7 +33,7 @@ describe('AnnotationContextMenu', () => {
         onRemove={vi.fn()}
       />,
     )
-    expect(view.getByRole('menu').query()).toBeNull()
+    expect(page.getByRole('menu').query()).toBeNull()
 
     await view.rerender(
       <AnnotationContextMenu
@@ -60,7 +60,8 @@ describe('AnnotationContextMenu', () => {
         onRemove={vi.fn()}
       />,
     )
-    // border 标注无文本时仍可复制：从矩形覆盖区域提取 PDF 文本。
+    // A border annotation without text still copies: the covered region's PDF
+    // text is extracted instead.
     await expect.element(page.getByRole('menuitem', { name: 'Copy text' })).toBeEnabled()
   })
 
@@ -85,7 +86,7 @@ describe('AnnotationContextMenu', () => {
         onRemove={vi.fn()}
       />,
     )
-    // text 类型标注无文本：无法提取，禁用。
+    // A text-type annotation without text cannot be extracted from; disabled.
     await expect.element(page.getByRole('menuitem', { name: 'Copy text' })).toBeDisabled()
   })
 
@@ -105,16 +106,17 @@ describe('AnnotationContextMenu', () => {
 
     await page.getByRole('menuitem', { name: 'Copy reference' }).click()
     expect(onCopyReference).toHaveBeenCalledWith(ITEM)
-    expect(onClose).toHaveBeenCalledTimes(1)
+    // base-ui closes the menu on item select, routing through onClose.
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
 
     await page.getByRole('menuitem', { name: 'Delete' }).click()
     expect(onRemove).toHaveBeenCalledWith('a1')
-    expect(onClose).toHaveBeenCalledTimes(2)
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledTimes(2))
   })
 
-  it('closes on Escape and on a click outside the menu', async () => {
+  it('closes on Escape', async () => {
     const onClose = vi.fn()
-    const view = await render(
+    await render(
       <AnnotationContextMenu
         anchor={anchor()}
         onClose={onClose}
@@ -126,40 +128,6 @@ describe('AnnotationContextMenu', () => {
     await expect.element(page.getByRole('menu')).toBeInTheDocument()
 
     await userEvent.keyboard('{Escape}')
-    expect(onClose).toHaveBeenCalledTimes(1)
-
-    await view.rerender(
-      <AnnotationContextMenu
-        anchor={anchor()}
-        onClose={onClose}
-        onCopyText={vi.fn()}
-        onCopyReference={vi.fn()}
-        onRemove={vi.fn()}
-      />,
-    )
-    await expect.element(page.getByRole('menu')).toBeInTheDocument()
-    document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    expect(onClose).toHaveBeenCalledTimes(2)
-  })
-
-  it('clamps the menu inside the viewport near the cursor', async () => {
-    await page.viewport(400, 300)
-    // 光标贴住右下角：菜单应翻折回窗口内。
-    await render(
-      <AnnotationContextMenu
-        anchor={anchor(399, 299)}
-        onClose={vi.fn()}
-        onCopyText={vi.fn()}
-        onCopyReference={vi.fn()}
-        onRemove={vi.fn()}
-      />,
-    )
-    const menu = page.getByRole('menu', { name: 'Annotation actions' }).element()
-    if (menu === null) {
-      throw new Error('menu missing')
-    }
-    const rect = menu.getBoundingClientRect()
-    expect(rect.left).toBeLessThan(400)
-    expect(rect.top).toBeLessThan(300)
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
   })
 })

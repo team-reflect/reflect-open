@@ -639,10 +639,17 @@ pub fn annotation_read(path: String, state: State<GraphState>) -> AppResult<Stri
 /// Persist a PDF's annotation sidecar JSON wholesale. Atomic (temp file +
 /// rename, staged under `.reflect/tmp/`) so a crash mid-write never leaves a
 /// truncated sidecar that the read would treat as empty. The content is
-/// opaque here — the caller owns the sidecar schema.
+/// opaque here — the caller owns the sidecar schema. Generation-pinned like
+/// every other mutating command (`root_for_generation`), so a write racing a
+/// graph switch fails loudly instead of landing in the wrong graph.
 #[tauri::command]
-pub fn annotation_write(path: String, content: String, state: State<GraphState>) -> AppResult<()> {
-    let root = current_root(&state)?;
+pub fn annotation_write(
+    path: String,
+    content: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<()> {
+    let root = root_for_generation(&state, generation)?;
     let sidecar = annotation_sidecar(&root, &path)?;
     atomic_write_bytes(&root, &sidecar, content.as_bytes())?;
     Ok(())

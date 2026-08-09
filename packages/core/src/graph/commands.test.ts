@@ -103,10 +103,11 @@ describe('graph commands', () => {
     })
     expect(contents).toBe('{"annotations":[]}')
 
-    await writeAnnotations('assets/paper.pdf', '{"annotations":[]}')
+    await writeAnnotations('assets/paper.pdf', '{"annotations":[]}', 42)
     expect(invoke).toHaveBeenNthCalledWith(2, 'annotation_write', {
       path: 'assets/paper.pdf',
       content: '{"annotations":[]}',
+      generation: 42,
     })
   })
 

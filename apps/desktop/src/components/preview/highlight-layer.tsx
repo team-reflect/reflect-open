@@ -106,8 +106,9 @@ type LatestProps = HighlightLayerProps & {
  */
 export function HighlightLayer(props: HighlightLayerProps): ReactElement | null {
   const { viewer } = usePdfViewer()
-  // 右键标注矩形 = 选中 + 在光标处打开上下文菜单；矩形是手动 DOM，处理函数
-  // 通过 latest 读取最新实现。
+  // Right-click on an annotation rect selects it and opens the context menu
+  // at the cursor; the rects are raw DOM, so the handler reads the freshest
+  // implementation through latest.
   const [menu, setMenu] = useState<AnnotationMenuAnchor | null>(null)
   const handleRectContextMenu = useCallback(
     (item: AnnotationItem, event: MouseEvent): void => {

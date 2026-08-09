@@ -4,8 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { PreviewPanel } from './preview-panel'
 
-// 快捷键逻辑在 PdfPreview 上，不依赖 pdf.js 外壳：透传 children 并提供
-// usePdfViewer 的 no-op 值（HighlightLayer/AnnotationList 消费）。
+// The shortcut logic lives in PdfPreview and needs no pdf.js shell: pass
+// children through and provide a no-op usePdfViewer (HighlightLayer /
+// AnnotationList consume it).
 vi.mock('./pdf-viewer-shell', () => ({
   PdfViewerShell: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   usePdfViewer: () => ({
@@ -40,7 +41,7 @@ vi.mock('@/providers/pdf-session-provider', () => ({
     clear: vi.fn(),
   }),
 }))
-// AnnotationSection 的清单高度 resize 读取设置。
+// The annotation list's height resize reads settings.
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
     settings: { annotationListHeight: 180 },
@@ -82,7 +83,7 @@ describe('PdfPreview annotation-mode shortcuts', () => {
     await expect.poll(() => drawPressed()).toBe('true')
     expect(browsePressed()).toBe('false')
 
-    // 幂等：重复按当前模式的键保持该模式。
+    // Idempotent: re-pressing the active mode's key keeps the mode.
     await userEvent.keyboard('r')
     await expect.poll(() => drawPressed()).toBe('true')
 
@@ -104,7 +105,7 @@ describe('PdfPreview annotation-mode shortcuts', () => {
     await renderPdfPreview()
     await expect.poll(() => browsePressed()).toBe('true')
 
-    // 焦点在 input 上（模拟页码输入框/表单）：r / v / ESC 都不生效。
+    // Focus sits on an input (a page-number field / form): r / v / ESC do nothing.
     const input = document.createElement('input')
     input.className = 'temp-preview-key'
     document.body.append(input)
@@ -117,7 +118,7 @@ describe('PdfPreview annotation-mode shortcuts', () => {
     await userEvent.keyboard('v')
     expect(browsePressed()).toBe('true')
 
-    // 移开焦点后快捷键恢复。
+    // The shortcuts resume once focus leaves the input.
     input.remove()
     await userEvent.keyboard('r')
     await expect.poll(() => drawPressed()).toBe('true')
@@ -129,12 +130,13 @@ describe('PdfPreview annotation-mode shortcuts', () => {
     browse?.focus()
     expect(document.activeElement).toBe(browse)
 
-    // 按 r 切到 create 后，焦点环从工具栏按钮上清除（回到阅读器上下文）。
+    // After r switches to create, the focus ring clears from the toolbar
+    // button (focus returns to the reader context).
     await userEvent.keyboard('r')
     await expect.poll(() => drawPressed()).toBe('true')
     await expect.poll(() => document.activeElement).not.toBe(browse)
 
-    // ESC 回 browse 同样清除焦点环。
+    // ESC back to browse clears the focus ring too.
     const draw = page.getByRole('button', { name: 'Draw rectangle' }).element()
     draw?.focus()
     await userEvent.keyboard('{Escape}')

@@ -15,8 +15,8 @@ function item(partial: Partial<AnnotationItem>): AnnotationItem {
 }
 
 /**
- * 300x200 页面的 scale-1 viewport mock：convertToViewportRectangle 翻转 y 轴
- * （PDF 用户空间 y 向上 → display y 向下），与真实 pdf.js 一致。
+ * A scale-1 viewport mock for a 300x200 page: convertToViewportRectangle flips
+ * the y axis (PDF user space grows up → display grows down), like real pdf.js.
  */
 function pageMock(textItems: unknown[]) {
   return {
@@ -38,8 +38,9 @@ const docMock = (page: unknown) => ({ getPage: async () => page })
 
 describe('extractRegionText', () => {
   it('joins the text items whose bboxes overlap the annotation rect', async () => {
-    // 文本基线 (60, 150)，沿 x 到 90、高 12：PDF 空间 [60,150,90,162]
-    // → display [60, 38, 90, 50] → 归一化 [0.2, 0.19, 0.3, 0.25]，落在标注矩形内。
+    // Baseline (60, 150), running to x=90 with height 12: PDF space
+    // [60,150,90,162] → display [60, 38, 90, 50] → normalized
+    // [0.2, 0.19, 0.3, 0.25], inside the annotation rect.
     const doc = docMock(
       pageMock([
         { str: 'Hello', transform: [1, 0, 0, 1, 60, 150], width: 30, height: 12, hasEOL: false },

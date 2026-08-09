@@ -7,7 +7,7 @@ import { usePdfSession } from '@/providers/pdf-session-provider'
 import { usePdfSidebarView } from '@/providers/pdf-sidebar-view-provider'
 import { cn } from '@/lib/utils'
 
-/** pdf.js 目录节点的结构子集（`getOutline` 的返回形状）。 */
+/** The structural subset of a pdf.js outline node (`getOutline`'s return shape). */
 interface PdfOutlineItem {
   title: string
   bold: boolean
@@ -18,18 +18,18 @@ interface PdfOutlineItem {
   items: PdfOutlineItem[]
 }
 
-/** 缩略图的目标 CSS 宽度（像素）。 */
+/** The thumbnail's target CSS width, in pixels. */
 const THUMBNAIL_WIDTH_PX = 96
 
-/** 侧栏正文行的排版（与 Similar notes 等区块完全一致）。 */
+/** The sidebar body-row typography, matching the Similar notes section and peers. */
 const ROW_CLASS =
   'flex w-full items-center space-x-1 rounded-md px-3 py-1 leading-5 text-text-secondary ' +
   'transition-colors duration-100 hover:bg-surface-hover hover:text-text'
 
 interface PdfSectionProps {
-  /** 区头标题（与侧栏其他区块一致的大小写与间距）。 */
+  /** The header title (same casing and spacing as the other sidebar sections). */
   title: string
-  /** 每次 PDF 打开时的展开预设：Outline 展开、Pages 折叠。 */
+  /** The per-open expand preset: Outline expanded, Pages collapsed. */
   defaultOpen: boolean
   children: ReactNode
 }
@@ -68,7 +68,7 @@ function PdfSection({ title, defaultOpen, children }: PdfSectionProps): ReactEle
   )
 }
 
-/** 从图库相对路径取去扩展名的文件名，区块头部展示用。 */
+/** The extension-stripped filename of a graph-relative path, for the header. */
 function pdfFilename(assetPath: string): string {
   return (
     assetPath
@@ -103,7 +103,7 @@ async function jumpToDestination(
     const pageIndex = await doc.getPageIndex(resolved[0] as { num: number; gen: number })
     viewer.currentPageNumber = pageIndex + 1
   } catch {
-    // 无效目标（文档已销毁等）：跳过
+    // A dest that cannot resolve (document destroyed, etc.): skip it.
   }
 }
 
@@ -128,9 +128,11 @@ export function PdfSidebarBlock({ assetPath }: { assetPath: string }): ReactElem
   }
 
   return (
-    // 面板撑满整个 context sidebar（h-full）；文件名区头与 PDF actions 固定，
-    // Outline/Pages 的内容区在 flex 列里各自 flex-1——默认仅 Outline 展开时
-    // 占满剩余空间（约面板 80%），同时展开则均分，长内容内部滚动。
+    // The panel fills the whole context sidebar (h-full); the filename header
+    // and PDF actions stay fixed, while the Outline/Pages content areas each
+    // take flex-1 in the column — with only Outline expanded (the default) it
+    // fills the remaining space (~80% of the panel), two expanded sections
+    // split it, and long content scrolls internally.
     <section
       aria-label={`PDF ${pdfFilename(assetPath)}`}
       className="flex h-full min-h-0 flex-col bg-accent/5"
@@ -174,8 +176,9 @@ function PdfOutline({
 
   useEffect(() => {
     let cancelled = false
-    // 目录读取是异步回调里 setState（合规）；换文档时整块通常会因 session
-    // 失配而重挂，旧目录最多短暂停留一帧。
+    // Outline reads are async setState (compliant); on a document switch the
+    // whole panel usually remounts on a session mismatch, so the stale outline
+    // lingers for at most a frame.
     void doc
       .getOutline()
       .then((outline) => {
@@ -193,7 +196,8 @@ function PdfOutline({
     }
   }, [doc])
 
-  // 目录读取中或文档没有目录：这一节不渲染，不占位闪烁。
+  // While the outline loads, or the document has none, the section renders
+  // nothing rather than flashing an empty placeholder.
   if (items === null || items.length === 0) {
     return null
   }
@@ -289,8 +293,9 @@ function PdfThumbnail({
 }): ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  // 每页一个低分辨率渲染：pdf.js 的渲染在 worker 线程，主线程只负责小块
-  // canvas 的分配；卸载/换文档时取消在途渲染并丢弃结果。
+  // One low-resolution render per page: pdf.js rasterizes on the worker
+  // thread, the main thread only allocates the small canvases; in-flight
+  // renders are cancelled and dropped on unmount / document switch.
   useEffect(() => {
     let cancelled = false
     let renderTask: RenderTask | null = null
@@ -321,7 +326,7 @@ function PdfThumbnail({
       try {
         await renderTask.promise
       } catch {
-        // 渲染被取消（卸载/换文档）是预期路径
+        // A cancelled render (unmount / document switch) is the expected path
       }
     })()
     return () => {

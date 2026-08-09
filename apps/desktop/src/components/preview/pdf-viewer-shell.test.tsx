@@ -2,8 +2,9 @@ import { render } from 'vitest-browser-react'
 import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// 最小单页 PDF（300x300），xref 偏移精确生成，pdf.js 无需 recovery 即可解析，
-// 避免 recovery 模式的警告噪音。测试中 readAssetBinary 被替换为返回该文档。
+// A minimal one-page PDF (300x300) with exact xref offsets, so pdf.js
+// parses it without recovery and its warning noise. readAssetBinary is
+// swapped to return this document in the tests.
 const PDF_BYTES = new Uint8Array([
   37, 80, 68, 70, 45, 49, 46, 52, 10, 49, 32, 48, 32, 111, 98, 106, 10, 60, 60, 32, 47, 84, 121,
   112, 101, 32, 47, 67, 97, 116, 97, 108, 111, 103, 32, 47, 80, 97, 103, 101, 115, 32, 50, 32, 48,
@@ -44,21 +45,21 @@ vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
 }))
 
-// pdf.js 在主线程走 fake worker 时读取该全局入口，跳过动态 import
-// `/pdf.worker.min.mjs`（测试环境不存在该 URL）。
-// @ts-expect-error pdf.js worker 构建未附带类型声明
+// pdf.js reads this global entry when running a main-thread fake worker,
+// skipping the dynamic import of `/pdf.worker.min.mjs` (absent in tests).
+// @ts-expect-error the pdf.js worker build ships no type declarations
 const { WorkerMessageHandler } = await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
 
 const { PdfViewerShell } = await import('./pdf-viewer-shell')
 
-/** 读取工具栏上的缩放百分比展示。 */
+/** Read the zoom percentage shown in the toolbar. */
 function zoomPercent(): number {
   return Number.parseInt(page.getByLabelText('Zoom level').element()?.textContent ?? '', 10)
 }
 
 beforeEach(async () => {
-  // fake worker 首次初始化会打一次 "Setting up fake worker." 警告——pdf.js
-  // 在测试环境下的正常降级路径，非应用噪音，测试内静默。
+  // The fake worker logs "Setting up fake worker." once on first init — a
+  // normal pdf.js fallback in the test environment, not app noise; silence it.
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   vi.stubGlobal('pdfjsWorker', { WorkerMessageHandler })
   await page.viewport(1280, 800)
@@ -75,10 +76,11 @@ describe('PdfViewerShell', () => {
     await render(<PdfViewerShell assetPath="assets/test.pdf" onClose={onClose} />)
 
     await expect.element(page.getByRole('button', { name: 'Fit width' })).toBeEnabled()
-    // 初始即 page-width：缩放百分比反映容器宽度，而非 100%。
+    // Opens at page-width: the zoom percentage reflects the container width,
+    // not 100%.
     await expect.poll(() => zoomPercent()).toBeGreaterThan(100)
 
-    // 适配预设按钮渲染，fit-width 处于激活态。
+    // The fit-preset buttons render with fit-width active.
     expect(
       page.getByRole('button', { name: 'Fit width' }).element()?.getAttribute('aria-pressed'),
     ).toBe('true')
@@ -89,7 +91,7 @@ describe('PdfViewerShell', () => {
       page.getByRole('button', { name: 'Actual size' }).element()?.getAttribute('aria-pressed'),
     ).toBe('false')
 
-    // 顶栏的显眼关闭入口。
+    // The explicit close affordance in the top toolbar.
     await page.getByRole('button', { name: 'Close preview' }).click()
     expect(onClose).toHaveBeenCalledTimes(1)
   })
@@ -99,7 +101,8 @@ describe('PdfViewerShell', () => {
     await expect.element(page.getByRole('button', { name: 'Fit page' })).toBeEnabled()
     const widthZoom = zoomPercent()
 
-    // 300x300 页面在宽而矮的容器里，page-fit（同时考虑高度）必然小于 page-width。
+    // For a 300x300 page in a wide, short container, page-fit (which also
+    // considers height) is necessarily smaller than page-width.
     await page.getByRole('button', { name: 'Fit page' }).click()
     await expect.poll(() => zoomPercent()).toBeLessThan(widthZoom)
     expect(
@@ -122,8 +125,8 @@ describe('PdfViewerShell', () => {
     await expect.element(page.getByRole('button', { name: 'Fit width' })).toBeEnabled()
     const narrow = zoomPercent()
 
-    // 面板拖宽（分栏 resize 改变容器宽度）：fit-width 应随新宽度重算，
-    // 缩放百分比显著上升。
+    // Widening the pane (a split resize changes the container width):
+    // fit-width must recompute from the new width and the zoom rises visibly.
     await view.rerender(
       <div style={{ width: 900, height: 600 }}>
         <PdfViewerShell assetPath="assets/test.pdf" />
@@ -150,7 +153,7 @@ describe('PdfViewerShell', () => {
       )
       .toBe('false')
 
-    // 显式缩放值不再跟随容器变化。
+    // An explicit zoom no longer follows the container size.
     const fixed = zoomPercent()
     await view.rerender(
       <div style={{ width: 900, height: 600 }}>
@@ -167,7 +170,8 @@ describe('PdfViewerShell', () => {
     await page.getByRole('button', { name: 'Fullscreen' }).click()
     const dialog = page.getByRole('dialog', { name: 'PDF fullscreen' })
     await expect.element(dialog).toBeInTheDocument()
-    // 浮层内是独立工具栏：缩放控制与退出按钮，无重复的进入全屏按钮。
+    // The overlay has its own toolbar: zoom controls and an exit button,
+    // with no duplicate enter-fullscreen button.
     await expect
       .element(dialog.getByRole('button', { name: 'Exit fullscreen' }))
       .toBeInTheDocument()
@@ -177,7 +181,7 @@ describe('PdfViewerShell', () => {
     await page.getByRole('button', { name: 'Exit fullscreen' }).click()
     await expect.element(dialog).not.toBeInTheDocument()
 
-    // Escape 同样退出全屏。
+    // Escape exits fullscreen too.
     await page.getByRole('button', { name: 'Fullscreen' }).click()
     await expect.element(page.getByRole('dialog', { name: 'PDF fullscreen' })).toBeInTheDocument()
     await userEvent.keyboard('{Escape}')
@@ -193,7 +197,7 @@ describe('PdfViewerShell', () => {
       </div>,
     )
     await expect.element(page.getByRole('button', { name: 'Fit width' })).toBeEnabled()
-    // 文本层 span 渲染完成后再测量。
+    // Measure only once the text layer's spans have rendered.
     await vi.waitFor(() => {
       expect(document.querySelectorAll('.textLayer span').length).toBeGreaterThan(0)
     })
@@ -205,9 +209,11 @@ describe('PdfViewerShell', () => {
     if (canvas === undefined || layer === undefined) {
       return
     }
-    // 回归防护：pdf.js 的 .page 带 9px 透明边框，若被全局 border-box 吃掉内容
-    // 盒，canvas（100%）会缩到 541px 而文本层保持 559px——选区高亮相对文字
-    // 垂直/水平错位。修复后两者同尺寸同原点（1px 容差）。
+    // Regression guard: pdf.js's .page carries a 9px transparent border; if
+    // the global border-box lets it eat the content box, the canvas (100%)
+    // shrinks to 541px while the text layer stays 559px, and the selection
+    // drifts from the glyphs. Fixed, both match in size and origin (1px
+    // tolerance).
     expect(Math.abs(canvas.width - layer.width)).toBeLessThanOrEqual(1)
     expect(Math.abs(canvas.height - layer.height)).toBeLessThanOrEqual(1)
     expect(Math.abs(canvas.x - layer.x)).toBeLessThanOrEqual(1)

@@ -1,8 +1,13 @@
-import { useEffect, useRef, type ReactElement } from 'react'
-import { createPortal } from 'react-dom'
+import type { ReactElement } from 'react'
 import { Copy, Link2, Trash2 } from 'lucide-react'
 import type { AnnotationItem } from '@/lib/annotations/annotations-store'
-import { cn } from '@/lib/utils'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 /** Where a right-click opened the menu: the cursor position plus the annotation. */
 export interface AnnotationMenuAnchor {
@@ -20,17 +25,17 @@ interface AnnotationContextMenuProps {
   onRemove: (id: string) => void
 }
 
-/** How far the menu's corner can sit from the viewport edge before it flips. */
-const VIEWPORT_MARGIN_PX = 8
-
 /**
- * The small menu that opens on a right-clicked annotation rect — the app-side
+ * The menu that opens on a right-clicked annotation rect — the app-side
  * equivalent of SiYuan's annotation popup, trimmed to the three actions that
- * map onto Reflect: copy the annotation's text, copy a markdown reference back
- * to its PDF page, and delete the annotation. Positioned at the cursor, closed
- * by Escape, a click outside, or any action. The visual language mirrors the
- * app's dropdown menu (`bg-popover`, ring, quiet menu items); the actions
- * themselves are the caller's business — this component only wires the UI.
+ * map onto Reflect: copy the annotation's text (extracted from the covered
+ * region when a border annotation carries none), copy a markdown reference
+ * back to its PDF page, and delete the annotation. Built on the shared shadcn
+ * DropdownMenu: a zero-size anchor parked at the cursor anchors the popper,
+ * whose collision handling replaces the hand-rolled viewport flip. The
+ * annotation rects are raw DOM (highlight-layer), so the menu is controlled —
+ * the layer sets `anchor` on contextmenu, and an action, Escape, or an outside
+ * click closes it through `onClose`.
  */
 export function AnnotationContextMenu({
   anchor,
@@ -39,97 +44,58 @@ export function AnnotationContextMenu({
   onCopyReference,
   onRemove,
 }: AnnotationContextMenuProps): ReactElement | null {
-  // The menu's own corner when closing a portal is the same element; a
-  // document pointerdown closes it, so the menu must not swallow the very
-  // click that opened it (the click lands before this mount).
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (anchor === null) {
-      return
-    }
-    const onPointerDown = (event: PointerEvent): void => {
-      if (menuRef.current !== null && !menuRef.current.contains(event.target as Node)) {
-        onClose()
-      }
-    }
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        onClose()
-      }
-    }
-    // 菜单由 contextmenu（右键）打开，那次交互的 pointerdown 已先发生，这里
-    // 直接挂全局监听不会立刻把自己关掉。
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [anchor, onClose])
-
   if (anchor === null) {
     return null
   }
   const { x, y, item } = anchor
-  // 贴近光标，但在窗口边缘翻折，避免菜单被裁掉。
-  const left = Math.min(x, window.innerWidth - VIEWPORT_MARGIN_PX - 176)
-  const top = Math.min(y, window.innerHeight - VIEWPORT_MARGIN_PX - 120)
-
-  const menuItemClass =
-    'group/annotation-menu-item flex w-full cursor-default items-center gap-2 rounded-md px-2 py-1.5 ' +
-    'text-sm text-text outline-hidden select-none focus:bg-surface-hover focus:text-text ' +
-    'data-disabled:pointer-events-none data-disabled:opacity-50'
-
-  return createPortal(
-    <div
-      ref={menuRef}
-      role="menu"
-      aria-label="Annotation actions"
-      className="fixed z-50 w-44 rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
-      style={{ left, top }}
+  return (
+    <DropdownMenu
+      open
+      onOpenChange={(next) => {
+        if (!next) {
+          onClose()
+        }
+      }}
     >
-      <button
-        type="button"
-        role="menuitem"
-        className={menuItemClass}
-        // 空文本的 border 标注可从矩形覆盖区域提取文本，因此不禁用；仅
-        // text 类型标注无文本时禁用（提取不到，点了也是状态栏提示）。
-        disabled={item.text.trim() === '' && item.type !== 'border'}
-        onClick={() => {
-          onCopyText(item)
-          onClose()
-        }}
+      {/* A zero-size anchor pinned to the cursor: the popper positions against
+          it and flips itself at the viewport edges. A real <button> keeps the
+          trigger's native-button semantics. */}
+      <DropdownMenuTrigger
+        render={
+          <button
+            type="button"
+            aria-hidden
+            tabIndex={-1}
+            style={{ position: 'fixed', left: x, top: y, width: 0, height: 0 }}
+          />
+        }
+      />
+      <DropdownMenuContent
+        align="start"
+        side="bottom"
+        sideOffset={2}
+        aria-label="Annotation actions"
+        className="w-44"
       >
-        <Copy />
-        <span className="min-w-0 flex-1 truncate text-left">Copy text</span>
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className={menuItemClass}
-        onClick={() => {
-          onCopyReference(item)
-          onClose()
-        }}
-      >
-        <Link2 />
-        <span className="min-w-0 flex-1 truncate text-left">Copy reference</span>
-      </button>
-      <div className={cn('-mx-1 my-1 h-px bg-border')} role="separator" />
-      <button
-        type="button"
-        role="menuitem"
-        className={cn(menuItemClass, 'text-destructive focus:bg-destructive/10')}
-        onClick={() => {
-          onRemove(item.id)
-          onClose()
-        }}
-      >
-        <Trash2 />
-        <span className="min-w-0 flex-1 truncate text-left">Delete</span>
-      </button>
-    </div>,
-    document.body,
+        <DropdownMenuItem
+          // An empty-text border annotation extracts its text from the covered
+          // region, so only a text-type annotation with no text is disabled.
+          disabled={item.text.trim() === '' && item.type !== 'border'}
+          onClick={() => onCopyText(item)}
+        >
+          <Copy />
+          Copy text
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onCopyReference(item)}>
+          <Link2 />
+          Copy reference
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onClick={() => onRemove(item.id)}>
+          <Trash2 />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

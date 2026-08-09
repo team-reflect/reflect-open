@@ -47,7 +47,8 @@ function firePointer(element: Element, type: string, init: PointerEventInit): vo
 }
 
 beforeEach(async () => {
-  // 测试里没有 SidebarWidthEffect，直接写死清单高度让布局与拖拽基准确定。
+  // No SidebarWidthEffect in this suite; pin the list height so layout and
+  // drag bases are deterministic.
   document.documentElement.style.setProperty('--annotation-list-height', '200px')
   await page.viewport(1280, 800)
 })
@@ -77,14 +78,14 @@ describe('AnnotationSection', () => {
     )
     await expect.element(page.getByText('First highlight')).toBeInTheDocument()
 
-    // 折叠只收起清单：行还在（清单头部的工具按钮与分隔条消失）。
+    // Collapse folds only the list: the toolbar row stays, the divider goes.
     await page.getByRole('button', { name: 'Collapse annotation list' }).click()
     expect(page.getByText('First highlight').query()).toBeNull()
     expect(page.getByRole('separator', { name: 'Resize annotation list' }).query()).toBeNull()
     await expect.element(page.getByRole('button', { name: 'Browse' })).toBeInTheDocument()
     expect(settingsState.updateSettings).not.toHaveBeenCalled()
 
-    // 展开后清单回来，分隔条也回来。
+    // Expanding brings the list and the divider back.
     await page.getByRole('button', { name: 'Expand annotation list' }).click()
     await expect.element(page.getByText('Second highlight')).toBeInTheDocument()
     await expect
@@ -110,7 +111,8 @@ describe('AnnotationSection', () => {
       throw new Error('handle missing')
     }
 
-    // 向上拖 40px：清单增高，拖拽期间全局 row-resize 光标。
+    // Dragging up 40px grows the list; the global cursor reads row-resize
+    // while dragging.
     firePointer(handle, 'pointerdown', { pointerId: 5, button: 0, clientY: 200 })
     firePointer(handle, 'pointermove', { pointerId: 5, clientY: 160 })
     expect(rootVariable('cursor')).toBe('row-resize')
@@ -175,7 +177,8 @@ describe('AnnotationSection', () => {
     expect(handle?.getAttribute('aria-controls')).toBe('annotation-list')
     expect(handle?.getAttribute('aria-valuemin')).toBe('120')
     expect(handle?.getAttribute('aria-valuemax')).toBe('480')
-    // 未拖拽时报告视口有效高度（180 偏好在此窗口内全额生效）。
+    // At rest it reports the viewport-effective height (the 180 preference
+    // applies in full at this window).
     expect(handle?.getAttribute('aria-valuenow')).toBe('180')
   })
 })

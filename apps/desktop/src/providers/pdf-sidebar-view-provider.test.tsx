@@ -42,11 +42,11 @@ describe('PdfSidebarViewProvider', () => {
     const harness = await renderHarness()
     expect(view()).toBe('document')
 
-    // PDF 打开（false→true）：自动推到 PDF 面板。
+    // Opening a PDF (false→true) auto-pushes the PDF panel on top.
     await page.getByRole('button', { name: 'target-on' }).click()
     await expect.poll(() => view()).toBe('pdf')
 
-    // PDF 关闭（true→false）：自动弹回文档面板。
+    // Closing it (true→false) auto-pops back to the document panel.
     await page.getByRole('button', { name: 'target-off' }).click()
     await expect.poll(() => view()).toBe('document')
     await harness.unmount()
@@ -55,17 +55,18 @@ describe('PdfSidebarViewProvider', () => {
   it('never overrides a manual view while the target state is steady', async () => {
     await renderHarness()
 
-    // 打开 PDF → 自动进 PDF 面板；用户手动返回文档面板。
+    // Opening the PDF auto-enters the PDF panel; the user manually returns.
     await page.getByRole('button', { name: 'target-on' }).click()
     await expect.poll(() => view()).toBe('pdf')
     await page.getByRole('button', { name: 'back' }).click()
     await expect.poll(() => view()).toBe('document')
 
-    // 目标状态不变时重放 applyTarget(true)：不是边缘变化，保持文档面板。
+    // Replaying applyTarget(true) with a steady target is not an edge
+    // change: the document panel stays.
     await page.getByRole('button', { name: 'target-on' }).click()
     expect(view()).toBe('document')
 
-    // 手动 enterPdf 仍然有效，且不因重放被覆盖。
+    // A manual enterPdf still works and is not overridden by the replay.
     await page.getByRole('button', { name: 'enter' }).click()
     await expect.poll(() => view()).toBe('pdf')
     await page.getByRole('button', { name: 'target-on' }).click()

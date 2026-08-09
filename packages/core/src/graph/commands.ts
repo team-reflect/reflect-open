@@ -247,10 +247,15 @@ export async function readAnnotations(pdfPath: string): Promise<string> {
 /**
  * Persist a PDF's annotation sidecar JSON wholesale (atomic in Rust). The
  * caller supplies the complete file text; each call replaces every annotation
- * for that PDF.
+ * for that PDF. `generation` pins the write to the graph session it was issued
+ * for, matching every other mutating command.
  */
-export async function writeAnnotations(pdfPath: string, content: string): Promise<void> {
-  await call('annotation_write', { path: pdfPath, content }, voidSchema)
+export async function writeAnnotations(
+  pdfPath: string,
+  content: string,
+  generation: number,
+): Promise<void> {
+  await call('annotation_write', { path: pdfPath, content, generation }, voidSchema)
 }
 
 /**

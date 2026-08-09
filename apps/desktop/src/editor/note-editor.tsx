@@ -411,10 +411,11 @@ export function NoteEditor({
     // meowdown cancels it so iOS WebKit can't focus the editor (and raise
     // the keyboard) under the opening lightbox.
     ({ src, alt, event }: { src: string; alt: string; event: MouseEvent | TouchEvent }) => {
-      // 迁移后的 SiYuan 图片标注是「PDF 链接包图片」的形态
-      // （[![…](img)](assets/…pdf#page=N)）；点击应像 SiYuan 一样跳到 PDF
-      // 预览的对应页，而不是打开图片灯箱。meowdown 的图片点击拦截先于链接
-      // 导航，所以在这里分支。
+      // A migrated SiYuan image annotation is an image wrapped in a PDF link
+      // (`[![…](img)](assets/…pdf#page=N)`); clicking it should jump to the
+      // PDF preview's page like SiYuan does, not open the image lightbox.
+      // meowdown's image-click intercept runs before link navigation, so the
+      // branch lives here.
       if (event.target instanceof HTMLElement) {
         const anchor = event.target.closest('a[href]')
         if (anchor !== null) {

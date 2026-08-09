@@ -2,8 +2,9 @@ import type { PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import type { AnnotationItem } from './annotations-store'
 
 /**
- * 归一化矩形（0~1，display 坐标：左上原点、y 向下，与标注 rects 同一空间）
- * 是否与另一个有正面积交集。
+ * Whether a normalized rectangle (0–1, display coordinates: top-left origin,
+ * y growing down — the same space as the annotation rects) has positive
+ * overlap with another.
  */
 function overlaps(a: readonly number[], b: readonly number[]): boolean {
   const overlapX = Math.min(a[2] ?? 0, b[2] ?? 0) - Math.max(a[0] ?? 0, b[0] ?? 0)
@@ -12,16 +13,21 @@ function overlaps(a: readonly number[], b: readonly number[]): boolean {
 }
 
 /**
- * 从 border 标注矩形覆盖的区域提取 PDF 文本：读取该页文本层，把每个文本项
- * 的 bbox 换算到与标注相同的归一化 display 坐标（PDF 用户空间 → viewport，
- * y 轴翻转，与 highlight-layer 一致），与标注矩形求交；命中项按阅读顺序拼接。
+ * Extract the PDF text covered by a border annotation's rect: read the page's
+ * text layer, convert each text item's bbox to the same normalized display
+ * coordinates as the annotation (PDF user space → viewport, y flipped like the
+ * highlight layer), and intersect with the rect; matching items join in
+ * reading order.
  *
- * 坐标换算：文本项 transform 是 `[a, b, c, d, e, f]`，基线起点在 PDF 用户
- * 空间 (e, f)，沿 x 延伸 `width`、字体高度 `height`（PDF y 轴向上），因此
- * bbox = `[e, f, e + width, f + height]`；`convertToViewportRectangle` 转到
- * display 像素后除以 viewport 尺寸即得 0~1 归一化值（与缩放无关）。
+ * Coordinate math: a text item's transform is `[a, b, c, d, e, f]`; the
+ * baseline starts at `(e, f)` in PDF user space and runs `width` along x with
+ * `height` of font height (PDF y grows up), so its bbox is
+ * `[e, f, e + width, f + height]`. `convertToViewportRectangle` maps that to
+ * display pixels; dividing by the viewport size yields the 0–1 fractions,
+ * independent of the render scale.
  *
- * 无命中或读取失败返回 null（调用方决定状态栏提示）。
+ * Returns null when nothing overlaps or the read fails (the caller decides
+ * the status-line feedback).
  */
 export async function extractRegionText(
   doc: PDFDocumentProxy,
@@ -41,7 +47,8 @@ export async function extractRegionText(
   const viewport = page.getViewport({ scale: 1 })
   const matched: string[] = []
   for (const textItem of content.items) {
-    // 文本层混有 markedContent 节点（无 str），用 `in` 收窄到 TextItem。
+    // The text layer mixes in markedContent nodes (no `str`); `in` narrows to
+    // TextItem.
     if (!('str' in textItem) || textItem.str === '') {
       continue
     }
@@ -62,7 +69,7 @@ export async function extractRegionText(
       matched.push(textItem.str + (textItem.hasEOL === true ? '\n' : ''))
     }
   }
-  // join 在换行项后补的空格会落到 '\n' 之后，折叠成干净的换行。
+  // join() puts a space after a line-break item; fold it into the newline.
   const text = matched.join(' ').replaceAll('\n ', '\n').trim()
   return text === '' ? null : text
 }

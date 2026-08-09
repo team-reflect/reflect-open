@@ -82,6 +82,7 @@ export const ANNOTATION_WRITE_DEBOUNCE_MS = 500
 interface PendingWrite {
   timer: ReturnType<typeof setTimeout>
   path: string
+  generation: number
 }
 
 /**
@@ -112,15 +113,16 @@ export function usePdfAnnotations(
   annotationsRef.current = annotations
   const pendingRef = useRef<PendingWrite | null>(null)
 
-  const persist = useCallback((path: string, content: string): void => {
-    void writeAnnotations(path, content).catch((cause: unknown) => {
+  const persist = useCallback((path: string, content: string, generation: number): void => {
+    void writeAnnotations(path, content, generation).catch((cause: unknown) => {
       console.error('write annotations failed:', cause)
     })
   }, [])
 
   const scheduleWrite = useCallback((): void => {
     const path = pathRef.current
-    if (generationRef.current === null) {
+    const generation = generationRef.current
+    if (generation === null) {
       return
     }
     if (pendingRef.current !== null) {
@@ -128,6 +130,7 @@ export function usePdfAnnotations(
     }
     pendingRef.current = {
       path,
+      generation,
       timer: setTimeout(() => {
         pendingRef.current = null
         // Merge the local state at fire time — every edit since the timer was
@@ -137,7 +140,7 @@ export function usePdfAnnotations(
           path,
           annotations: annotationsRef.current,
         }
-        persist(path, JSON.stringify(file))
+        persist(path, JSON.stringify(file), generation)
       }, ANNOTATION_WRITE_DEBOUNCE_MS),
     }
   }, [persist])
@@ -201,7 +204,7 @@ export function usePdfAnnotations(
         path: pending.path,
         annotations: annotationsRef.current,
       }
-      persist(pending.path, JSON.stringify(file))
+      persist(pending.path, JSON.stringify(file), pending.generation)
     }
   }, [pdfPath, generation, persist])
 

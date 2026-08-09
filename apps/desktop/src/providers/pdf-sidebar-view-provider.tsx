@@ -9,19 +9,20 @@ import {
   type ReactNode,
 } from 'react'
 
-/** 侧栏堆栈的当前顶层：文档面板（默认）还是 PDF 面板。 */
+/** The sidebar stack's current top: the document panel (default) or the PDF panel. */
 export type PdfSidebarView = 'document' | 'pdf'
 
 interface PdfSidebarViewContextValue {
   view: PdfSidebarView
-  /** 手动切到 PDF 面板（文档面板里的「进入 PDF 面板」入口）。 */
+  /** Push the PDF panel on top (the document panel's "enter PDF panel" entry). */
   enterPdf: () => void
-  /** 手动回到文档面板（PDF 面板里的「返回文档面板」按钮）。 */
+  /** Pop back to the document panel (the PDF panel's "back to document" button). */
   backToDocument: () => void
   /**
-   * 随 preview target 的 pdf 状态变化调用。只在边缘变化（false→true 或
-   * true→false）时自动切换视图；状态不变时是 no-op——用户在 PDF 仍打开时
-   * 手动回到文档面板，之后的重渲染不会把他再推回 PDF 面板。
+   * Called as the preview target's pdf-ness changes. Only edge transitions
+   * (false→true or true→false) switch the view automatically; a steady state
+   * is a no-op — after the user manually returns to the document panel while
+   * the PDF stays open, re-renders must not push them back.
    */
   applyTarget: (isPdf: boolean) => void
 }
@@ -42,8 +43,8 @@ const PdfSidebarViewContext = createContext<PdfSidebarViewContextValue>({
  */
 export function PdfSidebarViewProvider({ children }: { children: ReactNode }): ReactElement {
   const [view, setView] = useState<PdfSidebarView>('document')
-  // 最近一次 applyTarget 收到的 pdf 状态：边缘变化才自动切换，重渲染不覆盖
-  // 用户手动选中的视图。
+  // The pdf-ness of the last applyTarget call: only an edge transition auto-
+  // switches, so a re-render never overrides the user's chosen view.
   const isPdfRef = useRef<boolean | null>(null)
 
   const applyTarget = useCallback((isPdf: boolean): void => {

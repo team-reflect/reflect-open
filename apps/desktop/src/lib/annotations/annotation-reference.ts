@@ -14,13 +14,16 @@ export function annotationReference(assetPath: string, item: AnnotationItem): st
       .pop()
       ?.replace(/\.pdf$/i, '') ?? assetPath
   const page = item.pageIndex + 1
-  // 文本折叠空白（多行/连续空格会破坏单行链接标签）。
+  // Collapse whitespace: multiline or run-on spaces would break the one-line
+  // link label.
   const text = item.text.trim().replaceAll(/\s+/g, ' ')
   const rawTitle = text === '' ? `${filename} - p${page}` : `${filename} - p${page} - ${text}`
-  // 标签里的 markdown 特殊字符（[ ] \）转义一次，避免截断链接标签。
+  // Escape markdown special characters once, so they cannot close the link
+  // label early.
   const title = rawTitle.replaceAll(/[\\[\]]/g, (c) => `\\${c}`)
-  // 路径必须 URL 编码（与迁移链接一致：空格 %20、中文 percent-encoded）——
-  // markdown 链接目标含空格会解析失败、渲染成纯文本；parsePdfHref 点击时
-  // 解码回原始路径再读取文件。
+  // The path must be URL-encoded (matching the migration links: spaces →
+  // %20, CJK percent-encoded) — a markdown link target with raw spaces fails
+  // to parse and renders as plain text; parsePdfHref decodes it back to the
+  // on-disk path when clicked.
   return `[${title}](${encodeURI(assetPath)}#page=${page})`
 }

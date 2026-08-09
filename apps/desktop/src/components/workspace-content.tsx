@@ -70,9 +70,10 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
   // width again.
   const { target: previewTarget, close: closePreview } = usePreviewPanel()
 
-  // 侧栏堆栈：PDF 打开（false→true）自动把 PDF 面板推到顶层，关闭
-  // （true→false）自动弹回文档面板；用户在 PDF 仍打开时手动返回文档面板，
-  // 之后的重渲染不会覆盖（applyTarget 只在边缘变化时切换）。
+  // Sidebar stack: opening a PDF (false→true) pushes the PDF panel on top;
+  // closing it (true→false) pops back to the document panel. Returning to the
+  // document panel manually while the PDF stays open is never overridden by
+  // re-renders (applyTarget only switches on an edge change).
   const { view, applyTarget } = usePdfSidebarView()
   useEffect(() => {
     applyTarget(previewTarget?.kind === 'pdf')
@@ -85,9 +86,10 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
       <PdfSidebarBlock assetPath={previewTarget.assetPath} />
     </ErrorBoundary>
   ) : null
-  // 顶层是 PDF 面板时独占 context 插槽；否则显示文档面板。文档面板的
-  // SidebarSection 状态持久化在 sessionStorage，隐藏期间不被触碰，回到
-  // 文档视图时原样恢复。
+  // The PDF panel takes over the context slot exclusively; otherwise the
+  // document panel shows. The document panel's SidebarSection state lives in
+  // sessionStorage and is untouched while hidden, so it restores as-is when
+  // the document view returns.
   const context = pdfContextBlock ?? routeContext
 
   return (

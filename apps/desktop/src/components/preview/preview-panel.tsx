@@ -43,9 +43,10 @@ interface PdfPreviewProps {
 }
 
 /**
- * 事件目标是否落在可编辑区域（输入框/文本域/下拉/富文本）——这些目标上
- * 快捷键一律不生效，避免打断页码输入或笔记编辑。`[contenteditable]` 需排除
- * `contenteditable="false"`（可编辑容器内的只读片断）。
+ * Whether the event target is an editable region (input/textarea/select/rich
+ * text) — the mode shortcuts must never fire on these, so page-number entry
+ * and note editing are never interrupted. `[contenteditable]` excludes
+ * `contenteditable="false"` (read-only fragments inside an editable host).
  */
 function isEditableTarget(target: HTMLElement): boolean {
   return (
@@ -54,7 +55,7 @@ function isEditableTarget(target: HTMLElement): boolean {
   )
 }
 
-/** 模式快捷键处理后把焦点还给阅读器：清除工具栏按钮的焦点环（非可编辑目标）。 */
+/** Give focus back to the reader after a mode shortcut (non-editable targets only). */
 function blurActiveElement(): void {
   const active = document.activeElement
   if (active instanceof HTMLElement && !isEditableTarget(active)) {
@@ -75,11 +76,14 @@ function PdfPreview({ target, onClose }: PdfPreviewProps): ReactElement {
   const [color, setColor] = useState<AnnotationColor>(DEFAULT_ANNOTATION_COLOR)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  // 标注模式的单字母快捷键与 ESC 退出：`v` = Browse、`r` = Draw Rectangle、
-  // create 模式下 ESC 回 Browse。作用域 = 面板打开期间（监听随组件挂载/卸载）；
-  // 修饰键（⌘/Ctrl/Alt，避开 ⌘V 等）与可编辑目标（input/textarea/select/
-  // contenteditable——页码输入框、笔记编辑区）一律跳过，不打断打字。处理完
-  // 快捷键后 blur 当前聚焦元素（工具栏按钮的焦点环随之消失），焦点回到阅读器。
+  // Single-letter mode shortcuts and the ESC exit: `v` = Browse, `r` = Draw
+  // Rectangle, ESC returns to Browse from create. Scoped to the panel's
+  // lifetime (the listener mounts/unmounts with it); modifier keys (⌘/Ctrl/
+  // Alt, so ⌘V and friends pass through) and editable targets (input/textarea/
+  // select/contenteditable — the page-number field, the note editor) are
+  // skipped so typing is never interrupted. After a handled shortcut the
+  // focused element is blurred (a toolbar button's focus ring disappears) and
+  // focus returns to the reader.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing) {
@@ -162,7 +166,8 @@ function PdfPreview({ target, onClose }: PdfPreviewProps): ReactElement {
           })
         return
       }
-      // 无文本且无法提取（text 类型标注或文档未就绪）。
+      // No text to copy and nothing to extract from (a text-type annotation,
+      // or the document is not ready).
       startOperation('Copying annotation text').warn('No text in this area')
     },
     [session.pdfDocument],

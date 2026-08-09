@@ -27,7 +27,8 @@ import {
 } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { EventBus, PDFViewer } from 'pdfjs-dist/legacy/web/pdf_viewer.mjs'
 import 'pdfjs-dist/legacy/web/pdf_viewer.css'
-// 紧跟 pdf_viewer.css 引入：修正 preflight border-box 与 .page 边框的内容盒错位。
+// Loaded right after pdf_viewer.css: corrects the content-box mismatch
+// between preflight's border-box and the .page border.
 import './pdf-viewer-overrides.css'
 import { errorMessage, readAssetBinary } from '@reflect/core'
 import { Button } from '@/components/ui/button'
@@ -227,15 +228,17 @@ export function PdfViewerShell({
           container,
           viewer: viewerElement,
           eventBus,
-          // 显式启用文本层（TextLayerMode.ENABLE = 1；该枚举未从 web 构建导出）：
-          // 选中文字与标注层都依赖它，不依赖构造默认值。
+          // Enable the text layer explicitly (TextLayerMode.ENABLE = 1; the
+          // enum is not exported from the web build): text selection and the
+          // annotation layer depend on it, so don't rely on the constructor default.
           textLayerMode: 1,
           // No pinch-gesture wrapper: zoom is toolbar-only.
           supportsPinchToZoom: false,
         })
         viewerRef.current = pdfViewer
         pdfViewer.setDocument(pdfDocument)
-        // 侧栏的目录/缩略图区块消费这份文档：加载完成后发布，卸载时清除。
+        // The sidebar's outline/thumbnail block consumes this document:
+        // publish it once loaded, clear it on unmount.
         if (publishSession) {
           registerSession({ viewer: pdfViewer, pdfDocument, assetPath })
         }
@@ -379,11 +382,14 @@ export function PdfViewerShell({
       </div>
       {fullscreen
         ? createPortal(
-            // 全屏浮层：WKWebView/WebView2 不支持 HTML Fullscreen API，用覆盖
-            // 整个窗口的 fixed 层模拟。这里递归挂载一份独立的 PdfViewerShell
-            // （同样的 assetPath、从当前页开始），而不是把面板内的 pdf.js 实
-            // 例迁移过来——标注层与容器都绑定面板容器，迁移坐标会错位；代价
-            // 是全屏态与面板各持一份文档渲染，退出即销毁。
+            // The fullscreen overlay: WKWebView/WebView2 lack the HTML
+            // Fullscreen API, so a fixed layer covering the whole window
+            // simulates it. A fresh PdfViewerShell is mounted recursively
+            // (same assetPath, starting at the current page) instead of
+            // re-homing the panel's pdf.js instance — the annotation layers
+            // and containers are bound to the panel's DOM, and moving them
+            // would misplace coordinates; the cost is one extra document
+            // render, destroyed on exit.
             <div
               role="dialog"
               aria-label="PDF fullscreen"
