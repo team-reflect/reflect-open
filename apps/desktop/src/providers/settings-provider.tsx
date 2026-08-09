@@ -12,12 +12,12 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import {
   DEFAULT_SETTINGS,
-  hasBridge,
   loadSettings,
   saveSettings,
   errorMessage,
   type Settings,
 } from '@reflect/core'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { startOperation } from '@/lib/operations'
 import { setSettingsFlusher } from '@/lib/settings-flush'
 
@@ -135,10 +135,11 @@ interface SettingsProviderProps {
 }
 
 export function SettingsProvider({ children }: SettingsProviderProps): ReactElement {
+  const bridgeReady = useBridgeReady()
   const { data: loaded, error: loadError } = useQuery({
     queryKey: SETTINGS_QUERY_KEY,
     queryFn: loadSettings,
-    enabled: hasBridge(),
+    enabled: bridgeReady,
     staleTime: Infinity,
   })
   const [overrides, setOverrides] = useState<Partial<Settings>>({})
@@ -153,7 +154,7 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
   // for: that settles immediately as 'failed' — i.e. session-only — instead
   // of leaving waiters hanging on a load that will never happen.
   const loadState: SettingsLoadState =
-    !hasBridge() || loadError !== null ? 'failed' : loaded !== undefined ? 'loaded' : 'pending'
+    !bridgeReady || loadError !== null ? 'failed' : loaded !== undefined ? 'loaded' : 'pending'
 
   // Defaults are usable before the IPC load settles — no loading gate.
   const settings = useMemo<Settings>(

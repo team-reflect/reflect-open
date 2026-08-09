@@ -8,7 +8,7 @@ import { IntegrationsSection } from './integrations-section'
 // A browser-mode module mock materializes value exports once, so the macOS
 // behavior needs its own file with the flag statically true
 // (see `integrations-section.test.tsx` for the rest of the suite).
-vi.mock('@/lib/platform', () => ({ isMacosDesktop: true }))
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: true, isNativeShell: () => true }))
 
 vi.mock('./calendar-integration-field', () => ({
   CalendarIntegrationField: () => <div>Calendar events</div>,

@@ -23,6 +23,8 @@ export function useTemplateSlashItems(
 
   return useCallback(
     async (_query: string): Promise<SlashMenuItem[]> => {
+      // Call-time check on purpose: this runs on user action, not in render
+      // scope, so it reads the live bridge state instead of a captured one.
       if (!hasBridge() || graph === null) {
         return []
       }

@@ -33,7 +33,7 @@ vi.mock('@/lib/native-menu/menu', () => ({
 // macOS-only shortcut behavior lives in app-shortcuts-macos.test.tsx: a
 // browser-mode module mock materializes value exports once, so the flag
 // cannot flip per test.
-vi.mock('@/lib/platform', () => ({ isMacosDesktop: false }))
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: false, isNativeShell: () => false }))
 
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({

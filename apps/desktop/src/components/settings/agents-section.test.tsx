@@ -8,7 +8,7 @@ import { AgentsSection } from './agents-section'
 // A browser-mode module mock materializes value exports once, so this file
 // keeps the flag statically true; the off-macOS test lives in
 // `agents-section-non-macos.test.tsx`.
-vi.mock('@/lib/platform', () => ({ isMacosDesktop: true }))
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: true, isNativeShell: () => true }))
 
 const GRAPH = { root: '/graphs/Personal', name: 'Personal', generation: 7 }
 vi.mock('@/providers/graph-provider', () => ({

@@ -6,12 +6,12 @@ import {
   agentSkillStatus,
   agentSkillUninstall,
   errorMessage,
-  hasBridge,
   type AgentSkillStatus,
 } from '@reflect/core'
 import { SettingsField } from '@/components/settings/field'
 import { SettingsSection } from '@/components/settings/section'
 import { Button } from '@/components/ui/button'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { isMacosDesktop } from '@/lib/platform'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -28,10 +28,11 @@ export function AgentsSection(): ReactElement | null {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const queryKey = ['agent-skill', graph?.root]
+  const bridgeReady = useBridgeReady()
   const { data: status } = useQuery({
     queryKey,
     queryFn: agentSkillStatus,
-    enabled: hasBridge() && isMacosDesktop && graph !== null,
+    enabled: bridgeReady && isMacosDesktop && graph !== null,
   })
 
   if (!isMacosDesktop || graph === null) {

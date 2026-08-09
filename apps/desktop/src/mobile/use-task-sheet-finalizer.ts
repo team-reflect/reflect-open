@@ -36,7 +36,7 @@ export interface TaskSheetFinalizer {
   setDraft: Dispatch<SetStateAction<string>>
   /** Resolve the draft against the frozen baseline: commit / cancel / delete. */
   resolve: () => TaskEditResult
-  /** vaul's onOpenChange — a user dismissal finishes the visit first. */
+  /** The drawer's onOpenChange — a user dismissal finishes the visit first. */
   handleOpenChange: (open: boolean) => void
   /** Close after an action button took over the write (no dismissal commit). */
   closeHandled: () => void

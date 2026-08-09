@@ -2,11 +2,11 @@ import { useCallback, useMemo } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import {
   getBacklinksWithContext,
-  hasBridge,
   type BacklinkContext,
   type BacklinkContextPage,
   type BacklinkSourceCursor,
 } from '@reflect/core'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { groupBacklinksBySource, type BacklinkSource } from '@/lib/group-backlinks'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
@@ -70,6 +70,7 @@ function groupLoadedBacklinks(pages: readonly BacklinkContextPage[]): BacklinkSo
  */
 export function useBacklinkSources(path: string): BacklinkSources {
   const { graph } = useGraph()
+  const bridgeReady = useBridgeReady()
   const {
     data,
     fetchNextPage,
@@ -87,7 +88,7 @@ export function useBacklinkSources(path: string): BacklinkSources {
       }),
     initialPageParam: null as BacklinkSourceCursor | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: hasBridge() && graph !== null,
+    enabled: bridgeReady && graph !== null,
   })
   const groups = useMemo(() => groupLoadedBacklinks(data?.pages ?? []), [data])
   const loadMore = useCallback(() => {

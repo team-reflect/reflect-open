@@ -10,7 +10,7 @@ import { MonthPickerDrawer } from './month-picker-drawer'
  * month, and the selection/today months carry the strip's markings.
  */
 
-// vaul needs browser APIs jsdom doesn't provide (matchMedia, pointer
+// The drawer needs browser APIs jsdom doesn't provide (matchMedia, pointer
 // capture); its drag/animation is verified on-device. This passthrough
 // honours `open` so open/close behavior stays testable.
 vi.mock('@/components/ui/drawer', () => ({

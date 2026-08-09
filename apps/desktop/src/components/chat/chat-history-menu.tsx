@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
-import { hasBridge, listChatConversations } from '@reflect/core'
+import { listChatConversations } from '@reflect/core'
 import { Check, History, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { CHAT_QUERY_SCOPE } from '@/lib/query-client'
 import { useChatSession } from '@/providers/chat-provider'
 import { useGraph } from '@/providers/graph-provider'
@@ -24,7 +25,8 @@ export function ChatHistoryMenu(): ReactElement | null {
   const { graph, indexGeneration } = useGraph()
   const { activeConversationId, openConversation, deleteConversation } = useChatSession()
 
-  const enabled = hasBridge() && indexGeneration !== null
+  const bridgeReady = useBridgeReady()
+  const enabled = bridgeReady && indexGeneration !== null
   const { data: conversations } = useQuery({
     // The graph root is part of the key: conversations belong to one graph,
     // and a graph switch must never serve the previous graph's cached list.

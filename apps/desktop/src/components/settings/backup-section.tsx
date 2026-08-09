@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactElement } from 'react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { useQuery } from '@tanstack/react-query'
-import { getConflictedNotes, getDuplicateNoteIds, hasBridge } from '@reflect/core'
+import { getConflictedNotes, getDuplicateNoteIds } from '@reflect/core'
 import { ExternalLink } from 'lucide-react'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog'
 import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links'
@@ -10,6 +10,7 @@ import { GithubSignOutRow } from '@/components/settings/github-sign-out-row'
 import { SyncForkNotice } from '@/components/settings/sync-fork-notice'
 import { Button } from '@/components/ui/button'
 import { useAsyncAction } from '@/hooks/use-async-action'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useGithubConnected } from '@/hooks/use-github-connected'
 import { suggestRepoName } from '@/lib/github-repos'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
@@ -54,10 +55,11 @@ export function BackupSettingsField(): ReactElement {
   const openRepoAttempt = useRef(0)
   const action = useAsyncAction()
 
+  const bridgeReady = useBridgeReady()
   const conflicted = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, 'conflicted-notes', graph?.root],
     queryFn: () => getConflictedNotes(),
-    enabled: hasBridge() && graph !== null,
+    enabled: bridgeReady && graph !== null,
   })
   const conflictedNotes = conflicted.data ?? []
   const conflictCount = conflictedNotes.length
@@ -68,7 +70,7 @@ export function BackupSettingsField(): ReactElement {
   const duplicateIds = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, 'duplicate-note-ids', graph?.root],
     queryFn: () => getDuplicateNoteIds(),
-    enabled: hasBridge() && graph !== null,
+    enabled: bridgeReady && graph !== null,
   })
   const forkGroups = duplicateIds.data ?? []
 

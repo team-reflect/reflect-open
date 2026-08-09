@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import {
   contactDetailsMarkdown,
   contactNamesEqual,
-  hasBridge,
   isContactsReadable,
   isDaily,
   noteHasContactDetails,
@@ -11,6 +10,7 @@ import {
   suggestContactForTitle,
   type ContactMatch,
 } from '@reflect/core'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { readNoteSource } from '@/lib/note-frontmatter'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
@@ -45,8 +45,9 @@ export function useSuggestedContact(path: string): ContactMatch | null {
   const { settings } = useSettings()
   const authorization = useContactsAuthorization()
   const readable = authorization !== null && isContactsReadable(authorization)
+  const bridgeReady = useBridgeReady()
   const enabled =
-    hasBridge() && graph !== null && settings.contactsEnabled && readable && !isDaily(path)
+    bridgeReady && graph !== null && settings.contactsEnabled && readable && !isDaily(path)
   const { data } = useQuery({
     queryKey: suggestedContactQueryKey(graph?.root, path),
     queryFn: async () => {

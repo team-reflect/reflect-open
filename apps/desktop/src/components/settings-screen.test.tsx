@@ -42,6 +42,11 @@ vi.mock('@/providers/sync-provider', () => ({
     backUpNow: async () => {},
   }),
 }))
+// The update field gates on the native shell, which the test browser is not.
+vi.mock('@/lib/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/platform')>()),
+  isNativeShell: () => true,
+}))
 // The Import section only hands the picked zip to the workspace-level V1
 // import controller, which these screen tests don't mount.
 vi.mock('@/providers/v1-import-provider', () => ({

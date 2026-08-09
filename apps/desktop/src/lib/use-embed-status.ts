@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
-import { embedStatus, hasBridge, subscribeEmbedStatus, type EmbedStatus } from '@reflect/core'
+import { embedStatus, subscribeEmbedStatus, type EmbedStatus } from '@reflect/core'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 
 /**
  * The embedding runtime's live status (Plan 09). Polls once on mount, then
- * tracks `embed:status` events. Without a bridge (browser dev) semantic
+ * tracks `embed:status` events. Without a bridge (`?platform=none`) semantic
  * features stay in `uninitialized` — i.e. invisible.
  */
 export function useEmbedStatus(): EmbedStatus {
   const [status, setStatus] = useState<EmbedStatus>({ status: 'uninitialized' })
+  const bridgeReady = useBridgeReady()
 
   useEffect(() => {
-    if (!hasBridge()) {
+    if (!bridgeReady) {
       return
     }
     let active = true
@@ -35,7 +37,7 @@ export function useEmbedStatus(): EmbedStatus {
       active = false
       unlisten?.()
     }
-  }, [])
+  }, [bridgeReady])
 
   return status
 }

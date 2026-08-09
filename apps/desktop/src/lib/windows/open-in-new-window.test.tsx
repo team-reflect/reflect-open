@@ -1,13 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const hasBridge = vi.hoisted(() => vi.fn(() => true))
+const isNativeShell = vi.hoisted(() => vi.fn(() => true))
 const openNoteWindow = vi.hoisted(() => vi.fn<(link: string) => Promise<void>>())
 const isMobileSurface = vi.hoisted(() => vi.fn(() => false))
 
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
-  hasBridge,
   openNoteWindow,
+}))
+vi.mock('@/lib/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/platform')>()),
+  isNativeShell,
 }))
 vi.mock('@/lib/platform-surface', () => ({ isMobileSurface }))
 
@@ -20,7 +23,7 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  hasBridge.mockReturnValue(true)
+  isNativeShell.mockReturnValue(true)
   isMobileSurface.mockReturnValue(false)
   openNoteWindow.mockResolvedValue(undefined)
 })
@@ -86,9 +89,9 @@ describe('openRouteInNewWindow', () => {
   })
 
   it('declines without a native shell and on mobile', async () => {
-    hasBridge.mockReturnValue(false)
+    isNativeShell.mockReturnValue(false)
     await expect(openRouteInNewWindow({ kind: 'note', path: 'notes/foo.md' })).resolves.toBe(false)
-    hasBridge.mockReturnValue(true)
+    isNativeShell.mockReturnValue(true)
     isMobileSurface.mockReturnValue(true)
     await expect(openRouteInNewWindow({ kind: 'note', path: 'notes/foo.md' })).resolves.toBe(false)
     expect(openNoteWindow).not.toHaveBeenCalled()

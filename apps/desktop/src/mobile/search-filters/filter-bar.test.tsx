@@ -11,7 +11,7 @@ import { EMPTY_ALL_NOTES_FILTERS, type AllNotesFilters } from './filter-state'
 /**
  * The filter badge row (Plan 19): chips toggle or open pickers, everything
  * ANDs, and Reset clears the lot including the route tag. The drawer wrapper
- * is vaul, which needs browser APIs jsdom doesn't provide; as in
+ * needs browser APIs jsdom doesn't provide; as in
  * `note-actions-menu.test.tsx` it's mocked to a passthrough so picker rows
  * are always rendered and the state flow is what's exercised.
  */

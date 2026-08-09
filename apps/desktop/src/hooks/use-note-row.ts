@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getNote, hasBridge, type NoteRow } from '@reflect/core'
+import { getNote, type NoteRow } from '@reflect/core'
 import {
   applyNoteRowOverlay,
   reconcileNoteRowOverlay,
   useNoteRowOverlay,
 } from '@/hooks/note-row-overlay'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -21,10 +22,11 @@ import { useGraph } from '@/providers/graph-provider'
 export function useNoteRow(path: string): NoteRow | null {
   const { graph } = useGraph()
   const generation = graph?.generation
+  const bridgeReady = useBridgeReady()
   const { data } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'note', path],
     queryFn: async () => (await getNote(path)) ?? null,
-    enabled: hasBridge() && graph !== null,
+    enabled: bridgeReady && graph !== null,
   })
   const row = data ?? null
   const overlay = useNoteRowOverlay(path, generation)

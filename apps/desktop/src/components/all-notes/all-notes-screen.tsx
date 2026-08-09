@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { hasBridge, isDaily, listNotes, listNoteTags } from '@reflect/core'
+import { isDaily, listNotes, listNoteTags } from '@reflect/core'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { allNotesQueryKey, allNotesTagsQueryKey } from '@/lib/notes/all-notes-query'
 import { isNewWindowClick, type NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
@@ -51,7 +52,9 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   // The surface, so the keyboard shortcuts can scope to it (and focus it on mount).
   const rootRef = useRef<HTMLDivElement>(null)
-  const enabled = hasBridge() && graph !== null
+
+  const bridgeReady = useBridgeReady()
+  const enabled = bridgeReady && graph !== null
 
   const { data: notes } = useQuery({
     queryKey: allNotesQueryKey(graph?.root, tag),

@@ -1,8 +1,8 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { confirmQuit, hasBridge, subscribeQuitRequested } from '@reflect/core'
+import { confirmQuit, subscribeQuitRequested } from '@reflect/core'
 import { flushOpenDocuments } from '@/editor/open-documents'
 import { flushBackup } from '@/lib/backup-flush'
-import { isMacosDesktop } from '@/lib/platform'
+import { isMacosDesktop, isNativeShell } from '@/lib/platform'
 import { flushSettings } from '@/lib/settings-flush'
 import { trackSubscriptions } from '@/lib/subscriptions'
 import { isMainWindow } from '@/lib/windows/window-role'
@@ -28,9 +28,9 @@ import { isMainWindow } from '@/lib/windows/window-role'
  * sequence lives in `background-flush.ts` (Plan 19, decision 6).
  */
 export function installQuitFlush(): () => void {
-  // No bridge → no native shell (plain-browser dev): nothing can quit-flush.
-  // getCurrentWindow below is safe to reach only inside a Tauri webview.
-  if (!hasBridge()) {
+  // No native shell (browser dev): nothing can quit-flush. getCurrentWindow
+  // below is safe to reach only inside a Tauri webview.
+  if (!isNativeShell()) {
     return () => {}
   }
 

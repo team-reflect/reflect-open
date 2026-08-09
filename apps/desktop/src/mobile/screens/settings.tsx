@@ -4,7 +4,6 @@ import {
   aiProvider,
   aiProviderRequiresApiKey,
   errorMessage,
-  hasBridge,
   listNotes,
   normalizeChatSystemPrompt,
   type AiPrompt,
@@ -16,6 +15,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { useAiPrompts } from '@/hooks/use-ai-prompts'
 import { useAiProviders } from '@/hooks/use-ai-providers'
 import { useAppVersion } from '@/hooks/use-app-version'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { marketingVersion } from '@/lib/marketing-version'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer'
@@ -96,10 +96,11 @@ export function MobileSettings(): ReactElement {
   const [managedProvider, setManagedProvider] = useState<AiProviderConfig | null>(null)
   const [manageOpen, setManageOpen] = useState(false)
 
+  const bridgeReady = useBridgeReady()
   const { data: notes } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'mobile-note-count'],
     queryFn: () => listNotes(),
-    enabled: hasBridge() && graph !== null,
+    enabled: bridgeReady && graph !== null,
   })
 
   const backup = sync?.backup ?? null

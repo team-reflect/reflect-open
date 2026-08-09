@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { hasBridge, isDaily, relatedNotes, type RetrievalHit } from '@reflect/core'
+import { isDaily, relatedNotes, type RetrievalHit } from '@reflect/core'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { readNoteSource } from '@/lib/note-frontmatter'
 import { isOstensiblyEmptyNoteSource } from '@/lib/note-emptiness'
 import { INDEX_QUERY_SCOPE, SIMILAR_QUERY_SCOPE } from '@/lib/query-client'
@@ -43,7 +44,7 @@ export function useSimilarNotes(path: string): RetrievalHit[] {
   const { graph } = useGraph()
   const { settings } = useSettings()
   const queryClient = useQueryClient()
-  const bridgeAvailable = hasBridge()
+  const bridgeAvailable = useBridgeReady()
   const dailyNote = isDaily(path)
   const { data: dailyNoteIsEmpty } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'daily-empty', path],

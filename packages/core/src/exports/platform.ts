@@ -1,4 +1,10 @@
-export { setBridge, hasBridge, type IpcBridge, type Unlisten } from '../ipc/bridge'
+export {
+  setBridge,
+  hasBridge,
+  subscribeBridgeChanges,
+  type IpcBridge,
+  type Unlisten,
+} from '../ipc/bridge'
 export { call, callBinary } from '../ipc/invoke'
 export {
   getAppVersion,

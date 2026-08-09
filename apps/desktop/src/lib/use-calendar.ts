@@ -4,7 +4,6 @@ import {
   calendarAuthorizationStatus,
   dayRange,
   displayEvents,
-  hasBridge,
   listCalendarEvents,
   listCalendars,
   subscribeCalendarChanged,
@@ -13,6 +12,7 @@ import {
   type CalendarAuthorizationStatus,
   type Unlisten,
 } from '@reflect/core'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { isMacosDesktop } from '@/lib/platform'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -30,8 +30,8 @@ export const CALENDAR_AUTH_QUERY_KEY = ['calendar', 'authorization'] as const
 export const CALENDAR_LIST_QUERY_KEY = ['calendar', 'calendars'] as const
 
 /** Whether calendar queries can run at all in this environment. */
-export function calendarAvailable(): boolean {
-  return hasBridge() && isMacosDesktop
+function useCalendarAvailable(): boolean {
+  return useBridgeReady() && isMacosDesktop
 }
 
 /**
@@ -45,10 +45,11 @@ export function calendarAvailable(): boolean {
 export function useCalendarAuthorization(
   enabled: boolean,
 ): CalendarAuthorizationStatus | undefined {
+  const available = useCalendarAvailable()
   const query = useQuery({
     queryKey: CALENDAR_AUTH_QUERY_KEY,
     queryFn: calendarAuthorizationStatus,
-    enabled: enabled && calendarAvailable(),
+    enabled: enabled && available,
     staleTime: 0,
     refetchOnWindowFocus: 'always',
   })
@@ -66,10 +67,11 @@ export interface CalendarsResult {
 
 /** Every calendar on the Mac, for the Settings section's checkbox list. */
 export function useCalendars(enabled: boolean): CalendarsResult {
+  const available = useCalendarAvailable()
   const query = useQuery({
     queryKey: CALENDAR_LIST_QUERY_KEY,
     queryFn: listCalendars,
-    enabled: enabled && calendarAvailable(),
+    enabled: enabled && available,
   })
   return useMemo(
     () => ({ calendars: query.data ?? [], isLoaded: query.isSuccess }),
@@ -85,7 +87,8 @@ export function useCalendars(enabled: boolean): CalendarsResult {
  */
 export function useDayEvents(date: string): CalendarEvent[] {
   const { settings } = useSettings()
-  const enabled = settings.calendarEnabled && settings.calendarIds.length > 0 && calendarAvailable()
+  const available = useCalendarAvailable()
+  const enabled = settings.calendarEnabled && settings.calendarIds.length > 0 && available
   const query = useQuery({
     queryKey: ['calendar', 'events', date, settings.calendarIds],
     queryFn: () => {
@@ -108,8 +111,9 @@ export function useDayEvents(date: string): CalendarEvent[] {
  */
 export function useCalendarChangeInvalidation(enabled: boolean): void {
   const queryClient = useQueryClient()
+  const available = useCalendarAvailable()
   useEffect(() => {
-    if (!enabled || !calendarAvailable()) {
+    if (!enabled || !available) {
       return
     }
     let unlisten: Unlisten | null = null
@@ -127,5 +131,5 @@ export function useCalendarChangeInvalidation(enabled: boolean): void {
       disposed = true
       unlisten?.()
     }
-  }, [enabled, queryClient])
+  }, [available, enabled, queryClient])
 }

@@ -30,8 +30,10 @@ export const tauriBridge: IpcBridge = {
 
 /**
  * Install the Tauri bridge when running inside a Tauri webview. Plain-browser
- * dev (`pnpm dev` without the shell) installs nothing; `hasBridge()` then gates
- * native-only features like the file watcher and the recents store.
+ * dev (`pnpm dev` without the shell) installs nothing here — `PlatformRoot`
+ * later installs the in-memory dev bridge instead (unless `?platform=none`
+ * opts out), and features that need the real shell rather than just an
+ * answering bridge gate on `isNativeShell()`.
  */
 export function installTauriBridge(): void {
   if (isTauri()) {

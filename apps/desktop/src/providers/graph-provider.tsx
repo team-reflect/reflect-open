@@ -27,6 +27,7 @@ import {
 } from '@reflect/core'
 import { followHealedMove } from '@/editor/move-note'
 import { resetNoteRowOverlays } from '@/hooks/note-row-overlay'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { setIndexProgress } from '@/lib/index-progress'
 import {
   dropIcloudStatusQuery,
@@ -138,6 +139,7 @@ export function GraphProvider({
   children: ReactNode
   platform?: AppPlatform
 }) {
+  const bridgeReady = useBridgeReady()
   const [status, setStatus] = useState<GraphStatus>('loading')
   const [graph, setGraph] = useState<GraphInfo | null>(null)
   const [recents, setRecents] = useState<RecentGraph[]>([])
@@ -217,9 +219,12 @@ export function GraphProvider({
   }, [indexGeneration, platform])
 
   const loadRecents = useCallback(
+    // Call-time check on purpose: an imperative load reads the live bridge
+    // state, and a captured value would churn this callback's identity (and
+    // every boot effect downstream of it) on install/teardown.
     async (options?: { surfaceErrors?: boolean }): Promise<RecentGraph[]> => {
       if (!hasBridge()) {
-        return [] // browser dev — there's no backend store to read.
+        return [] // bridgeless browser dev — there's no backend store to read.
       }
       try {
         const list = await recentGraphs()
@@ -499,6 +504,9 @@ export function GraphProvider({
   // be expressed as per-file events; the watcher asks for one full reconcile
   // instead, and `refresh` coalesces bursts into a single queued rerun.
   useEffect(() => {
+    if (!bridgeReady) {
+      return // bridgeless browser dev — no native event stream to subscribe to
+    }
     let unlisten: (() => void) | null = null
     let disposed = false
     void subscribeReconcileRequests(() => refreshIndex()).then(
@@ -515,7 +523,7 @@ export function GraphProvider({
       disposed = true
       unlisten?.()
     }
-  }, [refreshIndex])
+  }, [bridgeReady, refreshIndex])
 
   const value = useMemo<GraphContextValue>(
     () => ({
