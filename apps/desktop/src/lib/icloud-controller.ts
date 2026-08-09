@@ -300,12 +300,24 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
   async function restartWatch(): Promise<void> {
     try {
       await icloudWatchStop()
-      if (disposed) {
-        return // closed mid-restart: never leave a watch running for a dead graph
-      }
+    } catch (err) {
+      // A failed stop must not abort the restart: the Rust install tears
+      // down any live watch itself, so starting over a possibly-live query
+      // is safe — and the reinstall is the half that matters here.
+      console.error('iCloud watch stop failed during restart:', err)
+    }
+    if (disposed) {
+      return // closed mid-restart: never leave a watch running for a dead graph
+    }
+    try {
       await icloudWatchStart(graph.root, emitFileChangesFromWatch)
     } catch (err) {
-      console.error('iCloud watch restart failed:', err)
+      // Same degradation contract as a failed initial start: freshness
+      // rides file-change batches and resume sweeps (this resume already
+      // scheduled one), and the next resume retries the reinstall. A
+      // Rust-side install failure additionally emits `icloud:watch-failed`,
+      // which the subscription above answers with an immediate sweep.
+      console.error('iCloud watch restart failed; relying on resume-triggered sweeps:', err)
     }
   }
 

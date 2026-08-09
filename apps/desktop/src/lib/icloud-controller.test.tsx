@@ -271,6 +271,7 @@ describe('createIcloudController', () => {
     await settleScan()
 
     expect(invoked.some(([command]) => command === 'icloud_watch_stop')).toBe(false)
+    expect(invoked.some(([command]) => command === 'icloud_watch_start')).toBe(false)
     expect(scanCalls).toHaveLength(2) // baseline + the resume sweep itself
   })
 
