@@ -59,7 +59,7 @@ export interface PageEnrichment {
 }
 
 const pageDescriptionSchema = z.object({
-  title: z.string(),
+  title: z.string().nullable(),
   description: z.string(),
 })
 
@@ -168,7 +168,7 @@ export async function describePage(request: DescribePageRequest): Promise<PageEn
       maxRetries: 0,
     })
     return {
-      title: normalizedPageTitle(result.object.title),
+      title: result.object.title === null ? null : normalizedPageTitle(result.object.title),
       description: result.object.description.trim(),
     }
   } catch (cause) {
