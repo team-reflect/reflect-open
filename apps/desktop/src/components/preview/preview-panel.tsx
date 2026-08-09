@@ -8,6 +8,7 @@ import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { useBacklinkNavigation } from '@/hooks/use-backlink-navigation'
 import { annotationReference } from '@/lib/annotations/annotation-reference'
 import { extractRegionText } from '@/lib/annotations/pdf-region-text'
+import { selectionToHighlight } from '@/lib/annotations/pdf-selection'
 import { usePdfAnnotations, type AnnotationItem } from '@/lib/annotations/annotations-store'
 import { startOperation } from '@/lib/operations'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
@@ -63,6 +64,13 @@ function blurActiveElement(): void {
   }
 }
 
+/** The pdf.js `.page` element a selection range sits in, or null when outside one. */
+function findSelectionPage(range: Range): HTMLElement | null {
+  const container = range.commonAncestorContainer
+  const element = container instanceof Element ? container : container.parentElement
+  return element?.closest('.page') ?? null
+}
+
 /** The PDF branch: viewer + annotation overlay under one toolbar and list. */
 function PdfPreview({ target, onClose }: PdfPreviewProps): ReactElement {
   const { graph } = useGraph()
@@ -77,13 +85,19 @@ function PdfPreview({ target, onClose }: PdfPreviewProps): ReactElement {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   // Single-letter mode shortcuts and the ESC exit: `v` = Browse, `r` = Draw
-  // Rectangle, ESC returns to Browse from create. Scoped to the panel's
-  // lifetime (the listener mounts/unmounts with it); modifier keys (⌘/Ctrl/
-  // Alt, so ⌘V and friends pass through) and editable targets (input/textarea/
-  // select/contenteditable — the page-number field, the note editor) are
-  // skipped so typing is never interrupted. After a handled shortcut the
-  // focused element is blurred (a toolbar button's focus ring disappears) and
-  // focus returns to the reader.
+  // Rectangle, `t` = Highlight text, ESC returns to Browse from any non-browse
+  // mode. Scoped to the panel's lifetime (the listeners mount/unmount with
+  // it); modifier keys (⌘/Ctrl/Alt, so ⌘V and friends pass through) and
+  // editable targets (input/textarea/select/contenteditable — the page-number
+  // field, the note editor) are skipped so typing is never interrupted. After
+  // a handled shortcut the focused element is blurred (a toolbar button's
+  // focus ring disappears) and focus returns to the reader.
+  //
+  // The mouseup listener runs the text-highlight capture: while the highlight
+  // mode is active, releasing a text selection inside a pdf `.page` converts
+  // it into a text-type annotation. The selection must sit inside a page
+  // (found via the range's common ancestor) — a selection in the note editor
+  // or elsewhere is left alone. Touch selection handles are out of scope.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing) {
@@ -94,7 +108,7 @@ function PdfPreview({ target, onClose }: PdfPreviewProps): ReactElement {
         return
       }
       if (event.key === 'Escape') {
-        if (mode === 'create') {
+        if (mode !== 'browse') {
           setMode('browse')
           blurActiveElement()
         }
@@ -108,17 +122,53 @@ function PdfPreview({ target, onClose }: PdfPreviewProps): ReactElement {
         case 'r':
           next = 'create'
           break
+        case 't':
+          next = 'highlight'
+          break
       }
       if (next !== null) {
         setMode(next)
         blurActiveElement()
       }
     }
+    const onMouseUp = (): void => {
+      if (mode !== 'highlight') {
+        return
+      }
+      const selection = window.getSelection()
+      if (selection === null || selection.isCollapsed || selection.rangeCount === 0) {
+        return
+      }
+      const range = selection.getRangeAt(0)
+      const page = findSelectionPage(range)
+      if (page === null) {
+        return
+      }
+      const highlight = selectionToHighlight(
+        {
+          collapsed: selection.isCollapsed,
+          getClientRects: () => range.getClientRects(),
+          toString: () => selection.toString(),
+        },
+        {
+          getBoundingClientRect: () => page.getBoundingClientRect(),
+          getAttribute: (name) => page.getAttribute(name),
+        },
+      )
+      if (highlight === null) {
+        return
+      }
+      addAnnotation({ ...highlight, type: 'text', color })
+      // Clear the selection so a second capture in a row starts fresh.
+      selection.removeAllRanges()
+    }
     window.addEventListener('keydown', onKeyDown)
+    document.addEventListener('mouseup', onMouseUp)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('mouseup', onMouseUp)
     }
-  }, [mode])
+  }, [mode, color, addAnnotation])
 
   const handleAdd = useCallback(
     (pageIndex: number, rect: NormalizedRect): void => {

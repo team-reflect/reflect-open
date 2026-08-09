@@ -1,10 +1,20 @@
 import type { ReactElement } from 'react'
-import { MousePointer, PanelBottomClose, PanelBottomOpen, SquareDashed, Trash2 } from 'lucide-react'
+import {
+  Highlighter,
+  MousePointer,
+  PanelBottomClose,
+  PanelBottomOpen,
+  SquareDashed,
+  Trash2,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-/** The sidebar's interaction mode: browse (click annotations) or draw new ones. */
-export type AnnotationTool = 'browse' | 'create'
+/**
+ * The sidebar's interaction modes: browse (click existing annotations), draw
+ * rectangle borders, or select PDF text to highlight (text-type annotations).
+ */
+export type AnnotationTool = 'browse' | 'create' | 'highlight'
 
 /**
  * Colors new annotations get, matching the classic PDF highlight palette the
@@ -39,12 +49,13 @@ interface AnnotationToolbarProps {
 }
 
 /**
- * The annotation tools row under the PDF viewer: browse/draw mode switch, the
- * color palette for new annotations, delete-selected, and the list's
- * collapse/expand toggle. The trailing button only folds the annotation list —
- * closing the whole panel lives in the viewer's own chrome (the page toolbar's
- * X). Styled to match the context sidebar chrome (`text-text`, `border-border`,
- * quiet icon buttons) rather than inventing a new surface.
+ * The annotation tools row under the PDF viewer: the browse/draw/highlight
+ * mode switch, the color palette for new annotations, delete-selected, and
+ * the list's collapse/expand toggle. The trailing button only folds the
+ * annotation list — closing the whole panel lives in the viewer's own chrome
+ * (the page toolbar's X). Styled to match the context sidebar chrome
+ * (`text-text`, `border-border`, quiet icon buttons) rather than inventing a
+ * new surface.
  */
 export function AnnotationToolbar({
   mode,
@@ -77,6 +88,16 @@ export function AnnotationToolbar({
         onClick={() => onModeChange('create')}
       >
         <SquareDashed />
+      </Button>
+      <Button
+        variant={mode === 'highlight' ? 'secondary' : 'ghost'}
+        size="icon-sm"
+        aria-label="Highlight text (t)"
+        aria-pressed={mode === 'highlight'}
+        title="Highlight text (t)"
+        onClick={() => onModeChange('highlight')}
+      >
+        <Highlighter />
       </Button>
 
       <span className="mx-1 h-4 w-px bg-border" aria-hidden />

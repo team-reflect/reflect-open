@@ -25,13 +25,17 @@ vi.mock('./pdf-viewer-shell', () => ({
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
 }))
+const annotationsState = vi.hoisted(() => ({
+  addAnnotation: vi.fn(),
+  removeAnnotation: vi.fn(),
+}))
 vi.mock('@/lib/annotations/annotations-store', () => ({
   usePdfAnnotations: () => ({
     annotations: [],
     status: 'ready',
-    addAnnotation: vi.fn(),
+    addAnnotation: annotationsState.addAnnotation,
     updateAnnotation: vi.fn(),
-    removeAnnotation: vi.fn(),
+    removeAnnotation: annotationsState.removeAnnotation,
   }),
 }))
 vi.mock('@/providers/pdf-session-provider', () => ({
@@ -63,6 +67,13 @@ function drawPressed(): string | null {
   )
 }
 
+function highlightPressed(): string | null {
+  return (
+    page.getByRole('button', { name: 'Highlight text' }).element()?.getAttribute('aria-pressed') ??
+    null
+  )
+}
+
 async function renderPdfPreview() {
   return await render(
     <PreviewPanel target={{ kind: 'pdf', assetPath: 'assets/paper.pdf' }} onClose={vi.fn()} />,
@@ -71,7 +82,11 @@ async function renderPdfPreview() {
 
 afterEach(() => {
   document.querySelectorAll('input.temp-preview-key').forEach((el) => el.remove())
+  document.querySelectorAll('.temp-preview-page').forEach((el) => el.remove())
+  window.getSelection()?.removeAllRanges()
   document.body.blur()
+  annotationsState.addAnnotation.mockClear()
+  annotationsState.removeAnnotation.mockClear()
 })
 
 describe('PdfPreview annotation-mode shortcuts', () => {
@@ -142,5 +157,109 @@ describe('PdfPreview annotation-mode shortcuts', () => {
     await userEvent.keyboard('{Escape}')
     await expect.poll(() => browsePressed()).toBe('true')
     await expect.poll(() => document.activeElement).not.toBe(draw)
+  })
+
+  it('switches to highlight with t and back with v or ESC', async () => {
+    await renderPdfPreview()
+    await expect.poll(() => browsePressed()).toBe('true')
+
+    await userEvent.keyboard('t')
+    await expect.poll(() => highlightPressed()).toBe('true')
+    expect(browsePressed()).toBe('false')
+
+    await userEvent.keyboard('v')
+    await expect.poll(() => browsePressed()).toBe('true')
+    expect(highlightPressed()).toBe('false')
+
+    await userEvent.keyboard('t')
+    await expect.poll(() => highlightPressed()).toBe('true')
+    await userEvent.keyboard('{Escape}')
+    await expect.poll(() => browsePressed()).toBe('true')
+  })
+
+  it('creates a text annotation from a selection inside a pdf page on mouseup', async () => {
+    await renderPdfPreview()
+    await userEvent.keyboard('t')
+    await expect.poll(() => highlightPressed()).toBe('true')
+    // Let the mode-change effect re-bind the mouseup listener before firing it.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // A fake pdf `.page` with a span, mirroring pdf.js's DOM shape. The app's
+    // global CSS is `user-select: none`, so the span must opt back in for the
+    // selection to carry text (the real textLayer spans are whitelisted).
+    const pageEl = document.createElement('div')
+    pageEl.className = 'page temp-preview-page'
+    pageEl.setAttribute('data-page-number', '3')
+    pageEl.style.width = '300px'
+    pageEl.style.height = '300px'
+    pageEl.style.position = 'absolute'
+    pageEl.style.left = '100px'
+    pageEl.style.top = '100px'
+    document.body.append(pageEl)
+    const span = document.createElement('span')
+    span.textContent = 'Some selected words'
+    span.style.userSelect = 'text'
+    pageEl.append(span)
+
+    const range = document.createRange()
+    range.selectNodeContents(span)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+
+    expect(annotationsState.addAnnotation).toHaveBeenCalledTimes(1)
+    const created = annotationsState.addAnnotation.mock.calls[0]?.[0] as
+      | {
+          pageIndex: number
+          type: string
+          rects: number[][]
+          text: string
+          color: string
+        }
+      | undefined
+    expect(created).toBeDefined()
+    if (created === undefined) {
+      return
+    }
+    expect(created.pageIndex).toBe(2)
+    expect(created.type).toBe('text')
+    expect(created.text).toBe('Some selected words')
+    expect(created.color).toBe('#FFD400')
+    expect(created.rects.length).toBeGreaterThan(0)
+    for (const rect of created.rects) {
+      expect(rect).toHaveLength(4)
+      for (const value of rect) {
+        expect(value).toBeGreaterThanOrEqual(0)
+        expect(value).toBeLessThanOrEqual(1)
+      }
+    }
+  })
+
+  it('does not create an annotation from a collapsed or out-of-page selection', async () => {
+    await renderPdfPreview()
+    await userEvent.keyboard('t')
+    await expect.poll(() => highlightPressed()).toBe('true')
+
+    // No selection at all.
+    window.getSelection()?.removeAllRanges()
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+    expect(annotationsState.addAnnotation).not.toHaveBeenCalled()
+
+    // A selection outside any `.page` (a plain div).
+    const plain = document.createElement('div')
+    plain.className = 'temp-preview-page'
+    document.body.append(plain)
+    const span = document.createElement('span')
+    span.textContent = 'editor text'
+    plain.append(span)
+    const range = document.createRange()
+    range.selectNodeContents(span)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+    expect(annotationsState.addAnnotation).not.toHaveBeenCalled()
   })
 })
