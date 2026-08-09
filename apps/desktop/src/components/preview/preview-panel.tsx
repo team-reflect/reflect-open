@@ -11,7 +11,11 @@ import { annotationReference } from '@/lib/annotations/annotation-reference'
 import { parsePdfHref } from '@/lib/annotations/pdf-href'
 import { extractRegionText } from '@/lib/annotations/pdf-region-text'
 import type { PdfTextItemLike } from '@/lib/annotations/pdf-region-text'
-import { normalizedSelectionRects, selectionToHighlight } from '@/lib/annotations/pdf-selection'
+import {
+  normalizedSelectionRects,
+  selectionPages,
+  selectionToHighlight,
+} from '@/lib/annotations/pdf-selection'
 import { usePdfAnnotations, type AnnotationItem } from '@/lib/annotations/annotations-store'
 import { startOperation } from '@/lib/operations'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
@@ -70,11 +74,56 @@ function blurActiveElement(): void {
   }
 }
 
-/** The pdf.js `.page` element a selection range sits in, or null when outside one. */
-function findSelectionPage(range: Range): HTMLElement | null {
-  const container = range.commonAncestorContainer
-  const element = container instanceof Element ? container : container.parentElement
+/** The pdf.js `.page` element a DOM node sits in, or null when outside one. */
+function closestPage(node: Node): HTMLElement | null {
+  const element = node instanceof Element ? node : node.parentElement
   return element?.closest('.page') ?? null
+}
+
+/** Every `.page` the selection spans, in document order. */
+function selectionPagesInRange(range: Range): HTMLElement[] {
+  const startPage = closestPage(range.startContainer)
+  const endPage = closestPage(range.endContainer)
+  if (startPage === null || endPage === null) {
+    return []
+  }
+  if (startPage === endPage) {
+    return [startPage]
+  }
+  const viewer = startPage.parentElement
+  if (viewer === null) {
+    return [startPage, endPage]
+  }
+  const allPages = Array.from(viewer.querySelectorAll<HTMLElement>('.page'))
+  return selectionPages(startPage, endPage, allPages)
+}
+
+/**
+ * The selection's own text within one page: the whole range for a single-page
+ * selection; for a cross-page one, the slice from the range's start to the
+ * start page's text-layer end, the end page's text-layer start to the range's
+ * end, or the whole text layer for pages in between.
+ */
+function selectionTextForPage(range: Range, page: HTMLElement): string {
+  const startPage = closestPage(range.startContainer)
+  const endPage = closestPage(range.endContainer)
+  if (startPage === endPage) {
+    return range.toString()
+  }
+  const textLayer = page.querySelector('.textLayer')
+  if (textLayer === null) {
+    return ''
+  }
+  const sub = range.cloneRange()
+  if (page === startPage) {
+    sub.setEnd(textLayer, textLayer.childNodes.length)
+  } else if (page === endPage) {
+    sub.setStart(textLayer, 0)
+  } else {
+    sub.setStart(textLayer, 0)
+    sub.setEnd(textLayer, textLayer.childNodes.length)
+  }
+  return sub.toString()
 }
 
 /** The PDF branch: viewer + annotation overlay under one toolbar and list. */
@@ -146,52 +195,65 @@ function PdfPreview({ target, onClose }: PdfPreviewProps): ReactElement {
         return
       }
       const range = selection.getRangeAt(0)
-      const page = findSelectionPage(range)
-      if (page === null) {
+      // The selection may span several pages: one annotation per page, with
+      // the page's own selection slice.
+      const pages = selectionPagesInRange(range)
+      if (pages.length === 0) {
         return
       }
-      const pageRect = page.getBoundingClientRect()
-      if (pageRect.right <= pageRect.left || pageRect.bottom <= pageRect.top) {
-        return
-      }
-      const pageNumber = Number(page.getAttribute('data-page-number'))
-      if (!Number.isSafeInteger(pageNumber) || pageNumber < 1) {
-        return
-      }
-      // The browser's selection rects can drift from the canvas glyphs when
-      // pdf.js substitutes a font, so they only hit-test; the annotation rects
-      // come from pdf.js's own text coordinates in createTextHighlight.
-      const selectionRects = normalizedSelectionRects(range.getClientRects(), pageRect)
-      if (selectionRects.length === 0) {
-        return
-      }
-      void createTextHighlight(pageNumber - 1, selectionRects, selection)
+      void createTextHighlights(pages, range, selection)
     }
-    const createTextHighlight = async (
-      pageIndex: number,
-      selectionRects: readonly NormalizedRect[],
+    const createTextHighlights = async (
+      pages: readonly HTMLElement[],
+      range: Range,
       selection: Selection,
     ): Promise<void> => {
       const doc = session.pdfDocument
       if (doc === null) {
         return
       }
-      try {
-        const page = await doc.getPage(pageIndex + 1)
-        const content = await page.getTextContent()
-        const viewport = page.getViewport({ scale: 1 })
-        const textItems = content.items.filter((textItem) => 'str' in textItem) as PdfTextItemLike[]
-        const highlight = selectionToHighlight(selectionRects, textItems, viewport, pageIndex)
-        if (highlight === null) {
-          return
+      const clientRects = Array.from(range.getClientRects())
+      for (const page of pages) {
+        const pageNumber = Number(page.getAttribute('data-page-number'))
+        if (!Number.isSafeInteger(pageNumber) || pageNumber < 1) {
+          continue
         }
-        addAnnotation({ ...highlight, type: 'text', color })
-        // Clear the selection so a second capture in a row starts fresh.
-        selection.removeAllRanges()
-      } catch {
-        // A failed read (document destroyed mid-selection, etc.) drops the
-        // capture rather than surfacing an error for a selection gesture.
+        const pageRect = page.getBoundingClientRect()
+        if (pageRect.right <= pageRect.left || pageRect.bottom <= pageRect.top) {
+          continue
+        }
+        // The browser's selection rects can drift from the canvas glyphs when
+        // pdf.js substitutes a font, so they only hit-test; the annotation
+        // rects come from pdf.js's own text coordinates below. Rects outside
+        // this page clamp away and drop.
+        const pageRects = normalizedSelectionRects(clientRects, pageRect)
+        if (pageRects.length === 0) {
+          continue
+        }
+        try {
+          const pageProxy = await doc.getPage(pageNumber)
+          const content = await pageProxy.getTextContent()
+          const viewport = pageProxy.getViewport({ scale: 1 })
+          const textItems = content.items.filter(
+            (textItem) => 'str' in textItem,
+          ) as PdfTextItemLike[]
+          const highlight = selectionToHighlight(
+            pageRects,
+            textItems,
+            viewport,
+            pageNumber - 1,
+            selectionTextForPage(range, page),
+          )
+          if (highlight !== null) {
+            addAnnotation({ ...highlight, type: 'text', color })
+          }
+        } catch {
+          // A failed read (document destroyed mid-selection, etc.) drops that
+          // page's capture rather than surfacing an error for a gesture.
+        }
       }
+      // Clear the selection once so a second capture in a row starts fresh.
+      selection.removeAllRanges()
     }
     window.addEventListener('keydown', onKeyDown)
     document.addEventListener('mouseup', onMouseUp)

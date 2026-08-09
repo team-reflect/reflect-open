@@ -8,10 +8,13 @@
  * making the selection rects narrower than the text. The annotation rects
  * therefore come from pdf.js's own text coordinates
  * ({@link textItemNormalizedRect}) — the same source that rasterized the
- * canvas — so they always align with the glyphs. The rects live in the
- * normalized display space (0–1 fractions of the page, top-left origin, y
- * growing down), and the text is the hit items' strings in reading order with
- * control characters and whitespace runs cleaned up.
+ * canvas — so they always align with the glyphs. Each hit item's bbox is
+ * clipped horizontally to the selection's extent, so a partial-line selection
+ * highlights only the covered run instead of the whole text item (pdf.js text
+ * items often span a whole line). The rects live in the normalized display
+ * space (0–1 fractions of the page, top-left origin, y growing down), and the
+ * text is the selection's own string, cleaned of control characters and
+ * whitespace runs.
  */
 
 import {
@@ -28,6 +31,12 @@ export interface RectLike {
   top: number
   right: number
   bottom: number
+}
+
+/** The `.page` element bits the extractor reads. */
+export interface PageElementLike {
+  getBoundingClientRect(): RectLike
+  getAttribute(name: 'data-page-number'): string | null
 }
 
 /** The extracted payload: 0-based page, per-line normalized rects, cleaned text. */
@@ -89,7 +98,7 @@ function normalizedSelectionText(raw: string): string {
 }
 
 /**
- * Merge the hit items' bboxes into one rect per visual line (items whose
+ * Merge the clipped items' bboxes into one rect per visual line (items whose
  * vertical ranges overlap), spanning the union — a selection over a run of
  * words becomes one highlight box per line.
  */
@@ -110,31 +119,72 @@ function mergeIntoLines(rects: NormalizedRect[]): NormalizedRect[] {
 }
 
 /**
- * Build the text-annotation payload from the browser selection rects and the
- * page's own text content, or null when nothing was selected: no hit items,
- * or no usable text. `pageIndex` is the 0-based page the selection sits on.
+ * Build the text-annotation payload for one page: hit-test the page's text
+ * items against the selection rects, clip each hit item horizontally to the
+ * selection's covered extent (a partial-line selection keeps only the covered
+ * run; the item's own vertical bounds stay, as they are the canvas-aligned
+ * ones), and merge the clipped rects into one per line. `selectionText` is the
+ * selection's own string for this page — not the hit items' strings, so a
+ * partial-line selection's text is only the selected part. Returns null when
+ * nothing was selected or the text cleans to empty.
  */
 export function selectionToHighlight(
   selectionRects: readonly NormalizedRect[],
   textItems: readonly PdfTextItemLike[],
   viewport: PdfViewportLike,
   pageIndex: number,
+  selectionText: string,
 ): SelectionHighlight | null {
   const normalizedItems = textItems
     .filter((item) => item.str !== '')
     .map((item) => ({ item, rect: textItemNormalizedRect(item, viewport) }))
-  const hitItems = normalizedItems.filter(({ rect }) =>
-    selectionRects.some((selectionRect) => rectsOverlap(selectionRect, rect)),
-  )
-  if (hitItems.length === 0) {
+  const clipped: NormalizedRect[] = []
+  for (const { rect } of normalizedItems) {
+    const covering = selectionRects.filter((selectionRect) => rectsOverlap(selectionRect, rect))
+    if (covering.length === 0) {
+      continue
+    }
+    const clipLeft = Math.min(...covering.map((selectionRect) => selectionRect[0]))
+    const clipRight = Math.max(...covering.map((selectionRect) => selectionRect[2]))
+    const left = Math.max(rect[0], clipLeft)
+    const right = Math.min(rect[2], clipRight)
+    if (right <= left) {
+      continue
+    }
+    clipped.push([left, rect[1], right, rect[3]])
+  }
+  if (clipped.length === 0) {
     return null
   }
-  const rects = mergeIntoLines(hitItems.map(({ rect }) => rect))
-  const text = normalizedSelectionText(
-    hitItems.map(({ item }) => item.str + (item.hasEOL === true ? '\n' : '')).join(' '),
-  )
+  const text = normalizedSelectionText(selectionText)
   if (text === '') {
     return null
   }
-  return { pageIndex, rects, text }
+  return { pageIndex, rects: mergeIntoLines(clipped), text }
+}
+
+/**
+ * The pages a selection spans, in document order, given the ordered page list
+ * (the viewer's `.page` elements). A single-page selection yields that page; a
+ * cross-page selection yields every page between the start and end pages,
+ * inclusive, regardless of the drag direction.
+ */
+export function selectionPages<T extends PageElementLike>(
+  startPage: T | null,
+  endPage: T | null,
+  allPages: readonly T[],
+): T[] {
+  if (startPage === null || endPage === null) {
+    return []
+  }
+  if (startPage === endPage) {
+    return [startPage]
+  }
+  const startIndex = allPages.indexOf(startPage)
+  const endIndex = allPages.indexOf(endPage)
+  if (startIndex === -1 || endIndex === -1) {
+    return [startPage, endPage]
+  }
+  const [lo, hi] = startIndex <= endIndex ? [startIndex, endIndex] : [endIndex, startIndex]
+  return allPages.slice(lo, hi + 1)
 }

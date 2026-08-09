@@ -32,13 +32,14 @@ const annotationsState = vi.hoisted(() => ({
 const sessionState = vi.hoisted(() => ({
   session: {
     viewer: null,
-    // The text-highlight capture reads pdf.js's own text coordinates.
+    // The text-highlight capture reads pdf.js's own text coordinates; each
+    // page's text content is its page number's word.
     pdfDocument: {
-      getPage: vi.fn(async () => ({
+      getPage: vi.fn(async (pageNumber: number) => ({
         getTextContent: async () => ({
           items: [
             {
-              str: 'Some selected words',
+              str: pageNumber === 1 ? 'Some selected words' : 'Second page words',
               transform: [1, 0, 0, 1, 15, 180],
               width: 280,
               height: 12,
@@ -292,5 +293,60 @@ describe('PdfPreview annotation-mode shortcuts', () => {
     selection?.addRange(range)
     document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
     expect(annotationsState.addAnnotation).not.toHaveBeenCalled()
+  })
+
+  it('creates one annotation per page for a cross-page selection', async () => {
+    await renderPdfPreview()
+    await userEvent.keyboard('t')
+    await expect.poll(() => highlightPressed()).toBe('true')
+    // Let the mode-change effect re-bind the mouseup listener before firing it.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // Two stacked fake pdf pages, each with a text layer (the per-page text is
+    // sliced from the text layer) and a selectable span.
+    const viewer = document.createElement('div')
+    viewer.className = 'pdfViewer temp-preview-page'
+    document.body.append(viewer)
+    const pages = [1, 2].map((n) => {
+      const pageEl = document.createElement('div')
+      pageEl.className = 'page'
+      pageEl.setAttribute('data-page-number', String(n))
+      pageEl.style.width = '300px'
+      pageEl.style.height = '300px'
+      pageEl.style.position = 'absolute'
+      pageEl.style.top = `${(n - 1) * 320}px`
+      const textLayer = document.createElement('div')
+      textLayer.className = 'textLayer'
+      const span = document.createElement('span')
+      span.textContent = n === 1 ? 'First page words' : 'Second page words'
+      span.style.userSelect = 'text'
+      textLayer.append(span)
+      pageEl.append(textLayer)
+      viewer.append(pageEl)
+      return { pageEl, textLayer, span }
+    })
+
+    // Select from page 1's span through page 2's span.
+    const firstText = pages[0]!.span.firstChild!
+    const secondText = pages[1]!.span.firstChild!
+    const range = document.createRange()
+    range.setStart(firstText, 0)
+    range.setEnd(secondText, 6)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+
+    await vi.waitFor(() => expect(annotationsState.addAnnotation).toHaveBeenCalledTimes(2))
+    const calls = annotationsState.addAnnotation.mock.calls
+    const byPage = new Map<number, { text: string; type: string }>()
+    for (const call of calls) {
+      const payload = call[0] as { pageIndex: number; text: string; type: string }
+      byPage.set(payload.pageIndex, { text: payload.text, type: payload.type })
+    }
+    expect(byPage.get(0)?.type).toBe('text')
+    expect(byPage.get(0)?.text).toBe('First page words')
+    expect(byPage.get(1)?.text).toBe('Second')
   })
 })

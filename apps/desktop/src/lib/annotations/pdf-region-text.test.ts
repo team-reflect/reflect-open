@@ -92,9 +92,7 @@ describe('extractRegionText', () => {
         ],
       }),
     }
-    await expect(extractRegionText(docMock(unsortedPage) as never, item({}))).resolves.toBe(
-      'Hello',
-    )
+    await expect(extractRegionText(docMock(unsortedPage) as never, item({}))).resolves.toBe('Hello')
   })
 
   it('returns null for a missing rect or a failing page read', async () => {
