@@ -2,6 +2,7 @@ import { indexedNoteSchema, ReflectError, type AppPlatform, type IpcBridge } fro
 import { z } from 'zod'
 import type { DevFileStore } from '@/dev/dev-file-store'
 import type { DevIndexDb } from '@/dev/dev-index-db'
+import { createDevPluginHost, type DevPluginHost } from '@/dev/dev-plugin-host'
 
 /** The fixed fake graph root the dev bridge reports (mirrors `mobile_storage`). */
 export const DEV_GRAPH_ROOT = '/dev-graph'
@@ -12,6 +13,8 @@ export interface DevBridgeBackend {
   platform: AppPlatform
   files: DevFileStore
   index: DevIndexDb
+  /** The mobile-plugin stand-in; passed in by `installDevBridge` so the console knob can reach it. */
+  plugins?: DevPluginHost
 }
 
 const dbQueryArgsSchema = z.object({ sql: z.string(), params: z.array(z.unknown()) })
@@ -64,6 +67,7 @@ const chatDeleteArgsSchema = z.object({ id: z.string() })
  */
 export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
   const { platform, files, index } = backend
+  const plugins = backend.plugins ?? createDevPluginHost()
   const graphInfo = { root: DEV_GRAPH_ROOT, name: 'Dev Graph', generation: 1 }
   let settingsDocument: Record<string, unknown> = { mobileOnboarded: true }
   const assets = new Map<string, string>()
@@ -72,6 +76,9 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
   const secrets = new Map<string, string>()
 
   async function invoke(command: string, args: Record<string, unknown>): Promise<unknown> {
+    if (command.startsWith('plugin:')) {
+      return plugins.invoke(command, args)
+    }
     switch (command) {
       case 'app_version':
         return '0.0.0-dev'
@@ -304,6 +311,9 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
     // browser; subscriptions succeed and simply never fire. Local writes still
     // refresh the UI through core's in-process local-write echo.
     listen: async () => () => {},
+    listenPlugin: async (plugin, event, handler) => {
+      plugins.listen(plugin, event, handler)
+    },
   }
 }
 
