@@ -164,13 +164,13 @@ interface NoteEditorProps {
    * Mod-Enter key press that followed the link) — handlers read its
    * modifiers, e.g. ⌘-click opens the target in a new window.
    */
-  onWikiLinkClick?: (target: string, event?: MouseEvent | KeyboardEvent) => void
+  onWikiLinkClick?: (options: { target: string; openInNewWindow: boolean }) => void
   /**
    * Click on a rendered Markdown link whose href is graph-local (scheme-less
    * and not an asset): a note link like `[Plan](./Plan.md)`. Receives the
    * authored href; the handler owns source-relative resolution.
    */
-  onNoteLinkClick?: (href: string, event: MouseEvent | KeyboardEvent) => void
+  onNoteLinkClick?: (options: { href: string; openInNewWindow: boolean }) => void
   /**
    * Resolve the passive body of Meowdown's editor-scoped wiki-link hover
    * card. Resolving `null` (missing, ambiguous, or unavailable targets)
@@ -331,8 +331,8 @@ export function NoteEditor({
   )
 
   const handleWikilinkClick = useCallback(
-    (payload: { target: string; event: MouseEvent | KeyboardEvent }) =>
-      onWikiLinkClickRef.current?.(payload.target, payload.event),
+    (payload: { target: string; event: MouseEvent | KeyboardEvent; mod: boolean }) =>
+      onWikiLinkClickRef.current?.({ target: payload.target, openInNewWindow: payload.mod }),
     [],
   )
   const handleTagClick = useCallback(
@@ -350,7 +350,7 @@ export function NoteEditor({
   const handleLinkClick = useCallback(
     // The event may also be the Mod-Enter key press that followed the link
     // (meowdown ≥0.33).
-    ({ href, event }: { href: string; event: MouseEvent | KeyboardEvent }) => {
+    ({ href, event, mod }: { href: string; event: MouseEvent | KeyboardEvent; mod: boolean }) => {
       // A graph-relative `assets/….pdf` link — optionally `#page=N`-targeted,
       // the annotation lane's migration links — opens in the in-app PDF
       // preview panel (annotation-aware) instead of the OS asset opener.
@@ -376,17 +376,17 @@ export function NoteEditor({
       }
       // A `reflect://` link routes through the in-app deep-link pipeline —
       // the OS opener would deny the scheme (and a round-trip could land on
-      // another installed flavor). ⌘-click sends an *addressing* link to a
-      // new window instead; a declined open (capture link, browser dev)
+      // another installed flavor). ⌘-click or a spare-`mod` keyboard follow sends an
+      // *addressing* link to a new window instead; a declined open (capture link, browser dev)
       // degrades to the normal dispatch.
       if (isDeepLinkUrl(href)) {
-        followDeepLink(href, event)
+        followDeepLink({ href, openInNewWindow: mod })
         return
       }
       if (!isOpenableExternalUrl(href)) {
         // A scheme-less local href is a note link; the host resolves it
         // against this note's own directory.
-        onNoteLinkClickRef.current?.(href, event)
+        onNoteLinkClickRef.current?.({ href, openInNewWindow: mod })
         return
       }
       void openUrl(href).catch((cause) => {
@@ -399,7 +399,7 @@ export function NoteEditor({
   // link click: `assets/…` through the asset opener, anything else through
   // the deep-link/URL path.
   const handleFileClick: FileClickHandler = useCallback(
-    ({ href, event }) => handleLinkClick({ href, event }),
+    ({ href, event, mod }) => handleLinkClick({ href, event, mod }),
     [handleLinkClick],
   )
   const handleResolveFileInfo: FileInfoResolver = useCallback(
@@ -410,7 +410,15 @@ export function NoteEditor({
     // Touch surfaces deliver the tap's `touchend` instead of a click —
     // meowdown cancels it so iOS WebKit can't focus the editor (and raise
     // the keyboard) under the opening lightbox.
-    ({ src, alt, event }: { src: string; alt: string; event: MouseEvent | TouchEvent }) => {
+    ({
+      src,
+      alt,
+      event,
+    }: {
+      src: string
+      alt: string
+      event: MouseEvent | TouchEvent | KeyboardEvent
+    }) => {
       // A migrated SiYuan image annotation is an image wrapped in a PDF link
       // (`[![…](img)](assets/…pdf#page=N)`); clicking it should jump to the
       // PDF preview's page like SiYuan does, not open the image lightbox.

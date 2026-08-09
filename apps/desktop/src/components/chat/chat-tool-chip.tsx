@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { routeForPath } from '@/routing/route'
 import { useRouter } from '@/routing/router'
+import { isModEvent } from '@meowdown/core'
 
 interface ChatToolChipProps {
   part: Extract<AssistantPart, { kind: 'tool' }>
@@ -77,7 +78,7 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
   const { navigate } = useRouter()
   const navigateNoteLink = useNoteLinkNavigation()
   const openNote = (path: string, event: MouseEvent<HTMLButtonElement>): void => {
-    navigateNoteLink(routeForPath(path), event)
+    navigateNoteLink({ target: routeForPath(path), openInNewWindow: isModEvent(event) })
   }
   const pending = isToolPending(part)
   const call = part.call

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { MarkdownPreview } from '@/editor/markdown-preview'
 import { useOpenExternalLink } from '@/editor/open-external-link'
 import { useAssetPersistence } from '@/editor/use-asset-persistence'
-import { useBacklinkNavigation } from '@/hooks/use-backlink-navigation'
+import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { annotationReference } from '@/lib/annotations/annotation-reference'
 import { parsePdfHref } from '@/lib/annotations/pdf-href'
 import { extractRegionText } from '@/lib/annotations/pdf-region-text'
@@ -391,7 +391,7 @@ function NotePreview({ path, onClose }: NotePreviewProps): ReactElement {
   const { graph } = useGraph()
   const generation = graph?.generation ?? null
   const { resolveImageUrl } = useAssetPersistence(generation)
-  const { onWikilinkClick } = useBacklinkNavigation()
+  const navigateWikiLink = useWikiLinkNavigation(generation)
   const setPreviewPanelTarget = useSetPreviewPanelTarget()
   const openExternalLink = useOpenExternalLink()
   const { data, isError } = useQuery({
@@ -409,7 +409,7 @@ function NotePreview({ path, onClose }: NotePreviewProps): ReactElement {
   // annotation lane's migration links); every other link keeps the default
   // OS-opener behavior.
   const onLinkClick = useCallback(
-    (href: string, event: MouseEvent | KeyboardEvent): void => {
+    (href: string, event: MouseEvent | KeyboardEvent, mod: boolean): void => {
       const pdfHref = parsePdfHref(href)
       if (pdfHref !== null) {
         event.preventDefault()
@@ -420,7 +420,7 @@ function NotePreview({ path, onClose }: NotePreviewProps): ReactElement {
         })
         return
       }
-      openExternalLink({ href, event })
+      openExternalLink({ href, event, mod })
     },
     [openExternalLink, setPreviewPanelTarget],
   )
@@ -439,11 +439,7 @@ function NotePreview({ path, onClose }: NotePreviewProps): ReactElement {
         content={body}
         resolveImageUrl={resolveImageUrl}
         onLinkClick={onLinkClick}
-        onWikiLinkClick={(target, event) => {
-          if (event !== undefined) {
-            onWikilinkClick({ target, event })
-          }
-        }}
+        onWikiLinkClick={navigateWikiLink}
         interactive
         className="px-3.5 py-2 text-sm"
       />

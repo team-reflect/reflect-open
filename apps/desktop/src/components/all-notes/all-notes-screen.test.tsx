@@ -247,7 +247,9 @@ describe('AllNotesScreen', () => {
   it('opens a modifier-clicked note subject in a new window without selecting its row', async () => {
     const view = await renderScreen()
 
-    await view.getByRole('button', { name: 'Health Stacked' }).click({ modifiers: ['Meta'] })
+    await view
+      .getByRole('button', { name: 'Health Stacked' })
+      .click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({
@@ -264,7 +266,7 @@ describe('AllNotesScreen', () => {
     const view = await renderScreen()
     const subject = view.getByRole('button', { name: 'Health Stacked' })
 
-    await subject.dblClick({ modifiers: ['Meta'] })
+    await subject.dblClick({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({

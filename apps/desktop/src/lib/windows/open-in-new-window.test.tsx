@@ -14,35 +14,13 @@ vi.mock('@/lib/platform', async (importOriginal) => ({
 }))
 vi.mock('@/lib/platform-surface', () => ({ isMobileSurface }))
 
-import {
-  isNewWindowClick,
-  openDeepLinkInNewWindow,
-  openRouteInNewWindow,
-} from './open-in-new-window'
+import { openDeepLinkInNewWindow, openRouteInNewWindow } from './open-in-new-window'
 
 beforeEach(() => {
   vi.clearAllMocks()
   isNativeShell.mockReturnValue(true)
   isMobileSurface.mockReturnValue(false)
   openNoteWindow.mockResolvedValue(undefined)
-})
-
-describe('isNewWindowClick', () => {
-  it('answers true for ⌘-click and ctrl-click', () => {
-    expect(isNewWindowClick(new MouseEvent('click', { metaKey: true }))).toBe(true)
-    expect(isNewWindowClick(new MouseEvent('click', { ctrlKey: true }))).toBe(true)
-  })
-
-  it('answers false for a plain click and a missing event', () => {
-    expect(isNewWindowClick(new MouseEvent('click'))).toBe(false)
-    expect(isNewWindowClick(undefined)).toBe(false)
-  })
-
-  it('never treats a keyboard follow as a new-window request', () => {
-    // Mod-Enter follows a link with the modifier held by definition — it must
-    // stay an in-window navigation.
-    expect(isNewWindowClick(new KeyboardEvent('keydown', { metaKey: true }))).toBe(false)
-  })
 })
 
 describe('openRouteInNewWindow', () => {

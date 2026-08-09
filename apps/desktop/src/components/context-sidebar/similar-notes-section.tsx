@@ -4,6 +4,7 @@ import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { useSimilarNotes } from '@/lib/use-similar-notes'
 import { routeForPath } from '@/routing/route'
 import { SidebarSection } from './sidebar-section'
+import { isModEvent } from '@meowdown/core'
 
 interface SimilarNotesSectionProps {
   /** Graph-relative path of the note whose semantic neighbors to show. */
@@ -36,7 +37,12 @@ export function SimilarNotesSection({ path }: SimilarNotesSectionProps): ReactEl
           <li key={hit.path}>
             <button
               type="button"
-              onClick={(event) => navigateNoteLink(routeForPath(hit.path), event)}
+              onClick={(event) =>
+                navigateNoteLink({
+                  target: routeForPath(hit.path),
+                  openInNewWindow: isModEvent(event),
+                })
+              }
               className="flex w-full items-center space-x-1 rounded-md px-3 py-1 leading-5 text-text-secondary transition-colors duration-100 hover:bg-surface-hover hover:text-text"
             >
               <span className="min-w-0 flex-1 truncate text-left text-xs font-medium">

@@ -13,28 +13,14 @@ import type { Route } from '@/routing/route'
  * modifier can never make a link do nothing.
  */
 
-/** The modifier shape shared by native and React synthetic mouse events. */
-export interface NewWindowClickEvent {
+/** The modifier fields meowdown's `isModEvent` reads off a link-like control's click. */
+export interface ModClickEvent {
   metaKey: boolean
   ctrlKey: boolean
-  type: string
 }
 
 /** Coalesce double-clicks before the shell has registered its content-addressed window label. */
 const pendingWindowOpens = new Map<string, Promise<boolean>>()
-
-/**
- * Whether a link click asked for a new window (⌘-click; ctrl-click off mac).
- * Mouse events only: meowdown also fires link handlers for the Mod-Enter
- * keyboard follow, whose modifier is held *by definition* — treating it as a
- * new-window request would hijack every keyboard link follow.
- */
-export function isNewWindowClick(event: NewWindowClickEvent | undefined): boolean {
-  if (event === undefined || event.type.startsWith('key')) {
-    return false
-  }
-  return event.metaKey || event.ctrlKey
-}
 
 /**
  * Open `route` in a secondary note window. False — never a throw — when this

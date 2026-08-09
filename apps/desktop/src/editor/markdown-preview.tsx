@@ -25,7 +25,7 @@ interface MarkdownPreviewProps {
    * inert chips (the palette preview's behavior). `event` carries the
    * originating click so handlers can honor ⌘-click (open in new window).
    */
-  onWikiLinkClick?: (target: string, event?: MouseEvent | KeyboardEvent) => void
+  onWikiLinkClick?: (options: { target: string; openInNewWindow: boolean }) => void
   /**
    * Intercept a rendered link click, replacing the default handling (the OS
    * opener for external URLs; scheme-less and asset hrefs are no-ops). The
@@ -33,7 +33,7 @@ interface MarkdownPreviewProps {
    * routes PDF and note links into the panel and defers the rest to
    * {@link useOpenExternalLink}.
    */
-  onLinkClick?: (href: string, event: MouseEvent | KeyboardEvent) => void
+  onLinkClick?: (href: string, event: MouseEvent | KeyboardEvent, mod: boolean) => void
   /**
    * Whether rendered links, images, and task checkboxes can be activated
    * (default true). A passive preview renders no anchors, focusable controls,
@@ -76,8 +76,8 @@ export function MarkdownPreview({
     [],
   )
   const onWikilinkClickStable = useCallback(
-    (payload: { target: string; event: MouseEvent | KeyboardEvent }) =>
-      navigateRef.current?.(payload.target, payload.event),
+    (payload: { target: string; event: MouseEvent | KeyboardEvent; mod: boolean }) =>
+      navigateRef.current?.({ target: payload.target, openInNewWindow: payload.mod }),
     [],
   )
   // A link click suppresses the default navigation and goes to the host's
@@ -88,7 +88,7 @@ export function MarkdownPreview({
     (payload: LinkClickPayload) => {
       if (linkClickRef.current !== undefined) {
         payload.event.preventDefault()
-        linkClickRef.current(payload.href, payload.event)
+        linkClickRef.current(payload.href, payload.event, payload.mod)
         return
       }
       openExternalLink(payload)

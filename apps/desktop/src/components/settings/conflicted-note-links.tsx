@@ -3,6 +3,7 @@ import type { ConflictedNote } from '@reflect/core'
 import { ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
+import { isModEvent } from '@meowdown/core'
 
 interface ConflictedNoteLinksProps {
   readonly notes: readonly ConflictedNote[]
@@ -21,7 +22,12 @@ function ConflictedNoteLink({ note }: ConflictedNoteLinkProps): ReactElement {
         variant="ghost"
         size="sm"
         className="h-auto w-full max-w-sm justify-start whitespace-normal px-2 py-1 text-left text-xs text-current hover:bg-amber-500/10 hover:text-current"
-        onClick={(event) => navigateNoteLink({ kind: 'note', path: note.path }, event)}
+        onClick={(event) =>
+          navigateNoteLink({
+            target: { kind: 'note', path: note.path },
+            openInNewWindow: isModEvent(event),
+          })
+        }
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium">{note.title}</span>

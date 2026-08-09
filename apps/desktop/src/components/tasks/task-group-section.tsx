@@ -7,7 +7,7 @@ import { taskKey } from '@/lib/tasks/task-identity'
 import type { TaskSelection } from '@/lib/tasks/use-task-selection'
 import type { TaskRowEditHandlers } from '@/lib/tasks/use-task-row-handlers'
 import { cn } from '@/lib/utils'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
+import type { ModClickEvent } from '@/lib/windows/open-in-new-window'
 import { TaskBreadcrumbs } from './task-breadcrumbs'
 import { TaskRow } from './task-row'
 
@@ -26,7 +26,7 @@ interface TaskGroupSectionProps {
   onAdd: (target: InsertTaskTarget) => void
   /** Holds the editing row's flush-then-convert trigger for the toolbar button. */
   convertControllerRef: MutableRefObject<(() => void) | null>
-  onOpen: (notePath: string, event?: NewWindowClickEvent) => void
+  onOpen: (notePath: string, event?: ModClickEvent) => void
 }
 
 /**

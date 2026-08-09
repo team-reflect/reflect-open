@@ -40,10 +40,10 @@ export function isOpenableExternalUrl(href: string): boolean {
 export function useOpenExternalLink(): LinkClickHandler {
   const followDeepLink = useFollowDeepLink()
   return useCallback<LinkClickHandler>(
-    ({ href, event }) => {
+    ({ href, event, mod }) => {
       event.preventDefault()
       if (isDeepLinkUrl(href)) {
-        followDeepLink(href, event)
+        followDeepLink({ href, openInNewWindow: mod })
         return
       }
       if (isOpenableExternalUrl(href)) {

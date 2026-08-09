@@ -173,7 +173,7 @@ describe('BacklinksPanel', () => {
     ])
     const view = await renderPanel('notes/roadmap.md')
 
-    await view.getByText('Meeting Notes').click({ modifiers: ['Meta'] })
+    await view.getByText('Meeting Notes').click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({

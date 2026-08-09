@@ -66,7 +66,7 @@ describe('TemplatesSection note links', () => {
   it('opens a ⌘-clicked template in a new window with its explicit note route', async () => {
     await renderSection()
 
-    await page.getByText('templates/weekly-review.md').click({ modifiers: ['Meta'] })
+    await page.getByText('templates/weekly-review.md').click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({

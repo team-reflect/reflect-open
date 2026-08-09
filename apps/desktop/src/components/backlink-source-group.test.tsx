@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-react'
 import { page } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
+import { isModEvent } from '@meowdown/core'
 import type { BacklinkSource } from '@/lib/group-backlinks'
 import { BacklinkSourceGroup } from './backlink-source-group'
 
@@ -10,7 +11,7 @@ const SOURCE: BacklinkSource = {
   snippets: [],
 }
 
-type OnOpen = (path: string, event?: { metaKey: boolean }) => void
+type OnOpen = (path: string, event?: { metaKey: boolean; ctrlKey: boolean }) => void
 
 function mount(onOpen: OnOpen) {
   return render(
@@ -30,12 +31,13 @@ describe('BacklinkSourceGroup', () => {
     const onOpen = vi.fn<OnOpen>()
     await mount(onOpen)
 
-    await page.getByRole('button', { name: 'Source Note' }).click({ modifiers: ['Meta'] })
+    await page.getByRole('button', { name: 'Source Note' }).click({ modifiers: ['ControlOrMeta'] })
 
     expect(onOpen).toHaveBeenCalledTimes(1)
     const [path, event] = onOpen.mock.calls[0]!
     expect(path).toBe('notes/source.md')
-    expect(event?.metaKey).toBe(true)
+    // The platform's mod key: Meta on mac dev machines, Ctrl on Linux CI.
+    expect(event !== undefined && isModEvent(event)).toBe(true)
   })
 
   it('plain clicks arrive without the modifier', async () => {
@@ -45,6 +47,6 @@ describe('BacklinkSourceGroup', () => {
     await page.getByRole('button', { name: 'Source Note' }).click()
 
     const [, event] = onOpen.mock.calls[0]!
-    expect(event?.metaKey).toBe(false)
+    expect(event !== undefined && isModEvent(event)).toBe(false)
   })
 })

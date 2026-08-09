@@ -41,7 +41,7 @@ vi.mock('@/editor/note-editor', async () => {
       handleRef,
     }: {
       initialContent: string
-      onWikiLinkClick?: (target: string) => void
+      onWikiLinkClick?: (options: { target: string; openInNewWindow: boolean }) => void
       handleRef?: (handle: import('@/editor/note-editor').NoteEditorHandle | null) => void
     }) => {
       const markdownRef = useRef(initialContent)
@@ -73,7 +73,10 @@ vi.mock('@/editor/note-editor', async () => {
         <div data-testid="fake-editor">
           {initialContent}
           {onWikiLinkClick ? (
-            <button type="button" onClick={() => onWikiLinkClick('Target Note')}>
+            <button
+              type="button"
+              onClick={() => onWikiLinkClick({ target: 'Target Note', openInNewWindow: false })}
+            >
               fake-wikilink
             </button>
           ) : null}

@@ -3,9 +3,10 @@ import type { WikilinkClickHandler } from '@meowdown/core'
 import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
+import type { ModClickEvent } from '@/lib/windows/open-in-new-window'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
+import { isModEvent } from '@meowdown/core'
 
 /** The click plumbing a backlinks surface wires into its rows and snippets. */
 export interface BacklinkNavigation {
@@ -17,7 +18,7 @@ export interface BacklinkNavigation {
    * desktop autofocuses note arrivals anyway. `event` (desktop) lets ⌘-click
    * open a new window; mobile taps omit it.
    */
-  openSource: (path: string, event?: NewWindowClickEvent) => void
+  openSource: (path: string, event?: ModClickEvent) => void
   /**
    * Navigate a `[[wiki link]]` clicked *inside* a snippet — resolves its
    * target the same way the editor does, distinct from {@link openSource}.
@@ -38,8 +39,11 @@ export function useBacklinkNavigation(): BacklinkNavigation {
   const navigateNoteLink = useNoteLinkNavigation()
 
   const openSource = useCallback(
-    (target: string, event?: NewWindowClickEvent) => {
-      navigateNoteLink(routeForPath(target), event)
+    (target: string, event?: ModClickEvent) => {
+      navigateNoteLink({
+        target: routeForPath(target),
+        openInNewWindow: event !== undefined && isModEvent(event),
+      })
     },
     [navigateNoteLink],
   )
@@ -47,7 +51,7 @@ export function useBacklinkNavigation(): BacklinkNavigation {
   const navigateWikiLink = useWikiLinkNavigation(graph?.generation ?? null)
   const { resolveImageUrl } = useAssetPersistence(graph?.generation ?? null)
   const onWikilinkClick = useCallback<WikilinkClickHandler>(
-    ({ target, event }) => navigateWikiLink(target, event),
+    (payload) => navigateWikiLink({ target: payload.target, openInNewWindow: payload.mod }),
     [navigateWikiLink],
   )
   const resolveImageUrlStable = useCallback(

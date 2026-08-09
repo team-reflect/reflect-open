@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import type { ReactElement } from 'react'
+import { isModEvent } from '@meowdown/core'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { useNoteLinkNavigation } from './use-note-link-navigation'
 
@@ -17,13 +18,23 @@ function Links({ scopeKey }: { readonly scopeKey: string | undefined }): ReactEl
     <>
       <button
         type="button"
-        onClick={(event) => openNoteLink({ kind: 'note', path: 'notes/alpha.md' }, event)}
+        onClick={(event) =>
+          openNoteLink({
+            target: { kind: 'note', path: 'notes/alpha.md' },
+            openInNewWindow: isModEvent(event),
+          })
+        }
       >
         Alpha
       </button>
       <button
         type="button"
-        onClick={(event) => openNoteLink({ kind: 'note', path: 'notes/bravo.md' }, event)}
+        onClick={(event) =>
+          openNoteLink({
+            target: { kind: 'note', path: 'notes/bravo.md' },
+            openInNewWindow: isModEvent(event),
+          })
+        }
       >
         Bravo
       </button>
@@ -86,7 +97,7 @@ describe('useNoteLinkNavigation', () => {
   it('opens a modifier-click in a secondary window without navigating', async () => {
     const view = await render(<Harness />)
 
-    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({
@@ -101,7 +112,7 @@ describe('useNoteLinkNavigation', () => {
     openRouteInNewWindow.mockResolvedValue(false)
     const view = await render(<Harness />)
 
-    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['ControlOrMeta'] })
 
     await expect.poll(() => route(view)).toEqual({ kind: 'note', path: 'notes/alpha.md' })
   })
@@ -110,7 +121,7 @@ describe('useNoteLinkNavigation', () => {
     openRouteInNewWindow.mockRejectedValue(new Error('window creation failed'))
     const view = await render(<Harness />)
 
-    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['ControlOrMeta'] })
 
     await expect.poll(() => route(view)).toEqual({ kind: 'note', path: 'notes/alpha.md' })
   })
@@ -124,7 +135,7 @@ describe('useNoteLinkNavigation', () => {
     )
     const view = await render(<Harness />)
 
-    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['ControlOrMeta'] })
     await vi.waitFor(() => expect(openRouteInNewWindow).toHaveBeenCalledTimes(1))
     await view.getByRole('button', { name: 'Bravo' }).click()
     await expect.poll(() => route(view)).toEqual({ kind: 'note', path: 'notes/bravo.md' })
@@ -147,9 +158,9 @@ describe('useNoteLinkNavigation', () => {
       .mockResolvedValueOnce(true)
     const view = await render(<Harness />)
 
-    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['ControlOrMeta'] })
     await vi.waitFor(() => expect(openRouteInNewWindow).toHaveBeenCalledTimes(1))
-    await view.getByRole('button', { name: 'Bravo' }).click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: 'Bravo' }).click({ modifiers: ['ControlOrMeta'] })
     await vi.waitFor(() => expect(openRouteInNewWindow).toHaveBeenCalledTimes(2))
 
     rejectOpen(new Error('window creation failed'))
@@ -167,7 +178,7 @@ describe('useNoteLinkNavigation', () => {
     )
     const view = await render(<Harness />)
 
-    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['ControlOrMeta'] })
     await vi.waitFor(() => expect(openRouteInNewWindow).toHaveBeenCalledTimes(1))
     await view.getByRole('button', { name: 'Reopen current route' }).click()
     finishOpen(false)
@@ -185,7 +196,7 @@ describe('useNoteLinkNavigation', () => {
     )
     const view = await render(<Harness scopeKey="2026-07-10" />)
 
-    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['ControlOrMeta'] })
     await vi.waitFor(() => expect(openRouteInNewWindow).toHaveBeenCalledTimes(1))
     await view.rerender(<Harness scopeKey="2026-07-11" />)
     finishOpen(false)
@@ -203,7 +214,7 @@ describe('useNoteLinkNavigation', () => {
     )
     const view = await render(<Harness />)
 
-    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: 'Alpha' }).click({ modifiers: ['ControlOrMeta'] })
     await vi.waitFor(() => expect(openRouteInNewWindow).toHaveBeenCalledTimes(1))
     await view.rerender(<Harness visible={false} />)
     finishOpen(false)

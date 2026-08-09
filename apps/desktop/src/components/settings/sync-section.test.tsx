@@ -182,7 +182,7 @@ describe('SyncSection', () => {
     const section = page.getByRole('region', { name: 'Sync' })
     await section
       .getByRole('button', { name: /Conflicted note.*notes\/conflicted\.md/ })
-      .click({ modifiers: ['Meta'] })
+      .click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({

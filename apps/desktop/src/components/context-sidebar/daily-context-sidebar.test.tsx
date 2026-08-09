@@ -112,7 +112,7 @@ describe('DailyContextSidebar calendar', () => {
     const view = await renderSidebar('2026-06-09')
     const day = page.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') })
 
-    fireEvent.click(day, { metaKey: true })
+    fireEvent.click(day, { metaKey: true, ctrlKey: true })
 
     await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({
@@ -137,7 +137,7 @@ describe('DailyContextSidebar calendar', () => {
     const view = await renderSidebar('2026-06-09')
     const day = page.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') })
 
-    fireEvent.click(day, { metaKey: true })
+    fireEvent.click(day, { metaKey: true, ctrlKey: true })
     await vi.waitFor(() => expect(openRouteInNewWindow).toHaveBeenCalledTimes(1))
     await view.rerender(
       <TooltipProvider>

@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactElemen
 import { Command } from 'cmdk'
 import { parseHighlights } from '@reflect/core'
 import { CalendarDays, FileText } from 'lucide-react'
-import { getIsComposing } from '@meowdown/core'
+import { getIsComposing, isModEvent } from '@meowdown/core'
 import { Kbd } from '@/components/kbd'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
@@ -10,7 +10,7 @@ import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { formatDayLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
+import type { ModClickEvent } from '@/lib/windows/open-in-new-window'
 import { useSettings } from '@/providers/settings-provider'
 import { routeForPath } from '@/routing/route'
 import { COMMAND_ICONS, FALLBACK_COMMAND_ICON } from './command-icons'
@@ -53,7 +53,7 @@ const Snippet = memo(function Snippet({ snippet }: { snippet: string }): ReactEl
 
 interface PendingNoteClick {
   path: string
-  event: NewWindowClickEvent
+  event: ModClickEvent
 }
 
 export function CommandPalette({ context }: CommandPaletteProps): ReactElement | null {
@@ -114,10 +114,10 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
   const openNote = (entry: NoteEntry): void => {
     const pendingClick = pendingNoteClickRef.current
     pendingNoteClickRef.current = null
-    navigateNoteLink(
-      routeForPath(entry.path),
-      pendingClick?.path === entry.path ? pendingClick.event : undefined,
-    )
+    navigateNoteLink({
+      target: routeForPath(entry.path),
+      openInNewWindow: pendingClick?.path === entry.path && isModEvent(pendingClick.event),
+    })
     closePalette()
   }
 
@@ -204,11 +204,7 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                         onClickCapture={(event) => {
                           pendingNoteClickRef.current = {
                             path: entry.path,
-                            event: {
-                              metaKey: event.metaKey,
-                              ctrlKey: event.ctrlKey,
-                              type: event.type,
-                            },
+                            event: { metaKey: event.metaKey, ctrlKey: event.ctrlKey },
                           }
                         }}
                         onSelect={() => openNote(entry)}

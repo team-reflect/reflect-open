@@ -27,13 +27,14 @@ import { useTaskSelection } from '@/lib/tasks/use-task-selection'
 import { completedTasksQueryKey, tasksQueryKey } from '@/lib/tasks/tasks-query'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration'
 import { useToday } from '@/lib/use-today'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
+import type { ModClickEvent } from '@/lib/windows/open-in-new-window'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
 import { TaskFiltersMenu } from './task-filters-menu'
 import { TaskGroupSection } from './task-group-section'
 import { TaskScheduleCalendar } from './task-schedule-calendar'
 import { TaskToolbarCountBadge } from './task-toolbar-count-badge'
+import { isModEvent } from '@meowdown/core'
 
 /** The selected task that owns keyboard focus: the cursor/anchor, else the first row left selected. */
 function focusedSelectedKey(
@@ -207,7 +208,11 @@ export function TasksScreen(): ReactElement {
     }
   }, [actions, selection, selectedTasks])
   const openNote = useCallback(
-    (path: string, event?: NewWindowClickEvent) => navigateNoteLink(routeForPath(path), event),
+    (path: string, event?: ModClickEvent) =>
+      navigateNoteLink({
+        target: routeForPath(path),
+        openInNewWindow: event !== undefined && isModEvent(event),
+      }),
     [navigateNoteLink],
   )
   useTaskKeyboard({
