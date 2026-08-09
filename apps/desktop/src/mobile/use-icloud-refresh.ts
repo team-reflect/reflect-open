@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { errorMessage, icloudDownloadPending, icloudPendingCount } from '@reflect/core'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useGraph } from '@/providers/graph-provider'
 
 /**
@@ -54,7 +54,7 @@ const PENDING_POLL_LIMIT_MS = 20_000
 export function useICloudRefresh(): void {
   const { graph, mobileStorageKind, refreshIndex } = useGraph()
   const root = mobileStorageKind === 'icloud' ? (graph?.root ?? null) : null
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
 
   useEffect(() => {
     if (root === null || !bridgeReady) {

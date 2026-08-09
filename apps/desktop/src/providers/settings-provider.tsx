@@ -17,7 +17,7 @@ import {
   errorMessage,
   type Settings,
 } from '@reflect/core'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { startOperation } from '@/lib/operations'
 import { setSettingsFlusher } from '@/lib/settings-flush'
 
@@ -135,7 +135,7 @@ interface SettingsProviderProps {
 }
 
 export function SettingsProvider({ children }: SettingsProviderProps): ReactElement {
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const { data: loaded, error: loadError } = useQuery({
     queryKey: SETTINGS_QUERY_KEY,
     queryFn: loadSettings,

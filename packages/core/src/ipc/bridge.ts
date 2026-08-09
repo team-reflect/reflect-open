@@ -55,7 +55,7 @@ export function setBridge(bridge: IpcBridge | null): void {
 /**
  * Subscribe to bridge installs/removals; returns the unsubscribe function.
  * The `useSyncExternalStore`-shaped companion to {@link hasBridge} — the
- * desktop app's `useHasBridge()` hook builds on this pair so React gates
+ * desktop app's `useBridgeReady()` hook builds on this pair so React gates
  * re-render when the (possibly async) install lands.
  */
 export function subscribeBridgeChanges(listener: () => void): Unlisten {
@@ -72,7 +72,7 @@ export function subscribeBridgeChanges(listener: () => void): Unlisten {
  * exists" (that question is the desktop app's `isNativeShell()`). React
  * render scope must not sample this directly (the answer would go stale
  * when the dev bridge installs asynchronously) — components use
- * `useHasBridge()`, which subscribes via {@link subscribeBridgeChanges}.
+ * `useBridgeReady()`, which subscribes via {@link subscribeBridgeChanges}.
  * Imperative code (event handlers, controllers) keeps calling this at its
  * own call time.
  */

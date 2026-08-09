@@ -27,7 +27,7 @@ import {
 } from '@reflect/core'
 import { followHealedMove } from '@/editor/move-note'
 import { resetNoteRowOverlays } from '@/hooks/note-row-overlay'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { setIndexProgress } from '@/lib/index-progress'
 import {
   dropIcloudStatusQuery,
@@ -139,7 +139,7 @@ export function GraphProvider({
   children: ReactNode
   platform?: AppPlatform
 }) {
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const [status, setStatus] = useState<GraphStatus>('loading')
   const [graph, setGraph] = useState<GraphInfo | null>(null)
   const [recents, setRecents] = useState<RecentGraph[]>([])

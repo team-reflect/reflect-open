@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { subscribeFileChanges, type FileChange } from '@reflect/core'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 
 /**
  * Subscribe to the watcher's file-change events (Plan 04b) for the lifetime of
@@ -18,7 +18,7 @@ import { useHasBridge } from '@/hooks/use-has-bridge'
  * Pass `null` to disable.
  */
 export function useFileChanges(handler: ((changes: FileChange[]) => void) | null): void {
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   useEffect(() => {
     if (handler === null || !bridgeReady) {
       return

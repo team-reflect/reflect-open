@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getPinnedNotes, type PinnedNote } from '@reflect/core'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -18,7 +18,7 @@ export function pinnedNotesQueryKey(
  */
 export function usePinnedNotes(): PinnedNote[] {
   const { graph } = useGraph()
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const { data } = useQuery({
     queryKey: pinnedNotesQueryKey(graph?.root),
     queryFn: () => getPinnedNotes(),

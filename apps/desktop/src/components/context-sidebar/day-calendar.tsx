@@ -6,7 +6,7 @@ import { ChevronLeftIcon } from '@/components/icons/chevron-left-icon'
 import { ChevronRightIcon } from '@/components/icons/chevron-right-icon'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { keybindingFor } from '@/lib/commands/app-commands'
 import { formatDayLabel } from '@/lib/dates'
@@ -61,7 +61,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
   }
 
   const grid = buildMonthGrid(month, weekStartsOn)
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const { data: notedDates } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'dailyDates', grid.start, grid.end],
     queryFn: () => dailyDatesInRange(grid.start, grid.end),

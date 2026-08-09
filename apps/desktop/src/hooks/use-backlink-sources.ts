@@ -6,7 +6,7 @@ import {
   type BacklinkContextPage,
   type BacklinkSourceCursor,
 } from '@reflect/core'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { groupBacklinksBySource, type BacklinkSource } from '@/lib/group-backlinks'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
@@ -70,7 +70,7 @@ function groupLoadedBacklinks(pages: readonly BacklinkContextPage[]): BacklinkSo
  */
 export function useBacklinkSources(path: string): BacklinkSources {
   const { graph } = useGraph()
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const {
     data,
     fetchNextPage,

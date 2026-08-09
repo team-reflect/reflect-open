@@ -5,7 +5,7 @@ import {
   type AiProvidersState,
   type GraphInfo,
 } from '@reflect/core'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useMainWindowEffect } from '@/hooks/use-main-window-effect'
 import { createCaptureController } from '@/lib/capture-controller'
 import { isMobileSurface } from '@/lib/platform-surface'
@@ -47,7 +47,7 @@ export function CaptureProvider({ graph, children }: CaptureProviderProps): Reac
 
   // One drain per app: a secondary note window running its own would race
   // the main window's over the same spooled envelopes.
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   useMainWindowEffect(() => {
     const mobile = isMobileSurface()
     const controller = createCaptureController({

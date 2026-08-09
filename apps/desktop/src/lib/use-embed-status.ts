@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { embedStatus, subscribeEmbedStatus, type EmbedStatus } from '@reflect/core'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 
 /**
  * The embedding runtime's live status (Plan 09). Polls once on mount, then
@@ -9,7 +9,7 @@ import { useHasBridge } from '@/hooks/use-has-bridge'
  */
 export function useEmbedStatus(): EmbedStatus {
   const [status, setStatus] = useState<EmbedStatus>({ status: 'uninitialized' })
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
 
   useEffect(() => {
     if (!bridgeReady) {

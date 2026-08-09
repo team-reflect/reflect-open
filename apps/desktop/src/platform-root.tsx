@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react'
 import { getAppPlatform, hasBridge, isMobilePlatform, type AppPlatform } from '@reflect/core'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { warmMobileStorage } from '@/lib/mobile-boot-warm'
 
 const DesktopRoot = lazy(() =>
@@ -92,7 +92,7 @@ function devBridgePlatform(): AppPlatform | null {
 export function PlatformRoot(): ReactElement {
   // This component drives the install itself, so it reads the reactive value
   // once per render rather than sampling `hasBridge()` mid-render.
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   // Hold the blank frame while the dev bridge chunk loads in plain-browser
   // dev; render the desktop tree directly when bridgeless (`?platform=none`,
   // production-in-browser). With a bridge, resolve the real platform.

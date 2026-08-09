@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { CHAT_QUERY_SCOPE } from '@/lib/query-client'
 import { useChatSession } from '@/providers/chat-provider'
 import { useGraph } from '@/providers/graph-provider'
@@ -25,7 +25,7 @@ export function ChatHistoryMenu(): ReactElement | null {
   const { graph, indexGeneration } = useGraph()
   const { activeConversationId, openConversation, deleteConversation } = useChatSession()
 
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const enabled = bridgeReady && indexGeneration !== null
   const { data: conversations } = useQuery({
     // The graph root is part of the key: conversations belong to one graph,

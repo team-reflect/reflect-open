@@ -29,7 +29,7 @@ import {
   type ChatTurn,
   type GraphInfo,
 } from '@reflect/core'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { toChatAttachment, type ChatAttachment } from '@/lib/chat-attachments'
 import { todayIso } from '@/lib/dates'
 import { isMobileSurface } from '@/lib/platform-surface'
@@ -70,7 +70,7 @@ interface ChatProviderProps {
 export function ChatProvider({ graph, children }: ChatProviderProps): ReactElement {
   const { settings, updateSettings } = useSettings()
   const { indexGeneration } = useGraph()
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])

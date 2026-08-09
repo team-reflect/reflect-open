@@ -16,8 +16,8 @@ import {
   buildAutocompleteEntries,
   type AutocompleteEntry,
 } from '@/editor/wiki-autocomplete-entries'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
-import { useHasBridge } from '@/hooks/use-has-bridge'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -82,7 +82,7 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   const anchorRef = useRef<HTMLInputElement>(null)
   const deferredQuery = useDeferredValue(query)
   const searchTerm = deferredQuery.trim()
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
 
   const {
     data: fetched,

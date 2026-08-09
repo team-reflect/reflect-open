@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { loadGithubAuth } from '@reflect/core'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { GITHUB_AUTH_QUERY_KEY } from '@/lib/github-auth-state'
 
 /**
@@ -11,7 +11,7 @@ import { GITHUB_AUTH_QUERY_KEY } from '@/lib/github-auth-state'
  * saves or clears the credential.
  */
 export function useGithubConnected(): boolean {
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const { data } = useQuery({
     queryKey: GITHUB_AUTH_QUERY_KEY,
     queryFn: async () => (await loadGithubAuth()) !== null,

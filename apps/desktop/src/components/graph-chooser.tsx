@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useGraphColors } from '@/hooks/use-graph-colors'
-import { useHasBridge } from '@/hooks/use-has-bridge'
 import { cleanGraphName, graphNameFromRoot, isGraphNameTaken } from '@/lib/graph-names'
 import { ICLOUD_STATUS_QUERY_KEY } from '@/lib/query-client'
 import { graphColorCss } from '@/lib/graph-colors'
@@ -202,7 +202,7 @@ function IcloudCard({
   const [typedName, setTypedName] = useState<string | null>(null)
   const [busy, setBusy] = useState<IcloudBusy>(null)
   const nameId = useId()
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const { data: status } = useQuery({
     queryKey: ICLOUD_STATUS_QUERY_KEY,
     queryFn: icloudStatus,

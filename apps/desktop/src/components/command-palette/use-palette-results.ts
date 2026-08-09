@@ -6,7 +6,7 @@ import {
   searchWithFilters,
   suggestWikiTargets,
 } from '@reflect/core'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { listCommands } from '@/lib/commands/registry'
 import { todayIso } from '@/lib/dates'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
@@ -49,7 +49,7 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   // switch the search into constrained mode (Plan 08b); plain text is the same
   // query with empty filters — one search path.
   const parsed = useMemo(() => parseSearchQuery(trimmed), [trimmed])
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const searching = open && bridgeReady && graph !== null && !trimmed.startsWith('>')
   // The generated date suggestions are relative to today, so the calendar day is
   // part of the cache identity — without it a palette cached before midnight

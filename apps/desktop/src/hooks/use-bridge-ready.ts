@@ -13,6 +13,6 @@ import { hasBridge, subscribeBridgeChanges } from '@reflect/core'
  * callbacks and non-React modules keep calling `hasBridge()` at their own
  * call time.
  */
-export function useHasBridge(): boolean {
+export function useBridgeReady(): boolean {
   return useSyncExternalStore(subscribeBridgeChanges, hasBridge, hasBridge)
 }

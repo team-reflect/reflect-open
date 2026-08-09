@@ -6,7 +6,7 @@ import {
   reconcileNoteRowOverlay,
   useNoteRowOverlay,
 } from '@/hooks/note-row-overlay'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -22,7 +22,7 @@ import { useGraph } from '@/providers/graph-provider'
 export function useNoteRow(path: string): NoteRow | null {
   const { graph } = useGraph()
   const generation = graph?.generation
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const { data } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'note', path],
     queryFn: async () => (await getNote(path)) ?? null,

@@ -12,7 +12,7 @@ import {
   type CalendarAuthorizationStatus,
   type Unlisten,
 } from '@reflect/core'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { isMacosDesktop } from '@/lib/platform'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -31,7 +31,7 @@ export const CALENDAR_LIST_QUERY_KEY = ['calendar', 'calendars'] as const
 
 /** Whether calendar queries can run at all in this environment. */
 function useCalendarAvailable(): boolean {
-  return useHasBridge() && isMacosDesktop
+  return useBridgeReady() && isMacosDesktop
 }
 
 /**

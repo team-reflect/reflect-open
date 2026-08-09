@@ -11,7 +11,7 @@ import {
 } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { FilterBar } from '@/mobile/search-filters/filter-bar'
 import {
@@ -80,7 +80,7 @@ export function MobileAllNotes({
 }: MobileAllNotesProps): ReactElement {
   const { graph } = useGraph()
   const { navigate, back, arrivalSeq, arrivalFocusEditor } = useRouter()
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const enabled = bridgeReady && graph !== null
 
   // The All-tab double-tap (`focusEditor` arrivals) lands in the search bar,

@@ -7,7 +7,7 @@ import { UpdateToast } from '@/components/update-toast'
 import { Toaster } from '@/components/ui/sonner'
 import { WindowDragRegion } from '@/components/window-drag-region'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useMainWindowEffect } from '@/hooks/use-main-window-effect'
 import { startDeepLinkListener } from '@/lib/deep-links/intake'
 import { isNativeShell } from '@/lib/platform'
@@ -22,7 +22,7 @@ import { UpdateProvider } from '@/providers/update-provider'
  * chooser/workspace app — none of which exist on mobile.
  */
 export function DesktopRoot(): ReactElement {
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   // Deep-link intake starts with the surface, not the workspace: a
   // `reflect://` URL that launched the app (or arrived on the graph chooser)
   // buffers in `intake.ts` until a graph opens. Browser dev has no plugin.

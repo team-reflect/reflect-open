@@ -10,8 +10,8 @@ import { GithubSignOutRow } from '@/components/settings/github-sign-out-row'
 import { SyncForkNotice } from '@/components/settings/sync-fork-notice'
 import { Button } from '@/components/ui/button'
 import { useAsyncAction } from '@/hooks/use-async-action'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useGithubConnected } from '@/hooks/use-github-connected'
-import { useHasBridge } from '@/hooks/use-has-bridge'
 import { suggestRepoName } from '@/lib/github-repos'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
@@ -55,7 +55,7 @@ export function BackupSettingsField(): ReactElement {
   const openRepoAttempt = useRef(0)
   const action = useAsyncAction()
 
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const conflicted = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, 'conflicted-notes', graph?.root],
     queryFn: () => getConflictedNotes(),

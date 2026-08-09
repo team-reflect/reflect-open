@@ -9,7 +9,7 @@ import {
   icloudStatus,
 } from '@reflect/core'
 import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links'
-import { useHasBridge } from '@/hooks/use-has-bridge'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { SettingsField } from '@/components/settings/field'
 import { Button } from '@/components/ui/button'
 import {
@@ -79,7 +79,7 @@ export function IcloudSettingsField(): ReactElement | null {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const bridgeAvailable = useHasBridge()
+  const bridgeAvailable = useBridgeReady()
   const hosted = graph !== null && isICloudRoot(graph.root)
   const { data: status } = useQuery({
     queryKey: ICLOUD_STATUS_QUERY_KEY,

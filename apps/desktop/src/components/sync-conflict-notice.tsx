@@ -10,8 +10,8 @@ import {
 import { CONFLICT_SIDE_DOT } from '@/components/conflict-note-view'
 import { InlineAlert } from '@/components/inline-alert'
 import { Button } from '@/components/ui/button'
+import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useConflictResolution } from '@/hooks/use-conflict-resolution'
-import { useHasBridge } from '@/hooks/use-has-bridge'
 import { isMobileSurface } from '@/lib/platform-surface'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
@@ -49,7 +49,7 @@ export function SyncConflictNotice({
 }: SyncConflictNoticeProps): ReactElement | null {
   const { graph } = useGraph()
   const { busy, error, resolve } = useConflictResolution(path)
-  const bridgeReady = useHasBridge()
+  const bridgeReady = useBridgeReady()
   const { data } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, 'note-conflict', graph?.root, path],
     queryFn: async () => (await getNote(path)) ?? null,
