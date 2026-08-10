@@ -93,7 +93,7 @@ export function definePluginEvent<Payload>(
     ready: Promise<void>
     handlers: Set<(payload: Payload) => void>
   }
-  // Keyed by bridge identity: tests install a fresh bridge per test and a
+  // REVIEW: "shared" should be placed in the root level and it should have type: `WeakMap<IpcBridge, Map<EventName, SharedListener>>`. Also rename this var so that it is not called as "shared"
   // swapped bridge must never inherit another bridge's registration.
   const shared = new WeakMap<IpcBridge, SharedListener>()
 
