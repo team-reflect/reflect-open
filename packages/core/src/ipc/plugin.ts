@@ -128,6 +128,7 @@ export function definePluginEvent<Payload>(
     // Drop a failed registration so the next subscriber retries. This catch
     // also keeps an unobserved rejection from surfacing as unhandled;
     // subscribers that do await ready still see it.
+    // REVIEW: since "shared" is placed in the root level, we can just have a simple roo async function that returns a promise. That function should contains the catch logic.
     entry.ready.catch(() => {
       shared.delete(bridge)
     })
