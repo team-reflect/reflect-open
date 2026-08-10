@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.7...v0.9.0-beta.8) (2026-08-10)
+
+
+### Bug Fixes
+
+* pick up iCloud note changes that arrive while the Mac sleeps ([#1076](https://github.com/team-reflect/reflect-open/issues/1076)) ([0bc7f6a](https://github.com/team-reflect/reflect-open/commit/0bc7f6a38cc2564def66b8d5e6adba97045634fa))
+* pick up Mac note edits after the iOS app returns from background ([#1084](https://github.com/team-reflect/reflect-open/issues/1084)) ([a3d4b5a](https://github.com/team-reflect/reflect-open/commit/a3d4b5a761819164cc8d4c0e18865bb1049e8b84))
+* update meowdown to ^0.65.1 ([#1078](https://github.com/team-reflect/reflect-open/issues/1078)) ([d09409b](https://github.com/team-reflect/reflect-open/commit/d09409b6eed14a793ddcaacf0312c7821f02590d))
+
 ## [0.9.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.6...v0.9.0-beta.7) (2026-08-10)
 
 
