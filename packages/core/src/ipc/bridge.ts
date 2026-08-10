@@ -32,6 +32,7 @@ export interface IpcBridge {
     body: Uint8Array,
     headers: Record<string, string>,
   ) => Promise<unknown>
+  // REVIEW: the plugin system is currently mobile-only, but it could be useful on desktop too in the future. So the comment below is not fully accurate. Do not assume that plugin is mobile-only. Update your code/test/comments/docs in the whole repo to remove this assumption.
   /**
    * Attach a handler to a mobile plugin's event stream, Tauri's
    * `addPluginListener` channel (`keyboardChange`, `recordingLevel`, ...),
