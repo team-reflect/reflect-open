@@ -4,8 +4,8 @@ import { getBridge, type IpcBridge, type Unlisten } from './bridge'
 import { call } from './invoke'
 
 /**
- * Typed bindings for the first-party mobile plugins
- * (`plugins/tauri-plugin-*`). A plugin's commands are declared once as a
+ * Typed bindings for the first-party plugins (`plugins/tauri-plugin-*`).
+ * A plugin's commands are declared once as a
  * contract map — command name to args/result schemas — and its events as
  * schema-carrying subscriptions; per-plugin modules (`recording-plugin.ts`,
  * `keyboard-plugin.ts`) export plain functions on top so callers never see a
@@ -29,7 +29,7 @@ export interface PluginCommandSpec {
 }
 
 /**
- * Build the typed caller for one mobile plugin from its command contract.
+ * Build the typed caller for one plugin from its command contract.
  * The returned function composes `plugin:<plugin>|<command>` itself, parses
  * the outgoing args (a malformed args record is a caller bug and throws
  * loudly), and funnels through {@link call} — so responses are validated and

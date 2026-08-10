@@ -10,7 +10,7 @@ const LEVEL_INTERVAL_MS = 100
 const FAKE_RECORDING_BASE64 = btoa('reflect dev recording')
 
 /**
- * The browser stand-in for the two mobile plugins (`tauri-plugin-keyboard`,
+ * The browser stand-in for the two first-party plugins (`tauri-plugin-keyboard`,
  * `tauri-plugin-recording`): an in-memory recorder state machine plus staging
  * map, so the audio-memo machinery (record, native stop, orphan scan, the
  * OS-action handshake) can run end to end in the browser harness. The

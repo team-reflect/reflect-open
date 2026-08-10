@@ -13,8 +13,6 @@ export interface DevBridgeBackend {
   platform: AppPlatform
   files: DevFileStore
   index: DevIndexDb
-  // REVIEW: remove the comment below
-  /** The mobile-plugin stand-in; passed in by `installDevBridge` so the console knob can reach it. */
   plugins?: DevPluginHost
 }
 

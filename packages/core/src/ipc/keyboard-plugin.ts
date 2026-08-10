@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { definePluginCommands, definePluginEvent } from './plugin'
 
 /**
- * Typed bindings for `plugins/tauri-plugin-keyboard` — the mobile keyboard
+ * Typed bindings for `plugins/tauri-plugin-keyboard` — the software-keyboard
  * bridge (Plan 19 decision 8) plus the app's single haptic. Schemas mirror
  * `KeyboardState` in the plugin's `src/models.rs`, which is also the
  * `keyboardChange` event payload.

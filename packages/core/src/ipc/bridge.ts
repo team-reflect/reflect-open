@@ -32,20 +32,10 @@ export interface IpcBridge {
     body: Uint8Array,
     headers: Record<string, string>,
   ) => Promise<unknown>
-  // REVIEW: the plugin system is currently mobile-only, but it could be useful on desktop too in the future. So the comment below is not fully accurate. Do not assume that plugin is mobile-only. Update your code/test/comments/docs in the whole repo to remove this assumption.
   /**
-   * Attach a handler to a mobile plugin's event stream, Tauri's
+   * Attach a handler to a plugin's event stream, Tauri's
    * `addPluginListener` channel (`keyboardChange`, `recordingLevel`, ...),
    * which is distinct from the global event bus behind {@link listen}.
-   *
-   * REVIEW: the following paragraph in the comment is useless,just remove it.
-   * Deliberately returns no unlisten: the handler stays attached for the
-   * bridge's lifetime, and the local fan-out above the bridge (core's plugin
-   * event layer) decides who actually receives events. With no
-   * `remove_listener` round-trip in the contract there is nothing that can
-   * fail during teardown. Optional: hosts without mobile plugins (the CLI)
-   * simply omit it, and plugin subscriptions then fail loudly rather than
-   * silently never firing.
    */
   listenPlugin?: (
     plugin: string,

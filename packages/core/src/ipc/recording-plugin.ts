@@ -3,7 +3,7 @@ import { definePluginCommands, definePluginEvent } from './plugin'
 
 /**
  * Typed bindings for `plugins/tauri-plugin-recording` — the native audio-memo
- * recorder (mobile-only; the desktop half of every command rejects with
+ * recorder (the desktop half currently rejects every command with
  * `UnsupportedPlatform`, see the plugin's `desktop.rs`). Each schema mirrors
  * a serde model in the plugin's `src/models.rs` (commands) or an `Encodable`
  * struct in `ios/Sources/RecordingPlugin.swift` (events); a field change
