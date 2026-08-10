@@ -66,7 +66,7 @@ export function definePluginCommands<Commands extends Record<string, PluginComma
  * reports the (possibly shared) registration outcome; `unlisten` is a
  * purely local, synchronous detach from the fan-out. There is no native
  * unregistration that could fail: the underlying listener is kept for the
- * bridge's lifetime (see `IpcBridge.listenPlugin`). Callers should observe
+ * bridge's lifetime. Callers should observe
  * `ready` (`void sub.ready.catch(...)`) to log a host without the event
  * stream.
  */
@@ -75,70 +75,102 @@ export interface PluginSubscription {
   unlisten: Unlisten
 }
 
+interface SharedListener<Payload> {
+  ready: Promise<void>
+  handlers: Set<(payload: Payload) => void>
+}
+
+// The shared native registrations, one per (bridge, plugin event). Keyed by
+// bridge identity first: tests install a fresh bridge per test, and a
+// swapped bridge must never inherit another bridge's registration. The inner
+// map is heterogeneous (each event key carries its own payload type), so
+// entries are stored erased; `getOrCreateSharedListener` is the only reader
+// and restores the type its schema defines.
+const pluginListeners = new WeakMap<IpcBridge, Map<string, SharedListener<never>>>()
+
+/**
+ * Register the shared native listener for one plugin event, fanning payloads
+ * out to `handlers`. On failure the entry is removed from
+ * {@link pluginListeners} and the error is rethrown, so every subscriber
+ * awaiting `ready` sees it and the next subscriber retries instead of
+ * inheriting a dead event for the whole session.
+ */
+async function registerSharedListener<Payload>(
+  bridge: IpcBridge,
+  plugin: string,
+  event: string,
+  schema: ZodType<Payload, unknown>,
+  handlers: Set<(payload: Payload) => void>,
+): Promise<void> {
+  try {
+    if (bridge.listenPlugin === undefined) {
+      const appError: AppError = {
+        kind: 'io',
+        message: `the installed IPC bridge has no plugin events for "${plugin}:${event}"`,
+      }
+      throw appError
+    }
+    await bridge.listenPlugin(plugin, event, (raw) => {
+      const parsed = schema.safeParse(raw)
+      if (!parsed.success) {
+        console.warn(`dropping a malformed "${plugin}:${event}" payload:`, parsed.error)
+        return
+      }
+      for (const handler of handlers) {
+        handler(parsed.data)
+      }
+    })
+  } catch (error) {
+    // A missing `listenPlugin` fails before the entry is cached, making this
+    // delete a no-op; caching that rejection is still right, because the
+    // bridge will never gain plugin events.
+    pluginListeners.get(bridge)?.delete(`${plugin}:${event}`)
+    throw error
+  }
+}
+
+function getOrCreateSharedListener<Payload>(
+  bridge: IpcBridge,
+  plugin: string,
+  event: string,
+  schema: ZodType<Payload, unknown>,
+): SharedListener<Payload> {
+  let events = pluginListeners.get(bridge)
+  if (events === undefined) {
+    events = new Map()
+    pluginListeners.set(bridge, events)
+  }
+  const key = `${plugin}:${event}`
+  const existing = events.get(key)
+  if (existing !== undefined) {
+    return existing as SharedListener<Payload>
+  }
+  const handlers = new Set<(payload: Payload) => void>()
+  const entry: SharedListener<Payload> = {
+    handlers,
+    ready: registerSharedListener(bridge, plugin, event, schema, handlers),
+  }
+  events.set(key, entry as SharedListener<never>)
+  return entry
+}
+
 /**
  * Declare one plugin event: name plus payload schema, returning its
  * subscribe function. All subscribers of an event share one native
  * registration per bridge, created on the first subscribe and kept alive
- * afterwards; a failed registration is dropped from the cache so the next
+ * afterwards; a failed registration is dropped from the registry so the next
  * subscriber retries instead of inheriting a dead event for the whole
- * session. Payloads that fail validation are dropped (native emitters are
- * trusted; a mismatch means contract drift, not user error).
+ * session. Payloads that fail validation are dropped with a `console.warn`
+ * (native emitters are trusted; a mismatch means contract drift, not user
+ * error).
  */
 export function definePluginEvent<Payload>(
   plugin: string,
   event: string,
   schema: ZodType<Payload, unknown>,
 ): (handler: (payload: Payload) => void) => PluginSubscription {
-  interface SharedListener {
-    ready: Promise<void>
-    handlers: Set<(payload: Payload) => void>
-  }
-  // REVIEW: "shared" should be placed in the root level and it should have type: `WeakMap<IpcBridge, Map<EventName, SharedListener>>`. Also rename this var so that it is not called as "shared"
-  // swapped bridge must never inherit another bridge's registration.
-  const shared = new WeakMap<IpcBridge, SharedListener>()
-
-  // REVIEW: rename "sharedListener" to "getOrCreateSharedListener" and move it to the root level.
-  function sharedListener(bridge: IpcBridge): SharedListener {
-    const existing = shared.get(bridge)
-    if (existing !== undefined) {
-      return existing
-    }
-    const handlers = new Set<(payload: Payload) => void>()
-    const entry: SharedListener = {
-      handlers,
-      ready: (async () => {
-        if (bridge.listenPlugin === undefined) {
-          const appError: AppError = {
-            kind: 'io',
-            message: `the installed IPC bridge has no plugin events for "${plugin}:${event}"`,
-          }
-          throw appError
-        }
-        await bridge.listenPlugin(plugin, event, (raw) => {
-          const parsed = schema.safeParse(raw)
-          if (!parsed.success) {
-            // REVIEW: print console.warn if the payload is invalid
-            return
-          }
-          for (const handler of handlers) {
-            handler(parsed.data)
-          }
-        })
-      })(),
-    }
-    // Drop a failed registration so the next subscriber retries. This catch
-    // also keeps an unobserved rejection from surfacing as unhandled;
-    // subscribers that do await ready still see it.
-    // REVIEW: since "shared" is placed in the root level, we can just have a simple roo async function that returns a promise. That function should contains the catch logic.
-    entry.ready.catch(() => {
-      shared.delete(bridge)
-    })
-    shared.set(bridge, entry)
-    return entry
-  }
-
   return (handler) => {
-    const entry = sharedListener(getBridge())
+    const entry = getOrCreateSharedListener(getBridge(), plugin, event, schema)
     // Wrapped for identity: two subscriptions sharing one handler function
     // must detach independently.
     const deliver = (payload: Payload): void => {
