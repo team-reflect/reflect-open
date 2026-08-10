@@ -19,6 +19,8 @@ import { getBridge } from './bridge'
  * @param args     Arguments passed to the command.
  * @param schema   Zod schema the response must satisfy.
  * @returns        The validated, typed result.
+ * REVIEW: call should have 2 typed parameters: the args type and the output type. Here is what it should look like:
+ * call<TArgs, TOutput>(command: string, args: TArgs, schema: ZodType<TOutput, unknown>): Promise<TOutput> {...}
  */
 export async function call<TOutput>(
   command: string,
