@@ -21,7 +21,7 @@ const impactLightCommand = definePluginCommand<Record<string, never>, null>(
   'keyboard',
   'impact_light',
   // REVIEW: if we do not need the return result, then we do not force the result to be null, just use something else. This ensure that our
-  // code is more robust to future changes in the plugin. For example, if the plugin returns a boolean to indicate whether the haptic was successful, we would not want our code to break.
+  // code is more robust to future changes in the plugin. For example, if the plugin returns a boolean to indicate whether the haptic was successful, we would not want our code to break. Apply this change to all other plugin commands/invokes that return null.
   z.null(),
 )
 
