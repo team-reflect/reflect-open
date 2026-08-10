@@ -378,6 +378,24 @@ fn search_finds_a_multi_term_partial_latin_title() {
     );
 }
 
+/// Body search uses the same word-prefix behavior as title recall, so users
+/// get results while they are still typing each term.
+#[test]
+fn search_finds_partial_terms_in_note_bodies() {
+    let fixture = graph();
+    fixture.write_note(
+        "notes/security-rollout.md",
+        "# Security Rollout\nthe plan covers authentication migration\n",
+    );
+    fixture.build_index();
+
+    let text = stdout(&reflect(&fixture, &["search", "authent migr"]));
+    assert!(
+        text.contains("notes/security-rollout.md"),
+        "expected partial body terms to match:\n{text}"
+    );
+}
+
 /// The V1-style exact-title boost (`filtered-search.ts`): a note whose title
 /// *is* the query ranks ahead of a louder lexical (bm25) match whose title only
 /// contains the query among other words — exact title is promoted before bm25.

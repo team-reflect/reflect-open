@@ -17,17 +17,21 @@ use crate::keys::contains_unsegmented_script;
 
 /// Build an FTS5 `MATCH` expression from a free-text query, or `None` when
 /// there is nothing to search. Every whitespace-split term is double-quoted
-/// (embedded quotes doubled) so user input is matched literally — operators
-/// like `AND`/`*` can't change the query's meaning or raise syntax errors.
+/// (embedded quotes doubled). Each term keeps exact-token matching in the title
+/// column and gains prefix matching in the body column. User operators like
+/// `AND`/`*` therefore cannot change the query's meaning or raise syntax errors.
 pub fn build_fts_match(query: &str) -> Option<String> {
     let terms: Vec<String> = query
         .split_whitespace()
-        .map(|term| format!("\"{}\"", term.replace('"', "\"\"")))
+        .map(|term| {
+            let literal = format!("\"{}\"", term.replace('"', "\"\""));
+            format!("(title : {literal} OR body : {literal}*)")
+        })
         .collect();
     if terms.is_empty() {
         return None;
     }
-    Some(terms.join(" "))
+    Some(terms.join(" AND "))
 }
 
 /// One search result row.
@@ -154,18 +158,30 @@ mod tests {
     fn match_expressions_match_the_ts_builder() {
         assert_eq!(build_fts_match(""), None);
         assert_eq!(build_fts_match("   \t \n "), None);
-        assert_eq!(build_fts_match("hello"), Some("\"hello\"".to_string()));
+        assert_eq!(
+            build_fts_match("hello"),
+            Some("(title : \"hello\" OR body : \"hello\"*)".to_string())
+        );
         assert_eq!(
             build_fts_match("cats AND (dogs*)"),
-            Some("\"cats\" \"AND\" \"(dogs*)\"".to_string())
+            Some(
+                "(title : \"cats\" OR body : \"cats\"*) AND (title : \"AND\" OR body : \"AND\"*) AND (title : \"(dogs*)\" OR body : \"(dogs*)\"*)"
+                    .to_string()
+            )
         );
         assert_eq!(
             build_fts_match("say \"hi\""),
-            Some("\"say\" \"\"\"hi\"\"\"".to_string())
+            Some(
+                "(title : \"say\" OR body : \"say\"*) AND (title : \"\"\"hi\"\"\" OR body : \"\"\"hi\"\"\"*)"
+                    .to_string()
+            )
         );
         assert_eq!(
             build_fts_match("  alpha   beta "),
-            Some("\"alpha\" \"beta\"".to_string())
+            Some(
+                "(title : \"alpha\" OR body : \"alpha\"*) AND (title : \"beta\" OR body : \"beta\"*)"
+                    .to_string()
+            )
         );
     }
 }

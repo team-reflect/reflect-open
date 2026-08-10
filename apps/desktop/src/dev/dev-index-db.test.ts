@@ -263,6 +263,31 @@ describe('createDevIndexDb', () => {
     expect(hits[2]!.highlightedTitle).toBe('Garage')
   })
 
+  it('prefix-matches partial terms in note bodies', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/security-rollout.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n87',
+        title: 'Security rollout',
+        titleKey: 'security rollout',
+        text: 'The plan covers authentication migration.',
+        preview: 'The plan covers authentication migration.',
+        tags: [],
+      }),
+    )
+    installQueryBridge(db)
+
+    const hits = await searchWithFilters(parseSearchQuery('authent migr'))
+
+    expect(hits).toMatchObject([{ path: 'notes/security-rollout.md', title: 'Security rollout' }])
+    expect(hits[0]!.snippet).toContain('authentication')
+    await expect(searchNotes('authent migr')).resolves.toEqual([
+      { path: 'notes/security-rollout.md', title: 'Security rollout' },
+    ])
+    await expect(searchNotes('thentication')).resolves.toEqual([])
+  })
+
   it('returns title markers from SQLite for tokenizer-normalized matches', async () => {
     const db = await openDb()
     db.applyNote(

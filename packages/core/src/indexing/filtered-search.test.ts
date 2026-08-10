@@ -168,10 +168,10 @@ describe('searchWithFilters', () => {
     expect(sql).toContain('"filtered_notes"."path" asc')
 
     const params = args['params'] as unknown[]
-    // The folded exact-title key, the literal FTS match expression, and the
-    // word-start-anchored recall needle.
+    // The folded exact-title key, the exact-title/body-prefix FTS expression,
+    // and the word-start-anchored recall needle.
     expect(params).toContain('quokka')
-    expect(params).toContain('"quokka"')
+    expect(params).toContain('(title : "quokka" OR body : "quokka"*)')
     expect(params).toContain(' quokka')
   })
 
