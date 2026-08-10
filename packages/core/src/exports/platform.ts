@@ -29,7 +29,7 @@ export {
   type StartRecordingOptions,
 } from '../ipc/recording-plugin'
 export {
-  currentKeyboardState,
+  getCurrentKeyboardHeight,
   impactLight,
   subscribeKeyboardChange,
   type KeyboardState,

@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import {
-  currentKeyboardState,
+  getCurrentKeyboardHeight,
   subscribeKeyboardChange,
   type PluginSubscription,
 } from '@reflect/core'
@@ -79,7 +79,7 @@ export function useKeyboardHeightVar(): void {
       try {
         // Initial state first, then subscribe — the same order as before, so
         // a change event can never be overwritten by a staler initial value.
-        const initial = await currentKeyboardState()
+        const initial = await getCurrentKeyboardHeight()
         if (disposed) {
           return
         }
