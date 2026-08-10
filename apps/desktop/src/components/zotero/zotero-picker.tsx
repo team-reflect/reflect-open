@@ -8,8 +8,15 @@ import {
   zoteroSearch,
   type ZoteroItem,
 } from '@reflect/core'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 import { closeZoteroPicker, useZoteroPicker } from '@/components/zotero/zotero-picker-store'
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry'
 import { startOperation } from '@/lib/operations'
@@ -21,6 +28,11 @@ const SEARCH_DEBOUNCE_MS = 250
  * (title / author / year, via Zotero 7's Local API), then pick an item to
  * insert its `[Title](zotero://…)` deep link at the caret of the note the
  * opener targeted. Mirrors the zotero-link Obsidian plugin's flow.
+ *
+ * The dialog is cmdk-driven (the ⌘K palette's component), so the candidate
+ * list supports the same keyboard traversal — ↑/↓ to move, Enter to pick,
+ * Esc to dismiss. `shouldFilter` is off: the rows are server results, and
+ * ranking belongs to Zotero's own search, not client-side filtering.
  *
  * The target note is captured at open time (`targetPath`); at insert time it
  * resolves to the pane's live editor handle, so a protected or unloaded note
@@ -62,11 +74,7 @@ function ZoteroPickerDialog({
     return () => clearTimeout(timer)
   }, [draft])
 
-  const {
-    data: items,
-    isFetching,
-    error,
-  } = useQuery({
+  const { data: items, error } = useQuery({
     queryKey: ['zotero-search', query],
     queryFn: () => zoteroSearch(query),
     enabled: query !== '',
@@ -85,51 +93,42 @@ function ZoteroPickerDialog({
   }
 
   return (
-    <Dialog
+    <CommandDialog
+      title="Insert Zotero item"
+      description="Search your Zotero library and insert the selected item's link"
       open
       onOpenChange={(next) => {
         if (!next) {
           onClose()
         }
       }}
+      className="sm:max-w-3xl"
     >
-      <DialogContent
-        aria-describedby={undefined}
-        className="grid max-h-[calc(100dvh-2rem)] grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden sm:max-w-3xl"
-      >
-        <DialogHeader className="pr-8">
-          <DialogTitle>Insert Zotero item</DialogTitle>
-        </DialogHeader>
-        <Input
+      <Command shouldFilter={false} label="Search Zotero">
+        <CommandInput
           autoFocus
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          onValueChange={setDraft}
           placeholder="Search your Zotero library…"
-          aria-label="Search Zotero"
         />
-        <div className="min-h-0 overflow-y-auto pr-1">
+        <CommandList>
           {query === '' ? (
-            <p className="px-3 py-8 text-center text-sm text-text-muted">
-              Type to search your Zotero library (title, author, year).
-            </p>
+            <CommandEmpty>Type to search your Zotero library (title, author, year).</CommandEmpty>
           ) : error !== null ? (
-            <p className="px-3 py-8 text-center text-sm text-text-muted">{errorMessage(error)}</p>
-          ) : items !== undefined && items.length === 0 ? (
-            <p className="px-3 py-8 text-center text-sm text-text-muted">
-              {isFetching ? 'Searching…' : 'No matching items.'}
-            </p>
+            <CommandEmpty>{errorMessage(error)}</CommandEmpty>
           ) : (
-            <ul className="flex flex-col">
+            <CommandGroup>
               {items?.map((item) => {
                 const summary = zoteroItemSummary(item)
                 const abstract = zoteroAbstractExcerpt(item)
                 return (
-                  <li key={item.key}>
-                    <button
-                      type="button"
-                      onClick={() => insert(item)}
-                      className="flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-surface-hover focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-                    >
+                  <CommandItem
+                    key={item.key}
+                    value={`zotero-${item.key}`}
+                    onSelect={() => insert(item)}
+                    className="items-start gap-2"
+                  >
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5 py-0.5">
                       <span className="w-full truncate text-sm font-medium">
                         {item.title.trim() === '' ? 'Untitled item' : item.title}
                       </span>
@@ -146,14 +145,19 @@ function ZoteroPickerDialog({
                           {item.url}
                         </span>
                       ) : null}
-                    </button>
-                  </li>
+                    </span>
+                  </CommandItem>
                 )
               })}
-            </ul>
+              {items === undefined ? (
+                <CommandItem disabled>Searching…</CommandItem>
+              ) : items.length === 0 ? (
+                <CommandItem disabled>No matching items.</CommandItem>
+              ) : null}
+            </CommandGroup>
           )}
-        </div>
-      </DialogContent>
-    </Dialog>
+        </CommandList>
+      </Command>
+    </CommandDialog>
   )
 }

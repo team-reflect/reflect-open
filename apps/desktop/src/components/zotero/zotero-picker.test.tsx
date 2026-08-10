@@ -58,7 +58,7 @@ describe('ZoteroPicker', () => {
   it('searches the Zotero library and inserts the picked item as a link', async () => {
     openZoteroPicker('notes/a.md')
     await render(<ZoteroPicker />, { wrapper })
-    const input = page.getByRole('textbox', { name: 'Search Zotero' })
+    const input = page.getByRole('combobox', { name: 'Search Zotero' })
     await expect.element(input).toHaveFocus()
 
     await userEvent.fill(input, 'attention')
@@ -68,7 +68,23 @@ describe('ZoteroPicker', () => {
       .element(page.getByText(/We propose a new network architecture/))
       .toBeInTheDocument()
     await expect.element(page.getByText('https://arxiv.org/abs/1706.03762')).toBeInTheDocument()
-    await userEvent.click(page.getByRole('button', { name: /Attention is all you need/ }))
+    await userEvent.click(page.getByRole('option', { name: /Attention is all you need/ }))
+
+    expect(mocks.insertMarkdown).toHaveBeenCalledWith(
+      '[Attention is all you need](zotero://select/library/items/ABCD1234)',
+    )
+    expect(mocks.focus).toHaveBeenCalled()
+  })
+
+  it('moves through results with arrow keys and picks with Enter', async () => {
+    openZoteroPicker('notes/a.md')
+    await render(<ZoteroPicker />, { wrapper })
+    const input = page.getByRole('combobox', { name: 'Search Zotero' })
+    await userEvent.fill(input, 'attention')
+
+    await expect.element(page.getByText('Attention is all you need')).toBeInTheDocument()
+    await userEvent.keyboard('{ArrowDown}')
+    await userEvent.keyboard('{Enter}')
 
     expect(mocks.insertMarkdown).toHaveBeenCalledWith(
       '[Attention is all you need](zotero://select/library/items/ABCD1234)',
@@ -79,7 +95,7 @@ describe('ZoteroPicker', () => {
   it('shows a no-results state for an unmatched query', async () => {
     openZoteroPicker('notes/a.md')
     await render(<ZoteroPicker />, { wrapper })
-    await userEvent.fill(page.getByRole('textbox', { name: 'Search Zotero' }), 'nothing-matches')
+    await userEvent.fill(page.getByRole('combobox', { name: 'Search Zotero' }), 'nothing-matches')
     await expect.element(page.getByText('No matching items.')).toBeInTheDocument()
   })
 })
