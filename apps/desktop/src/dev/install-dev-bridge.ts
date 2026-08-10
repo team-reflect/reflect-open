@@ -2,7 +2,6 @@ import { setBridge, type AppPlatform } from '@reflect/core'
 import { createDevBridge } from '@/dev/dev-bridge'
 import { createDevFileStore } from '@/dev/dev-file-store'
 import { createDevIndexDb } from '@/dev/dev-index-db'
-import { createDevPluginHost } from '@/dev/dev-plugin-host'
 import { seedGraphFiles } from '@/dev/seed-graph'
 
 let installation: Promise<void> | null = null
@@ -27,11 +26,9 @@ export function installDevBridge(platform: AppPlatform): Promise<void> {
 async function install(platform: AppPlatform): Promise<void> {
   const index = await createDevIndexDb()
   const files = createDevFileStore(seedGraphFiles())
-  const plugins = createDevPluginHost()
-  setBridge(createDevBridge({ platform, files, index, plugins }))
+  setBridge(createDevBridge({ platform, files, index }))
   // A console handle for poking the shim while debugging mobile surfaces:
-  // `__reflectDev.query('select path, title from notes')`, `.files.read(...)`,
-  // `.plugins.queueAction('recordAudio')` to fake an OS entry point.
-  Object.assign(window, { __reflectDev: { query: index.query, files, plugins } })
+  // `__reflectDev.query('select path, title from notes')`, `.files.read(...)`.
+  Object.assign(window, { __reflectDev: { query: index.query, files } })
   console.info(`[dev-bridge] installed: platform=${platform}, in-memory graph + wasm SQLite index`)
 }

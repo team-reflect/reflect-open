@@ -2,7 +2,6 @@ import { indexedNoteSchema, ReflectError, type AppPlatform, type IpcBridge } fro
 import { z } from 'zod'
 import type { DevFileStore } from '@/dev/dev-file-store'
 import type { DevIndexDb } from '@/dev/dev-index-db'
-import { createDevPluginHost, type DevPluginHost } from '@/dev/dev-plugin-host'
 
 /** The fixed fake graph root the dev bridge reports (mirrors `mobile_storage`). */
 export const DEV_GRAPH_ROOT = '/dev-graph'
@@ -13,7 +12,6 @@ export interface DevBridgeBackend {
   platform: AppPlatform
   files: DevFileStore
   index: DevIndexDb
-  plugins?: DevPluginHost
 }
 
 const dbQueryArgsSchema = z.object({ sql: z.string(), params: z.array(z.unknown()) })
@@ -66,7 +64,6 @@ const chatDeleteArgsSchema = z.object({ id: z.string() })
  */
 export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
   const { platform, files, index } = backend
-  const plugins = backend.plugins ?? createDevPluginHost()
   const graphInfo = { root: DEV_GRAPH_ROOT, name: 'Dev Graph', generation: 1 }
   let settingsDocument: Record<string, unknown> = { mobileOnboarded: true }
   const assets = new Map<string, string>()
@@ -75,9 +72,6 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
   const secrets = new Map<string, string>()
 
   async function invoke(command: string, args: Record<string, unknown>): Promise<unknown> {
-    if (command.startsWith('plugin:')) {
-      return await plugins.invoke(command, args)
-    }
     switch (command) {
       case 'app_version':
         return '0.0.0-dev'
@@ -86,6 +80,11 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       case 'background_task_begin':
         // Browser previews are never suspended like an iOS process, so the
         // native finite-length assertion is honestly unavailable.
+        return null
+      case 'plugin:keyboard|current_height':
+        // A desktop browser has no overlaying software keyboard to mirror.
+        return { height: 0, duration: 0 }
+      case 'plugin:keyboard|impact_light':
         return null
       case 'mobile_storage':
         // No iCloud in a plain browser — the dev harness exercises the
@@ -308,11 +307,11 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
     invoke,
     // Native event streams (watcher, embeddings, EventKit) don't exist in the
     // browser; subscriptions succeed and simply never fire. Local writes still
-    // refresh the UI through core's in-process local-write echo.
+    // refresh the UI through core's in-process local-write echo. Plugin event
+    // registrations get the same treatment, so the keyboard and recorder
+    // hooks mount cleanly in the harness.
     listen: async () => () => {},
-    listenPlugin: async (plugin, event, handler) => {
-      plugins.listen(plugin, event, handler)
-    },
+    listenPlugin: async () => {},
   }
 }
 
