@@ -127,7 +127,7 @@ describe('describePage', () => {
 
     const text = userText(calls)
     expect(text).toContain('share sheets often supply boilerplate')
-    expect(text).toContain('build the title from the meta title, page text, or screenshot')
+    expect(text).toContain('rebuild the title only from text you can actually quote')
   })
 
   it('sanitizes the returned title for wiki-link display', async () => {
