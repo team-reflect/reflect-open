@@ -130,6 +130,7 @@ export const subscribeRecordingStopped = definePluginEvent(
   'recordingStopped',
   stoppedEventSchema,
 )
+// REVIEW: rename "subscribeNativeAction" to "subscribeRecordingNativeAction"
 export const subscribeNativeAction = definePluginEvent(
   'recording',
   'nativeAction',
