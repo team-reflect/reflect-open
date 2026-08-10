@@ -25,6 +25,11 @@ vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
   openDeepLinkInNewWindow,
 }))
 
+const setPreviewPanelTarget = vi.hoisted(() => vi.fn())
+vi.mock('@/providers/preview-panel-provider', () => ({
+  useSetPreviewPanelTarget: () => setPreviewPanelTarget,
+}))
+
 const pmRoot = page.locate('.ProseMirror')
 
 const IMAGE_NOTE = 'A photo\n\n![Cat](assets/cat.png)'
@@ -339,6 +344,94 @@ describe('NoteEditor image lightbox', () => {
 
     await expect.element(pmRoot.getByAltText('Cat')).toBeInTheDocument()
     await expectLocatorToHaveCount(pmRoot.locate('img'), 1)
+  })
+})
+
+describe('NoteEditor linked PDF images', () => {
+  // An SVG data URL: it loads in the test browser with an intrinsic size, so
+  // the image view gets a real rect (an unloaded `asset://` URL stays 0×0).
+  const SHOT_URL =
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60'%3E%3C/svg%3E"
+
+  function renderLinkedImage(): ReturnType<typeof render> {
+    return render(
+      <NoteEditor
+        initialContent={'[![shot](assets/shot.png)](assets/paper.pdf#page=3)'}
+        resolveImageUrl={(src) => (src === 'assets/shot.png' ? SHOT_URL : null)}
+        resolveAssetOpenPath={(src) => (src === 'assets/shot.png' ? 'assets/shot.png' : null)}
+      />,
+    )
+  }
+
+  it('clicking the image jumps to the PDF page instead of opening the lightbox', async () => {
+    await renderLinkedImage()
+
+    await pmRoot.getByAltText('shot').click()
+    await vi.waitFor(() => {
+      expect(setPreviewPanelTarget).toHaveBeenCalledWith({
+        kind: 'pdf',
+        assetPath: 'assets/paper.pdf',
+        page: 3,
+      })
+    })
+    await expectLocatorToHaveCount(page.getByRole('dialog'), 0)
+  })
+
+  it('clicking the chip background around the image jumps too', async () => {
+    await renderLinkedImage()
+
+    await expect.element(pmRoot.getByAltText('shot')).toBeInTheDocument()
+    pmRoot
+      .element()
+      .querySelector('.md-pack[data-key="link"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    await vi.waitFor(() => {
+      expect(setPreviewPanelTarget).toHaveBeenCalledWith({
+        kind: 'pdf',
+        assetPath: 'assets/paper.pdf',
+        page: 3,
+      })
+    })
+    await expectLocatorToHaveCount(page.getByRole('dialog'), 0)
+  })
+
+  it('publishes the jump target as the chip caption', async () => {
+    await renderLinkedImage()
+
+    await expect.element(pmRoot.getByAltText('shot')).toBeInTheDocument()
+    await vi.waitFor(() => {
+      const caption = pmRoot.element().querySelector('.reflect-linked-pdf-caption')
+      expect(caption?.textContent).toBe('paper - p3')
+    })
+    // The widget nests inside the hidden source mark's wrapper (`.md-mark` —
+    // `opacity: 0` in hide mode); the stylesheet must lift that wrapper's
+    // opacity or the caption takes up layout space without ever painting.
+    const caption = pmRoot.element().querySelector('.reflect-linked-pdf-caption')
+    const wrapper = caption?.closest('.md-mark')
+    expect(wrapper).not.toBeNull()
+    expect(getComputedStyle(wrapper as Element).opacity).toBe('1')
+  })
+
+  it('folds a trailing size comment inside the link label into the hidden image source', async () => {
+    render(
+      <NoteEditor
+        initialContent={
+          '[![shot](assets/shot.png)<!-- {"width":120,"height":60} -->](assets/paper.pdf#page=3)'
+        }
+        resolveImageUrl={(src) => (src === 'assets/shot.png' ? SHOT_URL : null)}
+        resolveAssetOpenPath={(src) => (src === 'assets/shot.png' ? 'assets/shot.png' : null)}
+      />,
+    )
+
+    await expect.element(pmRoot.getByAltText('shot')).toBeInTheDocument()
+    const pack = pmRoot.element().querySelector('.md-pack[data-key="link"]')
+    const source = pack?.querySelector('.md-image-view-content')
+    // The comment stays in the hidden image source — never rendered as
+    // visible link text next to the preview.
+    expect(source?.textContent).toContain('"width":120')
+    expect(pack?.textContent?.replace(source?.textContent ?? '', '')).not.toContain('{"width"')
+    // …and supplies the persisted display size.
+    expect(pack?.querySelector('.md-image-resizable')).toHaveAttribute('data-width', '120')
   })
 })
 

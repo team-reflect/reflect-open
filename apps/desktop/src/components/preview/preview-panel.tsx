@@ -3,11 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import { errorMessage, isAppError, splitFrontmatter } from '@reflect/core'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { MarkdownPreview } from '@/editor/markdown-preview'
+import { MarkdownPreview, type MarkdownImageClick } from '@/editor/markdown-preview'
 import { useOpenExternalLink } from '@/editor/open-external-link'
 import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { annotationReference } from '@/lib/annotations/annotation-reference'
+import { linkedPdfImageHitAt } from '@/lib/annotations/linked-pdf-image'
 import { parsePdfHref } from '@/lib/annotations/pdf-href'
 import { extractRegionText } from '@/lib/annotations/pdf-region-text'
 import type { PdfTextItemLike } from '@/lib/annotations/pdf-region-text'
@@ -16,6 +17,7 @@ import {
   selectionPages,
   selectionToHighlight,
 } from '@/lib/annotations/pdf-selection'
+import { copyBorderReference } from '@/lib/annotations/pdf-region-screenshot'
 import { usePdfAnnotations, type AnnotationItem } from '@/lib/annotations/annotations-store'
 import { startOperation } from '@/lib/operations'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
@@ -131,6 +133,7 @@ function PdfPreview({ target, onClose }: PdfPreviewProps): ReactElement {
   const { graph } = useGraph()
   const generation = graph?.generation ?? null
   const { session } = usePdfSession()
+  const { saveFile } = useAssetPersistence(generation)
   const { annotations, addAnnotation, removeAnnotation } = usePdfAnnotations(
     target.assetPath,
     generation,
@@ -317,14 +320,33 @@ function PdfPreview({ target, onClose }: PdfPreviewProps): ReactElement {
   )
   const handleCopyReference = useCallback(
     (item: AnnotationItem): void => {
-      void navigator.clipboard
-        .writeText(annotationReference(target.assetPath, item))
-        .then(() => startOperation('Annotation reference copied').done())
-        .catch((cause: unknown) => {
-          startOperation('Copying annotation reference').fail(errorMessage(cause))
-        })
+      void (async () => {
+        const operation = startOperation('Copying annotation reference')
+        try {
+          if (item.type !== 'border') {
+            // A text-type annotation keeps its text link.
+            await navigator.clipboard.writeText(annotationReference(target.assetPath, item))
+            operation.done()
+            return
+          }
+          // A border annotation copies a linked screenshot of its region;
+          // when the screenshot is impossible it degrades to the text link.
+          const outcome = await copyBorderReference(target.assetPath, item, {
+            doc: session.pdfDocument,
+            saveFile,
+            writeClipboard: (text) => navigator.clipboard.writeText(text),
+          })
+          if (outcome === 'copied-screenshot') {
+            operation.done()
+          } else {
+            operation.warn('Screenshot unavailable; copied the text link instead')
+          }
+        } catch (cause) {
+          operation.fail(errorMessage(cause))
+        }
+      })()
     },
-    [target.assetPath],
+    [target.assetPath, session.pdfDocument, saveFile],
   )
   const handleRemove = useCallback(
     (id: string): void => {
@@ -424,7 +446,31 @@ function NotePreview({ path, onClose }: NotePreviewProps): ReactElement {
     },
     [openExternalLink, setPreviewPanelTarget],
   )
-
+  // An image click inside the note body: a linked PDF image (the screenshot
+  // reference shape) jumps to the PDF's page instead of zooming, and any
+  // other image click is a no-op — the resident preview has no lightbox for
+  // plain images, and the anchor's default navigation must never fire.
+  // meowdown never nests the preview inside the link's anchor, so the lookup
+  // goes through the rendered image view.
+  const onImageClick = useCallback(
+    (payload: MarkdownImageClick): void => {
+      const target = payload.event.target
+      if (target instanceof Element) {
+        const hit = linkedPdfImageHitAt(target)
+        if (hit !== null) {
+          payload.event.preventDefault()
+          setPreviewPanelTarget({
+            kind: 'pdf',
+            assetPath: hit.ref.path,
+            ...(hit.ref.page !== undefined ? { page: hit.ref.page } : {}),
+          })
+          return
+        }
+      }
+      payload.event.preventDefault()
+    },
+    [setPreviewPanelTarget],
+  )
   const body = data === null || data === undefined ? null : splitFrontmatter(data).body
   const title = path.split('/').pop()?.replace(/\.md$/i, '') ?? path
 
@@ -439,6 +485,7 @@ function NotePreview({ path, onClose }: NotePreviewProps): ReactElement {
         content={body}
         resolveImageUrl={resolveImageUrl}
         onLinkClick={onLinkClick}
+        onImageClick={onImageClick}
         onWikiLinkClick={navigateWikiLink}
         interactive
         className="px-3.5 py-2 text-sm"

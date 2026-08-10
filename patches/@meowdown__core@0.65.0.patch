@@ -1,0 +1,27 @@
+diff --git a/dist/index.js b/dist/index.js
+index 804e44e19758ce281937c08f249ba40d40ef6ca5..5668c98fbe994763d537a42483385f52e8b6e588 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -3131,7 +3131,9 @@ function walkResolvedLink(node, parts, resolution, parentMarks, text, marks, out
+ 	});
+ 	const base = [...parentMarks, pack];
+ 	let pos = node.from;
+-	for (const child of node.children) {
++	for (let index = 0; index < node.children.length; index++) {
++		const child = node.children[index];
++		if (child.to <= pos) continue;
+ 		if (child.from > pos) {
+ 			const childMarks = inLabel(pos) ? [...base, linkTextMark] : base;
+ 			emit(out, pos, child.from, childMarks);
+@@ -3148,8 +3150,9 @@ function walkResolvedLink(node, parts, resolution, parentMarks, text, marks, out
+ 			continue;
+ 		}
+ 		if (child.type === LEZER_NODE_IDS.Image) {
+-			walkImage(child, baseForChild, text, marks, out, options, context);
+-			pos = child.to;
++			const trailing = takeMagicComment(child, node.children[index + 1], text);
++			walkImage(child, baseForChild, text, marks, out, options, context, trailing);
++			pos = trailing ? trailing.to : child.to;
+ 			continue;
+ 		}
+ 		if (isReference && child.type === LEZER_NODE_IDS.LinkLabel) {

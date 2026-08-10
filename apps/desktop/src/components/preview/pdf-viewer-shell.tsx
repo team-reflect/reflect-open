@@ -36,11 +36,13 @@ import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 import { usePdfSession } from '@/providers/pdf-session-provider'
 
-// The worker ships from `apps/desktop/public/pdf.worker.min.mjs` (a copy of the
-// pdfjs-dist legacy worker), so it loads same-origin under the app's CSP
-// (`script-src 'self'`, no `worker-src`). pdf.js chooses an ES-module worker
-// when the URL ends in `.mjs`.
-GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
+// The worker URL comes straight from the pdfjs-dist package via Vite's `?url`
+// (dev-served / emitted as a hashed `.mjs` asset), so it loads same-origin
+// under the app's CSP (`script-src 'self'`, no `worker-src`) without a
+// vendored copy in the repo. The `.mjs` suffix makes pdf.js choose an
+// ES-module worker.
+import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
+GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 /** The zoom step applied by the in/out buttons. */
 const ZOOM_STEP = 1.2

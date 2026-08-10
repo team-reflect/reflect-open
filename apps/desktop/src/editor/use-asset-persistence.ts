@@ -69,7 +69,14 @@ function isSafeAssetSource(sourcePath: string): boolean {
  * it as a file pill instead of a plain link. Pure by contract (meowdown
  * caches and diffs parse results), which a stateless path check satisfies.
  */
-export function resolveAssetFileLink({ href }: FileLinkPayload): boolean {
+export function resolveAssetFileLink({ href, label }: FileLinkPayload): boolean {
+  // An image inside the link renders as the image (a claimed file pill would
+  // replace the link's content with a name/size chip); only plain-text
+  // attachment links become pills. The label carries nested syntax raw, so
+  // `![` reliably marks an image.
+  if (label.includes('![')) {
+    return false
+  }
   return isSafeAssetSource(href)
 }
 

@@ -170,8 +170,8 @@ describe('useAssetPersistence resolveImageUrl', () => {
   })
 })
 
-function fileLink(href: string): { href: string; label: string; title: string } {
-  return { href, label: 'label', title: '' }
+function fileLink(href: string, label = 'label'): { href: string; label: string; title: string } {
+  return { href, label, title: '' }
 }
 
 describe('resolveAssetFileLink', () => {
@@ -184,6 +184,16 @@ describe('resolveAssetFileLink', () => {
     expect(resolveAssetFileLink(fileLink('assets/../secrets.env'))).toBe(false)
     expect(resolveAssetFileLink(fileLink(String.raw`assets\evil.pdf`))).toBe(false)
     expect(resolveAssetFileLink(fileLink('assets/'))).toBe(false)
+  })
+
+  it('does not claim a link whose label is an image (a pill would hide it)', () => {
+    // The migration's image annotations are `[![image](assets/x.png)](assets/…pdf#page=N)`;
+    // claiming the outer link as a file pill replaces the image with a chip.
+    expect(
+      resolveAssetFileLink(fileLink('assets/paper.pdf#page=3', '![image](assets/paper.png)')),
+    ).toBe(false)
+    // A plain-text attachment label still claims.
+    expect(resolveAssetFileLink(fileLink('assets/paper.pdf', 'report.pdf'))).toBe(true)
   })
 })
 

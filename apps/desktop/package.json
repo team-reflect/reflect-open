@@ -26,6 +26,8 @@
     "@meowdown/core": "^0.65.0",
     "@meowdown/react": "^0.65.0",
     "@ocavue/utils": "^1.7.0",
+    "@prosekit/core": "0.13.0-beta.7",
+    "@prosekit/pm": "0.1.19-beta.4",
     "@reflect/core": "workspace:*",
     "@reflect/db": "workspace:*",
     "@reflect/design-system": "workspace:*",

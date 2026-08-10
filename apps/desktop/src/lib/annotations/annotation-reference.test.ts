@@ -15,13 +15,13 @@ function item(partial: Partial<AnnotationItem>): AnnotationItem {
 }
 
 describe('annotationReference', () => {
-  it('builds a pdf link with the 1-based page and the annotation text', () => {
+  it('labels the link with the annotation text, keeping the page in the href', () => {
     expect(annotationReference('assets/papers/paper.pdf', item({ pageIndex: 2 }))).toBe(
-      '[paper - p3 - A key claim](assets/papers/paper.pdf#page=3)',
+      '[A key claim](assets/papers/paper.pdf#page=3)',
     )
   })
 
-  it('drops the text suffix when the annotation carries none', () => {
+  it('falls back to the filename and page when the annotation carries no text', () => {
     expect(annotationReference('assets/paper.pdf', item({ text: '' }))).toBe(
       '[paper - p1](assets/paper.pdf#page=1)',
     )
@@ -46,7 +46,7 @@ describe('annotationReference', () => {
         item({ pageIndex: 14 }),
       ),
     ).toBe(
-      '[A Tour of C++ 2nd Edition In-Depth Series-20221006164454-p9l6vxe - p15 - A key claim](assets/A%20Tour%20of%20C%2B%2B%202nd%20Edition%20In-Depth%20Series-20221006164454-p9l6vxe.pdf#page=15)',
+      '[A key claim](assets/A%20Tour%20of%20C%2B%2B%202nd%20Edition%20In-Depth%20Series-20221006164454-p9l6vxe.pdf#page=15)',
     )
   })
 
@@ -58,7 +58,7 @@ describe('annotationReference', () => {
 
   it('escapes brackets and collapses whitespace in the link label', () => {
     expect(annotationReference('assets/paper.pdf', item({ text: 'claims [x] and\ny]' }))).toBe(
-      String.raw`[paper - p1 - claims \[x\] and y\]](assets/paper.pdf#page=1)`,
+      String.raw`[claims \[x\] and y\]](assets/paper.pdf#page=1)`,
     )
   })
 })

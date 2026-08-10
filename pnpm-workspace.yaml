@@ -24,3 +24,6 @@ minimumReleaseAgeExclude:
   - '@prosemirror-adapter/*'
   - prosemirror-flat-list
   - prosemirror-view
+
+patchedDependencies:
+  '@meowdown/core@0.65.0': patches/@meowdown__core@0.65.0.patch

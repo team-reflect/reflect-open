@@ -46,7 +46,7 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 
 // pdf.js reads this global entry when running a main-thread fake worker,
-// skipping the dynamic import of `/pdf.worker.min.mjs` (absent in tests).
+// skipping the dynamic import of the bundled worker URL (absent in tests).
 // @ts-expect-error the pdf.js worker build ships no type declarations
 const { WorkerMessageHandler } = await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
 

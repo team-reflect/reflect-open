@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
@@ -39,6 +40,8 @@ import {
 } from '@/editor/image-lightbox'
 import { isOpenableExternalUrl } from '@/editor/open-external-link'
 import { parsePdfHref } from '@/lib/annotations/pdf-href'
+import { linkedPdfImageHitAt } from '@/lib/annotations/linked-pdf-image'
+import { LinkedPdfImageCaptions } from '@/components/editor/linked-pdf-image-captions'
 import { isDeepLinkUrl } from '@/lib/deep-links/parse'
 import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
@@ -260,6 +263,9 @@ export function NoteEditor({
   handleRef,
 }: NoteEditorProps): ReactElement {
   const innerRef = useRef<EditorHandle>(null)
+  // Watches the editor surface for hovered linked PDF images (the zoom
+  // button). `contents` keeps the wrapper out of the layout.
+  const editorSurfaceRef = useRef<HTMLDivElement>(null)
   const followDeepLink = useFollowDeepLink()
   // The stable preview-panel setter: the editor only opens the panel, so
   // consuming the setter context — not the value — keeps it out of the
@@ -423,20 +429,18 @@ export function NoteEditor({
       // (`[![…](img)](assets/…pdf#page=N)`); clicking it should jump to the
       // PDF preview's page like SiYuan does, not open the image lightbox.
       // meowdown's image-click intercept runs before link navigation, so the
-      // branch lives here.
-      if (event.target instanceof HTMLElement) {
-        const anchor = event.target.closest('a[href]')
-        if (anchor !== null) {
-          const pdfHref = parsePdfHref(anchor.getAttribute('href') ?? '')
-          if (pdfHref !== null) {
-            event.preventDefault()
-            setPreviewPanelTarget({
-              kind: 'pdf',
-              assetPath: pdfHref.path,
-              ...(pdfHref.page !== undefined ? { page: pdfHref.page } : {}),
-            })
-            return
-          }
+      // branch lives here. meowdown never nests the preview inside the link's
+      // anchor, so the lookup goes through the rendered image view.
+      if (event.target instanceof Element) {
+        const hit = linkedPdfImageHitAt(event.target)
+        if (hit !== null) {
+          event.preventDefault()
+          setPreviewPanelTarget({
+            kind: 'pdf',
+            assetPath: hit.ref.path,
+            ...(hit.ref.page !== undefined ? { page: hit.ref.page } : {}),
+          })
+          return
         }
       }
       const displayUrl = resolveImageUrlRef.current?.(src) ?? null
@@ -451,6 +455,10 @@ export function NoteEditor({
               .closest('.md-image-view-preview, .md-image-preview')
               ?.querySelector('img') ?? null)
           : null
+      // The anchor's default navigation must never fire even when this click
+      // falls through the linked-PDF branch above (the interceptor in the
+      // effect below usually catches it first).
+      event.preventDefault()
       openLightbox(sourceImage, {
         src: displayUrl,
         alt,
@@ -461,6 +469,41 @@ export function NoteEditor({
     },
     [openLightbox, setPreviewPanelTarget],
   )
+  // A linked PDF image (`[![…](img)](assets/…pdf#page=N)`) must jump to the
+  // PDF preview's page no matter which meowdown handler sees the click — the
+  // image click handler and the link handler both run on different paths, so
+  // this capture-phase listener on the document fires first and routes the
+  // click before either can open a lightbox or navigate. It also makes the
+  // chip's padded background (outside the `<img>`) jump. The editor is the
+  // only meowdown surface in this document, so a document-wide listener is
+  // scoped enough.
+  useEffect(() => {
+    const onCaptureClick = (event: MouseEvent): void => {
+      const target = event.target
+      if (!(target instanceof Element)) {
+        return
+      }
+      // A drag on the resize handle ends in a click; it resizes, never jumps.
+      if (target.closest('.md-image-resize-handle') !== null) {
+        return
+      }
+      const hit = linkedPdfImageHitAt(target)
+      if (hit === null) {
+        return
+      }
+      event.preventDefault()
+      event.stopPropagation()
+      setPreviewPanelTarget({
+        kind: 'pdf',
+        assetPath: hit.ref.path,
+        ...(hit.ref.page !== undefined ? { page: hit.ref.page } : {}),
+      })
+    }
+    document.addEventListener('click', onCaptureClick, { capture: true })
+    return () => {
+      document.removeEventListener('click', onCaptureClick, { capture: true })
+    }
+  }, [setPreviewPanelTarget])
   const handleOpenLightboxImage = useCallback((image: LightboxImage) => {
     if (image.openPath !== null && image.openImage !== null) {
       void Promise.resolve(image.openImage(image.openPath)).catch((cause) => {
@@ -471,61 +514,64 @@ export function NoteEditor({
 
   return (
     <>
-      <MeowdownEditor
-        handleRef={innerRef}
-        mode={markMode}
-        initialMarkdown={initialContent}
-        // On the touch surface spellcheck is pinned off regardless of the
-        // setting: iOS derives the keyboard's smart-quotes/smart-dashes traits
-        // from it at focus time, and smart punctuation corrupts markdown
-        // syntax ([[ wiki links, code spans, --- fences) — Plan 19 gate.
-        // Autocorrect is independent and stays on (EditorInputTraits).
-        spellCheck={isTouchEditorSurface() ? false : spellCheck}
-        searchQuery={searchQuery ?? ''}
-        {...(onSearchChange !== undefined ? { onSearchChange } : {})}
-        // Reflect's implementation-neutral `12h`/`24h` maps to meowdown's
-        // `12`/`24` here at the boundary, like `markModeFromSyntax`.
-        timeFormat={timeFormat === '24h' ? '24' : '12'}
-        caretGlide={smoothCaretAnimation}
-        bulletAfterHeading={bulletAfterHeading}
-        // Pinned off on the touch surface regardless of the caller: the grip is
-        // revealed on hover and drag-reorders blocks with a pointer, neither of
-        // which a touch webview can express. Turning it off also drops the drop
-        // indicator, which meowdown gates on the same prop.
-        blockHandle={isTouchEditorSurface() ? false : blockHandle}
-        editorClassName={cn('reflect-editor', className)}
-        {...(titlePlaceholder !== undefined ? { placeholder: titlePlaceholder } : {})}
-        onDocChange={handleDocChange}
-        onWikilinkClick={handleWikilinkClick}
-        onTagClick={handleTagClick}
-        onLinkClick={handleLinkClick}
-        onImageClick={handleImageClick}
-        {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}
-        {...(onTagSearch !== undefined ? { onTagSearch } : {})}
-        {...(onSelectionMenuSearch !== undefined ? { onSelectionMenuSearch } : {})}
-        {...(pendingReplacementActions !== undefined ? { pendingReplacementActions } : {})}
-        {...(onPendingReplacementResolve !== undefined ? { onPendingReplacementResolve } : {})}
-        {...(onSlashMenuSearch !== undefined ? { onSlashMenuSearch } : {})}
-        resolveImageUrl={handleResolveImageUrl}
-        onFilePaste={handleFilePaste}
-        {...(resolveFileLink !== undefined ? { resolveFileLink } : {})}
-        resolveFileInfo={handleResolveFileInfo}
-        onFileClick={handleFileClick}
-        onExitBoundary={handleExitBoundary}
-      >
-        <EditorInputTraits />
-        {/* Only a pane that persists files gets the toolbar's attach button;
+      <div ref={editorSurfaceRef} className="contents">
+        <MeowdownEditor
+          handleRef={innerRef}
+          mode={markMode}
+          initialMarkdown={initialContent}
+          // On the touch surface spellcheck is pinned off regardless of the
+          // setting: iOS derives the keyboard's smart-quotes/smart-dashes traits
+          // from it at focus time, and smart punctuation corrupts markdown
+          // syntax ([[ wiki links, code spans, --- fences) — Plan 19 gate.
+          // Autocorrect is independent and stays on (EditorInputTraits).
+          spellCheck={isTouchEditorSurface() ? false : spellCheck}
+          searchQuery={searchQuery ?? ''}
+          {...(onSearchChange !== undefined ? { onSearchChange } : {})}
+          // Reflect's implementation-neutral `12h`/`24h` maps to meowdown's
+          // `12`/`24` here at the boundary, like `markModeFromSyntax`.
+          timeFormat={timeFormat === '24h' ? '24' : '12'}
+          caretGlide={smoothCaretAnimation}
+          bulletAfterHeading={bulletAfterHeading}
+          // Pinned off on the touch surface regardless of the caller: the grip is
+          // revealed on hover and drag-reorders blocks with a pointer, neither of
+          // which a touch webview can express. Turning it off also drops the drop
+          // indicator, which meowdown gates on the same prop.
+          blockHandle={isTouchEditorSurface() ? false : blockHandle}
+          editorClassName={cn('reflect-editor', className)}
+          {...(titlePlaceholder !== undefined ? { placeholder: titlePlaceholder } : {})}
+          onDocChange={handleDocChange}
+          onWikilinkClick={handleWikilinkClick}
+          onTagClick={handleTagClick}
+          onLinkClick={handleLinkClick}
+          onImageClick={handleImageClick}
+          {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}
+          {...(onTagSearch !== undefined ? { onTagSearch } : {})}
+          {...(onSelectionMenuSearch !== undefined ? { onSelectionMenuSearch } : {})}
+          {...(pendingReplacementActions !== undefined ? { pendingReplacementActions } : {})}
+          {...(onPendingReplacementResolve !== undefined ? { onPendingReplacementResolve } : {})}
+          {...(onSlashMenuSearch !== undefined ? { onSlashMenuSearch } : {})}
+          resolveImageUrl={handleResolveImageUrl}
+          onFilePaste={handleFilePaste}
+          {...(resolveFileLink !== undefined ? { resolveFileLink } : {})}
+          resolveFileInfo={handleResolveFileInfo}
+          onFileClick={handleFileClick}
+          onExitBoundary={handleExitBoundary}
+        >
+          <EditorInputTraits />
+          {/* Only a pane that persists files gets the toolbar's attach button;
             `handleFilePaste` is the same handler meowdown pastes through. */}
-        <FormattingToolbarBridge
-          {...(saveFile !== undefined ? { saveFile: handleFilePaste } : {})}
-        />
-        {renderWikilinkHoverCard !== undefined ? (
-          <WikilinkHoverCard className="reflect-hover-card">
-            {renderWikilinkHoverCard}
-          </WikilinkHoverCard>
-        ) : null}
-        {children}
-      </MeowdownEditor>
+          <FormattingToolbarBridge
+            {...(saveFile !== undefined ? { saveFile: handleFilePaste } : {})}
+          />
+          {renderWikilinkHoverCard !== undefined ? (
+            <WikilinkHoverCard className="reflect-hover-card">
+              {renderWikilinkHoverCard}
+            </WikilinkHoverCard>
+          ) : null}
+          {children}
+          <LinkedPdfImageCaptions />
+        </MeowdownEditor>
+      </div>
       <ImageLightbox
         image={lightboxImage}
         onClose={closeLightbox}

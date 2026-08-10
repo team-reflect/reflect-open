@@ -4,6 +4,18 @@ import { MarkdownView } from '@meowdown/react'
 import { useOpenExternalLink } from '@/editor/open-external-link'
 import { cn } from '@/lib/utils'
 
+/** The click payload forwarded from a rendered image (mirrors meowdown's). */
+export interface MarkdownImageClick {
+  /** The resolved source from `![alt](src)`. */
+  src: string
+  /** The image alt text. */
+  alt: string
+  /** The originating click or touch tap, or the key press that followed a selected image. */
+  event: MouseEvent | TouchEvent | KeyboardEvent
+  /** Whether the platform's mod key was held during the gesture. */
+  mod: boolean
+}
+
 /**
  * A read-only rendering of note markdown via @meowdown/react's `<MarkdownView>`
  * in `hide` mark mode, so previews look exactly like the note would in the
@@ -35,6 +47,13 @@ interface MarkdownPreviewProps {
    */
   onLinkClick?: (href: string, event: MouseEvent | KeyboardEvent, mod: boolean) => void
   /**
+   * Intercept a rendered image click, replacing the default handling (the OS
+   * opener for remote images). The handler owns forwarding what it doesn't
+   * consume — the resident preview routes linked PDF images (`[![…](img)](
+   * assets/….pdf#page=N)`) into the panel and otherwise suppresses the click.
+   */
+  onImageClick?: (payload: MarkdownImageClick) => void
+  /**
    * Whether rendered links, images, and task checkboxes can be activated
    * (default true). A passive preview renders no anchors, focusable controls,
    * or remote embeds.
@@ -49,6 +68,7 @@ export function MarkdownPreview({
   resolveImageUrl,
   onWikiLinkClick,
   onLinkClick,
+  onImageClick,
   interactive = true,
   className,
 }: MarkdownPreviewProps): ReactElement {
@@ -59,10 +79,12 @@ export function MarkdownPreview({
   const resolveRef = useRef(resolveImageUrl)
   const navigateRef = useRef(onWikiLinkClick)
   const linkClickRef = useRef(onLinkClick)
+  const imageClickRef = useRef(onImageClick)
   useEffect(() => {
     resolveRef.current = resolveImageUrl
     navigateRef.current = onWikiLinkClick
     linkClickRef.current = onLinkClick
+    imageClickRef.current = onImageClick
   })
 
   // Hosts either always pass the handler (chat) or never do (palette
@@ -95,6 +117,12 @@ export function MarkdownPreview({
     },
     [openExternalLink],
   )
+  // An image click routes to the host's handler when one is provided (the
+  // resident preview's linked-PDF-image jump) and is otherwise a no-op — the
+  // default handler would hand the image to the OS opener.
+  const onImageClickStable = useCallback((payload: MarkdownImageClick) => {
+    imageClickRef.current?.(payload)
+  }, [])
 
   return (
     <MarkdownView
@@ -102,7 +130,7 @@ export function MarkdownPreview({
       markMode="hide"
       interactive={interactive}
       resolveImageUrl={resolveImageUrlStable}
-      {...(interactive ? { onLinkClick: onLinkClickStable } : {})}
+      {...(interactive ? { onLinkClick: onLinkClickStable, onImageClick: onImageClickStable } : {})}
       {...(navigates ? { onWikilinkClick: onWikilinkClickStable } : {})}
       className={cn('reflect-editor', className)}
     />
