@@ -597,7 +597,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT:?}/../../xcode-scripts/preserve-recording-widget-entitlements.sh\"";
+			shellScript = "\"${SRCROOT:?}/../../xcode-scripts/preserve-entitlements.sh\"";
 		};
 		E8E8484E1F59D64EA785432B /* Preserve entitlements on skip-codesign builds */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -616,7 +616,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT:?}/../../xcode-scripts/preserve-share-extension-entitlements.sh\"";
+			shellScript = "\"${SRCROOT:?}/../../xcode-scripts/preserve-entitlements.sh\"";
 		};
 		F27159B8EA2BAA999947A4AF /* Build Rust Code */ = {
 			isa = PBXShellScriptBuildPhase;

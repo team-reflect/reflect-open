@@ -299,7 +299,7 @@ targets:
       # fails with "Couldn't save" (tauri-cli mobile/ios/build.rs). Ad-hoc
       # signing the extension with its entitlements here keeps them through
       # export; properly signed builds never enter the branch.
-      - script: '"${SRCROOT:?}/../../xcode-scripts/preserve-share-extension-entitlements.sh"'
+      - script: '"${SRCROOT:?}/../../xcode-scripts/preserve-entitlements.sh"'
         name: Preserve entitlements on skip-codesign builds
         basedOnDependencyAnalysis: false
 
@@ -352,6 +352,6 @@ targets:
       # Same skip-codesign entitlement preservation as ShareExtension: CI
       # TestFlight builds archive unsigned, and export re-signing only keeps
       # entitlements already present in a signature.
-      - script: '"${SRCROOT:?}/../../xcode-scripts/preserve-recording-widget-entitlements.sh"'
+      - script: '"${SRCROOT:?}/../../xcode-scripts/preserve-entitlements.sh"'
         name: Preserve entitlements on skip-codesign builds
         basedOnDependencyAnalysis: false
