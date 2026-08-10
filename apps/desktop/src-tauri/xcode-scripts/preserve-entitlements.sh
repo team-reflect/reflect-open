@@ -9,11 +9,20 @@ if [ -f "$ENV_LOCAL" ]; then
   . "$ENV_LOCAL"
 fi
 
-# CODE_SIGN_ENTITLEMENTS is per-target and per-configuration (Debug selects
-# the .dev entitlements with the dev App Group), so re-sign with the file the
-# active build picked rather than hardcoding one.
+# The path is derived from TARGET_NAME + CONFIGURATION rather than read from
+# $CODE_SIGN_ENTITLEMENTS: skip-codesign builds are exactly the flow where
+# tauri blanks that setting on the xcodebuild command line (cargo-mobile2
+# src/apple/target.rs passes CODE_SIGN_ENTITLEMENTS="" when skipping
+# codesign), and a command-line override beats every target setting. Debug
+# picks the .dev entitlements (dev App Group), everything else the release
+# file.
 if [ "${CODE_SIGNING_ALLOWED:-YES}" = "NO" ]; then
+  if [ "${CONFIGURATION:?}" = "debug" ]; then
+    ENTITLEMENTS="${SRCROOT:?}/${TARGET_NAME:?}/${TARGET_NAME:?}.dev.entitlements"
+  else
+    ENTITLEMENTS="${SRCROOT:?}/${TARGET_NAME:?}/${TARGET_NAME:?}.entitlements"
+  fi
   /usr/bin/codesign --force --sign - \
-    --entitlements "${SRCROOT:?}/${CODE_SIGN_ENTITLEMENTS:?}" \
+    --entitlements "$ENTITLEMENTS" \
     "${CODESIGNING_FOLDER_PATH:?}"
 fi
