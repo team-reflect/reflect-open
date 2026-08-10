@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { addPluginListener } from '@tauri-apps/api/core'
-import { IAP_PRODUCT_IDS, iapIsOwned } from '@reflect/core'
+import { IAP_PRODUCT_IDS, iapIsOwned, subscribeIapPurchaseUpdated } from '@reflect/core'
 
 export const ENTITLEMENT_QUERY_KEY = ['iap-entitlement']
 
@@ -37,21 +36,15 @@ export function useEntitlement(enabled: boolean): {
   // arrive as `purchaseUpdated` events; refetch so the gate lifts immediately.
   useEffect(() => {
     if (!enabled) return
-    let disposed = false
-    let unlisten: (() => void) | null = null
-    void addPluginListener('iap', 'purchaseUpdated', () => {
+    const subscription = subscribeIapPurchaseUpdated(() => {
       void queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY })
-    }).then((listener) => {
-      if (disposed) {
-        void listener.unregister()
-      } else {
-        unlisten = () => void listener.unregister()
-      }
     })
-    return () => {
-      disposed = true
-      unlisten?.()
-    }
+    // Fail loud in the log, soft in behavior: without the event stream the
+    // entitlement still refetches on its staleTime, just not instantly.
+    subscription.ready.catch((err: unknown) => {
+      console.error('subscribing to purchaseUpdated failed', err)
+    })
+    return subscription.unlisten
   }, [enabled, queryClient])
 
   if (query.data === true) return { status: 'entitled' }

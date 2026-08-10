@@ -316,5 +316,6 @@ export {
   iapPurchase,
   iapRestorePurchases,
   iapIsOwned,
+  subscribeIapPurchaseUpdated,
   type IapProduct,
-} from '../iap/commands'
+} from '../ipc/iap-plugin'
