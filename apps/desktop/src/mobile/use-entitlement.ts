@@ -26,8 +26,6 @@ export function useEntitlement(enabled: boolean): {
         iapIsOwned(IAP_PRODUCT_IDS.monthly),
         iapIsOwned(IAP_PRODUCT_IDS.yearly),
       ])
-      // TODO: remove this debug log
-      console.log("DEBUG v2 monthly, yearly", monthly, yearly)
       return monthly || yearly
     },
     staleTime: 60_000,
