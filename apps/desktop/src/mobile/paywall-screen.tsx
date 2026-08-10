@@ -91,8 +91,7 @@ export function PaywallScreen(): ReactElement {
               Unlock Reflect Pro
             </h1>
             <p className="text-sm leading-6 text-text-secondary">
-              Notes, tasks, search, and AI. Everything Reflect does on your Mac, now on your
-              iPhone.
+              Notes, tasks, search, and AI. Everything Reflect does on your Mac, now on your iPhone.
             </p>
           </div>
         </header>
