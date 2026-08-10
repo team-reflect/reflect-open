@@ -58,7 +58,7 @@ describe('ZoteroPicker', () => {
   it('searches the Zotero library and inserts the picked item as a link', async () => {
     openZoteroPicker('notes/a.md')
     await render(<ZoteroPicker />, { wrapper })
-    const input = page.getByRole('combobox', { name: 'Search Zotero' })
+    const input = page.getByRole('combobox', { name: 'Insert Zotero item' })
     await expect.element(input).toHaveFocus()
 
     await userEvent.fill(input, 'attention')
@@ -79,7 +79,7 @@ describe('ZoteroPicker', () => {
   it('moves through results with arrow keys and picks with Enter', async () => {
     openZoteroPicker('notes/a.md')
     await render(<ZoteroPicker />, { wrapper })
-    const input = page.getByRole('combobox', { name: 'Search Zotero' })
+    const input = page.getByRole('combobox', { name: 'Insert Zotero item' })
     await userEvent.fill(input, 'attention')
 
     await expect.element(page.getByText('Attention is all you need')).toBeInTheDocument()
@@ -95,7 +95,21 @@ describe('ZoteroPicker', () => {
   it('shows a no-results state for an unmatched query', async () => {
     openZoteroPicker('notes/a.md')
     await render(<ZoteroPicker />, { wrapper })
-    await userEvent.fill(page.getByRole('combobox', { name: 'Search Zotero' }), 'nothing-matches')
+    await userEvent.fill(
+      page.getByRole('combobox', { name: 'Insert Zotero item' }),
+      'nothing-matches',
+    )
     await expect.element(page.getByText('No matching items.')).toBeInTheDocument()
+  })
+
+  it('shows the keyboard hint footer and closes on Escape', async () => {
+    openZoteroPicker('notes/a.md')
+    await render(<ZoteroPicker />, { wrapper })
+    await expect.element(page.getByText('Navigate')).toBeInTheDocument()
+    await expect.element(page.getByText('↩ Insert')).toBeInTheDocument()
+    await expect.element(page.getByText('Cancel')).toBeInTheDocument()
+
+    await userEvent.keyboard('{Escape}')
+    await expect.element(page.getByRole('combobox')).not.toBeInTheDocument()
   })
 })
