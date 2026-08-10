@@ -59,6 +59,11 @@ export function definePluginCommands<Commands extends Record<string, PluginComma
     )) as SchemaOutput<Commands[Name]['result']>
   }
 }
+// REVIEW: definePluginCommands is too heavy:
+// 1. we do not need to validate the args, because the caller is already typed. so remove the spec.args.parse logic
+// 2. we do not need to group all commands under one plugin, we can just define each command separately, like this:
+// const cmd1 = definePluginCommand<ArgsType1, ResultType1>('plugin1', 'command1', resultSchema1)
+// comst result1 = await cmd1(args1)
 
 /**
  * A live plugin-event subscription. Registration is asynchronous (an IPC
