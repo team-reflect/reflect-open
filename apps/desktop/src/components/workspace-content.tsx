@@ -13,6 +13,7 @@ import { Sidebar } from '@/components/sidebar/sidebar'
 import { SidebarResizeHandle } from '@/components/sidebar-resize-handle'
 import { TemplateCreateDialog } from '@/components/templates/template-create-dialog'
 import { TemplatePicker } from '@/components/templates/template-picker'
+import { ZoteroPicker } from '@/components/zotero/zotero-picker'
 import { useDailyContextTarget } from '@/providers/focused-daily-provider'
 import { useSidebar } from '@/providers/sidebar-provider'
 import { useAppShortcuts } from '@/routing/app-shortcuts'
@@ -67,6 +68,7 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
         <ShortcutsDialog />
         <TemplatePicker context={commandContext} />
         <TemplateCreateDialog context={commandContext} />
+        <ZoteroPicker />
         <EmbeddingsSync />
       </div>
     </AppShell>

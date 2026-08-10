@@ -35,6 +35,7 @@ mod secrets;
 mod settings;
 mod skill;
 mod windows;
+mod zotero;
 
 // The watcher and the embedding runtime are desktop capabilities (Plan 19):
 // mobile swaps in stand-ins with the identical command surface, so the
@@ -345,6 +346,7 @@ pub fn run() {
             contacts::contacts_request_access,
             contacts::contacts_lookup_by_email,
             contacts::contacts_lookup_by_name,
+            zotero::zotero_search,
             capture::capture_host_register,
             capture::capture_inbox_list,
             capture::capture_inbox_spool,

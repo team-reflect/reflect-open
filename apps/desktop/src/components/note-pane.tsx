@@ -28,6 +28,7 @@ import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'
 import { useNoteDocument } from '@/editor/use-note-document'
 import { useTagNavigation } from '@/editor/use-tag-navigation'
 import { useTemplateSlashItems } from '@/editor/use-template-slash-items'
+import { useZoteroSlashItem } from '@/editor/use-zotero-slash-item'
 import { useMarkdownLinkNavigation } from '@/editor/use-markdown-link-navigation'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { useWikiLinkHoverPreview } from '@/editor/use-wiki-link-hover-preview'
@@ -192,9 +193,22 @@ export function NotePaneComponent({
   const registeredHandle = useRef<{ path: string; handle: NoteEditorHandle } | null>(null)
   // The `/` menu's template rows insert into this pane's own editor, read
   // through the registry ref at select time (a late resolve after the pane
-  // unmounted must insert nowhere rather than somewhere stale).
-  const onSlashMenuSearch = useTemplateSlashItems(
+  // unmounted must insert nowhere rather than somewhere stale). The Zotero
+  // row shares the menu; its picker inserts into this pane's note (desktop
+  // only — Zotero is a desktop app).
+  const templateSlashItems = useTemplateSlashItems(
     useCallback(() => registeredHandle.current?.handle ?? null, []),
+  )
+  const zoteroSlashItems = useZoteroSlashItem(path)
+  const onSlashMenuSearch = useCallback(
+    async (query: string) => {
+      const [templates, zotero] = await Promise.all([
+        templateSlashItems(query),
+        isTouchEditorSurface() ? Promise.resolve([]) : zoteroSlashItems(query),
+      ])
+      return [...templates, ...zotero]
+    },
+    [templateSlashItems, zoteroSlashItems],
   )
   const handleRef = useCallback(
     (handle: NoteEditorHandle | null) => {

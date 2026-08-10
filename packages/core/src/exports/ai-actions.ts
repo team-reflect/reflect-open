@@ -241,3 +241,10 @@ export {
   type ReconcileAssetDescriptionsInput,
   type ReconcileAssetDescriptionsOutcome,
 } from '../actions/asset-description'
+export {
+  zoteroSearch,
+  zoteroItemLink,
+  zoteroItemSummary,
+  zoteroItemSchema,
+  type ZoteroItem,
+} from '../zotero/commands'
