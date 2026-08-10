@@ -97,6 +97,7 @@ export function definePluginEvent<Payload>(
   // swapped bridge must never inherit another bridge's registration.
   const shared = new WeakMap<IpcBridge, SharedListener>()
 
+  // REVIEW: rename "sharedListener" to "getOrCreateSharedListener" and move it to the root level.
   function sharedListener(bridge: IpcBridge): SharedListener {
     const existing = shared.get(bridge)
     if (existing !== undefined) {
