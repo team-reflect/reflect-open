@@ -1,8 +1,7 @@
 import type { ReactElement } from 'react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { TRANSCRIPTION_PROVIDERS, type AiProviderInfo } from '@reflect/core'
-
-export const PRIVACY_POLICY_URL = 'https://reflect.app/privacy'
+import { PRIVACY_POLICY_URL } from '@/mobile/legal-urls'
 
 const TRANSCRIBING_PROVIDER_IDS: readonly string[] = TRANSCRIPTION_PROVIDERS
 
