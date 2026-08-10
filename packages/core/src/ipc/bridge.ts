@@ -32,6 +32,16 @@ export interface IpcBridge {
     body: Uint8Array,
     headers: Record<string, string>,
   ) => Promise<unknown>
+  /**
+   * Attach a handler to a plugin's event stream, Tauri's
+   * `addPluginListener` channel (`keyboardChange`, `recordingLevel`, ...),
+   * which is distinct from the global event bus behind {@link listen}.
+   */
+  listenPlugin?: (
+    plugin: string,
+    event: string,
+    handler: (payload: unknown) => void,
+  ) => Promise<void>
 }
 
 let activeBridge: IpcBridge | null = null

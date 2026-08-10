@@ -1,4 +1,4 @@
-import { invoke, isTauri } from '@tauri-apps/api/core'
+import { addPluginListener, invoke, isTauri } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { setBridge, type IpcBridge } from '@reflect/core'
 
@@ -25,6 +25,9 @@ export const tauriBridge: IpcBridge = {
       // as an unhandled promise rejection.
       void Promise.resolve(unlisten() as void | Promise<void>).catch(() => {})
     }
+  },
+  listenPlugin: async (plugin, event, handler) => {
+    await addPluginListener<unknown>(plugin, event, handler)
   },
 }
 

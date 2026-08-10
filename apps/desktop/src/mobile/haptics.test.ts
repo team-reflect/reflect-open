@@ -8,11 +8,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const invokeMock = vi.fn<(command: string) => Promise<unknown>>()
 
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: (command: string) => invokeMock(command),
-}))
-
 async function loadHaptics(): Promise<() => void> {
+  // resetModules gives this test a fresh latch and a fresh @reflect/core —
+  // install the fake bridge on the same instance the module under test sees.
+  const core = await import('@reflect/core')
+  core.setBridge({
+    invoke: (command) => invokeMock(command),
+    listen: async () => () => {},
+  })
   const module = await import('./haptics')
   return module.hapticImpactLight
 }

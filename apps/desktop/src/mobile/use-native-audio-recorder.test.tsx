@@ -1,29 +1,22 @@
 import { act } from 'react'
 import { renderHook } from 'vitest-browser-react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setBridge } from '@reflect/core'
+import {
+  isStagedPathClaimed,
+  releaseStagedPath,
+  useNativeAudioRecorder,
+} from './use-native-audio-recorder'
 
-const invoke = vi.hoisted(() => vi.fn<(command: string, args?: unknown) => Promise<unknown>>())
+const invoke = vi.fn<(command: string, args?: unknown) => Promise<unknown>>()
 
 /** Captured plugin-event handlers, keyed by event name, dispatchable per test. */
-const pluginEvents = vi.hoisted(() => ({
+const pluginEvents = {
   handlers: new Map<string, (payload: unknown) => void>(),
   emit(event: string, payload: unknown): void {
     pluginEvents.handlers.get(event)?.(payload)
   },
-}))
-
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke,
-  addPluginListener: vi.fn(
-    async (_plugin: string, event: string, handler: (p: unknown) => void) => {
-      pluginEvents.handlers.set(event, handler)
-      return { unregister: vi.fn() }
-    },
-  ),
-}))
-
-const { isStagedPathClaimed, releaseStagedPath, useNativeAudioRecorder } =
-  await import('./use-native-audio-recorder')
+}
 
 function base64Of(text: string): string {
   return btoa(text)
@@ -39,6 +32,20 @@ beforeEach(() => {
   vi.clearAllMocks()
   pluginEvents.handlers.clear()
   invoke.mockResolvedValue(undefined)
+  // A fresh bridge object per test: the shared plugin-event registration in
+  // core is keyed by bridge identity, so reusing one object would leak
+  // listeners across tests.
+  setBridge({
+    invoke,
+    listen: async () => () => {},
+    listenPlugin: async (_plugin, event, handler) => {
+      pluginEvents.handlers.set(event, handler)
+    },
+  })
+})
+
+afterEach(() => {
+  setBridge(null)
 })
 
 describe('useNativeAudioRecorder', () => {
@@ -64,7 +71,7 @@ describe('useNativeAudioRecorder', () => {
       act(async () => {
         await result.current.start()
       }),
-    ).rejects.toBe('microphone access denied')
+    ).rejects.toEqual({ kind: 'unknown', message: 'microphone access denied' })
     expect(result.current.status).toBe('idle')
   })
 

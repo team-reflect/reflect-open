@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { impactLight } from '@reflect/core'
 
 let bridgeAvailable = true
 
@@ -17,7 +17,7 @@ export function hapticImpactLight(): void {
   if (!bridgeAvailable) {
     return
   }
-  void invoke('plugin:keyboard|impact_light').catch((err: unknown) => {
+  void impactLight().catch((err: unknown) => {
     // Re-check the latch: rapid taps can have several invokes in flight
     // before the first rejection lands, and only one should warn.
     if (!bridgeAvailable) {
