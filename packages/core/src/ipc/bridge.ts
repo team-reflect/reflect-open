@@ -38,6 +38,7 @@ export interface IpcBridge {
    * `addPluginListener` channel (`keyboardChange`, `recordingLevel`, ...),
    * which is distinct from the global event bus behind {@link listen}.
    *
+   * REVIEW: the following paragraph in the comment is useless,just remove it.
    * Deliberately returns no unlisten: the handler stays attached for the
    * bridge's lifetime, and the local fan-out above the bridge (core's plugin
    * event layer) decides who actually receives events. With no
