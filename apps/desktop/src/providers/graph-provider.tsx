@@ -51,6 +51,10 @@ export type GraphStatus = 'loading' | 'choosing' | 'opening' | 'ready'
  * {@link MobileGraphBoot}, whose hook owns it.
  */
 interface GraphContextValue extends MobileGraphBoot {
+  /**
+   * Which UI family the shell was built for (Plan 19's root gate), fixed at
+   * boot; gates platform-only surfaces like the iOS subscription paywall.
+   */
   platform: AppPlatform
   status: GraphStatus
   graph: GraphInfo | null

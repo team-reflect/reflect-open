@@ -1,10 +1,25 @@
 import { useEffect } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { IAP_PRODUCT_IDS, iapIsOwned, subscribeIapPurchaseUpdated } from '@reflect/core'
 import { useGraph } from '@/providers/graph-provider'
 
-export const ENTITLEMENT_QUERY_KEY_YEARLY = ['iap-entitlement-yearly']
-export const ENTITLEMENT_QUERY_KEY_MONTHLY = ['iap-entitlement-monthly']
+const ENTITLEMENT_QUERY_KEY_YEARLY = ['iap-entitlement-yearly']
+const ENTITLEMENT_QUERY_KEY_MONTHLY = ['iap-entitlement-monthly']
+
+/**
+ * Drop the cached entitlement answers so both queries refetch from StoreKit.
+ * The purchase and restore flows must call this after their command
+ * resolves: the plugin resolves `purchase` directly and only emits
+ * `purchaseUpdated` from its `Transaction.updates` listener, which StoreKit
+ * does not feed for in-app purchases, so waiting for the event would leave a
+ * paying customer stuck on the paywall.
+ */
+export async function invalidateEntitlementQueries(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_YEARLY }),
+    queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_MONTHLY }),
+  ])
+}
 
 /**
  * The shared StoreKit entitlement queries: which subscription product this
@@ -12,11 +27,17 @@ export const ENTITLEMENT_QUERY_KEY_MONTHLY = ['iap-entitlement-monthly']
  * this is fast and works offline once a transaction exists. Only iOS needs a
  * subscription (`needSubscription`): elsewhere the queries stay idle and
  * `activeSubscription` stays null.
+ *
+ * `pending` is true until an answer exists: a positive from either query
+ * settles it immediately (a known subscription must never wait on, or lose
+ * to, the sibling product's lookup), otherwise both queries have to settle.
+ * A settled failure counts as an answer with `activeSubscription` null, not
+ * as pending forever.
  */
 export function useActiveSubscription(): {
   needSubscription: boolean
   activeSubscription: 'yearly' | 'monthly' | null
-  failed: boolean
+  pending: boolean
 } {
   const { platform } = useGraph()
   const needSubscription = platform === 'ios'
@@ -36,24 +57,36 @@ export function useActiveSubscription(): {
     enabled: needSubscription,
   })
 
-  // Offer-code redemptions, renewals, and purchases finished outside the app
-  // arrive as `purchaseUpdated` events; refetch so the gate lifts immediately.
+  // Two refresh paths beyond the initial fetch: renewals, offer-code
+  // redemptions, and purchases finished outside the app arrive as
+  // `purchaseUpdated` events, and every return to the foreground re-checks,
+  // so an entitlement that expired or appeared while the process was
+  // suspended is picked up without a relaunch. (`staleTime` alone schedules
+  // nothing, and the shared query client turns focus refetching off.)
   useEffect(() => {
     if (!needSubscription) return
     const subscription = subscribeIapPurchaseUpdated(() => {
-      void queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_YEARLY })
-      void queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_MONTHLY })
+      void invalidateEntitlementQueries(queryClient)
     })
     // Fail loud in the log, soft in behavior: without the event stream the
-    // entitlement still refetches on its staleTime, just not instantly.
+    // entitlement still refreshes on the next foreground, just not instantly.
     subscription.ready.catch((err: unknown) => {
       console.error('subscribing to purchaseUpdated failed', err)
     })
-    return subscription.unlisten
+    const onVisibilityChange = (): void => {
+      if (document.visibilityState === 'visible') {
+        void invalidateEntitlementQueries(queryClient)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      subscription.unlisten()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [needSubscription, queryClient])
 
   const activeSubscription = yearlyQuery.data ? 'yearly' : monthlyQuery.data ? 'monthly' : null
-  const failed = yearlyQuery.status === 'error' || monthlyQuery.status === 'error'
+  const pending = activeSubscription === null && (yearlyQuery.isPending || monthlyQuery.isPending)
 
-  return { needSubscription, activeSubscription, failed }
+  return { needSubscription, activeSubscription, pending }
 }

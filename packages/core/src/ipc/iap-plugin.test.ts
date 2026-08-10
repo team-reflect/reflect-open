@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from './bridge'
-import { iapGetProducts, iapIsOwned, iapPurchase, iapRestorePurchases } from './iap-plugin'
+import {
+  iapGetProducts,
+  iapIsOwned,
+  iapPurchase,
+  iapRestorePurchases,
+  subscribeIapPurchaseUpdated,
+} from './iap-plugin'
 
 afterEach(() => {
   setBridge(null)
@@ -41,5 +47,29 @@ describe('iap plugin bindings', () => {
   it('get_product_status reduces to the isOwned flag', async () => {
     bridgeReturning({ productId: 'a', isOwned: true })
     await expect(iapIsOwned('a')).resolves.toBe(true)
+  })
+
+  it('purchaseUpdated registers on the plugin listener channel and detaches locally', async () => {
+    let emit: (payload: unknown) => void = () => {}
+    const listenPlugin = vi.fn(
+      async (_plugin: string, _event: string, handler: (payload: unknown) => void) => {
+        emit = handler
+      },
+    )
+    setBridge({ invoke: async () => null, listen: async () => () => {}, listenPlugin })
+
+    const handler = vi.fn()
+    const subscription = subscribeIapPurchaseUpdated(handler)
+    await subscription.ready
+    expect(listenPlugin).toHaveBeenCalledWith('iap', 'purchaseUpdated', expect.any(Function))
+
+    emit({ productId: 'app.reflect.ios.pro.yearly' })
+    expect(handler).toHaveBeenCalledTimes(1)
+
+    // Unlisten is a local detach (the shared native registration stays):
+    // later events must not reach the handler anymore.
+    subscription.unlisten()
+    emit({ productId: 'app.reflect.ios.pro.yearly' })
+    expect(handler).toHaveBeenCalledTimes(1)
   })
 })

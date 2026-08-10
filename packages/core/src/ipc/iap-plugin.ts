@@ -3,9 +3,9 @@ import { definePluginCommand, definePluginEvent, ignoredResult } from './plugin'
 
 /**
  * Typed bindings for `tauri-plugin-iap` — the StoreKit In-App Purchase
- * bridge (third-party, pinned at v0.9.1, iOS-only in our build). Each schema
- * mirrors the plugin's wire format at that tag; check the permalinks below
- * when bumping the plugin version.
+ * bridge (third-party, iOS-only in our build). Each schema mirrors the
+ * plugin's wire format as of v0.9.1; check the permalinks below when
+ * bumping the plugin version.
  * TS shapes (hand-written, no runtime guarantee):
  * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/guest-js/index.ts
  * iOS ground truth (hand-built dictionaries; fields vary by code path):
@@ -29,6 +29,11 @@ const iapProductSchema = z.object({
   formattedPrice: z.string().nullish(),
 })
 
+/**
+ * One store product as the plugin reports it. `formattedPrice` is the
+ * store-localized display price ("$4.99"); it is nullish on plugin code
+ * paths that build the dictionary without loaded store metadata.
+ */
 export type IapProduct = z.infer<typeof iapProductSchema>
 
 // Command args mirror the serde request models (`GetProductsRequest`,
@@ -69,7 +74,9 @@ export async function iapGetProducts(productIds: string[]): Promise<IapProduct[]
  * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/ios/Sources/IapPlugin.swift#L137).
  * The Purchase response
  * (https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/src/models.rs#L98)
- * is ignored; the purchaseUpdated event drives the entitlement refetch.
+ * is ignored; callers refetch entitlements after the command resolves. Do
+ * not wait for purchaseUpdated instead: the plugin never emits it for an
+ * in-app purchase (see subscribeIapPurchaseUpdated).
  */
 export async function iapPurchase(productId: string): Promise<void> {
   await purchaseCommand({ payload: { productId, productType: 'subs' } })

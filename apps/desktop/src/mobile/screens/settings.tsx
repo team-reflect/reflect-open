@@ -36,8 +36,7 @@ import {
   type SegmentedOption,
 } from '@/mobile/settings-list'
 import {
-  ENTITLEMENT_QUERY_KEY_MONTHLY,
-  ENTITLEMENT_QUERY_KEY_YEARLY,
+  invalidateEntitlementQueries,
   useActiveSubscription,
 } from '@/mobile/use-active-subscription'
 import { useMobileSyncStatus } from '@/mobile/use-sync-status'
@@ -82,15 +81,19 @@ export function MobileSettings(): ReactElement {
   const { activeSubscription } = useActiveSubscription()
   const queryClient = useQueryClient()
   const [restorePending, setRestorePending] = useState(false)
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
 
   const handleRestore = async (): Promise<void> => {
     setRestorePending(true)
+    setRestoreMessage(null)
     try {
-      await iapRestorePurchases()
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_YEARLY }),
-        queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_MONTHLY }),
-      ])
+      const count = await iapRestorePurchases()
+      await invalidateEntitlementQueries(queryClient)
+      if (count === 0) {
+        setRestoreMessage('No previous purchase found for this Apple account.')
+      }
+    } catch {
+      setRestoreMessage('Restore failed. Check your connection and try again.')
     } finally {
       setRestorePending(false)
     }
@@ -308,7 +311,7 @@ export function MobileSettings(): ReactElement {
           ) : null}
 
           {isIos ? (
-            <SettingsGroup header="Subscription">
+            <SettingsGroup header="Subscription" footer={restoreMessage}>
               <SettingsValueRow
                 label="Plan"
                 value={
@@ -320,9 +323,9 @@ export function MobileSettings(): ReactElement {
                 }
               />
               {activeSubscription === null ? (
-                // Clearing the snooze flips useShouldShowPaywall back to true,
-                // so the gate in mobile-app.tsx replaces the app with the
-                // paywall immediately.
+                // Clearing the snooze flips useShouldShowPaywall back to
+                // 'show', so the gate in mobile-app.tsx replaces the app with
+                // the paywall immediately.
                 <SettingsActionRow
                   label="Upgrade to Pro"
                   onPress={() => updateSettings({ paywallSnoozeUntil: 0 })}

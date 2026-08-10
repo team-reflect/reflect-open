@@ -8,10 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
-import {
-  ENTITLEMENT_QUERY_KEY_MONTHLY,
-  ENTITLEMENT_QUERY_KEY_YEARLY,
-} from '@/mobile/use-active-subscription'
+import { invalidateEntitlementQueries } from '@/mobile/use-active-subscription'
 import { useSettings } from '@/providers/settings-provider'
 
 /** Which control kicked off the in-flight action (onboarding's PendingChoice
@@ -50,8 +47,11 @@ export function PaywallScreen(): ReactElement {
     setPending(plan)
     try {
       await iapPurchase(product.productId)
-      // No navigation on success: the purchaseUpdated event refetches the
-      // entitlement and the gate in mobile-app.tsx unmounts this screen.
+      // The plugin resolves `purchase` without emitting `purchaseUpdated`
+      // (see invalidateEntitlementQueries), so refetch here: the fresh
+      // entitlement flips the gate in mobile-app.tsx and unmounts this
+      // screen, no navigation needed.
+      await invalidateEntitlementQueries(queryClient)
     } catch {
       // Cancelled or failed; the StoreKit sheet already told the user.
     } finally {
@@ -67,10 +67,7 @@ export function PaywallScreen(): ReactElement {
       if (count === 0) {
         setRestoreMessage('No previous purchase found for this Apple account.')
       } else {
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_YEARLY }),
-          queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_MONTHLY }),
-        ])
+        await invalidateEntitlementQueries(queryClient)
       }
     } catch {
       setRestoreMessage('Restore failed. Check your connection and try again.')
@@ -201,6 +198,15 @@ export function PaywallScreen(): ReactElement {
   )
 }
 
+interface PlanCardProps {
+  title: string
+  price: string
+  badge?: string
+  selected: boolean
+  disabled: boolean
+  onSelect: () => void
+}
+
 function PlanCard({
   title,
   price,
@@ -208,14 +214,7 @@ function PlanCard({
   selected,
   disabled,
   onSelect,
-}: {
-  title: string
-  price: string
-  badge?: string
-  selected: boolean
-  disabled: boolean
-  onSelect: () => void
-}): ReactElement {
+}: PlanCardProps): ReactElement {
   return (
     <button
       type="button"

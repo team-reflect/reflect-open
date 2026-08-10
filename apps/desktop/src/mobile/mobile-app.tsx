@@ -48,8 +48,17 @@ export function MobileApp(): ReactElement {
     return installBackgroundFlush()
   }, [])
 
-  if (shouldShowPaywall) {
+  // The subscription gate deliberately comes before everything else,
+  // onboarding included: the paywall is the first screen of a fresh install,
+  // and onboarding runs after a purchase or "Remind me later" lifts the
+  // gate. While the gate is still deciding (entitlement queries, settings
+  // hydration) hold the loading screen instead of flashing the paywall at a
+  // subscribed or snoozed user.
+  if (shouldShowPaywall === 'show') {
     return <PaywallScreen />
+  }
+  if (shouldShowPaywall === 'pending') {
+    return <LoadingScreen />
   }
 
   if (status === 'ready' && graph) {
@@ -103,6 +112,10 @@ export function MobileApp(): ReactElement {
     )
   }
 
+  return <LoadingScreen />
+}
+
+function LoadingScreen(): ReactElement {
   return (
     <div className="flex h-dvh w-screen items-center justify-center text-sm text-text-muted">
       Loading…
