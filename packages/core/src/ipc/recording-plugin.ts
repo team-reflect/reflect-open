@@ -118,6 +118,7 @@ export type RecordingStoppedEvent = z.infer<typeof stoppedEventSchema>
 
 /** Mirrors Swift `NativeAction` (the OS entry-point handshake). */
 const nativeActionSchema = z.object({ action: z.string() })
+// rename NativeActionEvent etc to RecordingNativeActionEvent etc REVIEW
 export type NativeActionEvent = z.infer<typeof nativeActionSchema>
 
 export const subscribeRecordingLevel = definePluginEvent(
