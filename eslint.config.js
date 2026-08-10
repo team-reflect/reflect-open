@@ -13,7 +13,7 @@ export default defineESLintConfig(
     perfectionist: false,
   },
   {
-    ignores: ['./design-system/', '**/.wxt/'],
+    ignores: ['./design-system/', '**/.wxt/', "**/.output/"],
   },
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.mjs'],
