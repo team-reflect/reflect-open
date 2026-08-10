@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.6...v0.9.0-beta.7) (2026-08-10)
+
+
+### Bug Fixes
+
+* **ios:** fix TestFlight archive re-signing ([#1090](https://github.com/team-reflect/reflect-open/issues/1090)) ([e04046f](https://github.com/team-reflect/reflect-open/commit/e04046feab47663e06646a865a675a066e44b050))
+
 ## [0.9.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.5...v0.9.0-beta.6) (2026-08-10)
 
 
