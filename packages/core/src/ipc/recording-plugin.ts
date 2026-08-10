@@ -10,6 +10,8 @@ import { definePluginCommand, definePluginEvent } from './plugin'
  * a field change there must land here in the same review.
  */
 
+ // REVIEW: if we do not need the return result, then we do not force the result to be null, just use something else. This ensure that our
+ // code is more robust to future changes in the plugin. For example, if the plugin returns a boolean to indicate whether the haptic was successful, we would not want our code to break. Apply this change to all other plugin commands/invokes that return null.
 const voidResult = z.null()
 
 /** Mirrors `StopResponse`: a finished recording still in staging. */
