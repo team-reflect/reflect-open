@@ -440,7 +440,7 @@
 			path = "reflect-open_iOS";
 			sourceTree = "<group>";
 		};
-		"TEMP_09A2F93C-F8FB-4D40-ACEB-D9269A5161EE" /* x86_64 */ = {
+		"TEMP_5ACF277E-D681-426E-87FE-E93125BE8EAF" /* x86_64 */ = {
 			isa = PBXGroup;
 			children = (
 			);
@@ -597,7 +597,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT:?}/../../xcode-scripts/preserve-entitlements.sh\" \"${SRCROOT:?}/RecordingWidget/RecordingWidget.entitlements\"";
+			shellScript = "\"${SRCROOT:?}/../../xcode-scripts/preserve-recording-widget-entitlements.sh\"";
 		};
 		E8E8484E1F59D64EA785432B /* Preserve entitlements on skip-codesign builds */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -616,7 +616,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT:?}/../../xcode-scripts/preserve-entitlements.sh\" \"${SRCROOT:?}/ShareExtension/ShareExtension.entitlements\"";
+			shellScript = "\"${SRCROOT:?}/../../xcode-scripts/preserve-share-extension-entitlements.sh\"";
 		};
 		F27159B8EA2BAA999947A4AF /* Build Rust Code */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -724,7 +724,7 @@
 				CODE_SIGN_ENTITLEMENTS = "reflect-open_iOS/reflect-open_iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "789ULN5MZB";
+				DEVELOPMENT_TEAM = 789ULN5MZB;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -738,8 +738,8 @@
 				);
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios.dev;
-				PRODUCT_NAME = "Reflect";
+				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios;
+				PRODUCT_NAME = Reflect;
 				REFLECT_DISPLAY_NAME = Reflect;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
@@ -887,7 +887,7 @@
 				CODE_SIGN_ENTITLEMENTS = "reflect-open_iOS/reflect-open_iOS.dev.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "789ULN5MZB";
+				DEVELOPMENT_TEAM = 789ULN5MZB;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -902,7 +902,7 @@
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios.dev;
-				PRODUCT_NAME = "Reflect";
+				PRODUCT_NAME = Reflect;
 				REFLECT_DISPLAY_NAME = "Reflect Dev";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;

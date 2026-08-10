@@ -218,6 +218,15 @@ export const transcriptionFormatSchema = z.boolean().catch(true)
 export const mobileOnboardedSchema = z.boolean().catch(false)
 
 /**
+ * Epoch milliseconds until which the iOS paywall stays dismissed after
+ * "Remind me later" (0 = never dismissed). A first-rollout escape hatch: a
+ * broken store must never lock users out of their notes, so the entitlement
+ * gate stays open while this is in the future. Mobile-only; desktop never
+ * reads it.
+ */
+export const paywallSnoozeUntilSchema = z.number().catch(0)
+
+/**
  * Which storage root the mobile graph lives in (Plan 21): the app's iCloud
  * Drive container (`'icloud'` — the recommended default offered first during
  * onboarding, syncs across devices) or the app-sandbox Documents directory
@@ -513,6 +522,7 @@ export const settingsSchema = z.looseObject({
   mobileOnboarded: mobileOnboardedSchema,
   mobileStorage: mobileStorageKindSchema,
   mobileGraphName: mobileGraphNameSchema,
+  paywallSnoozeUntil: paywallSnoozeUntilSchema,
   theme: themePreferenceSchema,
   timeFormat: timeFormatSchema,
   dateFormat: dateFormatSchema,

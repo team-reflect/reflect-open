@@ -2,26 +2,28 @@ import { useState, type ReactElement } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { Check } from 'lucide-react'
-import {
-  IAP_PRODUCT_IDS,
-  iapGetProducts,
-  iapPurchase,
-  iapRestorePurchases,
-  type IapProduct,
-} from '@reflect/core'
+import { IAP_PRODUCT_IDS, iapGetProducts, iapPurchase, iapRestorePurchases } from '@reflect/core'
 import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
-import { ENTITLEMENT_QUERY_KEY } from '@/mobile/use-entitlement'
+import {
+  ENTITLEMENT_QUERY_KEY_MONTHLY,
+  ENTITLEMENT_QUERY_KEY_YEARLY,
+} from '@/mobile/use-active-subscription'
+import { useSettings } from '@/providers/settings-provider'
 
 /** Which control kicked off the in-flight action (onboarding's PendingChoice
  * pattern): every button disables, only the initiator shows progress. */
 type PendingAction = 'monthly' | 'yearly' | 'restore' | null
 
+/** How long "Remind me later" keeps the paywall dismissed. */
+const SNOOZE_MS = 24 * 60 * 60 * 1000
+
 export function PaywallScreen(): ReactElement {
   const queryClient = useQueryClient()
+  const { updateSettings } = useSettings()
   const [pending, setPending] = useState<PendingAction>(null)
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
   const [plan, setPlan] = useState<'monthly' | 'yearly'>('yearly')
@@ -37,7 +39,6 @@ export function PaywallScreen(): ReactElement {
   const productsFailed =
     products.status === 'error' ||
     (products.status === 'success' && (yearly === null || monthly === null))
-  const savings = yearly !== null && monthly !== null ? yearlySavingsPercent(monthly, yearly) : null
   const selectedPrice =
     plan === 'yearly'
       ? `${yearly?.formattedPrice ?? ''}/year`
@@ -66,7 +67,10 @@ export function PaywallScreen(): ReactElement {
       if (count === 0) {
         setRestoreMessage('No previous purchase found for this Apple account.')
       } else {
-        await queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY })
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_YEARLY }),
+          queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_MONTHLY }),
+        ])
       }
     } catch {
       setRestoreMessage('Restore failed. Check your connection and try again.')
@@ -118,7 +122,7 @@ export function PaywallScreen(): ReactElement {
               <PlanCard
                 title="Yearly"
                 price={`${yearly.formattedPrice ?? ''} / year`}
-                badge={savings !== null ? `Save ${savings}%` : 'Best value'}
+                badge="Best value"
                 selected={plan === 'yearly'}
                 disabled={pending !== null}
                 onSelect={() => setPlan('yearly')}
@@ -143,13 +147,26 @@ export function PaywallScreen(): ReactElement {
                 Start 7-day free trial
               </Button>
               <p className="text-center text-xs leading-5 text-text-muted">
-                7 days free, then {selectedPrice}. Cancel anytime in the App Store.
+                7 days free, then {selectedPrice}.
+                <br />
+                Cancel anytime in the App Store.
               </p>
             </div>
           </div>
         ) : null}
 
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-4">
+          {/* First-rollout escape hatch: dismissing writes a snooze timestamp
+              and the gate in mobile-app.tsx unmounts this screen, so a broken
+              store never locks anyone out of their notes. */}
+          <button
+            type="button"
+            className="text-sm text-text-muted underline disabled:opacity-50"
+            disabled={pending !== null}
+            onClick={() => updateSettings({ paywallSnoozeUntil: Date.now() + SNOOZE_MS })}
+          >
+            Remind me later
+          </button>
           <button
             type="button"
             className="text-sm text-text-muted underline disabled:opacity-50"
@@ -231,48 +248,4 @@ function PlanCard({
       ) : null}
     </button>
   )
-}
-
-/**
- * Approximate percent saved by paying yearly instead of twelve monthly
- * renewals. StoreKit only hands us localized display strings, so this parses
- * the digits back out of them; returns null (render no badge) whenever the
- * strings do not parse into two believable prices.
- */
-function yearlySavingsPercent(monthly: IapProduct, yearly: IapProduct): number | null {
-  const monthlyPrice = parsePrice(monthly.formattedPrice)
-  const yearlyPrice = parsePrice(yearly.formattedPrice)
-  if (monthlyPrice === null || yearlyPrice === null || monthlyPrice <= 0 || yearlyPrice <= 0) {
-    return null
-  }
-  const fullYear = monthlyPrice * 12
-  if (yearlyPrice >= fullYear) return null
-  const percent = Math.round(((fullYear - yearlyPrice) / fullYear) * 100)
-  return percent >= 5 ? percent : null
-}
-
-function parsePrice(formatted: string | null | undefined): number | null {
-  if (formatted == null) return null
-  const digits = formatted.replaceAll(/[^0-9.,]/g, '')
-  if (digits.length === 0) return null
-  // The last "." or "," is the decimal separator only when 1-2 digits follow
-  // it; a 3-digit tail is read as a thousands group ("1,280"), which is right
-  // for every App Store currency except the rare 3-decimal ones, and those
-  // only cost us the badge.
-  const separator = Math.max(digits.lastIndexOf('.'), digits.lastIndexOf(','))
-  let integer = digits
-  let fraction = ''
-  if (separator !== -1) {
-    const tail = digits.slice(separator + 1)
-    if (tail.length > 0 && tail.length <= 2) {
-      integer = digits.slice(0, separator)
-      fraction = tail
-    }
-  }
-  integer = integer.replaceAll(/[.,]/g, '')
-  if (integer.length === 0 && fraction.length === 0) return null
-  const value = Number.parseFloat(
-    `${integer.length === 0 ? '0' : integer}.${fraction.length === 0 ? '0' : fraction}`,
-  )
-  return Number.isFinite(value) ? value : null
 }

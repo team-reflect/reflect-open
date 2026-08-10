@@ -7,9 +7,9 @@ import { PaywallScreen } from '@/mobile/paywall-screen'
 import { MobileShell } from '@/mobile/mobile-shell'
 import { MobileStatusLayer } from '@/mobile/status-layer'
 import { RecordingDrawer } from '@/mobile/recording-drawer'
-import { useEntitlement } from '@/mobile/use-entitlement'
 import { useICloudRefresh } from '@/mobile/use-icloud-refresh'
 import { useKeyboardCaretReveal, useKeyboardHeightVar } from '@/mobile/use-keyboard'
+import { useShouldShowPaywall } from '@/mobile/use-should-show-paywall'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics'
 import { CaptureProvider } from '@/providers/capture-provider'
 import { ChatProvider } from '@/providers/chat-provider'
@@ -30,11 +30,8 @@ import { RouterProvider } from '@/routing/router'
  * checkbox-haptic listener mount here so they cover every screen's editors.
  */
 export function MobileApp(): ReactElement {
-  const { status, graph, error, needsOnboarding, platform } = useGraph()
-  const isIos = platform === 'ios'
-  // Non-iOS (Android, browser-dev without StoreKit) never queries:
-  // `enabled: false` keeps the hook idle and the gate open.
-  const entitlement = useEntitlement(isIos)
+  const { status, graph, error, needsOnboarding } = useGraph()
+  const shouldShowPaywall = useShouldShowPaywall()
   useKeyboardHeightVar()
   useKeyboardCaretReveal()
   useTaskCheckboxHaptics()
@@ -51,17 +48,11 @@ export function MobileApp(): ReactElement {
     return installBackgroundFlush()
   }, [])
 
-  // Paid gate (iOS only, after onboarding). Blocks the ready branch below;
-  // 'loading' falls through to the bottom loading screen instead of flashing
-  // either the app or the paywall. StoreKit answers from its local
-  // transaction cache, so 'loading' is brief.
-  const gateBlocked = isIos && entitlement.status !== 'entitled'
-
-  if (gateBlocked && entitlement.status === 'locked') {
+  if (shouldShowPaywall) {
     return <PaywallScreen />
   }
 
-  if (status === 'ready' && graph && !gateBlocked) {
+  if (status === 'ready' && graph) {
     return (
       <MobileErrorBoundary>
         <RouterProvider key={graph.root}>

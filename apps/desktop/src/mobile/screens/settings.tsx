@@ -35,7 +35,11 @@ import {
   SettingsValueRow,
   type SegmentedOption,
 } from '@/mobile/settings-list'
-import { ENTITLEMENT_QUERY_KEY, useEntitlement } from '@/mobile/use-entitlement'
+import {
+  ENTITLEMENT_QUERY_KEY_MONTHLY,
+  ENTITLEMENT_QUERY_KEY_YEARLY,
+  useActiveSubscription,
+} from '@/mobile/use-active-subscription'
 import { useMobileSyncStatus } from '@/mobile/use-sync-status'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -75,7 +79,7 @@ export function MobileSettings(): ReactElement {
   const { back, canBack, navigate } = useRouter()
   const { graph, mobileStorageKind, platform } = useGraph()
   const isIos = platform === 'ios'
-  const entitlement = useEntitlement(isIos)
+  const { activeSubscription } = useActiveSubscription()
   const queryClient = useQueryClient()
   const [restorePending, setRestorePending] = useState(false)
 
@@ -83,7 +87,10 @@ export function MobileSettings(): ReactElement {
     setRestorePending(true)
     try {
       await iapRestorePurchases()
-      await queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_YEARLY }),
+        queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_MONTHLY }),
+      ])
     } finally {
       setRestorePending(false)
     }
@@ -304,14 +311,30 @@ export function MobileSettings(): ReactElement {
             <SettingsGroup header="Subscription">
               <SettingsValueRow
                 label="Plan"
-                value={entitlement.status === 'entitled' ? 'Reflect Pro' : 'Free'}
+                value={
+                  activeSubscription === 'monthly'
+                    ? 'Reflect Pro Monthly'
+                    : activeSubscription === 'yearly'
+                      ? 'Reflect Pro Yearly'
+                      : 'Free'
+                }
               />
-              <SettingsActionRow
-                label="Manage Subscription"
-                onPress={() => {
-                  void openUrl('https://apps.apple.com/account/subscriptions').catch(() => {})
-                }}
-              />
+              {activeSubscription === null ? (
+                // Clearing the snooze flips useShouldShowPaywall back to true,
+                // so the gate in mobile-app.tsx replaces the app with the
+                // paywall immediately.
+                <SettingsActionRow
+                  label="Upgrade to Pro"
+                  onPress={() => updateSettings({ paywallSnoozeUntil: 0 })}
+                />
+              ) : (
+                <SettingsActionRow
+                  label="Manage Subscription"
+                  onPress={() => {
+                    void openUrl('https://apps.apple.com/account/subscriptions').catch(() => {})
+                  }}
+                />
+              )}
               <SettingsActionRow
                 label="Restore Purchases"
                 pending={restorePending}
