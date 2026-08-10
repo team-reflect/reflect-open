@@ -116,6 +116,7 @@ export function definePluginEvent<Payload>(
         await bridge.listenPlugin(plugin, event, (raw) => {
           const parsed = schema.safeParse(raw)
           if (!parsed.success) {
+            // REVIEW: print console.warn if the payload is invalid
             return
           }
           for (const handler of handlers) {
