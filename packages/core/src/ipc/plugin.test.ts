@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { isAppError } from '../errors'
 import { setBridge } from './bridge'
-import { definePluginCommand, definePluginEvent } from './plugin'
+import { definePluginCommand, definePluginEvent, ignoredResult } from './plugin'
 
 afterEach(() => {
   setBridge(null)
@@ -13,10 +13,10 @@ const doThing = definePluginCommand<{ request: { value: number } }, { doubled: n
   'do_thing',
   z.object({ doubled: z.number() }),
 )
-const fireAndForget = definePluginCommand<Record<string, never>, null>(
+const fireAndForget = definePluginCommand<Record<string, never>, unknown>(
   'demo',
   'fire_and_forget',
-  z.null(),
+  ignoredResult,
 )
 
 describe('definePluginCommand', () => {
@@ -28,11 +28,11 @@ describe('definePluginCommand', () => {
     expect(invoke).toHaveBeenCalledWith('plugin:demo|do_thing', { request: { value: 2 } })
   })
 
-  it('accepts null for a void result', async () => {
-    const invoke = vi.fn().mockResolvedValue(null)
+  it('passes any fire-and-forget acknowledgement through unvalidated', async () => {
+    const invoke = vi.fn().mockResolvedValue(true)
     setBridge({ invoke, listen: async () => () => {} })
 
-    await expect(fireAndForget({})).resolves.toBeNull()
+    await expect(fireAndForget({})).resolves.toBe(true)
     expect(invoke).toHaveBeenCalledWith('plugin:demo|fire_and_forget', {})
   })
 

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { definePluginCommand, definePluginEvent } from './plugin'
+import { definePluginCommand, definePluginEvent, ignoredResult } from './plugin'
 
 /**
  * Typed bindings for `plugins/tauri-plugin-recording` — the native audio-memo
@@ -9,10 +9,6 @@ import { definePluginCommand, definePluginEvent } from './plugin'
  * or an `Encodable` struct in `ios/Sources/RecordingPlugin.swift` (events);
  * a field change there must land here in the same review.
  */
-
- // REVIEW: if we do not need the return result, then we do not force the result to be null, just use something else. This ensure that our
- // code is more robust to future changes in the plugin. For example, if the plugin returns a boolean to indicate whether the haptic was successful, we would not want our code to break. Apply this change to all other plugin commands/invokes that return null.
-const voidResult = z.null()
 
 /** Mirrors `StopResponse`: a finished recording still in staging. */
 const stopResponseSchema = z.object({
@@ -35,35 +31,35 @@ const readStagedSchema = z.object({ base64: z.string() })
 
 // Command args mirror the serde request models (`StartRequest`,
 // `StagedPathRequest`) under the command's `request` parameter.
-const startRecordingCommand = definePluginCommand<{ request: StartRecordingOptions }, null>(
+const startRecordingCommand = definePluginCommand<{ request: StartRecordingOptions }, unknown>(
   'recording',
   'start_recording',
-  voidResult,
+  ignoredResult,
 )
 const stopRecordingCommand = definePluginCommand<Record<string, never>, RecordingStopResponse>(
   'recording',
   'stop_recording',
   stopResponseSchema,
 )
-const cancelRecordingCommand = definePluginCommand<Record<string, never>, null>(
+const cancelRecordingCommand = definePluginCommand<Record<string, never>, unknown>(
   'recording',
   'cancel_recording',
-  voidResult,
+  ignoredResult,
 )
 const recordingStatusCommand = definePluginCommand<Record<string, never>, RecordingStatus>(
   'recording',
   'recording_status',
   recordingStatusSchema,
 )
-const actionsReadyCommand = definePluginCommand<Record<string, never>, null>(
+const actionsReadyCommand = definePluginCommand<Record<string, never>, unknown>(
   'recording',
   'actions_ready',
-  voidResult,
+  ignoredResult,
 )
-const actionPerformedCommand = definePluginCommand<Record<string, never>, null>(
+const actionPerformedCommand = definePluginCommand<Record<string, never>, unknown>(
   'recording',
   'action_performed',
-  voidResult,
+  ignoredResult,
 )
 const listStagedCommand = definePluginCommand<
   Record<string, never>,
@@ -74,10 +70,10 @@ const readStagedCommand = definePluginCommand<{ request: { path: string } }, { b
   'read_staged',
   readStagedSchema,
 )
-const deleteStagedCommand = definePluginCommand<{ request: { path: string } }, null>(
+const deleteStagedCommand = definePluginCommand<{ request: { path: string } }, unknown>(
   'recording',
   'delete_staged',
-  voidResult,
+  ignoredResult,
 )
 
 export interface StartRecordingOptions {

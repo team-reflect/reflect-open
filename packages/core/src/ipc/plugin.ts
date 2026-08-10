@@ -1,4 +1,4 @@
-import type { ZodType } from 'zod'
+import { z, type ZodType } from 'zod'
 import type { AppError } from '../errors'
 import { getBridge, type IpcBridge, type Unlisten } from './bridge'
 import { call } from './invoke'
@@ -29,6 +29,13 @@ export function definePluginCommand<Args extends Record<string, unknown>, Result
     return await call(`plugin:${plugin}|${command}`, args, resultSchema)
   }
 }
+
+/**
+ * Result schema for fire-and-forget commands: the acknowledgement payload
+ * is deliberately not validated, so a future plugin response (a boolean
+ * ack, a struct) cannot start rejecting calls whose result nobody reads.
+ */
+export const ignoredResult = z.unknown()
 
 /**
  * A live plugin-event subscription. Registration is asynchronous (an IPC
