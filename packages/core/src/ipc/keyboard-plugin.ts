@@ -12,6 +12,7 @@ import { definePluginCommand, definePluginEvent } from './plugin'
 const keyboardStateSchema = z.object({ height: z.number(), duration: z.number() })
 export type KeyboardState = z.infer<typeof keyboardStateSchema>
 
+// REVIEW: do not call a command as "xxxCommand". Rename them as function. for example, `const getCurrentKeyboardHeight = definePluginCommand...`
 const currentHeightCommand = definePluginCommand<Record<string, never>, KeyboardState>(
   'keyboard',
   'current_height',
