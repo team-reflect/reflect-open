@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import {
   actionPerformed,
   actionsReady,
-  subscribeNativeAction,
+  subscribeRecordingNativeAction,
   type PluginSubscription,
 } from '@reflect/core'
 import { isNativeShell } from '@/lib/platform'
@@ -77,7 +77,7 @@ export function useNativeRecordAction(options: UseNativeRecordActionOptions): vo
       if (disposed) {
         return
       }
-      subscription = subscribeNativeAction((event) => {
+      subscription = subscribeRecordingNativeAction((event) => {
         if (event.action !== 'recordAudio') {
           return
         }
