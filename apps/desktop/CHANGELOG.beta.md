@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.5...v0.9.0-beta.6) (2026-08-10)
+
+
+### Features
+
+* **mobile:** add iOS subscription ([#1086](https://github.com/team-reflect/reflect-open/issues/1086)) ([3e8a8df](https://github.com/team-reflect/reflect-open/commit/3e8a8dfabe4190d8856631dbb0125e08774ab3c4))
+
+
+### Bug Fixes
+
+* capture titles and descriptions from oversized pages ([#1081](https://github.com/team-reflect/reflect-open/issues/1081)) ([1d48916](https://github.com/team-reflect/reflect-open/commit/1d48916fd9279bf69ee5f13450d89707ffb4cba5))
+* capture YouTube video titles via oEmbed ([#1087](https://github.com/team-reflect/reflect-open/issues/1087)) ([c0031ae](https://github.com/team-reflect/reflect-open/commit/c0031aebb65854a8e2c14f3c0da281b4ad51e10b))
+* stop AI enrichment from inventing titles for captured links ([#1085](https://github.com/team-reflect/reflect-open/issues/1085)) ([5fb921e](https://github.com/team-reflect/reflect-open/commit/5fb921ed0d03e26d74dd4b6a9a18a41c8786d371))
+
 ## [0.9.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.4...v0.9.0-beta.5) (2026-08-09)
 
 
