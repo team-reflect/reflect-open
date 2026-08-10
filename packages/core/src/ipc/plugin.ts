@@ -5,65 +5,30 @@ import { call } from './invoke'
 
 /**
  * Typed bindings for the first-party plugins (`plugins/tauri-plugin-*`).
- * A plugin's commands are declared once as a
- * contract map — command name to args/result schemas — and its events as
- * schema-carrying subscriptions; per-plugin modules (`recording-plugin.ts`,
- * `keyboard-plugin.ts`) export plain functions on top so callers never see a
- * `plugin:name|command` string or an untyped payload.
+ * A plugin's commands are declared one per command (args type plus result
+ * schema) and its events as schema-carrying subscriptions; per-plugin
+ * modules (`recording-plugin.ts`, `keyboard-plugin.ts`) export plain
+ * functions on top so callers never see a `plugin:name|command` string or
+ * an untyped payload.
  */
-
-// Structural aliases for a schema's parameter and result types. Zod exposes
-// the same as `z.input`/`z.output`; the conditional form keeps this module's
-// zod import type-only.
-type SchemaInput<Schema> = Schema extends ZodType<unknown, infer Input> ? Input : never
-type SchemaOutput<Schema> = Schema extends ZodType<infer Output, unknown> ? Output : never
 
 /**
- * One command in a plugin's contract: the schema for the args record the
- * webview sends (`z.object({})` for commands that take none) and the schema
- * for the raw response — `z.null()` for a Rust `Result<()>`.
+ * Build the typed caller for one plugin command. Args are typed but not
+ * validated: the binding modules construct them, so a malformed args record
+ * is a compile error, not a runtime case. The response still crosses the
+ * IPC boundary untyped and funnels through {@link call}: validated against
+ * `resultSchema`, failures coerced to {@link AppError} like every other
+ * command.
  */
-export interface PluginCommandSpec {
-  args: ZodType<Record<string, unknown>, unknown>
-  result: ZodType<unknown, unknown>
-}
-
-/**
- * Build the typed caller for one plugin from its command contract.
- * The returned function composes `plugin:<plugin>|<command>` itself, parses
- * the outgoing args (a malformed args record is a caller bug and throws
- * loudly), and funnels through {@link call} — so responses are validated and
- * failures arrive as {@link AppError} like every other command.
- */
-export function definePluginCommands<Commands extends Record<string, PluginCommandSpec>>(
+export function definePluginCommand<Args extends Record<string, unknown>, Result>(
   plugin: string,
-  commands: Commands,
-): <Name extends keyof Commands & string>(
-  command: Name,
-  args: SchemaInput<Commands[Name]['args']>,
-) => Promise<SchemaOutput<Commands[Name]['result']>> {
-  return async <Name extends keyof Commands & string>(
-    command: Name,
-    args: SchemaInput<Commands[Name]['args']>,
-  ): Promise<SchemaOutput<Commands[Name]['result']>> => {
-    // `Name` is `keyof Commands`, so the lookup can't miss; the constraint's
-    // index signature just hides that from the checker.
-    const spec = commands[command]!
-    // Inside the generic body the indexed schema types are opaque; `call`
-    // validates with the exact runtime schema, so the assertion only restates
-    // what the contract already guarantees.
-    return (await call(
-      `plugin:${plugin}|${command}`,
-      spec.args.parse(args),
-      spec.result,
-    )) as SchemaOutput<Commands[Name]['result']>
+  command: string,
+  resultSchema: ZodType<Result, unknown>,
+): (args: Args) => Promise<Result> {
+  return async (args) => {
+    return await call(`plugin:${plugin}|${command}`, args, resultSchema)
   }
 }
-// REVIEW: definePluginCommands is too heavy:
-// 1. we do not need to validate the args, because the caller is already typed. so remove the spec.args.parse logic
-// 2. we do not need to group all commands under one plugin, we can just define each command separately, like this:
-// const cmd1 : (args: ArgsType1) => Promise<ResultType1> = definePluginCommand<ArgsType1, ResultType1>('plugin1', 'command1', resultSchema1)
-// comst result1 : ResultType1 = await cmd1(args1)
 
 /**
  * A live plugin-event subscription. Registration is asynchronous (an IPC

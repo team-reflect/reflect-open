@@ -2,28 +2,29 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { isAppError } from '../errors'
 import { setBridge } from './bridge'
-import { definePluginCommands, definePluginEvent } from './plugin'
+import { definePluginCommand, definePluginEvent } from './plugin'
 
 afterEach(() => {
   setBridge(null)
 })
 
-const callDemo = definePluginCommands('demo', {
-  do_thing: {
-    args: z.object({ request: z.object({ value: z.number() }) }),
-    result: z.object({ doubled: z.number() }),
-  },
-  fire_and_forget: { args: z.object({}), result: z.null() },
-})
+const doThing = definePluginCommand<{ request: { value: number } }, { doubled: number }>(
+  'demo',
+  'do_thing',
+  z.object({ doubled: z.number() }),
+)
+const fireAndForget = definePluginCommand<Record<string, never>, null>(
+  'demo',
+  'fire_and_forget',
+  z.null(),
+)
 
-describe('definePluginCommands', () => {
+describe('definePluginCommand', () => {
   it('composes the plugin command name and validates the response', async () => {
     const invoke = vi.fn().mockResolvedValue({ doubled: 4 })
     setBridge({ invoke, listen: async () => () => {} })
 
-    await expect(callDemo('do_thing', { request: { value: 2 } })).resolves.toEqual({
-      doubled: 4,
-    })
+    await expect(doThing({ request: { value: 2 } })).resolves.toEqual({ doubled: 4 })
     expect(invoke).toHaveBeenCalledWith('plugin:demo|do_thing', { request: { value: 2 } })
   })
 
@@ -31,24 +32,14 @@ describe('definePluginCommands', () => {
     const invoke = vi.fn().mockResolvedValue(null)
     setBridge({ invoke, listen: async () => () => {} })
 
-    await expect(callDemo('fire_and_forget', {})).resolves.toBeNull()
+    await expect(fireAndForget({})).resolves.toBeNull()
     expect(invoke).toHaveBeenCalledWith('plugin:demo|fire_and_forget', {})
-  })
-
-  it('throws on malformed args before any IPC', async () => {
-    const invoke = vi.fn()
-    setBridge({ invoke, listen: async () => () => {} })
-
-    await expect(callDemo('do_thing', { request: { value: 'nope' } } as never)).rejects.toThrow()
-    expect(invoke).not.toHaveBeenCalled()
   })
 
   it('turns a mismatched response into a parse AppError naming the command', async () => {
     setBridge({ invoke: async () => ({ wrong: true }), listen: async () => () => {} })
 
-    const error = await callDemo('do_thing', { request: { value: 2 } }).catch(
-      (caught: unknown) => caught,
-    )
+    const error = await doThing({ request: { value: 2 } }).catch((caught: unknown) => caught)
     expect(isAppError(error)).toBe(true)
     if (isAppError(error)) {
       expect(error.kind).toBe('parse')
@@ -64,7 +55,7 @@ describe('definePluginCommands', () => {
       listen: async () => () => {},
     })
 
-    const error = await callDemo('fire_and_forget', {}).catch((caught: unknown) => caught)
+    const error = await fireAndForget({}).catch((caught: unknown) => caught)
     expect(error).toEqual({ kind: 'unknown', message: 'microphone access denied' })
   })
 })
