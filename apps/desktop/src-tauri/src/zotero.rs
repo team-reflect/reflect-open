@@ -36,6 +36,10 @@ pub struct ZoteroItem {
     /// The item's `date` field as authored ("2020-01-01", "2020", "n.d.").
     pub date: Option<String>,
     pub item_type: String,
+    /// The item's abstract as authored; the picker truncates for display.
+    pub abstract_note: Option<String>,
+    /// The item's URL field, when the item carries one.
+    pub url: Option<String>,
 }
 
 /// The `data` envelope every Local API item is wrapped in.
@@ -56,6 +60,10 @@ struct ZoteroApiData {
     date: Option<String>,
     #[serde(default)]
     item_type: String,
+    #[serde(default)]
+    abstract_note: Option<String>,
+    #[serde(default)]
+    url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -149,6 +157,8 @@ pub async fn zotero_search(query: String) -> AppResult<Vec<ZoteroItem>> {
                     .collect(),
                 date: data.date,
                 item_type: data.item_type,
+                abstract_note: data.abstract_note,
+                url: data.url,
             }
         })
         .collect();

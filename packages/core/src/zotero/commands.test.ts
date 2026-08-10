@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { zoteroItemLink, zoteroItemSchema, zoteroItemSummary } from './commands'
+import {
+  zoteroAbstractExcerpt,
+  zoteroItemLink,
+  zoteroItemSchema,
+  zoteroItemSummary,
+} from './commands'
 
 const baseItem = {
   key: 'ABCD1234',
@@ -7,6 +12,8 @@ const baseItem = {
   creators: ['Vaswani, Ashish'],
   date: '2017-06-12',
   itemType: 'journalArticle',
+  abstractNote: 'We propose a new network architecture.',
+  url: 'https://arxiv.org/abs/1706.03762',
 }
 
 describe('zoteroItemLink', () => {
@@ -61,8 +68,34 @@ describe('zoteroItemSchema', () => {
     expect(zoteroItemSchema.parse({ ...baseItem, date: null })).toEqual({ ...baseItem, date: null })
   })
 
+  it('accepts items without an abstract or url', () => {
+    expect(zoteroItemSchema.parse({ ...baseItem, abstractNote: null, url: null })).toEqual({
+      ...baseItem,
+      abstractNote: null,
+      url: null,
+    })
+  })
+
   it('rejects a payload missing the item key', () => {
     const { key: _key, ...rest } = baseItem
     expect(zoteroItemSchema.safeParse(rest).success).toBe(false)
+  })
+})
+
+describe('zoteroAbstractExcerpt', () => {
+  it('keeps a short abstract whole', () => {
+    expect(zoteroAbstractExcerpt(baseItem)).toBe('We propose a new network architecture.')
+  })
+
+  it('collapses whitespace and truncates a long abstract with an ellipsis', () => {
+    const long = 'word '.repeat(100)
+    const excerpt = zoteroAbstractExcerpt({ ...baseItem, abstractNote: `  ${long}  ` })
+    expect(excerpt.endsWith('…')).toBe(true)
+    expect(excerpt).not.toContain('\n')
+    expect(excerpt.length).toBeLessThanOrEqual(201)
+  })
+
+  it('returns an empty string when the item has no abstract', () => {
+    expect(zoteroAbstractExcerpt({ ...baseItem, abstractNote: null })).toBe('')
   })
 })

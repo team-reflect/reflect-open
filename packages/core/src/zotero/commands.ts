@@ -23,6 +23,10 @@ export const zoteroItemSchema = z.object({
   /** The item's `date` field as authored ("2020-01-01", "2020", "n.d."). */
   date: z.string().nullable(),
   itemType: z.string(),
+  /** The item's abstract as authored; truncate with {@link zoteroAbstractExcerpt}. */
+  abstractNote: z.string().nullable(),
+  /** The item's URL field, when the item carries one. */
+  url: z.string().nullable(),
 })
 
 export type ZoteroItem = z.infer<typeof zoteroItemSchema>
@@ -49,6 +53,25 @@ function yearOf(date: string | null): string | null {
   }
   const year = date.split('-')[0]?.trim() ?? ''
   return /^\d{4}$/.test(year) ? year : null
+}
+
+/** The longest excerpt the picker shows before truncating with an ellipsis. */
+export const ZOTERO_ABSTRACT_MAX_LENGTH = 200
+
+/**
+ * A short, whitespace-normalized excerpt of an item's abstract for the picker
+ * row — enough to tell two same-titled items apart, never the whole abstract.
+ * Returns an empty string when the item has no abstract.
+ */
+export function zoteroAbstractExcerpt(item: ZoteroItem): string {
+  if (item.abstractNote === null) {
+    return ''
+  }
+  const collapsed = item.abstractNote.replaceAll(/\s+/g, ' ').trim()
+  if (collapsed.length <= ZOTERO_ABSTRACT_MAX_LENGTH) {
+    return collapsed
+  }
+  return `${collapsed.slice(0, ZOTERO_ABSTRACT_MAX_LENGTH).trimEnd()}…`
 }
 
 /**

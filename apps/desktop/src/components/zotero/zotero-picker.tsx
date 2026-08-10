@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   errorMessage,
+  zoteroAbstractExcerpt,
   zoteroItemLink,
   zoteroItemSummary,
   zoteroSearch,
@@ -94,7 +95,7 @@ function ZoteroPickerDialog({
     >
       <DialogContent
         aria-describedby={undefined}
-        className="grid max-h-[calc(100dvh-2rem)] grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden sm:max-w-lg"
+        className="grid max-h-[calc(100dvh-2rem)] grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden sm:max-w-3xl"
       >
         <DialogHeader className="pr-8">
           <DialogTitle>Insert Zotero item</DialogTitle>
@@ -121,6 +122,7 @@ function ZoteroPickerDialog({
             <ul className="flex flex-col">
               {items?.map((item) => {
                 const summary = zoteroItemSummary(item)
+                const abstract = zoteroAbstractExcerpt(item)
                 return (
                   <li key={item.key}>
                     <button
@@ -133,6 +135,16 @@ function ZoteroPickerDialog({
                       </span>
                       {summary !== '' ? (
                         <span className="w-full truncate text-xs text-text-muted">{summary}</span>
+                      ) : null}
+                      {abstract !== '' ? (
+                        <span className="line-clamp-2 w-full text-xs text-text-secondary">
+                          {abstract}
+                        </span>
+                      ) : null}
+                      {item.url !== null && item.url.trim() !== '' ? (
+                        <span className="w-full truncate font-mono text-[11px] text-text-muted">
+                          {item.url}
+                        </span>
                       ) : null}
                     </button>
                   </li>

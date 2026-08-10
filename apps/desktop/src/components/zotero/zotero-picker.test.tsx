@@ -25,6 +25,8 @@ vi.mock('@reflect/core', async (importOriginal) => {
             creators: ['Vaswani, Ashish'],
             date: '2017-06-12',
             itemType: 'journalArticle',
+            abstractNote: 'We propose a new network architecture for sequence transduction.',
+            url: 'https://arxiv.org/abs/1706.03762',
           },
         ]
       }
@@ -62,6 +64,10 @@ describe('ZoteroPicker', () => {
     await userEvent.fill(input, 'attention')
 
     await expect.element(page.getByText('Attention is all you need')).toBeInTheDocument()
+    await expect
+      .element(page.getByText(/We propose a new network architecture/))
+      .toBeInTheDocument()
+    await expect.element(page.getByText('https://arxiv.org/abs/1706.03762')).toBeInTheDocument()
     await userEvent.click(page.getByRole('button', { name: /Attention is all you need/ }))
 
     expect(mocks.insertMarkdown).toHaveBeenCalledWith(
