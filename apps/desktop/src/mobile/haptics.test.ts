@@ -6,14 +6,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * registered (desktop, browser dev): one warning, then no further IPC.
  */
 
-const invokeMock = vi.fn<(command: string, args: Record<string, unknown>) => Promise<unknown>>()
+const invokeMock = vi.fn<(command: string) => Promise<unknown>>()
 
 async function loadHaptics(): Promise<() => void> {
   // resetModules gives this test a fresh latch and a fresh @reflect/core —
   // install the fake bridge on the same instance the module under test sees.
   const core = await import('@reflect/core')
   core.setBridge({
-    invoke: (command, args) => invokeMock(command, args),
+    invoke: (command) => invokeMock(command),
     listen: async () => () => {},
   })
   const module = await import('./haptics')
@@ -34,7 +34,7 @@ describe('hapticImpactLight', () => {
     hapticImpactLight()
 
     expect(invokeMock).toHaveBeenCalledTimes(2)
-    expect(invokeMock).toHaveBeenCalledWith('plugin:keyboard|impact_light', {})
+    expect(invokeMock).toHaveBeenCalledWith('plugin:keyboard|impact_light')
   })
 
   it('warns once and stops invoking after the bridge rejects', async () => {

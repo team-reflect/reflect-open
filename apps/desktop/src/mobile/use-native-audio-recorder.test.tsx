@@ -8,7 +8,7 @@ import {
   useNativeAudioRecorder,
 } from './use-native-audio-recorder'
 
-const invoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise<unknown>>()
+const invoke = vi.fn<(command: string, args?: unknown) => Promise<unknown>>()
 
 /** Captured plugin-event handlers, keyed by event name, dispatchable per test. */
 const pluginEvents = {
@@ -31,7 +31,7 @@ async function renderRecorder() {
 beforeEach(() => {
   vi.clearAllMocks()
   pluginEvents.handlers.clear()
-  invoke.mockResolvedValue(null)
+  invoke.mockResolvedValue(undefined)
   // A fresh bridge object per test: the shared plugin-event registration in
   // core is keyed by bridge identity, so reusing one object would leak
   // listeners across tests.
@@ -67,7 +67,6 @@ describe('useNativeAudioRecorder', () => {
     invoke.mockRejectedValueOnce('microphone access denied')
     const { result } = await renderRecorder()
 
-    // The raw string rejection arrives normalized to the AppError contract.
     await expect(
       act(async () => {
         await result.current.start()
@@ -80,7 +79,7 @@ describe('useNativeAudioRecorder', () => {
     const path = '/staging/stop-normal.m4a'
     invoke.mockImplementation(async (command: string) => {
       if (command === 'plugin:recording|start_recording') {
-        return null
+        return
       }
       if (command === 'plugin:recording|stop_recording') {
         return { path, durationMs: 4000, modifiedMs: 1_700_000_000_000 }
@@ -119,7 +118,7 @@ describe('useNativeAudioRecorder', () => {
       if (command === 'plugin:recording|stop_recording') {
         return { path, durationMs: 300, modifiedMs: 1_700_000_000_000 }
       }
-      return null
+      return
     })
     const { result } = await renderRecorder()
 
@@ -163,7 +162,7 @@ describe('useNativeAudioRecorder', () => {
       if (command === 'plugin:recording|read_staged') {
         return { base64: base64Of('native-bytes') }
       }
-      return null
+      return
     })
     const { result } = await renderRecorder()
     await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
@@ -221,7 +220,7 @@ describe('useNativeAudioRecorder', () => {
       if (command === 'plugin:recording|read_staged') {
         throw new Error('io error')
       }
-      return null
+      return
     })
     await renderRecorder()
     await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
@@ -249,9 +248,9 @@ describe('useNativeAudioRecorder', () => {
         await new Promise<void>((resolve) => {
           releaseStart = resolve
         })
-        return null
+        return
       }
-      return null
+      return
     })
     const { result } = await renderRecorder()
     await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))

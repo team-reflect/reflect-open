@@ -16,7 +16,7 @@ const captureAudioMemo = vi.hoisted(() =>
   vi.fn<(input: CaptureAudioMemoInput) => Promise<CaptureAudioMemoOutcome>>(),
 )
 const failOperation = vi.hoisted(() => vi.fn<(message: string) => void>())
-const invoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise<unknown>>()
+const invoke = vi.fn<(command: string, args?: unknown) => Promise<unknown>>()
 
 /** Captured plugin-event handlers, keyed by event name, dispatchable per test. */
 const pluginEvents = {
@@ -208,11 +208,7 @@ beforeEach(() => {
     transcriptionFormat: true,
   }
   captureAudioMemo.mockResolvedValue({ ok: true, memo: MEMO })
-  // Void plugin commands answer null (their z.null() contract); only the
-  // orphan scan's list_staged has a payload by default.
-  invoke.mockImplementation(async (command: string) =>
-    command === 'plugin:recording|list_staged' ? { files: [] } : null,
-  )
+  invoke.mockResolvedValue({ files: [] })
   pluginEvents.handlers.clear()
   // A fresh bridge object per test: the shared plugin-event registration in
   // core is keyed by bridge identity, so reusing one object would leak
