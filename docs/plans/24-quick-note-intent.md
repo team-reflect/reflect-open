@@ -116,13 +116,24 @@ morning still lands on the right day.
    message* (link captures through the native host) and is untouched; the
    native host and Rust relay never see text-envelope sources.
 2. **`packages/core/src/markdown/append-section.ts`** — new
-   `appendListItem(source, line)`, exported through `markdown/edit.ts` and
-   `markdown/index.ts`:
-   - Strip trailing whitespace (as `appendBlock` does). If the last
-     non-empty line matches an unordered list item —
-     `/^ {0,3}[-+*] /` (which also covers `- [ ]`, `- [x]`, and the round
-     `+ [ ]` task form) — append `line` **directly after it with a single
-     newline**, joining that list.
+   `appendListItem(source, text, kind)` (kind = `append` / `checkbox` /
+   `task`), exported through `markdown/edit.ts` and `markdown/index.ts`.
+   The helper composes the line itself so it can normalize the marker —
+   in CommonMark the bullet marker is part of the list structure, and a
+   `- ` item after a `* ` item is a *new* list, not a continuation:
+   - Strip trailing whitespace (as `appendBlock` does). Join only when the
+     last non-empty line matches an unordered list item
+     (`/^ {0,3}[-+*] /`, which also covers `- [ ]`, `- [x]`, and the round
+     `+ [ ]` task form): insert the new line **directly after it with a
+     single newline**.
+   - **Marker normalization:** the continuation marker is the marker of the
+     last column-0 item in the trailing list run (so a nested tail
+     continues the *outer* list); no column-0 item found → fall back to
+     `appendBlock`. `append` renders `<marker> text`, `checkbox`
+     `<marker> [ ] text`. `task` is the exception: always `+ [ ] text` —
+     the round `+` is the marker the Tasks projection reads and is never
+     normalized away, accepting that after a `-`/`*` list it technically
+     starts an adjacent list.
    - Otherwise fall back to `appendBlock` (blank line, new list). Ordered
      lists (`1. `), prose, headings, fences: fall back.
    - Use `documentLineEnding` throughout (CRLF-safe).
@@ -130,17 +141,27 @@ morning still lands on the right day.
    switches from `appendBlock` to `appendListItem` for **all three kinds**
    (`append` / `checkbox` / `task`) and all sources. This deliberately
    changes deep-link and share-sheet behavior too: consecutive text captures
-   coalesce into one list everywhere. The same-line dedup check is unchanged
-   (a repeated identical line on the same day is still dropped — see open
-   questions).
+   coalesce into one list everywhere. The dedup scan becomes
+   marker-insensitive: it compares the payload with the list prefix
+   (`/^ {0,3}[-+*] (\[[ xX]\] )?/`) stripped and the kind matched, so a
+   retried envelope still dedups even when an earlier drain adopted a
+   different marker for the same text (a repeated identical payload on the
+   same day is still dropped — see open questions).
 4. **Tests** (node project, `.test.ts`):
-   - `append-section.test.ts`: empty note; prose tail; bullet tail; checkbox
-     and `+ [ ]` task tails; nested-bullet tail (≤3 spaces indent); ordered
-     -list tail falls back; trailing blank lines; CRLF documents.
+   - `append-section.test.ts`: empty note; prose tail; bullet tail; `*` tail
+     (new item adopts `*`); checkbox and `+ [ ]` task tails; `task` after a
+     `-` list keeps its `+ [ ]` marker; nested-bullet tail continues the
+     outer column-0 marker; ordered-list tail falls back; trailing blank
+     lines; CRLF documents.
    - `capture-drain.test.ts`: two `append` envelopes on one day yield one
      two-item list; `append` after `task` joins the same list; prose after
      the list starts a fresh list; `ios-intent` source drains; dedup still
-     returns the deduped outcome.
+     returns the deduped outcome, including across markers (an `append`
+     retry dedups against a `* text` line).
+   - Privacy regression: an `ios-intent` envelope draining into a daily
+     note marked `private: true` writes only the local daily file — text
+     captures have no enrichment leg by construction, and the test pins
+     that no scrape/AI call is ever made for them.
    - `capture-envelope.test.ts`: `ios-intent` accepted, unknown sources
      rejected.
 
@@ -148,9 +169,11 @@ morning still lands on the right day.
 
 1. **`gen/apple/ShareExtension/CaptureInbox.swift`** — parametrize the
    producer: `TextCaptureEnvelope.source` becomes a `var` set by a new
-   `source` argument on `spoolText(_:source:)`. `ShareViewController` passes
-   `"ios-share"`; the intent passes `"ios-intent"`. No other changes — the
-   folding, caps, and atomic spool are exactly what the intent needs.
+   `source` argument on `spoolText(_:source:)` with no default, so the
+   compiler finds every call site. The share flow's one existing caller
+   (`ShareState.swift`) passes `"ios-share"`; the intent passes
+   `"ios-intent"`. No other changes — the folding, caps, and atomic spool
+   are exactly what the intent needs.
 2. **New `gen/apple/Sources/reflect-open/QuickNoteIntent.swift`** — modeled
    line-for-line on `RecordingIntents.swift` (`#if canImport(AppIntents)`,
    `@available(iOS 16.0, *)`):
@@ -166,10 +189,13 @@ morning still lands on the right day.
      `needsValueError` reprompt; spool; return
      `.result(dialog: "Saved")`. Spool failure throws so Siri reports
      failure honestly instead of claiming "Saved".
-   - Default `authenticationPolicy` (requires an authenticated device —
-     Face ID satisfies it invisibly from the lock screen). Revisit
-     `.alwaysAllowed` only after verifying the App Group container's file
-     protection class allows locked writes.
+   - `static var authenticationPolicy` set **explicitly** to
+     `.requiresAuthentication` — Apple's documented default is
+     `.alwaysAllowed`, which runs the intent on a locked device; that is
+     not the contract until the App Group container's file-protection
+     class is verified for locked writes. Face ID satisfies the policy
+     invisibly from the lock screen. Revisit `.alwaysAllowed` (true
+     no-unlock voice capture) only after that verification.
 3. **`RecordingIntents.swift`** — add to `ReflectAppShortcuts`:
    `AppShortcut(intent: QuickNoteIntent(), phrases: ["Add a note in
    \(.applicationName)", "Take a quick note in \(.applicationName)"],
@@ -206,7 +232,8 @@ morning still lands on the right day.
    lands once. Right for crash-retry protection, arguably wrong for genuine
    repeat notes. Predates this plan; keeping as-is, flagging for a product
    call.
-2. **Siri phrase wording.** "Add a note in Reflect" may collide with Apple
-   Notes' vocabulary in practice; the device pass should try variants before
-   we ship the phrase list (changing phrases later is cheap — they're not
-   user-visible strings until Siri learns them).
+2. **Siri phrase wording.** App Shortcut phrases are live in Siri,
+   Spotlight, and the Shortcuts app the moment a build installs — they are
+   user-facing metadata, not latent strings. "Add a note in Reflect" may
+   also collide with Apple Notes' vocabulary in practice. The device pass
+   must try variants before the phrase list ships in any TestFlight build.
