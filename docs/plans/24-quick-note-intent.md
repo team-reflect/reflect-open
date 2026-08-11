@@ -120,44 +120,59 @@ morning still lands on the right day.
    `task`), exported through `markdown/edit.ts` and `markdown/index.ts`.
    The helper composes the line itself so it can normalize the marker —
    in CommonMark the bullet marker is part of the list structure, and a
-   `- ` item after a `* ` item is a *new* list, not a continuation:
+   `-` item directly after a `*` item is a *new* list, not a continuation:
    - Strip trailing whitespace (as `appendBlock` does). Join only when the
-     last non-empty line matches an unordered list item
-     (`/^ {0,3}[-+*] /`, which also covers `- [ ]`, `- [x]`, and the round
-     `+ [ ]` task form): insert the new line **directly after it with a
-     single newline**.
-   - **Marker normalization:** the continuation marker is the marker of the
-     last column-0 item in the trailing list run (so a nested tail
-     continues the *outer* list); no column-0 item found → fall back to
-     `appendBlock`. `append` renders `<marker> text`, `checkbox`
-     `<marker> [ ] text`. `task` is the exception: always `+ [ ] text` —
-     the round `+` is the marker the Tasks projection reads and is never
-     normalized away, accepting that after a `-`/`*` list it technically
-     starts an adjacent list.
+     trailing lines form an unordered-list run: walk backwards over
+     consecutive unordered list items (`/^\s*[-+*] /` at **any** indent,
+     which also covers `- [ ]`, `- [x]`, and the round `+ [ ]` task form —
+     CommonMark nesting legally pushes deep markers past 3 spaces) until a
+     **column-0 item** is reached. Insert the new line **directly after
+     the last line with a single newline**. If the walk hits a blank line,
+     prose, a wrapped continuation line, or the note top before finding a
+     column-0 item, fall back to `appendBlock` — the anchor requirement is
+     what keeps an indented code block that merely looks like a list item
+     from being joined. A deliberate approximation of CommonMark list
+     structure, biased to fall back (today's behavior) whenever ambiguous.
+   - **Marker normalization:** the continuation marker is the marker of
+     that anchoring column-0 item (so a nested tail continues the *outer*
+     list). `append` renders `<marker> text`. `checkbox` renders
+     `<marker> [ ] text` but **never adopts `+`** — after a `+` list it
+     renders `- [ ] text` — so `+ [ ]` stays unambiguously a task and the
+     kind is always recoverable from the line form (no brackets = append,
+     `-`/`*` with brackets = checkbox, `+` with brackets = task). `task`
+     is the mirror exception: always `+ [ ] text`, the marker the Tasks
+     projection reads, never normalized away. Both exceptions accept that
+     the line technically starts an adjacent list.
    - Otherwise fall back to `appendBlock` (blank line, new list). Ordered
-     lists (`1. `), prose, headings, fences: fall back.
+     lists (`1.` followed by a space), prose, headings, fences: fall back.
    - Use `documentLineEnding` throughout (CRLF-safe).
 3. **`packages/core/src/actions/capture-drain.ts`** — `drainTextCapture`
    switches from `appendBlock` to `appendListItem` for **all three kinds**
    (`append` / `checkbox` / `task`) and all sources. This deliberately
    changes deep-link and share-sheet behavior too: consecutive text captures
    coalesce into one list everywhere. The dedup scan becomes
-   marker-insensitive: it compares the payload with the list prefix
-   (`/^ {0,3}[-+*] (\[[ xX]\] )?/`) stripped and the kind matched, so a
-   retried envelope still dedups even when an earlier drain adopted a
-   different marker for the same text (a repeated identical payload on the
-   same day is still dropped — see open questions).
+   marker-insensitive within a kind: it strips the list prefix
+   (`/^\s*[-+*] (\[[ xX]\] )?/`), recovers the kind from the line form (the
+   encoding the normalization rules guarantee), and dedups only when both
+   payload and kind match — so a retried `append` dedups against a `* text`
+   line, but a `checkbox` and a `task` with the same payload are distinct
+   captures and both land (a repeated identical payload of the same kind on
+   the same day is still dropped — see open questions).
 4. **Tests** (node project, `.test.ts`):
    - `append-section.test.ts`: empty note; prose tail; bullet tail; `*` tail
      (new item adopts `*`); checkbox and `+ [ ]` task tails; `task` after a
-     `-` list keeps its `+ [ ]` marker; nested-bullet tail continues the
-     outer column-0 marker; ordered-list tail falls back; trailing blank
-     lines; CRLF documents.
+     `-` list keeps its `+ [ ]` marker; `checkbox` after a `+` list renders
+     `- [ ]`; nested-bullet tail continues the outer column-0 marker,
+     including a four-space-deep nested marker (`- foo` / two-space `- bar`
+     / four-space `- baz`); an indented list-looking line with no column-0
+     anchor (code block) falls back; ordered-list tail falls back; trailing
+     blank lines; CRLF documents.
    - `capture-drain.test.ts`: two `append` envelopes on one day yield one
      two-item list; `append` after `task` joins the same list; prose after
      the list starts a fresh list; `ios-intent` source drains; dedup still
      returns the deduped outcome, including across markers (an `append`
-     retry dedups against a `* text` line).
+     retry dedups against a `* text` line) but never across kinds (a
+     `checkbox` and a `task` with the same payload both land).
    - Privacy regression: an `ios-intent` envelope draining into a daily
      note marked `private: true` writes only the local daily file — text
      captures have no enrichment leg by construction, and the test pins
@@ -190,12 +205,16 @@ morning still lands on the right day.
      `.result(dialog: "Saved")`. Spool failure throws so Siri reports
      failure honestly instead of claiming "Saved".
    - `static var authenticationPolicy` set **explicitly** to
-     `.requiresAuthentication` — Apple's documented default is
-     `.alwaysAllowed`, which runs the intent on a locked device; that is
-     not the contract until the App Group container's file-protection
-     class is verified for locked writes. Face ID satisfies the policy
-     invisibly from the lock screen. Revisit `.alwaysAllowed` (true
-     no-unlock voice capture) only after that verification.
+     `.requiresLocalDeviceAuthentication` — Apple's documented default is
+     `.alwaysAllowed` (runs on a locked device), and the milder
+     `.requiresAuthentication` can still run on a locked iPhone when the
+     user is authenticated elsewhere, e.g. an unlocked paired Watch. Until
+     the App Group container's file-protection class is verified for
+     locked writes, the contract is that the device performing the write
+     is itself unlocked, which only the local-device policy guarantees.
+     Face ID satisfies it invisibly from the lock screen. Relax stepwise
+     (Watch/HomePod capture, then true no-unlock voice capture) only after
+     that verification.
 3. **`RecordingIntents.swift`** — add to `ReflectAppShortcuts`:
    `AppShortcut(intent: QuickNoteIntent(), phrases: ["Add a note in
    \(.applicationName)", "Take a quick note in \(.applicationName)"],
