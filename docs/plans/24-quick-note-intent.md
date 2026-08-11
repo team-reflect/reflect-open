@@ -41,8 +41,16 @@ and the proven in-app `openAppWhenRun = false` intent pattern).
   `drainTextCapture`) validates against
   `textCaptureEnvelopeSchema` and appends `- <text>` to the capture-day
   daily note. Producer atomicity (`.json.tmp` → rename), the 64 KiB spool
-  cap, UTF-16 field caps, whitespace folding, quarantine, and the dedup
-  line-scan all exist and are not touched.
+  cap, UTF-16 field caps, whitespace folding, and quarantine all exist and
+  are not touched.
+- **List-editing machinery.** `packages/core/src/markdown/append-list-item.ts`
+  already solves "insert an item into an existing list" with the real
+  meowdown parser: `appendListItemAtHeading` finds a section's `BulletList`
+  node and `listMark` extends it with the list's own `-`/`+`/`*` marker
+  ("switching it would split the list in two"). This plan's helper is the
+  note-tail sibling of that code, not a new line-regex heuristic — the
+  parser already distinguishes nested lists, indented code blocks, ordered
+  lists, and fences correctly, for free.
 - **Relay/drain triggers.** `capture-controller.ts` runs relay + drain on
   graph launch and on every return to foreground
   (`visibilitychange` → visible, armed on mobile by `relaySharedInbox` in
@@ -107,6 +115,25 @@ the copy never overpromises. The daily note targeted is the **capture-day**
 note (`capturedAt` → `captureLocalDate`), so a 23:59 capture drained the next
 morning still lands on the right day.
 
+## Phase 0 — spike: background launch of an in-app intent (gates Phase 2 only)
+
+The one genuinely unverified assumption is that iOS background-launching the
+**Tauri** app to run an app-target intent is safe and fast: the app was never
+designed to boot without a foreground scene. Before building Phase 2, hack a
+throwaway intent into the app target (write a marker file to the App Group
+container, return a dialog) and, with the app fully killed, run it from the
+Shortcuts app and via Siri on a simulator + device:
+
+- `perform()` executes and the file lands (proves the execution model);
+- Siri round-trip latency is acceptable (target: dialog within ~2 s);
+- the background boot neither crashes (watch Sentry/console for
+  scene-assumption failures in the Tauri/webview init) nor wedges the
+  subsequent real foreground launch.
+
+Phase 1 is independent and proceeds regardless; a spike failure flips
+Phase 2 to the App Intents extension fallback (see the architecture
+decision) before any real Swift work is invested.
+
 ## Phase 1 — schema + drain coalescing (platform-neutral TS, CI-testable)
 
 1. **`packages/core/src/actions/capture-envelope.ts`** — add `'ios-intent'`
@@ -115,64 +142,59 @@ morning still lands on the right day.
    The parity corpus (`capture-envelope.fixtures.json`) covers the *wire
    message* (link captures through the native host) and is untouched; the
    native host and Rust relay never see text-envelope sources.
-2. **`packages/core/src/markdown/append-section.ts`** — new
+2. **`packages/core/src/markdown/append-list-item.ts`** — new
    `appendListItem(source, text, kind)` (kind = `append` / `checkbox` /
    `task`), exported through `markdown/edit.ts` and `markdown/index.ts`.
-   The helper composes the line itself so it can normalize the marker —
-   in CommonMark the bullet marker is part of the list structure, and a
-   `-` item directly after a `*` item is a *new* list, not a continuation:
-   - Strip trailing whitespace (as `appendBlock` does). Join only when the
-     trailing lines form an unordered-list run: walk backwards over
-     consecutive unordered list items (`/^\s*[-+*] /` at **any** indent,
-     which also covers `- [ ]`, `- [x]`, and the round `+ [ ]` task form —
-     CommonMark nesting legally pushes deep markers past 3 spaces) until a
-     **column-0 item** is reached. Insert the new line **directly after
-     the last line with a single newline**. If the walk hits a blank line,
-     prose, a wrapped continuation line, or the note top before finding a
-     column-0 item, fall back to `appendBlock` — the anchor requirement is
-     what keeps an indented code block that merely looks like a list item
-     from being joined. A deliberate approximation of CommonMark list
-     structure, biased to fall back (today's behavior) whenever ambiguous.
-   - **Marker normalization:** the continuation marker is the marker of
-     that anchoring column-0 item (so a nested tail continues the *outer*
-     list). `append` renders `<marker> text`. `checkbox` renders
-     `<marker> [ ] text` but **never adopts `+`** — after a `+` list it
-     renders `- [ ] text` — so `+ [ ]` stays unambiguously a task and the
-     kind is always recoverable from the line form (no brackets = append,
-     `-`/`*` with brackets = checkbox, `+` with brackets = task). `task`
-     is the mirror exception: always `+ [ ] text`, the marker the Tasks
-     projection reads, never normalized away. Both exceptions accept that
-     the line technically starts an adjacent list.
-   - Otherwise fall back to `appendBlock` (blank line, new list). Ordered
-     lists (`1.` followed by a space), prose, headings, fences: fall back.
-   - Use `documentLineEnding` throughout (CRLF-safe).
+   **Parser-based, beside the code it mirrors** — not a line-regex
+   heuristic. Like `appendListItemAtHeading`: `splitFrontmatter` +
+   `parseBody`, then look at the **last top-level block** of the body.
+   - If that block is a `BulletList`, read its marker with the existing
+     `listMark` helper and join when the kinds' marker rules allow
+     (below): insert `<mark> <payload>` directly after the list's end
+     with a single line ending (the same insertion mechanics as
+     `appendListItemAtHeading`'s join branch). The syntax tree makes the
+     hard cases trivial: a nested tail (markers legally pushed past
+     3 spaces) is *inside* the `BulletList` node, an indented code block,
+     ordered list, fence, or prose tail simply isn't one — all fall back.
+   - **Marker rules per kind** (in CommonMark the marker is list
+     structure — a `-` item directly after a `*` item is a *new* list):
+     `append` adopts the list's marker and always joins. `checkbox`
+     adopts the marker **unless it is `+`** — `+ [ ]` must stay
+     unambiguously a task for the Tasks projection, so after a `+` list a
+     checkbox falls back to its own `- [ ] text` block. `task` is fixed
+     at `+ [ ] text` and joins only a `+` list. Kind therefore stays
+     recoverable from the line form: no brackets = append, `-`/`*` with
+     brackets = checkbox, `+` with brackets = task.
+   - No trailing `BulletList`, or marker rules refuse the join → fall
+     back to `appendBlock` with the canonical form (`- text` /
+     `- [ ] text` / `+ [ ] text`). Line endings via the existing
+     `lineEndingAt`/`documentLineEnding` helpers (CRLF-safe).
 3. **`packages/core/src/actions/capture-drain.ts`** — `drainTextCapture`
    switches from `appendBlock` to `appendListItem` for **all three kinds**
-   (`append` / `checkbox` / `task`) and all sources. This deliberately
-   changes deep-link and share-sheet behavior too: consecutive text captures
-   coalesce into one list everywhere. The dedup scan becomes
-   marker-insensitive within a kind: it strips the list prefix
-   (`/^\s*[-+*] (\[[ xX]\] )?/`), recovers the kind from the line form (the
-   encoding the normalization rules guarantee), and dedups only when both
-   payload and kind match — so a retried `append` dedups against a `* text`
-   line, but a `checkbox` and a `task` with the same payload are distinct
-   captures and both land (a repeated identical payload of the same kind on
-   the same day is still dropped — see open questions).
+   and all sources, and **drops the same-line dedup scan** (decided
+   2026-08-11): duplicate quick notes are allowed until they prove to be a
+   real problem. Both are deliberate behavior changes for deep-link and
+   share-sheet captures too — coalescing and duplicate-tolerance apply
+   everywhere. Accepted failure mode: a crash between the note write and
+   `captureInboxRemove` re-appends the same line once on retry — rare and
+   self-limited, and the alternative (payload-level dedup) is exactly the
+   false-positive Alex opted out of. The outcome's `deduped` count becomes
+   link-capture-only.
 4. **Tests** (node project, `.test.ts`):
-   - `append-section.test.ts`: empty note; prose tail; bullet tail; `*` tail
-     (new item adopts `*`); checkbox and `+ [ ]` task tails; `task` after a
-     `-` list keeps its `+ [ ]` marker; `checkbox` after a `+` list renders
-     `- [ ]`; nested-bullet tail continues the outer column-0 marker,
-     including a four-space-deep nested marker (`- foo` / two-space `- bar`
-     / four-space `- baz`); an indented list-looking line with no column-0
-     anchor (code block) falls back; ordered-list tail falls back; trailing
-     blank lines; CRLF documents.
+   - `append-list-item.test.ts` (extending the file's existing suite):
+     empty note; prose tail; `-`/`*`/`+` bullet tails (append adopts each
+     marker); checkbox after `-`/`*` joins, checkbox after `+` falls back
+     to `- [ ]`; task after a `+ [ ]` list joins, task after a `-` list
+     falls back as its own `+ [ ]` block; nested tail (two-space and
+     four-space markers) appends at the outer level with the outer marker;
+     indented code-block tail falls back; ordered-list tail falls back;
+     fence tail falls back; trailing blank lines; CRLF documents;
+     frontmatter-only note.
    - `capture-drain.test.ts`: two `append` envelopes on one day yield one
-     two-item list; `append` after `task` joins the same list; prose after
-     the list starts a fresh list; `ios-intent` source drains; dedup still
-     returns the deduped outcome, including across markers (an `append`
-     retry dedups against a `* text` line) but never across kinds (a
-     `checkbox` and a `task` with the same payload both land).
+     two-item list; the *same* envelope content twice yields two bullets
+     (duplicates allowed); `append` after `task` behaves per the marker
+     rules; prose after the list starts a fresh list; `ios-intent` source
+     drains.
    - Privacy regression: an `ios-intent` envelope draining into a daily
      note marked `private: true` writes only the local daily file — text
      captures have no enrichment leg by construction, and the test pins
@@ -199,9 +221,10 @@ morning still lands on the right day.
      parameter is empty; Shortcuts users can bind it or leave "Ask Each
      Time".
    - `static var openAppWhenRun = false`. Plain `async` `perform()` (no
-     `@MainActor` — the file write must not queue behind app-boot main-thread
-     work): fold via `CaptureInbox.foldedLine`, empty →
-     `needsValueError` reprompt; spool; return
+     `@MainActor` — the file write must not queue behind app-boot
+     main-thread work) returning `some IntentResult & ProvidesDialog`:
+     fold via `CaptureInbox.foldedLine`, empty →
+     `throw $text.needsValueError(...)` to reprompt; spool; return
      `.result(dialog: "Saved")`. Spool failure throws so Siri reports
      failure honestly instead of claiming "Saved".
    - `static var authenticationPolicy` set **explicitly** to
@@ -235,23 +258,28 @@ morning still lands on the right day.
 - `pnpm check` + targeted vitest runs for the Phase 1 files.
 - **Simulator pass** (`pnpm tauri:ios:dev "iPhone 17 Pro"`): run the intent
   from the Shortcuts app with the app killed / backgrounded / foregrounded;
-  verify the envelope spools, and that reopening the app produces one
-  coalescing bullet list in today's daily note. Regression: share-sheet text
-  and link shares still land; recording shortcuts still appear and run.
+  verify the envelope spools, that reopening the app produces one coalescing
+  bullet list in today's daily note, and that the same text captured twice
+  produces two bullets. Regression: share-sheet text and link shares still
+  land; recording shortcuts still appear and run.
 - **Device pass (owed, with Alex):** Siri phrase from the lock screen
   (Face ID flow), Action button, lock-screen Shortcuts widget, dictation
   quality; confirm the dev flavor spools to the dev App Group only; Siri
   round-trip latency with the app killed (the go/no-go signal for the
   App Intents extension fallback).
 
+## Resolved decisions
+
+1. **Duplicates are allowed** (Alex, 2026-08-11). The drain's same-line dedup
+   scan is removed for text captures: "coffee" captured twice in one day
+   lands twice. The scan's only remaining value was crash-retry idempotency,
+   and that failure mode (a crash in the narrow window between the note
+   write and the spool removal, duplicating one line once) is accepted.
+   Revisit only if real usage surfaces a problem.
+
 ## Open questions
 
-1. **Same-day duplicate lines are dropped.** The drain's dedup scan treats an
-   identical line as an idempotent retry — "coffee" captured twice in one day
-   lands once. Right for crash-retry protection, arguably wrong for genuine
-   repeat notes. Predates this plan; keeping as-is, flagging for a product
-   call.
-2. **Siri phrase wording.** App Shortcut phrases are live in Siri,
+1. **Siri phrase wording.** App Shortcut phrases are live in Siri,
    Spotlight, and the Shortcuts app the moment a build installs — they are
    user-facing metadata, not latent strings. "Add a note in Reflect" may
    also collide with Apple Notes' vocabulary in practice. The device pass
