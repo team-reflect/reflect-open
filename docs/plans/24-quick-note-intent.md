@@ -12,7 +12,12 @@ extension (App Group inbox + Rust relay, `CaptureInbox.swift`), audio-memos
 wave 3 (`RecordingIntents.swift` — the app's existing `AppShortcutsProvider`
 and the proven in-app `openAppWhenRun = false` intent pattern).
 
-**Status:** planned.
+**Status:** Phases 1–2 implemented (schema source, parser-based
+`appendListItem` + drain switch with dedup removed, `QuickNoteIntent`,
+`spoolText` source parameter, App Shortcut, project regen; Swift typechecked
+against the iOS SDK). Remaining: the Phase 0 background-launch spike and the
+Phase 3 simulator + device passes — the spike result stays the gate for
+shipping the intent in a TestFlight build.
 
 **Explicitly not in scope:**
 

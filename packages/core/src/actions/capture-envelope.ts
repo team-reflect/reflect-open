@@ -109,9 +109,11 @@ export const textCaptureKindSchema = z.enum(['append', 'checkbox', 'task'])
  * {@link captureSourceSchema} and from the envelope *shape*: provenance and
  * shape are different axes, so a future producer (a widget, an Android
  * intent) joins by adding a member here — never by growing a new envelope
- * variant. `ios-share` is non-URL text shared through the iOS share sheet.
+ * variant. `ios-share` is non-URL text shared through the iOS share sheet;
+ * `ios-intent` is the Quick Note App Intent (Siri / Shortcuts / Action
+ * button, Plan 24).
  */
-export const textCaptureSourceSchema = z.enum(['deep-link', 'ios-share'])
+export const textCaptureSourceSchema = z.enum(['deep-link', 'ios-share', 'ios-intent'])
 
 /**
  * A text write (`reflect://append?text=…` / `reflect://checkbox?text=…` /

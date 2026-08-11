@@ -70,7 +70,7 @@ final class ShareState: ObservableObject {
                     metaDescription: metaDescription
                 )
             case let .text(text):
-                guard try CaptureInbox.spoolText(text) else {
+                guard try CaptureInbox.spoolText(text, source: "ios-share") else {
                     return update(.failed) // nothing printable to save
                 }
             }

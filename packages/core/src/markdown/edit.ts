@@ -13,6 +13,7 @@ import { scanInlineWikiLinks } from './scan'
 import { parseTaskMarker } from './task-marker'
 
 export { appendBlock } from './append-section'
+export { appendListItem, type ListItemKind } from './append-list-item'
 
 /**
  * Source-level edit helpers (Plan 03). These splice the original string by node

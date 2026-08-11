@@ -21,14 +21,15 @@ struct LinkCaptureEnvelope: Encodable {
 }
 
 /// Shared non-URL text, as `textCaptureEnvelopeSchema`: one folded line the
-/// drain appends to the capture-day daily note as a bullet.
+/// drain appends to the capture-day daily note as a bullet. `source` names
+/// the producer (`ios-share` / `ios-intent`) — provenance only, one shape.
 struct TextCaptureEnvelope: Encodable {
     var version = 1
     var id: String
     var kind = "append"
     var text: String
     var capturedAt: String
-    var source = "ios-share"
+    var source: String
 }
 
 enum CaptureInboxError: Error {
@@ -109,14 +110,17 @@ enum CaptureInbox {
         try spool(data, id: id)
     }
 
-    /// Spool shared text as an append capture — the daily note gets a bullet.
+    /// Spool text as an append capture — the daily note gets a bullet.
     /// Returns false (spooling nothing) when the text folds to empty.
-    static func spoolText(_ text: String) throws -> Bool {
+    /// `source` is the envelope's provenance tag; deliberately no default,
+    /// so the compiler names every producer.
+    static func spoolText(_ text: String, source: String) throws -> Bool {
         guard let line = foldedLine(text) else {
             return false
         }
         let id = envelopeId()
-        let envelope = TextCaptureEnvelope(id: id, text: line, capturedAt: capturedAt())
+        let envelope = TextCaptureEnvelope(
+            id: id, text: line, capturedAt: capturedAt(), source: source)
         try spool(try JSONEncoder().encode(envelope), id: id)
         return true
     }
