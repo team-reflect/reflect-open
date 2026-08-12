@@ -23,6 +23,13 @@ const SNOOZE_MS = 24 * 60 * 60 * 1000
  * free-year claim flow is not live yet. */
 const MEMBER_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000
 
+/** V1 web page that hands a paying Reflect member their free-year offer code. */
+const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
+
+/** When the free-week stopgap self-expires (30 days after it was written,
+ * 2026-08-12). After this the member button opens the claim page instead. */
+const MEMBER_STOPGAP_UNTIL = Date.parse('2026-09-11')
+
 export function PaywallScreen(): ReactElement {
   const queryClient = useQueryClient()
   const { updateSettings } = useSettings()
@@ -67,8 +74,14 @@ export function PaywallScreen(): ReactElement {
   // Stopgap while reflect.app/claim-reflect-open is not live: members get a
   // week free and the paywall asks again when it lapses. The toast outlives
   // this screen (its Toaster mounts in mobile-root.tsx, outside the gate),
-  // and the snooze write unmounts the paywall immediately.
+  // and the snooze write unmounts the paywall immediately. Past the stopgap
+  // deadline the button opens the claim page, so a stale build stops handing
+  // out free weeks once the real flow exists.
   const memberContinue = () => {
+    if (Date.now() > MEMBER_STOPGAP_UNTIL) {
+      void openUrl(CLAIM_FREE_YEAR_URL).catch(() => {})
+      return
+    }
     toast('Enjoy Reflect free for now', {
       description: "We'll ask about your free year again once codes are ready.",
       duration: 6000,
