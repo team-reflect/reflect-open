@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1-beta](https://github.com/team-reflect/reflect-open/compare/v0.9.0...v0.9.1-beta) (2026-08-12)
+
+
+### Bug Fixes
+
+* **mobile:** add member paywall button ([#1097](https://github.com/team-reflect/reflect-open/issues/1097)) ([f7aa0a6](https://github.com/team-reflect/reflect-open/commit/f7aa0a67d59375cd52b822ee62f73d60fc6399e8))
+
 ## [0.9.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.7...v0.9.0-beta.8) (2026-08-10)
 
 
