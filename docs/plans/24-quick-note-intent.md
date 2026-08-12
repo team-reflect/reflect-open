@@ -12,12 +12,17 @@ extension (App Group inbox + Rust relay, `CaptureInbox.swift`), audio-memos
 wave 3 (`RecordingIntents.swift` — the app's existing `AppShortcutsProvider`
 and the proven in-app `openAppWhenRun = false` intent pattern).
 
-**Status:** Phases 1–2 implemented (schema source, parser-based
-`appendListItem` + drain switch with dedup removed, `QuickNoteIntent`,
-`spoolText` source parameter, App Shortcut, project regen; Swift typechecked
-against the iOS SDK). Remaining: the Phase 0 background-launch spike and the
-Phase 3 simulator + device passes — the spike result stays the gate for
-shipping the intent in a TestFlight build.
+**Status:** Phases 1–2 implemented; Phase 0 spike and the Phase 3 simulator
+pass **ran green on the iOS 26.4 simulator** (2026-08-12): the App Shortcut
+auto-registered on install, the intent ran with the app killed and returned
+"Saved" near-instantly, and — better than the plan assumed — **no app process
+lingered and the webview never booted** (the envelope stayed spooled until
+the next real launch, so the background-launch weight concern is moot). The
+envelope was schema-exact (`source: "ios-intent"`, dev App Group), drained on
+next launch, and a second capture joined the first as one single-newline
+bullet list (verified against the raw markdown bytes). Remaining before
+TestFlight: the physical-device pass — Siri phrase from the lock screen
+(Face ID), Action button, dictation quality.
 
 **Explicitly not in scope:**
 
