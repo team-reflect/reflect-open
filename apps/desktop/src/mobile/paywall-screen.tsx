@@ -18,6 +18,9 @@ type PendingAction = 'monthly' | 'yearly' | 'restore' | null
 /** How long "Remind me later" keeps the paywall dismissed. */
 const SNOOZE_MS = 24 * 60 * 60 * 1000
 
+/** V1 web page that hands a paying Reflect member their free-year offer code. */
+const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
+
 export function PaywallScreen(): ReactElement {
   const queryClient = useQueryClient()
   const { updateSettings } = useSettings()
@@ -153,6 +156,14 @@ export function PaywallScreen(): ReactElement {
         ) : null}
 
         <div className="flex flex-col items-center gap-4">
+          <button
+            type="button"
+            className="text-sm text-text-secondary underline disabled:opacity-50"
+            disabled={pending !== null}
+            onClick={() => void openUrl(CLAIM_FREE_YEAR_URL).catch(() => {})}
+          >
+            Already a Reflect member? Get your first year free
+          </button>
           {/* First-rollout escape hatch: dismissing writes a snooze timestamp
               and the gate in mobile-app.tsx unmounts this screen, so a broken
               store never locks anyone out of their notes. */}
