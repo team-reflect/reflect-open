@@ -1,6 +1,5 @@
 import { useMemo, type ReactElement, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { canReadCalendars, requestCalendarAccess, type CalendarInfo } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { Button } from '@/components/ui/button'
@@ -14,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { openUrlSync } from '@/lib/open-url'
 import { isMacosDesktop } from '@/lib/platform'
 import {
   CALENDAR_QUERY_PREFIX,
@@ -110,9 +110,7 @@ export function CalendarIntegrationField(): ReactElement | null {
             <button
               type="button"
               onClick={() => {
-                void openUrl(CALENDAR_PRIVACY_PANE).catch((cause: unknown) => {
-                  console.error('failed to open System Settings:', cause)
-                })
+                openUrlSync(CALENDAR_PRIVACY_PANE)
               }}
               className={ACTION_BUTTON_CLASS}
             >

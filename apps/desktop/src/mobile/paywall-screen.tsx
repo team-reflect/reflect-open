@@ -1,12 +1,12 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { IAP_PRODUCT_IDS, iapGetProducts, iapPurchase, iapRestorePurchases } from '@reflect/core'
 import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { openUrlSync } from '@/lib/open-url'
 import { cn } from '@/lib/utils'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
 import { invalidateEntitlementQueries } from '@/mobile/use-active-subscription'
@@ -216,17 +216,13 @@ export function PaywallScreen(): ReactElement {
         </div>
 
         <footer className="mt-auto flex justify-center gap-4 text-[13px] text-text-muted">
-          <button
-            type="button"
-            className="underline"
-            onClick={() => void openUrl(TERMS_OF_USE_URL).catch(() => {})}
-          >
+          <button type="button" className="underline" onClick={() => openUrlSync(TERMS_OF_USE_URL)}>
             Terms of Use
           </button>
           <button
             type="button"
             className="underline"
-            onClick={() => void openUrl(PRIVACY_POLICY_URL).catch(() => {})}
+            onClick={() => openUrlSync(PRIVACY_POLICY_URL)}
           >
             Privacy Policy
           </button>
