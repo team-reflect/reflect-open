@@ -79,7 +79,7 @@ export function PaywallScreen(): ReactElement {
   // out free weeks once the real flow exists.
   const memberContinue = () => {
     if (Date.now() > MEMBER_STOPGAP_UNTIL) {
-      void openUrl(CLAIM_FREE_YEAR_URL).catch(() => {})
+      openUrlSync(CLAIM_FREE_YEAR_URL)
       return
     }
     toast('Enjoy Reflect free for now', {
