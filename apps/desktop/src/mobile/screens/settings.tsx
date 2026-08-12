@@ -12,12 +12,12 @@ import {
   type EditorTextSize,
   type ThemePreference,
 } from '@reflect/core'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { useAiPrompts } from '@/hooks/use-ai-prompts'
 import { useAiProviders } from '@/hooks/use-ai-providers'
 import { useAppVersion } from '@/hooks/use-app-version'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { marketingVersion } from '@/lib/marketing-version'
+import { openUrlSync } from '@/lib/open-url'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer'
 import { AiPromptDrawer } from '@/mobile/ai-prompt-drawer'
@@ -334,7 +334,7 @@ export function MobileSettings(): ReactElement {
                 <SettingsActionRow
                   label="Manage Subscription"
                   onPress={() => {
-                    void openUrl('https://apps.apple.com/account/subscriptions').catch(() => {})
+                    openUrlSync('https://apps.apple.com/account/subscriptions')
                   }}
                 />
               )}
@@ -348,7 +348,7 @@ export function MobileSettings(): ReactElement {
               <SettingsActionRow
                 label="Terms of Use"
                 onPress={() => {
-                  void openUrl(TERMS_OF_USE_URL).catch(() => {})
+                  openUrlSync(TERMS_OF_USE_URL)
                 }}
               />
             </SettingsGroup>
@@ -366,7 +366,7 @@ export function MobileSettings(): ReactElement {
             <SettingsActionRow
               label="Privacy Policy"
               onPress={() => {
-                void openUrl(PRIVACY_POLICY_URL).catch(() => {})
+                openUrlSync(PRIVACY_POLICY_URL)
               }}
             />
           </SettingsGroup>

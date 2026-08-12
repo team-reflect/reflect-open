@@ -1,11 +1,11 @@
 import { useEffect, useState, type ReactElement } from 'react'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { requestContactsAccess } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert'
 import {
   useContactsAuthorization,
   useRefreshContactsAuthorization,
 } from '@/hooks/use-contacts-authorization'
+import { openUrlSync } from '@/lib/open-url'
 import { isMacosDesktop } from '@/lib/platform'
 import { useSettings } from '@/providers/settings-provider'
 import { CalendarIntegrationField } from './calendar-integration-field'
@@ -113,9 +113,7 @@ export function IntegrationsSection(): ReactElement | null {
                     // A rejection here is a capability-scope bug (the ACL must
                     // allow x-apple.systempreferences:*) — surface it, don't
                     // swallow it into a dead link.
-                    openUrl(CONTACTS_PRIVACY_PANE).catch((cause: unknown) => {
-                      console.error('failed to open System Settings', cause)
-                    })
+                    openUrlSync(CONTACTS_PRIVACY_PANE)
                   }}
                 >
                   Open System Settings
