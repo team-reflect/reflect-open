@@ -46,3 +46,7 @@ dist-ssr
 .vitest-*/
 .vitest/
 __screenshots__/
+
+# Xcode build-phase toolchain paths, generated per machine (see
+# apps/desktop/src-tauri/xcode-scripts/generate-xcode-env.mjs)
+.xcode.env.local

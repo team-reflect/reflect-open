@@ -241,6 +241,40 @@ describe('createIcloudController', () => {
     }
   })
 
+  it('a mobile resume restarts the metadata watch (stop before start)', async () => {
+    // A long iOS suspension can kill NSMetadataQuery update delivery, and on
+    // mobile the query is the sole external-change source — the resume must
+    // reinstall it or remote edits stay invisible until relaunch.
+    const icloud = controller({ emit: true })
+    await icloud.start()
+    await settleScan()
+    invoked.length = 0
+
+    window.dispatchEvent(new Event('focus'))
+    await settleScan()
+
+    const commands = invoked.map(([command]) => command)
+    const stopAt = commands.indexOf('icloud_watch_stop')
+    const startAt = commands.indexOf('icloud_watch_start')
+    expect(stopAt).toBeGreaterThanOrEqual(0)
+    expect(startAt).toBeGreaterThan(stopAt)
+    expect(invoked[startAt]?.[1]).toMatchObject({ root: GRAPH.root, emitFileChanges: true })
+  })
+
+  it('a desktop resume sweeps without restarting the watch', async () => {
+    const icloud = controller()
+    await icloud.start()
+    await settleScan()
+    invoked.length = 0
+
+    window.dispatchEvent(new Event('focus'))
+    await settleScan()
+
+    expect(invoked.some(([command]) => command === 'icloud_watch_stop')).toBe(false)
+    expect(invoked.some(([command]) => command === 'icloud_watch_start')).toBe(false)
+    expect(scanCalls).toHaveLength(2) // baseline + the resume sweep itself
+  })
+
   it('preserves desktop baseline scanning while the document is hidden', async () => {
     const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
     try {

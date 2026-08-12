@@ -81,6 +81,11 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         // Browser previews are never suspended like an iOS process, so the
         // native finite-length assertion is honestly unavailable.
         return null
+      case 'plugin:keyboard|current_height':
+        // A desktop browser has no overlaying software keyboard to mirror.
+        return { height: 0, duration: 0 }
+      case 'plugin:keyboard|impact_light':
+        return null
       case 'mobile_storage':
         // No iCloud in a plain browser — the dev harness exercises the
         // local-storage path (and, via `mobileOnboarded` above, skips
@@ -302,8 +307,11 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
     invoke,
     // Native event streams (watcher, embeddings, EventKit) don't exist in the
     // browser; subscriptions succeed and simply never fire. Local writes still
-    // refresh the UI through core's in-process local-write echo.
+    // refresh the UI through core's in-process local-write echo. Plugin event
+    // registrations get the same treatment, so the keyboard and recorder
+    // hooks mount cleanly in the harness.
     listen: async () => () => {},
+    listenPlugin: async () => {},
   }
 }
 

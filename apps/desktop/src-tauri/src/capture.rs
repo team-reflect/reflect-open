@@ -520,9 +520,12 @@ pub async fn capture_link_preview(app: tauri::AppHandle, url: String) -> AppResu
 
 // ---- meta fetch -----------------------------------------------------------------
 
-/// How much HTML the meta scrape reads: `<head>` metadata lives well inside
-/// the first half-megabyte of any real page.
-const META_FETCH_MAX_BYTES: usize = 512 * 1024;
+/// How much HTML the meta scrape reads. Sized for the worst page measured:
+/// a YouTube watch page is ~1.2 MiB of identity-encoded HTML with every
+/// meta tag at ~690 KiB, near the end of a ~697 KiB `<head>` (2026-08).
+/// 2 MiB keeps whole pages of that shape, with margin for head growth,
+/// while still bounding what this command buffers and ships over IPC.
+const META_FETCH_MAX_BYTES: usize = 2 * 1024 * 1024;
 const META_FETCH_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// The meta fetch presents as a mainstream browser navigation: sites that
@@ -563,9 +566,9 @@ fn classify_fetch_status(url: &str, status: reqwest::StatusCode) -> Option<AppEr
 
 /// Fetch a captured page's HTML for meta-tag scraping, hard-capped (timeout,
 /// byte cap, redirect limit, http(s) only). Lives here rather than widening
-/// the webview's HTTP-plugin capability to every URL — the only thing that
-/// can reach arbitrary hosts is this bounded, HTML-only primitive, and the
-/// privacy gate in `@reflect/core` runs before it is ever called.
+/// the webview's HTTP-plugin capability to every URL — the only things that
+/// can reach arbitrary hosts are this module's bounded fetch primitives, and
+/// the privacy gate in `@reflect/core` runs before either is ever called.
 #[tauri::command]
 pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
     if !url.starts_with("https://") && !url.starts_with("http://") {
@@ -620,6 +623,64 @@ pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
         }
     }
     Ok(String::from_utf8_lossy(&body).into_owned())
+}
+
+// ---- oEmbed fetch ---------------------------------------------------------------
+
+/// oEmbed answers are ~1 KB of JSON; anything past this cap is not an oEmbed
+/// answer, and a truncated one would be unparseable, so oversize is an error
+/// rather than a cut.
+const OEMBED_FETCH_MAX_BYTES: usize = 64 * 1024;
+
+/// Fetch an oEmbed endpoint's JSON answer for the capture meta scrape. Which
+/// URLs are oEmbed endpoints is policy and lives in `@reflect/core`
+/// (`actions/oembed`), behind the same privacy gate as `capture_meta_fetch`;
+/// this side only bounds the transport, strictly tighter than the HTML
+/// fetch: https only, JSON only, a small byte cap, and no redirects (oEmbed
+/// endpoints answer directly, so a redirect is a failure).
+#[tauri::command]
+pub async fn capture_oembed_fetch(url: String) -> AppResult<String> {
+    if !url.starts_with("https://") {
+        return Err(AppError::parse(format!("not an https url: {url}")));
+    }
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(META_FETCH_TIMEOUT)
+        .user_agent(META_FETCH_USER_AGENT)
+        .build()
+        .map_err(|err| AppError::io(err.to_string()))?;
+    let response = client
+        .get(&url)
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(classify_fetch_error)?;
+    if let Some(err) = classify_fetch_status(&url, response.status()) {
+        return Err(err);
+    }
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("")
+        .to_ascii_lowercase(); // MIME types are case-insensitive (`TEXT/HTML`)
+    if !content_type.contains("json") {
+        return Err(AppError::parse(format!(
+            "{url} did not answer JSON ({content_type})"
+        )));
+    }
+    let mut body: Vec<u8> = Vec::new();
+    let mut response = response;
+    while let Some(chunk) = response.chunk().await.map_err(classify_fetch_error)? {
+        if body.len() + chunk.len() > OEMBED_FETCH_MAX_BYTES {
+            return Err(AppError::parse(format!(
+                "{url} answered more than {OEMBED_FETCH_MAX_BYTES} bytes"
+            )));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    String::from_utf8(body)
+        .map_err(|err| AppError::parse(format!("{url} answered non-UTF-8: {err}")))
 }
 
 #[cfg(test)]

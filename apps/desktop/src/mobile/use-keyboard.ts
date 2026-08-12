@@ -1,9 +1,10 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import { addPluginListener, invoke } from '@tauri-apps/api/core'
-import { z } from 'zod'
+import {
+  getCurrentKeyboardHeight,
+  subscribeKeyboardChange,
+  type PluginSubscription,
+} from '@reflect/core'
 import { focusedEditorCommands } from '@/editor/formatting-toolbar-store'
-
-const keyboardStateSchema = z.object({ height: z.number(), duration: z.number() })
 
 let currentKeyboardHeight = 0
 const keyboardListeners = new Set<() => void>()
@@ -73,26 +74,20 @@ export function useKeyboardHeightVar(): void {
       publishKeyboardHeight(height)
     }
     let disposed = false
-    let unlisten: (() => void) | null = null
+    let subscription: PluginSubscription | null = null
     void (async () => {
       try {
-        const initial = keyboardStateSchema.parse(await invoke('plugin:keyboard|current_height'))
-        if (!disposed) {
-          apply(initial.height)
-        }
-        const listener = await addPluginListener('keyboard', 'keyboardChange', (raw: unknown) => {
-          const parsed = keyboardStateSchema.safeParse(raw)
-          if (parsed.success) {
-            apply(parsed.data.height)
-          }
-        })
+        // Initial state first, then subscribe — the same order as before, so
+        // a change event can never be overwritten by a staler initial value.
+        const initial = await getCurrentKeyboardHeight()
         if (disposed) {
-          void listener.unregister()
-        } else {
-          unlisten = () => {
-            void listener.unregister()
-          }
+          return
         }
+        apply(initial.height)
+        subscription = subscribeKeyboardChange((state) => {
+          apply(state.height)
+        })
+        await subscription.ready
       } catch (err) {
         // Fail loud in the log, soft in layout: without the bridge the
         // variable stays 0 and the screen behaves like Tauri's default.
@@ -101,7 +96,7 @@ export function useKeyboardHeightVar(): void {
     })()
     return () => {
       disposed = true
-      unlisten?.()
+      subscription?.unlisten()
       root.style.removeProperty('--keyboard-height')
       publishKeyboardHeight(0)
     }

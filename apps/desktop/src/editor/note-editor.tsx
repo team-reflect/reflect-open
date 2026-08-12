@@ -8,7 +8,6 @@ import {
   type ReactNode,
   type Ref,
 } from 'react'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { errorMessage, type TimeFormat } from '@reflect/core'
 import type {
   AcceptPendingReplacementOptions,
@@ -47,6 +46,7 @@ import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
 import { useSetPreviewPanelTarget } from '@/providers/preview-panel-provider'
 import { useLightboxTransition } from '@/editor/use-lightbox-transition'
+import { openUrlSync } from '@/lib/open-url'
 import { cn } from '@/lib/utils'
 
 type WikilinkHoverRenderer = (hit: WikilinkHoverHit) => ReactNode | Promise<ReactNode>
@@ -395,9 +395,7 @@ export function NoteEditor({
         onNoteLinkClickRef.current?.({ href, openInNewWindow: mod })
         return
       }
-      void openUrl(href).catch((cause) => {
-        console.error('open link failed:', errorMessage(cause))
-      })
+      openUrlSync(href)
     },
     [followDeepLink, setPreviewPanelTarget],
   )

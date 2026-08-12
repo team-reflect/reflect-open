@@ -3,11 +3,13 @@ import { installBackgroundFlush } from '@/lib/background-flush'
 import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider'
 import { MobileErrorBoundary } from '@/mobile/mobile-error-boundary'
 import { MobileOnboardingScreen } from '@/mobile/onboarding-screen'
+import { PaywallScreen } from '@/mobile/paywall-screen'
 import { MobileShell } from '@/mobile/mobile-shell'
 import { MobileStatusLayer } from '@/mobile/status-layer'
 import { RecordingDrawer } from '@/mobile/recording-drawer'
 import { useICloudRefresh } from '@/mobile/use-icloud-refresh'
 import { useKeyboardCaretReveal, useKeyboardHeightVar } from '@/mobile/use-keyboard'
+import { useShouldShowPaywall } from '@/mobile/use-should-show-paywall'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics'
 import { CaptureProvider } from '@/providers/capture-provider'
 import { ChatProvider } from '@/providers/chat-provider'
@@ -29,6 +31,7 @@ import { RouterProvider } from '@/routing/router'
  */
 export function MobileApp(): ReactElement {
   const { status, graph, error, needsOnboarding } = useGraph()
+  const shouldShowPaywall = useShouldShowPaywall()
   useKeyboardHeightVar()
   useKeyboardCaretReveal()
   useTaskCheckboxHaptics()
@@ -44,6 +47,19 @@ export function MobileApp(): ReactElement {
   useEffect(() => {
     return installBackgroundFlush()
   }, [])
+
+  // The subscription gate deliberately comes before everything else,
+  // onboarding included: the paywall is the first screen of a fresh install,
+  // and onboarding runs after a purchase or "Remind me later" lifts the
+  // gate. While the gate is still deciding (entitlement queries, settings
+  // hydration) hold the loading screen instead of flashing the paywall at a
+  // subscribed or snoozed user.
+  if (shouldShowPaywall === 'show') {
+    return <PaywallScreen />
+  }
+  if (shouldShowPaywall === 'pending') {
+    return <LoadingScreen />
+  }
 
   if (status === 'ready' && graph) {
     return (
@@ -96,6 +112,10 @@ export function MobileApp(): ReactElement {
     )
   }
 
+  return <LoadingScreen />
+}
+
+function LoadingScreen(): ReactElement {
   return (
     <div className="flex h-dvh w-screen items-center justify-center text-sm text-text-muted">
       Loading…

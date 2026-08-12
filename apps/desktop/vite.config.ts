@@ -69,5 +69,9 @@ export default defineConfig({
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ['**/src-tauri/**'],
     },
+    forwardConsole: {
+      unhandledErrors: true,
+      logLevels: ['error', 'warn', 'info', 'log', 'debug'],
+    },
   },
 })

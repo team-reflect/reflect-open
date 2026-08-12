@@ -85,6 +85,7 @@
 		1A58A746A41B6BF1D50A8547 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		1B481887CBBFA6FB3C78F2B2 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
 		1EB2845C34150F5FE04A33D3 /* write.rs */ = {isa = PBXFileReference; path = write.rs; sourceTree = "<group>"; };
+		2090398BADEFF8597C73DEF4 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
 		2130029E77013461A501E644 /* devtools.rs */ = {isa = PBXFileReference; path = devtools.rs; sourceTree = "<group>"; };
 		21F0526713DAC48C777B2D4C /* union.rs */ = {isa = PBXFileReference; path = union.rs; sourceTree = "<group>"; };
 		2490DACB2171344E8D9A8807 /* capture.rs */ = {isa = PBXFileReference; path = capture.rs; sourceTree = "<group>"; };
@@ -163,7 +164,6 @@
 		E8031FEC080EBAF422BEE44C /* markers.rs */ = {isa = PBXFileReference; path = markers.rs; sourceTree = "<group>"; };
 		E833A01F2799F6788CDCE53F /* link_preview.rs */ = {isa = PBXFileReference; path = link_preview.rs; sourceTree = "<group>"; };
 		EC45808CD3D13DD431212EAE /* watch.rs */ = {isa = PBXFileReference; path = watch.rs; sourceTree = "<group>"; };
-		ED55B2588FBAE8E128D80472 /* native_diagnostics.rs */ = {isa = PBXFileReference; path = native_diagnostics.rs; sourceTree = "<group>"; };
 		F28F8A628D32337E04C0CBC0 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
 		F3173A0D7E498896FAC5A43E /* watcher_mobile.rs */ = {isa = PBXFileReference; path = watcher_mobile.rs; sourceTree = "<group>"; };
 		FDC9BB81FAB5AF8D65160799 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
@@ -305,7 +305,6 @@
 				E833A01F2799F6788CDCE53F /* link_preview.rs */,
 				37EF719F509C3A532C0E0114 /* main.rs */,
 				C948CE24FFADAD173A38CFF5 /* menu.rs */,
-				ED55B2588FBAE8E128D80472 /* native_diagnostics.rs */,
 				B667667E9C6C141128493B00 /* quit.rs */,
 				8C04E40F02C9B4AE9A24A9A4 /* recents.rs */,
 				D7DA2E13EA6655A16DFDE015 /* secrets.rs */,
@@ -327,6 +326,7 @@
 		59A902E5FAB9324234886822 /* Externals */ = {
 			isa = PBXGroup;
 			children = (
+				B08490267F4622BEF663A1E8 /* arm64 */,
 			);
 			path = Externals;
 			sourceTree = "<group>";
@@ -353,6 +353,14 @@
 			path = RecordingWidget;
 			sourceTree = "<group>";
 		};
+		9C4DCBE0B2A7049257446433 /* debug */ = {
+			isa = PBXGroup;
+			children = (
+				2090398BADEFF8597C73DEF4 /* libapp.a */,
+			);
+			path = debug;
+			sourceTree = "<group>";
+		};
 		9E54DCC255F04D51453CC522 /* db */ = {
 			isa = PBXGroup;
 			children = (
@@ -366,6 +374,14 @@
 				1EB2845C34150F5FE04A33D3 /* write.rs */,
 			);
 			path = db;
+			sourceTree = "<group>";
+		};
+		B08490267F4622BEF663A1E8 /* arm64 */ = {
+			isa = PBXGroup;
+			children = (
+				9C4DCBE0B2A7049257446433 /* debug */,
+			);
+			path = arm64;
 			sourceTree = "<group>";
 		};
 		B36B6C8C4266337158D8EA7E /* reflect-open */ = {
@@ -422,6 +438,13 @@
 				3AE251E5F7E95CDEFDD3C8B4 /* reflect-open_iOS.entitlements */,
 			);
 			path = "reflect-open_iOS";
+			sourceTree = "<group>";
+		};
+		"TEMP_5ACF277E-D681-426E-87FE-E93125BE8EAF" /* x86_64 */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = x86_64;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -574,7 +597,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"${CODE_SIGNING_ALLOWED:-YES}\" = \"NO\" ]; then\n  /usr/bin/codesign --force --sign - \\\n    --entitlements \"${SRCROOT:?}/RecordingWidget/RecordingWidget.entitlements\" \\\n    \"${CODESIGNING_FOLDER_PATH:?}\"\nfi\n";
+			shellScript = "\"${SRCROOT:?}/../../xcode-scripts/preserve-entitlements.sh\"";
 		};
 		E8E8484E1F59D64EA785432B /* Preserve entitlements on skip-codesign builds */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -593,7 +616,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"${CODE_SIGNING_ALLOWED:-YES}\" = \"NO\" ]; then\n  /usr/bin/codesign --force --sign - \\\n    --entitlements \"${SRCROOT:?}/ShareExtension/ShareExtension.entitlements\" \\\n    \"${CODESIGNING_FOLDER_PATH:?}\"\nfi\n";
+			shellScript = "\"${SRCROOT:?}/../../xcode-scripts/preserve-entitlements.sh\"";
 		};
 		F27159B8EA2BAA999947A4AF /* Build Rust Code */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -614,7 +637,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "CI=true pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}";
+			shellScript = "\"${SRCROOT:?}/../../xcode-scripts/build-rust-code.sh\"";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -701,7 +724,7 @@
 				CODE_SIGN_ENTITLEMENTS = "reflect-open_iOS/reflect-open_iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "789ULN5MZB";
+				DEVELOPMENT_TEAM = 789ULN5MZB;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -715,8 +738,8 @@
 				);
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios.dev;
-				PRODUCT_NAME = "Reflect";
+				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios;
+				PRODUCT_NAME = Reflect;
 				REFLECT_DISPLAY_NAME = Reflect;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
@@ -864,7 +887,7 @@
 				CODE_SIGN_ENTITLEMENTS = "reflect-open_iOS/reflect-open_iOS.dev.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "789ULN5MZB";
+				DEVELOPMENT_TEAM = 789ULN5MZB;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -879,7 +902,7 @@
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios.dev;
-				PRODUCT_NAME = "Reflect";
+				PRODUCT_NAME = Reflect;
 				REFLECT_DISPLAY_NAME = "Reflect Dev";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;

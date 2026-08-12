@@ -1,3 +1,14 @@
+# XcodeGen (https://github.com/yonaskolb/XcodeGen) project spec: the copy
+# XcodeGen actually consumes to generate reflect-open.xcodeproj in this
+# directory. To regenerate the Xcode project after a spec change
+# (`brew install xcodegen` once):
+#
+#   cd apps/desktop/src-tauri/gen/apple && xcodegen generate
+#
+# then inspect the project.pbxproj diff before committing (`tauri ios dev`
+# may additionally normalize the generated files; see
+# docs/contributing/mobile-simulator.md).
+#
 # Kept in sync by hand with ../../ios.project.yml: every change here must
 # also be applied there, and vice versa.
 name: reflect-open
@@ -158,6 +169,12 @@ targets:
       environmentVariables:
         RUST_BACKTRACE: full
         RUST_LOG: info
+      # Local StoreKit testing without App Store Connect: Xcode's Run action
+      # loads the subscription catalog from this file (path relative to this
+      # spec's directory). Only the Run action applies it; plain xcodebuild
+      # and `tauri ios dev` launches run without it, so the paywall shows
+      # "Could not load subscription options" there.
+      storeKitConfiguration: reflect-open-storekit.storekit
     settings:
       base:
         ENABLE_BITCODE: false
@@ -204,7 +221,9 @@ targets:
       - sdk: UIKit.framework
       - sdk: WebKit.framework
     preBuildScripts:
-      - script: CI=true pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
+      # The script body lives in xcode-scripts/build-rust-code.sh so it can
+      # locate node/cargo itself; Dock-launched Xcode has no usable PATH.
+      - script: '"${SRCROOT:?}/../../xcode-scripts/build-rust-code.sh"'
         name: Build Rust Code
         basedOnDependencyAnalysis: false
         outputFiles:
@@ -280,12 +299,7 @@ targets:
       # fails with "Couldn't save" (tauri-cli mobile/ios/build.rs). Ad-hoc
       # signing the extension with its entitlements here keeps them through
       # export; properly signed builds never enter the branch.
-      - script: |
-          if [ "${CODE_SIGNING_ALLOWED:-YES}" = "NO" ]; then
-            /usr/bin/codesign --force --sign - \
-              --entitlements "${SRCROOT:?}/ShareExtension/ShareExtension.entitlements" \
-              "${CODESIGNING_FOLDER_PATH:?}"
-          fi
+      - script: '"${SRCROOT:?}/../../xcode-scripts/preserve-entitlements.sh"'
         name: Preserve entitlements on skip-codesign builds
         basedOnDependencyAnalysis: false
 
@@ -338,11 +352,6 @@ targets:
       # Same skip-codesign entitlement preservation as ShareExtension: CI
       # TestFlight builds archive unsigned, and export re-signing only keeps
       # entitlements already present in a signature.
-      - script: |
-          if [ "${CODE_SIGNING_ALLOWED:-YES}" = "NO" ]; then
-            /usr/bin/codesign --force --sign - \
-              --entitlements "${SRCROOT:?}/RecordingWidget/RecordingWidget.entitlements" \
-              "${CODESIGNING_FOLDER_PATH:?}"
-          fi
+      - script: '"${SRCROOT:?}/../../xcode-scripts/preserve-entitlements.sh"'
         name: Preserve entitlements on skip-codesign builds
         basedOnDependencyAnalysis: false

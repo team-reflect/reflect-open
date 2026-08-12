@@ -1,8 +1,8 @@
 import { useCallback } from 'react'
 import type { LinkClickHandler } from '@meowdown/core'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { isDeepLinkUrl } from '@/lib/deep-links/parse'
 import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link'
+import { openUrlSync } from '@/lib/open-url'
 
 /**
  * Schemes that must never reach the OS opener: script and data URIs carry
@@ -47,7 +47,7 @@ export function useOpenExternalLink(): LinkClickHandler {
         return
       }
       if (isOpenableExternalUrl(href)) {
-        void openUrl(href)
+        openUrlSync(href)
       }
     },
     [followDeepLink],

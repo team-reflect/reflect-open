@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { invoke } from '@tauri-apps/api/core'
-import { z } from 'zod'
+import { listStaged } from '@reflect/core'
 import { isNativeShell } from '@/lib/platform'
 import {
   claimStagedPath,
@@ -28,10 +27,6 @@ export interface StagedRecordingInput {
   stagedPath: string
 }
 
-const listStagedSchema = z.object({
-  files: z.array(z.object({ path: z.string(), modifiedMs: z.number() })),
-})
-
 /** Mount the launch/foreground orphan scan. */
 export function useStagedRecordingIngest(
   enqueueStaged: (input: StagedRecordingInput) => void,
@@ -48,8 +43,7 @@ export function useStagedRecordingIngest(
       }
       scanningRef.current = true
       try {
-        const raw = await invoke('plugin:recording|list_staged')
-        const { files } = listStagedSchema.parse(raw)
+        const files = await listStaged()
         for (const file of files) {
           if (disposed) {
             return
