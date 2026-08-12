@@ -2,6 +2,7 @@ import { useState, type ReactElement } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { Check } from 'lucide-react'
+import { toast } from 'sonner'
 import { IAP_PRODUCT_IDS, iapGetProducts, iapPurchase, iapRestorePurchases } from '@reflect/core'
 import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button'
@@ -18,8 +19,9 @@ type PendingAction = 'monthly' | 'yearly' | 'restore' | null
 /** How long "Remind me later" keeps the paywall dismissed. */
 const SNOOZE_MS = 24 * 60 * 60 * 1000
 
-/** V1 web page that hands a paying Reflect member their free-year offer code. */
-const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
+/** How long the member button keeps the paywall dismissed while the
+ * free-year claim flow is not live yet. */
+const MEMBER_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000
 
 export function PaywallScreen(): ReactElement {
   const queryClient = useQueryClient()
@@ -60,6 +62,18 @@ export function PaywallScreen(): ReactElement {
     } finally {
       setPending(null)
     }
+  }
+
+  // Stopgap while reflect.app/claim-reflect-open is not live: members get a
+  // week free and the paywall asks again when it lapses. The toast outlives
+  // this screen (its Toaster mounts in mobile-root.tsx, outside the gate),
+  // and the snooze write unmounts the paywall immediately.
+  const memberContinue = () => {
+    toast('Enjoy Reflect free for now', {
+      description: "We'll ask about your free year again once codes are ready.",
+      duration: 6000,
+    })
+    updateSettings({ paywallSnoozeUntil: Date.now() + MEMBER_SNOOZE_MS })
   }
 
   const restore = async () => {
@@ -160,7 +174,7 @@ export function PaywallScreen(): ReactElement {
             type="button"
             className="text-sm text-text-secondary underline disabled:opacity-50"
             disabled={pending !== null}
-            onClick={() => void openUrl(CLAIM_FREE_YEAR_URL).catch(() => {})}
+            onClick={memberContinue}
           >
             Already a Reflect member? Get your first year free
           </button>

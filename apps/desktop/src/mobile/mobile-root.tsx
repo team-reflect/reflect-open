@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { setLocalWriteEcho, type AppPlatform } from '@reflect/core'
+import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { setPlatformSurface } from '@/lib/platform-surface'
 import { MobileApp } from '@/mobile/mobile-app'
@@ -26,6 +27,7 @@ export function MobileRoot({ platform }: { platform: AppPlatform }): ReactElemen
     <GraphProvider platform={platform}>
       <TooltipProvider>
         <MobileApp />
+        <Toaster position="top-center" />
       </TooltipProvider>
     </GraphProvider>
   )
