@@ -15,10 +15,7 @@ describe('openUrlSync', () => {
     vi.mocked(openUrl).mockRejectedValueOnce(new Error('no handler'))
     expect(() => openUrlSync('https://example.com')).not.toThrow()
     await vi.waitFor(() => {
-      expect(consoleError).toHaveBeenCalledWith(
-        'failed to open https://example.com:',
-        'no handler',
-      )
+      expect(consoleError).toHaveBeenCalledWith('failed to open https://example.com:', 'no handler')
     })
     consoleError.mockRestore()
   })

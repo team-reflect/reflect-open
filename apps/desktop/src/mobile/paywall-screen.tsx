@@ -178,11 +178,7 @@ export function PaywallScreen(): ReactElement {
         </div>
 
         <footer className="mt-auto flex justify-center gap-4 text-[13px] text-text-muted">
-          <button
-            type="button"
-            className="underline"
-            onClick={() => openUrlSync(TERMS_OF_USE_URL)}
-          >
+          <button type="button" className="underline" onClick={() => openUrlSync(TERMS_OF_USE_URL)}>
             Terms of Use
           </button>
           <button
