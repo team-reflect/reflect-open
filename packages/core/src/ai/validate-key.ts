@@ -2,6 +2,7 @@ import type { AiProviderId, HostedAiProviderId } from '../settings/schema'
 import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers'
 import { APP_REVIEW_STUB_KEY } from './audio-memo-review-stub'
 import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from './openai-compatible'
+import { ORCAROUTER_BASE_URL } from './orcarouter'
 import { OPENROUTER_BASE_URL } from './openrouter'
 
 /**
@@ -54,6 +55,11 @@ const PROBES: Record<HostedAiProviderId, KeyProbe> = {
   },
   openrouter: {
     url: `${OPENROUTER_BASE_URL}/key`,
+    headers: (key) => ({ Authorization: `Bearer ${key}` }),
+    invalidStatuses: [401, 403],
+  },
+  orcarouter: {
+    url: `${ORCAROUTER_BASE_URL}/models`,
     headers: (key) => ({ Authorization: `Bearer ${key}` }),
     invalidStatuses: [401, 403],
   },

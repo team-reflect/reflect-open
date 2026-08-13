@@ -31,6 +31,14 @@ describe('AI_PROVIDERS', () => {
     })
   })
 
+  it('includes OrcaRouter in the settings catalog', () => {
+    expect(aiProvider('orcarouter')).toMatchObject({
+      id: 'orcarouter',
+      label: 'OrcaRouter',
+      keyPlaceholder: 'sk-orca-…',
+    })
+  })
+
   it('includes OpenAI-compatible endpoints with optional keys', () => {
     expect(aiProvider('openai-compatible')).toMatchObject({
       id: 'openai-compatible',

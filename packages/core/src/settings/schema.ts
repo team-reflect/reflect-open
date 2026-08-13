@@ -329,12 +329,19 @@ export const aiProviderIdSchema = z.enum([
   'anthropic',
   'google',
   'openrouter',
+  'orcarouter',
   'openai-compatible',
 ])
 
 export type AiProviderId = z.infer<typeof aiProviderIdSchema>
 
-const hostedAiProviderIdSchema = z.enum(['openai', 'anthropic', 'google', 'openrouter'])
+const hostedAiProviderIdSchema = z.enum([
+  'openai',
+  'anthropic',
+  'google',
+  'openrouter',
+  'orcarouter',
+])
 
 export type HostedAiProviderId = z.infer<typeof hostedAiProviderIdSchema>
 
@@ -377,11 +384,16 @@ const openRouterProviderConfigSchema = aiProviderConfigBaseSchema.extend({
   provider: z.literal('openrouter'),
 })
 
+const orcaRouterProviderConfigSchema = aiProviderConfigBaseSchema.extend({
+  provider: z.literal('orcarouter'),
+})
+
 const hostedAiProviderConfigSchema = z.union([
   openAiProviderConfigSchema,
   anthropicProviderConfigSchema,
   googleProviderConfigSchema,
   openRouterProviderConfigSchema,
+  orcaRouterProviderConfigSchema,
 ])
 
 export type HostedAiProviderConfig = z.infer<typeof hostedAiProviderConfigSchema>
@@ -398,6 +410,7 @@ export const aiProviderConfigSchema = z.discriminatedUnion('provider', [
   anthropicProviderConfigSchema,
   googleProviderConfigSchema,
   openRouterProviderConfigSchema,
+  orcaRouterProviderConfigSchema,
   openAiCompatibleProviderConfigSchema,
 ])
 

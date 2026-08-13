@@ -44,6 +44,13 @@ const OPENROUTER_CONFIG: AiProviderConfig = {
   keyHint: 'wxyz1',
 }
 
+const ORCAROUTER_CONFIG: AiProviderConfig = {
+  id: 'cfg-orcarouter',
+  provider: 'orcarouter',
+  model: 'openai/gpt-5.5',
+  keyHint: 'wxyz1',
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -158,6 +165,19 @@ describe('generateAudioMemoTitle', () => {
       pickAudioMemoEnrichmentConfig({
         providers: [OPENROUTER_CONFIG, GOOGLE_CONFIG],
         defaultProviderId: OPENROUTER_CONFIG.id,
+      }),
+    ).toMatchObject({
+      id: GOOGLE_CONFIG.id,
+      provider: 'google',
+      model: 'gemini-3.1-flash-lite',
+    })
+  })
+
+  it('skips OrcaRouter because it does not guarantee a small model', () => {
+    expect(
+      pickAudioMemoEnrichmentConfig({
+        providers: [ORCAROUTER_CONFIG, GOOGLE_CONFIG],
+        defaultProviderId: ORCAROUTER_CONFIG.id,
       }),
     ).toMatchObject({
       id: GOOGLE_CONFIG.id,

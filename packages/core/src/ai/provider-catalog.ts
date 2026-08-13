@@ -97,6 +97,18 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
     ],
   },
   {
+    id: 'orcarouter',
+    label: 'OrcaRouter',
+    apiKeyRequired: true,
+    keyPlaceholder: 'sk-orca-…',
+    models: [
+      { id: 'openai/gpt-5.5', label: 'GPT-5.5', contextWindow: 400_000 },
+      { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5', contextWindow: 1_000_000 },
+      { id: 'google/gemini-3.5-flash', label: 'Gemini 3.5 Flash', contextWindow: 1_000_000 },
+      { id: 'orcarouter/auto', label: 'Auto Router', contextWindow: 128_000 },
+    ],
+  },
+  {
     id: 'openai-compatible',
     label: 'OpenAI-compatible',
     apiKeyRequired: false,

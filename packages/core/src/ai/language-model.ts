@@ -6,6 +6,7 @@ import type { LanguageModel } from 'ai'
 import type { AiProviderConfig } from '../settings/schema'
 import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers'
 import { OPENAI_COMPATIBLE_PROVIDER_ID } from './openai-compatible'
+import { ORCAROUTER_BASE_URL } from './orcarouter'
 import { OPENROUTER_BASE_URL, openRouterAttributionHeaders } from './openrouter'
 
 /**
@@ -37,6 +38,13 @@ export function languageModel(
         baseURL: OPENROUTER_BASE_URL,
         headers: openRouterAttributionHeaders(),
         name: 'openrouter',
+      }).chat(config.model)
+    case 'orcarouter':
+      return createOpenAI({
+        apiKey,
+        fetch: fetchFn,
+        baseURL: ORCAROUTER_BASE_URL,
+        name: 'orcarouter',
       }).chat(config.model)
     case 'openai-compatible':
       return createOpenAICompatible({

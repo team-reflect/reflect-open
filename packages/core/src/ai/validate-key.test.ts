@@ -25,6 +25,7 @@ describe('validateApiKey', () => {
     await validateApiKey({ provider: 'anthropic', apiKey: 'sk-ant-test' }, recordingFetch)
     await validateApiKey({ provider: 'google', apiKey: 'AIza-test' }, recordingFetch)
     await validateApiKey({ provider: 'openrouter', apiKey: 'sk-or-v1-test' }, recordingFetch)
+    await validateApiKey({ provider: 'orcarouter', apiKey: 'sk-orca-test' }, recordingFetch)
     await validateApiKey(
       {
         provider: 'openai-compatible',
@@ -47,10 +48,12 @@ describe('validateApiKey', () => {
     expect(calls[2]!.headers['x-goog-api-key']).toBe('AIza-test')
     expect(calls[3]!.url).toBe('https://openrouter.ai/api/v1/key')
     expect(calls[3]!.headers['Authorization']).toBe('Bearer sk-or-v1-test')
-    expect(calls[4]!.url).toBe('http://localhost:1234/v1/models')
-    expect(calls[4]!.headers['Authorization']).toBe('Bearer local-secret')
+    expect(calls[4]!.url).toBe('https://api.orcarouter.ai/v1/models')
+    expect(calls[4]!.headers['Authorization']).toBe('Bearer sk-orca-test')
     expect(calls[5]!.url).toBe('http://localhost:1234/v1/models')
-    expect(calls[5]!.headers['Authorization']).toBeUndefined()
+    expect(calls[5]!.headers['Authorization']).toBe('Bearer local-secret')
+    expect(calls[6]!.url).toBe('http://localhost:1234/v1/models')
+    expect(calls[6]!.headers['Authorization']).toBeUndefined()
   })
 
   it('reads an ok response as valid', async () => {
@@ -81,6 +84,9 @@ describe('validateApiKey', () => {
         { provider: 'openrouter', apiKey: 'sk-or-v1-test' },
         fetchReturning(401),
       ),
+    ).toBe('invalid')
+    expect(
+      await validateApiKey({ provider: 'orcarouter', apiKey: 'sk-orca-test' }, fetchReturning(401)),
     ).toBe('invalid')
     expect(
       await validateApiKey(

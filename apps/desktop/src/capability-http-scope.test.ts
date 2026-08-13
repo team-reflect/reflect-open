@@ -53,6 +53,7 @@ describe('http:default capability scope', () => {
     expect(allowed('https://api.anthropic.com/v1/messages')).toBe(true)
     expect(allowed('https://generativelanguage.googleapis.com/v1beta/models')).toBe(true)
     expect(allowed('https://openrouter.ai/api/v1/chat/completions')).toBe(true)
+    expect(allowed('https://api.orcarouter.ai/v1/chat/completions')).toBe(true)
     expect(allowed('https://github.com/login/device/code')).toBe(true)
     expect(allowed('https://api.github.com/user')).toBe(true)
   })

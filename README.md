@@ -26,7 +26,7 @@ another git remote are connected directly by the user.
 - **Local search:** `⌘K` searches notes, backlinks, and tags. Optional semantic
   search can be enabled locally.
 - **Ask your notes:** `⌘J` can query notes through user-provided OpenAI,
-  Anthropic, Google, or OpenRouter keys. Answers cite source notes.
+  Anthropic, Google, OpenRouter, or OrcaRouter keys. Answers cite source notes.
 - **Private notes:** `private: true` excludes a note's content from AI and
   other external services.
 - **Audio memos:** record audio and transcribe it into the daily note with a

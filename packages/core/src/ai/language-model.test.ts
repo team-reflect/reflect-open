@@ -34,6 +34,13 @@ const OPENROUTER_CONFIG: AiProviderConfig = {
   keyHint: 'wxyz1',
 }
 
+const ORCAROUTER_CONFIG: AiProviderConfig = {
+  id: 'cfg-orcarouter',
+  provider: 'orcarouter',
+  model: 'openai/gpt-5.5',
+  keyHint: 'wxyz1',
+}
+
 const OPENAI_COMPATIBLE_CONFIG: AiProviderConfig = {
   id: 'cfg-local',
   provider: 'openai-compatible',
@@ -104,6 +111,33 @@ function recordingOpenRouterFetch(calls: RecordedCall[]): typeof fetch {
         object: 'chat.completion',
         created: 0,
         model: OPENROUTER_CONFIG.model,
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'ok' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )
+  }
+}
+
+function recordingOrcaRouterFetch(calls: RecordedCall[]): typeof fetch {
+  return async (input, init) => {
+    calls.push({
+      url: String(input),
+      headers: new Headers(init?.headers),
+      body: typeof init?.body === 'string' ? init.body : null,
+    })
+    return new Response(
+      JSON.stringify({
+        id: 'chatcmpl_123',
+        object: 'chat.completion',
+        created: 0,
+        model: ORCAROUTER_CONFIG.model,
         choices: [
           {
             index: 0,
@@ -193,6 +227,21 @@ describe('languageModel', () => {
     expect(calls[0]!.headers.get('Authorization')).toBe('Bearer sk-or-v1-test')
     expect(calls[0]!.headers.get('HTTP-Referer')).toBe('https://reflect.app')
     expect(calls[0]!.headers.get('X-OpenRouter-Title')).toBe('Reflect')
+  })
+
+  it('routes OrcaRouter through its OpenAI-compatible chat endpoint', async () => {
+    const calls: RecordedCall[] = []
+
+    await generateText({
+      model: languageModel(ORCAROUTER_CONFIG, 'sk-orca-test', recordingOrcaRouterFetch(calls)),
+      prompt: 'hello',
+      maxRetries: 0,
+    })
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]!.url).toBe('https://api.orcarouter.ai/v1/chat/completions')
+    expect(calls[0]!.headers.get('Authorization')).toBe('Bearer sk-orca-test')
+    expect(calls[0]!.body).toContain('"model":"openai/gpt-5.5"')
   })
 
   it('routes custom OpenAI-compatible providers through their configured endpoint', async () => {
