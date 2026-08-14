@@ -22,16 +22,15 @@ describe('checkRoundTrip', () => {
     expect(checkRoundTrip('- item one\n\n- item two\n')).toBe('normalizing')
   })
 
-  it('classifies git conflict markers as lossy (sync conflicts open protected)', () => {
-    // Load-bearing for Plan 12: a sync merge commits raw conflict markers into
-    // the note, and the converter mangles them (`<<<<<<<` is swallowed, the
-    // `=======` separator re-parses as a setext underline, `>>>>>>>` becomes
-    // nested blockquotes — verified by the discovery spike). `lossy` is what
-    // routes conflicted notes into the protected read-only view, where the
-    // conflict notice offers marker-aware resolution on the raw text instead
-    // of ever letting the editor rewrite (and destroy) the markers. If
-    // meowdown ever learns to round-trip markers, this case starts failing —
-    // that is the signal the in-editor conflict widget can be built.
+  it('classifies git conflict markers as normalizing, not lossy (meowdown 0.65.3)', () => {
+    // meowdown grades conflict markers `normalizing`: `>>>>>>> other device`
+    // re-serializes as `> > > > > > > other device`, which parses to the same
+    // seven nested blockquotes, and `<<<<<<< ` / `=======` survive as a setext
+    // heading. The bytes still change, and `>>>>>>> ` is the prefix conflict
+    // resolution matches on, so protection for conflicted notes lives in the
+    // note session's own `detectConflictMarkersOutsideCode` gate (see
+    // `note-session-state.ts`), not in this classifier. This case is here to
+    // notice if meowdown's verdict moves again.
     const conflicted = [
       '# Shared',
       '',
@@ -42,6 +41,6 @@ describe('checkRoundTrip', () => {
       '>>>>>>> other device',
       '',
     ].join('\n')
-    expect(checkRoundTrip(conflicted)).toBe('lossy')
+    expect(checkRoundTrip(conflicted)).toBe('normalizing')
   })
 })
