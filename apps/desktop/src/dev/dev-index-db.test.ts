@@ -363,9 +363,22 @@ describe('createDevIndexDb', () => {
         tags: [],
       }),
     )
+    db.applyNote(
+      sampleNote({
+        path: 'notes/body-cafe.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n89',
+        title: 'Unrelated note',
+        titleKey: 'unrelated note',
+        text: 'A cafe appears in this body.',
+        preview: 'A cafe appears in this body.',
+        tags: [],
+      }),
+    )
     installQueryBridge(db)
 
-    const accentHit = (await searchWithFilters(parseSearchQuery('cafe')))[0]!
+    const accentHits = await searchWithFilters(parseSearchQuery('cafe'))
+    expect(accentHits.map((hit) => hit.path)).toEqual(['notes/cafe-alpha.md', 'notes/body-cafe.md'])
+    const accentHit = accentHits[0]!
     expect(parseHighlights(accentHit.highlightedTitle)).toEqual([
       { text: 'Café', highlighted: true },
       { text: ' Alpha', highlighted: false },

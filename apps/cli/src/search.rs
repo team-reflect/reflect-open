@@ -44,7 +44,7 @@ pub struct SearchHit {
     pub title: String,
     /// FTS5 `snippet()` over the indexed plain-text body.
     pub snippet: String,
-    /// Title-boosted bm25 score (more negative = better); `0` for title-only hits.
+    /// Title-boosted bm25 score (more negative = better); `0` for title-recall hits.
     pub score: f64,
 }
 
@@ -75,10 +75,10 @@ const RANK_EXPR: &str = "bm25(search_fts, 0, 10.0, 1.0)";
 /// then title-boosted bm25, pinned and recency tiebreakers, then `path`. A
 /// materialized CTE runs MATCH once because SQLite rejects it beneath a plain
 /// OR and otherwise flattens a derived FTS join into one scan per note. The
-/// LEFT JOIN admits title-recall-only rows. Title-only matches keep an empty
-/// snippet and score `0`, so lexical title-prefix recall does not change their
-/// presentation or ordering. The caller re-checks each hit's file frontmatter
-/// (the index row may lag a just-flagged note).
+/// LEFT JOIN admits title-recall-only rows. Matches already covered by title
+/// recall keep an empty snippet and score `0`, while tokenizer-normalized title
+/// matches retain their lexical rank. The caller re-checks each hit's file
+/// frontmatter (the index row may lag a just-flagged note).
 pub fn search_index(
     conn: &Connection,
     match_expr: &str,
@@ -103,8 +103,13 @@ pub fn search_index(
            FROM search_fts
            WHERE search_fts MATCH ?1
          )
-         SELECT notes.path, notes.title,
-                coalesce(lexical.snippet, ''), coalesce(lexical.rank, 0)
+         SELECT notes.path, notes.title, coalesce(lexical.snippet, ''),
+                CASE
+                  WHEN instr(coalesce(lexical.snippet, ''), char(1)) > 0
+                    OR NOT ({title_term_predicate})
+                    THEN coalesce(lexical.rank, 0)
+                  ELSE 0
+                END AS effective_rank
          FROM notes
          LEFT JOIN lexical ON lexical.path = notes.path
          WHERE (lexical.path IS NOT NULL OR ({title_term_predicate}))
@@ -115,11 +120,7 @@ pub fn search_index(
                     WHEN {title_term_predicate} THEN 2
                     ELSE 3
                   END,
-                  CASE
-                    WHEN instr(coalesce(lexical.snippet, ''), char(1)) > 0
-                      THEN coalesce(lexical.rank, 0)
-                    ELSE 0
-                  END,
+                  effective_rank,
                   notes.is_pinned DESC,
                   notes.mtime DESC,
                   notes.path ASC
@@ -143,7 +144,7 @@ pub fn search_index(
             path: row.get(0)?,
             title: row.get(1)?,
             snippet,
-            score: if has_body_match { row.get(3)? } else { 0.0 },
+            score: row.get(3)?,
         })
     })?;
     let mut hits = Vec::new();

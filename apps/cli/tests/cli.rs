@@ -380,6 +380,23 @@ fn search_finds_a_multi_term_partial_latin_title() {
 }
 
 #[test]
+fn search_keeps_tokenizer_normalized_title_matches_above_body_matches() {
+    let fixture = graph();
+    fixture.write_note("notes/Café Alpha.md", "an otherwise unrelated body\n");
+    fixture.write_note(
+        "notes/body-hit.md",
+        "# Unrelated note\na cafe appears here\n",
+    );
+    fixture.build_index();
+
+    let value = json(&reflect(&fixture, &["search", "cafe", "--json"]));
+    assert_eq!(value["results"][0]["path"], "notes/Café Alpha.md");
+    assert_eq!(value["results"][0]["snippet"], "");
+    assert!(value["results"][0]["score"].as_f64().unwrap() < 0.0);
+    assert_eq!(value["results"][1]["path"], "notes/body-hit.md");
+}
+
+#[test]
 fn search_breaks_title_prefix_ties_by_pinned_then_recency() {
     let fixture = graph();
     fixture.write_note(

@@ -307,10 +307,16 @@ export async function searchWithFilters(
     ])
     .where(sql<boolean>`("lexical"."path" is not null or ${titleMatch.containsAllTerms})`)
     .orderBy(titleMatch.rank)
-    // A title-only lexical prefix has no body marker. Keep its historical
-    // title-recall rank (`0`) rather than letting lexical bm25 reorder it.
+    // A title-only prefix already admitted by manual recall keeps its
+    // historical rank (`0`). Tokenizer-only title matches such as
+    // `cafe` -> `Café` retain lexical bm25 so they still outrank body hits.
     .orderBy(
-      sql`case when instr(coalesce("lexical"."snippet", ''), ${HIGHLIGHT_START}) > 0 then coalesce("lexical"."rank", 0) else 0 end`,
+      sql`case
+        when instr(coalesce("lexical"."snippet", ''), ${HIGHLIGHT_START}) > 0
+          or not (${titleMatch.containsAllTerms})
+        then coalesce("lexical"."rank", 0)
+        else 0
+      end`,
     )
     .orderBy('filteredNotes.isPinned', 'desc')
     .orderBy('filteredNotes.mtime', 'desc')
