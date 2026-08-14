@@ -28,6 +28,13 @@ const OPENAI_CONFIG: AiProviderConfig = {
   keyHint: 'wxyz1',
 }
 
+const GOOGLE_CONFIG: AiProviderConfig = {
+  id: 'cfg-google',
+  provider: 'google',
+  model: 'gemini-3.5-flash',
+  keyHint: 'wxyz1',
+}
+
 const OPENROUTER_CONFIG: AiProviderConfig = {
   id: 'cfg-openrouter',
   provider: 'openrouter',
@@ -218,6 +225,7 @@ describe('languageModel', () => {
     for (const config of [
       OPENAI_CONFIG,
       ANTHROPIC_CONFIG,
+      GOOGLE_CONFIG,
       OPENROUTER_CONFIG,
       OPENAI_COMPATIBLE_CONFIG,
     ]) {
