@@ -40,7 +40,12 @@ export const DEMO_REPLY_TEXT =
   'The demo notes ("Meet Reflect (Demo)", "Project Apollo (Demo)", "Reading List (Demo)") show the wiki links, backlinks, tags, and tasks it works with.'
 
 const DEMO_USAGE: LanguageModelV3Usage = {
-  inputTokens: { total: undefined, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
+  inputTokens: {
+    total: undefined,
+    noCache: undefined,
+    cacheRead: undefined,
+    cacheWrite: undefined,
+  },
   outputTokens: { total: undefined, text: undefined, reasoning: undefined },
 }
 
