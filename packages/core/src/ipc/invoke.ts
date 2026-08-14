@@ -20,9 +20,9 @@ import { getBridge } from './bridge'
  * @param schema   Zod schema the response must satisfy.
  * @returns        The validated, typed result.
  */
-export async function call<TOutput>(
+export async function call<TArgs extends Record<string, unknown>, TOutput>(
   command: string,
-  args: Record<string, unknown>,
+  args: TArgs,
   // Input is `unknown`, not `TOutput`: schemas that normalize (`.catch`,
   // `.default`) have a wider input type than output, and a validator's job is
   // to consume untyped IPC data anyway. (zod 4's `ZodType<Output, Input>`

@@ -1,8 +1,7 @@
 import type { ReactElement } from 'react'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { TRANSCRIPTION_PROVIDERS, type AiProviderInfo } from '@reflect/core'
-
-export const PRIVACY_POLICY_URL = 'https://reflect.app/privacy'
+import { openUrlSync } from '@/lib/open-url'
+import { PRIVACY_POLICY_URL } from '@/mobile/legal-urls'
 
 const TRANSCRIBING_PROVIDER_IDS: readonly string[] = TRANSCRIPTION_PROVIDERS
 
@@ -35,7 +34,7 @@ export function AiProviderConsent({
           type="button"
           className="underline"
           onClick={() => {
-            void openUrl(PRIVACY_POLICY_URL).catch(() => {})
+            openUrlSync(PRIVACY_POLICY_URL)
           }}
         >
           Privacy policy

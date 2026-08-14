@@ -1,11 +1,11 @@
 import { useEffect, useState, type MouseEvent, type ReactElement } from 'react'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { Check, Copy, RefreshCw } from 'lucide-react'
 import { errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useNoteRow } from '@/hooks/use-note-row'
 import { runGistPublish } from '@/lib/note-gist'
+import { openUrlSync } from '@/lib/open-url'
 import { startOperation } from '@/lib/operations'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
@@ -63,7 +63,7 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
   const openPublishedUrl = (event: MouseEvent<HTMLAnchorElement>): void => {
     event.preventDefault()
     if (url.startsWith('https://') || url.startsWith('http://')) {
-      void openUrl(url)
+      openUrlSync(url)
     }
   }
 

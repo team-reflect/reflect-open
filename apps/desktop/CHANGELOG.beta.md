@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.9.1-beta](https://github.com/team-reflect/reflect-open/compare/v0.9.0...v0.9.1-beta) (2026-08-12)
+
+
+### Bug Fixes
+
+* **mobile:** add member paywall button ([#1097](https://github.com/team-reflect/reflect-open/issues/1097)) ([f7aa0a6](https://github.com/team-reflect/reflect-open/commit/f7aa0a67d59375cd52b822ee62f73d60fc6399e8))
+
+## [0.9.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.7...v0.9.0-beta.8) (2026-08-10)
+
+
+### Bug Fixes
+
+* pick up iCloud note changes that arrive while the Mac sleeps ([#1076](https://github.com/team-reflect/reflect-open/issues/1076)) ([0bc7f6a](https://github.com/team-reflect/reflect-open/commit/0bc7f6a38cc2564def66b8d5e6adba97045634fa))
+* pick up Mac note edits after the iOS app returns from background ([#1084](https://github.com/team-reflect/reflect-open/issues/1084)) ([a3d4b5a](https://github.com/team-reflect/reflect-open/commit/a3d4b5a761819164cc8d4c0e18865bb1049e8b84))
+* update meowdown to ^0.65.1 ([#1078](https://github.com/team-reflect/reflect-open/issues/1078)) ([d09409b](https://github.com/team-reflect/reflect-open/commit/d09409b6eed14a793ddcaacf0312c7821f02590d))
+
+## [0.9.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.6...v0.9.0-beta.7) (2026-08-10)
+
+
+### Bug Fixes
+
+* **ios:** fix TestFlight archive re-signing ([#1090](https://github.com/team-reflect/reflect-open/issues/1090)) ([e04046f](https://github.com/team-reflect/reflect-open/commit/e04046feab47663e06646a865a675a066e44b050))
+
+## [0.9.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.5...v0.9.0-beta.6) (2026-08-10)
+
+
+### Features
+
+* **mobile:** add iOS subscription ([#1086](https://github.com/team-reflect/reflect-open/issues/1086)) ([3e8a8df](https://github.com/team-reflect/reflect-open/commit/3e8a8dfabe4190d8856631dbb0125e08774ab3c4))
+
+
+### Bug Fixes
+
+* capture titles and descriptions from oversized pages ([#1081](https://github.com/team-reflect/reflect-open/issues/1081)) ([1d48916](https://github.com/team-reflect/reflect-open/commit/1d48916fd9279bf69ee5f13450d89707ffb4cba5))
+* capture YouTube video titles via oEmbed ([#1087](https://github.com/team-reflect/reflect-open/issues/1087)) ([c0031ae](https://github.com/team-reflect/reflect-open/commit/c0031aebb65854a8e2c14f3c0da281b4ad51e10b))
+* stop AI enrichment from inventing titles for captured links ([#1085](https://github.com/team-reflect/reflect-open/issues/1085)) ([5fb921e](https://github.com/team-reflect/reflect-open/commit/5fb921ed0d03e26d74dd4b6a9a18a41c8786d371))
+
 ## [0.9.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.4...v0.9.0-beta.5) (2026-08-09)
 
 

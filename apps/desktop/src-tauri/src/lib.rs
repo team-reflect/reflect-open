@@ -34,6 +34,8 @@ mod recents;
 mod secrets;
 mod settings;
 mod skill;
+#[cfg(target_os = "macos")]
+mod wake;
 mod windows;
 
 // The watcher and the embedding runtime are desktop capabilities (Plan 19):
@@ -231,6 +233,9 @@ pub fn run() {
     #[cfg(mobile)]
     let builder = builder.plugin(tauri_plugin_recording::init());
 
+    #[cfg(target_os = "ios")]
+    let builder = builder.plugin(tauri_plugin_iap::init());
+
     // The main window starts hidden (`visible: false`); desktop reveals it
     // from the page-load hook above after restoring geometry, but mobile has
     // no window-state plugin, so show it here or the UI would never appear.
@@ -381,6 +386,12 @@ pub fn run() {
             // registration hook, which Tauri stores as a single callback.)
             #[cfg(desktop)]
             tauri::RunEvent::Ready => {
+                // Wake-from-sleep is the one moment external iCloud writes
+                // can land without the FSEvents watcher seeing them; the
+                // observer asks the frontend for one full reconcile per wake
+                // (wake.rs).
+                #[cfg(target_os = "macos")]
+                wake::install(app);
                 let app = app.clone();
                 windows::arm_reveal_fallback(
                     &revealed_main,

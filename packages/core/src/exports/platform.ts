@@ -6,6 +6,34 @@ export {
   type Unlisten,
 } from '../ipc/bridge'
 export { call, callBinary } from '../ipc/invoke'
+export { type PluginSubscription } from '../ipc/plugin'
+export {
+  actionPerformed,
+  actionsReady,
+  cancelRecording,
+  deleteStaged,
+  listStaged,
+  readStaged,
+  recordingStatus,
+  startRecording,
+  stopRecording,
+  subscribeRecordingLevel,
+  subscribeRecordingNativeAction,
+  subscribeRecordingStopped,
+  type RecordingLevelEvent,
+  type RecordingNativeActionEvent,
+  type RecordingStatus,
+  type RecordingStopResponse,
+  type RecordingStoppedEvent,
+  type StagedRecordingFile,
+  type StartRecordingOptions,
+} from '../ipc/recording-plugin'
+export {
+  getCurrentKeyboardHeight,
+  impactLight,
+  subscribeKeyboardChange,
+  type KeyboardState,
+} from '../ipc/keyboard-plugin'
 export {
   getAppVersion,
   getAppPlatform,
@@ -282,3 +310,12 @@ export {
   type PersonContactResolution,
   type PersonResolution,
 } from '../contacts/person'
+export {
+  IAP_PRODUCT_IDS,
+  iapGetProducts,
+  iapPurchase,
+  iapRestorePurchases,
+  iapIsOwned,
+  subscribeIapPurchaseUpdated,
+  type IapProduct,
+} from '../ipc/iap-plugin'

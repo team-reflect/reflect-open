@@ -49,3 +49,8 @@ export function isListItem(node: TypedNode): boolean {
 export function isListMark(node: TypedNode): boolean {
   return node.type.id === LEZER_NODE_IDS.ListMark
 }
+
+/** Is this a fenced (``` / ~~~) or an indented code block? */
+export function isCodeBlock(node: TypedNode): boolean {
+  return node.type.id === LEZER_NODE_IDS.FencedCode || node.type.id === LEZER_NODE_IDS.CodeBlock
+}

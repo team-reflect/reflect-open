@@ -89,6 +89,11 @@ export interface IcloudController {
  *   folder get no conflict signal — and a conflict version can appear
  *   without the working file changing, which the `notify` watcher can't see
  *   either. The resume sweep is the backstop for both.
+ * - On mobile, restarts the watch on every foreground resume: a long iOS
+ *   suspension can sever the query's link to `fileproviderd` and update
+ *   delivery never recovers, and the query is the *sole* external-change
+ *   source there — a silently dead watch means a Mac edit synced while
+ *   backgrounded stays invisible until the app is relaunched.
  *
  * Dirty open sessions are deferred (their paths ride `skipPaths`) as a
  * courtesy, not a safety net — even without it, a sweep write lands on disk
@@ -282,6 +287,40 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     }
   }
 
+  /**
+   * Tear down and reinstall the metadata watch — the mobile resume recovery.
+   * A stop/start pair is the canonical cure for a post-suspension
+   * NSMetadataQuery that has stopped delivering updates: the Rust epoch
+   * lifecycle serializes rapid restarts, the fresh gather round emits one
+   * coarse `index:reconcile` (folded into the resume's own refresh), and the
+   * live query then reports the remote metadata whenever `fileproviderd`
+   * learns of it — which closes the resume race where the nudge-and-poll
+   * backstop runs before the OS even knows a newer version exists.
+   */
+  async function restartWatch(): Promise<void> {
+    try {
+      await icloudWatchStop()
+    } catch (err) {
+      // A failed stop must not abort the restart: the Rust install tears
+      // down any live watch itself, so starting over a possibly-live query
+      // is safe — and the reinstall is the half that matters here.
+      console.error('iCloud watch stop failed during restart:', err)
+    }
+    if (disposed) {
+      return // closed mid-restart: never leave a watch running for a dead graph
+    }
+    try {
+      await icloudWatchStart(graph.root, emitFileChangesFromWatch)
+    } catch (err) {
+      // Same degradation contract as a failed initial start: freshness
+      // rides file-change batches and resume sweeps (this resume already
+      // scheduled one), and the next resume retries the reinstall. A
+      // Rust-side install failure additionally emits `icloud:watch-failed`,
+      // which the subscription above answers with an immediate sweep.
+      console.error('iCloud watch restart failed; relying on resume-triggered sweeps:', err)
+    }
+  }
+
   async function start(): Promise<void> {
     if (disposed) {
       return
@@ -352,7 +391,17 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     } catch (err) {
       console.error('iCloud change subscriptions failed to start:', err)
     }
-    disposers.push(...attachResumeListeners(scheduleScan))
+    disposers.push(
+      ...attachResumeListeners(() => {
+        if (emitFileChangesFromWatch) {
+          // Mobile only: desktop's query survives sleep well enough for its
+          // conflict-signal role, and desktop content freshness rides the
+          // `notify` watcher plus the wake-time reconcile, not this query.
+          void restartWatch()
+        }
+        scheduleScan()
+      }),
+    )
     // The adoption baseline + any conflicts that accrued while closed.
     scheduleScan()
   }

@@ -115,6 +115,7 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
   "NSEvent",
   "NSMenu",
   "NSMenuItem",
+  "NSWorkspace",
 ] }
 
 # Apple Contacts integration (`contacts.rs`): live CNContactStore lookups on
@@ -146,6 +147,7 @@ objc2-ui-kit = { version = "0.3.2", default-features = false, features = [
   "UIApplication",
   "block2",
 ] }
+tauri-plugin-iap = "0.9.1"
 
 # Desktop-only capabilities (Plan 19): auto-update (mobile updates go through
 # the app stores), window-state (no windows to restore on mobile), the file
