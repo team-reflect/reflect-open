@@ -367,10 +367,6 @@ export function buildIndexedNote(
     isPrivate: parsed.frontmatter.private,
     isPinned: isPinned(parsed.frontmatter),
     pinnedOrder: pinnedOrder(parsed.frontmatter),
-    // Code-aware: a note that quotes a conflict inside a fenced or indented
-    // block is documentation, not a conflict, and must not surface in the
-    // sync UI's conflicted list. The raw-scan short-circuit inside keeps the
-    // markerless common case free of a parse.
     hasConflict: detectConflictMarkersOutsideCode(meta.source),
     gistUrl: parsed.frontmatter.gist?.url ?? null,
     // Staleness is a body-hash comparison (frontmatter excluded): publishing

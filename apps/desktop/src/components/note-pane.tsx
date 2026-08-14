@@ -280,10 +280,7 @@ export function NotePaneComponent({
     // conflict notice — with its raw-text resolution actions — leads the
     // view, and the file renders with each block's sides color-coded instead
     // of the generic read-only dump (whose converter-gap alert would only
-    // double up on the conflict explanation). Code-aware for the same reason
-    // as the gate: a note protected for round-trip reasons that also quotes a
-    // conflict in a fence must not offer resolution buttons that would splice
-    // the quoted example.
+    // double up on the conflict explanation).
     const conflicted = detectConflictMarkersOutsideCode(document.initialContent)
     return (
       <div className={cn(gutterClassName, className)}>

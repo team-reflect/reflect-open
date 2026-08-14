@@ -301,14 +301,8 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         dirty = false
         missing = fileMissing
         // The data-loss gate: a note the editor can't reproduce opens read-only.
-        // Conflict markers get their own check rather than riding the round-trip
-        // verdict: meowdown grades them `normalizing` (since 0.65.3), because
-        // `>>>>>>> other device` and `> > > > > > > other device` parse to the
-        // same seven nested blockquotes. The bytes still change, and `>>>>>>> `
-        // is the literal prefix conflict detection and resolution match on, so
-        // a save would strand the conflict unresolvable. Markers inside a code
-        // block are somebody documenting a conflict, not carrying one: they
-        // survive verbatim, so that note stays editable.
+        // Conflict markers need their own check: the round trip mangles them
+        // but still classifies `normalizing` (meowdown 0.65.3).
         isProtected = detectConflictMarkersOutsideCode(adopted) || classify(doc.body) === 'lossy'
         initialContent = isProtected ? adopted : doc.body
         status = 'ready'
