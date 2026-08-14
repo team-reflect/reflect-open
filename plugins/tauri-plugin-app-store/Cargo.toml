@@ -1,0 +1,16 @@
+[package]
+name = "tauri-plugin-app-store"
+version = "0.1.0"
+description = "Expose the App Store distribution environment (App Store, TestFlight sandbox, or Xcode) to the app"
+edition = "2021"
+rust-version = "1.77.2"
+exclude = ["/examples", "/dist-js", "/guest-js", "/node_modules"]
+links = "tauri-plugin-app-store"
+
+[dependencies]
+tauri = { version = "2.11.5" }
+serde = "1.0.228"
+thiserror = "2.0.18"
+
+[build-dependencies]
+tauri-plugin = { version = "2.6.2", features = ["build"] }

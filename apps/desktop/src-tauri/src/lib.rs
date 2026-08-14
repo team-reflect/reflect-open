@@ -241,6 +241,12 @@ pub fn run() {
     #[cfg(target_os = "ios")]
     let builder = builder.plugin(tauri_plugin_iap::init());
 
+    // TestFlight and the App Store install the same binary, so only a
+    // runtime probe (StoreKit 2's `AppTransaction.environment`) can tell
+    // the channels apart, e.g. for the paywall gate.
+    #[cfg(target_os = "ios")]
+    let builder = builder.plugin(tauri_plugin_app_store::init());
+
     // The main window starts hidden (`visible: false`); desktop reveals it
     // from the page-load hook above after restoring geometry, but mobile has
     // no window-state plugin, so show it here or the UI would never appear.

@@ -1,0 +1,3 @@
+[default]
+description = "Read which channel installed this build (App Store, TestFlight sandbox, or Xcode)"
+permissions = ["allow-get-environment"]

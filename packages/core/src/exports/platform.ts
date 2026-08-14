@@ -315,3 +315,4 @@ export {
   subscribeIapPurchaseUpdated,
   type IapProduct,
 } from '../ipc/iap-plugin'
+export { getAppStoreEnvironment } from '../ipc/app-store-plugin'

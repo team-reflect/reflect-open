@@ -4905,6 +4905,7 @@ dependencies = [
  "sha2 0.11.0",
  "tauri",
  "tauri-build",
+ "tauri-plugin-app-store",
  "tauri-plugin-deep-link",
  "tauri-plugin-dialog",
  "tauri-plugin-http",
@@ -6178,6 +6179,16 @@ dependencies = [
  "serde_json",
  "tauri-utils",
  "walkdir",
+]
+
+[[package]]
+name = "tauri-plugin-app-store"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.19",
 ]
 
 [[package]]

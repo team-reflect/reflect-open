@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "ios",
-  "description": "iOS-only capabilities: the StoreKit In-App Purchase bridge",
+  "description": "iOS-only capabilities: the StoreKit In-App Purchase bridge and the App Store environment probe",
   "platforms": ["iOS"],
   "windows": ["main"],
-  "permissions": ["iap:default"]
+  "permissions": ["iap:default", "app-store:default"]
 }
