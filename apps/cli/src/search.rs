@@ -23,18 +23,42 @@ const HIGHLIGHT_END: char = '\u{2}';
 /// (embedded quotes doubled), then matched as a prefix in the title or body
 /// column. User operators like `AND`/`*` therefore cannot change the query's
 /// meaning or raise syntax errors.
+///
+/// A term without token characters (`-`, `&`) tokenizes to an empty phrase,
+/// which as an operand of the explicit `AND` matches no rows and would take
+/// the whole query with it, so those terms are dropped; when none survive,
+/// the quoted join keeps the expression valid but matchless so title recall
+/// still runs. `char::is_alphanumeric` mirrors `FTS_TOKEN_CHAR_RE`
+/// (`search-query.ts`); the two must move together. It also accepts combining
+/// marks, which `unicode61` separates on, so a term built solely from marks
+/// stays in here and matches nothing (unreachable from a keyboard, and the
+/// reason the parity corpus carries no such term).
 pub fn build_fts_match(query: &str) -> Option<String> {
-    let terms: Vec<String> = query
-        .split_whitespace()
-        .map(|term| {
-            let literal = format!("\"{}\"", term.replace('"', "\"\""));
-            format!("(title : {literal}* OR body : {literal}*)")
-        })
-        .collect();
+    fn quote(term: &str) -> String {
+        format!("\"{}\"", term.replace('"', "\"\""))
+    }
+    let terms: Vec<&str> = query.split_whitespace().collect();
     if terms.is_empty() {
         return None;
     }
-    Some(terms.join(" AND "))
+    let tokenizable: Vec<&str> = terms
+        .iter()
+        .copied()
+        .filter(|term| term.chars().any(char::is_alphanumeric))
+        .collect();
+    if tokenizable.is_empty() {
+        return Some(terms.into_iter().map(quote).collect::<Vec<_>>().join(" "));
+    }
+    Some(
+        tokenizable
+            .into_iter()
+            .map(|term| {
+                let literal = quote(term);
+                format!("(title : {literal}* OR body : {literal}*)")
+            })
+            .collect::<Vec<_>>()
+            .join(" AND "),
+    )
 }
 
 /// One search result row.
@@ -199,5 +223,18 @@ mod tests {
                     .to_string()
             )
         );
+        assert_eq!(
+            build_fts_match("meeting - notes"),
+            Some(
+                "(title : \"meeting\"* OR body : \"meeting\"*) AND (title : \"notes\"* OR body : \"notes\"*)"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            build_fts_match("東京 ・"),
+            Some("(title : \"東京\"* OR body : \"東京\"*)".to_string())
+        );
+        assert_eq!(build_fts_match("-"), Some("\"-\"".to_string()));
+        assert_eq!(build_fts_match(". -"), Some("\".\" \"-\"".to_string()));
     }
 }

@@ -301,6 +301,31 @@ describe('createDevIndexDb', () => {
     ])
   })
 
+  it('ignores a term that tokenizes to nothing instead of emptying the result', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/meeting-notes.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n92',
+        title: 'Meeting Notes',
+        titleKey: 'meeting notes',
+        text: 'Agenda items for the sync.',
+        preview: 'Agenda items for the sync.',
+        tags: [],
+      }),
+    )
+    installQueryBridge(db)
+
+    await expect(searchNotes('meeting - notes')).resolves.toEqual([
+      { path: 'notes/meeting-notes.md', title: 'Meeting Notes' },
+    ])
+    await expect(searchNotes('agenda &')).resolves.toEqual([
+      { path: 'notes/meeting-notes.md', title: 'Meeting Notes' },
+    ])
+    // Punctuation alone still matches nothing, never the whole recall feed.
+    await expect(searchNotes('- .')).resolves.toEqual([])
+  })
+
   it('uses pinning to break ties between title-only prefix hits', async () => {
     const db = await openDb()
     db.applyNote(

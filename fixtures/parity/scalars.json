@@ -1,4 +1,17 @@
 {
   "foldKey": ["  MiXeD Case  ", "Café", "ALPHA", "", "İstanbul", "ΟΔΟΣ", "STRASSE"],
-  "ftsMatch": ["", "   \t \n ", "hello", "cats AND (dogs*)", "say \"hi\"", "  alpha   beta "]
+  "ftsMatch": [
+    "",
+    "   \t \n ",
+    "hello",
+    "cats AND (dogs*)",
+    "say \"hi\"",
+    "  alpha   beta ",
+    "meeting - notes",
+    "-",
+    ". -",
+    "c++ +",
+    "東京 メモ",
+    "中文"
+  ]
 }

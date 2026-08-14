@@ -349,6 +349,12 @@
     "hello": "(title : \"hello\"* OR body : \"hello\"*)",
     "cats AND (dogs*)": "(title : \"cats\"* OR body : \"cats\"*) AND (title : \"AND\"* OR body : \"AND\"*) AND (title : \"(dogs*)\"* OR body : \"(dogs*)\"*)",
     "say \"hi\"": "(title : \"say\"* OR body : \"say\"*) AND (title : \"\"\"hi\"\"\"* OR body : \"\"\"hi\"\"\"*)",
-    "  alpha   beta ": "(title : \"alpha\"* OR body : \"alpha\"*) AND (title : \"beta\"* OR body : \"beta\"*)"
+    "  alpha   beta ": "(title : \"alpha\"* OR body : \"alpha\"*) AND (title : \"beta\"* OR body : \"beta\"*)",
+    "meeting - notes": "(title : \"meeting\"* OR body : \"meeting\"*) AND (title : \"notes\"* OR body : \"notes\"*)",
+    "-": "\"-\"",
+    ". -": "\".\" \"-\"",
+    "c++ +": "(title : \"c++\"* OR body : \"c++\"*)",
+    "東京 メモ": "(title : \"東京\"* OR body : \"東京\"*) AND (title : \"メモ\"* OR body : \"メモ\"*)",
+    "中文": "(title : \"中文\"* OR body : \"中文\"*)"
   }
 }

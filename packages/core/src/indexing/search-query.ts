@@ -20,19 +20,43 @@ export function splitSearchTerms(query: string): string[] {
 }
 
 /**
+ * A character `unicode61` keeps inside a token: its default `categories` is
+ * `'L* N* Co'`, so letters and numbers of every script count (Han, kana,
+ * Hangul and Thai included) while punctuation, symbols and combining marks
+ * separate tokens. Must stay a Unicode property class, since an ASCII one
+ * would drop whole CJK terms. The Rust mirror is `char::is_alphanumeric`
+ * (`apps/cli/src/search.rs`), which also accepts combining marks; the two
+ * therefore agree on every term a keyboard can produce, but not on one built
+ * solely from marks, so the parity corpus must not carry such a term.
+ */
+const FTS_TOKEN_CHAR_RE = /[\p{L}\p{N}]/u
+
+/**
  * Build a word-prefix FTS5 `MATCH` expression over titles and bodies, or `null`
  * when there is nothing to search. FTS5 errors on an empty `MATCH`, so callers
  * should treat `null` as an empty result set rather than passing it to the
  * database.
+ *
+ * A term without token characters (`-`, `&`) tokenizes to an empty phrase.
+ * That was a no-op while terms were implicitly joined, but as an operand of
+ * the explicit `AND` it matches no rows and would take the whole query with
+ * it, so those terms are dropped. When none survive, the quoted join is
+ * returned: a valid, matchless expression that still lets title recall admit
+ * rows, exactly as an all-punctuation query behaved before prefixes.
  */
 export function buildFtsMatch(query: string): string | null {
   const terms = splitSearchTerms(query)
   if (terms.length === 0) {
     return null
   }
-  return terms
+  const quote = (term: string) => `"${term.replaceAll('"', '""')}"`
+  const tokenizable = terms.filter((term) => FTS_TOKEN_CHAR_RE.test(term))
+  if (tokenizable.length === 0) {
+    return terms.map(quote).join(' ')
+  }
+  return tokenizable
     .map((term) => {
-      const literal = `"${term.replaceAll('"', '""')}"`
+      const literal = quote(term)
       return `(title : ${literal}* OR body : ${literal}*)`
     })
     .join(' AND ')

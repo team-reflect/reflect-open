@@ -28,6 +28,23 @@ describe('buildFtsMatch', () => {
       '(title : "alpha"* OR body : "alpha"*) AND (title : "beta"* OR body : "beta"*)',
     )
   })
+
+  it('drops a term that tokenizes to nothing rather than emptying the query', () => {
+    expect(buildFtsMatch('meeting - notes')).toBe(
+      '(title : "meeting"* OR body : "meeting"*) AND (title : "notes"* OR body : "notes"*)',
+    )
+    expect(buildFtsMatch('c++ +')).toBe('(title : "c++"* OR body : "c++"*)')
+  })
+
+  it('keeps unsegmented-script terms, whose characters are Unicode letters', () => {
+    expect(buildFtsMatch('東京 ・')).toBe('(title : "東京"* OR body : "東京"*)')
+    expect(buildFtsMatch('中文')).toBe('(title : "中文"* OR body : "中文"*)')
+  })
+
+  it('falls back to the quoted join when no term tokenizes', () => {
+    expect(buildFtsMatch('-')).toBe('"-"')
+    expect(buildFtsMatch('. -')).toBe('"." "-"')
+  })
 })
 
 describe('containsUnsegmentedScript', () => {
