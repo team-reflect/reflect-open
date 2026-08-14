@@ -55,7 +55,7 @@ export { parseTaskMarker } from './task-marker'
 export {
   conflictMarkerBlockCount,
   conflictMarkerLabels,
-  detectConflictMarkersOutsideCode,
+  detectConflictMarkers,
   parseConflictMarkers,
   resolveConflictMarkers,
   type ConflictMarkerLabels,

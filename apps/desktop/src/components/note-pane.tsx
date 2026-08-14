@@ -1,7 +1,7 @@
 import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from 'react'
 import type { ExitBoundaryHandler, SearchStatus } from '@meowdown/core'
 import {
-  detectConflictMarkersOutsideCode,
+  detectConflictMarkers,
   isDaily,
   isTemplatePath,
   isUntitledNotePath,
@@ -281,7 +281,7 @@ export function NotePaneComponent({
     // view, and the file renders with each block's sides color-coded instead
     // of the generic read-only dump (whose converter-gap alert would only
     // double up on the conflict explanation).
-    const conflicted = detectConflictMarkersOutsideCode(document.initialContent)
+    const conflicted = detectConflictMarkers(document.initialContent)
     return (
       <div className={cn(gutterClassName, className)}>
         <SyncConflictNotice path={path} className="mb-4" />

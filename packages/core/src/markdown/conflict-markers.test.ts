@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   conflictMarkerBlockCount,
   conflictMarkerLabels,
+  detectRawConflictMarkers,
   detectConflictMarkers,
-  detectConflictMarkersOutsideCode,
   parseConflictMarkers,
   resolveConflictMarkers,
 } from './conflict-markers'
@@ -19,28 +19,30 @@ const CONFLICTED = [
   '',
 ].join('\n')
 
-describe('detectConflictMarkers', () => {
+describe('detectRawConflictMarkers', () => {
   it('detects a complete labeled marker block', () => {
-    expect(detectConflictMarkers(CONFLICTED)).toBe(true)
+    expect(detectRawConflictMarkers(CONFLICTED)).toBe(true)
   })
 
   it('detects markers with CRLF line endings', () => {
-    expect(detectConflictMarkers(CONFLICTED.replaceAll('\n', '\r\n'))).toBe(true)
+    expect(detectRawConflictMarkers(CONFLICTED.replaceAll('\n', '\r\n'))).toBe(true)
   })
 
   it('requires the full sequence in order', () => {
-    expect(detectConflictMarkers('plain note body')).toBe(false)
-    expect(detectConflictMarkers('<<<<<<< this device\nno separator or end')).toBe(false)
-    expect(detectConflictMarkers('=======\n>>>>>>> other device\n<<<<<<< late start')).toBe(false)
+    expect(detectRawConflictMarkers('plain note body')).toBe(false)
+    expect(detectRawConflictMarkers('<<<<<<< this device\nno separator or end')).toBe(false)
+    expect(detectRawConflictMarkers('=======\n>>>>>>> other device\n<<<<<<< late start')).toBe(
+      false,
+    )
   })
 
   it('ignores prose that merely mentions a marker line', () => {
     const prose = 'Git writes `>>>>>>> theirs` after a `=======` separator.'
-    expect(detectConflictMarkers(prose)).toBe(false)
+    expect(detectRawConflictMarkers(prose)).toBe(false)
   })
 
   it('requires a label after the start/end arrows (as git writes them)', () => {
-    expect(detectConflictMarkers('<<<<<<<\nx\n=======\ny\n>>>>>>>')).toBe(false)
+    expect(detectRawConflictMarkers('<<<<<<<\nx\n=======\ny\n>>>>>>>')).toBe(false)
   })
 
   it('clears once the user resolves by editing the markers away', () => {
@@ -49,7 +51,7 @@ describe('detectConflictMarkers', () => {
         (line) => !line.startsWith('<<<<<<<') && line !== '=======' && !line.startsWith('>>>>>>>'),
       )
       .join('\n')
-    expect(detectConflictMarkers(resolved)).toBe(false)
+    expect(detectRawConflictMarkers(resolved)).toBe(false)
   })
 })
 
@@ -57,7 +59,7 @@ describe('resolveConflictMarkers', () => {
   it('keeps this device’s side', () => {
     const resolved = resolveConflictMarkers(CONFLICTED, 'ours')
     expect(resolved).toBe('# Shared\n\nedited on a\n')
-    expect(detectConflictMarkers(resolved)).toBe(false)
+    expect(detectRawConflictMarkers(resolved)).toBe(false)
   })
 
   it('keeps the other device’s side', () => {
@@ -195,55 +197,49 @@ describe('conflictMarkerBlockCount', () => {
   })
 })
 
-describe('detectConflictMarkersOutsideCode', () => {
+describe('detectConflictMarkers', () => {
   const EXAMPLE_BLOCK = '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n'
 
   it('still reports a real conflict in prose', () => {
-    expect(detectConflictMarkersOutsideCode(CONFLICTED)).toBe(true)
+    expect(detectConflictMarkers(CONFLICTED)).toBe(true)
   })
 
   it('ignores a conflict example inside a fenced block', () => {
-    expect(
-      detectConflictMarkersOutsideCode('# How to resolve\n\n```\n' + EXAMPLE_BLOCK + '```\n'),
-    ).toBe(false)
-    expect(
-      detectConflictMarkersOutsideCode('# How to resolve\n\n```diff\n' + EXAMPLE_BLOCK + '```\n'),
-    ).toBe(false)
+    expect(detectConflictMarkers('# How to resolve\n\n```\n' + EXAMPLE_BLOCK + '```\n')).toBe(false)
+    expect(detectConflictMarkers('# How to resolve\n\n```diff\n' + EXAMPLE_BLOCK + '```\n')).toBe(
+      false,
+    )
   })
 
   it('ignores one inside an indented code block', () => {
     const indented = EXAMPLE_BLOCK.replaceAll(/^/gmu, '    ')
-    expect(detectConflictMarkersOutsideCode('# Doc\n\n' + indented)).toBe(false)
+    expect(detectConflictMarkers('# Doc\n\n' + indented)).toBe(false)
   })
 
   it('reports a real conflict that also carries a fenced example', () => {
-    expect(
-      detectConflictMarkersOutsideCode(EXAMPLE_BLOCK + '\n```\n' + EXAMPLE_BLOCK + '```\n'),
-    ).toBe(true)
+    expect(detectConflictMarkers(EXAMPLE_BLOCK + '\n```\n' + EXAMPLE_BLOCK + '```\n')).toBe(true)
   })
 
   it('reports markers a merge dropped into the frontmatter header', () => {
     const conflictedHeader =
       '---\n<<<<<<< this device\ntitle: a\n=======\ntitle: b\n>>>>>>> other device\n---\n\nbody\n'
-    expect(detectConflictMarkersOutsideCode(conflictedHeader)).toBe(true)
+    expect(detectConflictMarkers(conflictedHeader)).toBe(true)
   })
 
   it('reports a block spanning the header and the body', () => {
     const spanning =
       '---\ntitle: x\n<<<<<<< this device\nk: v\n---\nbody a\n=======\nk: w\n>>>>>>> other device\n'
-    expect(detectConflictMarkersOutsideCode(spanning)).toBe(true)
+    expect(detectConflictMarkers(spanning)).toBe(true)
   })
 
-  it('matches only column-0 markers, like detectConflictMarkers', () => {
+  it('matches only column-0 markers, like detectRawConflictMarkers', () => {
     // Quoted or bulleted marker-shaped text is authored content, not a git
     // conflict (git always writes markers at column 0), and the raw detector
     // ignores it too; the round trip may normalize it, which is fine.
-    expect(
-      detectConflictMarkersOutsideCode('> <<<<<<< a\n> x\n> =======\n> y\n> >>>>>>> b\n'),
-    ).toBe(false)
+    expect(detectConflictMarkers('> <<<<<<< a\n> x\n> =======\n> y\n> >>>>>>> b\n')).toBe(false)
   })
 
   it('handles CRLF line endings', () => {
-    expect(detectConflictMarkersOutsideCode(CONFLICTED.replaceAll('\n', '\r\n'))).toBe(true)
+    expect(detectConflictMarkers(CONFLICTED.replaceAll('\n', '\r\n'))).toBe(true)
   })
 })

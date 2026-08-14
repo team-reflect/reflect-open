@@ -76,7 +76,7 @@ export {
   splitFrontmatter,
   parseFrontmatter,
   upsertFrontmatter,
-  detectConflictMarkersOutsideCode,
+  detectConflictMarkers,
   parseConflictMarkers,
   resolveConflictMarkers,
   conflictMarkerBlockCount,

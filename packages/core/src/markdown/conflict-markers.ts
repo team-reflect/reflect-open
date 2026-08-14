@@ -75,7 +75,7 @@ export interface ConflictMarkerLabels {
 /**
  * Parse the side labels out of `source`'s first complete conflict block, or
  * `null` when there is none. Same in-order sequence rule as
- * {@link detectConflictMarkers}, so a note that "has a conflict" always has
+ * {@link detectRawConflictMarkers}, so a note that "has a conflict" always has
  * labels.
  */
 export function conflictMarkerLabels(source: string): ConflictMarkerLabels | null {
@@ -224,8 +224,13 @@ export function conflictMarkerBlockCount(source: string): number {
   return count
 }
 
-/** True when `source` contains a complete Git conflict-marker block. */
-export function detectConflictMarkers(source: string): boolean {
+/**
+ * True when `source` contains a complete Git conflict-marker block, scanning
+ * every line — code blocks included. {@link detectConflictMarkers} is the
+ * code-aware check the app gates on; this raw scan is its fast pre-filter and
+ * the grammar the sibling functions here share.
+ */
+export function detectRawConflictMarkers(source: string): boolean {
   let stage: 'start' | 'separator' | 'end' = 'start'
   for (const rawLine of source.split('\n')) {
     const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
@@ -271,7 +276,7 @@ function codeBlockRanges(body: string): Array<readonly [number, number]> {
  * rewrite and the resolution actions should act on.
  *
  * Same in-order `<<<<<<< ` / `=======` / `>>>>>>> ` rule as
- * {@link detectConflictMarkers}, minus any line inside a fenced or indented
+ * {@link detectRawConflictMarkers}, minus any line inside a fenced or indented
  * code block. A note that *documents* a merge conflict in a code block
  * survives the editor's round trip byte for byte, so treating it as conflicted
  * would lock the author out of their own note and offer a "resolution" that
@@ -279,12 +284,12 @@ function codeBlockRanges(body: string): Array<readonly [number, number]> {
  * drop markers into it (or a block can span the header and the body), and
  * those still count.
  */
-export function detectConflictMarkersOutsideCode(source: string): boolean {
+export function detectConflictMarkers(source: string): boolean {
   // Cheap raw scan first: the scan below visits a subset of these lines and
   // the stage only ever advances, so when the full scan finds nothing the
   // subset cannot either — and the markerless common case never pays for a
   // parse.
-  if (!detectConflictMarkers(source)) {
+  if (!detectRawConflictMarkers(source)) {
     return false
   }
   const { body, bodyOffset } = splitFrontmatter(source)

@@ -8,7 +8,7 @@ import {
   isTemplatePath,
 } from '../graph/paths'
 import {
-  detectConflictMarkersOutsideCode,
+  detectConflictMarkers,
   extractEmailFields,
   foldEmail,
   foldKey,
@@ -367,7 +367,7 @@ export function buildIndexedNote(
     isPrivate: parsed.frontmatter.private,
     isPinned: isPinned(parsed.frontmatter),
     pinnedOrder: pinnedOrder(parsed.frontmatter),
-    hasConflict: detectConflictMarkersOutsideCode(meta.source),
+    hasConflict: detectConflictMarkers(meta.source),
     gistUrl: parsed.frontmatter.gist?.url ?? null,
     // Staleness is a body-hash comparison (frontmatter excluded): publishing
     // writes the `gist` block itself, and a pin/private toggle is not an edit

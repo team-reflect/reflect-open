@@ -28,7 +28,7 @@ describe('checkRoundTrip', () => {
     // seven nested blockquotes, and `<<<<<<< ` / `=======` survive as a setext
     // heading. The bytes still change, and `>>>>>>> ` is the prefix conflict
     // resolution matches on, so protection for conflicted notes lives in the
-    // note session's own `detectConflictMarkersOutsideCode` gate (see
+    // note session's own `detectConflictMarkers` gate (see
     // `note-session-state.ts`), not in this classifier. This case is here to
     // notice if meowdown's verdict moves again.
     const conflicted = [

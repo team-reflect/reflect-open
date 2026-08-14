@@ -1,6 +1,6 @@
 import {
   appendBlock,
-  detectConflictMarkersOutsideCode,
+  detectConflictMarkers,
   editTaskLine,
   errorMessage,
   isAppError,
@@ -215,7 +215,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     // Re-gate: the content may have introduced (or removed) syntax the editor
     // can't round-trip. When protection flips the pane remounts via
     // initialContent; otherwise reload the live editor in place.
-    const unsafe = detectConflictMarkersOutsideCode(content) || classify(doc.body) === 'lossy'
+    const unsafe = detectConflictMarkers(content) || classify(doc.body) === 'lossy'
     const flipped = unsafe !== isProtected
     isProtected = unsafe
     initialContent = unsafe ? content : doc.body
@@ -303,7 +303,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         // The data-loss gate: a note the editor can't reproduce opens read-only.
         // Conflict markers need their own check: the round trip mangles them
         // but still classifies `normalizing` (meowdown 0.65.3).
-        isProtected = detectConflictMarkersOutsideCode(adopted) || classify(doc.body) === 'lossy'
+        isProtected = detectConflictMarkers(adopted) || classify(doc.body) === 'lossy'
         initialContent = isProtected ? adopted : doc.body
         status = 'ready'
         emit()
