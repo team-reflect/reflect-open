@@ -232,7 +232,6 @@ describe('languageModel', () => {
       expect(languageModel(config, APP_REVIEW_STUB_KEY, throwingFetch)).toMatchObject({
         specificationVersion: 'v3',
         provider: 'reflect-demo',
-        modelId: config.model,
       })
     }
 

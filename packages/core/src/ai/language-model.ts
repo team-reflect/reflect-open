@@ -5,7 +5,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import type { LanguageModel } from 'ai'
 import type { AiProviderConfig } from '../settings/schema'
 import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers'
-import { APP_REVIEW_STUB_KEY, demoLanguageModel } from './app-review-demo'
+import { APP_REVIEW_STUB_KEY, createDemoModel } from './app-review-demo'
 import { OPENAI_COMPATIBLE_PROVIDER_ID } from './openai-compatible'
 import { OPENROUTER_BASE_URL, openRouterAttributionHeaders } from './openrouter'
 
@@ -23,7 +23,7 @@ export function languageModel(
   // App Review demo mode: a local model regardless of the configured
   // provider, since the reviewer may have picked any of them.
   if (apiKey === APP_REVIEW_STUB_KEY) {
-    return demoLanguageModel(config.model)
+    return createDemoModel()
   }
   switch (config.provider) {
     case 'openai':

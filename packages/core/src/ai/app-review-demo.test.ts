@@ -1,17 +1,17 @@
 import { generateText, streamText } from 'ai'
 import { describe, expect, it } from 'vitest'
 import type { AiProviderConfig } from '../settings/schema'
-import { APP_REVIEW_STUB_KEY, DEMO_REPLY_TEXT, demoLanguageModel } from './app-review-demo'
+import { APP_REVIEW_STUB_KEY, createDemoModel, DEMO_REPLY_TEXT } from './app-review-demo'
 import { streamChat, type ChatStreamEvent } from './chat/stream-chat'
 
 const throwingFetch = (() => {
   throw new Error('demo mode must not fetch')
 }) as unknown as typeof fetch
 
-describe('demoLanguageModel', () => {
+describe('createDemoModel', () => {
   it('generates the demo reply without any transport', async () => {
     const result = await generateText({
-      model: demoLanguageModel('gpt-any'),
+      model: createDemoModel(),
       prompt: 'hello',
       maxRetries: 0,
     })
@@ -20,7 +20,7 @@ describe('demoLanguageModel', () => {
 
   it('streams the demo reply word by word', async () => {
     const result = streamText({
-      model: demoLanguageModel('gpt-any'),
+      model: createDemoModel(),
       prompt: 'hello',
       maxRetries: 0,
     })
