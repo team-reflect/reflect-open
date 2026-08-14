@@ -1,6 +1,6 @@
 {
   "name": "@reflect/desktop",
-  "version": "0.9.1-beta",
+  "version": "0.9.1-beta.1",
   "private": true,
   "type": "module",
   "scripts": {
