@@ -7,25 +7,25 @@ describe('buildFtsMatch', () => {
     expect(buildFtsMatch('   \t \n ')).toBeNull()
   })
 
-  it('keeps title tokens exact and prefix-matches body tokens', () => {
-    expect(buildFtsMatch('hello')).toBe('(title : "hello" OR body : "hello"*)')
+  it('prefix-matches title and body tokens', () => {
+    expect(buildFtsMatch('hello')).toBe('(title : "hello"* OR body : "hello"*)')
   })
 
   it('quotes each term before adding controlled FTS5 operators', () => {
     expect(buildFtsMatch('cats AND (dogs*)')).toBe(
-      '(title : "cats" OR body : "cats"*) AND (title : "AND" OR body : "AND"*) AND (title : "(dogs*)" OR body : "(dogs*)"*)',
+      '(title : "cats"* OR body : "cats"*) AND (title : "AND"* OR body : "AND"*) AND (title : "(dogs*)"* OR body : "(dogs*)"*)',
     )
   })
 
   it('doubles embedded double-quotes (FTS5 escaping)', () => {
     expect(buildFtsMatch('say "hi"')).toBe(
-      '(title : "say" OR body : "say"*) AND (title : """hi""" OR body : """hi"""*)',
+      '(title : "say"* OR body : "say"*) AND (title : """hi"""* OR body : """hi"""*)',
     )
   })
 
   it('collapses runs of whitespace between terms', () => {
     expect(buildFtsMatch('  alpha   beta ')).toBe(
-      '(title : "alpha" OR body : "alpha"*) AND (title : "beta" OR body : "beta"*)',
+      '(title : "alpha"* OR body : "alpha"*) AND (title : "beta"* OR body : "beta"*)',
     )
   })
 })

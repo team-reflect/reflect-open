@@ -286,6 +286,57 @@ describe('createDevIndexDb', () => {
       { path: 'notes/security-rollout.md', title: 'Security rollout' },
     ])
     await expect(searchNotes('thentication')).resolves.toEqual([])
+
+    const mixedHits = await searchWithFilters(parseSearchQuery('secur migr'))
+    expect(mixedHits).toMatchObject([
+      { path: 'notes/security-rollout.md', title: 'Security rollout' },
+    ])
+    expect(mixedHits[0]!.snippet).toContain('migration')
+    expect(parseHighlights(mixedHits[0]!.highlightedTitle)).toEqual([
+      { text: 'Secur', highlighted: true },
+      { text: 'ity rollout', highlighted: false },
+    ])
+    await expect(searchNotes('migr secur')).resolves.toEqual([
+      { path: 'notes/security-rollout.md', title: 'Security rollout' },
+    ])
+  })
+
+  it('uses pinning to break ties between title-only prefix hits', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/tim-maccaw-planning.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n81',
+        title: 'Tim MacCaw Extended Project Planning',
+        titleKey: 'tim maccaw extended project planning',
+        isPinned: true,
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+        mtime: 100,
+      }),
+    )
+    db.applyNote(
+      sampleNote({
+        path: 'notes/tim-macrae.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n82',
+        title: 'Tim MacRae',
+        titleKey: 'tim macrae',
+        isPinned: false,
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+        mtime: 200,
+      }),
+    )
+    installQueryBridge(db)
+
+    const hits = await searchWithFilters(parseSearchQuery('Tim Mac'))
+    expect(hits.map((hit) => hit.path)).toEqual([
+      'notes/tim-maccaw-planning.md',
+      'notes/tim-macrae.md',
+    ])
+    expect(hits.map((hit) => hit.snippet)).toEqual([null, null])
   })
 
   it('returns title markers from SQLite for tokenizer-normalized matches', async () => {

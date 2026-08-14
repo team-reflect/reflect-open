@@ -5,9 +5,10 @@
  * input (`AND`, `OR`, `NOT`, `*`, `(`, `"`) would either change the meaning of
  * the search or raise a syntax error. {@link buildFtsMatch} defends that boundary:
  * it splits the query on whitespace and wraps every term in a double-quoted
- * string (doubling any embedded quote, FTS5's own escape). Each term keeps the
- * title column's established whole-token matching and adds word-prefix matching
- * for the body column, while remaining robust to whatever the user types.
+ * string (doubling any embedded quote, FTS5's own escape), then adds an FTS5
+ * prefix operator outside the escaped literal. Each term independently matches
+ * a word prefix in either the title or body while remaining robust to whatever
+ * the user types.
  */
 
 import { sql, type RawBuilder } from 'kysely'
@@ -19,10 +20,10 @@ export function splitSearchTerms(query: string): string[] {
 }
 
 /**
- * Build an FTS5 `MATCH` expression with exact-token title matching and
- * word-prefix body matching, or `null` when there is nothing to search. FTS5
- * errors on an empty `MATCH`, so callers should treat `null` as an empty result
- * set rather than passing it to the database.
+ * Build a word-prefix FTS5 `MATCH` expression over titles and bodies, or `null`
+ * when there is nothing to search. FTS5 errors on an empty `MATCH`, so callers
+ * should treat `null` as an empty result set rather than passing it to the
+ * database.
  */
 export function buildFtsMatch(query: string): string | null {
   const terms = splitSearchTerms(query)
@@ -32,7 +33,7 @@ export function buildFtsMatch(query: string): string | null {
   return terms
     .map((term) => {
       const literal = `"${term.replaceAll('"', '""')}"`
-      return `(title : ${literal} OR body : ${literal}*)`
+      return `(title : ${literal}* OR body : ${literal}*)`
     })
     .join(' AND ')
 }

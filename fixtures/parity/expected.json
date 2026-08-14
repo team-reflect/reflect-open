@@ -346,9 +346,9 @@
   "ftsMatch": {
     "": null,
     "   \t \n ": null,
-    "hello": "(title : \"hello\" OR body : \"hello\"*)",
-    "cats AND (dogs*)": "(title : \"cats\" OR body : \"cats\"*) AND (title : \"AND\" OR body : \"AND\"*) AND (title : \"(dogs*)\" OR body : \"(dogs*)\"*)",
-    "say \"hi\"": "(title : \"say\" OR body : \"say\"*) AND (title : \"\"\"hi\"\"\" OR body : \"\"\"hi\"\"\"*)",
-    "  alpha   beta ": "(title : \"alpha\" OR body : \"alpha\"*) AND (title : \"beta\" OR body : \"beta\"*)"
+    "hello": "(title : \"hello\"* OR body : \"hello\"*)",
+    "cats AND (dogs*)": "(title : \"cats\"* OR body : \"cats\"*) AND (title : \"AND\"* OR body : \"AND\"*) AND (title : \"(dogs*)\"* OR body : \"(dogs*)\"*)",
+    "say \"hi\"": "(title : \"say\"* OR body : \"say\"*) AND (title : \"\"\"hi\"\"\"* OR body : \"\"\"hi\"\"\"*)",
+    "  alpha   beta ": "(title : \"alpha\"* OR body : \"alpha\"*) AND (title : \"beta\"* OR body : \"beta\"*)"
   }
 }

@@ -54,6 +54,14 @@ describe('highlightTitle', () => {
     ])
   })
 
+  it('clips FTS prefix tokens to the partial terms typed in a mixed query', () => {
+    const ftsTitle = `${HIGHLIGHT_START}Security${HIGHLIGHT_END} rollout`
+    expect(segments('Security rollout', 'secur migr', ftsTitle)).toEqual([
+      { text: 'Secur', highlighted: true },
+      { text: 'ity rollout', highlighted: false },
+    ])
+  })
+
   it('returns the plain title when neither source matched it', () => {
     expect(segments('Project notes', 'roadmap', 'Project notes')).toEqual([
       { text: 'Project notes', highlighted: false },

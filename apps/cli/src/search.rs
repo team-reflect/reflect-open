@@ -15,17 +15,20 @@ use rusqlite::{params_from_iter, Connection};
 use crate::error::CliError;
 use crate::keys::contains_unsegmented_script;
 
+const HIGHLIGHT_START: char = '\u{1}';
+const HIGHLIGHT_END: char = '\u{2}';
+
 /// Build an FTS5 `MATCH` expression from a free-text query, or `None` when
 /// there is nothing to search. Every whitespace-split term is double-quoted
-/// (embedded quotes doubled). Each term keeps exact-token matching in the title
-/// column and gains prefix matching in the body column. User operators like
-/// `AND`/`*` therefore cannot change the query's meaning or raise syntax errors.
+/// (embedded quotes doubled), then matched as a prefix in the title or body
+/// column. User operators like `AND`/`*` therefore cannot change the query's
+/// meaning or raise syntax errors.
 pub fn build_fts_match(query: &str) -> Option<String> {
     let terms: Vec<String> = query
         .split_whitespace()
         .map(|term| {
             let literal = format!("\"{}\"", term.replace('"', "\"\""));
-            format!("(title : {literal} OR body : {literal}*)")
+            format!("(title : {literal}* OR body : {literal}*)")
         })
         .collect();
     if terms.is_empty() {
@@ -72,9 +75,10 @@ const RANK_EXPR: &str = "bm25(search_fts, 0, 10.0, 1.0)";
 /// then title-boosted bm25, pinned and recency tiebreakers, then `path`. A
 /// materialized CTE runs MATCH once because SQLite rejects it beneath a plain
 /// OR and otherwise flattens a derived FTS join into one scan per note. The
-/// LEFT JOIN admits title-recall-only rows. Their snippet is empty and score
-/// is `0`, since no FTS rank exists. The caller re-checks each hit's file
-/// frontmatter (the index row may lag a just-flagged note).
+/// LEFT JOIN admits title-recall-only rows. Title-only matches keep an empty
+/// snippet and score `0`, so lexical title-prefix recall does not change their
+/// presentation or ordering. The caller re-checks each hit's file frontmatter
+/// (the index row may lag a just-flagged note).
 pub fn search_index(
     conn: &Connection,
     match_expr: &str,
@@ -94,7 +98,7 @@ pub fn search_index(
     let limit_parameter = needles.len() + 3;
     let mut statement = conn.prepare(&format!(
         "WITH lexical AS MATERIALIZED (
-           SELECT path, snippet(search_fts, 2, '', '', '…', 12) AS snippet,
+           SELECT path, snippet(search_fts, 2, char(1), char(2), '…', 12) AS snippet,
                   {RANK_EXPR} AS rank
            FROM search_fts
            WHERE search_fts MATCH ?1
@@ -111,7 +115,11 @@ pub fn search_index(
                     WHEN {title_term_predicate} THEN 2
                     ELSE 3
                   END,
-                  coalesce(lexical.rank, 0),
+                  CASE
+                    WHEN instr(coalesce(lexical.snippet, ''), char(1)) > 0
+                      THEN coalesce(lexical.rank, 0)
+                    ELSE 0
+                  END,
                   notes.is_pinned DESC,
                   notes.mtime DESC,
                   notes.path ASC
@@ -124,11 +132,20 @@ pub fn search_index(
     parameters.extend(needles.into_iter().map(Value::Text));
     parameters.push(Value::Integer(limit as i64));
     let rows = statement.query_map(params_from_iter(parameters), |row| {
+        let marked_snippet: String = row.get(2)?;
+        let has_body_match = marked_snippet.contains(HIGHLIGHT_START);
+        let snippet = if has_body_match {
+            marked_snippet
+                .replace(HIGHLIGHT_START, "")
+                .replace(HIGHLIGHT_END, "")
+        } else {
+            String::new()
+        };
         Ok(SearchHit {
             path: row.get(0)?,
             title: row.get(1)?,
-            snippet: row.get(2)?,
-            score: row.get(3)?,
+            snippet,
+            score: if has_body_match { row.get(3)? } else { 0.0 },
         })
     })?;
     let mut hits = Vec::new();
@@ -160,26 +177,26 @@ mod tests {
         assert_eq!(build_fts_match("   \t \n "), None);
         assert_eq!(
             build_fts_match("hello"),
-            Some("(title : \"hello\" OR body : \"hello\"*)".to_string())
+            Some("(title : \"hello\"* OR body : \"hello\"*)".to_string())
         );
         assert_eq!(
             build_fts_match("cats AND (dogs*)"),
             Some(
-                "(title : \"cats\" OR body : \"cats\"*) AND (title : \"AND\" OR body : \"AND\"*) AND (title : \"(dogs*)\" OR body : \"(dogs*)\"*)"
+                "(title : \"cats\"* OR body : \"cats\"*) AND (title : \"AND\"* OR body : \"AND\"*) AND (title : \"(dogs*)\"* OR body : \"(dogs*)\"*)"
                     .to_string()
             )
         );
         assert_eq!(
             build_fts_match("say \"hi\""),
             Some(
-                "(title : \"say\" OR body : \"say\"*) AND (title : \"\"\"hi\"\"\" OR body : \"\"\"hi\"\"\"*)"
+                "(title : \"say\"* OR body : \"say\"*) AND (title : \"\"\"hi\"\"\"* OR body : \"\"\"hi\"\"\"*)"
                     .to_string()
             )
         );
         assert_eq!(
             build_fts_match("  alpha   beta "),
             Some(
-                "(title : \"alpha\" OR body : \"alpha\"*) AND (title : \"beta\" OR body : \"beta\"*)"
+                "(title : \"alpha\"* OR body : \"alpha\"*) AND (title : \"beta\"* OR body : \"beta\"*)"
                     .to_string()
             )
         );
