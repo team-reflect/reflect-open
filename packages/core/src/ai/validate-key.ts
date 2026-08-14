@@ -1,6 +1,6 @@
 import type { AiProviderId, HostedAiProviderId } from '../settings/schema'
 import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers'
-import { APP_REVIEW_STUB_KEY } from './audio-memo-review-stub'
+import { APP_REVIEW_STUB_KEY } from './app-review-demo'
 import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from './openai-compatible'
 import { OPENROUTER_BASE_URL } from './openrouter'
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { APP_REVIEW_STUB_KEY } from './audio-memo-review-stub'
+import { APP_REVIEW_STUB_KEY } from './app-review-demo'
 import { validateApiKey } from './validate-key'
 
 function fetchReturning(status: number): typeof fetch {
