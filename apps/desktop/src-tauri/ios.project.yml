@@ -18,7 +18,7 @@ name: reflect-open
 options:
   bundleIdPrefix: app.reflect
   deploymentTarget:
-    iOS: 15.0
+    iOS: 16.0
 packages:
   # Native crash/hang reporting (NativeDiagnostics.swift). Pinned exactly so
   # upgrades are deliberate: any bump must re-audit the options set in

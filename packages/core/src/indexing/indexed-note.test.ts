@@ -282,6 +282,17 @@ describe('buildIndexedNote', () => {
     expect(indexed.hasConflict).toBe(true)
   })
 
+  it('does not flag a note quoting a conflict inside a code block', () => {
+    const source =
+      '# How to resolve\n\n```\n<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n```\n'
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/howto.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+    expect(indexed.hasConflict).toBe(false)
+  })
+
   it('produces a payload that satisfies the cross-language contract schema', () => {
     // Guards the TS half of the TS↔Rust `IndexedNote` contract: if a field is
     // dropped or mistyped here, the schema parse fails before it can desync from

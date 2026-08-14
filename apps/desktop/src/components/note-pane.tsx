@@ -276,7 +276,7 @@ export function NotePaneComponent({
   }
 
   if (document.protected) {
-    // Sync-conflicted notes land here (markers classify as lossy), so the
+    // Sync-conflicted notes land here (the session gates on the markers), so the
     // conflict notice — with its raw-text resolution actions — leads the
     // view, and the file renders with each block's sides color-coded instead
     // of the generic read-only dump (whose converter-gap alert would only

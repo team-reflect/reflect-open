@@ -1,11 +1,12 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { Check } from 'lucide-react'
+import { toast } from 'sonner'
 import { IAP_PRODUCT_IDS, iapGetProducts, iapPurchase, iapRestorePurchases } from '@reflect/core'
 import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { openUrlSync } from '@/lib/open-url'
 import { cn } from '@/lib/utils'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
 import { invalidateEntitlementQueries } from '@/mobile/use-active-subscription'
@@ -17,6 +18,17 @@ type PendingAction = 'monthly' | 'yearly' | 'restore' | null
 
 /** How long "Remind me later" keeps the paywall dismissed. */
 const SNOOZE_MS = 24 * 60 * 60 * 1000
+
+/** How long the member button keeps the paywall dismissed while the
+ * free-year claim flow is not live yet. */
+const MEMBER_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000
+
+/** V1 web page that hands a paying Reflect member their free-year offer code. */
+const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
+
+/** When the free-week stopgap self-expires (30 days after it was written,
+ * 2026-08-12). After this the member button opens the claim page instead. */
+const MEMBER_STOPGAP_UNTIL = Date.parse('2026-09-11')
 
 export function PaywallScreen(): ReactElement {
   const queryClient = useQueryClient()
@@ -57,6 +69,24 @@ export function PaywallScreen(): ReactElement {
     } finally {
       setPending(null)
     }
+  }
+
+  // Stopgap while reflect.app/claim-reflect-open is not live: members get a
+  // week free and the paywall asks again when it lapses. The toast outlives
+  // this screen (its Toaster mounts in mobile-root.tsx, outside the gate),
+  // and the snooze write unmounts the paywall immediately. Past the stopgap
+  // deadline the button opens the claim page, so a stale build stops handing
+  // out free weeks once the real flow exists.
+  const memberContinue = () => {
+    if (Date.now() > MEMBER_STOPGAP_UNTIL) {
+      openUrlSync(CLAIM_FREE_YEAR_URL)
+      return
+    }
+    toast('Enjoy Reflect free for now', {
+      description: "We'll ask about your free year again once codes are ready.",
+      duration: 6000,
+    })
+    updateSettings({ paywallSnoozeUntil: Date.now() + MEMBER_SNOOZE_MS })
   }
 
   const restore = async () => {
@@ -153,6 +183,14 @@ export function PaywallScreen(): ReactElement {
         ) : null}
 
         <div className="flex flex-col items-center gap-4">
+          <button
+            type="button"
+            className="text-sm text-text-secondary underline disabled:opacity-50"
+            disabled={pending !== null}
+            onClick={memberContinue}
+          >
+            Already a Reflect member? Get your first year free
+          </button>
           {/* First-rollout escape hatch: dismissing writes a snooze timestamp
               and the gate in mobile-app.tsx unmounts this screen, so a broken
               store never locks anyone out of their notes. */}
@@ -178,17 +216,13 @@ export function PaywallScreen(): ReactElement {
         </div>
 
         <footer className="mt-auto flex justify-center gap-4 text-[13px] text-text-muted">
-          <button
-            type="button"
-            className="underline"
-            onClick={() => void openUrl(TERMS_OF_USE_URL).catch(() => {})}
-          >
+          <button type="button" className="underline" onClick={() => openUrlSync(TERMS_OF_USE_URL)}>
             Terms of Use
           </button>
           <button
             type="button"
             className="underline"
-            onClick={() => void openUrl(PRIVACY_POLICY_URL).catch(() => {})}
+            onClick={() => openUrlSync(PRIVACY_POLICY_URL)}
           >
             Privacy Policy
           </button>
