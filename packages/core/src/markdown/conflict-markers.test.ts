@@ -212,7 +212,7 @@ describe('detectConflictMarkersOutsideCode', () => {
   })
 
   it('ignores one inside an indented code block', () => {
-    const indented = EXAMPLE_BLOCK.replace(/^/gmu, '    ')
+    const indented = EXAMPLE_BLOCK.replaceAll(/^/gmu, '    ')
     expect(detectConflictMarkersOutsideCode('# Doc\n\n' + indented)).toBe(false)
   })
 

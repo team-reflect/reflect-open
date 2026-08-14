@@ -309,8 +309,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         // a save would strand the conflict unresolvable. Markers inside a code
         // block are somebody documenting a conflict, not carrying one: they
         // survive verbatim, so that note stays editable.
-        isProtected =
-          detectConflictMarkersOutsideCode(adopted) || classify(doc.body) === 'lossy'
+        isProtected = detectConflictMarkersOutsideCode(adopted) || classify(doc.body) === 'lossy'
         initialContent = isProtected ? adopted : doc.body
         status = 'ready'
         emit()
