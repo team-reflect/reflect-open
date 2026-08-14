@@ -1,5 +1,6 @@
 import {
   appendBlock,
+  detectConflictMarkersOutsideCode,
   editTaskLine,
   errorMessage,
   isAppError,
@@ -214,14 +215,14 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     // Re-gate: the content may have introduced (or removed) syntax the editor
     // can't round-trip. When protection flips the pane remounts via
     // initialContent; otherwise reload the live editor in place.
-    const lossy = classify(doc.body) === 'lossy'
-    const flipped = lossy !== isProtected
-    isProtected = lossy
-    initialContent = lossy ? content : doc.body
+    const unsafe = detectConflictMarkersOutsideCode(content) || classify(doc.body) === 'lossy'
+    const flipped = unsafe !== isProtected
+    isProtected = unsafe
+    initialContent = unsafe ? content : doc.body
     emit()
     // While protected there is no live editor mounted (the pane shows the
-    // read-only view), and lossy content must never enter one regardless.
-    if (!flipped && !lossy) {
+    // read-only view), and unsafe content must never enter one regardless.
+    if (!flipped && !unsafe) {
       applyToEditor(doc.body)
     }
     onContent?.(content, 'external')
@@ -300,7 +301,16 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         dirty = false
         missing = fileMissing
         // The data-loss gate: a note the editor can't reproduce opens read-only.
-        isProtected = classify(doc.body) === 'lossy'
+        // Conflict markers get their own check rather than riding the round-trip
+        // verdict: meowdown grades them `normalizing` (since 0.65.3), because
+        // `>>>>>>> other device` and `> > > > > > > other device` parse to the
+        // same seven nested blockquotes. The bytes still change, and `>>>>>>> `
+        // is the literal prefix conflict detection and resolution match on, so
+        // a save would strand the conflict unresolvable. Markers inside a code
+        // block are somebody documenting a conflict, not carrying one: they
+        // survive verbatim, so that note stays editable.
+        isProtected =
+          detectConflictMarkersOutsideCode(adopted) || classify(doc.body) === 'lossy'
         initialContent = isProtected ? adopted : doc.body
         status = 'ready'
         emit()
