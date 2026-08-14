@@ -2,12 +2,15 @@ import { useCallback, useState } from 'react'
 import {
   aiProvider,
   aiProviderRequiresApiKey,
+  APP_REVIEW_STUB_KEY,
   errorMessage,
   isHttpBaseUrl,
   normalizeOpenAICompatibleBaseUrl,
   validateApiKey,
 } from '@reflect/core'
+import { seedDemoNotes } from '@/lib/demo-notes'
 import { providerFetch } from '@/lib/provider-fetch'
+import { useGraph } from '@/providers/graph-provider'
 import type { NewAiProvider } from '@/hooks/use-ai-providers'
 
 interface UseAddAiProviderSubmitOptions {
@@ -43,6 +46,7 @@ export function useAddAiProviderSubmit({
   onAdd,
   onDone,
 }: UseAddAiProviderSubmitOptions): UseAddAiProviderSubmitValue {
+  const { graph, indexGeneration } = useGraph()
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [unverified, setUnverified] = useState(false)
 
@@ -91,12 +95,22 @@ export function useAddAiProviderSubmit({
           }
         }
         await onAdd({ ...draft, apiKey, baseUrl })
+        if (apiKey === APP_REVIEW_STUB_KEY && graph !== null && indexGeneration !== null) {
+          // Best-effort: the provider entry has already landed, so a failed
+          // seed must not fail the add. The reviewer still gets demo mode,
+          // only the sample notes are missing.
+          try {
+            await seedDemoNotes({ fileGeneration: graph.generation, indexGeneration })
+          } catch {
+            // Intentionally swallowed.
+          }
+        }
         onDone()
       } catch (error: unknown) {
         setSubmitError(errorMessage(error))
       }
     },
-    [unverified, onAdd, onDone],
+    [unverified, onAdd, onDone, graph, indexGeneration],
   )
 
   return { submitError, unverified, resetUnverified, submit }
