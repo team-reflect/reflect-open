@@ -56,6 +56,7 @@ export {
   conflictMarkerBlockCount,
   conflictMarkerLabels,
   detectConflictMarkers,
+  detectConflictMarkersOutsideCode,
   parseConflictMarkers,
   resolveConflictMarkers,
   type ConflictMarkerLabels,

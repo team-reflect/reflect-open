@@ -1,3 +1,7 @@
+import { splitFrontmatter } from './frontmatter'
+import { parseBody } from './grammar'
+import { isCodeBlock } from './node-types'
+
 /**
  * Git conflict-marker detection (Plan 12).
  *
@@ -224,6 +228,75 @@ export function conflictMarkerBlockCount(source: string): number {
 export function detectConflictMarkers(source: string): boolean {
   let stage: 'start' | 'separator' | 'end' = 'start'
   for (const rawLine of source.split('\n')) {
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+    switch (stage) {
+      case 'start':
+        if (line.startsWith('<<<<<<< ')) {
+          stage = 'separator'
+        }
+        break
+      case 'separator':
+        if (line === '=======') {
+          stage = 'end'
+        }
+        break
+      case 'end':
+        if (line.startsWith('>>>>>>> ')) {
+          return true
+        }
+        break
+    }
+  }
+  return false
+}
+
+/** The `[from, to)` offsets of every fenced or indented code block in `body`. */
+function codeBlockRanges(body: string): Array<readonly [number, number]> {
+  const ranges: Array<readonly [number, number]> = []
+  parseBody(body).iterate({
+    enter(node) {
+      if (!isCodeBlock(node)) {
+        return true
+      }
+      ranges.push([node.from, node.to])
+      return false // nothing inside a code block can un-code itself
+    },
+  })
+  return ranges
+}
+
+/**
+ * True when `source` carries a complete conflict block whose marker lines sit
+ * outside every code block — the only markers the editor's save pipeline would
+ * rewrite and the resolution actions should act on.
+ *
+ * Same in-order `<<<<<<< ` / `=======` / `>>>>>>> ` rule as
+ * {@link detectConflictMarkers}, minus any line inside a fenced or indented
+ * code block. A note that *documents* a merge conflict in a code block
+ * survives the editor's round trip byte for byte, so treating it as conflicted
+ * would lock the author out of their own note and offer a "resolution" that
+ * deletes half the example. The frontmatter header is not code: a merge can
+ * drop markers into it (or a block can span the header and the body), and
+ * those still count.
+ */
+export function detectConflictMarkersOutsideCode(source: string): boolean {
+  // Cheap raw scan first: the scan below visits a subset of these lines and
+  // the stage only ever advances, so when the full scan finds nothing the
+  // subset cannot either — and the markerless common case never pays for a
+  // parse.
+  if (!detectConflictMarkers(source)) {
+    return false
+  }
+  const { body, bodyOffset } = splitFrontmatter(source)
+  const ranges = codeBlockRanges(body)
+  let stage: 'start' | 'separator' | 'end' = 'start'
+  let offset = 0
+  for (const rawLine of source.split('\n')) {
+    const startInBody = offset - bodyOffset
+    offset += rawLine.length + 1
+    if (startInBody >= 0 && ranges.some(([from, to]) => startInBody >= from && startInBody < to)) {
+      continue
+    }
     const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
     switch (stage) {
       case 'start':
