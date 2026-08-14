@@ -7,7 +7,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/toast'
 import type {
   PendingReplacementResolveHandler,
   SelectionMenuContext,
@@ -149,7 +149,7 @@ export function useEditorAiMenu({
           setRunMode(null)
         }
         editorRef.current?.discardPendingReplacement()
-        toast.error(message)
+        toast.add({ type: 'error', title: message })
       }
 
       const base =
