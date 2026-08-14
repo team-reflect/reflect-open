@@ -135,9 +135,7 @@ pub fn search_index(
         let marked_snippet: String = row.get(2)?;
         let has_body_match = marked_snippet.contains(HIGHLIGHT_START);
         let snippet = if has_body_match {
-            marked_snippet
-                .replace(HIGHLIGHT_START, "")
-                .replace(HIGHLIGHT_END, "")
+            marked_snippet.replace([HIGHLIGHT_START, HIGHLIGHT_END], "")
         } else {
             String::new()
         };
