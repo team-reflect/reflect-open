@@ -18,12 +18,6 @@ import { AiProvidersSection } from './ai-providers-section'
 const { providerFetchMock } = vi.hoisted(() => ({ providerFetchMock: vi.fn() }))
 vi.mock('@/lib/provider-fetch', () => ({ providerFetch: providerFetchMock }))
 
-// The add-provider submit flow reads the graph generations to seed demo
-// notes when the App Review demo key is added; this suite never enters it.
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 }, indexGeneration: 1 }),
-}))
-
 let stored: Record<string, unknown>
 let saved: unknown[]
 let secrets: Map<string, string>

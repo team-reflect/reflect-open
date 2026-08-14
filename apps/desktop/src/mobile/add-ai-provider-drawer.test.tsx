@@ -22,12 +22,6 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 vi.mock('@/lib/provider-fetch', () => ({ providerFetch: vi.fn() }))
 vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn(() => Promise.resolve()) }))
 
-// The submit flow reads the graph generations to seed demo notes when the
-// App Review demo key is added; these suites never enter that key.
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 }, indexGeneration: 1 }),
-}))
-
 // Keep the sheet content inline so this suite exercises its state flow
 // without depending on the drawer's drag and animation behavior.
 vi.mock('@/components/ui/drawer', () => ({
