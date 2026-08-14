@@ -22,7 +22,7 @@ describe('checkRoundTrip', () => {
     expect(checkRoundTrip('- item one\n\n- item two\n')).toBe('normalizing')
   })
 
-  it('classifies git conflict markers as normalizing, not lossy (meowdown 0.65.3)', () => {
+  it('classifies git conflict markers as normalizing (protection comes from the marker gate)', () => {
     // meowdown grades conflict markers `normalizing`: `>>>>>>> other device`
     // re-serializes as `> > > > > > > other device`, which parses to the same
     // seven nested blockquotes, and `<<<<<<< ` / `=======` survive as a setext
