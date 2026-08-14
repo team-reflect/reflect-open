@@ -53,8 +53,7 @@ describe('demoLanguageModel', () => {
       events.push(event)
     }
     const text = events
-      .filter((event) => event.type === 'text-delta')
-      .map((event) => event.text)
+      .flatMap((event) => (event.type === 'text-delta' ? [event.text] : []))
       .join('')
     expect(text).toBe(DEMO_REPLY_TEXT)
     expect(events.at(-1)?.type).toBe('complete')
