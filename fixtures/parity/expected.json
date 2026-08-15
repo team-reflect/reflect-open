@@ -355,6 +355,10 @@
     ". -": "\".\" \"-\"",
     "c++ +": "(title : \"c++\"* OR body : \"c++\"*)",
     "東京 メモ": "(title : \"東京\"* OR body : \"東京\"*) AND (title : \"メモ\"* OR body : \"メモ\"*)",
-    "中文": "(title : \"中文\"* OR body : \"中文\"*)"
+    "中文": "(title : \"中文\"* OR body : \"中文\"*)",
+    "hello ͅ": "(title : \"hello\"* OR body : \"hello\"*)",
+    "apple ": "(title : \"apple\"* OR body : \"apple\"*) AND (title : \"\"* OR body : \"\"*)",
+    "": "(title : \"\"* OR body : \"\"*)",
+    "hello Ⓐ": "(title : \"hello\"* OR body : \"hello\"*)"
   }
 }

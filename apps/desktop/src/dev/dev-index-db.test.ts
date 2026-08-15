@@ -326,6 +326,43 @@ describe('createDevIndexDb', () => {
     await expect(searchNotes('- .')).resolves.toEqual([])
   })
 
+  it('drops an ignored term from title recall, not just from the FTS match', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/tokyo-trip.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n96',
+        title: '来週の東京旅行計画',
+        titleKey: '来週の東京旅行計画',
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+      }),
+    )
+    db.applyNote(
+      sampleNote({
+        path: 'notes/dotfiles.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n97',
+        title: '.hidden files',
+        titleKey: '.hidden files',
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+      }),
+    )
+    installQueryBridge(db)
+
+    // Only title recall can reach a term inside an unsegmented title run, so
+    // the ignored term has to leave recall too, not just the FTS expression.
+    await expect(searchNotes('東京 -')).resolves.toEqual([
+      { path: 'notes/tokyo-trip.md', title: '来週の東京旅行計画' },
+    ])
+    // A punctuation-only query keeps its terms, so recall still matches them.
+    await expect(searchNotes('.')).resolves.toEqual([
+      { path: 'notes/dotfiles.md', title: '.hidden files' },
+    ])
+  })
+
   it('uses pinning to break ties between title-only prefix hits', async () => {
     const db = await openDb()
     db.applyNote(

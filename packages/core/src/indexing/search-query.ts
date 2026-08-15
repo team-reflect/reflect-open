@@ -21,15 +21,36 @@ export function splitSearchTerms(query: string): string[] {
 
 /**
  * A character `unicode61` keeps inside a token: its default `categories` is
- * `'L* N* Co'`, so letters and numbers of every script count (Han, kana,
- * Hangul and Thai included) while punctuation, symbols and combining marks
- * separate tokens. Must stay a Unicode property class, since an ASCII one
- * would drop whole CJK terms. The Rust mirror is `char::is_alphanumeric`
- * (`apps/cli/src/search.rs`), which also accepts combining marks; the two
- * therefore agree on every term a keyboard can produce, but not on one built
- * solely from marks, so the parity corpus must not carry such a term.
+ * `'L* N* Co'`, so letters, numbers and private-use codepoints of every script
+ * count (Han, kana, Hangul and Thai included), while punctuation, symbols and
+ * combining marks separate tokens. `is_fts_token_char` (`apps/cli/src/search.rs`)
+ * mirrors this codepoint for codepoint; the two must move together.
  */
-const FTS_TOKEN_CHAR_RE = /[\p{L}\p{N}]/u
+const FTS_TOKEN_CHAR_RE = /[\p{L}\p{N}\p{Co}]/u
+
+/** Wrap a term as an FTS5 string literal, doubling quotes (FTS5's own escape). */
+function quoteFtsLiteral(term: string): string {
+  return `"${term.replaceAll('"', '""')}"`
+}
+
+/** Whether `unicode61` finds any token in a term, i.e. whether FTS can see it. */
+function isTokenizable(term: string): boolean {
+  return FTS_TOKEN_CHAR_RE.test(term)
+}
+
+/**
+ * The terms a search constrains on: those `unicode61` can tokenize. A term of
+ * pure punctuation tokenizes to an empty phrase, which as an operand of the
+ * explicit `AND` matches no rows and would take the whole query with it, so it
+ * constrains neither the FTS expression nor title recall. When no term
+ * survives, the originals are kept: the query is punctuation only, and title
+ * recall can still match it literally (`.` finds `.hidden files`).
+ */
+export function searchTerms(query: string): string[] {
+  const terms = splitSearchTerms(query)
+  const tokenizable = terms.filter(isTokenizable)
+  return tokenizable.length > 0 ? tokenizable : terms
+}
 
 /**
  * Build a word-prefix FTS5 `MATCH` expression over titles and bodies, or `null`
@@ -37,26 +58,21 @@ const FTS_TOKEN_CHAR_RE = /[\p{L}\p{N}]/u
  * should treat `null` as an empty result set rather than passing it to the
  * database.
  *
- * A term without token characters (`-`, `&`) tokenizes to an empty phrase.
- * That was a no-op while terms were implicitly joined, but as an operand of
- * the explicit `AND` it matches no rows and would take the whole query with
- * it, so those terms are dropped. When none survive, the quoted join is
- * returned: a valid, matchless expression that still lets title recall admit
- * rows, exactly as an all-punctuation query behaved before prefixes.
+ * A punctuation-only query has no tokenizable term to constrain on, so it gets
+ * the quoted join: a valid, matchless expression that still lets title recall
+ * admit rows, exactly as it behaved before prefixes.
  */
 export function buildFtsMatch(query: string): string | null {
-  const terms = splitSearchTerms(query)
+  const terms = searchTerms(query)
   if (terms.length === 0) {
     return null
   }
-  const quote = (term: string) => `"${term.replaceAll('"', '""')}"`
-  const tokenizable = terms.filter((term) => FTS_TOKEN_CHAR_RE.test(term))
-  if (tokenizable.length === 0) {
-    return terms.map(quote).join(' ')
+  if (!terms.some(isTokenizable)) {
+    return terms.map(quoteFtsLiteral).join(' ')
   }
-  return tokenizable
+  return terms
     .map((term) => {
-      const literal = quote(term)
+      const literal = quoteFtsLiteral(term)
       return `(title : ${literal}* OR body : ${literal}*)`
     })
     .join(' AND ')
@@ -108,7 +124,7 @@ export interface TitleRecallTerm {
 
 /** Resolve query terms into the shared title-recall matching policy. */
 export function titleRecallTerms(query: string): TitleRecallTerm[] {
-  return splitSearchTerms(query)
+  return searchTerms(query)
     .map(foldKey)
     .map((value) => ({
       value,
