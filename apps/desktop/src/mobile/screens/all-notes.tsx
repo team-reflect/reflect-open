@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useRef, type ReactElement } from 'react'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, FileText, SearchX } from 'lucide-react'
 import {
   foldTag,
@@ -34,6 +34,7 @@ export function rowForHit(hit: FilteredSearchHit): NoteRowModel {
     titleSegments: parseHighlights(hit.highlightedTitle),
     mtime: hit.mtime,
     isPinned: hit.isPinned,
+    canDelete: hit.dailyDate === null,
     snippet:
       hit.snippet !== null
         ? parseHighlights(hit.snippet)
@@ -80,6 +81,7 @@ export function MobileAllNotes({
 }: MobileAllNotesProps): ReactElement {
   const { graph } = useGraph()
   const { navigate, back, arrivalSeq, arrivalFocusEditor } = useRouter()
+  const queryClient = useQueryClient()
   const bridgeReady = useBridgeReady()
   const enabled = bridgeReady && graph !== null
 
@@ -114,6 +116,13 @@ export function MobileAllNotes({
 
   const rows = useMemo(() => (hits ?? []).map(rowForHit), [hits])
   const pristine = parsed.text === '' && !parsed.filtered
+
+  const removeDeletedRow = (path: string): void => {
+    queryClient.setQueriesData<FilteredSearchHit[]>(
+      { queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'mobile-all-notes'] },
+      (cachedHits) => cachedHits?.filter((hit) => hit.path !== path),
+    )
+  }
 
   const addPendingTag = (facet: NoteTagFacet): void => {
     const key = foldTag(facet.tag)
@@ -177,7 +186,11 @@ export function MobileAllNotes({
           <Empty icon={<SearchX className="size-6" />} message="No matches" />
         )
       ) : (
-        <NoteRowList rows={rows} onOpen={(path) => navigate(routeForPath(path))} />
+        <NoteRowList
+          rows={rows}
+          onOpen={(path) => navigate(routeForPath(path))}
+          onDeleted={removeDeletedRow}
+        />
       )}
     </div>
   )

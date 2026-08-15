@@ -2,20 +2,12 @@ import { useState, type ReactElement } from 'react'
 import { MoreHorizontal, Pin, PinOff, Share, Trash2 } from 'lucide-react'
 import { errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 import { toggleNotePinned } from '@/lib/note-pin'
-import { deleteOpenNote } from '@/lib/note-delete'
+import { usePinnedNotes } from '@/hooks/use-pinned-notes'
+import { NoteDeleteDialog } from '@/mobile/note-delete-dialog'
 import { shareNote } from '@/mobile/share'
 import { useGraph } from '@/providers/graph-provider'
-import { usePinnedNotes } from '@/hooks/use-pinned-notes'
 
 interface NoteActionsMenuProps {
   /** Graph-relative path of the note the actions operate on. */
@@ -37,8 +29,6 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
   const isPinned = usePinnedNotes().some((note) => note.path === path)
   const [actionsOpen, setActionsOpen] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const pin = (): void => {
     if (graph !== null) {
@@ -48,21 +38,6 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
 
   const share = (): void => {
     void shareNote(path).catch((cause) => console.error('share failed:', errorMessage(cause)))
-  }
-
-  const confirmDelete = (): void => {
-    if (graph === null) {
-      return
-    }
-    setBusy(true)
-    setError(null)
-    void deleteOpenNote(path, graph.generation)
-      .then(() => {
-        setConfirmingDelete(false)
-        onDeleted()
-      })
-      .catch((cause) => setError(errorMessage(cause)))
-      .finally(() => setBusy(false))
   }
 
   return (
@@ -118,28 +93,12 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
         </DrawerContent>
       </Drawer>
 
-      <Dialog open={confirmingDelete} onOpenChange={(open) => !busy && setConfirmingDelete(open)}>
-        <DialogContent>
-          <DialogTitle>Delete this note?</DialogTitle>
-          <DialogDescription>
-            It moves to the graph’s trash and disappears from your notes. You can recover it on
-            desktop.
-          </DialogDescription>
-          {error !== null && <p className="text-sm text-destructive">{error}</p>}
-          <DialogFooter>
-            <DialogClose
-              render={
-                <Button variant="ghost" disabled={busy}>
-                  Cancel
-                </Button>
-              }
-            />
-            <Button variant="destructive" disabled={busy} onClick={confirmDelete}>
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NoteDeleteDialog
+        path={path}
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        onDeleted={onDeleted}
+      />
     </>
   )
 }

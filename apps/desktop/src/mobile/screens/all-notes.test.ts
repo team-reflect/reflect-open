@@ -56,6 +56,13 @@ describe('rowForHit', () => {
     const row = rowForHit(hit({ title: 'Oscar plans', highlightedTitle: 'Oscar plans' }))
     expect(row.titleSegments).toEqual([{ text: 'Oscar plans', highlighted: false }])
   })
+
+  it('allows regular notes, but not daily notes, to expose delete', () => {
+    expect(rowForHit(hit({ path: 'notes/a.md', dailyDate: null })).canDelete).toBe(true)
+    expect(rowForHit(hit({ path: 'daily/2026-08-15.md', dailyDate: '2026-08-15' })).canDelete).toBe(
+      false,
+    )
+  })
 })
 
 describe('matchingTagFacets', () => {
