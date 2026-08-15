@@ -20,8 +20,9 @@ import {
   searchPlanFor,
   type AllNotesFilters,
 } from '@/mobile/search-filters/filter-state'
-import { NoteRowList, type NoteRowModel } from '@/mobile/note-row-list'
+import { NoteRowList } from '@/mobile/note-row-list'
 import { SearchInput } from '@/mobile/search-input'
+import type { NoteRowModel } from '@/mobile/swipeable-note-row'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
@@ -122,6 +123,10 @@ export function MobileAllNotes({
       { queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'mobile-all-notes'] },
       (cachedHits) => cachedHits?.filter((hit) => hit.path !== path),
     )
+    // Do not invalidate yet: the index can still contain the deleted row and
+    // would briefly resurrect it. `deleteNote`'s local-write echo reindexes,
+    // then invalidates the full index scope (including tag facets) once the
+    // projection has caught up.
   }
 
   const addPendingTag = (facet: NoteTagFacet): void => {

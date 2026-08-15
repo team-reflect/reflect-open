@@ -1,7 +1,8 @@
 import { act, useState, type ReactElement } from 'react'
 import { render } from 'vitest-browser-react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { NoteRowList, SwipeableNoteRow, type NoteRowModel } from './note-row-list'
+import { NoteRowList } from './note-row-list'
+import { SwipeableNoteRow, type NoteRowModel } from './swipeable-note-row'
 
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({ settings: { dateFormat: 'mdy', timeFormat: '12h' } }),
@@ -45,12 +46,12 @@ function SwipeHarness({ note = row() }: { note?: NoteRowModel }): ReactElement {
   )
 }
 
-async function pointer(
+function pointer(
   node: Element,
   type: 'pointerdown' | 'pointermove' | 'pointerup',
   clientX: number,
   clientY: number,
-): Promise<void> {
+): void {
   act(() => {
     node.dispatchEvent(
       new PointerEvent(type, {
@@ -66,14 +67,14 @@ async function pointer(
   })
 }
 
-async function swipe(
+function swipe(
   surface: Element,
   from: { x: number; y: number },
   to: { x: number; y: number },
-): Promise<void> {
-  await pointer(surface, 'pointerdown', from.x, from.y)
-  await pointer(surface, 'pointermove', to.x, to.y)
-  await pointer(surface, 'pointerup', to.x, to.y)
+): void {
+  pointer(surface, 'pointerdown', from.x, from.y)
+  pointer(surface, 'pointermove', to.x, to.y)
+  pointer(surface, 'pointerup', to.x, to.y)
   // A real touch sequence synthesizes a click after pointerup; dispatchEvent
   // does not, so mirror it to exercise the row's drag-click suppression.
   const touchSurface = surface as HTMLElement
@@ -118,7 +119,7 @@ describe('NoteRowList', () => {
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
     const rect = surface.getBoundingClientRect()
 
-    await swipe(
+    swipe(
       surface,
       { x: rect.right - 20, y: rect.top + 32 },
       { x: rect.right - 120, y: rect.top + 32 },
@@ -135,7 +136,7 @@ describe('NoteRowList', () => {
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
     const rect = surface.getBoundingClientRect()
 
-    await swipe(
+    swipe(
       surface,
       { x: rect.right - 20, y: rect.top + 12 },
       { x: rect.right - 22, y: rect.top + 52 },
@@ -150,7 +151,7 @@ describe('NoteRowList', () => {
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
     const rect = surface.getBoundingClientRect()
 
-    await swipe(
+    swipe(
       surface,
       { x: rect.right - 20, y: rect.top + 32 },
       { x: rect.right - 120, y: rect.top + 32 },
@@ -167,7 +168,7 @@ describe('NoteRowList', () => {
     const view = await render(<SwipeHarness />)
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
     const rect = surface.getBoundingClientRect()
-    await swipe(
+    swipe(
       surface,
       { x: rect.right - 20, y: rect.top + 32 },
       { x: rect.right - 120, y: rect.top + 32 },
@@ -185,7 +186,7 @@ describe('NoteRowList', () => {
     )
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
     const rect = surface.getBoundingClientRect()
-    await swipe(
+    swipe(
       surface,
       { x: rect.right - 20, y: rect.top + 32 },
       { x: rect.right - 90, y: rect.top + 32 },
@@ -193,5 +194,21 @@ describe('NoteRowList', () => {
 
     await expect.element(view.getByRole('button', { name: 'Pin Alpha' })).toBeInTheDocument()
     expect(view.getByRole('button', { name: 'Delete Alpha' }).query()).toBeNull()
+  })
+
+  it('recovers when a pre-threshold touch is abandoned outside the row', async () => {
+    const view = await render(<SwipeHarness />)
+    const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
+    const rect = surface.getBoundingClientRect()
+
+    // No move/up reaches the row for this first armed touch.
+    pointer(surface, 'pointerdown', rect.right - 20, rect.top + 32)
+    swipe(
+      surface,
+      { x: rect.right - 20, y: rect.top + 32 },
+      { x: rect.right - 120, y: rect.top + 32 },
+    )
+
+    await expect.element(view.getByRole('button', { name: 'Delete Alpha' })).toBeInTheDocument()
   })
 })

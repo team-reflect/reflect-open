@@ -76,9 +76,17 @@ export function useNoteRowSwipe({
   const offset = dragOffset ?? restingOffset
 
   const onPointerDown = (event: ReactPointerEvent<HTMLButtonElement>): void => {
-    if (event.pointerType !== 'touch' || !event.isPrimary || gestureRef.current !== null) {
+    if (event.pointerType !== 'touch' || !event.isPrimary) {
       return
     }
+    const currentGesture = gestureRef.current
+    if (currentGesture?.phase === 'dragging') {
+      return
+    }
+    // An armed touch has no explicit pointer capture yet. If its release was
+    // retargeted outside the row, let the next touch recover instead of
+    // permanently rejecting every later swipe.
+    gestureRef.current = null
     onBeginInteraction()
     suppressClickRef.current = false
     const startOffset = currentTranslateX(event.currentTarget, restingOffset)

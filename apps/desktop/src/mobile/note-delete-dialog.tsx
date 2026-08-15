@@ -38,7 +38,11 @@ export function NoteDeleteDialog({
   const submittingRef = useRef(false)
 
   const confirmDelete = async (): Promise<void> => {
-    if (graph === null || submittingRef.current) {
+    if (submittingRef.current) {
+      return
+    }
+    if (graph === null) {
+      setError('No graph is open.')
       return
     }
     submittingRef.current = true
