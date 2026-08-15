@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { act, type ReactNode } from 'react'
 import { render } from 'vitest-browser-react'
 import { page } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -24,10 +24,31 @@ vi.mock('@/components/ui/drawer', () => ({
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
 }))
 
-const graphState = vi.hoisted<{ current: GraphInfo | null }>(() => ({
-  current: { root: '/g', name: 'g', generation: 1 },
-}))
-vi.mock('@/providers/graph-provider', () => ({ useGraph: () => ({ graph: graphState.current }) }))
+const graphStore = vi.hoisted(() => {
+  let graph: GraphInfo | null = { root: '/g', name: 'g', generation: 1 }
+  const listeners = new Set<() => void>()
+  return {
+    getSnapshot: (): GraphInfo | null => graph,
+    subscribe: (listener: () => void): (() => void) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    set: (next: GraphInfo | null): void => {
+      graph = next
+      for (const listener of listeners) {
+        listener()
+      }
+    },
+  }
+})
+vi.mock('@/providers/graph-provider', async () => {
+  const { useSyncExternalStore } = await import('react')
+  return {
+    useGraph: () => ({
+      graph: useSyncExternalStore(graphStore.subscribe, graphStore.getSnapshot),
+    }),
+  }
+})
 // The pinned set comes from the index; an empty list means "not pinned".
 vi.mock('@/hooks/use-pinned-notes', () => ({ usePinnedNotes: () => [] }))
 // No session is open for the note in this unit; discard is a no-op lookup.
@@ -39,7 +60,7 @@ const mockInvoke = vi.fn<(command: string, args: Record<string, unknown>) => Pro
 setBridge({ invoke: mockInvoke, listen: async () => () => {} })
 
 beforeEach(() => {
-  graphState.current = { root: '/g', name: 'g', generation: 1 }
+  graphStore.set({ root: '/g', name: 'g', generation: 1 })
   calls.length = 0
   mockInvoke.mockReset()
   mockInvoke.mockImplementation(async (command, args) => {
@@ -91,11 +112,11 @@ describe('NoteActionsMenu', () => {
   })
 
   it('reports when the graph disappears before delete confirmation', async () => {
-    graphState.current = null
     const { view, onDeleted } = await mount()
 
     await view.getByRole('button', { name: 'Delete' }).click()
     const dialog = page.getByRole('dialog')
+    act(() => graphStore.set(null))
     await dialog.getByRole('button', { name: 'Delete' }).click()
 
     await expect.element(dialog.getByText('No graph is open.')).toBeInTheDocument()
