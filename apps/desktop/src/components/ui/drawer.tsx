@@ -165,14 +165,15 @@ function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.
 
 /**
  * The scrollable middle of a drawer. {@link DrawerContent}'s bottom padding
- * keeps its end above the home indicator and the software keyboard. Sits
- * inside {@link DrawerContent}, usually under a pinned {@link DrawerTitle}.
+ * keeps its end above the home indicator and the software keyboard, and the
+ * `scroll-fade-t` mask hints at content scrolled under the pinned
+ * {@link DrawerTitle}.
  */
 function DrawerBody({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="drawer-body"
-      className={cn('flex min-h-0 flex-col gap-3 overflow-y-auto pt-3', className)}
+      className={cn('flex min-h-0 scroll-fade-t flex-col gap-3 overflow-y-auto pt-3', className)}
       {...props}
     />
   )
