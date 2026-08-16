@@ -79,8 +79,8 @@ function readKeyboardOverlap(): number {
  * the document root (Plan 19, decision 8). With the webview pinned by the
  * Swift half of `tauri-plugin-keyboard`, `visualViewport` is the honest
  * keyboard signal and no native event bridge is needed. The mobile shell root
- * sizes itself to `calc(100dvh - var(--keyboard-height))`; only
- * viewport-anchored (`position: fixed`) elements read the variable directly.
+ * sizes itself to `calc(100dvh - var(--keyboard-height))`, and `DrawerContent`
+ * pads its bottom past it so drawers end above the keyboard.
  * The height is also published to {@link getKeyboardHeight} /
  * {@link useKeyboardVisible} for non-layout consumers (the carousel's swipe
  * guard, the tab bar hiding).
@@ -178,7 +178,8 @@ export function useKeyboardFieldReveal(): void {
     const reveal = (): void => {
       focusedKeyboardField()?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
-    // One frame late, so the slack padding is laid out before we measure.
+    // One frame late, so the drawer's keyboard padding is laid out before we
+    // measure.
     const frame = requestAnimationFrame(reveal)
     document.addEventListener('focusin', reveal)
     return () => {
