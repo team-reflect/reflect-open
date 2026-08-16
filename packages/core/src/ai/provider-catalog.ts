@@ -5,12 +5,8 @@ import type { AiProviderId } from '../settings/schema'
 
 import { DEFAULT_OPENAI_COMPATIBLE_MODEL } from './openai-compatible'
 
-
-
 /** A compile-time guarantee that an array has at least one element. */
 type NonEmptyArray<ElementType> = [ElementType, ...ElementType[]]
-
-
 
 /**
  * The static BYOK provider catalog (Plan 10): display names, key hints, and
@@ -47,7 +43,6 @@ export interface AiProviderInfo {
   models: NonEmptyArray<AiModelOption>
 }
 
-
 /** Drop the `(string & {})` escape hatch, leaving only the known literals. */
 type KnownId<T> = T extends string ? (string extends T ? never : T) : never
 
@@ -78,12 +73,13 @@ const ANTHROPIC_MODELS: NonEmptyArray<AiModelOption<AnthropicModelId>> = [
 
 // https://github.com/vercel/ai/blob/ai@7.0.66/packages/google/src/google-language-model-options.ts#L8
 const GOOGLE_MODELS: NonEmptyArray<AiModelOption<GoogleModelId>> = [
-{ id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', contextWindow: 1_000_000 },
-{ id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash', contextWindow: 1_000_000 },
-{ id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', contextWindow: 1_000_000 },
-{ id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', contextWindow: 1_000_000 },
-{ id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', contextWindow: 1_000_000 },
-{ id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', contextWindow: 1_000_000 },]
+  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', contextWindow: 1_000_000 },
+  { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash', contextWindow: 1_000_000 },
+  { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', contextWindow: 1_000_000 },
+  { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', contextWindow: 1_000_000 },
+  { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', contextWindow: 1_000_000 },
+  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', contextWindow: 1_000_000 },
+]
 
 export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
   {
@@ -91,21 +87,21 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
     label: 'OpenAI',
     apiKeyRequired: true,
     keyPlaceholder: 'sk-…',
-    models: OPENAI_MODELS
+    models: OPENAI_MODELS,
   },
   {
     id: 'anthropic',
     label: 'Anthropic',
     apiKeyRequired: true,
     keyPlaceholder: 'sk-ant-…',
-    models: ANTHROPIC_MODELS
+    models: ANTHROPIC_MODELS,
   },
   {
     id: 'google',
     label: 'Google Gemini',
     apiKeyRequired: true,
     keyPlaceholder: 'AIza…',
-    models:GOOGLE_MODELS
+    models: GOOGLE_MODELS,
   },
   {
     id: 'openrouter',
