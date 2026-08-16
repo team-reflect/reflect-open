@@ -97,7 +97,7 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
         label: 'Claude Sonnet Latest',
         contextWindow: 128_000,
       },
-      { id: 'openai/gpt-5.2', label: 'GPT-5.2', contextWindow: 400_000 },
+      { id: 'openai/gpt-5.6-sol', label: 'GPT-5.6 Sol', contextWindow: 400_000 },
     ],
   },
   {
