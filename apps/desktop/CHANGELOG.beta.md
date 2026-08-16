@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.1-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.9.1-beta.1...v0.9.1-beta.2) (2026-08-16)
+
+
+### Bug Fixes
+
+* match partial queries across note titles and content ([#1093](https://github.com/team-reflect/reflect-open/issues/1093)) ([7716e75](https://github.com/team-reflect/reflect-open/commit/7716e7505ce9456d6b6659ce4364d9ec6452dfc1))
+* update meowdown to ^0.65.4 ([#1107](https://github.com/team-reflect/reflect-open/issues/1107)) ([692dc81](https://github.com/team-reflect/reflect-open/commit/692dc8170cc839c5a92464af288271f722fd0af0))
+
 ## [0.9.1-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.9.1-beta...v0.9.1-beta.1) (2026-08-14)
 
 
