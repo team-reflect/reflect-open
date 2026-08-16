@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { monthLabel, monthShortLabel } from '@/lib/month-grid'
 import { cn } from '@/lib/utils'
 import { hapticImpactLight } from '@/mobile/haptics'

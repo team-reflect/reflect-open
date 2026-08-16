@@ -10,13 +10,7 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Drawer,
-  DrawerBody,
-  DrawerContent,
-  DrawerTitle,
-  DrawerTrigger,
-} from '@/components/ui/drawer'
+import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { deleteOpenNote } from '@/lib/note-delete'
 import { shareNote } from '@/mobile/share'

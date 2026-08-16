@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Square, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { useMobileAudioMemo } from '@/mobile/audio-memo-provider'
 import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform'
 import { useRouter } from '@/routing/router'
