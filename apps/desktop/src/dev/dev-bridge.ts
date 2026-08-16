@@ -81,9 +81,6 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         // Browser previews are never suspended like an iOS process, so the
         // native finite-length assertion is honestly unavailable.
         return null
-      case 'plugin:keyboard|current_height':
-        // A desktop browser has no overlaying software keyboard to mirror.
-        return { height: 0, duration: 0 }
       case 'plugin:keyboard|impact_light':
         return null
       case 'mobile_storage':
