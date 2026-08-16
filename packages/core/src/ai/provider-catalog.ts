@@ -12,8 +12,11 @@ type NonEmptyArray<ElementType> = [ElementType, ...ElementType[]]
 /** Drop the `(string & {})` escape hatch, leaving only the known literals. */
 type KnownId<T> = T extends string ? (string extends T ? never : T) : never
 
+// https://github.com/vercel/ai/blob/ai@7.0.66/packages/anthropic/src/anthropic-language-model-options.ts#L4
 type AnthropicModelId = KnownId<Parameters<AnthropicProvider>[0]>
+// https://github.com/vercel/ai/blob/ai@7.0.66/packages/google/src/google-language-model-options.ts#L8
 type GoogleModelId = KnownId<Parameters<GoogleProvider>[0]>
+// https://github.com/vercel/ai/blob/ai@7.0.66/packages/openai/src/responses/openai-responses-language-model-options.ts#L88
 type OpenAIModelId = KnownId<Parameters<OpenAIProvider>[0]>
 
 /**
