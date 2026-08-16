@@ -8,12 +8,7 @@ import type { OpenAIProvider } from '@ai-sdk/openai'
 /** A compile-time guarantee that an array has at least one element. */
 type NonEmptyArray<ElementType> = [ElementType, ...ElementType[]]
 
-/** Drop the `(string & {})` escape hatch, leaving only the known literals. */
-type KnownId<T> = T extends string ? (string extends T ? never : T) : never
 
-type AnthropicModelId = KnownId<Parameters<AnthropicProvider>[0]>
-type GoogleModelId = KnownId<Parameters<GoogleProvider>[0]>
-type OpenAIModelId = KnownId<Parameters<OpenAIProvider>[0]>
 
 /**
  * The static BYOK provider catalog (Plan 10): display names, key hints, and
@@ -49,6 +44,14 @@ export interface AiProviderInfo {
   /** Curated models, most capable first (the first is the picker default). */
   models: NonEmptyArray<AiModelOption>
 }
+
+
+/** Drop the `(string & {})` escape hatch, leaving only the known literals. */
+type KnownId<T> = T extends string ? (string extends T ? never : T) : never
+
+type AnthropicModelId = KnownId<Parameters<AnthropicProvider>[0]>
+type GoogleModelId = KnownId<Parameters<GoogleProvider>[0]>
+type OpenAIModelId = KnownId<Parameters<OpenAIProvider>[0]>
 
 // https://github.com/vercel/ai/blob/ai@7.0.66/packages/openai/src/responses/openai-responses-language-model-options.ts#L88
 const OPENAI_MODELS: NonEmptyArray<AiModelOption<OpenAIModelId>> = [
