@@ -57,7 +57,7 @@ export function useKeyboardVisible(): boolean {
 const KEYBOARD_MIN_OVERLAP = 60
 
 /** How long after a blur a lingering overlap is treated as stale (iOS 26.0). */
-const KEYBOARD_STALE_DELAY_MS = 1500 // REVIEW 6: 改成 1750 ms
+const KEYBOARD_STALE_DELAY_MS = 1750
 
 /**
  * The keyboard overlap per `visualViewport`. `KeyboardPlugin.swift` pins the
@@ -114,7 +114,7 @@ export function useKeyboardHeightVar(): void {
     }
     apply()
     viewport.addEventListener('resize', apply)
-    viewport.addEventListener('scroll', apply)
+    viewport.addEventListener('scroll', apply) // REVIEW 7: remove the scroll listener, only resize is needed
     document.addEventListener('focusout', onFocusOut)
     return () => {
       viewport.removeEventListener('resize', apply)
@@ -128,6 +128,7 @@ export function useKeyboardHeightVar(): void {
   // Store subscriber: touches the CSS variable only when the value changed.
   const height = useSyncExternalStore(subscribeKeyboard, getKeyboardHeight, getKeyboardHeight)
   useEffect(() => {
+    // REVIEW 8: useEffect change to useLayoutEffect to avoid flicker
     document.documentElement.style.setProperty('--keyboard-height', `${height}px`)
     return () => {
       document.documentElement.style.removeProperty('--keyboard-height')

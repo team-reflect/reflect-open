@@ -125,7 +125,7 @@ describe('useKeyboardHeightVar', () => {
       document.dispatchEvent(new Event('focusout'))
     })
     act(() => {
-      vi.advanceTimersByTime(1500)
+      vi.advanceTimersByTime(1750)
     })
     expect(getKeyboardHeight()).toBe(0)
     vi.useRealTimers()
