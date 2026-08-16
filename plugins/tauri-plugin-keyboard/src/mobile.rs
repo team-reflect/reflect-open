@@ -4,14 +4,12 @@ use tauri::{
     AppHandle, Runtime,
 };
 
-use crate::models::*;
-
 #[cfg(target_os = "ios")]
 tauri::ios_plugin_binding!(init_plugin_keyboard);
 
 /// Registers the native half. Android is a Plan 19 fast-follow: the Kotlin
-/// class does not exist yet, so an Android build fails here loudly instead
-/// of shipping a silently event-less keyboard bridge.
+/// class (the scroll-pin equivalent) does not exist yet, so an Android build
+/// fails here loudly instead of shipping a silently untuned webview.
 pub fn init<R: Runtime, C: DeserializeOwned>(
     _app: &AppHandle<R>,
     api: PluginApi<R, C>,
@@ -27,14 +25,6 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 pub struct Keyboard<R: Runtime>(PluginHandle<R>);
 
 impl<R: Runtime> Keyboard<R> {
-    /// The keyboard's current state (see `KeyboardState`); live changes
-    /// arrive on the plugin's `keyboardChange` event instead.
-    pub fn current_height(&self) -> crate::Result<KeyboardState> {
-        self.0
-            .run_mobile_plugin("currentHeight", ())
-            .map_err(Into::into)
-    }
-
     /// Fire a light impact haptic (`UIImpactFeedbackGenerator` on iOS).
     pub fn impact_light(&self) -> crate::Result<()> {
         self.0

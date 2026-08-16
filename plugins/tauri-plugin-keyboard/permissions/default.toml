@@ -1,8 +1,3 @@
 [default]
-description = "Read the keyboard state, subscribe to keyboard-change events, and fire light impact haptics"
-permissions = [
-  "allow-current-height",
-  "allow-impact-light",
-  "allow-registerListener",
-  "allow-remove-listener",
-]
+description = "Fire light impact haptics"
+permissions = ["allow-impact-light"]
