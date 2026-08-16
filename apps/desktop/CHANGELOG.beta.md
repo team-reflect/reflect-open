@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.10.0-beta.2...v0.10.0-beta.3) (2026-08-16)
+
+
+### Features
+
+* refresh the AI model catalog ([#1121](https://github.com/team-reflect/reflect-open/issues/1121)) ([f090b67](https://github.com/team-reflect/reflect-open/commit/f090b67329edcc8627bdc3270a510b4a714cefc4))
+
 ## [0.10.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.9.1-beta.2...v0.10.0-beta.2) (2026-08-16)
 
 
