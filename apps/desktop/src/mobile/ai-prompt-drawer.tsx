@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import type { AiPrompt, AiPromptMode } from '@reflect/core'
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -79,7 +79,7 @@ function AiPromptSheet({
       <DrawerTitle className="px-4 pt-1">
         {prompt === null ? 'Add prompt' : 'Edit prompt'}
       </DrawerTitle>
-      <div className="keyboard-slack flex max-h-[75dvh] flex-col gap-4 overflow-y-auto px-4 pt-3">
+      <DrawerBody className="gap-4 px-4">
         <p className="text-sm text-text-muted">
           The prompt runs on the text you select in a note. Use{' '}
           <code className="font-mono text-xs">{'{{selectedText}}'}</code> where the selection should
@@ -149,7 +149,7 @@ function AiPromptSheet({
             {prompt === null ? 'Add prompt' : 'Save'}
           </Button>
         </div>
-      </div>
+      </DrawerBody>
     </>
   )
 }

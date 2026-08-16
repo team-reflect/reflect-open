@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { CHAT_SYSTEM_PROMPT_MAX_LENGTH, normalizeChatSystemPrompt } from '@reflect/core'
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { Textarea } from '@/components/ui/textarea'
 
 interface ChatSystemPromptDrawerProps {
@@ -49,7 +49,7 @@ function ChatSystemPromptSheet({
   return (
     <>
       <DrawerTitle className="px-4 pt-1">System prompt</DrawerTitle>
-      <div className="keyboard-slack flex max-h-[75dvh] flex-col gap-4 overflow-y-auto px-4 pt-3">
+      <DrawerBody className="gap-4 px-4">
         <p className="text-sm text-text-muted">
           Additional instructions sent with every AI chat (up to{' '}
           {CHAT_SYSTEM_PROMPT_MAX_LENGTH.toLocaleString()} characters). Reflect’s note-search,
@@ -90,7 +90,7 @@ function ChatSystemPromptSheet({
             Save
           </Button>
         </div>
-      </div>
+      </DrawerBody>
     </>
   )
 }

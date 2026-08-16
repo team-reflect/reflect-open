@@ -2,7 +2,7 @@ import { useId, useState, type ReactElement } from 'react'
 import { errorMessage } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { cleanGraphName, graphRootForName, isGraphNameTaken } from '@/lib/graph-names'
@@ -73,7 +73,7 @@ export function NewGraphDrawer({
     <Drawer open={open} onOpenChange={handleOpenChange}>
       <DrawerContent aria-label="New iCloud graph">
         <DrawerTitle>New iCloud graph</DrawerTitle>
-        <div className="keyboard-slack flex max-h-[75dvh] flex-col gap-3 overflow-y-auto pt-3">
+        <DrawerBody>
           <div className="flex flex-col gap-1.5">
             <label htmlFor={nameId} className="text-xs font-medium text-text-secondary">
               Name
@@ -104,7 +104,7 @@ export function NewGraphDrawer({
             {busy ? <Spinner /> : null}
             {busy ? 'Setting up…' : 'Create'}
           </Button>
-        </div>
+        </DrawerBody>
       </DrawerContent>
     </Drawer>
   )

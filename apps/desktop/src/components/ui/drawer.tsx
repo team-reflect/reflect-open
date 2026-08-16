@@ -30,8 +30,8 @@ function useDrawer(): DrawerContextProps {
  * only — the other directions Base UI supports aren't needed on Reflect's mobile
  * surfaces — and the home-indicator safe area is padded for by default.
  *
- * Keyboard avoidance: bodies with text inputs use `.keyboard-slack`, which
- * needs this popup's auto height to grow the sheet. A future fixed-height or
+ * Keyboard avoidance: bodies with text inputs use {@link DrawerBody}
+ * (`.keyboard-slack`), which needs this popup's auto height to grow the sheet. A future fixed-height or
  * snap-point drawer will need a popup-level lift off `--keyboard-height`
  * instead (the slack cannot grow a fixed popup).
  */
@@ -162,6 +162,25 @@ function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.
   )
 }
 
+/**
+ * The scrollable middle of a drawer: grows with its content up to 75dvh and
+ * carries `.keyboard-slack`, so fields keep scrolling clear of the software
+ * keyboard (see `styles/index.css`). Sits inside {@link DrawerContent},
+ * usually under a pinned {@link DrawerTitle}.
+ */
+function DrawerBody({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot="drawer-body"
+      className={cn(
+        'keyboard-slack flex max-h-[75dvh] flex-col gap-3 overflow-y-auto pt-3',
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
 function DrawerHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div data-slot="drawer-header" className={cn('flex flex-col gap-1', className)} {...props} />
@@ -200,6 +219,7 @@ function DrawerDescription({ className, ...props }: DrawerPrimitive.Description.
 
 export {
   Drawer,
+  DrawerBody,
   DrawerClose,
   DrawerContent,
   DrawerDescription,

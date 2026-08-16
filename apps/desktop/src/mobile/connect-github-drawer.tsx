@@ -4,7 +4,7 @@ import { InlineAlert } from '@/components/inline-alert'
 import { ConnectGithubFinishStep } from '@/components/settings/connect-github-finish-step'
 import { GithubAuthStep } from '@/components/settings/github-auth-step'
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { Input } from '@/components/ui/input'
 import { useConnectGithubWizard, type ConnectWizardStep } from '@/hooks/use-connect-github-wizard'
 
@@ -73,7 +73,7 @@ function ConnectWizardSheet({
   const existingRepoId = useId()
 
   return (
-    <div className="keyboard-slack flex max-h-[75dvh] flex-col gap-3 overflow-y-auto">
+    <DrawerBody className="pt-0">
       <DrawerTitle>Connect GitHub</DrawerTitle>
       <p className="text-xs text-text-muted">{STEP_DESCRIPTIONS[wizard.step]}</p>
 
@@ -160,6 +160,6 @@ function ConnectWizardSheet({
       {wizard.step !== 'finish' && wizard.error !== null ? (
         <InlineAlert tone="error">{wizard.error}</InlineAlert>
       ) : null}
-    </div>
+    </DrawerBody>
   )
 }
