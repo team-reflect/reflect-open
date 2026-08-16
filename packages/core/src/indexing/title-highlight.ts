@@ -60,11 +60,8 @@ function titleRecallRanges(title: string, query: string): TextRange[] {
 
   const foldedTitle = foldWithSourceSpans(title)
   const termRanges = terms.map((term) => findRanges(foldedTitle, term.value, term.anywhere))
-  if (termRanges.some((ranges) => ranges.length === 0)) {
-    return []
-  }
 
-  if (terms.length > 1) {
+  if (terms.length > 1 && termRanges.every((ranges) => ranges.length > 0)) {
     const phraseRanges = findRanges(
       foldedTitle,
       terms.map((term) => term.value).join(' '),
@@ -76,6 +73,10 @@ function titleRecallRanges(title: string, query: string): TextRange[] {
   }
 
   return termRanges.flat()
+}
+
+function rangesOverlap(first: TextRange, second: TextRange): boolean {
+  return first.start < second.end && second.start < first.end
 }
 
 function ftsRanges(title: string, highlightedTitle: string | null): TextRange[] {
@@ -133,8 +134,9 @@ export function highlightTitle(
   query: string,
   ftsHighlightedTitle: string | null,
 ): string {
-  return markRanges(title, [
-    ...ftsRanges(title, ftsHighlightedTitle),
-    ...titleRecallRanges(title, query),
-  ])
+  const recallRanges = titleRecallRanges(title, query)
+  const lexicalRanges = ftsRanges(title, ftsHighlightedTitle).filter(
+    (lexicalRange) => !recallRanges.some((recallRange) => rangesOverlap(lexicalRange, recallRange)),
+  )
+  return markRanges(title, [...lexicalRanges, ...recallRanges])
 }

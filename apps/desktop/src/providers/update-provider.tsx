@@ -7,6 +7,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
+import { attachUpdateToasts } from '@/components/update-toasts'
 import { useMainWindowEffect } from '@/hooks/use-main-window-effect'
 import { isNativeShell } from '@/lib/platform'
 import {
@@ -63,8 +64,10 @@ export function UpdateProvider({ children, autoCheck }: UpdateProviderProps): Re
     // lifetime; it must be instantiated in an effect (it subscribes and starts)
     // and stored so useSyncExternalStore can read it.
     setController(next)
+    const detachToasts = attachUpdateToasts(next)
     next.start()
     return () => {
+      detachToasts()
       next.dispose()
       setController((current) => (current === next ? null : current))
     }

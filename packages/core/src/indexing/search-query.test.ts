@@ -7,20 +7,52 @@ describe('buildFtsMatch', () => {
     expect(buildFtsMatch('   \t \n ')).toBeNull()
   })
 
-  it('quotes a single term as a literal phrase', () => {
-    expect(buildFtsMatch('hello')).toBe('"hello"')
+  it('prefix-matches title and body tokens', () => {
+    expect(buildFtsMatch('hello')).toBe('(title : "hello"* OR body : "hello"*)')
   })
 
-  it('quotes each term so FTS5 operators are treated as literal text', () => {
-    expect(buildFtsMatch('cats AND (dogs*)')).toBe('"cats" "AND" "(dogs*)"')
+  it('quotes each term before adding controlled FTS5 operators', () => {
+    expect(buildFtsMatch('cats AND (dogs*)')).toBe(
+      '(title : "cats"* OR body : "cats"*) AND (title : "AND"* OR body : "AND"*) AND (title : "(dogs*)"* OR body : "(dogs*)"*)',
+    )
   })
 
   it('doubles embedded double-quotes (FTS5 escaping)', () => {
-    expect(buildFtsMatch('say "hi"')).toBe('"say" """hi"""')
+    expect(buildFtsMatch('say "hi"')).toBe(
+      '(title : "say"* OR body : "say"*) AND (title : """hi"""* OR body : """hi"""*)',
+    )
   })
 
   it('collapses runs of whitespace between terms', () => {
-    expect(buildFtsMatch('  alpha   beta ')).toBe('"alpha" "beta"')
+    expect(buildFtsMatch('  alpha   beta ')).toBe(
+      '(title : "alpha"* OR body : "alpha"*) AND (title : "beta"* OR body : "beta"*)',
+    )
+  })
+
+  it('drops a term that tokenizes to nothing rather than emptying the query', () => {
+    expect(buildFtsMatch('meeting - notes')).toBe(
+      '(title : "meeting"* OR body : "meeting"*) AND (title : "notes"* OR body : "notes"*)',
+    )
+    expect(buildFtsMatch('c++ +')).toBe('(title : "c++"* OR body : "c++"*)')
+  })
+
+  it('keeps unsegmented-script terms, whose characters are Unicode letters', () => {
+    expect(buildFtsMatch('東京 ・')).toBe('(title : "東京"* OR body : "東京"*)')
+    expect(buildFtsMatch('中文')).toBe('(title : "中文"* OR body : "中文"*)')
+  })
+
+  it('falls back to the quoted join when no term tokenizes', () => {
+    expect(buildFtsMatch('-')).toBe('"-"')
+    expect(buildFtsMatch('. -')).toBe('"." "-"')
+  })
+
+  it('classifies terms by the tokenizer categories, not by `is alphabetic`', () => {
+    // Private use is a token character (`L* N* Co`), so the term constrains.
+    expect(buildFtsMatch('\u{F8FF}')).toBe('(title : "\u{F8FF}"* OR body : "\u{F8FF}"*)')
+    // A combining mark and an enclosed alphanumeric are separators, even
+    // though both carry the Unicode `Alphabetic` property.
+    expect(buildFtsMatch('hello \u{345}')).toBe('(title : "hello"* OR body : "hello"*)')
+    expect(buildFtsMatch('hello \u{24B6}')).toBe('(title : "hello"* OR body : "hello"*)')
   })
 })
 
