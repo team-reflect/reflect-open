@@ -11,11 +11,8 @@ type NonEmptyArray<ElementType> = [ElementType, ...ElementType[]]
 /** Drop the `(string & {})` escape hatch, leaving only the known literals. */
 type KnownId<T> = T extends string ? (string extends T ? never : T) : never
 
-// https://github.com/vercel/ai/blob/ai@7.0.66/packages/anthropic/src/anthropic-language-model-options.ts#L4
 type AnthropicModelId = KnownId<Parameters<AnthropicProvider>[0]>
-// https://github.com/vercel/ai/blob/ai@7.0.66/packages/google/src/google-language-model-options.ts#L8
 type GoogleModelId = KnownId<Parameters<GoogleProvider>[0]>
-// https://github.com/vercel/ai/blob/ai@7.0.66/packages/openai/src/responses/openai-responses-language-model-options.ts#L88
 type OpenAIModelId = KnownId<Parameters<OpenAIProvider>[0]>
 
 /**
@@ -53,49 +50,56 @@ export interface AiProviderInfo {
   models: NonEmptyArray<AiModelOption>
 }
 
+// https://github.com/vercel/ai/blob/ai@7.0.66/packages/openai/src/responses/openai-responses-language-model-options.ts#L88
+const OPENAI_MODELS: NonEmptyArray<AiModelOption<OpenAIModelId>> = [
+  { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', contextWindow: 1_000_000 },
+  { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', contextWindow: 1_000_000 },
+  { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', contextWindow: 1_000_000 },
+  { id: 'gpt-5.5', label: 'GPT-5.5', contextWindow: 1_000_000 },
+  { id: 'gpt-5.4', label: 'GPT-5.4', contextWindow: 1_000_000 },
+  { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini', contextWindow: 400_000 },
+  { id: 'gpt-5.4-nano', label: 'GPT-5.4 nano', contextWindow: 400_000 },
+]
+
+// https://github.com/vercel/ai/blob/ai@7.0.66/packages/anthropic/src/anthropic-language-model-options.ts#L4
+const ANTHROPIC_MODELS: NonEmptyArray<AiModelOption<AnthropicModelId>> = [
+  { id: 'claude-fable-5', label: 'Claude Fable 5', contextWindow: 1_000_000 },
+  { id: 'claude-opus-5', label: 'Claude Opus 5', contextWindow: 1_000_000 },
+  { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', contextWindow: 1_000_000 },
+  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', contextWindow: 1_000_000 },
+  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', contextWindow: 1_000_000 },
+  { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', contextWindow: 200_000 },
+]
+
+// https://github.com/vercel/ai/blob/ai@7.0.66/packages/google/src/google-language-model-options.ts#L8
+const GOOGLE_MODELS: NonEmptyArray<AiModelOption<GoogleModelId>> = [  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', contextWindow: 1_000_000 },
+{ id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash', contextWindow: 1_000_000 },
+{ id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', contextWindow: 1_000_000 },
+{ id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', contextWindow: 1_000_000 },
+{ id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', contextWindow: 1_000_000 },
+{ id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', contextWindow: 1_000_000 },]
+
 export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
   {
     id: 'openai',
     label: 'OpenAI',
     apiKeyRequired: true,
     keyPlaceholder: 'sk-…',
-    models: [
-      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', contextWindow: 1_000_000 },
-      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', contextWindow: 1_000_000 },
-      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', contextWindow: 1_000_000 },
-      { id: 'gpt-5.5', label: 'GPT-5.5', contextWindow: 1_000_000 },
-      { id: 'gpt-5.4', label: 'GPT-5.4', contextWindow: 1_000_000 },
-      { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini', contextWindow: 400_000 },
-      { id: 'gpt-5.4-nano', label: 'GPT-5.4 nano', contextWindow: 400_000 },
-    ] as const satisfies AiModelOption<OpenAIModelId>[],
+    models: OPENAI_MODELS
   },
   {
     id: 'anthropic',
     label: 'Anthropic',
     apiKeyRequired: true,
     keyPlaceholder: 'sk-ant-…',
-    models: [
-      { id: 'claude-fable-5', label: 'Claude Fable 5', contextWindow: 1_000_000 },
-      { id: 'claude-opus-5', label: 'Claude Opus 5', contextWindow: 1_000_000 },
-      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', contextWindow: 1_000_000 },
-      { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', contextWindow: 1_000_000 },
-      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', contextWindow: 1_000_000 },
-      { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', contextWindow: 200_000 },
-    ] as const satisfies AiModelOption<AnthropicModelId>[],
+    models: ANTHROPIC_MODELS
   },
   {
     id: 'google',
     label: 'Google Gemini',
     apiKeyRequired: true,
     keyPlaceholder: 'AIza…',
-    models: [
-      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', contextWindow: 1_000_000 },
-      { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash', contextWindow: 1_000_000 },
-      { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', contextWindow: 1_000_000 },
-      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', contextWindow: 1_000_000 },
-      { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', contextWindow: 1_000_000 },
-      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', contextWindow: 1_000_000 },
-    ] as const satisfies AiModelOption<GoogleModelId>[],
+    models:GOOGLE_MODELS
   },
   {
     id: 'openrouter',
