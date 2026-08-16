@@ -114,11 +114,9 @@ export function useKeyboardHeightVar(): void {
     }
     apply()
     viewport.addEventListener('resize', apply)
-    viewport.addEventListener('scroll', apply) // REVIEW 7: remove the scroll listener, only resize is needed
     document.addEventListener('focusout', onFocusOut)
     return () => {
       viewport.removeEventListener('resize', apply)
-      viewport.removeEventListener('scroll', apply)
       document.removeEventListener('focusout', onFocusOut)
       clearTimeout(watchdog)
       publishKeyboardHeight(0)
