@@ -359,7 +359,7 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
    > exists (keyboard:default). Spike B's remaining on-device checklist
    > (IME, autocorrect, selection, real-device feel) still gates the editor
    > decision.
-
+   >
    > **Update:** the `keyboardChange` event bridge was later removed;
    > `--keyboard-height` is now derived from `visualViewport` on the web side
    > and the plugin only pins the webview (see decision 0003's keyboard note).
