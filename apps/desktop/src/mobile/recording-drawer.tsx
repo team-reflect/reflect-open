@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Square, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { useMobileAudioMemo } from '@/mobile/audio-memo-provider'
 import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform'
 import { useRouter } from '@/routing/router'
@@ -25,25 +25,27 @@ export function RecordingDrawer(): ReactElement {
     <Drawer open={memo.drawerOpen} onOpenChange={memo.onDrawerOpenChange}>
       <DrawerContent aria-label="Audio memo">
         <DrawerTitle className="sr-only">Audio memo</DrawerTitle>
-        {memo.error !== null ? (
-          <div className="flex flex-col gap-3 px-2 pb-2">
-            <p className="text-sm text-destructive">{memo.error}</p>
-            <div className="flex gap-2">
-              {memo.canRetry ? (
-                <Button variant="secondary" onClick={() => memo.retry()}>
-                  Retry
+        <DrawerBody>
+          {memo.error !== null ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-destructive">{memo.error}</p>
+              <div className="flex gap-2">
+                {memo.canRetry ? (
+                  <Button variant="secondary" onClick={() => memo.retry()}>
+                    Retry
+                  </Button>
+                ) : null}
+                <Button variant="ghost" onClick={() => memo.discard()}>
+                  Discard
                 </Button>
-              ) : null}
-              <Button variant="ghost" onClick={() => memo.discard()}>
-                Discard
-              </Button>
+              </div>
             </div>
-          </div>
-        ) : !memo.hasTranscriptionConfig ? (
-          <KeySetupControls memo={memo} />
-        ) : (
-          <LiveRecordingControls key={memo.drawerOpen ? 'open' : 'closed'} memo={memo} />
-        )}
+          ) : !memo.hasTranscriptionConfig ? (
+            <KeySetupControls memo={memo} />
+          ) : (
+            <LiveRecordingControls key={memo.drawerOpen ? 'open' : 'closed'} memo={memo} />
+          )}
+        </DrawerBody>
       </DrawerContent>
     </Drawer>
   )
@@ -59,7 +61,7 @@ function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
   const { navigate } = useRouter()
 
   return (
-    <div className="flex flex-col items-center gap-4 px-4 pb-2 text-center">
+    <div className="flex flex-col items-center gap-4 text-center">
       <p className="text-sm text-text-muted">
         Audio memos send the recording to OpenAI or Google Gemini for transcription into your notes,
         using your own API key. Add one in Settings to start recording.
@@ -111,7 +113,7 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 pb-2">
+    <div className="flex flex-col items-center gap-4">
       <div className="flex h-7 items-center justify-center">
         {memo.phase === 'recording' ? (
           <RecordingLevelWaveform level={memo.level} />

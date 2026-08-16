@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { monthLabel, monthShortLabel } from '@/lib/month-grid'
 import { cn } from '@/lib/utils'
 import { hapticImpactLight } from '@/mobile/haptics'
@@ -57,54 +57,56 @@ export function MonthPickerDrawer({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Change month">
         <DrawerTitle className="sr-only">Change month</DrawerTitle>
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9"
-            aria-label="Previous year"
-            onClick={() => setYear(year - 1)}
-          >
-            <ChevronLeft />
-          </Button>
-          <div className="text-base font-semibold tabular-nums">{year}</div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9"
-            aria-label="Next year"
-            onClick={() => setYear(year + 1)}
-          >
-            <ChevronRight />
-          </Button>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {months.map((candidate) => {
-            const isSelected = candidate === selected
-            const isThisMonth = candidate === today
-            return (
-              <button
-                key={candidate}
-                type="button"
-                aria-label={monthLabel(candidate)}
-                aria-pressed={isSelected}
-                aria-current={isThisMonth ? 'date' : undefined}
-                onClick={() => {
-                  hapticImpactLight()
-                  onPick(candidate)
-                }}
-                className={cn(
-                  'h-11 rounded-lg text-sm',
-                  isSelected && 'bg-primary font-semibold text-primary-foreground',
-                  !isSelected && isThisMonth && 'font-semibold text-primary',
-                  !isSelected && !isThisMonth && 'text-text',
-                )}
-              >
-                {monthShortLabel(candidate)}
-              </button>
-            )
-          })}
-        </div>
+        <DrawerBody>
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-9"
+              aria-label="Previous year"
+              onClick={() => setYear(year - 1)}
+            >
+              <ChevronLeft />
+            </Button>
+            <div className="text-base font-semibold tabular-nums">{year}</div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-9"
+              aria-label="Next year"
+              onClick={() => setYear(year + 1)}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {months.map((candidate) => {
+              const isSelected = candidate === selected
+              const isThisMonth = candidate === today
+              return (
+                <button
+                  key={candidate}
+                  type="button"
+                  aria-label={monthLabel(candidate)}
+                  aria-pressed={isSelected}
+                  aria-current={isThisMonth ? 'date' : undefined}
+                  onClick={() => {
+                    hapticImpactLight()
+                    onPick(candidate)
+                  }}
+                  className={cn(
+                    'h-11 rounded-lg text-sm',
+                    isSelected && 'bg-primary font-semibold text-primary-foreground',
+                    !isSelected && isThisMonth && 'font-semibold text-primary',
+                    !isSelected && !isThisMonth && 'text-text',
+                  )}
+                >
+                  {monthShortLabel(candidate)}
+                </button>
+              )
+            })}
+          </div>
+        </DrawerBody>
       </DrawerContent>
     </Drawer>
   )

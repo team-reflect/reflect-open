@@ -4,7 +4,7 @@ import { Priority } from '@meowdown/core'
 import { useKeymap } from '@meowdown/react'
 import type { OpenTask } from '@reflect/core'
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { markModeFromSyntax } from '@/editor/mark-mode'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'
@@ -213,98 +213,104 @@ export function MobileTaskEditSheet({
         }}
       >
         <DrawerTitle className="sr-only">Edit task</DrawerTitle>
-        <div
-          data-base-ui-swipe-ignore
-          className="rounded-md border border-border bg-surface px-3 py-2 focus-within:ring-1 focus-within:ring-accent"
-        >
-          <NoteEditor
-            key={editorSeed}
-            initialContent={draft}
-            onChange={handleChange}
-            markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
-            spellCheck={settings.editorSpellCheck}
-            smoothCaretAnimation={settings.editorSmoothCaretAnimation}
-            timeFormat={settings.timeFormat}
-            // A one-line editor has nothing to reorder, so keep the gutter grip off.
-            blockHandle={false}
-            onWikiLinkClick={openWikiLink}
-            onTagClick={openTag}
-            onWikilinkSearch={onWikilinkSearch}
-            onTagSearch={onTagSearch}
-            className="reflect-task-editor min-h-12 text-base leading-6"
-            handleRef={handleEditorRef}
+        <DrawerBody>
+          <div
+            data-base-ui-swipe-ignore
+            className="rounded-md border border-border bg-surface px-3 py-2 focus-within:ring-1 focus-within:ring-accent"
           >
-            <TaskSheetKeymap onDone={finishEdit} />
-          </NoteEditor>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5" aria-label="Schedule">
-          <ScheduleChip label="Today" active={dueDate === today} onClick={() => schedule(today)} />
-          <ScheduleChip
-            label="Tomorrow"
-            active={dueDate === addDaysIso(today, 1)}
-            onClick={() => schedule(addDaysIso(today, 1))}
-          />
-          <ScheduleChip
-            label="Next week"
-            active={dueDate === addDaysIso(today, 7)}
-            onClick={() => schedule(addDaysIso(today, 7))}
-          />
-          <ScheduleChip
-            label={dueDate !== null ? formatDayLabel(dueDate, settings.dateFormat) : 'Pick date'}
-            icon={<CalendarDays aria-hidden className="size-3.5" />}
-            active={showCalendar}
-            onClick={toggleCalendar}
-          />
-          {dueDate !== null ? (
+            <NoteEditor
+              key={editorSeed}
+              initialContent={draft}
+              onChange={handleChange}
+              markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
+              spellCheck={settings.editorSpellCheck}
+              smoothCaretAnimation={settings.editorSmoothCaretAnimation}
+              timeFormat={settings.timeFormat}
+              // A one-line editor has nothing to reorder, so keep the gutter grip off.
+              blockHandle={false}
+              onWikiLinkClick={openWikiLink}
+              onTagClick={openTag}
+              onWikilinkSearch={onWikilinkSearch}
+              onTagSearch={onTagSearch}
+              className="reflect-task-editor min-h-12 text-base leading-6"
+              handleRef={handleEditorRef}
+            >
+              <TaskSheetKeymap onDone={finishEdit} />
+            </NoteEditor>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5" aria-label="Schedule">
             <ScheduleChip
-              label="Clear"
-              icon={<X aria-hidden className="size-3.5" />}
-              active={false}
-              onClick={() => schedule(null)}
+              label="Today"
+              active={dueDate === today}
+              onClick={() => schedule(today)}
             />
+            <ScheduleChip
+              label="Tomorrow"
+              active={dueDate === addDaysIso(today, 1)}
+              onClick={() => schedule(addDaysIso(today, 1))}
+            />
+            <ScheduleChip
+              label="Next week"
+              active={dueDate === addDaysIso(today, 7)}
+              onClick={() => schedule(addDaysIso(today, 7))}
+            />
+            <ScheduleChip
+              label={dueDate !== null ? formatDayLabel(dueDate, settings.dateFormat) : 'Pick date'}
+              icon={<CalendarDays aria-hidden className="size-3.5" />}
+              active={showCalendar}
+              onClick={toggleCalendar}
+            />
+            {dueDate !== null ? (
+              <ScheduleChip
+                label="Clear"
+                icon={<X aria-hidden className="size-3.5" />}
+                active={false}
+                onClick={() => schedule(null)}
+              />
+            ) : null}
+          </div>
+          {showCalendar ? (
+            <TaskScheduleGrid today={today} selected={dueDate} onPick={schedule} />
           ) : null}
-        </div>
-        {showCalendar ? (
-          <TaskScheduleGrid today={today} selected={dueDate} onPick={schedule} />
-        ) : null}
-        <div className="flex flex-col gap-1 border-t border-border pt-2">
-          <Button
-            variant="ghost"
-            size="lg"
-            className="h-12 justify-start gap-3 text-base"
-            onClick={complete}
-          >
-            {task.checked ? <Undo2 /> : <CircleCheck />}
-            {task.checked ? 'Reopen' : 'Complete'}
-          </Button>
-          <Button
-            variant="ghost"
-            size="lg"
-            className="h-12 justify-start gap-3 text-base"
-            onClick={convertToBullet}
-          >
-            <List />
-            Convert to bullet
-          </Button>
-          <Button
-            variant="ghost"
-            size="lg"
-            className="h-12 justify-start gap-3 text-base"
-            onClick={openNote}
-          >
-            <ArrowRight />
-            Open note
-          </Button>
-          <Button
-            variant="ghost"
-            size="lg"
-            className="h-12 justify-start gap-3 text-base text-destructive hover:text-destructive"
-            onClick={remove}
-          >
-            <Trash2 />
-            Delete
-          </Button>
-        </div>
+          <div className="flex flex-col gap-1 border-t border-border pt-2">
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-12 justify-start gap-3 text-base"
+              onClick={complete}
+            >
+              {task.checked ? <Undo2 /> : <CircleCheck />}
+              {task.checked ? 'Reopen' : 'Complete'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-12 justify-start gap-3 text-base"
+              onClick={convertToBullet}
+            >
+              <List />
+              Convert to bullet
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-12 justify-start gap-3 text-base"
+              onClick={openNote}
+            >
+              <ArrowRight />
+              Open note
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-12 justify-start gap-3 text-base text-destructive hover:text-destructive"
+              onClick={remove}
+            >
+              <Trash2 />
+              Delete
+            </Button>
+          </div>
+        </DrawerBody>
       </DrawerContent>
     </Drawer>
   )
