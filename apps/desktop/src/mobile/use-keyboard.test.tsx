@@ -64,8 +64,10 @@ describe('useKeyboardHeightVar', () => {
 
   function installViewport(): FakeVisualViewport {
     const viewport = new FakeVisualViewport()
-    Object.defineProperty(window, 'visualViewport', { value: viewport, configurable: true })
-    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true })
+    Object.defineProperties(window, {
+      visualViewport: { value: viewport, configurable: true },
+      innerHeight: { value: 800, configurable: true },
+    })
     return viewport
   }
 

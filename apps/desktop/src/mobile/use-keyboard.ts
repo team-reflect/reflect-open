@@ -90,7 +90,7 @@ export function useKeyboardHeightVar(): void {
   useEffect(() => {
     const viewport = window.visualViewport
     if (!viewport) {
-      return undefined
+      return
     }
     const apply = (): void => {
       publishKeyboardHeight(readKeyboardOverlap())
@@ -140,7 +140,15 @@ export function useKeyboardHeightVar(): void {
  * missing attribute to `'text'`. Same allowlist as Base UI:
  * https://github.com/mui/base-ui/blob/v1.7.0/packages/react/src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardProvider.tsx#L42
  */
-const KEYBOARD_INPUT_TYPES = new Set(['email', 'number', 'password', 'search', 'tel', 'text', 'url'])
+const KEYBOARD_INPUT_TYPES = new Set([
+  'email',
+  'number',
+  'password',
+  'search',
+  'tel',
+  'text',
+  'url',
+])
 
 function focusedKeyboardField(): HTMLElement | null {
   const el = document.activeElement
@@ -166,7 +174,7 @@ export function useKeyboardFieldReveal(): void {
 
   useEffect(() => {
     if (height <= 0) {
-      return undefined
+      return
     }
     const reveal = (): void => {
       focusedKeyboardField()?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })

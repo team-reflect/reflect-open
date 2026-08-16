@@ -8,7 +8,11 @@ import { MobileShell } from '@/mobile/mobile-shell'
 import { MobileStatusLayer } from '@/mobile/status-layer'
 import { RecordingDrawer } from '@/mobile/recording-drawer'
 import { useICloudRefresh } from '@/mobile/use-icloud-refresh'
-import { useKeyboardCaretReveal, useKeyboardFieldReveal, useKeyboardHeightVar } from '@/mobile/use-keyboard'
+import {
+  useKeyboardCaretReveal,
+  useKeyboardFieldReveal,
+  useKeyboardHeightVar,
+} from '@/mobile/use-keyboard'
 import { useShouldShowPaywall } from '@/mobile/use-should-show-paywall'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics'
 import { CaptureProvider } from '@/providers/capture-provider'
