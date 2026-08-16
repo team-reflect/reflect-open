@@ -35,8 +35,8 @@ const TIME_FORMAT_OPTIONS: TimeFormatOption[] = [
 ]
 
 const WEEK_START_OPTIONS: WeekStartOption[] = [
-  { value: 'monday', label: 'Monday' },
   { value: 'sunday', label: 'Sunday' },
+  { value: 'monday', label: 'Monday' },
   { value: 'saturday', label: 'Saturday' },
 ]
 
