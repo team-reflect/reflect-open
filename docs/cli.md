@@ -87,7 +87,8 @@ match anywhere in the title, since FTS alone cannot see inside their
 uninterrupted title runs. A partial query such as `authent migr` finds
 `authentication migration`, and terms can match across the title and body; body
 matches include snippets. Terms are matched literally (FTS5 operators in the
-query have no special meaning). JSON results without a body match have an empty
+query have no special meaning); a term the tokenizer finds no word in, such as
+a lone `-`, is ignored entirely. JSON results without a body match have an empty
 snippet; title-prefix recall scores `0`, while tokenizer-normalized title matches
 retain their bm25 score. Requires the index: if `.reflect/index.sqlite` is missing
 the exit code is `4` — open the graph in Reflect to build it; the CLI never runs the

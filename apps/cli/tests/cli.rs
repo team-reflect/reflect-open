@@ -454,6 +454,31 @@ fn search_finds_partial_terms_in_note_bodies() {
     );
 }
 
+/// A term of punctuation alone tokenizes to an empty FTS phrase, which would
+/// empty the whole `AND` chain; it is dropped, while a query of nothing but
+/// punctuation still matches nothing.
+#[test]
+fn search_ignores_terms_that_tokenize_to_nothing() {
+    let fixture = graph();
+    fixture.write_note(
+        "notes/meeting-notes.md",
+        "# Meeting Notes\nagenda items for the sync\n",
+    );
+    fixture.build_index();
+
+    let text = stdout(&reflect(&fixture, &["search", "meeting - notes"]));
+    assert!(
+        text.contains("notes/meeting-notes.md"),
+        "expected the punctuation term to be ignored:\n{text}"
+    );
+
+    let punctuation = stdout(&reflect(&fixture, &["search", ". -"]));
+    assert!(
+        !punctuation.contains("notes/meeting-notes.md"),
+        "expected a punctuation-only query to match nothing:\n{punctuation}"
+    );
+}
+
 /// The V1-style exact-title boost (`filtered-search.ts`): a note whose title
 /// *is* the query ranks ahead of a louder lexical (bm25) match whose title only
 /// contains the query among other words — exact title is promoted before bm25.
