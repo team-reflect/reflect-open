@@ -58,6 +58,15 @@ import Foundation
         shortTitle: "Stop recording",
         systemImageName: "stop.circle"
       )
+      AppShortcut(
+        intent: QuickNoteIntent(),
+        phrases: [
+          "Add a note in \(.applicationName)",
+          "Take a quick note in \(.applicationName)",
+        ],
+        shortTitle: "Quick note",
+        systemImageName: "square.and.pencil"
+      )
     }
   }
 #endif

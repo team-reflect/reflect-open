@@ -38,6 +38,8 @@ export {
 } from './scan'
 export {
   appendBlock,
+  appendListItem,
+  type ListItemKind,
   appendTaskLine,
   appendTaskToContext,
   wikiLinkSafe,

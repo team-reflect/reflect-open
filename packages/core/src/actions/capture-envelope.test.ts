@@ -119,6 +119,12 @@ describe('textCaptureEnvelopeSchema', () => {
     ).toBe(true)
   })
 
+  it('accepts the quick note intent as a text producer', () => {
+    expect(
+      textCaptureEnvelopeSchema.safeParse({ ...VALID_TEXT, source: 'ios-intent' }).success,
+    ).toBe(true)
+  })
+
   it.each([
     ['empty text', { ...VALID_TEXT, text: '' }],
     ['whitespace-only text', { ...VALID_TEXT, text: '  \t ' }],

@@ -533,44 +533,75 @@ describe('drainCaptureInbox (text captures)', () => {
     expect(files.get(DAILY)).toBe('- [ ] pack a bag\n')
   })
 
-  it('appends after existing daily content as its own block', async () => {
+  it('joins the daily note’s trailing bullet list instead of opening a new block', async () => {
     files.set(DAILY, '- morning standup\n')
     addTextSpool(textEnvelope())
 
     await drain()
 
-    expect(files.get(DAILY)).toBe('- morning standup\n\n- call the bank\n')
+    expect(files.get(DAILY)).toBe('- morning standup\n- call the bank\n')
   })
 
-  it('still appends when an existing line merely contains the capture as a substring', async () => {
-    files.set(DAILY, '- call the bank tomorrow morning\n')
+  it('two same-day captures grow one list', async () => {
     addTextSpool(textEnvelope())
+    spool.set('a1b2c3d4-0000-4000-8000-000000000002.json', {
+      contents: JSON.stringify(
+        textEnvelope({ id: 'a1b2c3d4-0000-4000-8000-000000000002', text: 'buy milk' }),
+      ),
+      modifiedMs: 1,
+    })
 
     const outcome = await drain()
 
-    expect(outcome.deduped).toBe(0)
-    expect(files.get(DAILY)).toBe('- call the bank tomorrow morning\n\n- call the bank\n')
+    expect(outcome).toEqual({ pending: 2, drained: 2, deduped: 0, invalid: 0, stopped: null })
+    expect(files.get(DAILY)).toBe('- call the bank\n- buy milk\n')
   })
 
-  it('dedupes against a CRLF daily — a carriage return must not defeat the line match', async () => {
-    files.set(DAILY, '- morning standup\r\n- call the bank\r\n')
+  it('starts a fresh list after a prose tail', async () => {
+    files.set(DAILY, 'Wrote some prose.\n')
     addTextSpool(textEnvelope())
 
-    const outcome = await drain()
+    await drain()
 
-    expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 1, invalid: 0, stopped: null })
+    expect(files.get(DAILY)).toBe('Wrote some prose.\n\n- call the bank\n')
+  })
+
+  it('joins a CRLF daily with CRLF line endings', async () => {
+    files.set(DAILY, '- morning standup\r\n')
+    addTextSpool(textEnvelope())
+
+    await drain()
+
     expect(files.get(DAILY)).toBe('- morning standup\r\n- call the bank\r\n')
   })
 
-  it('re-draining after a crash between append and removal cannot double-append', async () => {
+  it('appends a duplicate line — identical text twice is two entries', async () => {
     files.set(DAILY, '- call the bank\n')
     addTextSpool(textEnvelope())
 
     const outcome = await drain()
 
-    expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 1, invalid: 0, stopped: null })
-    expect(files.get(DAILY)).toBe('- call the bank\n')
+    expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 0, invalid: 0, stopped: null })
+    expect(files.get(DAILY)).toBe('- call the bank\n- call the bank\n')
     expect(spool.size).toBe(0)
+  })
+
+  it('drains an ios-intent envelope like any other text source', async () => {
+    addTextSpool(textEnvelope({ source: 'ios-intent' }))
+
+    const outcome = await drain()
+
+    expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 0, invalid: 0, stopped: null })
+    expect(files.get(DAILY)).toBe('- call the bank\n')
+  })
+
+  it('a checkbox never joins a task list — the + marker stays a task', async () => {
+    files.set(DAILY, '+ [ ] buy milk\n')
+    addTextSpool(textEnvelope({ kind: 'checkbox', text: 'pack a bag' }))
+
+    await drain()
+
+    expect(files.get(DAILY)).toBe('+ [ ] buy milk\n\n- [ ] pack a bag\n')
   })
 
   it('still appends to a private daily — the write is entirely local', async () => {
