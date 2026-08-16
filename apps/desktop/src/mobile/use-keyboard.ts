@@ -57,7 +57,7 @@ export function useKeyboardVisible(): boolean {
 const KEYBOARD_MIN_OVERLAP = 60
 
 /** How long after a blur a lingering overlap is treated as stale (iOS 26.0). */
-const KEYBOARD_STALE_DELAY_MS = 1500
+const KEYBOARD_STALE_DELAY_MS = 1500 // REVIEW 6: 改成 1750 ms
 
 /**
  * The keyboard overlap per `visualViewport`. `KeyboardPlugin.swift` pins the
@@ -165,9 +165,9 @@ function focusedKeyboardField(): HTMLElement | null {
 
 /**
  * Scrolls the focused form field above the keyboard, whenever the keyboard
- * height changes or focus moves. Relies on the container's `.keyboard-slack`
- * (scroll room + `scroll-padding-bottom`); the native scroll pin already
- * blocks WebKit's own reveal, so one plain `scrollIntoView` is enough.
+ * height changes or focus moves. `DrawerContent`'s keyboard padding keeps the
+ * scroller above the keyboard; the native scroll pin already blocks WebKit's
+ * own reveal, so one plain `scrollIntoView` is enough.
  */
 export function useKeyboardFieldReveal(): void {
   const height = useSyncExternalStore(subscribeKeyboard, getKeyboardHeight, getKeyboardHeight)

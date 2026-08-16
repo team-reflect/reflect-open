@@ -30,10 +30,9 @@ function useDrawer(): DrawerContextProps {
  * only — the other directions Base UI supports aren't needed on Reflect's mobile
  * surfaces — and the home-indicator safe area is padded for by default.
  *
- * Keyboard avoidance: bodies with text inputs use {@link DrawerBody}
- * (`.keyboard-slack`), which needs this popup's auto height to grow the sheet. A future fixed-height or
- * snap-point drawer will need a popup-level lift off `--keyboard-height`
- * instead (the slack cannot grow a fixed popup).
+ * Keyboard avoidance: {@link DrawerContent} pads its bottom past
+ * `--keyboard-height`, so the auto-height popup grows and the body ends above
+ * the keyboard.
  */
 function Drawer({
   modal = true,
@@ -149,9 +148,11 @@ function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.
           <DrawerPrimitive.Content
             data-slot="drawer-content"
             className={cn(
-              'flex min-h-0 flex-1 flex-col gap-3 overflow-hidden overscroll-contain rounded-[inherit] p-4 transition-opacity duration-300 ease-[cubic-bezier(0.45,1.005,0,1.005)] select-text group-data-nested-drawer-open/drawer-popup:opacity-0 group-data-nested-drawer-swiping/drawer-popup:opacity-100 group-data-swiping/drawer-popup:select-none',
-              // Pad past the home indicator so the last row isn't tucked under it.
-              'pb-[max(env(safe-area-inset-bottom),1rem)]',
+              'flex max-h-[85dvh] min-h-0 flex-1 flex-col gap-3 overflow-hidden overscroll-contain rounded-[inherit] p-4 transition-opacity duration-300 ease-[cubic-bezier(0.45,1.005,0,1.005)] select-text group-data-nested-drawer-open/drawer-popup:opacity-0 group-data-nested-drawer-swiping/drawer-popup:opacity-100 group-data-swiping/drawer-popup:select-none',
+              // Pad past the home indicator, or past the software keyboard while
+              // it is up; max() keeps the two from stacking (the keyboard covers
+              // the indicator).
+              'pb-[max(env(safe-area-inset-bottom),calc(var(--keyboard-height,0px)+1rem))]',
             )}
           >
             {children}
@@ -163,19 +164,15 @@ function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.
 }
 
 /**
- * The scrollable middle of a drawer: grows with its content up to 75dvh and
- * carries `.keyboard-slack`, so fields keep scrolling clear of the software
- * keyboard (see `styles/index.css`). Sits inside {@link DrawerContent},
- * usually under a pinned {@link DrawerTitle}.
+ * The scrollable middle of a drawer. {@link DrawerContent}'s bottom padding
+ * keeps its end above the home indicator and the software keyboard. Sits
+ * inside {@link DrawerContent}, usually under a pinned {@link DrawerTitle}.
  */
 function DrawerBody({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="drawer-body"
-      className={cn(
-        'keyboard-slack flex max-h-[75dvh] flex-col gap-3 overflow-y-auto pt-3',
-        className,
-      )}
+      className={cn('flex min-h-0 flex-col gap-3 overflow-y-auto pt-3', className)}
       {...props}
     />
   )

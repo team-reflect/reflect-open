@@ -743,21 +743,3 @@ html:root {
     @apply font-sans;
   }
 }
-
-/* Software-keyboard slack for `DrawerBody` (any scroller with text inputs):
-   the transparent border pulls the scrollport's end above the keyboard, plus
-   2rem of breathing room, so lower fields can always scroll into the visible
-   band. A border, not padding, on purpose: WebKit extends scrollable overflow
-   past the content by the scroller's own trailing padding for block
-   containers only, never for flex ones (RenderBlockFlow.cpp keeps the
-   pre-clamp `afterPaddingEdge`; RenderFlexibleBox.cpp hands
-   `computeInFlowOverflow` the bare content box), so here padding-bottom adds
-   no scroll range on iOS. Keyboard strategy adapted from Base UI's
-   DrawerVirtualKeyboardProvider
-   (https://github.com/mui/base-ui/blob/v1.7.0/packages/react/src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardProvider.tsx#L121),
-   driven by our `--keyboard-height`. */
-.keyboard-slack {
-  border-bottom: calc(2rem + var(--keyboard-height, 0px)) solid transparent;
-  scroll-padding-bottom: 1rem;
-  overflow-anchor: none;
-}
