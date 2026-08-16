@@ -25,9 +25,8 @@ export function RecordingDrawer(): ReactElement {
     <Drawer open={memo.drawerOpen} onOpenChange={memo.onDrawerOpenChange}>
       <DrawerContent aria-label="Audio memo">
         <DrawerTitle className="sr-only">Audio memo</DrawerTitle>
-        <DrawerBody>
           {memo.error !== null ? (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 px-2 pb-2">
               <p className="text-sm text-destructive">{memo.error}</p>
               <div className="flex gap-2">
                 {memo.canRetry ? (
@@ -45,7 +44,6 @@ export function RecordingDrawer(): ReactElement {
           ) : (
             <LiveRecordingControls key={memo.drawerOpen ? 'open' : 'closed'} memo={memo} />
           )}
-        </DrawerBody>
       </DrawerContent>
     </Drawer>
   )
@@ -61,7 +59,7 @@ function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
   const { navigate } = useRouter()
 
   return (
-    <div className="flex flex-col items-center gap-4 text-center">
+    <div className="flex flex-col items-center gap-4 px-4 pb-2 text-center">
       <p className="text-sm text-text-muted">
         Audio memos send the recording to OpenAI or Google Gemini for transcription into your notes,
         using your own API key. Add one in Settings to start recording.
@@ -113,7 +111,7 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
   }
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-4 pb-2">
       <div className="flex h-7 items-center justify-center">
         {memo.phase === 'recording' ? (
           <RecordingLevelWaveform level={memo.level} />

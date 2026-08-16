@@ -57,8 +57,7 @@ export function MonthPickerDrawer({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Change month">
         <DrawerTitle className="sr-only">Change month</DrawerTitle>
-        <DrawerBody>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between p-4">
             <Button
               variant="ghost"
               size="icon"
@@ -106,7 +105,6 @@ export function MonthPickerDrawer({
               )
             })}
           </div>
-        </DrawerBody>
       </DrawerContent>
     </Drawer>
   )

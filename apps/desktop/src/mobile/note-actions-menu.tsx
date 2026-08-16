@@ -83,8 +83,7 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
         </DrawerTrigger>
         <DrawerContent>
           <DrawerTitle className="sr-only">Note actions</DrawerTitle>
-          <DrawerBody className="px-4">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 p-4">
               <Button
                 variant="ghost"
                 size="lg"
@@ -122,7 +121,6 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
                 Delete
               </Button>
             </div>
-          </DrawerBody>
         </DrawerContent>
       </Drawer>
 
