@@ -61,7 +61,8 @@ behavior while this simulator check covers the system integration.
 The simulator hides the software keyboard whenever "Connect Hardware
 Keyboard" is enabled (I/O → Keyboard, ⇧⌘K) — focusing the editor then
 types through the Mac keyboard with no on-screen keyboard and no
-`keyboardChange` events, which looks like a keyboard bug but isn't. Turn
+`visualViewport` shrink (`--keyboard-height` stays 0), which looks like a
+keyboard bug but isn't. Turn
 that setting off (or press ⌘K with the app focused) to exercise the real
 keyboard-avoidance path.
 
