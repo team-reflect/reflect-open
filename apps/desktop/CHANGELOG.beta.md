@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.9.1-beta.2...v0.10.0-beta.2) (2026-08-16)
+
+
+### Features
+
+* quick notes from Siri and Shortcuts on iOS ([#1096](https://github.com/team-reflect/reflect-open/issues/1096)) ([bb73c12](https://github.com/team-reflect/reflect-open/commit/bb73c1250d62ea777663fdffa591d46d363b2705))
+
+
+### Bug Fixes
+
+* allow Saturday as the first day of the week ([#1118](https://github.com/team-reflect/reflect-open/issues/1118)) ([b35bdc9](https://github.com/team-reflect/reflect-open/commit/b35bdc9311499703cffdbb08be0c790463c0c092))
+* update meowdown to ^0.65.5 ([#1120](https://github.com/team-reflect/reflect-open/issues/1120)) ([0f72613](https://github.com/team-reflect/reflect-open/commit/0f72613bb201baa1aac32cb0618296d07f5c3252))
+
 ## [0.9.1-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.9.1-beta.1...v0.9.1-beta.2) (2026-08-16)
 
 
