@@ -1,10 +1,8 @@
-import { useState, type ReactElement, type ReactNode } from 'react'
-import { errorMessage } from '@reflect/core'
+import type { ReactElement, ReactNode } from 'react'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { startOperation } from '@/lib/operations'
+import { useBridgedNoteToggle } from '@/lib/notes/use-bridged-note-toggle'
 import { cn } from '@/lib/utils'
-import { useGraph } from '@/providers/graph-provider'
 
 interface NoteToggleActionProps {
   /** Graph-relative path of the note the action operates on. */
@@ -30,18 +28,6 @@ interface NoteToggleActionProps {
 }
 
 /**
- * The toggle's resolved state, held until the index reflects it. The label
- * otherwise lags one watcher round-trip behind the write, and in that window
- * a stale click would silently undo the user's toggle. The toggle reads the
- * note itself, so its return value is the freshest truth; the bridge retires
- * the moment the index agrees or the action moves to another note.
- */
-interface PendingToggle {
-  path: string
-  active: boolean
-}
-
-/**
  * One note-scoped frontmatter-flag toggle as an action-sidebar button — the
  * shared shape behind pin/unpin and private/un-private. The button reflects
  * the index's state, bridged by the last toggle's result while the watcher
@@ -59,47 +45,19 @@ export function NoteToggleAction({
   applyOptimistic,
   onFailure,
 }: NoteToggleActionProps): ReactElement {
-  const { graph } = useGraph()
-  // Guards against a double-click racing two read-patch-write toggles.
-  const [isToggling, setIsToggling] = useState(false)
-  const [pending, setPending] = useState<PendingToggle | null>(null)
-
-  // Render-time state adjustment (the React-sanctioned pattern): drop the
-  // bridge once the index agrees with it, so a later external flag change
-  // can't resurrect a stale override.
-  if (pending !== null && (pending.path !== path || pending.active === indexActive)) {
-    setPending(null)
-  }
-  const isActive = pending !== null && pending.path === path ? pending.active : indexActive
-
-  const onToggle = async (): Promise<void> => {
-    const generation = graph?.generation
-    if (generation === undefined) {
-      return
-    }
-    const optimisticActive = !isActive
-    applyOptimistic?.(optimisticActive)
-    setPending({ path, active: optimisticActive })
-    setIsToggling(true)
-    try {
-      const active = await toggle(path, generation)
-      if (active !== optimisticActive) {
-        applyOptimistic?.(active)
-      }
-      setPending({ path, active })
-    } catch (cause) {
-      setPending(null)
-      onFailure?.()
-      startOperation(failureLabel).fail(errorMessage(cause))
-    } finally {
-      setIsToggling(false)
-    }
-  }
+  const { isActive, isToggling, toggleActive } = useBridgedNoteToggle({
+    path,
+    indexActive,
+    toggle,
+    failureLabel,
+    applyOptimistic,
+    onFailure,
+  })
 
   const button = (
     <button
       type="button"
-      onClick={() => void onToggle()}
+      onClick={() => void toggleActive()}
       disabled={isToggling}
       className="group relative flex w-full items-center space-x-2 rounded-lg px-3 py-2 text-start transition-colors duration-100 hover:bg-surface-hover disabled:opacity-50"
     >
