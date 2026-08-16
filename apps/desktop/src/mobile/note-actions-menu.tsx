@@ -41,6 +41,7 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
   const { graph } = useGraph()
   const isPinned = usePinnedNotes().some((note) => note.path === path)
   const noteRow = useNoteRow(path)
+  const privacyReady = noteRow !== null
   const [actionsOpen, setActionsOpen] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -55,6 +56,11 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
     toggle: toggleNotePrivate,
     failureLabel: (active) => (active ? 'Unlocking note' : 'Locking note'),
   })
+  const privacyActionLabel = !privacyReady
+    ? 'Loading privacy…'
+    : isPrivate
+      ? 'Unlock note'
+      : 'Lock note'
 
   const pin = (): void => {
     if (graph !== null) {
@@ -110,14 +116,14 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
               variant="ghost"
               size="lg"
               className="h-12 justify-start gap-3 text-base"
-              disabled={isTogglingPrivate}
+              disabled={!privacyReady || isTogglingPrivate}
               onClick={() => {
                 void togglePrivate()
                 setActionsOpen(false)
               }}
             >
-              {isPrivate ? <LockOpen aria-hidden /> : <Lock aria-hidden />}
-              {isPrivate ? 'Unlock note' : 'Lock note'}
+              {privacyReady && isPrivate ? <LockOpen aria-hidden /> : <Lock aria-hidden />}
+              {privacyActionLabel}
             </Button>
             <Button
               variant="ghost"

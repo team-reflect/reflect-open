@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { cleanup, render } from 'vitest-browser-react'
 import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -50,13 +50,7 @@ vi.mock('@/components/ui/drawer', async () => {
       onOpenChange?: (open: boolean) => void
       children?: ReactNode
     }) => <DrawerContext value={{ open, onOpenChange }}>{children}</DrawerContext>,
-    DrawerTrigger: ({
-      children,
-      render,
-    }: {
-      children?: ReactNode
-      render?: React.ReactElement
-    }) => {
+    DrawerTrigger: ({ children, render }: { children?: ReactNode; render?: ReactElement }) => {
       const { onOpenChange } = useDrawerContext()
       if (
         render !== undefined &&
@@ -194,6 +188,15 @@ describe('NoteActionsMenu', () => {
 
     await openActions()
     await expect.element(view.getByRole('button', { name: 'Lock note' })).toBeInTheDocument()
+  })
+
+  it('disables the privacy action until the indexed note row loads', async () => {
+    currentNoteRow = null
+    const { view } = await mount()
+
+    await openActions()
+    await expect.element(view.getByRole('button', { name: 'Loading privacy…' })).toBeDisabled()
+    expect(toggleNotePrivate).not.toHaveBeenCalled()
   })
 
   it('keeps the pin action intact and closes the drawer', async () => {
