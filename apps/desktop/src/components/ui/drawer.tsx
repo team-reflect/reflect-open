@@ -91,7 +91,7 @@ function DrawerSwipeHandle({ className, ...props }: React.ComponentProps<'div'>)
       data-slot="drawer-swipe-handle"
       aria-hidden="true"
       className={cn(
-        'mx-auto mt-3 mb-1 h-1 w-10 shrink-0 cursor-grab rounded-full bg-border active:cursor-grabbing',
+        'mx-auto mt-1 mb-1 h-1 w-10 shrink-0 cursor-grab rounded-full bg-border active:cursor-grabbing',
         className,
       )}
       {...props}
