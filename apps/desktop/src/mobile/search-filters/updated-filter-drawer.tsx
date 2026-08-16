@@ -52,7 +52,7 @@ export function UpdatedFilterDrawer({
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerContent>
         <DrawerTitle>Updated</DrawerTitle>
-        <DrawerBody>
+        <DrawerBody className="px-4">
           <div className="flex flex-col">
             {UPDATED_PRESETS.map(({ preset, label }) => (
               <button

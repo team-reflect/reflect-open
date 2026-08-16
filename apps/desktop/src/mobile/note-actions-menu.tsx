@@ -83,7 +83,7 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
         </DrawerTrigger>
         <DrawerContent>
           <DrawerTitle className="sr-only">Note actions</DrawerTitle>
-          <DrawerBody>
+          <DrawerBody className="px-4">
             <div className="flex flex-col gap-1">
               <Button
                 variant="ghost"

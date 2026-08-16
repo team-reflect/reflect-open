@@ -65,7 +65,7 @@ export function NotePickerDrawer({
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerContent>
         <DrawerTitle>{title}</DrawerTitle>
-        <DrawerBody>
+        <DrawerBody className="px-4">
           <SearchInput
             placeholder="Find a note…"
             aria-label="Find a note"

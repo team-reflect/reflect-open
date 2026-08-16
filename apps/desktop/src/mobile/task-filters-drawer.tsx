@@ -37,7 +37,7 @@ export function TaskFiltersDrawer({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Task filters">
         <DrawerTitle>Task filters</DrawerTitle>
-        <DrawerBody>
+        <DrawerBody className="px-4">
           <div className="flex flex-col">
             {BUCKETS.map(({ key, label }) => (
               <FilterRow
