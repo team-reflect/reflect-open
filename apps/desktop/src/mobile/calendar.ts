@@ -1,5 +1,5 @@
 import { differenceInCalendarDays, getDay } from 'date-fns'
-import type { WeekStartDay } from '@reflect/core'
+import { weekStartDow, type WeekStartDay } from '@reflect/core'
 import { addDaysIso, parseIsoDate } from '@/lib/dates'
 import { monthOf } from '@/lib/month-grid'
 
@@ -15,8 +15,7 @@ import { monthOf } from '@/lib/month-grid'
 /** The first day of `date`'s week, honoring the week-start setting. */
 export function weekStartOf(date: string, weekStart: WeekStartDay): string {
   const weekday = getDay(parseIsoDate(date)) // 0 = Sunday … 6 = Saturday
-  const offsetToFirst = weekStart === 'monday' ? (weekday === 0 ? -6 : 1 - weekday) : -weekday
-  return addDaysIso(date, offsetToFirst)
+  return addDaysIso(date, -((weekday - weekStartDow(weekStart) + 7) % 7))
 }
 
 /** The seven ISO dates of `date`'s week, honoring the week-start setting. */

@@ -731,6 +731,16 @@ describe('SettingsScreen', () => {
     )
   })
 
+  it('selecting Saturday persists the week start day', async () => {
+    await renderScreen()
+    const trigger = page.getByRole('combobox', { name: 'Start week on' })
+    await trigger.click()
+    await page.getByRole('option', { name: 'Saturday' }).click()
+
+    await expect.element(trigger).toHaveTextContent('Saturday')
+    await vi.waitFor(() => expect(saved.at(-1)).toMatchObject({ weekStartDay: 'saturday' }))
+  })
+
   it('reflects the persisted time format', async () => {
     stored = { timeFormat: '24h' }
     await renderScreen()

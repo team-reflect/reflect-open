@@ -166,11 +166,22 @@ export type DateFormat = z.infer<typeof dateFormatSchema>
 
 /**
  * Which day opens the calendar week. `monday` (the default) follows ISO 8601;
- * `sunday` matches the North-American convention.
+ * `sunday` matches the North-American convention; `saturday` matches the
+ * convention of most Middle-East and North-Africa locales.
  */
-export const weekStartDaySchema = z.enum(['monday', 'sunday']).catch('monday')
+export const weekStartDaySchema = z.enum(['monday', 'sunday', 'saturday']).catch('monday')
 
 export type WeekStartDay = z.infer<typeof weekStartDaySchema>
+
+const WEEK_START_DOW: Record<WeekStartDay, 0 | 1 | 6> = { sunday: 0, monday: 1, saturday: 6 }
+
+/**
+ * The week-start day in JS `getDay()` numbering (0 = Sunday, 6 = Saturday),
+ * which is also date-fns' `weekStartsOn` convention.
+ */
+export function weekStartDow(weekStartDay: WeekStartDay): 0 | 1 | 6 {
+  return WEEK_START_DOW[weekStartDay]
+}
 
 /**
  * Tags pinned as one-click filters on the All Notes screen, in display order.

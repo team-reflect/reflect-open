@@ -44,6 +44,12 @@ describe('weekdayLabels', () => {
     expect(labels[0]).toBe('Mo')
     expect(labels[6]).toBe('Su')
   })
+
+  it('returns Saturday-first labels when configured', () => {
+    const labels = weekdayLabels(6)
+    expect(labels[0]).toBe('Sa')
+    expect(labels[6]).toBe('Fr')
+  })
 })
 
 describe('buildMonthGrid', () => {
@@ -56,6 +62,14 @@ describe('buildMonthGrid', () => {
     for (const week of grid.weeks) {
       expect(week).toHaveLength(7)
     }
+  })
+
+  it('pads the month to full Saturday-first weeks when configured', () => {
+    // August 2026 starts on a Saturday and ends on a Monday.
+    const grid = buildMonthGrid('2026-08', 6)
+    expect(grid.start).toBe('2026-08-01')
+    expect(grid.end).toBe('2026-09-04')
+    expect(grid.weeks).toHaveLength(5)
   })
 
   it('flags leading and trailing fill days as outside the month', () => {

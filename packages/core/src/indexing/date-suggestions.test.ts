@@ -119,6 +119,32 @@ describe('generateDateSuggestions', () => {
       })
     })
 
+    it('anchors this/next week to a Saturday start when configured', () => {
+      expect(gen('this week', 'dmy', 'saturday')[0]).toEqual({
+        date: '2019-12-28',
+        phrase: 'This Week',
+      })
+      expect(gen('next week', 'dmy', 'saturday')[0]).toEqual({
+        date: '2020-01-04',
+        phrase: 'Next Week',
+      })
+    })
+
+    it('keeps the weekend on Saturday for Monday and Sunday starts', () => {
+      expect(gen('this weekend', 'dmy', 'monday')).toEqual([
+        { date: '2020-01-04', phrase: 'This Weekend' },
+      ])
+      expect(gen('this weekend', 'dmy', 'sunday')).toEqual([
+        { date: '2020-01-04', phrase: 'This Weekend' },
+      ])
+    })
+
+    it('anchors the weekend to Friday for a Saturday start', () => {
+      expect(gen('this weekend', 'dmy', 'saturday')).toEqual([
+        { date: '2020-01-03', phrase: 'This Weekend' },
+      ])
+    })
+
     it('leaves weekday phrases unaffected by the week start', () => {
       expect(gen('this monday', 'dmy', 'sunday')).toEqual([
         { date: '2020-01-06', phrase: 'This Monday' },

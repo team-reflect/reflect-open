@@ -232,6 +232,7 @@ export {
   timeFormatSchema,
   dateFormatSchema,
   weekStartDaySchema,
+  weekStartDow,
   allNotesFilterTagsSchema,
   calendarEnabledSchema,
   calendarIdsSchema,

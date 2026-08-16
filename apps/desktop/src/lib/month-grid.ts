@@ -15,7 +15,7 @@ import { addDaysIso } from './dates'
  * Pure month-grid math for the daily sidebar's calendar (no DOM, no queries).
  * Months are `YYYY-MM` strings and days are ISO `YYYY-MM-DD` strings — the
  * same local-calendar contract as `lib/dates`. By default weeks start on
- * Monday (ISO 8601); pass `weekStartsOn: 0` for Sunday.
+ * Monday (ISO 8601); pass `weekStartsOn: 0` for Sunday or `6` for Saturday.
  */
 
 const MONTH_FORMAT = 'yyyy-MM'
@@ -71,9 +71,9 @@ export function addMonths(month: string, delta: number): string {
 
 /**
  * Two-letter weekday labels for the grid's header row.
- * @param weekStartsOn - 1 for Monday (default, ISO 8601); 0 for Sunday.
+ * @param weekStartsOn - 1 for Monday (default, ISO 8601); 0 for Sunday; 6 for Saturday.
  */
-export function weekdayLabels(weekStartsOn: 0 | 1 = 1): string[] {
+export function weekdayLabels(weekStartsOn: 0 | 1 | 6 = 1): string[] {
   const weekStart = startOfWeek(new Date(), { weekStartsOn })
   return [...Array(7).keys()].map((dayOffset) => format(addDays(weekStart, dayOffset), 'EEEEEE'))
 }
@@ -81,9 +81,9 @@ export function weekdayLabels(weekStartsOn: 0 | 1 = 1): string[] {
 /**
  * Build the full-week grid for a `YYYY-MM` month.
  * @param month - The month to build, as `YYYY-MM`.
- * @param weekStartsOn - 1 for Monday (default, ISO 8601); 0 for Sunday.
+ * @param weekStartsOn - 1 for Monday (default, ISO 8601); 0 for Sunday; 6 for Saturday.
  */
-export function buildMonthGrid(month: string, weekStartsOn: 0 | 1 = 1): MonthGrid {
+export function buildMonthGrid(month: string, weekStartsOn: 0 | 1 | 6 = 1): MonthGrid {
   const monthStart = startOfMonth(parseMonth(month))
   const gridStart = format(startOfWeek(monthStart, { weekStartsOn }), ISO_DATE_FORMAT)
   const gridEnd = format(endOfWeek(endOfMonth(monthStart), { weekStartsOn }), ISO_DATE_FORMAT)

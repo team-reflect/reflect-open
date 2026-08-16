@@ -37,6 +37,7 @@ const TIME_FORMAT_OPTIONS: TimeFormatOption[] = [
 const WEEK_START_OPTIONS: WeekStartOption[] = [
   { value: 'monday', label: 'Monday' },
   { value: 'sunday', label: 'Sunday' },
+  { value: 'saturday', label: 'Saturday' },
 ]
 
 // The options demonstrate themselves: each shows today's date in its format,

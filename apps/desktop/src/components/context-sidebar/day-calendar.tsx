@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { dailyDatesInRange, type WeekStartDay } from '@reflect/core'
+import { dailyDatesInRange, weekStartDow } from '@reflect/core'
 import { CalendarIcon } from '@/components/icons/calendar-icon'
 import { ChevronLeftIcon } from '@/components/icons/chevron-left-icon'
 import { ChevronRightIcon } from '@/components/icons/chevron-right-icon'
@@ -25,11 +25,6 @@ interface DayCalendarProps {
   today: string
 }
 
-/** Maps the persisted `WeekStartDay` value to date-fns' numeric convention. */
-function toWeekStartsOn(weekStartDay: WeekStartDay): 0 | 1 {
-  return weekStartDay === 'sunday' ? 0 : 1
-}
-
 const TODAY_BINDING = keybindingFor('nav.today')
 
 const HEADER_BUTTON_CLASS =
@@ -50,7 +45,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
   const navigateNoteLink = useNoteLinkNavigation(selectedDate)
   const { graph } = useGraph()
   const { settings } = useSettings()
-  const weekStartsOn = toWeekStartsOn(settings.weekStartDay)
+  const weekStartsOn = weekStartDow(settings.weekStartDay)
 
   const [month, setMonth] = useState(() => monthOf(selectedDate))
   // Render-time state adjustment (not an effect): navigating to another day

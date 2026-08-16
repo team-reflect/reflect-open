@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type { WeekStartDay } from '@reflect/core'
+import { weekStartDow } from '@reflect/core'
 import { formatDayLabel } from '@/lib/dates'
 import { addMonths, buildMonthGrid, monthLabel, monthOf, weekdayLabels } from '@/lib/month-grid'
 import { cn } from '@/lib/utils'
@@ -15,11 +15,6 @@ interface TaskScheduleGridProps {
   onPick: (isoDate: string) => void
 }
 
-/** Maps the week-start setting to date-fns' numeric convention. */
-function toWeekStartsOn(weekStartDay: WeekStartDay): 0 | 1 {
-  return weekStartDay === 'sunday' ? 0 : 1
-}
-
 /**
  * The quick-edit sheet's month grid (V1 mobile's scheduling picker, desktop's
  * {@link TaskScheduleCalendar} restated for touch): tapping a day schedules the
@@ -29,7 +24,7 @@ function toWeekStartsOn(weekStartDay: WeekStartDay): 0 | 1 {
  */
 export function TaskScheduleGrid({ today, selected, onPick }: TaskScheduleGridProps): ReactElement {
   const { settings } = useSettings()
-  const weekStartsOn = toWeekStartsOn(settings.weekStartDay)
+  const weekStartsOn = weekStartDow(settings.weekStartDay)
   // Open on the due date's month when there is one — that's the date being
   // rescheduled — else today's.
   const [month, setMonth] = useState(() => monthOf(selected ?? today))

@@ -33,6 +33,12 @@ describe('weekOf', () => {
     expect(week).toContain('2026-06-12')
   })
 
+  it('builds a Saturday-first week containing the date', () => {
+    const week = weekOf('2026-06-12', 'saturday')
+    expect(week[0]).toBe('2026-06-06')
+    expect(week[6]).toBe('2026-06-12')
+  })
+
   it('keeps a Sunday in its own Monday-first week (the wrap edge)', () => {
     // 2026-06-14 is a Sunday: a Monday-first week runs Mon 06-08 … Sun 06-14.
     expect(weekOf('2026-06-14', 'monday')).toEqual([
@@ -83,9 +89,14 @@ describe('weekStartOf', () => {
     expect(weekStartOf('2026-06-12', 'sunday')).toBe('2026-06-07')
   })
 
+  it('finds the Saturday of a Saturday-first week', () => {
+    expect(weekStartOf('2026-06-12', 'saturday')).toBe('2026-06-06')
+  })
+
   it('is a fixed point on the week-start day itself', () => {
     expect(weekStartOf('2026-06-08', 'monday')).toBe('2026-06-08')
     expect(weekStartOf('2026-06-07', 'sunday')).toBe('2026-06-07')
+    expect(weekStartOf('2026-06-13', 'saturday')).toBe('2026-06-13')
   })
 })
 
