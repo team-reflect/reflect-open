@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.9.1-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.9.1-beta...v0.9.1-beta.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* keep conflicted notes protected ([#1108](https://github.com/team-reflect/reflect-open/issues/1108)) ([92118b7](https://github.com/team-reflect/reflect-open/commit/92118b7163f440bb67c8c19974b90b4538aa6534))
+* make the `sk-demo` review key cover AI chat and prompts ([#1109](https://github.com/team-reflect/reflect-open/issues/1109)) ([baa7a93](https://github.com/team-reflect/reflect-open/commit/baa7a93f978af185f90deeae5dc6407afa3465d9))
+* **mobile:** raise the minimum iOS version to 16 ([#1110](https://github.com/team-reflect/reflect-open/issues/1110)) ([7dd695a](https://github.com/team-reflect/reflect-open/commit/7dd695a5ec8e96c904cade27ff20ab97ce4f20ff))
+* update meowdown to ^0.65.2 ([#1102](https://github.com/team-reflect/reflect-open/issues/1102)) ([4f495e2](https://github.com/team-reflect/reflect-open/commit/4f495e264c553e87f5fb3e11ea62b711faf6fe3b))
+
 ## [0.9.1-beta](https://github.com/team-reflect/reflect-open/compare/v0.9.0...v0.9.1-beta) (2026-08-12)
 
 

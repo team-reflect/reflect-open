@@ -4,7 +4,8 @@ import { useSyncExternalStore } from 'react'
  * App-global background operations (foundations hardening, post-Plan-07).
  * Work that outlives its UI — a rename's graph-wide link rewrite finishing
  * after the pane closed — needs a home that isn't pane state; this store is
- * it, and {@link OperationsStatus} mirrors it into the global toaster. Operations are *product
+ * it; `attachOperationToasts` (desktop) and `MobileOperationsPills` (mobile)
+ * mirror it into the visible surfaces. Operations are *product
  * status*, not spinners: short-lived entries with a label, optional progress,
  * and a lingering failure state so errors from backgrounded work aren't lost.
  */
@@ -134,16 +135,25 @@ export function dismissOperation(id: number): void {
   remove(id)
 }
 
-function subscribe(listener: () => void): () => void {
+/**
+ * Subscribe to store changes; listeners run synchronously inside the mutation
+ * that caused them. Returns an unsubscribe.
+ */
+export function subscribeOperations(listener: () => void): () => void {
   listeners.add(listener)
   return () => {
     listeners.delete(listener)
   }
 }
 
+/** Snapshot of the current operations, newest last. */
+export function getOperations(): Operation[] {
+  return operations
+}
+
 /** The current operations, newest last. Re-renders on every store change. */
 export function useOperations(): Operation[] {
-  return useSyncExternalStore(subscribe, () => operations)
+  return useSyncExternalStore(subscribeOperations, getOperations)
 }
 
 /** Test seam: drop all operations without notifying timers. */
