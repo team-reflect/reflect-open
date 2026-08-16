@@ -86,6 +86,10 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         return { height: 0, duration: 0 }
       case 'plugin:keyboard|impact_light':
         return null
+      case 'plugin:iap|get_product_status':
+        // No StoreKit in a browser: answer as a subscribed device so the iOS
+        // tree's paywall gate lifts and the harness boots into the shell.
+        return { isOwned: true }
       case 'mobile_storage':
         // No iCloud in a plain browser — the dev harness exercises the
         // local-storage path (and, via `mobileOnboarded` above, skips
