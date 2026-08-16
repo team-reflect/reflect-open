@@ -1,7 +1,12 @@
 import { act } from 'react'
 import { renderHook } from 'vitest-browser-react'
-import { afterEach, describe, expect, it } from 'vitest'
-import { getKeyboardHeight, publishKeyboardHeight, useKeyboardVisible } from './use-keyboard'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  getKeyboardHeight,
+  publishKeyboardHeight,
+  useKeyboardHeightVar,
+  useKeyboardVisible,
+} from './use-keyboard'
 
 /**
  * The keyboard-height store behind `--keyboard-height`: imperative consumers
@@ -41,5 +46,87 @@ describe('keyboard height store', () => {
     act(() => publishKeyboardHeight(280))
     expect(second.result.current).toBe(true)
     await second.unmount()
+  })
+})
+
+/**
+ * The visual-viewport half of the store: with the webview pinned by
+ * `KeyboardPlugin.swift`, `window.innerHeight - visualViewport.height` is the
+ * keyboard overlap. A fake viewport stands in for the real one, which never
+ * shrinks inside the test browser.
+ */
+describe('useKeyboardHeightVar', () => {
+  class FakeVisualViewport extends EventTarget {
+    height = 800
+    offsetTop = 0
+    scale = 1
+  }
+
+  function installViewport(): FakeVisualViewport {
+    const viewport = new FakeVisualViewport()
+    Object.defineProperty(window, 'visualViewport', { value: viewport, configurable: true })
+    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true })
+    return viewport
+  }
+
+  afterEach(() => {
+    vi.useRealTimers()
+    Reflect.deleteProperty(window, 'visualViewport')
+    Reflect.deleteProperty(window, 'innerHeight')
+    publishKeyboardHeight(0)
+  })
+
+  it('mirrors the viewport shortfall into the store and the CSS variable', async () => {
+    const viewport = installViewport()
+    const view = await renderHook(() => useKeyboardHeightVar())
+
+    viewport.height = 464
+    act(() => {
+      viewport.dispatchEvent(new Event('resize'))
+    })
+    expect(getKeyboardHeight()).toBe(336)
+    expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('336px')
+
+    viewport.height = 800
+    act(() => {
+      viewport.dispatchEvent(new Event('resize'))
+    })
+    expect(getKeyboardHeight()).toBe(0)
+    await view.unmount()
+  })
+
+  it('ignores a shrink at or under the keyboard threshold', async () => {
+    const viewport = installViewport()
+    const view = await renderHook(() => useKeyboardHeightVar())
+
+    viewport.height = 745
+    act(() => {
+      viewport.dispatchEvent(new Event('resize'))
+    })
+    expect(getKeyboardHeight()).toBe(0)
+    await view.unmount()
+  })
+
+  it('clears a stale overlap once focus has left every editable element', async () => {
+    const viewport = installViewport()
+    const view = await renderHook(() => useKeyboardHeightVar())
+
+    viewport.height = 464
+    act(() => {
+      viewport.dispatchEvent(new Event('resize'))
+    })
+    expect(getKeyboardHeight()).toBe(336)
+
+    // iOS 26.0: the keyboard closed, but the viewport still reports 464.
+    vi.useFakeTimers()
+    act(() => {
+      document.dispatchEvent(new Event('focusout'))
+    })
+    act(() => {
+      vi.advanceTimersByTime(1500)
+    })
+    expect(getKeyboardHeight()).toBe(0)
+    vi.useRealTimers()
+    await view.unmount()
   })
 })

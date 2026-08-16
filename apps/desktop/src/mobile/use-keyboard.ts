@@ -1,9 +1,4 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import {
-  getCurrentKeyboardHeight,
-  subscribeKeyboardChange,
-  type PluginSubscription,
-} from '@reflect/core'
 import { focusedEditorCommands } from '@/editor/formatting-toolbar-store'
 
 let currentKeyboardHeight = 0
@@ -20,8 +15,8 @@ export function getKeyboardHeight(): number {
 
 /**
  * Record the keyboard overlap height. Called by {@link useKeyboardHeightVar}
- * as the plugin's events arrive; exported so tests can drive keyboard state
- * without the Tauri bridge.
+ * as the visual viewport changes; exported so tests can drive keyboard state
+ * without a real keyboard.
  */
 export function publishKeyboardHeight(height: number): void {
   if (height === currentKeyboardHeight) {
@@ -55,52 +50,89 @@ export function useKeyboardVisible(): boolean {
 }
 
 /**
+ * The smallest visual-viewport shrink treated as the software keyboard;
+ * anything under it is browser-chrome noise. Same threshold as Base UI:
+ * https://github.com/mui/base-ui/blob/v1.7.0/packages/react/src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardProvider.tsx#L25
+ */
+const KEYBOARD_MIN_OVERLAP = 60
+
+/** How long after a blur a lingering overlap is treated as stale (iOS 26.0). */
+const KEYBOARD_STALE_DELAY_MS = 1500
+
+/**
+ * The keyboard overlap per `visualViewport`. `KeyboardPlugin.swift` pins the
+ * webview (frame and scroll offset), so the layout viewport always matches
+ * the screen and the visual-viewport shortfall is exactly the keyboard
+ * overlap (decision 0003).
+ */
+function readKeyboardOverlap(): number {
+  const viewport = window.visualViewport
+  if (!viewport || viewport.scale !== 1) {
+    return 0
+  }
+  const overlap = window.innerHeight - viewport.height - viewport.offsetTop
+  return overlap > KEYBOARD_MIN_OVERLAP ? Math.round(overlap) : 0
+}
+
+/**
  * Mirrors the software keyboard's overlap height into `--keyboard-height` on
- * the document root (Plan 19, decision 8). The Swift half of
- * `tauri-plugin-keyboard` keeps the webview at its full-screen frame and
- * disables the system's scroll nudging, so layout owns keyboard avoidance:
- * the mobile shell root sizes itself to `calc(100dvh - var(--keyboard-height))`,
- * ending the layout — and floating-ui's positioning boundary (`body`) — at
- * the keyboard's top. Only viewport-anchored (`position: fixed`) elements
- * still read the variable directly. The height is also published to
- * {@link getKeyboardHeight} / {@link useKeyboardVisible} for non-layout
- * consumers (the carousel's swipe guard, the tab bar hiding).
+ * the document root (Plan 19, decision 8). With the webview pinned by the
+ * Swift half of `tauri-plugin-keyboard`, `visualViewport` is the honest
+ * keyboard signal and no native event bridge is needed. The mobile shell root
+ * sizes itself to `calc(100dvh - var(--keyboard-height))`; only
+ * viewport-anchored (`position: fixed`) elements read the variable directly.
+ * The height is also published to {@link getKeyboardHeight} /
+ * {@link useKeyboardVisible} for non-layout consumers (the carousel's swipe
+ * guard, the tab bar hiding).
  */
 export function useKeyboardHeightVar(): void {
+  // Viewport reader: feeds the store, which drops no-op publishes.
   useEffect(() => {
-    const root = document.documentElement
-    const apply = (height: number): void => {
-      root.style.setProperty('--keyboard-height', `${Math.round(height)}px`)
-      publishKeyboardHeight(height)
+    const viewport = window.visualViewport
+    if (!viewport) {
+      return undefined
     }
-    let disposed = false
-    let subscription: PluginSubscription | null = null
-    void (async () => {
-      try {
-        // Initial state first, then subscribe — the same order as before, so
-        // a change event can never be overwritten by a staler initial value.
-        const initial = await getCurrentKeyboardHeight()
-        if (disposed) {
-          return
+    const apply = (): void => {
+      publishKeyboardHeight(readKeyboardOverlap())
+    }
+    // iOS 26.0 leaves the visual viewport stale after the keyboard closes
+    // (https://developer.apple.com/forums/thread/800125, fixed in 26.1). If
+    // focus has left every editable element and an overlap still reads,
+    // clear it; on healthy systems the overlap is already 0 by then and the
+    // timer is a no-op.
+    let watchdog: ReturnType<typeof setTimeout> | undefined
+    const onFocusOut = (): void => {
+      clearTimeout(watchdog)
+      watchdog = setTimeout(() => {
+        const el = document.activeElement
+        const editing =
+          el instanceof HTMLElement && (el.isContentEditable || el.matches('textarea, input'))
+        if (!editing && readKeyboardOverlap() > 0) {
+          publishKeyboardHeight(0)
         }
-        apply(initial.height)
-        subscription = subscribeKeyboardChange((state) => {
-          apply(state.height)
-        })
-        await subscription.ready
-      } catch (err) {
-        // Fail loud in the log, soft in layout: without the bridge the
-        // variable stays 0 and the screen behaves like Tauri's default.
-        console.error('keyboard bridge unavailable:', err)
-      }
-    })()
+      }, KEYBOARD_STALE_DELAY_MS)
+    }
+    apply()
+    viewport.addEventListener('resize', apply)
+    viewport.addEventListener('scroll', apply)
+    document.addEventListener('focusout', onFocusOut)
     return () => {
-      disposed = true
-      subscription?.unlisten()
-      root.style.removeProperty('--keyboard-height')
+      viewport.removeEventListener('resize', apply)
+      viewport.removeEventListener('scroll', apply)
+      document.removeEventListener('focusout', onFocusOut)
+      clearTimeout(watchdog)
       publishKeyboardHeight(0)
     }
   }, [])
+
+  // Store subscriber: touches the CSS variable only when the value changed.
+  const height = useSyncExternalStore(subscribeKeyboard, getKeyboardHeight, getKeyboardHeight)
+  useEffect(() => {
+    document.documentElement.style.setProperty('--keyboard-height', `${height}px`)
+    return () => {
+      document.documentElement.style.removeProperty('--keyboard-height')
+    }
+  }, [height])
 }
 
 /**
