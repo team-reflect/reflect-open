@@ -1,8 +1,20 @@
 import type { AiProviderId } from '../settings/schema'
 import { DEFAULT_OPENAI_COMPATIBLE_MODEL } from './openai-compatible'
 
+import type { AnthropicProvider } from '@ai-sdk/anthropic'
+import type { GoogleProvider } from '@ai-sdk/google'
+import type { OpenAIProvider } from '@ai-sdk/openai'
+
+
 /** A compile-time guarantee that an array has at least one element. */
 type NonEmptyArray<ElementType> = [ElementType, ...ElementType[]]
+
+/** Drop the `(string & {})` escape hatch, leaving only the known literals. */
+type KnownId<T> = T extends string ? (string extends T ? never : T) : never
+
+type AnthropicModelId = KnownId<Parameters<AnthropicProvider>[0]>
+type GoogleModelId = KnownId<Parameters<GoogleProvider>[0]>
+type OpenAIModelId = KnownId<Parameters<OpenAIProvider>[0]>
 
 /**
  * The static BYOK provider catalog (Plan 10): display names, key hints, and
@@ -12,9 +24,9 @@ type NonEmptyArray<ElementType> = [ElementType, ...ElementType[]]
  */
 
 /** One selectable model in a provider's curated list. */
-export interface AiModelOption {
+export interface AiModelOption<Id extends string = string> {
   /** The provider's model identifier, sent verbatim on API calls. */
-  id: string
+  id: Id,
   /** Human-readable name shown in pickers. */
   label: string
   /**
@@ -45,7 +57,7 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
     label: 'OpenAI',
     apiKeyRequired: true,
     keyPlaceholder: 'sk-…',
-    models: [
+    models: ((([
       { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', contextWindow: 1_000_000 },
       { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', contextWindow: 1_000_000 },
       { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', contextWindow: 1_000_000 },
@@ -53,36 +65,35 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
       { id: 'gpt-5.4', label: 'GPT-5.4', contextWindow: 1_000_000 },
       { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini', contextWindow: 400_000 },
       { id: 'gpt-5.4-nano', label: 'GPT-5.4 nano', contextWindow: 400_000 },
-    ],
+    ]) as const) satisfies  AiModelOption<OpenAIModelId>[]),
   },
   {
     id: 'anthropic',
     label: 'Anthropic',
     apiKeyRequired: true,
     keyPlaceholder: 'sk-ant-…',
-    models: [
+    models: ((([
       { id: 'claude-fable-5', label: 'Claude Fable 5', contextWindow: 1_000_000 },
       { id: 'claude-opus-5', label: 'Claude Opus 5', contextWindow: 1_000_000 },
       { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', contextWindow: 1_000_000 },
       { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', contextWindow: 1_000_000 },
       { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', contextWindow: 1_000_000 },
       { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', contextWindow: 200_000 },
-    ],
+    ] as const )) satisfies  AiModelOption<AnthropicModelId>[] ),
   },
   {
     id: 'google',
     label: 'Google Gemini',
     apiKeyRequired: true,
     keyPlaceholder: 'AIza…',
-    models: [
+    models: ((([
       { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', contextWindow: 1_000_000 },
       { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash', contextWindow: 1_000_000 },
       { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', contextWindow: 1_000_000 },
       { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', contextWindow: 1_000_000 },
       { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', contextWindow: 1_000_000 },
-      { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite', contextWindow: 1_000_000 },
       { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', contextWindow: 1_000_000 },
-    ],
+    ] as const)) satisfies AiModelOption<GoogleModelId>[]),
   },
   {
     id: 'openrouter',
