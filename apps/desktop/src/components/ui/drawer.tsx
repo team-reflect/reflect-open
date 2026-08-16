@@ -189,7 +189,6 @@ function DrawerTitle({ className, ...props }: DrawerPrimitive.Title.Props) {
   )
 }
 
-
 /**
  * The scrollable middle of a drawer. {@link DrawerContent}'s bottom padding
  * keeps its end above the home indicator and the software keyboard, and the
@@ -200,12 +199,14 @@ function DrawerBody({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="drawer-body"
-      className={cn('flex min-h-0 scroll-fade-t flex-col overflow-y-auto px-8 pb-8 pt-4 gap-4', className)}
+      className={cn(
+        'flex min-h-0 scroll-fade-t flex-col overflow-y-auto px-8 pb-8 pt-4 gap-4',
+        className,
+      )}
       {...props}
     />
   )
 }
-
 
 function DrawerDescription({ className, ...props }: DrawerPrimitive.Description.Props) {
   return (
