@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useSyncExternalStore } from 'react'
 import { focusedEditorCommands } from '@/editor/formatting-toolbar-store'
 
 let currentKeyboardHeight = 0
@@ -123,10 +123,10 @@ export function useKeyboardHeightVar(): void {
     }
   }, [])
 
-  // Store subscriber: touches the CSS variable only when the value changed.
+  // Store subscriber: touches the CSS variable only when the value changed,
+  // in a layout effect so the shell resizes in the same paint.
   const height = useSyncExternalStore(subscribeKeyboard, getKeyboardHeight, getKeyboardHeight)
-  useEffect(() => {
-    // REVIEW 8: useEffect change to useLayoutEffect to avoid flicker
+  useLayoutEffect(() => {
     document.documentElement.style.setProperty('--keyboard-height', `${height}px`)
     return () => {
       document.documentElement.style.removeProperty('--keyboard-height')
