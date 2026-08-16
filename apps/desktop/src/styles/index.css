@@ -743,3 +743,15 @@ html:root {
     @apply font-sans;
   }
 }
+
+/* Software-keyboard scroll slack for drawer bodies with text inputs: the
+   content can scroll out of the keyboard's shadow, and scroll-into-view
+   stops 1rem above it. Strategy from Base UI's DrawerVirtualKeyboardProvider
+   (https://github.com/mui/base-ui/blob/v1.7.0/packages/react/src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardProvider.tsx#L121),
+   driven by our `--keyboard-height` instead of `visualViewport` snapshots.
+   The base padding is the drawers' standard 2rem (`pb-8`). */
+.keyboard-slack {
+  padding-bottom: calc(2rem + var(--keyboard-height, 0px));
+  scroll-padding-bottom: calc(var(--keyboard-height, 0px) + 1rem);
+  overflow-anchor: none;
+}

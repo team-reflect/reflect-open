@@ -136,6 +136,52 @@ export function useKeyboardHeightVar(): void {
 }
 
 /**
+ * Input types that raise the software keyboard; `input.type` normalizes a
+ * missing attribute to `'text'`. Same allowlist as Base UI:
+ * https://github.com/mui/base-ui/blob/v1.7.0/packages/react/src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardProvider.tsx#L42
+ */
+const KEYBOARD_INPUT_TYPES = new Set(['email', 'number', 'password', 'search', 'tel', 'text', 'url'])
+
+function focusedKeyboardField(): HTMLElement | null {
+  const el = document.activeElement
+  if (el instanceof HTMLTextAreaElement) {
+    return el
+  }
+  if (el instanceof HTMLInputElement && KEYBOARD_INPUT_TYPES.has(el.type)) {
+    return el
+  }
+  // contenteditable (the editor) is useKeyboardCaretReveal's job; everything
+  // else does not raise the keyboard.
+  return null
+}
+
+/**
+ * Scrolls the focused form field above the keyboard, whenever the keyboard
+ * height changes or focus moves. Relies on the container's `.keyboard-slack`
+ * (scroll room + `scroll-padding-bottom`); the native scroll pin already
+ * blocks WebKit's own reveal, so one plain `scrollIntoView` is enough.
+ */
+export function useKeyboardFieldReveal(): void {
+  const height = useSyncExternalStore(subscribeKeyboard, getKeyboardHeight, getKeyboardHeight)
+
+  useEffect(() => {
+    if (height <= 0) {
+      return undefined
+    }
+    const reveal = (): void => {
+      focusedKeyboardField()?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+    // One frame late, so the slack padding is laid out before we measure.
+    const frame = requestAnimationFrame(reveal)
+    document.addEventListener('focusin', reveal)
+    return () => {
+      cancelAnimationFrame(frame)
+      document.removeEventListener('focusin', reveal)
+    }
+  }, [height])
+}
+
+/**
  * Re-reveals the caret whenever the keyboard changes the visible area.
  *
  * Focus raises the keyboard before any height arrives, so the focus-time

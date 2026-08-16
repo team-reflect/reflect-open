@@ -8,7 +8,7 @@ import { MobileShell } from '@/mobile/mobile-shell'
 import { MobileStatusLayer } from '@/mobile/status-layer'
 import { RecordingDrawer } from '@/mobile/recording-drawer'
 import { useICloudRefresh } from '@/mobile/use-icloud-refresh'
-import { useKeyboardCaretReveal, useKeyboardHeightVar } from '@/mobile/use-keyboard'
+import { useKeyboardCaretReveal, useKeyboardFieldReveal, useKeyboardHeightVar } from '@/mobile/use-keyboard'
 import { useShouldShowPaywall } from '@/mobile/use-should-show-paywall'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics'
 import { CaptureProvider } from '@/providers/capture-provider'
@@ -25,14 +25,15 @@ import { RouterProvider } from '@/routing/router'
  *
  * The router mounts per graph exactly as on desktop; `MobileScreen` renders
  * the current route (daily spine, note pages), so wiki-link and date-link
- * taps navigate for real. The keyboard-height bridge lives here so every
- * screen inherits `--keyboard-height`; the caret reveal and the
- * checkbox-haptic listener mount here so they cover every screen's editors.
+ * taps navigate for real. The keyboard-height mirror lives here so every
+ * screen inherits `--keyboard-height`; the field/caret reveals and the
+ * checkbox-haptic listener mount here so they cover every screen's inputs.
  */
 export function MobileApp(): ReactElement {
   const { status, graph, error, needsOnboarding } = useGraph()
   const shouldShowPaywall = useShouldShowPaywall()
   useKeyboardHeightVar()
+  useKeyboardFieldReveal()
   useKeyboardCaretReveal()
   useTaskCheckboxHaptics()
   // iCloud graphs have an out-of-process writer (the OS syncing files in):

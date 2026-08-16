@@ -29,6 +29,11 @@ function useDrawer(): DrawerContextProps {
  * Tokens mirror {@link Dialog} so the two read as one system. Bottom-anchored
  * only — the other directions Base UI supports aren't needed on Reflect's mobile
  * surfaces — and the home-indicator safe area is padded for by default.
+ *
+ * Keyboard avoidance: bodies with text inputs use `.keyboard-slack`, which
+ * needs this popup's auto height to grow the sheet. A future fixed-height or
+ * snap-point drawer will need a popup-level lift off `--keyboard-height`
+ * instead (the slack cannot grow a fixed popup).
  */
 function Drawer({
   modal = true,

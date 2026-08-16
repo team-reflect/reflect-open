@@ -49,7 +49,7 @@ function ChatSystemPromptSheet({
   return (
     <>
       <DrawerTitle className="px-4 pt-1">System prompt</DrawerTitle>
-      <div className="flex max-h-[75dvh] flex-col gap-4 overflow-y-auto px-4 pb-8 pt-3">
+      <div className="keyboard-slack flex max-h-[75dvh] flex-col gap-4 overflow-y-auto px-4 pt-3">
         <p className="text-sm text-text-muted">
           Additional instructions sent with every AI chat (up to{' '}
           {CHAT_SYSTEM_PROMPT_MAX_LENGTH.toLocaleString()} characters). Reflect’s note-search,

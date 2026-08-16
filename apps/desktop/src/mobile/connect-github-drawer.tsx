@@ -73,7 +73,7 @@ function ConnectWizardSheet({
   const existingRepoId = useId()
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="keyboard-slack flex max-h-[75dvh] flex-col gap-3 overflow-y-auto">
       <DrawerTitle>Connect GitHub</DrawerTitle>
       <p className="text-xs text-text-muted">{STEP_DESCRIPTIONS[wizard.step]}</p>
 
