@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.10.0-beta.3...v0.10.0-beta.4) (2026-08-16)
+
+
+### Bug Fixes
+
+* **mobile:** keep drawer fields above the software keyboard ([#1122](https://github.com/team-reflect/reflect-open/issues/1122)) ([17f6cd5](https://github.com/team-reflect/reflect-open/commit/17f6cd5caacbeaeda9007d54d943e6e73c8d9269))
+
 ## [0.10.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.10.0-beta.2...v0.10.0-beta.3) (2026-08-16)
 
 
