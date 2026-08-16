@@ -25,25 +25,25 @@ export function RecordingDrawer(): ReactElement {
     <Drawer open={memo.drawerOpen} onOpenChange={memo.onDrawerOpenChange}>
       <DrawerContent aria-label="Audio memo">
         <DrawerTitle className="sr-only">Audio memo</DrawerTitle>
-          {memo.error !== null ? (
-            <div className="flex flex-col gap-3 px-2 pb-2">
-              <p className="text-sm text-destructive">{memo.error}</p>
-              <div className="flex gap-2">
-                {memo.canRetry ? (
-                  <Button variant="secondary" onClick={() => memo.retry()}>
-                    Retry
-                  </Button>
-                ) : null}
-                <Button variant="ghost" onClick={() => memo.discard()}>
-                  Discard
+        {memo.error !== null ? (
+          <div className="flex flex-col gap-3 px-2 pb-2">
+            <p className="text-sm text-destructive">{memo.error}</p>
+            <div className="flex gap-2">
+              {memo.canRetry ? (
+                <Button variant="secondary" onClick={() => memo.retry()}>
+                  Retry
                 </Button>
-              </div>
+              ) : null}
+              <Button variant="ghost" onClick={() => memo.discard()}>
+                Discard
+              </Button>
             </div>
-          ) : !memo.hasTranscriptionConfig ? (
-            <KeySetupControls memo={memo} />
-          ) : (
-            <LiveRecordingControls key={memo.drawerOpen ? 'open' : 'closed'} memo={memo} />
-          )}
+          </div>
+        ) : !memo.hasTranscriptionConfig ? (
+          <KeySetupControls memo={memo} />
+        ) : (
+          <LiveRecordingControls key={memo.drawerOpen ? 'open' : 'closed'} memo={memo} />
+        )}
       </DrawerContent>
     </Drawer>
   )

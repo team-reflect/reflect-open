@@ -83,44 +83,44 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
         </DrawerTrigger>
         <DrawerContent>
           <DrawerTitle className="sr-only">Note actions</DrawerTitle>
-            <div className="flex flex-col gap-1 p-4">
-              <Button
-                variant="ghost"
-                size="lg"
-                className="h-12 justify-start gap-3 text-base"
-                onClick={() => {
-                  pin()
-                  setActionsOpen(false)
-                }}
-              >
-                {isPinned ? <PinOff /> : <Pin />}
-                {isPinned ? 'Unpin' : 'Pin'}
-              </Button>
-              <Button
-                variant="ghost"
-                size="lg"
-                className="h-12 justify-start gap-3 text-base"
-                onClick={() => {
-                  share()
-                  setActionsOpen(false)
-                }}
-              >
-                <Share />
-                Share
-              </Button>
-              <Button
-                variant="ghost"
-                size="lg"
-                className="h-12 justify-start gap-3 text-base text-destructive hover:text-destructive"
-                onClick={() => {
-                  setActionsOpen(false)
-                  setConfirmingDelete(true)
-                }}
-              >
-                <Trash2 />
-                Delete
-              </Button>
-            </div>
+          <div className="flex flex-col gap-1 p-4">
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-12 justify-start gap-3 text-base"
+              onClick={() => {
+                pin()
+                setActionsOpen(false)
+              }}
+            >
+              {isPinned ? <PinOff /> : <Pin />}
+              {isPinned ? 'Unpin' : 'Pin'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-12 justify-start gap-3 text-base"
+              onClick={() => {
+                share()
+                setActionsOpen(false)
+              }}
+            >
+              <Share />
+              Share
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-12 justify-start gap-3 text-base text-destructive hover:text-destructive"
+              onClick={() => {
+                setActionsOpen(false)
+                setConfirmingDelete(true)
+              }}
+            >
+              <Trash2 />
+              Delete
+            </Button>
+          </div>
         </DrawerContent>
       </Drawer>
 
