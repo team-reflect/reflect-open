@@ -106,7 +106,7 @@ export function useKeyboardHeightVar(): void {
       watchdog = setTimeout(() => {
         const el = document.activeElement
         const editing =
-          el instanceof HTMLElement && (el.isContentEditable || el.matches('textarea, input'))
+          (el instanceof HTMLElement && el.isContentEditable) || focusedKeyboardField() !== null
         if (!editing && readKeyboardOverlap() > 0) {
           publishKeyboardHeight(0)
         }
