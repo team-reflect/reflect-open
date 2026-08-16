@@ -173,7 +173,7 @@ function DrawerBody({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="drawer-body"
-      className={cn('flex min-h-0 scroll-fade-t flex-col gap-3 overflow-y-auto pt-4 pb-5 px-4', className)}
+      className={cn('flex min-h-0 scroll-fade-t flex-col overflow-y-auto p-4 gap-4', className)}
       {...props}
     />
   )
@@ -199,7 +199,7 @@ function DrawerTitle({ className, ...props }: DrawerPrimitive.Title.Props) {
   return (
     <DrawerPrimitive.Title
       data-slot="drawer-title"
-      className={cn('font-heading text-base leading-none font-medium', className)}
+      className={cn('font-heading text-base leading-none font-medium px-4 pt-1', className)}
       {...props}
     />
   )

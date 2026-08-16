@@ -76,10 +76,8 @@ function AiPromptSheet({
 
   return (
     <>
-      <DrawerTitle className="px-4 pt-1">
-        {prompt === null ? 'Add prompt' : 'Edit prompt'}
-      </DrawerTitle>
-      <DrawerBody className="gap-4 px-4">
+      <DrawerTitle>{prompt === null ? 'Add prompt' : 'Edit prompt'}</DrawerTitle>
+      <DrawerBody>
         <p className="text-sm text-text-muted">
           The prompt runs on the text you select in a note. Use{' '}
           <code className="font-mono text-xs">{'{{selectedText}}'}</code> where the selection should

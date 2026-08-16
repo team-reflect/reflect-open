@@ -96,8 +96,8 @@ function AddAiProviderSheet({
 
   return (
     <>
-      <DrawerTitle className="px-4 pt-1">Add AI provider</DrawerTitle>
-      <DrawerBody className="gap-4 px-4">
+      <DrawerTitle>Add AI provider</DrawerTitle>
+      <DrawerBody>
         <p className="text-sm text-text-muted">
           The API key is stored in this device’s keychain, never in your graph — add it on each
           device you chat from.

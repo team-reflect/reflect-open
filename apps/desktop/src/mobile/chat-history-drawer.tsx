@@ -38,7 +38,7 @@ export function ChatHistoryDrawer({ open, onOpenChange }: ChatHistoryDrawerProps
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Chat history">
-        <DrawerTitle className="px-4 pt-1">History</DrawerTitle>
+        <DrawerTitle>History</DrawerTitle>
         <div className="max-h-[60dvh] overflow-y-auto px-4 pb-8 pt-4">
           {conversations === undefined || conversations.length === 0 ? (
             <p className="py-6 text-center text-sm text-text-muted">No past chats</p>

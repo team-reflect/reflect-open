@@ -48,8 +48,8 @@ function ChatSystemPromptSheet({
 
   return (
     <>
-      <DrawerTitle className="px-4 pt-1">System prompt</DrawerTitle>
-      <DrawerBody className="gap-4 px-4">
+      <DrawerTitle>System prompt</DrawerTitle>
+      <DrawerBody>
         <p className="text-sm text-text-muted">
           Additional instructions sent with every AI chat (up to{' '}
           {CHAT_SYSTEM_PROMPT_MAX_LENGTH.toLocaleString()} characters). Reflect’s note-search,
