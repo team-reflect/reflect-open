@@ -54,7 +54,7 @@ describe('modelContextWindow', () => {
 
   it('resolves a curated model and falls back for unknown ids', () => {
     expect(modelContextWindow('anthropic', 'claude-haiku-4-5')).toBe(200_000)
-    expect(modelContextWindow('openrouter', 'openrouter/auto')).toBe(128_000)
+    expect(modelContextWindow('openrouter', 'openrouter/auto')).toBe(2_000_000)
     // Settings may carry ids added by a newer app version.
     expect(modelContextWindow('anthropic', 'claude-fable-6')).toBe(DEFAULT_CONTEXT_WINDOW)
   })

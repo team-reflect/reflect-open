@@ -90,14 +90,14 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
     apiKeyRequired: true,
     keyPlaceholder: 'sk-or-v1-…',
     models: [
-      { id: 'openrouter/auto', label: 'Auto Router', contextWindow: 128_000 },
-      { id: '~openai/gpt-latest', label: 'OpenAI GPT Latest', contextWindow: 128_000 },
+      { id: 'openrouter/auto', label: 'Auto Router', contextWindow: 2_000_000 },
+      { id: '~openai/gpt-latest', label: 'OpenAI GPT Latest', contextWindow: 1_000_000 },
       {
         id: '~anthropic/claude-sonnet-latest',
         label: 'Claude Sonnet Latest',
-        contextWindow: 128_000,
+        contextWindow: 1_000_000,
       },
-      { id: 'openai/gpt-5.6-sol', label: 'GPT-5.6 Sol', contextWindow: 400_000 },
+      { id: 'openai/gpt-5.6-sol', label: 'GPT-5.6 Sol', contextWindow: 1_000_000 },
     ],
   },
   {
