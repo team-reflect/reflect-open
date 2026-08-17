@@ -74,7 +74,9 @@ export interface NoteRowSwipe {
   /**
    * Attach to the moving note surface. The hook writes its presentation
    * (`touch-action`, `transform`, `transition`, `will-change`) imperatively,
-   * so pointer moves never re-render React.
+   * so pointer moves never re-render React. While a drag owns the row the
+   * element carries a `data-dragging` attribute, letting CSS scope pressed
+   * styles (like the `:active` dim) to plain taps.
    */
   ref: (element: HTMLButtonElement | null) => void
   /**
@@ -177,6 +179,9 @@ export function useNoteRowSwipe({
       }
       // The eventual synthetic click belongs to this drag, not to the note.
       suppressClickRef.current = true
+      // Tell CSS a drag owns the row; the surface scopes its pressed dim to
+      // taps with a `not-data-dragging` variant.
+      event.currentTarget.dataset.dragging = ''
       const nextOffset = constrainOffset(gesture.startOffset + deltaX, actionWidth)
       const now = performance.now()
       gestureRef.current = {
@@ -255,6 +260,7 @@ export function useNoteRowSwipe({
 
 /** Presentation while settling or at rest: transition on (unless reduced motion), layer hint off. */
 function presentSettled(element: HTMLElement, offset: number, reducedMotion: boolean): void {
+  delete element.dataset.dragging
   element.style.willChange = ''
   element.style.transition = reducedMotion ? 'none' : `transform ${SETTLE_MS}ms ${SETTLE_EASING}`
   element.style.transform = `translate3d(${offset}px, 0, 0)`

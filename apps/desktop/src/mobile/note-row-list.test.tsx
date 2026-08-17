@@ -196,6 +196,21 @@ describe('NoteRowList', () => {
     expect(view.getByRole('button', { name: 'Delete Alpha' }).query()).toBeNull()
   })
 
+  it('marks the surface with data-dragging only while a drag owns it', async () => {
+    const view = await render(<SwipeHarness />)
+    const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
+    const rect = surface.getBoundingClientRect()
+
+    pointer(surface, 'pointerdown', rect.right - 20, rect.top + 32)
+    expect(surface.hasAttribute('data-dragging')).toBe(false)
+
+    pointer(surface, 'pointermove', rect.right - 120, rect.top + 32)
+    expect(surface.hasAttribute('data-dragging')).toBe(true)
+
+    pointer(surface, 'pointerup', rect.right - 120, rect.top + 32)
+    expect(surface.hasAttribute('data-dragging')).toBe(false)
+  })
+
   it('recovers when a pre-threshold touch is abandoned outside the row', async () => {
     const view = await render(<SwipeHarness />)
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
