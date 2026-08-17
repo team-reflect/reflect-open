@@ -10,20 +10,28 @@ import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
+export interface NoteRowState {
+  /** The overlay-bridged row, `null` while loading or when no row exists. */
+  readonly row: NoteRow | null
+  /** True once the row query has settled, so a `null` row means "no row". */
+  readonly settled: boolean
+}
+
 /**
- * One note's index row by graph-relative path, kept fresh by the usual index
- * invalidation (a frontmatter write lands in the file, the watcher re-indexes
- * it, the query refetches) and made *immediately* consistent with an in-app
- * write by the optimistic {@link useNoteRowOverlay}: an action records what it
- * just wrote, this hook merges it over the index row, and the overlay retires
- * once the index agrees. `null` while loading or when the note has no indexed
- * file yet — the lazy contract means a visible note can predate its row.
+ * One note's index row plus whether the query has settled, so callers that
+ * need to tell "still loading" from "no indexed row yet" (the lazy contract
+ * means a visible note can predate its row) can do so. The row is kept fresh
+ * by the usual index invalidation (a frontmatter write lands in the file, the
+ * watcher re-indexes it, the query refetches) and made *immediately*
+ * consistent with an in-app write by the optimistic {@link useNoteRowOverlay}:
+ * an action records what it just wrote, this hook merges it over the index
+ * row, and the overlay retires once the index agrees.
  */
-export function useNoteRow(path: string): NoteRow | null {
+export function useNoteRowState(path: string): NoteRowState {
   const { graph } = useGraph()
   const generation = graph?.generation
   const bridgeReady = useBridgeReady()
-  const { data } = useQuery({
+  const { data, isFetched } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'note', path],
     queryFn: async () => (await getNote(path)) ?? null,
     enabled: bridgeReady && graph !== null,
@@ -40,5 +48,13 @@ export function useNoteRow(path: string): NoteRow | null {
     }
   }, [path, generation, overlay, row])
 
-  return applyNoteRowOverlay(row, overlay)
+  return { row: applyNoteRowOverlay(row, overlay), settled: isFetched }
+}
+
+/**
+ * {@link useNoteRowState}'s row alone, for the common callers that treat
+ * loading and missing alike: `null` covers both.
+ */
+export function useNoteRow(path: string): NoteRow | null {
+  return useNoteRowState(path).row
 }

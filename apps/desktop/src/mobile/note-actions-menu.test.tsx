@@ -4,7 +4,7 @@ import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GraphInfo } from '@reflect/core'
 
-const useNoteRow = vi.hoisted(() => vi.fn())
+const useNoteRowState = vi.hoisted(() => vi.fn())
 const usePinnedNotes = vi.hoisted(() => vi.fn())
 const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
 const toggleNotePrivate = vi.hoisted(() => vi.fn(async () => true))
@@ -109,7 +109,10 @@ vi.mock('@/providers/graph-provider', async () => {
     }),
   }
 })
-vi.mock('@/hooks/use-note-row', () => ({ useNoteRow }))
+vi.mock('@/hooks/use-note-row', () => ({
+  useNoteRowState,
+  useNoteRow: (path: string) => useNoteRowState(path).row,
+}))
 vi.mock('@/hooks/use-pinned-notes', () => ({ usePinnedNotes }))
 vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
 vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
@@ -125,6 +128,7 @@ let currentNoteRow: {
   dailyDate: string | null
   isPrivate: boolean
 } | null
+let currentNoteRowSettled: boolean
 let currentPinnedNotes: Array<{ path: string; title: string; dailyDate: string | null }>
 
 function noteRow(path: string, isPrivate: boolean, title = 'Meeting') {
@@ -134,8 +138,12 @@ function noteRow(path: string, isPrivate: boolean, title = 'Meeting') {
 beforeEach(() => {
   graphStore.set({ root: '/g', name: 'g', generation: 7 })
   currentNoteRow = noteRow('notes/meeting.md', false)
+  currentNoteRowSettled = true
   currentPinnedNotes = []
-  useNoteRow.mockImplementation(() => currentNoteRow)
+  useNoteRowState.mockImplementation(() => ({
+    row: currentNoteRow,
+    settled: currentNoteRowSettled,
+  }))
   usePinnedNotes.mockImplementation(() => currentPinnedNotes)
   toggleNotePinned.mockReset().mockResolvedValue(true)
   toggleNotePrivate.mockReset().mockResolvedValue(true)
@@ -216,13 +224,24 @@ describe('NoteActionsMenu', () => {
     await expect.element(view.getByRole('button', { name: 'Lock note' })).toBeInTheDocument()
   })
 
-  it('disables the privacy action until the indexed note row loads', async () => {
+  it('disables the privacy action until the note row query settles', async () => {
     currentNoteRow = null
+    currentNoteRowSettled = false
     const { view } = await mount()
 
     await openActions()
     await expect.element(view.getByRole('button', { name: 'Loading privacy…' })).toBeDisabled()
     expect(toggleNotePrivate).not.toHaveBeenCalled()
+  })
+
+  it('offers Lock note for a visible note with no indexed row yet', async () => {
+    currentNoteRow = null
+    const { view } = await mount()
+
+    await openActions()
+    await view.getByRole('button', { name: 'Lock note' }).click()
+
+    await vi.waitFor(() => expect(toggleNotePrivate).toHaveBeenCalledWith('notes/meeting.md', 7))
   })
 
   it('keeps the pin action intact and closes the drawer', async () => {

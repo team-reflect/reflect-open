@@ -3,7 +3,7 @@ import { Lock, LockOpen, MoreHorizontal, Pin, PinOff, Share, Trash2 } from 'luci
 import { errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
-import { useNoteRow } from '@/hooks/use-note-row'
+import { useNoteRowState } from '@/hooks/use-note-row'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
@@ -32,8 +32,11 @@ interface NoteActionsMenuProps {
 export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): ReactElement {
   const { graph } = useGraph()
   const isPinned = usePinnedNotes().some((note) => note.path === path)
-  const noteRow = useNoteRow(path)
-  const privacyReady = noteRow !== null
+  // Settled distinguishes "row still loading" from "no indexed row yet": a
+  // visible note can predate its row, and such a note is not private (the
+  // flag lives in frontmatter), so the lock action stays offered like on
+  // desktop instead of parking on the loading label.
+  const { row: noteRow, settled: privacyReady } = useNoteRowState(path)
   const [actionsOpen, setActionsOpen] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const {
