@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/toast'
 import { IAP_PRODUCT_IDS, iapGetProducts, iapPurchase, iapRestorePurchases } from '@reflect/core'
 import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button'
@@ -82,9 +82,10 @@ export function PaywallScreen(): ReactElement {
       openUrlSync(CLAIM_FREE_YEAR_URL)
       return
     }
-    toast('Enjoy Reflect free for now', {
+    toast.add({
+      title: 'Enjoy Reflect free for now',
       description: "We'll ask about your free year again once codes are ready.",
-      duration: 6000,
+      timeout: 6000,
     })
     updateSettings({ paywallSnoozeUntil: Date.now() + MEMBER_SNOOZE_MS })
   }

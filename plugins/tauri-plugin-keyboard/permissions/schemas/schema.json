@@ -295,18 +295,6 @@
       "type": "string",
       "oneOf": [
         {
-          "description": "Enables the current_height command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-current-height",
-          "markdownDescription": "Enables the current_height command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the current_height command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-current-height",
-          "markdownDescription": "Denies the current_height command without any pre-configured scope."
-        },
-        {
           "description": "Enables the impact_light command without any pre-configured scope.",
           "type": "string",
           "const": "allow-impact-light",
@@ -319,34 +307,10 @@
           "markdownDescription": "Denies the impact_light command without any pre-configured scope."
         },
         {
-          "description": "Enables the registerListener command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-registerListener",
-          "markdownDescription": "Enables the registerListener command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the registerListener command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-registerListener",
-          "markdownDescription": "Denies the registerListener command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the remove_listener command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-remove-listener",
-          "markdownDescription": "Enables the remove_listener command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the remove_listener command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-remove-listener",
-          "markdownDescription": "Denies the remove_listener command without any pre-configured scope."
-        },
-        {
-          "description": "Read the keyboard state, subscribe to keyboard-change events, and fire light impact haptics\n#### This default permission set includes:\n\n- `allow-current-height`\n- `allow-impact-light`\n- `allow-registerListener`\n- `allow-remove-listener`",
+          "description": "Fire light impact haptics\n#### This default permission set includes:\n\n- `allow-impact-light`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Read the keyboard state, subscribe to keyboard-change events, and fire light impact haptics\n#### This default permission set includes:\n\n- `allow-current-height`\n- `allow-impact-light`\n- `allow-registerListener`\n- `allow-remove-listener`"
+          "markdownDescription": "Fire light impact haptics\n#### This default permission set includes:\n\n- `allow-impact-light`"
         }
       ]
     }

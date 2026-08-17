@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
-import type { WeekStartDay } from '@reflect/core'
+import { weekStartDow } from '@reflect/core'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { formatDayLabel } from '@/lib/dates'
 import { addMonths, buildMonthGrid, monthLabel, monthOf, weekdayLabels } from '@/lib/month-grid'
@@ -19,11 +19,6 @@ interface TaskScheduleCalendarProps {
   children: ReactElement
 }
 
-/** Maps the week-start setting to date-fns' numeric convention. */
-function toWeekStartsOn(weekStartDay: WeekStartDay): 0 | 1 {
-  return weekStartDay === 'sunday' ? 0 : 1
-}
-
 /**
  * The Tasks view's schedule calendar (V1): a month grid in a popover anchored to
  * the "Schedule" button. Picking a day sets the selected tasks' due date — a
@@ -40,7 +35,7 @@ export function TaskScheduleCalendar({
   children,
 }: TaskScheduleCalendarProps): ReactElement {
   const { settings } = useSettings()
-  const weekStartsOn = toWeekStartsOn(settings.weekStartDay)
+  const weekStartsOn = weekStartDow(settings.weekStartDay)
   const [month, setMonth] = useState(() => monthOf(today))
   // Re-anchor to today's month each time the popover opens, without an effect.
   const [wasOpen, setWasOpen] = useState(open)

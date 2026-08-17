@@ -360,21 +360,122 @@ fn search_matches_latin_title_terms_at_word_starts_only() {
     );
 }
 
-/// Multi-term Latin title recall accepts a prefix of each word, even though
-/// FTS5 itself cannot match the partial `Mac` token against `MacCaw`.
+/// Multi-term Latin title recall accepts a prefix of each word while keeping
+/// title-only presentation independent of the lexical implementation.
 #[test]
 fn search_finds_a_multi_term_partial_latin_title() {
     let fixture = graph();
-    fixture.write_note(
-        "notes/tim-maccaw.md",
-        "# Tim MacCaw\nan otherwise unrelated body\n",
-    );
+    fixture.write_note("notes/Tim MacCaw.md", "an otherwise unrelated body\n");
     fixture.build_index();
 
     let text = stdout(&reflect(&fixture, &["search", "Tim Mac"]));
     assert!(
-        text.contains("notes/tim-maccaw.md"),
+        text.contains("notes/Tim MacCaw.md"),
         "expected the partial title match:\n{text}"
+    );
+
+    let value = json(&reflect(&fixture, &["search", "Tim Mac", "--json"]));
+    assert_eq!(value["results"][0]["snippet"], "");
+    assert_eq!(value["results"][0]["score"], 0.0);
+}
+
+#[test]
+fn search_keeps_tokenizer_normalized_title_matches_above_body_matches() {
+    let fixture = graph();
+    fixture.write_note("notes/Café Alpha.md", "an otherwise unrelated body\n");
+    fixture.write_note(
+        "notes/body-hit.md",
+        "# Unrelated note\na cafe appears here\n",
+    );
+    fixture.build_index();
+
+    let value = json(&reflect(&fixture, &["search", "cafe", "--json"]));
+    assert_eq!(value["results"][0]["path"], "notes/Café Alpha.md");
+    assert_eq!(value["results"][0]["snippet"], "");
+    assert!(value["results"][0]["score"].as_f64().unwrap() < 0.0);
+    assert_eq!(value["results"][1]["path"], "notes/body-hit.md");
+}
+
+#[test]
+fn search_breaks_title_prefix_ties_by_pinned_then_recency() {
+    let fixture = graph();
+    fixture.write_note(
+        "notes/Tim MacCaw Extended Project Planning.md",
+        "an otherwise unrelated body\n",
+    );
+    fixture.write_note("notes/Tim MacRae.md", "an otherwise unrelated body\n");
+    fixture.build_index();
+
+    let conn = rusqlite::Connection::open(fixture.root().join(".reflect/index.sqlite")).unwrap();
+    conn.execute(
+        "UPDATE notes SET mtime = 100, is_pinned = 1 WHERE path = 'notes/Tim MacCaw Extended Project Planning.md'",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "UPDATE notes SET mtime = 200, is_pinned = 0 WHERE path = 'notes/Tim MacRae.md'",
+        [],
+    )
+    .unwrap();
+    drop(conn);
+
+    let text = stdout(&reflect(&fixture, &["search", "Tim Mac"]));
+    let pinned_pos = text
+        .find("notes/Tim MacCaw Extended Project Planning.md")
+        .unwrap();
+    let plain_pos = text.find("notes/Tim MacRae.md").unwrap();
+    assert!(
+        pinned_pos < plain_pos,
+        "expected pinning to break the title-prefix tie:\n{text}"
+    );
+}
+
+/// Body search uses the same word-prefix behavior as title recall, so users
+/// get results while they are still typing each term.
+#[test]
+fn search_finds_partial_terms_in_note_bodies() {
+    let fixture = graph();
+    fixture.write_note(
+        "notes/security-rollout.md",
+        "# Security Rollout\nthe plan covers authentication migration\n",
+    );
+    fixture.build_index();
+
+    let text = stdout(&reflect(&fixture, &["search", "authent migr"]));
+    assert!(
+        text.contains("notes/security-rollout.md"),
+        "expected partial body terms to match:\n{text}"
+    );
+
+    let mixed = stdout(&reflect(&fixture, &["search", "secur migr"]));
+    assert!(
+        mixed.contains("notes/security-rollout.md"),
+        "expected partial title and body terms to match together:\n{mixed}"
+    );
+}
+
+/// A term of punctuation alone tokenizes to an empty FTS phrase, which would
+/// empty the whole `AND` chain; it is dropped, while a query of nothing but
+/// punctuation still matches nothing.
+#[test]
+fn search_ignores_terms_that_tokenize_to_nothing() {
+    let fixture = graph();
+    fixture.write_note(
+        "notes/meeting-notes.md",
+        "# Meeting Notes\nagenda items for the sync\n",
+    );
+    fixture.build_index();
+
+    let text = stdout(&reflect(&fixture, &["search", "meeting - notes"]));
+    assert!(
+        text.contains("notes/meeting-notes.md"),
+        "expected the punctuation term to be ignored:\n{text}"
+    );
+
+    let punctuation = stdout(&reflect(&fixture, &["search", ". -"]));
+    assert!(
+        !punctuation.contains("notes/meeting-notes.md"),
+        "expected a punctuation-only query to match nothing:\n{punctuation}"
     );
 }
 

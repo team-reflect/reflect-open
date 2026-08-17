@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { setLocalWriteEcho, type AppPlatform } from '@reflect/core'
-import { Toaster } from '@/components/ui/sonner'
+import { Toaster } from '@/components/ui/toast'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { setPlatformSurface } from '@/lib/platform-surface'
 import { MobileApp } from '@/mobile/mobile-app'

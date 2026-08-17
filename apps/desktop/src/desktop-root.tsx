@@ -2,9 +2,8 @@ import { useEffect, type ReactElement } from 'react'
 import { subscribeNoteMoved } from '@reflect/core'
 import { App } from '@/app'
 import { followHealedMove } from '@/editor/move-note'
-import { OperationsStatus } from '@/components/operations-status'
-import { UpdateToast } from '@/components/update-toast'
-import { Toaster } from '@/components/ui/sonner'
+import { attachOperationToasts } from '@/components/operation-toasts'
+import { Toaster } from '@/components/ui/toast'
 import { WindowDragRegion } from '@/components/window-drag-region'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
@@ -55,6 +54,12 @@ export function DesktopRoot(): ReactElement {
     }
   }, [bridgeReady])
 
+  // Every desktop window mirrors its own operations store into toasts (the
+  // store is per-webview, matching the per-window mount this replaces). The
+  // effect only ties the subscription to the window's lifetime; the toast
+  // calls themselves run inside the store mutations that report the work.
+  useEffect(() => attachOperationToasts(), [])
+
   return (
     <UpdateProvider>
       <GraphProvider>
@@ -63,8 +68,6 @@ export function DesktopRoot(): ReactElement {
           <WindowDragRegion />
           <App />
           <Toaster />
-          <OperationsStatus />
-          <UpdateToast />
         </TooltipProvider>
       </GraphProvider>
     </UpdateProvider>

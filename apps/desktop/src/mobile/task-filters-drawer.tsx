@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { Check } from 'lucide-react'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import type { TaskFilters } from '@/lib/tasks/task-filters'
 import { cn } from '@/lib/utils'
 import { hapticImpactLight } from '@/mobile/haptics'
@@ -37,22 +37,24 @@ export function TaskFiltersDrawer({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Task filters">
         <DrawerTitle>Task filters</DrawerTitle>
-        <div className="flex flex-col">
-          {BUCKETS.map(({ key, label }) => (
+        <DrawerBody className="px-4">
+          <div className="flex flex-col">
+            {BUCKETS.map(({ key, label }) => (
+              <FilterRow
+                key={key}
+                label={label}
+                checked={filters[key]}
+                onToggle={() => toggle(key)}
+              />
+            ))}
+            <div className="my-1 border-t border-border" />
             <FilterRow
-              key={key}
-              label={label}
-              checked={filters[key]}
-              onToggle={() => toggle(key)}
+              label="Show archived"
+              checked={filters.archived}
+              onToggle={() => toggle('archived')}
             />
-          ))}
-          <div className="my-1 border-t border-border" />
-          <FilterRow
-            label="Show archived"
-            checked={filters.archived}
-            onToggle={() => toggle('archived')}
-          />
-        </div>
+          </div>
+        </DrawerBody>
       </DrawerContent>
     </Drawer>
   )

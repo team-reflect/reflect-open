@@ -12,8 +12,10 @@
 		1C8847A7F1C163FBA53373F9 /* ExtensionClass.js in Resources */ = {isa = PBXBuildFile; fileRef = 536E4F5E21B7DCC3C7ECDC1A /* ExtensionClass.js */; };
 		266B3807E809464C8FC14146 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FDC9BB81FAB5AF8D65160799 /* Metal.framework */; };
 		319EDF8F46AB05DFBA9D674F /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 80E05926405BFDA2A3BC70BC /* libz.tbd */; };
+		45B561FF8FBC00C0809C6856 /* QuickNoteIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 769DDD2643E0BA4942D2EF92 /* QuickNoteIntent.swift */; };
 		495C9E97530FC781EB5645D6 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A58A746A41B6BF1D50A8547 /* ShareViewController.swift */; };
 		5693613DE956199D6486EA26 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 8D0D6D72E614086946EBF890 /* LaunchScreen.storyboard */; };
+		6B01E62DB23C8918C76FD0F1 /* CaptureInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = D357D2D54012FD394DF9423E /* CaptureInbox.swift */; };
 		6C3751B3B175DFE411D97C0F /* StopRecordingLiveActivityIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3613166A0FB6AFF3C3B2F85C /* StopRecordingLiveActivityIntent.swift */; };
 		6C55CBAB912EC5920CE314DA /* RecordingIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D29B88183661F5C1C960E074 /* RecordingIntents.swift */; };
 		74275EAEFEA922B7D8A2C78F /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5249E1475DBD7CCB817F7D1B /* CoreGraphics.framework */; };
@@ -119,9 +121,11 @@
 		5F605BA8949402DAE91B9243 /* embed_write.rs */ = {isa = PBXFileReference; path = embed_write.rs; sourceTree = "<group>"; };
 		6572C3F24F414FF11A16F640 /* asset_protocol.rs */ = {isa = PBXFileReference; path = asset_protocol.rs; sourceTree = "<group>"; };
 		65C0E213C54BBE2152AA5DF2 /* chat_write.rs */ = {isa = PBXFileReference; path = chat_write.rs; sourceTree = "<group>"; };
+		6618B09F5BFAACC2B490AD9D /* wake.rs */ = {isa = PBXFileReference; path = wake.rs; sourceTree = "<group>"; };
 		68D1FDE7F099CA5F909105EB /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		6BB60C6D34C4AFB61F084B4D /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		73D6C2FDB2DD7919E24C4533 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		769DDD2643E0BA4942D2EF92 /* QuickNoteIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickNoteIntent.swift; sourceTree = "<group>"; };
 		772B62ED093A33BDCD1864D8 /* calendar.rs */ = {isa = PBXFileReference; path = calendar.rs; sourceTree = "<group>"; };
 		80E05926405BFDA2A3BC70BC /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 		88ED38A3B3D14839B5066255 /* embed.rs */ = {isa = PBXFileReference; path = embed.rs; sourceTree = "<group>"; };
@@ -310,6 +314,7 @@
 				D7DA2E13EA6655A16DFDE015 /* secrets.rs */,
 				18A732A38CD75FF514E4CF86 /* settings.rs */,
 				2FA419867A84041644CC42E9 /* skill.rs */,
+				6618B09F5BFAACC2B490AD9D /* wake.rs */,
 				F3173A0D7E498896FAC5A43E /* watcher_mobile.rs */,
 				4EE64B671C831953394179E2 /* watcher.rs */,
 				ACE1CDF45CDBB8D7B2446E36 /* windows.rs */,
@@ -389,6 +394,7 @@
 			children = (
 				57BCB79C0774021318852985 /* main.mm */,
 				B6A04E7EA62A721AED66B3F2 /* NativeDiagnostics.swift */,
+				769DDD2643E0BA4942D2EF92 /* QuickNoteIntent.swift */,
 				D29B88183661F5C1C960E074 /* RecordingIntents.swift */,
 				3613166A0FB6AFF3C3B2F85C /* StopRecordingLiveActivityIntent.swift */,
 				024093CF75026447063ECAFB /* bindings */,
@@ -440,7 +446,7 @@
 			path = "reflect-open_iOS";
 			sourceTree = "<group>";
 		};
-		"TEMP_5ACF277E-D681-426E-87FE-E93125BE8EAF" /* x86_64 */ = {
+		"TEMP_69140787-65EC-4577-B005-C5D36D4A508F" /* x86_64 */ = {
 			isa = PBXGroup;
 			children = (
 			);
@@ -669,7 +675,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6B01E62DB23C8918C76FD0F1 /* CaptureInbox.swift in Sources */,
 				ED7E82D99D937F44DF372E66 /* NativeDiagnostics.swift in Sources */,
+				45B561FF8FBC00C0809C6856 /* QuickNoteIntent.swift in Sources */,
 				6C55CBAB912EC5920CE314DA /* RecordingIntents.swift in Sources */,
 				6C3751B3B175DFE411D97C0F /* StopRecordingLiveActivityIntent.swift in Sources */,
 				14BE6EF4AB511AC099410853 /* main.mm in Sources */,
@@ -799,7 +807,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -956,7 +964,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

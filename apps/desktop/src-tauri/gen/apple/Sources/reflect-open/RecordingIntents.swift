@@ -13,7 +13,6 @@ import Foundation
   /// `plugins/tauri-plugin-recording/ios/Sources/RecordingPlugin.swift`.
   /// Starting goes through the plugin's persisted action queue (the webview
   /// must present recording UI); stopping is finalized natively at once.
-  @available(iOS 16.0, *)
   struct StartRecordingIntent: AppIntent {
     static var title: LocalizedStringResource = "Start recording"
     static var description = IntentDescription(
@@ -28,7 +27,6 @@ import Foundation
     }
   }
 
-  @available(iOS 16.0, *)
   struct StopRecordingSiriIntent: AppIntent {
     static var title: LocalizedStringResource = "Stop recording"
     static var description = IntentDescription("Stop the audio memo Reflect is recording.")
@@ -59,6 +57,15 @@ import Foundation
         phrases: ["Stop recording in \(.applicationName)"],
         shortTitle: "Stop recording",
         systemImageName: "stop.circle"
+      )
+      AppShortcut(
+        intent: QuickNoteIntent(),
+        phrases: [
+          "Add a note in \(.applicationName)",
+          "Take a quick note in \(.applicationName)",
+        ],
+        shortTitle: "Quick note",
+        systemImageName: "square.and.pencil"
       )
     }
   }

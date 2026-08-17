@@ -2,7 +2,7 @@ import { useDeferredValue, useState, type ReactElement } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { parseSearchQuery, searchWithFilters } from '@reflect/core'
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { SearchInput } from '@/mobile/search-input'
@@ -65,32 +65,34 @@ export function NotePickerDrawer({
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerContent>
         <DrawerTitle>{title}</DrawerTitle>
-        <SearchInput
-          placeholder="Find a note…"
-          aria-label="Find a note"
-          value={query}
-          onValueChange={setQuery}
-        />
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {hits !== undefined && hits.length === 0 && (
-            <p className="py-6 text-center text-sm text-text-muted">No matches</p>
+        <DrawerBody className="px-4">
+          <SearchInput
+            placeholder="Find a note…"
+            aria-label="Find a note"
+            value={query}
+            onValueChange={setQuery}
+          />
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {hits !== undefined && hits.length === 0 && (
+              <p className="py-6 text-center text-sm text-text-muted">No matches</p>
+            )}
+            {(hits ?? []).map((hit) => (
+              <button
+                key={hit.path}
+                type="button"
+                onClick={() => pick({ path: hit.path, title: hit.title })}
+                className="flex h-12 w-full items-center border-b border-border text-left text-base last:border-b-0"
+              >
+                <span className="min-w-0 flex-1 truncate">{hit.title}</span>
+              </button>
+            ))}
+          </div>
+          {current !== null && (
+            <Button variant="ghost" onClick={() => pick(null)}>
+              Clear filter
+            </Button>
           )}
-          {(hits ?? []).map((hit) => (
-            <button
-              key={hit.path}
-              type="button"
-              onClick={() => pick({ path: hit.path, title: hit.title })}
-              className="flex h-12 w-full items-center border-b border-border text-left text-base last:border-b-0"
-            >
-              <span className="min-w-0 flex-1 truncate">{hit.title}</span>
-            </button>
-          ))}
-        </div>
-        {current !== null && (
-          <Button variant="ghost" onClick={() => pick(null)}>
-            Clear filter
-          </Button>
-        )}
+        </DrawerBody>
       </DrawerContent>
     </Drawer>
   )

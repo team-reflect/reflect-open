@@ -16,7 +16,7 @@
  */
 
 import { addDaysIso, addMonthsIso, isCalendarDate, isoFromParts, weekdayIso } from '@reflect/utils'
-import type { DateFormat, WeekStartDay } from '../settings/schema'
+import { weekStartDow, type DateFormat, type WeekStartDay } from '../settings/schema'
 import { monthNameSuggestions } from './date-suggestions-months'
 
 /** One synthesised daily-note target: the resolved day plus its menu label. */
@@ -203,14 +203,21 @@ function upcomingWeekday(today: string, target: number): string {
 
 /** The first day of `today`'s week, honouring the user's week-start preference. */
 function firstOfWeek(today: string, weekStartDay: WeekStartDay): string {
-  const startDow = weekStartDay === 'sunday' ? 0 : 1
-  return addDaysIso(today, -((weekdayIso(today) - startDow + 7) % 7))
+  return addDaysIso(today, -((weekdayIso(today) - weekStartDow(weekStartDay) + 7) % 7))
 }
 
-/** The Saturday of `today`'s week (the same week the week-start preference defines). */
+/**
+ * The weekend anchor of `today`'s week: its Saturday. For Saturday-start weeks
+ * that Saturday is the week's first day and the weekend (Friday and Saturday
+ * in Saturday-first locales) closes the week instead, so the week's Friday is
+ * the anchor.
+ */
 function weekendOf(today: string, weekStartDay: WeekStartDay): string {
-  const startDow = weekStartDay === 'sunday' ? 0 : 1
-  return addDaysIso(firstOfWeek(today, weekStartDay), (6 - startDow + 7) % 7)
+  const weekendDow = weekStartDay === 'saturday' ? 5 : 6
+  return addDaysIso(
+    firstOfWeek(today, weekStartDay),
+    (weekendDow - weekStartDow(weekStartDay) + 7) % 7,
+  )
 }
 
 function resolveWeekday(today: string, target: number, modifier: Modifier): string {

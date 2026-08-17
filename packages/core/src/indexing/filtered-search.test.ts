@@ -131,7 +131,7 @@ describe('searchWithFilters', () => {
         mtime: 3000,
         is_pinned: 0,
         fts_highlighted_title: '\u{1}Quokka\u{2}',
-        snippet: 'a …',
+        snippet: '\u{1}a\u{2} …',
       },
     ])
 
@@ -143,7 +143,7 @@ describe('searchWithFilters', () => {
         title: 'Quokka',
         highlightedTitle: '\u{1}Quokka\u{2}',
         dailyDate: null,
-        snippet: 'a …',
+        snippet: '\u{1}a\u{2} …',
         preview: 'Quokka facts.',
         mtime: 3000,
         isPinned: false,
@@ -168,10 +168,10 @@ describe('searchWithFilters', () => {
     expect(sql).toContain('"filtered_notes"."path" asc')
 
     const params = args['params'] as unknown[]
-    // The folded exact-title key, the literal FTS match expression, and the
+    // The folded exact-title key, the title/body-prefix FTS expression, and the
     // word-start-anchored recall needle.
     expect(params).toContain('quokka')
-    expect(params).toContain('"quokka"')
+    expect(params).toContain('(title : "quokka"* OR body : "quokka"*)')
     expect(params).toContain(' quokka')
   })
 

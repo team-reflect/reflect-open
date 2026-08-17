@@ -12,7 +12,7 @@ import {
 } from '../ai/audio-memo-title'
 import { enrichSessionTranscript } from '../ai/audio-memo-transcript'
 import { AUDIO_EXTENSION_BY_MIME, baseMimeType } from '../ai/transcribe'
-import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from '../ai/audio-memo-review-stub'
+import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from '../ai/app-review-demo'
 import { bytesToBase64 } from '../lib/base64'
 import { listDir, listFiles, readNote, writeAsset, writeNote } from '../graph/commands'
 import { writeAssetStreamed } from '../graph/assets'

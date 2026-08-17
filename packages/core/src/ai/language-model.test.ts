@@ -5,6 +5,7 @@ import {
   ANTHROPIC_DIRECT_BROWSER_ACCESS_HEADER,
   ANTHROPIC_DIRECT_BROWSER_ACCESS_VALUE,
 } from './anthropic-headers'
+import { APP_REVIEW_STUB_KEY, DEMO_REPLY_TEXT } from './app-review-demo'
 import { languageModel } from './language-model'
 
 interface RecordedCall {
@@ -24,6 +25,13 @@ const OPENAI_CONFIG: AiProviderConfig = {
   id: 'cfg-openai',
   provider: 'openai',
   model: 'gpt-5.6-terra',
+  keyHint: 'wxyz1',
+}
+
+const GOOGLE_CONFIG: AiProviderConfig = {
+  id: 'cfg-google',
+  provider: 'google',
+  model: 'gemini-3.5-flash',
   keyHint: 'wxyz1',
 }
 
@@ -207,5 +215,31 @@ describe('languageModel', () => {
     expect(calls).toHaveLength(1)
     expect(calls[0]!.url).toBe('http://localhost:1234/v1/chat/completions')
     expect(calls[0]!.headers.get('Authorization')).toBeNull()
+  })
+
+  it('returns the local demo model for the App Review demo key', async () => {
+    const throwingFetch = (() => {
+      throw new Error('demo mode must not fetch')
+    }) as unknown as typeof fetch
+
+    for (const config of [
+      OPENAI_CONFIG,
+      ANTHROPIC_CONFIG,
+      GOOGLE_CONFIG,
+      OPENROUTER_CONFIG,
+      OPENAI_COMPATIBLE_CONFIG,
+    ]) {
+      expect(languageModel(config, APP_REVIEW_STUB_KEY, throwingFetch)).toMatchObject({
+        specificationVersion: 'v3',
+        provider: 'reflect-demo',
+      })
+    }
+
+    const result = await generateText({
+      model: languageModel(OPENAI_CONFIG, APP_REVIEW_STUB_KEY, throwingFetch),
+      prompt: 'hello',
+      maxRetries: 0,
+    })
+    expect(result.text).toBe(DEMO_REPLY_TEXT)
   })
 })

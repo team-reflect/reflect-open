@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.10.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.10.0-beta.3...v0.10.0-beta.4) (2026-08-16)
+
+
+### Bug Fixes
+
+* **mobile:** keep drawer fields above the software keyboard ([#1122](https://github.com/team-reflect/reflect-open/issues/1122)) ([17f6cd5](https://github.com/team-reflect/reflect-open/commit/17f6cd5caacbeaeda9007d54d943e6e73c8d9269))
+
+## [0.10.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.10.0-beta.2...v0.10.0-beta.3) (2026-08-16)
+
+
+### Features
+
+* refresh the AI model catalog ([#1121](https://github.com/team-reflect/reflect-open/issues/1121)) ([f090b67](https://github.com/team-reflect/reflect-open/commit/f090b67329edcc8627bdc3270a510b4a714cefc4))
+
+## [0.10.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.9.1-beta.2...v0.10.0-beta.2) (2026-08-16)
+
+
+### Features
+
+* quick notes from Siri and Shortcuts on iOS ([#1096](https://github.com/team-reflect/reflect-open/issues/1096)) ([bb73c12](https://github.com/team-reflect/reflect-open/commit/bb73c1250d62ea777663fdffa591d46d363b2705))
+
+
+### Bug Fixes
+
+* allow Saturday as the first day of the week ([#1118](https://github.com/team-reflect/reflect-open/issues/1118)) ([b35bdc9](https://github.com/team-reflect/reflect-open/commit/b35bdc9311499703cffdbb08be0c790463c0c092))
+* update meowdown to ^0.65.5 ([#1120](https://github.com/team-reflect/reflect-open/issues/1120)) ([0f72613](https://github.com/team-reflect/reflect-open/commit/0f72613bb201baa1aac32cb0618296d07f5c3252))
+
+## [0.9.1-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.9.1-beta.1...v0.9.1-beta.2) (2026-08-16)
+
+
+### Bug Fixes
+
+* match partial queries across note titles and content ([#1093](https://github.com/team-reflect/reflect-open/issues/1093)) ([7716e75](https://github.com/team-reflect/reflect-open/commit/7716e7505ce9456d6b6659ce4364d9ec6452dfc1))
+* update meowdown to ^0.65.4 ([#1107](https://github.com/team-reflect/reflect-open/issues/1107)) ([692dc81](https://github.com/team-reflect/reflect-open/commit/692dc8170cc839c5a92464af288271f722fd0af0))
+
+## [0.9.1-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.9.1-beta...v0.9.1-beta.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* keep conflicted notes protected ([#1108](https://github.com/team-reflect/reflect-open/issues/1108)) ([92118b7](https://github.com/team-reflect/reflect-open/commit/92118b7163f440bb67c8c19974b90b4538aa6534))
+* make the `sk-demo` review key cover AI chat and prompts ([#1109](https://github.com/team-reflect/reflect-open/issues/1109)) ([baa7a93](https://github.com/team-reflect/reflect-open/commit/baa7a93f978af185f90deeae5dc6407afa3465d9))
+* **mobile:** raise the minimum iOS version to 16 ([#1110](https://github.com/team-reflect/reflect-open/issues/1110)) ([7dd695a](https://github.com/team-reflect/reflect-open/commit/7dd695a5ec8e96c904cade27ff20ab97ce4f20ff))
+* update meowdown to ^0.65.2 ([#1102](https://github.com/team-reflect/reflect-open/issues/1102)) ([4f495e2](https://github.com/team-reflect/reflect-open/commit/4f495e264c553e87f5fb3e11ea62b711faf6fe3b))
+
 ## [0.9.1-beta](https://github.com/team-reflect/reflect-open/compare/v0.9.0...v0.9.1-beta) (2026-08-12)
 
 

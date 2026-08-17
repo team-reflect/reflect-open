@@ -18,7 +18,7 @@ name: reflect-open
 options:
   bundleIdPrefix: app.reflect
   deploymentTarget:
-    iOS: 15.0
+    iOS: 16.0
 packages:
   # Native crash/hang reporting (NativeDiagnostics.swift). Pinned exactly so
   # upgrades are deliberate: any bump must re-audit the options set in
@@ -83,6 +83,11 @@ targets:
         buildPhase: resources
         type: folder
       - path: LaunchScreen.storyboard
+      # The capture-inbox producer, shared by path with the share extension
+      # (the same pattern the widget uses for the Live Activity sources): the
+      # quick-note intent (Plan 24) spools envelopes from the app process
+      # through the same atomic App Group writer the share sheet uses.
+      - path: ShareExtension/CaptureInbox.swift
     info:
       path: reflect-open_iOS/Info.plist
       properties:

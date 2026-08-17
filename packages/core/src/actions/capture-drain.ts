@@ -11,10 +11,11 @@ import {
 import { dailyPath, notePath } from '../graph/paths'
 import { hashContent } from '../indexing/hash'
 import {
-  appendBlock,
+  appendListItem,
   appendListItemUnderBacklinkedHeading,
   headingMatchesBacklinkedTitle,
   upgradeSectionHeadingBacklink,
+  type ListItemKind,
 } from '../markdown/edit'
 import { parseNote } from '../markdown/extract'
 import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks'
@@ -66,7 +67,11 @@ export interface DrainCaptureInboxOutcome {
   pending: number
   /** Captures written (fresh notes plus dedup refreshes). */
   drained: number
-  /** Of `drained`, how many refreshed an existing same-day entry in place. */
+  /**
+   * Of `drained`, how many link captures refreshed an existing same-day
+   * entry in place. Text captures never count here: duplicates are allowed
+   * by design (Plan 24), so every text envelope appends.
+   */
   deduped: number
   /** Unparseable spool files quarantined under `.reflect/inbox-rejected/`. */
   invalid: number
@@ -188,9 +193,7 @@ export async function drainCaptureInbox(
         continue
       }
       if ('kind' in envelope) {
-        if (await drainTextCapture(envelope, input.generation)) {
-          deduped += 1
-        }
+        await drainTextCapture(envelope, input.generation)
         await captureInboxRemove(name, input.generation)
         drained += 1
         continue
@@ -289,26 +292,19 @@ function parseEnvelope(raw: string): InboxEnvelope | null {
   return parsed.success ? parsed.data : null
 }
 
-async function drainTextCapture(
-  envelope: TextCaptureEnvelope,
-  generation: number,
-): Promise<boolean> {
+/**
+ * Append one text capture to its capture-day daily note. Deliberately no
+ * dedup: identical text captured twice is two entries (Plan 24) — the only
+ * duplication risk left is a crash between this write and the spool removal,
+ * which re-appends one line once on retry.
+ */
+async function drainTextCapture(envelope: TextCaptureEnvelope, generation: number): Promise<void> {
   const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
   const dailySource = await noteSource(daily, generation)
   // `task` is Reflect's round `+` checkbox, the only marker the Tasks
   // projection reads; `checkbox` is the square `- [ ]`, an inert daily item.
-  const line =
-    envelope.kind === 'task'
-      ? `+ [ ] ${envelope.text}`
-      : envelope.kind === 'checkbox'
-        ? `- [ ] ${envelope.text}`
-        : `- ${envelope.text}`
-  const present = dailySource.split('\n').some((existing) => existing.replace(/\r$/, '') === line)
-  if (present) {
-    return true
-  }
-  await writeNote(daily, appendBlock(dailySource, line), generation)
-  return false
+  const kind: ListItemKind = envelope.kind === 'append' ? 'bullet' : envelope.kind
+  await writeNote(daily, appendListItem(dailySource, envelope.text, kind), generation)
 }
 
 async function sweepOrphanSpools(

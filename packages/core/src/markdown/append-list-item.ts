@@ -1,4 +1,5 @@
 import type { SyntaxNode } from '@meowdown/markdown'
+import { appendBlock } from './append-section'
 import { splitFrontmatter } from './frontmatter'
 import { parseBody } from './grammar'
 import { lineEndingAt, offsetBeforeLineEnding } from './line-endings'
@@ -95,4 +96,62 @@ export function appendListItemAtHeading(source: string, target: Heading, content
 /** The same item, as the whole body of a section that does not exist yet. */
 export function listItemBlock(content: string): string {
   return `${DEFAULT_LIST_MARK} ${content.trim()}`
+}
+
+/**
+ * How an appended line renders as a list item: a plain bullet, the square
+ * GFM checkbox, or Reflect's round `+ [ ]` task — the only marker the Tasks
+ * projection reads.
+ */
+export type ListItemKind = 'bullet' | 'checkbox' | 'task'
+
+/** The marker a kind starts its own list with when there is nothing to join. */
+function ownMark(kind: ListItemKind): string {
+  return kind === 'task' ? '+' : DEFAULT_LIST_MARK
+}
+
+/**
+ * The marker that lets a `kind` item join a list written with `mark`, or
+ * `null` when it must not join. `bullet` adopts any mark; `checkbox` adopts
+ * `-`/`*` but never `+`, because a `+ [ ]` line IS a task to the Tasks
+ * projection; `task` is fixed at `+` for the same reason, so it only joins a
+ * `+` list. Refused joins fall back to a block of their own — a structurally
+ * separate list beats a checkbox that silently became a task.
+ */
+function joinMark(kind: ListItemKind, mark: string): string | null {
+  if (kind === 'task') {
+    return mark === '+' ? '+' : null
+  }
+  if (kind === 'checkbox') {
+    return mark === '+' ? null : mark
+  }
+  return mark
+}
+
+/**
+ * Append `text` as one list item at the end of the note (Plan 24: quick
+ * notes coalesce into one growing list). When the note's last top-level
+ * block is a bullet list, the item joins it directly, written with the
+ * list's own marker — in CommonMark the marker is part of the list
+ * structure, so switching it would start a new list ({@link listMark}'s
+ * rule). Anything else at the tail — prose, headings, ordered lists, code —
+ * or a join the kind's marker rules refuse falls back to {@link appendBlock}
+ * (a blank line and a fresh list).
+ */
+export function appendListItem(source: string, text: string, kind: ListItemKind): string {
+  const payload = kind === 'bullet' ? text.trim() : `[ ] ${text.trim()}`
+  const { body, bodyOffset } = splitFrontmatter(source)
+  let tail: SyntaxNode | null = null
+  for (let block = parseBody(body).topNode.firstChild; block !== null; block = block.nextSibling) {
+    tail = block
+  }
+  const mark =
+    tail !== null && isBulletList(tail) ? joinMark(kind, listMark(source, bodyOffset, tail)) : null
+  if (tail === null || mark === null) {
+    return appendBlock(source, `${ownMark(kind)} ${payload}`)
+  }
+  const anchor = offsetBeforeLineEnding(source, bodyOffset + tail.to)
+  const lineEnding = lineEndingAt(source, anchor)
+  const suffix = source.slice(anchor)
+  return `${source.slice(0, anchor)}${lineEnding}${mark} ${payload}${suffix || lineEnding}`
 }

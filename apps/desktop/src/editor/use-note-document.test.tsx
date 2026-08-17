@@ -731,6 +731,45 @@ describe('useNoteDocument', () => {
     }
   })
 
+  it('an external change that introduces conflict markers flips the note protected', async () => {
+    vi.useFakeTimers()
+    try {
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+      const editor = fakeEditor()
+      await hook.act(() => hook.result.current.bindEditor(editor))
+      expect(hook.result.current.protected).toBe(false)
+
+      disk = '# Shared\n\n<<<<<<< this device\na\n=======\nb\n>>>>>>> other device\n'
+      await hook.act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+
+      expect(hook.result.current.protected).toBe(true)
+      // The conflicted bytes never enter a live editor.
+      expect(editor.applied).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a note documenting a conflict inside a fence stays editable and saves', async () => {
+    vi.useFakeTimers()
+    try {
+      disk = '# How to resolve\n\n```\n<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n```\n'
+      const hook = await renderHook(() => useNoteDocument('notes/tasks.md', 1))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+      expect(hook.result.current.status).toBe('ready')
+      expect(hook.result.current.protected).toBe(false)
+
+      // And it saves like any other note: the fenced markers are content.
+      await hook.act(() => hook.result.current.onEditorChange(disk + '\nmore\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(2000))
+      expect(writes).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('an external reload never dirties the buffer, even when serialization normalizes', async () => {
     vi.useFakeTimers()
     try {

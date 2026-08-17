@@ -307,7 +307,17 @@ export async function searchWithFilters(
     ])
     .where(sql<boolean>`("lexical"."path" is not null or ${titleMatch.containsAllTerms})`)
     .orderBy(titleMatch.rank)
-    .orderBy(sql`coalesce("lexical"."rank", 0)`)
+    // A title-only prefix already admitted by manual recall keeps its
+    // historical rank (`0`). Tokenizer-only title matches such as
+    // `cafe` -> `Café` retain lexical bm25 so they still outrank body hits.
+    .orderBy(
+      sql`case
+        when instr(coalesce("lexical"."snippet", ''), ${HIGHLIGHT_START}) > 0
+          or not (${titleMatch.containsAllTerms})
+        then coalesce("lexical"."rank", 0)
+        else 0
+      end`,
+    )
     .orderBy('filteredNotes.isPinned', 'desc')
     .orderBy('filteredNotes.mtime', 'desc')
     .orderBy('filteredNotes.path', 'asc')
@@ -315,8 +325,11 @@ export async function searchWithFilters(
     rankedQuery = rankedQuery.limit(limit)
   }
   const rows = await rankedQuery.execute()
-  return rows.map(({ ftsHighlightedTitle, ...row }) => ({
+  return rows.map(({ ftsHighlightedTitle, snippet, ...row }) => ({
     ...row,
+    // SQLite returns an unmarked body fragment when only the title matched.
+    // That is not a search snippet and would be misleading in the result row.
+    snippet: snippet?.includes(HIGHLIGHT_START) === true ? snippet : null,
     highlightedTitle: highlightTitle(row.title, parsed.text, ftsHighlightedTitle),
     isPinned: row.isPinned !== 0,
   }))

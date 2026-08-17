@@ -263,6 +263,144 @@ describe('createDevIndexDb', () => {
     expect(hits[2]!.highlightedTitle).toBe('Garage')
   })
 
+  it('prefix-matches partial terms in note bodies', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/security-rollout.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n87',
+        title: 'Security rollout',
+        titleKey: 'security rollout',
+        text: 'The plan covers authentication migration.',
+        preview: 'The plan covers authentication migration.',
+        tags: [],
+      }),
+    )
+    installQueryBridge(db)
+
+    const hits = await searchWithFilters(parseSearchQuery('authent migr'))
+
+    expect(hits).toMatchObject([{ path: 'notes/security-rollout.md', title: 'Security rollout' }])
+    expect(hits[0]!.snippet).toContain('authentication')
+    await expect(searchNotes('authent migr')).resolves.toEqual([
+      { path: 'notes/security-rollout.md', title: 'Security rollout' },
+    ])
+    await expect(searchNotes('thentication')).resolves.toEqual([])
+
+    const mixedHits = await searchWithFilters(parseSearchQuery('secur migr'))
+    expect(mixedHits).toMatchObject([
+      { path: 'notes/security-rollout.md', title: 'Security rollout' },
+    ])
+    expect(mixedHits[0]!.snippet).toContain('migration')
+    expect(parseHighlights(mixedHits[0]!.highlightedTitle)).toEqual([
+      { text: 'Secur', highlighted: true },
+      { text: 'ity rollout', highlighted: false },
+    ])
+    await expect(searchNotes('migr secur')).resolves.toEqual([
+      { path: 'notes/security-rollout.md', title: 'Security rollout' },
+    ])
+  })
+
+  it('ignores a term that tokenizes to nothing instead of emptying the result', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/meeting-notes.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n92',
+        title: 'Meeting Notes',
+        titleKey: 'meeting notes',
+        text: 'Agenda items for the sync.',
+        preview: 'Agenda items for the sync.',
+        tags: [],
+      }),
+    )
+    installQueryBridge(db)
+
+    await expect(searchNotes('meeting - notes')).resolves.toEqual([
+      { path: 'notes/meeting-notes.md', title: 'Meeting Notes' },
+    ])
+    await expect(searchNotes('agenda &')).resolves.toEqual([
+      { path: 'notes/meeting-notes.md', title: 'Meeting Notes' },
+    ])
+    // Punctuation alone still matches nothing, never the whole recall feed.
+    await expect(searchNotes('- .')).resolves.toEqual([])
+  })
+
+  it('drops an ignored term from title recall, not just from the FTS match', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/tokyo-trip.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n96',
+        title: '来週の東京旅行計画',
+        titleKey: '来週の東京旅行計画',
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+      }),
+    )
+    db.applyNote(
+      sampleNote({
+        path: 'notes/dotfiles.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n97',
+        title: '.hidden files',
+        titleKey: '.hidden files',
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+      }),
+    )
+    installQueryBridge(db)
+
+    // Only title recall can reach a term inside an unsegmented title run, so
+    // the ignored term has to leave recall too, not just the FTS expression.
+    await expect(searchNotes('東京 -')).resolves.toEqual([
+      { path: 'notes/tokyo-trip.md', title: '来週の東京旅行計画' },
+    ])
+    // A punctuation-only query keeps its terms, so recall still matches them.
+    await expect(searchNotes('.')).resolves.toEqual([
+      { path: 'notes/dotfiles.md', title: '.hidden files' },
+    ])
+  })
+
+  it('uses pinning to break ties between title-only prefix hits', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/tim-maccaw-planning.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n81',
+        title: 'Tim MacCaw Extended Project Planning',
+        titleKey: 'tim maccaw extended project planning',
+        isPinned: true,
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+        mtime: 100,
+      }),
+    )
+    db.applyNote(
+      sampleNote({
+        path: 'notes/tim-macrae.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n82',
+        title: 'Tim MacRae',
+        titleKey: 'tim macrae',
+        isPinned: false,
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+        mtime: 200,
+      }),
+    )
+    installQueryBridge(db)
+
+    const hits = await searchWithFilters(parseSearchQuery('Tim Mac'))
+    expect(hits.map((hit) => hit.path)).toEqual([
+      'notes/tim-maccaw-planning.md',
+      'notes/tim-macrae.md',
+    ])
+    expect(hits.map((hit) => hit.snippet)).toEqual([null, null])
+  })
+
   it('returns title markers from SQLite for tokenizer-normalized matches', async () => {
     const db = await openDb()
     db.applyNote(
@@ -287,9 +425,22 @@ describe('createDevIndexDb', () => {
         tags: [],
       }),
     )
+    db.applyNote(
+      sampleNote({
+        path: 'notes/body-cafe.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n89',
+        title: 'Unrelated note',
+        titleKey: 'unrelated note',
+        text: 'A cafe appears in this body.',
+        preview: 'A cafe appears in this body.',
+        tags: [],
+      }),
+    )
     installQueryBridge(db)
 
-    const accentHit = (await searchWithFilters(parseSearchQuery('cafe')))[0]!
+    const accentHits = await searchWithFilters(parseSearchQuery('cafe'))
+    expect(accentHits.map((hit) => hit.path)).toEqual(['notes/cafe-alpha.md', 'notes/body-cafe.md'])
+    const accentHit = accentHits[0]!
     expect(parseHighlights(accentHit.highlightedTitle)).toEqual([
       { text: 'Café', highlighted: true },
       { text: ' Alpha', highlighted: false },

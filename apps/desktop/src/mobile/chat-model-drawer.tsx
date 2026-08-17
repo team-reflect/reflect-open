@@ -25,7 +25,7 @@ export function ChatModelDrawer({ open, onOpenChange }: ChatModelDrawerProps): R
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Choose a model">
-        <DrawerTitle className="px-4 pt-1">Model</DrawerTitle>
+        <DrawerTitle>Model</DrawerTitle>
         <div className="flex max-h-[60dvh] flex-col gap-6 overflow-y-auto px-4 pb-8 pt-4">
           {groups.map((group) => (
             <SettingsGroup key={group.configId} header={group.label}>

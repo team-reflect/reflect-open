@@ -10,8 +10,8 @@ describe('AI_PROVIDERS', () => {
   it('offers the current Claude lineup in capability order', () => {
     expect(aiProvider('anthropic').models.slice(0, 3)).toEqual([
       { id: 'claude-fable-5', label: 'Claude Fable 5', contextWindow: 1_000_000 },
+      { id: 'claude-opus-5', label: 'Claude Opus 5', contextWindow: 1_000_000 },
       { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', contextWindow: 1_000_000 },
-      { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', contextWindow: 1_000_000 },
     ])
   })
 
@@ -54,7 +54,7 @@ describe('modelContextWindow', () => {
 
   it('resolves a curated model and falls back for unknown ids', () => {
     expect(modelContextWindow('anthropic', 'claude-haiku-4-5')).toBe(200_000)
-    expect(modelContextWindow('openrouter', 'openrouter/auto')).toBe(128_000)
+    expect(modelContextWindow('openrouter', 'openrouter/auto')).toBe(2_000_000)
     // Settings may carry ids added by a newer app version.
     expect(modelContextWindow('anthropic', 'claude-fable-6')).toBe(DEFAULT_CONTEXT_WINDOW)
   })
