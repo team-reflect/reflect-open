@@ -109,10 +109,7 @@ vi.mock('@/providers/graph-provider', async () => {
     }),
   }
 })
-vi.mock('@/hooks/use-note-row', () => ({
-  useNoteRowState,
-  useNoteRow: (path: string) => useNoteRowState(path).row,
-}))
+vi.mock('@/hooks/use-note-row', () => ({ useNoteRowState }))
 vi.mock('@/hooks/use-pinned-notes', () => ({ usePinnedNotes }))
 vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
 vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
