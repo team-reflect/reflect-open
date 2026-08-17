@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.10.0-beta.4...v0.10.0-beta.5) (2026-08-17)
+
+
+### Features
+
+* add lock note to the iOS note actions drawer ([#1125](https://github.com/team-reflect/reflect-open/issues/1125)) ([1c73011](https://github.com/team-reflect/reflect-open/commit/1c730115fa8118e86323fe5c248ec8ee8afc3131))
+* add swipe actions to iOS note list ([#1117](https://github.com/team-reflect/reflect-open/issues/1117)) ([dceda15](https://github.com/team-reflect/reflect-open/commit/dceda15376d1abd05cf091a00f62bcd702811df6))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.65.6 ([#1127](https://github.com/team-reflect/reflect-open/issues/1127)) ([862e853](https://github.com/team-reflect/reflect-open/commit/862e85322f261a4d4b39ec20041aadd32dbfa8cb))
+
 ## [0.10.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.10.0-beta.3...v0.10.0-beta.4) (2026-08-16)
 
 
