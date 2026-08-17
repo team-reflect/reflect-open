@@ -28,12 +28,7 @@ export {
   type StagedRecordingFile,
   type StartRecordingOptions,
 } from '../ipc/recording-plugin'
-export {
-  getCurrentKeyboardHeight,
-  impactLight,
-  subscribeKeyboardChange,
-  type KeyboardState,
-} from '../ipc/keyboard-plugin'
+export { impactLight } from '../ipc/keyboard-plugin'
 export {
   getAppVersion,
   getAppPlatform,

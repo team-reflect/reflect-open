@@ -4,32 +4,20 @@ import Tauri
 import UIKit
 import WebKit
 
-/// The payload for both the `keyboardChange` event and `currentHeight`.
-struct KeyboardState: Encodable {
-  /// Points of webview height the keyboard currently covers (0 = hidden).
-  let height: Float
-  /// The keyboard's animation duration in seconds, for matching CSS motion.
-  let duration: Float
-}
-
-/// Reflect's keyboard bridge (Plan 19, decision 8).
+/// Reflect's keyboard webview tuning (Plan 19, decision 8).
 ///
 /// Tauri has no iOS keyboard handling (tauri#9907): by default the system
 /// nudges the webview's scroll view around when the keyboard animates in,
-/// occluding whatever the caret is in. This plugin takes manual control —
-/// the webview keeps its full-screen frame, scroll-view auto-adjustment is
-/// disabled, its scroll offset is pinned to zero (WebKit's caret-reveal
-/// scroll would otherwise push the page out of the window on focus), and
-/// the keyboard's overlap height streams to JS as
-/// `keyboardChange` events so the layout can make room (a CSS variable, a
-/// pinned toolbar, caret scroll-into-view).
+/// occluding whatever the caret is in. This plugin pins the webview instead:
+/// the frame stays full-screen, scroll-view auto-adjustment is disabled, and
+/// the scroll offset is held at zero. With the page pinned, keyboard
+/// avoidance lives entirely on the web side, driven by `visualViewport`
+/// (decision 0003); no keyboard state crosses the bridge.
 ///
 /// As Reflect's only native UIKit touch bridge, it also carries the app's
 /// tiny haptics surface (`impactLight`) — WKWebView has no
 /// `navigator.vibrate`, so JS cannot fire haptics on its own.
 class KeyboardPlugin: Plugin {
-  private weak var webView: WKWebView?
-  private var currentState = KeyboardState(height: 0, duration: 0)
   private var scrollOffsetObservation: NSKeyValueObservation?
   // Lazy so the generator is created on the main thread, inside the first
   // `impactLight` dispatch; kept alive across taps to skip re-allocating
@@ -37,9 +25,8 @@ class KeyboardPlugin: Plugin {
   private lazy var lightImpactGenerator = UIImpactFeedbackGenerator(style: .light)
 
   @objc public override func load(webview: WKWebView) {
-    self.webView = webview
     // The system's automatic inset adjustment is the source of the jump:
-    // page layout owns keyboard avoidance instead (via the events below).
+    // page layout owns keyboard avoidance instead.
     webview.scrollView.contentInsetAdjustmentBehavior = .never
     // That flag alone doesn't stop WebKit's own keyboard avoidance: on focus
     // it scrolls the *native* scroll view to reveal the caret, not knowing
@@ -61,56 +48,6 @@ class KeyboardPlugin: Plugin {
     // "+" add flow, new-note autofocus) run after an async write, so they
     // landed with the keyboard down. Lift the restriction.
     Self.allowProgrammaticFocus()
-    let center = NotificationCenter.default
-    center.addObserver(
-      self,
-      selector: #selector(keyboardWillChangeFrame(_:)),
-      name: UIResponder.keyboardWillChangeFrameNotification,
-      object: nil
-    )
-    center.addObserver(
-      self,
-      selector: #selector(keyboardWillHide(_:)),
-      name: UIResponder.keyboardWillHideNotification,
-      object: nil
-    )
-  }
-
-  /// The keyboard's frame in the webview's coordinate space decides the
-  /// overlap; a hardware-keyboard bar or an undocked keyboard yields the
-  /// honest (smaller or zero) height rather than a guessed constant.
-  @objc private func keyboardWillChangeFrame(_ notification: Notification) {
-    guard
-      let webView = self.webView,
-      let endFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
-    else {
-      return
-    }
-    let frameInWebView = webView.convert(endFrame, from: nil)
-    let overlap = max(0, webView.bounds.maxY - frameInWebView.minY)
-    emit(height: Float(overlap), notification: notification)
-  }
-
-  @objc private func keyboardWillHide(_ notification: Notification) {
-    emit(height: 0, notification: notification)
-  }
-
-  private func emit(height: Float, notification: Notification) {
-    let duration =
-      (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0
-    let state = KeyboardState(height: height, duration: Float(duration))
-    currentState = state
-    do {
-      try trigger("keyboardChange", data: state)
-    } catch {
-      Logger.error("keyboard event failed to serialize: \(error)")
-    }
-  }
-
-  /// Mount-time state for late subscribers (the keyboard may already be up
-  /// when a screen mounts and subscribes).
-  @objc public func currentHeight(_ invoke: Invoke) {
-    invoke.resolve(currentState)
   }
 
   /// Fire a light impact haptic — V1 parity for date-selection, task controls,

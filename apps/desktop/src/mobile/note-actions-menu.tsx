@@ -2,21 +2,13 @@ import { useState, type ReactElement } from 'react'
 import { Lock, LockOpen, MoreHorizontal, Pin, PinOff, Share, Trash2 } from 'lucide-react'
 import { errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 import { useNoteRow } from '@/hooks/use-note-row'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
 import { useBridgedNoteToggle } from '@/lib/notes/use-bridged-note-toggle'
-import { deleteOpenNote } from '@/lib/note-delete'
+import { NoteDeleteDialog } from '@/mobile/note-delete-dialog'
 import { shareNote } from '@/mobile/share'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -44,8 +36,6 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
   const privacyReady = noteRow !== null
   const [actionsOpen, setActionsOpen] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const {
     isActive: isPrivate,
     isToggling: isTogglingPrivate,
@@ -72,21 +62,6 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
     void shareNote(path).catch((cause) => console.error('share failed:', errorMessage(cause)))
   }
 
-  const confirmDelete = (): void => {
-    if (graph === null) {
-      return
-    }
-    setBusy(true)
-    setError(null)
-    void deleteOpenNote(path, graph.generation)
-      .then(() => {
-        setConfirmingDelete(false)
-        onDeleted()
-      })
-      .catch((cause) => setError(errorMessage(cause)))
-      .finally(() => setBusy(false))
-  }
-
   return (
     <>
       <Drawer open={actionsOpen} onOpenChange={setActionsOpen}>
@@ -99,7 +74,7 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
         </DrawerTrigger>
         <DrawerContent>
           <DrawerTitle className="sr-only">Note actions</DrawerTitle>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 p-4">
             <Button
               variant="ghost"
               size="lg"
@@ -153,28 +128,12 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
         </DrawerContent>
       </Drawer>
 
-      <Dialog open={confirmingDelete} onOpenChange={(open) => !busy && setConfirmingDelete(open)}>
-        <DialogContent>
-          <DialogTitle>Delete this note?</DialogTitle>
-          <DialogDescription>
-            It moves to the graph’s trash and disappears from your notes. You can recover it on
-            desktop.
-          </DialogDescription>
-          {error !== null && <p className="text-sm text-destructive">{error}</p>}
-          <DialogFooter>
-            <DialogClose
-              render={
-                <Button variant="ghost" disabled={busy}>
-                  Cancel
-                </Button>
-              }
-            />
-            <Button variant="destructive" disabled={busy} onClick={confirmDelete}>
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NoteDeleteDialog
+        path={path}
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        onDeleted={onDeleted}
+      />
     </>
   )
 }

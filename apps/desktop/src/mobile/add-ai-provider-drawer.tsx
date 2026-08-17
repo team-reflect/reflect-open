@@ -10,7 +10,7 @@ import {
 } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -96,8 +96,8 @@ function AddAiProviderSheet({
 
   return (
     <>
-      <DrawerTitle className="px-4 pt-1">Add AI provider</DrawerTitle>
-      <div className="flex max-h-[75dvh] flex-col gap-4 overflow-y-auto px-4 pb-8 pt-3">
+      <DrawerTitle>Add AI provider</DrawerTitle>
+      <DrawerBody>
         <p className="text-sm text-text-muted">
           The API key is stored in this device’s keychain, never in your graph — add it on each
           device you chat from.
@@ -237,7 +237,7 @@ function AddAiProviderSheet({
         <Button disabled={submitDisabled} onClick={() => void submitDraft()}>
           {unverified ? 'Save anyway' : 'Add provider'}
         </Button>
-      </div>
+      </DrawerBody>
     </>
   )
 }

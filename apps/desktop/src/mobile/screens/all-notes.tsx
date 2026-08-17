@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useRef, type ReactElement } from 'react'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, FileText, SearchX } from 'lucide-react'
 import {
   foldTag,
@@ -20,8 +20,9 @@ import {
   searchPlanFor,
   type AllNotesFilters,
 } from '@/mobile/search-filters/filter-state'
-import { NoteRowList, type NoteRowModel } from '@/mobile/note-row-list'
+import { NoteRowList } from '@/mobile/note-row-list'
 import { SearchInput } from '@/mobile/search-input'
+import type { NoteRowModel } from '@/mobile/swipeable-note-row'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
@@ -34,6 +35,7 @@ export function rowForHit(hit: FilteredSearchHit): NoteRowModel {
     titleSegments: parseHighlights(hit.highlightedTitle),
     mtime: hit.mtime,
     isPinned: hit.isPinned,
+    canDelete: hit.dailyDate === null,
     snippet:
       hit.snippet !== null
         ? parseHighlights(hit.snippet)
@@ -80,6 +82,7 @@ export function MobileAllNotes({
 }: MobileAllNotesProps): ReactElement {
   const { graph } = useGraph()
   const { navigate, back, arrivalSeq, arrivalFocusEditor } = useRouter()
+  const queryClient = useQueryClient()
   const bridgeReady = useBridgeReady()
   const enabled = bridgeReady && graph !== null
 
@@ -114,6 +117,17 @@ export function MobileAllNotes({
 
   const rows = useMemo(() => (hits ?? []).map(rowForHit), [hits])
   const pristine = parsed.text === '' && !parsed.filtered
+
+  const removeDeletedRow = (path: string): void => {
+    queryClient.setQueriesData<FilteredSearchHit[]>(
+      { queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'mobile-all-notes'] },
+      (cachedHits) => cachedHits?.filter((hit) => hit.path !== path),
+    )
+    // Do not invalidate yet: the index can still contain the deleted row and
+    // would briefly resurrect it. `deleteNote`'s local-write echo reindexes,
+    // then invalidates the full index scope (including tag facets) once the
+    // projection has caught up.
+  }
 
   const addPendingTag = (facet: NoteTagFacet): void => {
     const key = foldTag(facet.tag)
@@ -177,7 +191,11 @@ export function MobileAllNotes({
           <Empty icon={<SearchX className="size-6" />} message="No matches" />
         )
       ) : (
-        <NoteRowList rows={rows} onOpen={(path) => navigate(routeForPath(path))} />
+        <NoteRowList
+          rows={rows}
+          onOpen={(path) => navigate(routeForPath(path))}
+          onDeleted={removeDeletedRow}
+        />
       )}
     </div>
   )

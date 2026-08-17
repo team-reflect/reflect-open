@@ -1,7 +1,8 @@
-import type { ReactElement, ReactNode } from 'react'
+import { act, type ReactElement, type ReactNode } from 'react'
 import { cleanup, render } from 'vitest-browser-react'
 import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { GraphInfo } from '@reflect/core'
 
 const useNoteRow = vi.hoisted(() => vi.fn())
 const usePinnedNotes = vi.hoisted(() => vi.fn())
@@ -24,6 +25,8 @@ const startOperation = vi.hoisted(() =>
  * The mobile note actions drawer: pin/share/delete already live here; this
  * suite adds privacy parity coverage against mocked index state and canonical
  * toggle helpers so close/reopen and failure rollback are exercised directly.
+ * Delete routes through the shared {@link NoteDeleteDialog}; the graph comes
+ * from a mutable store so the no-graph failure path can be exercised too.
  *
  * The real drawer's drag/animation is covered elsewhere and on-device. This
  * mock honours `open` and the trigger contract so the tests can verify that
@@ -81,9 +84,31 @@ vi.mock('@/components/ui/drawer', async () => {
   }
 })
 
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 7 } }),
-}))
+const graphStore = vi.hoisted(() => {
+  let graph: GraphInfo | null = null
+  const listeners = new Set<() => void>()
+  return {
+    getSnapshot: (): GraphInfo | null => graph,
+    subscribe: (listener: () => void): (() => void) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    set: (next: GraphInfo | null): void => {
+      graph = next
+      for (const listener of listeners) {
+        listener()
+      }
+    },
+  }
+})
+vi.mock('@/providers/graph-provider', async () => {
+  const { useSyncExternalStore } = await import('react')
+  return {
+    useGraph: () => ({
+      graph: useSyncExternalStore(graphStore.subscribe, graphStore.getSnapshot),
+    }),
+  }
+})
 vi.mock('@/hooks/use-note-row', () => ({ useNoteRow }))
 vi.mock('@/hooks/use-pinned-notes', () => ({ usePinnedNotes }))
 vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
@@ -107,6 +132,7 @@ function noteRow(path: string, isPrivate: boolean, title = 'Meeting') {
 }
 
 beforeEach(() => {
+  graphStore.set({ root: '/g', name: 'g', generation: 7 })
   currentNoteRow = noteRow('notes/meeting.md', false)
   currentPinnedNotes = []
   useNoteRow.mockImplementation(() => currentNoteRow)
@@ -230,5 +256,20 @@ describe('NoteActionsMenu', () => {
 
     await vi.waitFor(() => expect(deleteOpenNote).toHaveBeenCalledWith('notes/meeting.md', 7))
     expect(onDeleted).toHaveBeenCalledOnce()
+  })
+
+  it('reports when the graph disappears before delete confirmation', async () => {
+    const { view, onDeleted } = await mount()
+
+    await openActions()
+    await view.getByRole('button', { name: 'Delete' }).click()
+
+    const dialog = page.getByRole('dialog')
+    act(() => graphStore.set(null))
+    await dialog.getByRole('button', { name: 'Delete' }).click()
+
+    await expect.element(dialog.getByText('No graph is open.')).toBeInTheDocument()
+    expect(deleteOpenNote).not.toHaveBeenCalled()
+    expect(onDeleted).not.toHaveBeenCalled()
   })
 })

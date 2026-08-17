@@ -29,6 +29,10 @@ function useDrawer(): DrawerContextProps {
  * Tokens mirror {@link Dialog} so the two read as one system. Bottom-anchored
  * only — the other directions Base UI supports aren't needed on Reflect's mobile
  * surfaces — and the home-indicator safe area is padded for by default.
+ *
+ * Keyboard avoidance: {@link DrawerContent} pads its bottom past
+ * `--keyboard-height`, so the auto-height popup grows and the body ends above
+ * the keyboard.
  */
 function Drawer({
   modal = true,
@@ -87,7 +91,7 @@ function DrawerSwipeHandle({ className, ...props }: React.ComponentProps<'div'>)
       data-slot="drawer-swipe-handle"
       aria-hidden="true"
       className={cn(
-        'mx-auto mb-1 h-1 w-10 shrink-0 cursor-grab rounded-full bg-border active:cursor-grabbing',
+        'mx-auto mt-1 mb-1 h-1 w-10 shrink-0 cursor-grab rounded-full bg-border active:cursor-grabbing',
         className,
       )}
       {...props}
@@ -119,7 +123,7 @@ function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.
             // Bleed.
             'after:pointer-events-none after:absolute after:bg-(--drawer-bleed-background,var(--color-popover)) data-[swipe-axis=x]:after:inset-y-0 data-[swipe-axis=x]:after:w-(--bleed) data-[swipe-axis=y]:after:inset-x-0 data-[swipe-axis=y]:after:h-(--bleed) data-[swipe-direction=down]:after:top-full data-[swipe-direction=left]:after:right-full data-[swipe-direction=right]:after:left-full data-[swipe-direction=up]:after:bottom-full',
             // Sizing.
-            '[--drawer-content-height:var(--drawer-height,auto)] data-[swipe-axis=x]:[--drawer-content-width:75%] data-[swipe-axis=y]:[--drawer-content-max-height:85vh] data-[swipe-axis=y]:data-snap-points:[--drawer-content-height:100dvh] data-[swipe-axis=x]:sm:[--drawer-content-width:24rem]',
+            '[--drawer-content-height:var(--drawer-height,auto)] data-[swipe-axis=x]:[--drawer-content-width:75%] data-[swipe-axis=y]:[--drawer-content-max-height:calc(100dvh-6rem)] data-[swipe-axis=y]:data-snap-points:[--drawer-content-height:100dvh] data-[swipe-axis=x]:sm:[--drawer-content-width:24rem]',
             // Stack.
             '[--bleed:3rem] [--peek:1rem] [--stack-height:var(--drawer-frontmost-height,var(--drawer-height,0px))] [--stack-peek-offset:max(0px,calc((var(--nested-drawers)-var(--stack-progress))*var(--peek)))] [--stack-progress:clamp(0,var(--drawer-swipe-progress),1)] [--stack-scale-base:max(0,calc(1-(var(--nested-drawers)*var(--stack-step))))] [--stack-scale:clamp(0,calc(var(--stack-scale-base)+(var(--stack-step)*var(--stack-progress))),1)] [--stack-shrink:calc(1-var(--stack-scale))] [--stack-step:0.05]',
             // Transitions.
@@ -144,9 +148,11 @@ function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.
           <DrawerPrimitive.Content
             data-slot="drawer-content"
             className={cn(
-              'flex min-h-0 flex-1 flex-col gap-3 overflow-hidden overscroll-contain rounded-[inherit] p-4 transition-opacity duration-300 ease-[cubic-bezier(0.45,1.005,0,1.005)] select-text group-data-nested-drawer-open/drawer-popup:opacity-0 group-data-nested-drawer-swiping/drawer-popup:opacity-100 group-data-swiping/drawer-popup:select-none',
-              // Pad past the home indicator so the last row isn't tucked under it.
-              'pb-[max(env(safe-area-inset-bottom),1rem)]',
+              'flex min-h-0 flex-1 flex-col overflow-hidden overscroll-contain rounded-[inherit] transition-opacity duration-300 ease-[cubic-bezier(0.45,1.005,0,1.005)] select-text group-data-nested-drawer-open/drawer-popup:opacity-0 group-data-nested-drawer-swiping/drawer-popup:opacity-100 group-data-swiping/drawer-popup:select-none',
+              // Pad past the home indicator, or past the software keyboard while
+              // it is up; max() keeps the two from stacking (the keyboard covers
+              // the indicator).
+              'pb-[max(env(safe-area-inset-bottom),var(--keyboard-height,0px))]',
             )}
           >
             {children}
@@ -177,7 +183,26 @@ function DrawerTitle({ className, ...props }: DrawerPrimitive.Title.Props) {
   return (
     <DrawerPrimitive.Title
       data-slot="drawer-title"
-      className={cn('font-heading text-base leading-none font-medium', className)}
+      className={cn('font-heading text-base leading-none font-medium px-8 pt-6', className)}
+      {...props}
+    />
+  )
+}
+
+/**
+ * The scrollable middle of a drawer. {@link DrawerContent}'s bottom padding
+ * keeps its end above the home indicator and the software keyboard, and the
+ * `scroll-fade-t` mask hints at content scrolled under the pinned
+ * {@link DrawerTitle}.
+ */
+function DrawerBody({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot="drawer-body"
+      className={cn(
+        'flex min-h-0 scroll-fade-t flex-col overflow-y-auto px-8 pb-8 pt-4 gap-4',
+        className,
+      )}
       {...props}
     />
   )
@@ -195,6 +220,7 @@ function DrawerDescription({ className, ...props }: DrawerPrimitive.Description.
 
 export {
   Drawer,
+  DrawerBody,
   DrawerClose,
   DrawerContent,
   DrawerDescription,

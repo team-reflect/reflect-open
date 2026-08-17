@@ -77,7 +77,7 @@ export function AiProviderActionsDrawer({
       <DrawerContent aria-label="Manage AI provider">
         {provider !== null && providerInfo !== null ? (
           <>
-            <DrawerTitle className="px-4 pt-1">{title}</DrawerTitle>
+            <DrawerTitle>{title}</DrawerTitle>
             <div className="flex flex-col gap-6 px-4 pb-8 pt-4">
               <SettingsGroup header="Default model">
                 {models.map((model) => (

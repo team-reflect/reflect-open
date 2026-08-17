@@ -3,8 +3,6 @@ use tauri::{
     Manager, Runtime,
 };
 
-pub use models::*;
-
 #[cfg(desktop)]
 mod desktop;
 #[cfg(mobile)]
@@ -12,7 +10,6 @@ mod mobile;
 
 mod commands;
 mod error;
-mod models;
 
 pub use error::{Error, Result};
 
@@ -35,10 +32,7 @@ impl<R: Runtime, T: Manager<R>> crate::KeyboardExt<R> for T {
 /// Initializes the plugin.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("keyboard")
-        .invoke_handler(tauri::generate_handler![
-            commands::current_height,
-            commands::impact_light
-        ])
+        .invoke_handler(tauri::generate_handler![commands::impact_light])
         .setup(|app, api| {
             #[cfg(mobile)]
             let keyboard = mobile::init(app, api)?;

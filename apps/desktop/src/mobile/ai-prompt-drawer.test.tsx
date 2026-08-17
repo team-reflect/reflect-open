@@ -17,6 +17,7 @@ import '@/test-utils/locator'
 vi.mock('@/components/ui/drawer', () => ({
   Drawer: ({ children }: { children?: ReactNode }) => <>{children}</>,
   DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
 }))
 
