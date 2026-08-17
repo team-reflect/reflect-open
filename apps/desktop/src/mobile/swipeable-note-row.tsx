@@ -114,6 +114,7 @@ export function SwipeableNoteRow({
       </div>
       <button
         type="button"
+        ref={swipe.ref}
         {...swipe.handlers}
         onClick={(event) => {
           if (swipe.consumeDragClick()) {
@@ -127,7 +128,7 @@ export function SwipeableNoteRow({
           onOpen()
         }}
         className="absolute inset-0 flex w-full flex-col justify-center gap-0.5 overflow-hidden bg-background px-4 text-left active:opacity-70"
-        style={{ ...swipe.style, height: NOTE_ROW_HEIGHT }}
+        style={{ height: NOTE_ROW_HEIGHT }}
       >
         <span className="flex w-full items-baseline gap-2">
           {row.isPinned ? (
