@@ -32,10 +32,6 @@ interface NoteActionsMenuProps {
 export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): ReactElement {
   const { graph } = useGraph()
   const isPinned = usePinnedNotes().some((note) => note.path === path)
-  // Settled distinguishes "row still loading" from "no indexed row yet": a
-  // visible note can predate its row, and such a note is not private (the
-  // flag lives in frontmatter), so the lock action stays offered like on
-  // desktop instead of parking on the loading label.
   const { row: noteRow, settled: privacyReady } = useNoteRowState(path)
   const [actionsOpen, setActionsOpen] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
