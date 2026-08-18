@@ -46,7 +46,7 @@ interface DraggingGesture extends GestureBase {
 
 type RowGesture = ArmedGesture | DraggingGesture
 
-interface NoteRowSwipeOptions {
+interface RowSwipeOptions {
   /** Total width of the actions underneath the row. */
   actionWidth: number
   revealed: boolean
@@ -62,21 +62,21 @@ interface NoteRowSwipeOptions {
   onBeginInteraction: () => void
 }
 
-interface NoteRowSwipeHandlers {
-  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
-  onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => void
-  onPointerUp: (event: ReactPointerEvent<HTMLButtonElement>) => void
-  onPointerCancel: (event: ReactPointerEvent<HTMLButtonElement>) => void
+interface RowSwipeHandlers {
+  onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void
+  onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void
+  onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void
+  onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void
 }
 
-export interface NoteRowSwipe {
-  handlers: NoteRowSwipeHandlers
+export interface RowSwipe {
+  handlers: RowSwipeHandlers
   /**
-   * Attach to the moving note surface. The hook writes its presentation
+   * Attach to the moving row surface. The hook writes its presentation
    * (`touch-action`, `transform`, `transition`, `will-change`) imperatively,
    * so pointer moves never re-render React.
    */
-  ref: (element: HTMLButtonElement | null) => void
+  ref: (element: HTMLElement | null) => void
   /**
    * Consume the synthetic click that WebKit emits after a completed drag.
    * Call it first inside the row's click handler: it returns true exactly once
@@ -87,19 +87,19 @@ export interface NoteRowSwipe {
 }
 
 /**
- * The iOS-style swipe-action gesture for a note row. Touch follows the finger
+ * The iOS-style swipe-action gesture for a list row. Touch follows the finger
  * 1:1 after a small direction threshold, hands recent velocity into the
  * open/closed decision, and stays interruptible while settling.
  * `touch-action: pan-y` leaves list scrolling native until horizontal intent
- * wins; the hook applies that property through {@link NoteRowSwipe.ref}.
+ * wins; the hook applies that property through {@link RowSwipe.ref}.
  */
-export function useNoteRowSwipe({
+export function useRowSwipe({
   actionWidth,
   revealed,
   onReveal,
   onClose,
   onBeginInteraction,
-}: NoteRowSwipeOptions): NoteRowSwipe {
+}: RowSwipeOptions): RowSwipe {
   const reducedMotion = usePrefersReducedMotion()
   const gestureRef = useRef<RowGesture | null>(null)
   const suppressClickRef = useRef(false)
@@ -108,7 +108,7 @@ export function useNoteRowSwipe({
 
   // A fresh callback every render, so React re-runs it each commit and the
   // resting presentation follows `revealed` without any hook state.
-  const ref = (element: HTMLButtonElement | null): void => {
+  const ref = (element: HTMLElement | null): void => {
     if (element === null || gestureRef.current !== null) {
       return
     }
@@ -116,7 +116,7 @@ export function useNoteRowSwipe({
     presentSettled(element, restingOffset, reducedMotion)
   }
 
-  const onPointerDown = (event: ReactPointerEvent<HTMLButtonElement>): void => {
+  const onPointerDown = (event: ReactPointerEvent<HTMLElement>): void => {
     if (event.pointerType !== 'touch' || !event.isPrimary) {
       return
     }
@@ -146,7 +146,7 @@ export function useNoteRowSwipe({
     presentDragging(surface, startOffset)
   }
 
-  const onPointerMove = (event: ReactPointerEvent<HTMLButtonElement>): void => {
+  const onPointerMove = (event: ReactPointerEvent<HTMLElement>): void => {
     const gesture = gestureRef.current
     if (gesture === null || gesture.pointerId !== event.pointerId) {
       return
@@ -208,7 +208,7 @@ export function useNoteRowSwipe({
     event.currentTarget.style.transform = `translate3d(${nextOffset}px, 0, 0)`
   }
 
-  const release = (event: ReactPointerEvent<HTMLButtonElement>, interrupted: boolean): void => {
+  const release = (event: ReactPointerEvent<HTMLElement>, interrupted: boolean): void => {
     const gesture = gestureRef.current
     if (gesture === null || gesture.pointerId !== event.pointerId) {
       return

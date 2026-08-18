@@ -2,7 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { Pin, PinOff, Trash2 } from 'lucide-react'
 import type { HighlightSegment } from '@reflect/core'
 import { formatRecencyLabel } from '@/lib/dates'
-import { useNoteRowSwipe } from '@/mobile/use-note-row-swipe'
+import { useRowSwipe } from '@/mobile/use-row-swipe'
 import { useSettings } from '@/providers/settings-provider'
 
 /** V1's fixed row height (px) — placeholder resolution never causes jumps. */
@@ -49,7 +49,7 @@ function renderHighlightedSegments(segments: HighlightSegment[]): ReactNode {
 
 /**
  * One note row over its iOS-style reveal actions. The gesture physics live in
- * {@link useNoteRowSwipe}; this component owns the note-specific content and
+ * {@link useRowSwipe}; this component owns the note-specific content and
  * accessible action controls.
  */
 export function SwipeableNoteRow({
@@ -65,7 +65,7 @@ export function SwipeableNoteRow({
   const { settings } = useSettings()
   const actionWidth = ACTION_BUTTON_WIDTH * (row.canDelete ? 2 : 1)
   const title = row.titleSegments.map((segment) => segment.text).join('')
-  const swipe = useNoteRowSwipe({
+  const swipe = useRowSwipe({
     actionWidth,
     revealed,
     onReveal,
