@@ -216,7 +216,9 @@ body {
   .reflect-chat-message,
   .reflect-chat-message *,
   .reflect-protected-note,
-  .reflect-protected-note * {
+  .reflect-protected-note *,
+  .textLayer,
+  .textLayer * {
     -webkit-user-select: text;
     user-select: text;
     -webkit-touch-callout: default;
@@ -584,6 +586,50 @@ html:root {
 }
 .reflect-editor .md-image-view-preview img {
   cursor: zoom-in;
+}
+
+/* A linked PDF image (`[![…](img)](assets/….pdf#page=N)` — the annotation
+   screenshot reference) renders as a chip like the text references: clicking
+   jumps to the PDF's page, so the whole block carries the sunken surface and
+   a pointer cursor. The image keeps its drag-resize handle inside the chip.
+   meowdown never nests the image view inside the link's anchor — they are
+   siblings in the link's `.md-pack` — so the selector keys on the pack. */
+.reflect-editor .md-pack[data-key='link']:has(.md-image-view) {
+  display: inline-block;
+  max-width: 100%;
+  padding: 6px;
+  border-radius: var(--radius-md, 6px);
+  background: var(--surface-sunken, rgb(0 0 0 / 5%));
+  cursor: pointer;
+}
+.reflect-editor .md-pack[data-key='link']:has(.md-image-view):hover {
+  background: var(--accent-soft, rgb(99 102 241 / 12%));
+}
+.reflect-editor .md-pack[data-key='link']:has(.md-image-view) .md-image-view-preview img {
+  cursor: pointer;
+}
+/* The jump-target caption a LinkedPdfImageCaptions widget decoration renders
+   under the chip's image — the same role the visible label plays for a text
+   reference. Clicks pass through to the chip (the jump). */
+.reflect-linked-pdf-caption {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--text-muted);
+  pointer-events: none;
+  user-select: none;
+}
+/* ProseMirror nests the inline widget in the following source mark's wrapper
+   (`.md-mark`), which hide/focus mode suppresses with `opacity: 0` — geometry
+   stays, paint vanishes. Lift the opacity on the wrapper holding a caption;
+   the hidden source characters inside it stay invisible via `font-size: 0`. */
+.ProseMirror[data-mark-mode='hide'] .md-mark:has(.reflect-linked-pdf-caption),
+.ProseMirror[data-mark-mode='focus'] .md-mark:has(.reflect-linked-pdf-caption) {
+  opacity: 1;
 }
 
 /* Editor image lightbox: zoom the clicked image into the full-window preview

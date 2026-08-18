@@ -3,6 +3,7 @@ import type { GraphInfo } from '@reflect/core'
 import { handleDeepLink, type DeepLinkIo } from '@/lib/deep-links/handle'
 import { setDeepLinkHandler } from '@/lib/deep-links/intake'
 import { parseDeepLink } from '@/lib/deep-links/parse'
+import { useSetPreviewPanelTarget } from '@/providers/preview-panel-provider'
 import {
   beginLinkNavigationIntent,
   isCurrentLinkNavigationIntent,
@@ -23,6 +24,12 @@ interface DeepLinkProviderProps {
 
 export function DeepLinkProvider({ graph, children }: DeepLinkProviderProps): ReactElement {
   const { navigate, navigationRevision } = useRouter()
+  // The stable preview-panel setter: `preview/open` links open the panel for
+  // a note path, an app-local side-panel change rather than a navigation.
+  const setPreviewPanelTarget = useSetPreviewPanelTarget()
+  const openPreview = (path: string): void => {
+    setPreviewPanelTarget({ kind: 'note', path })
+  }
 
   // The graph session this provider instance currently serves. Staleness must
   // mean "the session changed", NOT "the effect re-ran": StrictMode's probe
@@ -39,12 +46,13 @@ export function DeepLinkProvider({ graph, children }: DeepLinkProviderProps): Re
     const issued = graph.generation
     setDeepLinkHandler((url) => {
       const link = parseDeepLink(url)
-      // Capture and rejected URLs do not express a navigation intent, so they
-      // must not supersede a note target that is still resolving.
+      // Capture and rejected URLs do not express a navigation intent, and a
+      // resident-preview link is a side-panel change rather than an addressing
+      // one — none may supersede a note target that is still resolving.
       const io =
-        link !== null && link.kind !== 'capture'
-          ? createNavigationIo(navigate, navigationRevision, sessionRef, issued)
-          : { navigate, generation: issued }
+        link !== null && link.kind !== 'capture' && link.kind !== 'preview'
+          ? createNavigationIo(navigate, navigationRevision, sessionRef, issued, openPreview)
+          : { navigate, generation: issued, openPreview }
       handleDeepLink(url, io).catch((cause: unknown) => {
         console.error('deep link failed:', url, cause)
       })
@@ -62,12 +70,14 @@ function createNavigationIo(
   navigationRevision: () => number,
   sessionRef: { readonly current: number },
   generation: number,
+  openPreview: DeepLinkIo['openPreview'],
 ): DeepLinkIo {
   const linkIntent = beginLinkNavigationIntent()
   const issuedAtRevision = navigationRevision()
   return {
     navigate,
     generation,
+    openPreview,
     isStale: () =>
       sessionRef.current !== generation ||
       navigationRevision() !== issuedAtRevision ||

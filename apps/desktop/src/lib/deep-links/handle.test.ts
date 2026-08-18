@@ -23,9 +23,10 @@ const operationHandle = {
   dismiss: vi.fn(),
 }
 const navigate = vi.fn()
+const openPreview = vi.fn()
 
 function handle(url: string) {
-  return handleDeepLink(url, { navigate, generation: 3 })
+  return handleDeepLink(url, { navigate, generation: 3, openPreview })
 }
 
 beforeEach(() => {
@@ -89,6 +90,7 @@ describe('handleDeepLink', () => {
     const pending = handleDeepLink('reflect://note/Project%20X', {
       navigate,
       generation: 3,
+      openPreview,
       isStale: () => stale,
     })
 
@@ -112,6 +114,7 @@ describe('handleDeepLink', () => {
     const pending = handleDeepLink('reflect://note/Project%20X', {
       navigate,
       generation: 3,
+      openPreview,
       isStale: () => stale,
     })
     stale = true
@@ -177,6 +180,29 @@ describe('handleDeepLink', () => {
 
     expect(operationHandle.done).not.toHaveBeenCalled()
     expect(startOperationMock).toHaveBeenCalledWith('Saving capture')
+    expect(operationHandle.fail).toHaveBeenCalled()
+  })
+
+  it('opens the resident preview for a resolved preview link without navigating', async () => {
+    resolveMock.mockResolvedValue('notes/foo.md')
+
+    await handle('reflect://preview/open?path=notes%2Ffoo.md')
+
+    expect(resolveMock).toHaveBeenCalledWith('notes/foo.md')
+    expect(openPreview).toHaveBeenCalledWith('notes/foo.md')
+    expect(navigate).not.toHaveBeenCalled()
+    expect(startOperationMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects a preview link whose path resolves to no indexed note', async () => {
+    // A traversal path names no indexed note: resolveNoteTarget returns null,
+    // and the path never reaches the preview's file reader.
+    resolveMock.mockResolvedValue(null)
+
+    await handle('reflect://preview/open?path=..%2F..%2Fetc%2Fpasswd')
+
+    expect(openPreview).not.toHaveBeenCalled()
+    expect(startOperationMock).toHaveBeenCalledWith('Opening preview')
     expect(operationHandle.fail).toHaveBeenCalled()
   })
 })

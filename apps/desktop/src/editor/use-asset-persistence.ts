@@ -11,6 +11,7 @@ import {
   type FileMeta,
 } from '@reflect/core'
 import { formatBytes } from '@/lib/format-bytes'
+import { decodeAssetHref } from '@/lib/annotations/pdf-href'
 import { startOperation } from '@/lib/operations'
 
 /**
@@ -32,6 +33,16 @@ const EXTENSION_BY_MIME: Record<string, string> = {
 }
 
 /**
+ * Strip a trailing `#fragment` / `?query` off a graph-relative reference, so a
+ * page-targeted PDF link (`assets/x.pdf#page=3`) vets, displays, and opens as
+ * the bare `assets/x.pdf` — never a path the Rust asset commands can't
+ * resolve. Every consumer of {@link isSafeAssetSource} inherits the fix.
+ */
+function stripLocationSuffix(sourcePath: string): string {
+  return sourcePath.split('#')[0]!.split('?')[0]!
+}
+
+/**
  * True for a graph-relative `assets/…` path with no traversal segments. The
  * Rust shell already guards every *write* against traversal; this guards
  * *display and open* resolution so a crafted `assets/../…` reference in note
@@ -39,10 +50,11 @@ const EXTENSION_BY_MIME: Record<string, string> = {
  * in depth).
  */
 function isSafeAssetSource(sourcePath: string): boolean {
-  if (!sourcePath.startsWith('assets/') || sourcePath.includes('\\')) {
+  const path = stripLocationSuffix(sourcePath)
+  if (!path.startsWith('assets/') || path.includes('\\')) {
     return false
   }
-  return sourcePath
+  return path
     .split('/')
     .every((segment, index) =>
       index === 0
@@ -57,7 +69,14 @@ function isSafeAssetSource(sourcePath: string): boolean {
  * it as a file pill instead of a plain link. Pure by contract (meowdown
  * caches and diffs parse results), which a stateless path check satisfies.
  */
-export function resolveAssetFileLink({ href }: FileLinkPayload): boolean {
+export function resolveAssetFileLink({ href, label }: FileLinkPayload): boolean {
+  // An image inside the link renders as the image (a claimed file pill would
+  // replace the link's content with a name/size chip); only plain-text
+  // attachment links become pills. The label carries nested syntax raw, so
+  // `![` reliably marks an image.
+  if (label.includes('![')) {
+    return false
+  }
   return isSafeAssetSource(href)
 }
 
@@ -145,8 +164,9 @@ export function useAssetPersistence(generation: number | null, path?: string): A
       if (/^https?:\/\//.test(src)) {
         return src
       }
-      if (generation !== null && isSafeAssetSource(src)) {
-        return convertFileSrc(`${generation}/${src}`, 'reflect-asset')
+      const path = decodeAssetHref(src)
+      if (generation !== null && isSafeAssetSource(path)) {
+        return convertFileSrc(`${generation}/${path}`, 'reflect-asset')
       }
       return null
     },
@@ -155,8 +175,9 @@ export function useAssetPersistence(generation: number | null, path?: string): A
 
   const resolveAssetOpenPath = useCallback(
     (src: string): string | null => {
-      if (generation !== null && isSafeAssetSource(src)) {
-        return src
+      const path = decodeAssetHref(src)
+      if (generation !== null && isSafeAssetSource(path)) {
+        return path
       }
       return null
     },

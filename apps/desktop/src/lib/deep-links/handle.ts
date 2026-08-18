@@ -14,6 +14,12 @@ export interface DeepLinkIo {
   /** `GraphInfo.generation` — pins the capture spool to the issuing graph. */
   generation: number
   /**
+   * Open a note's resident preview in the preview panel (a
+   * `reflect://preview/open` link). Synchronous — the target is app-local UI,
+   * not a navigation — so unlike {@link navigate} it needs no staleness gate.
+   */
+  openPreview: (path: string) => void
+  /**
    * Whether the graph session or navigation intent changed while the handler
    * awaited. Note resolution queries whichever index is open when it runs, so
    * a stale result must be dropped, never navigated — it may name a homonym
@@ -87,6 +93,31 @@ export async function handleDeepLink(url: string, io: DeepLinkIo): Promise<void>
         return
       }
       startOperation(label).done()
+      return
+    }
+    case 'preview': {
+      // The path comes from an untrusted URL; resolve it like a note target
+      // so only indexed note paths preview — a `../../` traversal names no
+      // indexed note and is rejected instead of reaching the file reader.
+      let path: string | null
+      try {
+        path = await resolveNoteTarget(link.path)
+      } catch (cause) {
+        if (io.isStale?.() === true) {
+          return
+        }
+        startOperation('Opening preview').fail(errorMessage(cause))
+        return
+      }
+      if (io.isStale?.() === true) {
+        return
+      }
+      if (path === null) {
+        startOperation('Opening preview').fail(`Note not found: ${truncate(link.path)}`)
+        return
+      }
+      io.openPreview(path)
+      return
     }
   }
 }

@@ -7,7 +7,9 @@ import {
   importReflectV1Zip,
   markReflectV1ImportOwnWrites,
   openAsset,
+  readAnnotations,
   subscribeImportProgress,
+  writeAnnotations,
   IMPORT_PROGRESS_EVENT,
 } from './commands'
 
@@ -89,6 +91,32 @@ describe('graph commands', () => {
       path: 'assets/cat.png',
       generation: 7,
     })
+  })
+
+  it('reads and writes PDF annotation sidecars through the native commands', async () => {
+    const invoke = vi.fn().mockResolvedValueOnce('{"annotations":[]}').mockResolvedValueOnce(null)
+    setBridge({ invoke, listen: async () => () => {} })
+
+    const contents = await readAnnotations('assets/paper.pdf')
+    expect(invoke).toHaveBeenNthCalledWith(1, 'annotation_read', {
+      path: 'assets/paper.pdf',
+    })
+    expect(contents).toBe('{"annotations":[]}')
+
+    await writeAnnotations('assets/paper.pdf', '{"annotations":[]}', 42)
+    expect(invoke).toHaveBeenNthCalledWith(2, 'annotation_write', {
+      path: 'assets/paper.pdf',
+      content: '{"annotations":[]}',
+      generation: 42,
+    })
+  })
+
+  it('surfaces an empty annotation sidecar as an empty string', async () => {
+    const invoke = vi.fn(async () => '')
+    setBridge({ invoke, listen: async () => () => {} })
+
+    await expect(readAnnotations('assets/paper.pdf')).resolves.toBe('')
+    expect(invoke).toHaveBeenCalledWith('annotation_read', { path: 'assets/paper.pdf' })
   })
 
   it('imports Reflect V1 zips through the generation-pinned native command', async () => {

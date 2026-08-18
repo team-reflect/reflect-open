@@ -297,6 +297,8 @@ pub fn run() {
             fs::audio_memo_delete,
             fs::transcript_cache_read,
             fs::transcript_cache_write,
+            fs::annotation_read,
+            fs::annotation_write,
             fs::asset_open,
             fs::asset_reveal,
             fs::assets::asset_upload_begin,

@@ -1,0 +1,534 @@
+import { useCallback, useEffect, useState, type ReactElement } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { errorMessage, isAppError, splitFrontmatter } from '@reflect/core'
+import { X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { MarkdownPreview, type MarkdownImageClick } from '@/editor/markdown-preview'
+import { useOpenExternalLink } from '@/editor/open-external-link'
+import { useAssetPersistence } from '@/editor/use-asset-persistence'
+import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
+import { annotationReference } from '@/lib/annotations/annotation-reference'
+import { linkedPdfImageHitAt } from '@/lib/annotations/linked-pdf-image'
+import { parsePdfHref } from '@/lib/annotations/pdf-href'
+import { extractRegionText } from '@/lib/annotations/pdf-region-text'
+import type { PdfTextItemLike } from '@/lib/annotations/pdf-region-text'
+import {
+  normalizedSelectionRects,
+  selectionPages,
+  selectionToHighlight,
+} from '@/lib/annotations/pdf-selection'
+import { copyBorderReference } from '@/lib/annotations/pdf-region-screenshot'
+import { usePdfAnnotations, type AnnotationItem } from '@/lib/annotations/annotations-store'
+import { startOperation } from '@/lib/operations'
+import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { readExistingNoteSource } from '@/lib/read-existing-note-source'
+import { useGraph } from '@/providers/graph-provider'
+import { usePdfSession } from '@/providers/pdf-session-provider'
+import {
+  useSetPreviewPanelTarget,
+  type PreviewPanelTarget,
+} from '@/providers/preview-panel-provider'
+import { AnnotationSection } from './annotation-section'
+import {
+  DEFAULT_ANNOTATION_COLOR,
+  type AnnotationColor,
+  type AnnotationTool,
+} from './annotation-toolbar'
+import { HighlightLayer, type NormalizedRect } from './highlight-layer'
+import { PdfViewerShell } from './pdf-viewer-shell'
+
+/**
+ * The resident preview panel's content, opened for a PDF or note link and
+ * rendered in the workspace's split pane — the vertical panel right of the
+ * note pane, not the context aside (which keeps its daily/note context). Owns
+ * the annotation interactions for PDF targets — the tool state (browse/draw,
+ * the picker color, the selected annotation), which the toolbar, list, and
+ * highlight layer all consume — and renders the note body read-only for note
+ * targets. Navigation closes the panel (PreviewPanelProvider), so clicking a
+ * wiki link in the note preview here just navigates the graph like anywhere
+ * else.
+ */
+
+interface PdfPreviewProps {
+  /** The PDF target to display, including the 1-based page it opened on. */
+  target: Extract<PreviewPanelTarget, { kind: 'pdf' }>
+  onClose: () => void
+}
+
+/**
+ * Whether the event target is an editable region (input/textarea/select/rich
+ * text) — the mode shortcuts must never fire on these, so page-number entry
+ * and note editing are never interrupted. `[contenteditable]` excludes
+ * `contenteditable="false"` (read-only fragments inside an editable host).
+ */
+function isEditableTarget(target: HTMLElement): boolean {
+  return (
+    target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])') !==
+    null
+  )
+}
+
+/** Give focus back to the reader after a mode shortcut (non-editable targets only). */
+function blurActiveElement(): void {
+  const active = document.activeElement
+  if (active instanceof HTMLElement && !isEditableTarget(active)) {
+    active.blur()
+  }
+}
+
+/** The pdf.js `.page` element a DOM node sits in, or null when outside one. */
+function closestPage(node: Node): HTMLElement | null {
+  const element = node instanceof Element ? node : node.parentElement
+  return element?.closest('.page') ?? null
+}
+
+/** Every `.page` the selection spans, in document order. */
+function selectionPagesInRange(range: Range): HTMLElement[] {
+  const startPage = closestPage(range.startContainer)
+  const endPage = closestPage(range.endContainer)
+  if (startPage === null || endPage === null) {
+    return []
+  }
+  if (startPage === endPage) {
+    return [startPage]
+  }
+  const viewer = startPage.parentElement
+  if (viewer === null) {
+    return [startPage, endPage]
+  }
+  const allPages = Array.from(viewer.querySelectorAll<HTMLElement>('.page'))
+  return selectionPages(startPage, endPage, allPages)
+}
+
+/**
+ * The selection's own text within one page: the whole range for a single-page
+ * selection; for a cross-page one, the slice from the range's start to the
+ * start page's text-layer end, the end page's text-layer start to the range's
+ * end, or the whole text layer for pages in between.
+ */
+function selectionTextForPage(range: Range, page: HTMLElement): string {
+  const startPage = closestPage(range.startContainer)
+  const endPage = closestPage(range.endContainer)
+  if (startPage === endPage) {
+    return range.toString()
+  }
+  const textLayer = page.querySelector('.textLayer')
+  if (textLayer === null) {
+    return ''
+  }
+  const sub = range.cloneRange()
+  if (page === startPage) {
+    sub.setEnd(textLayer, textLayer.childNodes.length)
+  } else if (page === endPage) {
+    sub.setStart(textLayer, 0)
+  } else {
+    sub.setStart(textLayer, 0)
+    sub.setEnd(textLayer, textLayer.childNodes.length)
+  }
+  return sub.toString()
+}
+
+/** The PDF branch: viewer + annotation overlay under one toolbar and list. */
+function PdfPreview({ target, onClose }: PdfPreviewProps): ReactElement {
+  const { graph } = useGraph()
+  const generation = graph?.generation ?? null
+  const { session } = usePdfSession()
+  const { saveFile } = useAssetPersistence(generation)
+  const { annotations, addAnnotation, removeAnnotation } = usePdfAnnotations(
+    target.assetPath,
+    generation,
+  )
+  const [mode, setMode] = useState<AnnotationTool>('browse')
+  const [color, setColor] = useState<AnnotationColor>(DEFAULT_ANNOTATION_COLOR)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  // Single-letter mode shortcuts and the ESC exit: `v` = Browse, `r` = Draw
+  // Rectangle, `t` = Highlight text, ESC returns to Browse from any non-browse
+  // mode. Scoped to the panel's lifetime (the listeners mount/unmount with
+  // it); modifier keys (⌘/Ctrl/Alt, so ⌘V and friends pass through) and
+  // editable targets (input/textarea/select/contenteditable — the page-number
+  // field, the note editor) are skipped so typing is never interrupted. After
+  // a handled shortcut the focused element is blurred (a toolbar button's
+  // focus ring disappears) and focus returns to the reader.
+  //
+  // The mouseup listener runs the text-highlight capture: while the highlight
+  // mode is active, releasing a text selection inside a pdf `.page` converts
+  // it into a text-type annotation. The selection must sit inside a page
+  // (found via the range's common ancestor) — a selection in the note editor
+  // or elsewhere is left alone. Touch selection handles are out of scope.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing) {
+        return
+      }
+      const target = event.target
+      if (target instanceof HTMLElement && isEditableTarget(target)) {
+        return
+      }
+      if (event.key === 'Escape') {
+        if (mode !== 'browse') {
+          setMode('browse')
+          blurActiveElement()
+        }
+        return
+      }
+      let next: AnnotationTool | null = null
+      switch (event.key.toLowerCase()) {
+        case 'v':
+          next = 'browse'
+          break
+        case 'r':
+          next = 'create'
+          break
+        case 't':
+          next = 'highlight'
+          break
+      }
+      if (next !== null) {
+        setMode(next)
+        blurActiveElement()
+      }
+    }
+    const onMouseUp = (): void => {
+      if (mode !== 'highlight') {
+        return
+      }
+      const selection = window.getSelection()
+      if (selection === null || selection.isCollapsed || selection.rangeCount === 0) {
+        return
+      }
+      const range = selection.getRangeAt(0)
+      // The selection may span several pages: one annotation per page, with
+      // the page's own selection slice.
+      const pages = selectionPagesInRange(range)
+      if (pages.length === 0) {
+        return
+      }
+      void createTextHighlights(pages, range, selection)
+    }
+    const createTextHighlights = async (
+      pages: readonly HTMLElement[],
+      range: Range,
+      selection: Selection,
+    ): Promise<void> => {
+      const doc = session.pdfDocument
+      if (doc === null) {
+        return
+      }
+      const clientRects = Array.from(range.getClientRects())
+      for (const page of pages) {
+        const pageNumber = Number(page.getAttribute('data-page-number'))
+        if (!Number.isSafeInteger(pageNumber) || pageNumber < 1) {
+          continue
+        }
+        const pageRect = page.getBoundingClientRect()
+        if (pageRect.right <= pageRect.left || pageRect.bottom <= pageRect.top) {
+          continue
+        }
+        // The browser's selection rects can drift from the canvas glyphs when
+        // pdf.js substitutes a font, so they only hit-test; the annotation
+        // rects come from pdf.js's own text coordinates below. Rects outside
+        // this page clamp away and drop.
+        const pageRects = normalizedSelectionRects(clientRects, pageRect)
+        if (pageRects.length === 0) {
+          continue
+        }
+        try {
+          const pageProxy = await doc.getPage(pageNumber)
+          const content = await pageProxy.getTextContent()
+          const viewport = pageProxy.getViewport({ scale: 1 })
+          const textItems = content.items.filter(
+            (textItem) => 'str' in textItem,
+          ) as PdfTextItemLike[]
+          const highlight = selectionToHighlight(
+            pageRects,
+            textItems,
+            viewport,
+            pageNumber - 1,
+            selectionTextForPage(range, page),
+          )
+          if (highlight !== null) {
+            addAnnotation({ ...highlight, type: 'text', color })
+          }
+        } catch {
+          // A failed read (document destroyed mid-selection, etc.) drops that
+          // page's capture rather than surfacing an error for a gesture.
+        }
+      }
+      // Clear the selection once so a second capture in a row starts fresh.
+      selection.removeAllRanges()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    document.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [mode, color, addAnnotation])
+
+  const handleAdd = useCallback(
+    (pageIndex: number, rect: NormalizedRect): void => {
+      addAnnotation({ pageIndex, type: 'border', rects: [rect], color, text: '' })
+    },
+    [addAnnotation, color],
+  )
+
+  const handleDeleteSelected = useCallback((): void => {
+    if (selectedId !== null) {
+      removeAnnotation(selectedId)
+    }
+    setSelectedId(null)
+  }, [removeAnnotation, selectedId])
+
+  // The context menu's actions: copy the annotation's text or a markdown
+  // reference back to its page, and delete it. Copies land on the clipboard
+  // and confirm through the operations status line, like the app's other copy
+  // surfaces. An empty-text border annotation has its text extracted from the
+  // PDF region the rect covers (via the shared session's document); nothing to
+  // copy surfaces as a status-line warning instead.
+  const handleCopyText = useCallback(
+    (item: AnnotationItem): void => {
+      const copy = (text: string): Promise<void> =>
+        navigator.clipboard.writeText(text).then(() => {
+          startOperation('Annotation text copied').done()
+        })
+      if (item.text.trim() !== '') {
+        copy(item.text).catch((cause: unknown) => {
+          startOperation('Copying annotation text').fail(errorMessage(cause))
+        })
+        return
+      }
+      const doc = session.pdfDocument
+      if (item.type === 'border' && doc !== null) {
+        void extractRegionText(doc, item)
+          .then((text) => {
+            if (text !== null) {
+              return copy(text)
+            }
+            startOperation('Copying annotation text').warn('No text in this area')
+          })
+          .catch((cause: unknown) => {
+            startOperation('Copying annotation text').fail(errorMessage(cause))
+          })
+        return
+      }
+      // No text to copy and nothing to extract from (a text-type annotation,
+      // or the document is not ready).
+      startOperation('Copying annotation text').warn('No text in this area')
+    },
+    [session.pdfDocument],
+  )
+  const handleCopyReference = useCallback(
+    (item: AnnotationItem): void => {
+      void (async () => {
+        const operation = startOperation('Copying annotation reference')
+        try {
+          if (item.type !== 'border') {
+            // A text-type annotation keeps its text link.
+            await navigator.clipboard.writeText(annotationReference(target.assetPath, item))
+            operation.done()
+            return
+          }
+          // A border annotation copies a linked screenshot of its region;
+          // when the screenshot is impossible it degrades to the text link.
+          const outcome = await copyBorderReference(target.assetPath, item, {
+            doc: session.pdfDocument,
+            saveFile,
+            writeClipboard: (text) => navigator.clipboard.writeText(text),
+          })
+          if (outcome === 'copied-screenshot') {
+            operation.done()
+          } else {
+            operation.warn('Screenshot unavailable; copied the text link instead')
+          }
+        } catch (cause) {
+          operation.fail(errorMessage(cause))
+        }
+      })()
+    },
+    [target.assetPath, session.pdfDocument, saveFile],
+  )
+  const handleRemove = useCallback(
+    (id: string): void => {
+      removeAnnotation(id)
+      setSelectedId((current) => (current === id ? null : current))
+    },
+    [removeAnnotation],
+  )
+
+  return (
+    <div className="flex h-full min-h-0 flex-col text-text">
+      <PdfViewerShell
+        assetPath={target.assetPath}
+        {...(target.page !== undefined ? { initialPage: target.page } : {})}
+        onClose={onClose}
+        publishSession
+      >
+        <HighlightLayer
+          annotations={annotations}
+          mode={mode}
+          color={color}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onAdd={handleAdd}
+          onCopyText={handleCopyText}
+          onCopyReference={handleCopyReference}
+          onRemove={handleRemove}
+        />
+        <AnnotationSection
+          annotations={annotations}
+          mode={mode}
+          onModeChange={setMode}
+          color={color}
+          onColorChange={setColor}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onDeleteSelected={handleDeleteSelected}
+        />
+      </PdfViewerShell>
+    </div>
+  )
+}
+
+interface NotePreviewProps {
+  /** The note target's graph-relative path. */
+  path: string
+  onClose: () => void
+}
+
+/** Read the note body; a missing note is not an error here, it previews as empty. */
+async function readNoteBody(path: string, generation: number): Promise<string | null> {
+  try {
+    return await readExistingNoteSource(path, generation)
+  } catch (cause) {
+    if (isAppError(cause) && cause.kind === 'notFound') {
+      return null
+    }
+    throw cause
+  }
+}
+
+/** The note branch: title header, live body preview, and a close button. */
+function NotePreview({ path, onClose }: NotePreviewProps): ReactElement {
+  const { graph } = useGraph()
+  const generation = graph?.generation ?? null
+  const { resolveImageUrl } = useAssetPersistence(generation)
+  const navigateWikiLink = useWikiLinkNavigation(generation)
+  const setPreviewPanelTarget = useSetPreviewPanelTarget()
+  const openExternalLink = useOpenExternalLink()
+  const { data, isError } = useQuery({
+    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'preview-note', path],
+    queryFn: () => {
+      if (generation === null) {
+        return null
+      }
+      return readNoteBody(path, generation)
+    },
+    enabled: generation !== null,
+  })
+
+  // PDF links inside the note body open the in-app PDF preview panel (the
+  // annotation lane's migration links); every other link keeps the default
+  // OS-opener behavior.
+  const onLinkClick = useCallback(
+    (href: string, event: MouseEvent | KeyboardEvent, mod: boolean): void => {
+      const pdfHref = parsePdfHref(href)
+      if (pdfHref !== null) {
+        event.preventDefault()
+        setPreviewPanelTarget({
+          kind: 'pdf',
+          assetPath: pdfHref.path,
+          ...(pdfHref.page !== undefined ? { page: pdfHref.page } : {}),
+        })
+        return
+      }
+      openExternalLink({ href, event, mod })
+    },
+    [openExternalLink, setPreviewPanelTarget],
+  )
+  // An image click inside the note body: a linked PDF image (the screenshot
+  // reference shape) jumps to the PDF's page instead of zooming, and any
+  // other image click is a no-op — the resident preview has no lightbox for
+  // plain images, and the anchor's default navigation must never fire.
+  // meowdown never nests the preview inside the link's anchor, so the lookup
+  // goes through the rendered image view.
+  const onImageClick = useCallback(
+    (payload: MarkdownImageClick): void => {
+      const target = payload.event.target
+      if (target instanceof Element) {
+        const hit = linkedPdfImageHitAt(target)
+        if (hit !== null) {
+          payload.event.preventDefault()
+          setPreviewPanelTarget({
+            kind: 'pdf',
+            assetPath: hit.ref.path,
+            ...(hit.ref.page !== undefined ? { page: hit.ref.page } : {}),
+          })
+          return
+        }
+      }
+      payload.event.preventDefault()
+    },
+    [setPreviewPanelTarget],
+  )
+  const body = data === null || data === undefined ? null : splitFrontmatter(data).body
+  const title = path.split('/').pop()?.replace(/\.md$/i, '') ?? path
+
+  let content: ReactElement
+  if (isError) {
+    content = <p className="px-3.5 py-3 text-sm text-text-muted">This note can’t be previewed.</p>
+  } else if (body === null || body.trim() === '') {
+    content = <p className="px-3.5 py-3 text-sm text-text-muted italic">Empty</p>
+  } else {
+    content = (
+      <MarkdownPreview
+        content={body}
+        resolveImageUrl={resolveImageUrl}
+        onLinkClick={onLinkClick}
+        onImageClick={onImageClick}
+        onWikiLinkClick={navigateWikiLink}
+        interactive
+        className="px-3.5 py-2 text-sm"
+      />
+    )
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col text-text">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3.5 py-2">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-xs font-medium">{title}</div>
+          <div className="truncate text-2xs text-text-muted">{path}</div>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Close preview"
+          title="Close preview"
+          onClick={onClose}
+        >
+          <X />
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{content}</div>
+    </div>
+  )
+}
+
+interface PreviewPanelProps {
+  /** The open preview panel's target; never null here (the shell hides the pane). */
+  target: PreviewPanelTarget
+  onClose: () => void
+}
+
+/**
+ * Renders the resident preview panel for its target. Keyed on the target's
+ * subject so switching PDFs (or notes) remounts the branch and resets its
+ * interaction state instead of leaking the previous document's selection.
+ */
+export function PreviewPanel({ target, onClose }: PreviewPanelProps): ReactElement {
+  if (target.kind === 'pdf') {
+    return <PdfPreview key={target.assetPath} target={target} onClose={onClose} />
+  }
+  return <NotePreview key={target.path} path={target.path} onClose={onClose} />
+}

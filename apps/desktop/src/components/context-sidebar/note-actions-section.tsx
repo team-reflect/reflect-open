@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { Lock } from 'lucide-react'
+import { FileText, Lock } from 'lucide-react'
 import { PinIcon } from '@/components/icons/pin-icon'
 import { useNoteRow } from '@/hooks/use-note-row'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes'
@@ -7,6 +7,9 @@ import { keybindingFor } from '@/lib/commands/app-commands'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
 import { useOptimisticPinToggle } from '@/lib/notes/use-optimistic-pin-toggle'
+import { usePdfSession } from '@/providers/pdf-session-provider'
+import { usePdfSidebarView } from '@/providers/pdf-sidebar-view-provider'
+import { usePreviewPanel } from '@/providers/preview-panel-provider'
 import { NoteGistAction } from './note-gist-action'
 import { NoteTrashAction } from './note-trash-action'
 import { NoteToggleAction } from './note-toggle-action'
@@ -42,8 +45,33 @@ export function NoteActionsSection({
   const isPrivate = noteRow?.isPrivate ?? false
   const { applyOptimisticPin, invalidateOptimisticPin } = useOptimisticPinToggle(path, noteRow)
 
+  // When the PDF session is active (the preview target is a PDF, its document
+  // is loaded, and the session belongs to that same asset), offer the entry
+  // into the sidebar stack's top PDF panel. The row layout matches
+  // NoteToggleAction (full-width rounded row, 20px icon container, body
+  // text); bg-accent/5 and the accent icon echo the PDF panel's temporary tint.
+  const { session } = usePdfSession()
+  const { enterPdf } = usePdfSidebarView()
+  const { target: previewTarget } = usePreviewPanel()
+  const pdfSessionActive =
+    previewTarget?.kind === 'pdf' &&
+    session.pdfDocument !== null &&
+    session.assetPath === previewTarget.assetPath
+
   return (
     <SidebarSection storageKey="note-actions" title="Note actions">
+      {pdfSessionActive ? (
+        <button
+          type="button"
+          onClick={enterPdf}
+          className="group relative flex w-full items-center space-x-2 rounded-lg bg-accent/5 px-3 py-2 text-start transition-colors duration-100 hover:bg-surface-hover"
+        >
+          <span className="flex h-5 w-5 flex-none items-center justify-center text-accent">
+            <FileText aria-hidden className="size-4" />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-xs font-medium">Deepdive PDF</span>
+        </button>
+      ) : null}
       <NoteToggleAction
         path={path}
         indexActive={isPinned}

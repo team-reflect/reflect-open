@@ -559,6 +559,102 @@ pub fn transcript_cache_write(
     Ok(())
 }
 
+/// A PDF's annotation sidecar lives under `.reflect/annotations/`: derived
+/// data invisible to the watcher, indexer, and sync like the rest of
+/// `.reflect/` (same pattern as the transcript cache). It gets its own narrow
+/// commands because the attachment IPC is deliberately fenced to `assets/`
+/// and `audio-memos/`.
+///
+/// The sidecar filename derives from the PDF's graph-relative path: every
+/// non-alphanumeric character becomes `_` (so `assets/xx.pdf` collapses to a
+/// single safe segment), with a short sha256 of the original path appended so
+/// two paths that sanitize to the same segment (`assets/a-b.pdf` vs
+/// `assets/a_b.pdf`) never share a sidecar.
+fn annotation_sidecar(root: &Path, path: &str) -> AppResult<PathBuf> {
+    let mut stem: String = path
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect();
+    // Keep the sidecar filename comfortably under the filesystem's name
+    // limit; the hash suffix below stays the uniqueness guarantee.
+    if stem.len() > 64 {
+        let mut end = 64;
+        while !stem.is_char_boundary(end) {
+            end -= 1;
+        }
+        stem.truncate(end);
+    }
+    let hash = annotation_path_hash(path);
+    let name = if stem.is_empty() {
+        hash
+    } else {
+        format!("{stem}_{hash}")
+    };
+    // Through the shared guard: a cache directory (or entry) symlinked
+    // outside the graph must not redirect IO past the graph root. The
+    // sanitize above already guarantees a single safe segment, but `resolve`
+    // is the canonical traversal check.
+    let path = resolve(root, &format!(".reflect/annotations/{name}.json"))?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    Ok(path)
+}
+
+/// Lowercase hex prefix of the sha256 of `path`, so an annotation sidecar
+/// name is deterministic across runs and versions.
+fn annotation_path_hash(path: &str) -> String {
+    use sha2::{Digest, Sha256};
+    use std::fmt::Write;
+    let digest = Sha256::digest(path.as_bytes());
+    let mut hex = String::with_capacity(12);
+    for byte in digest.iter().take(6) {
+        let _ = write!(hex, "{byte:02x}");
+    }
+    hex
+}
+
+/// Read a PDF's annotation sidecar as its raw JSON text; an empty string when
+/// nothing is cached — the sidecar is missing or its bytes don't parse as
+/// JSON. Both mean "no annotations", so the caller needs no error branch.
+#[tauri::command]
+pub fn annotation_read(path: String, state: State<GraphState>) -> AppResult<String> {
+    let root = current_root(&state)?;
+    let sidecar = annotation_sidecar(&root, &path)?;
+    match fs::read_to_string(&sidecar) {
+        Ok(contents) => {
+            // A torn or truncated sidecar reads as "no annotations", never an
+            // error: the writer recovers by replacing the whole file.
+            if serde_json::from_str::<serde_json::Value>(&contents).is_ok() {
+                Ok(contents)
+            } else {
+                Ok(String::new())
+            }
+        }
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        Err(err) => Err(err.into()),
+    }
+}
+
+/// Persist a PDF's annotation sidecar JSON wholesale. Atomic (temp file +
+/// rename, staged under `.reflect/tmp/`) so a crash mid-write never leaves a
+/// truncated sidecar that the read would treat as empty. The content is
+/// opaque here — the caller owns the sidecar schema. Generation-pinned like
+/// every other mutating command (`root_for_generation`), so a write racing a
+/// graph switch fails loudly instead of landing in the wrong graph.
+#[tauri::command]
+pub fn annotation_write(
+    path: String,
+    content: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<()> {
+    let root = root_for_generation(&state, generation)?;
+    let sidecar = annotation_sidecar(&root, &path)?;
+    atomic_write_bytes(&root, &sidecar, content.as_bytes())?;
+    Ok(())
+}
+
 /// Read a binary asset's bytes as a **raw IPC response** — no base64, no
 /// JSON. Long audio memos read back for transcription would otherwise cross
 /// the bridge ~1.33× inflated inside one giant JSON string. Pinned to
@@ -1027,6 +1123,40 @@ mod transcript_cache_tests {
         std::os::unix::fs::symlink(outside.path(), graph.path().join(".reflect/transcripts"))
             .expect("symlink");
         assert!(transcript_cache_file(graph.path(), "memo.json").is_err());
+    }
+}
+
+#[cfg(test)]
+mod annotation_sidecar_tests {
+    use super::annotation_sidecar;
+
+    #[test]
+    fn sanitizes_a_pdf_path_into_a_single_segment_sidecar() {
+        let graph = tempfile::tempdir().expect("graph");
+        let path = annotation_sidecar(graph.path(), "assets/paper.pdf").expect("path");
+        let name = path.file_name().unwrap().to_string_lossy();
+        assert!(name.starts_with("assets_paper_pdf_"));
+        assert!(name.ends_with(".json"));
+        assert!(graph.path().join(".reflect/annotations").is_dir());
+    }
+
+    #[test]
+    fn distinct_paths_never_share_a_sidecar() {
+        let graph = tempfile::tempdir().expect("graph");
+        // Both sanitize to the same stem; the hash suffix disambiguates.
+        let a = annotation_sidecar(graph.path(), "assets/a-b.pdf").expect("a");
+        let b = annotation_sidecar(graph.path(), "assets/a_b.pdf").expect("b");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn traversal_shaped_paths_cannot_escape_the_annotations_dir() {
+        let graph = tempfile::tempdir().expect("graph");
+        let path = annotation_sidecar(graph.path(), "../escape.pdf").expect("path");
+        let name = path.file_name().unwrap().to_string_lossy();
+        assert!(!name.contains('/'));
+        assert!(!name.contains('\\'));
+        assert!(path.starts_with(graph.path().join(".reflect/annotations")));
     }
 }
 

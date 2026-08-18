@@ -110,6 +110,30 @@ export const CONTEXT_SIDEBAR_WIDTH_RANGE: SidebarWidthRange = {
   fallback: 320,
 }
 
+/**
+ * The resident preview panel's range — the split pane inside the workspace's
+ * main column, right of the note pane. Its minimum keeps a PDF page legible
+ * and its maximum is generous because the pane lives beside the note (the
+ * note's own minimum, not this range, is what protects the editor).
+ */
+export const PREVIEW_PANEL_WIDTH_RANGE: SidebarWidthRange = {
+  min: 320,
+  max: 720,
+  fallback: 380,
+}
+
+/**
+ * The annotation list's height range — the collapsible index under the PDF
+ * pages. Its minimum keeps a couple of rows legible and its maximum stops the
+ * list from swallowing the whole pane; the pane's own minimum (see
+ * `effectiveAnnotationListHeight`) is what protects the PDF viewport.
+ */
+export const ANNOTATION_LIST_HEIGHT_RANGE: SidebarWidthRange = {
+  min: 120,
+  max: 480,
+  fallback: 180,
+}
+
 /** Rounds a width to whole pixels and clamps it into the given range. */
 export function clampSidebarWidth(range: SidebarWidthRange, width: number): number {
   return Math.min(range.max, Math.max(range.min, Math.round(width)))
@@ -136,6 +160,22 @@ export const sidebarWidthSchema = sidebarWidthValueSchema(SIDEBAR_WIDTH_RANGE)
  * independent of it because the two panels carry different content densities.
  */
 export const contextSidebarWidthSchema = sidebarWidthValueSchema(CONTEXT_SIDEBAR_WIDTH_RANGE)
+
+/**
+ * The resident preview panel's width in CSS pixels, set by dragging its left
+ * edge. Same resilience contract as {@link contextSidebarWidthSchema};
+ * independent of it because the pane's content (PDF pages, note bodies) has
+ * its own density and lives inside the main column, not the context aside.
+ */
+export const previewPanelWidthSchema = sidebarWidthValueSchema(PREVIEW_PANEL_WIDTH_RANGE)
+
+/**
+ * The annotation list's height in CSS pixels, set by dragging its top edge or
+ * with the keyboard. Same resilience contract as {@link previewPanelWidthSchema};
+ * independent of the widths because the list's density (rows of annotation
+ * text) has nothing to do with the rails'.
+ */
+export const annotationListHeightSchema = sidebarWidthValueSchema(ANNOTATION_LIST_HEIGHT_RANGE)
 
 /**
  * The app color theme. `system` (the default) follows the OS preference;
@@ -526,6 +566,8 @@ export const settingsSchema = z.looseObject({
   editorFullWidth: editorFullWidthSchema,
   sidebarWidth: sidebarWidthSchema,
   contextSidebarWidth: contextSidebarWidthSchema,
+  previewPanelWidth: previewPanelWidthSchema,
+  annotationListHeight: annotationListHeightSchema,
   semanticSearchEnabled: semanticSearchEnabledSchema,
   describeAssets: describeAssetsSchema,
   transcriptionFormat: transcriptionFormatSchema,

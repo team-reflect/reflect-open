@@ -13,6 +13,9 @@ import { ChatProvider } from '@/providers/chat-provider'
 import { DeepLinkProvider } from '@/providers/deep-link-provider'
 import { NoteFindProvider } from '@/providers/note-find-provider'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider'
+import { PdfSessionProvider } from '@/providers/pdf-session-provider'
+import { PdfSidebarViewProvider } from '@/providers/pdf-sidebar-view-provider'
+import { PreviewPanelProvider } from '@/providers/preview-panel-provider'
 import { ShortcutsProvider } from '@/providers/shortcuts-provider'
 import { SidebarProvider } from '@/providers/sidebar-provider'
 import { SyncProvider } from '@/providers/sync-provider'
@@ -46,33 +49,45 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
                     mic button) unmounting on collapse. */}
                 <AudioMemoProvider graph={graph}>
                   <CaptureProvider graph={graph}>
-                    {/* Inside the router (deep links navigate) and beside capture
-                        (deep-link writes spool into the same inbox drain). */}
-                    <DeepLinkProvider graph={graph}>
-                      <AssetDescribeProvider graph={graph}>
-                        <ChatProvider graph={graph}>
-                          {/* Tracks the focused day in the daily stream so the right
-                              sidebar describes it, not just the routed day. */}
-                          <FocusedDailyProvider>
-                            <NoteFindProvider>
-                              {/* A ⌘-clicked note window is chrome-free: the
-                                  routed view only, no sidebar/palette shell.
-                                  The V1 import lives above the routed views so
-                                  closing settings can't orphan a running
-                                  import; main window only — its dialog is the
-                                  import's single face. */}
-                              {isMainWindow() ? (
-                                <V1ImportProvider graph={graph}>
-                                  <WorkspaceContent graph={graph} />
-                                </V1ImportProvider>
-                              ) : (
-                                <NoteWindowContent />
-                              )}
-                            </NoteFindProvider>
-                          </FocusedDailyProvider>
-                        </ChatProvider>
-                      </AssetDescribeProvider>
-                    </DeepLinkProvider>
+                    {/* Inside the router (deep links navigate) and above the
+                        deep-link intake (its `preview/open` links open the
+                        panel); the workspace shell reads the target to render
+                        the preview sidebar. */}
+                    <PreviewPanelProvider>
+                      <DeepLinkProvider graph={graph}>
+                        <AssetDescribeProvider graph={graph}>
+                          <ChatProvider graph={graph}>
+                            {/* Tracks the focused day in the daily stream so the right
+                                sidebar describes it, not just the routed day. */}
+                            <FocusedDailyProvider>
+                              <NoteFindProvider>
+                                {/* A ⌘-clicked note window is chrome-free: the
+                                    routed view only, no sidebar/palette shell.
+                                    The V1 import lives above the routed views so
+                                    closing settings can't orphan a running
+                                    import; main window only — its dialog is the
+                                    import's single face. */}
+                                {isMainWindow() ? (
+                                  <V1ImportProvider graph={graph}>
+                                    {/* The sidebar stack (document panel ⇄
+                                        PDF panel) and PDF session providers
+                                        wrap both the split pane and the
+                                        context aside. */}
+                                    <PdfSidebarViewProvider>
+                                      <PdfSessionProvider>
+                                        <WorkspaceContent graph={graph} />
+                                      </PdfSessionProvider>
+                                    </PdfSidebarViewProvider>
+                                  </V1ImportProvider>
+                                ) : (
+                                  <NoteWindowContent />
+                                )}
+                              </NoteFindProvider>
+                            </FocusedDailyProvider>
+                          </ChatProvider>
+                        </AssetDescribeProvider>
+                      </DeepLinkProvider>
+                    </PreviewPanelProvider>
                   </CaptureProvider>
                 </AudioMemoProvider>
               </SidebarProvider>

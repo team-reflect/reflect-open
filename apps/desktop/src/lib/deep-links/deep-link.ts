@@ -28,8 +28,11 @@ export const DEEP_LINK_TEXT_MAX_LENGTH = TEXT_CAPTURE_MAX_LENGTH
  * - `capture` — `append`/`checkbox`/`task` write links, spooled into `.reflect/inbox/`.
  *   The capture kind is core's {@link TextCaptureKind} — the URL verb, the
  *   envelope kind, and the drain behavior share the one vocabulary.
+ * - `preview` — `preview/open?path=<graph-relative note path>`, opening the
+ *   note's resident preview in the preview panel without navigating.
  */
 export type DeepLink =
   | { kind: 'navigate'; route: Route }
   | { kind: 'openNote'; target: string }
   | { kind: 'capture'; capture: TextCaptureKind; text: string }
+  | { kind: 'preview'; path: string }

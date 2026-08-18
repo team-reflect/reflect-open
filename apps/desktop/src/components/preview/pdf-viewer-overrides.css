@@ -1,0 +1,22 @@
+/*
+ * pdf.js assumes `box-sizing: content-box` on `.page`: the `--page-border`
+ * (a default 9px transparent border) sits outside the content box, so the
+ * canvas and the text layer both align to the full page size. This app's
+ * Tailwind preflight sets the global `box-sizing` to `border-box`, which
+ * instead lets the border eat into the content box — `.canvasWrapper canvas`
+ * shrinks to the content box (page minus 18px) via `width:100%`, while the
+ * text layer keeps its full `calc(var(--scale-factor) * pageWidth)` size;
+ * same origin, different sizes, so the spans lay out at the full-size
+ * percentages while the canvas glyphs render at the shrunken size, and the
+ * selection highlight drifts from the text with an offset that grows with
+ * distance (the reported vertical displacement).
+ *
+ * Fix: restore the content-box semantics (pdf.js's assumption) and drop the
+ * page border — the split-pane layout doesn't need the standard viewer's page
+ * gutter. This file loads after `pdf_viewer.css`, so at equal selector
+ * specificity the source order wins.
+ */
+.pdfViewer .page {
+  box-sizing: content-box;
+  border: none;
+}

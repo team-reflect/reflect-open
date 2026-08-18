@@ -235,6 +235,30 @@ export async function writeTranscriptCache(
 }
 
 /**
+ * Read a PDF's annotation sidecar (`.reflect/annotations/<pdf>.json`): the
+ * sidecar's full JSON text, or an empty string when nothing is cached yet
+ * (the sidecar is missing, or its bytes don't parse as JSON). The content is
+ * opaque here — the PDF-annotation lane owns the sidecar schema.
+ */
+export async function readAnnotations(pdfPath: string): Promise<string> {
+  return await call('annotation_read', { path: pdfPath }, z.string())
+}
+
+/**
+ * Persist a PDF's annotation sidecar JSON wholesale (atomic in Rust). The
+ * caller supplies the complete file text; each call replaces every annotation
+ * for that PDF. `generation` pins the write to the graph session it was issued
+ * for, matching every other mutating command.
+ */
+export async function writeAnnotations(
+  pdfPath: string,
+  content: string,
+  generation: number,
+): Promise<void> {
+  await call('annotation_write', { path: pdfPath, content, generation }, voidSchema)
+}
+
+/**
  * Delete one recording under `audio-memos/` — cancelling a session discards
  * its already-landed segments. Idempotent; scoped in Rust to `audio-memos/`
  * so this can never become a general file-delete IPC.

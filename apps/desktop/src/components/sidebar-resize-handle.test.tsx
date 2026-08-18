@@ -5,7 +5,7 @@ import { activeSidebarWidthDrags } from '@/hooks/use-sidebar-resize'
 import { SidebarResizeHandle } from './sidebar-resize-handle'
 
 const settingsState = vi.hoisted(() => ({
-  settings: { sidebarWidth: 260, contextSidebarWidth: 320 },
+  settings: { sidebarWidth: 260, contextSidebarWidth: 320, previewPanelWidth: 380 },
   updateSettings: vi.fn(),
 }))
 
@@ -64,13 +64,14 @@ afterEach(async () => {
   for (const property of [
     '--sidebar-width',
     '--context-sidebar-width',
+    '--preview-panel-width',
     'cursor',
     'user-select',
     '-webkit-user-select',
   ]) {
     style.removeProperty(property)
   }
-  settingsState.settings = { sidebarWidth: 260, contextSidebarWidth: 320 }
+  settingsState.settings = { sidebarWidth: 260, contextSidebarWidth: 320, previewPanelWidth: 380 }
   settingsState.updateSettings.mockReset()
   activeSidebarWidthDrags.clear()
 })
@@ -118,6 +119,29 @@ describe('SidebarResizeHandle', () => {
     expect(settingsState.updateSettings).toHaveBeenCalledWith({ contextSidebarWidth: 380 })
   })
 
+  it('drags the preview pane wider leftward and commits its own preference', async () => {
+    // The pane lives inside the main column: its split container is the
+    // grandparent, and the drag budget leaves the editor its 360px reserve
+    // out of that container's rendered width.
+    await render(
+      <div style={{ position: 'relative', width: '800px' }}>
+        <div style={{ position: 'relative', width: '380px' }}>
+          <SidebarResizeHandle panel="preview" />
+        </div>
+      </div>,
+    )
+    const handle = page
+      .getByRole('separator', { name: 'Resize preview panel' })
+      .element() as HTMLElement
+
+    firePointer(handle, 'pointerdown', { pointerId: 9, button: 0, clientX: 400 })
+    firePointer(handle, 'pointermove', { pointerId: 9, clientX: 360 })
+    expect(rootVariable('--preview-panel-width')).toBe('420px')
+
+    firePointer(handle, 'pointerup', { pointerId: 9, clientX: 360 })
+    expect(settingsState.updateSettings).toHaveBeenCalledWith({ previewPanelWidth: 420 })
+  })
+
   it('ignores secondary-button presses and foreign pointer ids', async () => {
     const handle = await renderHandle('workspace')
 
@@ -162,7 +186,7 @@ describe('SidebarResizeHandle', () => {
   })
 
   it('keeps aria-valuenow in step with viewport scaling', async () => {
-    settingsState.settings = { sidebarWidth: 480, contextSidebarWidth: 480 }
+    settingsState.settings = { sidebarWidth: 480, contextSidebarWidth: 480, previewPanelWidth: 380 }
     const handle = await renderHandle('workspace')
     // At 1024px the 480px preferences scale to 332px each.
     expect(handle.getAttribute('aria-valuenow')).toBe('332')

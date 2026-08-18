@@ -36,6 +36,32 @@ vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 7 } }),
 }))
 
+const pdfSessionState = vi.hoisted(() => ({
+  session: {
+    viewer: null,
+    pdfDocument: null,
+    assetPath: null,
+  } as { viewer: unknown; pdfDocument: unknown; assetPath: string | null },
+}))
+const pdfSidebarViewState = vi.hoisted(() => ({
+  view: 'document' as 'document' | 'pdf',
+  enterPdf: vi.fn(),
+  backToDocument: vi.fn(),
+  applyTarget: vi.fn(),
+}))
+const previewPanelState = vi.hoisted(() => ({
+  target: null as { kind: string; assetPath?: string } | null,
+}))
+vi.mock('@/providers/pdf-session-provider', () => ({
+  usePdfSession: () => ({ session: pdfSessionState.session, register: vi.fn(), clear: vi.fn() }),
+}))
+vi.mock('@/providers/pdf-sidebar-view-provider', () => ({
+  usePdfSidebarView: () => pdfSidebarViewState,
+}))
+vi.mock('@/providers/preview-panel-provider', () => ({
+  usePreviewPanel: () => previewPanelState,
+}))
+
 async function renderSection(path: string, showTrash = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const view = await render(
@@ -60,6 +86,9 @@ beforeEach(() => {
   startOperation.mockClear()
   operationFail.mockClear()
   isApplePlatform.mockReturnValue(false)
+  pdfSessionState.session = { viewer: null, pdfDocument: null, assetPath: null }
+  previewPanelState.target = null
+  pdfSidebarViewState.enterPdf.mockReset()
 })
 
 function noteRow(path: string, isPrivate: boolean, title = 'A') {
@@ -218,6 +247,38 @@ describe('NoteActionsSection trash action', () => {
   it('does not offer trash for daily notes even if enabled', async () => {
     const view = await renderSection('daily/2026-06-10.md', true)
     expect(view.getByRole('button', { name: 'Trash note' }).query()).toBeNull()
+    await view.unmount()
+  })
+})
+
+describe('NoteActionsSection PDF panel entry', () => {
+  it('hides the Deepdive PDF entry until a PDF session is active', async () => {
+    const view = await renderSection('notes/a.md')
+    expect(view.getByRole('button', { name: /Deepdive PDF/ }).query()).toBeNull()
+    await view.unmount()
+
+    // PDF 预览目标打开且 session 已加载文档：入口出现。
+    pdfSessionState.session = {
+      viewer: {},
+      pdfDocument: {},
+      assetPath: 'assets/paper.pdf',
+    }
+    previewPanelState.target = { kind: 'pdf', assetPath: 'assets/paper.pdf' }
+    const active = await renderSection('notes/a.md')
+    await expect.element(active.getByRole('button', { name: /Deepdive PDF/ })).toBeInTheDocument()
+    await active.unmount()
+  })
+
+  it('enters the PDF panel from Deepdive on click', async () => {
+    pdfSessionState.session = {
+      viewer: {},
+      pdfDocument: {},
+      assetPath: 'assets/paper.pdf',
+    }
+    previewPanelState.target = { kind: 'pdf', assetPath: 'assets/paper.pdf' }
+    const view = await renderSection('notes/a.md')
+    await userEvent.click(view.getByRole('button', { name: /Deepdive PDF/ }))
+    expect(pdfSidebarViewState.enterPdf).toHaveBeenCalledTimes(1)
     await view.unmount()
   })
 })
