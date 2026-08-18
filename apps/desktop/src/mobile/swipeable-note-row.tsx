@@ -2,13 +2,12 @@ import type { ReactElement, ReactNode } from 'react'
 import { Pin, PinOff, Trash2 } from 'lucide-react'
 import type { HighlightSegment } from '@reflect/core'
 import { formatRecencyLabel } from '@/lib/dates'
+import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button'
 import { useRowSwipe } from '@/mobile/use-row-swipe'
 import { useSettings } from '@/providers/settings-provider'
 
 /** V1's fixed row height (px) — placeholder resolution never causes jumps. */
 export const NOTE_ROW_HEIGHT = 64
-
-const ACTION_BUTTON_WIDTH = 68
 
 /** One rendered row with query-aware title and snippet segments. */
 export interface NoteRowModel {
@@ -63,7 +62,7 @@ export function SwipeableNoteRow({
   onDelete,
 }: SwipeableNoteRowProps): ReactElement {
   const { settings } = useSettings()
-  const actionWidth = ACTION_BUTTON_WIDTH * (row.canDelete ? 2 : 1)
+  const actionWidth = SWIPE_ACTION_WIDTH * (row.canDelete ? 2 : 1)
   const title = row.titleSegments.map((segment) => segment.text).join('')
   const swipe = useRowSwipe({
     actionWidth,
@@ -84,32 +83,26 @@ export function SwipeableNoteRow({
         aria-hidden={!revealed || undefined}
         inert={!revealed}
       >
-        <button
-          type="button"
-          tabIndex={revealed ? 0 : -1}
-          className="flex h-full flex-col items-center justify-center gap-1 bg-accent text-[10px] font-medium text-text-on-brand active:opacity-70"
-          style={{ width: ACTION_BUTTON_WIDTH }}
-          aria-label={`${row.isPinned ? 'Unpin' : 'Pin'} ${title}`}
+        <SwipeActionButton
+          icon={row.isPinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
+          label={row.isPinned ? 'Unpin' : 'Pin'}
+          ariaLabel={`${row.isPinned ? 'Unpin' : 'Pin'} ${title}`}
+          revealed={revealed}
+          className="bg-accent"
           onClick={() => {
             onClose()
             onTogglePin()
           }}
-        >
-          {row.isPinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
-          <span aria-hidden>{row.isPinned ? 'Unpin' : 'Pin'}</span>
-        </button>
+        />
         {row.canDelete ? (
-          <button
-            type="button"
-            tabIndex={revealed ? 0 : -1}
-            className="flex h-full flex-col items-center justify-center gap-1 bg-destructive text-[10px] font-medium text-text-on-brand active:opacity-70"
-            style={{ width: ACTION_BUTTON_WIDTH }}
-            aria-label={`Delete ${title}`}
+          <SwipeActionButton
+            icon={<Trash2 className="size-4" />}
+            label="Delete"
+            ariaLabel={`Delete ${title}`}
+            revealed={revealed}
+            className="bg-destructive"
             onClick={onDelete}
-          >
-            <Trash2 className="size-4" />
-            <span aria-hidden>Delete</span>
-          </button>
+          />
         ) : null}
       </div>
       <button
