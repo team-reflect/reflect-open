@@ -1,6 +1,7 @@
-import { act, useState, type ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import { render } from 'vitest-browser-react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { pointer, swipe, translateX } from '@/test-utils/swipe'
 import { NoteRowList } from './note-row-list'
 import { SwipeableNoteRow, type NoteRowModel } from './swipeable-note-row'
 
@@ -44,45 +45,6 @@ function SwipeHarness({ note = row() }: { note?: NoteRowModel }): ReactElement {
       />
     </div>
   )
-}
-
-function pointer(
-  node: Element,
-  type: 'pointerdown' | 'pointermove' | 'pointerup',
-  clientX: number,
-  clientY: number,
-): void {
-  act(() => {
-    node.dispatchEvent(
-      new PointerEvent(type, {
-        bubbles: true,
-        cancelable: true,
-        pointerType: 'touch',
-        isPrimary: true,
-        pointerId: 1,
-        clientX,
-        clientY,
-      }),
-    )
-  })
-}
-
-function swipe(
-  surface: Element,
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-): void {
-  pointer(surface, 'pointerdown', from.x, from.y)
-  pointer(surface, 'pointermove', to.x, to.y)
-  pointer(surface, 'pointerup', to.x, to.y)
-  // A real touch sequence synthesizes a click after pointerup; dispatchEvent
-  // does not, so mirror it to exercise the row's drag-click suppression.
-  const touchSurface = surface as HTMLElement
-  touchSurface.click()
-}
-
-function translateX(element: Element): number {
-  return new DOMMatrixReadOnly(getComputedStyle(element).transform).m41
 }
 
 beforeEach(() => {
