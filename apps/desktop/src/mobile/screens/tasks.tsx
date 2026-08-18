@@ -33,9 +33,11 @@ import { useRouter } from '@/routing/router'
  * touch surface. Task taps, toggles, adds, filters, scheduling, and archival
  * get light haptics; tapping a row opens the quick-edit sheet (edit / schedule /
  * complete / convert / open note) instead of desktop's multi-select; the filter
- * sheet carries desktop's bucket toggles and "Show archived". Completing keeps
- * the row struck (V1's middle state) until Archive hides this session's completed
- * tasks.
+ * sheet carries desktop's bucket toggles and "Show archived". Swiping a row
+ * left reveals the note list's two actions, open the source note and delete the
+ * task; one row's actions show at a time and scrolling closes them. Completing
+ * keeps the row struck (V1's middle state) until Archive hides this session's
+ * completed tasks.
  */
 export function MobileTasks(): ReactElement {
   const { graph } = useGraph()
@@ -45,6 +47,8 @@ export function MobileTasks(): ReactElement {
   const [query, setQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  // The one row whose swipe actions are showing (its taskKey), across all groups.
+  const [revealedTaskKey, setRevealedTaskKey] = useState<string | null>(null)
   // The sheet's task sticks around after close so the exit animation has
   // content; `sheetOpen` alone drives visibility.
   const [editingTask, setEditingTask] = useState<OpenTask | null>(null)
@@ -191,7 +195,10 @@ export function MobileTasks(): ReactElement {
           ) : null}
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto pb-24">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto pb-24"
+          onScroll={() => setRevealedTaskKey(null)}
+        >
           {groups.map((group) => (
             <MobileTaskGroup
               key={group.kind === 'note' ? `note:${group.notePath}` : group.kind}
@@ -200,6 +207,9 @@ export function MobileTasks(): ReactElement {
               onAdd={onAdd}
               onEdit={editTask}
               onOpen={(path) => navigate(routeForPath(path))}
+              onDelete={(task) => actions.remove([task])}
+              revealedTaskKey={revealedTaskKey}
+              setRevealedTaskKey={setRevealedTaskKey}
             />
           ))}
         </div>

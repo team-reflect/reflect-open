@@ -8,6 +8,7 @@ import { makeOpenTask as task } from '@/lib/tasks/open-task-fixture'
 import { resetRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { RouterProvider, useRouter } from '@/routing/router'
 import '@/test-utils/locator'
+import { swipe, translateX } from '@/test-utils/swipe'
 import { MobileTasks } from './tasks'
 
 /**
@@ -64,6 +65,8 @@ vi.mock('@/editor/use-editor-autocomplete', () => ({
 vi.mock('@/mobile/haptics', () => ({
   hapticImpactLight,
 }))
+// Instant settle, so row transforms can be asserted synchronously.
+vi.mock('@/mobile/use-reduced-motion', () => ({ usePrefersReducedMotion: () => true }))
 
 const editorProbe = vi.hoisted(() => ({ focusCalls: 0 }))
 
@@ -228,6 +231,22 @@ function renderScreen() {
 }
 
 const waitFor = vi.waitFor
+
+/** Swipe a row far enough left that its release settles open, and return its moving surface. */
+async function revealSwipeActions(
+  view: Awaited<ReturnType<typeof renderScreen>>,
+  label: string,
+): Promise<HTMLElement> {
+  const body = await view.findByRole('button', { name: `Edit: ${label}` })
+  const surface = body.parentElement!
+  const rect = surface.getBoundingClientRect()
+  swipe(
+    surface,
+    { x: rect.right - 20, y: rect.top + 16 },
+    { x: rect.right - 160, y: rect.top + 16 },
+  )
+  return surface
+}
 
 beforeEach(async () => {
   await page.viewport(375, 700)
@@ -798,6 +817,77 @@ describe('MobileTasks', () => {
     const view = await renderScreen()
 
     await view.findByRole('alert')
+    await view.unmount()
+  })
+
+  it('reveals note and delete actions with a leftward swipe', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const view = await renderScreen()
+
+    const surface = await revealSwipeActions(view, 'buy milk')
+
+    await expect
+      .element(view.getByRole('button', { name: 'Open note: buy milk' }))
+      .toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'Delete: buy milk' })).toBeInTheDocument()
+    expect(translateX(surface)).toBe(-136)
+    // The drag's synthetic click was swallowed; the sheet did not open.
+    expect(view.queryByText('dismiss-drawer')).toBeNull()
+    await view.unmount()
+  })
+
+  it('deletes a task from its swipe action without a dialog', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const view = await renderScreen()
+
+    await revealSwipeActions(view, 'buy milk')
+    await view.getByRole('button', { name: 'Delete: buy milk' }).click()
+
+    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
+    // Optimistic removal: the row leaves the list before the reindex.
+    await waitFor(() => expect(view.queryByRole('button', { name: 'Edit: buy milk' })).toBeNull())
+    expect(view.queryByText('dismiss-drawer')).toBeNull()
+    await view.unmount()
+  })
+
+  it('opens the source note from its swipe action', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const view = await renderScreen()
+
+    await revealSwipeActions(view, 'buy milk')
+    await view.getByRole('button', { name: 'Open note: buy milk' }).click()
+
+    await waitFor(() =>
+      expect(view.getByTestId('route').element().textContent).toContain('notes/n.md'),
+    )
+    expect(view.queryByText('dismiss-drawer')).toBeNull()
+    await view.unmount()
+  })
+
+  it('closes a revealed row on tap instead of opening the sheet', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const view = await renderScreen()
+
+    await revealSwipeActions(view, 'buy milk')
+    await view.getByRole('button', { name: 'Edit: buy milk' }).click()
+
+    await waitFor(() => expect(view.queryByRole('button', { name: 'Delete: buy milk' })).toBeNull())
+    expect(view.queryByText('dismiss-drawer')).toBeNull()
+    await view.unmount()
+  })
+
+  it('reveals one row at a time across groups', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ text: 'buy milk' }),
+      task({ text: 'walk dog', notePath: 'notes/dog.md' }),
+    ])
+    const view = await renderScreen()
+
+    await revealSwipeActions(view, 'buy milk')
+    await revealSwipeActions(view, 'walk dog')
+
+    await expect.element(view.getByRole('button', { name: 'Delete: walk dog' })).toBeInTheDocument()
+    await waitFor(() => expect(view.queryByRole('button', { name: 'Delete: buy milk' })).toBeNull())
     await view.unmount()
   })
 })

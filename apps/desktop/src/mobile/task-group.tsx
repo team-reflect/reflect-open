@@ -1,4 +1,4 @@
-import { Fragment, type ReactElement } from 'react'
+import { Fragment, type Dispatch, type ReactElement, type SetStateAction } from 'react'
 import { Plus } from 'lucide-react'
 import { groupTaskContexts, type OpenTask, type TaskGroup } from '@reflect/core'
 import { TaskBreadcrumbs } from '@/components/tasks/task-breadcrumbs'
@@ -17,8 +17,13 @@ interface MobileTaskGroupProps {
   onAdd: (target: InsertTaskTarget) => void
   /** Open the quick-edit sheet for a tapped row. */
   onEdit: (task: OpenTask) => void
-  /** Open a note group's source note from its header. */
+  /** Open a note group's source note from its header, or a row's from its swipe action. */
   onOpen: (notePath: string) => void
+  /** Delete a task from its swipe action. */
+  onDelete: (task: OpenTask) => void
+  /** The `taskKey` of the one row whose swipe actions are showing, across all groups. */
+  revealedTaskKey: string | null
+  setRevealedTaskKey: Dispatch<SetStateAction<string | null>>
 }
 
 /**
@@ -35,6 +40,9 @@ export function MobileTaskGroup({
   onAdd,
   onEdit,
   onOpen,
+  onDelete,
+  revealedTaskKey,
+  setRevealedTaskKey,
 }: MobileTaskGroupProps): ReactElement {
   const showSource = group.kind !== 'note'
   const { notePath } = group
@@ -82,14 +90,25 @@ export function MobileTaskGroup({
         {contexts.map((context) => (
           <Fragment key={taskKey(context.tasks[0]!)}>
             <TaskBreadcrumbs breadcrumbs={context.visibleBreadcrumbs} className="px-4 pb-1 pt-3" />
-            {context.tasks.map((task) => (
-              <MobileTaskRow
-                key={taskKey(task)}
-                task={task}
-                showSource={showSource}
-                onEdit={onEdit}
-              />
-            ))}
+            {context.tasks.map((task) => {
+              const key = taskKey(task)
+              return (
+                <MobileTaskRow
+                  key={key}
+                  task={task}
+                  showSource={showSource}
+                  onEdit={onEdit}
+                  revealed={revealedTaskKey === key}
+                  onReveal={() => setRevealedTaskKey(key)}
+                  onClose={() => setRevealedTaskKey(null)}
+                  onBeginInteraction={() =>
+                    setRevealedTaskKey((current) => (current === key ? current : null))
+                  }
+                  onOpenNote={() => onOpen(task.notePath)}
+                  onDelete={() => onDelete(task)}
+                />
+              )
+            })}
           </Fragment>
         ))}
       </ul>
