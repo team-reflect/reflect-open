@@ -92,6 +92,15 @@ export interface GraphIndexOptions {
    */
   onApplied?: () => void
   /**
+   * Called once per completed, un-superseded sync pass, right after
+   * {@link GraphIndexOptions.onApplied}. The pass reads changed files straight
+   * into the index but emits no per-file `index:changed` events, so holders of
+   * in-memory file content (open note sessions) must be told to re-read here;
+   * on iOS the resume reconcile is the only signal a remote edit ever produces
+   * for an already-open note.
+   */
+  onReconciled?: () => void
+  /**
    * Called when id-based healing relocates a note's rows (Plan 17): an
    * external rename observed by the reconcile or a watcher batch. The app
    * carries live sessions and rewrites routes off this, exactly as for an
@@ -130,6 +139,7 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
     onError,
     onProgress,
     onApplied,
+    onReconciled,
     onMoved,
     onFileProgress,
     onStalePlaceholders,
@@ -255,6 +265,7 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
           return
         }
         onApplied?.()
+        onReconciled?.()
         pending = await subscribeIndexChanges(
           generation,
           onApplied,

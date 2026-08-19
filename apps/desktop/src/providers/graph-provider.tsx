@@ -26,6 +26,7 @@ import {
   type RecentGraph,
 } from '@reflect/core'
 import { followHealedMove } from '@/editor/move-note'
+import { reloadOpenDocuments } from '@/editor/open-documents'
 import { resetNoteRowOverlays } from '@/hooks/note-row-overlay'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { setIndexProgress } from '@/lib/index-progress'
@@ -172,6 +173,10 @@ export function GraphProvider({
       // sync — the throttled variant collapses them to one refetch round per
       // window (an isolated batch still invalidates immediately).
       onApplied: throttledInvalidateIndexQueries,
+      // A completed reconcile read changed files into the index without
+      // per-file events; open sessions re-read so the visible note converges
+      // with the index (unchanged files are no-op reads).
+      onReconciled: reloadOpenDocuments,
       onFileProgress: (done, total, worked) => setIndexProgress({ done, total, worked }),
       // External renames healed by id follow through to sessions and routes,
       // exactly as for an in-app rename (Plan 17).

@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import type { NoteSession } from './note-session'
-import { flushOpenDocuments, openSession, registerOpenDocument } from './open-documents'
+import { describe, expect, it, vi } from 'vitest'
+import { createNoteSession, type NoteSession, type NoteSessionSnapshot } from './note-session'
+import {
+  flushOpenDocuments,
+  openSession,
+  registerOpenDocument,
+  reloadOpenDocuments,
+} from './open-documents'
 
 function fakeSession(path: string, log: string[]): NoteSession {
   return {
@@ -8,7 +13,9 @@ function fakeSession(path: string, log: string[]): NoteSession {
     retarget: () => {},
     load: () => {},
     editorChanged: () => {},
-    externalChanged: () => {},
+    externalChanged: () => {
+      log.push(`externalChanged:${path}`)
+    },
     flush: async () => {
       log.push(`flush:${path}`)
     },
@@ -68,6 +75,19 @@ describe('open documents', () => {
     }
   })
 
+  it('reloadOpenDocuments asks every open session to reconcile against disk', () => {
+    const log: string[] = []
+    const unregisterA = registerOpenDocument({ session: fakeSession('notes/a.md', log) })
+    const unregisterB = registerOpenDocument({ session: fakeSession('notes/b.md', log) })
+    try {
+      reloadOpenDocuments()
+      expect(log).toEqual(['externalChanged:notes/a.md', 'externalChanged:notes/b.md'])
+    } finally {
+      unregisterA()
+      unregisterB()
+    }
+  })
+
   it('one failing document does not block the others, and nothing rejects', async () => {
     const log: string[] = []
     const failing = fakeSession('notes/bad.md', log)
@@ -118,6 +138,97 @@ describe('retargetOpenDocument (Plan 17)', () => {
       expect(openSession('notes/old.md')).toBeNull()
     } finally {
       unregister()
+    }
+  })
+})
+
+describe('reloadOpenDocuments with live sessions', () => {
+  // The iOS resume bug: the index reconcile re-reads a remotely edited note
+  // into the index but emits no `index:changed`, so nothing ever told the open
+  // session and it kept showing stale content until the app was relaunched.
+  // These pin the whole path with real sessions: content changes on disk, no
+  // file event fires, the reload converges the editor.
+
+  function liveSession(
+    read: () => string,
+    applied: string[],
+    snapshots: NoteSessionSnapshot[],
+  ): NoteSession {
+    return createNoteSession({
+      path: 'notes/stale.md',
+      // No writer: the session tracks dirtiness but never writes, so a dirty
+      // buffer can't race a debounced save into the assertions.
+      io: { read: async () => read(), write: null },
+      classify: () => 'exact',
+      onSnapshot: (snapshot) => {
+        snapshots.push(snapshot)
+      },
+      applyContent: (markdown) => {
+        applied.push(markdown)
+      },
+    })
+  }
+
+  it('a clean open note adopts the new disk content silently', async () => {
+    let disk = '# Old\n'
+    const applied: string[] = []
+    const snapshots: NoteSessionSnapshot[] = []
+    const session = liveSession(() => disk, applied, snapshots)
+    const unregister = registerOpenDocument({ session })
+    try {
+      session.load()
+      await vi.waitFor(() => expect(snapshots.at(-1)?.status).toBe('ready'))
+
+      disk = '# New from the Mac\n' // the reconcile saw this; no index:changed fired
+      reloadOpenDocuments()
+
+      await vi.waitFor(() => expect(applied).toContain('# New from the Mac\n'))
+      expect(snapshots.at(-1)?.conflict).toBeNull()
+    } finally {
+      unregister()
+      session.dispose()
+    }
+  })
+
+  it('a dirty open note parks the conflict banner instead of losing edits', async () => {
+    let disk = '# Old\n'
+    const snapshots: NoteSessionSnapshot[] = []
+    const session = liveSession(() => disk, [], snapshots)
+    const unregister = registerOpenDocument({ session })
+    try {
+      session.load()
+      await vi.waitFor(() => expect(snapshots.at(-1)?.status).toBe('ready'))
+      session.editorChanged('# Old\nmy unsaved line\n')
+
+      disk = '# New from the Mac\n'
+      reloadOpenDocuments()
+
+      await vi.waitFor(() => expect(snapshots.at(-1)?.conflict).toBe('# New from the Mac\n'))
+      expect(snapshots.at(-1)?.dirty).toBe(true)
+    } finally {
+      unregister()
+      session.discard() // never flush the deliberately-dirty buffer
+    }
+  })
+
+  it('an unchanged file is a no-op read: no editor push, no conflict', async () => {
+    const applied: string[] = []
+    const snapshots: NoteSessionSnapshot[] = []
+    const session = liveSession(() => '# Old\n', applied, snapshots)
+    const unregister = registerOpenDocument({ session })
+    try {
+      session.load()
+      await vi.waitFor(() => expect(snapshots.at(-1)?.status).toBe('ready'))
+      const settled = snapshots.length
+
+      reloadOpenDocuments()
+      await new Promise((resolve) => setTimeout(resolve, 0)) // drain the reconcile read
+
+      expect(applied).toEqual([])
+      expect(snapshots).toHaveLength(settled) // the echo guard emitted nothing
+    } finally {
+      unregister()
+      session.dispose()
     }
   })
 })

@@ -80,6 +80,36 @@ describe('createGraphIndex', () => {
     expect(unlisten).not.toHaveBeenCalled() // retained as the active subscription
   })
 
+  it('reports a completed pass via onReconciled, after onApplied', async () => {
+    // The pass reads changed files into the index without emitting per-file
+    // events; open note sessions re-read off this callback.
+    const order: string[] = []
+    const index = createGraphIndex({
+      onApplied: () => {
+        order.push('applied')
+      },
+      onReconciled: () => {
+        order.push('reconciled')
+      },
+    })
+    index.sync(5, () => false)
+    await index.stop()
+    expect(order).toEqual(['applied', 'reconciled'])
+  })
+
+  it('a superseded or failed pass never fires onReconciled', async () => {
+    const onReconciled = vi.fn()
+    const index = createGraphIndex({ onReconciled })
+    index.sync(5, () => true) // stale right after the reconcile
+    await index.stop()
+    expect(onReconciled).not.toHaveBeenCalled()
+
+    mockSync.mockRejectedValue(new Error('boom'))
+    index.sync(5, () => false)
+    await index.stop()
+    expect(onReconciled).not.toHaveBeenCalled()
+  })
+
   it('reports progress: reconciling → live; idle when closed', async () => {
     const onProgress = vi.fn<(progress: GraphIndexProgress) => void>()
     const index = createGraphIndex({ onProgress })

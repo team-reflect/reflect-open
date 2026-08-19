@@ -63,6 +63,21 @@ export function dirtyOpenPaths(): string[] {
 }
 
 /**
+ * Ask every open document to reconcile against disk, exactly as if a watcher
+ * upsert had arrived for its path: an unchanged file is a no-op, a clean
+ * buffer adopts silently, a dirty buffer parks the conflict banner. The index
+ * lifecycle calls this after each completed reconcile pass, because the pass
+ * reads changed files into the index without emitting per-file events. On iOS
+ * there is no file watcher, so a resume reconcile is the only signal a remote
+ * edit produces: without this, an open note keeps stale content until relaunch.
+ */
+export function reloadOpenDocuments(): void {
+  for (const document of documents.values()) {
+    document.session.externalChanged()
+  }
+}
+
+/**
  * Re-key an open document after its note file moved (Plan 17), so
  * {@link openSession} lookups under the new path find the live session. The
  * entry moves only when it actually holds `session` — a failed move's
