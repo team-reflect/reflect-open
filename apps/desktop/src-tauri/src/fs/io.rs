@@ -12,9 +12,12 @@ use std::io::Write;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 use std::os::raw::c_int;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard, TryLockError};
 use std::time::{Duration, Instant, UNIX_EPOCH};
 
+use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
+use cap_std::ambient_authority;
+use cap_std::fs::{Dir as CapDir, OpenOptions as CapOpenOptions};
 use reflect_graph_paths::{evicted_logical_path, eviction_placeholder, is_dataless};
 use same_file::Handle as FileIdentity;
 
@@ -59,20 +62,33 @@ pub(super) fn with_file_mutation_lock<T>(
         return operation();
     }
     let root_identity = FileIdentity::from_path(&canonical_root)?;
-    let _guard = match FILE_MUTATION_LOCK.lock() {
-        Ok(guard) => guard,
-        Err(poisoned) => {
-            // The mutex protects serialization, not mutable state. A panic in
-            // one operation drops the OS lock and thread-local root guard, so
-            // the next mutation can safely recover instead of permanently
-            // disabling every graph write in this process.
-            tracing::warn!("recovering poisoned file mutation lock");
-            FILE_MUTATION_LOCK.clear_poison();
-            poisoned.into_inner()
+    let deadline = Instant::now() + FILE_MUTATION_LOCK_TIMEOUT;
+    let _guard = lock_process_mutex_until(&FILE_MUTATION_LOCK, deadline)?;
+    let lock_file = open_file_mutation_lock(&canonical_root, &root_identity)?;
+    with_opened_file_mutation_lock(
+        root,
+        &canonical_root,
+        root_identity,
+        lock_file,
+        deadline,
+        operation,
+    )
+}
+
+fn lock_process_mutex_until(mutex: &Mutex<()>, deadline: Instant) -> AppResult<MutexGuard<'_, ()>> {
+    loop {
+        match mutex.try_lock() {
+            Ok(guard) => return Ok(guard),
+            Err(TryLockError::Poisoned(poisoned)) => {
+                // The mutex protects serialization, not mutable state. A panic
+                // drops the OS lock and thread-local guard, so recovery is safe.
+                tracing::warn!("recovering poisoned file mutation lock");
+                mutex.clear_poison();
+                return Ok(poisoned.into_inner());
+            }
+            Err(TryLockError::WouldBlock) => wait_for_mutation_lock_retry(deadline)?,
         }
-    };
-    let lock_file = open_file_mutation_lock(&canonical_root)?;
-    with_opened_file_mutation_lock(root, &canonical_root, root_identity, lock_file, operation)
+    }
 }
 
 /// Acquire a lock file that was opened against the pre-wait graph, then prove
@@ -82,10 +98,11 @@ fn with_opened_file_mutation_lock<T>(
     canonical_root: &Path,
     expected_root_identity: FileIdentity,
     lock_file: File,
+    deadline: Instant,
     operation: impl FnOnce() -> AppResult<T>,
 ) -> AppResult<T> {
     let expected_lock_identity = FileIdentity::from_file(lock_file.try_clone()?)?;
-    lock_file_with_timeout(&lock_file, FILE_MUTATION_LOCK_TIMEOUT)?;
+    lock_file_until(&lock_file, deadline)?;
     let lock_is_current = file_mutation_lock_is_current(
         root,
         canonical_root,
@@ -131,27 +148,21 @@ fn file_mutation_lock_is_current(
     if &current_root_identity != expected_root_identity {
         return false;
     }
-    let Ok(Some(current_lock)) = try_open_file_mutation_lock(&current_root) else {
+    let Ok(runtime_dir) = open_lock_runtime(&current_root, expected_root_identity) else {
+        return false;
+    };
+    let Ok(Some(current_lock)) = try_open_file_mutation_lock(&runtime_dir) else {
         return false;
     };
     FileIdentity::from_file(current_lock)
         .is_ok_and(|current_lock_identity| &current_lock_identity == expected_lock_identity)
 }
 
-fn lock_file_with_timeout(lock_file: &File, timeout: Duration) -> AppResult<()> {
-    let started = Instant::now();
+fn lock_file_until(lock_file: &File, deadline: Instant) -> AppResult<()> {
     loop {
         match lock_file.try_lock() {
             Ok(()) => return Ok(()),
-            Err(std::fs::TryLockError::WouldBlock) => {
-                let elapsed = started.elapsed();
-                if elapsed >= timeout {
-                    return Err(AppError::io(
-                        "timed out waiting for another Reflect process to finish writing this graph",
-                    ));
-                }
-                std::thread::sleep(FILE_MUTATION_LOCK_RETRY_DELAY.min(timeout - elapsed));
-            }
+            Err(std::fs::TryLockError::WouldBlock) => wait_for_mutation_lock_retry(deadline)?,
             Err(error) => {
                 return Err(AppError::io(format!(
                     "failed to acquire the graph mutation lock: {error}"
@@ -161,65 +172,69 @@ fn lock_file_with_timeout(lock_file: &File, timeout: Duration) -> AppResult<()> 
     }
 }
 
-/// Open the persistent advisory-lock inode without accepting a planted
-/// symlink. On Apple platforms `O_NOFOLLOW_ANY` makes the final open itself
-/// race-free; elsewhere the metadata checks still fail closed for the normal
-/// case. The file contains no state and lives below `.reflect/`, so it is
-/// neither synced nor watcher-visible.
-fn open_file_mutation_lock(root: &Path) -> AppResult<File> {
-    let path = root.join(REFLECT_DIR).join("write.lock");
+fn wait_for_mutation_lock_retry(deadline: Instant) -> AppResult<()> {
+    let now = Instant::now();
+    if now >= deadline {
+        return Err(AppError::io(
+            "timed out waiting for another Reflect operation to finish writing this graph",
+        ));
+    }
+    std::thread::sleep(FILE_MUTATION_LOCK_RETRY_DELAY.min(deadline - now));
+    Ok(())
+}
+
+/// Open the persistent advisory-lock inode relative to pinned graph/runtime
+/// directory handles. No-follow capability opens make both path components
+/// race-safe on Unix and reject Windows reparse points.
+fn open_file_mutation_lock(root: &Path, expected_root_identity: &FileIdentity) -> AppResult<File> {
+    let runtime_dir = open_lock_runtime(root, expected_root_identity)?;
     loop {
-        if let Some(file) = try_open_file_mutation_lock(root)? {
+        if let Some(file) = try_open_file_mutation_lock(&runtime_dir)? {
             return Ok(file);
         }
-        match fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .open(&path)
-        {
-            Ok(file) => return Ok(file),
+        let mut options = lock_open_options();
+        options.create_new(true);
+        match runtime_dir.open_with("write.lock", &options) {
+            Ok(file) => return Ok(file.into_std()),
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(error) => return Err(error.into()),
         }
     }
 }
 
+fn open_lock_runtime(root: &Path, expected_root_identity: &FileIdentity) -> AppResult<CapDir> {
+    let root_dir = CapDir::open_ambient_dir(root, ambient_authority())?;
+    let opened_root_identity = FileIdentity::from_file(root_dir.try_clone()?.into_std_file())?;
+    if &opened_root_identity != expected_root_identity {
+        return Err(AppError::io(
+            "the graph moved or was replaced before its mutation lock was opened",
+        ));
+    }
+    root_dir.open_dir_nofollow(REFLECT_DIR).map_err(|error| {
+        AppError::io(format!(
+            "failed to open the graph runtime directory without following links: {error}"
+        ))
+    })
+}
+
+fn lock_open_options() -> CapOpenOptions {
+    let mut options = CapOpenOptions::new();
+    options.read(true).write(true).follow(FollowSymlinks::No);
+    options
+}
+
 /// Open the currently addressed lock without creating anything. Mutation-lock
 /// revalidation uses this so a stale waiter cannot seed a replacement graph.
-fn try_open_file_mutation_lock(root: &Path) -> AppResult<Option<File>> {
-    let path = root.join(REFLECT_DIR).join("write.lock");
-    match fs::symlink_metadata(&path) {
-        Ok(metadata) if metadata.file_type().is_file() => {
-            let mut options = fs::OpenOptions::new();
-            options.read(true).write(true);
-            #[cfg(any(target_os = "macos", target_os = "ios"))]
-            {
-                use std::os::unix::fs::OpenOptionsExt;
-                options.custom_flags(O_NOFOLLOW_ANY);
-            }
-            let opened_path = if cfg!(any(target_os = "macos", target_os = "ios")) {
-                root.canonicalize()?.join(REFLECT_DIR).join("write.lock")
-            } else {
-                path.clone()
-            };
-            let file = match options.open(opened_path) {
-                Ok(file) => file,
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-                Err(error) => return Err(error.into()),
-            };
+fn try_open_file_mutation_lock(runtime_dir: &CapDir) -> AppResult<Option<File>> {
+    match runtime_dir.open_with("write.lock", &lock_open_options()) {
+        Ok(file) => {
             if !file.metadata()?.is_file() {
-                return Err(AppError::traversal(format!(
-                    "mutation lock path must be a real file: {}",
-                    path.display()
-                )));
+                return Err(AppError::traversal(
+                    "mutation lock path must be a real file",
+                ));
             }
-            Ok(Some(file))
+            Ok(Some(file.into_std()))
         }
-        Ok(_) => Err(AppError::traversal(format!(
-            "mutation lock path must be a real file: {}",
-            path.display()
-        ))),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(error.into()),
     }
@@ -1269,7 +1284,7 @@ mod tests {
         holder.lock().unwrap();
 
         let started = Instant::now();
-        let error = lock_file_with_timeout(&contender, Duration::from_millis(30)).unwrap_err();
+        let error = lock_file_until(&contender, started + Duration::from_millis(30)).unwrap_err();
         let elapsed = started.elapsed();
         holder.unlock().unwrap();
 
@@ -1283,6 +1298,44 @@ mod tests {
     }
 
     #[test]
+    fn process_mutation_lock_wait_is_bounded() {
+        let mutex = Mutex::new(());
+        let holder = mutex.lock().unwrap();
+        let started = Instant::now();
+
+        let error =
+            lock_process_mutex_until(&mutex, started + Duration::from_millis(30)).unwrap_err();
+        let elapsed = started.elapsed();
+        drop(holder);
+
+        assert!(elapsed >= Duration::from_millis(30));
+        assert!(elapsed < Duration::from_secs(1));
+        assert!(matches!(
+            error,
+            AppError::Io { message } if message.contains("timed out waiting")
+        ));
+    }
+
+    #[test]
+    fn process_mutation_lock_waits_for_a_healthy_holder() {
+        let mutex = std::sync::Arc::new(Mutex::new(()));
+        let holder = mutex.lock().unwrap();
+        let contender = std::sync::Arc::clone(&mutex);
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let result =
+                lock_process_mutex_until(&contender, Instant::now() + Duration::from_secs(1));
+            result_tx.send(result.is_ok()).unwrap();
+        });
+
+        std::thread::sleep(Duration::from_millis(30));
+        drop(holder);
+
+        assert!(result_rx.recv_timeout(Duration::from_secs(1)).unwrap());
+        worker.join().unwrap();
+    }
+
+    #[test]
     fn mutation_lock_refuses_a_graph_moved_while_waiting() {
         let parent = tempdir().unwrap();
         let root = parent.path().join("graph");
@@ -1290,7 +1343,7 @@ mod tests {
         fs::write(root.join("notes/sentinel.md"), "original").unwrap();
         let canonical_root = root.canonicalize().unwrap();
         let root_identity = FileIdentity::from_path(&canonical_root).unwrap();
-        let lock_file = open_file_mutation_lock(&canonical_root).unwrap();
+        let lock_file = open_file_mutation_lock(&canonical_root, &root_identity).unwrap();
         let trashed = parent.path().join("trashed");
         fs::rename(&root, &trashed).unwrap();
 
@@ -1300,6 +1353,7 @@ mod tests {
             &canonical_root,
             root_identity,
             lock_file,
+            Instant::now() + Duration::from_secs(1),
             || {
                 closure_ran = true;
                 fs::create_dir_all(root.join("notes"))?;
@@ -1328,7 +1382,7 @@ mod tests {
         fs::write(root.join("notes/original.md"), "original").unwrap();
         let canonical_root = root.canonicalize().unwrap();
         let root_identity = FileIdentity::from_path(&canonical_root).unwrap();
-        let lock_file = open_file_mutation_lock(&canonical_root).unwrap();
+        let lock_file = open_file_mutation_lock(&canonical_root, &root_identity).unwrap();
         let moved = parent.path().join("moved");
         fs::rename(&root, &moved).unwrap();
         bootstrap(&root).unwrap();
@@ -1340,6 +1394,7 @@ mod tests {
             &canonical_root,
             root_identity,
             lock_file,
+            Instant::now() + Duration::from_secs(1),
             || {
                 closure_ran = true;
                 fs::write(root.join("notes/resurrected.md"), "resurrected")?;
@@ -1364,12 +1419,31 @@ mod tests {
     }
 
     #[test]
+    fn mutation_lock_refuses_a_replacement_before_creating_its_lock() {
+        let parent = tempdir().unwrap();
+        let root = parent.path().join("graph");
+        bootstrap(&root).unwrap();
+        let canonical_root = root.canonicalize().unwrap();
+        let root_identity = FileIdentity::from_path(&canonical_root).unwrap();
+        fs::rename(&root, parent.path().join("moved")).unwrap();
+        fs::create_dir_all(root.join(REFLECT_DIR)).unwrap();
+
+        let result = open_file_mutation_lock(&canonical_root, &root_identity);
+
+        assert!(matches!(
+            result,
+            Err(AppError::Io { message }) if message.contains("moved or was replaced")
+        ));
+        assert!(!root.join(REFLECT_DIR).join("write.lock").exists());
+    }
+
+    #[test]
     fn mutation_lock_refuses_a_replaced_lock_inode() {
         let root = tempdir().unwrap();
         bootstrap(root.path()).unwrap();
         let canonical_root = root.path().canonicalize().unwrap();
         let root_identity = FileIdentity::from_path(&canonical_root).unwrap();
-        let lock_file = open_file_mutation_lock(&canonical_root).unwrap();
+        let lock_file = open_file_mutation_lock(&canonical_root, &root_identity).unwrap();
         let lock_path = canonical_root.join(REFLECT_DIR).join("write.lock");
         fs::rename(
             &lock_path,
@@ -1384,6 +1458,7 @@ mod tests {
             &canonical_root,
             root_identity,
             lock_file,
+            Instant::now() + Duration::from_secs(1),
             || {
                 closure_ran = true;
                 fs::write(root.path().join("notes/mutated.md"), "mutated")?;
@@ -1397,6 +1472,55 @@ mod tests {
         ));
         assert!(!closure_ran);
         assert!(!root.path().join("notes/mutated.md").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn mutation_lock_refuses_a_symlinked_runtime_without_creating_outside_state() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempdir().unwrap();
+        bootstrap(root.path()).unwrap();
+        let canonical_root = root.path().canonicalize().unwrap();
+        let root_identity = FileIdentity::from_path(&canonical_root).unwrap();
+        fs::rename(
+            canonical_root.join(REFLECT_DIR),
+            canonical_root.join(".reflect-original"),
+        )
+        .unwrap();
+        let outside = tempdir().unwrap();
+        symlink(outside.path(), canonical_root.join(REFLECT_DIR)).unwrap();
+
+        let result = open_file_mutation_lock(&canonical_root, &root_identity);
+
+        assert!(result.is_err());
+        assert!(!outside.path().join("write.lock").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn mutation_lock_refuses_a_symlinked_lock_file() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempdir().unwrap();
+        bootstrap(root.path()).unwrap();
+        let canonical_root = root.path().canonicalize().unwrap();
+        let root_identity = FileIdentity::from_path(&canonical_root).unwrap();
+        let lock_path = canonical_root.join(REFLECT_DIR).join("write.lock");
+        fs::rename(
+            &lock_path,
+            canonical_root.join(REFLECT_DIR).join("write.lock-original"),
+        )
+        .unwrap();
+        let outside = tempdir().unwrap();
+        let outside_lock = outside.path().join("outside.lock");
+        fs::write(&outside_lock, "untouched").unwrap();
+        symlink(&outside_lock, &lock_path).unwrap();
+
+        let result = open_file_mutation_lock(&canonical_root, &root_identity);
+
+        assert!(result.is_err());
+        assert_eq!(fs::read_to_string(outside_lock).unwrap(), "untouched");
     }
 
     #[test]
@@ -1420,6 +1544,47 @@ mod tests {
         })
         .unwrap();
         assert!(nested_ran);
+    }
+
+    #[test]
+    fn mutation_lock_refuses_a_nested_different_graph() {
+        let first = tempdir().unwrap();
+        let second = tempdir().unwrap();
+        bootstrap(first.path()).unwrap();
+        bootstrap(second.path()).unwrap();
+
+        let mut inner_ran = false;
+        let result = with_file_mutation_lock(first.path(), || {
+            with_file_mutation_lock(second.path(), || {
+                inner_ran = true;
+                Ok(())
+            })
+        });
+
+        assert!(matches!(
+            result,
+            Err(AppError::Io { message })
+                if message.contains("different graph lock recursively")
+        ));
+        assert!(!inner_ran);
+        with_file_mutation_lock(second.path(), || Ok(())).unwrap();
+    }
+
+    #[test]
+    fn mutation_lock_releases_directory_handles_before_moving_the_graph() {
+        let parent = tempdir().unwrap();
+        let root = parent.path().join("graph");
+        let moved = parent.path().join("moved");
+        bootstrap(&root).unwrap();
+
+        with_file_mutation_lock(&root, || {
+            fs::rename(&root, &moved)?;
+            Ok(())
+        })
+        .unwrap();
+
+        assert!(!root.exists());
+        assert!(moved.join(REFLECT_DIR).join("write.lock").is_file());
     }
 
     #[test]

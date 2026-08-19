@@ -44,6 +44,8 @@ reflect-graph-paths = { workspace = true }
 tempfile = { workspace = true }
 sha2 = { workspace = true }
 same-file = "1.0.6"
+cap-std = "4.0.2"
+cap-fs-ext = "4.0.2"
 unicode-normalization = { workspace = true }
 dirs = "6.0.0"
 tauri-plugin-dialog = "2.7.2"
