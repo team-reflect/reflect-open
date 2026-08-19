@@ -66,8 +66,6 @@ export function TemplatePicker({ context }: TemplatePickerProps): ReactElement |
       title="Insert template"
       description="Choose a template to insert at the cursor"
     >
-      {/* CommandDialog does not provide the cmdk root; the caller must (the
-          same contract as shadcn's Base UI command examples). */}
       <Command>
         <CommandInput placeholder="Insert template…" />
         <CommandList>
