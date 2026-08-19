@@ -102,15 +102,25 @@ jobs:
       # Tauri v2 build dependencies (the crate links the WebView + GTK stack).
       - name: Install Tauri system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          PACKAGES="\
             libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libxdo-dev \
             libssl-dev \
             build-essential \
-            curl wget file patchelf
+            curl \
+            wget \
+            file \
+            patchelf"
+          echo "Installing Tauri system dependencies..."
+          if sudo apt-get install -y $PACKAGES; then
+            echo "Tauri system dependencies installed successfully without apt-get update."
+          else
+            echo "Initial installation failed. Running apt-get update and retrying..."
+            sudo apt-get update
+            sudo apt-get install -y $PACKAGES
+          fi
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
