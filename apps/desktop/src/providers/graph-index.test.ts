@@ -172,6 +172,37 @@ describe('createGraphIndex', () => {
     expect(unlisten).toHaveBeenCalledTimes(1) // pending subscription cleaned up
   })
 
+  it('an abort during the subscribe drops the pending subscription', async () => {
+    const unlisten = vi.fn()
+    const index = createGraphIndex()
+    // The abort lands while `subscribeIndexChanges` is still in flight, so the
+    // pass clears its own signal check only after the listener exists.
+    mockSubscribe.mockImplementation(async () => {
+      void index.stop()
+      return unlisten
+    })
+    index.sync(5, () => false)
+    await index.settled()
+    expect(mockWatchStart).not.toHaveBeenCalled()
+    expect(unlisten).toHaveBeenCalledTimes(1) // pending subscription cleaned up
+  })
+
+  it('an abort during the watcher start leaves the subscription unadopted', async () => {
+    const unlisten = vi.fn()
+    const onProgress = vi.fn<(progress: GraphIndexProgress) => void>()
+    mockSubscribe.mockResolvedValue(unlisten)
+    const index = createGraphIndex({ onProgress })
+    mockWatchStart.mockImplementation(async () => {
+      void index.stop()
+    })
+    index.sync(5, () => false)
+    await index.settled()
+    // Dropped rather than adopted, and the pass never claims to be live. The
+    // watcher stays up for the replacement pass; only `close` stops it.
+    expect(unlisten).toHaveBeenCalledTimes(1)
+    expect(onProgress.mock.calls.map(([stage]) => stage)).toEqual(['reconciling'])
+  })
+
   it('reports a sync failure but stop() still settles', async () => {
     const onError = vi.fn()
     mockSync.mockRejectedValue(new Error('reconcile boom'))

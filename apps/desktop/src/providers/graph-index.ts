@@ -262,12 +262,13 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
             `index: pass finished in ${Math.round(performance.now() - passStarted)}ms — read ${passWorked} of ${passTotal} files`,
           )
         }
-        // Aborted counts as superseded here: `stop()` aborts without making
-        // `isStale()` true, and every caller that stops a pass (`refresh`,
-        // `close`, a graph switch) either starts a replacement pass or tears
-        // the lifecycle down. Letting a stopped pass subscribe, start the
-        // watcher, and reload every open note is churn the replacement pass
-        // immediately undoes and redoes.
+        // Aborted counts as superseded at every step below: `stop()` aborts
+        // without making `isStale()` true, and every caller that stops a pass
+        // (`refresh`, `close`, a graph switch) either starts a replacement pass
+        // or tears the lifecycle down. Letting a stopped pass subscribe, start
+        // the watcher, and reload every open note is churn the replacement pass
+        // immediately undoes and redoes. The watcher itself is left running:
+        // only `close` wants it stopped, and it calls `watchStop` itself.
         if (controller.signal.aborted || isStale() || isSuspended()) {
           return
         }
@@ -279,11 +280,11 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
           onMoved,
           () => !controller.signal.aborted && !isStale() && !isSuspended(),
         )
-        if (isStale() || isSuspended()) {
+        if (controller.signal.aborted || isStale() || isSuspended()) {
           return
         }
         await watchStart()
-        if (isStale() || isSuspended()) {
+        if (controller.signal.aborted || isStale() || isSuspended()) {
           return
         }
         live.unlisten?.()
