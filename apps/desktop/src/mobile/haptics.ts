@@ -5,9 +5,9 @@ let bridgeAvailable = true
 /**
  * Fire a light impact haptic — V1 parity for calendar-strip date taps and
  * tab presses, plus task-surface confirmations. WKWebView has no
- * `navigator.vibrate`, so the tap goes through the first-party keyboard plugin's
+ * `navigator.vibrate`, so the tap goes through the first-party haptics plugin's
  * `impact_light` command
- * (`plugins/tauri-plugin-keyboard`).
+ * (`plugins/tauri-plugin-mobile-haptics`).
  *
  * Fire-and-forget and fail-soft: where the plugin isn't registered (desktop,
  * browser dev) the first rejected invoke logs once and disables further

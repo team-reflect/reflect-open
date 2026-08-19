@@ -221,10 +221,15 @@ pub fn run() {
 
     // The keyboard bridge (Plan 19, decision 8) is mobile-only: desktop has
     // no software keyboard to track. (Sharing uses the webview's Web Share
-    // API, so it needs no native plugin; haptics ride this plugin's
-    // `impact_light` command.)
+    // API, so it needs no native plugin.)
     #[cfg(mobile)]
     let builder = builder.plugin(tauri_plugin_keyboard::init());
+
+    // Haptics are mobile-only too: WKWebView has no `navigator.vibrate`, so
+    // taps reach `UIImpactFeedbackGenerator` through this plugin's
+    // `impact_light` command.
+    #[cfg(mobile)]
+    let builder = builder.plugin(tauri_plugin_mobile_haptics::init());
 
     // The native audio-memo recorder is mobile-only too: desktop records
     // through the webview's MediaRecorder (`use-audio-recorder.ts`), while

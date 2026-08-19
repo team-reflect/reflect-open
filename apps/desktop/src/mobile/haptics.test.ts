@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * `hapticImpactLight` is fire-and-forget over the keyboard plugin's
+ * `hapticImpactLight` is fire-and-forget over the haptics plugin's
  * `impact_light` command, and must fail soft where the plugin isn't
  * registered (desktop, browser dev): one warning, then no further IPC.
  */
@@ -34,11 +34,11 @@ describe('hapticImpactLight', () => {
     hapticImpactLight()
 
     expect(invokeMock).toHaveBeenCalledTimes(2)
-    expect(invokeMock).toHaveBeenCalledWith('plugin:keyboard|impact_light')
+    expect(invokeMock).toHaveBeenCalledWith('plugin:mobile-haptics|impact_light')
   })
 
   it('warns once and stops invoking after the bridge rejects', async () => {
-    invokeMock.mockRejectedValue(new Error('plugin keyboard not found'))
+    invokeMock.mockRejectedValue(new Error('plugin mobile-haptics not found'))
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const hapticImpactLight = await loadHaptics()
 

@@ -28,7 +28,7 @@ export {
   type StagedRecordingFile,
   type StartRecordingOptions,
 } from '../ipc/recording-plugin'
-export { impactLight } from '../ipc/keyboard-plugin'
+export { impactLight } from '../ipc/mobile-haptics-plugin'
 export {
   getAppVersion,
   getAppPlatform,

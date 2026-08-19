@@ -81,7 +81,7 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         // Browser previews are never suspended like an iOS process, so the
         // native finite-length assertion is honestly unavailable.
         return null
-      case 'plugin:keyboard|impact_light':
+      case 'plugin:mobile-haptics|impact_light':
         return null
       case 'mobile_storage':
         // No iCloud in a plain browser — the dev harness exercises the

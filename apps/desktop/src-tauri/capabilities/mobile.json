@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "mobile",
-  "description": "Mobile-only capabilities: keyboard webview tuning with haptics (Plan 19) and the native audio-memo recorder",
+  "description": "Mobile-only capabilities: keyboard webview tuning (Plan 19), the light impact haptic, and the native audio-memo recorder",
   "platforms": ["iOS", "android"],
   "windows": ["main"],
-  "permissions": ["keyboard:default", "recording:default"]
+  "permissions": ["keyboard:default", "mobile-haptics:default", "recording:default"]
 }
