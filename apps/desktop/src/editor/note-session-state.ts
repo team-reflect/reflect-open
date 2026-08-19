@@ -453,6 +453,13 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       path = to
       return Promise.resolve()
     }
+    if (claimedPaths.has(to)) {
+      if (disposed) {
+        return Promise.reject(new Error('the note session was disposed while retargeting'))
+      }
+      path = to
+      return Promise.resolve()
+    }
     return claimOwnership(to).then((claimed) => {
       if (!claimed) {
         throw new Error('the note session was disposed while retargeting')

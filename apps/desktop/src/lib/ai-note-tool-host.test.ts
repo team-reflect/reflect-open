@@ -797,6 +797,48 @@ describe('createDesktopChatNoteToolHost', () => {
     expect(setup.dependencies.createNote).not.toHaveBeenCalled()
     expect(setup.events).toEqual([])
   })
+
+  it('settles only mutations dispatched by that turn host', async () => {
+    const firstWrite = deferred<{
+      kind: 'written'
+      revision: string
+      modifiedMs: number
+    }>()
+    const secondWrite = deferred<{
+      kind: 'written'
+      revision: string
+      modifiedMs: number
+    }>()
+    const first = options({ writeNoteIfRevision: vi.fn(async () => await firstWrite.promise) })
+    const second = options({ writeNoteIfRevision: vi.fn(async () => await secondWrite.promise) })
+    const mutation = (host: typeof first.host, path: string) =>
+      host.applyChange({
+        kind: 'edit',
+        toolCallId: `tool-${path}`,
+        path,
+        title: 'Project',
+        beforeSource: BEFORE,
+        afterSource: AFTER,
+        expectedRevision: 'before-revision',
+      })
+
+    const firstMutation = mutation(first.host, 'notes/shared.md')
+    const secondMutation = mutation(second.host, 'notes/shared.md')
+    let firstSettled = false
+    const firstSettlement = first.host.settled().then(() => {
+      firstSettled = true
+    })
+
+    expect(second.dependencies.writeNoteIfRevision).not.toHaveBeenCalled()
+    firstWrite.resolve({ kind: 'written', revision: 'after-revision', modifiedMs: 1 })
+    await firstMutation
+    await vi.waitFor(() => expect(firstSettled).toBe(true))
+    expect(second.dependencies.writeNoteIfRevision).toHaveBeenCalledOnce()
+
+    secondWrite.resolve({ kind: 'written', revision: 'after-revision', modifiedMs: 1 })
+    await secondMutation
+    await firstSettlement
+  })
 })
 
 describe('createDesktopChatNoteChangeService', () => {

@@ -152,8 +152,8 @@ describe('createNoteWithTitlePrepared', () => {
   it('awaits the durable preparation before the no-clobber create', async () => {
     const invoke = bindBridge()
     const events: string[] = []
-    // Rebind with a simple call-order assertion instead of relying on mock
-    // invocation timestamps: the prepare callback must see no create yet.
+    // Use a direct call-order assertion instead of relying on mock invocation
+    // timestamps: the prepare callback must see no create yet.
     const prepared = vi.fn(async (creation: PreparedNoteCreation) => {
       expect(invoke.mock.calls.some(([command]) => command === 'note_create')).toBe(false)
       events.push(`prepared:${creation.path}`)

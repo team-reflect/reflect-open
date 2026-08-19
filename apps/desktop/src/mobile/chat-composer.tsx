@@ -133,7 +133,7 @@ export function MobileChatComposer(): ReactElement {
           type="button"
           aria-label="Model"
           disabled={busy}
-          className="flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-text-muted"
+          className="flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-text-muted disabled:opacity-50"
           onClick={() => setModelOpen(true)}
         >
           <span className="min-w-0 truncate">

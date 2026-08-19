@@ -113,7 +113,6 @@ const defaultDependencies: DesktopChatNoteHostDependencies = {
 
 interface GraphMutationCoordinator {
   readonly queue: NotePathOperationQueue
-  readonly active: Set<Promise<unknown>>
 }
 
 const graphCoordinators = new Map<string, GraphMutationCoordinator>()
@@ -127,7 +126,7 @@ function coordinatorFor(
   if (existing !== undefined) {
     return existing
   }
-  const created = { queue: createNotePathOperationQueue(), active: new Set<Promise<unknown>>() }
+  const created = { queue: createNotePathOperationQueue() }
   graphCoordinators.set(key, created)
   return created
 }
@@ -170,7 +169,8 @@ export function createDesktopChatNoteToolHost(
     ...defaultDependencies,
     ...options.dependencies,
   }
-  const { queue, active } = coordinatorFor(options.graphGeneration, options.indexGeneration)
+  const { queue } = coordinatorFor(options.graphGeneration, options.indexGeneration)
+  const active = new Set<Promise<unknown>>()
   let nextSequence = 0
   let sealed = false
 

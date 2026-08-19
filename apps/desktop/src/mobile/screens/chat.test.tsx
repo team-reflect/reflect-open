@@ -219,6 +219,10 @@ describe('MobileChat', () => {
     await userEvent.keyboard('{ArrowDown}')
     const writeTrigger = page.getByRole('button', { name: 'Chat permissions, Read & write' })
     await expect.element(writeTrigger).toHaveTextContent('Write')
+    await expect.element(writeTrigger).toHaveAttribute('aria-expanded', 'true')
+    await expect.element(group.getByRole('radio', { name: /Read & write/ })).toBeChecked()
+
+    await userEvent.keyboard(' ')
     await expect.element(writeTrigger).toHaveAttribute('aria-expanded', 'false')
     await writeTrigger.click()
     await expect
@@ -247,6 +251,9 @@ describe('MobileChat', () => {
     await expect.element(page.getByText('Working…')).toBeVisible()
 
     await expect.element(trigger).toBeDisabled()
+    const modelTrigger = page.getByRole('button', { name: 'Model' })
+    await expect.element(modelTrigger).toBeDisabled()
+    await expect.element(modelTrigger).toHaveClass('disabled:opacity-50')
     const group = page.getByRole('radiogroup', { name: 'Chat permissions' })
     await expect.element(group.getByRole('radio', { name: /Read only/ })).toBeDisabled()
     await expect.element(group.getByRole('radio', { name: /Read & write/ })).toBeDisabled()

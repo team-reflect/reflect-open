@@ -1,6 +1,6 @@
 import type { ChatPermissionMode } from '@reflect/core'
 import { Check } from 'lucide-react'
-import type { ReactElement } from 'react'
+import { useRef, type KeyboardEvent, type ReactElement } from 'react'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { cn } from '@/lib/utils'
 import { useChatSession } from '@/providers/chat-provider'
@@ -35,7 +35,34 @@ export function ChatPermissionDrawer({
   onOpenChange,
 }: ChatPermissionDrawerProps): ReactElement {
   const { permissionMode, setPermissionMode, status } = useChatSession()
+  const arrowTraversalRef = useRef(false)
   const disabled = status !== 'idle'
+
+  const handleRadioKeyDown = (
+    event: KeyboardEvent<HTMLInputElement>,
+    mode: ChatPermissionMode,
+  ): void => {
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault()
+      arrowTraversalRef.current = false
+      setPermissionMode(mode)
+      onOpenChange(false)
+      return
+    }
+    if (
+      event.key === 'ArrowDown' ||
+      event.key === 'ArrowLeft' ||
+      event.key === 'ArrowRight' ||
+      event.key === 'ArrowUp'
+    ) {
+      arrowTraversalRef.current = true
+      setTimeout(() => {
+        arrowTraversalRef.current = false
+      }, 0)
+    } else {
+      arrowTraversalRef.current = false
+    }
+  }
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -62,8 +89,16 @@ export function ChatPermissionDrawer({
                   checked={selected}
                   disabled={disabled}
                   className="sr-only"
-                  onChange={() => {
-                    setPermissionMode(option.value)
+                  onKeyDown={(event) => handleRadioKeyDown(event, option.value)}
+                  onPointerDown={() => {
+                    arrowTraversalRef.current = false
+                  }}
+                  onChange={() => setPermissionMode(option.value)}
+                  onClick={() => {
+                    if (arrowTraversalRef.current) {
+                      arrowTraversalRef.current = false
+                      return
+                    }
                     onOpenChange(false)
                   }}
                 />

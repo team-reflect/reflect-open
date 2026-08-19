@@ -969,8 +969,10 @@ fn trash_note_if_revision_with(
     expected_revision: &str,
     trash: impl FnOnce(&Path) -> AppResult<()>,
 ) -> AppResult<NoteTrashIfRevisionOutcome> {
-    let staging_parent = root.join(".reflect").join("trash-staging");
-    fs::create_dir_all(&staging_parent)?;
+    let runtime = root.join(".reflect");
+    io::ensure_real_directory(&runtime)?;
+    let staging_parent = runtime.join("trash-staging");
+    io::ensure_real_directory(&staging_parent)?;
     let current = match io::read_note_no_follow(root, target) {
         Ok(current) => current,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -1012,7 +1014,29 @@ fn trash_note_if_revision_with(
     let staged_revision = io::read_note_no_follow(root, &stage_target)
         .ok()
         .map(|source| io::note_revision(&source));
-    trash(&stage_target)?;
+    if let Err(error) = trash(&stage_target) {
+        // Restore the reviewed inode when the platform trash call fails. A
+        // hard link is the portable no-clobber claim here: unlike rename it
+        // cannot overwrite a replacement that raced into the public path.
+        // If either step fails, retain the staged link for recovery rather
+        // than deleting the only remaining copy of the note.
+        match fs::hard_link(&stage_target, target) {
+            Ok(()) => match fs::remove_file(&stage_target) {
+                Ok(()) => {
+                    let _ = fs::remove_dir(&stage_dir);
+                }
+                Err(rollback_error) => tracing::warn!(
+                    ?rollback_error,
+                    "restored a conditionally trashed note but could not remove its staging link"
+                ),
+            },
+            Err(rollback_error) => tracing::warn!(
+                ?rollback_error,
+                "could not restore a note after the platform trash operation failed"
+            ),
+        }
+        return Err(error);
+    }
     let _ = fs::remove_dir(&stage_dir);
 
     let current_at_path = match io::read_note_no_follow(root, target) {
@@ -1616,6 +1640,71 @@ mod ai_note_mutation_tests {
             })
         );
         assert_eq!(std::fs::read_to_string(target).unwrap(), "replacement");
+    }
+
+    #[test]
+    fn conditional_trash_restores_the_note_when_platform_trash_fails() {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("note.md");
+        std::fs::write(&target, "reviewed").unwrap();
+        let expected = super::io::note_revision("reviewed");
+        let mut staged_path = None;
+
+        let result = trash_note_if_revision_with(root.path(), &target, &expected, |staged| {
+            staged_path = Some(staged.to_path_buf());
+            Err(super::AppError::io("platform trash failed"))
+        });
+
+        assert!(result.is_err());
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "reviewed");
+        assert!(!staged_path.unwrap().exists());
+    }
+
+    #[test]
+    fn conditional_trash_failure_never_overwrites_a_racing_replacement() {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("note.md");
+        std::fs::write(&target, "reviewed").unwrap();
+        let expected = super::io::note_revision("reviewed");
+        let mut staged_path = None;
+
+        let result = trash_note_if_revision_with(root.path(), &target, &expected, |staged| {
+            staged_path = Some(staged.to_path_buf());
+            std::fs::write(&target, "replacement")?;
+            Err(super::AppError::io("platform trash failed"))
+        });
+
+        assert!(result.is_err());
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "replacement");
+        assert_eq!(
+            std::fs::read_to_string(staged_path.unwrap()).unwrap(),
+            "reviewed"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn conditional_trash_rejects_a_symlinked_staging_directory() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::fs::create_dir(root.path().join(".reflect")).unwrap();
+        symlink(outside.path(), root.path().join(".reflect/trash-staging")).unwrap();
+        let target = root.path().join("note.md");
+        std::fs::write(&target, "reviewed").unwrap();
+        let expected = super::io::note_revision("reviewed");
+        let mut trash_called = false;
+
+        let result = trash_note_if_revision_with(root.path(), &target, &expected, |_| {
+            trash_called = true;
+            Ok(())
+        });
+
+        assert!(matches!(result, Err(super::AppError::Traversal { .. })));
+        assert!(!trash_called);
+        assert_eq!(std::fs::read_to_string(target).unwrap(), "reviewed");
+        assert_eq!(std::fs::read_dir(outside.path()).unwrap().count(), 0);
     }
 }
 

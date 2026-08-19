@@ -28,7 +28,7 @@ describe('validateChatSource', () => {
     ).resolves.toBe(false)
   })
 
-  it('allows an asset only while its sidecar exists and every referer is public', async () => {
+  it('allows an asset only with its sidecar, at least one public referer, and no private referers', async () => {
     const files: Record<string, string> = {
       'assets/chart.png.reflect.md': 'A chart',
       'notes/deck.md': '# Deck\n\n![chart](assets/chart.png)\n',
@@ -47,7 +47,12 @@ describe('validateChatSource', () => {
     }
     const source = { kind: 'asset' as const, path: 'assets/chart.png' }
     await expect(validateChatSource(source, deps)).resolves.toBe(true)
+    referers = []
+    await expect(validateChatSource(source, deps)).resolves.toBe(false)
     referers = ['notes/deck.md', 'notes/diary.md']
+    await expect(validateChatSource(source, deps)).resolves.toBe(false)
+    referers = ['notes/deck.md']
+    delete files['assets/chart.png.reflect.md']
     await expect(validateChatSource(source, deps)).resolves.toBe(false)
   })
 })

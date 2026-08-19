@@ -17,17 +17,27 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   moveNoteIndexed: core.moveNoteIndexed,
 }))
 
-function fakeSession(path: string) {
+function fakeSession(
+  path: string,
+  failRetarget: (to: string, attempt: number) => boolean = () => false,
+) {
   let current = path
+  let retargetAttempt = 0
   const flush = vi.fn(async () => {})
+  const retarget = vi.fn(async (to: string) => {
+    retargetAttempt += 1
+    if (failRetarget(to, retargetAttempt)) {
+      throw new Error(`retarget refused: ${to}`)
+    }
+    current = to
+  })
+  const discard = vi.fn()
   const session: NoteSession = {
     ownerId: null,
     get path() {
       return current
     },
-    retarget: async (to: string) => {
-      current = to
-    },
+    retarget,
     releaseRetargetedPath: async () => {},
     load: () => {},
     editorChanged: () => {},
@@ -49,9 +59,9 @@ function fakeSession(path: string) {
     commitBodyMutation: async () => ({ status: 'refused', reason: 'no_write' }),
     commitConditionalTrash: async () => ({ kind: 'refused', reason: 'no_write' }),
     dispose: () => {},
-    discard: () => {},
+    discard,
   }
-  return { session, flush }
+  return { session, flush, retarget, discard }
 }
 
 beforeEach(() => {
@@ -94,6 +104,28 @@ describe('moveNoteCarryingSession', () => {
         'disk full',
       )
       expect(session.path).toBe('notes/a.md')
+      expect(openSession('notes/a.md')).toBe(session)
+      expect(openSession('notes/b.md')).toBeNull()
+    } finally {
+      unregister()
+    }
+  })
+
+  it('preserves the move failure, repairs the registry, and freezes a failed rollback', async () => {
+    const moveFailure = new Error('disk full')
+    core.moveNoteIndexed.mockRejectedValue(moveFailure)
+    const { session, discard, retarget } = fakeSession(
+      'notes/a.md',
+      (_to, attempt) => attempt === 2,
+    )
+    const unregister = registerOpenDocument({ session })
+    try {
+      await expect(moveNoteCarryingSession('notes/a.md', 'notes/b.md', 7)).rejects.toBe(moveFailure)
+
+      expect(retarget).toHaveBeenNthCalledWith(1, 'notes/b.md')
+      expect(retarget).toHaveBeenNthCalledWith(2, 'notes/a.md')
+      expect(discard).toHaveBeenCalledOnce()
+      expect(session.path).toBe('notes/b.md')
       expect(openSession('notes/a.md')).toBe(session)
       expect(openSession('notes/b.md')).toBeNull()
     } finally {
@@ -154,6 +186,27 @@ describe('followHealedMove', () => {
       expect(moves).toEqual([['notes/a.md', 'notes/renamed.md']])
     } finally {
       unsubscribe()
+    }
+  })
+
+  it('announces a landed move and freezes the stale session when retargeting fails', async () => {
+    const { session, discard } = fakeSession('notes/a.md', () => true)
+    const unregister = registerOpenDocument({ session })
+    const moves: Array<[string, string]> = []
+    const unsubscribe = onNoteMoved((from, to) => {
+      moves.push([from, to])
+    })
+    try {
+      await followHealedMove('notes/a.md', 'notes/renamed.md')
+
+      expect(discard).toHaveBeenCalledOnce()
+      expect(session.path).toBe('notes/a.md')
+      expect(openSession('notes/a.md')).toBe(session)
+      expect(openSession('notes/renamed.md')).toBeNull()
+      expect(moves).toEqual([['notes/a.md', 'notes/renamed.md']])
+    } finally {
+      unsubscribe()
+      unregister()
     }
   })
 })

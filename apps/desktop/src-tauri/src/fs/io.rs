@@ -13,7 +13,7 @@ use std::io::Write;
 use std::os::raw::c_int;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::UNIX_EPOCH;
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use reflect_graph_paths::{evicted_logical_path, eviction_placeholder, is_dataless};
 
@@ -26,6 +26,8 @@ use super::FileMeta;
 /// file extends the same critical section across concurrently running Reflect
 /// flavors/processes that have the graph open.
 static FILE_MUTATION_LOCK: Mutex<()> = Mutex::new(());
+const FILE_MUTATION_LOCK_TIMEOUT: Duration = Duration::from_secs(5);
+const FILE_MUTATION_LOCK_RETRY_DELAY: Duration = Duration::from_millis(10);
 thread_local! {
     static HELD_FILE_MUTATION_ROOT: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
 }
@@ -52,11 +54,20 @@ pub(super) fn with_file_mutation_lock<T>(
         }
         return operation();
     }
-    let _guard = FILE_MUTATION_LOCK
-        .lock()
-        .map_err(|_| AppError::io("file mutation lock poisoned"))?;
+    let _guard = match FILE_MUTATION_LOCK.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => {
+            // The mutex protects serialization, not mutable state. A panic in
+            // one operation drops the OS lock and thread-local root guard, so
+            // the next mutation can safely recover instead of permanently
+            // disabling every graph write in this process.
+            tracing::warn!("recovering poisoned file mutation lock");
+            FILE_MUTATION_LOCK.clear_poison();
+            poisoned.into_inner()
+        }
+    };
     let lock_file = open_file_mutation_lock(&canonical_root)?;
-    lock_file.lock()?;
+    lock_file_with_timeout(&lock_file, FILE_MUTATION_LOCK_TIMEOUT)?;
     HELD_FILE_MUTATION_ROOT.with(|held| *held.borrow_mut() = Some(canonical_root));
     let _thread_root = ThreadMutationRootGuard;
     let result = operation();
@@ -65,6 +76,29 @@ pub(super) fn with_file_mutation_lock<T>(
         (Ok(value), Ok(())) => Ok(value),
         (Err(error), _) => Err(error),
         (Ok(_), Err(error)) => Err(error.into()),
+    }
+}
+
+fn lock_file_with_timeout(lock_file: &File, timeout: Duration) -> AppResult<()> {
+    let started = Instant::now();
+    loop {
+        match lock_file.try_lock() {
+            Ok(()) => return Ok(()),
+            Err(std::fs::TryLockError::WouldBlock) => {
+                let elapsed = started.elapsed();
+                if elapsed >= timeout {
+                    return Err(AppError::io(
+                        "timed out waiting for another Reflect process to finish writing this graph",
+                    ));
+                }
+                std::thread::sleep(FILE_MUTATION_LOCK_RETRY_DELAY.min(timeout - elapsed));
+            }
+            Err(error) => {
+                return Err(AppError::io(format!(
+                    "failed to acquire the graph mutation lock: {error}"
+                )))
+            }
+        }
     }
 }
 
@@ -211,19 +245,28 @@ pub(super) fn initialize_runtime(root: &Path) -> AppResult<()> {
 /// would let an untrusted vault redirect cleanup and metadata writes outside
 /// its root; inspect the entry itself and fail closed on every non-directory.
 fn ensure_runtime_directory(root: &Path) -> AppResult<()> {
-    let runtime = root.join(REFLECT_DIR);
-    match fs::symlink_metadata(&runtime) {
+    ensure_real_directory(&root.join(REFLECT_DIR))
+}
+
+/// Create one directory component without accepting a pre-existing symlink.
+/// The parent must already be a verified real directory.
+pub(super) fn ensure_real_directory(path: &Path) -> AppResult<()> {
+    match fs::symlink_metadata(path) {
         Ok(metadata) if metadata.file_type().is_dir() => Ok(()),
         Ok(_) => Err(AppError::traversal(format!(
-            "runtime path must be a real directory: {}",
-            runtime.display()
+            "directory path must be a real directory: {}",
+            path.display()
         ))),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            // The graph root already exists. A single-component create is
-            // intentional: if another process races in a symlink or file,
-            // `create_dir` fails instead of accepting and following it.
-            fs::create_dir(&runtime)?;
-            Ok(())
+            // A single-component create is intentional: if another process
+            // races in a symlink or file, `create_dir` refuses to follow it.
+            match fs::create_dir(path) {
+                Ok(()) => Ok(()),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                    ensure_real_directory(path)
+                }
+                Err(error) => Err(error.into()),
+            }
         }
         Err(error) => Err(error.into()),
     }
@@ -1146,6 +1189,51 @@ mod tests {
             }
         );
         assert_eq!(fs::read_to_string(target).unwrap(), "child");
+    }
+
+    #[test]
+    fn mutation_lock_wait_is_bounded() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("lock");
+        let holder = File::create(&path).unwrap();
+        let contender = File::options().read(true).write(true).open(path).unwrap();
+        holder.lock().unwrap();
+
+        let started = Instant::now();
+        let error = lock_file_with_timeout(&contender, Duration::from_millis(30)).unwrap_err();
+        let elapsed = started.elapsed();
+        holder.unlock().unwrap();
+
+        assert!(elapsed >= Duration::from_millis(30));
+        assert!(elapsed < Duration::from_secs(1));
+        assert!(matches!(
+            error,
+            AppError::Io { message } if message.contains("timed out waiting")
+        ));
+        assert_eq!(FILE_MUTATION_LOCK_TIMEOUT, Duration::from_secs(5));
+    }
+
+    #[test]
+    fn process_mutation_lock_recovers_after_a_panicking_operation() {
+        let dir = tempdir().unwrap();
+        bootstrap(dir.path()).unwrap();
+
+        let panic = std::panic::catch_unwind(|| {
+            let _ = with_file_mutation_lock(dir.path(), || -> AppResult<()> {
+                panic!("intentional mutation panic");
+            });
+        });
+        assert!(panic.is_err());
+
+        let mut nested_ran = false;
+        with_file_mutation_lock(dir.path(), || {
+            with_file_mutation_lock(dir.path(), || {
+                nested_ran = true;
+                Ok(())
+            })
+        })
+        .unwrap();
+        assert!(nested_ran);
     }
 
     #[test]

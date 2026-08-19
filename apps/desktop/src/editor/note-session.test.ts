@@ -213,6 +213,13 @@ describe('createNoteSession', () => {
     expect(claims).toEqual(['notes/a.md', 'notes/renamed.md'])
     expect(releases).toEqual([])
 
+    // Rollback and retry reuse the deliberately-retained claims. Reclaiming
+    // through IPC would make compensation needlessly fallible and could drop
+    // the original claim if a response were lost.
+    await h.session.retarget('notes/a.md')
+    await h.session.retarget('notes/renamed.md')
+    expect(claims).toEqual(['notes/a.md', 'notes/renamed.md'])
+
     await h.session.releaseRetargetedPath('notes/a.md')
     expect(releases).toEqual(['notes/a.md'])
   })
