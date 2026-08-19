@@ -21,12 +21,14 @@ function fakeSession(path: string) {
   let current = path
   const flush = vi.fn(async () => {})
   const session: NoteSession = {
+    ownerId: null,
     get path() {
       return current
     },
-    retarget: (to: string) => {
+    retarget: async (to: string) => {
       current = to
     },
+    releaseRetargetedPath: async () => {},
     load: () => {},
     editorChanged: () => {},
     externalChanged: () => {},
@@ -37,12 +39,15 @@ function fakeSession(path: string) {
     commitFrontmatter: async () => true,
     content: () => '',
     liveContent: () => '',
+    readFreshContent: async () => ({ source: '', revision: '' }),
     updateFrontmatter: () => true,
     commitTaskToggle: async () => false,
     commitTaskEdit: async () => false,
     commitTaskRemove: async () => false,
     commitTaskToBullet: async () => false,
     commitBodyAppend: async () => false,
+    commitBodyMutation: async () => ({ status: 'refused', reason: 'no_write' }),
+    commitConditionalTrash: async () => ({ kind: 'refused', reason: 'no_write' }),
     dispose: () => {},
     discard: () => {},
   }
@@ -117,7 +122,7 @@ describe('moveNoteCarryingSession', () => {
 })
 
 describe('followHealedMove', () => {
-  it('carries a live session to the healed path and announces', () => {
+  it('carries a live session to the healed path and announces', async () => {
     const { session } = fakeSession('notes/a.md')
     const unregister = registerOpenDocument({ session })
     const moves: Array<[string, string]> = []
@@ -125,7 +130,7 @@ describe('followHealedMove', () => {
       moves.push([from, to])
     })
     try {
-      followHealedMove('notes/a.md', 'notes/renamed.md')
+      await followHealedMove('notes/a.md', 'notes/renamed.md')
 
       // The open pane follows the externally renamed file: its next save
       // writes the new path instead of resurrecting the dead one.
@@ -139,13 +144,13 @@ describe('followHealedMove', () => {
     }
   })
 
-  it('a heal of a closed note just announces (routes still follow)', () => {
+  it('a heal of a closed note just announces (routes still follow)', async () => {
     const moves: Array<[string, string]> = []
     const unsubscribe = onNoteMoved((from, to) => {
       moves.push([from, to])
     })
     try {
-      followHealedMove('notes/a.md', 'notes/renamed.md')
+      await followHealedMove('notes/a.md', 'notes/renamed.md')
       expect(moves).toEqual([['notes/a.md', 'notes/renamed.md']])
     } finally {
       unsubscribe()

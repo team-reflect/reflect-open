@@ -4923,6 +4923,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "trash",
+ "unicode-normalization",
  "walkdir",
  "xattr",
  "zip 8.6.0",

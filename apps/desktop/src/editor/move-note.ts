@@ -32,17 +32,21 @@ export async function moveNoteCarryingSession(
   const owner = openSession(from)
   if (owner !== null) {
     await owner.flush()
-    owner.retarget(to)
+    await owner.retarget(to)
     retargetOpenDocument(from, to, owner)
   }
   try {
     await moveNoteIndexed(from, to, generation)
   } catch (cause) {
     if (owner !== null) {
-      owner.retarget(from)
+      await owner.retarget(from)
       retargetOpenDocument(to, from, owner)
+      void owner.releaseRetargetedPath(to).catch(() => {})
     }
     throw cause
+  }
+  if (owner !== null) {
+    void owner.releaseRetargetedPath(from).catch(() => {})
   }
   emitNoteMoved(from, to)
 }
@@ -56,11 +60,12 @@ export async function moveNoteCarryingSession(
  * move already happened; this only updates what points at it — and without
  * it, an open pane's next save would resurrect the dead path.
  */
-export function followHealedMove(from: string, to: string): void {
+export async function followHealedMove(from: string, to: string): Promise<void> {
   const owner = openSession(from)
   if (owner !== null) {
-    owner.retarget(to)
+    await owner.retarget(to)
     retargetOpenDocument(from, to, owner)
+    void owner.releaseRetargetedPath(from).catch(() => {})
   }
   emitNoteMoved(from, to)
 }

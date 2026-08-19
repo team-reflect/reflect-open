@@ -7,10 +7,12 @@ import type {
   LanguageModelV3Usage,
 } from '@ai-sdk/provider'
 import type { RetrievalHit } from '../../embeddings/retrieve'
+import { chunkAssetDescriptionsWithAttribution } from '../../embeddings/chunk'
 import { cloudSafeGraphContext } from '../checkers'
 import { languageModel } from '../language-model'
 import { fitToContextWindow } from './context-window'
 import { MAX_STEPS, streamChat, streamChatTurn, type ChatStreamEvent } from './stream-chat'
+import type { ChatSourceRef } from './transcript'
 
 vi.mock('../language-model', () => ({
   languageModel: vi.fn(),
@@ -95,6 +97,13 @@ async function collect(events: AsyncGenerator<ChatStreamEvent>): Promise<ChatStr
   return all
 }
 
+function allowRevalidation(messages: ModelMessage[]) {
+  return {
+    revalidateHistory: async () => messages,
+    validateSource: async () => true,
+  }
+}
+
 const PUBLIC_HIT: RetrievalHit = {
   path: 'notes/atlas.md',
   title: 'Atlas Launch Plan',
@@ -102,6 +111,7 @@ const PUBLIC_HIT: RetrievalHit = {
   snippet: 'launch plan',
   heading: null,
   isPrivate: false,
+  evidence: { kind: 'lexical', assetPaths: [] },
 }
 
 const PRIVATE_HIT: RetrievalHit = {
@@ -111,6 +121,49 @@ const PRIVATE_HIT: RetrievalHit = {
   snippet: '',
   heading: null,
   isPrivate: true,
+  evidence: { kind: 'lexical', assetPaths: [] },
+}
+
+const ASSET_QUERY = 'quasar-budget-sentinel'
+const ASSET_PATH = 'assets/chart.png'
+const ASSET_NOTE_PATH = 'notes/board.md'
+const ASSET_NOTE = `# Board\n\n![chart](${ASSET_PATH})\n`
+const ASSET_DESCRIPTION = `${ASSET_QUERY} appears only in the attachment description.`
+
+async function assetRetrievalHit(kind: 'lexical' | 'semantic'): Promise<RetrievalHit> {
+  if (kind === 'lexical') {
+    return {
+      path: ASSET_NOTE_PATH,
+      title: 'Board',
+      score: 1,
+      snippet: ASSET_DESCRIPTION,
+      heading: null,
+      isPrivate: false,
+      evidence: { kind: 'lexical', assetPaths: [ASSET_PATH] },
+    }
+  }
+  const [chunk] = await chunkAssetDescriptionsWithAttribution(
+    [{ assetPath: ASSET_PATH, body: ASSET_DESCRIPTION }],
+    ASSET_NOTE.length + 1,
+  )
+  if (chunk === undefined) {
+    throw new Error('expected an asset chunk')
+  }
+  return {
+    path: ASSET_NOTE_PATH,
+    title: 'Board',
+    score: 1,
+    snippet: chunk.text,
+    heading: chunk.heading,
+    isPrivate: false,
+    evidence: {
+      kind: 'semantic',
+      assetPaths: [ASSET_PATH],
+      posFrom: chunk.posFrom,
+      posTo: chunk.posTo,
+      contentHash: chunk.contentHash,
+    },
+  }
 }
 
 describe('streamChat', () => {
@@ -135,6 +188,7 @@ describe('streamChat', () => {
         semanticSearchEnabled: true,
         customSystemPrompt,
         context: null,
+        ...allowRevalidation(messages),
       }),
     )
 
@@ -148,24 +202,65 @@ describe('streamChat', () => {
     expect(model.doStreamCalls).toHaveLength(1)
     expect(JSON.stringify(model.doStreamCalls[0]?.prompt)).toContain(customSystemPrompt)
   })
+
+  it('context-fits rebuilt history before each provider step', async () => {
+    const initialMessages: ModelMessage[] = [
+      { role: 'user', content: 'old question' },
+      { role: 'assistant', content: 'old answer' },
+      { role: 'user', content: 'current question' },
+    ]
+    const rebuiltMessages: ModelMessage[] = [initialMessages.at(-1)!]
+    const model = new MockLanguageModelV3({ doStream: sequence([textTurn('hi')]) })
+    languageModelMock.mockReturnValue(model)
+    const callsBefore = fitToContextWindowMock.mock.calls.length
+
+    await collect(
+      streamChat({
+        config: {
+          id: 'cfg-openai',
+          provider: 'openai',
+          model: 'gpt-5.5',
+          keyHint: 'wxyz1',
+        },
+        apiKey: 'sk-live-key',
+        fetchFn: globalThis.fetch,
+        messages: initialMessages,
+        today: '2026-06-11',
+        semanticSearchEnabled: true,
+        customSystemPrompt: '',
+        context: null,
+        revalidateHistory: async () => rebuiltMessages,
+        validateSource: async () => true,
+      }),
+    )
+
+    expect(
+      fitToContextWindowMock.mock.calls.slice(callsBefore).map(([messages]) => messages),
+    ).toEqual([initialMessages, rebuiltMessages])
+    const outbound = JSON.stringify(model.doStreamCalls[0]?.prompt)
+    expect(outbound).not.toContain('old question')
+    expect(outbound).toContain('current question')
+  })
 })
 
 describe('streamChatTurn', () => {
   it('streams tool activity, text, and a terminal complete event', async () => {
+    const messages: ModelMessage[] = [{ role: 'user', content: 'where is the launch plan?' }]
     const model = new MockLanguageModelV3({
       doStream: sequence([toolCallTurn('atlas'), textTurn('Found it: [[Atlas Launch Plan]]')]),
     })
     const events = await collect(
       streamChatTurn(model, {
-        messages: [{ role: 'user', content: 'where is the launch plan?' }],
+        messages,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         customSystemPrompt: '',
         context: null,
         toolDeps: {
           retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT],
-          readNoteFn: async () => 'launch plan\n',
+          readNoteFn: async () => '# Atlas Launch Plan\n\nlaunch plan\n',
         },
+        ...allowRevalidation(messages),
       }),
     )
 
@@ -187,6 +282,7 @@ describe('streamChatTurn', () => {
         toolCallId: 'call-1',
         query: 'atlas',
         hits: [{ path: 'notes/atlas.md', title: 'Atlas Launch Plan' }],
+        sourceProvenance: [{ kind: 'note', path: 'notes/atlas.md' }],
       },
     })
     expect(events[2]).toMatchObject({ text: 'Found it: [[Atlas Launch Plan]]' })
@@ -195,20 +291,22 @@ describe('streamChatTurn', () => {
   })
 
   it('never sends private content in the outbound prompt (payload assertion)', async () => {
+    const messages: ModelMessage[] = [{ role: 'user', content: 'what do my notes say?' }]
     const model = new MockLanguageModelV3({
       doStream: sequence([toolCallTurn('diary'), textTurn('done')]),
     })
     await collect(
       streamChatTurn(model, {
-        messages: [{ role: 'user', content: 'what do my notes say?' }],
+        messages,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         customSystemPrompt: '',
         context: null,
         toolDeps: {
           retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT],
-          readNoteFn: async () => 'launch plan\n',
+          readNoteFn: async () => '# Atlas Launch Plan\n\nlaunch plan diary\n',
         },
+        ...allowRevalidation(messages),
       }),
     )
 
@@ -221,11 +319,271 @@ describe('streamChatTurn', () => {
     expect(outbound).toContain('notes/atlas.md')
   })
 
+  it('stops before a second provider call when a tool source becomes private', async () => {
+    const messages: ModelMessage[] = [{ role: 'user', content: 'find atlas' }]
+    let liveReads = 0
+    let sourceBecamePrivate = false
+    const validateSource = vi.fn(async () => !sourceBecamePrivate)
+    const model = new MockLanguageModelV3({
+      doStream: sequence([toolCallTurn('atlas'), textTurn('must not be called')]),
+    })
+
+    const events = await collect(
+      streamChatTurn(model, {
+        messages,
+        today: '2026-06-11',
+        semanticSearchEnabled: true,
+        customSystemPrompt: '',
+        context: null,
+        toolDeps: {
+          retrieveFn: async () => [PUBLIC_HIT],
+          readNoteFn: async () => {
+            const source =
+              liveReads >= 2
+                ? '---\nprivate: true\n---\n# Atlas Launch Plan\n'
+                : '# Atlas Launch Plan\n'
+            liveReads += 1
+            sourceBecamePrivate = liveReads >= 2
+            return source
+          },
+        },
+        revalidateHistory: async () => messages,
+        validateSource,
+      }),
+    )
+
+    expect(model.doStreamCalls).toHaveLength(1)
+    expect(validateSource).toHaveBeenCalledWith({ kind: 'note', path: 'notes/atlas.md' })
+    expect(events.some((event) => event.type === 'tool-result')).toBe(true)
+    const terminal = events.at(-1)
+    if (terminal?.type !== 'error') {
+      expect.unreachable('expected privacy revalidation to stop the turn')
+    }
+    expect(terminal.message).not.toContain('notes/atlas.md')
+    expect(terminal.message).not.toContain('Atlas Launch Plan')
+  })
+
+  it.each(['lexical', 'semantic'] as const)(
+    'stops before resending a %s asset search result when its asset provenance becomes private',
+    async (kind) => {
+      const messages: ModelMessage[] = [{ role: 'user', content: 'find the attachment budget' }]
+      const validateSource = vi.fn(async (source: ChatSourceRef) => source.kind !== 'asset')
+      const files: Record<string, string> = {
+        [ASSET_NOTE_PATH]: ASSET_NOTE,
+        [`${ASSET_PATH}.reflect.md`]: ASSET_DESCRIPTION,
+      }
+      const model = new MockLanguageModelV3({
+        doStream: sequence([toolCallTurn(ASSET_QUERY), textTurn('must not be called')]),
+      })
+
+      const events = await collect(
+        streamChatTurn(model, {
+          messages,
+          today: '2026-06-11',
+          semanticSearchEnabled: kind === 'semantic',
+          customSystemPrompt: '',
+          context: null,
+          toolDeps: {
+            retrieveFn: async () => [await assetRetrievalHit(kind)],
+            readNoteFn: async (path) => {
+              const source = files[path]
+              if (source === undefined) {
+                throw { kind: 'notFound', message: 'missing' }
+              }
+              return source
+            },
+            assetReferencingNotePathsFn: async () => [ASSET_NOTE_PATH],
+          },
+          revalidateHistory: async () => messages,
+          validateSource,
+        }),
+      )
+
+      expect(model.doStreamCalls).toHaveLength(1)
+      expect(validateSource).toHaveBeenCalledWith({ kind: 'asset', path: ASSET_PATH })
+      const result = events.find((event) => event.type === 'tool-result')
+      expect(result).toMatchObject({
+        result: {
+          tool: 'search',
+          sourceProvenance: [
+            { kind: 'note', path: ASSET_NOTE_PATH },
+            { kind: 'asset', path: ASSET_PATH },
+          ],
+        },
+      })
+      expect(events.at(-1)?.type).toBe('error')
+      expect(JSON.stringify(model.doStreamCalls)).not.toContain(ASSET_DESCRIPTION)
+    },
+  )
+
+  it('revalidates the same safe initial history before every provider step', async () => {
+    const staleHistorySentinel = 'sentinel-prior-history-01jxq3'
+    const currentUser: ModelMessage = { role: 'user', content: 'find atlas' }
+    const initialMessages: ModelMessage[] = [
+      { role: 'user', content: staleHistorySentinel },
+      { role: 'assistant', content: 'An earlier answer.' },
+      currentUser,
+    ]
+    let historyChecks = 0
+    const model = new MockLanguageModelV3({
+      doStream: sequence([toolCallTurn('atlas'), textTurn('Found it.')]),
+    })
+
+    await collect(
+      streamChatTurn(model, {
+        messages: initialMessages,
+        today: '2026-06-11',
+        semanticSearchEnabled: true,
+        customSystemPrompt: '',
+        context: null,
+        toolDeps: {
+          retrieveFn: async () => [PUBLIC_HIT],
+          readNoteFn: async () => '# Atlas Launch Plan\n',
+        },
+        revalidateHistory: async () => {
+          historyChecks += 1
+          return initialMessages
+        },
+        validateSource: async () => true,
+      }),
+    )
+
+    expect(historyChecks).toBe(2)
+    expect(model.doStreamCalls).toHaveLength(2)
+    expect(JSON.stringify(model.doStreamCalls[0]?.prompt)).toContain(staleHistorySentinel)
+    const secondPrompt = JSON.stringify(model.doStreamCalls[1]?.prompt)
+    expect(secondPrompt).toContain(staleHistorySentinel)
+    expect(secondPrompt).toContain('notes/atlas.md')
+    expect(secondPrompt).toContain('find atlas')
+  })
+
+  it('stops if previously sent history becomes unsafe between provider steps', async () => {
+    const priorHistory = 'sentinel-newly-private-history-01jxq3'
+    const currentUser: ModelMessage = { role: 'user', content: 'find atlas' }
+    const initialMessages: ModelMessage[] = [
+      { role: 'user', content: priorHistory },
+      { role: 'assistant', content: 'An earlier answer.' },
+      currentUser,
+    ]
+    let historyChecks = 0
+    const model = new MockLanguageModelV3({
+      doStream: sequence([toolCallTurn('atlas'), textTurn('must not be called')]),
+    })
+
+    const events = await collect(
+      streamChatTurn(model, {
+        messages: initialMessages,
+        today: '2026-06-11',
+        semanticSearchEnabled: true,
+        customSystemPrompt: '',
+        context: null,
+        toolDeps: {
+          retrieveFn: async () => [PUBLIC_HIT],
+          readNoteFn: async () => '# Atlas Launch Plan\n',
+        },
+        revalidateHistory: async () => {
+          historyChecks += 1
+          return historyChecks === 1 ? initialMessages : [currentUser]
+        },
+        validateSource: async () => true,
+      }),
+    )
+
+    expect(historyChecks).toBe(2)
+    expect(model.doStreamCalls).toHaveLength(1)
+    const terminal = events.at(-1)
+    if (terminal?.type !== 'error') {
+      expect.unreachable('expected history revalidation to stop the turn')
+    }
+    expect(terminal.message).not.toContain(priorHistory)
+  })
+
+  it('stops when context fitting swaps history without changing its message count', async () => {
+    const currentUser: ModelMessage = { role: 'user', content: 'find atlas' }
+    const initialMessages: ModelMessage[] = [
+      { role: 'user', content: 'initial fitted question' },
+      { role: 'assistant', content: 'initial fitted answer' },
+      currentUser,
+    ]
+    const replacementMessages: ModelMessage[] = [
+      { role: 'user', content: 'older newly admitted question' },
+      { role: 'assistant', content: 'older newly admitted answer' },
+      currentUser,
+    ]
+    let historyChecks = 0
+    const model = new MockLanguageModelV3({
+      doStream: sequence([toolCallTurn('atlas'), textTurn('must not be called')]),
+    })
+
+    const events = await collect(
+      streamChatTurn(model, {
+        messages: initialMessages,
+        today: '2026-06-11',
+        semanticSearchEnabled: true,
+        customSystemPrompt: '',
+        context: null,
+        toolDeps: {
+          retrieveFn: async () => [PUBLIC_HIT],
+          readNoteFn: async () => '# Atlas Launch Plan\n',
+        },
+        revalidateHistory: async () => {
+          historyChecks += 1
+          return historyChecks === 1 ? initialMessages : replacementMessages
+        },
+        validateSource: async () => true,
+      }),
+    )
+
+    expect(historyChecks).toBe(2)
+    expect(model.doStreamCalls).toHaveLength(1)
+    expect(JSON.stringify(model.doStreamCalls[0]?.prompt)).toContain('initial fitted question')
+    expect(JSON.stringify(model.doStreamCalls[0]?.prompt)).not.toContain(
+      'older newly admitted question',
+    )
+    expect(events.at(-1)?.type).toBe('error')
+  })
+
+  it('does not add history that becomes eligible after the first provider step', async () => {
+    const currentUser: ModelMessage = { role: 'user', content: 'find atlas' }
+    const expandedHistory: ModelMessage[] = [
+      { role: 'user', content: 'previously excluded question' },
+      { role: 'assistant', content: 'previously excluded answer' },
+      currentUser,
+    ]
+    let historyChecks = 0
+    const model = new MockLanguageModelV3({
+      doStream: sequence([toolCallTurn('atlas'), textTurn('must not be called')]),
+    })
+
+    await collect(
+      streamChatTurn(model, {
+        messages: [currentUser],
+        today: '2026-06-11',
+        semanticSearchEnabled: true,
+        customSystemPrompt: '',
+        context: null,
+        toolDeps: {
+          retrieveFn: async () => [PUBLIC_HIT],
+          readNoteFn: async () => '# Atlas Launch Plan\n',
+        },
+        revalidateHistory: async () => {
+          historyChecks += 1
+          return historyChecks === 1 ? [currentUser] : expandedHistory
+        },
+        validateSource: async () => true,
+      }),
+    )
+
+    expect(historyChecks).toBe(2)
+    expect(model.doStreamCalls).toHaveLength(1)
+  })
+
   it('carries the graph overview in the outbound system prompt', async () => {
+    const messages: ModelMessage[] = [{ role: 'user', content: 'hi' }]
     const model = new MockLanguageModelV3({ doStream: sequence([textTurn('hi')]) })
     await collect(
       streamChatTurn(model, {
-        messages: [{ role: 'user', content: 'hi' }],
+        messages,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         customSystemPrompt: 'Challenge my assumptions before answering.',
@@ -238,6 +596,7 @@ describe('streamChatTurn', () => {
           tags: [{ tag: 'book', count: 2 }],
           tagsTruncated: false,
         }),
+        ...allowRevalidation(messages),
       }),
     )
 
@@ -249,6 +608,7 @@ describe('streamChatTurn', () => {
   })
 
   it('yields a terminal error event when the stream errors', async () => {
+    const messages: ModelMessage[] = [{ role: 'user', content: 'hi' }]
     const model = new MockLanguageModelV3({
       doStream: sequence([
         stream([
@@ -259,17 +619,19 @@ describe('streamChatTurn', () => {
     })
     const events = await collect(
       streamChatTurn(model, {
-        messages: [{ role: 'user', content: 'hi' }],
+        messages,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         customSystemPrompt: '',
         context: null,
+        ...allowRevalidation(messages),
       }),
     )
     expect(events.at(-1)).toEqual({ type: 'error', message: 'rate limited', messages: [] })
   })
 
   it('a cut-short turn still carries the completed steps, properly paired', async () => {
+    const messages: ModelMessage[] = [{ role: 'user', content: 'where is the launch plan?' }]
     // Step 1 completes (tool call + result); step 2 streams text, then errors.
     const model = new MockLanguageModelV3({
       doStream: sequence([
@@ -284,12 +646,13 @@ describe('streamChatTurn', () => {
     })
     const events = await collect(
       streamChatTurn(model, {
-        messages: [{ role: 'user', content: 'where is the launch plan?' }],
+        messages,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         customSystemPrompt: '',
         context: null,
         toolDeps: { retrieveFn: async () => [PUBLIC_HIT], readNoteFn: async () => 'launch plan\n' },
+        ...allowRevalidation(messages),
       }),
     )
 
@@ -304,6 +667,7 @@ describe('streamChatTurn', () => {
   })
 
   it('keeps every completed step when cut short after multiple tool rounds', async () => {
+    const messages: ModelMessage[] = [{ role: 'user', content: 'plan and budget?' }]
     // Pins the SDK semantic the engine relies on: each onStepEnd's
     // `response.messages` holds *only that step's* messages, so appending
     // (not assigning) yields the full paired history. If an `ai` upgrade ever
@@ -323,12 +687,13 @@ describe('streamChatTurn', () => {
     })
     const events = await collect(
       streamChatTurn(model, {
-        messages: [{ role: 'user', content: 'plan and budget?' }],
+        messages,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         customSystemPrompt: '',
         context: null,
         toolDeps: { retrieveFn: async () => [PUBLIC_HIT], readNoteFn: async () => 'launch plan\n' },
+        ...allowRevalidation(messages),
       }),
     )
 
@@ -349,6 +714,7 @@ describe('streamChatTurn', () => {
   })
 
   it('disables tools on the final step so a tool-bound turn still answers', async () => {
+    const messages: ModelMessage[] = [{ role: 'user', content: 'summarize everything' }]
     // Every gathering step calls a tool; the model only writes its answer
     // once tools are disabled on the last permitted step. Without that force,
     // the turn would end on a tool result with no reply.
@@ -360,12 +726,13 @@ describe('streamChatTurn', () => {
     })
     const events = await collect(
       streamChatTurn(model, {
-        messages: [{ role: 'user', content: 'summarize everything' }],
+        messages,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         customSystemPrompt: '',
         context: null,
         toolDeps: { retrieveFn: async () => [PUBLIC_HIT], readNoteFn: async () => 'body\n' },
+        ...allowRevalidation(messages),
       }),
     )
 

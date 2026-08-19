@@ -3,17 +3,25 @@ import {
   detectConflictMarkers,
   editTaskLine,
   errorMessage,
+  hashContent,
   isAppError,
   removeTaskLine,
   taskLineToBullet,
   toggleTaskMarker,
   upsertFrontmatter,
+  type NoteRevisionWriteOutcome,
   type TaskMarker,
 } from '@reflect/core'
 import { splitDoc } from './note-session-doc'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter'
 import type {
   NoteSession,
+  NoteBodyMutationOptions,
+  NoteBodyMutationRefusal,
+  NoteBodyMutationResult,
+  NoteConditionalTrashOptions,
+  NoteConditionalTrashResult,
+  NoteFreshContent,
   NoteSessionOptions,
   NoteSessionSnapshot,
   NoteSessionStatus,
@@ -49,6 +57,8 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   /** Serializes writes so a flush can't interleave with a debounced save. */
   let saveChain: Promise<void> = Promise.resolve()
+  /** Serializes out-of-editor body transactions against one another. */
+  let bodyMutationChain: Promise<void> = Promise.resolve()
   /**
    * Content of the write currently in flight (set when dispatched, before the
    * write resolves). The watcher event for our own save can arrive before the
@@ -66,6 +76,8 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   // Set by `discard` — tells `dispose` to skip its flush (the file is being
   // deleted, so rewriting it would recreate it).
   let discarded = false
+  /** A move temporarily retains both paths so AI cannot enter its IPC gap. */
+  const claimedPaths = new Set<string>()
 
   let lastEmitted: NoteSessionSnapshot | null = null
 
@@ -98,6 +110,18 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     onSnapshot(next)
   }
 
+  function enqueueSaveOperation<Result>(
+    operation: () => Promise<Result>,
+    onRejected?: (cause: unknown) => void,
+  ): Promise<Result> {
+    const result = saveChain.then(operation)
+    saveChain = result.then(
+      () => {},
+      (cause) => onRejected?.(cause),
+    )
+    return result
+  }
+
   function save(): void {
     // A discarded session never writes: its file is being deleted, so any
     // save — including a teardown `flush()` (the pane unmounts via flush →
@@ -109,8 +133,8 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       return
     }
     const write = io.write
-    saveChain = saveChain
-      .then(async () => {
+    void enqueueSaveOperation(
+      async () => {
         // Re-check at execution time and take the freshest buffer — a queued
         // step can run behind a slow prior write, during which the user may
         // have reverted or kept typing, or the session may have been discarded
@@ -132,12 +156,13 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         } finally {
           inFlightWrite = null
         }
-      })
-      .catch((cause) => {
+      },
+      (cause) => {
         console.error('failed to save note:', cause)
         error = errorMessage(cause)
         emit()
-      })
+      },
+    )
   }
 
   function scheduleSave(): void {
@@ -164,6 +189,52 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     // save() extended the chain synchronously (or left it settled when there
     // was nothing to do) — the chain as of now is exactly this flush's write.
     return saveChain
+  }
+
+  function bodyMutationRefusal(): NoteBodyMutationRefusal | null {
+    if (io.writeIfRevision === null) {
+      return 'no_write'
+    }
+    if (disposed) {
+      return 'disposed'
+    }
+    if (isProtected) {
+      return 'protected'
+    }
+    if (status !== 'ready') {
+      return 'not_ready'
+    }
+    if (conflict !== null) {
+      return 'conflict'
+    }
+    return null
+  }
+
+  async function readFreshContent(
+    readPersisted: () => Promise<string> = () => io.read(path),
+  ): Promise<NoteFreshContent | null> {
+    return await enqueueSaveOperation(async () => {
+      if (disposed || status !== 'ready') {
+        return null
+      }
+      reconcilePendingEditorInput?.()
+      if (disposed || status !== 'ready') {
+        return null
+      }
+      const persistedSource = await readPersisted()
+      if (!reconcilePersistedContent(persistedSource)) {
+        return null
+      }
+      const source = header + buffer
+      const revision = await hashContent(source)
+      // Hashing yields to editor/frontmatter input. Never return a source that
+      // stopped being the complete live document while its revision was being
+      // computed: the changed bytes could include a newly-private flag.
+      if (disposed || status !== 'ready' || conflict !== null || header + buffer !== source) {
+        return null
+      }
+      return { source, revision }
+    })
   }
 
   function editorChanged(markdown: string): void {
@@ -229,6 +300,32 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   }
 
   /**
+   * Reconcile a source read from disk while the caller owns the relevant
+   * operation queue. Clean editors adopt it; dirty editors park it so neither
+   * an ordinary save nor an AI mutation can overwrite the external bytes.
+   */
+  function reconcilePersistedContent(content: string): boolean {
+    if (disposed || status !== 'ready') {
+      return false
+    }
+    if (content === disk || content === inFlightWrite) {
+      if (missing) {
+        missing = false
+        emit()
+      }
+      return true
+    }
+    if (dirty) {
+      cancelScheduledSave()
+      conflict = content
+      emit()
+      return false
+    }
+    adoptCleanContent(content)
+    return true
+  }
+
+  /**
    * Re-read the note and reconcile the buffer with what's on disk (the
    * external-change path).
    */
@@ -239,30 +336,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     } catch {
       return // deleted/unreadable between event and read; nothing to reconcile
     }
-    if (disposed) {
-      return
-    }
-    if (content === disk || content === inFlightWrite) {
-      // Nothing to reconcile (stale, or an echo of our own possibly
-      // still-settling save) — but a successful read of a previously-missing
-      // note means the file exists now (e.g. another device wrote the seed
-      // verbatim), so record that transition before skipping.
-      if (missing) {
-        missing = false
-        emit()
-      }
-      return
-    }
-    if (dirty) {
-      // Never clobber unsaved edits — park the external content and pause the
-      // save pipeline (cancel any pending debounce) until the user chooses; a
-      // save landing now would overwrite "theirs" first.
-      cancelScheduledSave()
-      conflict = content
-      emit()
-      return
-    }
-    adoptCleanContent(content)
+    reconcilePersistedContent(content)
   }
 
   /** The initial read; with `createIfMissing`, a missing file is an empty note. */
@@ -286,6 +360,9 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     emit()
     void (async () => {
       try {
+        if (!(await claimOwnership(path))) {
+          return
+        }
         const { content, fileMissing } = await readInitial()
         if (disposed) {
           return
@@ -329,6 +406,59 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         }
       }
     })()
+  }
+
+  async function claimOwnership(target: string): Promise<boolean> {
+    const ownership = io.ownership
+    if (ownership === null || ownership === undefined) {
+      return !disposed
+    }
+    try {
+      await ownership.claim(target)
+      claimedPaths.add(target)
+    } catch (cause) {
+      // The claim may have landed even when IPC lost its response.
+      await ownership.release(target).catch(() => {})
+      throw cause
+    }
+    if (!disposed) {
+      return true
+    }
+    await releaseOwnership(target)
+    return false
+  }
+
+  async function releaseOwnership(target: string): Promise<void> {
+    const ownership = io.ownership
+    if (!claimedPaths.has(target) || ownership === null || ownership === undefined) {
+      return
+    }
+    await ownership.release(target)
+    claimedPaths.delete(target)
+  }
+
+  async function releaseAllOwnership(): Promise<void> {
+    for (const target of claimedPaths) {
+      try {
+        await releaseOwnership(target)
+      } catch {
+        // A retained native/OS lease is a conservative availability failure;
+        // window destruction is the final native cleanup backstop.
+      }
+    }
+  }
+
+  function retarget(to: string): Promise<void> {
+    if (io.ownership === null || io.ownership === undefined) {
+      path = to
+      return Promise.resolve()
+    }
+    return claimOwnership(to).then((claimed) => {
+      if (!claimed) {
+        throw new Error('the note session was disposed while retargeting')
+      }
+      path = to
+    })
   }
 
   function externalChanged(): void {
@@ -416,7 +546,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
    * a failed flush reverts the in-memory edit so the editor and the Tasks list
    * can't diverge, then re-throws the failure.
    */
-  async function commitBodyEdit(transform: (full: string) => string): Promise<boolean> {
+  async function performBodyEdit(transform: (full: string) => string): Promise<boolean> {
     if (io.write === null || disposed || isProtected || status !== 'ready' || conflict !== null) {
       return false
     }
@@ -447,6 +577,336 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     return true
   }
 
+  function enqueueBodyMutation<T>(operation: () => Promise<T>): Promise<T> {
+    const result = bodyMutationChain.then(operation)
+    bodyMutationChain = result.then(
+      () => {},
+      () => {},
+    )
+    return result
+  }
+
+  function commitBodyEdit(transform: (full: string) => string): Promise<boolean> {
+    return enqueueBodyMutation(() => performBodyEdit(transform))
+  }
+
+  async function performGuardedBodyMutation(
+    options: NoteBodyMutationOptions,
+  ): Promise<NoteBodyMutationResult> {
+    cancelScheduledSave()
+    try {
+      return await enqueueSaveOperation(async () => {
+        reconcilePendingEditorInput?.()
+        const initialRefusal = bodyMutationRefusal()
+        if (initialRefusal !== null) {
+          return { status: 'refused', reason: initialRefusal }
+        }
+
+        let persistedSource: string
+        try {
+          persistedSource = await io.read(path)
+        } catch (cause) {
+          if (isAppError(cause) && cause.kind === 'notFound') {
+            return { status: 'refused', reason: 'missing' }
+          }
+          throw cause
+        }
+        if (!reconcilePersistedContent(persistedSource)) {
+          return { status: 'refused', reason: conflict === null ? 'not_ready' : 'conflict' }
+        }
+
+        const beforeSource = header + buffer
+        const beforeRevision = await hashContent(beforeSource)
+        // Hashing and the durable prepare callback both yield to the editor. Any
+        // intervening keystroke invalidates this operation instead of being folded
+        // into a change the model never saw.
+        if (header + buffer !== beforeSource || beforeRevision !== options.expectedRevision) {
+          const currentSource = header + buffer
+          return { status: 'stale', currentRevision: await hashContent(currentSource) }
+        }
+
+        const intendedBody = options.transform(buffer)
+        const intendedSource = header + intendedBody
+        if (detectConflictMarkers(intendedSource) || classify(intendedBody) === 'lossy') {
+          return { status: 'refused', reason: 'unsafe_result' }
+        }
+        if (intendedSource === beforeSource) {
+          return { status: 'unchanged', source: beforeSource, revision: beforeRevision }
+        }
+        const intendedRevision = await hashContent(intendedSource)
+        if (header + buffer !== beforeSource) {
+          const currentSource = header + buffer
+          return { status: 'stale', currentRevision: await hashContent(currentSource) }
+        }
+
+        await options.onPrepared?.({
+          beforeSource,
+          beforeRevision,
+          intendedSource,
+          intendedRevision,
+        })
+
+        // Preparing the durable row can take long enough for native input, a
+        // watcher reconciliation, or another UI action to change the document.
+        // The entire refresh → prepare → compare-and-swap sequence owns the save
+        // queue, so ordinary editor saves can only run before or after it.
+        reconcilePendingEditorInput?.()
+        const preparedRefusal = bodyMutationRefusal()
+        if (preparedRefusal !== null) {
+          return { status: 'refused', reason: preparedRefusal }
+        }
+        if (header + buffer !== beforeSource) {
+          const currentSource = header + buffer
+          return { status: 'stale', currentRevision: await hashContent(currentSource) }
+        }
+
+        const previousHeader = header
+        const previousBuffer = buffer
+        const persistedBeforeMutation = disk
+        const persistedRevision = await hashContent(persistedBeforeMutation)
+        if (disk !== persistedBeforeMutation || header + buffer !== beforeSource) {
+          const currentSource = header + buffer
+          return { status: 'stale', currentRevision: await hashContent(currentSource) }
+        }
+
+        buffer = intendedBody
+        applyToEditor(intendedBody)
+        const afterSource = header + buffer
+        if (
+          afterSource !== intendedSource ||
+          header !== previousHeader ||
+          detectConflictMarkers(afterSource) ||
+          classify(buffer) === 'lossy'
+        ) {
+          header = previousHeader
+          buffer = previousBuffer
+          applyToEditor(previousBuffer)
+          return { status: 'refused', reason: 'unsafe_result' }
+        }
+        dirty = afterSource !== disk
+        emit()
+
+        let outcome: NoteRevisionWriteOutcome
+        inFlightWrite = afterSource
+        try {
+          outcome = await io.writeIfRevision!(path, afterSource, persistedRevision)
+        } catch (cause) {
+          inFlightWrite = null
+          await parkPersistedConflict()
+          if (header + buffer === afterSource) {
+            restoreLiveMutation(previousHeader, previousBuffer)
+            throw cause
+          }
+          return uncertainMutation(
+            'live_content_changed',
+            beforeSource,
+            beforeRevision,
+            afterSource,
+            intendedRevision,
+          )
+        } finally {
+          inFlightWrite = null
+        }
+
+        if (outcome.kind === 'contended') {
+          await parkPersistedConflict()
+          return uncertainMutation(
+            'persisted_write_contended',
+            beforeSource,
+            beforeRevision,
+            afterSource,
+            intendedRevision,
+          )
+        }
+
+        if (outcome.kind === 'blocked') {
+          await parkPersistedConflict()
+          if (header + buffer !== afterSource) {
+            return uncertainMutation(
+              'live_content_changed',
+              beforeSource,
+              beforeRevision,
+              afterSource,
+              intendedRevision,
+            )
+          }
+          restoreLiveMutation(previousHeader, previousBuffer)
+          return { status: 'refused', reason: 'owned_elsewhere' }
+        }
+
+        if (outcome.kind !== 'written') {
+          await parkPersistedConflict()
+          if (header + buffer !== afterSource) {
+            return uncertainMutation(
+              'live_content_changed',
+              beforeSource,
+              beforeRevision,
+              afterSource,
+              intendedRevision,
+            )
+          }
+          restoreLiveMutation(previousHeader, previousBuffer)
+          return outcome.kind === 'missing'
+            ? { status: 'refused', reason: 'missing' }
+            : { status: 'stale', currentRevision: outcome.currentRevision }
+        }
+
+        disk = afterSource
+        dirty = header + buffer !== afterSource
+        missing = false
+        error = null
+        emit()
+        onContent?.(afterSource, 'saved')
+
+        let verifiedSource: string
+        try {
+          verifiedSource = await io.read(path)
+        } catch {
+          return uncertainMutation(
+            'verification_failed',
+            beforeSource,
+            beforeRevision,
+            afterSource,
+            intendedRevision,
+          )
+        }
+        if (verifiedSource !== afterSource || outcome.revision !== intendedRevision) {
+          reconcilePersistedContent(verifiedSource)
+          return uncertainMutation(
+            'persisted_content_mismatch',
+            beforeSource,
+            beforeRevision,
+            afterSource,
+            intendedRevision,
+          )
+        }
+
+        return {
+          status: 'applied',
+          beforeSource,
+          beforeRevision,
+          afterSource,
+          afterRevision: intendedRevision,
+        }
+      })
+    } finally {
+      resumeDirtySave()
+    }
+  }
+
+  function restoreLiveMutation(previousHeader: string, previousBuffer: string): void {
+    header = previousHeader
+    buffer = previousBuffer
+    applyToEditor(previousBuffer)
+    dirty = header + buffer !== disk
+    error = null
+    emit()
+  }
+
+  async function parkPersistedConflict(): Promise<void> {
+    let currentPersisted = disk
+    try {
+      currentPersisted = await io.read(path)
+    } catch (cause) {
+      if (isAppError(cause) && cause.kind === 'notFound') {
+        currentPersisted = ''
+      }
+    }
+    cancelScheduledSave()
+    conflict = currentPersisted
+    emit()
+  }
+
+  function uncertainMutation(
+    reason:
+      | 'live_content_changed'
+      | 'persisted_content_mismatch'
+      | 'persisted_write_contended'
+      | 'verification_failed',
+    beforeSource: string,
+    beforeRevision: string,
+    intendedSource: string,
+    intendedRevision: string,
+  ): NoteBodyMutationResult {
+    return {
+      status: 'uncertain',
+      reason,
+      beforeSource,
+      beforeRevision,
+      intendedSource,
+      intendedRevision,
+    }
+  }
+
+  function commitBodyMutation(options: NoteBodyMutationOptions): Promise<NoteBodyMutationResult> {
+    return enqueueBodyMutation(() => performGuardedBodyMutation(options))
+  }
+
+  function commitConditionalTrash(
+    options: NoteConditionalTrashOptions,
+  ): Promise<NoteConditionalTrashResult> {
+    cancelScheduledSave()
+    return enqueueBodyMutation(async () => {
+      try {
+        return await enqueueSaveOperation<NoteConditionalTrashResult>(async () => {
+          reconcilePendingEditorInput?.()
+          const refusal = bodyMutationRefusal()
+          if (refusal !== null) {
+            return { kind: 'refused', reason: refusal }
+          }
+
+          let persistedSource: string
+          try {
+            persistedSource = await io.read(path)
+          } catch (cause) {
+            if (isAppError(cause) && cause.kind === 'notFound') {
+              return { kind: 'missing' }
+            }
+            throw cause
+          }
+          if (!reconcilePersistedContent(persistedSource)) {
+            return { kind: 'stale', currentRevision: await hashContent(persistedSource) }
+          }
+
+          const liveSource = header + buffer
+          const liveRevision = await hashContent(liveSource)
+          if (
+            disposed ||
+            status !== 'ready' ||
+            conflict !== null ||
+            header + buffer !== liveSource ||
+            liveRevision !== options.expectedRevision
+          ) {
+            return { kind: 'stale', currentRevision: await hashContent(header + buffer) }
+          }
+
+          const outcome = await options.trash(options.expectedRevision)
+          reconcilePendingEditorInput?.()
+          if (outcome.kind === 'trashed' && header + buffer === liveSource) {
+            discard()
+            return outcome
+          }
+          if (outcome.kind === 'trashed') {
+            cancelScheduledSave()
+            conflict = ''
+            emit()
+            return { kind: 'contended', currentRevision: null }
+          }
+          await parkPersistedConflict()
+          return outcome
+        })
+      } finally {
+        resumeDirtySave()
+      }
+    })
+  }
+
+  function resumeDirtySave(): void {
+    if (!disposed && dirty && conflict === null) {
+      scheduleSave()
+    }
+  }
+
   function commitTaskToggle(task: TaskMarker): Promise<boolean> {
     return commitBodyEdit((full) => toggleTaskMarker(full, task).source)
   }
@@ -475,25 +935,25 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     // flush would recreate it. Otherwise flush first — the queued save step
     // reads the (now frozen) buffer, so pending edits persist to this
     // session's path even after the UI moves on.
-    if (!discarded) {
-      void flush()
-    }
+    const settled = discarded ? Promise.resolve() : flush()
     disposed = true
+    void settled.finally(releaseAllOwnership)
   }
 
   function discard(): void {
     cancelScheduledSave()
     discarded = true
     disposed = true
+    void releaseAllOwnership()
   }
 
   return {
+    ownerId: io.ownership?.ownerId ?? null,
     get path() {
       return path
     },
-    retarget: (to: string) => {
-      path = to
-    },
+    retarget,
+    releaseRetargetedPath: releaseOwnership,
     load,
     editorChanged,
     externalChanged,
@@ -502,6 +962,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     loadTheirs,
     content: () => header + buffer,
     liveContent: () => (status === 'ready' ? header + buffer : null),
+    readFreshContent,
     isDirty: () => dirty,
     updateFrontmatter,
     commitFrontmatter,
@@ -510,6 +971,8 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     commitTaskRemove,
     commitTaskToBullet,
     commitBodyAppend,
+    commitBodyMutation,
+    commitConditionalTrash,
     dispose,
     discard,
   }

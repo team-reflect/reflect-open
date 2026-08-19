@@ -191,3 +191,86 @@ describe('dev bridge note_create parity', () => {
     expect(files.read('notes/existing.md')).toBe('# Existing\n')
   })
 })
+
+describe('dev bridge live-note ownership', () => {
+  it('requires the exact owner token for guarded access in the same webview', async () => {
+    const files = createDevFileStore({ 'notes/API.md': '# API\n' })
+    const bridge = createDevBridge({
+      platform: 'desktop',
+      files,
+      index: await createDevIndexDb(),
+    })
+    await bridge.invoke('note_window_claim', {
+      path: 'notes/API.md',
+      ownerId: 'owner-1',
+      generation: 1,
+    })
+
+    await expect(
+      bridge.invoke('note_read_for_ai', { path: 'notes/api.md', generation: 1 }),
+    ).resolves.toEqual({ kind: 'blocked' })
+    await expect(
+      bridge.invoke('note_write_if_revision', {
+        path: 'notes/API.md',
+        contents: '# Replaced\n',
+        expectedRevision: 'does-not-matter-while-blocked',
+        generation: 1,
+      }),
+    ).resolves.toEqual({ kind: 'blocked' })
+    await expect(
+      bridge.invoke('note_read_for_ai', {
+        path: 'notes/API.md',
+        generation: 1,
+        requesterOwnerId: 'owner-1',
+      }),
+    ).resolves.toMatchObject({ kind: 'content', source: '# API\n' })
+
+    await bridge.invoke('note_window_release', {
+      path: 'notes/API.md',
+      ownerId: 'owner-1',
+    })
+    await expect(
+      bridge.invoke('note_read_for_ai', { path: 'notes/API.md', generation: 1 }),
+    ).resolves.toMatchObject({ kind: 'content', source: '# API\n' })
+  })
+
+  it('blocks creation over a claimed lazy note path', async () => {
+    const files = createDevFileStore({})
+    const bridge = createDevBridge({
+      platform: 'desktop',
+      files,
+      index: await createDevIndexDb(),
+    })
+    await bridge.invoke('note_window_claim', {
+      path: 'notes/lazy.md',
+      ownerId: 'owner-1',
+      generation: 1,
+    })
+
+    await expect(
+      bridge.invoke('note_create', {
+        path: 'notes/lazy.md',
+        contents: '# AI creation\n',
+        generation: 1,
+      }),
+    ).resolves.toEqual({ kind: 'blocked' })
+    expect(files.read('notes/lazy.md')).toBeNull()
+  })
+
+  it('folds Unicode case aliases for ownership checks', async () => {
+    const bridge = createDevBridge({
+      platform: 'ios',
+      files: createDevFileStore({ 'notes/CAFÉ.md': '# Café\n' }),
+      index: await createDevIndexDb(),
+    })
+    await bridge.invoke('note_window_claim', {
+      path: 'notes/CAFÉ.md',
+      ownerId: 'owner-1',
+      generation: 1,
+    })
+
+    await expect(
+      bridge.invoke('note_read_for_ai', { path: 'notes/café.md', generation: 1 }),
+    ).resolves.toEqual({ kind: 'blocked' })
+  })
+})

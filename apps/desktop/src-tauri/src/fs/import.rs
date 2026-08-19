@@ -378,25 +378,32 @@ pub(super) fn finalize_import(
         if !is_note_markdown(&entry.relative) {
             continue;
         }
-        match plan_note_entry(root, entry, &mut names, &claimed)? {
-            NotePlan::SkipIdentical => skipped_files += 1,
-            NotePlan::Write { relative, renamed } => {
-                let target = resolve(root, &relative)?;
-                atomic_write_bytes(root, &target, &entry.bytes)?;
-                names.record(&target);
-                imported_files += 1;
-                if renamed {
-                    renamed_files += 1;
+        super::with_file_mutation_lock(root, || {
+            // Planning reads existing note bytes and may choose a daily-note
+            // merge. Keep that read/decision/write under the same graph lock
+            // as editor and AI mutations; the nested atomic persist reuses
+            // this thread's already-held lock.
+            match plan_note_entry(root, entry, &mut names, &claimed)? {
+                NotePlan::SkipIdentical => skipped_files += 1,
+                NotePlan::Write { relative, renamed } => {
+                    let target = resolve(root, &relative)?;
+                    atomic_write_bytes(root, &target, &entry.bytes)?;
+                    names.record(&target);
+                    imported_files += 1;
+                    if renamed {
+                        renamed_files += 1;
+                    }
+                    changed_paths.push(relative);
                 }
-                changed_paths.push(relative);
+                NotePlan::Merge { merged } => {
+                    let target = resolve(root, &entry.relative)?;
+                    atomic_write_bytes(root, &target, &merged)?;
+                    merged_files += 1;
+                    changed_paths.push(entry.relative.clone());
+                }
             }
-            NotePlan::Merge { merged } => {
-                let target = resolve(root, &entry.relative)?;
-                atomic_write_bytes(root, &target, &merged)?;
-                merged_files += 1;
-                changed_paths.push(entry.relative.clone());
-            }
-        }
+            Ok(())
+        })?;
         processed += 1;
         on_progress(processed, total);
     }
@@ -1002,6 +1009,44 @@ mod tests {
         assert_eq!(
             fs::read(root.path().join("assets/pic.bin")).unwrap(),
             b"raw"
+        );
+    }
+
+    #[test]
+    fn note_writes_and_daily_merges_reuse_the_reentrant_graph_lock() {
+        let root = tempdir().unwrap();
+        fs::create_dir_all(root.path().join("notes")).unwrap();
+        fs::create_dir_all(root.path().join("daily")).unwrap();
+        fs::create_dir(root.path().join(".reflect")).unwrap();
+        fs::write(
+            root.path().join("daily/2026-07-04.md"),
+            "# July 4th, 2026\n\n- existing\n",
+        )
+        .unwrap();
+        let root_path = root.path().to_path_buf();
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let result = super::super::with_file_mutation_lock(&root_path, || {
+                import_entries_into_graph(
+                    &root_path,
+                    entries(&[
+                        ("notes/a.md", "# A\n"),
+                        ("daily/2026-07-04.md", "# July 4th, 2026\n\n- imported\n"),
+                    ]),
+                )
+            });
+            result_tx.send(result).unwrap();
+        });
+        let summary = result_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("import deadlocked while reentering for note persistence")
+            .unwrap();
+        worker.join().unwrap();
+        assert_eq!(summary.imported_files, 1);
+        assert_eq!(summary.merged_files, 1);
+        assert_eq!(
+            fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap(),
+            "# July 4th, 2026\n\n- existing\n\n- imported\n"
         );
     }
 

@@ -1,8 +1,91 @@
-import type { TaskMarker } from '@reflect/core'
+import type { NoteRevisionTrashOutcome, NoteRevisionWriteOutcome, TaskMarker } from '@reflect/core'
 import type { FrontmatterPatch } from './note-session-frontmatter'
 import type { RoundTripFidelity } from './roundtrip'
 
 export type NoteSessionStatus = 'loading' | 'ready' | 'error'
+
+/** A stable full-source snapshot of an open note, including exact frontmatter bytes. */
+export interface NoteFreshContent {
+  readonly source: string
+  readonly revision: string
+}
+
+/** The durable journal payload produced before an out-of-editor body mutation lands. */
+export interface NoteBodyMutationPreparation {
+  readonly beforeSource: string
+  readonly beforeRevision: string
+  readonly intendedSource: string
+  readonly intendedRevision: string
+}
+
+export type NoteBodyMutationRefusal =
+  | 'no_write'
+  | 'disposed'
+  | 'protected'
+  | 'not_ready'
+  | 'missing'
+  | 'conflict'
+  | 'owned_elsewhere'
+  | 'unsafe_result'
+
+/** Options for a guarded mutation of an open note's Markdown body. */
+export interface NoteBodyMutationOptions {
+  /** Revision returned by a prior full-source read of this live session. */
+  readonly expectedRevision: string
+  /** Rewrites only the body; frontmatter is retained byte-for-byte by the session. */
+  readonly transform: (body: string) => string
+  /**
+   * Awaited after the result is computed but before editor or disk state changes.
+   * AI callers use this boundary to durably journal the intended mutation.
+   */
+  readonly onPrepared?: ((preparation: NoteBodyMutationPreparation) => Promise<void>) | undefined
+}
+
+/** Outcome of a guarded body mutation against an open editor session. */
+export type NoteBodyMutationResult =
+  | {
+      readonly status: 'applied'
+      readonly beforeSource: string
+      readonly beforeRevision: string
+      readonly afterSource: string
+      readonly afterRevision: string
+    }
+  | {
+      readonly status: 'unchanged'
+      readonly source: string
+      readonly revision: string
+    }
+  | {
+      readonly status: 'stale'
+      readonly currentRevision: string
+    }
+  | {
+      readonly status: 'refused'
+      readonly reason: NoteBodyMutationRefusal
+    }
+  | {
+      readonly status: 'uncertain'
+      readonly reason:
+        | 'live_content_changed'
+        | 'persisted_content_mismatch'
+        | 'persisted_write_contended'
+        | 'verification_failed'
+      readonly beforeSource: string
+      readonly beforeRevision: string
+      readonly intendedSource: string
+      readonly intendedRevision: string
+    }
+
+/** Options for conditionally trashing an unchanged note through its live session. */
+export interface NoteConditionalTrashOptions {
+  readonly expectedRevision: string
+  readonly trash: (expectedRevision: string) => Promise<NoteRevisionTrashOutcome>
+}
+
+/** Live-session outcome for a revision-guarded conditional trash. */
+export type NoteConditionalTrashResult =
+  | NoteRevisionTrashOutcome
+  | { readonly kind: 'refused'; readonly reason: NoteBodyMutationRefusal }
 
 /** The observable document state, emitted to `onSnapshot` whenever it changes. */
 export interface NoteSessionSnapshot {
@@ -52,6 +135,27 @@ export interface NoteSessionIo {
    * writes.
    */
   write: ((path: string, contents: string) => Promise<void>) | null
+  /**
+   * Full-source compare-and-swap used by AI apply and Undo. The expected
+   * revision always describes persisted bytes, never the possibly-dirty live
+   * editor buffer. `null` when the graph has no writable generation.
+   */
+  writeIfRevision:
+    | ((
+        path: string,
+        contents: string,
+        expectedRevision: string,
+      ) => Promise<NoteRevisionWriteOutcome>)
+    | null
+  /**
+   * Native live-buffer claim retained from before the initial read through
+   * the final flush. Omitted in pure tests and non-native read-only surfaces.
+   */
+  ownership?: {
+    readonly ownerId: string
+    readonly claim: (path: string) => Promise<void>
+    readonly release: (path: string) => Promise<void>
+  } | null
 }
 
 /** Why {@link NoteSessionOptions.onContent} fired. */
@@ -107,6 +211,8 @@ export interface NoteSessionOptions {
 }
 /** One open note's document lifecycle. Create via {@link createNoteSession}. */
 export interface NoteSession {
+  /** Exact native ownership token; only this session may bypass its claim. */
+  readonly ownerId: string | null
   /** The graph-relative path this session is bound to (mutable via {@link NoteSession.retarget}). */
   readonly path: string
   /**
@@ -116,7 +222,9 @@ export interface NoteSession {
    * right before the file move lands, so a racing save can never resurrect
    * the old path.
    */
-  retarget: (to: string) => void
+  retarget: (to: string) => Promise<void>
+  /** Release the conservative old-side claim after a move has settled. */
+  releaseRetargetedPath: (path: string) => Promise<void>
   /** Read the note and emit `ready` (or `error`). Call once after creation. */
   load: () => void
   /** Every editor document change enters the pipeline here. */
@@ -144,6 +252,15 @@ export interface NoteSession {
    * rather than treating the loading buffer's emptiness as the truth.
    */
   liveContent: () => string | null
+  /**
+   * In the save queue, call the optional generation-pinned persisted reader,
+   * reconcile its result with pending native editor input, and capture the
+   * complete live source with its SHA-256 revision. Differing persisted bytes
+   * are adopted when clean; when dirty they are parked as a conflict and this
+   * returns `null`. The snapshot is rechecked after hashing so a concurrent
+   * edit or privacy toggle can never return stale bytes.
+   */
+  readFreshContent: (readPersisted?: () => Promise<string>) => Promise<NoteFreshContent | null>
   /**
    * Whether the buffer holds unsaved edits right now. A pull accessor for
    * out-of-band consumers (the iCloud conflict sweep skips dirty notes,
@@ -215,6 +332,22 @@ export interface NoteSession {
    * A blank block is refused (`false`) — there is nothing to write.
    */
   commitBodyAppend: (block: string) => Promise<boolean>
+  /**
+   * Apply a revision-guarded body transform to the freshest open-editor
+   * source. The session preserves frontmatter exactly, refuses protected or
+   * conflicted notes, journals through `onPrepared` before mutation, reflects
+   * the result in the editor, flushes, rolls back a failed write when doing so
+   * cannot clobber newer typing, and verifies the landed bytes.
+   */
+  commitBodyMutation: (options: NoteBodyMutationOptions) => Promise<NoteBodyMutationResult>
+  /**
+   * Conditionally trash an unchanged open note inside the session save queue.
+   * A dirty or concurrently-changing editor is never discarded: the missing
+   * disk state is parked as a conflict and reported as contended instead.
+   */
+  commitConditionalTrash: (
+    options: NoteConditionalTrashOptions,
+  ) => Promise<NoteConditionalTrashResult>
   /** Flush pending edits and detach: no further snapshots are emitted. */
   dispose: () => void
   /**

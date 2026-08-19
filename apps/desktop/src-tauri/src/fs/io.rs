@@ -6,11 +6,13 @@
 //! rename stays atomic, but excluded from cloud sync so a crash-stranded temp
 //! can never replicate to another device (Plan 21).
 
-use std::fs;
+use std::cell::RefCell;
+use std::fs::{self, File};
 use std::io::Write;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 use std::os::raw::c_int;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 
 use reflect_graph_paths::{evicted_logical_path, eviction_placeholder, is_dataless};
@@ -19,6 +21,128 @@ use crate::error::{AppError, AppResult};
 use crate::graph_gitignore;
 
 use super::FileMeta;
+
+/// Serializes native file mutations within this process. A graph-local locked
+/// file extends the same critical section across concurrently running Reflect
+/// flavors/processes that have the graph open.
+static FILE_MUTATION_LOCK: Mutex<()> = Mutex::new(());
+thread_local! {
+    static HELD_FILE_MUTATION_ROOT: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+}
+
+struct ThreadMutationRootGuard;
+
+impl Drop for ThreadMutationRootGuard {
+    fn drop(&mut self) {
+        HELD_FILE_MUTATION_ROOT.with(|held| *held.borrow_mut() = None);
+    }
+}
+
+pub(super) fn with_file_mutation_lock<T>(
+    root: &Path,
+    operation: impl FnOnce() -> AppResult<T>,
+) -> AppResult<T> {
+    let canonical_root = root.canonicalize()?;
+    let nested = HELD_FILE_MUTATION_ROOT.with(|held| held.borrow().clone());
+    if let Some(held_root) = nested {
+        if held_root != canonical_root {
+            return Err(AppError::io(
+                "a graph mutation cannot acquire a different graph lock recursively",
+            ));
+        }
+        return operation();
+    }
+    let _guard = FILE_MUTATION_LOCK
+        .lock()
+        .map_err(|_| AppError::io("file mutation lock poisoned"))?;
+    let lock_file = open_file_mutation_lock(&canonical_root)?;
+    lock_file.lock()?;
+    HELD_FILE_MUTATION_ROOT.with(|held| *held.borrow_mut() = Some(canonical_root));
+    let _thread_root = ThreadMutationRootGuard;
+    let result = operation();
+    let unlock_result = lock_file.unlock();
+    match (result, unlock_result) {
+        (Ok(value), Ok(())) => Ok(value),
+        (Err(error), _) => Err(error),
+        (Ok(_), Err(error)) => Err(error.into()),
+    }
+}
+
+/// Open the persistent advisory-lock inode without accepting a planted
+/// symlink. On Apple platforms `O_NOFOLLOW_ANY` makes the final open itself
+/// race-free; elsewhere the metadata checks still fail closed for the normal
+/// case. The file contains no state and lives below `.reflect/`, so it is
+/// neither synced nor watcher-visible.
+fn open_file_mutation_lock(root: &Path) -> AppResult<File> {
+    let path = root.join(REFLECT_DIR).join("write.lock");
+    loop {
+        match fs::symlink_metadata(&path) {
+            Ok(metadata) if metadata.file_type().is_file() => {
+                let mut options = fs::OpenOptions::new();
+                options.read(true).write(true);
+                #[cfg(any(target_os = "macos", target_os = "ios"))]
+                {
+                    use std::os::unix::fs::OpenOptionsExt;
+                    options.custom_flags(O_NOFOLLOW_ANY);
+                }
+                let opened_path = if cfg!(any(target_os = "macos", target_os = "ios")) {
+                    root.canonicalize()?.join(REFLECT_DIR).join("write.lock")
+                } else {
+                    path.clone()
+                };
+                let file = options.open(opened_path)?;
+                if !file.metadata()?.is_file() {
+                    return Err(AppError::traversal(format!(
+                        "mutation lock path must be a real file: {}",
+                        path.display()
+                    )));
+                }
+                return Ok(file);
+            }
+            Ok(_) => {
+                return Err(AppError::traversal(format!(
+                    "mutation lock path must be a real file: {}",
+                    path.display()
+                )))
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                match fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create_new(true)
+                    .open(&path)
+                {
+                    Ok(file) => return Ok(file),
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                    Err(error) => return Err(error.into()),
+                }
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+}
+
+/// Lowercase SHA-256 of a note's complete UTF-8 source.
+pub(super) fn note_revision(source: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(source.as_bytes());
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum AtomicRevisionWriteOutcome {
+    Written {
+        revision: String,
+        modified_ms: Option<u64>,
+    },
+    Stale {
+        current_revision: String,
+    },
+    Contended {
+        current_revision: Option<String>,
+    },
+    Missing,
+}
 
 /// One walk's worth of notes and attachments, in desktop `FileMeta` form.
 #[derive(Clone, Default)]
@@ -61,7 +185,12 @@ pub(super) fn bootstrap(root: &Path) -> AppResult<()> {
 /// the root `.gitignore` remain byte-for-byte untouched.
 pub(super) fn initialize_runtime(root: &Path) -> AppResult<()> {
     ensure_runtime_directory(root)?;
-    sweep_upload_staging(root);
+    // Another Reflect flavor can have this graph open. Never sweep a temp
+    // inode while a guarded write has staged it and is about to persist it.
+    with_file_mutation_lock(root, || {
+        sweep_upload_staging(root);
+        Ok(())
+    })?;
     mark_dir_local_only(&root.join(REFLECT_DIR));
     ensure_runtime_gitignore(root)?;
     // A backup repo must never ride a file-sync provider: two devices' object
@@ -272,6 +401,63 @@ pub(super) fn atomic_write(root: &Path, target: &Path, contents: &str) -> AppRes
     atomic_write_bytes(root, target, contents.as_bytes())
 }
 
+/// Compare the complete current source and atomically replace it under the
+/// process- and graph-wide mutation lock.
+pub(super) fn atomic_write_if_revision(
+    root: &Path,
+    target: &Path,
+    contents: &str,
+    expected_revision: &str,
+) -> AppResult<AtomicRevisionWriteOutcome> {
+    atomic_write_if_revision_with(root, target, contents, expected_revision, || Ok(()))
+}
+
+fn atomic_write_if_revision_with(
+    root: &Path,
+    target: &Path,
+    contents: &str,
+    expected_revision: &str,
+    after_persist: impl FnOnce() -> AppResult<()>,
+) -> AppResult<AtomicRevisionWriteOutcome> {
+    with_file_mutation_lock(root, || {
+        // Stage before the revision check. Nothing watcher-visible changes
+        // until the compare has succeeded and this prepared inode is renamed
+        // over the note in one operation.
+        let staged = stage_bytes(root, target, contents.as_bytes())?;
+        let current = match read_note_no_follow(root, target) {
+            Ok(current) => current,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(AtomicRevisionWriteOutcome::Missing)
+            }
+            Err(error) => return Err(error.into()),
+        };
+        let current_revision = note_revision(&current);
+        if current_revision != expected_revision {
+            return Ok(AtomicRevisionWriteOutcome::Stale { current_revision });
+        }
+        let modified_ms = persist_staged(staged, target)?;
+        after_persist()?;
+        let intended_revision = note_revision(contents);
+        // Advisory locking coordinates every cooperating Reflect process. A
+        // generic filesystem has no portable atomic content-CAS, so another
+        // program that ignores the lock can still replace the path. Verify
+        // immediately and surface that race as uncertain rather than claiming
+        // the intended bytes are current.
+        let verified_revision = read_note_no_follow(root, target)
+            .ok()
+            .map(|source| note_revision(&source));
+        if verified_revision.as_deref() != Some(intended_revision.as_str()) {
+            return Ok(AtomicRevisionWriteOutcome::Contended {
+                current_revision: verified_revision,
+            });
+        }
+        Ok(AtomicRevisionWriteOutcome::Written {
+            revision: intended_revision,
+            modified_ms,
+        })
+    })
+}
+
 /// Result of an atomic create-if-absent attempt.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum AtomicCreateOutcome {
@@ -284,6 +470,14 @@ pub(super) enum AtomicCreateOutcome {
 /// beforehand for policy, but only `persist_noclobber` closes the race with a
 /// concurrent sync checkout or another creator.
 pub(super) fn atomic_create(
+    root: &Path,
+    target: &Path,
+    contents: &str,
+) -> AppResult<AtomicCreateOutcome> {
+    with_file_mutation_lock(root, || atomic_create_unlocked(root, target, contents))
+}
+
+fn atomic_create_unlocked(
     root: &Path,
     target: &Path,
     contents: &str,
@@ -322,7 +516,19 @@ pub(crate) fn atomic_write_bytes(
     target: &Path,
     contents: &[u8],
 ) -> AppResult<Option<u64>> {
+    with_file_mutation_lock(root, || atomic_write_bytes_unlocked(root, target, contents))
+}
+
+fn atomic_write_bytes_unlocked(
+    root: &Path,
+    target: &Path,
+    contents: &[u8],
+) -> AppResult<Option<u64>> {
     let tmp = stage_bytes(root, target, contents)?;
+    persist_staged(tmp, target)
+}
+
+fn persist_staged(tmp: tempfile::NamedTempFile, target: &Path) -> AppResult<Option<u64>> {
     let file = tmp
         .persist(target)
         .map_err(|err| AppError::io(err.to_string()))?;
@@ -793,6 +999,153 @@ mod tests {
         let target = dir.path().join("notes/hello.md");
         atomic_write(dir.path(), &target, "# Hello\n\nworld\n").unwrap();
         assert_eq!(fs::read_to_string(&target).unwrap(), "# Hello\n\nworld\n");
+    }
+
+    #[test]
+    fn revision_guarded_write_rejects_stale_and_missing_sources() {
+        let dir = tempdir().unwrap();
+        bootstrap(dir.path()).unwrap();
+        let target = dir.path().join("notes/hello.md");
+
+        assert_eq!(
+            atomic_write_if_revision(dir.path(), &target, "new", "missing").unwrap(),
+            AtomicRevisionWriteOutcome::Missing
+        );
+        atomic_write(dir.path(), &target, "# Original\n").unwrap();
+        let stale = atomic_write_if_revision(dir.path(), &target, "# New\n", "wrong").unwrap();
+        assert_eq!(
+            stale,
+            AtomicRevisionWriteOutcome::Stale {
+                current_revision: note_revision("# Original\n")
+            }
+        );
+        assert_eq!(fs::read_to_string(&target).unwrap(), "# Original\n");
+    }
+
+    #[test]
+    fn revision_guarded_write_replaces_the_complete_matching_source() {
+        let dir = tempdir().unwrap();
+        bootstrap(dir.path()).unwrap();
+        let target = dir.path().join("notes/hello.md");
+        let original = "---\nid: 01ABC\n---\n# Hello\n\nOld\n";
+        let replacement = "---\nid: 01ABC\n---\n# Hello\n\nNew\n";
+        atomic_write(dir.path(), &target, original).unwrap();
+
+        let outcome =
+            atomic_write_if_revision(dir.path(), &target, replacement, &note_revision(original))
+                .unwrap();
+        assert!(matches!(
+            outcome,
+            AtomicRevisionWriteOutcome::Written { revision, .. }
+                if revision == note_revision(replacement)
+        ));
+        assert_eq!(fs::read_to_string(target).unwrap(), replacement);
+    }
+
+    #[test]
+    fn revision_guarded_write_reports_a_noncooperating_post_persist_race() {
+        let dir = tempdir().unwrap();
+        bootstrap(dir.path()).unwrap();
+        let target = dir.path().join("notes/hello.md");
+        atomic_write(dir.path(), &target, "original").unwrap();
+
+        let outcome = atomic_write_if_revision_with(
+            dir.path(),
+            &target,
+            "intended",
+            &note_revision("original"),
+            || {
+                // Deliberately bypass the advisory lock: this is the external
+                // editor/file-provider race the post-persist check detects.
+                fs::write(&target, "external")?;
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            outcome,
+            AtomicRevisionWriteOutcome::Contended {
+                current_revision: Some(note_revision("external"))
+            }
+        );
+        assert_eq!(fs::read_to_string(target).unwrap(), "external");
+    }
+
+    #[test]
+    fn cross_process_mutation_lock_serializes_revision_guards() {
+        const TEST_NAME: &str =
+            "fs::io::tests::cross_process_mutation_lock_serializes_revision_guards";
+        const ROLE: &str = "REFLECT_FILE_LOCK_TEST_CHILD";
+        const ROOT: &str = "REFLECT_FILE_LOCK_TEST_ROOT";
+
+        let wait_for = |path: &Path| {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while !path.exists() {
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "timed out waiting for {path:?}"
+                );
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        };
+
+        if std::env::var_os(ROLE).is_some() {
+            let root = PathBuf::from(std::env::var_os(ROOT).expect("child root"));
+            let locked = root.join("child-locked");
+            let release = root.join("release-child");
+            with_file_mutation_lock(&root, || {
+                fs::write(&locked, b"")?;
+                wait_for(&release);
+                atomic_write_bytes_unlocked(&root, &root.join("notes/a.md"), b"child")?;
+                Ok(())
+            })
+            .unwrap();
+            return;
+        }
+
+        let dir = tempdir().unwrap();
+        bootstrap(dir.path()).unwrap();
+        let target = dir.path().join("notes/a.md");
+        atomic_write(dir.path(), &target, "original").unwrap();
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", TEST_NAME, "--nocapture"])
+            .env(ROLE, "1")
+            .env(ROOT, dir.path())
+            .spawn()
+            .unwrap();
+        wait_for(&dir.path().join("child-locked"));
+
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        let root = dir.path().to_path_buf();
+        let expected = note_revision("original");
+        let worker = std::thread::spawn(move || {
+            started_tx.send(()).unwrap();
+            let result =
+                atomic_write_if_revision(&root, &root.join("notes/a.md"), "parent", &expected);
+            result_tx.send(result).unwrap();
+        });
+        started_rx.recv().unwrap();
+        assert!(matches!(
+            result_rx.recv_timeout(std::time::Duration::from_millis(150)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+        ));
+
+        fs::write(dir.path().join("release-child"), b"").unwrap();
+        let status = child.wait().unwrap();
+        assert!(status.success(), "child lock process failed: {status}");
+        let outcome = result_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap()
+            .unwrap();
+        worker.join().unwrap();
+        assert_eq!(
+            outcome,
+            AtomicRevisionWriteOutcome::Stale {
+                current_revision: note_revision("child")
+            }
+        );
+        assert_eq!(fs::read_to_string(target).unwrap(), "child");
     }
 
     #[test]

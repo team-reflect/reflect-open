@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { readNote, writeNote, type FileChange } from '@reflect/core'
+import {
+  claimNoteWindow,
+  readNote,
+  releaseNoteWindow,
+  writeNote,
+  writeNoteIfRevision,
+  type FileChange,
+} from '@reflect/core'
 import { useFileChanges } from '@/lib/use-file-changes'
 import { createDocumentBinding, type DocumentBinding } from './document-binding'
 import type { NoteEditorHandle } from './note-editor'
@@ -110,11 +117,12 @@ export function useNoteDocument(
               canFire: () => conflictRef.current === null,
             })
           : null,
-      session: (coordinator) =>
-        createNoteSession({
+      session: (coordinator) => {
+        const ownerId = crypto.randomUUID()
+        return createNoteSession({
           path,
           io: {
-            read: readNote,
+            read: (forPath) => readNote(forPath, generationRef.current ?? undefined),
             write: canWrite
               ? (forPath, contents) => {
                   const current = generationRef.current
@@ -122,6 +130,32 @@ export function useNoteDocument(
                     return Promise.reject(new Error('no graph generation available for save'))
                   }
                   return writeNote(forPath, contents, current)
+                }
+              : null,
+            writeIfRevision: canWrite
+              ? (forPath, contents, expectedRevision) => {
+                  const current = generationRef.current
+                  if (current === null) {
+                    return Promise.reject(
+                      new Error('no graph generation available for guarded save'),
+                    )
+                  }
+                  return writeNoteIfRevision(forPath, contents, expectedRevision, current, ownerId)
+                }
+              : null,
+            ownership: canWrite
+              ? {
+                  ownerId,
+                  claim: (forPath) => {
+                    const current = generationRef.current
+                    if (current === null) {
+                      return Promise.reject(
+                        new Error('no graph generation available for note ownership'),
+                      )
+                    }
+                    return claimNoteWindow(forPath, ownerId, current)
+                  },
+                  release: (forPath) => releaseNoteWindow(forPath, ownerId),
                 }
               : null,
           },
@@ -141,7 +175,8 @@ export function useNoteDocument(
           onContent: coordinator ? coordinator.content : undefined,
           createIfMissing,
           missingSeed,
-        }),
+        })
+      },
     })
     if (created) {
       session.load()

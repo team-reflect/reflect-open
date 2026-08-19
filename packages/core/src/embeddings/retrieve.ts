@@ -22,7 +22,24 @@ export interface RetrievalHit {
   snippet: string
   heading: string | null
   isPrivate: boolean
+  /** Local-only evidence used to re-prove a hit against live source before AI sees it. */
+  evidence: RetrievalEvidence
 }
+
+/**
+ * Index evidence for one retrieval hit. Asset candidates are deliberately
+ * paths only; descriptions are read and privacy-classified live at the AI
+ * boundary instead of trusting indexed text or privacy flags.
+ */
+export type RetrievalEvidence =
+  | { kind: 'lexical'; assetPaths: string[] }
+  | {
+      kind: 'semantic'
+      assetPaths: string[]
+      posFrom: number
+      posTo: number
+      contentHash: string
+    }
 
 export interface RetrieveOptions {
   limit?: number
@@ -52,6 +69,9 @@ export interface ChunkHitRow {
   text: string
   isPrivate: number
   distance: number
+  posFrom: number
+  posTo: number
+  contentHash: string
 }
 
 /**
@@ -65,6 +85,7 @@ export function bestChunkPerNote(
   rows: readonly ChunkHitRow[],
   limit: number,
   excludePath?: string,
+  assetPathsByNote: ReadonlyMap<string, readonly string[]> = new Map(),
 ): RetrievalHit[] {
   const byNote = new Map<string, RetrievalHit>()
   for (const row of rows) {
@@ -81,6 +102,13 @@ export function bestChunkPerNote(
       snippet: row.text.trim(),
       heading: row.heading,
       isPrivate: row.isPrivate !== 0,
+      evidence: {
+        kind: 'semantic',
+        assetPaths: [...(assetPathsByNote.get(row.path) ?? [])],
+        posFrom: row.posFrom,
+        posTo: row.posTo,
+        contentHash: row.contentHash,
+      },
     })
   }
   return [...byNote.values()].slice(0, limit)
@@ -90,6 +118,7 @@ async function semanticHits(query: string, limit: number): Promise<RetrievalHit[
   const [vector] = await embedTexts([query])
   const result = await sql<ChunkHitRow>`
     SELECT c.note_path AS path, n.title, c.heading, c.text,
+           c.pos_from AS posFrom, c.pos_to AS posTo, c.content_hash AS contentHash,
            n.is_private AS isPrivate, v.distance
     FROM embedding_vectors v
     JOIN embedding_chunks c ON c.id = v.rowid
@@ -97,7 +126,12 @@ async function semanticHits(query: string, limit: number): Promise<RetrievalHit[
     WHERE v.embedding MATCH ${JSON.stringify(vector)} AND k = ${KNN_CANDIDATES}
     ORDER BY v.distance
   `.execute(db)
-  return bestChunkPerNote(result.rows, limit)
+  return bestChunkPerNote(
+    result.rows,
+    limit,
+    undefined,
+    await assetPathsForNotes(result.rows.map((row) => row.path)),
+  )
 }
 
 async function lexicalHits(query: string, limit: number): Promise<RetrievalHit[]> {
@@ -118,6 +152,7 @@ async function lexicalHits(query: string, limit: number): Promise<RetrievalHit[]
     .select(['path', 'isPrivate'])
     .execute()
   const privateByPath = new Map(flags.map((row) => [row.path, row.isPrivate !== 0]))
+  const assetsByPath = await assetPathsForNotes(hits.map((hit) => hit.path))
   return hits.map((hit, index) => ({
     path: hit.path,
     title: hit.title,
@@ -125,7 +160,32 @@ async function lexicalHits(query: string, limit: number): Promise<RetrievalHit[]
     snippet: hit.snippet ?? '',
     heading: null,
     isPrivate: privateByPath.get(hit.path) ?? false,
+    evidence: { kind: 'lexical', assetPaths: [...(assetsByPath.get(hit.path) ?? [])] },
   }))
+}
+
+/** Indexed asset candidates for hit notes; live attribution happens later. */
+async function assetPathsForNotes(
+  paths: readonly string[],
+): Promise<Map<string, readonly string[]>> {
+  const uniquePaths = [...new Set(paths)]
+  if (uniquePaths.length === 0) {
+    return new Map()
+  }
+  const rows = await db
+    .selectFrom('assets')
+    .where('notePath', 'in', uniquePaths)
+    .select(['notePath', 'assetPath'])
+    .execute()
+  const byNote = new Map<string, string[]>()
+  for (const row of rows) {
+    const assets = byNote.get(row.notePath) ?? []
+    if (!assets.includes(row.assetPath)) {
+      assets.push(row.assetPath)
+    }
+    byNote.set(row.notePath, assets)
+  }
+  return byNote
 }
 
 /** Reciprocal rank fusion: order-based, scale-free, deterministic. */
@@ -232,6 +292,7 @@ export async function relatedNotes(path: string, limit = 10): Promise<RetrievalH
     seeds.rows.map(async (seed) => {
       const result = await sql<ChunkHitRow>`
         SELECT c.note_path AS path, n.title, c.heading, c.text,
+               c.pos_from AS posFrom, c.pos_to AS posTo, c.content_hash AS contentHash,
                n.is_private AS isPrivate, v.distance
         FROM embedding_vectors v
         JOIN embedding_chunks c ON c.id = v.rowid
@@ -243,5 +304,11 @@ export async function relatedNotes(path: string, limit = 10): Promise<RetrievalH
       return result.rows
     }),
   )
-  return bestChunkPerNote(mergeNearestFirst(neighborLists), limit, path)
+  const merged = mergeNearestFirst(neighborLists)
+  return bestChunkPerNote(
+    merged,
+    limit,
+    path,
+    await assetPathsForNotes(merged.map((row) => row.path)),
+  )
 }

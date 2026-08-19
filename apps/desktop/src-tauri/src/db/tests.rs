@@ -6,7 +6,12 @@ use reflect_index_schema::LATEST_SCHEMA_VERSION;
 use rusqlite::Connection;
 use serde_json::Value;
 
-use super::chat_write::{delete_conversation, save_message, ChatConversation, ChatMessageRow};
+use super::chat_write::{
+    delete_conversation, note_changes_for_message, pending_note_changes, prepare_note_change,
+    save_message, set_note_change_state, set_note_changes_state, ChatConversation, ChatMessageRow,
+    ChatNoteChangeInput, ChatNoteChangeOperation, ChatNoteChangeState, ChatNoteChangeUpdateOutcome,
+    ChatNoteChangesUpdateOutcome,
+};
 use super::embed_write::{apply_chunks, remove_chunks, EmbeddedChunk};
 use super::migrations::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
 use super::query::run_query;
@@ -15,6 +20,7 @@ use super::write::{
     apply_note, claim_tier, clear_index, move_note, touch_note, IndexedAlias, IndexedClaim,
     IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, MovedNoteAddress,
 };
+use super::ChatJournalSession;
 
 fn migrated() -> Connection {
     // Registers sqlite-vec before migrating — the 0002 migration creates a
@@ -24,6 +30,8 @@ fn migrated() -> Connection {
     migrate(&mut conn).expect("migrate");
     conn
 }
+
+const JOURNAL_SESSION: &str = "test-process-session";
 
 /// The filename-stem key the TS projection derives (`noteBasenameKey`).
 fn stem_key(path: &str) -> String {
@@ -1136,6 +1144,7 @@ fn session_adoption_reads_never_bump_generations() {
         .expect("mock app");
     app.manage(crate::fs::GraphState::default());
     app.manage(super::IndexState::default());
+    app.manage(super::ChatJournalSession::default());
     app.manage(crate::background_task::BackgroundTaskState::default());
 
     let graph_dir = tempfile::tempdir().expect("tempdir");
@@ -1150,7 +1159,8 @@ fn session_adoption_reads_never_bump_generations() {
     // than opening one itself.
     assert_eq!(super::current_generation(&app.state()).unwrap(), None);
 
-    let opened = super::index_open(app.state(), app.state(), app.state()).expect("open");
+    let opened =
+        super::index_open(app.state(), app.state(), app.state(), app.state()).expect("open");
     for _ in 0..2 {
         let info = crate::fs::current_graph_info(&app.state()).expect("graph info");
         assert_eq!(info.generation, 3);
@@ -1176,6 +1186,7 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         .expect("mock app");
     app.manage(crate::fs::GraphState::default());
     app.manage(super::IndexState::default());
+    app.manage(super::ChatJournalSession::default());
     app.manage(crate::background_task::BackgroundTaskState::default());
 
     let graph_dir = tempfile::tempdir().expect("tempdir");
@@ -1196,7 +1207,8 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         rows[0]["n"].clone()
     };
 
-    let stale = super::index_open(app.state(), app.state(), app.state()).expect("first open");
+    let stale =
+        super::index_open(app.state(), app.state(), app.state(), app.state()).expect("first open");
     super::index_apply(
         note("notes/a.md", "A", vec![]),
         stale,
@@ -1208,7 +1220,8 @@ fn stale_generation_writes_are_dropped_end_to_end() {
     assert_eq!(count("after first apply"), Value::from(1));
 
     // Reopening (graph switch / reload) bumps the generation; the old one is stale.
-    let fresh = super::index_open(app.state(), app.state(), app.state()).expect("reopen");
+    let fresh =
+        super::index_open(app.state(), app.state(), app.state(), app.state()).expect("reopen");
     assert_ne!(stale, fresh);
 
     super::index_apply(
@@ -1799,6 +1812,38 @@ fn watcher_echo_after_a_move_is_benign_and_vectors_survive() {
 
 // ---- chat history (0008) ----------------------------------------------------
 
+#[test]
+fn chat_write_migration_defaults_legacy_turns_to_read_with_unknown_provenance() {
+    let mut conn = open_in_memory().expect("open");
+    conn.execute_batch("PRAGMA foreign_keys=ON;").expect("fk");
+    migrate_to(&mut conn, 20).expect("stage v20");
+    conn.execute(
+        "INSERT INTO chat_conversations(id, title, created_ms, updated_ms)
+         VALUES ('c1', 'Legacy', 1000, 1000)",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO chat_messages(
+            id, conversation_id, seq, user_text, attachments, parts,
+            response_messages, created_ms)
+         VALUES ('m1', 'c1', 0, 'Legacy', '[]', '[]', '[]', 1000)",
+        [],
+    )
+    .unwrap();
+
+    migrate(&mut conn).expect("migrate to v21");
+    let (permission_mode, source_provenance): (String, Option<String>) = conn
+        .query_row(
+            "SELECT permission_mode, source_provenance FROM chat_messages WHERE id = 'm1'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(permission_mode, "read");
+    assert_eq!(source_provenance, None);
+}
+
 fn conversation(id: &str) -> ChatConversation {
     ChatConversation {
         id: id.to_string(),
@@ -1816,7 +1861,26 @@ fn chat_message(id: &str, conversation_id: &str) -> ChatMessageRow {
         attachments: "[]".to_string(),
         parts: "[]".to_string(),
         response_messages: "[]".to_string(),
+        permission_mode: "read".to_string(),
+        source_provenance: Some("[]".to_string()),
         created_ms: 1_000,
+    }
+}
+
+fn chat_change(id: &str, message_id: &str, sequence: i64) -> ChatNoteChangeInput {
+    ChatNoteChangeInput {
+        id: id.to_string(),
+        conversation_id: "c1".to_string(),
+        turn_id: message_id.to_string(),
+        tool_call_id: format!("tool-{sequence}"),
+        path: "notes/project-atlas.md".to_string(),
+        sequence,
+        operation: ChatNoteChangeOperation::Edit,
+        before_source: Some("# Project Atlas\n\nOld\n".to_string()),
+        after_source: "# Project Atlas\n\nNew\n".to_string(),
+        before_revision: Some("before".to_string()),
+        after_revision: "after".to_string(),
+        created_ms: 2_000 + sequence,
     }
 }
 
@@ -1883,6 +1947,326 @@ fn chat_message_resave_updates_by_id() {
 }
 
 #[test]
+fn chat_message_persists_permission_and_provenance() {
+    let conn = migrated();
+    let mut message = chat_message("m1", "c1");
+    message.permission_mode = "readWrite".to_string();
+    message.source_provenance =
+        Some(r#"[{"kind":"note","path":"notes/project-atlas.md"}]"#.to_string());
+    save_message(&conn, &conversation("c1"), &message).unwrap();
+
+    let rows = run_query(
+        &conn,
+        "SELECT permission_mode, source_provenance FROM chat_messages WHERE id = 'm1'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(rows[0]["permission_mode"], Value::from("readWrite"));
+    assert_eq!(
+        rows[0]["source_provenance"],
+        Value::from(r#"[{"kind":"note","path":"notes/project-atlas.md"}]"#)
+    );
+}
+
+#[test]
+fn chat_note_change_journal_prepares_transitions_and_queries() {
+    let conn = migrated();
+    save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
+    let input = chat_change("change-1", "m1", 0);
+
+    let prepared = prepare_note_change(&conn, &input, JOURNAL_SESSION).unwrap();
+    assert_eq!(prepared.state, ChatNoteChangeState::Prepared);
+    // An IPC retry after a lost response is idempotent.
+    assert_eq!(
+        prepare_note_change(&conn, &input, JOURNAL_SESSION).unwrap(),
+        prepared
+    );
+    assert!(
+        pending_note_changes(&conn, |owner| owner == JOURNAL_SESSION)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        pending_note_changes(&conn, |owner| owner == "next-process-session").unwrap(),
+        vec![prepared.clone()]
+    );
+
+    let outcome = set_note_change_state(
+        &conn,
+        "change-1",
+        ChatNoteChangeState::Prepared,
+        ChatNoteChangeState::Applied,
+        None,
+        3_000,
+        JOURNAL_SESSION,
+    )
+    .unwrap();
+    let ChatNoteChangeUpdateOutcome::Updated { change: applied } = outcome else {
+        panic!("expected updated outcome")
+    };
+    assert_eq!(applied.state, ChatNoteChangeState::Applied);
+    assert_eq!(applied.updated_ms, 3_000);
+    assert!(
+        pending_note_changes(&conn, |owner| owner == "next-process-session")
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        note_changes_for_message(&conn, "m1").unwrap(),
+        vec![applied]
+    );
+
+    let mismatch = set_note_change_state(
+        &conn,
+        "change-1",
+        ChatNoteChangeState::Prepared,
+        ChatNoteChangeState::Applied,
+        None,
+        4_000,
+        JOURNAL_SESSION,
+    )
+    .unwrap();
+    assert!(matches!(
+        mismatch,
+        ChatNoteChangeUpdateOutcome::StateMismatch { .. }
+    ));
+}
+
+#[test]
+fn chat_note_change_rejects_reused_ids_and_invalid_transitions() {
+    let conn = migrated();
+    save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
+    let input = chat_change("change-1", "m1", 0);
+    prepare_note_change(&conn, &input, JOURNAL_SESSION).unwrap();
+
+    let mut different = input.clone();
+    different.after_source = "# Project Atlas\n\nDifferent\n".to_string();
+    assert!(prepare_note_change(&conn, &different, JOURNAL_SESSION).is_err());
+    assert!(set_note_change_state(
+        &conn,
+        "change-1",
+        ChatNoteChangeState::Prepared,
+        ChatNoteChangeState::Undone,
+        None,
+        3_000,
+        JOURNAL_SESSION,
+    )
+    .is_err());
+}
+
+#[test]
+fn chat_note_change_process_session_separates_live_work_from_recovery() {
+    let conn = migrated();
+    save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
+    let input = chat_change("change-1", "m1", 0);
+    prepare_note_change(&conn, &input, "earlier-process").unwrap();
+
+    // A new native process may reconcile the abandoned row, but may not
+    // accidentally resume the old process's immutable prepare operation.
+    assert!(prepare_note_change(&conn, &input, JOURNAL_SESSION).is_err());
+    assert_eq!(
+        pending_note_changes(&conn, |owner| owner == JOURNAL_SESSION)
+            .unwrap()
+            .len(),
+        1
+    );
+    assert!(
+        pending_note_changes(&conn, |owner| owner == "earlier-process")
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn chat_note_change_leases_distinguish_live_processes_and_reopened_sessions() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir(root.path().join(".reflect")).unwrap();
+    let first = ChatJournalSession::default();
+    first.activate_graph(root.path()).unwrap();
+    let first_id = first.id_for_root(root.path()).unwrap();
+    let second = ChatJournalSession::default();
+    second.activate_graph(root.path()).unwrap();
+    let second_id = second.id_for_root(root.path()).unwrap();
+    let lease_dir = root.path().join(".reflect/chat-journal-leases");
+    let first_path = lease_dir.join(format!("{first_id}.lock"));
+    let second_path = lease_dir.join(format!("{second_id}.lock"));
+    assert!(first_path.is_file());
+    assert!(second_path.is_file());
+    assert!(first.owner_is_live(root.path(), &first_id));
+    assert!(first.owner_is_live(root.path(), &second_id));
+
+    let conn = migrated();
+    save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
+    let input = chat_change("change-1", "m1", 0);
+    let prepared = prepare_note_change(&conn, &input, &second_id).unwrap();
+    assert!(
+        pending_note_changes(&conn, |owner| first.owner_is_live(root.path(), owner))
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        delete_conversation(&conn, "c1", |owner| first.owner_is_live(root.path(), owner)).is_err()
+    );
+
+    drop(second);
+    assert!(!second_path.exists());
+    assert!(!first.owner_is_live(root.path(), &second_id));
+    assert_eq!(
+        pending_note_changes(&conn, |owner| first.owner_is_live(root.path(), owner)).unwrap(),
+        vec![prepared]
+    );
+    delete_conversation(&conn, "c1", |owner| first.owner_is_live(root.path(), owner)).unwrap();
+
+    // Reopening the same graph rotates and releases the prior generation's
+    // token; rows left by a graph switch cannot remain "live" forever merely
+    // because the native process itself is still running.
+    first.activate_graph(root.path()).unwrap();
+    let reopened_id = first.id_for_root(root.path()).unwrap();
+    assert_ne!(reopened_id, first_id);
+    assert!(!first_path.exists());
+    assert!(!first.owner_is_live(root.path(), &first_id));
+    assert!(first.owner_is_live(root.path(), &reopened_id));
+}
+
+#[test]
+fn chat_note_change_reopen_recovers_same_process_abandoned_rows() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir(root.path().join(".reflect")).unwrap();
+    let journal = ChatJournalSession::default();
+    journal.activate_graph(root.path()).unwrap();
+    let old_id = journal.id_for_root(root.path()).unwrap();
+
+    let conn = migrated();
+    save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
+    let prepared = prepare_note_change(&conn, &chat_change("change-1", "m1", 0), &old_id).unwrap();
+    assert!(
+        pending_note_changes(&conn, |owner| journal.owner_is_live(root.path(), owner))
+            .unwrap()
+            .is_empty()
+    );
+
+    journal.activate_graph(root.path()).unwrap();
+    assert!(!root
+        .path()
+        .join(".reflect/chat-journal-leases")
+        .join(format!("{old_id}.lock"))
+        .exists());
+    assert!(!journal.owner_is_live(root.path(), &old_id));
+    assert_eq!(
+        pending_note_changes(&conn, |owner| journal.owner_is_live(root.path(), owner)).unwrap(),
+        vec![prepared]
+    );
+}
+
+#[test]
+fn chat_note_change_batch_claim_is_all_or_none() {
+    let conn = migrated();
+    save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
+    for sequence in 0..2 {
+        prepare_note_change(
+            &conn,
+            &chat_change(&format!("change-{sequence}"), "m1", sequence),
+            JOURNAL_SESSION,
+        )
+        .unwrap();
+    }
+    let ids = vec!["change-0".to_string(), "change-1".to_string()];
+    let applied = set_note_changes_state(
+        &conn,
+        &ids,
+        ChatNoteChangeState::Prepared,
+        ChatNoteChangeState::Applied,
+        None,
+        3_000,
+        JOURNAL_SESSION,
+    )
+    .unwrap();
+    assert!(matches!(
+        applied,
+        ChatNoteChangesUpdateOutcome::Updated { ref changes }
+            if changes.iter().all(|change| change.state == ChatNoteChangeState::Applied)
+    ));
+
+    let claimed = set_note_changes_state(
+        &conn,
+        &ids,
+        ChatNoteChangeState::Applied,
+        ChatNoteChangeState::Undoing,
+        None,
+        4_000,
+        JOURNAL_SESSION,
+    )
+    .unwrap();
+    assert!(matches!(
+        claimed,
+        ChatNoteChangesUpdateOutcome::Updated { ref changes }
+            if changes.iter().all(|change| change.state == ChatNoteChangeState::Undoing)
+    ));
+    assert!(
+        pending_note_changes(&conn, |owner| owner == JOURNAL_SESSION)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        pending_note_changes(&conn, |owner| owner == "next-process")
+            .unwrap()
+            .len(),
+        2
+    );
+
+    set_note_change_state(
+        &conn,
+        "change-0",
+        ChatNoteChangeState::Undoing,
+        ChatNoteChangeState::Applied,
+        Some("undo refused"),
+        5_000,
+        JOURNAL_SESSION,
+    )
+    .unwrap();
+    let mismatch = set_note_changes_state(
+        &conn,
+        &ids,
+        ChatNoteChangeState::Undoing,
+        ChatNoteChangeState::Undone,
+        None,
+        6_000,
+        JOURNAL_SESSION,
+    )
+    .unwrap();
+    assert!(matches!(
+        mismatch,
+        ChatNoteChangesUpdateOutcome::StateMismatch { .. }
+    ));
+    let states: Vec<ChatNoteChangeState> = note_changes_for_message(&conn, "m1")
+        .unwrap()
+        .into_iter()
+        .map(|change| change.state)
+        .collect();
+    assert_eq!(
+        states,
+        vec![ChatNoteChangeState::Applied, ChatNoteChangeState::Undoing]
+    );
+
+    let missing = set_note_changes_state(
+        &conn,
+        &["change-0".to_string(), "missing".to_string()],
+        ChatNoteChangeState::Applied,
+        ChatNoteChangeState::Undoing,
+        None,
+        7_000,
+        JOURNAL_SESSION,
+    )
+    .unwrap();
+    assert_eq!(
+        missing,
+        ChatNoteChangesUpdateOutcome::Missing {
+            missing_ids: vec!["missing".to_string()]
+        }
+    );
+}
+
+#[test]
 fn chat_message_seq_is_assigned_per_conversation() {
     // seq is computed inside the insert (MAX + 1 per conversation), never by
     // the caller — the frontend's view can undercount the table (the read
@@ -1925,7 +2309,7 @@ fn chat_conversation_delete_cascades_to_messages() {
     let conn = migrated();
     save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
     save_message(&conn, &conversation("c2"), &chat_message("m2", "c2")).unwrap();
-    delete_conversation(&conn, "c1").unwrap();
+    delete_conversation(&conn, "c1", |owner| owner == JOURNAL_SESSION).unwrap();
 
     let conversations = run_query(&conn, "SELECT id FROM chat_conversations", &[]).unwrap();
     assert_eq!(conversations.len(), 1);
@@ -1936,18 +2320,88 @@ fn chat_conversation_delete_cascades_to_messages() {
 }
 
 #[test]
+fn chat_conversation_delete_waits_for_change_recovery_then_cascades() {
+    let conn = migrated();
+    save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
+    prepare_note_change(&conn, &chat_change("change-1", "m1", 0), JOURNAL_SESSION).unwrap();
+
+    assert!(delete_conversation(&conn, "c1", |owner| owner == JOURNAL_SESSION).is_err());
+    set_note_change_state(
+        &conn,
+        "change-1",
+        ChatNoteChangeState::Prepared,
+        ChatNoteChangeState::Applied,
+        None,
+        3_000,
+        JOURNAL_SESSION,
+    )
+    .unwrap();
+    delete_conversation(&conn, "c1", |owner| owner == JOURNAL_SESSION).unwrap();
+    let changes = run_query(&conn, "SELECT id FROM chat_note_changes", &[]).unwrap();
+    assert!(changes.is_empty());
+}
+
+#[test]
+fn chat_conversation_delete_only_waits_for_live_process_mutations() {
+    for (owner, state, should_block) in [
+        (JOURNAL_SESSION, ChatNoteChangeState::Prepared, true),
+        (JOURNAL_SESSION, ChatNoteChangeState::Undoing, true),
+        ("earlier-process", ChatNoteChangeState::Prepared, false),
+        ("earlier-process", ChatNoteChangeState::Undoing, false),
+        (JOURNAL_SESSION, ChatNoteChangeState::Uncertain, false),
+    ] {
+        let conn = migrated();
+        save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
+        prepare_note_change(&conn, &chat_change("change-1", "m1", 0), owner).unwrap();
+        if state != ChatNoteChangeState::Prepared {
+            let intermediate = if state == ChatNoteChangeState::Undoing {
+                let outcome = set_note_change_state(
+                    &conn,
+                    "change-1",
+                    ChatNoteChangeState::Prepared,
+                    ChatNoteChangeState::Applied,
+                    None,
+                    3_000,
+                    owner,
+                )
+                .unwrap();
+                assert!(matches!(
+                    outcome,
+                    ChatNoteChangeUpdateOutcome::Updated { .. }
+                ));
+                ChatNoteChangeState::Applied
+            } else {
+                ChatNoteChangeState::Prepared
+            };
+            set_note_change_state(&conn, "change-1", intermediate, state, None, 4_000, owner)
+                .unwrap();
+        }
+
+        let result = delete_conversation(&conn, "c1", |candidate| candidate == JOURNAL_SESSION);
+        assert_eq!(
+            result.is_err(),
+            should_block,
+            "owner={owner}, state={state:?}"
+        );
+    }
+}
+
+#[test]
 fn clear_index_preserves_chat_history() {
     // Chat rows are durable, not a rebuildable projection — the full-rebuild
     // wipe must leave them alone.
     let conn = migrated();
     apply_note(&conn, &note("notes/a.md", "A", vec![])).unwrap();
     save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
+    prepare_note_change(&conn, &chat_change("change-1", "m1", 0), JOURNAL_SESSION).unwrap();
     clear_index(&conn).unwrap();
 
     let notes = run_query(&conn, "SELECT count(*) AS n FROM notes", &[]).unwrap();
     assert_eq!(notes[0]["n"], Value::from(0));
     let messages = run_query(&conn, "SELECT count(*) AS n FROM chat_messages", &[]).unwrap();
     assert_eq!(messages[0]["n"], Value::from(1));
+    let changes = run_query(&conn, "SELECT count(*) AS n FROM chat_note_changes", &[]).unwrap();
+    assert_eq!(changes[0]["n"], Value::from(1));
 }
 
 // ---- note_claims addressing (0019) ------------------------------------------
@@ -2142,6 +2596,7 @@ fn reconcile_scan_walks_the_index_sessions_root_not_the_current_graph() {
         .expect("mock app");
     app.manage(crate::fs::GraphState::default());
     app.manage(super::IndexState::default());
+    app.manage(super::ChatJournalSession::default());
     app.manage(crate::background_task::BackgroundTaskState::default());
 
     let graph_a = tempfile::tempdir().expect("tempdir");
@@ -2156,7 +2611,8 @@ fn reconcile_scan_walks_the_index_sessions_root_not_the_current_graph() {
         inner.generation = 1;
         inner.root = Some(graph_a.path().to_path_buf());
     }
-    let generation = super::index_open(app.state(), app.state(), app.state()).expect("open");
+    let generation =
+        super::index_open(app.state(), app.state(), app.state(), app.state()).expect("open");
 
     // The switch's first half: `graph_open` swapped the root, `index_open`
     // hasn't run yet — the exact window a queued scan can land in.

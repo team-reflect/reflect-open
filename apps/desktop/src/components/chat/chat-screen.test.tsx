@@ -237,6 +237,7 @@ describe('ChatScreen', () => {
           toolCallId: 'tool-1',
           query: 'atlas',
           hits: [{ path: 'notes/atlas.md', title: 'Atlas' }],
+          sourceProvenance: [{ kind: 'note', path: 'notes/atlas.md' }],
         },
       },
       { type: 'text-delta', text: 'It ships in June. [[Atlas]]' },
@@ -250,6 +251,12 @@ describe('ChatScreen', () => {
     await userEvent.type(view.getByLabelText('Chat message'), 'when does atlas ship?{Enter}')
 
     await expect.element(view.getByText('when does atlas ship?')).toBeInTheDocument()
+    const userMessage = view
+      .getByText('when does atlas ship?')
+      .element()
+      .closest('[data-slot="message-content"]')
+    expect(userMessage).not.toBeNull()
+    expect(userMessage?.textContent).toContain('Read only')
     await expect.element(view.getByText(/Searched “atlas” · 1 note/)).toBeInTheDocument()
     // The turn settled, so the answer renders as markdown (not plain text).
     await expect
@@ -317,6 +324,7 @@ describe('ChatScreen', () => {
           toolCallId: 'tool-1',
           query: 'atlas',
           hits: [{ path: 'notes/atlas.md', title: 'Atlas' }],
+          sourceProvenance: [{ kind: 'note', path: 'notes/atlas.md' }],
         },
       },
       {
@@ -446,6 +454,66 @@ describe('ChatScreen', () => {
     await expect.element(picked).toHaveAttribute('aria-selected', 'true')
   })
 
+  it('offers an accessible Read only / Read & write permission selector', async () => {
+    configureModel()
+    const view = await renderChat()
+    const permissions = view.getByRole('combobox', { name: 'Chat permissions' })
+
+    await expect.element(permissions).toHaveTextContent('Read only')
+    await permissions.click()
+    const readOnly = page.getByRole('option', { name: /Read only/ })
+    const readWrite = page.getByRole('option', { name: /Read & write/ })
+    await expect.element(readOnly).toHaveAttribute('aria-selected', 'true')
+    await expect.element(readOnly).toHaveTextContent('Search and answer from your notes')
+    await expect
+      .element(readWrite)
+      .toHaveTextContent('Can edit non-private notes; changes are reviewable and undoable')
+
+    await readWrite.click()
+    await expect.element(permissions).toHaveTextContent('Read & write')
+    await permissions.click()
+    await expect
+      .element(page.getByRole('option', { name: /Read & write/ }))
+      .toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('shows the captured write grant on the historic turn', async () => {
+    configureModel()
+    scriptTurn([
+      { type: 'text-delta', text: 'Updated.' },
+      { type: 'complete', messages: [{ role: 'assistant', content: 'Updated.' }] },
+    ])
+    const view = await renderChat()
+
+    await view.getByRole('combobox', { name: 'Chat permissions' }).click()
+    await page.getByRole('option', { name: /Read & write/ }).click()
+    await userEvent.type(view.getByLabelText('Chat message'), 'update the project note{Enter}')
+
+    const userMessage = view
+      .getByText('update the project note')
+      .element()
+      .closest('[data-slot="message-content"]')
+    expect(userMessage).not.toBeNull()
+    expect(userMessage?.textContent).toContain('Read & write')
+  })
+
+  it('disables the permission selector while a chat turn is busy', async () => {
+    configureModel()
+    streamChat.mockImplementation(() =>
+      (async function* (): AsyncGenerator<ChatStreamEvent> {
+        yield { type: 'text-delta', text: 'Working…' }
+        await new Promise<never>(() => {})
+      })(),
+    )
+    const view = await renderChat()
+    const permissions = view.getByRole('combobox', { name: 'Chat permissions' })
+
+    await expect.element(permissions).toBeEnabled()
+    await userEvent.type(view.getByLabelText('Chat message'), 'keep working{Enter}')
+    await expect.element(view.getByText('Working…')).toBeInTheDocument()
+    await expect.element(permissions).toBeDisabled()
+  })
+
   it('sends the graph overview context with each turn', async () => {
     configureModel()
     scriptTurn([
@@ -571,6 +639,64 @@ describe('ChatScreen', () => {
     await expect
       .element(view.getByText(/scan\.pdf — This asset cannot be read by AI\./))
       .toBeInTheDocument()
+  })
+
+  it('renders successful edit and creation activity with local change statistics', async () => {
+    configureModel()
+    scriptTurn([
+      {
+        type: 'tool-call',
+        call: {
+          tool: 'edit',
+          toolCallId: 'tool-edit',
+          path: 'notes/atlas.md',
+          replacements: 1,
+        },
+      },
+      {
+        type: 'tool-result',
+        result: {
+          tool: 'edit',
+          toolCallId: 'tool-edit',
+          outcome: {
+            ok: true,
+            changeId: 'change-edit',
+            path: 'notes/atlas.md',
+            revision: 'a'.repeat(64),
+            addedLines: 3,
+            removedLines: 1,
+          },
+        },
+      },
+      {
+        type: 'tool-call',
+        call: { tool: 'create', toolCallId: 'tool-create', title: 'Launch notes' },
+      },
+      {
+        type: 'tool-result',
+        result: {
+          tool: 'create',
+          toolCallId: 'tool-create',
+          outcome: {
+            ok: true,
+            changeId: 'change-create',
+            path: 'notes/launch-notes.md',
+            revision: 'b'.repeat(64),
+            addedLines: 4,
+            removedLines: 0,
+          },
+        },
+      },
+      { type: 'complete', messages: [{ role: 'assistant', content: 'Done.' }] },
+    ])
+    const view = await renderChat()
+
+    await userEvent.type(view.getByLabelText('Chat message'), 'make the requested changes{Enter}')
+
+    await expect.element(view.getByText(/Edited notes\/atlas\.md · \+3 −1/)).toBeInTheDocument()
+    await expect.element(view.getByText('Created Launch notes')).toBeInTheDocument()
+    await view.getByRole('button', { name: 'notes/atlas.md' }).click()
+    expect(probedRoute).toEqual({ kind: 'note', path: 'notes/atlas.md' })
   })
 
   it('renders streaming text as plain text until the turn settles', async () => {

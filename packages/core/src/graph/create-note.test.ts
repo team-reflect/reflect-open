@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge'
 import {
   createNoteWithTitle,
+  createNoteWithTitlePrepared,
   isUntitledNotePath,
   resolveOrCreateNoteWithTitle,
+  type PreparedNoteCreation,
   untitledNotePath,
   untitledNoteSeed,
 } from './create-note'
@@ -143,6 +145,49 @@ describe('createNoteWithTitle', () => {
     expect(args.contents).toMatch(
       /^---\nid: [0-9a-z]{26}\n---\n# Ada Lovelace\n\n- Type: #person\n$/,
     )
+  })
+})
+
+describe('createNoteWithTitlePrepared', () => {
+  it('awaits the durable preparation before the no-clobber create', async () => {
+    const invoke = bindBridge()
+    const events: string[] = []
+    // Rebind with a simple call-order assertion instead of relying on mock
+    // invocation timestamps: the prepare callback must see no create yet.
+    const prepared = vi.fn(async (creation: PreparedNoteCreation) => {
+      expect(invoke.mock.calls.some(([command]) => command === 'note_create')).toBe(false)
+      events.push(`prepared:${creation.path}`)
+    })
+
+    const creation = await createNoteWithTitlePrepared('Project Atlas', 7, 'First line', prepared)
+
+    expect(creation.path).toBe('notes/project-atlas.md')
+    expect(creation.source).toContain('# Project Atlas\n\nFirst line\n')
+    expect(creation.revision).toMatch(/^[0-9a-f]{64}$/)
+    expect(events).toEqual(['prepared:notes/project-atlas.md'])
+  })
+
+  it('skips occupied collision-family paths before preparing one candidate', async () => {
+    const invoke = bindBridge({ occupied: ['notes/project.md'] })
+    const prepared = vi.fn(async (_creation: PreparedNoteCreation) => {})
+
+    await expect(
+      createNoteWithTitlePrepared('Project', 7, undefined, prepared),
+    ).resolves.toMatchObject({
+      path: 'notes/project-2.md',
+    })
+    expect(prepared).toHaveBeenCalledOnce()
+    expect(prepared.mock.calls[0]?.[0].path).toBe('notes/project-2.md')
+    expect(invoke.mock.calls.filter(([command]) => command === 'note_create')).toHaveLength(1)
+  })
+
+  it('fails a lost prepared claim instead of creating an unjournaled suffix', async () => {
+    const invoke = bindBridge({ create: () => ({ kind: 'collision' }) })
+
+    await expect(
+      createNoteWithTitlePrepared('Project', 7, undefined, async () => {}),
+    ).rejects.toThrow('retry the create')
+    expect(invoke.mock.calls.filter(([command]) => command === 'note_create')).toHaveLength(1)
   })
 })
 

@@ -1,7 +1,8 @@
 import { ulid } from 'ulidx'
 import { upsertFrontmatter } from '../markdown/frontmatter'
 import { slugForTitle } from '../markdown/slug'
-import { createNoteIfAbsent } from './commands'
+import { hashContent } from '../indexing/hash'
+import { createNoteIfAbsent, noteExists } from './commands'
 import { wikiNoteReference } from './note-reference'
 import { notePath } from './paths'
 import {
@@ -84,6 +85,56 @@ export async function createNoteWithTitle(
     generation,
   )
   return claimed.path
+}
+
+/** The exact candidate journaled before a guarded titled-note creation. */
+export interface PreparedNoteCreation {
+  readonly path: string
+  readonly source: string
+  readonly revision: string
+}
+
+/** A definitive no-write refusal after a creation candidate was journaled. */
+export class PreparedNoteCreationRefusal extends Error {
+  constructor(readonly kind: 'collision' | 'blocked') {
+    super(
+      kind === 'collision'
+        ? 'the prepared note path was claimed; retry the create'
+        : 'the prepared note path is owned by another live editor',
+    )
+  }
+}
+
+/**
+ * Create a titled note with the regular identity and collision-family policy,
+ * awaiting `onPrepared` before the no-clobber filesystem claim. Existing
+ * candidates are skipped before journaling. If a racing creator claims the
+ * prepared candidate, this call fails rather than journaling a second path
+ * for the same logical operation; a retry receives a new tool-call identity.
+ */
+export async function createNoteWithTitlePrepared(
+  title: string,
+  generation: number,
+  body: string | undefined,
+  onPrepared: (creation: PreparedNoteCreation) => Promise<void>,
+): Promise<PreparedNoteCreation> {
+  const slug = slugForTitle(title)
+  const source = newNoteSource(title, body)
+  const revision = await hashContent(source)
+  for (let ordinal = 1; ordinal <= MAX_CREATE_ATTEMPTS; ordinal += 1) {
+    const path = notePath(ordinal === 1 ? slug : `${slug}-${ordinal}`)
+    if (await noteExists(path)) {
+      continue
+    }
+    const creation = { path, source, revision }
+    await onPrepared(creation)
+    const outcome = await createNoteIfAbsent(path, source, generation)
+    if (outcome.kind === 'created') {
+      return creation
+    }
+    throw new PreparedNoteCreationRefusal(outcome.kind)
+  }
+  throw new Error(`no available note path for slug "${slug}" after ${MAX_CREATE_ATTEMPTS} attempts`)
 }
 
 /** Far beyond any real graph's same-slug population; fail loud instead of spinning. */

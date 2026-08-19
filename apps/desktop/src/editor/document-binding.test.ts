@@ -17,12 +17,14 @@ function fakeSession(path: string) {
   const dispose = vi.fn()
   const discard = vi.fn()
   const session: NoteSession = {
+    ownerId: null,
     get path() {
       return current
     },
-    retarget: (to: string) => {
+    retarget: async (to: string) => {
       current = to
     },
+    releaseRetargetedPath: async () => {},
     load: () => {},
     editorChanged: () => {},
     externalChanged: () => {},
@@ -33,12 +35,15 @@ function fakeSession(path: string) {
     commitFrontmatter: async () => true,
     content: () => '',
     liveContent: () => '',
+    readFreshContent: async () => ({ source: '', revision: '' }),
     updateFrontmatter: () => true,
     commitTaskToggle: async () => false,
     commitTaskEdit: async () => false,
     commitTaskRemove: async () => false,
     commitTaskToBullet: async () => false,
     commitBodyAppend: async () => false,
+    commitBodyMutation: async () => ({ status: 'refused', reason: 'no_write' }),
+    commitConditionalTrash: async () => ({ kind: 'refused', reason: 'no_write' }),
     dispose,
     discard,
   }

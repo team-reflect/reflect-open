@@ -13,6 +13,11 @@ import { parseFrontmatter, splitFrontmatter } from '../../markdown/frontmatter'
 import { isTagName } from '../../markdown/extract'
 import { buildReadOneAsset, readAssetsInput, type ReadAssetsOutput } from './read-assets'
 import { buildReadOneNote, readNotesInput, type ReadNotesOutput } from './read-notes'
+import { resolveSearchHitsForChat } from './search-hit-privacy'
+import type { ChatNoteToolHost, NoteMutationOutput } from './note-mutations'
+import type { ChatPermissionMode } from './permissions'
+import { buildWriteNoteTools, type MutationNoteTools, type NoteReadGrant } from './write-tools'
+import type { ChatSourceProvenance, ChatSourceRef } from './transcript'
 import {
   cloudSafeNoteListings,
   cloudSafeSearchHits,
@@ -23,13 +28,11 @@ import {
 } from '../checkers'
 
 /**
- * The read-only note tools the chat model can call (Plan 10, first wave),
- * and — deliberately in the same module — everything else that knows their
- * names: the {@link NoteToolCall}/{@link NoteToolResult} unions the engine
- * streams and the UI renders, and the mappers from SDK stream parts onto
- * them. Adding a tool means registering it here (batch executors live in
- * sibling `read-*.ts` modules) and extending the chip that renders it;
- * nothing else switches on tool names.
+ * The note tools chat can call and the centralized names the engine streams
+ * and UI renders. Read tools are always present; `./write-tools` contributes
+ * mutation tools only to a captured Read & write turn. Adding a tool means
+ * extending the {@link NoteToolCall}/{@link NoteToolResult} mapper here, the
+ * persisted transcript schema, and the chip that renders it.
  *
  * Note content enters tool outputs only as {@link CloudSafe} values, minted
  * by the privacy gate in `../checkers` — search drops private hits entirely,
@@ -62,6 +65,12 @@ export interface BuildNoteToolsOptions extends NoteToolDeps {
    * false, `search_notes` stays lexical so disabled semantic search is honored.
    */
   semanticSearchEnabled?: boolean
+  /** Captured permission for this turn. Mutation tools are absent in read mode. */
+  permissionMode?: ChatPermissionMode
+  /** Live editor/filesystem host. Required before mutation tools can be exposed. */
+  noteHost?: ChatNoteToolHost
+  /** Record each provider-visible source as soon as a tool successfully returns it. */
+  observeSource?: ((source: ChatSourceRef) => void) | undefined
 }
 
 export interface SearchNotesOutput {
@@ -142,9 +151,13 @@ function listingCandidate(
  * production callers omit them and the tools run over the shared retrieval
  * layer and the live filesystem.
  */
-export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
+export function buildNoteTools(options: BuildNoteToolsOptions = {}): AnyNoteTools {
   const retrieveFn = options.retrieveFn ?? retrieve
-  const readNoteFn = options.readNoteFn ?? readNote
+  const liveHost = options.noteHost
+  const readNoteFn =
+    liveHost === undefined
+      ? (options.readNoteFn ?? readNote)
+      : (path: string) => liveHost.readNote(path)
   const listRecentNotesFn = options.listRecentNotesFn ?? listRecentNotes
   const listDailyNotesFn = options.listDailyNotesFn ?? listDailyNotes
   const assetRefsFn = options.assetReferencingNotePathsFn ?? assetReferencingNotePaths
@@ -171,7 +184,12 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
     assetReferencingNotePathsFn: assetRefsFn,
   })
 
-  return {
+  // A write tool may use only a revision this turn's read_notes call minted.
+  // The second live read in the mutation preparer still catches changes after
+  // that read; this map prevents guessed or historic revisions from writing.
+  const readGrants = new Map<string, NoteReadGrant>()
+
+  const readTools: NoteTools = {
     search_notes: tool({
       description: searchNotesDescription(options.semanticSearchEnabled !== false),
       inputSchema: searchNotesInput,
@@ -181,7 +199,22 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
           mode: searchMode,
           excludePrivateContent: true,
         })
-        return { hits: await cloudSafeSearchHits(hits, isPrivateLive) }
+        const resolved = await resolveSearchHitsForChat(query, hits, {
+          readNoteFn,
+          assetReferencingNotePathsFn: assetRefsFn,
+        })
+        const output = { hits: await cloudSafeSearchHits(resolved.hits, isPrivateLive) }
+        const sentPaths = new Set(output.hits.map((hit) => hit.path))
+        for (const attribution of resolved.attributions) {
+          if (!sentPaths.has(attribution.notePath)) {
+            continue
+          }
+          options.observeSource?.({ kind: 'note', path: attribution.notePath })
+          for (const assetPath of attribution.assetPaths) {
+            options.observeSource?.({ kind: 'asset', path: assetPath })
+          }
+        }
+        return output
       },
     }),
 
@@ -200,10 +233,12 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
           limit: limit ?? DEFAULT_RECENT_LIMIT,
           tag: tag ?? null,
         })
-        return {
+        const output = {
           ok: true,
           notes: await cloudSafeNoteListings(rows.map(listingCandidate), isPrivateLive),
-        }
+        } as const
+        observeNoteSources(output.notes, options.observeSource)
+        return output
       },
     }),
 
@@ -218,10 +253,12 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
         const rows = await listDailyNotesFn({ start, end, limit: MAX_DAILY_NOTE_DAYS + 1 })
         const truncated = rows.length > MAX_DAILY_NOTE_DAYS
         const kept = truncated ? rows.slice(0, MAX_DAILY_NOTE_DAYS) : rows
-        return {
+        const output = {
           days: await cloudSafeNoteListings(kept.map(listingCandidate), isPrivateLive),
           truncated,
         }
+        observeNoteSources(output.days, options.observeSource)
+        return output
       },
     }),
 
@@ -232,7 +269,18 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
         'rather than reading them one at a time. Private notes cannot be read.',
       inputSchema: readNotesInput,
       execute: async ({ paths }): Promise<ReadNotesOutput> => {
-        return { notes: await Promise.all(paths.map(readOneNote)) }
+        const notes = await Promise.all(paths.map(readOneNote))
+        for (const result of notes) {
+          if (result.ok) {
+            readGrants.set(result.note.path, {
+              revision: result.note.revision,
+              visibleContent: result.note.content,
+              truncated: result.note.truncated,
+            })
+            options.observeSource?.({ kind: 'note', path: result.note.path })
+          }
+        }
+        return { notes }
       },
     }),
 
@@ -245,9 +293,33 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
         'Attachments of private notes cannot be read.',
       inputSchema: readAssetsInput,
       execute: async ({ paths }): Promise<ReadAssetsOutput> => {
-        return { assets: await Promise.all(paths.map(readOneAsset)) }
+        const output = { assets: await Promise.all(paths.map(readOneAsset)) }
+        for (const result of output.assets) {
+          if (result.ok) {
+            options.observeSource?.({ kind: 'asset', path: result.asset.path })
+          }
+        }
+        return output
       },
     }),
+  }
+
+  if (options.permissionMode !== 'readWrite' || options.noteHost === undefined) {
+    return readTools
+  }
+
+  return {
+    ...readTools,
+    ...buildWriteNoteTools(options.noteHost, readGrants, options.observeSource),
+  }
+}
+
+function observeNoteSources(
+  sources: readonly { readonly path: string }[],
+  observe: ((source: ChatSourceRef) => void) | undefined,
+): void {
+  for (const source of sources) {
+    observe?.({ kind: 'note', path: source.path })
   }
 }
 
@@ -274,6 +346,12 @@ export type NoteTools = {
   read_assets: Tool<z.infer<typeof readAssetsInput>, ReadAssetsOutput>
 }
 
+/** Full tool set available only to a captured Read & write turn. */
+export type WritableNoteTools = NoteTools & MutationNoteTools
+
+/** Runtime set: read tools, with mutation tools present only when permitted. */
+export type AnyNoteTools = NoteTools | WritableNoteTools
+
 /** The hit slice tool-activity UI renders (full hits stay engine-side). */
 export type NoteHitSummary = Pick<CloudSearchHit, 'path' | 'title'>
 
@@ -299,10 +377,20 @@ export type NoteToolCall =
   | { tool: 'assets'; toolCallId: string; paths: string[] }
   | { tool: 'recents'; toolCallId: string; tag: string | null }
   | { tool: 'dailies'; toolCallId: string; start: string; end: string }
+  | { tool: 'edit'; toolCallId: string; path: string; replacements: number }
+  | { tool: 'append'; toolCallId: string; path: string }
+  | { tool: 'create'; toolCallId: string; title: string }
 
 /** One settled tool invocation. A failed read or listing keeps its refusal. */
 export type NoteToolResult =
-  | { tool: 'search'; toolCallId: string; query: string; hits: NoteHitSummary[] }
+  | {
+      tool: 'search'
+      toolCallId: string
+      query: string
+      hits: NoteHitSummary[]
+      /** Local-only live sources; absent legacy attribution is unsafe. */
+      sourceProvenance: ChatSourceProvenance
+    }
   | { tool: 'read'; toolCallId: string; notes: ReadNoteSummary[] }
   | { tool: 'assets'; toolCallId: string; assets: ReadAssetSummary[] }
   | {
@@ -313,9 +401,12 @@ export type NoteToolResult =
       error: string | null
     }
   | { tool: 'dailies'; toolCallId: string; start: string; end: string; days: NoteHitSummary[] }
+  | { tool: 'edit'; toolCallId: string; outcome: NoteMutationOutput }
+  | { tool: 'append'; toolCallId: string; outcome: NoteMutationOutput }
+  | { tool: 'create'; toolCallId: string; outcome: NoteMutationOutput }
 
 /** Map an SDK tool-call part onto {@link NoteToolCall} (null for dynamic). */
-export function noteToolCall(part: TypedToolCall<NoteTools>): NoteToolCall | null {
+export function noteToolCall(part: TypedToolCall<WritableNoteTools>): NoteToolCall | null {
   if (part.dynamic) {
     return null
   }
@@ -335,6 +426,17 @@ export function noteToolCall(part: TypedToolCall<NoteTools>): NoteToolCall | nul
         start: part.input.start,
         end: part.input.end,
       }
+    case 'edit_note':
+      return {
+        tool: 'edit',
+        toolCallId: part.toolCallId,
+        path: part.input.path,
+        replacements: part.input.replacements.length,
+      }
+    case 'append_to_note':
+      return { tool: 'append', toolCallId: part.toolCallId, path: part.input.path }
+    case 'create_note':
+      return { tool: 'create', toolCallId: part.toolCallId, title: part.input.title }
   }
 }
 
@@ -344,7 +446,10 @@ function listingSummary(entry: CloudNoteListing): NoteHitSummary {
 }
 
 /** Map an SDK tool-result part onto {@link NoteToolResult} (null for dynamic). */
-export function noteToolResult(part: TypedToolResult<NoteTools>): NoteToolResult | null {
+export function noteToolResult(
+  part: TypedToolResult<WritableNoteTools>,
+  searchSourceProvenance: ChatSourceProvenance = null,
+): NoteToolResult | null {
   if (part.dynamic) {
     return null
   }
@@ -355,6 +460,7 @@ export function noteToolResult(part: TypedToolResult<NoteTools>): NoteToolResult
         toolCallId: part.toolCallId,
         query: part.input.query,
         hits: part.output.hits.map((hit) => ({ path: hit.path, title: hit.title })),
+        sourceProvenance: searchSourceProvenance,
       }
     case 'read_notes':
       return {
@@ -402,5 +508,11 @@ export function noteToolResult(part: TypedToolResult<NoteTools>): NoteToolResult
         end: part.input.end,
         days: part.output.days.map(listingSummary),
       }
+    case 'edit_note':
+      return { tool: 'edit', toolCallId: part.toolCallId, outcome: part.output }
+    case 'append_to_note':
+      return { tool: 'append', toolCallId: part.toolCallId, outcome: part.output }
+    case 'create_note':
+      return { tool: 'create', toolCallId: part.toolCallId, outcome: part.output }
   }
 }
