@@ -26,7 +26,10 @@ use super::FileMeta;
 /// file extends the same critical section across concurrently running Reflect
 /// flavors/processes that have the graph open.
 static FILE_MUTATION_LOCK: Mutex<()> = Mutex::new(());
-const FILE_MUTATION_LOCK_TIMEOUT: Duration = Duration::from_secs(5);
+// This budget must cover whole-graph Git checkout and merge critical sections,
+// not just individual note writes. Keep a finite ceiling so a wedged process
+// cannot block every other Reflect flavor indefinitely.
+const FILE_MUTATION_LOCK_TIMEOUT: Duration = Duration::from_secs(60);
 const FILE_MUTATION_LOCK_RETRY_DELAY: Duration = Duration::from_millis(10);
 thread_local! {
     static HELD_FILE_MUTATION_ROOT: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
@@ -1210,7 +1213,7 @@ mod tests {
             error,
             AppError::Io { message } if message.contains("timed out waiting")
         ));
-        assert_eq!(FILE_MUTATION_LOCK_TIMEOUT, Duration::from_secs(5));
+        assert_eq!(FILE_MUTATION_LOCK_TIMEOUT, Duration::from_secs(60));
     }
 
     #[test]
