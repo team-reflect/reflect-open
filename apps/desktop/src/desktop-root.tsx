@@ -2,6 +2,7 @@ import { useEffect, type ReactElement } from 'react'
 import { subscribeNoteMoved } from '@reflect/core'
 import { App } from '@/app'
 import { followHealedMove } from '@/editor/move-note'
+import { AppErrorBoundary } from '@/components/app-error-boundary'
 import { attachOperationToasts } from '@/components/operation-toasts'
 import { Toaster } from '@/components/ui/toast'
 import { WindowDragRegion } from '@/components/window-drag-region'
@@ -61,15 +62,17 @@ export function DesktopRoot(): ReactElement {
   useEffect(() => attachOperationToasts(), [])
 
   return (
-    <UpdateProvider>
-      <GraphProvider>
-        <TooltipProvider>
-          <SidebarWidthEffect />
-          <WindowDragRegion />
-          <App />
-          <Toaster />
-        </TooltipProvider>
-      </GraphProvider>
-    </UpdateProvider>
+    <AppErrorBoundary>
+      <UpdateProvider>
+        <GraphProvider>
+          <TooltipProvider>
+            <SidebarWidthEffect />
+            <WindowDragRegion />
+            <App />
+            <Toaster />
+          </TooltipProvider>
+        </GraphProvider>
+      </UpdateProvider>
+    </AppErrorBoundary>
   )
 }

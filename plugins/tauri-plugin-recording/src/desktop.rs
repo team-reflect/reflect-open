@@ -10,9 +10,7 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
     Ok(Recording(app.clone()))
 }
 
-/// Desktop stand-in: desktop records through the webview's MediaRecorder
-/// (`use-audio-recorder.ts`), so every native-recorder call here is a plain
-/// unsupported error — loud, because nothing on desktop should reach it.
+/// Compiled only by workspace-wide desktop builds; the shipped desktop app never compiles it.
 pub struct Recording<R: Runtime>(AppHandle<R>);
 
 impl<R: Runtime> Recording<R> {
