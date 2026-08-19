@@ -9,8 +9,9 @@ import { Button } from '@/components/ui/button'
  * indistinguishable from a hang, since WKWebView's console is out of reach.
  * Sentry still records the error: with a boundary present it arrives through
  * the root's `onCaughtError` handler instead of `onUncaughtError` (both are
- * wired in `main.tsx`). Ten quick taps on the settings version field crash
- * the tree on purpose to drill this screen (`useCrashTestTap`).
+ * wired in `main.tsx`). Ten quick taps on the settings version field reveal
+ * debug actions whose `Trigger test error` row crashes the tree on purpose to
+ * drill this screen (`useCrashTest`).
  */
 export function AppErrorBoundary({ children }: { children: ReactNode }): ReactElement {
   return (

@@ -4,6 +4,7 @@ import {
   aiProvider,
   aiProviderRequiresApiKey,
   errorMessage,
+  getAppStoreEnvironment,
   iapRestorePurchases,
   listNotes,
   normalizeChatSystemPrompt,
@@ -16,7 +17,7 @@ import { useAiPrompts } from '@/hooks/use-ai-prompts'
 import { useAiProviders } from '@/hooks/use-ai-providers'
 import { useAppVersion } from '@/hooks/use-app-version'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
-import { useCrashTestTap } from '@/hooks/use-crash-test-tap'
+import { useCrashTest, useDebugUnlockTap } from '@/hooks/use-debug-unlock'
 import { marketingVersion } from '@/lib/marketing-version'
 import { openUrlSync } from '@/lib/open-url'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
@@ -101,7 +102,16 @@ export function MobileSettings(): ReactElement {
   }
   const { settings, updateSettings } = useSettings()
   const version = useAppVersion()
-  const crashTap = useCrashTestTap()
+  const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
+  const crashTest = useCrashTest()
+  // The install channel cannot change while the process lives, so one fetch
+  // is enough, and it only happens once the debug actions are unlocked.
+  const environment = useQuery({
+    queryKey: ['app-store-environment'],
+    queryFn: () => getAppStoreEnvironment(),
+    staleTime: Infinity,
+    enabled: debugUnlocked && isIos,
+  })
   const sync = useSyncContext()
   // Shared with the status pill (one hook, one query cache entry) — and null
   // until the conflict count is known, so the row never claims `Backed up`
@@ -364,7 +374,7 @@ export function MobileSettings(): ReactElement {
             <SettingsValueRow
               label="Version"
               value={version === null ? '…' : marketingVersion(version)}
-              onPress={crashTap}
+              onPress={versionTap}
             />
             <SettingsActionRow
               label="Privacy Policy"
@@ -373,6 +383,25 @@ export function MobileSettings(): ReactElement {
               }}
             />
           </SettingsGroup>
+
+          {debugUnlocked ? (
+            <SettingsGroup
+              header="Debug"
+              footer="Production is an App Store install; Sandbox is TestFlight or a development install."
+            >
+              {isIos ? (
+                <SettingsValueRow
+                  label="Environment"
+                  value={environment.data ?? (environment.isError ? 'Unknown' : '…')}
+                />
+              ) : null}
+              <SettingsActionRow
+                label="Trigger test error"
+                tone="destructive"
+                onPress={crashTest}
+              />
+            </SettingsGroup>
+          ) : null}
         </div>
       </main>
       <ConnectGithubDrawer open={connectOpen} onOpenChange={setConnectOpen} />
