@@ -50,3 +50,17 @@ __screenshots__/
 # Xcode build-phase toolchain paths, generated per machine (see
 # apps/desktop/src-tauri/xcode-scripts/generate-xcode-env.mjs)
 .xcode.env.local
+
+# Tauri mobile plugins (plugins/*): `.tauri` is the vendored copy of tauri's
+# Swift API package that each plugin's build script recreates on every build;
+# the SwiftPM/Xcode directories appear when the plugins' ios/ packages are
+# built (via swift-rs) or opened in Xcode. These names are tracked nowhere in
+# the repo, so they are global; `Package.resolved` IS tracked inside
+# gen/apple's Xcode workspace (the Sentry pin), so the plugin copies are
+# scoped by path instead.
+.tauri/
+.build/
+.swiftpm/
+xcuserdata/
+DerivedData/
+plugins/*/ios/Package.resolved
