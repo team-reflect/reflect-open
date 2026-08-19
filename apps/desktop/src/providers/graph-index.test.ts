@@ -93,7 +93,7 @@ describe('createGraphIndex', () => {
       },
     })
     index.sync(5, () => false)
-    await index.stop()
+    await index.settled() // settle without aborting: `stop()` would suppress it
     expect(order).toEqual(['applied', 'reconciled'])
   })
 
@@ -108,6 +108,21 @@ describe('createGraphIndex', () => {
     index.sync(5, () => false)
     await index.stop()
     expect(onReconciled).not.toHaveBeenCalled()
+  })
+
+  it('an aborted pass never fires onReconciled', async () => {
+    // `stop()` aborts without making `isStale()` true, so the pass a refresh
+    // interrupted would otherwise reload every open note off disk moments
+    // before the replacement pass does it again.
+    const onApplied = vi.fn()
+    const onReconciled = vi.fn()
+    const index = createGraphIndex({ onApplied, onReconciled })
+    index.sync(5, () => false)
+    await index.stop()
+    expect(onReconciled).not.toHaveBeenCalled()
+    // The cheap idempotent callback keeps its existing behavior; only the one
+    // that touches the filesystem is withheld.
+    expect(onApplied).toHaveBeenCalledTimes(1)
   })
 
   it('reports progress: reconciling → live; idle when closed', async () => {

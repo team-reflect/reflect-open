@@ -92,8 +92,9 @@ export interface GraphIndexOptions {
    */
   onApplied?: () => void
   /**
-   * Called once per completed, un-superseded sync pass, right after
-   * {@link GraphIndexOptions.onApplied}. The pass reads changed files straight
+   * Called once per sync pass that runs to completion, right after
+   * {@link GraphIndexOptions.onApplied}. A pass that was aborted, superseded,
+   * or suspended never reports. The pass reads changed files straight
    * into the index but emits no per-file `index:changed` events, so holders of
    * in-memory file content (open note sessions) must be told to re-read here;
    * on iOS the resume reconcile is the only signal a remote edit ever produces
@@ -265,7 +266,14 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
           return
         }
         onApplied?.()
-        onReconciled?.()
+        // Aborted passes are excluded (`stop()` aborts without making
+        // `isStale()` true, so the checks above let one through): this reads
+        // every open note off disk, and the refresh that stopped this pass
+        // runs its own to completion. Same reasoning as the `aborted` leg of
+        // the `onStalePlaceholders` guard above.
+        if (!controller.signal.aborted) {
+          onReconciled?.()
+        }
         pending = await subscribeIndexChanges(
           generation,
           onApplied,
