@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { listTemplates } from '@reflect/core'
 import { FilePlus2, LayoutTemplate } from 'lucide-react'
 import {
+  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -65,32 +66,36 @@ export function TemplatePicker({ context }: TemplatePickerProps): ReactElement |
       title="Insert template"
       description="Choose a template to insert at the cursor"
     >
-      <CommandInput placeholder="Insert template…" />
-      <CommandList>
-        <CommandEmpty>No templates</CommandEmpty>
-        {templates !== undefined && templates.length > 0 ? (
-          <CommandGroup>
-            {templates.map((template) => (
-              <CommandItem
-                key={template.path}
-                // Title + path: cmdk matches on the value, and duplicate
-                // titles across files must stay distinct rows.
-                value={`${template.title} ${template.path}`}
-                onSelect={() => insert(template.path)}
-              >
-                <LayoutTemplate aria-hidden strokeWidth={1.75} className="text-text-muted" />
-                <span className="truncate">{template.title}</span>
-              </CommandItem>
-            ))}
+      {/* CommandDialog does not provide the cmdk root; the caller must (the
+          same contract as shadcn's Base UI command examples). */}
+      <Command>
+        <CommandInput placeholder="Insert template…" />
+        <CommandList>
+          <CommandEmpty>No templates</CommandEmpty>
+          {templates !== undefined && templates.length > 0 ? (
+            <CommandGroup>
+              {templates.map((template) => (
+                <CommandItem
+                  key={template.path}
+                  // Title + path: cmdk matches on the value, and duplicate
+                  // titles across files must stay distinct rows.
+                  value={`${template.title} ${template.path}`}
+                  onSelect={() => insert(template.path)}
+                >
+                  <LayoutTemplate aria-hidden strokeWidth={1.75} className="text-text-muted" />
+                  <span className="truncate">{template.title}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ) : null}
+          <CommandGroup forceMount>
+            <CommandItem forceMount value="new-template" onSelect={openTemplateCreate}>
+              <FilePlus2 aria-hidden strokeWidth={1.75} className="text-text-muted" />
+              New template
+            </CommandItem>
           </CommandGroup>
-        ) : null}
-        <CommandGroup forceMount>
-          <CommandItem forceMount value="new-template" onSelect={openTemplateCreate}>
-            <FilePlus2 aria-hidden strokeWidth={1.75} className="text-text-muted" />
-            New template
-          </CommandItem>
-        </CommandGroup>
-      </CommandList>
+        </CommandList>
+      </Command>
     </CommandDialog>
   )
 }
