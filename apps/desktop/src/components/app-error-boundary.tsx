@@ -1,6 +1,6 @@
-import { useState, type ReactElement, type ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary'
-import { CRASH_FALLBACK_DESIGNS } from '@/components/crash-fallback-designs'
+import { Button } from '@/components/ui/button'
 
 /**
  * Catches render-phase crashes on both surfaces. Without a boundary React
@@ -25,34 +25,23 @@ export function AppErrorBoundary({ children }: { children: ReactNode }): ReactEl
   )
 }
 
-function reload(): void {
-  window.location.reload()
-}
-
 function CrashFallback({ error }: FallbackProps): ReactElement {
-  const [designIndex, setDesignIndex] = useState(0)
   const message = error instanceof Error ? error.message : String(error)
-  const stack = error instanceof Error ? (error.stack ?? null) : null
-  const design = CRASH_FALLBACK_DESIGNS[designIndex] ?? CRASH_FALLBACK_DESIGNS[0]!
   return (
-    <>
-      <design.Render message={message} stack={stack} reload={reload} />
-      {/* Temporary design picker: delete along with the losing designs once
-          one is chosen. */}
-      <select
-        aria-label="Crash screen design"
-        value={designIndex}
-        onChange={(event) => {
-          setDesignIndex(Number(event.target.value))
-        }}
-        className="fixed right-3 bottom-3 z-50 rounded-md border border-border bg-surface px-2 py-1 text-xs text-text-secondary"
-      >
-        {CRASH_FALLBACK_DESIGNS.map((candidate, index) => (
-          <option key={candidate.name} value={index}>
-            {`${index + 1} · ${candidate.name}`}
-          </option>
-        ))}
-      </select>
-    </>
+    <div className="flex h-dvh w-screen items-center justify-center bg-black/20 px-6">
+      <div className="flex w-full max-w-sm flex-col gap-4 rounded-xl bg-popover p-4 text-sm ring-1 ring-foreground/10">
+        <p className="font-heading text-base font-medium">Something went wrong</p>
+        <p className="text-text-muted">{message}</p>
+        <div className="flex justify-end">
+          <Button
+            onClick={() => {
+              window.location.reload()
+            }}
+          >
+            Reload
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
