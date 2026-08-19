@@ -102,7 +102,7 @@ The v2 Daily screen should have all of:
 - [x] Collapsible incoming-backlinks section below content; daily-note
       backlinks swipe the carousel instead of pushing a screen.
 - [x] Haptic on date selection — a light `UIImpactFeedbackGenerator` tap
-      via the first-party keyboard plugin's `impact_light` command
+      via the first-party haptics plugin's `impact_light` command
       (WKWebView has no `navigator.vibrate`), fired fail-soft from
       `src/mobile/haptics.ts` on day-cell taps (and tab presses, per
       [app-shell-and-navigation](./app-shell-and-navigation.md)).

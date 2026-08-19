@@ -1,9 +1,8 @@
 import { definePluginCommand, ignoredResult } from './plugin'
 
 /**
- * Typed bindings for `plugins/tauri-plugin-mobile-haptics`: the app's single
- * haptic, split out of the keyboard plugin so that one stays pure native
- * webview tuning with no IPC surface.
+ * Typed bindings for `plugins/tauri-plugin-mobile-haptics`, the app's
+ * single haptic.
  */
 
 const impactLightCommand = definePluginCommand<Record<string, never>, unknown>(

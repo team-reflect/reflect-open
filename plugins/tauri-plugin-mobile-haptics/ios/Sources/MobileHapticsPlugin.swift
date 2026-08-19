@@ -1,9 +1,8 @@
 import Tauri
 import UIKit
 
-/// The app's haptics surface, split out of `KeyboardPlugin` so the keyboard
-/// plugin stays pure webview tuning. WKWebView has no `navigator.vibrate`,
-/// so JS cannot fire haptics on its own; taps cross the bridge to
+/// The app's haptics surface. WKWebView has no `navigator.vibrate`, so JS
+/// cannot fire haptics on its own; taps cross the bridge to
 /// `UIImpactFeedbackGenerator` here.
 class MobileHapticsPlugin: Plugin {
   // Lazy so the generator is created on the main thread, inside the first

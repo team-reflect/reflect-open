@@ -2,8 +2,7 @@
 
 Reflect's haptics: one command, `impact_light`, the app's single haptic
 strength. It exists because WKWebView has no `navigator.vibrate`, so JS
-cannot fire haptics on its own. Split out of `tauri-plugin-keyboard`, which
-is pure webview tuning now. The `mobile-haptics` name keeps the crate
+cannot fire haptics on its own. The `mobile-haptics` name keeps the crate
 distinct from the official crates.io `tauri-plugin-haptics`, a different,
 unrelated implementation.
 

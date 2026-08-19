@@ -31,7 +31,7 @@ toolbar — and the hard-won keyboard/focus lessons.
 > viewport with no per-popup fitting, and only `position: fixed` elements
 > (the `+` button) read the variable themselves. The tab bar hides while
 > the keyboard is up (V1 let the keyboard cover it). Checkbox-toggle
-> haptics ride the keyboard plugin's `impact_light` command like the
+> haptics ride the haptics plugin's `impact_light` command like the
 > date/tab taps. **Still owed to the spike-B gate:** the simulator/
 > on-device pass — smart-punctuation typing test, menu tappability,
 > caret visibility, haptic feel — plus focus restore for wiki links
