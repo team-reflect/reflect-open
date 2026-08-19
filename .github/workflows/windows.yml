@@ -1,0 +1,81 @@
+name: Windows
+
+# Experimental: builds an unsigned Windows x64 NSIS installer. The installer
+# is kept as a workflow artifact only — it is never uploaded to a GitHub
+# release. See docs/windows-builds.md.
+
+on:
+  workflow_dispatch:
+  # Validate changes to the Windows build itself before merging; regular PRs
+  # never trigger this.
+  pull_request:
+    paths:
+      - .github/workflows/windows.yml
+      - apps/desktop/scripts/release-windows.mjs
+  # Called by release-please.yml so every release also produces a Windows
+  # build for testing.
+  workflow_call:
+    inputs:
+      commit:
+        description: Immutable commit targeted by the release tag.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Build Windows x64 (unsigned)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      # The runner image enables OS-level long paths but not git's own
+      # support; deep pnpm paths can fail checkout without it.
+      - name: Enable git long paths
+        run: git config --system core.longpaths true
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit || github.sha }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Install Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # The default toolchain's host triple is x86_64-pc-windows-msvc, which
+      # is exactly the build target — no extra rustup target needed.
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-on-failure: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # No secrets on purpose: without SENTRY_AUTH_TOKEN the Sentry vite
+      # plugin skips source-map upload, and without VITE_SENTRY_DSN the
+      # experimental build carries no telemetry.
+      - name: Build Windows installer
+        shell: bash
+        run: pnpm release:windows build --artifact-dir="$RUNNER_TEMP/windows-artifacts"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reflect-windows-x64
+          path: ${{ runner.temp }}/windows-artifacts/*
+          if-no-files-found: error
+          # The NSIS installer is already lzma-compressed; zipping it again
+          # wastes minutes for nothing.
+          compression-level: 0
+          retention-days: 90

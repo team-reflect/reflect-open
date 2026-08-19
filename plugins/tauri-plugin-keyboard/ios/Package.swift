@@ -1,16 +1,16 @@
 // swift-tools-version:5.3
-// The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let package = Package(
     name: "tauri-plugin-keyboard",
+    // iOS only: KeyboardPlugin.swift imports UIKit/WebKit unconditionally,
+    // and only the iOS target registers the plugin (desktop builds do not
+    // compile this crate at all; see `src/desktop.rs`).
     platforms: [
-        .macOS(.v10_13),
         .iOS(.v13),
     ],
     products: [
-        // Products define the executables and libraries a package produces, and make them visible to other packages.
         .library(
             name: "tauri-plugin-keyboard",
             type: .static,
@@ -20,8 +20,6 @@ let package = Package(
         .package(name: "Tauri", path: "../.tauri/tauri-api")
     ],
     targets: [
-        // Targets are the basic building blocks of a package. A target can define a module or a test suite.
-        // Targets can depend on other targets in this package, and on products in packages this package depends on.
         .target(
             name: "tauri-plugin-keyboard",
             dependencies: [

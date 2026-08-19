@@ -8,11 +8,10 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
     Ok(Keyboard(app.clone()))
 }
 
-/// Desktop stand-in so shared frontend code can call unconditionally.
+/// Compiled only by workspace-wide desktop builds; the shipped desktop app never compiles it.
 pub struct Keyboard<R: Runtime>(AppHandle<R>);
 
 impl<R: Runtime> Keyboard<R> {
-    /// Desktop stand-in: no haptic engine, so a successful no-op.
     pub fn impact_light(&self) -> crate::Result<()> {
         Ok(())
     }
