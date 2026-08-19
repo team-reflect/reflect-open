@@ -21,6 +21,7 @@
     "release:ios": "pnpm --filter @reflect/desktop release:ios",
     "release:macos": "pnpm --filter @reflect/desktop release:macos",
     "release:testflight": "pnpm --filter @reflect/desktop release:ios testflight",
+    "release:windows": "pnpm --filter @reflect/desktop release:windows",
     "tauri:dev": "pnpm --filter @reflect/desktop tauri:dev",
     "tauri:ios:dev": "pnpm --filter @reflect/desktop tauri:ios:dev",
     "tauri:ios:dev:sim": "pnpm --filter @reflect/desktop tauri:ios:dev:sim",
