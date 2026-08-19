@@ -2,7 +2,7 @@
 name = "tauri-plugin-keyboard"
 version = "0.1.0"
 authors = ["Reflect"]
-description = "Native webview input tuning for the Reflect iOS app (keyboard scroll pinning, accessory-bar removal, programmatic-focus keyboard) plus the app's light impact haptic."
+description = "Native webview input tuning for the Reflect iOS app (keyboard scroll pinning, accessory-bar removal, programmatic-focus keyboard)."
 edition = "2021"
 rust-version = "1.77.2"
 links = "tauri-plugin-keyboard"

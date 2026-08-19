@@ -13,16 +13,8 @@ import WebKit
 /// the scroll offset is held at zero. With the page pinned, keyboard
 /// avoidance lives entirely on the web side, driven by `visualViewport`
 /// (decision 0003); no keyboard state crosses the bridge.
-///
-/// As Reflect's only native UIKit touch bridge, it also carries the app's
-/// tiny haptics surface (`impactLight`) — WKWebView has no
-/// `navigator.vibrate`, so JS cannot fire haptics on its own.
 class KeyboardPlugin: Plugin {
   private var scrollOffsetObservation: NSKeyValueObservation?
-  // Lazy so the generator is created on the main thread, inside the first
-  // `impactLight` dispatch; kept alive across taps to skip re-allocating
-  // the underlying haptic engine on every press.
-  private lazy var lightImpactGenerator = UIImpactFeedbackGenerator(style: .light)
 
   @objc public override func load(webview: WKWebView) {
     // The system's automatic inset adjustment is the source of the jump:
@@ -48,18 +40,6 @@ class KeyboardPlugin: Plugin {
     // "+" add flow, new-note autofocus) run after an async write, so they
     // landed with the keyboard down. Lift the restriction.
     Self.allowProgrammaticFocus()
-  }
-
-  /// Fire a light impact haptic — V1 parity for date-selection, task controls,
-  /// and tab taps. `UIFeedbackGenerator` is main-thread-only; resolve immediately
-  /// rather than after the dispatch since the tap has already happened and
-  /// callers are fire-and-forget. Silently does nothing on hardware
-  /// without a haptic engine (iPads, the simulator).
-  @objc public func impactLight(_ invoke: Invoke) {
-    DispatchQueue.main.async {
-      self.lightImpactGenerator.impactOccurred()
-    }
-    invoke.resolve()
   }
 
   /// `WKContentView` (the webview's private first responder) returns the

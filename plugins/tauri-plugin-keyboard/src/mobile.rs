@@ -23,12 +23,3 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 
 /// Access to the keyboard APIs.
 pub struct Keyboard<R: Runtime>(PluginHandle<R>);
-
-impl<R: Runtime> Keyboard<R> {
-    /// Fire a light impact haptic (`UIImpactFeedbackGenerator` on iOS).
-    pub fn impact_light(&self) -> crate::Result<()> {
-        self.0
-            .run_mobile_plugin("impactLight", ())
-            .map_err(Into::into)
-    }
-}

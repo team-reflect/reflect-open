@@ -4910,6 +4910,7 @@ dependencies = [
  "tauri-plugin-http",
  "tauri-plugin-iap",
  "tauri-plugin-keyboard",
+ "tauri-plugin-mobile-haptics",
  "tauri-plugin-opener",
  "tauri-plugin-process",
  "tauri-plugin-recording",
