@@ -105,3 +105,23 @@ jobs:
     with:
       commit: ${{ needs.release-please.outputs.beta_commit }}
     secrets: inherit
+
+  # The experimental Windows build rides every release too, but stays off the
+  # GitHub release: windows.yml only uploads a workflow artifact. An
+  # independent job — a Windows failure never blocks the macOS release or
+  # the TestFlight upload. No secrets: the build is unsigned by design.
+  build-windows-stable:
+    name: Build the Windows installer (stable)
+    needs: release-please
+    if: needs.release-please.outputs.stable_created == 'true'
+    uses: ./.github/workflows/windows.yml
+    with:
+      commit: ${{ needs.release-please.outputs.stable_commit }}
+
+  build-windows-beta:
+    name: Build the Windows installer (beta)
+    needs: release-please
+    if: needs.release-please.outputs.beta_created == 'true'
+    uses: ./.github/workflows/windows.yml
+    with:
+      commit: ${{ needs.release-please.outputs.beta_commit }}
