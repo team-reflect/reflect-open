@@ -10,8 +10,7 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
     Ok(AppStore(app.clone()))
 }
 
-/// Desktop stand-in: desktop builds ship outside the App Store (auto-update),
-/// so the permanent answer is the fail-closed `Production`.
+/// Compiled only by workspace-wide desktop builds; the shipped desktop app never compiles it.
 pub struct AppStore<R: Runtime>(AppHandle<R>);
 
 impl<R: Runtime> AppStore<R> {

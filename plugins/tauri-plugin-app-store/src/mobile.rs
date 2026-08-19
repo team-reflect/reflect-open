@@ -9,10 +9,9 @@ use crate::models::*;
 #[cfg(target_os = "ios")]
 tauri::ios_plugin_binding!(init_plugin_app_store);
 
-/// Registers the native half. StoreKit has no Android counterpart (Play
-/// Billing models the install channel differently), so an Android build
-/// fails here loudly instead of shipping a probe that always answers
-/// `Production`.
+/// Registers the native half. StoreKit has no Android counterpart, so an
+/// Android build fails here loudly instead of shipping a probe that always
+/// answers `Production`.
 pub fn init<R: Runtime, C: DeserializeOwned>(
     _app: &AppHandle<R>,
     api: PluginApi<R, C>,

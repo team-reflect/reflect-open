@@ -2,9 +2,8 @@ import { z } from 'zod'
 import { definePluginCommand } from './plugin'
 
 /**
- * Typed bindings for `plugins/tauri-plugin-app-store`, the App Store
- * environment probe. The schema mirrors `AppStoreEnvironment` in the
- * plugin's `src/models.rs`.
+ * Typed bindings for `plugins/tauri-plugin-app-store`, the install-channel
+ * probe.
  */
 
 const appStoreEnvironmentSchema = z.object({ environment: z.string() })
