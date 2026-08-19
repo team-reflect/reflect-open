@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-impact-light"
+description = "Enables the impact_light command without any pre-configured scope."
+commands.allow = ["impact_light"]
+
+[[permission]]
+identifier = "deny-impact-light"
+description = "Denies the impact_light command without any pre-configured scope."
+commands.deny = ["impact_light"]

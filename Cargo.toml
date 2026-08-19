@@ -11,6 +11,7 @@ members = [
   "crates/graph-paths",
   "crates/index-schema",
   "plugins/tauri-plugin-keyboard",
+  "plugins/tauri-plugin-mobile-haptics",
   "plugins/tauri-plugin-recording",
 ]
 

@@ -6296,6 +6296,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-mobile-haptics"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.19",
+]
+
+[[package]]
 name = "tauri-plugin-opener"
 version = "2.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

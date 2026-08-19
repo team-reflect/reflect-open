@@ -1,0 +1,16 @@
+[package]
+name = "tauri-plugin-mobile-haptics"
+version = "0.1.0"
+authors = ["Reflect"]
+description = "The Reflect app's haptics: a single light impact command, because WKWebView has no navigator.vibrate."
+edition = "2021"
+rust-version = "1.77.2"
+links = "tauri-plugin-mobile-haptics"
+
+[dependencies]
+tauri = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[build-dependencies]
+tauri-plugin = { workspace = true }
