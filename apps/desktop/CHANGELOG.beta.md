@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.11.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta...v0.11.0-beta.1) (2026-08-19)
+
+
+### Features
+
+* **mobile:** display App Store environment ([#1111](https://github.com/team-reflect/reflect-open/issues/1111)) ([c682e64](https://github.com/team-reflect/reflect-open/commit/c682e64385234c9bf674c8e17aef8124487e5e0d))
+* show a recovery screen when the UI crashes ([#1134](https://github.com/team-reflect/reflect-open/issues/1134)) ([8d76323](https://github.com/team-reflect/reflect-open/commit/8d76323f063d3b1edccf1123ffa7ec227150ee58))
+
+
+### Bug Fixes
+
+* fix `Insert template…` crash ([#1133](https://github.com/team-reflect/reflect-open/issues/1133)) ([3f88a5a](https://github.com/team-reflect/reflect-open/commit/3f88a5a5ad993d648f79af9839d70586c7079a90))
+* reload open note sessions after each index reconcile ([#1141](https://github.com/team-reflect/reflect-open/issues/1141)) ([8e7ada8](https://github.com/team-reflect/reflect-open/commit/8e7ada8ee2e10e52f69bb3ef81614f646e9b4717))
+
 ## [0.11.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.10.0...v0.11.0-beta) (2026-08-19)
 
 
