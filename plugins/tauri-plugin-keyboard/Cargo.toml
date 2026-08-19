@@ -10,7 +10,6 @@ links = "tauri-plugin-keyboard"
 [dependencies]
 tauri = { workspace = true }
 serde = { workspace = true }
-thiserror = { workspace = true }
 
 [build-dependencies]
 tauri-plugin = { workspace = true }
