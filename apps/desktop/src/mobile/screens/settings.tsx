@@ -16,6 +16,7 @@ import { useAiPrompts } from '@/hooks/use-ai-prompts'
 import { useAiProviders } from '@/hooks/use-ai-providers'
 import { useAppVersion } from '@/hooks/use-app-version'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
+import { useCrashTestTap } from '@/hooks/use-crash-test-tap'
 import { marketingVersion } from '@/lib/marketing-version'
 import { openUrlSync } from '@/lib/open-url'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
@@ -100,6 +101,7 @@ export function MobileSettings(): ReactElement {
   }
   const { settings, updateSettings } = useSettings()
   const version = useAppVersion()
+  const crashTap = useCrashTestTap()
   const sync = useSyncContext()
   // Shared with the status pill (one hook, one query cache entry) — and null
   // until the conflict count is known, so the row never claims `Backed up`
@@ -362,6 +364,7 @@ export function MobileSettings(): ReactElement {
             <SettingsValueRow
               label="Version"
               value={version === null ? '…' : marketingVersion(version)}
+              onPress={crashTap}
             />
             <SettingsActionRow
               label="Privacy Policy"

@@ -1,7 +1,7 @@
 import { useEffect, type ReactElement } from 'react'
 import { installBackgroundFlush } from '@/lib/background-flush'
 import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider'
-import { MobileErrorBoundary } from '@/mobile/mobile-error-boundary'
+import { AppErrorBoundary } from '@/components/app-error-boundary'
 import { MobileOnboardingScreen } from '@/mobile/onboarding-screen'
 import { PaywallScreen } from '@/mobile/paywall-screen'
 import { MobileShell } from '@/mobile/mobile-shell'
@@ -68,7 +68,7 @@ export function MobileApp(): ReactElement {
 
   if (status === 'ready' && graph) {
     return (
-      <MobileErrorBoundary>
+      <AppErrorBoundary>
         <RouterProvider key={graph.root}>
           {/* Same engine, contracts, and triggers as desktop (Plan 12) — the
               controller owns resume/edit/online; mobile adds only the
@@ -97,7 +97,7 @@ export function MobileApp(): ReactElement {
             </CaptureProvider>
           </SyncProvider>
         </RouterProvider>
-      </MobileErrorBoundary>
+      </AppErrorBoundary>
     )
   }
 

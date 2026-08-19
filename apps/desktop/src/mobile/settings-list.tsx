@@ -53,9 +53,18 @@ export function SettingsGroup({
 }
 
 /** A static label / value pair (version, note count, …). */
-export function SettingsValueRow({ label, value }: { label: string; value: string }): ReactElement {
+export function SettingsValueRow({
+  label,
+  value,
+  onPress,
+}: {
+  label: string
+  value: string
+  /** Optional tap handler without pressable styling (the row stays static-looking). */
+  onPress?: () => void
+}): ReactElement {
   return (
-    <div className={ROW_CLASS}>
+    <div className={ROW_CLASS} onClick={onPress}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <span className="shrink-0 text-text-muted tabular-nums">{value}</span>
     </div>
