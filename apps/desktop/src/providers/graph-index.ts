@@ -262,18 +262,17 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
             `index: pass finished in ${Math.round(performance.now() - passStarted)}ms — read ${passWorked} of ${passTotal} files`,
           )
         }
-        if (isStale() || isSuspended()) {
+        // Aborted counts as superseded here: `stop()` aborts without making
+        // `isStale()` true, and every caller that stops a pass (`refresh`,
+        // `close`, a graph switch) either starts a replacement pass or tears
+        // the lifecycle down. Letting a stopped pass subscribe, start the
+        // watcher, and reload every open note is churn the replacement pass
+        // immediately undoes and redoes.
+        if (controller.signal.aborted || isStale() || isSuspended()) {
           return
         }
         onApplied?.()
-        // Aborted passes are excluded (`stop()` aborts without making
-        // `isStale()` true, so the checks above let one through): this reads
-        // every open note off disk, and the refresh that stopped this pass
-        // runs its own to completion. Same reasoning as the `aborted` leg of
-        // the `onStalePlaceholders` guard above.
-        if (!controller.signal.aborted) {
-          onReconciled?.()
-        }
+        onReconciled?.()
         pending = await subscribeIndexChanges(
           generation,
           onApplied,

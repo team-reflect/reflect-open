@@ -54,7 +54,7 @@ describe('createGraphIndex', () => {
     const onMoved = vi.fn()
     const index = createGraphIndex({ onApplied, onMoved })
     index.sync(5, () => false)
-    await index.stop()
+    await index.settled() // settle without aborting: `stop()` skips the tail
 
     // Both healing paths get the move hook: the reconcile pass and the live
     // subscription — external renames must follow through to sessions/routes.
@@ -101,35 +101,36 @@ describe('createGraphIndex', () => {
     const onReconciled = vi.fn()
     const index = createGraphIndex({ onReconciled })
     index.sync(5, () => true) // stale right after the reconcile
-    await index.stop()
+    await index.settled()
     expect(onReconciled).not.toHaveBeenCalled()
 
     mockSync.mockRejectedValue(new Error('boom'))
     index.sync(5, () => false)
-    await index.stop()
+    await index.settled()
     expect(onReconciled).not.toHaveBeenCalled()
   })
 
-  it('an aborted pass never fires onReconciled', async () => {
-    // `stop()` aborts without making `isStale()` true, so the pass a refresh
-    // interrupted would otherwise reload every open note off disk moments
-    // before the replacement pass does it again.
+  it('an aborted pass runs no tail: no callbacks, no subscribe, no watcher', async () => {
+    // `stop()` aborts without making `isStale()` true, so an interrupted pass
+    // bails on its own signal. Whoever stopped it either starts a replacement
+    // pass (`refresh`, a graph switch) or tears the lifecycle down (`close`),
+    // so a tail here is only undone and redone moments later.
     const onApplied = vi.fn()
     const onReconciled = vi.fn()
     const index = createGraphIndex({ onApplied, onReconciled })
     index.sync(5, () => false)
     await index.stop()
+    expect(onApplied).not.toHaveBeenCalled()
     expect(onReconciled).not.toHaveBeenCalled()
-    // The cheap idempotent callback keeps its existing behavior; only the one
-    // that touches the filesystem is withheld.
-    expect(onApplied).toHaveBeenCalledTimes(1)
+    expect(mockSubscribe).not.toHaveBeenCalled()
+    expect(mockWatchStart).not.toHaveBeenCalled()
   })
 
   it('reports progress: reconciling → live; idle when closed', async () => {
     const onProgress = vi.fn<(progress: GraphIndexProgress) => void>()
     const index = createGraphIndex({ onProgress })
     index.sync(5, () => false)
-    await index.stop()
+    await index.settled()
     expect(onProgress.mock.calls.map(([stage]) => stage)).toEqual(['reconciling', 'live'])
 
     onProgress.mockClear()
@@ -149,7 +150,7 @@ describe('createGraphIndex', () => {
   it('bails after reconcile when superseded — no subscribe, no watcher', async () => {
     const index = createGraphIndex()
     index.sync(5, () => true) // stale immediately after reconcile
-    await index.stop()
+    await index.settled()
     expect(mockSync).toHaveBeenCalledTimes(1)
     expect(mockSubscribe).not.toHaveBeenCalled()
     expect(mockWatchStart).not.toHaveBeenCalled()
@@ -157,13 +158,15 @@ describe('createGraphIndex', () => {
 
   it('tears down a subscription created after supersession (no listener leak)', async () => {
     const unlisten = vi.fn()
-    mockSubscribe.mockResolvedValue(unlisten)
-    // Fresh after reconcile (1st check), stale after subscribe (2nd check).
-    let checks = 0
-    const isStale = () => ++checks >= 2
+    let stale = false
+    // Fresh through the reconcile, stale by the time the subscription resolves.
+    mockSubscribe.mockImplementation(async () => {
+      stale = true
+      return unlisten
+    })
     const index = createGraphIndex()
-    index.sync(5, isStale)
-    await index.stop()
+    index.sync(5, () => stale)
+    await index.settled()
     expect(mockSubscribe).toHaveBeenCalledTimes(1)
     expect(mockWatchStart).not.toHaveBeenCalled()
     expect(unlisten).toHaveBeenCalledTimes(1) // pending subscription cleaned up
@@ -208,7 +211,7 @@ describe('createGraphIndex', () => {
     mockSubscribe.mockResolvedValue(unlisten)
     const index = createGraphIndex()
     index.sync(5, () => false)
-    await index.stop()
+    await index.settled()
 
     await index.close()
 
