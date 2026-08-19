@@ -41,7 +41,7 @@ const KEYCHAIN_SERVICE = 'reflect-notary'
 const UPDATER_KEYCHAIN_SERVICE = 'reflect-updater'
 const APP_SPECIFIC_PASSWORD_URL = 'https://account.apple.com'
 const BETA_UPDATER_FEED_TAG = 'updater-beta'
-const STABLE_UPDATER_ENDPOINT =
+export const STABLE_UPDATER_ENDPOINT =
   'https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json'
 const APPLE_SILICON_MAC_TARGET = 'aarch64-apple-darwin'
 const INTEL_MAC_TARGET = 'x86_64-apple-darwin'
@@ -385,7 +385,7 @@ function readPlatformConf(platform) {
 }
 
 /** Apply an RFC 7396 JSON Merge Patch — the same algorithm Tauri uses for `--config`. */
-function mergePatch(target, patch) {
+export function mergePatch(target, patch) {
   if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) return patch
   const out = target && typeof target === 'object' && !Array.isArray(target) ? { ...target } : {}
   for (const [key, value] of Object.entries(patch)) {
