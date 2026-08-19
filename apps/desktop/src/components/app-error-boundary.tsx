@@ -1,6 +1,6 @@
-import type { ReactElement, ReactNode } from 'react'
+import { useState, type ReactElement, type ReactNode } from 'react'
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary'
-import { Button } from '@/components/ui/button'
+import { CRASH_FALLBACK_DESIGNS } from '@/components/crash-fallback-designs'
 
 /**
  * Catches render-phase crashes on both surfaces. Without a boundary React
@@ -25,21 +25,34 @@ export function AppErrorBoundary({ children }: { children: ReactNode }): ReactEl
   )
 }
 
+function reload(): void {
+  window.location.reload()
+}
+
 function CrashFallback({ error }: FallbackProps): ReactElement {
+  const [designIndex, setDesignIndex] = useState(0)
   const message = error instanceof Error ? error.message : String(error)
+  const stack = error instanceof Error ? (error.stack ?? null) : null
+  const design = CRASH_FALLBACK_DESIGNS[designIndex] ?? CRASH_FALLBACK_DESIGNS[0]!
   return (
-    <div className="flex h-dvh w-screen flex-col items-center justify-center gap-2 px-8 text-center">
-      <p className="text-sm font-medium">Something broke</p>
-      <p className="text-sm text-text-muted">{message}</p>
-      <Button
-        variant="outline"
-        className="mt-2"
-        onClick={() => {
-          window.location.reload()
+    <>
+      <design.Render message={message} stack={stack} reload={reload} />
+      {/* Temporary design picker: delete along with the losing designs once
+          one is chosen. */}
+      <select
+        aria-label="Crash screen design"
+        value={designIndex}
+        onChange={(event) => {
+          setDesignIndex(Number(event.target.value))
         }}
+        className="fixed right-3 bottom-3 z-50 rounded-md border border-border bg-surface px-2 py-1 text-xs text-text-secondary"
       >
-        Reload
-      </Button>
-    </div>
+        {CRASH_FALLBACK_DESIGNS.map((candidate, index) => (
+          <option key={candidate.name} value={index}>
+            {`${index + 1} · ${candidate.name}`}
+          </option>
+        ))}
+      </select>
+    </>
   )
 }
