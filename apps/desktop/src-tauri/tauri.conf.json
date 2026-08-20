@@ -15,6 +15,8 @@
         "title": "Reflect",
         "width": 1300,
         "height": 650,
+        "minWidth": 200,
+        "minHeight": 200,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "dragDropEnabled": false,
