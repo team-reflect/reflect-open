@@ -169,6 +169,23 @@ describe('AgentsSection', () => {
     expect(page.getByText('Installing failed').query()).toBeNull()
   })
 
+  it('does not carry a mutation error to another graph', async () => {
+    installResult = () => Promise.reject(new Error('Installing failed'))
+    const view = await renderSection()
+    await page.getByRole('button', { name: 'Install skill' }).click()
+    await expect.element(page.getByText('Installing failed')).toBeInTheDocument()
+
+    graphState.graph = { root: '/graphs/Work', name: 'Work', generation: 11 }
+    await view.rerender(
+      <QueryClientProvider client={queryClient}>
+        <AgentsSection />
+      </QueryClientProvider>,
+    )
+
+    await expect.element(page.getByRole('button', { name: 'Install skill' })).toBeEnabled()
+    expect(page.getByText('Installing failed').query()).toBeNull()
+  })
+
   it('writes a completed mutation to its original graph cache', async () => {
     const pendingInstall = deferred<AgentSkillStatus>()
     installResult = () => pendingInstall.promise
@@ -182,6 +199,12 @@ describe('AgentsSection', () => {
         <AgentsSection />
       </QueryClientProvider>,
     )
+    await vi.waitFor(() =>
+      expect(queryClient.getQueryState(queryKeys.agentSkill.status(nextGraph.root))?.status).toBe(
+        'success',
+      ),
+    )
+    await expect.element(page.getByRole('button', { name: 'Install skill' })).toBeEnabled()
     const nextStatus = { ...statusPayload(), skillPath: '/work/SKILL.md' }
     queryClient.setQueryData(queryKeys.agentSkill.status(nextGraph.root), nextStatus)
 
