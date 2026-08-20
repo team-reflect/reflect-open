@@ -13,7 +13,7 @@ import {
   useKeyboardFieldReveal,
   useKeyboardHeightVar,
 } from '@/mobile/use-keyboard'
-import { useShouldShowPaywall } from '@/mobile/use-should-show-paywall'
+import { usePaywallGate } from '@/mobile/use-paywall-gate'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics'
 import { CaptureProvider } from '@/providers/capture-provider'
 import { ChatProvider } from '@/providers/chat-provider'
@@ -35,7 +35,7 @@ import { RouterProvider } from '@/routing/router'
  */
 export function MobileApp(): ReactElement {
   const { status, graph, error, needsOnboarding } = useGraph()
-  const shouldShowPaywall = useShouldShowPaywall()
+  const paywallGate = usePaywallGate()
   useKeyboardHeightVar()
   useKeyboardFieldReveal()
   useKeyboardCaretReveal()
@@ -59,10 +59,10 @@ export function MobileApp(): ReactElement {
   // gate. While the gate is still deciding (entitlement queries, settings
   // hydration) hold the loading screen instead of flashing the paywall at a
   // subscribed or snoozed user.
-  if (shouldShowPaywall === 'show') {
+  if (paywallGate === 'show') {
     return <PaywallScreen />
   }
-  if (shouldShowPaywall === 'pending') {
+  if (paywallGate === 'pending') {
     return <LoadingScreen />
   }
 

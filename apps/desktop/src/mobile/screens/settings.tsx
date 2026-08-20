@@ -1,10 +1,9 @@
 import { useId, useState, type ReactElement } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import {
   aiProvider,
   aiProviderRequiresApiKey,
   errorMessage,
-  getAppStoreEnvironment,
   iapRestorePurchases,
   listNotes,
   normalizeChatSystemPrompt,
@@ -27,6 +26,7 @@ import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer'
 import { ChatSystemPromptDrawer } from '@/mobile/chat-system-prompt-drawer'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
+import { requestPaywall } from '@/mobile/paywall-request'
 import { MobileScreenHeader } from '@/mobile/screen-header'
 import {
   SettingsActionRow,
@@ -37,10 +37,8 @@ import {
   SettingsValueRow,
   type SegmentedOption,
 } from '@/mobile/settings-list'
-import {
-  invalidateEntitlementQueries,
-  useActiveSubscription,
-} from '@/mobile/use-active-subscription'
+import { useActiveSubscription } from '@/mobile/use-active-subscription'
+import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment'
 import { useMobileSyncStatus } from '@/mobile/use-sync-status'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -80,8 +78,7 @@ export function MobileSettings(): ReactElement {
   const { back, canBack, navigate } = useRouter()
   const { graph, mobileStorageKind, platform } = useGraph()
   const isIos = platform === 'ios'
-  const { activeSubscription } = useActiveSubscription()
-  const queryClient = useQueryClient()
+  const subscription = useActiveSubscription()
   const [restorePending, setRestorePending] = useState(false)
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
 
@@ -90,7 +87,7 @@ export function MobileSettings(): ReactElement {
     setRestoreMessage(null)
     try {
       const count = await iapRestorePurchases()
-      await invalidateEntitlementQueries(queryClient)
+      subscription.invalidate()
       if (count === 0) {
         setRestoreMessage('No previous purchase found for this Apple account.')
       }
@@ -104,14 +101,9 @@ export function MobileSettings(): ReactElement {
   const version = useAppVersion()
   const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
   const crashTest = useCrashTest()
-  // The install channel cannot change while the process lives, so one fetch
-  // is enough, and it only happens once the debug actions are unlocked.
-  const environment = useQuery({
-    queryKey: ['app-store-environment'],
-    queryFn: () => getAppStoreEnvironment(),
-    staleTime: Infinity,
-    enabled: debugUnlocked && isIos,
-  })
+  // The gate asks for the install channel at boot, so this row reads the
+  // shared answer instead of probing again.
+  const environment = useAppStoreEnvironment()
   const sync = useSyncContext()
   // Shared with the status pill (one hook, one query cache entry) — and null
   // until the conflict count is known, so the row never claims `Backed up`
@@ -327,20 +319,25 @@ export function MobileSettings(): ReactElement {
               <SettingsValueRow
                 label="Plan"
                 value={
-                  activeSubscription === 'monthly'
+                  subscription.value === 'monthly'
                     ? 'Reflect Pro Monthly'
-                    : activeSubscription === 'yearly'
+                    : subscription.value === 'yearly'
                       ? 'Reflect Pro Yearly'
                       : 'Free'
                 }
               />
-              {activeSubscription === null ? (
-                // Clearing the snooze flips useShouldShowPaywall back to
+              {subscription.value === null ? (
+                // Clearing the snooze flips usePaywallGate back to
                 // 'show', so the gate in mobile-app.tsx replaces the app with
-                // the paywall immediately.
+                // the paywall immediately. `requestPaywall` is what makes that
+                // work outside the App Store, where the gate otherwise never
+                // shows the paywall at all.
                 <SettingsActionRow
                   label="Upgrade to Pro"
-                  onPress={() => updateSettings({ paywallSnoozeUntil: 0 })}
+                  onPress={() => {
+                    requestPaywall()
+                    updateSettings({ paywallSnoozeUntil: 0 })
+                  }}
                 />
               ) : (
                 <SettingsActionRow
@@ -392,7 +389,7 @@ export function MobileSettings(): ReactElement {
               {isIos ? (
                 <SettingsValueRow
                   label="Environment"
-                  value={environment.data ?? (environment.isError ? 'Unknown' : '…')}
+                  value={environment.value ?? (environment.isError ? 'Unknown' : '…')}
                 />
               ) : null}
               <SettingsActionRow

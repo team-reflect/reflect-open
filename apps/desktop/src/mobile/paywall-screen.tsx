@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
 import { toast } from '@/components/ui/toast'
 import { IAP_PRODUCT_IDS, iapGetProducts, iapPurchase, iapRestorePurchases } from '@reflect/core'
@@ -9,7 +9,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { openUrlSync } from '@/lib/open-url'
 import { cn } from '@/lib/utils'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
-import { invalidateEntitlementQueries } from '@/mobile/use-active-subscription'
+import { useActiveSubscription } from '@/mobile/use-active-subscription'
 import { useSettings } from '@/providers/settings-provider'
 
 /** Which control kicked off the in-flight action (onboarding's PendingChoice
@@ -31,7 +31,7 @@ const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
 const MEMBER_STOPGAP_UNTIL = Date.parse('2026-09-11')
 
 export function PaywallScreen(): ReactElement {
-  const queryClient = useQueryClient()
+  const subscription = useActiveSubscription()
   const { updateSettings } = useSettings()
   const [pending, setPending] = useState<PendingAction>(null)
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
@@ -60,10 +60,10 @@ export function PaywallScreen(): ReactElement {
     try {
       await iapPurchase(product.productId)
       // The plugin resolves `purchase` without emitting `purchaseUpdated`
-      // (see invalidateEntitlementQueries), so refetch here: the fresh
-      // entitlement flips the gate in mobile-app.tsx and unmounts this
-      // screen, no navigation needed.
-      await invalidateEntitlementQueries(queryClient)
+      // (see `useActiveSubscription`), so refetch here: the fresh entitlement
+      // flips the gate in mobile-app.tsx and unmounts this screen, no
+      // navigation needed.
+      subscription.invalidate()
     } catch {
       // Cancelled or failed; the StoreKit sheet already told the user.
     } finally {
@@ -98,7 +98,7 @@ export function PaywallScreen(): ReactElement {
       if (count === 0) {
         setRestoreMessage('No previous purchase found for this Apple account.')
       } else {
-        await invalidateEntitlementQueries(queryClient)
+        subscription.invalidate()
       }
     } catch {
       setRestoreMessage('Restore failed. Check your connection and try again.')
