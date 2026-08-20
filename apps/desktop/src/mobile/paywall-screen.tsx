@@ -41,7 +41,7 @@ const MEMBER_STOPGAP_UNTIL = Date.parse('2026-09-11')
 export function PaywallScreen(): ReactElement {
   const subscription = useActiveSubscription()
   const { updateSettings } = useSettings()
-  const [plan, setPlan] = useState<PurchasePlan>('yearly')
+  const [selectedPlan, setSelectedPlan] = useState<PurchasePlan>('yearly')
 
   const products = useQuery({
     queryKey: queryKeys.iap.products,
@@ -55,7 +55,7 @@ export function PaywallScreen(): ReactElement {
     products.status === 'error' ||
     (products.status === 'success' && (yearly === null || monthly === null))
   const selectedPrice =
-    plan === 'yearly'
+    selectedPlan === 'yearly'
       ? `${yearly?.formattedPrice ?? ''}/year`
       : `${monthly?.formattedPrice ?? ''}/month`
 
@@ -79,17 +79,17 @@ export function PaywallScreen(): ReactElement {
   const purchasingPlan = purchaseMutation.isPending
     ? (purchaseMutation.variables?.plan ?? null)
     : null
-  const restoreMessage = restoreMutation.isError
+  const restoreFeedback = restoreMutation.isError
     ? 'Restore failed. Check your connection and try again.'
     : restoreMutation.data === 0
       ? 'No previous purchase found for this Apple account.'
       : null
 
   const subscribe = () => {
-    const product = plan === 'yearly' ? yearly : monthly
+    const product = selectedPlan === 'yearly' ? yearly : monthly
     if (product === null) return
     restoreMutation.reset()
-    purchaseMutation.mutate({ plan, productId: product.productId })
+    purchaseMutation.mutate({ plan: selectedPlan, productId: product.productId })
   }
 
   // Stopgap while reflect.app/claim-reflect-open is not live: members get a
@@ -160,16 +160,16 @@ export function PaywallScreen(): ReactElement {
                 title="Yearly"
                 price={`${yearly.formattedPrice ?? ''} / year`}
                 badge="Best value"
-                selected={plan === 'yearly'}
+                selected={selectedPlan === 'yearly'}
                 disabled={actionPending}
-                onSelect={() => setPlan('yearly')}
+                onSelect={() => setSelectedPlan('yearly')}
               />
               <PlanCard
                 title="Monthly"
                 price={`${monthly.formattedPrice ?? ''} / month`}
-                selected={plan === 'monthly'}
+                selected={selectedPlan === 'monthly'}
                 disabled={actionPending}
-                onSelect={() => setPlan('monthly')}
+                onSelect={() => setSelectedPlan('monthly')}
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -218,8 +218,8 @@ export function PaywallScreen(): ReactElement {
           >
             {restoreMutation.isPending ? 'Restoring…' : 'Restore Purchases'}
           </button>
-          {restoreMessage !== null ? (
-            <p className="text-center text-sm text-text-muted">{restoreMessage}</p>
+          {restoreFeedback !== null ? (
+            <p className="text-center text-sm text-text-muted">{restoreFeedback}</p>
           ) : null}
         </div>
 
