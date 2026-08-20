@@ -16,13 +16,14 @@ import { isMacosDesktop } from '@/lib/platform'
 import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
-type AgentSkillAction =
-  | { action: 'install'; generation: number; root: string }
-  | { action: 'update'; generation: number; root: string }
-  | { action: 'remove'; generation: number; root: string }
+interface AgentSkillAction {
+  action: 'install' | 'uninstall'
+  generation: number
+  root: string
+}
 
 function writeAgentSkill(variables: AgentSkillAction): Promise<AgentSkillStatus> {
-  return variables.action === 'remove'
+  return variables.action === 'uninstall'
     ? agentSkillUninstall(variables.generation)
     : agentSkillInstall(variables.generation)
 }
@@ -87,7 +88,7 @@ export function AgentsSection(): ReactElement | null {
                     disabled={mutation.isPending}
                     onClick={() =>
                       mutation.mutate({
-                        action: status.installState === 'stale' ? 'update' : 'install',
+                        action: 'install',
                         generation: graph.generation,
                         root: graph.root,
                       })
@@ -103,7 +104,7 @@ export function AgentsSection(): ReactElement | null {
                     disabled={mutation.isPending}
                     onClick={() =>
                       mutation.mutate({
-                        action: 'remove',
+                        action: 'uninstall',
                         generation: graph.generation,
                         root: graph.root,
                       })
