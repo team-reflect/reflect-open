@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
-import type { ReactNode } from 'react'
+import { StrictMode, type ReactNode } from 'react'
 import { setBridge, type AiProviderConfig } from '@reflect/core'
 import { resetOperations, useOperations } from '@/lib/operations'
 import { flushSettings } from '@/lib/settings-flush'
 import { queryKeys } from '@/lib/query-client'
+import { createSettingsQueryOptions } from '@/lib/query-options'
 import { SettingsProvider, useSettings } from './settings-provider'
 
 /**
@@ -22,6 +23,7 @@ let failLoad: boolean
 /** When set, `settings_load` blocks until {@link releaseLoad} is called. */
 let pendingLoad: (() => void) | null
 let gateLoad: boolean
+let loadCalls: number
 
 function releaseLoad(): void {
   pendingLoad?.()
@@ -38,6 +40,7 @@ function installFakeBridge(): void {
     invoke: async (command, args) => {
       switch (command) {
         case 'settings_load':
+          loadCalls += 1
           if (failLoad) {
             throw { kind: 'io', message: 'corrupt store' }
           }
@@ -78,6 +81,7 @@ async function loadSettled(): Promise<void> {
 
 beforeEach(() => {
   stored = {}
+  loadCalls = 0
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
@@ -99,8 +103,25 @@ describe('SettingsProvider', () => {
     expect(result.current.settings.editorMarkdownSyntax).toBe('hide')
     releaseLoad()
     await vi.waitFor(() => expect(result.current.settings.editorMarkdownSyntax).toBe('show'))
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(result.current.settings)
     // Hydration alone must not write the store back.
     expect(saved).toEqual([])
+  })
+
+  it('keeps imperative loading pending until the disk read settles', async () => {
+    stored = { editorMarkdownSyntax: 'show' }
+    gateLoad = true
+    await renderHook(() => useSettings(), { wrapper })
+
+    const settled = vi.fn()
+    const loading = queryClient.ensureQueryData(createSettingsQueryOptions())
+    void loading.then(settled)
+    await vi.waitFor(() => expect(pendingLoad).not.toBeNull())
+    expect(settled).not.toHaveBeenCalled()
+
+    releaseLoad()
+    await expect(loading).resolves.toMatchObject({ editorMarkdownSyntax: 'show' })
+    expect(settled).toHaveBeenCalledOnce()
   })
 
   it('normalizes an invalid persisted value to its default', async () => {
@@ -114,6 +135,7 @@ describe('SettingsProvider', () => {
     stored = { allNotesFilterTags: ['book', 'person'] }
     const { result, act } = await renderHook(() => useSettings(), { wrapper })
     await loadSettled()
+    const before = queryClient.getQueryData(queryKeys.settings.all)
 
     // Same value, new instance — a consumer writing back what it read must
     // not count as a change (reference equality would).
@@ -124,6 +146,7 @@ describe('SettingsProvider', () => {
       await flushSettings()
     })
     expect(saved).toEqual([])
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(before)
 
     // A genuinely changed array still persists.
     await act(() => {
@@ -171,6 +194,7 @@ describe('SettingsProvider', () => {
     stored = { graphColors: { '/graphs/work': 'teal' } }
     const { result, act } = await renderHook(() => useSettings(), { wrapper })
     await loadSettled()
+    const before = queryClient.getQueryData(queryKeys.settings.all)
 
     // Same entries, new instance — re-choosing the current color rebuilds the
     // record without changing it; that must not count as a change.
@@ -181,6 +205,7 @@ describe('SettingsProvider', () => {
       await flushSettings()
     })
     expect(saved).toEqual([])
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(before)
 
     // A genuinely changed record still persists.
     await act(() => {
@@ -201,6 +226,7 @@ describe('SettingsProvider', () => {
     })
     // Applied synchronously — plain React state, no IO in the way.
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(result.current.settings)
     // The persisted document keeps unknown keys (newer-version settings survive).
     await vi.waitFor(() =>
       expect(saved).toEqual([
@@ -300,6 +326,28 @@ describe('SettingsProvider', () => {
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')
   })
 
+  it('keeps a simple patch dispatched as the disk query settles', async () => {
+    stored = { editorMarkdownSyntax: 'hide', futureKey: true }
+    gateLoad = true
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
+    const loading = queryClient.ensureQueryData(createSettingsQueryOptions())
+    void loading.then(() => {
+      result.current.updateSettings({ editorMarkdownSyntax: 'show' })
+    })
+
+    await act(async () => {
+      releaseLoad()
+      await loading
+    })
+    await vi.waitFor(() => expect(result.current.settings.editorMarkdownSyntax).toBe('show'))
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(result.current.settings)
+    await vi.waitFor(() =>
+      expect(saved).toEqual([
+        expect.objectContaining({ editorMarkdownSyntax: 'show', futureKey: true }),
+      ]),
+    )
+  })
+
   it('compounding updates racing the initial load flush as one document', async () => {
     stored = { editorMarkdownSyntax: 'show' }
     gateLoad = true
@@ -373,6 +421,50 @@ describe('SettingsProvider', () => {
       }))
     })
     expect(result.current.settings.aiProviders).toEqual([])
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(result.current.settings)
+  })
+
+  it('merges disk, preload patches, and queued updaters in order', async () => {
+    const persisted: AiProviderConfig = {
+      id: 'a',
+      provider: 'openai',
+      model: 'gpt-5.1',
+      keyHint: '11111',
+    }
+    const added: AiProviderConfig = {
+      id: 'b',
+      provider: 'anthropic',
+      model: 'claude-opus-4-8',
+      keyHint: '22222',
+    }
+    stored = { aiProviders: [persisted], futureKey: true }
+    gateLoad = true
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
+
+    await act(() => {
+      result.current.updateSettings({ editorMarkdownSyntax: 'show' })
+      result.current.updateSettingsWith((current) => ({
+        aiProviders: [...current.aiProviders, added],
+      }))
+      result.current.updateSettingsWith((current) => ({
+        aiProviders: current.aiProviders.filter((provider) => provider.id !== persisted.id),
+      }))
+    })
+    expect(result.current.settings.editorMarkdownSyntax).toBe('show')
+    expect(result.current.settings.aiProviders).toEqual([])
+
+    await act(() => releaseLoad())
+    await vi.waitFor(() => expect(result.current.settings.aiProviders).toEqual([added]))
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(result.current.settings)
+    await vi.waitFor(() =>
+      expect(saved).toEqual([
+        expect.objectContaining({
+          editorMarkdownSyntax: 'show',
+          aiProviders: [added],
+          futureKey: true,
+        }),
+      ]),
+    )
   })
 
   it('a read-modify-write racing the initial load replays over the loaded document', async () => {
@@ -420,6 +512,10 @@ describe('SettingsProvider', () => {
     }
     failLoad = true
     const { result, act } = await renderHook(() => useSettings(), { wrapper })
+    await vi.waitFor(() =>
+      expect(queryClient.getQueryState(queryKeys.settings.all)?.status).toBe('error'),
+    )
+    const loadError = queryClient.getQueryState(queryKeys.settings.all)?.error
 
     await act(() => {
       result.current.updateSettingsWith((current) => ({
@@ -433,6 +529,9 @@ describe('SettingsProvider', () => {
       await flushSettings()
     })
     expect(saved).toEqual([])
+    expect(queryClient.getQueryState(queryKeys.settings.all)?.status).toBe('error')
+    expect(queryClient.getQueryState(queryKeys.settings.all)?.error).toBe(loadError)
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBeUndefined()
   })
 
   it('with no bridge (browser dev) the load settles as failed instead of hanging', async () => {
@@ -604,5 +703,34 @@ describe('SettingsProvider', () => {
       await flushSettings()
     })
     expect(saved).toEqual([])
+  })
+
+  it('does not repeat load, updater drain, or save in StrictMode', async () => {
+    const added: AiProviderConfig = {
+      id: 'b',
+      provider: 'anthropic',
+      model: 'claude-opus-4-8',
+      keyHint: '22222',
+    }
+    gateLoad = true
+    const strictWrapper = ({ children }: { children: ReactNode }) => (
+      <StrictMode>
+        <QueryClientProvider client={queryClient}>
+          <SettingsProvider>{children}</SettingsProvider>
+        </QueryClientProvider>
+      </StrictMode>
+    )
+    const { result, act } = await renderHook(() => useSettings(), { wrapper: strictWrapper })
+
+    await act(() => {
+      result.current.updateSettingsWith((current) => ({
+        aiProviders: [...current.aiProviders, added],
+      }))
+      releaseLoad()
+    })
+    await vi.waitFor(() => expect(result.current.settings.aiProviders).toEqual([added]))
+    await vi.waitFor(() => expect(saved).toHaveLength(1))
+    expect(loadCalls).toBe(1)
+    expect(saved[0]).toMatchObject({ aiProviders: [added] })
   })
 })
