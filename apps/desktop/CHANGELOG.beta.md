@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.2...v0.11.0-beta.3) (2026-08-20)
+
+
+### Features
+
+* **mobile:** show the paywall only on App Store installs ([#1147](https://github.com/team-reflect/reflect-open/issues/1147)) ([a705ddc](https://github.com/team-reflect/reflect-open/commit/a705ddc430ce99ed4b1f5e7574e87f4aec6bc518))
+
+
+### Bug Fixes
+
+* **desktop:** add a minimum size to the main window ([#1153](https://github.com/team-reflect/reflect-open/issues/1153)) ([d8cd866](https://github.com/team-reflect/reflect-open/commit/d8cd8664d95dba162f07a7c02e267c8f09488975))
+
 ## [0.11.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.1...v0.11.0-beta.2) (2026-08-20)
 
 
