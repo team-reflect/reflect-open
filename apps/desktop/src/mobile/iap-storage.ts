@@ -7,11 +7,10 @@ export type AppStoreEnvironment = z.infer<typeof appStoreEnvironmentSchema>
 export const activeSubscriptionSchema = z.enum(['yearly', 'monthly']).nullable()
 export type ActiveSubscription = z.infer<typeof activeSubscriptionSchema>
 
-export const activeSubscriptionSeedSchema = z.object({
+const activeSubscriptionSeedSchema = z.object({
   value: activeSubscriptionSchema,
   updatedAt: z.number(),
 })
-export type ActiveSubscriptionSeed = z.infer<typeof activeSubscriptionSeedSchema>
 
 export const IAP_ENVIRONMENT_STORAGE_KEY = 'reflect.iap.environment'
 export const ACTIVE_SUBSCRIPTION_STORAGE_KEY = 'reflect.iap.active-subscription'
@@ -43,10 +42,10 @@ export function writeIapEnvironmentSeed(value: AppStoreEnvironment): void {
   writeStoredValue(IAP_ENVIRONMENT_STORAGE_KEY, appStoreEnvironmentSchema, value)
 }
 
-export function readActiveSubscriptionSeed(): ActiveSubscriptionSeed | undefined {
+export function readActiveSubscriptionSeed(): ActiveSubscription | undefined {
   const seed = readStoredValue(ACTIVE_SUBSCRIPTION_STORAGE_KEY, activeSubscriptionSeedSchema)
   return seed !== undefined && Date.now() - seed.updatedAt <= ACTIVE_SUBSCRIPTION_MAX_AGE_MS
-    ? seed
+    ? seed.value
     : undefined
 }
 

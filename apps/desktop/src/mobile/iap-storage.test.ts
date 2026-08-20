@@ -66,7 +66,8 @@ describe('active subscription seed', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-20T00:00:00Z'))
     writeActiveSubscriptionSeed('yearly')
-    expect(readActiveSubscriptionSeed()).toEqual({
+    expect(readActiveSubscriptionSeed()).toBe('yearly')
+    expect(JSON.parse(storage.getItem(ACTIVE_SUBSCRIPTION_STORAGE_KEY) ?? '')).toEqual({
       value: 'yearly',
       updatedAt: Date.now(),
     })

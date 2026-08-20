@@ -37,7 +37,7 @@ export function useActiveSubscription(): {
   const query = useQuery({
     queryKey: queryKeys.iap.entitlements,
     queryFn: fetchActiveSubscription,
-    initialData: () => readActiveSubscriptionSeed()?.value,
+    initialData: readActiveSubscriptionSeed,
     initialDataUpdatedAt: 0,
     staleTime: 60_000,
     refetchOnWindowFocus: 'always',
