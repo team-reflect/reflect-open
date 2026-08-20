@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { resetLocalStorageStores } from '@/lib/local-storage'
 import {
   ACTIVE_SUBSCRIPTION_STORAGE_KEY,
   IAP_ENVIRONMENT_STORAGE_KEY,
@@ -33,6 +34,7 @@ let storage: Storage
 beforeEach(() => {
   storage = createStorage()
   vi.stubGlobal('window', { localStorage: storage })
+  resetLocalStorageStores()
 })
 
 afterEach(() => {
@@ -96,6 +98,7 @@ describe('storage failures', () => {
     expect(() => writeActiveSubscriptionSeed('monthly')).not.toThrow()
 
     vi.stubGlobal('window', { localStorage: storage })
+    resetLocalStorageStores()
     vi.spyOn(storage, 'getItem').mockImplementation(() => {
       throw new Error('SecurityError')
     })

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { getLocalStorageStore } from '@/lib/local-storage'
 
 export const appStoreEnvironmentSchema = z.enum(['Production', 'Sandbox', 'Xcode']).nullable()
 export type AppStoreEnvironment = z.infer<typeof appStoreEnvironmentSchema>
@@ -20,31 +21,8 @@ export const ACTIVE_SUBSCRIPTION_STORAGE_KEY = 'reflect.iap.active-subscription'
 
 const ACTIVE_SUBSCRIPTION_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000
 
-function getLocalStorage(): Storage | null {
-  if (typeof window === 'undefined') {
-    return null
-  }
-  try {
-    return window.localStorage
-  } catch (error) {
-    console.error('reaching IAP storage failed', error)
-    return null
-  }
-}
-
 function readStoredValue<T>(key: string, schema: z.ZodType<T>): T | undefined {
-  const storage = getLocalStorage()
-  if (storage === null) {
-    return undefined
-  }
-
-  let rawValue: string | null
-  try {
-    rawValue = storage.getItem(key)
-  } catch (error) {
-    console.error('reading IAP storage failed', key, error)
-    return undefined
-  }
+  const rawValue = getLocalStorageStore(key).get()
   if (rawValue === null) {
     return undefined
   }
@@ -63,15 +41,7 @@ function writeStoredValue<T>(key: string, schema: z.ZodType<T>, value: T): void 
   if (!parsed.success) {
     return
   }
-  const storage = getLocalStorage()
-  if (storage === null) {
-    return
-  }
-  try {
-    storage.setItem(key, JSON.stringify(parsed.data))
-  } catch (error) {
-    console.error('writing IAP storage failed', key, error)
-  }
+  getLocalStorageStore(key).set(JSON.stringify(parsed.data))
 }
 
 /** Read the last validated install channel, or undefined when no valid seed exists. */
