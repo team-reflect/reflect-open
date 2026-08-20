@@ -4,6 +4,7 @@ import { cleanup, render } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { IAP_PRODUCT_IDS, setBridge, type IapProduct, type IpcBridge } from '@reflect/core'
 import { mutationKeys, mutationScopeIds } from '@/lib/query-client'
+import { deferred } from '@/test-utils/deferred'
 import { PaywallScreen } from './paywall-screen'
 
 const mocks = vi.hoisted(() => ({
@@ -24,26 +25,15 @@ vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({ updateSettings: mocks.updateSettings }),
 }))
 
-const PRODUCTS: IapProduct[] = [
-  { formattedPrice: '$39.99', productId: IAP_PRODUCT_IDS.yearly },
-  { formattedPrice: '$4.99', productId: IAP_PRODUCT_IDS.monthly },
-]
-
-interface Deferred<T> {
-  promise: Promise<T>
-  reject: (error: Error) => void
-  resolve: (value: T) => void
-}
-
-function deferred<T>(): Deferred<T> {
-  let rejectPromise = (_error: Error): void => {}
-  let resolvePromise = (_value: T): void => {}
-  const promise = new Promise<T>((resolve, reject) => {
-    rejectPromise = reject
-    resolvePromise = resolve
-  })
-  return { promise, reject: rejectPromise, resolve: resolvePromise }
-}
+const YEARLY_PRODUCT = {
+  formattedPrice: '$39.99',
+  productId: IAP_PRODUCT_IDS.yearly,
+} satisfies IapProduct
+const MONTHLY_PRODUCT = {
+  formattedPrice: '$4.99',
+  productId: IAP_PRODUCT_IDS.monthly,
+} satisfies IapProduct
+const PRODUCTS: IapProduct[] = [YEARLY_PRODUCT, MONTHLY_PRODUCT]
 
 let getProducts: () => Promise<{ products: IapProduct[] }>
 let purchase: () => Promise<null>
@@ -87,7 +77,7 @@ afterEach(async () => {
 
 describe('PaywallScreen products', () => {
   it('shows the existing failure UI when a required product is missing', async () => {
-    getProducts = async () => ({ products: [PRODUCTS[0]!] })
+    getProducts = async () => ({ products: [YEARLY_PRODUCT] })
     const view = await render(<PaywallScreen />, { wrapper })
 
     await expect.element(view.getByText(/Could not load subscription options/)).toBeVisible()

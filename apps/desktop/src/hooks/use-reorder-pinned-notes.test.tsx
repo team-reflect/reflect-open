@@ -4,6 +4,7 @@ import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PinnedNote } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client'
+import { deferred } from '@/test-utils/deferred'
 import { useReorderPinnedNotes } from './use-reorder-pinned-notes'
 
 const reorderPinnedNotes = vi.hoisted(() =>
@@ -16,29 +17,13 @@ const graphState: {
 } = vi.hoisted(() => ({ graph: { generation: 7, root: '/graphs/personal' } }))
 vi.mock('@/providers/graph-provider', () => ({ useGraph: () => graphState }))
 
-const A = { dailyDate: null, path: 'a.md', title: 'A' } satisfies PinnedNote
-const B = { dailyDate: null, path: 'b.md', title: 'B' } satisfies PinnedNote
-const C = { dailyDate: null, path: 'c.md', title: 'C' } satisfies PinnedNote
-const NOTES = [A, B, C] as const
-const FIRST_ORDER = [B, A, C]
-const SECOND_ORDER = [B, C, A]
-const THIRD_ORDER = [C, A, B]
-
-interface Deferred<T> {
-  promise: Promise<T>
-  reject: (error: Error) => void
-  resolve: (value: T) => void
-}
-
-function deferred<T>(): Deferred<T> {
-  let rejectPromise = (_error: Error): void => {}
-  let resolvePromise = (_value: T): void => {}
-  const promise = new Promise<T>((resolve, reject) => {
-    rejectPromise = reject
-    resolvePromise = resolve
-  })
-  return { promise, reject: rejectPromise, resolve: resolvePromise }
-}
+const NOTE_A = { dailyDate: null, path: 'a.md', title: 'A' } satisfies PinnedNote
+const NOTE_B = { dailyDate: null, path: 'b.md', title: 'B' } satisfies PinnedNote
+const NOTE_C = { dailyDate: null, path: 'c.md', title: 'C' } satisfies PinnedNote
+const NOTES = [NOTE_A, NOTE_B, NOTE_C] as const
+const FIRST_ORDER = [NOTE_B, NOTE_A, NOTE_C]
+const SECOND_ORDER = [NOTE_B, NOTE_C, NOTE_A]
+const THIRD_ORDER = [NOTE_C, NOTE_A, NOTE_B]
 
 let queryClient: QueryClient
 
@@ -134,7 +119,7 @@ describe('useReorderPinnedNotes', () => {
   })
 
   it('refetches disk truth when the last outstanding reorder fails', async () => {
-    const diskTruth = [A, C, B]
+    const diskTruth = [NOTE_A, NOTE_C, NOTE_B]
     const readPinnedNotes = vi.fn<() => Promise<PinnedNote[]>>().mockResolvedValue(diskTruth)
     reorderPinnedNotes.mockRejectedValue(new Error('write failed'))
     const hook = await renderHook(

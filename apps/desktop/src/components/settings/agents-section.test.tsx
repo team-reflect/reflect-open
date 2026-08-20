@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge, type AgentSkillStatus } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client'
+import { deferred } from '@/test-utils/deferred'
 import { AgentsSection } from './agents-section'
 
 // A browser-mode module mock materializes value exports once, so this file
@@ -27,16 +28,6 @@ let uninstallGenerations: number[]
 let installResult: () => Promise<AgentSkillStatus>
 let uninstallResult: () => Promise<AgentSkillStatus>
 let queryClient: QueryClient
-
-function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
-  let resolvePromise = (_value: T): void => {
-    throw new Error('promise not initialized')
-  }
-  const promise = new Promise<T>((resolve) => {
-    resolvePromise = resolve
-  })
-  return { promise, resolve: (value) => resolvePromise(value) }
-}
 
 function statusPayload(): AgentSkillStatus {
   return {

@@ -18,7 +18,7 @@ export function useReorderPinnedNotes(
 ): (activePath: string, overPath: string) => void {
   const { graph } = useGraph()
   const queryClient = useQueryClient()
-  const mutation = useMutation({
+  const { mutate } = useMutation({
     mutationKey: mutationKeys.pinnedNotes.reorder(graph?.root),
     scope: { id: mutationScopeIds.pinnedNotesReorder(graph?.root) },
     mutationFn: (variables: ReorderPinnedNotesVariables) =>
@@ -48,8 +48,8 @@ export function useReorderPinnedNotes(
       }
       const reordered = arrayMove([...pinned], activeIndex, overIndex)
       updatePinnedNotesCache(queryClient, graph.root, () => reordered)
-      mutation.mutate({ generation: graph.generation, notes: reordered, root: graph.root })
+      mutate({ generation: graph.generation, notes: reordered, root: graph.root })
     },
-    [graph, mutation, pinned, queryClient],
+    [graph, mutate, pinned, queryClient],
   )
 }
