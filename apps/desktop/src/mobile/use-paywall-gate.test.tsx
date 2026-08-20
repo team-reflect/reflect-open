@@ -20,6 +20,8 @@ import { usePaywallGate, type PaywallGate } from './use-paywall-gate'
 // is: the factory runs before the module body assigns anything.
 const graphState = vi.hoisted(() => ({ platform: 'ios' as AppPlatform }))
 vi.mock('@/providers/graph-provider', () => ({ useGraph: () => graphState }))
+const bridgeState = vi.hoisted(() => ({ ready: true }))
+vi.mock('@/hooks/use-bridge-ready', () => ({ useBridgeReady: () => bridgeState.ready }))
 
 /** What the install-channel probe answers, or how it fails to. */
 let environment: () => Promise<string>
@@ -106,6 +108,7 @@ function wrapper({ children }: { children: ReactNode }) {
 
 beforeEach(() => {
   graphState.platform = 'ios'
+  bridgeState.ready = true
   environment = () => Promise.resolve('Production')
   owned = () => Promise.resolve(false)
   stored = {}
@@ -197,9 +200,18 @@ describe('usePaywallGate', () => {
     const { result } = await renderHook(() => usePaywallGate(), { wrapper })
     await vi.waitFor(() => expect(result.current).toBe('show'))
 
-    owned = (productId) => Promise.resolve(productId.endsWith('.yearly'))
+    const storeKit = deferred<boolean>()
+    owned = storeKit.answer
     focusManager.setFocused(false)
     focusManager.setFocused(true)
+    await vi.waitFor(() =>
+      expect(queryClient.getQueryState(queryKeys.iap.entitlement('yearly'))?.fetchStatus).toBe(
+        'fetching',
+      ),
+    )
+    expect(result.current).toBe('show')
+
+    storeKit.settle(true)
     await vi.waitFor(() => expect(result.current).toBe('hide'))
   })
 
@@ -250,6 +262,40 @@ describe('usePaywallGate', () => {
         expect(queryClient.getQueryState(queryKeys.iap.environment)?.status).toBe('error'),
       )
       expect(result.current).toBe('hide')
+    })
+
+    it('verifies a remembered channel when the bridge becomes ready later', async () => {
+      environment = () => Promise.resolve('Sandbox')
+      owned = never
+      await runLaunch('hide')
+
+      bridgeState.ready = false
+      environment = () => Promise.resolve('Production')
+      const { result, rerender } = await renderHook(() => usePaywallGate(), { wrapper })
+      expect(result.current).toBe('hide')
+
+      bridgeState.ready = true
+      await rerender()
+      await vi.waitFor(() =>
+        expect(queryClient.getQueryData(queryKeys.iap.environment)).toBe('Production'),
+      )
+    })
+
+    it('does not re-probe a live channel for a second observer', async () => {
+      let probeCount = 0
+      environment = async () => {
+        probeCount += 1
+        return 'Sandbox'
+      }
+      owned = never
+
+      const first = await renderHook(() => usePaywallGate(), { wrapper })
+      await vi.waitFor(() => expect(first.result.current).toBe('hide'))
+      expect(probeCount).toBe(1)
+
+      const second = await renderHook(() => usePaywallGate(), { wrapper })
+      expect(second.result.current).toBe('hide')
+      expect(probeCount).toBe(1)
     })
 
     it('answers from a remembered subscription before StoreKit says anything', async () => {

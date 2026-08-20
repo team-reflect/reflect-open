@@ -42,8 +42,11 @@ function combineEntitlementQueries(
 ): ActiveSubscriptionResult {
   const [yearly, monthly] = results
   const value = yearly.data ? 'yearly' : monthly.data ? 'monthly' : null
-  const yearlySettled = yearly.isFetchedAfterMount && !yearly.isFetching
-  const monthlySettled = monthly.isFetchedAfterMount && !monthly.isFetching
+  const yearlyFetched = yearly.isFetchedAfterMount
+  const monthlyFetched = monthly.isFetchedAfterMount
+  const yearlySettled = yearlyFetched && !yearly.isFetching
+  const monthlySettled = monthlyFetched && !monthly.isFetching
+  const bothFetched = yearlyFetched && monthlyFetched
   const bothSettled = yearlySettled && monthlySettled
   const liveFailed = yearly.isError || monthly.isError
   const confirmedValue =
@@ -56,8 +59,8 @@ function combineEntitlementQueries(
           : undefined
   return {
     value,
-    isLoading: value === null && !bothSettled,
-    isError: value === null && bothSettled && liveFailed,
+    isLoading: value === null && !bothFetched,
+    isError: value === null && bothFetched && liveFailed,
     confirmedValue,
   }
 }

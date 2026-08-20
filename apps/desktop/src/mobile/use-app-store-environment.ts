@@ -23,6 +23,7 @@ export function useAppStoreEnvironment(): {
   const queryClient = useQueryClient()
   const query = useQuery({
     queryKey: queryKeys.iap.environment,
+    // REVIEW： 把这个 queryFn 放在 文件 top level 里，给他一个合适的 function name，而不是放在这里作为一个 lambda 函数
     queryFn: async () => {
       const parsed = appStoreEnvironmentSchema.safeParse(await getAppStoreEnvironment())
       const environment = parsed.success ? parsed.data : null
@@ -30,8 +31,9 @@ export function useAppStoreEnvironment(): {
       return environment
     },
     initialData: readIapEnvironmentSeed,
-    staleTime: Infinity,
-    refetchOnMount: 'always',
+    initialDataUpdatedAt: 0,
+    // A persisted seed stays stale until this launch verifies it.
+    staleTime: (environmentQuery) => (environmentQuery.state.dataUpdatedAt === 0 ? 0 : Infinity),
     enabled: platform === 'ios' && bridgeReady,
   })
   const invalidate = useCallback(() => {

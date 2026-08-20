@@ -36,6 +36,7 @@ export function MobileGraphs(): ReactElement {
     queryKey: queryKeys.mobile.storage,
     queryFn: mobileStorage,
     enabled: bridgeReady,
+    // The graph list can change outside the app between visits.
     refetchOnMount: 'always',
   })
 
