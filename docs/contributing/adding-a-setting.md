@@ -61,9 +61,9 @@ const { settings, updateSettings, updateSettingsWith } = useSettings()
 
 Semantics you get for free from the provider (and must not re-implement):
 
-- **Instant apply.** `updateSettings` merges into local state immediately;
-  defaults are usable before the disk load settles, so there is no loading
-  gate to handle.
+- **Instant simple patches.** `updateSettings` applies over defaults while the
+  disk load is pending. After hydration, it updates the current document in the
+  TanStack Query cache.
 - **Async, ordered persistence.** Writes are chained in apply order, trail
   hydration (nothing is written before the disk document has been read), and
   save the full merged document. Failures surface through the operations
@@ -73,10 +73,17 @@ Semantics you get for free from the provider (and must not re-implement):
   dispatched before hydration are queued and replayed over the loaded
   document, so an early edit cannot accidentally compute from defaults and
   wipe the stored value.
+- **One runtime document.** After a successful load, `useSettings()` and
+  imperative readers of `queryKeys.settings.all` observe the same Query cache
+  document. The settings JSON remains the durable source, and the provider's
+  ordered persistence queue writes cache updates back to it.
 - **Load-sensitive side effects must await hydration.** If a settings entry is
   paired with state elsewhere (for example an OS-keychain secret), call
   `whenSettingsLoaded()` before writing the other half. If the initial load
   failed, settings are session-only and the paired write would be stranded.
+- **Load failure is session-only.** Simple and functional updates still apply
+  over defaults for the current session, but the provider never writes over an
+  unreadable or corrupt settings document.
 - **No save button.** Settings apply live — design your control accordingly.
 
 ## 3. Add the control
