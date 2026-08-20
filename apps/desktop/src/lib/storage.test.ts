@@ -120,6 +120,19 @@ describe('getLocalStorageStore', () => {
     expect(error).toHaveBeenCalledOnce()
   })
 
+  it('reads null when the browser refuses to hand over storage', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubGlobal('window', {
+      get localStorage(): Storage {
+        throw new Error('SecurityError')
+      },
+    })
+    resetStorageStores()
+
+    expect(getLocalStorageStore(KEY).get()).toBeNull()
+    expect(error).toHaveBeenCalledOnce()
+  })
+
   it('reads null with no window to read from', () => {
     vi.stubGlobal('window', undefined)
     const store = getLocalStorageStore(KEY)

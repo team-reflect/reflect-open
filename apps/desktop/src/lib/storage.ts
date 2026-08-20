@@ -59,14 +59,29 @@ export class StorageStore {
 const localStorageStores = new Map<string, StorageStore>()
 const sessionStorageStores = new Map<string, StorageStore>()
 
+/** The storage `pick` reaches for, or null where the browser refuses to hand it over. */
+function pickStorage(pick: () => Storage): Storage | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+  try {
+    return pick()
+  } catch (error) {
+    console.error('reaching storage failed', error)
+    return null
+  }
+}
+
 /** The localStorage store for `key`, created on first use and shared from then on. */
 export function getLocalStorageStore(key: string): StorageStore {
   const existing = localStorageStores.get(key)
   if (existing !== undefined) {
     return existing
   }
-  const storage = typeof window === 'undefined' ? null : window.localStorage
-  const store = new StorageStore(key, storage)
+  const store = new StorageStore(
+    key,
+    pickStorage(() => window.localStorage),
+  )
   localStorageStores.set(key, store)
   return store
 }
@@ -77,8 +92,10 @@ export function getSessionStorageStore(key: string): StorageStore {
   if (existing !== undefined) {
     return existing
   }
-  const storage = typeof window === 'undefined' ? null : window.sessionStorage
-  const store = new StorageStore(key, storage)
+  const store = new StorageStore(
+    key,
+    pickStorage(() => window.sessionStorage),
+  )
   sessionStorageStores.set(key, store)
   return store
 }
