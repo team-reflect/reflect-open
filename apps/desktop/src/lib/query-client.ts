@@ -8,89 +8,172 @@ type PaletteSearchMode = 'hybrid' | 'lexical'
 export const queryKeys = {
   index: {
     all: ['index'] as const,
-    graph: (root: GraphRoot) => ['index', root] as const,
-    allNotesPrefix: (root: GraphRoot) => ['index', root, 'all-notes'] as const,
-    allNotes: (root: GraphRoot, foldedTag: string | null) =>
-      ['index', root, 'all-notes', foldedTag] as const,
-    allNotesTags: (root: GraphRoot) => ['index', root, 'all-notes-tags'] as const,
-    paletteSuggestions: (
+    graph(root: GraphRoot) {
+      return [...this.all, root] as const
+    },
+    allNotesPrefix(root: GraphRoot) {
+      return [...this.graph(root), 'all-notes'] as const
+    },
+    allNotes(root: GraphRoot, foldedTag: string | null) {
+      return [...this.allNotesPrefix(root), foldedTag] as const
+    },
+    allNotesTags(root: GraphRoot) {
+      return [...this.graph(root), 'all-notes-tags'] as const
+    },
+    paletteSuggestions(
       root: GraphRoot,
       text: string,
       dateFormat: string,
       weekStartDay: string,
       today: string,
-    ) => ['index', root, 'palette-suggest', text, dateFormat, weekStartDay, today] as const,
-    paletteSearch: (root: GraphRoot, mode: PaletteSearchMode, text: string) =>
-      ['index', root, 'palette-search', mode, text] as const,
-    notePreview: (root: GraphRoot, path: string) => ['index', root, 'note-preview', path] as const,
-    attendeeSuggestions: (root: GraphRoot, text: string, contacts: boolean) =>
-      ['index', root, 'attendee-suggestions', text, contacts] as const,
-    dailyDates: (root: GraphRoot, start: string, end: string) =>
-      ['index', root, 'daily-dates', start, end] as const,
-    conflictedNotes: (root: GraphRoot) => ['index', root, 'conflicted-notes'] as const,
-    duplicateNoteIds: (root: GraphRoot) => ['index', root, 'duplicate-note-ids'] as const,
-    templates: (root: GraphRoot) => ['index', root, 'templates'] as const,
-    noteConflict: (root: GraphRoot, path: string) =>
-      ['index', root, 'note-conflict', path] as const,
-    noteConflictLabels: (root: GraphRoot, path: string) =>
-      ['index', root, 'note-conflict-labels', path] as const,
-    openTasks: (root: GraphRoot) => ['index', root, 'tasks'] as const,
-    completedTasks: (root: GraphRoot) => ['index', root, 'tasks-completed'] as const,
-    backlinks: (root: GraphRoot, path: string) => ['index', root, 'backlinks', path] as const,
-    note: (root: GraphRoot, path: string) => ['index', root, 'note', path] as const,
-    pinnedNotes: (root: GraphRoot) => ['index', root, 'pinned-notes'] as const,
-    suggestedContact: (root: GraphRoot, path: string) =>
-      ['index', root, 'suggested-contact', path] as const,
-    dailyEmpty: (root: GraphRoot, path: string) => ['index', root, 'daily-empty', path] as const,
-    mobileAllNotesPrefix: (root: GraphRoot) => ['index', root, 'mobile-all-notes'] as const,
-    mobileAllNotes: <TSearch>(root: GraphRoot, search: TSearch) =>
-      ['index', root, 'mobile-all-notes', search] as const,
-    mobileNotePicker: (root: GraphRoot, text: string) =>
-      ['index', root, 'mobile-note-picker', text] as const,
-    mobileNoteCount: (root: GraphRoot) => ['index', root, 'mobile-note-count'] as const,
+    ) {
+      return [
+        ...this.graph(root),
+        'palette-suggest',
+        text,
+        dateFormat,
+        weekStartDay,
+        today,
+      ] as const
+    },
+    paletteSearch(root: GraphRoot, mode: PaletteSearchMode, text: string) {
+      return [...this.graph(root), 'palette-search', mode, text] as const
+    },
+    notePreview(root: GraphRoot, path: string) {
+      return [...this.graph(root), 'note-preview', path] as const
+    },
+    attendeeSuggestions(root: GraphRoot, text: string, contacts: boolean) {
+      return [...this.graph(root), 'attendee-suggestions', text, contacts] as const
+    },
+    dailyDates(root: GraphRoot, start: string, end: string) {
+      return [...this.graph(root), 'daily-dates', start, end] as const
+    },
+    conflictedNotes(root: GraphRoot) {
+      return [...this.graph(root), 'conflicted-notes'] as const
+    },
+    duplicateNoteIds(root: GraphRoot) {
+      return [...this.graph(root), 'duplicate-note-ids'] as const
+    },
+    templates(root: GraphRoot) {
+      return [...this.graph(root), 'templates'] as const
+    },
+    noteConflict(root: GraphRoot, path: string) {
+      return [...this.graph(root), 'note-conflict', path] as const
+    },
+    noteConflictLabels(root: GraphRoot, path: string) {
+      return [...this.graph(root), 'note-conflict-labels', path] as const
+    },
+    openTasks(root: GraphRoot) {
+      return [...this.graph(root), 'tasks'] as const
+    },
+    completedTasks(root: GraphRoot) {
+      return [...this.graph(root), 'tasks-completed'] as const
+    },
+    backlinks(root: GraphRoot, path: string) {
+      return [...this.graph(root), 'backlinks', path] as const
+    },
+    note(root: GraphRoot, path: string) {
+      return [...this.graph(root), 'note', path] as const
+    },
+    pinnedNotes(root: GraphRoot) {
+      return [...this.graph(root), 'pinned-notes'] as const
+    },
+    suggestedContact(root: GraphRoot, path: string) {
+      return [...this.graph(root), 'suggested-contact', path] as const
+    },
+    dailyEmpty(root: GraphRoot, path: string) {
+      return [...this.graph(root), 'daily-empty', path] as const
+    },
+    mobileAllNotesPrefix(root: GraphRoot) {
+      return [...this.graph(root), 'mobile-all-notes'] as const
+    },
+    mobileAllNotes<TSearch>(root: GraphRoot, search: TSearch) {
+      return [...this.mobileAllNotesPrefix(root), search] as const
+    },
+    mobileNotePicker(root: GraphRoot, text: string) {
+      return [...this.graph(root), 'mobile-note-picker', text] as const
+    },
+    mobileNoteCount(root: GraphRoot) {
+      return [...this.graph(root), 'mobile-note-count'] as const
+    },
   },
   similar: {
     all: ['similar'] as const,
-    note: (root: GraphRoot, path: string) => ['similar', root, path] as const,
+    note(root: GraphRoot, path: string) {
+      return [...this.all, root, path] as const
+    },
   },
   chat: {
     all: ['chat'] as const,
-    conversations: (root: GraphRoot) => ['chat', root, 'conversations'] as const,
+    conversations(root: GraphRoot) {
+      return [...this.all, root, 'conversations'] as const
+    },
   },
   settings: {
-    current: ['settings'] as const,
+    all: ['settings'] as const,
+    get current() {
+      return this.all
+    },
   },
   calendar: {
     all: ['calendar'] as const,
-    authorization: ['calendar', 'authorization'] as const,
-    calendars: ['calendar', 'calendars'] as const,
-    events: (date: string, calendarIds: readonly string[]) =>
-      ['calendar', 'events', date, calendarIds] as const,
+    get authorization() {
+      return [...this.all, 'authorization'] as const
+    },
+    get calendars() {
+      return [...this.all, 'calendars'] as const
+    },
+    events(date: string, calendarIds: readonly string[]) {
+      return [...this.all, 'events', date, calendarIds] as const
+    },
   },
   contacts: {
-    authorization: ['contacts', 'authorization'] as const,
+    all: ['contacts'] as const,
+    get authorization() {
+      return [...this.all, 'authorization'] as const
+    },
   },
   github: {
-    authentication: ['github', 'authentication'] as const,
+    all: ['github'] as const,
+    get authentication() {
+      return [...this.all, 'authentication'] as const
+    },
   },
   icloud: {
     all: ['icloud'] as const,
-    status: ['icloud', 'status'] as const,
-    pendingNotes: (root: GraphRoot) => ['icloud', root, 'pending-notes'] as const,
+    get status() {
+      return [...this.all, 'status'] as const
+    },
+    pendingNotes(root: GraphRoot) {
+      return [...this.all, root, 'pending-notes'] as const
+    },
   },
   agentSkill: {
     all: ['agent-skill'] as const,
-    status: (root: GraphRoot) => ['agent-skill', root, 'status'] as const,
+    status(root: GraphRoot) {
+      return [...this.all, root, 'status'] as const
+    },
   },
   iap: {
     all: ['iap'] as const,
-    environment: ['iap', 'environment'] as const,
-    products: ['iap', 'products'] as const,
-    entitlements: ['iap', 'entitlement'] as const,
-    entitlement: (product: EntitlementProduct) => ['iap', 'entitlement', product] as const,
+    get environment() {
+      return [...this.all, 'environment'] as const
+    },
+    get products() {
+      return [...this.all, 'products'] as const
+    },
+    get entitlements() {
+      return [...this.all, 'entitlement'] as const
+    },
+    entitlement(product: EntitlementProduct) {
+      return [...this.entitlements, product] as const
+    },
   },
   mobile: {
-    storage: ['mobile', 'storage'] as const,
+    all: ['mobile'] as const,
+    get storage() {
+      return [...this.all, 'storage'] as const
+    },
   },
 } as const
 
@@ -98,32 +181,72 @@ export const queryKeys = {
 export const mutationKeys = {
   tasks: {
     all: ['tasks'] as const,
-    graph: (root: GraphRoot) => ['tasks', root] as const,
-    complete: (root: GraphRoot) => ['tasks', root, 'complete'] as const,
-    reopen: (root: GraphRoot) => ['tasks', root, 'reopen'] as const,
-    delete: (root: GraphRoot) => ['tasks', root, 'delete'] as const,
-    edit: (root: GraphRoot) => ['tasks', root, 'edit'] as const,
-    schedule: (root: GraphRoot) => ['tasks', root, 'schedule'] as const,
-    convert: (root: GraphRoot) => ['tasks', root, 'convert'] as const,
-    editAndConvert: (root: GraphRoot) => ['tasks', root, 'edit-and-convert'] as const,
-    insert: (root: GraphRoot) => ['tasks', root, 'insert'] as const,
-    editAndToggle: (root: GraphRoot) => ['tasks', root, 'edit-and-toggle'] as const,
-    checkboxToggle: (root: GraphRoot) => ['tasks', root, 'checkbox-toggle'] as const,
-    contextInsert: (root: GraphRoot) => ['tasks', root, 'context-insert'] as const,
-    snippetToggle: (root: GraphRoot) => ['tasks', root, 'snippet-toggle'] as const,
+    graph(root: GraphRoot) {
+      return [...this.all, root] as const
+    },
+    complete(root: GraphRoot) {
+      return [...this.graph(root), 'complete'] as const
+    },
+    reopen(root: GraphRoot) {
+      return [...this.graph(root), 'reopen'] as const
+    },
+    delete(root: GraphRoot) {
+      return [...this.graph(root), 'delete'] as const
+    },
+    edit(root: GraphRoot) {
+      return [...this.graph(root), 'edit'] as const
+    },
+    schedule(root: GraphRoot) {
+      return [...this.graph(root), 'schedule'] as const
+    },
+    convert(root: GraphRoot) {
+      return [...this.graph(root), 'convert'] as const
+    },
+    editAndConvert(root: GraphRoot) {
+      return [...this.graph(root), 'edit-and-convert'] as const
+    },
+    insert(root: GraphRoot) {
+      return [...this.graph(root), 'insert'] as const
+    },
+    editAndToggle(root: GraphRoot) {
+      return [...this.graph(root), 'edit-and-toggle'] as const
+    },
+    checkboxToggle(root: GraphRoot) {
+      return [...this.graph(root), 'checkbox-toggle'] as const
+    },
+    contextInsert(root: GraphRoot) {
+      return [...this.graph(root), 'context-insert'] as const
+    },
+    snippetToggle(root: GraphRoot) {
+      return [...this.graph(root), 'snippet-toggle'] as const
+    },
   },
   pinnedNotes: {
-    reorder: (root: GraphRoot) => ['pinned-notes', root, 'reorder'] as const,
+    all: ['pinned-notes'] as const,
+    reorder(root: GraphRoot) {
+      return [...this.all, root, 'reorder'] as const
+    },
   },
   agentSkill: {
-    write: (root: GraphRoot) => ['agent-skill', root, 'write'] as const,
+    all: ['agent-skill'] as const,
+    write(root: GraphRoot) {
+      return [...this.all, root, 'write'] as const
+    },
   },
   iap: {
-    purchase: ['iap', 'purchase'] as const,
-    restore: ['iap', 'restore'] as const,
+    all: ['iap'] as const,
+    get purchase() {
+      return [...this.all, 'purchase'] as const
+    },
+    get restore() {
+      return [...this.all, 'restore'] as const
+    },
   },
   settings: {
-    save: ['settings', 'save'] as const,
+    all: ['settings'] as const,
+    get save() {
+      return [...this.all, 'save'] as const
+    },
   },
 } as const
 

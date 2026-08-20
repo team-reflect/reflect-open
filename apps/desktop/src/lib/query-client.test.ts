@@ -83,9 +83,9 @@ describe('query defaults', () => {
   })
 
   it.each([
-    queryKeys.index.note('/graph', 'notes/example.md'),
-    queryKeys.chat.conversations('/graph'),
-    queryKeys.settings.current,
+    [queryKeys.index.note('/graph', 'notes/example.md')],
+    [queryKeys.chat.conversations('/graph')],
+    [queryKeys.settings.current],
   ])('keeps explicitly invalidated data fresh for %j', (queryKey) => {
     expect(queryClient.defaultQueryOptions({ queryKey }).staleTime).toBe(Infinity)
   })

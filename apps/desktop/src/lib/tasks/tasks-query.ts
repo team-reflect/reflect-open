@@ -8,11 +8,12 @@ import { queryKeys } from '@/lib/query-client'
  * (which reads it) and a task row (which optimistically updates it on
  * completion), so the two can't drift.
  */
-export const createOpenTasksQueryOptions = (graphRoot: string | undefined) =>
-  queryOptions({
+export function createOpenTasksQueryOptions(graphRoot: string | undefined) {
+  return queryOptions({
     queryKey: queryKeys.index.openTasks(graphRoot),
     queryFn: getOpenTasks,
   })
+}
 
 /**
  * The query options for the completed-tasks list (the "show archived" surface),
@@ -20,8 +21,9 @@ export const createOpenTasksQueryOptions = (graphRoot: string | undefined) =>
  * can move its row from the open cache into this one optimistically rather than
  * letting it vanish until the refetch.
  */
-export const createCompletedTasksQueryOptions = (graphRoot: string | undefined) =>
-  queryOptions({
+export function createCompletedTasksQueryOptions(graphRoot: string | undefined) {
+  return queryOptions({
     queryKey: queryKeys.index.completedTasks(graphRoot),
     queryFn: getCompletedTasks,
   })
+}

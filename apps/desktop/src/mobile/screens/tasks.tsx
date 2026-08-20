@@ -1,7 +1,7 @@
 import { useDeferredValue, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Archive, CircleCheck, Plus, SlidersHorizontal } from 'lucide-react'
-import { type OpenTask } from '@reflect/core'
+import type { OpenTask } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
