@@ -1,3 +1,5 @@
+import type { ZodType } from 'zod'
+
 /** Shared primitive for a subscribable browser-storage key. */
 
 /**
@@ -36,6 +38,16 @@ export class StorageStore {
     return this.cachedValue
   }
 
+  getJson = <T>(schema: ZodType<T>): T | undefined => {
+    try {
+      const value: unknown = JSON.parse(this.get() ?? '')
+      const result = schema.safeParse(value)
+      return result.success ? result.data : undefined
+    } catch {
+      return undefined
+    }
+  }
+
   set = (value: string | null): void => {
     if (this.get() === value) {
       return
@@ -52,6 +64,13 @@ export class StorageStore {
     }
     for (const listener of this.listeners) {
       listener()
+    }
+  }
+
+  setJson = <T>(schema: ZodType<T>, value: T): void => {
+    const result = schema.safeParse(value)
+    if (result.success) {
+      this.set(JSON.stringify(result.data))
     }
   }
 }

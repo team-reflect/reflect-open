@@ -247,7 +247,7 @@ describe('usePaywallGate', () => {
       const { result } = await renderHook(() => usePaywallGate(), { wrapper })
       expect(result.current).toBe('hide')
       await vi.waitFor(() =>
-        expect(queryClient.getQueryState(queryKeys.iap.environment)?.status).toBe('error'),
+        expect(queryClient.getQueryState(queryKeys.appStore.environment)?.status).toBe('error'),
       )
       expect(result.current).toBe('hide')
     })
@@ -265,7 +265,7 @@ describe('usePaywallGate', () => {
       bridgeState.ready = true
       await rerender()
       await vi.waitFor(() =>
-        expect(queryClient.getQueryData(queryKeys.iap.environment)).toBe('Production'),
+        expect(queryClient.getQueryData(queryKeys.appStore.environment)).toBe('Production'),
       )
     })
 
@@ -318,6 +318,18 @@ describe('usePaywallGate', () => {
       owned = never
       const { result } = await renderHook(() => usePaywallGate(), { wrapper })
       // A remembered `yearly` would have let this launch straight in.
+      expect(result.current).toBe('pending')
+    })
+
+    it('waits for live verification before trusting a remembered null', async () => {
+      await runLaunch('show')
+
+      environment = never
+      owned = never
+      const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+      await vi.waitFor(() =>
+        expect(queryClient.getQueryState(queryKeys.iap.entitlements)?.fetchStatus).toBe('fetching'),
+      )
       expect(result.current).toBe('pending')
     })
 

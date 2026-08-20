@@ -147,11 +147,14 @@ export const queryKeys = {
       return [...this.all, root, 'status'] as const
     },
   },
-  iap: {
-    all: ['iap'] as const,
+  appStore: {
+    all: ['app-store'] as const,
     get environment() {
       return [...this.all, 'environment'] as const
     },
+  },
+  iap: {
+    all: ['iap'] as const,
     get products() {
       return [...this.all, 'products'] as const
     },

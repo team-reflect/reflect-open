@@ -1,13 +1,36 @@
 import { useEffect } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { IAP_PRODUCT_IDS, iapIsOwned, subscribeIapPurchaseUpdated } from '@reflect/core'
+import { z } from 'zod'
+import { getLocalStorageStore } from '@/lib/local-storage'
 import { queryKeys } from '@/lib/query-client'
-import {
-  readActiveSubscriptionSeed,
-  writeActiveSubscriptionSeed,
-  type ActiveSubscription,
-} from '@/mobile/iap-storage'
 import { useGraph } from '@/providers/graph-provider'
+
+const activeSubscriptionSchema = z.enum(['yearly', 'monthly']).nullable()
+type ActiveSubscription = z.infer<typeof activeSubscriptionSchema>
+
+const activeSubscriptionSeedSchema = z.object({
+  value: activeSubscriptionSchema,
+  updatedAt: z.number(),
+})
+const ACTIVE_SUBSCRIPTION_STORAGE_KEY = 'reflect.iap.active-subscription'
+const ACTIVE_SUBSCRIPTION_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000
+
+function readActiveSubscriptionSeed(): ActiveSubscription | undefined {
+  const seed = getLocalStorageStore(ACTIVE_SUBSCRIPTION_STORAGE_KEY).getJson(
+    activeSubscriptionSeedSchema,
+  )
+  return seed !== undefined && Date.now() - seed.updatedAt <= ACTIVE_SUBSCRIPTION_MAX_AGE_MS
+    ? seed.value
+    : undefined
+}
+
+function writeActiveSubscriptionSeed(value: ActiveSubscription): void {
+  getLocalStorageStore(ACTIVE_SUBSCRIPTION_STORAGE_KEY).setJson(activeSubscriptionSeedSchema, {
+    value,
+    updatedAt: Date.now(),
+  })
+}
 
 async function fetchActiveSubscription(): Promise<ActiveSubscription> {
   const [yearly, monthly] = await Promise.all([
@@ -59,7 +82,8 @@ export function useActiveSubscription(): {
 
   return {
     value: query.data ?? null,
-    isLoading: query.isLoading,
+    isLoading:
+      query.isLoading || (query.data === null && query.dataUpdatedAt === 0 && query.isFetching),
     isError: query.isError && query.data == null,
     invalidate: () => void invalidateEntitlements(queryClient),
   }

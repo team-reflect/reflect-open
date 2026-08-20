@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 import { StorageStore } from './storage'
 
 function createStorage(entries: Record<string, string> = {}): Storage {
@@ -61,5 +62,15 @@ describe('StorageStore', () => {
     expect(() => store.set('written')).not.toThrow()
     expect(store.get()).toBe('written')
     expect(error).toHaveBeenCalledTimes(2)
+  })
+
+  it('reads and writes schema-validated JSON', () => {
+    const storage = createStorage()
+    const store = new StorageStore('key', storage)
+    const schema = z.object({ value: z.string() })
+
+    store.setJson(schema, { value: 'stored' })
+    expect(store.getJson(schema)).toEqual({ value: 'stored' })
+    expect(new StorageStore('key', createStorage({ key: '{' })).getJson(schema)).toBeUndefined()
   })
 })
