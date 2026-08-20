@@ -108,10 +108,32 @@ done
 PLAN
 echo 0 >"$PROBE_DIR/progress.txt"
 
+# Record the actual Window menu structure once: the injected tiling item
+# names vary across macOS 26 point releases, and the exact names on the
+# machine that reproduces the bug are themselves useful data.
+dump_window_menu() {
+  osascript >>"$DRIVER_LOG" 2>&1 <<EOF
+tell application "System Events"
+  tell process "$PROCESS_NAME"
+    set frontmost to true
+    delay 0.4
+    get name of every menu item of menu "Window" of menu bar 1
+  end tell
+end tell
+EOF
+  osascript >>"$DRIVER_LOG" 2>&1 <<EOF
+tell application "System Events"
+  tell process "$PROCESS_NAME"
+    try
+      get name of every menu item of menu 1 of menu item "Move & Resize" of menu "Window" of menu bar 1
+    end try
+  end tell
+end tell
+EOF
+}
+
 # One tiling attempt: try each candidate menu item under the app's Window
-# menu until one clicks. macOS injects the tiling items into every app's
-# Window menu, but their names vary across macOS 26 point releases, so we
-# probe a list. Requires the Automation permission (System Events).
+# menu until one clicks. Requires the Automation permission (System Events).
 tile_action() {
   local label="$1"; shift
   for item in "$@"; do
@@ -136,7 +158,7 @@ EOF
     log "tile[$label] $result"
     case "$result" in ok*) return 0 ;; esac
   done
-  log "tile[$label] all candidates failed (Automation permission missing, or menu names differ; dump the Window menu with probe-menu.sh if present)"
+  log "tile[$label] all candidates failed (Automation permission missing, or menu names differ; see the menu dump above)"
   return 1
 }
 
@@ -163,6 +185,7 @@ while [ "$(date +%s)" -lt "$DEADLINE" ]; do
   if [ -f "$PROBE_DIR/phase" ]; then
     PHASE_COUNT=$((PHASE_COUNT + 1))
     log "wait-user phase $PHASE_COUNT: driving window tiling"
+    [ "$PHASE_COUNT" = 1 ] && dump_window_menu
     run_tile_phase "$PHASE_COUNT"
     touch "$PROBE_DIR/continue"
     # Wait for the app to consume the signal before polling again.
