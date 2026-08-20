@@ -15,6 +15,7 @@ import {
 import { useAiPrompts } from '@/hooks/use-ai-prompts'
 import { useAiProviders } from '@/hooks/use-ai-providers'
 import { useAppVersion } from '@/hooks/use-app-version'
+import { usePaywallRequested } from '@/hooks/use-paywall-requested'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useCrashTest, useDebugUnlockTap } from '@/hooks/use-debug-unlock'
 import { marketingVersion } from '@/lib/marketing-version'
@@ -26,7 +27,6 @@ import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer'
 import { ChatSystemPromptDrawer } from '@/mobile/chat-system-prompt-drawer'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
-import { requestPaywall } from '@/mobile/paywall-request'
 import { MobileScreenHeader } from '@/mobile/screen-header'
 import {
   SettingsActionRow,
@@ -79,6 +79,7 @@ export function MobileSettings(): ReactElement {
   const { graph, mobileStorageKind, platform } = useGraph()
   const isIos = platform === 'ios'
   const subscription = useActiveSubscription()
+  const [, setPaywallRequested] = usePaywallRequested()
   const [restorePending, setRestorePending] = useState(false)
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
 
@@ -327,13 +328,13 @@ export function MobileSettings(): ReactElement {
               {subscription.value === null ? (
                 // Clearing the snooze flips usePaywallGate back to
                 // 'show', so the gate in mobile-app.tsx replaces the app with
-                // the paywall immediately. `requestPaywall` is what makes that
-                // work outside the App Store, where the gate otherwise never
-                // shows the paywall at all.
+                // the paywall immediately. The request is what makes that work
+                // outside the App Store, where the gate otherwise never shows
+                // the paywall at all.
                 <SettingsActionRow
                   label="Upgrade to Pro"
                   onPress={() => {
-                    requestPaywall()
+                    setPaywallRequested(true)
                     updateSettings({ paywallSnoozeUntil: 0 })
                   }}
                 />

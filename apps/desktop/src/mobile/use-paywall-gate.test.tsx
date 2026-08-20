@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import { setBridge, type AppPlatform } from '@reflect/core'
-import { resetLocalStorageStores } from '@/lib/local-storage'
-import { requestPaywall, resetPaywallRequest } from '@/mobile/paywall-request'
+import { usePaywallRequested } from '@/hooks/use-paywall-requested'
+import { resetStorageStores } from '@/lib/storage'
 import { SettingsProvider } from '@/providers/settings-provider'
 import { usePaywallGate, type PaywallGate } from './use-paywall-gate'
 
@@ -104,7 +104,8 @@ beforeEach(() => {
   owned = () => Promise.resolve(false)
   stored = {}
   localStorage.clear()
-  resetLocalStorageStores()
+  sessionStorage.clear()
+  resetStorageStores()
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
@@ -114,7 +115,6 @@ beforeEach(() => {
 afterEach(() => {
   setBridge(null)
   queryClient.clear()
-  resetPaywallRequest()
 })
 
 describe('usePaywallGate', () => {
@@ -158,10 +158,15 @@ describe('usePaywallGate', () => {
 
   it('honors an explicit request outside the App Store', async () => {
     environment = () => Promise.resolve('Sandbox')
-    const { result } = await renderHook(() => usePaywallGate(), { wrapper })
-    await vi.waitFor(() => expect(result.current).toBe('hide'))
-    requestPaywall()
-    await vi.waitFor(() => expect(result.current).toBe('show'))
+    const { result, act } = await renderHook(
+      () => ({ gate: usePaywallGate(), requested: usePaywallRequested() }),
+      { wrapper },
+    )
+    await vi.waitFor(() => expect(result.current.gate).toBe('hide'))
+    await act(() => {
+      result.current.requested[1](true)
+    })
+    await vi.waitFor(() => expect(result.current.gate).toBe('show'))
   })
 
   it('lets a subscriber through in every channel', async () => {

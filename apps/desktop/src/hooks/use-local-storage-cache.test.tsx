@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { renderHook } from 'vitest-browser-react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { CACHE_KEY_PREFIX, useLocalStorageCache } from '@/hooks/use-local-storage-cache'
-import { resetLocalStorageStores } from '@/lib/local-storage'
+import { resetStorageStores } from '@/lib/storage'
 import { useLocalStorageExternalStore } from '@/hooks/use-local-storage-external-store'
 
 /**
@@ -15,7 +15,7 @@ const KEY = 'test-cache'
 
 beforeEach(() => {
   localStorage.clear()
-  resetLocalStorageStores()
+  resetStorageStores()
 })
 
 describe('useLocalStorageCache', () => {

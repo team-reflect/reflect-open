@@ -1,5 +1,5 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
-import { getPaywallRequested, subscribePaywallRequested } from '@/mobile/paywall-request'
+import { useEffect, useState } from 'react'
+import { usePaywallRequested } from '@/hooks/use-paywall-requested'
 import { useActiveSubscription } from '@/mobile/use-active-subscription'
 import {
   useAppStoreEnvironment,
@@ -25,11 +25,7 @@ export function usePaywallGate(): PaywallGate {
   const subscription = useActiveSubscription()
   const environment = useAppStoreEnvironment()
   const { settings, whenSettingsLoaded } = useSettings()
-  const paywallRequested = useSyncExternalStore(
-    subscribePaywallRequested,
-    getPaywallRequested,
-    getPaywallRequested,
-  )
+  const [paywallRequested] = usePaywallRequested()
 
   // The snooze deadline lives in the settings document, and the provider
   // serves defaults (never snoozed) before hydration: waiting for the load

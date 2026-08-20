@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getLocalStorageStore, resetLocalStorageStores } from './local-storage'
+import { getLocalStorageStore, getSessionStorageStore, resetStorageStores } from './storage'
 
 /**
  * The store's two jobs: hold one key's value in memory, and let every failure
@@ -33,7 +33,7 @@ let storage: Storage
 beforeEach(() => {
   storage = createStorage()
   vi.stubGlobal('window', { localStorage: storage })
-  resetLocalStorageStores()
+  resetStorageStores()
 })
 
 afterEach(() => {
@@ -127,5 +127,16 @@ describe('getLocalStorageStore', () => {
     expect(() => {
       store.set('written')
     }).not.toThrow()
+  })
+})
+
+describe('getSessionStorageStore', () => {
+  it('reads from sessionStorage, under its own store per key', () => {
+    const session = createStorage({ [KEY]: 'from session' })
+    vi.stubGlobal('window', { localStorage: storage, sessionStorage: session })
+    resetStorageStores()
+
+    expect(getSessionStorageStore(KEY).get()).toBe('from session')
+    expect(getSessionStorageStore(KEY)).not.toBe(getLocalStorageStore(KEY))
   })
 })

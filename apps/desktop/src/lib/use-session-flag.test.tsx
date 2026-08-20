@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
+import { resetStorageStores } from '@/lib/storage'
 import { useSessionFlag } from './use-session-flag'
 
 beforeEach(() => {
   window.sessionStorage.clear()
+  resetStorageStores()
 })
 
 describe('useSessionFlag', () => {
