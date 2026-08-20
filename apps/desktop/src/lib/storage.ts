@@ -1,4 +1,4 @@
-/** localStorage and sessionStorage as sets of subscribable per-key stores. */
+/** Shared primitive for a subscribable browser-storage key. */
 
 /**
  * One key's value, held in memory and published to subscribers. The store
@@ -56,11 +56,8 @@ export class StorageStore {
   }
 }
 
-const localStorageStores = new Map<string, StorageStore>()
-const sessionStorageStores = new Map<string, StorageStore>()
-
 /** The storage `pick` reaches for, or null where the browser refuses to hand it over. */
-function pickStorage(pick: () => Storage): Storage | null {
+export function pickStorage(pick: () => Storage): Storage | null {
   if (typeof window === 'undefined') {
     return null
   }
@@ -70,38 +67,4 @@ function pickStorage(pick: () => Storage): Storage | null {
     console.error('reaching storage failed', error)
     return null
   }
-}
-
-/** The localStorage store for `key`, created on first use and shared from then on. */
-export function getLocalStorageStore(key: string): StorageStore {
-  const existing = localStorageStores.get(key)
-  if (existing !== undefined) {
-    return existing
-  }
-  const store = new StorageStore(
-    key,
-    pickStorage(() => window.localStorage),
-  )
-  localStorageStores.set(key, store)
-  return store
-}
-
-/** The sessionStorage store for `key`, created on first use and shared from then on. */
-export function getSessionStorageStore(key: string): StorageStore {
-  const existing = sessionStorageStores.get(key)
-  if (existing !== undefined) {
-    return existing
-  }
-  const store = new StorageStore(
-    key,
-    pickStorage(() => window.sessionStorage),
-  )
-  sessionStorageStores.set(key, store)
-  return store
-}
-
-/** Test seam: forget every store, so the next read comes from storage. */
-export function resetStorageStores(): void {
-  localStorageStores.clear()
-  sessionStorageStores.clear()
 }

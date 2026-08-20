@@ -1,5 +1,5 @@
 import { useMemo, useSyncExternalStore } from 'react'
-import { getLocalStorageStore } from '@/lib/storage'
+import { getLocalStorageStore } from '@/lib/local-storage'
 
 /**
  * One localStorage key as React state, as the raw string it is stored as.

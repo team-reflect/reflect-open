@@ -1,5 +1,5 @@
 import { useMemo, useSyncExternalStore } from 'react'
-import { getSessionStorageStore } from '@/lib/storage'
+import { getSessionStorageStore } from '@/lib/session-storage'
 
 /**
  * One sessionStorage key as React state, as the raw string it is stored as.
