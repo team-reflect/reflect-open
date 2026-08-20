@@ -1,18 +1,41 @@
-import { useCallback, useRef } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { arrayMove } from '@dnd-kit/sortable'
 import type { PinnedNote } from '@reflect/core'
 import { reorderPinnedNotes } from '@/lib/note-pin'
+import { mutationKeys, mutationScopeIds } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { invalidatePinnedNotesCache, updatePinnedNotesCache } from '@/lib/notes/pinned-notes-cache'
+
+interface ReorderPinnedNotesVariables {
+  generation: number
+  notes: readonly PinnedNote[]
+  root: string
+}
+
+function writePinnedNotesOrder(variables: ReorderPinnedNotesVariables): Promise<void> {
+  return reorderPinnedNotes(variables.notes, variables.generation)
+}
 
 export function useReorderPinnedNotes(
   pinned: readonly PinnedNote[],
 ): (activePath: string, overPath: string) => void {
   const { graph } = useGraph()
   const queryClient = useQueryClient()
-  const saveChain = useRef<Promise<void>>(Promise.resolve())
-  const mutationId = useRef(0)
+  const mutation = useMutation({
+    mutationKey: mutationKeys.pinnedNotes.reorder(graph?.root),
+    scope: { id: mutationScopeIds.pinnedNotesReorder(graph?.root) },
+    mutationFn: writePinnedNotesOrder,
+    onError: (_error, variables) => {
+      const pendingCount = queryClient.isMutating({
+        exact: true,
+        mutationKey: mutationKeys.pinnedNotes.reorder(variables.root),
+      })
+      if (pendingCount === 1) {
+        invalidatePinnedNotesCache(queryClient, variables.root)
+      }
+    },
+  })
 
   return useCallback(
     (activePath: string, overPath: string): void => {
@@ -26,21 +49,13 @@ export function useReorderPinnedNotes(
         return
       }
       const reordered = arrayMove([...pinned], activeIndex, overIndex)
-
-      const currentMutation = mutationId.current + 1
-      mutationId.current = currentMutation
-
       updatePinnedNotesCache(queryClient, graph.root, () => reordered)
-
-      saveChain.current = saveChain.current
-        .catch(() => undefined)
-        .then(() => reorderPinnedNotes(reordered, graph.generation))
-        .catch(() => {
-          if (mutationId.current === currentMutation) {
-            invalidatePinnedNotesCache(queryClient, graph.root)
-          }
-        })
+      mutation.mutate({
+        generation: graph.generation,
+        notes: reordered,
+        root: graph.root,
+      })
     },
-    [graph, pinned, queryClient],
+    [graph, mutation, pinned, queryClient],
   )
 }
