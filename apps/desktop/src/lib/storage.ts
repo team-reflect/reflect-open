@@ -55,16 +55,3 @@ export class StorageStore {
     }
   }
 }
-
-/** The storage `pick` reaches for, or null where the browser refuses to hand it over. */
-export function pickStorage(pick: () => Storage): Storage | null {
-  if (typeof window === 'undefined') {
-    return null
-  }
-  try {
-    return pick()
-  } catch (error) {
-    console.error('reaching storage failed', error)
-    return null
-  }
-}

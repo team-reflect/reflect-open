@@ -36,4 +36,17 @@ describe('getLocalStorageStore', () => {
     expect(getLocalStorageStore('key')).toBe(getLocalStorageStore('key'))
     expect(getLocalStorageStore('key')).not.toBe(getLocalStorageStore('other'))
   })
+
+  it('returns an empty store when localStorage is unavailable', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubGlobal('window', {
+      get localStorage(): Storage {
+        throw new Error('SecurityError')
+      },
+    })
+    resetLocalStorageStores()
+
+    expect(getLocalStorageStore('key').get()).toBeNull()
+    expect(error).toHaveBeenCalledOnce()
+  })
 })

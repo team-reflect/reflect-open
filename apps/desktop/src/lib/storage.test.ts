@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { pickStorage, StorageStore } from './storage'
+import { StorageStore } from './storage'
 
 function createStorage(entries: Record<string, string> = {}): Storage {
   const values = new Map(Object.entries(entries))
@@ -61,21 +61,5 @@ describe('StorageStore', () => {
     expect(() => store.set('written')).not.toThrow()
     expect(store.get()).toBe('written')
     expect(error).toHaveBeenCalledTimes(2)
-  })
-})
-
-describe('pickStorage', () => {
-  it('returns null without a window or when access throws', () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    vi.stubGlobal('window', undefined)
-    expect(pickStorage(() => window.localStorage)).toBeNull()
-
-    vi.stubGlobal('window', {})
-    expect(
-      pickStorage(() => {
-        throw new Error('SecurityError')
-      }),
-    ).toBeNull()
-    expect(error).toHaveBeenCalledOnce()
   })
 })

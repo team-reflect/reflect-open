@@ -1,4 +1,4 @@
-import { pickStorage, StorageStore } from '@/lib/storage'
+import { StorageStore } from '@/lib/storage'
 
 const localStorageStores = new Map<string, StorageStore>()
 
@@ -8,10 +8,15 @@ export function getLocalStorageStore(key: string): StorageStore {
   if (existing !== undefined) {
     return existing
   }
-  const store = new StorageStore(
-    key,
-    pickStorage(() => window.localStorage),
-  )
+  let storage: Storage | null = null
+  if (typeof window !== 'undefined') {
+    try {
+      storage = window.localStorage
+    } catch (error) {
+      console.error('reaching localStorage failed', error)
+    }
+  }
+  const store = new StorageStore(key, storage)
   localStorageStores.set(key, store)
   return store
 }

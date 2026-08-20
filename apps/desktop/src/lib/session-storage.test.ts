@@ -36,4 +36,17 @@ describe('getSessionStorageStore', () => {
     expect(getSessionStorageStore('key')).toBe(getSessionStorageStore('key'))
     expect(getSessionStorageStore('key')).not.toBe(getSessionStorageStore('other'))
   })
+
+  it('returns an empty store when sessionStorage is unavailable', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubGlobal('window', {
+      get sessionStorage(): Storage {
+        throw new Error('SecurityError')
+      },
+    })
+    resetSessionStorageStores()
+
+    expect(getSessionStorageStore('key').get()).toBeNull()
+    expect(error).toHaveBeenCalledOnce()
+  })
 })
