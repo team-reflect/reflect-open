@@ -57,13 +57,12 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
     isLoading: suggestionsLoading,
     isError: suggestionsError,
   } = useQuery({
-    queryKey: queryKeys.index.paletteSuggestions(
-      graph?.root,
-      trimmed,
-      settings.dateFormat,
-      settings.weekStartDay,
+    queryKey: queryKeys.index.paletteSuggestions(graph?.root, {
+      text: trimmed,
+      dateFormat: settings.dateFormat,
+      weekStartDay: settings.weekStartDay,
       today,
-    ),
+    }),
     queryFn: () =>
       suggestWikiTargets(trimmed, 8, {
         today,

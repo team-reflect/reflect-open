@@ -180,7 +180,7 @@ export function useMobileGraphBoot(options: MobileGraphBootOptions): MobileGraph
         // in-flight (usually settled) load instead of issuing a second
         // settings_load round trip.
         const settings = await queryClient.ensureQueryData({
-          queryKey: queryKeys.settings.current,
+          queryKey: queryKeys.settings.all,
           queryFn: loadSettings,
         })
         if (!active) {

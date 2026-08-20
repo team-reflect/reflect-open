@@ -73,7 +73,7 @@ function wrapper({ children }: { children: ReactNode }) {
 
 /** Resolves once the initial settings_load has populated the query cache. */
 async function loadSettled(): Promise<void> {
-  await vi.waitFor(() => expect(queryClient.getQueryData(queryKeys.settings.current)).toBeDefined())
+  await vi.waitFor(() => expect(queryClient.getQueryData(queryKeys.settings.all)).toBeDefined())
 }
 
 beforeEach(() => {

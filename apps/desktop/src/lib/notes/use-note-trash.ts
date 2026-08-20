@@ -71,7 +71,7 @@ export function useNoteTrash(): NoteTrash {
             // *fails* is left in the list, so it keeps its place in the
             // selection (which prunes only vanished rows) for an immediate retry.
             queryClient.setQueriesData<NoteListEntry[]>(
-              { queryKey: queryKeys.index.allNotesPrefix(root) },
+              { queryKey: queryKeys.index.allNotes(root) },
               (rows) => rows?.filter((row) => row.path !== path),
             )
           } catch (cause) {

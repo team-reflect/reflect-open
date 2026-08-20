@@ -318,7 +318,7 @@ describe('AllNotesScreen', () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     })
-    client.setQueryData(queryKeys.index.allNotes('/g', null), [
+    client.setQueryData(queryKeys.index.allNotesWithTag('/g', null), [
       {
         path: 'notes/health.md',
         title: 'Health Stacked',

@@ -1,12 +1,5 @@
-import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createConflictedNotesQueryOptions } from './query-options'
-import {
-  mutationKeys,
-  queryClient,
-  queryKeys,
-  throttledInvalidateIndexQueries,
-} from './query-client'
+import { queryClient, queryKeys, throttledInvalidateIndexQueries } from './query-client'
 
 const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
@@ -87,7 +80,7 @@ describe('query defaults', () => {
   it.each([
     [queryKeys.index.note('/graph', 'notes/example.md')],
     [queryKeys.chat.conversations('/graph')],
-    [queryKeys.settings.current],
+    [queryKeys.settings.all],
   ])('keeps explicitly invalidated data fresh for %j', (queryKey) => {
     expect(queryClient.defaultQueryOptions({ queryKey }).staleTime).toBe(Infinity)
   })
@@ -101,71 +94,5 @@ describe('query defaults', () => {
 
   it('runs mutations while the browser reports offline', () => {
     expect(queryClient.getDefaultOptions().mutations?.networkMode).toBe('always')
-  })
-})
-
-// REVIEW/fixme: this test is not usefull. remove this queryKeys block
-describe('queryKeys', () => {
-  it('builds prefixes that match exact graph resources', () => {
-    const prefix = queryKeys.index.allNotesPrefix('/graph')
-    const exact = queryKeys.index.allNotes('/graph', 'books')
-
-    expect(exact.slice(0, prefix.length)).toEqual(prefix)
-  })
-
-  it('isolates graphs and parameters deterministically', () => {
-    expect(queryKeys.index.dailyDates('/one', '2026-08-01', '2026-08-31')).toEqual(
-      queryKeys.index.dailyDates('/one', '2026-08-01', '2026-08-31'),
-    )
-    expect(queryKeys.index.dailyDates('/one', '2026-08-01', '2026-08-31')).not.toEqual(
-      queryKeys.index.dailyDates('/two', '2026-08-01', '2026-08-31'),
-    )
-  })
-
-  it('uses one conflicted-notes identity on every surface', () => {
-    expect(queryKeys.index.conflictedNotes('/graph')).toEqual([
-      'index',
-      '/graph',
-      'conflicted-notes',
-    ])
-  })
-})
-
-// REVIEW/fixme: this test is not usefull. remove this describe block
-describe('shared query options', () => {
-  it('deduplicates consumers while allowing consumer-specific overrides', async () => {
-    const client = new QueryClient()
-    const queryFn = vi.fn(async () => [{ path: 'notes/conflicted.md', title: 'Conflicted note' }])
-    const desktopOptions = {
-      ...createConflictedNotesQueryOptions('/graph'),
-      queryFn,
-    }
-    const mobileOptions = {
-      ...createConflictedNotesQueryOptions('/graph'),
-      queryFn,
-      staleTime: 10_000,
-    }
-
-    const [desktopResult, mobileResult] = await Promise.all([
-      client.fetchQuery(desktopOptions),
-      client.fetchQuery(mobileOptions),
-    ])
-
-    expect(queryFn).toHaveBeenCalledTimes(1)
-    expect(desktopResult).toEqual(mobileResult)
-    expect(
-      client.getQueryCache().findAll({
-        queryKey: queryKeys.index.conflictedNotes('/graph'),
-        exact: true,
-      }),
-    ).toHaveLength(1)
-  })
-})
-
-// REVIEW/fixme: this test is not usefull. remove this "mutationKeys" block.  queryKeys is so simple that it doesn't need to be tested.  mutationKeys is also simple and doesn't need to be tested.
-describe('mutationKeys', () => {
-  it('isolates task actions and graphs', () => {
-    expect(mutationKeys.tasks.complete('/one')).not.toEqual(mutationKeys.tasks.reopen('/one'))
-    expect(mutationKeys.tasks.complete('/one')).not.toEqual(mutationKeys.tasks.complete('/two'))
   })
 })

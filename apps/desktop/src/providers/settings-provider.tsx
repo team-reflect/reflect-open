@@ -136,7 +136,7 @@ interface SettingsProviderProps {
 export function SettingsProvider({ children }: SettingsProviderProps): ReactElement {
   const bridgeReady = useBridgeReady()
   const { data: loaded, error: loadError } = useQuery({
-    queryKey: queryKeys.settings.current,
+    queryKey: queryKeys.settings.all,
     queryFn: loadSettings,
     enabled: bridgeReady,
   })

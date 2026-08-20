@@ -86,7 +86,7 @@ async function settleLoad(act: Act): Promise<void> {
       // A query that has not been registered yet reads as `undefined`, which is
       // also "not pending" — require the real settled state, or this returns
       // before the load has even started.
-      const state = queryClient.getQueryState(queryKeys.settings.current)
+      const state = queryClient.getQueryState(queryKeys.settings.all)
       expect(state).toBeDefined()
       expect(state?.status).not.toBe('pending')
     })

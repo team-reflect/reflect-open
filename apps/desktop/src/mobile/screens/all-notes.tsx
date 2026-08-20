@@ -107,7 +107,7 @@ export function MobileAllNotes({
     enabled,
   })
   const { data: hits } = useQuery({
-    queryKey: queryKeys.index.mobileAllNotes(graph?.root, parsed),
+    queryKey: queryKeys.index.mobileAllNotesWithSearch(graph?.root, parsed),
     queryFn: () => searchWithFilters(parsed, searchPlanFor(parsed)),
     enabled,
     // Typing re-keys the query as the deferred value settles; holding the
@@ -120,7 +120,7 @@ export function MobileAllNotes({
 
   const removeDeletedRow = (path: string): void => {
     queryClient.setQueriesData<FilteredSearchHit[]>(
-      { queryKey: queryKeys.index.mobileAllNotesPrefix(graph?.root) },
+      { queryKey: queryKeys.index.mobileAllNotes(graph?.root) },
       (cachedHits) => cachedHits?.filter((hit) => hit.path !== path),
     )
     // Do not invalidate yet: the index can still contain the deleted row and

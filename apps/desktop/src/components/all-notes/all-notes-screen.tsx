@@ -58,7 +58,7 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const enabled = bridgeReady && graph !== null
 
   const { data: notes } = useQuery({
-    queryKey: queryKeys.index.allNotes(graph?.root, tag === null ? null : foldTag(tag)),
+    queryKey: queryKeys.index.allNotesWithTag(graph?.root, tag === null ? null : foldTag(tag)),
     queryFn: () => listNotes({ tag }),
     enabled,
   })

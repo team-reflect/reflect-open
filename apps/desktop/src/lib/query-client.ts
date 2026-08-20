@@ -11,32 +11,26 @@ export const queryKeys = {
     graph(root: GraphRoot) {
       return [...this.all, root] as const
     },
-    allNotesPrefix(root: GraphRoot) {
-      // REVIEW: rename "allNotesPrefix(root)" method to "allNotes(root)"
+    allNotes(root: GraphRoot) {
       return [...this.graph(root), 'all-notes'] as const
     },
-    allNotes(root: GraphRoot, foldedTag: string | null) {
-      // REVIEW/ FIXME: rename "allNotes(root, foldedTag)" method to "allNotesWithTag((root, foldedTag))"
-      // REVIEW: "[...this.allNotesPrefix(root), foldedTag]" and "[...this.graph(root), 'all-notes-tags']" might conflict, if "foldedTag" is exatly "all-notes-tags", so add a string beteween like return [...this.allNotesPrefix(root), "tag???I do not know you name it " foldedTag] as const
-      return [...this.allNotesPrefix(root), foldedTag] as const
+    allNotesWithTag(root: GraphRoot, foldedTag: string | null) {
+      return [...this.allNotes(root), 'tag', foldedTag] as const
     },
     allNotesTags(root: GraphRoot) {
       return [...this.graph(root), 'all-notes-tags'] as const
     },
     paletteSuggestions(
       root: GraphRoot,
-      text: string,
-      dateFormat: string,
-      weekStartDay: string,
-      today: string,
+      options: { text: string; dateFormat: string; weekStartDay: string; today: string },
     ) {
       return [
         ...this.graph(root),
         'palette-suggest',
-        text,
-        dateFormat,
-        weekStartDay,
-        today,
+        options.text,
+        options.dateFormat,
+        options.weekStartDay,
+        options.today,
       ] as const
     },
     paletteSearch(root: GraphRoot, mode: PaletteSearchMode, text: string) {
@@ -87,11 +81,11 @@ export const queryKeys = {
     dailyEmpty(root: GraphRoot, path: string) {
       return [...this.graph(root), 'daily-empty', path] as const
     },
-    mobileAllNotesPrefix(root: GraphRoot) {
+    mobileAllNotes(root: GraphRoot) {
       return [...this.graph(root), 'mobile-all-notes'] as const
     },
-    mobileAllNotes<TSearch>(root: GraphRoot, search: TSearch) {
-      return [...this.mobileAllNotesPrefix(root), search] as const
+    mobileAllNotesWithSearch<TSearch>(root: GraphRoot, search: TSearch) {
+      return [...this.mobileAllNotes(root), search] as const
     },
     mobileNotePicker(root: GraphRoot, text: string) {
       return [...this.graph(root), 'mobile-note-picker', text] as const
@@ -114,9 +108,6 @@ export const queryKeys = {
   },
   settings: {
     all: ['settings'] as const,
-    get current() {
-      return this.all
-    },
   },
   calendar: {
     all: ['calendar'] as const,
@@ -285,7 +276,7 @@ export const queryClient = new QueryClient({
 // Settings is hydrated once, then updated by its provider.
 queryClient.setQueryDefaults(queryKeys.index.all, { staleTime: Infinity })
 queryClient.setQueryDefaults(queryKeys.chat.all, { staleTime: Infinity })
-queryClient.setQueryDefaults(queryKeys.settings.current, { staleTime: Infinity })
+queryClient.setQueryDefaults(queryKeys.settings.all, { staleTime: Infinity })
 
 /** Refetch all index-backed queries; called after index rows change. */
 export function invalidateIndexQueries(): void {
