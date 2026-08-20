@@ -1,9 +1,10 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import { setBridge, type AppPlatform } from '@reflect/core'
 import { usePaywallRequested } from '@/hooks/use-paywall-requested'
+import { queryKeys } from '@/lib/query-client'
 import { SettingsProvider } from '@/providers/settings-provider'
 import { usePaywallGate, type PaywallGate } from './use-paywall-gate'
 
@@ -26,6 +27,8 @@ let environment: () => Promise<string>
 let owned: (productId: string) => Promise<boolean>
 /** The persisted settings document. */
 let stored: Record<string, unknown>
+/** The native purchase event callback registered by the entitlement hook. */
+let emitPurchaseUpdated: ((payload: unknown) => void) | null
 
 /** A promise that never settles, for the calls a case must not wait on. */
 function never<T>(): Promise<T> {
@@ -83,7 +86,11 @@ function installFakeBridge(): void {
     listen: async () => () => {},
     // `subscribeIapPurchaseUpdated` registers through the plugin channel, and
     // logs loudly when the bridge has none.
-    listenPlugin: async () => {},
+    listenPlugin: async (plugin, event, handler) => {
+      if (plugin === 'iap' && event === 'purchaseUpdated') {
+        emitPurchaseUpdated = handler
+      }
+    },
   })
 }
 
@@ -102,6 +109,7 @@ beforeEach(() => {
   environment = () => Promise.resolve('Production')
   owned = () => Promise.resolve(false)
   stored = {}
+  emitPurchaseUpdated = null
   localStorage.clear()
   sessionStorage.clear()
   queryClient = new QueryClient({
@@ -111,6 +119,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  focusManager.setFocused(undefined)
   setBridge(null)
   queryClient.clear()
 })
@@ -173,6 +182,38 @@ describe('usePaywallGate', () => {
     await vi.waitFor(() => expect(result.current).toBe('hide'))
   })
 
+  it.each(['yearly', 'monthly'] as const)(
+    'accepts a live %s subscription without waiting on its sibling lookup',
+    async (product) => {
+      owned = (productId) =>
+        productId.endsWith(`.${product}`) ? Promise.resolve(true) : never<boolean>()
+      const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+      await vi.waitFor(() => expect(result.current).toBe('hide'))
+    },
+  )
+
+  it('refetches entitlements through the TanStack focus path', async () => {
+    owned = () => Promise.resolve(false)
+    const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+    await vi.waitFor(() => expect(result.current).toBe('show'))
+
+    owned = (productId) => Promise.resolve(productId.endsWith('.yearly'))
+    focusManager.setFocused(false)
+    focusManager.setFocused(true)
+    await vi.waitFor(() => expect(result.current).toBe('hide'))
+  })
+
+  it('invalidates the entitlement prefix after a native purchase update', async () => {
+    owned = () => Promise.resolve(false)
+    const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+    await vi.waitFor(() => expect(result.current).toBe('show'))
+    await vi.waitFor(() => expect(emitPurchaseUpdated).not.toBeNull())
+
+    owned = (productId) => Promise.resolve(productId.endsWith('.monthly'))
+    emitPurchaseUpdated?.({ productId: 'app.reflect.ios.pro.monthly' })
+    await vi.waitFor(() => expect(result.current).toBe('hide'))
+  })
+
   it('respects a live "Remind me later" snooze', async () => {
     stored = { paywallSnoozeUntil: Date.now() + 60_000 }
     const { result } = await renderHook(() => usePaywallGate(), { wrapper })
@@ -194,6 +235,20 @@ describe('usePaywallGate', () => {
       environment = never
       const { result } = await renderHook(() => usePaywallGate(), { wrapper })
       // No `waitFor`: this is the whole point of the cache.
+      expect(result.current).toBe('hide')
+    })
+
+    it('keeps a remembered channel when the live probe fails', async () => {
+      environment = () => Promise.resolve('Sandbox')
+      owned = never
+      await runLaunch('hide')
+
+      environment = () => Promise.reject(new Error('no app transaction'))
+      const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+      expect(result.current).toBe('hide')
+      await vi.waitFor(() =>
+        expect(queryClient.getQueryState(queryKeys.iap.environment)?.status).toBe('error'),
+      )
       expect(result.current).toBe('hide')
     })
 
@@ -230,6 +285,30 @@ describe('usePaywallGate', () => {
       const { result } = await renderHook(() => usePaywallGate(), { wrapper })
       // A remembered `yearly` would have let this launch straight in.
       expect(result.current).toBe('pending')
+    })
+
+    it('does not persist null when one entitlement fails and the sibling is negative', async () => {
+      owned = (productId) => Promise.resolve(productId.endsWith('.yearly'))
+      await runLaunch('hide')
+
+      owned = (productId) =>
+        productId.endsWith('.yearly')
+          ? Promise.reject(new Error('StoreKit unavailable'))
+          : Promise.resolve(false)
+      const failedLaunch = await renderHook(() => usePaywallGate(), { wrapper })
+      expect(failedLaunch.result.current).toBe('hide')
+      await vi.waitFor(() =>
+        expect(queryClient.getQueryState(queryKeys.iap.entitlement('yearly'))?.status).toBe(
+          'error',
+        ),
+      )
+      await failedLaunch.unmount()
+      queryClient.clear()
+
+      environment = never
+      owned = never
+      const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+      expect(result.current).toBe('hide')
     })
 
     it('drops a remembered channel the probe no longer recognizes', async () => {
