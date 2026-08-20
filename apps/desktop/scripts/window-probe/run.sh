@@ -143,7 +143,7 @@ EOF
 # Phase K of wait-user: perform the K-th tiling choreography.
 run_tile_phase() {
   case "$1" in
-    1) tile_action "left" "Left" "Left Half" "﻿Left" ;;
+    1) tile_action "left" "Left" "Left Half" ;;
     2) tile_action "fill" "Fill" "Fill Screen" ;;
     3) tile_action "revert" "Return to Previous Size" "Revert" "Restore" ;;
   esac
