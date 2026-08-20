@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PinnedNote } from '@reflect/core'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { pinnedNotesQueryKey } from '@/hooks/use-pinned-notes'
+import { queryKeys } from '@/lib/query-client'
 import { RouterProvider } from '@/routing/router'
 import { NoteActionsSection } from './note-actions-section'
 
@@ -108,7 +108,7 @@ describe('NoteActionsSection pin toggle', () => {
     ])
     getNote.mockResolvedValue(noteRow('notes/mid.md', false, 'Mid'))
     const view = await renderSection('notes/mid.md')
-    const queryKey = pinnedNotesQueryKey('/g')
+    const queryKey = queryKeys.index.pinnedNotes('/g')
     await vi.waitFor(() =>
       expect(view.client.getQueryData<PinnedNote[]>(queryKey)?.map((note) => note.title)).toEqual([
         'Zeta',

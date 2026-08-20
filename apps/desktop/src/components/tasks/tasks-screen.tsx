@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Archive, CalendarClock, List, Search } from 'lucide-react'
-import { getCompletedTasks, getOpenTasks, type OpenTask, type TaskGroup } from '@reflect/core'
+import { type OpenTask, type TaskGroup } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
@@ -24,7 +24,10 @@ import { useTaskFilters } from '@/lib/tasks/task-filters'
 import { composeVisibleTaskGroups } from '@/lib/tasks/task-visibility'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard'
 import { useTaskSelection } from '@/lib/tasks/use-task-selection'
-import { completedTasksQueryKey, tasksQueryKey } from '@/lib/tasks/tasks-query'
+import {
+  createCompletedTasksQueryOptions,
+  createOpenTasksQueryOptions,
+} from '@/lib/tasks/tasks-query'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration'
 import { useToday } from '@/lib/use-today'
 import type { ModClickEvent } from '@/lib/windows/open-in-new-window'
@@ -82,13 +85,11 @@ export function TasksScreen(): ReactElement {
   const enabled = bridgeReady && graph !== null
 
   const { data: open, isError: openFailed } = useQuery({
-    queryKey: tasksQueryKey(graph?.root),
-    queryFn: () => getOpenTasks(),
+    ...createOpenTasksQueryOptions(graph?.root),
     enabled,
   })
   const { data: completed, isError: completedFailed } = useQuery({
-    queryKey: completedTasksQueryKey(graph?.root),
-    queryFn: () => getCompletedTasks(),
+    ...createCompletedTasksQueryOptions(graph?.root),
     enabled: enabled && filters.archived,
   })
 

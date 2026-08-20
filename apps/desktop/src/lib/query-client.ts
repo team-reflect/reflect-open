@@ -1,31 +1,169 @@
 import { QueryClient } from '@tanstack/react-query'
 
+type GraphRoot = string | undefined
+type EntitlementProduct = 'yearly' | 'monthly'
+type PaletteSearchMode = 'hybrid' | 'lexical'
+
+/** The single source of truth for every TanStack Query cache identity. */
+export const queryKeys = {
+  index: {
+    all: ['index'] as const,
+    graph: (root: GraphRoot) => ['index', root] as const,
+    allNotesPrefix: (root: GraphRoot) => ['index', root, 'all-notes'] as const,
+    allNotes: (root: GraphRoot, foldedTag: string | null) =>
+      ['index', root, 'all-notes', foldedTag] as const,
+    allNotesTags: (root: GraphRoot) => ['index', root, 'all-notes-tags'] as const,
+    paletteSuggestions: (
+      root: GraphRoot,
+      text: string,
+      dateFormat: string,
+      weekStartDay: string,
+      today: string,
+    ) => ['index', root, 'palette-suggest', text, dateFormat, weekStartDay, today] as const,
+    paletteSearch: (root: GraphRoot, mode: PaletteSearchMode, text: string) =>
+      ['index', root, 'palette-search', mode, text] as const,
+    notePreview: (root: GraphRoot, path: string) => ['index', root, 'note-preview', path] as const,
+    attendeeSuggestions: (root: GraphRoot, text: string, contacts: boolean) =>
+      ['index', root, 'attendee-suggestions', text, contacts] as const,
+    dailyDates: (root: GraphRoot, start: string, end: string) =>
+      ['index', root, 'daily-dates', start, end] as const,
+    conflictedNotes: (root: GraphRoot) => ['index', root, 'conflicted-notes'] as const,
+    duplicateNoteIds: (root: GraphRoot) => ['index', root, 'duplicate-note-ids'] as const,
+    templates: (root: GraphRoot) => ['index', root, 'templates'] as const,
+    noteConflict: (root: GraphRoot, path: string) =>
+      ['index', root, 'note-conflict', path] as const,
+    noteConflictLabels: (root: GraphRoot, path: string) =>
+      ['index', root, 'note-conflict-labels', path] as const,
+    openTasks: (root: GraphRoot) => ['index', root, 'tasks'] as const,
+    completedTasks: (root: GraphRoot) => ['index', root, 'tasks-completed'] as const,
+    backlinks: (root: GraphRoot, path: string) => ['index', root, 'backlinks', path] as const,
+    note: (root: GraphRoot, path: string) => ['index', root, 'note', path] as const,
+    pinnedNotes: (root: GraphRoot) => ['index', root, 'pinned-notes'] as const,
+    suggestedContact: (root: GraphRoot, path: string) =>
+      ['index', root, 'suggested-contact', path] as const,
+    dailyEmpty: (root: GraphRoot, path: string) => ['index', root, 'daily-empty', path] as const,
+    mobileAllNotesPrefix: (root: GraphRoot) => ['index', root, 'mobile-all-notes'] as const,
+    mobileAllNotes: <TSearch>(root: GraphRoot, search: TSearch) =>
+      ['index', root, 'mobile-all-notes', search] as const,
+    mobileNotePicker: (root: GraphRoot, text: string) =>
+      ['index', root, 'mobile-note-picker', text] as const,
+    mobileNoteCount: (root: GraphRoot) => ['index', root, 'mobile-note-count'] as const,
+  },
+  similar: {
+    all: ['similar'] as const,
+    note: (root: GraphRoot, path: string) => ['similar', root, path] as const,
+  },
+  chat: {
+    all: ['chat'] as const,
+    conversations: (root: GraphRoot) => ['chat', root, 'conversations'] as const,
+  },
+  settings: {
+    current: ['settings'] as const,
+  },
+  calendar: {
+    all: ['calendar'] as const,
+    authorization: ['calendar', 'authorization'] as const,
+    calendars: ['calendar', 'calendars'] as const,
+    events: (date: string, calendarIds: readonly string[]) =>
+      ['calendar', 'events', date, calendarIds] as const,
+  },
+  contacts: {
+    authorization: ['contacts', 'authorization'] as const,
+  },
+  github: {
+    authentication: ['github', 'authentication'] as const,
+  },
+  icloud: {
+    all: ['icloud'] as const,
+    status: ['icloud', 'status'] as const,
+    pendingNotes: (root: GraphRoot) => ['icloud', root, 'pending-notes'] as const,
+  },
+  agentSkill: {
+    all: ['agent-skill'] as const,
+    status: (root: GraphRoot) => ['agent-skill', root, 'status'] as const,
+  },
+  iap: {
+    all: ['iap'] as const,
+    environment: ['iap', 'environment'] as const,
+    products: ['iap', 'products'] as const,
+    entitlements: ['iap', 'entitlement'] as const,
+    entitlement: (product: EntitlementProduct) => ['iap', 'entitlement', product] as const,
+  },
+  mobile: {
+    storage: ['mobile', 'storage'] as const,
+  },
+} as const
+
+/** Stable identities for mutations that are observed outside their owning hook. */
+export const mutationKeys = {
+  tasks: {
+    all: ['tasks'] as const,
+    graph: (root: GraphRoot) => ['tasks', root] as const,
+    complete: (root: GraphRoot) => ['tasks', root, 'complete'] as const,
+    reopen: (root: GraphRoot) => ['tasks', root, 'reopen'] as const,
+    delete: (root: GraphRoot) => ['tasks', root, 'delete'] as const,
+    edit: (root: GraphRoot) => ['tasks', root, 'edit'] as const,
+    schedule: (root: GraphRoot) => ['tasks', root, 'schedule'] as const,
+    convert: (root: GraphRoot) => ['tasks', root, 'convert'] as const,
+    editAndConvert: (root: GraphRoot) => ['tasks', root, 'edit-and-convert'] as const,
+    insert: (root: GraphRoot) => ['tasks', root, 'insert'] as const,
+    editAndToggle: (root: GraphRoot) => ['tasks', root, 'edit-and-toggle'] as const,
+    checkboxToggle: (root: GraphRoot) => ['tasks', root, 'checkbox-toggle'] as const,
+    contextInsert: (root: GraphRoot) => ['tasks', root, 'context-insert'] as const,
+    snippetToggle: (root: GraphRoot) => ['tasks', root, 'snippet-toggle'] as const,
+  },
+  pinnedNotes: {
+    reorder: (root: GraphRoot) => ['pinned-notes', root, 'reorder'] as const,
+  },
+  agentSkill: {
+    write: (root: GraphRoot) => ['agent-skill', root, 'write'] as const,
+  },
+  iap: {
+    purchase: ['iap', 'purchase'] as const,
+    restore: ['iap', 'restore'] as const,
+  },
+  settings: {
+    save: ['settings', 'save'] as const,
+  },
+} as const
+
+export const mutationScopeIds = {
+  pinnedNotesReorder: (root: string) => `pinned-notes:reorder:${root}`,
+  agentSkillWrite: (root: string) => `agent-skill:write:${root}`,
+  iapAction: 'iap:action',
+  settingsSave: 'settings:save',
+} as const
+
 /**
  * The app's one TanStack Query client (adopted in Plan 07 per architecture
  * conventions §5): `queryFn`s are `@reflect/core` getters over the SQLite
- * projection, so freshness is event-driven, not poll-driven — the graph index
- * lifecycle calls {@link invalidateIndexQueries} after rows actually change
- * (initial reconcile, then each applied watcher batch).
+ * projection, so index freshness is event-driven, not poll-driven — the graph
+ * index lifecycle calls {@link invalidateIndexQueries} after rows actually
+ * change (initial reconcile, then each applied watcher batch).
  */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Index reads are local SQLite over IPC: cheap, and kept fresh by
-      // invalidation. Treat cached data as good until an invalidation says
-      // otherwise; never refetch just because a window regained focus.
-      staleTime: Infinity,
+      staleTime: 0,
       retry: 1,
       refetchOnWindowFocus: false,
+      networkMode: 'always',
+    },
+    mutations: {
+      networkMode: 'always',
     },
   },
 })
 
-/** Every index-backed query nests under this key (e.g. `['index', 'backlinks', path]`). */
-export const INDEX_QUERY_SCOPE = 'index'
+// SQLite projections and chat history are refreshed by explicit invalidation.
+// Settings is hydrated once, then updated by its provider.
+queryClient.setQueryDefaults(queryKeys.index.all, { staleTime: Infinity })
+queryClient.setQueryDefaults(queryKeys.chat.all, { staleTime: Infinity })
+queryClient.setQueryDefaults(queryKeys.settings.current, { staleTime: Infinity })
 
 /** Refetch all index-backed queries; called after index rows change. */
 export function invalidateIndexQueries(): void {
-  void queryClient.invalidateQueries({ queryKey: [INDEX_QUERY_SCOPE] })
+  void queryClient.invalidateQueries({ queryKey: queryKeys.index.all })
 }
 
 /**
@@ -67,28 +205,21 @@ export function throttledInvalidateIndexQueries(): void {
 
 /**
  * "Similar notes" results nest under this key — deliberately *outside*
- * {@link INDEX_QUERY_SCOPE}. Every other index-backed read is one cheap SQLite
+ * `queryKeys.index`. Every other index-backed read is one cheap SQLite
  * query, so refetching the lot after any applied batch is fine; a neighbor
  * lookup is up to seventeen vector KNN queries (one per seed chunk), and under
  * the index scope it re-ran for changes it has nothing to do with — a remote
  * sync batch, a Git commit, an asset description, your own keystrokes in an
  * unrelated pane. With its own scope the panel computes once per note per
  * session, which is what it's for.
- */
-export const SIMILAR_QUERY_SCOPE = 'similar'
-
-/**
- * Forget cached neighbors on a graph switch. The graph root is part of the key
- * so stale rows could never be *read* after a switch, but these entries are
- * kept for the whole session ({@link SIMILAR_QUERY_SCOPE}) and would otherwise
- * never be collected — memory hygiene, same as the note-row overlays.
+ *
+ * Forget these cached neighbors on a graph switch. The graph root is part of
+ * the key so stale rows could never be *read* after a switch, but these entries
+ * are kept for the whole session and would otherwise never be collected.
  */
 export function dropSimilarNotesQueries(): void {
-  queryClient.removeQueries({ queryKey: [SIMILAR_QUERY_SCOPE] })
+  queryClient.removeQueries({ queryKey: queryKeys.similar.all })
 }
-
-/** The iCloud container listing (`icloud_status`) — read by the graph chooser and Settings → iCloud. */
-export const ICLOUD_STATUS_QUERY_KEY = ['icloud-status'] as const
 
 /**
  * Forget the cached iCloud container listing after its contents change (a
@@ -97,13 +228,10 @@ export const ICLOUD_STATUS_QUERY_KEY = ['icloud-status'] as const
  * list — deleted graph included — while the refetch runs.
  */
 export function dropIcloudStatusQuery(): void {
-  queryClient.removeQueries({ queryKey: ICLOUD_STATUS_QUERY_KEY })
+  queryClient.removeQueries({ queryKey: queryKeys.icloud.status })
 }
-
-/** Chat-history queries nest under this key (e.g. `['chat', 'conversations', root]`). */
-export const CHAT_QUERY_SCOPE = 'chat'
 
 /** Refetch chat-history queries; called after a turn save or a delete. */
 export function invalidateChatQueries(): void {
-  void queryClient.invalidateQueries({ queryKey: [CHAT_QUERY_SCOPE] })
+  void queryClient.invalidateQueries({ queryKey: queryKeys.chat.all })
 }

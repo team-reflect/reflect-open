@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useConflictResolution } from '@/hooks/use-conflict-resolution'
 import { isMobileSurface } from '@/lib/platform-surface'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -46,7 +46,7 @@ export function SyncConflictNotice({
   const { busy, error, resolve } = useConflictResolution(path)
   const bridgeReady = useBridgeReady()
   const { data } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, 'note-conflict', graph?.root, path],
+    queryKey: queryKeys.index.noteConflict(graph?.root, path),
     queryFn: async () => (await getNote(path)) ?? null,
     enabled: bridgeReady && graph !== null,
   })
@@ -57,7 +57,7 @@ export function SyncConflictNotice({
   // A multi-block note (three-plus devices, Plan 21) pluralizes: `theirs`
   // splices in every non-first side, so naming a single device would lie.
   const { data: markerInfo } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, 'note-conflict-labels', graph?.root, path],
+    queryKey: queryKeys.index.noteConflictLabels(graph?.root, path),
     queryFn: async () => {
       const source = await readNote(path)
       return {

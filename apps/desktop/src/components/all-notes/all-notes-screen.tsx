@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { isDaily, listNotes, listNoteTags } from '@reflect/core'
+import { foldTag, isDaily, listNotes, listNoteTags } from '@reflect/core'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
-import { allNotesQueryKey, allNotesTagsQueryKey } from '@/lib/notes/all-notes-query'
+import { queryKeys } from '@/lib/query-client'
 import type { ModClickEvent } from '@/lib/windows/open-in-new-window'
 import { useListSelection } from '@/lib/selection/use-list-selection'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration'
@@ -58,12 +58,12 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const enabled = bridgeReady && graph !== null
 
   const { data: notes } = useQuery({
-    queryKey: allNotesQueryKey(graph?.root, tag),
+    queryKey: queryKeys.index.allNotes(graph?.root, tag === null ? null : foldTag(tag)),
     queryFn: () => listNotes({ tag }),
     enabled,
   })
   const { data: facets } = useQuery({
-    queryKey: allNotesTagsQueryKey(graph?.root),
+    queryKey: queryKeys.index.allNotesTags(graph?.root),
     queryFn: () => listNoteTags(),
     enabled,
   })

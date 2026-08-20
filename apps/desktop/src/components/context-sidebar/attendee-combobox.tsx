@@ -18,7 +18,7 @@ import {
 } from '@/editor/wiki-autocomplete-entries'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -89,7 +89,7 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
     isFetching,
     isPlaceholderData,
   } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'attendee-suggestions', searchTerm, contactsInMenu],
+    queryKey: queryKeys.index.attendeeSuggestions(graph?.root, searchTerm, contactsInMenu),
     queryFn: async () => {
       const [suggestions, contacts] = await Promise.all([
         suggestWikiTargets(searchTerm, SUGGESTION_LIMIT),

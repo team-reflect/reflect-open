@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { getConflictedNotes } from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { createConflictedNotesQueryOptions } from '@/lib/query-options'
 import { mobileSyncStatus, type MobileSyncStatus } from '@/mobile/sync-status'
 import { useGraph } from '@/providers/graph-provider'
 import { useSyncContext } from '@/providers/sync-provider'
@@ -25,8 +24,7 @@ export function useMobileSyncStatus(): MobileSyncStatus | null {
 
   const bridgeReady = useBridgeReady()
   const { data: conflicted, isError: countUnavailable } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'conflicted-notes'],
-    queryFn: getConflictedNotes,
+    ...createConflictedNotesQueryOptions(graph?.root),
     enabled: bridgeReady && graph !== null && connected,
   })
 

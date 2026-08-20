@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { errorMessage, listTemplates, type TemplateEntry } from '@reflect/core'
+import { errorMessage, type TemplateEntry } from '@reflect/core'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,7 +16,7 @@ import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { deleteOpenNote } from '@/lib/note-delete'
 import { renameTemplate } from '@/lib/note-templates'
 import { startOperation } from '@/lib/operations'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { createTemplatesQueryOptions } from '@/lib/query-options'
 import { useGraph } from '@/providers/graph-provider'
 import { useNoteTemplates } from '@/providers/note-templates-provider'
 import { SettingsField } from './field'
@@ -36,8 +36,7 @@ export function TemplatesSection(): ReactElement {
   const [renaming, setRenaming] = useState<TemplateEntry | null>(null)
   const [deleting, setDeleting] = useState<TemplateEntry | null>(null)
   const { data: templates } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'templates'],
-    queryFn: listTemplates,
+    ...createTemplatesQueryOptions(graph?.root),
     enabled: graph !== null,
   })
 

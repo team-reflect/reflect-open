@@ -1,6 +1,5 @@
 import type { ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { listTemplates } from '@reflect/core'
 import { FilePlus2, LayoutTemplate } from 'lucide-react'
 import {
   Command,
@@ -14,7 +13,7 @@ import {
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { insertTemplate } from '@/lib/note-templates'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { createTemplatesQueryOptions } from '@/lib/query-options'
 import { useGraph } from '@/providers/graph-provider'
 import { useNoteTemplates } from '@/providers/note-templates-provider'
 
@@ -35,8 +34,7 @@ export function TemplatePicker({ context }: TemplatePickerProps): ReactElement |
   const { pickerOpen, closeTemplatePicker, openTemplateCreate } = useNoteTemplates()
   const { graph } = useGraph()
   const { data: templates } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'templates'],
-    queryFn: listTemplates,
+    ...createTemplatesQueryOptions(graph?.root),
     enabled: graph !== null && pickerOpen,
   })
 

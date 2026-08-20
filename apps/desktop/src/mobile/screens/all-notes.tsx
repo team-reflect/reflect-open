@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { FilterBar } from '@/mobile/search-filters/filter-bar'
 import {
   buildAllNotesSearch,
@@ -102,12 +102,12 @@ export function MobileAllNotes({
   )
 
   const { data: facets } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'all-notes-tags'],
+    queryKey: queryKeys.index.allNotesTags(graph?.root),
     queryFn: () => listNoteTags(),
     enabled,
   })
   const { data: hits } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'mobile-all-notes', parsed],
+    queryKey: queryKeys.index.mobileAllNotes(graph?.root, parsed),
     queryFn: () => searchWithFilters(parsed, searchPlanFor(parsed)),
     enabled,
     // Typing re-keys the query as the deferred value settles; holding the
@@ -120,7 +120,7 @@ export function MobileAllNotes({
 
   const removeDeletedRow = (path: string): void => {
     queryClient.setQueriesData<FilteredSearchHit[]>(
-      { queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'mobile-all-notes'] },
+      { queryKey: queryKeys.index.mobileAllNotesPrefix(graph?.root) },
       (cachedHits) => cachedHits?.filter((hit) => hit.path !== path),
     )
     // Do not invalidate yet: the index can still contain the deleted row and

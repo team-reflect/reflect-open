@@ -13,6 +13,7 @@ import { SettingsSection } from '@/components/settings/section'
 import { Button } from '@/components/ui/button'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { isMacosDesktop } from '@/lib/platform'
+import { queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
 /**
@@ -27,7 +28,7 @@ export function AgentsSection(): ReactElement | null {
   const queryClient = useQueryClient()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const queryKey = ['agent-skill', graph?.root]
+  const queryKey = queryKeys.agentSkill.status(graph?.root)
   const bridgeReady = useBridgeReady()
   const { data: status } = useQuery({
     queryKey,

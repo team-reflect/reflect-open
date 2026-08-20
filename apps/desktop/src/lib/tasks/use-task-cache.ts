@@ -2,9 +2,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { errorMessage, type OpenTask } from '@reflect/core'
 import type { TaskMarkerOffsetChange } from '@/lib/note-task'
 import { startOperation } from '@/lib/operations'
+import { queryKeys } from '@/lib/query-client'
 import { withRelocatedTaskMarkers } from '@/lib/tasks/task-cache'
 import { sameTask } from '@/lib/tasks/task-identity'
-import { completedTasksQueryKey, tasksQueryKey } from '@/lib/tasks/tasks-query'
 import { useGraph } from '@/providers/graph-provider'
 
 /** Updates a cached task list in place; returning the same `undefined` is a no-op. */
@@ -56,8 +56,8 @@ export interface TaskCacheWriter {
 export function useTaskCacheWriter(): TaskCacheWriter {
   const { graph } = useGraph()
   const queryClient = useQueryClient()
-  const openKey = tasksQueryKey(graph?.root)
-  const completedKey = completedTasksQueryKey(graph?.root)
+  const openKey = queryKeys.index.openTasks(graph?.root)
+  const completedKey = queryKeys.index.completedTasks(graph?.root)
 
   const snapshot = async (): Promise<TaskCacheSnapshot> => {
     await queryClient.cancelQueries({ queryKey: openKey })

@@ -7,6 +7,7 @@ import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { openUrlSync } from '@/lib/open-url'
+import { queryKeys } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
 import { useActiveSubscription } from '@/mobile/use-active-subscription'
@@ -38,7 +39,7 @@ export function PaywallScreen(): ReactElement {
   const [plan, setPlan] = useState<'monthly' | 'yearly'>('yearly')
 
   const products = useQuery({
-    queryKey: ['iap-products'],
+    queryKey: queryKeys.iap.products,
     queryFn: () => iapGetProducts([IAP_PRODUCT_IDS.yearly, IAP_PRODUCT_IDS.monthly]),
   })
   const yearly =

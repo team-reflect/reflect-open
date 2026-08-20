@@ -1,13 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  errorMessage,
-  getConflictedNotes,
-  getDuplicateNoteIds,
-  icloudAdoptGraph,
-  icloudPendingCount,
-  icloudStatus,
-} from '@reflect/core'
+import { errorMessage, icloudAdoptGraph, icloudPendingCount, icloudStatus } from '@reflect/core'
 import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { SettingsField } from '@/components/settings/field'
@@ -23,12 +16,15 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { isICloudRoot } from '@/lib/icloud-controller'
-import { ICLOUD_STATUS_QUERY_KEY, INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
+import {
+  createConflictedNotesQueryOptions,
+  createDuplicateNoteIdsQueryOptions,
+} from '@/lib/query-options'
 import { isMacosDesktop } from '@/lib/platform'
 import { useGraph } from '@/providers/graph-provider'
 import { useSync } from '@/providers/sync-provider'
 
-const ICLOUD_PENDING_NOTES_QUERY_KEY = 'icloud-pending-notes'
 const PENDING_NOTES_REFETCH_MS = 5_000
 
 function graphCountLine(count: number): string {
@@ -82,12 +78,12 @@ export function IcloudSettingsField(): ReactElement | null {
   const bridgeAvailable = useBridgeReady()
   const hosted = graph !== null && isICloudRoot(graph.root)
   const { data: status } = useQuery({
-    queryKey: ICLOUD_STATUS_QUERY_KEY,
+    queryKey: queryKeys.icloud.status,
     queryFn: icloudStatus,
     enabled: bridgeAvailable && isMacosDesktop,
   })
   const pendingNotes = useQuery({
-    queryKey: [ICLOUD_PENDING_NOTES_QUERY_KEY, graph?.root],
+    queryKey: queryKeys.icloud.pendingNotes(graph?.root),
     queryFn: () => (graph === null ? Promise.resolve(0) : icloudPendingCount(graph.root, 'notes')),
     enabled: bridgeAvailable && isMacosDesktop && hosted,
     staleTime: PENDING_NOTES_REFETCH_MS,
@@ -97,13 +93,11 @@ export function IcloudSettingsField(): ReactElement | null {
     },
   })
   const conflicted = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, 'conflicted-notes', graph?.root],
-    queryFn: () => getConflictedNotes(),
+    ...createConflictedNotesQueryOptions(graph?.root),
     enabled: bridgeAvailable && hosted,
   })
   const duplicateIds = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, 'duplicate-note-ids', graph?.root],
-    queryFn: () => getDuplicateNoteIds(),
+    ...createDuplicateNoteIdsQueryOptions(graph?.root),
     enabled: bridgeAvailable && hosted,
   })
 

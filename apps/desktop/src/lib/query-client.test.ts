@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { queryClient, throttledInvalidateIndexQueries } from './query-client'
+import {
+  mutationKeys,
+  queryClient,
+  queryKeys,
+  throttledInvalidateIndexQueries,
+} from './query-client'
 
 const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
@@ -62,5 +67,70 @@ describe('throttledInvalidateIndexQueries', () => {
 
     throttledInvalidateIndexQueries()
     expect(invalidateSpy).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('query defaults', () => {
+  it('keeps external sources stale and disables browser network pausing', () => {
+    const defaults = queryClient.defaultQueryOptions({ queryKey: queryKeys.calendar.all })
+
+    expect(defaults).toMatchObject({
+      staleTime: 0,
+      retry: 1,
+      refetchOnWindowFocus: false,
+      networkMode: 'always',
+    })
+  })
+
+  it.each([
+    queryKeys.index.note('/graph', 'notes/example.md'),
+    queryKeys.chat.conversations('/graph'),
+    queryKeys.settings.current,
+  ])('keeps explicitly invalidated data fresh for %j', (queryKey) => {
+    expect(queryClient.defaultQueryOptions({ queryKey }).staleTime).toBe(Infinity)
+  })
+
+  it('does not apply projection freshness to similar notes', () => {
+    expect(
+      queryClient.defaultQueryOptions({ queryKey: queryKeys.similar.note('/graph', 'note.md') })
+        .staleTime,
+    ).toBe(0)
+  })
+
+  it('runs mutations while the browser reports offline', () => {
+    expect(queryClient.getDefaultOptions().mutations?.networkMode).toBe('always')
+  })
+})
+
+describe('queryKeys', () => {
+  it('builds prefixes that match exact graph resources', () => {
+    const prefix = queryKeys.index.allNotesPrefix('/graph')
+    const exact = queryKeys.index.allNotes('/graph', 'books')
+
+    expect(exact.slice(0, prefix.length)).toEqual(prefix)
+  })
+
+  it('isolates graphs and parameters deterministically', () => {
+    expect(queryKeys.index.dailyDates('/one', '2026-08-01', '2026-08-31')).toEqual(
+      queryKeys.index.dailyDates('/one', '2026-08-01', '2026-08-31'),
+    )
+    expect(queryKeys.index.dailyDates('/one', '2026-08-01', '2026-08-31')).not.toEqual(
+      queryKeys.index.dailyDates('/two', '2026-08-01', '2026-08-31'),
+    )
+  })
+
+  it('uses one conflicted-notes identity on every surface', () => {
+    expect(queryKeys.index.conflictedNotes('/graph')).toEqual([
+      'index',
+      '/graph',
+      'conflicted-notes',
+    ])
+  })
+})
+
+describe('mutationKeys', () => {
+  it('isolates task actions and graphs', () => {
+    expect(mutationKeys.tasks.complete('/one')).not.toEqual(mutationKeys.tasks.reopen('/one'))
+    expect(mutationKeys.tasks.complete('/one')).not.toEqual(mutationKeys.tasks.complete('/two'))
   })
 })

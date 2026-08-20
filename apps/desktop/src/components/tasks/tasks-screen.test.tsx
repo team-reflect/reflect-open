@@ -4,7 +4,7 @@ import { userEvent, type Locator } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenTask } from '@reflect/core'
 import { act, useEffect, useState, type MutableRefObject, type ReactNode } from 'react'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { makeOpenTask as task } from '@/lib/tasks/open-task-fixture'
 import { resetRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { RouterProvider, useRouter } from '@/routing/router'
@@ -1473,7 +1473,7 @@ describe('TasksScreen', () => {
         updatedAt: 200,
       }),
     ])
-    await client.invalidateQueries({ queryKey: [INDEX_QUERY_SCOPE] })
+    await client.invalidateQueries({ queryKey: queryKeys.index.all })
 
     await view.findByRole('button', { name: 'Complete: project task' })
     expect(view.queryByRole('button', { name: 'Reopen: project task' })).toBeNull()
@@ -1500,7 +1500,7 @@ describe('TasksScreen', () => {
     // An unrelated invalidation refetches before the completion's reindex lands:
     // the index still returns the pre-completion row (same updatedAt). The row
     // must stay struck rather than flicker back to open.
-    await client.invalidateQueries({ queryKey: [INDEX_QUERY_SCOPE] })
+    await client.invalidateQueries({ queryKey: queryKeys.index.all })
 
     await view.findByRole('button', { name: 'Reopen: project task' })
     expect(view.queryByRole('button', { name: 'Complete: project task' })).toBeNull()

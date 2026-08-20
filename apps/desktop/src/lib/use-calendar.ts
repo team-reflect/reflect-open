@@ -14,6 +14,7 @@ import {
 } from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { isMacosDesktop } from '@/lib/platform'
+import { queryKeys } from '@/lib/query-client'
 import { useSettings } from '@/providers/settings-provider'
 
 /**
@@ -21,13 +22,6 @@ import { useSettings } from '@/providers/settings-provider'
  * (docs/porting/calendar-meetings-integration.md). Events are fetched live —
  * nothing is cached beyond the query layer, and nothing is indexed.
  */
-
-/** Prefix key for every calendar query — the change-event invalidation target. */
-export const CALENDAR_QUERY_PREFIX = ['calendar'] as const
-
-export const CALENDAR_AUTH_QUERY_KEY = ['calendar', 'authorization'] as const
-
-export const CALENDAR_LIST_QUERY_KEY = ['calendar', 'calendars'] as const
 
 /** Whether calendar queries can run at all in this environment. */
 function useCalendarAvailable(): boolean {
@@ -37,8 +31,7 @@ function useCalendarAvailable(): boolean {
 /**
  * The macOS calendar permission state (never prompts). The state changes
  * behind Reflect's back in System Settings, so this query opts out of the
- * app-wide defaults (`staleTime: Infinity`, no focus refetch — right for
- * invalidation-driven index reads, wrong here) and re-checks every time the
+ * app-wide focus policy and re-checks every time the
  * window regains focus: exactly the "flip it in System Settings and come
  * back" path.
  */
@@ -47,7 +40,7 @@ export function useCalendarAuthorization(
 ): CalendarAuthorizationStatus | undefined {
   const available = useCalendarAvailable()
   const query = useQuery({
-    queryKey: CALENDAR_AUTH_QUERY_KEY,
+    queryKey: queryKeys.calendar.authorization,
     queryFn: calendarAuthorizationStatus,
     enabled: enabled && available,
     staleTime: 0,
@@ -69,7 +62,7 @@ export interface CalendarsResult {
 export function useCalendars(enabled: boolean): CalendarsResult {
   const available = useCalendarAvailable()
   const query = useQuery({
-    queryKey: CALENDAR_LIST_QUERY_KEY,
+    queryKey: queryKeys.calendar.calendars,
     queryFn: listCalendars,
     enabled: enabled && available,
   })
@@ -90,7 +83,7 @@ export function useDayEvents(date: string): CalendarEvent[] {
   const available = useCalendarAvailable()
   const enabled = settings.calendarEnabled && settings.calendarIds.length > 0 && available
   const query = useQuery({
-    queryKey: ['calendar', 'events', date, settings.calendarIds],
+    queryKey: queryKeys.calendar.events(date, settings.calendarIds),
     queryFn: () => {
       const range = dayRange(date)
       return listCalendarEvents(range.start, range.end, settings.calendarIds)
@@ -119,7 +112,7 @@ export function useCalendarChangeInvalidation(enabled: boolean): void {
     let unlisten: Unlisten | null = null
     let disposed = false
     void subscribeCalendarChanged(() => {
-      void queryClient.invalidateQueries({ queryKey: CALENDAR_QUERY_PREFIX })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
     }).then((stop) => {
       if (disposed) {
         stop()

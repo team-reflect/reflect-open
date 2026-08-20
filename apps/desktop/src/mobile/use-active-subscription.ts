@@ -3,15 +3,13 @@ import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-quer
 import { z } from 'zod'
 import { IAP_PRODUCT_IDS, iapIsOwned, subscribeIapPurchaseUpdated } from '@reflect/core'
 import { useLocalStorageCacheWithExpiry } from '@/hooks/use-local-storage-cache-with-expiry'
+import { queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
 /** Which subscription product this device owns, if any. */
 const activeSubscriptionSchema = z.enum(['yearly', 'monthly']).nullable()
 
 export type ActiveSubscription = z.infer<typeof activeSubscriptionSchema>
-
-const ENTITLEMENT_QUERY_KEY_YEARLY = ['iap-entitlement-yearly']
-const ENTITLEMENT_QUERY_KEY_MONTHLY = ['iap-entitlement-monthly']
 
 const ACTIVE_SUBSCRIPTION_CACHE_KEY = 'active-subscription'
 
@@ -32,8 +30,8 @@ const ACTIVE_SUBSCRIPTION_CACHE_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000
  */
 async function refetchEntitlements(queryClient: QueryClient): Promise<void> {
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_YEARLY }),
-    queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_MONTHLY }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.iap.entitlement('yearly') }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.iap.entitlement('monthly') }),
   ])
 }
 
@@ -57,14 +55,14 @@ function useActiveSubscriptionQuery(): {
   const queryClient = useQueryClient()
 
   const yearlyQuery = useQuery({
-    queryKey: ENTITLEMENT_QUERY_KEY_YEARLY,
+    queryKey: queryKeys.iap.entitlement('yearly'),
     queryFn: () => iapIsOwned(IAP_PRODUCT_IDS.yearly),
     staleTime: 60_000,
     enabled,
   })
 
   const monthlyQuery = useQuery({
-    queryKey: ENTITLEMENT_QUERY_KEY_MONTHLY,
+    queryKey: queryKeys.iap.entitlement('monthly'),
     queryFn: () => iapIsOwned(IAP_PRODUCT_IDS.monthly),
     staleTime: 60_000,
     enabled,

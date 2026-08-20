@@ -4,7 +4,7 @@ import { parseSearchQuery, searchWithFilters } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { SearchInput } from '@/mobile/search-input'
 import { useGraph } from '@/providers/graph-provider'
 import type { NoteFilterRef } from './filter-state'
@@ -39,7 +39,7 @@ export function NotePickerDrawer({
 
   const bridgeReady = useBridgeReady()
   const { data: hits } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'mobile-note-picker', deferredQuery],
+    queryKey: queryKeys.index.mobileNotePicker(graph?.root, deferredQuery),
     queryFn: () => searchWithFilters(parseSearchQuery(deferredQuery), { limit: PICKER_LIMIT }),
     enabled: open && bridgeReady && graph !== null,
     // Typing re-keys the query as the deferred value settles; holding the

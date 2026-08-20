@@ -5,7 +5,7 @@ import { render } from 'vitest-browser-react'
 import type { ReactElement } from 'react'
 import { setBridge } from '@reflect/core'
 import { resetOperations, useOperations } from '@/lib/operations'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { expectLocatorToHaveCount } from '@/test-utils/expect'
 import { AllNotesScreen } from './all-notes-screen'
@@ -318,26 +318,23 @@ describe('AllNotesScreen', () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     })
-    client.setQueryData(
-      [INDEX_QUERY_SCOPE, '/g', 'all-notes', null],
-      [
-        {
-          path: 'notes/health.md',
-          title: 'Health Stacked',
-          snippet: 'Shop your health goals.',
-          tags: ['link'],
-          mtime: HEALTH_MTIME,
-        },
-        {
-          path: 'notes/tokyo.md',
-          title: 'Tokyo Gâteau',
-          snippet: 'Dandelion chocolate.',
-          tags: ['link'],
-          mtime: TOKYO_MTIME,
-        },
-      ],
-    )
-    client.setQueryData([INDEX_QUERY_SCOPE, '/g', 'all-notes-tags'], facetRows)
+    client.setQueryData(queryKeys.index.allNotes('/g', null), [
+      {
+        path: 'notes/health.md',
+        title: 'Health Stacked',
+        snippet: 'Shop your health goals.',
+        tags: ['link'],
+        mtime: HEALTH_MTIME,
+      },
+      {
+        path: 'notes/tokyo.md',
+        title: 'Tokyo Gâteau',
+        snippet: 'Dandelion chocolate.',
+        tags: ['link'],
+        mtime: TOKYO_MTIME,
+      },
+    ])
+    client.setQueryData(queryKeys.index.allNotesTags('/g'), facetRows)
 
     const view = await renderScreen(client)
 

@@ -5,7 +5,8 @@ import type { ReactNode } from 'react'
 import { setBridge, type AiProviderConfig } from '@reflect/core'
 import { resetOperations, useOperations } from '@/lib/operations'
 import { flushSettings } from '@/lib/settings-flush'
-import { SETTINGS_QUERY_KEY, SettingsProvider, useSettings } from './settings-provider'
+import { queryKeys } from '@/lib/query-client'
+import { SettingsProvider, useSettings } from './settings-provider'
 
 /**
  * Exercises the hydration + overrides contract: defaults while the load is in
@@ -72,7 +73,7 @@ function wrapper({ children }: { children: ReactNode }) {
 
 /** Resolves once the initial settings_load has populated the query cache. */
 async function loadSettled(): Promise<void> {
-  await vi.waitFor(() => expect(queryClient.getQueryData(SETTINGS_QUERY_KEY)).toBeDefined())
+  await vi.waitFor(() => expect(queryClient.getQueryData(queryKeys.settings.current)).toBeDefined())
 }
 
 beforeEach(() => {

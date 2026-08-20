@@ -1,14 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { getPinnedNotes, type PinnedNote } from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
-
-export function pinnedNotesQueryKey(
-  graphRoot: string | undefined,
-): readonly [typeof INDEX_QUERY_SCOPE, string | undefined, 'pinned-notes'] {
-  return [INDEX_QUERY_SCOPE, graphRoot, 'pinned-notes']
-}
 
 /**
  * The pinned notes from the index, kept fresh by the usual index invalidation
@@ -20,7 +14,7 @@ export function usePinnedNotes(): PinnedNote[] {
   const { graph } = useGraph()
   const bridgeReady = useBridgeReady()
   const { data } = useQuery({
-    queryKey: pinnedNotesQueryKey(graph?.root),
+    queryKey: queryKeys.index.pinnedNotes(graph?.root),
     queryFn: () => getPinnedNotes(),
     enabled: bridgeReady && graph !== null,
   })

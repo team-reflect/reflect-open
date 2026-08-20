@@ -19,6 +19,7 @@ import {
 } from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { startOperation } from '@/lib/operations'
+import { queryKeys } from '@/lib/query-client'
 import { setSettingsFlusher } from '@/lib/settings-flush'
 
 /**
@@ -30,8 +31,6 @@ import { setSettingsFlusher } from '@/lib/settings-flush'
  * optimistic cache write to defend, so an update racing the initial load needs
  * no cancellation or re-apply — the merge order is the whole story.
  */
-
-export const SETTINGS_QUERY_KEY = ['settings'] as const
 
 interface SettingsContextValue {
   settings: Settings
@@ -137,10 +136,9 @@ interface SettingsProviderProps {
 export function SettingsProvider({ children }: SettingsProviderProps): ReactElement {
   const bridgeReady = useBridgeReady()
   const { data: loaded, error: loadError } = useQuery({
-    queryKey: SETTINGS_QUERY_KEY,
+    queryKey: queryKeys.settings.current,
     queryFn: loadSettings,
     enabled: bridgeReady,
-    staleTime: Infinity,
   })
   const [overrides, setOverrides] = useState<Partial<Settings>>({})
   const loadedRef = useRef(loaded)

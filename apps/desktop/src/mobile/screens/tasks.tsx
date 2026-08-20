@@ -1,7 +1,7 @@
 import { useDeferredValue, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Archive, CircleCheck, Plus, SlidersHorizontal } from 'lucide-react'
-import { getCompletedTasks, getOpenTasks, type OpenTask } from '@reflect/core'
+import { type OpenTask } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
@@ -11,7 +11,10 @@ import { useTaskFilters } from '@/lib/tasks/task-filters'
 import type { InsertTaskTarget } from '@/lib/tasks/task-insert-target'
 import { todaysDailyTarget } from '@/lib/tasks/task-navigation'
 import { composeVisibleTaskGroups } from '@/lib/tasks/task-visibility'
-import { completedTasksQueryKey, tasksQueryKey } from '@/lib/tasks/tasks-query'
+import {
+  createCompletedTasksQueryOptions,
+  createOpenTasksQueryOptions,
+} from '@/lib/tasks/tasks-query'
 import { useTaskActions } from '@/lib/tasks/use-task-actions'
 import { useToday } from '@/lib/use-today'
 import { hapticImpactLight } from '@/mobile/haptics'
@@ -69,13 +72,11 @@ export function MobileTasks(): ReactElement {
   })
 
   const { data: open, isError: openFailed } = useQuery({
-    queryKey: tasksQueryKey(graph?.root),
-    queryFn: () => getOpenTasks(),
+    ...createOpenTasksQueryOptions(graph?.root),
     enabled,
   })
   const { data: completed, isError: completedFailed } = useQuery({
-    queryKey: completedTasksQueryKey(graph?.root),
-    queryFn: () => getCompletedTasks(),
+    ...createCompletedTasksQueryOptions(graph?.root),
     enabled: enabled && filters.archived,
   })
   const isError = openFailed || (filters.archived && completedFailed)

@@ -20,7 +20,7 @@ import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useCrashTest, useDebugUnlockTap } from '@/hooks/use-debug-unlock'
 import { marketingVersion } from '@/lib/marketing-version'
 import { openUrlSync } from '@/lib/open-url'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer'
 import { AiPromptDrawer } from '@/mobile/ai-prompt-drawer'
 import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer'
@@ -127,7 +127,7 @@ export function MobileSettings(): ReactElement {
 
   const bridgeReady = useBridgeReady()
   const { data: notes } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'mobile-note-count'],
+    queryKey: queryKeys.index.mobileNoteCount(graph?.root),
     queryFn: () => listNotes(),
     enabled: bridgeReady && graph !== null,
   })

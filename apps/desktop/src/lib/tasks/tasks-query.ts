@@ -1,4 +1,6 @@
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryOptions } from '@tanstack/react-query'
+import { getCompletedTasks, getOpenTasks } from '@reflect/core'
+import { queryKeys } from '@/lib/query-client'
 
 /**
  * The TanStack Query key for the open-tasks list, scoped to the graph root so a
@@ -6,20 +8,20 @@ import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
  * (which reads it) and a task row (which optimistically updates it on
  * completion), so the two can't drift.
  */
-export function tasksQueryKey(
-  graphRoot: string | undefined,
-): readonly [string, string | undefined, 'tasks'] {
-  return [INDEX_QUERY_SCOPE, graphRoot, 'tasks']
-}
+export const createOpenTasksQueryOptions = (graphRoot: string | undefined) =>
+  queryOptions({
+    queryKey: queryKeys.index.openTasks(graphRoot),
+    queryFn: getOpenTasks,
+  })
 
 /**
- * The query key for the completed-tasks list (the "show archived" surface),
- * scoped like {@link tasksQueryKey}. Shared so completing a task can move its row
- * from the open cache into this one optimistically rather than letting it vanish
- * until the refetch.
+ * The query options for the completed-tasks list (the "show archived" surface),
+ * scoped like {@link createOpenTasksQueryOptions}. Shared so completing a task
+ * can move its row from the open cache into this one optimistically rather than
+ * letting it vanish until the refetch.
  */
-export function completedTasksQueryKey(
-  graphRoot: string | undefined,
-): readonly [string, string | undefined, 'tasks-completed'] {
-  return [INDEX_QUERY_SCOPE, graphRoot, 'tasks-completed']
-}
+export const createCompletedTasksQueryOptions = (graphRoot: string | undefined) =>
+  queryOptions({
+    queryKey: queryKeys.index.completedTasks(graphRoot),
+    queryFn: getCompletedTasks,
+  })

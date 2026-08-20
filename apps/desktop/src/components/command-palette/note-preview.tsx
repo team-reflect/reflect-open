@@ -4,7 +4,7 @@ import { isAppError, readNote, splitFrontmatter } from '@reflect/core'
 import { MarkdownPreview } from '@/editor/markdown-preview'
 import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { formatDayLabel } from '@/lib/dates'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 import type { NoteEntry } from './entries'
@@ -39,7 +39,7 @@ export function NotePreview({ entry }: NotePreviewProps): ReactElement {
   const { settings } = useSettings()
   const { resolveImageUrl } = useAssetPersistence(graph?.generation ?? null)
   const { data, isError } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'note-preview', entry.path],
+    queryKey: queryKeys.index.notePreview(graph?.root, entry.path),
     queryFn: () => readNoteForPreview(entry.path),
     enabled: graph !== null,
   })

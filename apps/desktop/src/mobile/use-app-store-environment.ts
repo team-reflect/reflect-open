@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { getAppStoreEnvironment } from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useLocalStorageCache } from '@/hooks/use-local-storage-cache'
+import { queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
 /**
@@ -14,8 +15,6 @@ import { useGraph } from '@/providers/graph-provider'
 const appStoreEnvironmentSchema = z.enum(['Production', 'Sandbox', 'Xcode'])
 
 export type AppStoreEnvironment = z.infer<typeof appStoreEnvironmentSchema>
-
-const APP_STORE_ENVIRONMENT_QUERY_KEY = ['app-store-environment']
 
 const APP_STORE_ENVIRONMENT_CACHE_KEY = 'app-store-environment'
 
@@ -33,7 +32,7 @@ function useAppStoreEnvironmentQuery(): UseQueryResult<AppStoreEnvironment | nul
   const { platform } = useGraph()
   const bridgeReady = useBridgeReady()
   return useQuery({
-    queryKey: APP_STORE_ENVIRONMENT_QUERY_KEY,
+    queryKey: queryKeys.iap.environment,
     queryFn: async () => {
       const parsed = appStoreEnvironmentSchema.safeParse(await getAppStoreEnvironment())
       return parsed.success ? parsed.data : null
@@ -83,7 +82,7 @@ export function useAppStoreEnvironment(): {
 
   const invalidate = useCallback(() => {
     setCached(null)
-    void queryClient.invalidateQueries({ queryKey: APP_STORE_ENVIRONMENT_QUERY_KEY })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.iap.environment })
   }, [queryClient, setCached])
 
   return useMemo(

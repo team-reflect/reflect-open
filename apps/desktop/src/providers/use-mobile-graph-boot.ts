@@ -12,7 +12,8 @@ import {
   type MobileStorageKind,
 } from '@reflect/core'
 import { takeWarmMobileStorage } from '@/lib/mobile-boot-warm'
-import { SETTINGS_QUERY_KEY, useSettings } from '@/providers/settings-provider'
+import { queryKeys } from '@/lib/query-client'
+import { useSettings } from '@/providers/settings-provider'
 
 /** The graph directory created in the container for a fresh start — reads as
  * `iCloud Drive → Reflect → Notes` in Files/Finder. */
@@ -179,7 +180,7 @@ export function useMobileGraphBoot(options: MobileGraphBootOptions): MobileGraph
         // in-flight (usually settled) load instead of issuing a second
         // settings_load round trip.
         const settings = await queryClient.ensureQueryData({
-          queryKey: SETTINGS_QUERY_KEY,
+          queryKey: queryKeys.settings.current,
           queryFn: loadSettings,
         })
         if (!active) {

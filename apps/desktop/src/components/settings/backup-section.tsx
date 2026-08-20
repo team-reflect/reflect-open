@@ -1,7 +1,6 @@
 import { useRef, useState, type ReactElement } from 'react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { useQuery } from '@tanstack/react-query'
-import { getConflictedNotes, getDuplicateNoteIds } from '@reflect/core'
 import { ExternalLink } from 'lucide-react'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog'
 import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links'
@@ -13,7 +12,10 @@ import { useAsyncAction } from '@/hooks/use-async-action'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useGithubConnected } from '@/hooks/use-github-connected'
 import { suggestRepoName } from '@/lib/github-repos'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import {
+  createConflictedNotesQueryOptions,
+  createDuplicateNoteIdsQueryOptions,
+} from '@/lib/query-options'
 import { useGraph } from '@/providers/graph-provider'
 import { useSync, type BackupState } from '@/providers/sync-provider'
 
@@ -57,8 +59,7 @@ export function BackupSettingsField(): ReactElement {
 
   const bridgeReady = useBridgeReady()
   const conflicted = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, 'conflicted-notes', graph?.root],
-    queryFn: () => getConflictedNotes(),
+    ...createConflictedNotesQueryOptions(graph?.root),
     enabled: bridgeReady && graph !== null,
   })
   const conflictedNotes = conflicted.data ?? []
@@ -68,8 +69,7 @@ export function BackupSettingsField(): ReactElement {
   // note retitled differently on two devices. Surfaced for review beside the
   // marker conflicts; repair is the user's call, never automatic.
   const duplicateIds = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, 'duplicate-note-ids', graph?.root],
-    queryFn: () => getDuplicateNoteIds(),
+    ...createDuplicateNoteIdsQueryOptions(graph?.root),
     enabled: bridgeReady && graph !== null,
   })
   const forkGroups = duplicateIds.data ?? []

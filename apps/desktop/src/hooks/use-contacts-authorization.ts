@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { contactsAuthorizationStatus, type ContactsAuthorization } from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
+import { queryKeys } from '@/lib/query-client'
 
 /**
  * One shared query for the Contacts permission state, consumed by the
@@ -10,13 +11,11 @@ import { useBridgeReady } from '@/hooks/use-bridge-ready'
  * suggested-contact gate. Not index data — the key lives outside the
  * `index` scope, and consumers refresh it explicitly after prompting.
  */
-export const CONTACTS_AUTHORIZATION_QUERY_KEY = ['contacts', 'authorization'] as const
-
 /** The Contacts permission state, or `null` while the first read is in flight. */
 export function useContactsAuthorization(): ContactsAuthorization | null {
   const bridgeReady = useBridgeReady()
   const { data } = useQuery({
-    queryKey: CONTACTS_AUTHORIZATION_QUERY_KEY,
+    queryKey: queryKeys.contacts.authorization,
     queryFn: () => contactsAuthorizationStatus(),
     enabled: bridgeReady,
   })
@@ -27,7 +26,7 @@ export function useContactsAuthorization(): ContactsAuthorization | null {
 export function useRefreshContactsAuthorization(): () => Promise<void> {
   const queryClient = useQueryClient()
   return useCallback(
-    () => queryClient.invalidateQueries({ queryKey: CONTACTS_AUTHORIZATION_QUERY_KEY }),
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.contacts.authorization }),
     [queryClient],
   )
 }

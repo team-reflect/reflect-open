@@ -5,7 +5,8 @@ import type { ReactNode } from 'react'
 import { setBridge } from '@reflect/core'
 import { resetOperations } from '@/lib/operations'
 import { THEME_PREFERENCE_CACHE_KEY } from '@/lib/theme-cache'
-import { SETTINGS_QUERY_KEY, SettingsProvider } from './settings-provider'
+import { queryKeys } from '@/lib/query-client'
+import { SettingsProvider } from './settings-provider'
 import { ThemeProvider, useTheme } from './theme-provider'
 
 /**
@@ -85,7 +86,7 @@ async function settleLoad(act: Act): Promise<void> {
       // A query that has not been registered yet reads as `undefined`, which is
       // also "not pending" — require the real settled state, or this returns
       // before the load has even started.
-      const state = queryClient.getQueryState(SETTINGS_QUERY_KEY)
+      const state = queryClient.getQueryState(queryKeys.settings.current)
       expect(state).toBeDefined()
       expect(state?.status).not.toBe('pending')
     })

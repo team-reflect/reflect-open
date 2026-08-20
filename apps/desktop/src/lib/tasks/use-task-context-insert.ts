@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import type { OpenTask } from '@reflect/core'
 import { continueTaskInContext, type ContinuedTaskInContext } from '@/lib/note-task'
+import { mutationKeys } from '@/lib/query-client'
 import { relocateRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { withEditedTask, withoutTasks } from '@/lib/tasks/task-cache'
 import { insertedTaskRow } from '@/lib/tasks/task-insert-target'
@@ -33,6 +34,7 @@ export function useTaskContextInsert(): TaskContextInsert {
   const { graph } = useGraph()
   const cache = useTaskCacheWriter()
   const mutation = useMutation({
+    mutationKey: mutationKeys.tasks.contextInsert(graph?.root),
     mutationFn: ({ task, content, generation }: ContextInsertInput) =>
       continueTaskInContext(task, content, generation),
     onMutate: async ({ task, content }: ContextInsertInput) => {

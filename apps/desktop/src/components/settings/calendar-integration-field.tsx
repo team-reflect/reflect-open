@@ -15,8 +15,8 @@ import {
 } from '@/components/ui/dialog'
 import { openUrlSync } from '@/lib/open-url'
 import { isMacosDesktop } from '@/lib/platform'
+import { queryKeys } from '@/lib/query-client'
 import {
-  CALENDAR_QUERY_PREFIX,
   useCalendarAuthorization,
   useCalendarChangeInvalidation,
   useCalendars,
@@ -73,7 +73,7 @@ export function CalendarIntegrationField(): ReactElement | null {
         console.error('calendar access request failed:', cause)
       })
       .finally(() => {
-        void queryClient.invalidateQueries({ queryKey: CALENDAR_QUERY_PREFIX })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
       })
   }
 

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import type { RetrievalHit } from '@reflect/core'
-import { INDEX_QUERY_SCOPE, SIMILAR_QUERY_SCOPE } from './query-client'
+import { queryKeys } from './query-client'
 import { useSimilarNotes } from './use-similar-notes'
 
 const relatedNotes = vi.hoisted(() => vi.fn())
@@ -100,7 +100,7 @@ describe('useSimilarNotes', () => {
     // A neighbor lookup is up to seventeen vector KNN queries; unrelated graph
     // churn (a sync batch, a Git commit, the user's own typing) must not drag
     // it along, so it deliberately sits outside the index invalidation scope.
-    await client.invalidateQueries({ queryKey: [INDEX_QUERY_SCOPE] })
+    await client.invalidateQueries({ queryKey: queryKeys.index.all })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(relatedNotes).toHaveBeenCalledTimes(1)
   })
@@ -150,7 +150,7 @@ describe('useSimilarNotes', () => {
     const cleared = await renderHook(() => useSimilarNotes('daily/2026-06-09.md'), {
       wrapper: wrapper(client),
     })
-    const similarKey = [SIMILAR_QUERY_SCOPE, '/g', 'daily/2026-06-09.md']
+    const similarKey = queryKeys.similar.note('/g', 'daily/2026-06-09.md')
     await vi.waitFor(() => expect(client.getQueryData(similarKey)).toBeUndefined())
     expect(cleared.result.current).toEqual([])
     await cleared.unmount()

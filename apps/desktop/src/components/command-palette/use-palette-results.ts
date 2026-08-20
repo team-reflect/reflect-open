@@ -4,7 +4,7 @@ import { parseSearchQuery, retrieve, searchWithFilters, suggestWikiTargets } fro
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { listCommands } from '@/lib/commands/registry'
 import { todayIso } from '@/lib/dates'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { useEmbedStatus } from '@/lib/use-embed-status'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -57,15 +57,13 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
     isLoading: suggestionsLoading,
     isError: suggestionsError,
   } = useQuery({
-    queryKey: [
-      INDEX_QUERY_SCOPE,
+    queryKey: queryKeys.index.paletteSuggestions(
       graph?.root,
-      'palette-suggest',
       trimmed,
       settings.dateFormat,
       settings.weekStartDay,
       today,
-    ],
+    ),
     queryFn: () =>
       suggestWikiTargets(trimmed, 8, {
         today,
@@ -80,13 +78,7 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
     isLoading: hitsLoading,
     isError: hitsError,
   } = useQuery({
-    queryKey: [
-      INDEX_QUERY_SCOPE,
-      graph?.root,
-      'palette-search',
-      useHybrid ? 'hybrid' : 'lexical',
-      trimmed,
-    ],
+    queryKey: queryKeys.index.paletteSearch(graph?.root, useHybrid ? 'hybrid' : 'lexical', trimmed),
     queryFn: async () => {
       if (!useHybrid) {
         return await searchWithFilters(parsed)

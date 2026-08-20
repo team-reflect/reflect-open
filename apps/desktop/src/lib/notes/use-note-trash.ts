@@ -3,8 +3,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { errorMessage, type NoteListEntry } from '@reflect/core'
 import { deleteOpenNote } from '@/lib/note-delete'
 import { startOperation } from '@/lib/operations'
+import { queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
-import { allNotesListPrefix } from './all-notes-query'
 
 export interface NoteTrash {
   /**
@@ -71,7 +71,7 @@ export function useNoteTrash(): NoteTrash {
             // *fails* is left in the list, so it keeps its place in the
             // selection (which prunes only vanished rows) for an immediate retry.
             queryClient.setQueriesData<NoteListEntry[]>(
-              { queryKey: allNotesListPrefix(root) },
+              { queryKey: queryKeys.index.allNotesPrefix(root) },
               (rows) => rows?.filter((row) => row.path !== path),
             )
           } catch (cause) {
