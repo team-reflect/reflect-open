@@ -5,6 +5,7 @@ import {
   getDuplicateNoteIds,
   listChatConversations,
   listTemplates,
+  loadSettings,
 } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client'
 
@@ -45,5 +46,13 @@ export function createChatConversationsQueryOptions(root: string | undefined) {
   return queryOptions({
     queryKey: queryKeys.chat.conversations(root),
     queryFn: () => listChatConversations(),
+  })
+}
+
+export function createSettingsQueryOptions() {
+  return queryOptions({
+    queryKey: queryKeys.settings.all,
+    queryFn: loadSettings,
+    staleTime: Infinity,
   })
 }

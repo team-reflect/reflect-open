@@ -10,16 +10,10 @@ import {
   type ReactNode,
 } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  DEFAULT_SETTINGS,
-  loadSettings,
-  saveSettings,
-  errorMessage,
-  type Settings,
-} from '@reflect/core'
+import { DEFAULT_SETTINGS, saveSettings, errorMessage, type Settings } from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { startOperation } from '@/lib/operations'
-import { queryKeys } from '@/lib/query-client'
+import { createSettingsQueryOptions } from '@/lib/query-options'
 import { setSettingsFlusher } from '@/lib/settings-flush'
 
 /**
@@ -136,8 +130,7 @@ interface SettingsProviderProps {
 export function SettingsProvider({ children }: SettingsProviderProps): ReactElement {
   const bridgeReady = useBridgeReady()
   const { data: loaded, error: loadError } = useQuery({
-    queryKey: queryKeys.settings.all,
-    queryFn: loadSettings,
+    ...createSettingsQueryOptions(),
     enabled: bridgeReady,
   })
   const [overrides, setOverrides] = useState<Partial<Settings>>({})

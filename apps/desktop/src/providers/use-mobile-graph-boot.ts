@@ -4,7 +4,6 @@ import {
   createGraph,
   errorMessage,
   isMobilePlatform,
-  loadSettings,
   mobileStorage,
   mobileStorageLocal,
   type AppPlatform,
@@ -12,7 +11,7 @@ import {
   type MobileStorageKind,
 } from '@reflect/core'
 import { takeWarmMobileStorage } from '@/lib/mobile-boot-warm'
-import { queryKeys } from '@/lib/query-client'
+import { createSettingsQueryOptions } from '@/lib/query-options'
 import { useSettings } from '@/providers/settings-provider'
 
 /** The graph directory created in the container for a fresh start — reads as
@@ -179,10 +178,7 @@ export function useMobileGraphBoot(options: MobileGraphBootOptions): MobileGraph
         // before the mobile chunk was even fetched — so this reads the
         // in-flight (usually settled) load instead of issuing a second
         // settings_load round trip.
-        const settings = await queryClient.ensureQueryData({
-          queryKey: queryKeys.settings.all,
-          queryFn: loadSettings,
-        })
+        const settings = await queryClient.ensureQueryData(createSettingsQueryOptions())
         if (!active) {
           return
         }

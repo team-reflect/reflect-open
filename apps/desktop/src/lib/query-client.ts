@@ -272,10 +272,9 @@ export const queryClient = new QueryClient({
 })
 
 // SQLite projections and chat history are refreshed by explicit invalidation.
-// Settings is hydrated once, then updated by its provider.
+// Settings load freshness lives with its shared query options.
 queryClient.setQueryDefaults(queryKeys.index.all, { staleTime: Infinity })
 queryClient.setQueryDefaults(queryKeys.chat.all, { staleTime: Infinity })
-queryClient.setQueryDefaults(queryKeys.settings.all, { staleTime: Infinity })
 
 /** Refetch all index-backed queries; called after index rows change. */
 export function invalidateIndexQueries(): void {
