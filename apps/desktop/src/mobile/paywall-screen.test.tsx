@@ -36,7 +36,7 @@ beforeEach(() => {
   setBridge({
     invoke: async (command) => {
       if (command === 'plugin:iap|get_products') {
-        return getProducts()
+        return await getProducts()
       }
       return null
     },
