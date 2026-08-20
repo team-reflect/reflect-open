@@ -20,10 +20,6 @@ interface PurchaseVariables {
   productId: string
 }
 
-function purchaseProduct(variables: PurchaseVariables): Promise<void> {
-  return iapPurchase(variables.productId)
-}
-
 /** How long "Remind me later" keeps the paywall dismissed. */
 const SNOOZE_MS = 24 * 60 * 60 * 1000
 
@@ -62,7 +58,7 @@ export function PaywallScreen(): ReactElement {
   const purchaseMutation = useMutation({
     mutationKey: mutationKeys.iap.purchase,
     scope: { id: mutationScopeIds.iapAction },
-    mutationFn: purchaseProduct,
+    mutationFn: (variables: PurchaseVariables) => iapPurchase(variables.productId),
     onSuccess: subscription.invalidate,
   })
   const restoreMutation = useMutation({

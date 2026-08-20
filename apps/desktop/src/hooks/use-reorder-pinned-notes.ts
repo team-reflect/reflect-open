@@ -13,10 +13,6 @@ interface ReorderPinnedNotesVariables {
   root: string
 }
 
-function writePinnedNotesOrder(variables: ReorderPinnedNotesVariables): Promise<void> {
-  return reorderPinnedNotes(variables.notes, variables.generation)
-}
-
 export function useReorderPinnedNotes(
   pinned: readonly PinnedNote[],
 ): (activePath: string, overPath: string) => void {
@@ -25,13 +21,15 @@ export function useReorderPinnedNotes(
   const mutation = useMutation({
     mutationKey: mutationKeys.pinnedNotes.reorder(graph?.root),
     scope: { id: mutationScopeIds.pinnedNotesReorder(graph?.root) },
-    mutationFn: writePinnedNotesOrder,
+    mutationFn: (variables: ReorderPinnedNotesVariables) =>
+      reorderPinnedNotes(variables.notes, variables.generation),
     onError: (_error, variables) => {
-      const pendingCount = queryClient.isMutating({
-        exact: true,
-        mutationKey: mutationKeys.pinnedNotes.reorder(variables.root),
-      })
-      if (pendingCount === 1) {
+      if (
+        queryClient.isMutating({
+          exact: true,
+          mutationKey: mutationKeys.pinnedNotes.reorder(variables.root),
+        }) === 1
+      ) {
         invalidatePinnedNotesCache(queryClient, variables.root)
       }
     },
@@ -50,11 +48,7 @@ export function useReorderPinnedNotes(
       }
       const reordered = arrayMove([...pinned], activeIndex, overIndex)
       updatePinnedNotesCache(queryClient, graph.root, () => reordered)
-      mutation.mutate({
-        generation: graph.generation,
-        notes: reordered,
-        root: graph.root,
-      })
+      mutation.mutate({ generation: graph.generation, notes: reordered, root: graph.root })
     },
     [graph, mutation, pinned, queryClient],
   )

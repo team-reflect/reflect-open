@@ -60,6 +60,8 @@ export function AgentsSection(): ReactElement | null {
 
   const installed = status?.installState === 'current'
   const actionError = mutation.error === null ? null : errorMessage(mutation.error)
+  const mutate = (action: AgentSkillAction['action']): void =>
+    mutation.mutate({ action, generation: graph.generation, root: graph.root })
   return (
     <SettingsSection id="agents">
       <SettingsField
@@ -83,17 +85,7 @@ export function AgentsSection(): ReactElement | null {
                     Installed
                   </span>
                 ) : (
-                  <Button
-                    size="xs"
-                    disabled={mutation.isPending}
-                    onClick={() =>
-                      mutation.mutate({
-                        action: 'install',
-                        generation: graph.generation,
-                        root: graph.root,
-                      })
-                    }
-                  >
+                  <Button size="xs" disabled={mutation.isPending} onClick={() => mutate('install')}>
                     {status.installState === 'stale' ? 'Update skill' : 'Install skill'}
                   </Button>
                 )}
@@ -102,13 +94,7 @@ export function AgentsSection(): ReactElement | null {
                     size="xs"
                     variant="outline"
                     disabled={mutation.isPending}
-                    onClick={() =>
-                      mutation.mutate({
-                        action: 'uninstall',
-                        generation: graph.generation,
-                        root: graph.root,
-                      })
-                    }
+                    onClick={() => mutate('uninstall')}
                   >
                     Remove
                   </Button>
