@@ -11,6 +11,7 @@ export default defineESLintConfig(
     packageJson: false,
     command: true,
     perfectionist: false,
+    jsdoc: false,
   },
   {
     ignores: ['./design-system/', '**/.wxt/', '**/.output/'],
@@ -38,8 +39,6 @@ export default defineESLintConfig(
       '@typescript-eslint/prefer-promise-reject-errors': 'off',
       '@typescript-eslint/require-await': 'off',
       '@typescript-eslint/unbound-method': 'off',
-      'jsdoc/multiline-blocks': 'off',
-      'jsdoc/no-multi-asterisks': 'off',
       'no-var': 'off',
       'react-hooks/exhaustive-deps': 'off',
       'react-hooks/globals': 'off',
