@@ -16,15 +16,14 @@ function readAppStoreEnvironmentSeed(): AppStoreEnvironment | undefined {
   return getLocalStorageStore(APP_STORE_ENVIRONMENT_STORAGE_KEY).getJson(appStoreEnvironmentSchema)
 }
 
-// REVIEW: 你既然有 readAppStoreEnvironmentSeed，那么也创建一个对称的函数 writeAppStoreEnvironmentSeed(value: AppStoreEnvironment): void . 这样可以提升代码美观度 FIXME
+function writeAppStoreEnvironmentSeed(value: AppStoreEnvironment): void {
+  getLocalStorageStore(APP_STORE_ENVIRONMENT_STORAGE_KEY).setJson(appStoreEnvironmentSchema, value)
+}
 
 async function fetchAppStoreEnvironment(): Promise<AppStoreEnvironment> {
   const parsed = appStoreEnvironmentSchema.safeParse(await getAppStoreEnvironment())
   const environment = parsed.success ? parsed.data : null
-  getLocalStorageStore(APP_STORE_ENVIRONMENT_STORAGE_KEY).setJson(
-    appStoreEnvironmentSchema,
-    environment,
-  )
+  writeAppStoreEnvironmentSeed(environment)
   return environment
 }
 
