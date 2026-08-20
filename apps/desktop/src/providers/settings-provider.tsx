@@ -91,6 +91,11 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
     (): Promise<SettingsLoadOutcome> => loadSettle.current?.promise ?? Promise.resolve('failed'),
     [],
   )
+  useEffect(() => {
+    if (loadState !== 'pending') {
+      loadSettle.current?.resolve(loadState)
+    }
+  }, [loadState])
 
   const persistQueue = useRef<Promise<void>>(Promise.resolve())
   const lastPersisted = useRef<Settings | null>(null)
@@ -202,7 +207,6 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
     setLoadState(outcome)
     preloadPatchRef.current = {}
     setPreloadPatch({})
-    loadSettle.current?.resolve(outcome)
     if (outcome === 'loaded') {
       void persistIfChanged(current)
     }
