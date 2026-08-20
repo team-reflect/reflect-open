@@ -58,7 +58,7 @@ function installFakeBridge(): void {
         case 'skill_install': {
           const generation = args?.['generation']
           if (typeof generation !== 'number') {
-            throw new Error('missing generation')
+            throw new TypeError('missing generation')
           }
           installGenerations.push(generation)
           return await installResult()
@@ -66,7 +66,7 @@ function installFakeBridge(): void {
         case 'skill_uninstall': {
           const generation = args?.['generation']
           if (typeof generation !== 'number') {
-            throw new Error('missing generation')
+            throw new TypeError('missing generation')
           }
           uninstallGenerations.push(generation)
           return await uninstallResult()
@@ -82,7 +82,7 @@ function installFakeBridge(): void {
 type SectionView = Awaited<ReturnType<typeof render>>
 
 async function renderSection(): Promise<SectionView> {
-  return render(
+  return await render(
     <QueryClientProvider client={queryClient}>
       <AgentsSection />
     </QueryClientProvider>,
