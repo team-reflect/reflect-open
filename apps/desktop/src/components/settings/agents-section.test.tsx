@@ -2,7 +2,8 @@ import { render } from 'vitest-browser-react'
 import { page } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { setBridge } from '@reflect/core'
+import { setBridge, type AgentSkillStatus } from '@reflect/core'
+import { queryKeys } from '@/lib/query-client'
 import { AgentsSection } from './agents-section'
 
 // A browser-mode module mock materializes value exports once, so this file
@@ -11,17 +12,33 @@ import { AgentsSection } from './agents-section'
 vi.mock('@/lib/platform', () => ({ isMacosDesktop: true, isNativeShell: () => true }))
 
 const GRAPH = { root: '/graphs/Personal', name: 'Personal', generation: 7 }
+const graphState = vi.hoisted(() => ({
+  graph: { root: '/graphs/Personal', name: 'Personal', generation: 7 },
+}))
 vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: GRAPH }),
+  useGraph: () => graphState,
 }))
 
 type InstallState = 'missing' | 'current' | 'stale' | 'conflict'
 
 let installState: InstallState
-let installCalls: Array<Record<string, unknown>>
-let uninstallCalls: Array<Record<string, unknown>>
+let installGenerations: number[]
+let uninstallGenerations: number[]
+let installResult: () => Promise<AgentSkillStatus>
+let uninstallResult: () => Promise<AgentSkillStatus>
+let queryClient: QueryClient
 
-function statusPayload(): Record<string, unknown> {
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolvePromise = (_value: T): void => {
+    throw new Error('promise not initialized')
+  }
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve
+  })
+  return { promise, resolve: (value) => resolvePromise(value) }
+}
+
+function statusPayload(): AgentSkillStatus {
   return {
     skillName: 'reflect-personal',
     skillPath: '/Users/me/.agents/skills/reflect-personal/SKILL.md',
@@ -31,22 +48,28 @@ function statusPayload(): Record<string, unknown> {
 }
 
 function installFakeBridge(): void {
-  installCalls = []
-  uninstallCalls = []
+  installGenerations = []
+  uninstallGenerations = []
   setBridge({
     invoke: async (command, args) => {
       switch (command) {
         case 'skill_status':
           return statusPayload()
         case 'skill_install': {
-          installCalls.push(args ?? {})
-          installState = 'current'
-          return statusPayload()
+          const generation = args?.['generation']
+          if (typeof generation !== 'number') {
+            throw new Error('missing generation')
+          }
+          installGenerations.push(generation)
+          return await installResult()
         }
         case 'skill_uninstall': {
-          uninstallCalls.push(args ?? {})
-          installState = 'missing'
-          return statusPayload()
+          const generation = args?.['generation']
+          if (typeof generation !== 'number') {
+            throw new Error('missing generation')
+          }
+          uninstallGenerations.push(generation)
+          return await uninstallResult()
         }
         default:
           throw new Error(`unexpected command ${command}`)
@@ -56,9 +79,10 @@ function installFakeBridge(): void {
   })
 }
 
-async function renderSection(): Promise<void> {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  await render(
+type SectionView = Awaited<ReturnType<typeof render>>
+
+async function renderSection(): Promise<SectionView> {
+  return render(
     <QueryClientProvider client={queryClient}>
       <AgentsSection />
     </QueryClientProvider>,
@@ -66,12 +90,23 @@ async function renderSection(): Promise<void> {
 }
 
 beforeEach(() => {
+  graphState.graph = GRAPH
   installState = 'missing'
+  installResult = async () => {
+    installState = 'current'
+    return statusPayload()
+  }
+  uninstallResult = async () => {
+    installState = 'missing'
+    return statusPayload()
+  }
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   installFakeBridge()
 })
 
 afterEach(() => {
   setBridge(null)
+  queryClient.clear()
 })
 
 describe('AgentsSection', () => {
@@ -80,19 +115,86 @@ describe('AgentsSection', () => {
     await page.getByRole('button', { name: 'Install skill' }).click()
 
     await expect.element(page.getByText('Installed')).toBeInTheDocument()
-    expect(installCalls).toEqual([{ generation: GRAPH.generation }])
+    expect(installGenerations).toEqual([GRAPH.generation])
     await expect
       .element(page.getByText('/Users/me/.agents/skills/reflect-personal/SKILL.md'))
       .toBeInTheDocument()
   })
 
-  it('offers an update for a stale install and removal for any managed one', async () => {
+  it('updates a stale install with the graph generation pinned', async () => {
+    installState = 'stale'
+    await renderSection()
+
+    await page.getByRole('button', { name: 'Update skill' }).click()
+    await expect.element(page.getByText('Installed')).toBeInTheDocument()
+    expect(installGenerations).toEqual([GRAPH.generation])
+  })
+
+  it('removes any managed install with the graph generation pinned', async () => {
     installState = 'stale'
     await renderSection()
 
     await page.getByRole('button', { name: 'Remove' }).click()
     await expect.element(page.getByRole('button', { name: 'Install skill' })).toBeInTheDocument()
-    expect(uninstallCalls).toEqual([{ generation: GRAPH.generation }])
+    expect(uninstallGenerations).toEqual([GRAPH.generation])
+  })
+
+  it('disables all actions while one mutation is pending', async () => {
+    installState = 'stale'
+    installResult = () => new Promise<AgentSkillStatus>(() => {})
+    await renderSection()
+
+    await page.getByRole('button', { name: 'Update skill' }).click()
+    await expect.element(page.getByRole('button', { name: 'Update skill' })).toBeDisabled()
+    await expect.element(page.getByRole('button', { name: 'Remove' })).toBeDisabled()
+  })
+
+  it('shows mutation errors and clears them when retrying', async () => {
+    let shouldFail = true
+    installResult = async () => {
+      if (shouldFail) {
+        throw new Error('Installing failed')
+      }
+      installState = 'current'
+      return statusPayload()
+    }
+    await renderSection()
+
+    await page.getByRole('button', { name: 'Install skill' }).click()
+    await expect.element(page.getByText('Installing failed')).toBeInTheDocument()
+
+    shouldFail = false
+    await page.getByRole('button', { name: 'Install skill' }).click()
+    await expect.element(page.getByText('Installed')).toBeInTheDocument()
+    expect(page.getByText('Installing failed').query()).toBeNull()
+  })
+
+  it('writes a completed mutation to its original graph cache', async () => {
+    const pendingInstall = deferred<AgentSkillStatus>()
+    installResult = () => pendingInstall.promise
+    const view = await renderSection()
+    await page.getByRole('button', { name: 'Install skill' }).click()
+
+    const nextGraph = { root: '/graphs/Work', name: 'Work', generation: 11 }
+    graphState.graph = nextGraph
+    await view.rerender(
+      <QueryClientProvider client={queryClient}>
+        <AgentsSection />
+      </QueryClientProvider>,
+    )
+    const nextStatus = { ...statusPayload(), skillPath: '/work/SKILL.md' }
+    queryClient.setQueryData(queryKeys.agentSkill.status(nextGraph.root), nextStatus)
+
+    installState = 'current'
+    pendingInstall.resolve(statusPayload())
+    await vi.waitFor(() =>
+      expect(queryClient.getQueryData(queryKeys.agentSkill.status(GRAPH.root))).toEqual(
+        statusPayload(),
+      ),
+    )
+    expect(queryClient.getQueryData(queryKeys.agentSkill.status(nextGraph.root))).toEqual(
+      nextStatus,
+    )
   })
 
   it('refuses to touch an unmanaged file', async () => {

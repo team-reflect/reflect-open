@@ -245,7 +245,7 @@ export const mutationKeys = {
 
 export const mutationScopeIds = {
   pinnedNotesReorder: (root: string) => `pinned-notes:reorder:${root}`,
-  agentSkillWrite: (root: string) => `agent-skill:write:${root}`,
+  agentSkillWrite: (root: GraphRoot) => `agent-skill:write:${root ?? 'none'}`,
   iapAction: 'iap:action',
   settingsSave: 'settings:save',
 } as const

@@ -1,5 +1,5 @@
-import { useState, type ReactElement } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
 import {
   agentSkillInstall,
@@ -13,8 +13,19 @@ import { SettingsSection } from '@/components/settings/section'
 import { Button } from '@/components/ui/button'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { isMacosDesktop } from '@/lib/platform'
-import { queryKeys } from '@/lib/query-client'
+import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
+
+type AgentSkillAction =
+  | { action: 'install'; generation: number; root: string }
+  | { action: 'update'; generation: number; root: string }
+  | { action: 'remove'; generation: number; root: string }
+
+function writeAgentSkill(variables: AgentSkillAction): Promise<AgentSkillStatus> {
+  return variables.action === 'remove'
+    ? agentSkillUninstall(variables.generation)
+    : agentSkillInstall(variables.generation)
+}
 
 /**
  * Settings → Agents: one-click install of a per-graph agent skill under
@@ -26,8 +37,6 @@ import { useGraph } from '@/providers/graph-provider'
 export function AgentsSection(): ReactElement | null {
   const { graph } = useGraph()
   const queryClient = useQueryClient()
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const queryKey = queryKeys.agentSkill.status(graph?.root)
   const bridgeReady = useBridgeReady()
   const { data: status } = useQuery({
@@ -35,27 +44,21 @@ export function AgentsSection(): ReactElement | null {
     queryFn: agentSkillStatus,
     enabled: bridgeReady && isMacosDesktop && graph !== null,
   })
+  const mutation = useMutation({
+    mutationKey: mutationKeys.agentSkill.write(graph?.root),
+    scope: { id: mutationScopeIds.agentSkillWrite(graph?.root) },
+    mutationFn: writeAgentSkill,
+    onSuccess: (nextStatus, variables) => {
+      queryClient.setQueryData(queryKeys.agentSkill.status(variables.root), nextStatus)
+    },
+  })
 
   if (!isMacosDesktop || graph === null) {
     return null
   }
 
-  async function run(action: (generation: number) => Promise<AgentSkillStatus>): Promise<void> {
-    if (graph === null) {
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      queryClient.setQueryData(queryKey, await action(graph.generation))
-    } catch (caught) {
-      setError(errorMessage(caught))
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const installed = status?.installState === 'current'
+  const actionError = mutation.error === null ? null : errorMessage(mutation.error)
   return (
     <SettingsSection id="agents">
       <SettingsField
@@ -79,7 +82,17 @@ export function AgentsSection(): ReactElement | null {
                     Installed
                   </span>
                 ) : (
-                  <Button size="xs" disabled={busy} onClick={() => void run(agentSkillInstall)}>
+                  <Button
+                    size="xs"
+                    disabled={mutation.isPending}
+                    onClick={() =>
+                      mutation.mutate({
+                        action: status.installState === 'stale' ? 'update' : 'install',
+                        generation: graph.generation,
+                        root: graph.root,
+                      })
+                    }
+                  >
                     {status.installState === 'stale' ? 'Update skill' : 'Install skill'}
                   </Button>
                 )}
@@ -87,15 +100,23 @@ export function AgentsSection(): ReactElement | null {
                   <Button
                     size="xs"
                     variant="outline"
-                    disabled={busy}
-                    onClick={() => void run(agentSkillUninstall)}
+                    disabled={mutation.isPending}
+                    onClick={() =>
+                      mutation.mutate({
+                        action: 'remove',
+                        generation: graph.generation,
+                        root: graph.root,
+                      })
+                    }
                   >
                     Remove
                   </Button>
                 ) : null}
               </div>
             )}
-            {error !== null ? <p className="text-xs text-destructive">{error}</p> : null}
+            {actionError !== null ? (
+              <p className="text-xs text-destructive">{actionError}</p>
+            ) : null}
           </div>
         ) : null}
       </SettingsField>
