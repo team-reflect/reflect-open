@@ -12,9 +12,12 @@ export const queryKeys = {
       return [...this.all, root] as const
     },
     allNotesPrefix(root: GraphRoot) {
+      // REVIEW: rename "allNotesPrefix(root)" method to "allNotes(root)"
       return [...this.graph(root), 'all-notes'] as const
     },
     allNotes(root: GraphRoot, foldedTag: string | null) {
+      // REVIEW/ FIXME: rename "allNotes(root, foldedTag)" method to "allNotesWithTag((root, foldedTag))"
+      // REVIEW: "[...this.allNotesPrefix(root), foldedTag]" and "[...this.graph(root), 'all-notes-tags']" might conflict, if "foldedTag" is exatly "all-notes-tags", so add a string beteween like return [...this.allNotesPrefix(root), "tag???I do not know you name it " foldedTag] as const
       return [...this.allNotesPrefix(root), foldedTag] as const
     },
     allNotesTags(root: GraphRoot) {
