@@ -4,7 +4,6 @@ import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import { setBridge, type AppPlatform } from '@reflect/core'
 import { usePaywallRequested } from '@/hooks/use-paywall-requested'
-import { resetStorageStores } from '@/lib/storage'
 import { SettingsProvider } from '@/providers/settings-provider'
 import { usePaywallGate, type PaywallGate } from './use-paywall-gate'
 
@@ -105,7 +104,6 @@ beforeEach(() => {
   stored = {}
   localStorage.clear()
   sessionStorage.clear()
-  resetStorageStores()
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
@@ -232,6 +230,18 @@ describe('usePaywallGate', () => {
       const { result } = await renderHook(() => usePaywallGate(), { wrapper })
       // A remembered `yearly` would have let this launch straight in.
       expect(result.current).toBe('pending')
+    })
+
+    it('drops a remembered channel the probe no longer recognizes', async () => {
+      environment = () => Promise.resolve('Sandbox')
+      await runLaunch('hide')
+      environment = () => Promise.resolve('Moon')
+      await runLaunch('show')
+
+      environment = never
+      const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+      // A remembered `Sandbox` would have let this launch straight in.
+      await vi.waitFor(() => expect(result.current).toBe('show'))
     })
 
     it('corrects a remembered Sandbox once the build reaches the App Store', async () => {

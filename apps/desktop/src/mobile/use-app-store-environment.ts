@@ -67,16 +67,19 @@ export function useAppStoreEnvironment(): {
   const [cached, setCached] = useAppStoreEnvironmentCache()
 
   const queryData = query.data ?? null
+  const isSuccess = query.isSuccess
   const isLoading = query.isLoading
   const isError = query.isError
 
+  // A settled answer replaces what was remembered, a channel this build does
+  // not know included; a failed probe leaves it alone.
   useEffect(() => {
-    if (!isLoading && !isError && queryData !== null) {
+    if (isSuccess) {
       setCached(queryData)
     }
-  }, [isError, isLoading, queryData, setCached])
+  }, [isSuccess, queryData, setCached])
 
-  const value = queryData ?? cached
+  const value = isSuccess ? queryData : cached
 
   const invalidate = useCallback(() => {
     setCached(null)
