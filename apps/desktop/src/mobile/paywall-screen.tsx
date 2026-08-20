@@ -59,10 +59,7 @@ export function PaywallScreen(): ReactElement {
     setPending(plan)
     try {
       await iapPurchase(product.productId)
-      // The plugin resolves `purchase` without emitting `purchaseUpdated`
-      // (see `useActiveSubscription`), so refetch here: the fresh entitlement
-      // flips the gate in mobile-app.tsx and unmounts this screen, no
-      // navigation needed.
+      // The plugin resolves `purchase` without emitting `purchaseUpdated`.
       subscription.invalidate()
     } catch {
       // Cancelled or failed; the StoreKit sheet already told the user.

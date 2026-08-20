@@ -101,8 +101,6 @@ export function MobileSettings(): ReactElement {
   const version = useAppVersion()
   const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
   const crashTest = useCrashTest()
-  // The gate asks for the install channel at boot, so this row reads the
-  // shared answer instead of probing again.
   const environment = useAppStoreEnvironment()
   const sync = useSyncContext()
   // Shared with the status pill (one hook, one query cache entry) — and null
@@ -389,7 +387,7 @@ export function MobileSettings(): ReactElement {
               {isIos ? (
                 <SettingsValueRow
                   label="Environment"
-                  value={environment.value ?? (environment.isError ? 'Unknown' : '…')}
+                  value={environment.value ?? (environment.isError ? 'Unknown' : 'Loading…')}
                 />
               ) : null}
               <SettingsActionRow
