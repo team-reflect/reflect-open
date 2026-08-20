@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { IAP_PRODUCT_IDS, iapIsOwned, subscribeIapPurchaseUpdated } from '@reflect/core'
+import { measureBootTiming } from '@/mobile/boot-timing'
 import { useGraph } from '@/providers/graph-provider'
 
 const ENTITLEMENT_QUERY_KEY_YEARLY = ['iap-entitlement-yearly']
@@ -45,14 +46,17 @@ export function useActiveSubscription(): {
 
   const yearlyQuery = useQuery({
     queryKey: ENTITLEMENT_QUERY_KEY_YEARLY,
-    queryFn: () => iapIsOwned(IAP_PRODUCT_IDS.yearly),
+    // The `measureBootTiming` wrapper is temporary; see `boot-timing.ts`.
+    queryFn: () =>
+      measureBootTiming('entitlement: yearly', () => iapIsOwned(IAP_PRODUCT_IDS.yearly)),
     staleTime: 60_000,
     enabled: needSubscription,
   })
 
   const monthlyQuery = useQuery({
     queryKey: ENTITLEMENT_QUERY_KEY_MONTHLY,
-    queryFn: () => iapIsOwned(IAP_PRODUCT_IDS.monthly),
+    queryFn: () =>
+      measureBootTiming('entitlement: monthly', () => iapIsOwned(IAP_PRODUCT_IDS.monthly)),
     staleTime: 60_000,
     enabled: needSubscription,
   })

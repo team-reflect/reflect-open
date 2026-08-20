@@ -13,6 +13,7 @@ import {
   useKeyboardFieldReveal,
   useKeyboardHeightVar,
 } from '@/mobile/use-keyboard'
+import { useBootTiming } from '@/mobile/use-boot-timing'
 import { useShouldShowPaywall } from '@/mobile/use-should-show-paywall'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics'
 import { CaptureProvider } from '@/providers/capture-provider'
@@ -36,6 +37,9 @@ import { RouterProvider } from '@/routing/router'
 export function MobileApp(): ReactElement {
   const { status, graph, error, needsOnboarding } = useGraph()
   const shouldShowPaywall = useShouldShowPaywall()
+  // Temporary (see `boot-timing.ts`): how long the paywall gate and the graph
+  // open each hold this screen's `Loading…` on a cold start.
+  useBootTiming(shouldShowPaywall, status)
   useKeyboardHeightVar()
   useKeyboardFieldReveal()
   useKeyboardCaretReveal()

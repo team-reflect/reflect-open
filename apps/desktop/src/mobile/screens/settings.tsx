@@ -24,6 +24,7 @@ import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer'
 import { AiPromptDrawer } from '@/mobile/ai-prompt-drawer'
 import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer'
+import { BootTimingRows } from '@/mobile/boot-timing-rows'
 import { ChatSystemPromptDrawer } from '@/mobile/chat-system-prompt-drawer'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
@@ -400,6 +401,8 @@ export function MobileSettings(): ReactElement {
                 tone="destructive"
                 onPress={crashTest}
               />
+              {/* Temporary; see `boot-timing.ts`. */}
+              <BootTimingRows />
             </SettingsGroup>
           ) : null}
         </div>
