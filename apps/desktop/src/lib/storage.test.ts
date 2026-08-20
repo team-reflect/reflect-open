@@ -1,26 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
+import { createStorage } from '@/test-utils/storage'
 import { StorageStore } from './storage'
-
-function createStorage(entries: Record<string, string> = {}): Storage {
-  const values = new Map(Object.entries(entries))
-  return {
-    get length() {
-      return values.size
-    },
-    key: (index) => [...values.keys()][index] ?? null,
-    getItem: (key) => values.get(key) ?? null,
-    setItem: (key, value) => {
-      values.set(key, value)
-    },
-    removeItem: (key) => {
-      values.delete(key)
-    },
-    clear: () => {
-      values.clear()
-    },
-  }
-}
 
 afterEach(() => {
   vi.unstubAllGlobals()
