@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.1...v0.11.0-beta.2) (2026-08-20)
+
+
+### Bug Fixes
+
+* fix TestFlight CI build ([#1144](https://github.com/team-reflect/reflect-open/issues/1144)) ([1fa7391](https://github.com/team-reflect/reflect-open/commit/1fa73918710b07093e6e19415dee80fafebcf172))
+
 ## [0.11.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta...v0.11.0-beta.1) (2026-08-19)
 
 
