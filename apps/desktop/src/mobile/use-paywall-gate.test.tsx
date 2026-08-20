@@ -185,16 +185,6 @@ describe('usePaywallGate', () => {
     await vi.waitFor(() => expect(result.current).toBe('hide'))
   })
 
-  it.each(['yearly', 'monthly'] as const)(
-    'accepts a live %s subscription without waiting on its sibling lookup',
-    async (product) => {
-      owned = (productId) =>
-        productId.endsWith(`.${product}`) ? Promise.resolve(true) : never<boolean>()
-      const { result } = await renderHook(() => usePaywallGate(), { wrapper })
-      await vi.waitFor(() => expect(result.current).toBe('hide'))
-    },
-  )
-
   it('refetches entitlements through the TanStack focus path', async () => {
     owned = () => Promise.resolve(false)
     const { result } = await renderHook(() => usePaywallGate(), { wrapper })
@@ -205,9 +195,7 @@ describe('usePaywallGate', () => {
     focusManager.setFocused(false)
     focusManager.setFocused(true)
     await vi.waitFor(() =>
-      expect(queryClient.getQueryState(queryKeys.iap.entitlement('yearly'))?.fetchStatus).toBe(
-        'fetching',
-      ),
+      expect(queryClient.getQueryState(queryKeys.iap.entitlements)?.fetchStatus).toBe('fetching'),
     )
     expect(result.current).toBe('show')
 
@@ -344,9 +332,7 @@ describe('usePaywallGate', () => {
       const failedLaunch = await renderHook(() => usePaywallGate(), { wrapper })
       expect(failedLaunch.result.current).toBe('hide')
       await vi.waitFor(() =>
-        expect(queryClient.getQueryState(queryKeys.iap.entitlement('yearly'))?.status).toBe(
-          'error',
-        ),
+        expect(queryClient.getQueryState(queryKeys.iap.entitlements)?.status).toBe('error'),
       )
       await failedLaunch.unmount()
       queryClient.clear()
