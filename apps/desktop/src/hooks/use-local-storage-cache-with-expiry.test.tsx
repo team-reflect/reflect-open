@@ -2,7 +2,6 @@ import { renderHook } from 'vitest-browser-react'
 import { z } from 'zod'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLocalStorageCacheWithExpiry } from '@/hooks/use-local-storage-cache-with-expiry'
-import { resetStorageStores } from '@/lib/storage'
 
 /**
  * What the shelf life adds: a value that reads as `null` once it is too old,
@@ -16,7 +15,6 @@ const MINUTE_MS = 60_000
 
 beforeEach(() => {
   localStorage.clear()
-  resetStorageStores()
 })
 
 afterEach(() => {

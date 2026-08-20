@@ -2,7 +2,6 @@ import { z } from 'zod'
 import { renderHook } from 'vitest-browser-react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { CACHE_KEY_PREFIX, useLocalStorageCache } from '@/hooks/use-local-storage-cache'
-import { resetStorageStores } from '@/lib/storage'
 import { useLocalStorageExternalStore } from '@/hooks/use-local-storage-external-store'
 
 /**
@@ -15,7 +14,6 @@ const KEY = 'test-cache'
 
 beforeEach(() => {
   localStorage.clear()
-  resetStorageStores()
 })
 
 describe('useLocalStorageCache', () => {
@@ -75,12 +73,12 @@ describe('useLocalStorageCache', () => {
 
   it('keeps every instance of one key in agreement', async () => {
     const { result, act } = await renderHook(() => ({
-      a: useLocalStorageCache(KEY, schema),
-      b: useLocalStorageCache(KEY, schema),
+      first: useLocalStorageCache(KEY, schema),
+      second: useLocalStorageCache(KEY, schema),
     }))
     await act(() => {
-      result.current.a[1]({ name: 'reflect' })
+      result.current.first[1]({ name: 'reflect' })
     })
-    expect(result.current.b[0]).toEqual({ name: 'reflect' })
+    expect(result.current.second[0]).toEqual({ name: 'reflect' })
   })
 })
