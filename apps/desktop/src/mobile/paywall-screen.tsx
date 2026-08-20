@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
 import { toast } from '@/components/ui/toast'
 import { IAP_PRODUCT_IDS, iapGetProducts, iapPurchase, iapRestorePurchases } from '@reflect/core'
@@ -38,10 +38,12 @@ export function PaywallScreen(): ReactElement {
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
   const [plan, setPlan] = useState<'monthly' | 'yearly'>('yearly')
 
-  const products = useQuery({
-    queryKey: queryKeys.iap.products,
-    queryFn: () => iapGetProducts([IAP_PRODUCT_IDS.yearly, IAP_PRODUCT_IDS.monthly]),
-  })
+  const products = useQuery(
+    queryOptions({
+      queryKey: queryKeys.iap.products,
+      queryFn: () => iapGetProducts([IAP_PRODUCT_IDS.yearly, IAP_PRODUCT_IDS.monthly]),
+    }),
+  )
   const yearly =
     products.data?.find((product) => product.productId === IAP_PRODUCT_IDS.yearly) ?? null
   const monthly =
