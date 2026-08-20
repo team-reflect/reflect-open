@@ -20,7 +20,7 @@ export const ACTIVE_SUBSCRIPTION_STORAGE_KEY = 'reflect.iap.active-subscription'
 
 const ACTIVE_SUBSCRIPTION_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000
 
-function localStorageOrNull(): Storage | null {
+function getLocalStorage(): Storage | null {
   if (typeof window === 'undefined') {
     return null
   }
@@ -33,7 +33,7 @@ function localStorageOrNull(): Storage | null {
 }
 
 function readStoredValue<T>(key: string, schema: z.ZodType<T>): T | undefined {
-  const storage = localStorageOrNull()
+  const storage = getLocalStorage()
   if (storage === null) {
     return undefined
   }
@@ -63,7 +63,7 @@ function writeStoredValue<T>(key: string, schema: z.ZodType<T>, value: T): void 
   if (!parsed.success) {
     return
   }
-  const storage = localStorageOrNull()
+  const storage = getLocalStorage()
   if (storage === null) {
     return
   }
