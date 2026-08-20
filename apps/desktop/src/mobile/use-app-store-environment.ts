@@ -11,6 +11,13 @@ import {
 } from '@/mobile/iap-storage'
 import { useGraph } from '@/providers/graph-provider'
 
+async function fetchAppStoreEnvironment(): Promise<AppStoreEnvironment> {
+  const parsed = appStoreEnvironmentSchema.safeParse(await getAppStoreEnvironment())
+  const environment = parsed.success ? parsed.data : null
+  writeIapEnvironmentSeed(environment)
+  return environment
+}
+
 /** The live or startup-seeded App Store install channel. */
 export function useAppStoreEnvironment(): {
   value: AppStoreEnvironment
@@ -23,13 +30,7 @@ export function useAppStoreEnvironment(): {
   const queryClient = useQueryClient()
   const query = useQuery({
     queryKey: queryKeys.iap.environment,
-    // REVIEW： 把这个 queryFn 放在 文件 top level 里，给他一个合适的 function name，而不是放在这里作为一个 lambda 函数
-    queryFn: async () => {
-      const parsed = appStoreEnvironmentSchema.safeParse(await getAppStoreEnvironment())
-      const environment = parsed.success ? parsed.data : null
-      writeIapEnvironmentSeed(environment)
-      return environment
-    },
+    queryFn: fetchAppStoreEnvironment,
     initialData: readIapEnvironmentSeed,
     initialDataUpdatedAt: 0,
     // A persisted seed stays stale until this launch verifies it.
