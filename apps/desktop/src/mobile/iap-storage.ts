@@ -11,10 +11,7 @@ export const activeSubscriptionSeedSchema = z.object({
   value: activeSubscriptionSchema,
   updatedAt: z.number(),
 })
-export interface ActiveSubscriptionSeed {
-  readonly value: ActiveSubscription
-  readonly updatedAt: number
-}
+export type ActiveSubscriptionSeed = z.infer<typeof activeSubscriptionSeedSchema>
 
 export const IAP_ENVIRONMENT_STORAGE_KEY = 'reflect.iap.environment'
 export const ACTIVE_SUBSCRIPTION_STORAGE_KEY = 'reflect.iap.active-subscription'
@@ -22,13 +19,8 @@ export const ACTIVE_SUBSCRIPTION_STORAGE_KEY = 'reflect.iap.active-subscription'
 const ACTIVE_SUBSCRIPTION_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000
 
 function readStoredValue<T>(key: string, schema: z.ZodType<T>): T | undefined {
-  const rawValue = getLocalStorageStore(key).get()
-  if (rawValue === null) {
-    return undefined
-  }
-
   try {
-    const parsed: unknown = JSON.parse(rawValue)
+    const parsed: unknown = JSON.parse(getLocalStorageStore(key).get() ?? '')
     const result = schema.safeParse(parsed)
     return result.success ? result.data : undefined
   } catch {
@@ -38,32 +30,26 @@ function readStoredValue<T>(key: string, schema: z.ZodType<T>): T | undefined {
 
 function writeStoredValue<T>(key: string, schema: z.ZodType<T>, value: T): void {
   const parsed = schema.safeParse(value)
-  if (!parsed.success) {
-    return
+  if (parsed.success) {
+    getLocalStorageStore(key).set(JSON.stringify(parsed.data))
   }
-  getLocalStorageStore(key).set(JSON.stringify(parsed.data))
 }
 
-/** Read the last validated install channel, or undefined when no valid seed exists. */
 export function readIapEnvironmentSeed(): AppStoreEnvironment | undefined {
   return readStoredValue(IAP_ENVIRONMENT_STORAGE_KEY, appStoreEnvironmentSchema)
 }
 
-/** Persist a validated install channel for the next launch. */
 export function writeIapEnvironmentSeed(value: AppStoreEnvironment): void {
   writeStoredValue(IAP_ENVIRONMENT_STORAGE_KEY, appStoreEnvironmentSchema, value)
 }
 
-/** Read a fresh validated entitlement seed, or undefined when missing, invalid, or expired. */
 export function readActiveSubscriptionSeed(): ActiveSubscriptionSeed | undefined {
   const seed = readStoredValue(ACTIVE_SUBSCRIPTION_STORAGE_KEY, activeSubscriptionSeedSchema)
-  if (seed === undefined || Date.now() - seed.updatedAt > ACTIVE_SUBSCRIPTION_MAX_AGE_MS) {
-    return undefined
-  }
-  return seed
+  return seed !== undefined && Date.now() - seed.updatedAt <= ACTIVE_SUBSCRIPTION_MAX_AGE_MS
+    ? seed
+    : undefined
 }
 
-/** Persist a validated entitlement answer with its write time for the next launch. */
 export function writeActiveSubscriptionSeed(value: ActiveSubscription): void {
   writeStoredValue(ACTIVE_SUBSCRIPTION_STORAGE_KEY, activeSubscriptionSeedSchema, {
     value,

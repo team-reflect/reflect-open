@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useEffect } from 'react'
 import {
   queryOptions,
   useQueries,
@@ -14,8 +14,6 @@ import {
   type ActiveSubscription,
 } from '@/mobile/iap-storage'
 import { useGraph } from '@/providers/graph-provider'
-
-export type { ActiveSubscription } from '@/mobile/iap-storage'
 
 interface ActiveSubscriptionResult {
   readonly value: ActiveSubscription
@@ -46,21 +44,20 @@ function combineEntitlementQueries(
   const value = yearly.data ? 'yearly' : monthly.data ? 'monthly' : null
   const yearlySettled = yearly.isFetchedAfterMount && !yearly.isFetching
   const monthlySettled = monthly.isFetchedAfterMount && !monthly.isFetching
-
-  let confirmedValue: ActiveSubscription | undefined
-  if (yearlySettled && !yearly.isError && yearly.data) {
-    confirmedValue = 'yearly'
-  } else if (monthlySettled && !monthly.isError && monthly.data) {
-    confirmedValue = 'monthly'
-  } else if (yearlySettled && monthlySettled && !yearly.isError && !monthly.isError) {
-    confirmedValue = null
-  }
-
   const bothSettled = yearlySettled && monthlySettled
+  const liveFailed = yearly.isError || monthly.isError
+  const confirmedValue =
+    yearlySettled && !yearly.isError && yearly.data
+      ? 'yearly'
+      : monthlySettled && !monthly.isError && monthly.data
+        ? 'monthly'
+        : bothSettled && !liveFailed
+          ? null
+          : undefined
   return {
     value,
     isLoading: value === null && !bothSettled,
-    isError: value === null && bothSettled && (yearly.isError || monthly.isError),
+    isError: value === null && bothSettled && liveFailed,
     confirmedValue,
   }
 }
@@ -107,14 +104,10 @@ export function useActiveSubscription(): {
     return subscription.unlisten
   }, [enabled, queryClient])
 
-  const invalidate = useCallback(() => {
-    void invalidateEntitlements(queryClient)
-  }, [queryClient])
-
   return {
     value: result.value,
     isLoading: result.isLoading,
     isError: result.isError,
-    invalidate,
+    invalidate: () => void invalidateEntitlements(queryClient),
   }
 }

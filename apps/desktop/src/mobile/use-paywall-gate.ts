@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
 import { usePaywallRequested } from '@/hooks/use-paywall-requested'
 import { useActiveSubscription } from '@/mobile/use-active-subscription'
-import {
-  useAppStoreEnvironment,
-  type AppStoreEnvironment,
-} from '@/mobile/use-app-store-environment'
+import type { AppStoreEnvironment } from '@/mobile/iap-storage'
+import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 
