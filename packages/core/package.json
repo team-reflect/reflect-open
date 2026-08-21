@@ -28,10 +28,10 @@
   "devDependencies": {
     "@ai-sdk/provider": "^4.0.7",
     "@ocavue/tsconfig": "^0.7.1",
-    "@vitest/browser-playwright": "^4.1.10",
+    "@vitest/browser-playwright": "^4.1.11",
     "playwright": "^1.62.1",
     "sqlite-vec": "^0.1.9",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }
