@@ -28,7 +28,6 @@ interface SettingsContextValue {
 export type SettingsLoadOutcome = 'loaded' | 'failed'
 
 type SettingsUpdater = (current: Settings) => Partial<Settings>
-
 const SettingsContext = createContext<SettingsContextValue | null>(null)
 
 export function SettingsProvider({ children }: { children: ReactNode }): ReactElement {
