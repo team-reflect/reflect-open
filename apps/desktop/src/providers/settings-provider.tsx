@@ -1,9 +1,7 @@
 import {
   createContext,
-  useCallback,
   use,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ReactElement,
@@ -13,10 +11,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DEFAULT_SETTINGS, errorMessage, type Settings } from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { startOperation } from '@/lib/operations'
-import {
-  createSettingsQueryOptions,
-  createSettingsSaveMutationOptions,
-} from '@/lib/query-options'
+import { createSettingsQueryOptions, createSettingsSaveMutationOptions } from '@/lib/query-options'
 import { setSettingsFlusher } from '@/lib/settings-flush'
 
 interface SettingsContextValue {
@@ -36,11 +31,7 @@ type SettingsUpdater = (current: Settings) => Partial<Settings>
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
 
-interface SettingsProviderProps {
-  children: ReactNode
-}
-
-export function SettingsProvider({ children }: SettingsProviderProps): ReactElement {
+export function SettingsProvider({ children }: { children: ReactNode }): ReactElement {
   const bridgeReady = useBridgeReady()
   const queryClient = useQueryClient()
   const queryOptions = createSettingsQueryOptions()
@@ -60,13 +51,9 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
         resolveLoad.current = resolve
       }),
   )
-  const whenSettingsLoaded = useCallback(() => loadPromise, [loadPromise])
+  const whenSettingsLoaded = (): Promise<SettingsLoadOutcome> => loadPromise
   const loadState =
-    pendingUpdaters.current === null
-      ? settingsQuery.isSuccess
-        ? 'loaded'
-        : 'failed'
-      : 'pending'
+    pendingUpdaters.current !== null ? 'pending' : settingsQuery.isSuccess ? 'loaded' : 'failed'
   useEffect(() => {
     if (loadState !== 'pending') {
       resolveLoad.current(loadState)
@@ -85,56 +72,44 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
     onError: (error) => startOperation('Saving settings').fail(errorMessage(error)),
   })
 
-  const submitSettings = useCallback(
-    (target: Settings): void => {
-      dirty.current = true
-      lastSubmission.current = save(target).catch(() => {})
-    },
-    [save],
-  )
+  const submitSettings = (target: Settings): void => {
+    dirty.current = true
+    lastSubmission.current = save(target).catch(() => {})
+  }
 
-  const applySettingsUpdate = useCallback(
-    (updater: SettingsUpdater): void => {
-      if (settingsQuery.isSuccess) {
-        const previous = queryClient.getQueryData(queryOptions.queryKey)
-        const next = queryClient.setQueryData(queryOptions.queryKey, (current) =>
-          current === undefined ? current : { ...current, ...updater(current) },
-        )
-        if (next !== undefined && (dirty.current || next !== previous)) {
-          submitSettings(next)
-        }
-        return
+  const applySettingsUpdate = (updater: SettingsUpdater): void => {
+    if (settingsQuery.isSuccess) {
+      const previous = queryClient.getQueryData(queryOptions.queryKey)
+      const next = queryClient.setQueryData(queryOptions.queryKey, (current) =>
+        current === undefined ? current : { ...current, ...updater(current) },
+      )
+      if (next !== undefined && (dirty.current || next !== previous)) {
+        submitSettings(next)
       }
-      setSessionSettings((current) => {
-        const base = current ?? DEFAULT_SETTINGS
-        return { ...base, ...updater(base) }
-      })
-    },
-    [queryClient, queryOptions.queryKey, settingsQuery.isSuccess, submitSettings],
-  )
+      return
+    }
+    setSessionSettings((current) => {
+      const base = current ?? DEFAULT_SETTINGS
+      return { ...base, ...updater(base) }
+    })
+  }
 
-  const updateSettings = useCallback(
-    (patch: Partial<Settings>): void => {
-      if (pendingUpdaters.current !== null) {
-        preloadPatchRef.current = { ...preloadPatchRef.current, ...patch }
-        setPreloadPatch(preloadPatchRef.current)
-        return
-      }
-      applySettingsUpdate(() => patch)
-    },
-    [applySettingsUpdate],
-  )
+  const updateSettings = (patch: Partial<Settings>): void => {
+    if (pendingUpdaters.current !== null) {
+      preloadPatchRef.current = { ...preloadPatchRef.current, ...patch }
+      setPreloadPatch(preloadPatchRef.current)
+      return
+    }
+    applySettingsUpdate(() => patch)
+  }
 
-  const updateSettingsWith = useCallback(
-    (updater: SettingsUpdater): void => {
-      if (pendingUpdaters.current !== null) {
-        pendingUpdaters.current?.push(updater)
-        return
-      }
-      applySettingsUpdate(updater)
-    },
-    [applySettingsUpdate],
-  )
+  const updateSettingsWith = (updater: SettingsUpdater): void => {
+    if (pendingUpdaters.current !== null) {
+      pendingUpdaters.current.push(updater)
+      return
+    }
+    applySettingsUpdate(updater)
+  }
 
   useEffect(() => {
     if (pendingUpdaters.current === null) {
@@ -180,42 +155,41 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
     submitSettings,
   ])
 
-  const settings = useMemo<Settings>(() => {
-    if (loadState === 'loaded') {
-      return settingsQuery.data ?? DEFAULT_SETTINGS
-    }
-    if (loadState === 'failed') {
-      return sessionSettings ?? DEFAULT_SETTINGS
-    }
-    return { ...DEFAULT_SETTINGS, ...preloadPatch }
-  }, [loadState, preloadPatch, sessionSettings, settingsQuery.data])
+  const settings: Settings =
+    loadState === 'loaded'
+      ? (settingsQuery.data ?? DEFAULT_SETTINGS)
+      : loadState === 'failed'
+        ? (sessionSettings ?? DEFAULT_SETTINGS)
+        : { ...DEFAULT_SETTINGS, ...preloadPatch }
 
-  const drainSubmissions = useCallback(async (): Promise<void> => {
+  const drainSubmissions = async (): Promise<void> => {
     let submission = lastSubmission.current
     await submission
     while (submission !== lastSubmission.current) {
       submission = lastSubmission.current
       await submission
     }
-  }, [])
-  const flush = useCallback(async (): Promise<void> => {
+  }
+  const flush = async (): Promise<void> => {
     await drainSubmissions()
     const current = queryClient.getQueryData(queryOptions.queryKey)
     if (dirty.current && current !== undefined) {
       submitSettings(current)
       await drainSubmissions()
     }
-  }, [drainSubmissions, queryClient, queryOptions.queryKey, submitSettings])
+  }
 
   useEffect(() => {
     setSettingsFlusher(flush)
     return () => setSettingsFlusher(null)
   }, [flush])
 
-  const value = useMemo<SettingsContextValue>(
-    () => ({ settings, updateSettings, updateSettingsWith, whenSettingsLoaded }),
-    [settings, updateSettings, updateSettingsWith, whenSettingsLoaded],
-  )
+  const value: SettingsContextValue = {
+    settings,
+    updateSettings,
+    updateSettingsWith,
+    whenSettingsLoaded,
+  }
 
   return <SettingsContext value={value}>{children}</SettingsContext>
 }

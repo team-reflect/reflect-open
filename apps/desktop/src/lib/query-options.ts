@@ -57,7 +57,6 @@ export function createSettingsQueryOptions() {
     staleTime: Infinity,
   })
 }
-
 export function createSettingsSaveMutationOptions() {
   return mutationOptions({
     mutationKey: mutationKeys.settings.save,
