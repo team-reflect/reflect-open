@@ -31,16 +31,27 @@ interface TemplateCreateForm {
   name: string
 }
 
+/**
+ * The dialog lives for the workspace's lifetime, so the form only mounts while
+ * it is open: every "New template" starts from an empty name and no stale
+ * error, rather than the last name this workspace typed.
+ */
 export function TemplateCreateDialog({ context }: TemplateCreateDialogProps): ReactElement | null {
-  const { createOpen, closeTemplateCreate } = useNoteTemplates()
-  const { register, handleSubmit, formState } = useForm<TemplateCreateForm>({
-    defaultValues: { name: '' },
-  })
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const { createOpen } = useNoteTemplates()
 
   if (!createOpen) {
     return null
   }
+
+  return <TemplateCreateDialogContent context={context} />
+}
+
+function TemplateCreateDialogContent({ context }: TemplateCreateDialogProps): ReactElement {
+  const { closeTemplateCreate } = useNoteTemplates()
+  const { register, handleSubmit, formState } = useForm<TemplateCreateForm>({
+    defaultValues: { name: '' },
+  })
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const submit = handleSubmit(async (values) => {
     setSubmitError(null)
