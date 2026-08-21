@@ -15,6 +15,7 @@ import { useChatSession } from '@/providers/chat-provider'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider'
 import { useGraph } from '@/providers/graph-provider'
 import { useNoteFindActions } from '@/providers/note-find-provider'
+import { openZoteroPicker, useZoteroPicker } from '@/components/zotero/zotero-picker-store'
 import { useNoteTemplates } from '@/providers/note-templates-provider'
 import { useSettings } from '@/providers/settings-provider'
 import { useShortcuts } from '@/providers/shortcuts-provider'
@@ -171,6 +172,8 @@ export function useAppShortcuts(): CommandContext {
     pickerOpen: templatePickerOpen,
     createOpen: templateCreateOpen,
   } = useNoteTemplates()
+  const zoteroPicker = useZoteroPicker()
+  const zoteroPickerOpen = zoteroPicker !== null
   const { toggleSidebar } = useSidebar()
   const { toggle: toggleAudioMemo } = useAudioMemo()
   const { newChat } = useChatSession()
@@ -191,6 +194,8 @@ export function useAppShortcuts(): CommandContext {
   // And for the template dialogs — both are Radix modals; nothing may
   // navigate behind them.
   const templatesOpenRef = useRef(templatePickerOpen || templateCreateOpen)
+  // The Zotero picker is a modal dialog too.
+  const zoteroPickerOpenRef = useRef(zoteroPickerOpen)
 
   // Read at run time, not captured: a command can fire long after the render
   // that created the context (palette open across an index rebuild, etc.).
@@ -204,6 +209,7 @@ export function useAppShortcuts(): CommandContext {
     paletteOpenRef.current = paletteOpen
     shortcutsOpenRef.current = shortcutsOpen
     templatesOpenRef.current = templatePickerOpen || templateCreateOpen
+    zoteroPickerOpenRef.current = zoteroPickerOpen
     generationRef.current = graph?.generation ?? null
     graphRootRef.current = graph?.root ?? null
     recentsRef.current = recents
@@ -248,6 +254,13 @@ export function useAppShortcuts(): CommandContext {
       openShortcuts,
       openTemplatePicker,
       openTemplateCreate,
+      // Resolve the target note at open time — the same path {@link notePath}
+      // yields, so the picker inserts where the command's other note-scoped
+      // siblings would.
+      openZoteroPicker: () =>
+        openZoteroPicker(
+          focusedNotePathForRoute(routeRef.current, todayIso(), focusedDailyDateRef.current),
+        ),
       enableSemanticSearch: () => {
         updateSettings({ semanticSearchEnabled: true })
         // EmbeddingsSync loads an untouched runtime; a `failed` one only
@@ -266,6 +279,7 @@ export function useAppShortcuts(): CommandContext {
       openShortcuts,
       openTemplatePicker,
       openTemplateCreate,
+      openZoteroPicker,
       toggleSidebar,
       newChat,
       openNoteFindForPath,
@@ -294,6 +308,9 @@ export function useAppShortcuts(): CommandContext {
       }
       if (templatesOpenRef.current) {
         return false // the template picker/create dialogs are modal too
+      }
+      if (zoteroPickerOpenRef.current) {
+        return false // the Zotero picker is modal too
       }
       void runCommand(id, context)
       return true

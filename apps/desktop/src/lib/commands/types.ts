@@ -55,6 +55,11 @@ export interface CommandContext {
   /** Open the "New template" name dialog. */
   openTemplateCreate: () => void
   /**
+   * Open the "Insert Zotero item" picker (inserts into {@link notePath}'s
+   * editor; no-op when no note is being edited).
+   */
+  openZoteroPicker: () => void
+  /**
    * Persist the semantic-search opt-in (`semanticSearchEnabled`).
    * EmbeddingsSync reacts to the setting by loading — first time:
    * downloading — the model, so flipping the flag is the whole command.
