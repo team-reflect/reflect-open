@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { isDeepEqual } from '@ocavue/utils'
 import {
   DEFAULT_SETTINGS,
   loadSettings,
@@ -75,58 +76,6 @@ function createLoadSettle(): LoadSettle {
     resolve = promiseResolve
   })
   return { promise, resolve }
-}
-
-/**
- * One settings value equals another: identity, element-wise for arrays
- * (`allNotesFilterTags`; `aiProviders` holds plain config objects, compared as
- * JSON below), or key-wise for plain-object records (`graphColors`, whose
- * values are scalars). Reference equality alone would make an equal-but-
- * rebuilt value (a re-parse — the schema transforms rebuild arrays and
- * records on every parse — or a no-op update) read as a change and trigger
- * spurious saves.
- */
-function sameValue(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) {
-    return true
-  }
-  if (Array.isArray(a) || Array.isArray(b)) {
-    return (
-      Array.isArray(a) &&
-      Array.isArray(b) &&
-      a.length === b.length &&
-      a.every((item, index) => sameItem(item, b[index]))
-    )
-  }
-  if (isRecord(a) && isRecord(b)) {
-    const aKeys = Object.keys(a)
-    const bKeys = Object.keys(b)
-    return aKeys.length === bKeys.length && aKeys.every((key) => sameItem(a[key], b[key]))
-  }
-  return false
-}
-
-/** A plain-object record (not an array, not null). */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-/** One array element equals another: identity for scalars, JSON for objects. */
-function sameItem(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) {
-    return true
-  }
-  if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
-    return JSON.stringify(a) === JSON.stringify(b)
-  }
-  return false
-}
-
-/** Own-key equality over the flat settings document. */
-function sameDocument(a: Settings, b: Settings): boolean {
-  const aKeys = Object.keys(a)
-  const bKeys = Object.keys(b)
-  return aKeys.length === bKeys.length && aKeys.every((key) => sameValue(a[key], b[key]))
 }
 
 interface SettingsProviderProps {
@@ -255,7 +204,10 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
     }
     const target = settingsRef.current
     const confirmed = lastPersisted.current ?? disk
-    if (sameDocument(target, confirmed)) {
+    // Structural, not reference: the schema transforms rebuild arrays and
+    // records on every parse, so an equal-but-rebuilt value would read as a
+    // change and trigger a spurious save.
+    if (isDeepEqual(target, confirmed)) {
       lastPersisted.current = confirmed
       return persistQueue.current
     }
