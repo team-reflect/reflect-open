@@ -51,6 +51,8 @@ mod watcher;
 #[cfg(mobile)]
 #[path = "watcher_mobile.rs"]
 mod watcher;
+#[cfg(desktop)]
+mod window_state_guard;
 
 use tauri::{Emitter, Manager};
 
@@ -179,6 +181,10 @@ pub fn run() {
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // Must be registered before window-state below: plugins initialize
+        // in registration order, and the guard rewrites the state file that
+        // the next plugin's setup reads.
+        .plugin(window_state_guard::init())
         .plugin(
             // Note windows are excluded from state tracking: they cascade
             // fresh from their opener, and their content-hashed labels would
