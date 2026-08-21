@@ -9,58 +9,32 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { DEFAULT_SETTINGS, saveSettings, errorMessage, type Settings } from '@reflect/core'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { DEFAULT_SETTINGS, errorMessage, type Settings } from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { startOperation } from '@/lib/operations'
-import { createSettingsQueryOptions } from '@/lib/query-options'
+import {
+  createSettingsQueryOptions,
+  createSettingsSaveMutationOptions,
+} from '@/lib/query-options'
 import { setSettingsFlusher } from '@/lib/settings-flush'
 
 interface SettingsContextValue {
   settings: Settings
   /** Merge `patch` into the settings: applied immediately, persisted async. */
   updateSettings: (patch: Partial<Settings>) => void
-  /**
-   * Like {@link updateSettings}, but the patch is computed from the latest
-   * merged settings at apply time. Use this for read-modify-write updates
-   * (e.g. list edits after an `await`): React applies functional updaters
-   * sequentially, so concurrent edits compose instead of clobbering each
-   * other through a stale render-time snapshot. Updaters dispatched before
-   * hydration are queued and replayed over the loaded document — an edit of
-   * a list the disk is about to supply must not be computed from defaults.
-   */
+  /** Compute a patch from the latest settings; pre-load calls replay after hydration. */
   updateSettingsWith: (updater: (current: Settings) => Partial<Settings>) => void
-  /**
-   * Resolves once the initial disk load has settled, and with which outcome.
-   * After `'failed'`, changes apply session-only and nothing persists —
-   * callers that pair a settings entry with state elsewhere (e.g. a keychain
-   * secret) must await this before writing the other half, or a restart
-   * loses the entry and strands its counterpart. A boolean can't close that
-   * window: a write racing the in-flight load needs the eventual outcome.
-   */
+  /** Resolve after the initial disk load; `'failed'` means session-only updates. */
   whenSettingsLoaded: () => Promise<SettingsLoadOutcome>
 }
 
 /** How the initial settings load ended (`'failed'` ⇒ session-only mode). */
 export type SettingsLoadOutcome = 'loaded' | 'failed'
 
-type SettingsLoadState = SettingsLoadOutcome | 'pending'
 type SettingsUpdater = (current: Settings) => Partial<Settings>
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
-
-interface LoadSettle {
-  promise: Promise<SettingsLoadOutcome>
-  resolve: (outcome: SettingsLoadOutcome) => void
-}
-
-function createLoadSettle(): LoadSettle {
-  let resolve: (outcome: SettingsLoadOutcome) => void = () => {}
-  const promise = new Promise<SettingsLoadOutcome>((promiseResolve) => {
-    resolve = promiseResolve
-  })
-  return { promise, resolve }
-}
 
 interface SettingsProviderProps {
   children: ReactNode
@@ -77,116 +51,105 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
   const [preloadPatch, setPreloadPatch] = useState<Partial<Settings>>({})
   const preloadPatchRef = useRef<Partial<Settings>>({})
   const pendingUpdaters = useRef<SettingsUpdater[] | null>([])
-  const [loadState, setLoadState] = useState<SettingsLoadState>('pending')
-  const loadStateRef = useRef<SettingsLoadState>('pending')
   const [sessionSettings, setSessionSettings] = useState<Settings | null>(null)
-  const diskSettings = useRef<Settings | null>(null)
-  const settingsRef = useRef<Settings>(DEFAULT_SETTINGS)
 
-  const loadSettle = useRef<LoadSettle | null>(null)
-  if (loadSettle.current === null) {
-    loadSettle.current = createLoadSettle()
-  }
-  const whenSettingsLoaded = useCallback(
-    (): Promise<SettingsLoadOutcome> => loadSettle.current?.promise ?? Promise.resolve('failed'),
-    [],
+  const resolveLoad = useRef<(outcome: SettingsLoadOutcome) => void>(() => {})
+  const [loadPromise] = useState(
+    () =>
+      new Promise<SettingsLoadOutcome>((resolve) => {
+        resolveLoad.current = resolve
+      }),
   )
+  const whenSettingsLoaded = useCallback(() => loadPromise, [loadPromise])
+  const loadState =
+    pendingUpdaters.current === null
+      ? settingsQuery.isSuccess
+        ? 'loaded'
+        : 'failed'
+      : 'pending'
   useEffect(() => {
     if (loadState !== 'pending') {
-      loadSettle.current?.resolve(loadState)
+      resolveLoad.current(loadState)
     }
   }, [loadState])
 
-  const persistQueue = useRef<Promise<void>>(Promise.resolve())
-  const lastPersisted = useRef<Settings | null>(null)
-  const persistIfChanged = useCallback((target = settingsRef.current): Promise<void> => {
-    const disk = diskSettings.current
-    if (disk === null) {
-      return persistQueue.current
-    }
-    const confirmed = lastPersisted.current ?? disk
-    if (target === confirmed) {
-      lastPersisted.current = confirmed
-      return persistQueue.current
-    }
-    persistQueue.current = persistQueue.current
-      .then(() => saveSettings(target))
-      .then(() => {
-        lastPersisted.current = target
-      })
-      .catch((error) => {
-        startOperation('Saving settings').fail(errorMessage(error))
-      })
-    return persistQueue.current
-  }, [])
-
-  const setLoadedSettings = useCallback(
-    (updater: (current: Settings) => Settings): void => {
-      const next = queryClient.setQueryData(queryOptions.queryKey, (current) =>
-        current === undefined ? current : updater(current),
-      )
-      if (next !== undefined) {
-        settingsRef.current = next
-        void persistIfChanged(next)
+  const dirty = useRef(false)
+  const lastSubmission = useRef<Promise<void>>(Promise.resolve())
+  const { mutateAsync: save } = useMutation({
+    ...createSettingsSaveMutationOptions(),
+    onSuccess: (_data, target) => {
+      if (queryClient.getQueryData(queryOptions.queryKey) === target) {
+        dirty.current = false
       }
     },
-    [persistIfChanged, queryClient, queryOptions.queryKey],
-  )
+    onError: (error) => startOperation('Saving settings').fail(errorMessage(error)),
+  })
 
-  const updateSettings = useCallback(
-    (patch: Partial<Settings>): void => {
-      if (loadStateRef.current === 'pending') {
-        preloadPatchRef.current = { ...preloadPatchRef.current, ...patch }
-        setPreloadPatch(preloadPatchRef.current)
-        return
-      }
-      if (loadStateRef.current === 'loaded') {
-        setLoadedSettings((current) => ({ ...current, ...patch }))
-        return
-      }
-      setSessionSettings((current) => {
-        const next = { ...(current ?? DEFAULT_SETTINGS), ...patch }
-        settingsRef.current = next
-        return next
-      })
+  const submitSettings = useCallback(
+    (target: Settings): void => {
+      dirty.current = true
+      lastSubmission.current = save(target).catch(() => {})
     },
-    [setLoadedSettings],
+    [save],
   )
 
-  const updateSettingsWith = useCallback(
+  const applySettingsUpdate = useCallback(
     (updater: SettingsUpdater): void => {
-      if (loadStateRef.current === 'pending') {
-        pendingUpdaters.current?.push(updater)
-        return
-      }
-      if (loadStateRef.current === 'loaded') {
-        setLoadedSettings((current) => ({ ...current, ...updater(current) }))
+      if (settingsQuery.isSuccess) {
+        const previous = queryClient.getQueryData(queryOptions.queryKey)
+        const next = queryClient.setQueryData(queryOptions.queryKey, (current) =>
+          current === undefined ? current : { ...current, ...updater(current) },
+        )
+        if (next !== undefined && (dirty.current || next !== previous)) {
+          submitSettings(next)
+        }
         return
       }
       setSessionSettings((current) => {
         const base = current ?? DEFAULT_SETTINGS
-        const next = { ...base, ...updater(base) }
-        settingsRef.current = next
-        return next
+        return { ...base, ...updater(base) }
       })
     },
-    [setLoadedSettings],
+    [queryClient, queryOptions.queryKey, settingsQuery.isSuccess, submitSettings],
+  )
+
+  const updateSettings = useCallback(
+    (patch: Partial<Settings>): void => {
+      if (pendingUpdaters.current !== null) {
+        preloadPatchRef.current = { ...preloadPatchRef.current, ...patch }
+        setPreloadPatch(preloadPatchRef.current)
+        return
+      }
+      applySettingsUpdate(() => patch)
+    },
+    [applySettingsUpdate],
+  )
+
+  const updateSettingsWith = useCallback(
+    (updater: SettingsUpdater): void => {
+      if (pendingUpdaters.current !== null) {
+        pendingUpdaters.current?.push(updater)
+        return
+      }
+      applySettingsUpdate(updater)
+    },
+    [applySettingsUpdate],
   )
 
   useEffect(() => {
-    if (loadStateRef.current !== 'pending') {
+    if (pendingUpdaters.current === null) {
       return
     }
 
-    let outcome: SettingsLoadOutcome
+    const loaded = settingsQuery.isSuccess
     let current: Settings
-    if (settingsQuery.isSuccess) {
-      outcome = 'loaded'
-      diskSettings.current = settingsQuery.data
+    if (loaded) {
       current = { ...settingsQuery.data, ...preloadPatchRef.current }
     } else if (!bridgeReady || settingsQuery.isError) {
-      outcome = 'failed'
       current = { ...DEFAULT_SETTINGS, ...preloadPatchRef.current }
+      if (settingsQuery.error) {
+        startOperation('Loading settings').fail(errorMessage(settingsQuery.error))
+      }
     } else {
       return
     }
@@ -197,51 +160,57 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
       current = { ...current, ...updater(current) }
     }
 
-    if (outcome === 'loaded') {
+    if (loaded) {
       current = queryClient.setQueryData(queryOptions.queryKey, current) ?? current
     } else {
       setSessionSettings(current)
     }
-    settingsRef.current = current
-    loadStateRef.current = outcome
-    setLoadState(outcome)
     preloadPatchRef.current = {}
     setPreloadPatch({})
-    if (outcome === 'loaded') {
-      void persistIfChanged(current)
+    if (loaded && current !== settingsQuery.data) {
+      submitSettings(current)
     }
   }, [
     bridgeReady,
-    persistIfChanged,
     queryClient,
     queryOptions.queryKey,
     settingsQuery.data,
     settingsQuery.isError,
     settingsQuery.isSuccess,
+    submitSettings,
   ])
 
   const settings = useMemo<Settings>(() => {
     if (loadState === 'loaded') {
-      return settingsQuery.data ?? settingsRef.current
+      return settingsQuery.data ?? DEFAULT_SETTINGS
     }
     if (loadState === 'failed') {
-      return sessionSettings ?? settingsRef.current
+      return sessionSettings ?? DEFAULT_SETTINGS
     }
     return { ...DEFAULT_SETTINGS, ...preloadPatch }
   }, [loadState, preloadPatch, sessionSettings, settingsQuery.data])
 
-  const loadErrorSurfaced = useRef(false)
-  useEffect(() => {
-    if (settingsQuery.error && !loadErrorSurfaced.current) {
-      loadErrorSurfaced.current = true
-      startOperation('Loading settings').fail(errorMessage(settingsQuery.error))
+  const drainSubmissions = useCallback(async (): Promise<void> => {
+    let submission = lastSubmission.current
+    await submission
+    while (submission !== lastSubmission.current) {
+      submission = lastSubmission.current
+      await submission
     }
-  }, [settingsQuery.error])
+  }, [])
+  const flush = useCallback(async (): Promise<void> => {
+    await drainSubmissions()
+    const current = queryClient.getQueryData(queryOptions.queryKey)
+    if (dirty.current && current !== undefined) {
+      submitSettings(current)
+      await drainSubmissions()
+    }
+  }, [drainSubmissions, queryClient, queryOptions.queryKey, submitSettings])
 
   useEffect(() => {
-    setSettingsFlusher(persistIfChanged)
+    setSettingsFlusher(flush)
     return () => setSettingsFlusher(null)
-  }, [persistIfChanged])
+  }, [flush])
 
   const value = useMemo<SettingsContextValue>(
     () => ({ settings, updateSettings, updateSettingsWith, whenSettingsLoaded }),
