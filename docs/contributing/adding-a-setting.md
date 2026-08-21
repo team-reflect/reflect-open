@@ -64,10 +64,12 @@ Semantics you get for free from the provider (and must not re-implement):
 - **Instant simple patches.** `updateSettings` applies over defaults while the
   disk load is pending. After hydration, it updates the current document in the
   TanStack Query cache.
-- **Async, ordered persistence.** Writes are chained in apply order, trail
-  hydration (nothing is written before the disk document has been read), and
-  save the full merged document. Failures surface through the operations
-  status UI and retry on the next change or the quit flush.
+- **Async, ordered persistence.** Each hydrated cache update submits its full
+  immutable document to a scoped TanStack Query mutation. The scope serializes
+  writes in apply order, and nothing is submitted before the disk document has
+  been read. Failures keep the optimistic cache value, surface through the
+  operations status UI, and leave it dirty for the next change or quit flush
+  to retry.
 - **Functional updates for read-modify-write.** Use `updateSettingsWith` for
   list/object edits or anything derived from the current document. Updaters
   dispatched before hydration are queued and replayed over the loaded
@@ -75,8 +77,9 @@ Semantics you get for free from the provider (and must not re-implement):
   wipe the stored value.
 - **One runtime document.** After a successful load, `useSettings()` and
   imperative readers of `queryKeys.settings.all` observe the same Query cache
-  document. The settings JSON remains the durable source, and the provider's
-  ordered persistence queue writes cache updates back to it.
+  document. The settings JSON remains the durable source. Quit and background
+  flushes drain submitted mutations, then retry and await the current document
+  when its last save was not confirmed.
 - **Load-sensitive side effects must await hydration.** If a settings entry is
   paired with state elsewhere (for example an OS-keychain secret), call
   `whenSettingsLoaded()` before writing the other half. If the initial load
