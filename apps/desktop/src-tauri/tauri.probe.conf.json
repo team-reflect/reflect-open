@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Reflect Probe",
+  "identifier": "app.reflect.desktop.probe",
+  "app": {
+    "windows": [
+      {
+        "title": "Reflect Probe",
+        "width": 1300,
+        "height": 650,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "dragDropEnabled": false,
+        "visible": false
+      }
+    ]
+  },
+  "bundle": {
+    "icon": [
+      "icons-dev/32x32.png",
+      "icons-dev/128x128.png",
+      "icons-dev/128x128@2x.png",
+      "icons-dev/icon.icns",
+      "icons-dev/icon.ico"
+    ],
+    "macOS": {
+      "entitlements": "Entitlements.dev.plist",
+      "files": {
+        "embedded.provisionprofile": null
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/team-reflect/reflect-open/releases/download/updater-probe-noop/latest.json"
+      ]
+    }
+  }
+}
