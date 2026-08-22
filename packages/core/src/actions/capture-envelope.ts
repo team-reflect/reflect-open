@@ -49,6 +49,8 @@ export const captureEnvelopeSchema = z.object({
   selection: z.string().optional(),
   /** Plain text paragraphs extracted from the captured page. */
   contentText: z.string().optional(),
+  /** Markdown summary generated on-device by the capturing browser. */
+  summary: z.string().optional(),
   /**
    * The page's own meta/OpenGraph description, extracted in-page at capture
    * time (the iOS share extension's Safari preprocessor). The drain writes it

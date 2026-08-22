@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser'
 import { defineBackground } from '#imports'
-import { SAVE_CURRENT_PAGE_COMMAND } from '@/lib/commands'
+import { openCapturePopupOrFallback, SAVE_CURRENT_PAGE_COMMAND } from '@/lib/commands'
 import { flushQueue } from '@/lib/flush'
 import { isFlushRequest } from '@/lib/messages'
 import { readIncludePageTextPreference } from '@/lib/popup-preferences'
@@ -9,11 +9,10 @@ import { snapshotTab } from '@/lib/snapshot-active-tab'
 import { tryExtractPageText } from './popup/extract-page-text'
 
 /**
- * The MV3 service worker owns retries and the shortcut fast path. Every
- * capture is persisted before a flush starts, so nothing depends on this
- * worker's (or the popup's) lifetime. Retries ride four triggers: every flush
- * ping, the keyboard shortcut, browser startup, and a coarse alarm for the
- * "Reflect installed an hour later" case.
+ * The MV3 service worker owns retries and opens the popup for the shortcut.
+ * Every capture is persisted before a flush starts, so nothing depends on
+ * this worker's (or the popup's) lifetime. Retries ride flush pings, browser
+ * startup, and a coarse alarm for the "Reflect installed an hour later" case.
  */
 
 const RETRY_ALARM = 'capture-retry'
@@ -55,9 +54,16 @@ export default defineBackground(() => {
 
   browser.commands.onCommand.addListener((command, tab) => {
     if (command === SAVE_CURRENT_PAGE_COMMAND) {
-      void saveTabWithDefaults(tab).catch((cause: unknown) => {
-        console.error('shortcut capture failed:', cause)
-      })
+      void flushQueue()
+      const openPopup =
+        typeof browser.action.openPopup === 'function'
+          ? () => browser.action.openPopup()
+          : undefined
+      void openCapturePopupOrFallback(openPopup, () => saveTabWithDefaults(tab)).catch(
+        (cause: unknown) => {
+          console.error('shortcut capture failed:', cause)
+        },
+      )
     }
   })
 

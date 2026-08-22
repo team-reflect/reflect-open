@@ -127,7 +127,7 @@ async function generateEnrichment(input: GenerateEnrichmentInput): Promise<PageE
       metaTitle: input.scraped?.title ?? undefined,
       siteName: input.scraped?.siteName ?? undefined,
       metaDescription: input.scraped?.description ?? undefined,
-      contentText: capturePageTextFromBody(input.body),
+      contentText: await capturePageTextFromBody(input.body, input.meta.capturePageTextHash),
       screenshotBase64: input.screenshotBase64,
     })
   } catch (cause) {
@@ -235,7 +235,12 @@ export async function reconcileCaptureEnrichment(
   }
   const skipPending = async (identity: CaptureIdentity): Promise<void> => {
     const snapshot = await readPendingCaptureSnapshot(identity, input.generation)
-    if (snapshot !== null) {
+    if (snapshot === null) {
+      return
+    }
+    const dailySource = await noteSource(dailyPath(identity.date), input.generation)
+    const bodyHash = await hashContent(snapshot.body)
+    if (snapshot.isPrivate || notePrivate(dailySource) || bodyHash !== snapshot.meta.captureHash) {
       await markSkipped(snapshot.source, identity)
     }
   }
@@ -249,12 +254,14 @@ export async function reconcileCaptureEnrichment(
     }
     const dailySource = await noteSource(dailyPath(identity.date), input.generation)
     const bodyHash = await hashContent(snapshot.body)
-    if (
-      snapshot.isPrivate ||
-      notePrivate(dailySource) ||
-      bodyHash !== (expectedHash ?? snapshot.meta.captureHash)
-    ) {
+    if (snapshot.isPrivate || notePrivate(dailySource) || bodyHash !== snapshot.meta.captureHash) {
       await markSkipped(snapshot.source, identity)
+      return null
+    }
+    if (expectedHash !== undefined && snapshot.meta.captureHash !== expectedHash) {
+      // Another drain-managed recapture refreshed this note while enrichment
+      // was in flight. Its own captureHash still matches, so leave it pending
+      // for the next pass instead of treating it as a user edit.
       return null
     }
     return snapshot
@@ -480,7 +487,7 @@ export async function reconcileCaptureEnrichment(
         return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
       }
 
-      snapshot = await currentCapture(identity, metadataHash)
+      snapshot = await currentCapture(identity)
       if (snapshot === null) {
         continue
       }
@@ -496,7 +503,7 @@ export async function reconcileCaptureEnrichment(
       }
       const captureHash = await persistCaptureEnrichment({
         identity,
-        expectedHash: metadataHash,
+        expectedHash: snapshot.meta.captureHash,
         body: newBody,
         fromTitle: snapshot.title,
         toTitle: enrichedTitle,
