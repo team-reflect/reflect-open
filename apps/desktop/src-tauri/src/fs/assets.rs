@@ -20,11 +20,12 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::io::Write;
-use std::path::Path;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
+use sha2::{Digest, Sha256};
 use tauri::ipc::{InvokeBody, Request};
 use tauri::State;
 
@@ -36,8 +37,15 @@ use super::{root_for_generation, GraphState};
 /// Header carrying the upload id on `asset_upload_append` calls — raw-body
 /// requests have no JSON args, so the id travels out-of-band.
 const UPLOAD_ID_HEADER: &str = "x-upload-id";
-/// Collision probes before giving up, mirroring `probeNotePath`'s cap.
-const MAX_NAME_PROBES: u32 = 1000;
+/// Sequential `-2`-style probes before candidates switch to content-digest
+/// names. Small on purpose: everyday collisions stay readable, while a
+/// densely collided stem jumps to digests instead of marching toward the
+/// probe cap — a V1 import can carry thousands of pastes all named
+/// `image.png`.
+pub(super) const SEQUENTIAL_NAME_PROBES: u32 = 8;
+/// Hard cap on collision probes. With digest candidates in the sequence this
+/// is a backstop against pathological inputs, not a limit real graphs reach.
+pub(super) const MAX_NAME_PROBES: u32 = 1000;
 
 struct Upload {
     generation: u64,
@@ -77,7 +85,7 @@ fn ensure_asset_name(name: &str) -> AppResult<()> {
 
 /// Split `name` into (stem, `.ext`) for suffix probing; the extension stays
 /// attached through collisions (`report.pdf` → `report-2.pdf`).
-fn split_name(name: &str) -> (&str, &str) {
+pub(super) fn split_name(name: &str) -> (&str, &str) {
     match name.rfind('.') {
         // A leading dot is a hidden file, not an extension.
         Some(idx) if idx > 0 => name.split_at(idx),
@@ -85,23 +93,97 @@ fn split_name(name: &str) -> (&str, &str) {
     }
 }
 
-/// Persist `temp` under `assets_dir` as `desired`, probing `-2`, `-3`, …
-/// suffixes until a name is free. `persist_noclobber` is the collision check
-/// *and* the claim (`O_EXCL` semantics), so two concurrent intakes of the
-/// same name can never clobber each other. Returns the winning filename.
+/// Candidate names for one collision-probe sequence: the desired name, then
+/// readable `-2`…`-8` suffixes, then names carrying the first 8 hex chars of
+/// the file's sha256 (`image-3f9ab2c1.png`, `image-3f9ab2c1-2.png`, …).
+/// Content digests make candidates effectively unique per distinct file, so
+/// a graph already dense with one stem resolves in a couple of probes instead
+/// of exhausting the cap — and they are deterministic, so planning the same
+/// bytes again re-derives the same name (which is how a re-import finds the
+/// file it wrote last time).
+pub(super) struct NameCandidates<'a> {
+    stem: &'a str,
+    ext: &'a str,
+    contents: PathBuf,
+    digest: Option<String>,
+    attempt: u32,
+}
+
+impl<'a> NameCandidates<'a> {
+    /// `contents` is the staged file the digest candidates hash; it is read
+    /// lazily, only once sequential probing runs dry.
+    pub(super) fn new(desired: &'a str, contents: PathBuf) -> Self {
+        let (stem, ext) = split_name(desired);
+        Self {
+            stem,
+            ext,
+            contents,
+            digest: None,
+            attempt: 0,
+        }
+    }
+
+    /// The next candidate filename, or `None` once [`MAX_NAME_PROBES`] is
+    /// exhausted.
+    pub(super) fn next(&mut self) -> AppResult<Option<String>> {
+        self.attempt += 1;
+        let (stem, ext) = (self.stem, self.ext);
+        match self.attempt {
+            1 => Ok(Some(format!("{stem}{ext}"))),
+            attempt @ 2..=SEQUENTIAL_NAME_PROBES => Ok(Some(format!("{stem}-{attempt}{ext}"))),
+            attempt if attempt <= MAX_NAME_PROBES => {
+                if self.digest.is_none() {
+                    self.digest = Some(sha256_hex_prefix(&self.contents)?);
+                }
+                let digest = self.digest.as_deref().expect("digest just computed");
+                let round = attempt - SEQUENTIAL_NAME_PROBES;
+                Ok(Some(if round == 1 {
+                    format!("{stem}-{digest}{ext}")
+                } else {
+                    format!("{stem}-{digest}-{round}{ext}")
+                }))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+fn sha256_hex_prefix(path: &Path) -> AppResult<String> {
+    use std::fmt::Write as FmtWrite;
+
+    let mut file = fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let bytes_read = file.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
+
+    let digest = hasher.finalize();
+    let mut hex = String::with_capacity(8);
+    for byte in &digest[..4] {
+        write!(&mut hex, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    Ok(hex)
+}
+
+/// Persist `temp` under `assets_dir` as `desired`, probing [`NameCandidates`]
+/// until a name is free. `persist_noclobber` is the collision check *and* the
+/// claim (`O_EXCL` semantics), so two concurrent intakes of the same name can
+/// never clobber each other. Like [`persist_exact`], fsyncs before the rename
+/// — durability is the persist helpers' job, never their callers. Returns the
+/// winning filename.
 fn persist_unique(
     mut temp: tempfile::NamedTempFile,
     assets_dir: &Path,
     desired: &str,
 ) -> AppResult<String> {
     temp.as_file().sync_all()?;
-    let (stem, ext) = split_name(desired);
-    for attempt in 1..=MAX_NAME_PROBES {
-        let candidate = if attempt == 1 {
-            desired.to_string()
-        } else {
-            format!("{stem}-{attempt}{ext}")
-        };
+    let mut candidates = NameCandidates::new(desired, temp.path().to_path_buf());
+    while let Some(candidate) = candidates.next()? {
         match temp.persist_noclobber(assets_dir.join(&candidate)) {
             Ok(_) => return Ok(candidate),
             Err(err) if err.error.kind() == std::io::ErrorKind::AlreadyExists => {
@@ -352,6 +434,48 @@ mod tests {
         // Nothing existing was touched.
         assert_eq!(fs::read(assets.join("report.pdf")).unwrap(), b"first");
         assert_eq!(fs::read(assets.join("report-2.pdf")).unwrap(), b"second");
+    }
+
+    #[test]
+    fn persist_switches_to_digest_names_when_sequential_probes_exhaust() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let assets = graph.path().join("assets");
+        fs::write(assets.join("image.png"), b"existing").unwrap();
+        for suffix in 2..=SEQUENTIAL_NAME_PROBES {
+            fs::write(assets.join(format!("image-{suffix}.png")), b"existing").unwrap();
+        }
+        let temp = temp_in(graph.path(), b"fresh screenshot");
+        let expected_digest = sha256_hex_prefix(temp.path()).unwrap();
+        let name = persist_unique(temp, &assets, "image.png").unwrap();
+        let digest = name
+            .strip_prefix("image-")
+            .and_then(|rest| rest.strip_suffix(".png"))
+            .unwrap();
+        assert_eq!(digest, expected_digest);
+        assert_eq!(fs::read(assets.join(&name)).unwrap(), b"fresh screenshot");
+    }
+
+    #[test]
+    fn sha256_hex_prefix_hashes_large_files_incrementally() {
+        use std::fmt::Write as FmtWrite;
+
+        let graph = tempdir().unwrap();
+        let mut temp = tempfile::NamedTempFile::new_in(graph.path()).unwrap();
+        let mut hasher = Sha256::new();
+        let chunk = [7_u8; 1024];
+        for _ in 0..100 {
+            temp.write_all(&chunk).unwrap();
+            hasher.update(chunk);
+        }
+
+        let digest = hasher.finalize();
+        let mut expected = String::with_capacity(8);
+        for byte in &digest[..4] {
+            write!(&mut expected, "{byte:02x}").unwrap();
+        }
+
+        assert_eq!(sha256_hex_prefix(temp.path()).unwrap(), expected);
     }
 
     #[test]
