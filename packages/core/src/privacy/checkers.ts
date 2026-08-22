@@ -1,4 +1,5 @@
 import type { RetrievalHit } from '../embeddings/retrieve'
+import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter'
 
 /**
  * Reflect's outbound-service privacy gate (Plan 10). `private: true` is a hard block:
@@ -67,6 +68,11 @@ export function assertCloudAllowed(note: CloudSendable): void {
 export function cloudSafeLinkHref(note: CloudSendable, href: string): CloudSafe<string> {
   assertCloudAllowed(note)
   return mint(href)
+}
+
+/** Read a note's authored `private` flag from its full markdown source. */
+export function notePrivate(source: string): boolean {
+  return parseFrontmatter(splitFrontmatter(source).raw).data.private
 }
 
 /** One search hit as an external service may see it. */

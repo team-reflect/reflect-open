@@ -110,13 +110,47 @@ describe('createNoteLinkPreviewResolver', () => {
     expect(deps.fetchHtml).toHaveBeenCalledTimes(2)
   })
 
-  it('caches failed lookups and refuses non-web destinations', async () => {
+  it('caches permanent failed lookups and refuses non-web destinations', async () => {
     const deps = dependencies({ fetchHtml: vi.fn().mockRejectedValue(new Error('offline')) })
     const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
     await expect(resolver('https://example.com')).resolves.toBeUndefined()
     await expect(resolver('https://example.com')).resolves.toBeUndefined()
     await expect(resolver('file:///etc/passwd')).resolves.toBeUndefined()
     expect(deps.fetchHtml).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries transient page-fetch failures', async () => {
+    const fetchHtml = vi
+      .fn()
+      .mockRejectedValueOnce({ kind: 'network', message: 'offline' })
+      .mockResolvedValue(page)
+    const deps = dependencies({ fetchHtml })
+    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+
+    await expect(resolver('https://example.com')).resolves.toBeUndefined()
+    await expect(resolver('https://example.com')).resolves.toMatchObject({
+      title: 'Example title',
+    })
+    expect(fetchHtml).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows metadata but retries after a transient favicon failure', async () => {
+    const fetchIcon = vi
+      .fn()
+      .mockRejectedValueOnce({ kind: 'network', message: 'offline' })
+      .mockResolvedValue('data:image/png;base64,aGVsbG8=')
+    const deps = dependencies({ fetchIcon })
+    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+
+    await expect(resolver('https://example.com')).resolves.toEqual({
+      title: 'Example title',
+      description: 'Example body',
+    })
+    await expect(resolver('https://example.com')).resolves.toMatchObject({
+      iconSrc: 'data:image/png;base64,aGVsbG8=',
+    })
+    expect(deps.fetchHtml).toHaveBeenCalledTimes(2)
+    expect(fetchIcon).toHaveBeenCalledTimes(2)
   })
 
   it('silently caches metadata parse failures', async () => {
@@ -148,18 +182,13 @@ describe('createNoteLinkPreviewResolver', () => {
 
   it.each([
     {
-      checkpoint: 'after page metadata',
+      checkpoint: 'after page metadata and before favicon retrieval',
       sources: [publicSource, privateSource],
       expectedIconCalls: 0,
     },
     {
-      checkpoint: 'immediately before favicon retrieval',
-      sources: [publicSource, publicSource, privateSource],
-      expectedIconCalls: 0,
-    },
-    {
       checkpoint: 'after favicon retrieval',
-      sources: [publicSource, publicSource, publicSource, privateSource],
+      sources: [publicSource, publicSource, privateSource],
       expectedIconCalls: 1,
     },
   ])('fails closed when privacy changes $checkpoint', async ({ sources, expectedIconCalls }) => {

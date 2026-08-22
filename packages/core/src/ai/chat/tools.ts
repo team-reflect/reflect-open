@@ -9,13 +9,13 @@ import {
   type RecentNoteRow,
   type RecentNotesOptions,
 } from '../../indexing/note-list'
-import { parseFrontmatter, splitFrontmatter } from '../../markdown/frontmatter'
 import { isTagName } from '../../markdown/extract'
 import { buildReadOneAsset, readAssetsInput, type ReadAssetsOutput } from './read-assets'
 import { buildReadOneNote, readNotesInput, type ReadNotesOutput } from './read-notes'
 import {
   cloudSafeNoteListings,
   cloudSafeSearchHits,
+  notePrivate,
   type CloudNoteListing,
   type CloudSafe,
   type CloudSearchHit,
@@ -157,8 +157,7 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
   // for sending.
   const isPrivateLive = async (path: string): Promise<boolean> => {
     try {
-      const { raw } = splitFrontmatter(await readNoteFn(path))
-      return parseFrontmatter(raw).data.private
+      return notePrivate(await readNoteFn(path))
     } catch {
       return true
     }

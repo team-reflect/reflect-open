@@ -8,6 +8,7 @@ import {
   cloudSafeSearchHits,
   cloudSafeSelection,
   isPrivateNoteError,
+  notePrivate,
   PrivateNoteError,
 } from './checkers'
 
@@ -40,6 +41,14 @@ describe('cloudSafeLinkHref', () => {
     expect(() =>
       cloudSafeLinkHref({ path: PRIVATE_PATH, isPrivate: true }, 'https://example.com'),
     ).toThrow(PrivateNoteError)
+  })
+})
+
+describe('notePrivate', () => {
+  it('reads the shared privacy flag from full note source', () => {
+    expect(notePrivate('---\nprivate: true\n---\nsecret')).toBe(true)
+    expect(notePrivate('---\nprivate: false\n---\npublic')).toBe(false)
+    expect(notePrivate('no frontmatter')).toBe(false)
   })
 })
 

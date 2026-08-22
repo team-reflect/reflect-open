@@ -6,7 +6,7 @@ use base64::Engine;
 use serde::Serialize;
 
 use crate::error::{AppError, AppResult};
-use crate::web_fetch::{fetch_public_bytes, fetch_public_html};
+use crate::web_fetch::{fetch_public_html, fetch_public_image};
 
 const ICON_FETCH_MAX_BYTES: usize = 512 * 1024;
 const ICON_MAX_DIMENSION: u32 = 1024;
@@ -87,13 +87,8 @@ fn normalize_icon(bytes: &[u8]) -> AppResult<Vec<u8>> {
 /// Fetch a public raster favicon, normalize it, and return a PNG data URL.
 #[tauri::command]
 pub(crate) async fn link_preview_fetch_icon(url: String) -> AppResult<String> {
-    let response = fetch_public_bytes(
-        &url,
-        "image/webp,image/png,image/jpeg,image/gif,image/x-icon,*/*;q=0.1",
-        ICON_FETCH_MAX_BYTES,
-        validate_raster_content_type,
-    )
-    .await?;
+    let response =
+        fetch_public_image(&url, ICON_FETCH_MAX_BYTES, validate_raster_content_type).await?;
     let png = tauri::async_runtime::spawn_blocking(move || normalize_icon(&response.body))
         .await
         .map_err(|error| AppError::io(format!("favicon task failed: {error}")))??;

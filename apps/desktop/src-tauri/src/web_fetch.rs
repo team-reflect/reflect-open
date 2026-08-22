@@ -1,16 +1,21 @@
 //! Bounded native HTTP transport shared by capture and editor link previews.
 
+use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
-use reqwest::{redirect, StatusCode, Url};
+use reqwest::dns::{Addrs, Name, Resolve, Resolving};
+use reqwest::{redirect, Client, StatusCode, Url};
 
 use crate::error::{AppError, AppResult};
 
-pub(crate) const FETCH_TIMEOUT: Duration = Duration::from_secs(15);
+const FETCH_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_REDIRECTS: usize = 5;
+const MAX_CONCURRENT_DNS_LOOKUPS: usize = 8;
 const HTML_MAX_BYTES: usize = 2 * 1024 * 1024;
-pub(crate) const USER_AGENT: &str = concat!(
+const USER_AGENT: &str = concat!(
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ",
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
 );
@@ -28,10 +33,38 @@ pub(crate) struct FetchResponse {
 
 type ContentTypeValidator = fn(&str, &str) -> AppResult<()>;
 
-struct PublicResolution {
-    dns_host: Option<String>,
-    addresses: Vec<SocketAddr>,
+#[derive(Clone, Copy)]
+struct RequestProfile {
+    accept: &'static str,
+    destination: Option<&'static str>,
+    mode: Option<&'static str>,
+    site: Option<&'static str>,
+    upgrade_insecure_requests: bool,
 }
+
+const DOCUMENT_PROFILE: RequestProfile = RequestProfile {
+    accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    destination: Some("document"),
+    mode: Some("navigate"),
+    site: Some("none"),
+    upgrade_insecure_requests: true,
+};
+
+const IMAGE_PROFILE: RequestProfile = RequestProfile {
+    accept: "image/webp,image/png,image/jpeg,image/gif,image/x-icon,*/*;q=0.1",
+    destination: Some("image"),
+    mode: Some("no-cors"),
+    site: None,
+    upgrade_insecure_requests: false,
+};
+
+const JSON_PROFILE: RequestProfile = RequestProfile {
+    accept: "application/json",
+    destination: None,
+    mode: None,
+    site: None,
+    upgrade_insecure_requests: false,
+};
 
 #[derive(Clone, Copy)]
 enum LimitBehavior {
@@ -129,13 +162,26 @@ fn is_public_ip(address: IpAddr) -> bool {
     }
 }
 
-fn validate_public_addresses(url: &Url, addresses: &[SocketAddr]) -> AppResult<()> {
+fn validate_public_addresses(destination: &str, addresses: &[SocketAddr]) -> AppResult<()> {
     if addresses.is_empty() || addresses.iter().any(|address| !is_public_ip(address.ip())) {
         return Err(AppError::parse(format!(
-            "link preview destination is not on the public internet: {url}"
+            "link preview destination is not on the public internet: {destination}"
         )));
     }
     Ok(())
+}
+
+fn validate_public_literal(url: &Url) -> AppResult<()> {
+    let host = url
+        .host_str()
+        .ok_or_else(|| AppError::parse(format!("URL has no host: {url}")))?;
+    let Ok(address) = host.trim_matches(['[', ']']).parse::<IpAddr>() else {
+        return Ok(());
+    };
+    let port = url
+        .port_or_known_default()
+        .ok_or_else(|| AppError::parse(format!("URL has no port: {url}")))?;
+    validate_public_addresses(url.as_str(), &[SocketAddr::new(address, port)])
 }
 
 fn remaining_timeout(deadline: Instant) -> AppResult<Duration> {
@@ -147,72 +193,80 @@ fn remaining_timeout(deadline: Instant) -> AppResult<Duration> {
         })
 }
 
-async fn resolve_public(url: &Url, deadline: Instant) -> AppResult<PublicResolution> {
-    let host = url
-        .host_str()
-        .ok_or_else(|| AppError::parse(format!("URL has no host: {url}")))?
-        .to_owned();
-    let port = url
-        .port_or_known_default()
-        .ok_or_else(|| AppError::parse(format!("URL has no port: {url}")))?;
+struct PublicDnsResolver;
 
-    if let Ok(address) = host.trim_matches(['[', ']']).parse::<IpAddr>() {
-        let addresses = vec![SocketAddr::new(address, port)];
-        validate_public_addresses(url, &addresses)?;
-        return Ok(PublicResolution {
-            dns_host: None,
-            addresses,
-        });
+static ACTIVE_DNS_LOOKUPS: AtomicUsize = AtomicUsize::new(0);
+
+struct DnsLookupPermit;
+
+impl DnsLookupPermit {
+    fn acquire() -> io::Result<Self> {
+        ACTIVE_DNS_LOOKUPS
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |active| {
+                (active < MAX_CONCURRENT_DNS_LOOKUPS).then_some(active + 1)
+            })
+            .map(|_| Self)
+            .map_err(|_| io::Error::other("too many concurrent link-preview DNS lookups"))
     }
-
-    let resolve_host = host.clone();
-    let mut resolve_task = tauri::async_runtime::spawn_blocking(move || {
-        (resolve_host.as_str(), port)
-            .to_socket_addrs()
-            .map(|addresses| addresses.collect::<Vec<_>>())
-    });
-    let addresses =
-        match tokio::time::timeout(remaining_timeout(deadline)?, &mut resolve_task).await {
-            Ok(result) => result,
-            Err(_) => {
-                resolve_task.abort();
-                return Err(AppError::Network {
-                    message: format!("timed out resolving {host}"),
-                });
-            }
-        }
-        .map_err(|error| AppError::io(format!("DNS task failed: {error}")))?
-        .map_err(|error| AppError::Network {
-            message: format!("could not resolve {host}: {error}"),
-        })?;
-    validate_public_addresses(url, &addresses)?;
-    Ok(PublicResolution {
-        dns_host: Some(host),
-        addresses,
-    })
 }
 
-async fn client_for(
-    url: &Url,
-    scope: NetworkScope,
-    deadline: Instant,
-) -> AppResult<reqwest::Client> {
-    let mut builder = reqwest::Client::builder()
+impl Drop for DnsLookupPermit {
+    fn drop(&mut self) {
+        ACTIVE_DNS_LOOKUPS.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+impl Resolve for PublicDnsResolver {
+    fn resolve(&self, name: Name) -> Resolving {
+        let host = name.as_str().to_owned();
+        Box::pin(async move {
+            let permit = DnsLookupPermit::acquire()
+                .map_err(|error| -> Box<dyn std::error::Error + Send + Sync> { Box::new(error) })?;
+            let resolve_host = host.clone();
+            let addresses = tauri::async_runtime::spawn_blocking(move || {
+                let _permit = permit;
+                (resolve_host.as_str(), 0)
+                    .to_socket_addrs()
+                    .map(|addresses| addresses.collect::<Vec<_>>())
+            })
+            .await
+            .map_err(|error| -> Box<dyn std::error::Error + Send + Sync> { Box::new(error) })?
+            .map_err(|error| -> Box<dyn std::error::Error + Send + Sync> { Box::new(error) })?;
+            validate_public_addresses(&host, &addresses).map_err(|_| {
+                Box::new(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    format!("link preview destination is not on the public internet: {host}"),
+                )) as Box<dyn std::error::Error + Send + Sync>
+            })?;
+            Ok(Box::new(addresses.into_iter()) as Addrs)
+        })
+    }
+}
+
+fn client_for(scope: NetworkScope) -> AppResult<&'static Client> {
+    static CAPTURE_CLIENT: OnceLock<Client> = OnceLock::new();
+    static PUBLIC_CLIENT: OnceLock<Client> = OnceLock::new();
+
+    let slot = match scope {
+        NetworkScope::AnyHttp => &CAPTURE_CLIENT,
+        NetworkScope::PublicHttp => &PUBLIC_CLIENT,
+    };
+    if let Some(client) = slot.get() {
+        return Ok(client);
+    }
+
+    let mut builder = Client::builder()
         .redirect(redirect::Policy::none())
         .user_agent(USER_AGENT);
     if matches!(scope, NetworkScope::PublicHttp) {
-        let resolution = resolve_public(url, deadline).await?;
         // A system proxy would resolve and fetch the original URL itself,
-        // bypassing both our DNS validation and address pinning.
-        builder = builder.no_proxy();
-        if let Some(host) = resolution.dns_host {
-            builder = builder.resolve_to_addrs(&host, &resolution.addresses);
-        }
+        // bypassing the public-address resolver and its SSRF validation.
+        builder = builder.no_proxy().dns_resolver(Arc::new(PublicDnsResolver));
     }
-    builder
-        .timeout(remaining_timeout(deadline)?)
+    let client = builder
         .build()
-        .map_err(|error| AppError::io(error.to_string()))
+        .map_err(|error| AppError::io(error.to_string()))?;
+    Ok(slot.get_or_init(|| client))
 }
 
 fn redirect_url(url: &Url, location: &str, scope: NetworkScope) -> AppResult<Url> {
@@ -234,29 +288,43 @@ fn redirect_url(url: &Url, location: &str, scope: NetworkScope) -> AppResult<Url
 async fn fetch(
     value: &str,
     scope: NetworkScope,
-    accept: &str,
+    profile: RequestProfile,
     max_bytes: usize,
+    max_redirects: usize,
     limit_behavior: LimitBehavior,
     validate_content_type: ContentTypeValidator,
 ) -> AppResult<FetchResponse> {
     let deadline = Instant::now() + FETCH_TIMEOUT;
     let mut url = parse_http_url(value)?;
-    for redirect_count in 0..=MAX_REDIRECTS {
-        let client = client_for(&url, scope, deadline).await?;
-        let response = client
+    let client = client_for(scope)?;
+    for redirect_count in 0..=max_redirects {
+        if matches!(scope, NetworkScope::PublicHttp) {
+            validate_public_literal(&url)?;
+        }
+        let mut request = client
             .get(url.clone())
-            .header("Accept", accept)
-            .header("Accept-Language", "en-US,en;q=0.9")
-            .header("Sec-Fetch-Dest", "document")
-            .header("Sec-Fetch-Mode", "navigate")
-            .header("Sec-Fetch-Site", "none")
-            .header("Upgrade-Insecure-Requests", "1")
+            .header("Accept", profile.accept)
+            .header("Accept-Language", "en-US,en;q=0.9");
+        if let Some(destination) = profile.destination {
+            request = request.header("Sec-Fetch-Dest", destination);
+        }
+        if let Some(mode) = profile.mode {
+            request = request.header("Sec-Fetch-Mode", mode);
+        }
+        if let Some(site) = profile.site {
+            request = request.header("Sec-Fetch-Site", site);
+        }
+        if profile.upgrade_insecure_requests {
+            request = request.header("Upgrade-Insecure-Requests", "1");
+        }
+        let response = request
+            .timeout(remaining_timeout(deadline)?)
             .send()
             .await
             .map_err(classify_fetch_error)?;
 
         if response.status().is_redirection() {
-            if redirect_count == MAX_REDIRECTS {
+            if redirect_count == max_redirects {
                 return Err(AppError::io(format!("too many redirects from {value}")));
             }
             let location = response
@@ -312,12 +380,22 @@ fn validate_html_content_type(url: &str, content_type: &str) -> AppResult<()> {
     Ok(())
 }
 
+fn validate_json_content_type(url: &str, content_type: &str) -> AppResult<()> {
+    if !content_type.contains("json") {
+        return Err(AppError::parse(format!(
+            "{url} did not answer JSON ({content_type})"
+        )));
+    }
+    Ok(())
+}
+
 async fn fetch_html(value: &str, scope: NetworkScope) -> AppResult<FetchResponse> {
     fetch(
         value,
         scope,
-        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        DOCUMENT_PROFILE,
         HTML_MAX_BYTES,
+        MAX_REDIRECTS,
         LimitBehavior::Truncate,
         validate_html_content_type,
     )
@@ -327,15 +405,16 @@ async fn fetch_html(value: &str, scope: NetworkScope) -> AppResult<FetchResponse
 async fn fetch_bytes(
     value: &str,
     scope: NetworkScope,
-    accept: &str,
+    profile: RequestProfile,
     max_bytes: usize,
     validate_content_type: ContentTypeValidator,
 ) -> AppResult<FetchResponse> {
     fetch(
         value,
         scope,
-        accept,
+        profile,
         max_bytes,
+        MAX_REDIRECTS,
         LimitBehavior::Reject,
         validate_content_type,
     )
@@ -347,22 +426,39 @@ pub(crate) async fn fetch_capture_html(value: &str) -> AppResult<FetchResponse> 
     fetch_html(value, NetworkScope::AnyHttp).await
 }
 
+/// Fetch a bounded HTTPS JSON response without following redirects.
+pub(crate) async fn fetch_capture_json(value: &str, max_bytes: usize) -> AppResult<FetchResponse> {
+    let url = parse_http_url(value)?;
+    if url.scheme() != "https" {
+        return Err(AppError::parse(format!("not an https URL: {value}")));
+    }
+    fetch(
+        value,
+        NetworkScope::AnyHttp,
+        JSON_PROFILE,
+        max_bytes,
+        0,
+        LimitBehavior::Reject,
+        validate_json_content_type,
+    )
+    .await
+}
+
 /// Fetch editor-preview HTML from public internet destinations only.
 pub(crate) async fn fetch_public_html(value: &str) -> AppResult<FetchResponse> {
     fetch_html(value, NetworkScope::PublicHttp).await
 }
 
-/// Fetch bounded bytes from public internet destinations only.
-pub(crate) async fn fetch_public_bytes(
+/// Fetch a bounded image from public internet destinations only.
+pub(crate) async fn fetch_public_image(
     value: &str,
-    accept: &str,
     max_bytes: usize,
     validate_content_type: ContentTypeValidator,
 ) -> AppResult<FetchResponse> {
     fetch_bytes(
         value,
         NetworkScope::PublicHttp,
-        accept,
+        IMAGE_PROFILE,
         max_bytes,
         validate_content_type,
     )
@@ -391,19 +487,7 @@ mod tests {
             "http://[64:ff9b:1::7f00:1]/",
         ] {
             let url = parse_http_url(value).unwrap();
-            let port = url.port_or_known_default().unwrap();
-            let address = SocketAddr::new(
-                url.host_str()
-                    .unwrap()
-                    .trim_matches(['[', ']'])
-                    .parse()
-                    .unwrap(),
-                port,
-            );
-            assert!(
-                validate_public_addresses(&url, &[address]).is_err(),
-                "{value}"
-            );
+            assert!(validate_public_literal(&url).is_err(), "{value}");
         }
     }
 
@@ -417,18 +501,16 @@ mod tests {
     }
 
     #[test]
-    fn resolves_public_ipv6_literals_without_dns() {
+    fn clients_are_reused_within_each_network_scope() {
+        let first = client_for(NetworkScope::PublicHttp).unwrap();
+        let second = client_for(NetworkScope::PublicHttp).unwrap();
+        assert!(std::ptr::eq(first, second));
+    }
+
+    #[test]
+    fn accepts_public_ipv6_literals_without_dns() {
         let url = parse_http_url("https://[2606:4700:4700::1111]/").unwrap();
-        let resolution = tauri::async_runtime::block_on(resolve_public(
-            &url,
-            Instant::now() + Duration::from_secs(1),
-        ))
-        .unwrap();
-        assert!(resolution.dns_host.is_none());
-        assert_eq!(
-            resolution.addresses,
-            ["[2606:4700:4700::1111]:443".parse().unwrap()]
-        );
+        assert!(validate_public_literal(&url).is_ok());
     }
 
     #[test]
@@ -451,19 +533,7 @@ mod tests {
             "https://[64:ff9b::808:808]/",
         ] {
             let url = parse_http_url(value).unwrap();
-            let port = url.port_or_known_default().unwrap();
-            let address = SocketAddr::new(
-                url.host_str()
-                    .unwrap()
-                    .trim_matches(['[', ']'])
-                    .parse()
-                    .unwrap(),
-                port,
-            );
-            assert!(
-                validate_public_addresses(&url, &[address]).is_ok(),
-                "{value}"
-            );
+            assert!(validate_public_literal(&url).is_ok(), "{value}");
         }
     }
 
@@ -474,7 +544,7 @@ mod tests {
             "1.1.1.1:443".parse().unwrap(),
             "127.0.0.1:443".parse().unwrap(),
         ];
-        assert!(validate_public_addresses(&url, &addresses).is_err());
+        assert!(validate_public_addresses(url.as_str(), &addresses).is_err());
     }
 
     #[test]

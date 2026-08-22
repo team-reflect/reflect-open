@@ -15,9 +15,9 @@ use tauri::State;
 
 use crate::error::{AppError, AppResult};
 use crate::fs::{current_root, modified_ms, root_for_generation, FileMeta, GraphState};
-use crate::web_fetch::{
-    classify_fetch_error, classify_fetch_status, fetch_capture_html, FETCH_TIMEOUT, USER_AGENT,
-};
+#[cfg(test)]
+use crate::web_fetch::classify_fetch_status;
+use crate::web_fetch::{fetch_capture_html, fetch_capture_json};
 
 /// The native-messaging host name browsers route on; must match the name the
 /// extension passes to `runtime.sendNativeMessage`.
@@ -549,46 +549,8 @@ const OEMBED_FETCH_MAX_BYTES: usize = 64 * 1024;
 /// endpoints answer directly, so a redirect is a failure).
 #[tauri::command]
 pub async fn capture_oembed_fetch(url: String) -> AppResult<String> {
-    if !url.starts_with("https://") {
-        return Err(AppError::parse(format!("not an https url: {url}")));
-    }
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(FETCH_TIMEOUT)
-        .user_agent(USER_AGENT)
-        .build()
-        .map_err(|err| AppError::io(err.to_string()))?;
-    let response = client
-        .get(&url)
-        .header("Accept", "application/json")
-        .send()
-        .await
-        .map_err(classify_fetch_error)?;
-    if let Some(err) = classify_fetch_status(&url, response.status()) {
-        return Err(err);
-    }
-    let content_type = response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("")
-        .to_ascii_lowercase(); // MIME types are case-insensitive (`TEXT/HTML`)
-    if !content_type.contains("json") {
-        return Err(AppError::parse(format!(
-            "{url} did not answer JSON ({content_type})"
-        )));
-    }
-    let mut body: Vec<u8> = Vec::new();
-    let mut response = response;
-    while let Some(chunk) = response.chunk().await.map_err(classify_fetch_error)? {
-        if body.len() + chunk.len() > OEMBED_FETCH_MAX_BYTES {
-            return Err(AppError::parse(format!(
-                "{url} answered more than {OEMBED_FETCH_MAX_BYTES} bytes"
-            )));
-        }
-        body.extend_from_slice(&chunk);
-    }
-    String::from_utf8(body)
+    let response = fetch_capture_json(&url, OEMBED_FETCH_MAX_BYTES).await?;
+    String::from_utf8(response.body)
         .map_err(|err| AppError::parse(format!("{url} answered non-UTF-8: {err}")))
 }
 

@@ -1,11 +1,11 @@
 import type { LinkPreview, LinkPreviewResolver } from '@meowdown/core'
 import {
   cloudSafeLinkHref,
+  isAppError,
   linkPreviewFetchHtml,
   linkPreviewFetchIcon,
-  parseFrontmatter,
+  notePrivate,
   parseLinkPreviewMeta,
-  splitFrontmatter,
 } from '@reflect/core'
 import type { CloudSafe } from '@reflect/core'
 import { readExistingNoteSource } from '@/lib/read-existing-note-source'
@@ -42,11 +42,21 @@ const defaultDependencies: LinkPreviewResolverDependencies = {
 }
 
 type LinkPreviewResolution =
-  | { readonly kind: 'resolved'; readonly preview: LinkPreview | undefined }
+  | {
+      readonly kind: 'resolved'
+      readonly preview: LinkPreview | undefined
+      readonly cacheable: boolean
+    }
   | { readonly kind: 'authorization-denied' }
+  | { readonly kind: 'transient-failure' }
 
 const AUTHORIZATION_DENIED: LinkPreviewResolution = { kind: 'authorization-denied' }
-const FAILED_RESOLUTION: LinkPreviewResolution = { kind: 'resolved', preview: undefined }
+const TRANSIENT_FAILURE: LinkPreviewResolution = { kind: 'transient-failure' }
+const FAILED_RESOLUTION: LinkPreviewResolution = {
+  kind: 'resolved',
+  preview: undefined,
+  cacheable: true,
+}
 
 function sameSession(left: LinkPreviewSession | null, right: LinkPreviewSession): boolean {
   return (
@@ -59,7 +69,8 @@ function sameSession(left: LinkPreviewSession | null, right: LinkPreviewSession)
 
 /**
  * Build one editor-session resolver. The returned promise cache includes
- * successful and failed lookups and naturally deduplicates concurrent calls.
+ * successful and permanent failed lookups, deduplicates concurrent calls,
+ * and leaves transient network failures eligible for retry.
  */
 export function createNoteLinkPreviewResolver(
   session: LinkPreviewSession,
@@ -68,24 +79,30 @@ export function createNoteLinkPreviewResolver(
 ): LinkPreviewResolver {
   const cache = new Map<string, Promise<LinkPreviewResolution>>()
 
-  async function authorizeOutboundUrl(url: string): Promise<CloudSafe<string> | null> {
+  async function authorizeOutboundUrls(
+    urls: readonly string[],
+  ): Promise<readonly CloudSafe<string>[] | null> {
     if (!sameSession(currentSession(), session)) return null
     try {
       const source = await dependencies.readSource(session.path, session.generation)
       if (!sameSession(currentSession(), session)) return null
-      const frontmatter = parseFrontmatter(splitFrontmatter(source).raw).data
-      return cloudSafeLinkHref({ path: session.path, isPrivate: frontmatter.private }, url)
+      const note = { path: session.path, isPrivate: notePrivate(source) }
+      return urls.map((url) => cloudSafeLinkHref(note, url))
     } catch {
       return null
     }
+  }
+
+  function isTransientFailure(error: unknown): boolean {
+    return isAppError(error) && error.kind === 'network'
   }
 
   async function resolve(href: string, pageUrl: CloudSafe<string>): Promise<LinkPreviewResolution> {
     let page
     try {
       page = await dependencies.fetchHtml(pageUrl)
-    } catch {
-      return FAILED_RESOLUTION
+    } catch (error) {
+      return isTransientFailure(error) ? TRANSIENT_FAILURE : FAILED_RESOLUTION
     }
 
     let metadata
@@ -96,21 +113,24 @@ export function createNoteLinkPreviewResolver(
     }
     if (metadata === null) return FAILED_RESOLUTION
 
-    // Re-read privacy after page metadata, then mint the separately resolved
-    // favicon URL immediately before its own outbound request.
-    if ((await authorizeOutboundUrl(href)) === null) return AUTHORIZATION_DENIED
-    const iconUrl = await authorizeOutboundUrl(metadata.iconUrl)
-    if (iconUrl === null) return AUTHORIZATION_DENIED
+    // One live snapshot re-checks the page and separately mints the favicon
+    // URL immediately before its outbound request.
+    const authorizedUrls = await authorizeOutboundUrls([href, metadata.iconUrl])
+    if (authorizedUrls === null) return AUTHORIZATION_DENIED
+    const iconUrl = authorizedUrls[1]
+    if (iconUrl === undefined) return FAILED_RESOLUTION
 
     let iconSrc: string | undefined
+    let cacheable = true
     try {
       iconSrc = await dependencies.fetchIcon(iconUrl)
-    } catch {
+    } catch (error) {
+      cacheable = !isTransientFailure(error)
       // A favicon is optional; the card falls back to a globe.
     }
 
     // A result is usable only while its source note and editor session remain public.
-    if ((await authorizeOutboundUrl(href)) === null) return AUTHORIZATION_DENIED
+    if ((await authorizeOutboundUrls([href])) === null) return AUTHORIZATION_DENIED
 
     return {
       kind: 'resolved',
@@ -119,6 +139,7 @@ export function createNoteLinkPreviewResolver(
         ...(metadata.description === null ? {} : { description: metadata.description }),
         ...(iconSrc === undefined ? {} : { iconSrc }),
       },
+      cacheable,
     }
   }
 
@@ -133,8 +154,10 @@ export function createNoteLinkPreviewResolver(
     // Authorization is deliberately outside the cache: a completed preview
     // must disappear as soon as its note becomes private, while a denied
     // lookup must become eligible when the note becomes public again.
-    const pageUrl = await authorizeOutboundUrl(href)
-    if (pageUrl === null) return
+    const authorizedPageUrls = await authorizeOutboundUrls([href])
+    if (authorizedPageUrls === null) return
+    const pageUrl = authorizedPageUrls[0]
+    if (pageUrl === undefined) return
 
     let pending = cache.get(href)
     if (pending === undefined) {
@@ -142,8 +165,14 @@ export function createNoteLinkPreviewResolver(
       cache.set(href, pending)
     }
     const resolution = await pending
-    if (resolution.kind === 'authorization-denied') {
+    if (
+      resolution.kind === 'authorization-denied' ||
+      resolution.kind === 'transient-failure' ||
+      !resolution.cacheable
+    ) {
       if (cache.get(href) === pending) cache.delete(href)
+    }
+    if (resolution.kind !== 'resolved') {
       return
     }
     return resolution.preview
