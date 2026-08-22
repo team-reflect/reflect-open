@@ -1,6 +1,20 @@
 import { Fragment, type MouseEvent, type ReactElement, type ReactNode } from 'react'
-import { CalendarDays, FileText, History, Paperclip, Search } from 'lucide-react'
-import { isTagName, isToolPending, type AssistantPart, type NoteHitSummary } from '@reflect/core'
+import {
+  CalendarDays,
+  FilePlus2,
+  FileText,
+  History,
+  Paperclip,
+  PencilLine,
+  Search,
+} from 'lucide-react'
+import {
+  isTagName,
+  isToolPending,
+  type AssistantPart,
+  type NoteHitSummary,
+  type NoteMutationOutput,
+} from '@reflect/core'
 import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker'
 import { Spinner } from '@/components/ui/spinner'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
@@ -64,6 +78,65 @@ function NoteLinks({ notes, onOpen }: NoteLinksProps): ReactElement | null {
         </Fragment>
       ))}
     </>
+  )
+}
+
+interface MutationChipProps {
+  pending: boolean
+  icon: ReactElement
+  pendingLabel: string
+  verb: string
+  label: string
+  showStatistics?: boolean
+  outcome: NoteMutationOutput | null
+  error: string | null
+  onOpen: (path: string, event: MouseEvent<HTMLButtonElement>) => void
+}
+
+function MutationChip({
+  pending,
+  icon,
+  pendingLabel,
+  verb,
+  label,
+  showStatistics = true,
+  outcome,
+  error,
+  onOpen,
+}: MutationChipProps): ReactElement {
+  if (error !== null) {
+    return (
+      <ChipFrame pending={false} icon={icon}>
+        {pendingLabel} — {error}
+      </ChipFrame>
+    )
+  }
+  if (outcome === null) {
+    return (
+      <ChipFrame pending={pending} icon={icon}>
+        {pendingLabel}
+      </ChipFrame>
+    )
+  }
+  if (!outcome.ok) {
+    return (
+      <ChipFrame pending={false} icon={icon}>
+        {pendingLabel} — {outcome.message}
+      </ChipFrame>
+    )
+  }
+  return (
+    <ChipFrame pending={false} icon={icon}>
+      {verb}{' '}
+      <button
+        type="button"
+        onClick={(event) => onOpen(outcome.path, event)}
+        className="underline-offset-2 hover:text-text hover:underline"
+      >
+        {label}
+      </button>
+      {showStatistics ? ` · +${outcome.addedLines} −${outcome.removedLines}` : null}
+    </ChipFrame>
   )
 }
 
@@ -132,6 +205,55 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
         {result !== null ? countSuffix(result.days.length, 'day') : ''}
         {result !== null ? <NoteLinks notes={result.days} onOpen={openNote} /> : null}
       </ChipFrame>
+    )
+  }
+
+  if (call.tool === 'edit') {
+    const outcome = part.result?.tool === 'edit' ? part.result.outcome : null
+    return (
+      <MutationChip
+        pending={pending}
+        icon={<PencilLine aria-hidden className="size-3.5" />}
+        pendingLabel={`Editing ${call.path}`}
+        verb="Edited"
+        label={call.path}
+        outcome={outcome}
+        error={part.error}
+        onOpen={openNote}
+      />
+    )
+  }
+
+  if (call.tool === 'append') {
+    const outcome = part.result?.tool === 'append' ? part.result.outcome : null
+    return (
+      <MutationChip
+        pending={pending}
+        icon={<PencilLine aria-hidden className="size-3.5" />}
+        pendingLabel={`Appending to ${call.path}`}
+        verb="Edited"
+        label={call.path}
+        outcome={outcome}
+        error={part.error}
+        onOpen={openNote}
+      />
+    )
+  }
+
+  if (call.tool === 'create') {
+    const outcome = part.result?.tool === 'create' ? part.result.outcome : null
+    return (
+      <MutationChip
+        pending={pending}
+        icon={<FilePlus2 aria-hidden className="size-3.5" />}
+        pendingLabel={`Creating ${call.title}`}
+        verb="Created"
+        label={call.title}
+        showStatistics={false}
+        outcome={outcome}
+        error={part.error}
+        onOpen={openNote}
+      />
     )
   }
 

@@ -45,6 +45,8 @@ export function ChatInput(): ReactElement {
     modelOptions,
     activeModel,
     selectModel,
+    permissionMode,
+    setPermissionMode,
     draft,
     setDraft,
     attachments,
@@ -55,6 +57,7 @@ export function ChatInput(): ReactElement {
     newChat,
   } = useChatSession()
   const streaming = status === 'streaming'
+  const busy = status !== 'idle'
   const empty = draft.trim() === '' && attachments.length === 0
 
   const groups = useMemo(
@@ -72,7 +75,7 @@ export function ChatInput(): ReactElement {
   // on mobile every tab switch does that), and a send that goes through
   // clears it there.
   const submit = () => {
-    if (streaming || empty) {
+    if (busy || empty) {
       return
     }
     void send(draft)
@@ -141,6 +144,44 @@ export function ChatInput(): ReactElement {
         />
         <div className="flex items-center gap-2 px-2.5 pb-2.5">
           <Select
+            value={permissionMode}
+            disabled={busy}
+            items={[
+              { value: 'read', label: 'Read only' },
+              { value: 'readWrite', label: 'Read & write' },
+            ]}
+            onValueChange={(value) => {
+              if (value === 'read' || value === 'readWrite') {
+                setPermissionMode(value)
+              }
+            }}
+          >
+            <SelectTrigger
+              aria-label="Chat permissions"
+              size="sm"
+              className="w-auto border-none bg-transparent text-xs text-text-muted shadow-none"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="read">
+                <span className="flex flex-col">
+                  <span>Read only</span>
+                  <span className="text-xs text-text-muted">Search and answer from your notes</span>
+                </span>
+              </SelectItem>
+              <SelectItem value="readWrite">
+                <span className="flex flex-col">
+                  <span>Read &amp; write</span>
+                  <span className="text-xs text-text-muted">
+                    Can edit non-private notes; changes are reviewable and undoable
+                  </span>
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            disabled={busy}
             value={activeIndex >= 0 ? String(activeIndex) : ''}
             items={modelOptions.map((option, index) => ({
               value: String(index),
@@ -175,7 +216,7 @@ export function ChatInput(): ReactElement {
           </Select>
           <div className="flex-1" />
           <ChatHistoryMenu />
-          {turns.length > 0 && !streaming ? (
+          {turns.length > 0 && !busy ? (
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -198,7 +239,7 @@ export function ChatInput(): ReactElement {
             <Button
               size="icon-sm"
               aria-label="Send"
-              disabled={empty || activeModel === null}
+              disabled={busy || empty || activeModel === null}
               onClick={submit}
             >
               <ArrowUp aria-hidden />

@@ -12,6 +12,8 @@ import {
   type ReadAssetsOutput,
 } from './read-assets'
 import { MAX_NOTE_CONTENT_CHARS, type ReadNoteResult, type ReadNotesOutput } from './read-notes'
+import { hashContent } from '../../indexing/hash'
+import type { ChatSourceRef } from './transcript'
 import {
   buildNoteTools,
   INVALID_TAG_ERROR,
@@ -43,6 +45,7 @@ function hit(overrides: Partial<RetrievalHit>): RetrievalHit {
     snippet: 'a public snippet',
     heading: null,
     isPrivate: false,
+    evidence: { kind: 'lexical', assetPaths: [] },
     ...overrides,
   }
 }
@@ -200,14 +203,19 @@ describe('search_notes', () => {
         hit({}),
         hit({ path: PRIVATE_PATH, title: PRIVATE_TITLE, snippet: '', isPrivate: true }),
       ],
-      readNoteFn: async () => 'a public body\n',
+      readNoteFn: async () => '# Public note\n\na public diary body\n',
     })
     const output = await runSearch(tools, { query: 'diary' })
     const payload = JSON.stringify(output)
     expect(payload).not.toContain(PRIVATE_TITLE)
     expect(payload).not.toContain(PRIVATE_PATH)
     expect(output.hits).toEqual([
-      { path: 'notes/public.md', title: 'Public note', snippet: 'a public snippet', heading: null },
+      {
+        path: 'notes/public.md',
+        title: 'Public note',
+        snippet: 'Public note a public diary body',
+        heading: null,
+      },
     ])
   })
 
@@ -278,6 +286,9 @@ describe('read_notes', () => {
       expect.unreachable('expected a successful read')
     }
     expect(output.note.title).toBe('Project Atlas')
+    expect(output.note.revision).toBe(
+      await hashContent('---\npinned: true\n---\n# Project Atlas\n\nLaunch plan.\n'),
+    )
     expect(output.note.content).toBe('# Project Atlas\n\nLaunch plan.\n')
     expect(output.note.truncated).toBe(false)
   })
@@ -676,5 +687,50 @@ describe('list_daily_notes', () => {
     const output = await runDailies(tools, { start: '2026-06-01', end: '2026-06-30' })
     expect(output.days).toEqual([])
     expect(JSON.stringify(output)).not.toContain(PRIVATE_TITLE)
+  })
+})
+
+describe('tool source observation', () => {
+  it('observes every successful search, listing, note-read, and asset-read source', async () => {
+    const observed: ChatSourceRef[] = []
+    const assetPath = 'assets/chart.png'
+    const tools = buildNoteTools({
+      retrieveFn: async () => [hit({ path: 'notes/search.md' })],
+      listRecentNotesFn: async () => [recentRow({ path: 'notes/recent.md' })],
+      listDailyNotesFn: async () => [dailyRow('2026-06-10', { path: 'daily/2026-06-10.md' })],
+      readNoteFn: async (path) => {
+        if (path === `${assetPath}.reflect.md`) {
+          return 'A chart description.\n'
+        }
+        if (path === 'notes/referrer.md') {
+          return `# Referrer\n\n![chart](${assetPath})\n`
+        }
+        if (path === 'notes/private.md') {
+          return '---\nprivate: true\n---\n# Private\n'
+        }
+        if (path === 'notes/search.md') {
+          return '# Atlas\n\nSearch result.\n'
+        }
+        return '# Public\n\nBody.\n'
+      },
+      assetReferencingNotePathsFn: async () => ['notes/referrer.md'],
+      observeSource: (source) => {
+        observed.push(source)
+      },
+    })
+
+    await runSearch(tools, { query: 'atlas' })
+    await runRecents(tools, {})
+    await runDailies(tools, { start: '2026-06-01', end: '2026-06-30' })
+    await runReadNotes(tools, ['notes/read.md', 'notes/private.md'])
+    await runReadAssets(tools, [assetPath, 'not-an-asset'])
+
+    expect(observed).toEqual([
+      { kind: 'note', path: 'notes/search.md' },
+      { kind: 'note', path: 'notes/recent.md' },
+      { kind: 'note', path: 'daily/2026-06-10.md' },
+      { kind: 'note', path: 'notes/read.md' },
+      { kind: 'asset', path: assetPath },
+    ])
   })
 })

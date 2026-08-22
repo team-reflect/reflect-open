@@ -69,10 +69,26 @@ export {
   type NoteToolDeps,
   type NoteToolResult,
   type NoteTools,
+  type AnyNoteTools,
+  type WritableNoteTools,
   type ReadAssetSummary,
   type ReadNoteSummary,
   type SearchNotesOutput,
 } from '../ai/chat/tools'
+export {
+  applyExactReplacements,
+  prepareExactNoteEdit,
+  prepareNoteAppend,
+  type ApplyChatNoteChangeInput,
+  type ChatNoteMutationKind,
+  type ChatNoteToolHost,
+  type CreateChatNoteInput,
+  type ExactNoteReplacement,
+  type NoteMutationFailureCode,
+  type NoteMutationOutput,
+  type PreparedChatNoteChange,
+} from '../ai/chat/note-mutations'
+export { DEFAULT_CHAT_PERMISSION_MODE, type ChatPermissionMode } from '../ai/chat/permissions'
 export {
   MAX_NOTE_CONTENT_CHARS,
   MAX_READ_NOTES,
@@ -105,13 +121,20 @@ export {
 export {
   appendEvent,
   buildHistory,
+  buildPrivacySafeHistory,
   isToolPending,
+  mergeSourceProvenance,
   NO_REPLY_NOTICE,
+  sourceProvenanceForParts,
+  sourceProvenanceForResult,
   userMessage,
   type AssistantPart,
   type ChatAttachment,
+  type ChatSourceProvenance,
+  type ChatSourceRef,
   type ChatTurn,
 } from '../ai/chat/transcript'
+export { validateChatSource, type ValidateChatSourceDeps } from '../ai/chat/history-privacy'
 export {
   deleteChatConversation,
   listChatConversations,
@@ -119,6 +142,19 @@ export {
   saveChatMessage,
   type ChatConversation,
 } from '../ai/chat/store'
+export {
+  chatNoteChangesForTurn,
+  pendingChatNoteChanges,
+  prepareChatNoteChange,
+  setChatNoteChangeState,
+  setChatNoteChangesStateBatch,
+  type ChatNoteChange,
+  type ChatNoteChangeOperation,
+  type ChatNoteChangeState,
+  type PrepareChatNoteChangeInput,
+  type SetChatNoteChangeStateResult,
+  type SetChatNoteChangesStateBatchResult,
+} from '../ai/chat/change-store'
 export {
   estimateTokens,
   fitToContextWindow,

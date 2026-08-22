@@ -52,6 +52,7 @@ describe('cloudSafeSearchHits', () => {
     snippet: 'body',
     heading: null,
     isPrivate: false,
+    evidence: { kind: 'lexical', assetPaths: [] },
   }
   const PRIVATE: RetrievalHit = {
     path: PRIVATE_PATH,
@@ -60,6 +61,7 @@ describe('cloudSafeSearchHits', () => {
     snippet: '',
     heading: null,
     isPrivate: true,
+    evidence: { kind: 'lexical', assetPaths: [] },
   }
 
   const neverPrivate = async () => false
@@ -109,10 +111,17 @@ describe('cloudSafeNoteContent', () => {
         path: 'notes/a.md',
         isPrivate: false,
         title: 'A',
+        revision: 'a'.repeat(64),
         content: 'body',
         truncated: false,
       }),
-    ).toEqual({ path: 'notes/a.md', title: 'A', content: 'body', truncated: false })
+    ).toEqual({
+      path: 'notes/a.md',
+      title: 'A',
+      revision: 'a'.repeat(64),
+      content: 'body',
+      truncated: false,
+    })
   })
 
   it('refuses to mint a private note before any content escapes', () => {
@@ -121,6 +130,7 @@ describe('cloudSafeNoteContent', () => {
         path: PRIVATE_PATH,
         isPrivate: true,
         title: PRIVATE_TITLE,
+        revision: 'b'.repeat(64),
         content: PRIVATE_BODY,
         truncated: false,
       }),

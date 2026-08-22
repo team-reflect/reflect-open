@@ -39,15 +39,18 @@ describe('createDemoModel', () => {
       keyHint: 'demo1',
     }
     const events: ChatStreamEvent[] = []
+    const messages = [{ role: 'user' as const, content: 'What is in my notes?' }]
     const turn = streamChat({
       config,
       apiKey: APP_REVIEW_STUB_KEY,
       fetchFn: throwingFetch,
-      messages: [{ role: 'user', content: 'What is in my notes?' }],
+      messages,
       today: '2026-08-14',
       semanticSearchEnabled: false,
       customSystemPrompt: '',
       context: null,
+      revalidateHistory: async () => messages,
+      validateSource: async () => true,
     })
     for await (const event of turn) {
       events.push(event)

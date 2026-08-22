@@ -5,6 +5,7 @@ import type {
   AiProviderConfig,
   ChatConversation,
   ChatModelSelection,
+  ChatNoteChange,
   ChatStreamEvent,
   ChatTurn,
   GraphInfo,
@@ -31,12 +32,49 @@ const core = vi.hoisted(() => ({
   loadChatGraphContext: vi.fn<(graphName: string) => Promise<null>>(),
   listChatConversations: vi.fn<(limit?: number) => Promise<ChatConversation[]>>(),
   loadChatMessages: vi.fn<(id: string) => Promise<ChatTurn[]>>(),
+  chatNoteChangesForTurn:
+    vi.fn<(turnId: string, generation: number) => Promise<ChatNoteChange[]>>(),
   saveChatMessage: vi.fn<(input: unknown) => Promise<void>>(),
   deleteChatConversation: vi.fn<(id: string, generation: number) => Promise<void>>(),
 }))
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   ...core,
+}))
+
+const noteChanges = vi.hoisted(() => {
+  const readNote = vi.fn(async () => '# Note\n')
+  const applyChange = vi.fn(async () => ({
+    ok: false as const,
+    code: 'failed' as const,
+    message: 'No note mutation was scripted for this test.',
+  }))
+  const createNote = vi.fn(async () => ({
+    ok: false as const,
+    code: 'failed' as const,
+    message: 'No note creation was scripted for this test.',
+  }))
+  const seal = vi.fn()
+  const settled = vi.fn(async () => {})
+  const reconcilePendingChanges = vi.fn(async () => [])
+  const undoTurn = vi.fn(async () => ({ ok: true, undonePaths: [], failures: [] }))
+  const undoPath = vi.fn(async () => ({ ok: true, undonePaths: [], failures: [] }))
+  return {
+    readNote,
+    applyChange,
+    createNote,
+    seal,
+    settled,
+    reconcilePendingChanges,
+    undoTurn,
+    undoPath,
+    createHost: vi.fn(() => ({ readNote, applyChange, createNote, seal, settled })),
+    createService: vi.fn(() => ({ reconcilePendingChanges, undoTurn, undoPath })),
+  }
+})
+vi.mock('@/lib/ai-note-tool-host', () => ({
+  createDesktopChatNoteToolHost: noteChanges.createHost,
+  createDesktopChatNoteChangeService: noteChanges.createService,
 }))
 
 const settingsState = vi.hoisted(() => ({
@@ -87,6 +125,8 @@ const RESTORED_TURN: ChatTurn = {
   attachments: [],
   parts: [{ kind: 'text', text: 'Three notes.' }],
   responseMessages: [{ role: 'assistant', content: 'Three notes.' }],
+  permissionMode: 'read',
+  sourceProvenance: [],
   status: 'done',
 }
 
@@ -140,8 +180,10 @@ beforeEach(() => {
   core.loadChatGraphContext.mockResolvedValue(null)
   core.listChatConversations.mockResolvedValue([])
   core.loadChatMessages.mockResolvedValue([RESTORED_TURN])
+  core.chatNoteChangesForTurn.mockResolvedValue([])
   core.saveChatMessage.mockResolvedValue(undefined)
   core.deleteChatConversation.mockResolvedValue(undefined)
+  noteChanges.readNote.mockResolvedValue('# Public note\n')
 })
 
 describe('ChatProvider persistence', () => {
@@ -387,6 +429,50 @@ describe('ChatProvider persistence', () => {
     expect(core.saveChatMessage).toHaveBeenCalledTimes(1)
   })
 
+  it('aborts and seals a conversation before deleting it mid-stream', async () => {
+    let releaseStream: () => void = () => {}
+    const gate = new Promise<void>((resolve) => {
+      releaseStream = resolve
+    })
+    core.streamChat.mockImplementation(function script() {
+      return (async function* () {
+        yield { type: 'text-delta', text: 'Working…' } satisfies ChatStreamEvent
+        await gate
+        yield { type: 'aborted', messages: [] } satisfies ChatStreamEvent
+      })()
+    })
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+
+    let sendDone: Promise<void> | undefined
+    await act(async () => {
+      sendDone = session?.send('change my note')
+      await Promise.resolve()
+    })
+    await vi.waitFor(() => expect(core.streamChat).toHaveBeenCalled())
+    const sentInto = core.saveChatMessage.mock.calls[0]![0] as { conversation: { id: string } }
+    const signal = core.streamChat.mock.calls[0]![0].signal
+    core.deleteChatConversation.mockImplementation(async () => {
+      expect(signal?.aborted).toBe(true)
+    })
+
+    await act(() => session?.deleteConversation(sentInto.conversation.id))
+
+    expect(signal?.aborted).toBe(true)
+    expect(noteChanges.seal).toHaveBeenCalledOnce()
+    expect(noteChanges.seal.mock.invocationCallOrder[0]).toBeLessThan(
+      noteChanges.settled.mock.invocationCallOrder[0]!,
+    )
+    expect(noteChanges.settled.mock.invocationCallOrder[0]).toBeLessThan(
+      core.deleteChatConversation.mock.invocationCallOrder[0]!,
+    )
+
+    releaseStream()
+    await act(async () => {
+      await sendDone
+    })
+  })
+
   it('lets an in-flight save land before deleting its conversation', async () => {
     // The delete and a dispatched save are independent IPC commands with no
     // ordering guarantee — the provider must hold the delete until the
@@ -417,6 +503,195 @@ describe('ChatProvider persistence', () => {
       await deleteDone
     })
     expect(core.deleteChatConversation).toHaveBeenCalledWith(sentInto.conversation.id, 7)
+  })
+})
+
+describe('ChatProvider note permissions', () => {
+  it('defaults to read and never restores a historic write grant', async () => {
+    const historicWriteTurn = { ...RESTORED_TURN, permissionMode: 'readWrite' as const }
+    core.listChatConversations.mockResolvedValue([conversation()])
+    core.loadChatMessages.mockResolvedValue([historicWriteTurn])
+
+    await renderProvider()
+
+    await vi.waitFor(() => expect(session?.turns).toEqual([historicWriteTurn]))
+    expect(session?.permissionMode).toBe('read')
+    expect(session?.turns[0]?.permissionMode).toBe('readWrite')
+  })
+
+  it('resets write permission for new and opened conversations', async () => {
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+
+    await act(() => session?.setPermissionMode('readWrite'))
+    expect(session?.permissionMode).toBe('readWrite')
+    await act(() => session?.newChat())
+    expect(session?.permissionMode).toBe('read')
+
+    await act(() => session?.setPermissionMode('readWrite'))
+    await act(() => session?.openConversation('conv-9'))
+    expect(session?.permissionMode).toBe('read')
+  })
+
+  it('captures write permission at send and durably persists it on the turn', async () => {
+    let releaseStream: () => void = () => {}
+    const gate = new Promise<void>((resolve) => {
+      releaseStream = resolve
+    })
+    core.streamChat.mockImplementation(function script() {
+      return (async function* () {
+        yield { type: 'text-delta', text: 'Updated.' } satisfies ChatStreamEvent
+        await gate
+        yield {
+          type: 'complete',
+          messages: [{ role: 'assistant', content: 'Updated.' }],
+        } satisfies ChatStreamEvent
+      })()
+    })
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    await act(() => session?.setPermissionMode('readWrite'))
+
+    let sendDone: Promise<void> | undefined
+    await act(async () => {
+      sendDone = session?.send('append an update')
+      await Promise.resolve()
+    })
+    await vi.waitFor(() => expect(core.streamChat).toHaveBeenCalled())
+
+    // The composer disables this control while streaming. Calling the context
+    // setter directly still proves the in-flight turn uses its send-time grant.
+    await act(() => session?.setPermissionMode('read'))
+    releaseStream()
+    await act(async () => {
+      await sendDone
+    })
+
+    expect(core.streamChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        permissionMode: 'readWrite',
+        noteHost: noteChanges.createHost.mock.results[0]?.value,
+      }),
+    )
+    expect(core.saveChatMessage.mock.invocationCallOrder[0]).toBeLessThan(
+      core.streamChat.mock.invocationCallOrder[0]!,
+    )
+    const savedTurns = core.saveChatMessage.mock.calls.map(
+      ([input]) => (input as { turn: ChatTurn }).turn,
+    )
+    expect(savedTurns).not.toHaveLength(0)
+    expect(savedTurns.every((turn) => turn.permissionMode === 'readWrite')).toBe(true)
+    expect(session?.turns.at(-1)?.permissionMode).toBe('readWrite')
+    expect(session?.permissionMode).toBe('read')
+  })
+
+  it('does not escalate a read turn when the next-turn mode changes mid-stream', async () => {
+    let releaseStream: () => void = () => {}
+    const gate = new Promise<void>((resolve) => {
+      releaseStream = resolve
+    })
+    core.streamChat.mockImplementation(function script() {
+      return (async function* () {
+        yield { type: 'text-delta', text: 'Reading.' } satisfies ChatStreamEvent
+        await gate
+        yield {
+          type: 'complete',
+          messages: [{ role: 'assistant', content: 'Reading.' }],
+        } satisfies ChatStreamEvent
+      })()
+    })
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+
+    let sendDone: Promise<void> | undefined
+    await act(async () => {
+      sendDone = session?.send('read my notes')
+      await Promise.resolve()
+    })
+    await vi.waitFor(() => expect(core.streamChat).toHaveBeenCalled())
+    await act(() => session?.setPermissionMode('readWrite'))
+    releaseStream()
+    await act(async () => {
+      await sendDone
+    })
+
+    expect(core.streamChat).toHaveBeenCalledWith(
+      expect.objectContaining({ permissionMode: 'read' }),
+    )
+    const savedTurns = core.saveChatMessage.mock.calls.map(
+      ([input]) => (input as { turn: ChatTurn }).turn,
+    )
+    expect(savedTurns).not.toHaveLength(0)
+    expect(savedTurns.every((turn) => turn.permissionMode === 'read')).toBe(true)
+    expect(session?.turns.at(-1)?.permissionMode).toBe('read')
+    expect(session?.permissionMode).toBe('readWrite')
+  })
+
+  it('honors an immediate write-permission revocation before Send', async () => {
+    scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Read.' }] }])
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+
+    await act(async () => {
+      session?.setPermissionMode('readWrite')
+      session?.setPermissionMode('read')
+      await session?.send('read this without editing')
+    })
+
+    expect(core.streamChat).toHaveBeenCalledWith(
+      expect.objectContaining({ permissionMode: 'read' }),
+    )
+    expect(session?.turns.at(-1)?.permissionMode).toBe('read')
+  })
+})
+
+describe('ChatProvider step privacy', () => {
+  const source = { kind: 'note' as const, path: 'notes/grounded.md' }
+  const groundedTurn: ChatTurn = {
+    ...RESTORED_TURN,
+    sourceProvenance: [source],
+  }
+
+  it('rebuilds prior history through the live host while retaining the current user', async () => {
+    core.listChatConversations.mockResolvedValue([conversation()])
+    core.loadChatMessages.mockResolvedValue([groundedTurn])
+    scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Current.' }] }])
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(session?.turns).toEqual([groundedTurn]))
+
+    await act(() => session?.send('and today?'))
+    const options = core.streamChat.mock.calls.at(-1)?.[0]
+    if (options === undefined) {
+      expect.unreachable('expected stream options')
+    }
+    expect(JSON.stringify(options.messages)).toContain(RESTORED_TURN.userText)
+
+    noteChanges.readNote.mockResolvedValue('---\nprivate: true\n---\n# Grounded\n')
+    await expect(options.revalidateHistory()).resolves.toEqual([
+      { role: 'user', content: 'and today?' },
+    ])
+    await expect(options.validateSource(source)).resolves.toBe(false)
+  })
+
+  it('never adds history that was excluded when the turn started', async () => {
+    core.listChatConversations.mockResolvedValue([conversation()])
+    core.loadChatMessages.mockResolvedValue([groundedTurn])
+    noteChanges.readNote.mockResolvedValue('---\nprivate: true\n---\n# Grounded\n')
+    scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Current.' }] }])
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(session?.turns).toEqual([groundedTurn]))
+
+    await act(() => session?.send('current question'))
+    const options = core.streamChat.mock.calls.at(-1)?.[0]
+    if (options === undefined) {
+      expect.unreachable('expected stream options')
+    }
+    expect(options.messages).toEqual([{ role: 'user', content: 'current question' }])
+
+    noteChanges.readNote.mockResolvedValue('# Public again\n')
+    await expect(options.revalidateHistory()).resolves.toEqual([
+      { role: 'user', content: 'current question' },
+    ])
   })
 })
 

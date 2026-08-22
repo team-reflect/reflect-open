@@ -26,7 +26,15 @@ vi.mock('@/providers/settings-provider', () => ({
 }))
 
 function hit(path: string): RetrievalHit {
-  return { path, title: path, score: 0.9, snippet: '', heading: null, isPrivate: false }
+  return {
+    path,
+    title: path,
+    score: 0.9,
+    snippet: '',
+    heading: null,
+    isPrivate: false,
+    evidence: { kind: 'lexical', assetPaths: [] },
+  }
 }
 
 function wrapper(client: QueryClient) {

@@ -43,9 +43,30 @@ export interface ChatMessages {
   createdMs: number;
   id: string;
   parts: string;
+  permissionMode: Generated<string>;
   responseMessages: string;
   seq: number;
+  sourceProvenance: string | null;
   userText: string;
+}
+
+export interface ChatNoteChanges {
+  afterRevision: string;
+  afterSource: string;
+  beforeRevision: string | null;
+  beforeSource: string | null;
+  conversationId: string;
+  createdMs: number;
+  errorMessage: string | null;
+  id: string;
+  messageId: string;
+  operation: string;
+  ownerSession: string;
+  path: string;
+  seq: number;
+  state: Generated<string>;
+  toolCallId: string;
+  updatedMs: number;
 }
 
 export interface EmbeddingChunks {
@@ -146,6 +167,7 @@ export interface DB {
   backlinks: Backlinks;
   chatConversations: ChatConversations;
   chatMessages: ChatMessages;
+  chatNoteChanges: ChatNoteChanges;
   embeddingChunks: EmbeddingChunks;
   indexMeta: IndexMeta;
   links: Links;

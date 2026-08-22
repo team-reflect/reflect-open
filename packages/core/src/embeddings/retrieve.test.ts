@@ -15,6 +15,7 @@ function hit(path: string, overrides?: Partial<RetrievalHit>): RetrievalHit {
     snippet: `about ${path}`,
     heading: null,
     isPrivate: false,
+    evidence: { kind: 'lexical', assetPaths: [] },
     ...overrides,
   }
 }
@@ -27,6 +28,9 @@ function row(path: string, distance: number, overrides?: Partial<ChunkHitRow>): 
     text: ` about ${path} `,
     isPrivate: 0,
     distance,
+    posFrom: 0,
+    posTo: 1,
+    contentHash: 'hash',
     ...overrides,
   }
 }

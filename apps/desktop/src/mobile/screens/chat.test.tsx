@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render } from 'vitest-browser-react'
-import { page } from 'vitest/browser'
+import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement, ReactNode } from 'react'
 import type {
@@ -70,6 +70,7 @@ vi.mock('@/components/ui/drawer', () => ({
   Drawer: ({ children }: { children?: ReactNode }) => <>{children}</>,
   DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DrawerDescription: ({ children }: { children?: ReactNode }) => <p>{children}</p>,
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
 }))
 
@@ -194,5 +195,67 @@ describe('MobileChat', () => {
     await page.getByRole('button', { name: 'focus chat input' }).click()
 
     await vi.waitFor(() => expect(document.activeElement).toBe(composer.element()))
+  })
+
+  it('opens an accessible permission drawer and selects Read & write', async () => {
+    configureModel()
+    await render(<Harness showScreen />)
+    const trigger = page.getByRole('button', { name: 'Chat permissions, Read only' })
+
+    await expect.element(trigger).toHaveTextContent('Read')
+    await expect.element(trigger).toHaveAttribute('aria-expanded', 'false')
+    await trigger.click()
+    await expect.element(trigger).toHaveAttribute('aria-expanded', 'true')
+
+    const group = page.getByRole('radiogroup', { name: 'Chat permissions' })
+    const readOnly = group.getByRole('radio', { name: /Read only/ })
+    await expect.element(readOnly).toBeChecked()
+    await expect.element(page.getByText('Search and answer from your notes')).toBeVisible()
+    await expect
+      .element(page.getByText('Can edit non-private notes; changes are reviewable and undoable'))
+      .toBeVisible()
+
+    readOnly.element().focus()
+    await userEvent.keyboard('{ArrowDown}')
+    const writeTrigger = page.getByRole('button', { name: 'Chat permissions, Read & write' })
+    await expect.element(writeTrigger).toHaveTextContent('Write')
+    await expect.element(writeTrigger).toHaveAttribute('aria-expanded', 'true')
+    await expect.element(group.getByRole('radio', { name: /Read & write/ })).toBeChecked()
+
+    await userEvent.keyboard(' ')
+    await expect.element(writeTrigger).toHaveAttribute('aria-expanded', 'false')
+    await writeTrigger.click()
+    await expect
+      .element(
+        page
+          .getByRole('radiogroup', { name: 'Chat permissions' })
+          .getByRole('radio', { name: /Read & write/ }),
+      )
+      .toBeChecked()
+  })
+
+  it('disables the permission trigger and drawer choices while chat is busy', async () => {
+    configureModel()
+    streamChat.mockImplementation(() =>
+      (async function* (): AsyncGenerator<ChatStreamEvent> {
+        yield { type: 'text-delta', text: 'Working…' }
+        await new Promise<never>(() => {})
+      })(),
+    )
+    await render(<Harness showScreen />)
+    const trigger = page.getByRole('button', { name: /Chat permissions/ })
+    await trigger.click()
+
+    fireEvent.change(page.getByLabelText('Chat message'), { target: { value: 'keep working' } })
+    await page.getByRole('button', { name: 'Send' }).click()
+    await expect.element(page.getByText('Working…')).toBeVisible()
+
+    await expect.element(trigger).toBeDisabled()
+    const modelTrigger = page.getByRole('button', { name: 'Model' })
+    await expect.element(modelTrigger).toBeDisabled()
+    await expect.element(modelTrigger).toHaveClass('disabled:opacity-50')
+    const group = page.getByRole('radiogroup', { name: 'Chat permissions' })
+    await expect.element(group.getByRole('radio', { name: /Read only/ })).toBeDisabled()
+    await expect.element(group.getByRole('radio', { name: /Read & write/ })).toBeDisabled()
   })
 })

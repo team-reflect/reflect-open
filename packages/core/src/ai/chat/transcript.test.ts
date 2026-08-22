@@ -3,7 +3,10 @@ import type { ChatStreamEvent } from './stream-chat'
 import {
   appendEvent,
   buildHistory,
+  buildPrivacySafeHistory,
+  mergeSourceProvenance,
   NO_REPLY_NOTICE,
+  sourceProvenanceForParts,
   userMessage,
   type AssistantPart,
   type ChatAttachment,
@@ -35,6 +38,7 @@ describe('appendEvent', () => {
           toolCallId: 'tool-1',
           query: 'atlas',
           hits: [{ path: 'notes/a.md', title: 'Atlas' }],
+          sourceProvenance: [{ kind: 'note', path: 'notes/a.md' }],
         },
       },
       { type: 'text-delta', text: 'Found it.' },
@@ -49,6 +53,7 @@ describe('appendEvent', () => {
           toolCallId: 'tool-1',
           query: 'atlas',
           hits: [{ path: 'notes/a.md', title: 'Atlas' }],
+          sourceProvenance: [{ kind: 'note', path: 'notes/a.md' }],
         },
         error: null,
       },
@@ -158,18 +163,22 @@ describe('buildHistory', () => {
     const turns: ChatTurn[] = [
       {
         id: 'turn-1',
+        permissionMode: 'read',
         userText: 'where is the plan?',
         attachments: [],
         parts: [],
         responseMessages: [{ role: 'assistant', content: 'In [[Atlas]].' }],
+        sourceProvenance: [],
         status: 'done',
       },
       {
         id: 'turn-2',
+        permissionMode: 'read',
         userText: 'and the budget?',
         attachments: [],
         parts: [],
         responseMessages: [{ role: 'assistant', content: 'In [[Q3 Budget]].' }],
+        sourceProvenance: [],
         status: 'done',
       },
     ]
@@ -185,20 +194,24 @@ describe('buildHistory', () => {
     const turns: ChatTurn[] = [
       {
         id: 'turn-1',
+        permissionMode: 'read',
         // Failed before the provider replied (e.g. missing API key): the
         // transcript shows the error, the model history never saw it.
         userText: 'this one failed',
         attachments: [],
         parts: [{ kind: 'notice', tone: 'error', text: 'No API key found' }],
         responseMessages: [],
+        sourceProvenance: [],
         status: 'done',
       },
       {
         id: 'turn-2',
+        permissionMode: 'read',
         userText: 'this one worked',
         attachments: [],
         parts: [],
         responseMessages: [{ role: 'assistant', content: 'Answer.' }],
+        sourceProvenance: [],
         status: 'done',
       },
     ]
@@ -218,10 +231,12 @@ describe('buildHistory', () => {
     const turns: ChatTurn[] = [
       {
         id: 'turn-1',
+        permissionMode: 'read',
         userText: '',
         attachments: [photo],
         parts: [],
         responseMessages: [{ role: 'assistant', content: 'A cat.' }],
+        sourceProvenance: [],
         status: 'done',
       },
     ]
@@ -232,6 +247,159 @@ describe('buildHistory', () => {
       },
       { role: 'assistant', content: 'A cat.' },
     ])
+  })
+})
+
+describe('buildPrivacySafeHistory', () => {
+  function turn(
+    id: string,
+    sourceProvenance: ChatTurn['sourceProvenance'],
+    parts: AssistantPart[] = [],
+  ): ChatTurn {
+    return {
+      id,
+      permissionMode: 'read',
+      userText: `question ${id}`,
+      attachments: [],
+      parts,
+      responseMessages: [{ role: 'assistant', content: `answer ${id}` }],
+      sourceProvenance,
+      status: 'done',
+    }
+  }
+
+  it('drops the contaminated turn and every later turn from outbound history', async () => {
+    const turns = [
+      turn('one', [{ kind: 'note', path: 'notes/public.md' }]),
+      turn('two', [{ kind: 'note', path: 'notes/private.md' }]),
+      turn('three', []),
+    ]
+    const history = await buildPrivacySafeHistory(
+      turns,
+      async (source) => source.path !== 'notes/private.md',
+    )
+    expect(history).toEqual([
+      { role: 'user', content: 'question one' },
+      { role: 'assistant', content: 'answer one' },
+    ])
+  })
+
+  it('fails closed on an unclassifiable legacy turn or validator error', async () => {
+    expect(
+      await buildPrivacySafeHistory([turn('legacy', null), turn('later', [])], async () => true),
+    ).toEqual([])
+    expect(
+      await buildPrivacySafeHistory(
+        [turn('error', [{ kind: 'asset', path: 'assets/a.png' }])],
+        async () => {
+          throw new Error('disk unavailable')
+        },
+      ),
+    ).toEqual([])
+  })
+
+  it('merges successful tool result provenance without duplicates', () => {
+    expect(
+      mergeSourceProvenance([{ kind: 'note', path: 'notes/a.md' }], {
+        tool: 'read',
+        toolCallId: 'read-1',
+        notes: [
+          { path: 'notes/a.md', title: 'A', error: null },
+          { path: 'notes/b.md', title: 'B', error: null },
+          { path: 'notes/private.md', title: null, error: 'private' },
+        ],
+      }),
+    ).toEqual([
+      { kind: 'note', path: 'notes/a.md' },
+      { kind: 'note', path: 'notes/b.md' },
+    ])
+    expect(
+      mergeSourceProvenance([], {
+        tool: 'search',
+        toolCallId: 'search-1',
+        query: 'chart',
+        hits: [{ path: 'notes/a.md', title: 'A' }],
+        sourceProvenance: [
+          { kind: 'note', path: 'notes/a.md' },
+          { kind: 'asset', path: 'assets/chart.png' },
+        ],
+      }),
+    ).toEqual([
+      { kind: 'note', path: 'notes/a.md' },
+      { kind: 'asset', path: 'assets/chart.png' },
+    ])
+    expect(
+      mergeSourceProvenance([], {
+        tool: 'search',
+        toolCallId: 'legacy-search',
+        query: 'chart',
+        hits: [],
+        sourceProvenance: null,
+      }),
+    ).toBeNull()
+  })
+
+  it('classifies an unrepresented legacy tool call as unknown provenance', () => {
+    expect(
+      sourceProvenanceForParts(
+        [],
+        [
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'tool-call',
+                toolCallId: 'legacy-call',
+                toolName: 'removed_tool',
+                input: {},
+              },
+            ],
+          },
+        ],
+      ),
+    ).toBeNull()
+  })
+
+  it('treats a model tool result with only a call chip as unknown provenance', () => {
+    expect(
+      sourceProvenanceForParts(
+        [
+          {
+            kind: 'tool',
+            call: { tool: 'read', toolCallId: 'legacy-read', paths: ['notes/a.md'] },
+            result: null,
+            error: null,
+          },
+        ],
+        [
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'tool-call',
+                toolCallId: 'legacy-read',
+                toolName: 'read_notes',
+                input: { paths: ['notes/a.md'] },
+              },
+            ],
+          },
+          {
+            role: 'tool',
+            content: [
+              {
+                type: 'tool-result',
+                toolCallId: 'legacy-read',
+                toolName: 'read_notes',
+                output: {
+                  type: 'json',
+                  value: { notes: [{ path: 'notes/a.md', content: 'legacy note bytes' }] },
+                },
+              },
+            ],
+          },
+        ],
+      ),
+    ).toBeNull()
   })
 })
 

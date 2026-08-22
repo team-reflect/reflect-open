@@ -20,6 +20,9 @@ mod scan;
 mod tests;
 mod write;
 
+use std::fs::{self, File};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 use rusqlite::{params, Connection};
@@ -30,9 +33,200 @@ use crate::background_task::{self, BackgroundTaskState};
 use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
 
-pub use chat_write::{ChatConversation, ChatMessageRow};
+pub use chat_write::{
+    ChatConversation, ChatMessageRow, ChatNoteChangeInput, ChatNoteChangeRow, ChatNoteChangeState,
+    ChatNoteChangeUpdateOutcome, ChatNoteChangesUpdateOutcome,
+};
 pub use embed_write::EmbeddedChunk;
 pub use write::IndexedNote;
+
+/// Identity and OS lease for the currently open index session. The token
+/// rotates on every `index_open`: a graph switch/reopen makes unfinished rows
+/// from the superseded generation recoverable even within one native process.
+pub struct ChatJournalSession {
+    current: Mutex<Option<ChatJournalLease>>,
+}
+
+impl Default for ChatJournalSession {
+    fn default() -> Self {
+        Self {
+            current: Mutex::new(None),
+        }
+    }
+}
+
+impl Drop for ChatJournalSession {
+    fn drop(&mut self) {
+        if let Ok(current) = self.current.get_mut() {
+            if let Some(lease) = current.take() {
+                release_chat_journal_lease(lease);
+            }
+        }
+    }
+}
+
+struct ChatJournalLease {
+    id: String,
+    root: PathBuf,
+    path: PathBuf,
+    file: File,
+}
+
+impl ChatJournalSession {
+    fn activate_graph(&self, root: &Path) -> AppResult<()> {
+        static NEXT_SESSION: AtomicU64 = AtomicU64::new(1);
+        let root = root.canonicalize()?;
+        let epoch_nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        let id = format!(
+            "{}-{epoch_nanos}-{}",
+            std::process::id(),
+            NEXT_SESSION.fetch_add(1, Ordering::Relaxed)
+        );
+        let runtime_dir = root.join(".reflect");
+        ensure_real_directory(&runtime_dir)?;
+        let lease_dir = runtime_dir.join("chat-journal-leases");
+        ensure_real_directory(&lease_dir)?;
+        let path = lease_dir.join(format!("{id}.lock"));
+        let file = open_real_lease_file(&path)?;
+        file.lock()?;
+        let mut current = self
+            .current
+            .lock()
+            .map_err(|_| AppError::io("chat journal lease lock poisoned"))?;
+        let previous = current.replace(ChatJournalLease {
+            id,
+            root,
+            path,
+            file,
+        });
+        drop(current);
+        if let Some(previous) = previous {
+            release_chat_journal_lease(previous);
+        }
+        Ok(())
+    }
+
+    fn id_for_root(&self, root: &Path) -> AppResult<String> {
+        let root = root.canonicalize()?;
+        let current = self
+            .current
+            .lock()
+            .map_err(|_| AppError::io("chat journal lease lock poisoned"))?;
+        let lease = current
+            .as_ref()
+            .filter(|lease| lease.root == root)
+            .ok_or_else(|| AppError::io("chat journal session is not active for this graph"))?;
+        Ok(lease.id.clone())
+    }
+
+    /// Whether `owner_session` still has a native process holding its graph
+    /// lease. Every probe error is treated as live: recovery/deletion must be
+    /// conservative when liveness cannot be established safely.
+    fn owner_is_live(&self, root: &Path, owner_session: &str) -> bool {
+        let Ok(root) = root.canonicalize() else {
+            return true;
+        };
+        if self.current.lock().is_ok_and(|current| {
+            current
+                .as_ref()
+                .is_some_and(|lease| lease.root == root && lease.id == owner_session)
+        }) {
+            return true;
+        }
+        if owner_session.is_empty()
+            || !owner_session
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        {
+            return true;
+        }
+        let path = root
+            .join(".reflect")
+            .join("chat-journal-leases")
+            .join(format!("{owner_session}.lock"));
+        let file = match open_existing_real_lease_file(&path) {
+            Ok(Some(file)) => file,
+            Ok(None) => return false,
+            Err(_) => return true,
+        };
+        match file.try_lock() {
+            Ok(()) => {
+                let _ = file.unlock();
+                drop(file);
+                let _ = fs::remove_file(path);
+                false
+            }
+            Err(std::fs::TryLockError::WouldBlock) => true,
+            Err(_) => true,
+        }
+    }
+}
+
+fn release_chat_journal_lease(lease: ChatJournalLease) {
+    let _ = lease.file.unlock();
+    drop(lease.file);
+    let _ = fs::remove_file(lease.path);
+}
+
+fn ensure_real_directory(path: &Path) -> AppResult<()> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_dir() => Ok(()),
+        Ok(_) => Err(AppError::traversal(format!(
+            "chat journal lease path must be a real directory: {}",
+            path.display()
+        ))),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => match fs::create_dir(path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                ensure_real_directory(path)
+            }
+            Err(error) => Err(error.into()),
+        },
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn open_real_lease_file(path: &Path) -> AppResult<File> {
+    loop {
+        match open_existing_real_lease_file(path)? {
+            Some(file) => return Ok(file),
+            None => match fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create_new(true)
+                .open(path)
+            {
+                Ok(file) => return Ok(file),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error.into()),
+            },
+        }
+    }
+}
+
+fn open_existing_real_lease_file(path: &Path) -> AppResult<Option<File>> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_file() => {
+            let file = fs::OpenOptions::new().read(true).write(true).open(path)?;
+            if !file.metadata()?.is_file() {
+                return Err(AppError::traversal(format!(
+                    "chat journal lease path must be a real file: {}",
+                    path.display()
+                )));
+            }
+            Ok(Some(file))
+        }
+        Ok(_) => Err(AppError::traversal(format!(
+            "chat journal lease path must be a real file: {}",
+            path.display()
+        ))),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
 
 /// The open index connection plus its monotonic generation, kept **under one
 /// lock** so they swap atomically. `index_open` bumps the generation and rebinds
@@ -141,6 +335,7 @@ fn emit_note_moved<R: tauri::Runtime>(app: &tauri::AppHandle<R>, from: &str, to:
 pub fn index_open(
     graph: State<GraphState>,
     index: State<IndexState>,
+    journal: State<ChatJournalSession>,
     background_tasks: State<BackgroundTaskState>,
 ) -> AppResult<u64> {
     let _background_task = background_task::scoped(&background_tasks, "Reflect index open");
@@ -169,6 +364,7 @@ pub fn index_open(
         let mut read = lock_read(&index)?;
         read.conn = None;
     }
+    journal.activate_graph(&root)?;
     state.conn = Some(migrations::open_index_at(&root)?);
     let mut read = lock_read(&index)?;
     read.conn = Some(migrations::open_index_read_only_at(&root)?);
@@ -552,15 +748,157 @@ pub fn chat_conversation_delete(
     id: String,
     generation: u64,
     index: State<IndexState>,
+    journal: State<ChatJournalSession>,
     background_tasks: State<BackgroundTaskState>,
 ) -> AppResult<()> {
     let _background_task = background_task::scoped(&background_tasks, "Reflect chat delete");
-    let state = lock_state(&index)?;
+    let mut state = lock_state(&index)?;
     if state.generation != generation {
         return Ok(());
     }
+    let root = state.root.clone().ok_or_else(AppError::no_graph)?;
+    let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
+    // Reserve the writer before checking for pending rows. This closes the
+    // cross-process gap where another Reflect flavor could prepare a change
+    // after the probe but before the cascade delete.
+    let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+    chat_write::delete_conversation(&tx, &id, |owner| journal.owner_is_live(&root, owner))?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Persist an immutable AI note-change checkpoint before the corresponding
+/// editor or filesystem mutation begins. Retrying the identical id is safe;
+/// reusing it for different bytes fails closed.
+#[tauri::command]
+pub fn chat_note_change_prepare(
+    change: ChatNoteChangeInput,
+    generation: u64,
+    index: State<IndexState>,
+    journal: State<ChatJournalSession>,
+    background_tasks: State<BackgroundTaskState>,
+) -> AppResult<ChatNoteChangeRow> {
+    let _background_task =
+        background_task::scoped(&background_tasks, "Reflect chat change prepare");
+    let mut state = lock_state(&index)?;
+    if state.generation != generation {
+        return Err(AppError::io("stale index generation"));
+    }
+    let root = state.root.clone().ok_or_else(AppError::no_graph)?;
+    let owner_session = journal.id_for_root(&root)?;
+    let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
+    let tx = conn.transaction()?;
+    let row = chat_write::prepare_note_change(&tx, &change, &owner_session)?;
+    tx.commit()?;
+    Ok(row)
+}
+
+/// Compare-and-transition one AI note-change journal row. Transition rules
+/// are enforced natively so retries and competing recovery passes cannot
+/// silently move a terminal checkpoint backwards.
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub fn chat_note_change_set_state(
+    id: String,
+    expected_state: ChatNoteChangeState,
+    state: ChatNoteChangeState,
+    error_message: Option<String>,
+    updated_ms: i64,
+    generation: u64,
+    index: State<IndexState>,
+    journal: State<ChatJournalSession>,
+    background_tasks: State<BackgroundTaskState>,
+) -> AppResult<ChatNoteChangeUpdateOutcome> {
+    let _background_task = background_task::scoped(&background_tasks, "Reflect chat change state");
+    let mut index_state = lock_state(&index)?;
+    if index_state.generation != generation {
+        return Err(AppError::io("stale index generation"));
+    }
+    let root = index_state.root.clone().ok_or_else(AppError::no_graph)?;
+    let owner_session = journal.id_for_root(&root)?;
+    let conn = index_state.conn.as_mut().ok_or_else(AppError::no_graph)?;
+    let tx = conn.transaction()?;
+    let outcome = chat_write::set_note_change_state(
+        &tx,
+        &id,
+        expected_state,
+        state,
+        error_message.as_deref(),
+        updated_ms,
+        &owner_session,
+    )?;
+    tx.commit()?;
+    Ok(outcome)
+}
+
+/// Atomically compare-and-transition every row in an Undo group. `applied ->
+/// undoing` is the durable claim that must succeed before the note changes;
+/// a later `undoing -> undone|applied|uncertain` records its exact outcome.
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub fn chat_note_changes_set_state_batch(
+    ids: Vec<String>,
+    expected_state: ChatNoteChangeState,
+    state: ChatNoteChangeState,
+    error_message: Option<String>,
+    updated_ms: i64,
+    generation: u64,
+    index: State<IndexState>,
+    journal: State<ChatJournalSession>,
+    background_tasks: State<BackgroundTaskState>,
+) -> AppResult<ChatNoteChangesUpdateOutcome> {
+    let _background_task =
+        background_task::scoped(&background_tasks, "Reflect chat change batch state");
+    let mut index_state = lock_state(&index)?;
+    if index_state.generation != generation {
+        return Err(AppError::io("stale index generation"));
+    }
+    let root = index_state.root.clone().ok_or_else(AppError::no_graph)?;
+    let owner_session = journal.id_for_root(&root)?;
+    let conn = index_state.conn.as_mut().ok_or_else(AppError::no_graph)?;
+    let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+    let outcome = chat_write::set_note_changes_state(
+        &tx,
+        &ids,
+        expected_state,
+        state,
+        error_message.as_deref(),
+        updated_ms,
+        &owner_session,
+    )?;
+    tx.commit()?;
+    Ok(outcome)
+}
+
+/// Load all checkpoints belonging to one chat turn, in tool-call sequence.
+#[tauri::command]
+pub fn chat_note_changes_for_turn(
+    turn_id: String,
+    generation: u64,
+    index: State<IndexState>,
+) -> AppResult<Vec<ChatNoteChangeRow>> {
+    let state = lock_state(&index)?;
+    if state.generation != generation {
+        return Err(AppError::io("stale index generation"));
+    }
     let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
-    chat_write::delete_conversation(conn, &id)
+    chat_write::note_changes_for_message(conn, &turn_id)
+}
+
+/// Load checkpoints that need crash recovery before new note writes proceed.
+#[tauri::command]
+pub fn chat_note_changes_pending(
+    generation: u64,
+    index: State<IndexState>,
+    journal: State<ChatJournalSession>,
+) -> AppResult<Vec<ChatNoteChangeRow>> {
+    let state = lock_state(&index)?;
+    if state.generation != generation {
+        return Err(AppError::io("stale index generation"));
+    }
+    let root = state.root.as_ref().ok_or_else(AppError::no_graph)?;
+    let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
+    chat_write::pending_note_changes(conn, |owner| journal.owner_is_live(root, owner))
 }
 
 /// Replace a note's embedding chunk set (diff applied in one transaction;

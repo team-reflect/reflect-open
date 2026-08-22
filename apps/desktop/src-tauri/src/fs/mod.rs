@@ -25,6 +25,7 @@ use crate::error::{AppError, AppResult};
 
 use self::io::{
     atomic_create, atomic_write, bootstrap, collect_files, initialize_runtime, AtomicCreateOutcome,
+    AtomicRevisionWriteOutcome,
 };
 use self::resolve::resolve;
 
@@ -45,6 +46,15 @@ pub(crate) use self::io::file_occupied;
 /// backup repo must never ride a file-sync provider — Plan 21).
 pub(crate) use self::io::mark_dir_local_only;
 pub(crate) use self::io::modified_ms;
+/// Serialize a compound native graph mutation with ordinary atomic note
+/// writes. Git checkout/merge uses this wrapper because libgit2 writes the
+/// working tree directly rather than through [`atomic_write_bytes`].
+pub(crate) fn with_file_mutation_lock<T>(
+    root: &Path,
+    operation: impl FnOnce() -> AppResult<T>,
+) -> AppResult<T> {
+    io::with_file_mutation_lock(root, operation)
+}
 /// The lexical traversal guard, shared with the conflict stores that mirror
 /// note paths under `.reflect/` (shadow bases, conflict archive).
 pub(crate) use self::resolve::ensure_relative;
@@ -129,6 +139,98 @@ pub enum NoteCreateOutcome {
     Created { modified_ms: Option<u64> },
     /// A file or iCloud eviction placeholder already owns the path.
     Collision,
+    /// Another webview or Reflect process has a live editor for this path.
+    Blocked,
+}
+
+/// A full-source note read performed for an AI tool. Unlike the general
+/// editor read command, this refuses disk access while another live editor
+/// owns the path, because that editor's unsaved source is authoritative.
+#[derive(Debug, Serialize)]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "kind"
+)]
+pub enum AiNoteReadOutcome {
+    /// The authoritative disk source and its full-source SHA-256 revision.
+    Content { source: String, revision: String },
+    /// A live editor owns newer or potentially private source for this path.
+    Blocked,
+    /// No note currently occupies the requested path.
+    Missing,
+}
+
+/// Result of a full-source revision-guarded note replacement.
+#[derive(Debug, Serialize)]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "kind"
+)]
+pub enum NoteWriteIfRevisionOutcome {
+    Written {
+        revision: String,
+        modified_ms: Option<u64>,
+    },
+    Stale {
+        current_revision: String,
+    },
+    Contended {
+        current_revision: Option<String>,
+    },
+    /// A live editor other than the exact requesting session owns the path.
+    Blocked,
+    Missing,
+}
+
+/// Result of conditionally moving an unchanged note to recoverable trash.
+#[derive(Debug, Serialize)]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "kind"
+)]
+pub enum NoteTrashIfRevisionOutcome {
+    Trashed,
+    Stale {
+        current_revision: String,
+    },
+    Contended {
+        current_revision: Option<String>,
+    },
+    /// A live editor other than the exact requesting session owns the path.
+    Blocked,
+    Missing,
+}
+
+pub(crate) fn ensure_ai_writable_note_path(path: &str) -> AppResult<()> {
+    let is_template = path
+        .split('/')
+        .next()
+        .is_some_and(|component| component.eq_ignore_ascii_case("templates"));
+    if reflect_graph_paths::is_note(path) && !is_template {
+        return Ok(());
+    }
+    Err(AppError::traversal(format!(
+        "not an AI-writable note path: {path}"
+    )))
+}
+
+pub(crate) fn ensure_note_ownership_path(path: &str) -> AppResult<()> {
+    if reflect_graph_paths::is_note(path) {
+        return Ok(());
+    }
+    Err(AppError::traversal(format!(
+        "not an ownable note path: {path}"
+    )))
+}
+
+pub(crate) use resolve::resolve as resolve_note_path;
+
+#[cfg(test)]
+pub(crate) fn bootstrap_for_test(root: &Path) -> AppResult<()> {
+    bootstrap(root)
 }
 
 // ---- state accessors --------------------------------------------------------
@@ -347,6 +449,52 @@ pub async fn note_read(
     crate::blocking::run_blocking(move || Ok(io::read_note_no_follow(&root, &abs)?)).await
 }
 
+/// Read the complete source used by an AI tool together with its opaque
+/// revision. The ownership probe and disk read share the graph mutation
+/// critical section, so a detached editor cannot claim the path between the
+/// check and the read. A blocked response deliberately carries no path or
+/// content metadata.
+#[tauri::command]
+pub async fn note_read_for_ai(
+    path: String,
+    generation: u64,
+    requester_owner_id: Option<String>,
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    state: State<'_, GraphState>,
+) -> AppResult<AiNoteReadOutcome> {
+    if !reflect_graph_paths::is_note(&path) {
+        return Err(AppError::traversal("not an AI-readable note path"));
+    }
+    let root = root_for_generation(&state, generation)?;
+    let target = resolve(&root, &path)?;
+    let requester_label = window.label().to_owned();
+    crate::blocking::run_blocking(move || {
+        io::with_file_mutation_lock(&root, || {
+            let ownership = app.state::<crate::note_ownership::NoteWindowOwnershipState>();
+            if !ownership.ai_access_available(
+                &root,
+                &path,
+                &requester_label,
+                requester_owner_id.as_deref(),
+            )? {
+                return Ok(AiNoteReadOutcome::Blocked);
+            }
+            match io::read_note_no_follow(&root, &target) {
+                Ok(source) => {
+                    let revision = io::note_revision(&source);
+                    Ok(AiNoteReadOutcome::Content { source, revision })
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    Ok(AiNoteReadOutcome::Missing)
+                }
+                Err(error) => Err(error.into()),
+            }
+        })
+    })
+    .await
+}
+
 /// How a [`note_read_local`] request found the note on disk.
 #[derive(Debug, Serialize)]
 #[serde(
@@ -428,6 +576,60 @@ pub fn note_write(
     Ok(modified_ms)
 }
 
+/// Atomically replace a note only when its complete current source still has
+/// `expected_revision`. This is a local compare-and-swap primitive for AI
+/// edits and guarded Undo; policy such as privacy/title preservation remains
+/// in TypeScript, while path eligibility and the byte-level guard are enforced
+/// again here at the capability boundary.
+#[tauri::command]
+pub fn note_write_if_revision(
+    path: String,
+    contents: String,
+    expected_revision: String,
+    generation: u64,
+    requester_owner_id: Option<String>,
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+) -> AppResult<NoteWriteIfRevisionOutcome> {
+    ensure_ai_writable_note_path(&path)?;
+    let state = app.state::<GraphState>();
+    let ownership = app.state::<crate::note_ownership::NoteWindowOwnershipState>();
+    let root = root_for_generation(&state, generation)?;
+    let target = resolve(&root, &path)?;
+    let outcome = io::with_file_mutation_lock(&root, || {
+        if !ownership.ai_access_available(
+            &root,
+            &path,
+            window.label(),
+            requester_owner_id.as_deref(),
+        )? {
+            return Ok(NoteWriteIfRevisionOutcome::Blocked);
+        }
+        Ok(
+            match io::atomic_write_if_revision(&root, &target, &contents, &expected_revision)? {
+                AtomicRevisionWriteOutcome::Written {
+                    revision,
+                    modified_ms,
+                } => NoteWriteIfRevisionOutcome::Written {
+                    revision,
+                    modified_ms,
+                },
+                AtomicRevisionWriteOutcome::Stale { current_revision } => {
+                    NoteWriteIfRevisionOutcome::Stale { current_revision }
+                }
+                AtomicRevisionWriteOutcome::Contended { current_revision } => {
+                    NoteWriteIfRevisionOutcome::Contended { current_revision }
+                }
+                AtomicRevisionWriteOutcome::Missing => NoteWriteIfRevisionOutcome::Missing,
+            },
+        )
+    })?;
+    if matches!(outcome, NoteWriteIfRevisionOutcome::Written { .. }) {
+        invalidate_file_catalog(&state, &root);
+    }
+    Ok(outcome)
+}
+
 /// Atomically create a note only when `path` is still free. Unlike
 /// [`note_write`], this is a no-clobber claim: a concurrent sync checkout or
 /// creator wins as `Collision`, with its file left byte-for-byte intact.
@@ -436,17 +638,36 @@ pub fn note_create(
     path: String,
     contents: String,
     generation: u64,
+    requester_owner_id: Option<String>,
+    window: tauri::WebviewWindow,
     state: State<GraphState>,
+    ownership: State<crate::note_ownership::NoteWindowOwnershipState>,
 ) -> AppResult<NoteCreateOutcome> {
+    if !reflect_graph_paths::is_note(&path) {
+        return Err(AppError::traversal("not a note path"));
+    }
     let root = root_for_generation(&state, generation)?;
     let target = resolve(&root, &path)?;
-    match atomic_create(&root, &target, &contents)? {
-        AtomicCreateOutcome::Created(modified_ms) => {
-            invalidate_file_catalog(&state, &root);
-            Ok(NoteCreateOutcome::Created { modified_ms })
+    let outcome = io::with_file_mutation_lock(&root, || {
+        if !ownership.ai_access_available(
+            &root,
+            &path,
+            window.label(),
+            requester_owner_id.as_deref(),
+        )? {
+            return Ok(NoteCreateOutcome::Blocked);
         }
-        AtomicCreateOutcome::Collision => Ok(NoteCreateOutcome::Collision),
+        match atomic_create(&root, &target, &contents)? {
+            AtomicCreateOutcome::Created(modified_ms) => {
+                Ok(NoteCreateOutcome::Created { modified_ms })
+            }
+            AtomicCreateOutcome::Collision => Ok(NoteCreateOutcome::Collision),
+        }
+    })?;
+    if matches!(outcome, NoteCreateOutcome::Created { .. }) {
+        invalidate_file_catalog(&state, &root);
     }
+    Ok(outcome)
 }
 
 /// Atomically write a binary asset (pasted/dropped image) by graph-relative
@@ -710,23 +931,130 @@ pub fn note_exists(path: String, state: State<GraphState>) -> AppResult<bool> {
 /// reports failed. One rule, no adoption heuristics; the filename drifts
 /// until the next settled rename retries.
 pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()> {
-    let from_abs = resolve(root, from)?;
-    let to_abs = resolve(root, to)?;
-    // Occupied includes an evicted iCloud note (placeholder only on disk):
-    // renaming onto it would collide with the re-download (Plan 21).
-    if io::file_occupied(&to_abs) {
-        return Err(AppError::io(format!(
-            "cannot move note: {to} already exists on disk"
-        )));
+    io::with_file_mutation_lock(root, || {
+        let from_abs = resolve(root, from)?;
+        let to_abs = resolve(root, to)?;
+        // Occupied includes an evicted iCloud note (placeholder only on disk):
+        // renaming onto it would collide with the re-download (Plan 21).
+        if io::file_occupied(&to_abs) {
+            return Err(AppError::io(format!(
+                "cannot move note: {to} already exists on disk"
+            )));
+        }
+        if let Some(parent) = to_abs.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::rename(from_abs, to_abs)?;
+        // Carry the note's sync ancestor across the rename (Plan 21) — a missed
+        // move only degrades one future merge, never blocks the rename.
+        crate::conflict::shadow::ShadowStore::new(root).record_move(from, to);
+        Ok(())
+    })
+}
+
+fn trash_note_target(root: &Path, target: &Path) -> AppResult<()> {
+    #[cfg(desktop)]
+    {
+        let _ = root;
+        os_trash_delete(target)?;
     }
-    if let Some(parent) = to_abs.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::rename(from_abs, to_abs)?;
-    // Carry the note's sync ancestor across the rename (Plan 21) — a missed
-    // move only degrades one future merge, never blocks the rename.
-    crate::conflict::shadow::ShadowStore::new(root).record_move(from, to);
+    #[cfg(mobile)]
+    move_to_graph_trash(root, target)?;
     Ok(())
+}
+
+fn trash_note_if_revision_with(
+    root: &Path,
+    target: &Path,
+    expected_revision: &str,
+    trash: impl FnOnce(&Path) -> AppResult<()>,
+) -> AppResult<NoteTrashIfRevisionOutcome> {
+    let runtime = root.join(".reflect");
+    io::ensure_real_directory(&runtime)?;
+    let staging_parent = runtime.join("trash-staging");
+    io::ensure_real_directory(&staging_parent)?;
+    let current = match io::read_note_no_follow(root, target) {
+        Ok(current) => current,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(NoteTrashIfRevisionOutcome::Missing)
+        }
+        Err(error) => return Err(error.into()),
+    };
+    let current_revision = io::note_revision(&current);
+    if current_revision != expected_revision {
+        return Ok(NoteTrashIfRevisionOutcome::Stale { current_revision });
+    }
+
+    // Detach the reviewed inode into Reflect's local-only runtime directory
+    // before handing it to a path-based platform trash API. A non-cooperating
+    // writer can replace the original path, but it can no longer make us trash
+    // that replacement. The kept directory deliberately survives an error:
+    // the reviewed file remains recoverable instead of being deleted by a
+    // temporary-directory destructor or exposed to the graph watcher.
+    let stage_dir = tempfile::Builder::new()
+        .prefix("conditional-trash-")
+        .tempdir_in(&staging_parent)?
+        .keep();
+    let stage_target = stage_dir.join(
+        target
+            .file_name()
+            .ok_or_else(|| AppError::io("trash target has no file name"))?,
+    );
+    if let Err(error) = fs::rename(target, &stage_target) {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            let current_revision = io::read_note_no_follow(root, target)
+                .ok()
+                .map(|source| io::note_revision(&source));
+            let _ = fs::remove_dir(&stage_dir);
+            return Ok(NoteTrashIfRevisionOutcome::Contended { current_revision });
+        }
+        let _ = fs::remove_dir(&stage_dir);
+        return Err(error.into());
+    }
+    let staged_revision = io::read_note_no_follow(root, &stage_target)
+        .ok()
+        .map(|source| io::note_revision(&source));
+    if let Err(error) = trash(&stage_target) {
+        // Restore the reviewed inode when the platform trash call fails. A
+        // hard link is the portable no-clobber claim here: unlike rename it
+        // cannot overwrite a replacement that raced into the public path.
+        // If either step fails, retain the staged link for recovery rather
+        // than deleting the only remaining copy of the note.
+        match fs::hard_link(&stage_target, target) {
+            Ok(()) => match fs::remove_file(&stage_target) {
+                Ok(()) => {
+                    let _ = fs::remove_dir(&stage_dir);
+                }
+                Err(rollback_error) => tracing::warn!(
+                    ?rollback_error,
+                    "restored a conditionally trashed note but could not remove its staging link"
+                ),
+            },
+            Err(rollback_error) => tracing::warn!(
+                ?rollback_error,
+                "could not restore a note after the platform trash operation failed"
+            ),
+        }
+        return Err(error);
+    }
+    let _ = fs::remove_dir(&stage_dir);
+
+    let current_at_path = match io::read_note_no_follow(root, target) {
+        Ok(source) => Some(Some(io::note_revision(&source))),
+        Err(error)
+            if error.kind() == std::io::ErrorKind::NotFound && !io::file_occupied(target) =>
+        {
+            None
+        }
+        Err(_) => Some(None),
+    };
+    if staged_revision.as_deref() == Some(expected_revision) && current_at_path.is_none() {
+        Ok(NoteTrashIfRevisionOutcome::Trashed)
+    } else {
+        Ok(NoteTrashIfRevisionOutcome::Contended {
+            current_revision: current_at_path.flatten(),
+        })
+    }
 }
 
 /// Send a note to the OS trash (recoverable), not a hard delete (pinned to
@@ -737,24 +1065,59 @@ pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()>
 pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
     let root = root_for_generation(&state, generation)?;
     let abs = resolve(&root, &path)?;
-    // An iCloud-evicted note exists only as its `.name.md.icloud` stub —
-    // trashing the logical path would fail and the note would be
-    // undeletable. Removing the stub deletes the iCloud item (Plan 21).
-    let target = if abs.exists() {
-        abs
-    } else {
-        eviction_placeholder(&abs)
-            .filter(|stub| stub.exists())
-            .unwrap_or(abs)
-    };
-    #[cfg(desktop)]
-    os_trash_delete(&target)?;
-    #[cfg(mobile)]
-    move_to_graph_trash(&root, &target)?;
+    io::with_file_mutation_lock(&root, || {
+        // An iCloud-evicted note exists only as its `.name.md.icloud` stub —
+        // trashing the logical path would fail and the note would be
+        // undeletable. Removing the stub deletes the iCloud item (Plan 21).
+        let target = if abs.exists() {
+            abs
+        } else {
+            eviction_placeholder(&abs)
+                .filter(|stub| stub.exists())
+                .unwrap_or(abs)
+        };
+        trash_note_target(&root, &target)
+    })?;
     // A deleted note's sync ancestor is meaningless — drop it (Plan 21).
     crate::conflict::shadow::ShadowStore::new(&root).forget(&path);
     invalidate_file_catalog(&state, &root);
     Ok(())
+}
+
+/// Move a note to recoverable trash only when its complete current source is
+/// still the version the caller reviewed. Used solely to Undo AI-created notes
+/// without deleting user edits that landed afterward.
+#[tauri::command]
+pub fn note_trash_if_revision(
+    path: String,
+    expected_revision: String,
+    generation: u64,
+    requester_owner_id: Option<String>,
+    window: tauri::WebviewWindow,
+    state: State<GraphState>,
+    ownership: State<crate::note_ownership::NoteWindowOwnershipState>,
+) -> AppResult<NoteTrashIfRevisionOutcome> {
+    ensure_ai_writable_note_path(&path)?;
+    let root = root_for_generation(&state, generation)?;
+    let abs = resolve(&root, &path)?;
+    let outcome = io::with_file_mutation_lock(&root, || {
+        if !ownership.ai_access_available(
+            &root,
+            &path,
+            window.label(),
+            requester_owner_id.as_deref(),
+        )? {
+            return Ok(NoteTrashIfRevisionOutcome::Blocked);
+        }
+        trash_note_if_revision_with(&root, &abs, &expected_revision, |target| {
+            trash_note_target(&root, target)
+        })
+    })?;
+    if matches!(outcome, NoteTrashIfRevisionOutcome::Trashed) {
+        crate::conflict::shadow::ShadowStore::new(&root).forget(&path);
+        invalidate_file_catalog(&state, &root);
+    }
+    Ok(outcome)
 }
 
 /// Move the open graph's **entire directory** to the OS trash (recoverable)
@@ -787,7 +1150,7 @@ pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> 
             inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
             root
         };
-        os_trash_delete(&root)?;
+        io::with_file_mutation_lock(&root, || os_trash_delete(&root))?;
         // Recents is a convenience cache (same stance as `activate`): the
         // directory is already in the trash, so a failure to persist must not
         // report the delete as failed. A stale entry fails loudly on open.
@@ -1137,6 +1500,211 @@ mod note_create_tests {
             serde_json::to_value(NoteCreateOutcome::Collision).unwrap(),
             json!({ "kind": "collision" })
         );
+        assert_eq!(
+            serde_json::to_value(NoteCreateOutcome::Blocked).unwrap(),
+            json!({ "kind": "blocked" })
+        );
+    }
+}
+
+#[cfg(test)]
+mod ai_note_mutation_tests {
+    use super::{
+        ensure_ai_writable_note_path, trash_note_if_revision_with, AiNoteReadOutcome,
+        NoteTrashIfRevisionOutcome, NoteWriteIfRevisionOutcome,
+    };
+    use serde_json::json;
+
+    #[test]
+    fn ai_note_paths_exclude_templates_and_non_notes() {
+        assert!(ensure_ai_writable_note_path("notes/a.md").is_ok());
+        assert!(ensure_ai_writable_note_path("daily/2026-08-19.md").is_ok());
+        assert!(ensure_ai_writable_note_path("Projects/deep/plan.md").is_ok());
+        assert!(ensure_ai_writable_note_path("templates/journal.md").is_err());
+        assert!(ensure_ai_writable_note_path("Templates/journal.md").is_err());
+        assert!(ensure_ai_writable_note_path("assets/caption.md").is_err());
+        assert!(ensure_ai_writable_note_path("notes/a.MD").is_err());
+        assert!(ensure_ai_writable_note_path("../outside.md").is_err());
+    }
+
+    #[test]
+    fn revision_mutation_outcomes_serialize_for_typescript() {
+        assert_eq!(
+            serde_json::to_value(AiNoteReadOutcome::Content {
+                source: "# Note\n".to_string(),
+                revision: "rev".to_string(),
+            })
+            .unwrap(),
+            json!({ "kind": "content", "source": "# Note\n", "revision": "rev" })
+        );
+        assert_eq!(
+            serde_json::to_value(AiNoteReadOutcome::Blocked).unwrap(),
+            json!({ "kind": "blocked" })
+        );
+        assert_eq!(
+            serde_json::to_value(NoteWriteIfRevisionOutcome::Written {
+                revision: "after".to_string(),
+                modified_ms: Some(1_234),
+            })
+            .unwrap(),
+            json!({ "kind": "written", "revision": "after", "modifiedMs": 1_234 })
+        );
+        assert_eq!(
+            serde_json::to_value(NoteWriteIfRevisionOutcome::Stale {
+                current_revision: "current".to_string(),
+            })
+            .unwrap(),
+            json!({ "kind": "stale", "currentRevision": "current" })
+        );
+        assert_eq!(
+            serde_json::to_value(NoteWriteIfRevisionOutcome::Contended {
+                current_revision: None,
+            })
+            .unwrap(),
+            json!({ "kind": "contended", "currentRevision": null })
+        );
+        assert_eq!(
+            serde_json::to_value(NoteWriteIfRevisionOutcome::Blocked).unwrap(),
+            json!({ "kind": "blocked" })
+        );
+        assert_eq!(
+            serde_json::to_value(NoteTrashIfRevisionOutcome::Trashed).unwrap(),
+            json!({ "kind": "trashed" })
+        );
+        assert_eq!(
+            serde_json::to_value(NoteTrashIfRevisionOutcome::Contended {
+                current_revision: Some("newer".to_string()),
+            })
+            .unwrap(),
+            json!({ "kind": "contended", "currentRevision": "newer" })
+        );
+        assert_eq!(
+            serde_json::to_value(NoteTrashIfRevisionOutcome::Blocked).unwrap(),
+            json!({ "kind": "blocked" })
+        );
+    }
+
+    #[test]
+    fn conditional_trash_only_deletes_the_reviewed_revision() {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("note.md");
+        std::fs::write(&target, "# Current\n").unwrap();
+        let mut trash_calls = 0;
+
+        let stale = trash_note_if_revision_with(root.path(), &target, "wrong", |_| {
+            trash_calls += 1;
+            Ok(())
+        })
+        .unwrap();
+        assert!(matches!(stale, NoteTrashIfRevisionOutcome::Stale { .. }));
+        assert_eq!(trash_calls, 0);
+        assert!(target.exists());
+
+        let expected = super::io::note_revision("# Current\n");
+        let trashed = trash_note_if_revision_with(root.path(), &target, &expected, |path| {
+            trash_calls += 1;
+            std::fs::remove_file(path).map_err(Into::into)
+        })
+        .unwrap();
+        assert!(matches!(trashed, NoteTrashIfRevisionOutcome::Trashed));
+        assert_eq!(trash_calls, 1);
+        assert!(!target.exists());
+
+        assert!(matches!(
+            trash_note_if_revision_with(root.path(), &target, &expected, |_| Ok(())).unwrap(),
+            NoteTrashIfRevisionOutcome::Missing
+        ));
+    }
+
+    #[test]
+    fn conditional_trash_preserves_a_racing_replacement_and_reports_contention() {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("note.md");
+        std::fs::write(&target, "reviewed").unwrap();
+        let expected = super::io::note_revision("reviewed");
+
+        let outcome = trash_note_if_revision_with(root.path(), &target, &expected, |staged| {
+            // A non-cooperating writer recreates the public path after the
+            // reviewed inode was detached. Only the staged reviewed file is
+            // removed; the replacement must survive byte-for-byte.
+            std::fs::write(&target, "replacement")?;
+            std::fs::remove_file(staged)?;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(outcome).unwrap(),
+            json!({
+                "kind": "contended",
+                "currentRevision": super::io::note_revision("replacement")
+            })
+        );
+        assert_eq!(std::fs::read_to_string(target).unwrap(), "replacement");
+    }
+
+    #[test]
+    fn conditional_trash_restores_the_note_when_platform_trash_fails() {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("note.md");
+        std::fs::write(&target, "reviewed").unwrap();
+        let expected = super::io::note_revision("reviewed");
+        let mut staged_path = None;
+
+        let result = trash_note_if_revision_with(root.path(), &target, &expected, |staged| {
+            staged_path = Some(staged.to_path_buf());
+            Err(super::AppError::io("platform trash failed"))
+        });
+
+        assert!(result.is_err());
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "reviewed");
+        assert!(!staged_path.unwrap().exists());
+    }
+
+    #[test]
+    fn conditional_trash_failure_never_overwrites_a_racing_replacement() {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("note.md");
+        std::fs::write(&target, "reviewed").unwrap();
+        let expected = super::io::note_revision("reviewed");
+        let mut staged_path = None;
+
+        let result = trash_note_if_revision_with(root.path(), &target, &expected, |staged| {
+            staged_path = Some(staged.to_path_buf());
+            std::fs::write(&target, "replacement")?;
+            Err(super::AppError::io("platform trash failed"))
+        });
+
+        assert!(result.is_err());
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "replacement");
+        assert_eq!(
+            std::fs::read_to_string(staged_path.unwrap()).unwrap(),
+            "reviewed"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn conditional_trash_rejects_a_symlinked_staging_directory() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::fs::create_dir(root.path().join(".reflect")).unwrap();
+        symlink(outside.path(), root.path().join(".reflect/trash-staging")).unwrap();
+        let target = root.path().join("note.md");
+        std::fs::write(&target, "reviewed").unwrap();
+        let expected = super::io::note_revision("reviewed");
+        let mut trash_called = false;
+
+        let result = trash_note_if_revision_with(root.path(), &target, &expected, |_| {
+            trash_called = true;
+            Ok(())
+        });
+
+        assert!(matches!(result, Err(super::AppError::Traversal { .. })));
+        assert!(!trash_called);
+        assert_eq!(std::fs::read_to_string(target).unwrap(), "reviewed");
+        assert_eq!(std::fs::read_dir(outside.path()).unwrap().count(), 0);
     }
 }
 
@@ -1150,6 +1718,7 @@ mod move_tests {
     fn graph() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         fs::create_dir_all(dir.path().join("notes")).unwrap();
+        fs::create_dir(dir.path().join(".reflect")).unwrap();
         dir
     }
 
@@ -1162,6 +1731,31 @@ mod move_tests {
         assert_eq!(
             fs::read_to_string(root.path().join("notes/b.md")).unwrap(),
             "# A\n"
+        );
+    }
+
+    #[test]
+    fn rename_with_shadow_bookkeeping_reuses_the_reentrant_mutation_lock() {
+        let root = graph();
+        fs::write(root.path().join("notes/a.md"), "# A\n").unwrap();
+        crate::conflict::shadow::ShadowStore::new(root.path())
+            .record("notes/a.md", "# synced\n")
+            .unwrap();
+        let root_path = root.path().to_path_buf();
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            result_tx
+                .send(move_note_file(&root_path, "notes/a.md", "notes/b.md"))
+                .unwrap();
+        });
+        result_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("rename deadlocked while reentering for shadow bookkeeping")
+            .unwrap();
+        worker.join().unwrap();
+        assert_eq!(
+            fs::read_to_string(root.path().join(".reflect/sync-base/notes/b.md")).unwrap(),
+            "# synced\n"
         );
     }
 
