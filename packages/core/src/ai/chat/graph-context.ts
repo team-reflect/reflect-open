@@ -1,5 +1,9 @@
 import { loadGraphStats, type GraphStats, type GraphStatsOptions } from '../../indexing/graph-stats'
-import { cloudSafeGraphContext, type CloudGraphContext, type CloudSafe } from '../checkers'
+import {
+  cloudSafeGraphContext,
+  type CloudGraphContext,
+  type CloudSafe,
+} from '../../privacy/checkers'
 
 /**
  * The graph-level grounding block for one chat turn's system prompt: what

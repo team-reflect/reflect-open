@@ -9,18 +9,18 @@ import {
   type RecentNoteRow,
   type RecentNotesOptions,
 } from '../../indexing/note-list'
-import { parseFrontmatter, splitFrontmatter } from '../../markdown/frontmatter'
 import { isTagName } from '../../markdown/extract'
 import { buildReadOneAsset, readAssetsInput, type ReadAssetsOutput } from './read-assets'
 import { buildReadOneNote, readNotesInput, type ReadNotesOutput } from './read-notes'
 import {
   cloudSafeNoteListings,
   cloudSafeSearchHits,
+  notePrivate,
   type CloudNoteListing,
   type CloudSafe,
   type CloudSearchHit,
   type CloudSendable,
-} from '../checkers'
+} from '../../privacy/checkers'
 
 /**
  * The read-only note tools the chat model can call (Plan 10, first wave),
@@ -32,7 +32,7 @@ import {
  * nothing else switches on tool names.
  *
  * Note content enters tool outputs only as {@link CloudSafe} values, minted
- * by the privacy gate in `../checkers` — search drops private hits entirely,
+ * by the privacy gate in `../../privacy/checkers` — search drops private hits entirely,
  * and reads re-check the live frontmatter before any content is minted.
  */
 
@@ -157,8 +157,7 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
   // for sending.
   const isPrivateLive = async (path: string): Promise<boolean> => {
     try {
-      const { raw } = splitFrontmatter(await readNoteFn(path))
-      return parseFrontmatter(raw).data.private
+      return notePrivate(await readNoteFn(path))
     } catch {
       return true
     }

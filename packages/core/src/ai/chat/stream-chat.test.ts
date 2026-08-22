@@ -7,7 +7,7 @@ import type {
   LanguageModelV3Usage,
 } from '@ai-sdk/provider'
 import type { RetrievalHit } from '../../embeddings/retrieve'
-import { cloudSafeGraphContext } from '../checkers'
+import { cloudSafeGraphContext } from '../../privacy/checkers'
 import { languageModel } from '../language-model'
 import { fitToContextWindow } from './context-window'
 import { MAX_STEPS, streamChat, streamChatTurn, type ChatStreamEvent } from './stream-chat'

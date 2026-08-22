@@ -58,7 +58,7 @@ export {
   type CloudSafe,
   type CloudSearchHit,
   type CloudSendable,
-} from '../ai/checkers'
+} from '../privacy/checkers'
 export {
   buildNoteTools,
   MAX_DAILY_NOTE_DAYS,
@@ -185,7 +185,8 @@ export {
   type ReconcileCaptureEnrichmentInput,
   type ReconcileCaptureEnrichmentOutcome,
 } from '../actions/capture'
-export { parsePageMeta, scrapePageMeta, type PageMeta } from '../actions/meta-scrape'
+export { parsePageMeta, type PageMeta } from '../link-preview/metadata'
+export { scrapePageMeta } from '../actions/meta-scrape'
 export {
   calendarAuthorizationStatus,
   canReadCalendars,

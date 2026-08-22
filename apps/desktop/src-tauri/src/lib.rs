@@ -22,6 +22,7 @@ mod conflict;
 mod contacts;
 mod db;
 mod devtools;
+mod editor_link_preview;
 mod error;
 mod fs;
 mod git;
@@ -36,6 +37,7 @@ mod settings;
 mod skill;
 #[cfg(target_os = "macos")]
 mod wake;
+mod web_fetch;
 mod windows;
 
 // The watcher and the embedding runtime are desktop capabilities (Plan 19):
@@ -372,6 +374,8 @@ pub fn run() {
             capture::capture_link_preview,
             capture::capture_meta_fetch,
             capture::capture_oembed_fetch,
+            editor_link_preview::link_preview_fetch_html,
+            editor_link_preview::link_preview_fetch_icon,
             git::git_status,
             git::git_setup,
             git::git_disconnect,
