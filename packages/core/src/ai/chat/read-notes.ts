@@ -7,7 +7,7 @@ import {
   isPrivateNoteError,
   type CloudNoteContent,
   type CloudSafe,
-} from '../checkers'
+} from '../../privacy/checkers'
 
 /**
  * The read_notes tool's executor (Plan 10): resolve a graph-relative note

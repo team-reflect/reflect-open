@@ -1,5 +1,6 @@
 import { toAppError } from '../errors'
 import { captureMetaFetch, captureOEmbedFetch } from '../graph/commands'
+import { normalizePageMetaValue, parsePageMeta, type PageMeta } from '../link-preview/metadata'
 import { oembedRequestURL, parseOEmbedAnswer } from './oembed'
 
 /**
@@ -9,99 +10,6 @@ import { oembedRequestURL, parseOEmbedAnswer } from './oembed'
  * and the OpenGraph basics out of the HTML. Parsing uses `DOMParser`
  * (native in the webview; tests run in a real browser), never regex over HTML.
  */
-
-export interface PageMeta {
-  /** `og:title`, falling back to `<title>`. */
-  title: string | null
-  /** `og:description`, falling back to `<meta name="description">`. */
-  description: string | null
-  /** `og:site_name`. */
-  siteName: string | null
-}
-
-/** Display metadata extracted for an editor link preview. */
-export interface LinkPreviewMeta {
-  /** A bounded `og:title` or document title. */
-  title: string
-  /** A bounded OpenGraph or standard description. */
-  description: string | null
-  /** A declared raster icon URL, or the conventional `/favicon.ico`. */
-  iconUrl: string
-}
-
-/** Caps how much of a meta value survives — these render inline in notes. */
-const MAX_META_CHARS = 500
-const MAX_LINK_TITLE_CHARS = 200
-const MAX_LINK_DESCRIPTION_CHARS = 300
-
-function clean(value: string | null | undefined): string | null {
-  const collapsed = value?.replaceAll(/\s+/g, ' ').trim() ?? ''
-  if (collapsed === '') {
-    return null
-  }
-  return collapsed.slice(0, MAX_META_CHARS)
-}
-
-function metaContent(document: Document, selector: string): string | null {
-  return clean(document.querySelector(selector)?.getAttribute('content'))
-}
-
-function pageMetaFromDocument(document: Document): PageMeta {
-  return {
-    title:
-      metaContent(document, 'meta[property="og:title"]') ??
-      clean(document.querySelector('title')?.textContent),
-    description:
-      metaContent(document, 'meta[property="og:description"]') ??
-      metaContent(document, 'meta[name="description"]'),
-    siteName: metaContent(document, 'meta[property="og:site_name"]'),
-  }
-}
-
-/** Extract {@link PageMeta} from an HTML document's text. Never throws. */
-export function parsePageMeta(html: string): PageMeta {
-  return pageMetaFromDocument(new DOMParser().parseFromString(html, 'text/html'))
-}
-
-function rasterIconUrl(document: Document, pageUrl: string): string {
-  for (const element of document.querySelectorAll<HTMLLinkElement>('link[rel][href]')) {
-    const rels = element.rel.toLowerCase().split(/\s+/)
-    if (
-      !rels.includes('icon') &&
-      !rels.includes('apple-touch-icon') &&
-      !rels.includes('apple-touch-icon-precomposed')
-    ) {
-      continue
-    }
-    const type = element.type.trim().toLowerCase()
-    if (type.includes('svg')) continue
-    try {
-      const url = new URL(element.getAttribute('href') ?? '', pageUrl)
-      if (url.protocol !== 'https:' && url.protocol !== 'http:') continue
-      if (url.pathname.toLowerCase().endsWith('.svg')) continue
-      return url.href
-    } catch {
-      continue
-    }
-  }
-  return new URL('/favicon.ico', pageUrl).href
-}
-
-/**
- * Parse editor link-preview metadata and resolve its favicon against the final
- * page URL after redirects. A missing title is not a usable rich preview.
- */
-export function parseLinkPreviewMeta(html: string, finalUrl: string): LinkPreviewMeta | null {
-  const document = new DOMParser().parseFromString(html, 'text/html')
-  const page = pageMetaFromDocument(document)
-  const title = clean(page.title)?.slice(0, MAX_LINK_TITLE_CHARS) ?? null
-  if (title === null) return null
-  return {
-    title,
-    description: clean(page.description)?.slice(0, MAX_LINK_DESCRIPTION_CHARS) ?? null,
-    iconUrl: rasterIconUrl(document, finalUrl),
-  }
-}
 
 async function scrapeOEmbed(requestURL: string): Promise<PageMeta | null> {
   let json: string
@@ -121,13 +29,13 @@ async function scrapeOEmbed(requestURL: string): Promise<PageMeta | null> {
   if (answer === null) {
     return null
   }
-  const title = clean(answer.title)
+  const title = normalizePageMetaValue(answer.title)
   if (title === null) {
     return null
   }
   // oEmbed has no description field; the capture keeps none until (and
   // unless) the AI leg writes one, now grounded in this real title.
-  return { title, description: null, siteName: clean(answer.providerName) }
+  return { title, description: null, siteName: normalizePageMetaValue(answer.providerName) }
 }
 
 /**

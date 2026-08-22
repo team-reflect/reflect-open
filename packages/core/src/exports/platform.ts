@@ -185,9 +185,6 @@ export {
   captureInboxReject,
   captureInboxRemove,
   captureMetaFetch,
-  linkPreviewFetchHtml,
-  linkPreviewFetchIcon,
-  type LinkPreviewHtml,
   captureSharedInboxRelay,
   promoteCaptureScreenshot,
 } from '../graph/commands'

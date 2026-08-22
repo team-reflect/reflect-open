@@ -1,14 +1,14 @@
 import type { RetrievalHit } from '../embeddings/retrieve'
 
 /**
- * The AI domain's privacy gate (Plan 10). `private: true` is a hard block:
+ * Reflect's outbound-service privacy gate (Plan 10). `private: true` is a hard block:
  * a private note's content must never be sent to an external service.
  *
  * Enforcement is structural, not call-site discipline: provider-bound
  * payloads carry note content only as {@link CloudSafe} values, and the
  * *only* constructors for `CloudSafe` live in this module, where the privacy
- * checks run. An unchecked payload can't be built — adding a new AI tool
- * means minting its content here or it won't typecheck.
+ * checks run. An unchecked payload can't be built — adding a new outbound
+ * integration means minting its content here or it won't typecheck.
  */
 
 declare const cloudSafeBrand: unique symbol
@@ -16,7 +16,7 @@ declare const cloudSafeBrand: unique symbol
 /**
  * Proof that a value passed this module's privacy gate. The brand is
  * compile-time only (it serializes as plain JSON); its job is making
- * "checked for privacy" a type the rest of the AI domain can demand.
+ * "checked for privacy" a type every outbound boundary can demand.
  */
 export type CloudSafe<T> = T & { readonly [cloudSafeBrand]: true }
 

@@ -16,7 +16,7 @@ pub(crate) const USER_AGENT: &str = concat!(
 );
 
 #[derive(Clone, Copy)]
-pub(crate) enum NetworkScope {
+enum NetworkScope {
     AnyHttp,
     PublicHttp,
 }
@@ -246,7 +246,7 @@ async fn fetch(
     unreachable!("redirect loop always returns")
 }
 
-pub(crate) async fn fetch_html(value: &str, scope: NetworkScope) -> AppResult<FetchResponse> {
+async fn fetch_html(value: &str, scope: NetworkScope) -> AppResult<FetchResponse> {
     let response = fetch(
         value,
         scope,
@@ -264,13 +264,32 @@ pub(crate) async fn fetch_html(value: &str, scope: NetworkScope) -> AppResult<Fe
     Ok(response)
 }
 
-pub(crate) async fn fetch_bytes(
+async fn fetch_bytes(
     value: &str,
     scope: NetworkScope,
     accept: &str,
     max_bytes: usize,
 ) -> AppResult<FetchResponse> {
     fetch(value, scope, accept, max_bytes, LimitBehavior::Reject).await
+}
+
+/// Fetch capture HTML while preserving capture's existing intranet behavior.
+pub(crate) async fn fetch_capture_html(value: &str) -> AppResult<FetchResponse> {
+    fetch_html(value, NetworkScope::AnyHttp).await
+}
+
+/// Fetch editor-preview HTML from public internet destinations only.
+pub(crate) async fn fetch_public_html(value: &str) -> AppResult<FetchResponse> {
+    fetch_html(value, NetworkScope::PublicHttp).await
+}
+
+/// Fetch bounded bytes from public internet destinations only.
+pub(crate) async fn fetch_public_bytes(
+    value: &str,
+    accept: &str,
+    max_bytes: usize,
+) -> AppResult<FetchResponse> {
+    fetch_bytes(value, NetworkScope::PublicHttp, accept, max_bytes).await
 }
 
 #[cfg(test)]

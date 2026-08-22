@@ -1,0 +1,93 @@
+/** Metadata shared by capture enrichment and editor link previews. */
+
+export interface PageMeta {
+  /** `og:title`, falling back to `<title>`. */
+  title: string | null
+  /** `og:description`, falling back to `<meta name="description">`. */
+  description: string | null
+  /** `og:site_name`. */
+  siteName: string | null
+}
+
+/** Display metadata extracted for an editor link preview. */
+export interface LinkPreviewMeta {
+  /** A bounded `og:title` or document title. */
+  title: string
+  /** A bounded OpenGraph or standard description. */
+  description: string | null
+  /** A declared raster icon URL, or the conventional `/favicon.ico`. */
+  iconUrl: string
+}
+
+const MAX_PAGE_META_CHARS = 500
+const MAX_LINK_TITLE_CHARS = 200
+const MAX_LINK_DESCRIPTION_CHARS = 300
+
+/** Collapse metadata whitespace, reject blanks, and cap its display length. */
+export function normalizePageMetaValue(
+  value: string | null | undefined,
+  maxCharacters = MAX_PAGE_META_CHARS,
+): string | null {
+  const collapsed = value?.replaceAll(/\s+/g, ' ').trim() ?? ''
+  return collapsed === '' ? null : collapsed.slice(0, maxCharacters)
+}
+
+function metaContent(document: Document, selector: string): string | null {
+  return normalizePageMetaValue(document.querySelector(selector)?.getAttribute('content'))
+}
+
+function pageMetaFromDocument(document: Document): PageMeta {
+  return {
+    title:
+      metaContent(document, 'meta[property="og:title"]') ??
+      normalizePageMetaValue(document.querySelector('title')?.textContent),
+    description:
+      metaContent(document, 'meta[property="og:description"]') ??
+      metaContent(document, 'meta[name="description"]'),
+    siteName: metaContent(document, 'meta[property="og:site_name"]'),
+  }
+}
+
+/** Extract {@link PageMeta} from an HTML document's text. Never throws. */
+export function parsePageMeta(html: string): PageMeta {
+  return pageMetaFromDocument(new DOMParser().parseFromString(html, 'text/html'))
+}
+
+function rasterIconUrl(document: Document, pageUrl: string): string {
+  for (const element of document.querySelectorAll<HTMLLinkElement>('link[rel][href]')) {
+    const relationships = element.rel.toLowerCase().split(/\s+/)
+    if (
+      !relationships.includes('icon') &&
+      !relationships.includes('apple-touch-icon') &&
+      !relationships.includes('apple-touch-icon-precomposed')
+    ) {
+      continue
+    }
+    if (element.type.trim().toLowerCase().includes('svg')) continue
+    try {
+      const url = new URL(element.getAttribute('href') ?? '', pageUrl)
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') continue
+      if (url.pathname.toLowerCase().endsWith('.svg')) continue
+      return url.href
+    } catch {
+      continue
+    }
+  }
+  return new URL('/favicon.ico', pageUrl).href
+}
+
+/**
+ * Parse editor link-preview metadata and resolve its favicon against the final
+ * page URL after redirects. A missing title is not a usable rich preview.
+ */
+export function parseLinkPreviewMeta(html: string, finalUrl: string): LinkPreviewMeta | null {
+  const document = new DOMParser().parseFromString(html, 'text/html')
+  const page = pageMetaFromDocument(document)
+  const title = normalizePageMetaValue(page.title, MAX_LINK_TITLE_CHARS)
+  if (title === null) return null
+  return {
+    title,
+    description: normalizePageMetaValue(page.description, MAX_LINK_DESCRIPTION_CHARS),
+    iconUrl: rasterIconUrl(document, finalUrl),
+  }
+}

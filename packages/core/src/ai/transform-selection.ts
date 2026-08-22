@@ -1,7 +1,7 @@
 import { streamText, type LanguageModel } from 'ai'
 import { errorMessage } from '../errors'
 import type { AiProviderConfig } from '../settings/schema'
-import type { CloudSafe } from './checkers'
+import type { CloudSafe } from '../privacy/checkers'
 import { languageModel } from './language-model'
 import { renderSelectionPrompt } from './selection-prompts'
 

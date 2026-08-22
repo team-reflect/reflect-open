@@ -20,7 +20,7 @@ import {
   type CloudSafe,
   type CloudSearchHit,
   type CloudSendable,
-} from '../checkers'
+} from '../../privacy/checkers'
 
 /**
  * The read-only note tools the chat model can call (Plan 10, first wave),
@@ -32,7 +32,7 @@ import {
  * nothing else switches on tool names.
  *
  * Note content enters tool outputs only as {@link CloudSafe} values, minted
- * by the privacy gate in `../checkers` — search drops private hits entirely,
+ * by the privacy gate in `../../privacy/checkers` — search drops private hits entirely,
  * and reads re-check the live frontmatter before any content is minted.
  */
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseLinkPreviewMeta, parsePageMeta } from './meta-scrape'
+import { parseLinkPreviewMeta, parsePageMeta } from './metadata'
 
 describe('parsePageMeta', () => {
   it('prefers OpenGraph tags over the document fallbacks', () => {

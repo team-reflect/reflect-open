@@ -16,8 +16,7 @@ use tauri::State;
 use crate::error::{AppError, AppResult};
 use crate::fs::{current_root, modified_ms, root_for_generation, FileMeta, GraphState};
 use crate::web_fetch::{
-    classify_fetch_error, classify_fetch_status, fetch_html, NetworkScope, FETCH_TIMEOUT,
-    USER_AGENT,
+    classify_fetch_error, classify_fetch_status, fetch_capture_html, FETCH_TIMEOUT, USER_AGENT,
 };
 
 /// The native-messaging host name browsers route on; must match the name the
@@ -531,7 +530,7 @@ pub async fn capture_link_preview(app: tauri::AppHandle, url: String) -> AppResu
 /// the privacy gate in `@reflect/core` runs before either is ever called.
 #[tauri::command]
 pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
-    let response = fetch_html(&url, NetworkScope::AnyHttp).await?;
+    let response = fetch_capture_html(&url).await?;
     Ok(String::from_utf8_lossy(&response.body).into_owned())
 }
 

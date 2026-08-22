@@ -3,7 +3,7 @@ import {
   createNoteLinkPreviewResolver,
   type LinkPreviewResolverDependencies,
   type LinkPreviewSession,
-} from './use-link-preview'
+} from './link-preview-resolver'
 
 const session: LinkPreviewSession = {
   path: 'notes/a.md',
@@ -50,6 +50,7 @@ describe('createNoteLinkPreviewResolver', () => {
     await expect(resolver('https://example.com/page')).resolves.toEqual(await first)
     expect(deps.fetchHtml).toHaveBeenCalledTimes(1)
     expect(deps.fetchIcon).toHaveBeenCalledTimes(1)
+    expect(deps.fetchIcon).toHaveBeenCalledWith('https://example.com/icon.png')
   })
 
   it('caches failed lookups and refuses non-web destinations', async () => {
@@ -88,41 +89,30 @@ describe('createNoteLinkPreviewResolver', () => {
     }
   })
 
-  it('stops when privacy changes after page metadata', async () => {
-    const readSource = vi
-      .fn()
-      .mockResolvedValueOnce(publicSource)
-      .mockResolvedValueOnce(privateSource)
+  it.each([
+    {
+      checkpoint: 'after page metadata',
+      sources: [publicSource, privateSource],
+      expectedIconCalls: 0,
+    },
+    {
+      checkpoint: 'immediately before favicon retrieval',
+      sources: [publicSource, publicSource, privateSource],
+      expectedIconCalls: 0,
+    },
+    {
+      checkpoint: 'after favicon retrieval',
+      sources: [publicSource, publicSource, publicSource, privateSource],
+      expectedIconCalls: 1,
+    },
+  ])('fails closed when privacy changes $checkpoint', async ({ sources, expectedIconCalls }) => {
+    const readSource = vi.fn()
+    for (const source of sources) readSource.mockResolvedValueOnce(source)
     const deps = dependencies({ readSource })
     const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
     await expect(resolver('https://example.com')).resolves.toBeUndefined()
     expect(deps.fetchHtml).toHaveBeenCalledTimes(1)
-    expect(deps.fetchIcon).not.toHaveBeenCalled()
-  })
-
-  it('rechecks privacy immediately before favicon retrieval', async () => {
-    const readSource = vi
-      .fn()
-      .mockResolvedValueOnce(publicSource)
-      .mockResolvedValueOnce(publicSource)
-      .mockResolvedValueOnce(privateSource)
-    const deps = dependencies({ readSource })
-    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
-    await expect(resolver('https://example.com')).resolves.toBeUndefined()
-    expect(deps.fetchIcon).not.toHaveBeenCalled()
-  })
-
-  it('discards a favicon result when privacy changes during retrieval', async () => {
-    const readSource = vi
-      .fn()
-      .mockResolvedValueOnce(publicSource)
-      .mockResolvedValueOnce(publicSource)
-      .mockResolvedValueOnce(publicSource)
-      .mockResolvedValueOnce(privateSource)
-    const deps = dependencies({ readSource })
-    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
-    await expect(resolver('https://example.com')).resolves.toBeUndefined()
-    expect(deps.fetchIcon).toHaveBeenCalledTimes(1)
+    expect(deps.fetchIcon).toHaveBeenCalledTimes(expectedIconCalls)
   })
 
   it('discards stale graph and editor-session work before a later request', async () => {
