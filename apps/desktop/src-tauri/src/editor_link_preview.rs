@@ -42,6 +42,15 @@ fn is_raster_content_type(content_type: &str) -> bool {
     )
 }
 
+fn validate_raster_content_type(url: &str, content_type: &str) -> AppResult<()> {
+    if !is_raster_content_type(content_type) {
+        return Err(AppError::parse(format!(
+            "{url} is not a supported raster favicon ({content_type})"
+        )));
+    }
+    Ok(())
+}
+
 fn normalize_icon(bytes: &[u8]) -> AppResult<Vec<u8>> {
     let mut reader = image::ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()
@@ -82,14 +91,9 @@ pub(crate) async fn link_preview_fetch_icon(url: String) -> AppResult<String> {
         &url,
         "image/webp,image/png,image/jpeg,image/gif,image/x-icon,*/*;q=0.1",
         ICON_FETCH_MAX_BYTES,
+        validate_raster_content_type,
     )
     .await?;
-    if !is_raster_content_type(&response.content_type) {
-        return Err(AppError::parse(format!(
-            "{} is not a supported raster favicon ({})",
-            response.final_url, response.content_type
-        )));
-    }
     let png = tauri::async_runtime::spawn_blocking(move || normalize_icon(&response.body))
         .await
         .map_err(|error| AppError::io(format!("favicon task failed: {error}")))??;

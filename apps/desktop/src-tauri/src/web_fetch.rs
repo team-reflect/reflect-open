@@ -23,8 +23,14 @@ enum NetworkScope {
 
 pub(crate) struct FetchResponse {
     pub(crate) body: Vec<u8>,
-    pub(crate) content_type: String,
     pub(crate) final_url: String,
+}
+
+type ContentTypeValidator = fn(&str, &str) -> AppResult<()>;
+
+struct PublicResolution {
+    dns_host: Option<String>,
+    addresses: Vec<SocketAddr>,
 }
 
 #[derive(Clone, Copy)]
@@ -141,7 +147,7 @@ fn remaining_timeout(deadline: Instant) -> AppResult<Duration> {
         })
 }
 
-async fn resolve_public(url: &Url, deadline: Instant) -> AppResult<(String, Vec<SocketAddr>)> {
+async fn resolve_public(url: &Url, deadline: Instant) -> AppResult<PublicResolution> {
     let host = url
         .host_str()
         .ok_or_else(|| AppError::parse(format!("URL has no host: {url}")))?
@@ -149,23 +155,41 @@ async fn resolve_public(url: &Url, deadline: Instant) -> AppResult<(String, Vec<
     let port = url
         .port_or_known_default()
         .ok_or_else(|| AppError::parse(format!("URL has no port: {url}")))?;
+
+    if let Ok(address) = host.trim_matches(['[', ']']).parse::<IpAddr>() {
+        let addresses = vec![SocketAddr::new(address, port)];
+        validate_public_addresses(url, &addresses)?;
+        return Ok(PublicResolution {
+            dns_host: None,
+            addresses,
+        });
+    }
+
     let resolve_host = host.clone();
-    let resolve_task = tauri::async_runtime::spawn_blocking(move || {
+    let mut resolve_task = tauri::async_runtime::spawn_blocking(move || {
         (resolve_host.as_str(), port)
             .to_socket_addrs()
             .map(|addresses| addresses.collect::<Vec<_>>())
     });
-    let addresses = tokio::time::timeout(remaining_timeout(deadline)?, resolve_task)
-        .await
-        .map_err(|_| AppError::Network {
-            message: format!("timed out resolving {host}"),
-        })?
+    let addresses =
+        match tokio::time::timeout(remaining_timeout(deadline)?, &mut resolve_task).await {
+            Ok(result) => result,
+            Err(_) => {
+                resolve_task.abort();
+                return Err(AppError::Network {
+                    message: format!("timed out resolving {host}"),
+                });
+            }
+        }
         .map_err(|error| AppError::io(format!("DNS task failed: {error}")))?
         .map_err(|error| AppError::Network {
             message: format!("could not resolve {host}: {error}"),
         })?;
     validate_public_addresses(url, &addresses)?;
-    Ok((host, addresses))
+    Ok(PublicResolution {
+        dns_host: Some(host),
+        addresses,
+    })
 }
 
 async fn client_for(
@@ -175,17 +199,36 @@ async fn client_for(
 ) -> AppResult<reqwest::Client> {
     let mut builder = reqwest::Client::builder()
         .redirect(redirect::Policy::none())
-        .timeout(remaining_timeout(deadline)?)
         .user_agent(USER_AGENT);
     if matches!(scope, NetworkScope::PublicHttp) {
-        let (host, addresses) = resolve_public(url, deadline).await?;
+        let resolution = resolve_public(url, deadline).await?;
         // A system proxy would resolve and fetch the original URL itself,
         // bypassing both our DNS validation and address pinning.
-        builder = builder.no_proxy().resolve_to_addrs(&host, &addresses);
+        builder = builder.no_proxy();
+        if let Some(host) = resolution.dns_host {
+            builder = builder.resolve_to_addrs(&host, &resolution.addresses);
+        }
     }
     builder
+        .timeout(remaining_timeout(deadline)?)
         .build()
         .map_err(|error| AppError::io(error.to_string()))
+}
+
+fn redirect_url(url: &Url, location: &str, scope: NetworkScope) -> AppResult<Url> {
+    let redirected = url
+        .join(location)
+        .map_err(|error| AppError::parse(format!("invalid redirect from {url}: {error}")))?;
+    let redirected = parse_http_url(redirected.as_str())?;
+    if matches!(scope, NetworkScope::PublicHttp)
+        && url.scheme() == "https"
+        && redirected.scheme() == "http"
+    {
+        return Err(AppError::parse(format!(
+            "link preview redirect downgrades HTTPS to HTTP: {url} -> {redirected}"
+        )));
+    }
+    Ok(redirected)
 }
 
 async fn fetch(
@@ -194,6 +237,7 @@ async fn fetch(
     accept: &str,
     max_bytes: usize,
     limit_behavior: LimitBehavior,
+    validate_content_type: ContentTypeValidator,
 ) -> AppResult<FetchResponse> {
     let deadline = Instant::now() + FETCH_TIMEOUT;
     let mut url = parse_http_url(value)?;
@@ -220,10 +264,7 @@ async fn fetch(
                 .get(reqwest::header::LOCATION)
                 .and_then(|value| value.to_str().ok())
                 .ok_or_else(|| AppError::parse(format!("redirect from {url} has no Location")))?;
-            url = url.join(location).map_err(|error| {
-                AppError::parse(format!("invalid redirect from {url}: {error}"))
-            })?;
-            url = parse_http_url(url.as_str())?;
+            url = redirect_url(&url, location, scope)?;
             continue;
         }
 
@@ -237,6 +278,7 @@ async fn fetch(
             .unwrap_or("")
             .to_ascii_lowercase();
         let final_url = url.to_string();
+        validate_content_type(&final_url, &content_type)?;
         let mut body = Vec::new();
         let mut response = response;
         while let Some(chunk) = response.chunk().await.map_err(classify_fetch_error)? {
@@ -256,31 +298,30 @@ async fn fetch(
             }
             body.extend_from_slice(&chunk);
         }
-        return Ok(FetchResponse {
-            body,
-            content_type,
-            final_url,
-        });
+        return Ok(FetchResponse { body, final_url });
     }
     unreachable!("redirect loop always returns")
 }
 
+fn validate_html_content_type(url: &str, content_type: &str) -> AppResult<()> {
+    if !content_type.contains("html") {
+        return Err(AppError::parse(format!(
+            "{url} is not an HTML page ({content_type})"
+        )));
+    }
+    Ok(())
+}
+
 async fn fetch_html(value: &str, scope: NetworkScope) -> AppResult<FetchResponse> {
-    let response = fetch(
+    fetch(
         value,
         scope,
         "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         HTML_MAX_BYTES,
         LimitBehavior::Truncate,
+        validate_html_content_type,
     )
-    .await?;
-    if !response.content_type.contains("html") {
-        return Err(AppError::parse(format!(
-            "{} is not an HTML page ({})",
-            response.final_url, response.content_type
-        )));
-    }
-    Ok(response)
+    .await
 }
 
 async fn fetch_bytes(
@@ -288,8 +329,17 @@ async fn fetch_bytes(
     scope: NetworkScope,
     accept: &str,
     max_bytes: usize,
+    validate_content_type: ContentTypeValidator,
 ) -> AppResult<FetchResponse> {
-    fetch(value, scope, accept, max_bytes, LimitBehavior::Reject).await
+    fetch(
+        value,
+        scope,
+        accept,
+        max_bytes,
+        LimitBehavior::Reject,
+        validate_content_type,
+    )
+    .await
 }
 
 /// Fetch capture HTML while preserving capture's existing intranet behavior.
@@ -307,8 +357,16 @@ pub(crate) async fn fetch_public_bytes(
     value: &str,
     accept: &str,
     max_bytes: usize,
+    validate_content_type: ContentTypeValidator,
 ) -> AppResult<FetchResponse> {
-    fetch_bytes(value, NetworkScope::PublicHttp, accept, max_bytes).await
+    fetch_bytes(
+        value,
+        NetworkScope::PublicHttp,
+        accept,
+        max_bytes,
+        validate_content_type,
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -356,6 +414,31 @@ mod tests {
             remaining_timeout(deadline),
             Err(AppError::Network { .. })
         ));
+    }
+
+    #[test]
+    fn resolves_public_ipv6_literals_without_dns() {
+        let url = parse_http_url("https://[2606:4700:4700::1111]/").unwrap();
+        let resolution = tauri::async_runtime::block_on(resolve_public(
+            &url,
+            Instant::now() + Duration::from_secs(1),
+        ))
+        .unwrap();
+        assert!(resolution.dns_host.is_none());
+        assert_eq!(
+            resolution.addresses,
+            ["[2606:4700:4700::1111]:443".parse().unwrap()]
+        );
+    }
+
+    #[test]
+    fn public_redirects_cannot_downgrade_https() {
+        let https = parse_http_url("https://example.com/page").unwrap();
+        assert!(
+            redirect_url(&https, "http://example.com/other", NetworkScope::PublicHttp).is_err()
+        );
+        assert!(redirect_url(&https, "/other", NetworkScope::PublicHttp).is_ok());
+        assert!(redirect_url(&https, "http://example.com/other", NetworkScope::AnyHttp).is_ok());
     }
 
     #[test]
