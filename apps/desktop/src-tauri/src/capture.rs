@@ -15,6 +15,10 @@ use tauri::State;
 
 use crate::error::{AppError, AppResult};
 use crate::fs::{current_root, modified_ms, root_for_generation, FileMeta, GraphState};
+use crate::web_fetch::{
+    classify_fetch_error, classify_fetch_status, fetch_html, NetworkScope, FETCH_TIMEOUT,
+    USER_AGENT,
+};
 
 /// The native-messaging host name browsers route on; must match the name the
 /// extension passes to `runtime.sendNativeMessage`.
@@ -520,50 +524,6 @@ pub async fn capture_link_preview(app: tauri::AppHandle, url: String) -> AppResu
 
 // ---- meta fetch -----------------------------------------------------------------
 
-/// How much HTML the meta scrape reads. Sized for the worst page measured:
-/// a YouTube watch page is ~1.2 MiB of identity-encoded HTML with every
-/// meta tag at ~690 KiB, near the end of a ~697 KiB `<head>` (2026-08).
-/// 2 MiB keeps whole pages of that shape, with margin for head growth,
-/// while still bounding what this command buffers and ships over IPC.
-const META_FETCH_MAX_BYTES: usize = 2 * 1024 * 1024;
-const META_FETCH_TIMEOUT: Duration = Duration::from_secs(15);
-
-/// The meta fetch presents as a mainstream browser navigation: sites that
-/// gate on client fingerprint (Instagram among them) can answer bare app
-/// user agents with login walls or challenges a normal browser request never
-/// sees. Safari's platform token is frozen upstream, so the string stays
-/// plausible without tracking macOS releases.
-const META_FETCH_USER_AGENT: &str = concat!(
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ",
-    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
-);
-
-fn classify_fetch_error(err: reqwest::Error) -> AppError {
-    if err.is_timeout() || err.is_connect() || err.is_request() {
-        AppError::Network {
-            message: err.to_string(),
-        }
-    } else {
-        AppError::io(err.to_string())
-    }
-}
-
-/// Map a meta-fetch response status to its error: `None` for success,
-/// retryable `Network` for server errors and rate limiting (sites like
-/// Instagram answer `429` to bursts and recover — the enrichment pass keeps
-/// the capture pending and tries again later), permanent `io` for everything
-/// else.
-fn classify_fetch_status(url: &str, status: reqwest::StatusCode) -> Option<AppError> {
-    if status.is_success() {
-        return None;
-    }
-    let message = format!("{url} answered {status}");
-    if status.is_server_error() || status == reqwest::StatusCode::TOO_MANY_REQUESTS {
-        return Some(AppError::Network { message });
-    }
-    Some(AppError::io(message))
-}
-
 /// Fetch a captured page's HTML for meta-tag scraping, hard-capped (timeout,
 /// byte cap, redirect limit, http(s) only). Lives here rather than widening
 /// the webview's HTTP-plugin capability to every URL — the only things that
@@ -571,58 +531,8 @@ fn classify_fetch_status(url: &str, status: reqwest::StatusCode) -> Option<AppEr
 /// the privacy gate in `@reflect/core` runs before either is ever called.
 #[tauri::command]
 pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
-    if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Err(AppError::parse(format!("not an http(s) url: {url}")));
-    }
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::limited(5))
-        .timeout(META_FETCH_TIMEOUT)
-        .user_agent(META_FETCH_USER_AGENT)
-        .build()
-        .map_err(|err| AppError::io(err.to_string()))?;
-    let response = client
-        .get(&url)
-        // The full header set a browser sends on a typed-URL navigation —
-        // absent Sec-Fetch/Accept-Language headers are themselves a bot
-        // signal to fingerprinting CDNs.
-        .header(
-            "Accept",
-            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        )
-        .header("Accept-Language", "en-US,en;q=0.9")
-        .header("Sec-Fetch-Dest", "document")
-        .header("Sec-Fetch-Mode", "navigate")
-        .header("Sec-Fetch-Site", "none")
-        .header("Upgrade-Insecure-Requests", "1")
-        .send()
-        .await
-        .map_err(classify_fetch_error)?;
-
-    if let Some(err) = classify_fetch_status(&url, response.status()) {
-        return Err(err);
-    }
-    let content_type = response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("")
-        .to_ascii_lowercase(); // MIME types are case-insensitive (`TEXT/HTML`)
-    if !content_type.contains("html") {
-        return Err(AppError::parse(format!(
-            "{url} is not an HTML page ({content_type})"
-        )));
-    }
-
-    let mut body: Vec<u8> = Vec::new();
-    let mut response = response;
-    while let Some(chunk) = response.chunk().await.map_err(classify_fetch_error)? {
-        let remaining = META_FETCH_MAX_BYTES - body.len();
-        body.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
-        if body.len() >= META_FETCH_MAX_BYTES {
-            break;
-        }
-    }
-    Ok(String::from_utf8_lossy(&body).into_owned())
+    let response = fetch_html(&url, NetworkScope::AnyHttp).await?;
+    Ok(String::from_utf8_lossy(&response.body).into_owned())
 }
 
 // ---- oEmbed fetch ---------------------------------------------------------------
@@ -645,8 +555,8 @@ pub async fn capture_oembed_fetch(url: String) -> AppResult<String> {
     }
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
-        .timeout(META_FETCH_TIMEOUT)
-        .user_agent(META_FETCH_USER_AGENT)
+        .timeout(FETCH_TIMEOUT)
+        .user_agent(USER_AGENT)
         .build()
         .map_err(|err| AppError::io(err.to_string()))?;
     let response = client

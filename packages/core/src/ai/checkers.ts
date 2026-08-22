@@ -60,6 +60,15 @@ export function assertCloudAllowed(note: CloudSendable): void {
   }
 }
 
+/**
+ * Gate a link destination before local metadata lookup performs any outbound
+ * request on behalf of a note.
+ */
+export function cloudSafeLinkHref(note: CloudSendable, href: string): CloudSafe<string> {
+  assertCloudAllowed(note)
+  return mint(href)
+}
+
 /** One search hit as an external service may see it. */
 export interface CloudSearchHit {
   path: string

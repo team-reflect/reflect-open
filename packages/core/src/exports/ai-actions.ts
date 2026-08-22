@@ -45,6 +45,7 @@ export {
   assertCloudAllowed,
   cloudSafeAssetDescription,
   cloudSafeGraphContext,
+  cloudSafeLinkHref,
   cloudSafeNoteContent,
   cloudSafeNoteListings,
   cloudSafeSearchHits,
@@ -185,7 +186,13 @@ export {
   type ReconcileCaptureEnrichmentInput,
   type ReconcileCaptureEnrichmentOutcome,
 } from '../actions/capture'
-export { parsePageMeta, scrapePageMeta, type PageMeta } from '../actions/meta-scrape'
+export {
+  parseLinkPreviewMeta,
+  parsePageMeta,
+  scrapePageMeta,
+  type LinkPreviewMeta,
+  type PageMeta,
+} from '../actions/meta-scrape'
 export {
   calendarAuthorizationStatus,
   canReadCalendars,
