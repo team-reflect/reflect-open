@@ -54,6 +54,7 @@ export default defineBackground(() => {
 
   browser.commands.onCommand.addListener((command, tab) => {
     if (command === SAVE_CURRENT_PAGE_COMMAND) {
+      void flushQueue()
       const openPopup =
         typeof browser.action.openPopup === 'function'
           ? () => browser.action.openPopup()

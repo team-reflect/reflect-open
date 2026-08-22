@@ -154,6 +154,19 @@ describe('runCaptureFlow', () => {
     expect(setup.saveCapture.mock.calls[1]?.[0].summary).toBeUndefined()
   })
 
+  it('reports a rejected page-text fallback update instead of implying it landed', async () => {
+    const rejected: SaveOutcome = { fate: 'rejected' }
+    const summarize = vi
+      .fn<PageSummaryTask['summarize']>()
+      .mockRejectedValue(new Error('model failed'))
+    const setup = dependencies({ startPageSummary: () => ({ summarize, cancel: vi.fn() }) })
+    setup.saveCapture.mockResolvedValueOnce(QUEUED).mockResolvedValueOnce(rejected)
+
+    await expect(
+      runCaptureFlow({ ...INPUT, includePageText: true }, callbacks(), setup.dependencies),
+    ).resolves.toEqual({ kind: 'update-rejected', linkOutcome: QUEUED })
+  })
+
   it('cancels model work when extraction returns no readable page text', async () => {
     const setup = dependencies({ extractPageText: vi.fn().mockResolvedValue(undefined) })
 

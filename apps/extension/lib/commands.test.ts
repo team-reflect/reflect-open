@@ -11,18 +11,21 @@ describe('openCapturePopupOrFallback', () => {
     expect(fallbackCapture).not.toHaveBeenCalled()
   })
 
-  it('falls back when openPopup is unavailable or rejected', async () => {
+  it('falls back only when openPopup is unavailable', async () => {
     const fallbackCapture = vi.fn().mockResolvedValue(undefined)
 
     await expect(openCapturePopupOrFallback(undefined, fallbackCapture)).resolves.toBe(
       'fallback-capture',
     )
     expect(fallbackCapture).toHaveBeenCalledOnce()
+  })
 
-    const rejectedPopup = vi.fn().mockRejectedValue(new Error('not supported'))
-    await expect(openCapturePopupOrFallback(rejectedPopup, fallbackCapture)).resolves.toBe(
-      'fallback-capture',
-    )
-    expect(fallbackCapture).toHaveBeenCalledTimes(2)
+  it('does not silently capture when an available openPopup call is rejected', async () => {
+    const popupFailure = new Error('the popup is already open')
+    const openPopup = vi.fn().mockRejectedValue(popupFailure)
+    const fallbackCapture = vi.fn().mockResolvedValue(undefined)
+
+    await expect(openCapturePopupOrFallback(openPopup, fallbackCapture)).rejects.toBe(popupFailure)
+    expect(fallbackCapture).not.toHaveBeenCalled()
   })
 })

@@ -72,7 +72,13 @@ function truncateAtTextBoundary(text: string, maximumLength: number): string {
   const prefix = text.slice(0, Math.max(1, maximumLength))
   const paragraphAt = prefix.lastIndexOf('\n\n')
   const wordAt = prefix.lastIndexOf(' ')
-  const boundary = paragraphAt >= prefix.length / 2 ? paragraphAt : wordAt
+  const minimumBoundary = prefix.length / 2
+  const boundary =
+    paragraphAt >= minimumBoundary
+      ? paragraphAt
+      : wordAt >= minimumBoundary
+        ? wordAt
+        : prefix.length
   return prefix.slice(0, boundary > 0 ? boundary : prefix.length).trimEnd()
 }
 
@@ -153,9 +159,13 @@ export function startPageSummary(options: StartPageSummaryOptions): PageSummaryT
       }
       try {
         const input = await fitToInputQuota(result.summarizer, contentText)
-        return summaryOutputSchema.parse(
+        const output = summaryOutputSchema.safeParse(
           await result.summarizer.summarize(input, { signal: abortController.signal }),
         )
+        if (!output.success) {
+          throw new Error(output.error.issues[0]?.message ?? 'Chrome returned an invalid summary')
+        }
+        return output.data
       } finally {
         if (activeSummarizer === result.summarizer) {
           result.summarizer.destroy()

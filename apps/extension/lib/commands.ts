@@ -14,12 +14,8 @@ export async function openCapturePopupOrFallback(
   fallbackCapture: () => Promise<void>,
 ): Promise<OpenCaptureCommandOutcome> {
   if (openPopup) {
-    try {
-      await openPopup()
-      return 'popup'
-    } catch {
-      // A browser that exposes but rejects openPopup still gets a capture.
-    }
+    await openPopup()
+    return 'popup'
   }
   await fallbackCapture()
   return 'fallback-capture'

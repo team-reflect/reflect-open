@@ -10,6 +10,7 @@ import {
   IDENTITY,
   inboxRemoveMock,
   promoteMock,
+  reconcile,
   rejected,
   scrapeMock,
   spool,
@@ -367,6 +368,74 @@ describe('drainCaptureInbox', () => {
     expect((files.get(DAILY) ?? '').match(/capture-2026-06-11-093000-000-0000/g)).toHaveLength(1)
   })
 
+  it('does not overwrite a capture edited before its deferred summary arrives', async () => {
+    addSpool(
+      envelope({
+        id: '00000000-0000-4000-8000-000000000001',
+        capturedAt: new Date(2026, 5, 11, 9, 30, 0, 0).toISOString(),
+      }),
+      { screenshot: false },
+    )
+    await drain()
+    const originalNotePath = 'notes/capture-2026-06-11-093000-000-0000.md'
+    const edited = `${files.get(originalNotePath) ?? ''}\nMy own follow-up.\n`
+    files.set(originalNotePath, edited)
+
+    addSpool(envelope({ summary: '- Deferred key point' }), { screenshot: false })
+    const outcome = await drain()
+
+    expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 1, invalid: 0, stopped: null })
+    expect(files.get(originalNotePath)).toBe(edited)
+    expect(spool.size).toBe(0)
+  })
+
+  it('does not overwrite a capture made private before its deferred summary arrives', async () => {
+    addSpool(
+      envelope({
+        id: '00000000-0000-4000-8000-000000000001',
+        capturedAt: new Date(2026, 5, 11, 9, 30, 0, 0).toISOString(),
+      }),
+      { screenshot: false },
+    )
+    await drain()
+    const originalNotePath = 'notes/capture-2026-06-11-093000-000-0000.md'
+    const privateSource = (files.get(originalNotePath) ?? '').replace(
+      '---\n',
+      '---\nprivate: true\n',
+    )
+    files.set(originalNotePath, privateSource)
+
+    addSpool(envelope({ summary: '- Deferred key point' }), { screenshot: false })
+    const outcome = await drain()
+
+    expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 1, invalid: 0, stopped: null })
+    expect(files.get(originalNotePath)).toBe(privateSource)
+    expect(spool.size).toBe(0)
+  })
+
+  it('preserves unrelated frontmatter during a safe deferred refresh', async () => {
+    addSpool(
+      envelope({
+        id: '00000000-0000-4000-8000-000000000001',
+        capturedAt: new Date(2026, 5, 11, 9, 30, 0, 0).toISOString(),
+      }),
+      { screenshot: false },
+    )
+    await drain()
+    const originalNotePath = 'notes/capture-2026-06-11-093000-000-0000.md'
+    files.set(
+      originalNotePath,
+      (files.get(originalNotePath) ?? '').replace('---\n', '---\ntags:\n  - reading\n'),
+    )
+
+    addSpool(envelope({ summary: '- Deferred key point' }), { screenshot: false })
+    await drain()
+
+    const refreshed = files.get(originalNotePath) ?? ''
+    expect(refreshed).toContain('tags:\n  - reading')
+    expect(refreshed).toContain('## Summary\n\n- Deferred key point')
+  })
+
   it('preserves deferred fields when the enriched spool sorts before the raw link', async () => {
     addSpool(
       envelope({
@@ -427,10 +496,10 @@ describe('drainCaptureInbox', () => {
       }),
     )
     await drain()
-    // Simulate a completed enrichment: H1 and daily link text carry the AI title.
+    // Complete enrichment so the managed hash, H1, and daily link text all carry the AI title.
     const notePath = 'notes/capture-2026-06-11-093000-000-0000.md'
-    files.set(notePath, (files.get(notePath) ?? '').replace('# An article', '# AI Title'))
-    files.set(DAILY, (files.get(DAILY) ?? '').replace('|An article]]', '|AI Title]]'))
+    describeMock.mockResolvedValue({ title: 'AI Title', description: '' })
+    expect((await reconcile()).enriched).toBe(1)
 
     addSpool(envelope()) // same URL re-capture, 15:30
     const outcome = await drain()

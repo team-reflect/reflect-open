@@ -1009,7 +1009,7 @@ describe('reconcileCaptureEnrichment', () => {
     expect(note).toContain('captureStatus: skipped')
   })
 
-  it('leaves a managed summary refresh pending when it arrives during AI enrichment', async () => {
+  it('persists a finished AI result across a managed summary refresh', async () => {
     await drainOne()
     describeMock.mockImplementationOnce(async () => {
       addSpool(
@@ -1022,22 +1022,14 @@ describe('reconcileCaptureEnrichment', () => {
       return { title: 'An AI title', description: 'An AI description.' }
     })
 
-    const interrupted = await reconcile()
+    const outcome = await reconcile()
 
-    expect(interrupted).toEqual({ pending: 1, enriched: 0, skipped: 0, stopped: null })
-    const refreshed = files.get(IDENTITY.notePath) ?? ''
-    expect(refreshed).toContain('captureStatus: pending')
-    expect(refreshed).toContain('## Summary\n\n- A locally generated key point')
-    expect(refreshed).not.toContain('An AI description.')
-
-    describeMock.mockResolvedValue({ title: 'An AI title', description: 'An AI description.' })
-    const retry = await reconcile()
-
-    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(outcome).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
     const enriched = files.get(IDENTITY.notePath) ?? ''
     expect(enriched).toContain('## Summary\n\n- A locally generated key point')
     expect(enriched).toContain('- Description: An AI description.')
     expect(enriched).toContain('captureStatus: done')
+    expect(describeMock).toHaveBeenCalledOnce()
   })
 
   it('leaves a user-edited daily link text alone while still retitling the note', async () => {

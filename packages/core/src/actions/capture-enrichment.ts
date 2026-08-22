@@ -487,7 +487,7 @@ export async function reconcileCaptureEnrichment(
         return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
       }
 
-      snapshot = await currentCapture(identity, metadataHash)
+      snapshot = await currentCapture(identity)
       if (snapshot === null) {
         continue
       }
@@ -503,7 +503,7 @@ export async function reconcileCaptureEnrichment(
       }
       const captureHash = await persistCaptureEnrichment({
         identity,
-        expectedHash: metadataHash,
+        expectedHash: snapshot.meta.captureHash,
         body: newBody,
         fromTitle: snapshot.title,
         toTitle: enrichedTitle,

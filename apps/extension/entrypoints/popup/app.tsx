@@ -195,7 +195,7 @@ export function CapturePopup(): ReactElement {
       } else if (result.kind === 'update-rejected') {
         setSave({
           phase: 'summary-failed',
-          message: 'Link captured, but the summary update was rejected — please report this.',
+          message: 'Link captured, but the capture update was rejected — please report this.',
           result: result.linkOutcome.fate === 'held' ? result.linkOutcome.result : undefined,
         })
       } else if (result.kind === 'summary-failed') {

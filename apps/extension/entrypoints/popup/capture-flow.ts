@@ -118,6 +118,9 @@ export async function runCaptureFlow(
     const pageTextOutcome = await dependencies.saveCapture(
       captureInput(input, dependencies, capturedAt, { contentText }),
     )
+    if (pageTextOutcome.fate === 'rejected') {
+      return { kind: 'update-rejected', linkOutcome }
+    }
     return { kind: 'summary-failed', cause, linkOutcome, pageTextOutcome }
   }
 

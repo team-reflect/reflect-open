@@ -119,19 +119,39 @@ function firstSectionStart(body: string): number {
   return body.length
 }
 
+interface CaptureNoteSourceOptions {
+  /** Whether this write successfully promoted a screenshot asset. */
+  hasScreenshot: boolean
+  /** Enrichment state for the generated note. */
+  status: CaptureStatus
+  /** Hash distinguishing otherwise-identical captures with different selections. */
+  selectionHash?: string | undefined
+  /** Existing managed capture whose unrelated frontmatter should survive a refresh. */
+  existingSource?: string | undefined
+}
+
 export async function captureNoteSource(
   envelope: CaptureEnvelope,
   identity: CaptureIdentity,
-  options: { hasScreenshot: boolean; status: CaptureStatus; selectionHash?: string | undefined },
+  options: CaptureNoteSourceOptions,
 ): Promise<string> {
   const body = captureNoteBody(envelope, identity, options.hasScreenshot)
   const summary = envelope.summary?.trim()
-  return upsertFrontmatter(body, {
+  const source =
+    options.existingSource === undefined
+      ? body
+      : options.existingSource.slice(0, splitFrontmatter(options.existingSource).bodyOffset) + body
+  return upsertFrontmatter(source, {
     aliases: [identity.base],
     captureUrl: envelope.url,
     capturedAt: envelope.capturedAt,
     captureSource: envelope.source,
     captureStatus: options.status,
+    captureMetadataStatus: undefined,
+    captureDailyFromTitle: undefined,
+    captureFinalizeStatus: undefined,
+    captureProvider: undefined,
+    captureModel: undefined,
     captureHash: await hashContent(body),
     captureSelectionHash: options.selectionHash,
     captureScreenshot: options.hasScreenshot ? identity.assetPath : undefined,

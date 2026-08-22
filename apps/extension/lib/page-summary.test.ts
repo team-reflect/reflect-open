@@ -94,14 +94,25 @@ describe('startPageSummary', () => {
     expect(summarizedInput).toBe('First paragraph contains the important')
   })
 
+  it('hard-trims instead of collapsing to an early word boundary', async () => {
+    const summarize = vi.fn((_input: string) => Promise.resolve('- Summary'))
+    const summarizer = fakeSummarizer({ inputQuota: 50, summarize })
+    installSummarizerApi(summarizer)
+
+    await startPageSummary({ title: 'Blob-heavy article' }).summarize(`A ${'x'.repeat(200)}`)
+
+    expect(summarize.mock.calls[0]?.[0]).toHaveLength(45)
+    expect(summarize.mock.calls[0]?.[0].startsWith('A ')).toBe(true)
+  })
+
   it('rejects blank model output and still releases the session', async () => {
     const summarizer = fakeSummarizer({
       summarize: vi.fn((_input: string) => Promise.resolve('  ')),
     })
     installSummarizerApi(summarizer)
 
-    await expect(startPageSummary({ title: 'Article' }).summarize('Readable text')).rejects.toThrow(
-      'Chrome returned an empty summary',
+    await expect(startPageSummary({ title: 'Article' }).summarize('Readable text')).rejects.toEqual(
+      new Error('Chrome returned an empty summary'),
     )
     expect(summarizer.destroy).toHaveBeenCalledOnce()
   })
