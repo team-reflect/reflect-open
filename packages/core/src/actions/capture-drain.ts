@@ -90,6 +90,8 @@ interface SameDayCapture {
   title: string
   /** Existing managed fields survive a later link-only envelope in the same batch. */
   body: string
+  /** Page text validated against its structured managed-content hash. */
+  pageText?: string | undefined
   /** Structured summary backing the managed Summary body section. */
   summary?: string | undefined
   /** Full source used to preserve unrelated frontmatter during a safe refresh. */
@@ -123,6 +125,7 @@ async function readSameDayCapture(
     identity,
     title: parseNote({ path: identity.notePath, source }).title,
     body: split.body,
+    pageText: await capturePageTextFromBody(split.body, meta.capturePageTextHash),
     summary: meta.captureSummary,
     source,
     refreshable: !frontmatter.private && (await hashContent(split.body)) === meta.captureHash,
@@ -302,7 +305,7 @@ export async function drainCaptureInbox(
       const mergedEnvelope = existing
         ? {
             ...envelope,
-            contentText: envelope.contentText ?? capturePageTextFromBody(existing.body),
+            contentText: envelope.contentText ?? existing.pageText,
             summary: envelope.summary ?? existing.summary,
             metaDescription: envelope.metaDescription ?? captureDescriptionFromBody(existing.body),
           }

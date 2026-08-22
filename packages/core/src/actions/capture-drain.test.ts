@@ -104,6 +104,7 @@ describe('drainCaptureInbox', () => {
 
     expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 0, invalid: 0, stopped: null })
     const note = files.get(IDENTITY.notePath)
+    expect(note).toContain('capturePageTextHash:')
     expect(note).toContain(
       '## Page Text\n\n<!-- reflect-capture-page-text:start -->\nFirst paragraph.\n\nSecond paragraph.\n<!-- reflect-capture-page-text:end -->',
     )
@@ -486,6 +487,35 @@ describe('drainCaptureInbox', () => {
     expect(refreshed.match(/## Summary/g)).toHaveLength(1)
     expect(refreshed).toContain(note)
     expect(refreshed).not.toContain('captureSummary:')
+  })
+
+  it('does not promote a user-authored Page Text marker during a summary refresh', async () => {
+    const note =
+      'My note\n\n## Page Text\n\n<!-- reflect-capture-page-text:start -->\nThis text belongs to the user.\n<!-- reflect-capture-page-text:end -->'
+    addSpool(envelope({ id: '00000000-0000-4000-8000-000000000001', note }), {
+      screenshot: false,
+      modifiedMs: 0,
+    })
+    addSpool(
+      envelope({
+        id: 'ffff0000-0000-4000-8000-000000000002',
+        note,
+        summary: '- A generated key point',
+      }),
+      { screenshot: false, modifiedMs: 0 },
+    )
+
+    const outcome = await drain()
+
+    expect(outcome.deduped).toBe(1)
+    const refreshed = files.get('notes/capture-2026-06-11-153022-845-0000.md') ?? ''
+    expect(refreshed.match(/## Page Text/g)).toHaveLength(1)
+    expect(refreshed).toContain(note)
+    expect(refreshed).toContain('## Summary\n\n- A generated key point')
+    expect(refreshed).not.toContain('capturePageTextHash:')
+
+    expect((await reconcile()).enriched).toBe(1)
+    expect(describeMock).toHaveBeenCalledWith(expect.objectContaining({ contentText: undefined }))
   })
 
   it('a dedup refresh re-syncs the daily link text with the fresh tab title', async () => {

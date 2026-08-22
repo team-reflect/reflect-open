@@ -127,7 +127,7 @@ async function generateEnrichment(input: GenerateEnrichmentInput): Promise<PageE
       metaTitle: input.scraped?.title ?? undefined,
       siteName: input.scraped?.siteName ?? undefined,
       metaDescription: input.scraped?.description ?? undefined,
-      contentText: capturePageTextFromBody(input.body),
+      contentText: await capturePageTextFromBody(input.body, input.meta.capturePageTextHash),
       screenshotBase64: input.screenshotBase64,
     })
   } catch (cause) {
