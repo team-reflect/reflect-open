@@ -3,9 +3,7 @@ import { isAppError } from '../errors'
 import { readNote } from '../graph/commands'
 import { hashContent } from '../indexing/hash'
 import { wikiLinkSafe } from '../markdown/edit'
-import { parseNote } from '../markdown/extract'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
-import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks'
 import type { Frontmatter } from '../markdown/model'
 import type { CaptureIdentity } from './capture-identity'
 import type { CaptureEnvelope } from './capture-envelope'
@@ -52,6 +50,8 @@ function urlHost(url: string): string {
 
 const PAGE_TEXT_START = '<!-- reflect-capture-page-text:start -->'
 const PAGE_TEXT_END = '<!-- reflect-capture-page-text:end -->'
+const SUMMARY_START = '<!-- reflect-capture-summary:start -->'
+const SUMMARY_END = '<!-- reflect-capture-summary:end -->'
 
 /** The capture's display title: the page title, else the URL's host. */
 export function displayTitle(envelope: Pick<CaptureEnvelope, 'title' | 'url'>): string {
@@ -77,7 +77,7 @@ function captureNoteBody(
   }
   const summary = envelope.summary?.trim()
   if (summary) {
-    parts.push(`## Summary\n\n${summary}`)
+    parts.push(`## Summary\n\n${SUMMARY_START}\n${summary}\n${SUMMARY_END}`)
   }
   const selection = envelope.selection?.trim()
   if (selection) {
@@ -110,16 +110,17 @@ export function capturePageTextFromBody(body: string): string | undefined {
 
 /** The on-device summary written in the managed Summary section, when present. */
 export function captureSummaryFromBody(body: string): string | undefined {
-  const headings = topLevelHeadings(parseNote({ path: '', source: body }).headings)
-  const summaryHeading = headings.find(
-    (heading) => heading.level === 2 && heading.text.trim() === 'Summary',
-  )
-  if (!summaryHeading) {
+  const marker = `## Summary\n\n${SUMMARY_START}\n`
+  const markerAt = body.indexOf(marker)
+  if (markerAt === -1) {
     return undefined
   }
-  const summary = body
-    .slice(summaryHeading.to, sectionEnd(headings, summaryHeading, body.length))
-    .trim()
+  const contentStart = markerAt + marker.length
+  const endAt = body.indexOf(SUMMARY_END, contentStart)
+  if (endAt === -1) {
+    throw new Error('capture note is missing summary end marker')
+  }
+  const summary = body.slice(contentStart, endAt).trim()
   return summary === '' ? undefined : summary
 }
 

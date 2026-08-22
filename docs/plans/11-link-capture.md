@@ -134,10 +134,10 @@ Every capture lands in two phases so saving never waits on the network or AI:
    manifests for detected browsers on every launch.
 
 3. **Capture inbox + drain (core action).** A platform-agnostic capture envelope (zod)
-   in `actions/capture` — `{url, title, selection?, screenshotRef?, note?, capturedAt,
-   source}` — written identically by the desktop host today and by the future iOS
-   share extension (app-group inbox) / Android intent handler. `drainCaptureInbox`
-   executes these steps **in order**:
+   in `actions/capture` — `{version, id, url, title, selection?, contentText?, summary?,
+   metaDescription?, note?, screenshotRef?, capturedAt, source}` — written identically
+   by the desktop host today and by the future iOS share extension (app-group inbox) /
+   Android intent handler. `drainCaptureInbox` executes these steps **in order**:
    1. Resolve the capture target (today's daily note, or a chosen note).
    2. **Privacy gate:** if the target is `private: true`, skip all enrichment and all
       outbound traffic (no URL fetch, no meta scrape, no screenshot/selection/note
