@@ -134,10 +134,11 @@ describe('runCaptureFlow', () => {
     const summaryFailure = new Error('model failed')
     const summarize = vi.fn<PageSummaryTask['summarize']>().mockRejectedValue(summaryFailure)
     const setup = dependencies({ startPageSummary: () => ({ summarize, cancel: vi.fn() }) })
+    const events = callbacks()
 
     const result = await runCaptureFlow(
       { ...INPUT, includePageText: true },
-      callbacks(),
+      events,
       setup.dependencies,
     )
 
@@ -152,6 +153,12 @@ describe('runCaptureFlow', () => {
       'First paragraph.\n\nSecond paragraph.',
     )
     expect(setup.saveCapture.mock.calls[1]?.[0].summary).toBeUndefined()
+    expect(events.phases.mock.calls.map(([phase]) => phase)).toEqual([
+      'saving-link',
+      'extracting-page',
+      'generating-summary',
+      'saving-page-text',
+    ])
   })
 
   it('reports a rejected page-text fallback update instead of implying it landed', async () => {

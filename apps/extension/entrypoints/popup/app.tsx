@@ -50,6 +50,39 @@ function holdMessage(result: FlushResult): string {
   }
 }
 
+function CheckIcon(): ReactElement {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none">
+      <path
+        d="m3.25 8.25 3 3 6.5-6.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function Spinner(): ReactElement {
+  return <span aria-hidden="true" className="capture-spinner size-3.5 rounded-full border" />
+}
+
+function workingButtonLabel(step: CaptureFlowPhase, downloadingModel: boolean): string {
+  switch (step) {
+    case 'saving-link':
+      return 'Saving link…'
+    case 'extracting-page':
+      return 'Reading page…'
+    case 'generating-summary':
+      return downloadingModel ? 'Downloading…' : 'Generating summary…'
+    case 'saving-page-text':
+      return 'Saving page text…'
+    case 'saving-update':
+      return 'Adding summary…'
+  }
+}
+
 export function CapturePopup(): ReactElement {
   const captured = useCapturedPage()
   const [note, setNote] = useState('')
@@ -235,12 +268,18 @@ export function CapturePopup(): ReactElement {
     summaryAvailability === 'downloading'
   const waitingForSummaryAvailability = includePageSummary && summaryAvailability === 'checking'
   const summaryRequested = includePageSummary && summarySupported
+  const downloadingModel = downloadProgress !== null && downloadProgress < 100
+  const linkCaptured = save.phase === 'working' && summaryRequested && save.step !== 'saving-link'
+  const showWorkingStatus =
+    save.phase === 'working' && summaryRequested && (linkCaptured || downloadingModel)
   const busy =
     save.phase === 'working' ||
     !includePageTextPreferenceLoaded ||
     !includePageSummaryPreferenceLoaded ||
     waitingForSummaryAvailability
   const lockedAfterSummaryFailure = save.phase === 'summary-failed'
+  const captureOptionsDisabled = busy || lockedAfterSummaryFailure
+  const summaryOptionDisabled = captureOptionsDisabled || !summarySupported
 
   function onIncludePageTextChange(checked: boolean): void {
     includePageTextTouched.current = true
@@ -260,29 +299,17 @@ export function CapturePopup(): ReactElement {
     })
   }
 
-  function workingMessage(step: CaptureFlowPhase): string | null {
-    const downloadingModel = downloadProgress !== null && downloadProgress < 100
-    switch (step) {
-      case 'saving-link':
-        return downloadingModel
-          ? `Saving link. Downloading Chrome’s local model… ${downloadProgress}%`
-          : null
-      case 'extracting-page':
-        return summaryRequested
-          ? downloadingModel
-            ? `Link captured. Downloading Chrome’s local model… ${downloadProgress}%`
-            : 'Link captured. Reading page…'
-          : null
-      case 'generating-summary':
-        return downloadingModel
-          ? `Link captured. Downloading Chrome’s local model… ${downloadProgress}%`
-          : 'Link captured. Generating summary…'
-      case 'saving-update':
-        return 'Link captured. Adding summary…'
-      default:
-        return null
-    }
-  }
+  const buttonLabel =
+    save.phase === 'working'
+      ? workingButtonLabel(save.step, downloadingModel)
+      : waitingForSummaryAvailability
+        ? 'Checking summarizer…'
+        : !includePageTextPreferenceLoaded || !includePageSummaryPreferenceLoaded
+          ? 'Loading…'
+          : save.phase === 'summary-failed'
+            ? 'Link captured'
+            : 'Save to Reflect'
+  const showButtonSpinner = busy
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3 p-3">
@@ -308,56 +335,95 @@ export function CapturePopup(): ReactElement {
         onChange={(event) => setNote(event.target.value)}
         placeholder="Add a note (optional)"
         autoFocus
-        disabled={busy || lockedAfterSummaryFailure}
+        disabled={captureOptionsDisabled}
         className="rounded-md border border-border bg-input-bg px-2 py-1.5 text-sm text-text outline-none placeholder:text-text-muted focus:ring-2 focus:ring-focus-ring"
       />
-      <label className="flex items-center gap-2 text-xs text-text-secondary">
-        <input
-          type="checkbox"
-          checked={includePageText}
-          onChange={(event) => onIncludePageTextChange(event.target.checked)}
-          disabled={busy || lockedAfterSummaryFailure}
-          className="size-3.5 rounded border-border text-accent focus:ring-focus-ring"
-        />
-        Capture page text
-      </label>
-      <label
-        className="flex items-center gap-2 text-xs text-text-secondary"
-        title={
-          summarySupported
-            ? 'Runs locally with Chrome built-in AI'
-            : 'Chrome built-in page summaries are unavailable on this device'
-        }
-      >
-        <input
-          type="checkbox"
-          checked={summarySupported && includePageSummary}
-          onChange={(event) => onIncludePageSummaryChange(event.target.checked)}
-          disabled={busy || lockedAfterSummaryFailure || !summarySupported}
-          className="size-3.5 rounded border-border text-accent focus:ring-focus-ring"
-        />
-        Capture page summary
-        {summaryAvailability === 'unsupported'
-          ? ' (requires Chrome 138+)'
-          : summaryAvailability === 'unavailable'
-            ? ' (unavailable)'
-            : ''}
-      </label>
+      <div className="flex flex-col gap-0.5">
+        <label
+          className="capture-option -mx-1 flex min-h-8 items-center gap-2.5 rounded-lg px-2 text-[13px] font-medium text-text"
+          data-disabled={captureOptionsDisabled}
+        >
+          <input
+            type="checkbox"
+            checked={includePageText}
+            onChange={(event) => onIncludePageTextChange(event.target.checked)}
+            disabled={captureOptionsDisabled}
+            className="size-4 shrink-0 accent-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1"
+          />
+          <span className="min-w-0 flex-1">Capture page text</span>
+        </label>
+        <label
+          className="capture-option -mx-1 flex min-h-8 items-center gap-2.5 rounded-lg px-2 text-[13px] font-medium text-text"
+          data-disabled={summaryOptionDisabled}
+          title={
+            summarySupported
+              ? 'Runs locally with Chrome built-in AI'
+              : 'Chrome built-in page summaries are unavailable on this device'
+          }
+        >
+          <input
+            type="checkbox"
+            checked={summarySupported && includePageSummary}
+            onChange={(event) => onIncludePageSummaryChange(event.target.checked)}
+            disabled={summaryOptionDisabled}
+            className="size-4 shrink-0 accent-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1"
+          />
+          <span className="min-w-0 flex-1">Capture page summary</span>
+          {summaryAvailability === 'unsupported' ? (
+            <span className="text-[11px] font-normal text-text-muted">Chrome 138+</span>
+          ) : summaryAvailability === 'unavailable' ? (
+            <span className="text-[11px] font-normal text-text-muted">Unavailable</span>
+          ) : null}
+        </label>
+      </div>
       <button
         type="submit"
-        disabled={busy || lockedAfterSummaryFailure}
-        className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-text-on-brand hover:bg-accent-hover disabled:opacity-60"
+        disabled={captureOptionsDisabled}
+        className="capture-button h-8 w-full rounded-lg bg-accent px-3 text-sm font-medium text-text-on-brand disabled:opacity-60"
       >
-        {save.phase === 'working'
-          ? save.step === 'generating-summary'
-            ? 'Generating…'
-            : 'Saving…'
-          : save.phase === 'summary-failed'
-            ? 'Link captured'
-            : 'Save to Reflect'}
+        <span
+          key={buttonLabel}
+          className="capture-state-enter inline-flex items-center justify-center gap-2"
+        >
+          {showButtonSpinner ? <Spinner /> : null}
+          <span>{buttonLabel}</span>
+        </span>
       </button>
-      {save.phase === 'working' && workingMessage(save.step) ? (
-        <p className="text-xs text-text-muted">{workingMessage(save.step)}</p>
+      {showWorkingStatus ? (
+        <div
+          key={`${linkCaptured ? 'captured' : 'saving'}-${downloadingModel ? 'downloading' : 'ready'}`}
+          className="capture-state-enter flex flex-col gap-2 px-0.5 text-xs text-text-muted"
+        >
+          {linkCaptured ? (
+            <div role="status" className="flex items-center gap-1.5 text-text-secondary">
+              <span className="text-accent">
+                <CheckIcon />
+              </span>
+              <span>Link captured</span>
+            </div>
+          ) : null}
+          {downloadingModel ? (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <span>Downloading summarizer</span>
+                <span className="tabular-nums">{downloadProgress}%</span>
+              </div>
+              <div
+                role="progressbar"
+                aria-label="Downloading summarizer"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={downloadProgress}
+                className="h-0.5 overflow-hidden rounded-full bg-border"
+              >
+                <div
+                  className="capture-progress-fill h-full w-full origin-left rounded-full bg-accent"
+                  style={{ transform: `scaleX(${downloadProgress / 100})` }}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
       ) : null}
       {save.phase === 'held' ? (
         <p className="text-xs text-text-muted">

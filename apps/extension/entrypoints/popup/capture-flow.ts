@@ -6,6 +6,7 @@ export type CaptureFlowPhase =
   | 'extracting-page'
   | 'saving-link'
   | 'generating-summary'
+  | 'saving-page-text'
   | 'saving-update'
 
 export interface CaptureFlowInput {
@@ -114,7 +115,7 @@ export async function runCaptureFlow(
     if (!input.includePageText) {
       return { kind: 'summary-failed', cause, linkOutcome }
     }
-    callbacks.onPhase('saving-update')
+    callbacks.onPhase('saving-page-text')
     const pageTextOutcome = await dependencies.saveCapture(
       captureInput(input, dependencies, capturedAt, { contentText }),
     )

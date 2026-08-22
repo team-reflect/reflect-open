@@ -29,3 +29,97 @@ body {
   color: var(--text);
   font-family: var(--font-sans, system-ui, sans-serif);
 }
+
+.capture-option {
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    opacity var(--duration-fast) var(--ease-standard);
+}
+
+.capture-option[data-disabled='true'] {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.capture-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.capture-button {
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    opacity var(--duration-fast) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard);
+}
+
+.capture-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.capture-spinner {
+  border-color: currentColor;
+  border-right-color: transparent;
+  animation: capture-spin 650ms linear infinite;
+}
+
+.capture-state-enter {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard);
+}
+
+.capture-progress-fill {
+  transition: transform var(--duration-base) linear;
+}
+
+@starting-style {
+  .capture-state-enter {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+@keyframes capture-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .capture-option[data-disabled='false']:hover {
+    background: var(--surface-hover);
+  }
+
+  .capture-button:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capture-option,
+  .capture-button,
+  .capture-progress-fill {
+    transition: none;
+  }
+
+  .capture-state-enter {
+    transform: none;
+    transition: opacity var(--duration-fast) var(--ease-standard);
+  }
+
+  .capture-spinner {
+    animation-duration: 1.2s;
+  }
+
+  @starting-style {
+    .capture-state-enter {
+      opacity: 0;
+      transform: none;
+    }
+  }
+}
