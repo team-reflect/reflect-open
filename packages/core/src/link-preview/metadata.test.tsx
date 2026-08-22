@@ -107,4 +107,9 @@ describe('parseLinkPreviewMeta', () => {
     expect(meta?.title).toHaveLength(200)
     expect(meta?.description).toHaveLength(300)
   })
+
+  it('rejects metadata whose final page URL is not HTTP(S)', () => {
+    expect(parseLinkPreviewMeta('<title>Example</title>', 'file:///tmp/page')).toBeNull()
+    expect(parseLinkPreviewMeta('<title>Example</title>', 'not a URL')).toBeNull()
+  })
 })

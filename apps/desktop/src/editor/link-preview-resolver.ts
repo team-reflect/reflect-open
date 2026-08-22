@@ -31,6 +31,13 @@ const defaultDependencies: LinkPreviewResolverDependencies = {
   parseMetadata: parseLinkPreviewMeta,
 }
 
+type LinkPreviewResolution =
+  | { readonly kind: 'resolved'; readonly preview: LinkPreview | undefined }
+  | { readonly kind: 'authorization-denied' }
+
+const AUTHORIZATION_DENIED: LinkPreviewResolution = { kind: 'authorization-denied' }
+const FAILED_RESOLUTION: LinkPreviewResolution = { kind: 'resolved', preview: undefined }
+
 function sameSession(left: LinkPreviewSession | null, right: LinkPreviewSession): boolean {
   return (
     left?.path === right.path &&
@@ -49,7 +56,7 @@ export function createNoteLinkPreviewResolver(
   currentSession: () => LinkPreviewSession | null,
   dependencies: LinkPreviewResolverDependencies = defaultDependencies,
 ): LinkPreviewResolver {
-  const cache = new Map<string, Promise<LinkPreview | undefined>>()
+  const cache = new Map<string, Promise<LinkPreviewResolution>>()
 
   async function authorizeOutboundUrl(url: string): Promise<CloudSafe<string> | null> {
     if (!sameSession(currentSession(), session)) return null
@@ -63,37 +70,27 @@ export function createNoteLinkPreviewResolver(
     }
   }
 
-  async function resolve(href: string): Promise<LinkPreview | undefined> {
-    try {
-      const url = new URL(href)
-      if (url.protocol !== 'https:' && url.protocol !== 'http:') return
-    } catch {
-      return
-    }
-
-    const pageUrl = await authorizeOutboundUrl(href)
-    if (pageUrl === null) return
-
+  async function resolve(href: string, pageUrl: CloudSafe<string>): Promise<LinkPreviewResolution> {
     let page
     try {
       page = await dependencies.fetchHtml(pageUrl)
     } catch {
-      return
+      return FAILED_RESOLUTION
     }
 
     let metadata
     try {
       metadata = dependencies.parseMetadata(page.html, page.finalUrl)
     } catch {
-      return
+      return FAILED_RESOLUTION
     }
-    if (metadata === null) return
+    if (metadata === null) return FAILED_RESOLUTION
 
     // Re-read privacy after page metadata, then mint the separately resolved
     // favicon URL immediately before its own outbound request.
-    if ((await authorizeOutboundUrl(href)) === null) return
+    if ((await authorizeOutboundUrl(href)) === null) return AUTHORIZATION_DENIED
     const iconUrl = await authorizeOutboundUrl(metadata.iconUrl)
-    if (iconUrl === null) return
+    if (iconUrl === null) return AUTHORIZATION_DENIED
 
     let iconSrc: string | undefined
     try {
@@ -103,20 +100,42 @@ export function createNoteLinkPreviewResolver(
     }
 
     // A result is usable only while its source note and editor session remain public.
-    if ((await authorizeOutboundUrl(href)) === null) return
+    if ((await authorizeOutboundUrl(href)) === null) return AUTHORIZATION_DENIED
 
     return {
-      title: metadata.title,
-      ...(metadata.description === null ? {} : { description: metadata.description }),
-      ...(iconSrc === undefined ? {} : { iconSrc }),
+      kind: 'resolved',
+      preview: {
+        title: metadata.title,
+        ...(metadata.description === null ? {} : { description: metadata.description }),
+        ...(iconSrc === undefined ? {} : { iconSrc }),
+      },
     }
   }
 
-  return (href) => {
-    const cached = cache.get(href)
-    if (cached !== undefined) return cached
-    const pending = resolve(href)
-    cache.set(href, pending)
-    return pending
+  return async (href) => {
+    try {
+      const url = new URL(href)
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') return
+    } catch {
+      return
+    }
+
+    // Authorization is deliberately outside the cache: a completed preview
+    // must disappear as soon as its note becomes private, while a denied
+    // lookup must become eligible when the note becomes public again.
+    const pageUrl = await authorizeOutboundUrl(href)
+    if (pageUrl === null) return
+
+    let pending = cache.get(href)
+    if (pending === undefined) {
+      pending = resolve(href, pageUrl)
+      cache.set(href, pending)
+    }
+    const resolution = await pending
+    if (resolution.kind === 'authorization-denied') {
+      if (cache.get(href) === pending) cache.delete(href)
+      return
+    }
+    return resolution.preview
   }
 }

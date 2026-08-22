@@ -41,16 +41,73 @@ describe('createNoteLinkPreviewResolver', () => {
     const first = resolver('https://example.com/page')
     const second = resolver('https://example.com/page')
 
-    expect(first).toBe(second)
     await expect(first).resolves.toEqual({
       title: 'Example title',
       description: 'Example body',
       iconSrc: 'data:image/png;base64,aGVsbG8=',
     })
+    await expect(second).resolves.toEqual(await first)
     await expect(resolver('https://example.com/page')).resolves.toEqual(await first)
     expect(deps.fetchHtml).toHaveBeenCalledTimes(1)
     expect(deps.fetchIcon).toHaveBeenCalledTimes(1)
     expect(deps.fetchIcon).toHaveBeenCalledWith('https://example.com/icon.png')
+  })
+
+  it('revalidates privacy before returning a cached preview', async () => {
+    let source = publicSource
+    const deps = dependencies({ readSource: vi.fn(async () => source) })
+    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+
+    await expect(resolver('https://example.com')).resolves.toMatchObject({
+      title: 'Example title',
+    })
+    source = privateSource
+    await expect(resolver('https://example.com')).resolves.toBeUndefined()
+    expect(deps.fetchHtml).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not cache an initial privacy denial', async () => {
+    let source = privateSource
+    const deps = dependencies({ readSource: vi.fn(async () => source) })
+    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+
+    await expect(resolver('https://example.com')).resolves.toBeUndefined()
+    source = publicSource
+    await expect(resolver('https://example.com')).resolves.toMatchObject({
+      title: 'Example title',
+    })
+    expect(deps.fetchHtml).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not cache a privacy denial during resolution', async () => {
+    let source = publicSource
+    const parseMetadata = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        source = privateSource
+        return {
+          title: 'Example title',
+          description: 'Example body',
+          iconUrl: 'https://example.com/icon.png',
+        }
+      })
+      .mockReturnValue({
+        title: 'Example title',
+        description: 'Example body',
+        iconUrl: 'https://example.com/icon.png',
+      })
+    const deps = dependencies({
+      readSource: vi.fn(async () => source),
+      parseMetadata,
+    })
+    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+
+    await expect(resolver('https://example.com')).resolves.toBeUndefined()
+    source = publicSource
+    await expect(resolver('https://example.com')).resolves.toMatchObject({
+      title: 'Example title',
+    })
+    expect(deps.fetchHtml).toHaveBeenCalledTimes(2)
   })
 
   it('caches failed lookups and refuses non-web destinations', async () => {

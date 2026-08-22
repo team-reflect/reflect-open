@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 /** Metadata shared by capture enrichment and editor link previews. */
 
 export interface PageMeta {
@@ -12,16 +14,29 @@ export interface PageMeta {
 /** Display metadata extracted for an editor link preview. */
 export interface LinkPreviewMeta {
   /** A bounded `og:title` or document title. */
-  title: string
+  readonly title: string
   /** A bounded OpenGraph or standard description. */
-  description: string | null
+  readonly description: string | null
   /** A declared raster icon URL, or the conventional `/favicon.ico`. */
-  iconUrl: string
+  readonly iconUrl: string
 }
 
 const MAX_PAGE_META_CHARS = 500
 const MAX_LINK_TITLE_CHARS = 200
 const MAX_LINK_DESCRIPTION_CHARS = 300
+
+const linkPreviewMetaSchema: z.ZodType<LinkPreviewMeta> = z.object({
+  title: z.string().min(1).max(MAX_LINK_TITLE_CHARS),
+  description: z.string().min(1).max(MAX_LINK_DESCRIPTION_CHARS).nullable(),
+  iconUrl: z.url().refine((value) => {
+    try {
+      const protocol = new URL(value).protocol
+      return protocol === 'https:' || protocol === 'http:'
+    } catch {
+      return false
+    }
+  }),
+})
 
 /** Collapse metadata whitespace, reject blanks, and cap its display length. */
 export function normalizePageMetaValue(
@@ -85,9 +100,16 @@ export function parseLinkPreviewMeta(html: string, finalUrl: string): LinkPrevie
   const page = pageMetaFromDocument(document)
   const title = normalizePageMetaValue(page.title, MAX_LINK_TITLE_CHARS)
   if (title === null) return null
-  return {
+  let iconUrl: string
+  try {
+    iconUrl = rasterIconUrl(document, finalUrl)
+  } catch {
+    return null
+  }
+  const parsed = linkPreviewMetaSchema.safeParse({
     title,
     description: normalizePageMetaValue(page.description, MAX_LINK_DESCRIPTION_CHARS),
-    iconUrl: rasterIconUrl(document, finalUrl),
-  }
+    iconUrl,
+  })
+  return parsed.success ? parsed.data : null
 }

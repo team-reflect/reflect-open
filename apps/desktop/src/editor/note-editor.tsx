@@ -171,7 +171,7 @@ interface NoteEditorProps {
    */
   onNoteLinkClick?: (options: { href: string; openInNewWindow: boolean }) => void
   /** Resolve privacy-gated metadata for an HTTP(S) link popup. */
-  resolveLinkPreview?: LinkPreviewResolver
+  readonly resolveLinkPreview?: LinkPreviewResolver
   /**
    * Resolve the passive body of Meowdown's editor-scoped wiki-link hover
    * card. Resolving `null` (missing, ambiguous, or unavailable targets)

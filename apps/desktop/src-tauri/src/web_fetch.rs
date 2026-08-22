@@ -84,10 +84,26 @@ fn is_public_ipv4(address: Ipv4Addr) -> bool {
 }
 
 fn is_public_ipv6(address: Ipv6Addr) -> bool {
-    if let Some(mapped) = address.to_ipv4_mapped() {
-        return is_public_ipv4(mapped);
+    if let Some(embedded) = address.to_ipv4() {
+        return is_public_ipv4(embedded);
     }
     let segments = address.segments();
+    if segments[0] == 0x2002 {
+        return is_public_ipv4(Ipv4Addr::new(
+            (segments[1] >> 8) as u8,
+            segments[1] as u8,
+            (segments[2] >> 8) as u8,
+            segments[2] as u8,
+        ));
+    }
+    if segments[..6] == [0x0064, 0xff9b, 0, 0, 0, 0] {
+        return is_public_ipv4(Ipv4Addr::new(
+            (segments[6] >> 8) as u8,
+            segments[6] as u8,
+            (segments[7] >> 8) as u8,
+            segments[7] as u8,
+        ));
+    }
     !(address.is_unspecified()
         || address.is_loopback()
         || address.is_multicast()
@@ -308,6 +324,9 @@ mod tests {
             "http://[fe80::1]/",
             "http://[fd00::1]/",
             "http://[::ffff:127.0.0.1]/",
+            "http://[::7f00:1]/",
+            "http://[2002:7f00:1::]/",
+            "http://[64:ff9b::7f00:1]/",
         ] {
             let url = parse_http_url(value).unwrap();
             let port = url.port_or_known_default().unwrap();
@@ -337,7 +356,13 @@ mod tests {
 
     #[test]
     fn accepts_public_ip_addresses() {
-        for value in ["https://1.1.1.1/", "https://[2606:4700:4700::1111]/"] {
+        for value in [
+            "https://1.1.1.1/",
+            "https://[2606:4700:4700::1111]/",
+            "https://[::808:808]/",
+            "https://[2002:808:808::]/",
+            "https://[64:ff9b::808:808]/",
+        ] {
             let url = parse_http_url(value).unwrap();
             let port = url.port_or_known_default().unwrap();
             let address = SocketAddr::new(
