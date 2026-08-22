@@ -22,11 +22,12 @@ describe('captureEnvelopeSchema', () => {
     expect(captureEnvelopeSchema.parse(VALID)).toEqual(VALID)
   })
 
-  it('accepts the full shape with selection, page text, note, and screenshot', () => {
+  it('accepts the full shape with selection, page text, summary, note, and screenshot', () => {
     const full = {
       ...VALID,
       selection: 'quoted text',
       contentText: 'First paragraph.\n\nSecond paragraph.',
+      summary: '- First key point\n- Second key point',
       note: 'check this later',
       screenshotRef: `${VALID.id}.jpg`,
     }

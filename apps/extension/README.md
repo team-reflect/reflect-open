@@ -1,9 +1,9 @@
 # Reflect Capture (Chrome extension)
 
-Save the page you're reading into Reflect: ⌘⇧K saves immediately with default
-settings, including the stored page-text preference, while the toolbar button
-opens the capture popup for an optional note. Captures include the page URL,
-title, selection, screenshot, and optional page text when Chrome allows them,
+Save the page you're reading into Reflect: the toolbar button or ⌘⇧K opens the
+capture popup, and Enter saves. Captures include the page URL, title, selection,
+screenshot, and optional page text. On supported devices, Chrome's on-device
+Summarizer can also add a page summary shortly after the link is queued. Captures
 then hand off to the **installed desktop app** through a local native-messaging
 host. No Reflect-hosted services are involved, and capture works even while the
 app is closed: the host spools into the graph's capture inbox
@@ -19,9 +19,11 @@ popup → `chrome.storage` queue → background `sendNativeMessage` →
 `reflect-capture-host` (Tauri sidecar, registered by the desktop app on every
 launch) → capture inbox → desktop drain (`@reflect/core` `actions/capture`):
 raw note + daily `## [[Links]]` entry now (resolving or creating that category
-note), meta-scrape + BYOK AI title + description async. The extension stores no
-keys and makes no AI or network calls; its only honest status is **queued** — it
-cannot observe the desktop drain.
+note), meta-scrape + BYOK AI title + description async. Optional summaries run
+inside Chrome with its built-in local model; the extension stores no keys and
+sends no page content to an AI provider. Chrome may download the model before its
+first use. The extension's only honest status is **queued** — it cannot observe
+the desktop drain.
 
 ## Develop
 
@@ -124,18 +126,21 @@ in the [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
 
 **Detailed description:**
 
-> Reflect Capture saves the page you're reading into Reflect with one click or a
-> keyboard shortcut (⌘⇧K / Ctrl+Shift+K).
+> Reflect Capture saves the page you're reading into Reflect from the toolbar or
+> keyboard shortcut (⌘⇧K / Ctrl+Shift+K). Press Enter in the popup to save.
 >
 > A capture includes the page's URL and title, your current text selection, and a
 > screenshot of the visible tab. Optionally, tick "Capture page text" to include the
-> page's readable text as well.
+> page's readable text, or "Capture page summary" to summarize that text with Chrome's
+> built-in on-device AI. The link is queued first, then its summary is added shortly
+> afterward.
 >
 > Captures are handed to the **installed Reflect desktop app** over a local connection
 > on your own machine — there is no Reflect account and no Reflect server in the path.
 > Capturing works even when the app is closed: the link is held and saved automatically
-> the next time Reflect runs. The extension stores no API keys and makes no AI or
-> network calls of its own.
+> the next time Reflect runs. The extension stores no API keys and sends no captured
+> content to an AI provider. Chrome may download its local summarization model before
+> the first summary.
 >
 > Requires the Reflect desktop app: https://github.com/team-reflect/reflect-open
 
@@ -160,7 +165,7 @@ Each is reviewed individually; every permission below is exercised by the code:
 | Permission | Why it's needed |
 | --- | --- |
 | `activeTab` | Read the URL/title and grab a screenshot + selection of the tab you capture — only at the moment you click the button or press the shortcut. Avoids any broad host permission. |
-| `scripting` | Run a one-line script in the active tab to read the current selection and, when opted in, extract the page's readable text. |
+| `scripting` | Run a script in the active tab to read the current selection and, when opted in, extract readable text for full-text capture or on-device summarization. |
 | `nativeMessaging` | The only output: hand each capture to the local `reflect-capture-host` the desktop app registers. No network is used. |
 | `storage` | Queue captures locally so a capture survives the app being closed and retries until it spools. |
 | `unlimitedStorage` | Queued captures embed a screenshot data URL, which can exceed the default storage quota while waiting for the app. |
@@ -169,10 +174,11 @@ Each is reviewed individually; every permission below is exercised by the code:
 ### Data-handling disclosures (Privacy practices tab)
 
 - **Data collected:** *Website content* (the captured page's URL, title, selection,
-  screenshot, and — only when opted in — page text). Collected **only on an explicit
-  user action**, never in the background.
+  screenshot, and — only when opted in — page text and/or its on-device summary). Collected
+  **only on an explicit user action**, never in the background.
 - **Where it goes:** to the user's own machine (the local Reflect desktop app). It is
-  **not** sent to Reflect or any third party.
+  **not** sent to Reflect or an AI provider; Chrome's built-in model processes summary
+  input locally.
 - The three required certifications are all true and can be affirmed:
   1. Data is **not** sold to third parties.
   2. Data is **not** used or transferred for purposes unrelated to the single purpose.

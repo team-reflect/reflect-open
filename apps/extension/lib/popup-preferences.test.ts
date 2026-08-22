@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { readIncludePageTextPreference, writeIncludePageTextPreference } from './popup-preferences'
+import {
+  readIncludePageSummaryPreference,
+  readIncludePageTextPreference,
+  writeIncludePageSummaryPreference,
+  writeIncludePageTextPreference,
+} from './popup-preferences'
 
 const store = new Map<string, unknown>()
 
@@ -20,6 +25,7 @@ vi.mock('wxt/browser', () => ({
 }))
 
 const INCLUDE_PAGE_TEXT_KEY = 'preference:includePageText'
+const INCLUDE_PAGE_SUMMARY_KEY = 'preference:includePageSummary'
 
 beforeEach(() => {
   store.clear()
@@ -50,5 +56,22 @@ describe('writeIncludePageTextPreference', () => {
 
     await writeIncludePageTextPreference(false)
     expect(store.get(INCLUDE_PAGE_TEXT_KEY)).toBe(false)
+  })
+})
+
+describe('page summary preference', () => {
+  it('defaults to false and reads a persisted choice', async () => {
+    await expect(readIncludePageSummaryPreference()).resolves.toBe(false)
+
+    store.set(INCLUDE_PAGE_SUMMARY_KEY, true)
+    await expect(readIncludePageSummaryPreference()).resolves.toBe(true)
+  })
+
+  it('persists the latest checkbox value', async () => {
+    await writeIncludePageSummaryPreference(true)
+    expect(store.get(INCLUDE_PAGE_SUMMARY_KEY)).toBe(true)
+
+    await writeIncludePageSummaryPreference(false)
+    expect(store.get(INCLUDE_PAGE_SUMMARY_KEY)).toBe(false)
   })
 })

@@ -2,6 +2,7 @@
   "extends": "@ocavue/tsconfig/dom/app.json",
   "compilerOptions": {
     "jsx": "react-jsx",
+    "types": ["node", "dom-chromium-ai"],
     "noUnusedParameters": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,

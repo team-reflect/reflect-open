@@ -54,7 +54,13 @@ beforeEach(() => {
 
 describe('drainCaptureInbox', () => {
   it('writes the capture note, daily entry, and asset — then removes the spool', async () => {
-    addSpool(envelope({ selection: 'quoted text', note: 'check later' }))
+    addSpool(
+      envelope({
+        selection: 'quoted text',
+        note: 'check later',
+        summary: '- First key point',
+      }),
+    )
 
     const outcome = await drain()
 
@@ -74,7 +80,10 @@ describe('drainCaptureInbox', () => {
     expect(note).toContain('- Type: #link')
     expect(note).not.toContain('Highlights')
     expect(note).toContain('## Note\n\ncheck later')
+    expect(note).toContain('## Summary\n\n- First key point')
     expect(note).toContain('## Selection\n\nquoted text')
+    expect((note ?? '').indexOf('## Note')).toBeLessThan((note ?? '').indexOf('## Summary'))
+    expect((note ?? '').indexOf('## Summary')).toBeLessThan((note ?? '').indexOf('## Selection'))
     expect(note).toContain(`## Screenshot\n\n![An article](${IDENTITY.assetPath})`)
 
     const daily = files.get(DAILY)
@@ -95,6 +104,19 @@ describe('drainCaptureInbox', () => {
     const note = files.get(IDENTITY.notePath)
     expect(note).toContain(
       '## Page Text\n\n<!-- reflect-capture-page-text:start -->\nFirst paragraph.\n\nSecond paragraph.\n<!-- reflect-capture-page-text:end -->',
+    )
+  })
+
+  it('writes an on-device page summary into its own capture-note section', async () => {
+    addSpool(envelope({ summary: '- First key point\n- Second key point' }), {
+      screenshot: false,
+    })
+
+    const outcome = await drain()
+
+    expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 0, invalid: 0, stopped: null })
+    expect(files.get(IDENTITY.notePath)).toContain(
+      '## Summary\n\n- First key point\n- Second key point',
     )
   })
 
@@ -323,6 +345,25 @@ describe('drainCaptureInbox', () => {
     const daily = files.get(DAILY) ?? ''
     expect(daily.match(/capture-2026-06-11-093000-000-0000/g)).toHaveLength(1)
     expect(daily).not.toContain('capture-2026-06-11-153022-845')
+  })
+
+  it('adds a deferred summary to the original same-day capture note', async () => {
+    addSpool(
+      envelope({
+        id: '00000000-0000-4000-8000-000000000001',
+        capturedAt: new Date(2026, 5, 11, 9, 30, 0, 0).toISOString(),
+      }),
+    )
+    await drain()
+    const originalNotePath = 'notes/capture-2026-06-11-093000-000-0000.md'
+
+    addSpool(envelope({ summary: '- Deferred key point' }))
+    const outcome = await drain()
+
+    expect(outcome.deduped).toBe(1)
+    expect(files.get(originalNotePath)).toContain('## Summary\n\n- Deferred key point')
+    expect(files.has(IDENTITY.notePath)).toBe(false)
+    expect((files.get(DAILY) ?? '').match(/capture-2026-06-11-093000-000-0000/g)).toHaveLength(1)
   })
 
   it('a dedup refresh re-syncs the daily link text with the fresh tab title', async () => {

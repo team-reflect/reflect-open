@@ -235,7 +235,12 @@ export async function reconcileCaptureEnrichment(
   }
   const skipPending = async (identity: CaptureIdentity): Promise<void> => {
     const snapshot = await readPendingCaptureSnapshot(identity, input.generation)
-    if (snapshot !== null) {
+    if (snapshot === null) {
+      return
+    }
+    const dailySource = await noteSource(dailyPath(identity.date), input.generation)
+    const bodyHash = await hashContent(snapshot.body)
+    if (snapshot.isPrivate || notePrivate(dailySource) || bodyHash !== snapshot.meta.captureHash) {
       await markSkipped(snapshot.source, identity)
     }
   }
@@ -249,12 +254,14 @@ export async function reconcileCaptureEnrichment(
     }
     const dailySource = await noteSource(dailyPath(identity.date), input.generation)
     const bodyHash = await hashContent(snapshot.body)
-    if (
-      snapshot.isPrivate ||
-      notePrivate(dailySource) ||
-      bodyHash !== (expectedHash ?? snapshot.meta.captureHash)
-    ) {
+    if (snapshot.isPrivate || notePrivate(dailySource) || bodyHash !== snapshot.meta.captureHash) {
       await markSkipped(snapshot.source, identity)
+      return null
+    }
+    if (expectedHash !== undefined && snapshot.meta.captureHash !== expectedHash) {
+      // Another drain-managed recapture refreshed this note while enrichment
+      // was in flight. Its own captureHash still matches, so leave it pending
+      // for the next pass instead of treating it as a user edit.
       return null
     }
     return snapshot

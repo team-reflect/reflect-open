@@ -73,6 +73,10 @@ function captureNoteBody(
   if (note) {
     parts.push(`## Note\n\n${note}`)
   }
+  const summary = envelope.summary?.trim()
+  if (summary) {
+    parts.push(`## Summary\n\n${summary}`)
+  }
   const selection = envelope.selection?.trim()
   if (selection) {
     parts.push(`## Selection\n\n${selection}`)

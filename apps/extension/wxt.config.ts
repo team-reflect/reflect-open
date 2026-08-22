@@ -48,7 +48,7 @@ export default defineConfig({
     commands: {
       [SAVE_CURRENT_PAGE_COMMAND]: {
         suggested_key: { default: 'Ctrl+Shift+K', mac: 'Command+Shift+K' },
-        description: 'Save the current page to Reflect',
+        description: 'Open Reflect capture options for the current page',
       },
     },
   },

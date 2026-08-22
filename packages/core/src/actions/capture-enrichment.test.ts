@@ -1009,6 +1009,37 @@ describe('reconcileCaptureEnrichment', () => {
     expect(note).toContain('captureStatus: skipped')
   })
 
+  it('leaves a managed summary refresh pending when it arrives during AI enrichment', async () => {
+    await drainOne()
+    describeMock.mockImplementationOnce(async () => {
+      addSpool(
+        envelope({
+          id: '00000000-0000-4000-8000-000000000002',
+          summary: '- A locally generated key point',
+        }),
+      )
+      expect((await drain()).deduped).toBe(1)
+      return { title: 'An AI title', description: 'An AI description.' }
+    })
+
+    const interrupted = await reconcile()
+
+    expect(interrupted).toEqual({ pending: 1, enriched: 0, skipped: 0, stopped: null })
+    const refreshed = files.get(IDENTITY.notePath) ?? ''
+    expect(refreshed).toContain('captureStatus: pending')
+    expect(refreshed).toContain('## Summary\n\n- A locally generated key point')
+    expect(refreshed).not.toContain('An AI description.')
+
+    describeMock.mockResolvedValue({ title: 'An AI title', description: 'An AI description.' })
+    const retry = await reconcile()
+
+    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    const enriched = files.get(IDENTITY.notePath) ?? ''
+    expect(enriched).toContain('## Summary\n\n- A locally generated key point')
+    expect(enriched).toContain('- Description: An AI description.')
+    expect(enriched).toContain('captureStatus: done')
+  })
+
   it('leaves a user-edited daily link text alone while still retitling the note', async () => {
     await drainOne()
     files.set(DAILY, (files.get(DAILY) ?? '').replace('|An article]]', '|my own link text]]'))
