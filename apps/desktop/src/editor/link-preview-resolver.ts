@@ -10,17 +10,27 @@ import {
 import type { CloudSafe } from '@reflect/core'
 import { readExistingNoteSource } from '@/lib/read-existing-note-source'
 
+/** Immutable identity of the note and editor session that owns a resolver. */
 export interface LinkPreviewSession {
+  /** Graph-relative note path whose live source supplies the privacy flag. */
   readonly path: string
+  /** Open-graph generation that pins source reads against graph switches. */
   readonly generation: number
+  /** Stable graph-root identity used to reject results from another graph. */
   readonly graphKey: string
+  /** Open-document epoch used to reject results from a replaced editor session. */
   readonly sessionEpoch: number
 }
 
+/** Injectable boundaries used by the pure, session-scoped resolver pipeline. */
 export interface LinkPreviewResolverDependencies {
+  /** Read the note's live full markdown through the open-document registry. */
   readonly readSource: (path: string, generation: number) => Promise<string>
+  /** Fetch bounded page HTML using a privacy-authorized URL. */
   readonly fetchHtml: typeof linkPreviewFetchHtml
+  /** Fetch a bounded raster favicon using a privacy-authorized URL. */
   readonly fetchIcon: typeof linkPreviewFetchIcon
+  /** Parse and validate bounded display metadata from the fetched page. */
   readonly parseMetadata: typeof parseLinkPreviewMeta
 }
 

@@ -4,11 +4,11 @@ import { z } from 'zod'
 
 export interface PageMeta {
   /** `og:title`, falling back to `<title>`. */
-  title: string | null
+  readonly title: string | null
   /** `og:description`, falling back to `<meta name="description">`. */
-  description: string | null
+  readonly description: string | null
   /** `og:site_name`. */
-  siteName: string | null
+  readonly siteName: string | null
 }
 
 /** Display metadata extracted for an editor link preview. */
@@ -24,6 +24,12 @@ export interface LinkPreviewMeta {
 const MAX_PAGE_META_CHARS = 500
 const MAX_LINK_TITLE_CHARS = 200
 const MAX_LINK_DESCRIPTION_CHARS = 300
+
+const pageMetaSchema: z.ZodType<PageMeta> = z.object({
+  title: z.string().min(1).max(MAX_PAGE_META_CHARS).nullable(),
+  description: z.string().min(1).max(MAX_PAGE_META_CHARS).nullable(),
+  siteName: z.string().min(1).max(MAX_PAGE_META_CHARS).nullable(),
+})
 
 const linkPreviewMetaSchema: z.ZodType<LinkPreviewMeta> = z.object({
   title: z.string().min(1).max(MAX_LINK_TITLE_CHARS),
@@ -65,7 +71,10 @@ function pageMetaFromDocument(document: Document): PageMeta {
 
 /** Extract {@link PageMeta} from an HTML document's text. Never throws. */
 export function parsePageMeta(html: string): PageMeta {
-  return pageMetaFromDocument(new DOMParser().parseFromString(html, 'text/html'))
+  const parsed = pageMetaSchema.safeParse(
+    pageMetaFromDocument(new DOMParser().parseFromString(html, 'text/html')),
+  )
+  return parsed.success ? parsed.data : { title: null, description: null, siteName: null }
 }
 
 function rasterIconUrl(document: Document, pageUrl: string): string {

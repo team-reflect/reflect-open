@@ -168,6 +168,7 @@ describe('createNoteLinkPreviewResolver', () => {
     const deps = dependencies({ readSource })
     const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
     await expect(resolver('https://example.com')).resolves.toBeUndefined()
+    expect(readSource).toHaveBeenCalledTimes(sources.length)
     expect(deps.fetchHtml).toHaveBeenCalledTimes(1)
     expect(deps.fetchIcon).toHaveBeenCalledTimes(expectedIconCalls)
   })
