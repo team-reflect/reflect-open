@@ -8,8 +8,9 @@
 >
 > **Update (2026-08-22):** Chrome captures can optionally use Chrome's built-in
 > on-device Summarizer. The extension queues the raw link first, then sends a
-> same-day deduplicating update with a dedicated summary; no model key or cloud
-> AI provider is involved.
+> same-day deduplicating update with a dedicated summary; summary generation uses
+> no model key or cloud AI provider. Separate desktop BYOK enrichment remains as
+> described below.
 >
 > **Status (2026-06-14): Implemented.** The pipeline below is built end-to-end:
 > `apps/extension` (WXT MV3, popup + queue + ⌘⇧K), `apps/native-host`
@@ -113,8 +114,9 @@ Every capture lands in two phases so saving never waits on the network or AI:
 
 1. **Chrome extension** (`apps/extension`, MV3): action button + `⌘⇧P` (or `⌘⇧K` if reserved)
    to capture the active tab's URL, title, user-selected text/highlights, and a
-   screenshot (`captureVisibleTab`). Minimal UI: confirm + optional note, page text,
-   or on-device page summary. No keys or provider-backed AI.
+   screenshot (`captureVisibleTab`). Minimal UI: confirm + optional note and
+   independently selectable page text and on-device page summary (including both
+   together). No extension-held keys or provider-backed AI in this browser flow.
    If the host is missing (app not installed) the extension explains + links the
    download, queues the capture in `chrome.storage`, and retries later. Status states
    are honest: **queued** (spooled into inbox or held in `chrome.storage` — the host

@@ -366,6 +366,34 @@ describe('drainCaptureInbox', () => {
     expect((files.get(DAILY) ?? '').match(/capture-2026-06-11-093000-000-0000/g)).toHaveLength(1)
   })
 
+  it('preserves deferred fields when the enriched spool sorts before the raw link', async () => {
+    addSpool(
+      envelope({
+        id: '00000000-0000-4000-8000-000000000001',
+        summary: '- Deferred key point',
+        contentText: 'Readable page text',
+        metaDescription: 'Scraped page description',
+      }),
+      { screenshot: false, modifiedMs: 0 },
+    )
+    addSpool(envelope({ id: 'ffff0000-0000-4000-8000-000000000002' }), {
+      screenshot: false,
+      modifiedMs: 0,
+    })
+
+    const outcome = await drain()
+
+    expect(outcome).toEqual({ pending: 2, drained: 2, deduped: 1, invalid: 0, stopped: null })
+    const note = files.get('notes/capture-2026-06-11-153022-845-0000.md')
+    expect(note).toContain('- Description: Scraped page description')
+    expect(note).toContain('## Summary\n\n- Deferred key point')
+    expect(note).toContain(
+      '## Page Text\n\n<!-- reflect-capture-page-text:start -->\nReadable page text',
+    )
+    expect(files.has('notes/capture-2026-06-11-153022-845-ffff.md')).toBe(false)
+    expect((files.get(DAILY) ?? '').match(/capture-2026-06-11-153022-845-0000/g)).toHaveLength(1)
+  })
+
   it('a dedup refresh re-syncs the daily link text with the fresh tab title', async () => {
     addSpool(
       envelope({

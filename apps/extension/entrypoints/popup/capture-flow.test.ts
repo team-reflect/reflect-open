@@ -154,6 +154,45 @@ describe('runCaptureFlow', () => {
     expect(setup.saveCapture.mock.calls[1]?.[0].summary).toBeUndefined()
   })
 
+  it('cancels model work when extraction returns no readable page text', async () => {
+    const setup = dependencies({ extractPageText: vi.fn().mockResolvedValue(undefined) })
+
+    const result = await runCaptureFlow(INPUT, callbacks(), setup.dependencies)
+
+    expect(result).toMatchObject({ kind: 'summary-failed', linkOutcome: QUEUED })
+    expect(result.kind === 'summary-failed' ? result.cause : null).toEqual(
+      new Error('The page did not contain any readable text to summarize'),
+    )
+    expect(setup.cancel).toHaveBeenCalledOnce()
+    expect(setup.summarize).not.toHaveBeenCalled()
+    expect(setup.saveCapture).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the raw link without an update when a summary-only capture fails', async () => {
+    const summaryFailure = new Error('model failed')
+    const summarize = vi.fn<PageSummaryTask['summarize']>().mockRejectedValue(summaryFailure)
+    const setup = dependencies({ startPageSummary: () => ({ summarize, cancel: vi.fn() }) })
+
+    await expect(runCaptureFlow(INPUT, callbacks(), setup.dependencies)).resolves.toEqual({
+      kind: 'summary-failed',
+      cause: summaryFailure,
+      linkOutcome: QUEUED,
+    })
+    expect(setup.saveCapture).toHaveBeenCalledOnce()
+  })
+
+  it('reports a rejected enrichment update without losing the queued link', async () => {
+    const rejected: SaveOutcome = { fate: 'rejected' }
+    const setup = dependencies()
+    setup.saveCapture.mockResolvedValueOnce(QUEUED).mockResolvedValueOnce(rejected)
+
+    await expect(runCaptureFlow(INPUT, callbacks(), setup.dependencies)).resolves.toEqual({
+      kind: 'update-rejected',
+      linkOutcome: QUEUED,
+    })
+    expect(setup.saveCapture).toHaveBeenCalledTimes(2)
+  })
+
   it('cancels model work when the raw link is rejected', async () => {
     const rejected: SaveOutcome = { fate: 'rejected' }
     const saveCapture = vi.fn<CaptureFlowDependencies['saveCapture']>().mockResolvedValue(rejected)

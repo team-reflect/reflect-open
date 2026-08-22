@@ -22,8 +22,9 @@ raw note + daily `## [[Links]]` entry now (resolving or creating that category
 note), meta-scrape + BYOK AI title + description async. Optional summaries run
 inside Chrome with its built-in local model; the extension stores no keys and
 sends no page content to an AI provider. Chrome may download the model before its
-first use. The extension's only honest status is **queued** — it cannot observe
-the desktop drain.
+first use. After local handoff, the desktop app may separately perform BYOK AI
+enrichment under Reflect's desktop privacy rules. The extension's only honest
+status is **queued** — it cannot observe the desktop drain.
 
 ## Develop
 
@@ -131,16 +132,18 @@ in the [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
 >
 > A capture includes the page's URL and title, your current text selection, and a
 > screenshot of the visible tab. Optionally, tick "Capture page text" to include the
-> page's readable text, or "Capture page summary" to summarize that text with Chrome's
-> built-in on-device AI. The link is queued first, then its summary is added shortly
+> page's readable text and/or "Capture page summary" to summarize that text with
+> Chrome's built-in on-device AI. The two options are independent and can be selected
+> together. The link is queued first, then its text and summary are added shortly
 > afterward.
 >
 > Captures are handed to the **installed Reflect desktop app** over a local connection
 > on your own machine — there is no Reflect account and no Reflect server in the path.
 > Capturing works even when the app is closed: the link is held and saved automatically
 > the next time Reflect runs. The extension stores no API keys and sends no captured
-> content to an AI provider. Chrome may download its local summarization model before
-> the first summary.
+> content to an AI provider; Chrome may download its local summarization model before
+> the first summary. After local capture, the desktop app may perform separately
+> configured BYOK AI enrichment under Reflect's privacy controls.
 >
 > Requires the Reflect desktop app: https://github.com/team-reflect/reflect-open
 
@@ -177,8 +180,10 @@ Each is reviewed individually; every permission below is exercised by the code:
   screenshot, and — only when opted in — page text and/or its on-device summary). Collected
   **only on an explicit user action**, never in the background.
 - **Where it goes:** to the user's own machine (the local Reflect desktop app). It is
-  **not** sent to Reflect or an AI provider; Chrome's built-in model processes summary
-  input locally.
+  **not** sent to Reflect, and the extension sends nothing to an AI provider; Chrome's
+  built-in model processes summary input locally. Once captured, the desktop app may
+  separately send eligible content to the user's configured BYOK provider for optional
+  enrichment, subject to Reflect's privacy controls.
 - The three required certifications are all true and can be affirmed:
   1. Data is **not** sold to third parties.
   2. Data is **not** used or transferred for purposes unrelated to the single purpose.

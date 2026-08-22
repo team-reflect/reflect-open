@@ -35,8 +35,11 @@ import {
   type TextCaptureEnvelope,
 } from './capture-envelope'
 import {
+  captureDescriptionFromBody,
   captureNoteMeta,
   captureNoteSource,
+  capturePageTextFromBody,
+  captureSummaryFromBody,
   displayTitle,
   notePrivate,
   noteSource,
@@ -83,6 +86,8 @@ interface SameDayCapture {
   identity: CaptureIdentity
   /** The existing note's display title — what the daily's link text mirrors. */
   title: string
+  /** Existing managed fields survive a later link-only envelope in the same batch. */
+  body: string
 }
 
 /**
@@ -132,9 +137,14 @@ async function findSameDayCapture(
       }
       throw cause
     }
-    const meta = captureNoteMeta(parseFrontmatter(splitFrontmatter(source).raw).data)
+    const split = splitFrontmatter(source)
+    const meta = captureNoteMeta(parseFrontmatter(split.raw).data)
     if (meta && meta.captureUrl === url && meta.captureSelectionHash === selectionHash) {
-      return { identity, title: parseNote({ path: identity.notePath, source }).title }
+      return {
+        identity,
+        title: parseNote({ path: identity.notePath, source }).title,
+        body: split.body,
+      }
     }
   }
   return null
@@ -213,6 +223,14 @@ export async function drainCaptureInbox(
       )
       const identity = existing?.identity ?? fresh
       const status: CaptureStatus = notePrivate(dailySource) ? 'skipped' : 'pending'
+      const mergedEnvelope = existing
+        ? {
+            ...envelope,
+            contentText: envelope.contentText ?? capturePageTextFromBody(existing.body),
+            summary: envelope.summary ?? captureSummaryFromBody(existing.body),
+            metaDescription: envelope.metaDescription ?? captureDescriptionFromBody(existing.body),
+          }
+        : envelope
 
       let hasScreenshot = false
       if (envelope.screenshotRef) {
@@ -234,14 +252,14 @@ export async function drainCaptureInbox(
 
       await writeNote(
         identity.notePath,
-        await captureNoteSource(envelope, identity, {
+        await captureNoteSource(mergedEnvelope, identity, {
           hasScreenshot,
           status,
           selectionHash,
         }),
         input.generation,
       )
-      const freshTitle = displayTitle(envelope)
+      const freshTitle = displayTitle(mergedEnvelope)
       let updatedDaily = dailySource
       if (existing !== null) {
         // The refresh reset the note's H1 to the fresh tab title; keep the

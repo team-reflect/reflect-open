@@ -18,6 +18,7 @@ const summaryAvailabilitySchema = z.enum([
   'available',
 ])
 
+/** Chrome model readiness, plus `unsupported` when the API is absent. */
 export type PageSummaryAvailability = z.infer<typeof summaryAvailabilitySchema> | 'unsupported'
 
 export interface PageSummaryTask {
@@ -27,8 +28,11 @@ export interface PageSummaryTask {
   cancel(): void
 }
 
+/** Context and progress reporting for one user-activated summary session. */
 export interface StartPageSummaryOptions {
+  /** Page title supplied as model context. */
   title: string
+  /** Receives whole-number model download percentages from zero through 100. */
   onDownloadProgress?: ((progress: number) => void) | undefined
 }
 

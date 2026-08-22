@@ -3,7 +3,9 @@ import { isAppError } from '../errors'
 import { readNote } from '../graph/commands'
 import { hashContent } from '../indexing/hash'
 import { wikiLinkSafe } from '../markdown/edit'
+import { parseNote } from '../markdown/extract'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
+import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks'
 import type { Frontmatter } from '../markdown/model'
 import type { CaptureIdentity } from './capture-identity'
 import type { CaptureEnvelope } from './capture-envelope'
@@ -104,6 +106,21 @@ export function capturePageTextFromBody(body: string): string | undefined {
   }
   const content = body.slice(contentStart, endAt).trim()
   return content === '' ? undefined : content
+}
+
+/** The on-device summary written in the managed Summary section, when present. */
+export function captureSummaryFromBody(body: string): string | undefined {
+  const headings = topLevelHeadings(parseNote({ path: '', source: body }).headings)
+  const summaryHeading = headings.find(
+    (heading) => heading.level === 2 && heading.text.trim() === 'Summary',
+  )
+  if (!summaryHeading) {
+    return undefined
+  }
+  const summary = body
+    .slice(summaryHeading.to, sectionEnd(headings, summaryHeading, body.length))
+    .trim()
+  return summary === '' ? undefined : summary
 }
 
 function firstSectionStart(body: string): number {

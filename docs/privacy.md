@@ -60,14 +60,16 @@ disk at call time), and it is covered by tests.
 
 ## Browser capture (the Chrome extension)
 
-- **Where:** captured content goes nowhere on the network. The **Reflect Capture** extension hands each
-  capture to a local native-messaging host (`reflect-capture-host`) that the desktop
-  app registers on your machine; the host spools it to the capture inbox on disk
+- **Where:** during browser capture and summary generation, captured content goes
+  nowhere on the network. The **Reflect Capture** extension hands each capture to a
+  local native-messaging host (`reflect-capture-host`) that the desktop app registers
+  on your machine; the host spools it to the capture inbox on disk
   (`<graph>/.reflect/inbox/`) and the app drains it on next launch. Optional page
   summaries use Chrome's built-in on-device model; the page text is processed locally
   and is not sent to Reflect or an AI provider. Chrome may download that model before
   its first use, but the download carries no captured content. The extension stores no
-  keys and makes no page-content network request of its own.
+  keys and makes no page-content network request of its own. After this local phase,
+  the desktop enrichment rules below apply.
 - **What:** only the page you explicitly capture (toolbar button or ⌘⇧K) — its URL,
   title, your current text selection, a screenshot of the visible tab, and, only when
   you opt in, the page's extracted text and/or an on-device summary generated from it.
@@ -162,7 +164,7 @@ API keys and tokens live in the **OS keychain only** — never in markdown, neve
 | Backup | Your git repository | Yes — including private notes | Yes (needs connecting) |
 | Key validation | The provider | No | — (only when adding a key) |
 | Update check | GitHub Releases | No | On in packaged builds |
-| Browser capture and on-device summary | Nowhere for captured content (Chrome may download its local model) | — (stays on your machine) | — (only when you capture) |
+| Browser capture and on-device summary | Local native host and Chrome model; optional later desktop enrichment may use your BYOK provider | Local capture stays on your machine; eligible content may later enter optional BYOK enrichment | — (only when you capture) |
 | Capture metadata and preview | The captured website, via Reflect and Apple LinkPresentation | URL only; private captures are blocked | No (after an explicit capture) |
 | Contacts lookup | Nowhere (on-device OS store) | — (stays on your machine) | Yes (opt-in) |
 | Exception diagnostics | Sentry | No — free-form messages and context are redacted | No (official releases) |
