@@ -137,7 +137,13 @@ Every capture lands in two phases so saving never waits on the network or AI:
    in `actions/capture` — `{version, id, url, title, selection?, contentText?, summary?,
    metaDescription?, note?, screenshotRef?, capturedAt, source}` — written identically
    by the desktop host today and by the future iOS share extension (app-group inbox) /
-   Android intent handler. `drainCaptureInbox` executes these steps **in order**:
+   Android intent handler. A Chrome summary capture emits two envelopes in order: the
+   raw link without `summary`, then a new-ID refresh with the same `capturedAt`, URL,
+   selection, note, and screenshot plus `summary` (and `contentText` when selected).
+   Same-day dedup treats them as one capture; if desktop enrichment observes the raw
+   write in between, the managed refresh remains pending for a retry. Capture-flow,
+   drain, and enrichment-race tests pin this contract. `drainCaptureInbox` executes
+   these steps **in order**:
    1. Resolve the capture target (today's daily note, or a chosen note).
    2. **Privacy gate:** if the target is `private: true`, skip all enrichment and all
       outbound traffic (no URL fetch, no meta scrape, no screenshot/selection/note

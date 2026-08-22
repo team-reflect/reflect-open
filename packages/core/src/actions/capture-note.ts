@@ -30,6 +30,8 @@ const captureNoteMetaSchema = z.object({
   captureHash: z.string(),
   captureSelectionHash: z.string().optional(),
   captureScreenshot: z.string().optional(),
+  /** Structured copy used to preserve the managed body section across recaptures. */
+  captureSummary: z.string().optional(),
 })
 
 export type CaptureNoteMeta = z.infer<typeof captureNoteMetaSchema>
@@ -50,8 +52,6 @@ function urlHost(url: string): string {
 
 const PAGE_TEXT_START = '<!-- reflect-capture-page-text:start -->'
 const PAGE_TEXT_END = '<!-- reflect-capture-page-text:end -->'
-const SUMMARY_START = '<!-- reflect-capture-summary:start -->'
-const SUMMARY_END = '<!-- reflect-capture-summary:end -->'
 
 /** The capture's display title: the page title, else the URL's host. */
 export function displayTitle(envelope: Pick<CaptureEnvelope, 'title' | 'url'>): string {
@@ -77,7 +77,7 @@ function captureNoteBody(
   }
   const summary = envelope.summary?.trim()
   if (summary) {
-    parts.push(`## Summary\n\n${SUMMARY_START}\n${summary}\n${SUMMARY_END}`)
+    parts.push(`## Summary\n\n${summary}`)
   }
   const selection = envelope.selection?.trim()
   if (selection) {
@@ -108,22 +108,6 @@ export function capturePageTextFromBody(body: string): string | undefined {
   return content === '' ? undefined : content
 }
 
-/** The on-device summary written in the managed Summary section, when present. */
-export function captureSummaryFromBody(body: string): string | undefined {
-  const marker = `## Summary\n\n${SUMMARY_START}\n`
-  const markerAt = body.indexOf(marker)
-  if (markerAt === -1) {
-    return undefined
-  }
-  const contentStart = markerAt + marker.length
-  const endAt = body.indexOf(SUMMARY_END, contentStart)
-  if (endAt === -1) {
-    throw new Error('capture note is missing summary end marker')
-  }
-  const summary = body.slice(contentStart, endAt).trim()
-  return summary === '' ? undefined : summary
-}
-
 function firstSectionStart(body: string): number {
   let offset = 0
   for (const line of body.split('\n')) {
@@ -141,6 +125,7 @@ export async function captureNoteSource(
   options: { hasScreenshot: boolean; status: CaptureStatus; selectionHash?: string | undefined },
 ): Promise<string> {
   const body = captureNoteBody(envelope, identity, options.hasScreenshot)
+  const summary = envelope.summary?.trim()
   return upsertFrontmatter(body, {
     aliases: [identity.base],
     captureUrl: envelope.url,
@@ -150,6 +135,7 @@ export async function captureNoteSource(
     captureHash: await hashContent(body),
     captureSelectionHash: options.selectionHash,
     captureScreenshot: options.hasScreenshot ? identity.assetPath : undefined,
+    captureSummary: summary === '' ? undefined : summary,
   })
 }
 

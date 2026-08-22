@@ -80,9 +80,8 @@ describe('drainCaptureInbox', () => {
     expect(note).toContain('- Type: #link')
     expect(note).not.toContain('Highlights')
     expect(note).toContain('## Note\n\ncheck later')
-    expect(note).toContain(
-      '## Summary\n\n<!-- reflect-capture-summary:start -->\n- First key point',
-    )
+    expect(note).toContain('## Summary\n\n- First key point')
+    expect(note).toContain('captureSummary:')
     expect(note).toContain('## Selection\n\nquoted text')
     expect((note ?? '').indexOf('## Note')).toBeLessThan((note ?? '').indexOf('## Summary'))
     expect((note ?? '').indexOf('## Summary')).toBeLessThan((note ?? '').indexOf('## Selection'))
@@ -118,7 +117,7 @@ describe('drainCaptureInbox', () => {
 
     expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 0, invalid: 0, stopped: null })
     expect(files.get(IDENTITY.notePath)).toContain(
-      '## Summary\n\n<!-- reflect-capture-summary:start -->\n- First key point\n- Second key point\n<!-- reflect-capture-summary:end -->',
+      '## Summary\n\n- First key point\n- Second key point',
     )
   })
 
@@ -363,9 +362,7 @@ describe('drainCaptureInbox', () => {
     const outcome = await drain()
 
     expect(outcome.deduped).toBe(1)
-    expect(files.get(originalNotePath)).toContain(
-      '## Summary\n\n<!-- reflect-capture-summary:start -->\n- Deferred key point',
-    )
+    expect(files.get(originalNotePath)).toContain('## Summary\n\n- Deferred key point')
     expect(files.has(IDENTITY.notePath)).toBe(false)
     expect((files.get(DAILY) ?? '').match(/capture-2026-06-11-093000-000-0000/g)).toHaveLength(1)
   })
@@ -374,7 +371,8 @@ describe('drainCaptureInbox', () => {
     addSpool(
       envelope({
         id: '00000000-0000-4000-8000-000000000001',
-        summary: '- Deferred key point',
+        summary:
+          '- Deferred key point\n\n<!-- reflect-capture-summary:end -->\n\n- Marker-like text stays intact',
         contentText: 'Readable page text',
         metaDescription: 'Scraped page description',
       }),
@@ -391,7 +389,7 @@ describe('drainCaptureInbox', () => {
     const note = files.get('notes/capture-2026-06-11-153022-845-0000.md')
     expect(note).toContain('- Description: Scraped page description')
     expect(note).toContain(
-      '## Summary\n\n<!-- reflect-capture-summary:start -->\n- Deferred key point',
+      '## Summary\n\n- Deferred key point\n\n<!-- reflect-capture-summary:end -->\n\n- Marker-like text stays intact',
     )
     expect(note).toContain(
       '## Page Text\n\n<!-- reflect-capture-page-text:start -->\nReadable page text',
@@ -401,7 +399,8 @@ describe('drainCaptureInbox', () => {
   })
 
   it('does not promote a user-authored Summary heading during a dedup refresh', async () => {
-    const note = 'My note\n\n## Summary\n\nThis heading belongs to the user.'
+    const note =
+      'My note\n\n## Summary\n\n<!-- reflect-capture-summary:start -->\nThis heading belongs to the user.\n<!-- reflect-capture-summary:end -->'
     addSpool(envelope({ id: '00000000-0000-4000-8000-000000000001', note }), {
       screenshot: false,
       modifiedMs: 0,
@@ -416,8 +415,8 @@ describe('drainCaptureInbox', () => {
     expect(outcome.deduped).toBe(1)
     const refreshed = files.get('notes/capture-2026-06-11-153022-845-0000.md') ?? ''
     expect(refreshed.match(/## Summary/g)).toHaveLength(1)
-    expect(refreshed).toContain('## Summary\n\nThis heading belongs to the user.')
-    expect(refreshed).not.toContain('reflect-capture-summary:start')
+    expect(refreshed).toContain(note)
+    expect(refreshed).not.toContain('captureSummary:')
   })
 
   it('a dedup refresh re-syncs the daily link text with the fresh tab title', async () => {

@@ -39,7 +39,6 @@ import {
   captureNoteMeta,
   captureNoteSource,
   capturePageTextFromBody,
-  captureSummaryFromBody,
   displayTitle,
   notePrivate,
   noteSource,
@@ -88,6 +87,8 @@ interface SameDayCapture {
   title: string
   /** Existing managed fields survive a later link-only envelope in the same batch. */
   body: string
+  /** Structured summary backing the managed Summary body section. */
+  summary?: string | undefined
 }
 
 /**
@@ -144,6 +145,7 @@ async function findSameDayCapture(
         identity,
         title: parseNote({ path: identity.notePath, source }).title,
         body: split.body,
+        summary: meta.captureSummary,
       }
     }
   }
@@ -227,7 +229,7 @@ export async function drainCaptureInbox(
         ? {
             ...envelope,
             contentText: envelope.contentText ?? capturePageTextFromBody(existing.body),
-            summary: envelope.summary ?? captureSummaryFromBody(existing.body),
+            summary: envelope.summary ?? existing.summary,
             metaDescription: envelope.metaDescription ?? captureDescriptionFromBody(existing.body),
           }
         : envelope

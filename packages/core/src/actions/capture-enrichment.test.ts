@@ -1027,9 +1027,7 @@ describe('reconcileCaptureEnrichment', () => {
     expect(interrupted).toEqual({ pending: 1, enriched: 0, skipped: 0, stopped: null })
     const refreshed = files.get(IDENTITY.notePath) ?? ''
     expect(refreshed).toContain('captureStatus: pending')
-    expect(refreshed).toContain(
-      '## Summary\n\n<!-- reflect-capture-summary:start -->\n- A locally generated key point',
-    )
+    expect(refreshed).toContain('## Summary\n\n- A locally generated key point')
     expect(refreshed).not.toContain('An AI description.')
 
     describeMock.mockResolvedValue({ title: 'An AI title', description: 'An AI description.' })
@@ -1037,9 +1035,7 @@ describe('reconcileCaptureEnrichment', () => {
 
     expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
     const enriched = files.get(IDENTITY.notePath) ?? ''
-    expect(enriched).toContain(
-      '## Summary\n\n<!-- reflect-capture-summary:start -->\n- A locally generated key point',
-    )
+    expect(enriched).toContain('## Summary\n\n- A locally generated key point')
     expect(enriched).toContain('- Description: An AI description.')
     expect(enriched).toContain('captureStatus: done')
   })
