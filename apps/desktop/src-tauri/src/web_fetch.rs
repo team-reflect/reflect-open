@@ -96,6 +96,9 @@ fn is_public_ipv6(address: Ipv6Addr) -> bool {
             segments[2] as u8,
         ));
     }
+    if segments[..3] == [0x0064, 0xff9b, 0x0001] {
+        return false;
+    }
     if segments[..6] == [0x0064, 0xff9b, 0, 0, 0, 0] {
         return is_public_ipv4(Ipv4Addr::new(
             (segments[6] >> 8) as u8,
@@ -327,6 +330,7 @@ mod tests {
             "http://[::7f00:1]/",
             "http://[2002:7f00:1::]/",
             "http://[64:ff9b::7f00:1]/",
+            "http://[64:ff9b:1::7f00:1]/",
         ] {
             let url = parse_http_url(value).unwrap();
             let port = url.port_or_known_default().unwrap();
