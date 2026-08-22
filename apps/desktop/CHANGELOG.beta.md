@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.4...v0.11.0-beta.5) (2026-08-22)
+
+
+### Bug Fixes
+
+* show active pinned notes in dark mode ([#1162](https://github.com/team-reflect/reflect-open/issues/1162)) ([cf10cd5](https://github.com/team-reflect/reflect-open/commit/cf10cd56ef95d443f984ab2ba50974784f722f9b))
+
 ## [0.11.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.3...v0.11.0-beta.4) (2026-08-21)
 
 
