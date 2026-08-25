@@ -29,6 +29,7 @@ mod graph_gitignore;
 mod icloud;
 mod link_preview;
 mod menu;
+mod note_ownership;
 mod quit;
 mod recents;
 mod secrets;
@@ -207,6 +208,15 @@ pub fn run() {
     let builder = {
         let revealed = std::sync::Arc::clone(&revealed_main);
         builder.on_page_load(move |webview, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+                note_ownership::release_window(
+                    &webview
+                        .app_handle()
+                        .state::<note_ownership::NoteWindowOwnershipState>(),
+                    webview.label(),
+                );
+                return;
+            }
             if webview.label() != windows::MAIN_WINDOW_LABEL {
                 return;
             }
@@ -218,6 +228,18 @@ pub fn run() {
             });
         })
     };
+
+    #[cfg(mobile)]
+    let builder = builder.on_page_load(move |webview, payload| {
+        if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+            note_ownership::release_window(
+                &webview
+                    .app_handle()
+                    .state::<note_ownership::NoteWindowOwnershipState>(),
+                webview.label(),
+            );
+        }
+    });
 
     // The keyboard bridge (Plan 19, decision 8) is mobile-only: desktop has
     // no software keyboard to track. (Sharing uses the webview's Web Share
@@ -274,6 +296,8 @@ pub fn run() {
         .manage(fs::ImportCancel::default())
         .manage(fs::assets::AssetUploads::default())
         .manage(db::IndexState::default())
+        .manage(db::ChatJournalSession::default())
+        .manage(note_ownership::NoteWindowOwnershipState::default())
         .manage(watcher::WatcherState::default())
         .manage(quit::QuitState::default())
         .manage(windows::WindowInit::default())
@@ -299,9 +323,11 @@ pub fn run() {
             fs::graph_import_reflect_v1_zip,
             fs::graph_import_cancel,
             fs::note_read,
+            fs::note_read_for_ai,
             fs::note_read_local,
             fs::note_create,
             fs::note_write,
+            fs::note_write_if_revision,
             fs::asset_write,
             fs::asset_read,
             fs::asset_read_binary,
@@ -319,6 +345,9 @@ pub fn run() {
             fs::dir_list,
             fs::note_exists,
             fs::note_delete,
+            fs::note_trash_if_revision,
+            note_ownership::note_window_claim,
+            note_ownership::note_window_release,
             fs::list_files,
             fs::list_attachments,
             fs::vault_scan_stats,
@@ -345,6 +374,11 @@ pub fn run() {
             db::db_query,
             db::chat_message_save,
             db::chat_conversation_delete,
+            db::chat_note_change_prepare,
+            db::chat_note_change_set_state,
+            db::chat_note_changes_set_state_batch,
+            db::chat_note_changes_for_turn,
+            db::chat_note_changes_pending,
             db::embed_apply,
             db::embed_remove,
             embed::embed_status,
@@ -481,6 +515,10 @@ pub fn run() {
                 // A window destroyed mid-handshake (user closed it while the
                 // quit flush ran) can no longer confirm — settle its label or
                 // the surviving windows' quit would hang forever.
+                note_ownership::release_window(
+                    &app.state::<note_ownership::NoteWindowOwnershipState>(),
+                    label,
+                );
                 let quit = app.state::<quit::QuitState>();
                 if quit.settle(label) {
                     app.exit(0);

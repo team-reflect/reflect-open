@@ -33,6 +33,18 @@ export interface DevIndexDb {
   setMeta: (key: string, value: string) => void
   /** Upsert one chat turn + its conversation row (`chat_message_save`). */
   saveChatMessage: (conversation: DevChatConversation, message: DevChatMessageRow) => void
+  /** Persist a prepared note-change checkpoint (`chat_note_change_prepare`). */
+  prepareChatNoteChange: (change: DevChatNoteChangeInput) => DevChatNoteChange
+  /** Compare-and-set a checkpoint lifecycle state (`chat_note_change_set_state`). */
+  setChatNoteChangeState: (input: DevChatNoteChangeStateInput) => DevChatNoteChangeStateResult
+  /** Atomically compare-and-set an Undo group's checkpoint states. */
+  setChatNoteChangesStateBatch: (
+    input: DevChatNoteChangesStateInput,
+  ) => DevChatNoteChangesStateResult
+  /** Ordered checkpoints belonging to one chat turn. */
+  chatNoteChangesForTurn: (turnId: string) => DevChatNoteChange[]
+  /** Checkpoints requiring launch-time recovery. */
+  pendingChatNoteChanges: () => DevChatNoteChange[]
   /** Delete a conversation; its messages cascade (`chat_conversation_delete`). */
   deleteChatConversation: (id: string) => void
 }
@@ -53,8 +65,66 @@ export interface DevChatMessageRow {
   attachments: string
   parts: string
   responseMessages: string
+  permissionMode?: 'read' | 'readWrite'
+  sourceProvenance?: string | null
   createdMs: number
 }
+
+export type DevChatNoteChangeOperation = 'edit' | 'append' | 'create'
+export type DevChatNoteChangeState =
+  | 'prepared'
+  | 'applied'
+  | 'undoing'
+  | 'undone'
+  | 'failed'
+  | 'uncertain'
+
+export interface DevChatNoteChangeInput {
+  id: string
+  conversationId: string
+  turnId: string
+  toolCallId: string
+  path: string
+  sequence: number
+  operation: DevChatNoteChangeOperation
+  beforeSource: string | null
+  afterSource: string
+  beforeRevision: string | null
+  afterRevision: string
+  createdMs: number
+}
+
+export interface DevChatNoteChange extends DevChatNoteChangeInput {
+  state: DevChatNoteChangeState
+  errorMessage: string | null
+  updatedMs: number
+}
+
+export interface DevChatNoteChangeStateInput {
+  id: string
+  expectedState: DevChatNoteChangeState
+  state: DevChatNoteChangeState
+  errorMessage: string | null
+  updatedMs: number
+}
+
+export type DevChatNoteChangeStateResult =
+  | { kind: 'updated'; change: DevChatNoteChange }
+  | { kind: 'stateMismatch'; change: DevChatNoteChange }
+  | { kind: 'missing' }
+
+export interface DevChatNoteChangesStateInput {
+  ids: string[]
+  expectedState: DevChatNoteChangeState
+  state: DevChatNoteChangeState
+  errorMessage: string | null
+  updatedMs: number
+}
+
+export type DevChatNoteChangesStateResult =
+  | { kind: 'updated'; changes: DevChatNoteChange[] }
+  | { kind: 'stateMismatch'; changes: DevChatNoteChange[] }
+  | { kind: 'missing'; missingIds: string[] }
 
 // The real migrations, inlined at build time. This chunk only loads behind the
 // DEV platform override, so the raw SQL never reaches production bundles.
@@ -108,6 +178,7 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
   for (const [, source] of migrations) {
     db.exec(stubVectorTables(source))
   }
+  const journalSessionId = crypto.randomUUID()
 
   return {
     query: (sql, params) => {
@@ -311,16 +382,18 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
         db,
         `INSERT INTO chat_messages(
             id, conversation_id, seq, user_text, attachments, parts,
-            response_messages, created_ms)
+            response_messages, permission_mode, source_provenance, created_ms)
          VALUES (
             ?1, ?2,
             (SELECT COALESCE(MAX(seq) + 1, 0) FROM chat_messages WHERE conversation_id = ?2),
-            ?3, ?4, ?5, ?6, ?7)
+            ?3, ?4, ?5, ?6, ?7, ?8, ?9)
          ON CONFLICT(id) DO UPDATE SET
             user_text = excluded.user_text,
             attachments = excluded.attachments,
             parts = excluded.parts,
-            response_messages = excluded.response_messages`,
+            response_messages = excluded.response_messages,
+            permission_mode = excluded.permission_mode,
+            source_provenance = excluded.source_provenance`,
         [
           message.id,
           message.conversationId,
@@ -328,15 +401,292 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
           message.attachments,
           message.parts,
           message.responseMessages,
+          message.permissionMode ?? 'read',
+          message.sourceProvenance ?? null,
           message.createdMs,
         ],
       )
     },
 
+    prepareChatNoteChange: (change) => {
+      const belongs = db.selectValue(
+        'SELECT EXISTS(SELECT 1 FROM chat_messages WHERE id = ? AND conversation_id = ?)',
+        [change.turnId, change.conversationId],
+      )
+      if (Number(belongs) !== 1) {
+        throw new ReflectError(
+          'notFound',
+          `chat message ${change.turnId} does not belong to ${change.conversationId}`,
+        )
+      }
+      run(
+        db,
+        `INSERT INTO chat_note_changes(
+           id, conversation_id, message_id, tool_call_id, path, seq, operation,
+           before_source, after_source, before_revision, after_revision, state,
+           owner_session, error_message, created_ms, updated_ms)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'prepared', ?, NULL, ?, ?)
+         ON CONFLICT(id) DO NOTHING`,
+        [
+          change.id,
+          change.conversationId,
+          change.turnId,
+          change.toolCallId,
+          change.path,
+          change.sequence,
+          change.operation,
+          change.beforeSource,
+          change.afterSource,
+          change.beforeRevision,
+          change.afterRevision,
+          journalSessionId,
+          change.createdMs,
+          change.createdMs,
+        ],
+      )
+      const stored = loadDevChatNoteChange(db, change.id)
+      if (stored === null || !samePreparedChange(stored, change)) {
+        throw new ReflectError('io', `chat note change ${change.id} was reused`)
+      }
+      const storedOwner = db.selectValue(
+        'SELECT owner_session FROM chat_note_changes WHERE id = ?',
+        [change.id],
+      )
+      if (storedOwner !== journalSessionId) {
+        throw new ReflectError(
+          'io',
+          `chat note change ${change.id} belongs to an earlier process session`,
+        )
+      }
+      return stored
+    },
+
+    setChatNoteChangeState: (input) => {
+      if (!canTransitionChatNoteChange(input.expectedState, input.state)) {
+        throw new ReflectError(
+          'io',
+          `invalid chat note change transition: ${input.expectedState} -> ${input.state}`,
+        )
+      }
+      const before = loadDevChatNoteChange(db, input.id)
+      if (before === null) {
+        return { kind: 'missing' }
+      }
+      if (before.state !== input.expectedState) {
+        return { kind: 'stateMismatch', change: before }
+      }
+      run(
+        db,
+        `UPDATE chat_note_changes
+         SET state = ?,
+             owner_session = CASE WHEN ? = 'undoing' THEN ? ELSE owner_session END,
+             error_message = ?, updated_ms = ?
+         WHERE id = ? AND state = ?`,
+        [
+          input.state,
+          input.state,
+          journalSessionId,
+          input.errorMessage,
+          input.updatedMs,
+          input.id,
+          input.expectedState,
+        ],
+      )
+      const change = loadDevChatNoteChange(db, input.id)
+      if (change === null) {
+        return { kind: 'missing' }
+      }
+      return { kind: 'updated', change }
+    },
+
+    setChatNoteChangesStateBatch: (input) => {
+      if (input.ids.length === 0) {
+        throw new ReflectError('io', 'chat note change batch must not be empty')
+      }
+      if (new Set(input.ids).size !== input.ids.length) {
+        throw new ReflectError('io', 'chat note change batch contains duplicate ids')
+      }
+      if (!canTransitionChatNoteChange(input.expectedState, input.state)) {
+        throw new ReflectError(
+          'io',
+          `invalid chat note change transition: ${input.expectedState} -> ${input.state}`,
+        )
+      }
+
+      run(db, 'BEGIN IMMEDIATE')
+      try {
+        const changes = input.ids.flatMap((id) => {
+          const change = loadDevChatNoteChange(db, id)
+          return change === null ? [] : [change]
+        })
+        const found = new Set(changes.map((change) => change.id))
+        const missingIds = input.ids.filter((id) => !found.has(id))
+        if (missingIds.length > 0) {
+          run(db, 'COMMIT')
+          return { kind: 'missing', missingIds }
+        }
+        if (changes.some((change) => change.state !== input.expectedState)) {
+          run(db, 'COMMIT')
+          return { kind: 'stateMismatch', changes }
+        }
+
+        for (const id of input.ids) {
+          run(
+            db,
+            `UPDATE chat_note_changes
+             SET state = ?,
+                 owner_session = CASE WHEN ? = 'undoing' THEN ? ELSE owner_session END,
+                 error_message = ?, updated_ms = ?
+             WHERE id = ? AND state = ?`,
+            [
+              input.state,
+              input.state,
+              journalSessionId,
+              input.errorMessage,
+              input.updatedMs,
+              id,
+              input.expectedState,
+            ],
+          )
+        }
+        const updated = input.ids.map((id) => {
+          const change = loadDevChatNoteChange(db, id)
+          if (change === null) {
+            throw new ReflectError('io', `chat note change ${id} disappeared during batch update`)
+          }
+          return change
+        })
+        run(db, 'COMMIT')
+        return { kind: 'updated', changes: updated }
+      } catch (error) {
+        run(db, 'ROLLBACK')
+        throw error
+      }
+    },
+
+    chatNoteChangesForTurn: (turnId) =>
+      selectDevChatNoteChanges(
+        db,
+        'SELECT * FROM chat_note_changes WHERE message_id = ? ORDER BY seq',
+        [turnId],
+      ),
+
+    pendingChatNoteChanges: () =>
+      selectDevChatNoteChanges(
+        db,
+        `SELECT * FROM chat_note_changes
+         WHERE state = 'uncertain'
+            OR (state IN ('prepared', 'undoing') AND owner_session <> ?)
+         ORDER BY created_ms, message_id, seq`,
+        [journalSessionId],
+      ),
+
     deleteChatConversation: (id) => {
+      const unfinished = db.selectValue(
+        `SELECT EXISTS(
+           SELECT 1 FROM chat_note_changes
+           WHERE conversation_id = ? AND owner_session = ?
+             AND state IN ('prepared', 'undoing'))`,
+        [id, journalSessionId],
+      )
+      if (Number(unfinished) === 1) {
+        throw new ReflectError('io', 'conversation has unfinished note changes')
+      }
       run(db, 'DELETE FROM chat_conversations WHERE id = ?', [id])
     },
   }
+}
+
+function canTransitionChatNoteChange(
+  current: DevChatNoteChangeState,
+  next: DevChatNoteChangeState,
+): boolean {
+  return (
+    current === next ||
+    (current === 'prepared' && (next === 'applied' || next === 'failed' || next === 'uncertain')) ||
+    (current === 'applied' && (next === 'undoing' || next === 'uncertain')) ||
+    (current === 'undoing' && (next === 'undone' || next === 'applied' || next === 'uncertain')) ||
+    (current === 'uncertain' && (next === 'applied' || next === 'failed' || next === 'undone'))
+  )
+}
+
+function selectDevChatNoteChanges(
+  db: Database,
+  sql: string,
+  params: readonly unknown[],
+): DevChatNoteChange[] {
+  const resultRows: Record<string, SqlValue>[] = []
+  db.exec({ sql, bind: params.map(bindValue), rowMode: 'object', resultRows })
+  return resultRows.map(devChatNoteChangeFromRow)
+}
+
+function loadDevChatNoteChange(db: Database, id: string): DevChatNoteChange | null {
+  return (
+    selectDevChatNoteChanges(db, 'SELECT * FROM chat_note_changes WHERE id = ?', [id])[0] ?? null
+  )
+}
+
+function devChatNoteChangeFromRow(row: Record<string, SqlValue>): DevChatNoteChange {
+  const operation = row['operation']
+  const state = row['state']
+  if (operation === undefined || state === undefined) {
+    throw new ReflectError('io', 'chat note change row is missing operation or state')
+  }
+  return {
+    id: String(row['id']),
+    conversationId: String(row['conversation_id']),
+    turnId: String(row['message_id']),
+    toolCallId: String(row['tool_call_id']),
+    path: String(row['path']),
+    sequence: Number(row['seq']),
+    operation: devChatNoteChangeOperation(operation),
+    beforeSource: row['before_source'] === null ? null : String(row['before_source']),
+    afterSource: String(row['after_source']),
+    beforeRevision: row['before_revision'] === null ? null : String(row['before_revision']),
+    afterRevision: String(row['after_revision']),
+    state: devChatNoteChangeState(state),
+    errorMessage: row['error_message'] === null ? null : String(row['error_message']),
+    createdMs: Number(row['created_ms']),
+    updatedMs: Number(row['updated_ms']),
+  }
+}
+
+function devChatNoteChangeOperation(value: SqlValue): DevChatNoteChangeOperation {
+  if (value === 'edit' || value === 'append' || value === 'create') {
+    return value
+  }
+  throw new ReflectError('io', `invalid chat note change operation: ${String(value)}`)
+}
+
+function devChatNoteChangeState(value: SqlValue): DevChatNoteChangeState {
+  if (
+    value === 'prepared' ||
+    value === 'applied' ||
+    value === 'undoing' ||
+    value === 'undone' ||
+    value === 'failed' ||
+    value === 'uncertain'
+  ) {
+    return value
+  }
+  throw new ReflectError('io', `invalid chat note change state: ${String(value)}`)
+}
+
+function samePreparedChange(stored: DevChatNoteChange, input: DevChatNoteChangeInput): boolean {
+  return (
+    stored.id === input.id &&
+    stored.conversationId === input.conversationId &&
+    stored.turnId === input.turnId &&
+    stored.toolCallId === input.toolCallId &&
+    stored.path === input.path &&
+    stored.sequence === input.sequence &&
+    stored.operation === input.operation &&
+    stored.beforeSource === input.beforeSource &&
+    stored.afterSource === input.afterSource &&
+    stored.beforeRevision === input.beforeRevision &&
+    stored.afterRevision === input.afterRevision &&
+    stored.createdMs === input.createdMs
+  )
 }
 
 function removeNote(db: Database, path: string): void {

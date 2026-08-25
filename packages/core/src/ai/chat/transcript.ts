@@ -1,15 +1,17 @@
 import type { ModelMessage } from 'ai'
 import type { ChatStreamEvent } from './stream-chat'
 import type { NoteToolCall, NoteToolResult } from './tools'
+import type { ChatPermissionMode } from './permissions'
 
 /**
  * The chat conversation model (Plan 10). A {@link ChatTurn} is the single
  * source of truth for one exchange: the user's text and image attachments,
  * the assistant's renderable parts, and the model-facing messages the turn
  * contributed. Hosts store only turns — the history a new turn resends is
- * *derived* via {@link buildHistory}, so the transcript and the model's view
- * can never drift apart. The same record is what the store persists
- * (`./store`), so a restored conversation renders and resends identically.
+ * derived via {@link buildHistory}; provider call sites use
+ * {@link buildPrivacySafeHistory} to remove a history suffix whose app-sourced
+ * material is no longer sendable. The same record is what the store persists,
+ * so privacy filtering never destroys the local transcript.
  *
  * Parts are built by folding the engine's {@link ChatStreamEvent}s with
  * {@link appendEvent} (pure, so the fold is unit-testable without
@@ -28,6 +30,15 @@ export interface ChatAttachment {
   dataUrl: string
 }
 
+/** App-sourced material an earlier answer may have derived from. */
+export interface ChatSourceRef {
+  kind: 'note' | 'asset'
+  path: string
+}
+
+/** `null` means a legacy turn's tool provenance cannot be classified safely. */
+export type ChatSourceProvenance = ChatSourceRef[] | null
+
 /** One renderable slice of an assistant message. */
 export type AssistantPart =
   | { kind: 'text'; text: string }
@@ -37,12 +48,16 @@ export type AssistantPart =
 /** One user message and everything the assistant did in response. */
 export interface ChatTurn {
   id: string
+  /** Capability captured when this turn was sent; restored chats never re-grant it. */
+  permissionMode: ChatPermissionMode
   userText: string
   /** Images attached to the user message (possibly its whole content). */
   attachments: ChatAttachment[]
   parts: AssistantPart[]
   /** The model-facing messages this turn contributed once it settled. */
   responseMessages: ModelMessage[]
+  /** Sources to revalidate before any later provider request. */
+  sourceProvenance: ChatSourceProvenance
   status: 'streaming' | 'done'
 }
 
@@ -170,4 +185,171 @@ export function buildHistory(turns: readonly ChatTurn[]): ModelMessage[] {
       userMessage(turn.userText, turn.attachments),
       ...turn.responseMessages,
     ])
+}
+
+/**
+ * Build provider history while revalidating every app-sourced note and asset.
+ * Once a source is private, unreadable, or unclassifiable, the contaminated
+ * turn and the whole suffix after it are omitted; the local transcript stays
+ * untouched.
+ */
+export async function buildPrivacySafeHistory(
+  turns: readonly ChatTurn[],
+  validate: (source: ChatSourceRef) => Promise<boolean>,
+): Promise<ModelMessage[]> {
+  const history: ModelMessage[] = []
+  for (const turn of turns) {
+    if (turn.responseMessages.length === 0) {
+      continue
+    }
+    const provenance = resolvedSourceProvenance(turn)
+    if (provenance === null) {
+      break
+    }
+    const verdicts = await Promise.all(
+      provenance.map(async (source) => {
+        try {
+          return await validate(source)
+        } catch {
+          return false
+        }
+      }),
+    )
+    if (verdicts.some((allowed) => !allowed)) {
+      break
+    }
+    history.push(userMessage(turn.userText, turn.attachments), ...turn.responseMessages)
+  }
+  return history
+}
+
+/** Provider-safe source paths exposed by one settled tool result. */
+export function sourceProvenanceForResult(result: NoteToolResult): ChatSourceProvenance {
+  switch (result.tool) {
+    case 'search':
+      return result.sourceProvenance
+    case 'read':
+      return result.notes.flatMap((note) =>
+        note.error === null ? [{ kind: 'note' as const, path: note.path }] : [],
+      )
+    case 'assets':
+      return result.assets.flatMap((asset) =>
+        asset.error === null ? [{ kind: 'asset' as const, path: asset.path }] : [],
+      )
+    case 'recents':
+      return result.notes.map((note) => ({ kind: 'note', path: note.path }))
+    case 'dailies':
+      return result.days.map((note) => ({ kind: 'note', path: note.path }))
+    case 'edit':
+    case 'append':
+    case 'create':
+      return result.outcome.ok ? [{ kind: 'note', path: result.outcome.path }] : []
+  }
+}
+
+/** Add one result's sources without duplicating a kind/path pair. */
+export function mergeSourceProvenance(
+  provenance: ChatSourceProvenance,
+  result: NoteToolResult,
+): ChatSourceProvenance {
+  if (provenance === null) {
+    return null
+  }
+  const resultProvenance = sourceProvenanceForResult(result)
+  if (resultProvenance === null) {
+    return null
+  }
+  const merged = new Map(provenance.map((source) => [sourceKey(source), source]))
+  for (const source of resultProvenance) {
+    merged.set(sourceKey(source), source)
+  }
+  return [...merged.values()]
+}
+
+/** Derive known provenance from renderable parts (used to upgrade legacy rows). */
+export function sourceProvenanceForParts(
+  parts: readonly AssistantPart[],
+  responseMessages: readonly ModelMessage[] = [],
+): ChatSourceProvenance {
+  const representedCalls = new Map<string, Extract<AssistantPart, { kind: 'tool' }>>()
+  let provenance: ChatSourceProvenance = []
+  for (const part of parts) {
+    if (part.kind !== 'tool') {
+      continue
+    }
+    representedCalls.set(part.call.toolCallId, part)
+    if (part.result !== null) {
+      provenance = mergeSourceProvenance(provenance, part.result)
+    }
+  }
+  const modelTools = modelToolIds(responseMessages)
+  const everyCallIsRepresented = [...modelTools.calls].every((toolCallId) =>
+    representedCalls.has(toolCallId),
+  )
+  const everyResultIsClassified = [...modelTools.results].every((toolCallId) => {
+    const represented = representedCalls.get(toolCallId)
+    return (
+      represented !== undefined &&
+      represented.result !== null &&
+      represented.result.toolCallId === toolCallId &&
+      represented.result.tool === represented.call.tool
+    )
+  })
+  return everyCallIsRepresented && everyResultIsClassified ? provenance : null
+}
+
+function resolvedSourceProvenance(turn: ChatTurn): ChatSourceProvenance {
+  const derived = sourceProvenanceForParts(turn.parts, turn.responseMessages)
+  if (derived === null || turn.sourceProvenance === null) {
+    return null
+  }
+  let merged: ChatSourceProvenance = turn.sourceProvenance
+  for (const part of turn.parts) {
+    if (part.kind === 'tool' && part.result !== null) {
+      merged = mergeSourceProvenance(merged, part.result)
+    }
+  }
+  return merged
+}
+
+interface ModelToolIds {
+  readonly calls: Set<string>
+  readonly results: Set<string>
+}
+
+function modelToolIds(messages: readonly ModelMessage[]): ModelToolIds {
+  const calls = new Set<string>()
+  const results = new Set<string>()
+  for (const message of messages) {
+    collectModelToolIds(message.content, calls, results)
+  }
+  return { calls, results }
+}
+
+function collectModelToolIds(value: unknown, calls: Set<string>, results: Set<string>): void {
+  if (!Array.isArray(value)) {
+    return
+  }
+  const entries: readonly unknown[] = value
+  for (const entry of entries) {
+    if (
+      typeof entry !== 'object' ||
+      entry === null ||
+      !('type' in entry) ||
+      !('toolCallId' in entry) ||
+      typeof entry.toolCallId !== 'string'
+    ) {
+      continue
+    }
+    const toolCallId = entry.toolCallId
+    if (entry.type === 'tool-call') {
+      calls.add(toolCallId)
+    } else if (entry.type === 'tool-result') {
+      results.add(toolCallId)
+    }
+  }
+}
+
+function sourceKey(source: ChatSourceRef): string {
+  return `${source.kind}:${source.path}`
 }

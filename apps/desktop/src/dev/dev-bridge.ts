@@ -1,4 +1,10 @@
-import { indexedNoteSchema, ReflectError, type AppPlatform, type IpcBridge } from '@reflect/core'
+import {
+  hashContent,
+  indexedNoteSchema,
+  ReflectError,
+  type AppPlatform,
+  type IpcBridge,
+} from '@reflect/core'
 import { z } from 'zod'
 import type { DevFileStore } from '@/dev/dev-file-store'
 import type { DevIndexDb } from '@/dev/dev-index-db'
@@ -17,7 +23,26 @@ export interface DevBridgeBackend {
 const dbQueryArgsSchema = z.object({ sql: z.string(), params: z.array(z.unknown()) })
 const pathArgsSchema = z.object({ path: z.string() })
 const writeArgsSchema = z.object({ path: z.string(), contents: z.string() })
-const createArgsSchema = writeArgsSchema.extend({ generation: z.number().int().nonnegative() })
+const createArgsSchema = writeArgsSchema.extend({
+  generation: z.number().int().nonnegative(),
+  requesterOwnerId: z.string().optional(),
+})
+const revisionWriteArgsSchema = createArgsSchema.extend({
+  expectedRevision: z.string(),
+  requesterOwnerId: z.string().optional(),
+})
+const revisionTrashArgsSchema = z.object({
+  path: z.string(),
+  expectedRevision: z.string(),
+  generation: z.number().int().nonnegative(),
+  requesterOwnerId: z.string().optional(),
+})
+const noteWindowClaimArgsSchema = z.object({
+  path: z.string(),
+  ownerId: z.string(),
+  generation: z.number().int().nonnegative(),
+})
+const noteWindowReleaseArgsSchema = z.object({ path: z.string(), ownerId: z.string() })
 const moveArgsSchema = z.object({ from: z.string(), to: z.string() })
 const moveRequestArgsSchema = z.object({
   request: z.object({ from: z.string(), to: z.string() }),
@@ -45,10 +70,60 @@ const chatSaveArgsSchema = z.object({
     attachments: z.string(),
     parts: z.string(),
     responseMessages: z.string(),
+    permissionMode: z.enum(['read', 'readWrite']).default('read'),
+    sourceProvenance: z.string().nullable().default(null),
     createdMs: z.number(),
   }),
 })
 const chatDeleteArgsSchema = z.object({ id: z.string() })
+const changeOperationSchema = z.enum(['edit', 'append', 'create'])
+const changeStateSchema = z.enum([
+  'prepared',
+  'applied',
+  'undoing',
+  'undone',
+  'failed',
+  'uncertain',
+])
+const chatNoteChangeInputSchema = z.object({
+  id: z.string(),
+  conversationId: z.string(),
+  turnId: z.string(),
+  toolCallId: z.string(),
+  path: z.string(),
+  sequence: z.number().int().nonnegative(),
+  operation: changeOperationSchema,
+  beforeSource: z.string().nullable(),
+  afterSource: z.string(),
+  beforeRevision: z.string().nullable(),
+  afterRevision: z.string(),
+  createdMs: z.number(),
+})
+const chatNoteChangePrepareArgsSchema = z.object({
+  change: chatNoteChangeInputSchema,
+  generation: z.number().int().nonnegative(),
+})
+const chatNoteChangeStateArgsSchema = z.object({
+  id: z.string(),
+  expectedState: changeStateSchema,
+  state: changeStateSchema,
+  errorMessage: z.string().nullable(),
+  updatedMs: z.number(),
+  generation: z.number().int().nonnegative(),
+})
+const chatNoteChangesStateBatchArgsSchema = z.object({
+  ids: z.array(z.string()),
+  expectedState: changeStateSchema,
+  state: changeStateSchema,
+  errorMessage: z.string().nullable(),
+  updatedMs: z.number(),
+  generation: z.number().int().nonnegative(),
+})
+const chatTurnChangesArgsSchema = z.object({
+  turnId: z.string(),
+  generation: z.number().int().nonnegative(),
+})
+const chatPendingChangesArgsSchema = z.object({ generation: z.number().int().nonnegative() })
 
 /**
  * The in-browser stand-in for the Rust shell (dev builds only): answers the
@@ -70,6 +145,16 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
   // In-memory keychain stand-in so the AI-provider settings flow (and chat,
   // against a CORS-permissive provider) works end-to-end in the harness.
   const secrets = new Map<string, string>()
+  const noteOwners = new Map<string, Set<string>>()
+
+  function ownershipPathKey(path: string): string {
+    return path.normalize('NFC').toLowerCase().normalize('NFC')
+  }
+
+  function noteOwnedByAnother(path: string, requesterOwnerId?: string): boolean {
+    const owners = noteOwners.get(ownershipPathKey(path))
+    return owners !== undefined && [...owners].some((ownerId) => ownerId !== requesterOwnerId)
+  }
 
   async function invoke(command: string, args: Record<string, unknown>): Promise<unknown> {
     switch (command) {
@@ -133,6 +218,53 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         }
         return contents
       }
+      case 'note_read_for_ai': {
+        const { path, generation, requesterOwnerId } = z
+          .object({
+            path: z.string(),
+            generation: z.number().int().nonnegative(),
+            requesterOwnerId: z.string().optional(),
+          })
+          .parse(args)
+        if (generation !== graphInfo.generation) {
+          throw new ReflectError(
+            'io',
+            'the graph changed since this command was issued; dropping it',
+          )
+        }
+        if (noteOwnedByAnother(path, requesterOwnerId)) {
+          return { kind: 'blocked' }
+        }
+        const source = files.read(path)
+        if (source === null) {
+          return { kind: 'missing' }
+        }
+        return { kind: 'content', source, revision: await hashContent(source) }
+      }
+      case 'note_window_claim': {
+        const { path, ownerId, generation } = noteWindowClaimArgsSchema.parse(args)
+        if (generation !== graphInfo.generation) {
+          throw new ReflectError(
+            'io',
+            'the graph changed since this command was issued; dropping it',
+          )
+        }
+        const key = ownershipPathKey(path)
+        const owners = noteOwners.get(key) ?? new Set<string>()
+        owners.add(ownerId)
+        noteOwners.set(key, owners)
+        return null
+      }
+      case 'note_window_release': {
+        const { path, ownerId } = noteWindowReleaseArgsSchema.parse(args)
+        const key = ownershipPathKey(path)
+        const owners = noteOwners.get(key)
+        owners?.delete(ownerId)
+        if (owners?.size === 0) {
+          noteOwners.delete(key)
+        }
+        return null
+      }
       case 'note_read_local': {
         // The in-memory store has no iCloud, so a note is never evicted.
         const { path } = pathArgsSchema.parse(args)
@@ -146,13 +278,39 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         const { path, contents } = writeArgsSchema.parse(args)
         return files.write(path, contents)
       }
-      case 'note_create': {
-        const { path, contents, generation } = createArgsSchema.parse(args)
+      case 'note_write_if_revision': {
+        const { path, contents, expectedRevision, generation, requesterOwnerId } =
+          revisionWriteArgsSchema.parse(args)
         if (generation !== graphInfo.generation) {
           throw new ReflectError(
             'io',
             'the graph changed since this command was issued; dropping it',
           )
+        }
+        if (noteOwnedByAnother(path, requesterOwnerId)) {
+          return { kind: 'blocked' }
+        }
+        const current = files.read(path)
+        if (current === null) {
+          return { kind: 'missing' }
+        }
+        const currentRevision = await hashContent(current)
+        if (currentRevision !== expectedRevision) {
+          return { kind: 'stale', currentRevision }
+        }
+        const modifiedMs = files.write(path, contents)
+        return { kind: 'written', revision: await hashContent(contents), modifiedMs }
+      }
+      case 'note_create': {
+        const { path, contents, generation, requesterOwnerId } = createArgsSchema.parse(args)
+        if (generation !== graphInfo.generation) {
+          throw new ReflectError(
+            'io',
+            'the graph changed since this command was issued; dropping it',
+          )
+        }
+        if (noteOwnedByAnother(path, requesterOwnerId)) {
+          return { kind: 'blocked' }
         }
         return files.create(path, contents)
       }
@@ -161,6 +319,29 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       case 'note_delete': {
         files.remove(pathArgsSchema.parse(args).path)
         return null
+      }
+      case 'note_trash_if_revision': {
+        const { path, expectedRevision, generation, requesterOwnerId } =
+          revisionTrashArgsSchema.parse(args)
+        if (generation !== graphInfo.generation) {
+          throw new ReflectError(
+            'io',
+            'the graph changed since this command was issued; dropping it',
+          )
+        }
+        if (noteOwnedByAnother(path, requesterOwnerId)) {
+          return { kind: 'blocked' }
+        }
+        const current = files.read(path)
+        if (current === null) {
+          return { kind: 'missing' }
+        }
+        const currentRevision = await hashContent(current)
+        if (currentRevision !== expectedRevision) {
+          return { kind: 'stale', currentRevision }
+        }
+        files.remove(path)
+        return { kind: 'trashed' }
       }
       case 'list_files':
         return files.list()
@@ -293,6 +474,31 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         index.deleteChatConversation(chatDeleteArgsSchema.parse(args).id)
         return null
       }
+      case 'chat_note_change_prepare': {
+        const { change, generation } = chatNoteChangePrepareArgsSchema.parse(args)
+        requireDevGeneration(generation, graphInfo.generation)
+        return index.prepareChatNoteChange(change)
+      }
+      case 'chat_note_change_set_state': {
+        const { generation, ...input } = chatNoteChangeStateArgsSchema.parse(args)
+        requireDevGeneration(generation, graphInfo.generation)
+        return index.setChatNoteChangeState(input)
+      }
+      case 'chat_note_changes_set_state_batch': {
+        const { generation, ...input } = chatNoteChangesStateBatchArgsSchema.parse(args)
+        requireDevGeneration(generation, graphInfo.generation)
+        return index.setChatNoteChangesStateBatch(input)
+      }
+      case 'chat_note_changes_for_turn': {
+        const { turnId, generation } = chatTurnChangesArgsSchema.parse(args)
+        requireDevGeneration(generation, graphInfo.generation)
+        return index.chatNoteChangesForTurn(turnId)
+      }
+      case 'chat_note_changes_pending': {
+        const { generation } = chatPendingChangesArgsSchema.parse(args)
+        requireDevGeneration(generation, graphInfo.generation)
+        return index.pendingChatNoteChanges()
+      }
 
       default:
         console.error(`[dev-bridge] unimplemented command "${command}"`, args)
@@ -309,6 +515,12 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
     // hooks mount cleanly in the harness.
     listen: async () => () => {},
     listenPlugin: async () => {},
+  }
+}
+
+function requireDevGeneration(generation: number, expected: number): void {
+  if (generation !== expected) {
+    throw new ReflectError('io', 'the graph changed since this command was issued; dropping it')
   }
 }
 

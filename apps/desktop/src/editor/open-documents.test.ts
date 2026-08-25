@@ -9,8 +9,10 @@ import {
 
 function fakeSession(path: string, log: string[]): NoteSession {
   return {
+    ownerId: null,
     path,
-    retarget: () => {},
+    retarget: async () => {},
+    releaseRetargetedPath: async () => {},
     load: () => {},
     editorChanged: () => {},
     externalChanged: () => {
@@ -25,12 +27,15 @@ function fakeSession(path: string, log: string[]): NoteSession {
     commitFrontmatter: async () => true,
     content: () => '',
     liveContent: () => '',
+    readFreshContent: async () => ({ source: '', revision: '' }),
     updateFrontmatter: () => true,
     commitTaskToggle: async () => false,
     commitTaskEdit: async () => false,
     commitTaskRemove: async () => false,
     commitTaskToBullet: async () => false,
     commitBodyAppend: async () => false,
+    commitBodyMutation: async () => ({ status: 'refused', reason: 'no_write' }),
+    commitConditionalTrash: async () => ({ kind: 'refused', reason: 'no_write' }),
     dispose: () => {},
     discard: () => {},
   }
@@ -158,7 +163,7 @@ describe('reloadOpenDocuments with live sessions', () => {
       path: 'notes/stale.md',
       // No writer: the session tracks dirtiness but never writes, so a dirty
       // buffer can't race a debounced save into the assertions.
-      io: { read: async () => read(), write: null },
+      io: { read: async () => read(), write: null, writeIfRevision: null },
       classify: () => 'exact',
       onSnapshot: (snapshot) => {
         snapshots.push(snapshot)

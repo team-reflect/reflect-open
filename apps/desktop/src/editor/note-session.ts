@@ -7,7 +7,14 @@ export { frontmatterPatchToYaml } from './note-session-frontmatter'
 export { INITIAL_NOTE_SNAPSHOT } from './note-session-types'
 export type { FrontmatterPatch } from './note-session-frontmatter'
 export type {
+  NoteBodyMutationOptions,
+  NoteBodyMutationPreparation,
+  NoteBodyMutationRefusal,
+  NoteBodyMutationResult,
+  NoteConditionalTrashOptions,
+  NoteConditionalTrashResult,
   NoteContentOrigin,
+  NoteFreshContent,
   NoteSession,
   NoteSessionIo,
   NoteSessionOptions,

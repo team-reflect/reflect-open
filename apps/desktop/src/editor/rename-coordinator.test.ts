@@ -101,12 +101,14 @@ function fakeSession(content: string): NoteSession & {
 } {
   let path = PATH
   return {
+    ownerId: null,
     get path() {
       return path
     },
-    retarget: vi.fn((to: string) => {
+    retarget: vi.fn(async (to: string) => {
       path = to
     }),
+    releaseRetargetedPath: async () => {},
     load: () => {},
     editorChanged: () => {},
     externalChanged: () => {},
@@ -117,12 +119,15 @@ function fakeSession(content: string): NoteSession & {
     commitFrontmatter: async () => true,
     content: () => content,
     liveContent: () => content,
+    readFreshContent: async () => ({ source: content, revision: '' }),
     updateFrontmatter: vi.fn(() => true),
     commitTaskToggle: async () => false,
     commitTaskEdit: async () => false,
     commitTaskRemove: async () => false,
     commitTaskToBullet: async () => false,
     commitBodyAppend: async () => false,
+    commitBodyMutation: async () => ({ status: 'refused', reason: 'no_write' }),
+    commitConditionalTrash: async () => ({ kind: 'refused', reason: 'no_write' }),
     dispose: () => {},
     discard: () => {},
   }

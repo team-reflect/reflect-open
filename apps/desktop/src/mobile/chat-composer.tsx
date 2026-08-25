@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/attachment'
 import { Button } from '@/components/ui/button'
 import { ChatModelDrawer } from '@/mobile/chat-model-drawer'
+import { ChatPermissionDrawer } from '@/mobile/chat-permission-drawer'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus'
 import { useChatSession } from '@/providers/chat-provider'
 import { useRouter } from '@/routing/router'
@@ -28,6 +29,7 @@ export function MobileChatComposer(): ReactElement {
   const {
     status,
     activeModel,
+    permissionMode,
     draft,
     setDraft,
     attachments,
@@ -37,15 +39,17 @@ export function MobileChatComposer(): ReactElement {
     stop,
   } = useChatSession()
   const [modelOpen, setModelOpen] = useState(false)
+  const [permissionOpen, setPermissionOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const streaming = status === 'streaming'
+  const busy = status !== 'idle'
   const empty = draft.trim() === '' && attachments.length === 0
 
   useArrivalFocus({ arrivalSeq, arrivalFocusEditor, target: textareaRef })
 
   const submit = (): void => {
-    if (streaming || empty) {
+    if (busy || empty) {
       return
     }
     void send(draft)
@@ -116,8 +120,20 @@ export function MobileChatComposer(): ReactElement {
         </Button>
         <button
           type="button"
+          aria-label={`Chat permissions, ${permissionMode === 'readWrite' ? 'Read & write' : 'Read only'}`}
+          aria-expanded={permissionOpen}
+          disabled={busy}
+          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-text-muted disabled:opacity-50"
+          onClick={() => setPermissionOpen(true)}
+        >
+          {permissionMode === 'readWrite' ? 'Write' : 'Read'}
+          <ChevronDown aria-hidden className="size-3 shrink-0" />
+        </button>
+        <button
+          type="button"
           aria-label="Model"
-          className="flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-text-muted"
+          disabled={busy}
+          className="flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-text-muted disabled:opacity-50"
           onClick={() => setModelOpen(true)}
         >
           <span className="min-w-0 truncate">
@@ -136,13 +152,14 @@ export function MobileChatComposer(): ReactElement {
           <Button
             size="icon-sm"
             aria-label="Send"
-            disabled={empty || activeModel === null}
+            disabled={busy || empty || activeModel === null}
             onClick={submit}
           >
             <ArrowUp aria-hidden />
           </Button>
         )}
       </div>
+      <ChatPermissionDrawer open={permissionOpen} onOpenChange={setPermissionOpen} />
       <ChatModelDrawer open={modelOpen} onOpenChange={setModelOpen} />
     </div>
   )

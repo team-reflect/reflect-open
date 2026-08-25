@@ -1,5 +1,6 @@
 import type { CloudGraphContext, CloudSafe } from '../checkers'
 import { normalizeChatSystemPrompt } from '../../settings/schema'
+import type { ChatPermissionMode } from './permissions'
 
 /**
  * The grounded chat system prompt (Plan 10). Reflect's chat is deliberately
@@ -23,6 +24,8 @@ export interface SystemPromptInput {
    * it could not be loaded — the prompt then simply omits the overview.
    */
   context: CloudSafe<CloudGraphContext> | null
+  /** Capability captured for this turn; defaults to least privilege. */
+  permissionMode?: ChatPermissionMode
 }
 
 /** Build the system prompt for one chat session. */
@@ -31,6 +34,7 @@ export function chatSystemPrompt({
   context,
   semanticSearchEnabled,
   customSystemPrompt,
+  permissionMode = 'read',
 }: SystemPromptInput): string {
   const customInstructions = normalizeChatSystemPrompt(customSystemPrompt)
   return [
@@ -47,6 +51,7 @@ export function chatSystemPrompt({
     '- Ground answers in what the tools return. If the notes don’t cover something, say so plainly instead of guessing.',
     '- Cite every note you draw on with a wiki link of its exact title, e.g. [[Project Atlas]]. Do not invent titles that the tools did not return.',
     '- Private notes are excluded from search and cannot be read. If a tool reports a note is private, tell the user that — never speculate about its contents.',
+    ...permissionGuidance(permissionMode),
     '',
     'Style: answer in concise markdown. Prefer short paragraphs and lists over headings.',
     ...(customInstructions === ''
@@ -57,6 +62,19 @@ export function chatSystemPrompt({
           customInstructions,
         ]),
   ].join('\n')
+}
+
+function permissionGuidance(permissionMode: ChatPermissionMode): string[] {
+  if (permissionMode === 'read') {
+    return [
+      '- This turn is read-only. You cannot edit or create notes. If the user asks for a change, explain that they can enable Read & write and send the request again.',
+    ]
+  }
+  return [
+    '- This turn may edit and create notes. Before editing or appending, call read_notes and use its exact path and revision in the write tool.',
+    '- Use edit_note for exact body replacements, append_to_note for a new block at the end, and create_note for a new titled note. Never attempt to change frontmatter, titles, paths, or private notes.',
+    '- Changes apply immediately and are reviewable and undoable. State clearly what changed after the tools settle.',
+  ]
 }
 
 /** The search-specific prompt rule, matching the active retrieval mode. */

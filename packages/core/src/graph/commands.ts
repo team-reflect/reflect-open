@@ -126,6 +126,45 @@ export async function readNote(path: string, generation?: number): Promise<strin
   return await call('note_read', { path, generation }, z.string())
 }
 
+const noteAiReadOutcomeSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('content'), source: z.string(), revision: z.string() }),
+  z.object({ kind: z.literal('blocked') }),
+  z.object({ kind: z.literal('missing') }),
+])
+
+/** A full-source AI read guarded against live editors in every webview/process. */
+export type NoteAiReadOutcome = z.infer<typeof noteAiReadOutcomeSchema>
+
+/**
+ * Read a note for external AI use only when no other webview or Reflect
+ * process owns a live buffer for the path.
+ */
+export async function readNoteForAi(
+  path: string,
+  generation: number,
+  requesterOwnerId?: string,
+): Promise<NoteAiReadOutcome> {
+  return await call(
+    'note_read_for_ai',
+    { path, generation, ...(requesterOwnerId ? { requesterOwnerId } : {}) },
+    noteAiReadOutcomeSchema,
+  )
+}
+
+/** Claim a live note path before its editor reads or accepts input. */
+export async function claimNoteWindow(
+  path: string,
+  ownerId: string,
+  generation: number,
+): Promise<void> {
+  await call('note_window_claim', { path, ownerId, generation }, voidSchema)
+}
+
+/** Release one exact live-note claim after its final flush has settled. */
+export async function releaseNoteWindow(path: string, ownerId: string): Promise<void> {
+  await call('note_window_release', { path, ownerId }, voidSchema)
+}
+
 const localNoteReadSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('content'), content: z.string() }),
   z.object({ kind: z.literal('evicted') }),
@@ -163,6 +202,50 @@ export async function writeNote(path: string, contents: string, generation: numb
   echoLocalWrite({ path, kind: 'upsert', modifiedMs: modifiedMs ?? Date.now() })
 }
 
+const noteRevisionWriteOutcomeSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('written'),
+    revision: z.string(),
+    modifiedMs: z.number().nullable(),
+  }),
+  z.object({ kind: z.literal('stale'), currentRevision: z.string() }),
+  z.object({ kind: z.literal('missing') }),
+  z.object({ kind: z.literal('contended'), currentRevision: z.string().nullable() }),
+  z.object({ kind: z.literal('blocked') }),
+])
+
+/** Outcome of a full-source compare-and-swap note write. */
+export type NoteRevisionWriteOutcome = z.infer<typeof noteRevisionWriteOutcomeSchema>
+
+/**
+ * Replace a closed note only when its complete current source still matches
+ * `expectedRevision`. Reflect-owned writes serialize with this native compare
+ * and replacement; stale or missing files are returned as data.
+ */
+export async function writeNoteIfRevision(
+  path: string,
+  contents: string,
+  expectedRevision: string,
+  generation: number,
+  requesterOwnerId?: string,
+): Promise<NoteRevisionWriteOutcome> {
+  const outcome = await call(
+    'note_write_if_revision',
+    {
+      path,
+      contents,
+      expectedRevision,
+      generation,
+      ...(requesterOwnerId ? { requesterOwnerId } : {}),
+    },
+    noteRevisionWriteOutcomeSchema,
+  )
+  if (outcome.kind === 'written') {
+    echoLocalWrite({ path, kind: 'upsert', modifiedMs: outcome.modifiedMs ?? Date.now() })
+  }
+  return outcome
+}
+
 /**
  * Atomically create a note only if `path` is still unoccupied. A collision is
  * returned as data and never overwrites the winner, closing the race between a
@@ -172,8 +255,13 @@ export async function createNoteIfAbsent(
   path: string,
   contents: string,
   generation: number,
+  requesterOwnerId?: string,
 ): Promise<NoteCreateOutcome> {
-  const outcome = await call('note_create', { path, contents, generation }, noteCreateOutcomeSchema)
+  const outcome = await call(
+    'note_create',
+    { path, contents, generation, ...(requesterOwnerId ? { requesterOwnerId } : {}) },
+    noteCreateOutcomeSchema,
+  )
   if (outcome.kind === 'created') {
     echoLocalWrite({ path, kind: 'upsert', modifiedMs: outcome.modifiedMs ?? Date.now() })
   }
@@ -283,6 +371,35 @@ export async function noteExists(path: string): Promise<boolean> {
 export async function deleteNote(path: string, generation: number): Promise<void> {
   await call('note_delete', { path, generation }, voidSchema)
   echoLocalWrite({ path, kind: 'remove' })
+}
+
+const noteRevisionTrashOutcomeSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('trashed') }),
+  z.object({ kind: z.literal('stale'), currentRevision: z.string() }),
+  z.object({ kind: z.literal('missing') }),
+  z.object({ kind: z.literal('contended'), currentRevision: z.string().nullable() }),
+  z.object({ kind: z.literal('blocked') }),
+])
+
+/** Outcome of a revision-guarded move to the platform trash. */
+export type NoteRevisionTrashOutcome = z.infer<typeof noteRevisionTrashOutcomeSchema>
+
+/** Move a note to trash only while its complete source has the expected revision. */
+export async function trashNoteIfRevision(
+  path: string,
+  expectedRevision: string,
+  generation: number,
+  requesterOwnerId?: string,
+): Promise<NoteRevisionTrashOutcome> {
+  const outcome = await call(
+    'note_trash_if_revision',
+    { path, expectedRevision, generation, ...(requesterOwnerId ? { requesterOwnerId } : {}) },
+    noteRevisionTrashOutcomeSchema,
+  )
+  if (outcome.kind === 'trashed') {
+    echoLocalWrite({ path, kind: 'remove' })
+  }
+  return outcome
 }
 
 /**

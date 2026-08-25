@@ -19,6 +19,11 @@ export interface NoteChunk {
   contentHash: string
 }
 
+/** One synthetic asset-description chunk with its contributing asset retained. */
+export interface AttributedAssetChunk extends NoteChunk {
+  assetPath: string
+}
+
 /** Accumulate sentences up to this size before starting a new chunk. */
 const TARGET_CHARS = 1000
 /** A trailing chunk smaller than this merges into its predecessor. */
@@ -177,7 +182,21 @@ export async function chunkAssetDescriptions(
   bodies: readonly AssetDescriptionBody[],
   baseOffset: number,
 ): Promise<NoteChunk[]> {
-  const chunks: NoteChunk[] = []
+  return (await chunkAssetDescriptionsWithAttribution(bodies, baseOffset)).map(
+    ({ assetPath: _assetPath, ...chunk }) => chunk,
+  )
+}
+
+/**
+ * The attributed form of {@link chunkAssetDescriptions}. Retrieval uses this
+ * to prove which live asset description produced a stored semantic chunk;
+ * the embedding index keeps the historical attribution-free row shape.
+ */
+export async function chunkAssetDescriptionsWithAttribution(
+  bodies: readonly AssetDescriptionBody[],
+  baseOffset: number,
+): Promise<AttributedAssetChunk[]> {
+  const chunks: AttributedAssetChunk[] = []
   let offset = baseOffset
   let budget = MAX_ASSET_TEXT_CHARS
   for (const { assetPath, body } of bodies) {
@@ -193,7 +212,7 @@ export async function chunkAssetDescriptions(
     const bodyChunks = await mergeRuntTail(await chunkRun(text, offset, heading), (from, to) =>
       text.slice(from - offset, to - offset),
     )
-    chunks.push(...bodyChunks)
+    chunks.push(...bodyChunks.map((chunk) => ({ ...chunk, assetPath })))
     offset += text.length + 2 // as if joined by the FTS fold's blank line
   }
   return chunks

@@ -615,6 +615,114 @@ describe('createDevIndexDb', () => {
     expect(db.query('SELECT count(*) AS rows FROM chat_messages', [])).toEqual([{ rows: 0 }])
   })
 
+  it('journals live changes and claims Undo batches atomically', async () => {
+    const db = await openDb()
+    db.saveChatMessage(
+      { id: 'c1', title: 'edit this', createdMs: 1, updatedMs: 1 },
+      {
+        id: 'm1',
+        conversationId: 'c1',
+        userText: 'edit it',
+        attachments: '[]',
+        parts: '[]',
+        responseMessages: '[]',
+        createdMs: 1,
+      },
+    )
+    const change = (id: string, sequence: number) => ({
+      id,
+      conversationId: 'c1',
+      turnId: 'm1',
+      toolCallId: `tool-${sequence}`,
+      path: `notes/${sequence}.md`,
+      sequence,
+      operation: 'edit' as const,
+      beforeSource: '# Before\n',
+      afterSource: '# After\n',
+      beforeRevision: 'before',
+      afterRevision: 'after',
+      createdMs: 2 + sequence,
+    })
+    db.prepareChatNoteChange(change('change-0', 0))
+    db.prepareChatNoteChange(change('change-1', 1))
+
+    // Current-process prepares are live, not crash-recovery candidates.
+    expect(db.pendingChatNoteChanges()).toEqual([])
+    expect(() => db.deleteChatConversation('c1')).toThrow(/unfinished note changes/)
+
+    const ids = ['change-0', 'change-1']
+    expect(
+      db.setChatNoteChangesStateBatch({
+        ids,
+        expectedState: 'prepared',
+        state: 'applied',
+        errorMessage: null,
+        updatedMs: 3,
+      }),
+    ).toMatchObject({ kind: 'updated' })
+    expect(
+      db.setChatNoteChangesStateBatch({
+        ids,
+        expectedState: 'applied',
+        state: 'undoing',
+        errorMessage: null,
+        updatedMs: 4,
+      }),
+    ).toMatchObject({ kind: 'updated' })
+    expect(() => db.deleteChatConversation('c1')).toThrow(/unfinished note changes/)
+
+    db.setChatNoteChangeState({
+      id: 'change-0',
+      expectedState: 'undoing',
+      state: 'applied',
+      errorMessage: 'stale',
+      updatedMs: 5,
+    })
+    const mismatch = db.setChatNoteChangesStateBatch({
+      ids,
+      expectedState: 'undoing',
+      state: 'undone',
+      errorMessage: null,
+      updatedMs: 6,
+    })
+    expect(mismatch).toMatchObject({ kind: 'stateMismatch' })
+    expect(db.chatNoteChangesForTurn('m1').map((row) => row.state)).toEqual(['applied', 'undoing'])
+  })
+
+  it('only exposes earlier-process work for recovery and does not let it block deletion', async () => {
+    const db = await openDb()
+    db.saveChatMessage(
+      { id: 'c1', title: 'edit this', createdMs: 1, updatedMs: 1 },
+      {
+        id: 'm1',
+        conversationId: 'c1',
+        userText: 'edit it',
+        attachments: '[]',
+        parts: '[]',
+        responseMessages: '[]',
+        createdMs: 1,
+      },
+    )
+    db.prepareChatNoteChange({
+      id: 'change-1',
+      conversationId: 'c1',
+      turnId: 'm1',
+      toolCallId: 'tool-1',
+      path: 'notes/a.md',
+      sequence: 0,
+      operation: 'edit',
+      beforeSource: '# Before\n',
+      afterSource: '# After\n',
+      beforeRevision: 'before',
+      afterRevision: 'after',
+      createdMs: 2,
+    })
+    // Simulate a database reopened by a fresh native process.
+    db.query("UPDATE chat_note_changes SET owner_session = 'earlier-process'", [])
+    expect(db.pendingChatNoteChanges()).toHaveLength(1)
+    expect(() => db.deleteChatConversation('c1')).not.toThrow()
+  })
+
   it('clearing the index leaves chat history alone (the durable-tables rule)', async () => {
     const db = await openDb()
     db.applyNote(sampleNote())
@@ -630,10 +738,25 @@ describe('createDevIndexDb', () => {
         createdMs: 1,
       },
     )
+    db.prepareChatNoteChange({
+      id: 'change-1',
+      conversationId: 'c1',
+      turnId: 'm1',
+      toolCallId: 'tool-1',
+      path: 'notes/a.md',
+      sequence: 0,
+      operation: 'edit',
+      beforeSource: '# Before\n',
+      afterSource: '# After\n',
+      beforeRevision: 'before',
+      afterRevision: 'after',
+      createdMs: 2,
+    })
 
     db.clear()
 
     expect(db.query('SELECT count(*) AS rows FROM notes', [])).toEqual([{ rows: 0 }])
     expect(db.query('SELECT count(*) AS rows FROM chat_messages', [])).toEqual([{ rows: 1 }])
+    expect(db.query('SELECT count(*) AS rows FROM chat_note_changes', [])).toEqual([{ rows: 1 }])
   })
 })

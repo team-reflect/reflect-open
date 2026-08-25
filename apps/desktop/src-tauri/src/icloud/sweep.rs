@@ -197,36 +197,45 @@ fn run_sweep(
                 continue; // the provider says no conflict lives here
             }
         }
-        let abs = root.join(&file.path);
-        let scan = unresolved_versions(&abs);
-        if scan.none() {
-            continue;
-        }
-        if !scan.complete {
-            // A version with no readable store path can't be archived, and
-            // mark_resolved would purge it — defer the whole file instead.
-            outcome.deferred.push(file.path.clone());
-            continue;
-        }
-        if skip.contains(file.path.as_str()) {
-            outcome.deferred.push(file.path.clone());
-            continue;
-        }
-        // Order the working copy by the version store's date for it — the
-        // metadata the *other* device sees for this same content as a
-        // conflict version — never the filesystem mtime, which iCloud does
-        // not propagate bit-exactly. Mixed keys would let two devices order
-        // the same content pair differently and emit different merged bytes.
-        let current_ms = current_version_modified_ms(&abs).unwrap_or(file.modified_ms);
-        match resolve_file(root, &file.path, current_ms, scan.versions, &shadow) {
-            Ok(resolved) => {
-                apply_file_resolution(root, &file.path, resolved, &shadow, &mut outcome)
+        if let Err(err) = crate::fs::with_file_mutation_lock(root, || {
+            // Re-read every version only after acquiring the same graph lock
+            // as editor/AI writes. Resolution, note replacement, and shadow
+            // bookkeeping are one compound mutation; nested atomic writes
+            // reuse this thread's already-held lock.
+            let abs = root.join(&file.path);
+            let scan = unresolved_versions(&abs);
+            if scan.none() {
+                return Ok(());
             }
-            Err(err) => {
-                // One bad note must not stop the sweep; versions stay
-                // unresolved and the next sweep retries it.
-                tracing::warn!(path = %file.path, ?err, "conflict resolution failed");
+            if !scan.complete {
+                // A version with no readable store path can't be archived,
+                // and mark_resolved would purge it — defer the whole file.
+                outcome.deferred.push(file.path.clone());
+                return Ok(());
             }
+            if skip.contains(file.path.as_str()) {
+                outcome.deferred.push(file.path.clone());
+                return Ok(());
+            }
+            // Order the working copy by the version store's date for it — the
+            // metadata the *other* device sees for this same content as a
+            // conflict version — never the filesystem mtime, which iCloud
+            // does not propagate bit-exactly.
+            let current_ms = current_version_modified_ms(&abs).unwrap_or(file.modified_ms);
+            match resolve_file(root, &file.path, current_ms, scan.versions, &shadow) {
+                Ok(resolved) => {
+                    apply_file_resolution(root, &file.path, resolved, &shadow, &mut outcome)
+                }
+                Err(err) => {
+                    // One bad note must not stop the sweep; versions stay
+                    // unresolved and the next sweep retries it.
+                    tracing::warn!(path = %file.path, ?err, "conflict resolution failed");
+                }
+            }
+            Ok(())
+        }) {
+            tracing::warn!(path = %file.path, ?err, "failed to lock conflict resolution");
+            outcome.deferred.push(file.path.clone());
         }
     }
 
@@ -560,7 +569,13 @@ fn fold_collision_duplicates(
             outcome.deferred.push(file.path.clone());
             continue;
         }
-        fold_duplicate(root, file, &canonical_rel, shadow, outcome);
+        if let Err(err) = crate::fs::with_file_mutation_lock(root, || {
+            fold_duplicate(root, file, &canonical_rel, shadow, outcome);
+            Ok(())
+        }) {
+            tracing::warn!(path = %file.path, ?err, "failed to lock collision fold");
+            outcome.deferred.push(file.path.clone());
+        }
     }
 }
 

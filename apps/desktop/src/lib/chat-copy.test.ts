@@ -9,6 +9,8 @@ function turnWith(parts: ChatTurn['parts']): ChatTurn {
     attachments: [],
     parts,
     responseMessages: [],
+    permissionMode: 'read',
+    sourceProvenance: [],
     status: 'done',
   }
 }
@@ -20,7 +22,13 @@ describe('assistantReplyMarkdown', () => {
       {
         kind: 'tool',
         call: { tool: 'search', toolCallId: 'tool-1', query: 'atlas' },
-        result: { tool: 'search', toolCallId: 'tool-1', query: 'atlas', hits: [] },
+        result: {
+          tool: 'search',
+          toolCallId: 'tool-1',
+          query: 'atlas',
+          hits: [],
+          sourceProvenance: [],
+        },
         error: null,
       },
       { kind: 'text', text: 'It ships in June. [[Atlas]]\n' },
