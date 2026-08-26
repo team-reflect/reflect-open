@@ -120,6 +120,8 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
   const recorderInitRef = useRef<MediaRecorderOptions>({})
   /** Segments emitted so far this session. */
   const partsRef = useRef(0)
+  /** Elapsed time the next rotation is due at, bumped when one is scheduled. */
+  const rotateAtRef = useRef(0)
   /** Reminder boundaries already crossed this session. */
   const remindersRef = useRef(0)
   /** Serializes rotations against stop — each op awaits the previous onstop. */
@@ -143,6 +145,7 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
     recorderRef.current = null
     chunksRef.current = []
     partsRef.current = 0
+    rotateAtRef.current = 0
     remindersRef.current = 0
     if (intervalRef.current !== null) {
       clearInterval(intervalRef.current)
@@ -239,6 +242,7 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
     try {
       chunksRef.current = []
       partsRef.current = 0
+      rotateAtRef.current = optionsRef.current.segmentMs ?? 0
       remindersRef.current = 0
       attachRecorder(input)
     } catch (cause) {
@@ -260,7 +264,14 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
       // Rotation runs off elapsed time, not one long timeout — a throttled
       // webview timer may fire late, but it always fires.
       const segmentMs = optionsRef.current.segmentMs
-      if (segmentMs !== undefined && elapsed >= (partsRef.current + 1) * segmentMs) {
+      if (segmentMs !== undefined && elapsed >= rotateAtRef.current) {
+        // Move the boundary when a rotation is *scheduled*, not when it
+        // lands: `partsRef` only advances once the old recorder has flushed,
+        // so a flush outliving a tick would queue a second rotation that cuts
+        // the fresh recorder into a near-empty segment. Measuring from
+        // `elapsed` also means a machine that slept through several
+        // boundaries rotates once instead of emitting a run of stubs.
+        rotateAtRef.current = elapsed + segmentMs
         rotate()
       }
       const reminderMs = optionsRef.current.reminderMs

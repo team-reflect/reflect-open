@@ -12,11 +12,15 @@ class FakeMediaRecorder {
     return this.supported.includes(type)
   }
 
+  /** While true, `stop()` flushes but withholds `onstop` until released. */
+  static holdStop = false
+
   ondataavailable: ((event: { data: Blob }) => void) | null = null
   onstop: (() => void) | null = null
   state: RecordingState = 'inactive'
   stopCalls = 0
   readonly mimeType: string
+  private heldStop: (() => void) | null = null
 
   constructor(_stream: MediaStream, options?: { mimeType?: string }) {
     if (FakeMediaRecorder.failConstruction) {
@@ -34,7 +38,17 @@ class FakeMediaRecorder {
     this.stopCalls += 1
     this.state = 'inactive'
     this.ondataavailable?.({ data: new Blob(['audio-bytes']) })
+    if (FakeMediaRecorder.holdStop) {
+      this.heldStop = () => this.onstop?.()
+      return
+    }
     this.onstop?.()
+  }
+
+  releaseStop(): void {
+    const held = this.heldStop
+    this.heldStop = null
+    held?.()
   }
 }
 
@@ -52,6 +66,7 @@ beforeEach(() => {
   FakeMediaRecorder.instances = []
   FakeMediaRecorder.supported = ['audio/mp4']
   FakeMediaRecorder.failConstruction = false
+  FakeMediaRecorder.holdStop = false
   vi.stubGlobal('MediaRecorder', FakeMediaRecorder)
   vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } })
   getUserMedia.mockReset()
@@ -279,6 +294,35 @@ describe('useAudioRecorder', () => {
     expect(recording).toBeNull()
     expect(FakeMediaRecorder.instances[0]!.stopCalls).toBe(0)
     expect(result.current.status).toBe('idle')
+  })
+
+  it('a flush that outlives a tick does not queue extra rotations', async () => {
+    getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
+    const onSegment = vi.fn()
+    FakeMediaRecorder.holdStop = true
+    const { result } = await renderHook(() => useAudioRecorder({ segmentMs: 1000, onSegment }))
+
+    await act(async () => {
+      await result.current.start()
+    })
+    // Cross the boundary, then keep ticking while the first flush is stuck:
+    // the segment counter cannot advance until it lands.
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+    act(() => {
+      vi.advanceTimersByTime(600)
+    })
+
+    FakeMediaRecorder.holdStop = false
+    await act(async () => {
+      FakeMediaRecorder.instances[0]!.releaseStop()
+    })
+
+    expect(onSegment).toHaveBeenCalledTimes(1)
+    // One replacement recorder, still live — not a run of near-empty stubs.
+    expect(FakeMediaRecorder.instances).toHaveLength(2)
+    expect(FakeMediaRecorder.instances[1]!.stopCalls).toBe(0)
   })
 
   it('reminds the user on every interval boundary', async () => {
