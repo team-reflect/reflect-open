@@ -95,10 +95,6 @@ struct ListStagedResponse: Encodable {
   let files: [StagedFile]
 }
 
-struct ReadStagedResponse: Encodable {
-  let base64: String
-}
-
 struct StartArgs: Decodable {
   /// Rotate the recorder after this much audio; each segment lands as its own
   /// complete `.m4a`, so a session has no length limit.
@@ -376,19 +372,6 @@ class RecordingPlugin: Plugin {
             }))
       } catch {
         invoke.reject("listing staged recordings failed: \(error.localizedDescription)")
-      }
-    }
-  }
-
-  @objc public func readStaged(_ invoke: Invoke) throws {
-    let args = try invoke.parseArgs(StagedPathArgs.self)
-    DispatchQueue.main.async {
-      do {
-        let url = try self.stagedURL(for: args.path)
-        let data = try Data(contentsOf: url)
-        invoke.resolve(ReadStagedResponse(base64: data.base64EncodedString()))
-      } catch {
-        invoke.reject("reading staged recording failed: \(error.localizedDescription)")
       }
     }
   }

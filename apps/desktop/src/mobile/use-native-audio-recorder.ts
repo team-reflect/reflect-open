@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  base64ToBytes,
   cancelRecording,
   deleteStaged,
   errorMessage,
-  readStaged,
   recordingStatus,
   startRecording,
   stopRecording,
@@ -122,12 +120,6 @@ export function isStagedPathClaimed(path: string): boolean {
 /** True when the native recorder rejected `start` because access was denied. */
 export function isMicDeniedError(cause: unknown): boolean {
   return errorMessage(cause).includes('denied')
-}
-
-/** Read a staged recording back as the pipeline's blob. */
-export async function readStagedRecording(path: string): Promise<Blob> {
-  const base64 = await readStaged(path)
-  return new Blob([base64ToBytes(base64)], { type: NATIVE_RECORDING_MIME })
 }
 
 /** Remove a staged recording once its bytes are durable in the graph. */

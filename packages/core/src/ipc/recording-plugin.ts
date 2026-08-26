@@ -38,7 +38,6 @@ const stagedFileSchema = z.object({
 export type StagedRecordingFile = z.infer<typeof stagedFileSchema>
 
 const listStagedSchema = z.object({ files: z.array(stagedFileSchema) })
-const readStagedSchema = z.object({ base64: z.string() })
 
 // Command args mirror the serde request models (`StartRequest`,
 // `StagedPathRequest`) under the command's `request` parameter.
@@ -75,11 +74,6 @@ const listStagedCommand = definePluginCommand<
   Record<string, never>,
   { files: StagedRecordingFile[] }
 >('recording', 'list_staged', listStagedSchema)
-const readStagedCommand = definePluginCommand<{ request: { path: string } }, { base64: string }>(
-  'recording',
-  'read_staged',
-  readStagedSchema,
-)
 const deleteStagedCommand = definePluginCommand<{ request: { path: string } }, unknown>(
   'recording',
   'delete_staged',
@@ -136,12 +130,6 @@ export async function actionPerformed(): Promise<void> {
 export async function listStaged(): Promise<StagedRecordingFile[]> {
   const { files } = await listStagedCommand({})
   return files
-}
-
-/** A staged recording's bytes, base64-encoded. */
-export async function readStaged(path: string): Promise<string> {
-  const { base64 } = await readStagedCommand({ request: { path } })
-  return base64
 }
 
 /** Remove a staged recording once its bytes are durable in the graph. */

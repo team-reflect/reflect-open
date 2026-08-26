@@ -46,10 +46,6 @@ impl<R: Runtime> Recording<R> {
         Err(crate::Error::UnsupportedPlatform)
     }
 
-    pub fn read_staged(&self, _request: StagedPathRequest) -> crate::Result<ReadStagedResponse> {
-        Err(crate::Error::UnsupportedPlatform)
-    }
-
     pub fn delete_staged(&self, _request: StagedPathRequest) -> crate::Result<()> {
         Err(crate::Error::UnsupportedPlatform)
     }

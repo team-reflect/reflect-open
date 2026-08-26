@@ -81,16 +81,8 @@ pub struct ListStagedResponse {
     pub files: Vec<StagedFile>,
 }
 
-/// `read_staged`'s response — a staged recording's bytes.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ReadStagedResponse {
-    /// The staged file's bytes, base64-encoded.
-    pub base64: String,
-}
-
-/// Path argument for `read_staged` / `delete_staged`. The native side rejects
-/// paths outside its staging directory.
+/// Path argument for `delete_staged`. The native side rejects paths outside
+/// its staging directory.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StagedPathRequest {

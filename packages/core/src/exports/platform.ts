@@ -13,7 +13,6 @@ export {
   cancelRecording,
   deleteStaged,
   listStaged,
-  readStaged,
   recordingStatus,
   startRecording,
   stopRecording,

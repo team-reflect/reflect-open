@@ -8,7 +8,6 @@ permissions = [
   "allow-actions-ready",
   "allow-action-performed",
   "allow-list-staged",
-  "allow-read-staged",
   "allow-delete-staged",
   "allow-registerListener",
   "allow-remove-listener",

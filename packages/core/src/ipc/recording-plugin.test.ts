@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from './bridge'
-import { listStaged, readStaged, startRecording, stopRecording } from './recording-plugin'
+import { listStaged, startRecording, stopRecording } from './recording-plugin'
 
 afterEach(() => {
   setBridge(null)
@@ -38,7 +38,7 @@ describe('recording plugin bindings', () => {
     })
   })
 
-  it('list_staged unwraps the files array and read_staged the base64', async () => {
+  it('list_staged unwraps the files array', async () => {
     const staged = {
       path: '/staging/a.part-001.m4a',
       sessionStartedMs: 1_700_000_000_000,
@@ -46,13 +46,7 @@ describe('recording plugin bindings', () => {
       end: false,
       modifiedMs: 1,
     }
-    const invoke = bridgeReturning({ files: [staged] })
+    bridgeReturning({ files: [staged] })
     await expect(listStaged()).resolves.toEqual([staged])
-
-    invoke.mockResolvedValue({ base64: 'QUFB' })
-    await expect(readStaged('/staging/a.m4a')).resolves.toBe('QUFB')
-    expect(invoke).toHaveBeenLastCalledWith('plugin:recording|read_staged', {
-      request: { path: '/staging/a.m4a' },
-    })
   })
 })

@@ -95,13 +95,6 @@ impl<R: Runtime> Recording<R> {
             .map_err(Into::into)
     }
 
-    /// A staged file's bytes, base64-encoded.
-    pub fn read_staged(&self, request: StagedPathRequest) -> crate::Result<ReadStagedResponse> {
-        self.0
-            .run_mobile_plugin("readStaged", request)
-            .map_err(Into::into)
-    }
-
     /// Remove a staged file — called after its bytes landed in the graph.
     pub fn delete_staged(&self, request: StagedPathRequest) -> crate::Result<()> {
         self.0
