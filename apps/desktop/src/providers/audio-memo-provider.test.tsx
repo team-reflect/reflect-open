@@ -209,7 +209,7 @@ describe('AudioMemoProvider', () => {
     await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
 
     expect(captureAudioMemoPart).toHaveBeenCalledWith({
-      audio: RECORDING.blob,
+      audio: { blob: RECORDING.blob },
       mimeType: 'audio/mp4',
       recordedAt: expect.any(Date),
       part: 1,
@@ -310,7 +310,7 @@ describe('AudioMemoProvider', () => {
     await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(captureAudioMemoPart).toHaveBeenCalledTimes(2)
     expect(captureAudioMemoPart).toHaveBeenLastCalledWith(
-      expect.objectContaining({ audio: RECORDING.blob }),
+      expect.objectContaining({ audio: { blob: RECORDING.blob } }),
     )
   })
 
@@ -437,7 +437,7 @@ describe('AudioMemoProvider', () => {
     expect(result.current.pendingCount).toBe(0)
     expect(captureAudioMemoPart).toHaveBeenCalledTimes(2)
     expect(captureAudioMemoPart).toHaveBeenLastCalledWith(
-      expect.objectContaining({ audio: second.blob }),
+      expect.objectContaining({ audio: { blob: second.blob } }),
     )
   })
 
@@ -527,7 +527,7 @@ describe('AudioMemoProvider', () => {
     await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(captureAudioMemoPart).toHaveBeenCalledTimes(2)
     expect(captureAudioMemoPart).toHaveBeenLastCalledWith(
-      expect.objectContaining({ audio: second.blob }),
+      expect.objectContaining({ audio: { blob: second.blob } }),
     )
   })
 

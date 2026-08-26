@@ -5,6 +5,7 @@ import {
   errorMessage,
   pickTranscriptionConfig,
   type AiProvidersState,
+  type AudioMemoSource,
   type GraphInfo,
 } from '@reflect/core'
 import { useMainWindowEffect } from '@/hooks/use-main-window-effect'
@@ -33,7 +34,7 @@ import { useSettings } from '@/providers/settings-provider'
 
 /** A stopped recording waiting its turn through the capture queue. */
 export interface PendingAudioCapture {
-  audio: Blob
+  audio: AudioMemoSource
   mimeType: string
   recordedAt: Date
   /** Session segment placement; absent for a legacy single-file capture. */

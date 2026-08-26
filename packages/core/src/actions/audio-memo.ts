@@ -14,7 +14,14 @@ import { enrichSessionTranscript } from '../ai/audio-memo-transcript'
 import { AUDIO_EXTENSION_BY_MIME, baseMimeType } from '../ai/transcribe'
 import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from '../ai/app-review-demo'
 import { bytesToBase64 } from '../lib/base64'
-import { listDir, listFiles, readNote, writeAsset, writeNote } from '../graph/commands'
+import {
+  importAudioMemo,
+  listDir,
+  listFiles,
+  readNote,
+  writeAsset,
+  writeNote,
+} from '../graph/commands'
 import { writeAssetStreamed } from '../graph/assets'
 import { hasBinaryIpc } from '../ipc/bridge'
 import {
@@ -202,9 +209,15 @@ export function audioMemoPartPath(memo: AudioMemoIdentity, part: number, end: bo
   return audioMemoPath(`${memo.base}.part-${pad(part, 3)}${end ? '-end' : ''}.${extension}`)
 }
 
+/**
+ * A recording's bytes: held in webview memory, or sitting at an OS path only
+ * Rust can read (the mobile recorder writes its segments straight to disk).
+ */
+export type AudioMemoSource = { blob: Blob } | { sourcePath: string }
+
 export interface CaptureAudioMemoInput {
   /** The recording, as the recorder produced it. */
-  audio: Blob
+  audio: AudioMemoSource
   /** The recording's MIME type, possibly with codec parameters. */
   mimeType: string
   /** When the recording stopped — names the asset and picks the daily note. */
@@ -222,14 +235,28 @@ export type CaptureAudioMemoOutcome =
  * Persist one recording into the graph — the durable step, no network. The
  * transcription happens later, in {@link reconcileAudioMemos}.
  */
-async function writeAudioMemoAsset(path: string, audio: Blob, generation: number): Promise<void> {
+async function writeAudioMemoAsset(
+  path: string,
+  audio: AudioMemoSource,
+  generation: number,
+): Promise<void> {
+  if ('sourcePath' in audio) {
+    // The recorder already wrote the file: Rust copies it in file-to-file, so
+    // a meeting-length segment never enters webview memory.
+    await importAudioMemo(audio.sourcePath, path, generation)
+    return
+  }
   if (hasBinaryIpc()) {
-    await writeAssetStreamed(path, audio, generation)
+    await writeAssetStreamed(path, audio.blob, generation)
     return
   }
   // Browser dev's in-memory bridge has no binary transport; recordings there
   // are short enough for the base64 JSON route.
-  await writeAsset(path, bytesToBase64(new Uint8Array(await audio.arrayBuffer())), generation)
+  await writeAsset(
+    path,
+    bytesToBase64(new Uint8Array(await audio.blob.arrayBuffer())),
+    generation,
+  )
 }
 
 export async function captureAudioMemo(
@@ -246,7 +273,7 @@ export async function captureAudioMemo(
 
 export interface CaptureAudioMemoPartInput {
   /** One finished segment, as the recorder produced it. */
-  audio: Blob
+  audio: AudioMemoSource
   /** The segment's MIME type, possibly with codec parameters. */
   mimeType: string
   /** When the *session* started — every part shares the session identity. */

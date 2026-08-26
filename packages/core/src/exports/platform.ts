@@ -171,6 +171,7 @@ export {
   noteExists,
   deleteNote,
   deleteAudioMemo,
+  importAudioMemo,
   listFiles,
   listAttachments,
   vaultScanStats,

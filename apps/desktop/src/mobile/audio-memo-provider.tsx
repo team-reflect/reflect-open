@@ -131,7 +131,7 @@ export function MobileAudioMemoProvider({
         }
       }
       const capture: PendingAudioCapture = {
-        audio: input.blob,
+        audio: { blob: input.blob },
         mimeType: NATIVE_RECORDING_MIME,
         recordedAt: input.recordedAt,
         onCaptured: release,

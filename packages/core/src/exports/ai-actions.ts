@@ -139,6 +139,7 @@ export {
   listPendingAudioMemoSessions,
   reconcileAudioMemos,
   type AudioMemoIdentity,
+  type AudioMemoSource,
   type CaptureAudioMemoInput,
   type CaptureAudioMemoOutcome,
   type CaptureAudioMemoPartInput,

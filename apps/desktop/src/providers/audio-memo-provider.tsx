@@ -151,7 +151,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
       session.memo ??= audioMemoIdentity(session.recordedAt, segment.mimeType)
       const path = audioMemoPartPath(session.memo, segment.part, segment.end)
       enqueueCapture({
-        audio: segment.blob,
+        audio: { blob: segment.blob },
         mimeType: segment.mimeType,
         recordedAt: session.recordedAt,
         segment: { part: segment.part, end: segment.end },

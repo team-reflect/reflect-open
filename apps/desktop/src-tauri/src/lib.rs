@@ -316,6 +316,7 @@ pub fn run() {
             fs::assets::asset_upload_commit_path,
             fs::assets::asset_upload_abort,
             fs::assets::asset_import,
+            fs::assets::audio_memo_import,
             fs::dir_list,
             fs::note_exists,
             fs::note_delete,

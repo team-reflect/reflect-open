@@ -250,7 +250,7 @@ describe('MobileAudioMemoProvider', () => {
     expect(result.current.drawerOpen).toBe(false)
 
     expect(captureAudioMemo).toHaveBeenCalledWith({
-      audio: RECORDING.blob,
+      audio: { blob: RECORDING.blob },
       mimeType: 'audio/mp4',
       recordedAt: expect.any(Date),
       generation: 3,
@@ -329,7 +329,7 @@ describe('MobileAudioMemoProvider', () => {
     expect(result.current.drawerOpen).toBe(false)
     await vi.waitFor(() =>
       expect(captureAudioMemo).toHaveBeenCalledWith(
-        expect.objectContaining({ audio: RECORDING.blob, generation: 3 }),
+        expect.objectContaining({ audio: { blob: RECORDING.blob }, generation: 3 }),
       ),
     )
   })
@@ -487,7 +487,7 @@ describe('MobileAudioMemoProvider', () => {
     await vi.waitFor(() => expect(stagedControls.stopActive).toHaveBeenCalledTimes(1))
     await vi.waitFor(() =>
       expect(captureAudioMemo).toHaveBeenCalledWith(
-        expect.objectContaining({ audio: orphaned.blob, generation: 3 }),
+        expect.objectContaining({ audio: { blob: orphaned.blob }, generation: 3 }),
       ),
     )
     await vi.waitFor(() =>
