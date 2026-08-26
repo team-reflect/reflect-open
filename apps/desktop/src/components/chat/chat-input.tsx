@@ -156,7 +156,7 @@ export function ChatInput(): ReactElement {
             <SelectTrigger
               aria-label="Model"
               size="sm"
-              className="w-auto max-w-64 border-none bg-transparent text-xs text-text-muted shadow-none"
+              className="w-auto max-w-64 border-transparent bg-transparent text-xs text-text-muted shadow-none"
             >
               <SelectValue placeholder="Choose a model" />
             </SelectTrigger>
