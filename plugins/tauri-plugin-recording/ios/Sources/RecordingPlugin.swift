@@ -402,7 +402,9 @@ class RecordingPlugin: Plugin {
     try audioSession.setCategory(.record, mode: .default, options: [.allowBluetoothHFP])
     try audioSession.setActive(true)
 
-    self.sessionStartedMs = Date().timeIntervalSince1970 * 1000
+    // Whole milliseconds: the staged filenames carry `Int(sessionStartedMs)`,
+    // so the events must not report a fraction the filenames cannot.
+    self.sessionStartedMs = (Date().timeIntervalSince1970 * 1000).rounded(.down)
     self.segmentMs = segmentMs
     self.partIndex = 0
     self.elapsedBeforeSegmentMs = 0

@@ -8,8 +8,9 @@ no length limit; interruptions, input route loss, Siri, and the Live Activity
 stop button all finalize the current segment natively and mark it as the
 session's last. The webview ingests staged segments into the graph when it
 can (including a launch-time orphan scan, which regroups a crash's leftovers
-from the filenames alone) and deletes them only afterwards, so a crash
-anywhere in the chain loses nothing.
+from the filenames alone) and deletes them only afterwards, so a crash costs
+at most the segment that was still being recorded, whose container never got
+its finalizing write.
 
 Mobile-only: `apps/desktop/src-tauri` depends on this crate for iOS/Android
 targets only and registers it under `#[cfg(mobile)]`; desktop records through
