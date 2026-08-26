@@ -298,12 +298,19 @@ pub fn asset_import(
 }
 
 /// Copy `source` into the graph at `target`, staging the bytes under
-/// `.reflect/tmp/` so the watcher never sees a partial file. Idempotent by
-/// construction: a segment's path encodes its session and position, so an
-/// existing target is that same segment and re-importing it is a no-op
-/// rather than a failure.
+/// `.reflect/tmp/` so the watcher never sees a partial file.
+///
+/// Idempotent by construction, in both directions: a segment's path encodes
+/// its session and position, so an existing target *is* that same segment,
+/// and a source that is already gone means an earlier ingest moved it (or a
+/// cancelled session swept it away while this capture sat in the queue).
+/// Neither is a failure worth parking the capture queue behind.
 fn import_exact(source: &Path, staging: &Path, target: &Path) -> AppResult<()> {
     if super::file_occupied(target) {
+        return Ok(());
+    }
+    if !source.is_file() {
+        tracing::warn!(?source, ?target, "audio memo import source is gone; skipping");
         return Ok(());
     }
     let mut temp = tempfile::NamedTempFile::new_in(staging)?;
@@ -329,15 +336,9 @@ pub fn audio_memo_import(
             "not an audio memo path: {path}"
         )));
     }
-    let source = Path::new(&source_path);
-    if !source.is_file() {
-        return Err(AppError::not_found(format!(
-            "import source is not a file: {source_path}"
-        )));
-    }
     let root = root_for_generation(&state, generation)?;
     let target = resolve(&root, &path)?;
-    import_exact(source, &staging_dir(&root)?, &target)?;
+    import_exact(Path::new(&source_path), &staging_dir(&root)?, &target)?;
     super::invalidate_file_catalog(&state, &root);
     Ok(())
 }
@@ -441,6 +442,20 @@ mod tests {
         let target = graph.path().join("audio-memos/memo.part-001.m4a");
         import_exact(source.path(), &staging_dir(graph.path()).unwrap(), &target).unwrap();
         assert_eq!(fs::read(&target).unwrap(), b"segment bytes");
+    }
+
+    #[test]
+    fn import_skips_a_source_that_is_already_gone() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let target = graph.path().join("audio-memos/memo.part-001.m4a");
+        import_exact(
+            &graph.path().join("staging/vanished.m4a"),
+            &staging_dir(graph.path()).unwrap(),
+            &target,
+        )
+        .unwrap();
+        assert!(!target.exists());
     }
 
     #[test]
