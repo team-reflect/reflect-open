@@ -32,7 +32,13 @@ import {
   type AudioMemoPart,
   type AudioMemoSession,
 } from './audio-memo-session'
-import { AUDIO_MEMOS_DIR, audioMemoPath, dailyPath, notePath } from '../graph/paths'
+import {
+  AUDIO_MEMOS_DIR,
+  audioMemoPath,
+  dailyPath,
+  DESCRIPTION_SUFFIX,
+  notePath,
+} from '../graph/paths'
 import { appendListItemUnderBacklinkedHeading, wikiLinkSafe } from '../markdown/edit'
 import { getSecret } from '../secrets/keychain'
 import { ensureBacklinkTarget } from './backlink-target'
@@ -61,14 +67,20 @@ import { ensureBacklinkTarget } from './backlink-target'
  *    with a failure note instead — retrying the same bytes can't help, and
  *    stopping would wedge every memo behind it.
  *
- * Deleting a transcription note does **not** resurrect it: the daily-note
- * backlink doubles as the tombstone (a memo is only pending while *neither*
- * its note nor its backlink exists). Deleting both regenerates the
- * transcription on the next pass — the documented way to redo one. The
- * backlink targets the memo's *base name*, declared as a frontmatter alias
- * on the transcription note: bases are unique per recording, so two memos
- * stopped within the same second (whose display titles collide) can never
- * tombstone each other, and the link survives a note-title rename.
+ * A transcribed session is tombstoned three ways, checked in this order: a
+ * sidecar marker (`audio-memos/<base>.reflect.md`, written once the note and
+ * backlink have landed), the transcription note itself, and the daily-note
+ * backlink. The marker is the durable one: notes and backlinks are user
+ * content that a cleanup edit legitimately deletes, and before the marker
+ * existed, deleting both made every synced device regenerate (and re-bill)
+ * the memo. Sessions tombstoned only by note or backlink get their missing
+ * marker healed at the start of each pass, so pre-marker graphs converge.
+ * Redoing a transcription means deleting all three (deleting the marker
+ * alone is undone by the next heal). The backlink probe targets the memo's
+ * *base name*, declared as a frontmatter alias on the transcription note:
+ * bases are unique per recording, so two memos stopped within the same
+ * second (whose display titles collide) can never tombstone each other, and
+ * the link survives a note-title rename.
  *
  * Privacy: the captured audio and its fresh transcript (for naming and optional
  * formatting) are sent to user-configured providers — never any existing note
@@ -304,21 +316,68 @@ function hasBacklink(source: string, memo: AudioMemoIdentity): boolean {
 }
 
 /**
- * Sessions awaiting transcription, oldest first: recordings under
- * `audio-memos/` grouped by session base, with no same-named transcription
- * note and no daily-note backlink (the backlink is the tombstone — see the
- * module doc). Every read is pinned to `generation` — recordings, notes, and
- * daily-note tombstones must come from one graph session, never a mix across
- * a switch.
+ * Graph-relative path of a session's transcribed marker,
+ * `audio-memos/<base>.reflect.md`. Existence is the signal: while the marker
+ * is present the session is never (re)transcribed, no matter what happens to
+ * the transcription note or the daily-note backlink. The `.reflect.md`
+ * suffix marks it Reflect-managed like asset descriptions; the path never
+ * parses as a recording (two-dot tail, see MEMO_PATH_RE) and is invisible to
+ * the note index (`audio-memos/` is a reserved tree), but syncs like any
+ * other graph file.
  */
-export async function listPendingAudioMemoSessions(
-  generation: number,
-): Promise<AudioMemoSession[]> {
+export function audioMemoSidecarPath(memo: AudioMemoIdentity): string {
+  return audioMemoPath(`${memo.base}${DESCRIPTION_SUFFIX}`)
+}
+
+/**
+ * Marker body. A fixed string, deliberately without timestamps: two devices
+ * healing the same session write byte-identical files, which a sync merge
+ * treats as one clean same-content add instead of a binary conflict copy.
+ */
+export const AUDIO_MEMO_SIDECAR_CONTENTS = `Reflect wrote this marker when the recording with the same name was
+transcribed. While this file exists, the recording will not be transcribed
+again. To redo a transcription, delete this file together with the
+transcription note and its daily-note link.
+`
+
+/**
+ * Write the marker, best-effort: at every call site the session is already
+ * tombstoned by the note (and usually the backlink), and the next pass's
+ * heal loop retries a marker that failed to land — so a marker write must
+ * never fail a pass that transcribed successfully.
+ */
+async function writeSidecarMarker(memo: AudioMemoIdentity, generation: number): Promise<void> {
+  try {
+    await writeNote(audioMemoSidecarPath(memo), AUDIO_MEMO_SIDECAR_CONTENTS, generation)
+  } catch {
+    // Retried by the next pass's heal loop.
+  }
+}
+
+export interface AudioMemoSessionScan {
+  /** Sessions with no tombstone at all — the transcription work list, oldest first. */
+  pending: AudioMemoSession[]
+  /** Transcribed sessions (note or backlink present) still missing their marker. */
+  missingSidecars: AudioMemoIdentity[]
+}
+
+/**
+ * Scan `audio-memos/` into the pass's work: sessions to transcribe, and
+ * already-transcribed sessions whose durable marker is missing (pre-marker
+ * graphs, or a pass that died between the backlink and the marker) for the
+ * heal loop. The marker check is free — it reads the same directory listing
+ * the parts come from — and short-circuits before any daily-note read, so a
+ * healed graph settles to zero per-pass note IO. Every read is pinned to
+ * `generation` — recordings, notes, and daily-note tombstones must come from
+ * one graph session, never a mix across a switch.
+ */
+export async function scanAudioMemoSessions(generation: number): Promise<AudioMemoSessionScan> {
   const [recordings, notes] = await Promise.all([
     listDir(AUDIO_MEMOS_DIR, generation),
     listFiles(generation),
   ])
   const existingNotes = new Set(notes.map((file) => file.path))
+  const recordingPaths = new Set(recordings.map((file) => file.path))
   const parts = recordings
     .map((file): AudioMemoPart | null => {
       const parsed = audioMemoPartFromPath(file.path)
@@ -336,16 +395,23 @@ export async function listPendingAudioMemoSessions(
       }
     })
     .filter((part): part is AudioMemoPart => part !== null)
-  const sessions = groupAudioMemoSessions(parts).filter(
-    (session) => !existingNotes.has(session.memo.notePath),
-  )
   const pending: AudioMemoSession[] = []
-  for (const session of sessions) {
-    if (!hasBacklink(await dailyNoteSource(session.memo.date, generation), session.memo)) {
-      pending.push(session)
+  const missingSidecars: AudioMemoIdentity[] = []
+  for (const session of groupAudioMemoSessions(parts)) {
+    if (recordingPaths.has(audioMemoSidecarPath(session.memo))) {
+      continue
     }
+    if (existingNotes.has(session.memo.notePath)) {
+      missingSidecars.push(session.memo)
+      continue
+    }
+    if (hasBacklink(await dailyNoteSource(session.memo.date, generation), session.memo)) {
+      missingSidecars.push(session.memo)
+      continue
+    }
+    pending.push(session)
   }
-  return pending
+  return { pending, missingSidecars }
 }
 
 /**
@@ -480,9 +546,9 @@ export interface ReconcileAudioMemosOutcome {
 export async function reconcileAudioMemos(
   input: ReconcileAudioMemosInput,
 ): Promise<ReconcileAudioMemosOutcome> {
-  let sessions: AudioMemoSession[]
+  let scan: AudioMemoSessionScan
   try {
-    sessions = await listPendingAudioMemoSessions(input.generation)
+    scan = await scanAudioMemoSessions(input.generation)
   } catch (cause) {
     return {
       pending: 0,
@@ -491,7 +557,22 @@ export async function reconcileAudioMemos(
       stopped: { reason: toAppError(cause).kind, message: errorMessage(cause) },
     }
   }
+  const sessions = scan.pending
   input.onPending?.(sessions.length)
+  // Heal missing markers before the provider gate and the empty-pending
+  // return: the steady state is zero pending, and a device whose key went
+  // missing must still be able to make old tombstones durable.
+  for (const memo of scan.missingSidecars) {
+    if (input.isStale?.() === true) {
+      return {
+        pending: sessions.length,
+        transcribed: 0,
+        rejected: 0,
+        stopped: { reason: 'stale', message: 'the graph session ended mid-pass' },
+      }
+    }
+    await writeSidecarMarker(memo, input.generation)
+  }
   if (sessions.length === 0) {
     return { pending: 0, transcribed: 0, rejected: 0, stopped: null }
   }
@@ -584,6 +665,7 @@ export async function reconcileAudioMemos(
         )
         await writeNote(memo.notePath, note, input.generation)
         await ensureDailyBacklink(memo, memo.title, memosNoteTitle, input.generation)
+        await writeSidecarMarker(memo, input.generation)
         transcribed += 1
         continue
       }
@@ -638,6 +720,7 @@ export async function reconcileAudioMemos(
         input.generation,
       )
       await ensureDailyBacklink(memo, title, memosNoteTitle, input.generation)
+      await writeSidecarMarker(memo, input.generation)
       if (allRejected) {
         rejected += 1
       } else {
