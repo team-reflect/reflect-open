@@ -135,6 +135,13 @@ export function MobileAudioMemoProvider({
   const enqueuePipeline = pipeline.enqueue
 
   const sessionRef = useRef<LiveSession | null>(null)
+  /**
+   * Sessions the user discarded, by identity timestamp. A native discard that
+   * fails to delete a staged segment leaves it for the orphan scan, which
+   * would otherwise resurrect a memo the user threw away on the next
+   * foreground.
+   */
+  const cancelledSessionsRef = useRef<Set<number>>(new Set())
   const generationRef = useRef(graph.generation)
   useEffect(() => {
     generationRef.current = graph.generation
@@ -143,16 +150,6 @@ export function MobileAudioMemoProvider({
   /** Wrap a staged segment as a pipeline capture that owns the file. */
   const enqueuePart = useCallback(
     (part: NativeRecordingPart): void => {
-      const memo = audioMemoIdentity(part.recordedAt, NATIVE_RECORDING_MIME)
-      const path = audioMemoPartPath(memo, part.part, part.end)
-      // Only the live session's segments answer to its cancel: a segment the
-      // orphan scan found from an earlier run must not be swept away by
-      // discarding the recording running now.
-      const session = sessionRef.current
-      const live =
-        session !== null && session.recordedAt.getTime() === part.recordedAt.getTime()
-          ? session
-          : null
       const release = async (): Promise<void> => {
         // Always drop the claim, even if the delete fails: a still-claimed
         // path is skipped forever by the orphan scan, so a discarded memo
@@ -163,6 +160,20 @@ export function MobileAudioMemoProvider({
           releaseStagedPath(part.stagedPath)
         }
       }
+      if (cancelledSessionsRef.current.has(part.recordedAt.getTime())) {
+        void release()
+        return
+      }
+      const memo = audioMemoIdentity(part.recordedAt, NATIVE_RECORDING_MIME)
+      const path = audioMemoPartPath(memo, part.part, part.end)
+      // Only the live session's segments answer to its cancel: a segment the
+      // orphan scan found from an earlier run must not be swept away by
+      // discarding the recording running now.
+      const session = sessionRef.current
+      const live =
+        session !== null && session.recordedAt.getTime() === part.recordedAt.getTime()
+          ? session
+          : null
       enqueuePipeline({
         audio: { sourcePath: part.stagedPath },
         mimeType: NATIVE_RECORDING_MIME,
@@ -265,6 +276,7 @@ export function MobileAudioMemoProvider({
       // What is on disk is the only complete account of what this session
       // wrote, and the flag catches the segments still being copied.
       session.cancelled = true
+      cancelledSessionsRef.current.add(session.recordedAt.getTime())
       const memo = audioMemoIdentity(session.recordedAt, NATIVE_RECORDING_MIME)
       const generation = generationRef.current
       void (async () => {

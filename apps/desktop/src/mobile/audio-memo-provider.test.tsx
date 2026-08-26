@@ -333,6 +333,33 @@ describe('MobileAudioMemoProvider', () => {
     await vi.waitFor(() => expect(deleteAudioMemo).toHaveBeenCalledWith(landed, 3))
   })
 
+  it('a straggler segment from a discarded session is dropped, not resurrected', async () => {
+    const { result } = await renderHook(() => useMobileAudioMemo(), { wrapper })
+
+    await act(async () => {
+      result.current.toggle()
+    })
+    await act(async () => {
+      result.current.cancelRecording()
+    })
+    captureAudioMemoPart.mockClear()
+
+    // A staged segment the native discard failed to delete, handed back by a
+    // later orphan scan.
+    const straggler = '/staging/recording-1700000000000.part-002.m4a'
+    await act(async () => {
+      recorderControls.options?.onSegment({
+        stagedPath: straggler,
+        recordedAt: SESSION_STARTED_AT,
+        part: 2,
+        end: false,
+      })
+    })
+
+    expect(captureAudioMemoPart).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(stagedControls.deleteStaged).toHaveBeenCalledWith(straggler))
+  })
+
   it('a capture failure keeps the staged file; discard deletes it', async () => {
     captureAudioMemoPart.mockResolvedValue({ ok: false, message: 'disk full' })
     const { result } = await renderHook(() => useMobileAudioMemo(), {
