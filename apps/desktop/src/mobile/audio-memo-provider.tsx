@@ -131,7 +131,7 @@ export function MobileAudioMemoProvider({
         }
       }
       const capture: PendingAudioCapture = {
-        audio: { blob: input.blob },
+        audio: { sourcePath: input.stagedPath },
         mimeType: NATIVE_RECORDING_MIME,
         recordedAt: input.recordedAt,
         onCaptured: release,
@@ -147,11 +147,7 @@ export function MobileAudioMemoProvider({
       setDrawerOpen(false)
       setStopping(false)
       if (result !== null) {
-        enqueueStaged({
-          blob: result.blob,
-          recordedAt: result.recordedAt,
-          stagedPath: result.stagedPath,
-        })
+        enqueueStaged({ recordedAt: result.recordedAt, stagedPath: result.stagedPath })
       }
     },
     [enqueueStaged, setDrawerOpen],
@@ -202,7 +198,6 @@ export function MobileAudioMemoProvider({
       const recording = await stopRecorder()
       if (recording !== null) {
         enqueueStaged({
-          blob: recording.blob,
           recordedAt: recording.recordedAt,
           stagedPath: recording.stagedPath,
         })

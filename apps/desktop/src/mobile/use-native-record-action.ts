@@ -62,11 +62,7 @@ export function useNativeRecordAction(options: UseNativeRecordActionOptions): vo
         if (status.recording) {
           const result = await stopActiveRecording()
           if (result !== null) {
-            enqueueStaged({
-              blob: result.blob,
-              recordedAt: result.recordedAt,
-              stagedPath: result.stagedPath,
-            })
+            enqueueStaged({ recordedAt: result.recordedAt, stagedPath: result.stagedPath })
           }
         }
       } catch (cause) {

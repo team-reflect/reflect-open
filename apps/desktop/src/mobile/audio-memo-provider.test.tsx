@@ -68,7 +68,6 @@ const recorderControls = vi.hoisted(() => ({
 
 const stagedControls = vi.hoisted(() => ({
   claimed: new Set<string>(),
-  readStaged: vi.fn<(path: string) => Promise<Blob>>(),
   deleteStaged: vi.fn<(path: string) => Promise<void>>(),
   recordingStatus: vi.fn<() => Promise<{ recording: boolean; elapsedMs: number }>>(),
   stopActive: vi.fn<() => Promise<NativeRecorderResult | null>>(),
@@ -100,7 +99,6 @@ vi.mock('@/mobile/haptics', () => ({
 vi.mock('@/mobile/use-native-audio-recorder', () => ({
   NATIVE_RECORDING_MIME: 'audio/mp4',
   isMicDeniedError: (cause: unknown) => typeof cause === 'string' && cause.includes('denied'),
-  readStagedRecording: stagedControls.readStaged,
   deleteStagedRecording: stagedControls.deleteStaged,
   nativeRecordingStatus: stagedControls.recordingStatus,
   stopActiveRecording: stagedControls.stopActive,
@@ -165,8 +163,6 @@ function wrapper({ children }: { children: ReactNode }): ReactElement {
 }
 
 const RECORDING: NativeRecorderResult = {
-  blob: new Blob(['audio'], { type: 'audio/mp4' }),
-  mimeType: 'audio/mp4',
   durationMs: 4000,
   stagedPath: '/staging/recording-1.m4a',
   recordedAt: new Date(1_700_000_000_000),
@@ -188,7 +184,6 @@ beforeEach(() => {
   recorderControls.failStart = null
   recorderControls.options = null
   stagedControls.claimed.clear()
-  stagedControls.readStaged.mockResolvedValue(new Blob(['staged'], { type: 'audio/mp4' }))
   stagedControls.deleteStaged.mockResolvedValue(undefined)
   stagedControls.recordingStatus.mockResolvedValue({
     recording: false,
@@ -250,7 +245,7 @@ describe('MobileAudioMemoProvider', () => {
     expect(result.current.drawerOpen).toBe(false)
 
     expect(captureAudioMemo).toHaveBeenCalledWith({
-      audio: { blob: RECORDING.blob },
+      audio: { sourcePath: RECORDING.stagedPath },
       mimeType: 'audio/mp4',
       recordedAt: expect.any(Date),
       generation: 3,
@@ -329,7 +324,7 @@ describe('MobileAudioMemoProvider', () => {
     expect(result.current.drawerOpen).toBe(false)
     await vi.waitFor(() =>
       expect(captureAudioMemo).toHaveBeenCalledWith(
-        expect.objectContaining({ audio: { blob: RECORDING.blob }, generation: 3 }),
+        expect.objectContaining({ audio: { sourcePath: RECORDING.stagedPath }, generation: 3 }),
       ),
     )
   })
@@ -446,6 +441,7 @@ describe('MobileAudioMemoProvider', () => {
     await vi.waitFor(() => expect(captureAudioMemo).toHaveBeenCalledTimes(1))
     expect(captureAudioMemo).toHaveBeenCalledWith(
       expect.objectContaining({
+        audio: { sourcePath: '/staging/recording-old.m4a' },
         recordedAt: new Date(1_700_000_000_000),
         generation: 3,
       }),
@@ -453,7 +449,9 @@ describe('MobileAudioMemoProvider', () => {
     await vi.waitFor(() =>
       expect(stagedControls.deleteStaged).toHaveBeenCalledWith('/staging/recording-old.m4a'),
     )
-    expect(stagedControls.readStaged).not.toHaveBeenCalledWith('/staging/recording-claimed.m4a')
+    expect(captureAudioMemo).not.toHaveBeenCalledWith(
+      expect.objectContaining({ audio: { sourcePath: '/staging/recording-claimed.m4a' } }),
+    )
   })
 
   it('foregrounding re-runs the orphan scan', async () => {
@@ -474,8 +472,6 @@ describe('MobileAudioMemoProvider', () => {
       elapsedMs: 30_000,
     })
     const orphaned: NativeRecorderResult = {
-      blob: new Blob(['orphan'], { type: 'audio/mp4' }),
-      mimeType: 'audio/mp4',
       durationMs: 30_000,
       stagedPath: '/staging/recording-orphan.m4a',
       recordedAt: new Date(1_700_000_050_000),
@@ -487,7 +483,7 @@ describe('MobileAudioMemoProvider', () => {
     await vi.waitFor(() => expect(stagedControls.stopActive).toHaveBeenCalledTimes(1))
     await vi.waitFor(() =>
       expect(captureAudioMemo).toHaveBeenCalledWith(
-        expect.objectContaining({ audio: { blob: orphaned.blob }, generation: 3 }),
+        expect.objectContaining({ audio: { sourcePath: orphaned.stagedPath }, generation: 3 }),
       ),
     )
     await vi.waitFor(() =>

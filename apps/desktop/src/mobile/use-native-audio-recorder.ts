@@ -39,10 +39,8 @@ export const NATIVE_RECORDING_MIME = 'audio/mp4'
 const MIN_DURATION_MS = 500
 
 export interface NativeRecorderResult {
-  blob: Blob
-  mimeType: string
   durationMs: number
-  /** The staged file's absolute path — delete it once the blob is durable. */
+  /** The staged file's absolute path; delete it once the graph write lands. */
   stagedPath: string
   /**
    * The recording's stop time (the staged file's mtime), used as the memo's
@@ -144,20 +142,7 @@ export async function stopActiveRecording(): Promise<NativeRecorderResult | null
     releaseStagedPath(path)
     return null
   }
-  try {
-    const blob = await readStagedRecording(path)
-    return {
-      blob,
-      mimeType: NATIVE_RECORDING_MIME,
-      durationMs,
-      stagedPath: path,
-      recordedAt: new Date(modifiedMs),
-    }
-  } catch (cause) {
-    // Leave the file for the orphan scan rather than losing the memo.
-    releaseStagedPath(path)
-    throw cause
-  }
+  return { durationMs, stagedPath: path, recordedAt: new Date(modifiedMs) }
 }
 
 /**
@@ -207,33 +192,17 @@ export function useNativeAudioRecorder(
       setStatusBoth('idle')
       const { path, durationMs, modifiedMs } = event
       claimStagedPath(path)
-      void (async () => {
-        if (durationMs < MIN_DURATION_MS) {
-          await deleteStagedRecording(path).catch(() => {})
-          releaseStagedPath(path)
-          optionsRef.current.onNativeStop(null)
-          return
-        }
-        try {
-          const blob = await readStagedRecording(path)
-          optionsRef.current.onNativeStop({
-            blob,
-            mimeType: NATIVE_RECORDING_MIME,
-            durationMs,
-            stagedPath: path,
-            recordedAt: new Date(modifiedMs),
-          })
-        } catch (cause) {
-          // Reading it back failed — leave the file staged (released,
-          // so the orphan scan ingests it on the next launch or
-          // foreground instead). Still notify the host so the recording
-          // UI closes: the recorder is already idle, and leaving the
-          // drawer open would strand it.
-          releaseStagedPath(path)
-          console.error('reading a native-stopped recording failed:', cause)
-          optionsRef.current.onNativeStop(null)
-        }
-      })()
+      if (durationMs < MIN_DURATION_MS) {
+        void deleteStagedRecording(path).catch(() => {})
+        releaseStagedPath(path)
+        optionsRef.current.onNativeStop(null)
+        return
+      }
+      optionsRef.current.onNativeStop({
+        durationMs,
+        stagedPath: path,
+        recordedAt: new Date(modifiedMs),
+      })
     }
     const levelSubscription = subscribeRecordingLevel((event) => {
       if (statusRef.current === 'recording') {

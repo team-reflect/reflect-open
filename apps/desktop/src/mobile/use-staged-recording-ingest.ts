@@ -1,12 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { listStaged } from '@reflect/core'
 import { isNativeShell } from '@/lib/platform'
-import {
-  claimStagedPath,
-  isStagedPathClaimed,
-  readStagedRecording,
-  releaseStagedPath,
-} from '@/mobile/use-native-audio-recorder'
+import { claimStagedPath, isStagedPathClaimed } from '@/mobile/use-native-audio-recorder'
 
 /**
  * The orphan scan (audio-memos wave 1): staged recordings no live flow owns —
@@ -20,7 +15,6 @@ import {
 
 /** A staged native recording, ready for the capture pipeline. */
 export interface StagedRecordingInput {
-  blob: Blob
   /** The memo's identity timestamp — the file's stop time for re-scans. */
   recordedAt: Date
   /** The staging-directory file the capture owns until it lands. */
@@ -52,17 +46,7 @@ export function useStagedRecordingIngest(
             continue
           }
           claimStagedPath(file.path)
-          try {
-            const blob = await readStagedRecording(file.path)
-            enqueueStaged({
-              blob,
-              recordedAt: new Date(file.modifiedMs),
-              stagedPath: file.path,
-            })
-          } catch (cause) {
-            releaseStagedPath(file.path)
-            console.error('ingesting a staged recording failed:', cause)
-          }
+          enqueueStaged({ recordedAt: new Date(file.modifiedMs), stagedPath: file.path })
         }
       } catch (cause) {
         console.error('audio memo orphan scan failed:', cause)
