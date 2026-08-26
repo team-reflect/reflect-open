@@ -1,4 +1,4 @@
-import { useEffect, type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import type { AiPrompt, AiPromptMode } from '@reflect/core'
 import { Button } from '@/components/ui/button'
@@ -45,18 +45,6 @@ export function AiPromptDialog({ prompt, onSave, onClose }: AiPromptDialogProps)
     },
   })
   const mode = useWatch({ control, name: 'mode' })
-
-  // The dialog is conditionally mounted by its parent, so Radix's close-focus
-  // path is bypassed when Cancel or a successful submit calls onClose()
-  // directly; restore the opener's focus ourselves.
-  useEffect(() => {
-    const opener = document.activeElement
-    return () => {
-      if (opener instanceof HTMLElement) {
-        opener.focus()
-      }
-    }
-  }, [])
 
   const submit = handleSubmit((values) => {
     onSave({ label: values.label.trim(), body: values.body.trim(), mode: values.mode })
