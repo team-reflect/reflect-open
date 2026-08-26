@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import { InlineAlert } from '@/components/inline-alert'
 import { ConnectGithubFinishStep } from '@/components/settings/connect-github-finish-step'
 import { GithubAuthStep } from '@/components/settings/github-auth-step'
@@ -40,14 +40,21 @@ export function ConnectGithubDialog({
   onClose,
   pollIntervalMs = 3000,
 }: ConnectGithubDialogProps): ReactElement {
-  const wizard = useConnectGithubWizard({ suggestedRepoName, onClose, pollIntervalMs })
+  const [open, setOpen] = useState(true)
+  const close = (): void => setOpen(false)
+  const wizard = useConnectGithubWizard({ suggestedRepoName, onClose: close, pollIntervalMs })
 
   useRestoreFocus()
 
   return (
     <Dialog
-      open
+      open={open}
       onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          close()
+        }
+      }}
+      onOpenChangeComplete={(isOpen) => {
         if (!isOpen) {
           onClose()
         }

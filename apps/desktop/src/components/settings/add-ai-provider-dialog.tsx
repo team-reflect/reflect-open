@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import {
   AI_PROVIDERS,
@@ -56,6 +56,8 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
  * failure keeps the dialog open with the typed key intact for a retry.
  */
 export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps): ReactElement {
+  const [open, setOpen] = useState(true)
+  const close = (): void => setOpen(false)
   const { register, control, handleSubmit, setValue, formState } = useForm<AddAiProviderForm>({
     defaultValues: {
       provider: AI_PROVIDERS[0].id,
@@ -67,7 +69,7 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
   })
   const { submitError, unverified, resetUnverified, submit } = useAddAiProviderSubmit({
     onAdd,
-    onDone: onClose,
+    onDone: close,
   })
 
   const providerId = useWatch({ control, name: 'provider' })
@@ -83,9 +85,16 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
 
   return (
     <Dialog
-      open
+      open={open}
       onOpenChange={(isOpen) => {
-        if (!isOpen) onClose()
+        if (!isOpen) {
+          close()
+        }
+      }}
+      onOpenChangeComplete={(isOpen) => {
+        if (!isOpen) {
+          onClose()
+        }
       }}
     >
       <DialogContent showCloseButton={false} className="max-w-md">
@@ -231,7 +240,7 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
           ) : null}
 
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            <Button type="button" variant="outline" size="sm" onClick={close}>
               Cancel
             </Button>
             <Button type="submit" size="sm" disabled={formState.isSubmitting}>

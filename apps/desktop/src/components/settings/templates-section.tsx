@@ -109,6 +109,8 @@ interface TemplateDialogProps {
 
 /** Rename = move onto the new name's slug and rewrite the authored title. */
 function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): ReactElement {
+  const [open, setOpen] = useState(true)
+  const close = (): void => setOpen(false)
   const { graph } = useGraph()
   const [name, setName] = useState(template.title)
   const [error, setError] = useState<string | null>(null)
@@ -122,7 +124,7 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
     setError(null)
     try {
       await renameTemplate(template.path, trimmed, generation)
-      onClose()
+      close()
     } catch (cause) {
       setError(errorMessage(cause))
     }
@@ -130,8 +132,13 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
 
   return (
     <Dialog
-      open
+      open={open}
       onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          close()
+        }
+      }}
+      onOpenChangeComplete={(isOpen) => {
         if (!isOpen) {
           onClose()
         }
@@ -163,7 +170,7 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
             </span>
           ) : null}
           <DialogFooter>
-            <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            <Button type="button" variant="outline" size="sm" onClick={close}>
               Cancel
             </Button>
             <Button type="submit" size="sm" disabled={name.trim() === ''}>
@@ -178,6 +185,8 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
 
 /** Delete = move the file to the trash (recoverable), confirmed first. */
 function TemplateDeleteDialog({ template, onClose }: TemplateDialogProps): ReactElement {
+  const [open, setOpen] = useState(true)
+  const close = (): void => setOpen(false)
   const { graph } = useGraph()
   const [error, setError] = useState<string | null>(null)
 
@@ -191,7 +200,7 @@ function TemplateDeleteDialog({ template, onClose }: TemplateDialogProps): React
     try {
       await deleteOpenNote(template.path, generation)
       operation.done()
-      onClose()
+      close()
     } catch (cause) {
       operation.fail(errorMessage(cause))
       setError(errorMessage(cause))
@@ -200,8 +209,13 @@ function TemplateDeleteDialog({ template, onClose }: TemplateDialogProps): React
 
   return (
     <Dialog
-      open
+      open={open}
       onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          close()
+        }
+      }}
+      onOpenChangeComplete={(isOpen) => {
         if (!isOpen) {
           onClose()
         }
