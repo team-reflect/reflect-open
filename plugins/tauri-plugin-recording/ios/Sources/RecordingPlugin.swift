@@ -578,16 +578,16 @@ class RecordingPlugin: Plugin {
       elapsedBeforeSegmentMs = sessionDurationMs
       do {
         try startSegment()
+        emitSegment(path: path, part: finishedPart)
+        return
       } catch {
-        // Nothing is recording now: close the session on the segment that
-        // just landed rather than leave a live-looking one behind.
+        // Nothing is recording now: fall through to the teardown below and
+        // close the session on the segment that just landed, rather than
+        // leave the audio session, the meter timer, the idle-timer hold, the
+        // Live Activity, and the reminder running behind a dead recorder.
         Logger.error("rotating to the next segment failed: \(error)")
         nativeStopReason = .error
-        endSession(path: path, durationMs: sessionDurationMs)
-        return
       }
-      emitSegment(path: path, part: finishedPart)
-      return
     }
 
     if !successfully && nativeStopReason == nil {
