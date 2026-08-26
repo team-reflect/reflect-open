@@ -218,7 +218,9 @@ beforeEach(() => {
   captureAudioMemoPart.mockResolvedValue({ ok: true, memo: MEMO })
   // `list_staged` (the orphan scan) and `dir_list` (the cancel sweep) are the
   // two commands the provider drives on its own.
-  invoke.mockImplementation(async (command: string) => (command === 'dir_list' ? [] : { files: [] }))
+  invoke.mockImplementation(async (command: string) =>
+    command === 'dir_list' ? [] : { files: [] },
+  )
   pluginEvents.handlers.clear()
   // A fresh bridge object per test: the shared plugin-event registration in
   // core is keyed by bridge identity, so reusing one object would leak
