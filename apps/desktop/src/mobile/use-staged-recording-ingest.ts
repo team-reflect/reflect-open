@@ -20,9 +20,7 @@ import {
  */
 
 /** Mount the launch/foreground orphan scan. */
-export function useStagedRecordingIngest(
-  enqueuePart: (part: NativeRecordingPart) => void,
-): void {
+export function useStagedRecordingIngest(enqueuePart: (part: NativeRecordingPart) => void): void {
   const scanningRef = useRef(false)
   useEffect(() => {
     if (!isNativeShell()) {

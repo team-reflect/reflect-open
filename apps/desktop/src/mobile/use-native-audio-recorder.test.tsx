@@ -111,7 +111,7 @@ describe('useNativeAudioRecorder', () => {
     const path = '/staging/stop-normal.m4a'
     invoke.mockImplementation(async (command: string) => {
       if (command === 'plugin:recording|start_recording') {
-        return
+        return { sessionStartedMs: SESSION_STARTED_MS }
       }
       if (command === 'plugin:recording|stop_recording') {
         return { path, sessionStartedMs: SESSION_STARTED_MS, part: 2, durationMs: 4000 }

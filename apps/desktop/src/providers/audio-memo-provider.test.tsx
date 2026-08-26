@@ -478,8 +478,8 @@ describe('AudioMemoProvider', () => {
     })
     await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(captureAudioMemoPart).toHaveBeenCalledTimes(3)
-    expect(captureAudioMemoPart.mock.calls[1]?.[0].audio).toBe(RECORDING.blob)
-    expect(captureAudioMemoPart.mock.calls[2]?.[0].audio).toBe(second.blob)
+    expect(captureAudioMemoPart.mock.calls[1]?.[0].audio).toEqual({ blob: RECORDING.blob })
+    expect(captureAudioMemoPart.mock.calls[2]?.[0].audio).toEqual({ blob: second.blob })
   })
 
   it('discarding a failed memo releases the queue behind it', async () => {

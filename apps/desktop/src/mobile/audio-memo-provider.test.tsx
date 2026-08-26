@@ -5,15 +5,18 @@ import { audioMemoIdentity, audioMemoPartPath, setBridge } from '@reflect/core'
 import type {
   AiProvidersState,
   AudioMemoIdentity,
-  CaptureAudioMemoInput,
+  CaptureAudioMemoPartInput,
   CaptureAudioMemoOutcome,
   GraphInfo,
   Settings,
 } from '@reflect/core'
 import type { NativeRecordingPart } from '@/mobile/use-native-audio-recorder'
 
-const captureAudioMemo = vi.hoisted(() =>
-  vi.fn<(input: CaptureAudioMemoInput) => Promise<CaptureAudioMemoOutcome>>(),
+const captureAudioMemoPart = vi.hoisted(() =>
+  vi.fn<(input: CaptureAudioMemoPartInput) => Promise<CaptureAudioMemoOutcome>>(),
+)
+const deleteAudioMemo = vi.hoisted(() =>
+  vi.fn<(path: string, generation: number) => Promise<void>>(async () => {}),
 )
 const failOperation = vi.hoisted(() => vi.fn<(message: string) => void>())
 const invoke = vi.fn<(command: string, args?: unknown) => Promise<unknown>>()
@@ -77,7 +80,8 @@ const stagedControls = vi.hoisted(() => ({
 
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
-  captureAudioMemo,
+  captureAudioMemoPart,
+  deleteAudioMemo,
 }))
 
 vi.mock('@/lib/platform', () => ({ isMacosDesktop: false, isNativeShell: () => true }))
@@ -211,8 +215,10 @@ beforeEach(() => {
     defaultAiProviderId: 'cfg-openai',
     transcriptionFormat: true,
   }
-  captureAudioMemo.mockResolvedValue({ ok: true, memo: MEMO })
-  invoke.mockResolvedValue({ files: [] })
+  captureAudioMemoPart.mockResolvedValue({ ok: true, memo: MEMO })
+  // `list_staged` (the orphan scan) and `dir_list` (the cancel sweep) are the
+  // two commands the provider drives on its own.
+  invoke.mockImplementation(async (command: string) => (command === 'dir_list' ? [] : { files: [] }))
   pluginEvents.handlers.clear()
   // A fresh bridge object per test: the shared plugin-event registration in
   // core is keyed by bridge identity, so reusing one object would leak
@@ -254,14 +260,13 @@ describe('MobileAudioMemoProvider', () => {
     await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(result.current.drawerOpen).toBe(false)
 
-    expect(captureAudioMemo).toHaveBeenCalledWith({
+    expect(captureAudioMemoPart).toHaveBeenCalledWith({
       audio: { sourcePath: RECORDING.stagedPath },
       mimeType: 'audio/mp4',
       recordedAt: SESSION_STARTED_AT,
-      segment: { part: 1, end: true },
+      part: 1,
+      end: true,
       generation: 3,
-      onCaptured: expect.any(Function),
-      onDiscarded: expect.any(Function),
     })
     // The staged file is deleted only after the graph write succeeded.
     expect(stagedControls.deleteStaged).toHaveBeenCalledWith(RECORDING.stagedPath)
@@ -284,10 +289,11 @@ describe('MobileAudioMemoProvider', () => {
     })
 
     await vi.waitFor(() =>
-      expect(captureAudioMemo).toHaveBeenCalledWith(
+      expect(captureAudioMemoPart).toHaveBeenCalledWith(
         expect.objectContaining({
           audio: { sourcePath: '/staging/recording-1700000000000.part-001.m4a' },
-          segment: { part: 1, end: false },
+          part: 1,
+          end: false,
         }),
       ),
     )
@@ -316,19 +322,17 @@ describe('MobileAudioMemoProvider', () => {
         end: false,
       })
     })
-    await vi.waitFor(() => expect(captureAudioMemo).toHaveBeenCalled())
+    await vi.waitFor(() => expect(captureAudioMemoPart).toHaveBeenCalled())
 
     await act(async () => {
       result.current.cancelRecording()
     })
 
-    await vi.waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('audio_memo_delete', { path: landed, generation: 3 }),
-    )
+    await vi.waitFor(() => expect(deleteAudioMemo).toHaveBeenCalledWith(landed, 3))
   })
 
   it('a capture failure keeps the staged file; discard deletes it', async () => {
-    captureAudioMemo.mockResolvedValue({ ok: false, message: 'disk full' })
+    captureAudioMemoPart.mockResolvedValue({ ok: false, message: 'disk full' })
     const { result } = await renderHook(() => useMobileAudioMemo(), {
       wrapper,
     })
@@ -354,7 +358,7 @@ describe('MobileAudioMemoProvider', () => {
   })
 
   it('retry re-runs the same recording and deletes the staged file on success', async () => {
-    captureAudioMemo
+    captureAudioMemoPart
       .mockResolvedValueOnce({ ok: false, message: 'disk full' })
       .mockResolvedValueOnce({ ok: true, memo: MEMO })
     const { result } = await renderHook(() => useMobileAudioMemo(), {
@@ -373,7 +377,7 @@ describe('MobileAudioMemoProvider', () => {
       result.current.retry()
     })
     await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
-    expect(captureAudioMemo).toHaveBeenCalledTimes(2)
+    expect(captureAudioMemoPart).toHaveBeenCalledTimes(2)
     expect(stagedControls.deleteStaged).toHaveBeenCalledWith(RECORDING.stagedPath)
   })
 
@@ -393,7 +397,7 @@ describe('MobileAudioMemoProvider', () => {
 
     expect(result.current.drawerOpen).toBe(false)
     await vi.waitFor(() =>
-      expect(captureAudioMemo).toHaveBeenCalledWith(
+      expect(captureAudioMemoPart).toHaveBeenCalledWith(
         expect.objectContaining({ audio: { sourcePath: RECORDING.stagedPath }, generation: 3 }),
       ),
     )
@@ -412,7 +416,7 @@ describe('MobileAudioMemoProvider', () => {
     })
 
     expect(result.current.drawerOpen).toBe(false)
-    expect(captureAudioMemo).not.toHaveBeenCalled()
+    expect(captureAudioMemoPart).not.toHaveBeenCalled()
   })
 
   it('dismissing the drawer mid-recording stops and saves, never drops', async () => {
@@ -427,7 +431,7 @@ describe('MobileAudioMemoProvider', () => {
       result.current.onDrawerOpenChange(false)
     })
 
-    await vi.waitFor(() => expect(captureAudioMemo).toHaveBeenCalled())
+    await vi.waitFor(() => expect(captureAudioMemoPart).toHaveBeenCalled())
     expect(recorderControls.cancelSpy).not.toHaveBeenCalled()
   })
 
@@ -445,7 +449,7 @@ describe('MobileAudioMemoProvider', () => {
 
     expect(result.current.drawerOpen).toBe(false)
     expect(recorderControls.cancelSpy).toHaveBeenCalled()
-    expect(captureAudioMemo).not.toHaveBeenCalled()
+    expect(captureAudioMemoPart).not.toHaveBeenCalled()
   })
 
   it('a denied microphone shows the iOS Settings guidance in the drawer', async () => {
@@ -465,7 +469,7 @@ describe('MobileAudioMemoProvider', () => {
   })
 
   it('a parked error reopens the drawer from the FAB instead of blocking silently', async () => {
-    captureAudioMemo.mockResolvedValue({ ok: false, message: 'disk full' })
+    captureAudioMemoPart.mockResolvedValue({ ok: false, message: 'disk full' })
     const { result } = await renderHook(() => useMobileAudioMemo(), {
       wrapper,
     })
@@ -514,12 +518,13 @@ describe('MobileAudioMemoProvider', () => {
 
     await renderHook(() => useMobileAudioMemo(), { wrapper })
 
-    await vi.waitFor(() => expect(captureAudioMemo).toHaveBeenCalledTimes(1))
-    expect(captureAudioMemo).toHaveBeenCalledWith(
+    await vi.waitFor(() => expect(captureAudioMemoPart).toHaveBeenCalledTimes(1))
+    expect(captureAudioMemoPart).toHaveBeenCalledWith(
       expect.objectContaining({
         audio: { sourcePath: '/staging/recording-1700000000000.part-001-end.m4a' },
         recordedAt: new Date(1_700_000_000_000),
-        segment: { part: 1, end: true },
+        part: 1,
+        end: true,
         generation: 3,
       }),
     )
@@ -528,7 +533,7 @@ describe('MobileAudioMemoProvider', () => {
         '/staging/recording-1700000000000.part-001-end.m4a',
       ),
     )
-    expect(captureAudioMemo).not.toHaveBeenCalledWith(
+    expect(captureAudioMemoPart).not.toHaveBeenCalledWith(
       expect.objectContaining({
         audio: { sourcePath: '/staging/recording-claimed.part-001.m4a' },
       }),
@@ -564,7 +569,7 @@ describe('MobileAudioMemoProvider', () => {
 
     await vi.waitFor(() => expect(stagedControls.stopActive).toHaveBeenCalledTimes(1))
     await vi.waitFor(() =>
-      expect(captureAudioMemo).toHaveBeenCalledWith(
+      expect(captureAudioMemoPart).toHaveBeenCalledWith(
         expect.objectContaining({ audio: { sourcePath: orphaned.stagedPath }, generation: 3 }),
       ),
     )

@@ -254,11 +254,7 @@ async function writeAudioMemoAsset(
   }
   // Browser dev's in-memory bridge has no binary transport; recordings there
   // are short enough for the base64 JSON route.
-  await writeAsset(
-    path,
-    bytesToBase64(new Uint8Array(await audio.blob.arrayBuffer())),
-    generation,
-  )
+  await writeAsset(path, bytesToBase64(new Uint8Array(await audio.blob.arrayBuffer())), generation)
 }
 
 export async function captureAudioMemo(
