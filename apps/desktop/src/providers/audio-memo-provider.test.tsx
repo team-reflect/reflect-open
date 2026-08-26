@@ -18,6 +18,7 @@ const deleteAudioMemo = vi.hoisted(() =>
   vi.fn<(path: string, generation: number) => Promise<void>>(async () => {}),
 )
 const failOperation = vi.hoisted(() => vi.fn<(message: string) => void>())
+const toast = vi.hoisted(() => ({ add: vi.fn(), close: vi.fn() }))
 const toggleSidebar = vi.hoisted(() => vi.fn())
 
 /** Fake reconciler lifecycle — the provider is only a shim over it. */
@@ -148,6 +149,8 @@ vi.mock('@/lib/provider-fetch', () => ({
 vi.mock('@/lib/operations', () => ({
   startOperation: () => ({ progress: vi.fn(), done: vi.fn(), fail: failOperation }),
 }))
+
+vi.mock('@/components/ui/toast', () => ({ toast }))
 
 const { AudioMemoProvider, useAudioMemo } = await import('./audio-memo-provider')
 
@@ -322,6 +325,26 @@ describe('AudioMemoProvider', () => {
       result.current.toggle()
     })
     expect(result.current.phase).toBe('recording')
+  })
+
+  it('stopping takes the still-recording reminder down with it', async () => {
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
+
+    await act(async () => {
+      result.current.toggle()
+    })
+    recorderControls.options?.onReminder?.(30 * 60_000)
+    expect(toast.add).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'audio-memo-reminder', title: 'Still recording' }),
+    )
+
+    await act(async () => {
+      result.current.toggle()
+    })
+
+    // Left up, it would keep claiming a session is running, and its stop
+    // control would land on whatever recording started next.
+    expect(toast.close).toHaveBeenCalledWith('audio-memo-reminder')
   })
 
   it('collapsing the sidebar mid-recording stops and saves', async () => {

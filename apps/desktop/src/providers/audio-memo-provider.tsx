@@ -24,7 +24,10 @@ import {
   useAudioRecorder,
   type RecorderSegment,
 } from '@/hooks/use-audio-recorder'
-import { showRecordingReminder } from '@/components/audio-memo/recording-reminder'
+import {
+  dismissRecordingReminder,
+  showRecordingReminder,
+} from '@/components/audio-memo/recording-reminder'
 import { useAudioMemoPipeline } from '@/hooks/use-audio-memo-pipeline'
 import { useSettings } from '@/providers/settings-provider'
 import { useSidebar } from '@/providers/sidebar-provider'
@@ -199,6 +202,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
       return
     }
     stoppingRef.current = true
+    dismissRecordingReminder()
     // The stop click commits the memo: flip to 'transcribing' before the stop
     // settles, so an Esc landing in the await gap can't read a lingering
     // 'recording' phase and cancel a recording the user just saved.
@@ -250,6 +254,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   }, [recorder.status, pipeline, stopAndSave, cancelRecorder, start, toggleSidebar])
 
   const cancel = useCallback((): void => {
+    dismissRecordingReminder()
     const session = sessionRef.current
     if (session !== null) {
       // Discard means discard: segments already on disk go too. Segments
