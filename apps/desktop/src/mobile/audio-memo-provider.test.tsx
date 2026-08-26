@@ -62,6 +62,7 @@ const recorderControls = vi.hoisted(() => ({
   failStart: null as string | null,
   options: null as {
     segmentMs: number
+    reminderMs: number
     onSegment: (part: NativeRecordingPart) => void
     onNativeStop: (part: NativeRecordingPart | null) => void
   } | null,
@@ -108,6 +109,7 @@ vi.mock('@/mobile/use-native-audio-recorder', () => ({
   isStagedPathClaimed: (path: string) => stagedControls.claimed.has(path),
   useNativeAudioRecorder: (options: {
     segmentMs: number
+    reminderMs: number
     onSegment: (part: NativeRecordingPart) => void
     onNativeStop: (part: NativeRecordingPart | null) => void
   }) => {
@@ -238,6 +240,7 @@ describe('MobileAudioMemoProvider', () => {
     })
     expect(result.current.available).toBe(true)
     expect(recorderControls.options?.segmentMs).toBe(20 * 60_000)
+    expect(recorderControls.options?.reminderMs).toBe(30 * 60_000)
 
     await act(async () => {
       result.current.toggle()

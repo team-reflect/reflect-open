@@ -41,6 +41,13 @@ import type { AudioMemoIdentity } from './audio-memo'
 export const AUDIO_MEMO_SEGMENT_MS = 20 * 60_000
 
 /**
+ * How often a running session reminds the user that the microphone is still
+ * live. Recording has no duration cap, so this reminder is the only thing
+ * between a forgotten tap and a recorder that runs until the battery dies.
+ */
+export const AUDIO_MEMO_REMINDER_MS = 30 * 60_000
+
+/**
  * Crash fallback for "is this session still being recorded?": with no `-end`
  * marker, a session whose newest segment is older than a segment plus this
  * slack cannot still be live — the recorder would have rotated by now.

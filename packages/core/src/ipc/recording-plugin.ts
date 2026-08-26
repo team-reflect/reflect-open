@@ -92,6 +92,12 @@ export interface StartRecordingOptions {
    * even if JS never wakes. Each segment is one staged file.
    */
   segmentMs: number
+  /**
+   * Remind the user this often while the session runs. The plugin schedules
+   * the notification itself, so it survives a sleeping webview and is
+   * cleared by whatever ends the session.
+   */
+  reminderMs: number
 }
 
 /** Ask for the microphone and start a recording session. */

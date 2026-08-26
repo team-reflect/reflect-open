@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  AUDIO_MEMO_REMINDER_MS,
   AUDIO_MEMO_SEGMENT_MS,
   audioMemoIdentity,
   audioMemoPartPath,
@@ -23,6 +24,7 @@ import {
   useAudioRecorder,
   type RecorderSegment,
 } from '@/hooks/use-audio-recorder'
+import { showRecordingReminder } from '@/components/audio-memo/recording-reminder'
 import { useAudioMemoPipeline } from '@/hooks/use-audio-memo-pipeline'
 import { useSettings } from '@/providers/settings-provider'
 import { useSidebar } from '@/providers/sidebar-provider'
@@ -110,6 +112,8 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   const handleSegmentRef = useRef<(segment: RecorderSegment) => void>(() => {})
   const recorder = useAudioRecorder({
     segmentMs: AUDIO_MEMO_SEGMENT_MS,
+    reminderMs: AUDIO_MEMO_REMINDER_MS,
+    onReminder: (elapsedMs) => showRecordingReminder(elapsedMs, () => stopAndSaveRef.current()),
     onSegment: (segment) => handleSegmentRef.current(segment),
   })
   // The hook's functions are stable; the wrapper object is not (elapsed ticks

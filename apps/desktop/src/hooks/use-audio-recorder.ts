@@ -35,6 +35,10 @@ export interface RecorderResult {
 export interface UseAudioRecorderOptions {
   /** Rotate the recorder each time the session grows by this much. */
   segmentMs?: number
+  /** Fire `onReminder` each time the session crosses another multiple of this. */
+  reminderMs?: number
+  /** The session is still running; the host nudges the user. */
+  onReminder?: (elapsedMs: number) => void
   /** Receives every finished segment, including the final one on stop. */
   onSegment?: (segment: RecorderSegment) => void
 }
@@ -116,6 +120,8 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
   const recorderInitRef = useRef<MediaRecorderOptions>({})
   /** Segments emitted so far this session. */
   const partsRef = useRef(0)
+  /** Reminder boundaries already crossed this session. */
+  const remindersRef = useRef(0)
   /** Serializes rotations against stop — each op awaits the previous onstop. */
   const opChainRef = useRef<Promise<void>>(Promise.resolve())
   // Read at fire time, not captured at start — the host's callback identity
@@ -137,6 +143,7 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
     recorderRef.current = null
     chunksRef.current = []
     partsRef.current = 0
+    remindersRef.current = 0
     if (intervalRef.current !== null) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
@@ -232,6 +239,7 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
     try {
       chunksRef.current = []
       partsRef.current = 0
+      remindersRef.current = 0
       attachRecorder(input)
     } catch (cause) {
       // A recorder that failed to set up must not strand the acquired stream
@@ -254,6 +262,16 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
       const segmentMs = optionsRef.current.segmentMs
       if (segmentMs !== undefined && elapsed >= (partsRef.current + 1) * segmentMs) {
         rotate()
+      }
+      const reminderMs = optionsRef.current.reminderMs
+      if (reminderMs !== undefined) {
+        // Catch up in one step: a machine that slept through three reminder
+        // boundaries owes the user one nudge, not three.
+        const due = Math.floor(elapsed / reminderMs)
+        if (due > remindersRef.current) {
+          remindersRef.current = due
+          optionsRef.current.onReminder?.(elapsed)
+        }
       }
     }, ELAPSED_TICK_MS)
     setStream(input)

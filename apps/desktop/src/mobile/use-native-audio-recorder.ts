@@ -62,6 +62,12 @@ export interface NativeRecordingPart {
 export interface UseNativeAudioRecorderOptions {
   /** Rotate the recorder this often, natively, so it holds if JS never wakes. */
   segmentMs: number
+  /**
+   * Remind the user this often while the session runs. The plugin owns the
+   * schedule: a session the native side ends must clear the reminder even
+   * when the webview is gone.
+   */
+  reminderMs: number
   /** A segment the recorder rotated away from; the session keeps recording. */
   onSegment: (part: NativeRecordingPart) => void
   /**
@@ -261,7 +267,10 @@ export function useNativeAudioRecorder(
     setStatusBoth('requesting')
     let session: RecordingSessionStart
     try {
-      session = await startRecording({ segmentMs: optionsRef.current.segmentMs })
+      session = await startRecording({
+        segmentMs: optionsRef.current.segmentMs,
+        reminderMs: optionsRef.current.reminderMs,
+      })
     } catch (cause) {
       setStatusBoth('idle')
       throw cause

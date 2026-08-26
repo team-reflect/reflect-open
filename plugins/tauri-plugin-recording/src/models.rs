@@ -7,6 +7,9 @@ pub struct StartRequest {
     /// Rotate the recorder after this much audio; each segment lands as its
     /// own complete file, so a session has no length limit.
     pub segment_ms: f64,
+    /// Remind the user this often while the session runs; the plugin owns the
+    /// schedule so it outlives a sleeping webview.
+    pub reminder_ms: f64,
 }
 
 /// `start_recording`'s response: the identity every segment of the session

@@ -281,6 +281,47 @@ describe('useAudioRecorder', () => {
     expect(result.current.status).toBe('idle')
   })
 
+  it('reminds the user on every interval boundary', async () => {
+    getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
+    const onReminder = vi.fn()
+    const { result } = await renderHook(() => useAudioRecorder({ reminderMs: 1000, onReminder }))
+
+    await act(async () => {
+      await result.current.start()
+    })
+    act(() => {
+      vi.advanceTimersByTime(999)
+    })
+    expect(onReminder).not.toHaveBeenCalled()
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(onReminder).toHaveBeenCalledTimes(1)
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+    expect(onReminder).toHaveBeenCalledTimes(2)
+  })
+
+  it('a clock jump past several boundaries reminds once', async () => {
+    getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
+    const onReminder = vi.fn()
+    const { result } = await renderHook(() => useAudioRecorder({ reminderMs: 1000, onReminder }))
+
+    await act(async () => {
+      await result.current.start()
+    })
+    // The machine slept through three boundaries: the elapsed clock jumps
+    // without the tick firing in between.
+    act(() => {
+      vi.setSystemTime(Date.now() + 3000)
+      vi.advanceTimersByTime(200)
+    })
+
+    expect(onReminder).toHaveBeenCalledTimes(1)
+    expect(onReminder).toHaveBeenCalledWith(3200)
+  })
+
   it('unmount releases the microphone', async () => {
     const track = { stop: vi.fn() }
     getUserMedia.mockResolvedValue(fakeStream([track]))

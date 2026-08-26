@@ -12,6 +12,7 @@ import {
 import {
   audioMemoIdentity,
   audioMemoPartPath,
+  AUDIO_MEMO_REMINDER_MS,
   AUDIO_MEMO_SEGMENT_MS,
   deleteAudioMemo,
   errorMessage,
@@ -195,6 +196,7 @@ export function MobileAudioMemoProvider({
 
   const recorder = useNativeAudioRecorder({
     segmentMs: AUDIO_MEMO_SEGMENT_MS,
+    reminderMs: AUDIO_MEMO_REMINDER_MS,
     onSegment: enqueuePart,
     onNativeStop,
   })

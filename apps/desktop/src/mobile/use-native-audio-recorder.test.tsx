@@ -26,7 +26,12 @@ const SESSION_STARTED_MS = 1_700_000_000_000
 
 async function renderRecorder() {
   return await renderHook(() =>
-    useNativeAudioRecorder({ segmentMs: 20 * 60_000, onSegment, onNativeStop }),
+    useNativeAudioRecorder({
+      segmentMs: 20 * 60_000,
+      reminderMs: 30 * 60_000,
+      onSegment,
+      onNativeStop,
+    }),
   )
 }
 
@@ -61,7 +66,7 @@ describe('useNativeAudioRecorder', () => {
     })
 
     expect(invoke).toHaveBeenCalledWith('plugin:recording|start_recording', {
-      request: { segmentMs: 20 * 60_000 },
+      request: { segmentMs: 20 * 60_000, reminderMs: 30 * 60_000 },
     })
     expect(started[0]).toEqual(new Date(SESSION_STARTED_MS))
     expect(result.current.status).toBe('recording')

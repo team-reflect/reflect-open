@@ -15,11 +15,11 @@ function bridgeReturning(response: unknown) {
 describe('recording plugin bindings', () => {
   it('start_recording wraps the options in the request parameter', async () => {
     const invoke = bridgeReturning({ sessionStartedMs: 1_700_000_000_000 })
-    await expect(startRecording({ segmentMs: 20 * 60_000 })).resolves.toEqual({
-      sessionStartedMs: 1_700_000_000_000,
-    })
+    await expect(
+      startRecording({ segmentMs: 20 * 60_000, reminderMs: 30 * 60_000 }),
+    ).resolves.toEqual({ sessionStartedMs: 1_700_000_000_000 })
     expect(invoke).toHaveBeenCalledWith('plugin:recording|start_recording', {
-      request: { segmentMs: 20 * 60_000 },
+      request: { segmentMs: 20 * 60_000, reminderMs: 30 * 60_000 },
     })
   })
 

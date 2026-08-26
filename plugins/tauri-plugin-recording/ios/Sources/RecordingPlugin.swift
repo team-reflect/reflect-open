@@ -1,6 +1,7 @@
 import AVFoundation
 import Tauri
 import UIKit
+import UserNotifications
 import WebKit
 
 #if canImport(ActivityKit)
@@ -102,6 +103,8 @@ struct StartArgs: Decodable {
   /// Rotate the recorder after this much audio; each segment lands as its own
   /// complete `.m4a`, so a session has no length limit.
   let segmentMs: Double
+  /// Remind the user this often while the session runs.
+  let reminderMs: Double
 }
 
 /// `startRecording`'s response: the identity the webview files this session's
@@ -163,6 +166,11 @@ class RecordingPlugin: Plugin {
   /// microphone on days after the tap that asked for it is a surprise no
   /// user reads as their own action.
   private static let pendingActionMaxAgeSeconds: TimeInterval = 15 * 60
+  /// The repeating "still recording" reminder's request id; one per app, so a
+  /// later delivery replaces the banner instead of stacking another one.
+  private static let reminderRequestId = "app.reflect.recording.reminder"
+  /// `UNTimeIntervalNotificationTrigger` refuses anything under a minute.
+  private static let minimumReminderSeconds: TimeInterval = 60
 
   /// The delegate-hook target for OS callbacks that carry no plugin context.
   private static weak var shared: RecordingPlugin?
@@ -251,9 +259,11 @@ class RecordingPlugin: Plugin {
     Self.installShortcutHandler()
     // A crash mid-recording leaves its Live Activity counting on the lock
     // screen with nothing behind it (the orphan scan saves the audio, but
-    // nobody ended the activity). Nothing can be legitimately live at plugin
-    // load, so end them all.
+    // nobody ended the activity), and its reminder still firing every half
+    // hour. A recording cannot outlive the app process, so nothing can be
+    // legitimately live at plugin load: clear both.
     endStaleLiveActivities()
+    clearReminder()
   }
 
   // MARK: - Commands
@@ -280,7 +290,7 @@ class RecordingPlugin: Plugin {
             return
           }
           do {
-            try self.beginSession(segmentMs: args.segmentMs)
+            try self.beginSession(segmentMs: args.segmentMs, reminderMs: args.reminderMs)
             invoke.resolve(StartResponse(sessionStartedMs: self.sessionStartedMs))
           } catch {
             self.deactivateAudioSession()
@@ -404,7 +414,7 @@ class RecordingPlugin: Plugin {
   /// belongs to the *session* rather than to one segment lives here: the
   /// audio session, the idle-timer hold, the meter timer, and the Live
   /// Activity all survive rotations untouched.
-  private func beginSession(segmentMs: Double) throws {
+  private func beginSession(segmentMs: Double, reminderMs: Double) throws {
     let audioSession = AVAudioSession.sharedInstance()
     try audioSession.setCategory(.record, mode: .default, options: [.allowBluetoothHFP])
     try audioSession.setActive(true)
@@ -426,6 +436,7 @@ class RecordingPlugin: Plugin {
       self?.emitLevel()
     }
     startLiveActivity()
+    scheduleReminder(intervalMs: reminderMs)
   }
 
   /// Start the next segment on the already-open audio session.
@@ -604,6 +615,7 @@ class RecordingPlugin: Plugin {
     UIApplication.shared.isIdleTimerDisabled = false
     deactivateAudioSession()
     endLiveActivity()
+    clearReminder()
 
     if let cancel = pendingCancel {
       pendingCancel = nil
@@ -819,6 +831,57 @@ class RecordingPlugin: Plugin {
       }
     class_addMethod(
       delegateClass, selector, imp_implementationWithBlock(block), "v@:@@@?")
+  }
+
+  // MARK: - Recording reminder
+
+  /// Remind the user that a recording is still running. Recording has no
+  /// duration cap, so this repeating notification is the only thing between a
+  /// forgotten tap and a microphone that runs until the battery dies. The
+  /// plugin owns the schedule rather than the webview: a session the native
+  /// side ends (a call, an encoder error) has to clear it even when the
+  /// webview is gone.
+  private func scheduleReminder(intervalMs: Double) {
+    let interval = max(intervalMs / 1000, Self.minimumReminderSeconds)
+    let center = UNUserNotificationCenter.current()
+    // Asked on the first recording rather than at launch, and never blocking:
+    // a denial is not an error, it just leaves the Live Activity as the only
+    // running indicator.
+    center.requestAuthorization(options: [.alert]) { granted, error in
+      if let error {
+        Logger.error("recording reminder authorization failed: \(error)")
+        return
+      }
+      guard granted else { return }
+      DispatchQueue.main.async {
+        // The session may have ended while the permission prompt was up.
+        guard self.recorder != nil else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Reflect is still recording"
+        content.body = "Open Reflect to stop the recording."
+        // Silent on purpose: the microphone is live, and an alert tone would
+        // land in the recording itself. The elapsed time lives on the Live
+        // Activity, since a repeating request cannot carry a changing body.
+        content.sound = nil
+        let request = UNNotificationRequest(
+          identifier: Self.reminderRequestId,
+          content: content,
+          trigger: UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: true)
+        )
+        center.add(request) { error in
+          if let error {
+            Logger.error("scheduling the recording reminder failed: \(error)")
+          }
+        }
+      }
+    }
+  }
+
+  /// Clear the reminder and any banner it already delivered.
+  private func clearReminder() {
+    let center = UNUserNotificationCenter.current()
+    center.removePendingNotificationRequests(withIdentifiers: [Self.reminderRequestId])
+    center.removeDeliveredNotifications(withIdentifiers: [Self.reminderRequestId])
   }
 
   // MARK: - Live Activity
