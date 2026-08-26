@@ -366,6 +366,24 @@ describe('AiProvidersSection', () => {
     })
   })
 
+  it('returns focus to the opener when the dialog closes', async () => {
+    await renderSection()
+    await expect.element(page.getByText(/No AI providers configured/)).toBeInTheDocument()
+
+    // WebKit does not focus buttons on click, so anchor focus explicitly:
+    // both engines then open the dialog with the opener as the previously
+    // focused element, which Base UI restores after the popup unmounts.
+    const opener = page.getByRole('button', { name: /add provider/i })
+    opener.element().focus()
+    const dialog = await openDialog()
+
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    // The restore runs in a microtask after the popup unmounts; poll for it.
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(opener.element())
+    })
+  })
+
   it('falls back to the first entry when the default id dangles', async () => {
     stored = { ...twoStoredModels(), defaultAiProviderId: 'gone' }
     await renderSection()
