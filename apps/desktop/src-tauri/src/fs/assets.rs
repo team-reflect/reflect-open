@@ -310,7 +310,7 @@ fn import_exact(source: &Path, staging: &Path, target: &Path) -> AppResult<()> {
         return Ok(());
     }
     if !source.is_file() {
-        tracing::warn!(?source, ?target, "audio memo import source is gone; skipping");
+        tracing::warn!(?source, "audio memo import source is gone");
         return Ok(());
     }
     let mut temp = tempfile::NamedTempFile::new_in(staging)?;
