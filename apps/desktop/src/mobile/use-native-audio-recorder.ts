@@ -139,6 +139,32 @@ export async function nativeRecordingStatus(): Promise<{
 }
 
 /**
+ * Claim a finalized session's last segment for ingest, or drop it as a
+ * misclick. Only a one-segment session can be too short to keep: a later
+ * segment always ships, however small, because it carries the end marker
+ * without which the session never closes.
+ */
+function claimFinalPart(stop: {
+  path: string
+  sessionStartedMs: number
+  part: number
+  durationMs: number
+}): NativeRecordingPart | null {
+  claimStagedPath(stop.path)
+  if (stop.part === 1 && stop.durationMs < MIN_DURATION_MS) {
+    void deleteStagedRecording(stop.path).catch(() => {})
+    releaseStagedPath(stop.path)
+    return null
+  }
+  return {
+    stagedPath: stop.path,
+    recordedAt: new Date(stop.sessionStartedMs),
+    part: stop.part,
+    end: true,
+  }
+}
+
+/**
  * Stop the live native session and claim its final segment — `null` for a
  * session too short to be a memo. The shared machinery behind the hook's
  * `stop` and the provider's mount-time reconcile of a recording that
@@ -146,16 +172,7 @@ export async function nativeRecordingStatus(): Promise<{
  * the race — its `recordingStopped` event delivers the memo instead).
  */
 export async function stopActiveRecording(): Promise<NativeRecordingPart | null> {
-  const { path, sessionStartedMs, part, durationMs } = await stopRecording()
-  claimStagedPath(path)
-  // Only a one-segment session can be a misclick: a later segment always
-  // ships, however small, because it carries the session's end marker.
-  if (part === 1 && durationMs < MIN_DURATION_MS) {
-    await deleteStagedRecording(path).catch(() => {})
-    releaseStagedPath(path)
-    return null
-  }
-  return { stagedPath: path, recordedAt: new Date(sessionStartedMs), part, end: true }
+  return claimFinalPart(await stopRecording())
 }
 
 /**
@@ -213,22 +230,7 @@ export function useNativeAudioRecorder(
     }
     const handleStopped = (event: RecordingStoppedEvent): void => {
       setStatusBoth('idle')
-      const { path, sessionStartedMs, part, durationMs } = event
-      claimStagedPath(path)
-      // Only a one-segment session can be a misclick: a later segment always
-      // ships, however small, because it carries the session's end marker.
-      if (part === 1 && durationMs < MIN_DURATION_MS) {
-        void deleteStagedRecording(path).catch(() => {})
-        releaseStagedPath(path)
-        optionsRef.current.onNativeStop(null)
-        return
-      }
-      optionsRef.current.onNativeStop({
-        stagedPath: path,
-        recordedAt: new Date(sessionStartedMs),
-        part,
-        end: true,
-      })
+      optionsRef.current.onNativeStop(claimFinalPart(event))
     }
     const levelSubscription = subscribeRecordingLevel((event) => {
       if (statusRef.current === 'recording') {
