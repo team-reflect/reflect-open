@@ -62,10 +62,6 @@ export function TemplateCreateDialog({ context }: TemplateCreateDialogProps): Re
         }
       }}
       onOpenChangeComplete={(isOpen) => {
-        // The component stays mounted across opens, so the previous name,
-        // validation error, and submit error would leak into the next open;
-        // clear them after the exit transition so the fields never blank
-        // mid-fade.
         if (!isOpen) {
           reset()
           setSubmitError(null)
