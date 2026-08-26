@@ -40,9 +40,6 @@ import type { AudioMemoIdentity } from './audio-memo'
  */
 export const AUDIO_MEMO_SEGMENT_MS = 20 * 60_000
 
-/** Auto-stop cap for one recording session: four hours covers most meetings. */
-export const AUDIO_MEMO_MAX_DURATION_MS = 4 * 60 * 60_000
-
 /**
  * Crash fallback for "is this session still being recorded?": with no `-end`
  * marker, a session whose newest segment is older than a segment plus this

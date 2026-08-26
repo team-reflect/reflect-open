@@ -281,45 +281,6 @@ describe('useAudioRecorder', () => {
     expect(result.current.status).toBe('idle')
   })
 
-  it('fires onMaxDuration once when the cap is reached', async () => {
-    getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
-    const onMaxDuration = vi.fn()
-    const { result } = await renderHook(() =>
-      useAudioRecorder({ maxDurationMs: 1000, onMaxDuration }),
-    )
-
-    await act(async () => {
-      await result.current.start()
-    })
-    act(() => {
-      vi.advanceTimersByTime(999)
-    })
-    expect(onMaxDuration).not.toHaveBeenCalled()
-    act(() => {
-      vi.advanceTimersByTime(5000)
-    })
-    expect(onMaxDuration).toHaveBeenCalledTimes(1)
-  })
-
-  it('stopping before the cap disarms it', async () => {
-    getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
-    const onMaxDuration = vi.fn()
-    const { result } = await renderHook(() =>
-      useAudioRecorder({ maxDurationMs: 1000, onMaxDuration }),
-    )
-
-    await act(async () => {
-      await result.current.start()
-    })
-    await act(async () => {
-      await result.current.stop()
-    })
-    act(() => {
-      vi.advanceTimersByTime(5000)
-    })
-    expect(onMaxDuration).not.toHaveBeenCalled()
-  })
-
   it('unmount releases the microphone', async () => {
     const track = { stop: vi.fn() }
     getUserMedia.mockResolvedValue(fakeStream([track]))

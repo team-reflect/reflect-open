@@ -10,7 +10,6 @@ import {
   type ReactNode,
 } from 'react'
 import {
-  AUDIO_MEMO_MAX_DURATION_MS,
   AUDIO_MEMO_SEGMENT_MS,
   audioMemoIdentity,
   audioMemoPartPath,
@@ -111,8 +110,6 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   const handleSegmentRef = useRef<(segment: RecorderSegment) => void>(() => {})
   const recorder = useAudioRecorder({
     segmentMs: AUDIO_MEMO_SEGMENT_MS,
-    maxDurationMs: AUDIO_MEMO_MAX_DURATION_MS,
-    onMaxDuration: () => stopAndSaveRef.current(),
     onSegment: (segment) => handleSegmentRef.current(segment),
   })
   // The hook's functions are stable; the wrapper object is not (elapsed ticks

@@ -148,7 +148,6 @@ export {
   type ReconcileStop,
 } from '../actions/audio-memo'
 export {
-  AUDIO_MEMO_MAX_DURATION_MS,
   AUDIO_MEMO_SEGMENT_MS,
   type AudioMemoSession,
 } from '../actions/audio-memo-session'

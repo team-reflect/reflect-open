@@ -35,10 +35,6 @@ export interface RecorderResult {
 export interface UseAudioRecorderOptions {
   /** Rotate the recorder each time the session grows by this much. */
   segmentMs?: number
-  /** Auto-stop guard: `onMaxDuration` fires once when a session reaches this. */
-  maxDurationMs?: number
-  /** Called when the cap is hit — the host decides what stopping means. */
-  onMaxDuration?: () => void
   /** Receives every finished segment, including the final one on stop. */
   onSegment?: (segment: RecorderSegment) => void
 }
@@ -120,7 +116,6 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
   const recorderInitRef = useRef<MediaRecorderOptions>({})
   /** Segments emitted so far this session. */
   const partsRef = useRef(0)
-  const maxFiredRef = useRef(false)
   /** Serializes rotations against stop — each op awaits the previous onstop. */
   const opChainRef = useRef<Promise<void>>(Promise.resolve())
   // Read at fire time, not captured at start — the host's callback identity
@@ -142,7 +137,6 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
     recorderRef.current = null
     chunksRef.current = []
     partsRef.current = 0
-    maxFiredRef.current = false
     if (intervalRef.current !== null) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
@@ -238,7 +232,6 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
     try {
       chunksRef.current = []
       partsRef.current = 0
-      maxFiredRef.current = false
       attachRecorder(input)
     } catch (cause) {
       // A recorder that failed to set up must not strand the acquired stream
@@ -256,16 +249,11 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
     intervalRef.current = setInterval(() => {
       const elapsed = Date.now() - startedAtRef.current
       setElapsedMs(elapsed)
-      // Rotation and the cap run off elapsed time, not one long timeout — a
-      // throttled webview timer may fire late, but it always fires.
+      // Rotation runs off elapsed time, not one long timeout — a throttled
+      // webview timer may fire late, but it always fires.
       const segmentMs = optionsRef.current.segmentMs
       if (segmentMs !== undefined && elapsed >= (partsRef.current + 1) * segmentMs) {
         rotate()
-      }
-      const maxDurationMs = optionsRef.current.maxDurationMs
-      if (maxDurationMs !== undefined && !maxFiredRef.current && elapsed >= maxDurationMs) {
-        maxFiredRef.current = true
-        optionsRef.current.onMaxDuration?.()
       }
     }, ELAPSED_TICK_MS)
     setStream(input)

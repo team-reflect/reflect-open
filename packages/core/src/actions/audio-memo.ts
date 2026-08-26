@@ -109,9 +109,11 @@ const MIME_BY_EXTENSION: Record<string, string> = Object.fromEntries(
  * them. The optional `part` suffix is a session segment (see
  * `audio-memo-session`): `-end` marks the final segment of a cleanly stopped
  * session, and a legacy suffix-free file reads as a one-part closed session.
+ * Part numbers are zero-padded to three digits and grow past it: a session
+ * has no duration cap, so `part-1000` must parse like `part-999`.
  */
 const MEMO_PATH_RE =
-  /^audio-memos\/(audio-memo-(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})(\d{2})-\d{3})(?:\.part-(\d{3})(-end)?)?\.([a-z0-9]+)$/
+  /^audio-memos\/(audio-memo-(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})(\d{2})-\d{3})(?:\.part-(\d{3,})(-end)?)?\.([a-z0-9]+)$/
 
 function pad(value: number, width: number): string {
   return String(value).padStart(width, '0')

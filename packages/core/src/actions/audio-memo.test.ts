@@ -8,6 +8,8 @@ import type {
 import {
   audioMemoFromPath,
   audioMemoIdentity,
+  audioMemoPartFromPath,
+  audioMemoPartPath,
   captureAudioMemo,
   isSilentStop,
   reconcileAudioMemos,
@@ -152,6 +154,12 @@ describe('audioMemoIdentity', () => {
 describe('audioMemoFromPath', () => {
   it('round-trips the identity from the recording path', () => {
     expect(audioMemoFromPath(MEMO.audioPath)).toEqual(MEMO)
+  })
+
+  it('parses a part number that outgrew three digits', () => {
+    const path = 'audio-memos/audio-memo-2026-06-11-153022-845.part-1000.webm'
+    expect(audioMemoPartFromPath(path)).toEqual({ memo: MEMO, part: 1000, end: false })
+    expect(audioMemoPartPath(MEMO, 1000, false)).toBe(path)
   })
 
   it('rejects everything that is not a well-formed memo recording', () => {

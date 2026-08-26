@@ -314,19 +314,14 @@ describe('AudioMemoProvider', () => {
     )
   })
 
-  it('arms the recorder cap and saves when it fires', async () => {
+  it('rotates the recorder every segment and never stops on its own', async () => {
     const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
     expect(recorderControls.options?.segmentMs).toBe(20 * 60_000)
-    expect(recorderControls.options?.maxDurationMs).toBe(4 * 60 * 60_000)
 
     await act(async () => {
       result.current.toggle()
     })
-    await act(async () => {
-      recorderControls.options?.onMaxDuration?.()
-    })
-
-    await vi.waitFor(() => expect(captureAudioMemoPart).toHaveBeenCalled())
+    expect(result.current.phase).toBe('recording')
   })
 
   it('collapsing the sidebar mid-recording stops and saves', async () => {
