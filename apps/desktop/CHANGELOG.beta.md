@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.5...v0.11.0-beta.6) (2026-08-26)
+
+
+### Features
+
+* record audio memos without a duration cap ([#1167](https://github.com/team-reflect/reflect-open/issues/1167)) ([ddabded](https://github.com/team-reflect/reflect-open/commit/ddabded1713b08199d9b0472cde5cc2d5feeccc9))
+
+
+### Bug Fixes
+
+* reset the "New template" dialog when it closes ([#1168](https://github.com/team-reflect/reflect-open/issues/1168)) ([11103ee](https://github.com/team-reflect/reflect-open/commit/11103ee949578a3e388eae63c1becc316a7c508e))
+
 ## [0.11.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.4...v0.11.0-beta.5) (2026-08-22)
 
 
