@@ -234,14 +234,6 @@ body {
   }
 }
 
-/* One keyboard-focus treatment everywhere. Zero-specificity (`:where`) so any
-   component rule below (the editor's `outline: none`, the palette input)
-   can still opt out. */
-:where(button, a, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
-}
-
 /* ---- Editor (Plan 05) ------------------------------------------------------
    meowdown reads its theme from `--meowdown-*` variables; we remap them to
    Reflect tokens. This lives on `html:root`, not `.reflect-editor`: meowdown
