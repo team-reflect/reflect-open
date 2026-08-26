@@ -31,7 +31,7 @@ pub struct Recording<R: Runtime>(PluginHandle<R>);
 impl<R: Runtime> Recording<R> {
     /// Ask for the microphone (prompting if needed) and start recording into
     /// the staging directory. Resolves once the recorder is live.
-    pub fn start_recording(&self, request: StartRequest) -> crate::Result<()> {
+    pub fn start_recording(&self, request: StartRequest) -> crate::Result<StartResponse> {
         self.0
             .run_mobile_plugin("startRecording", request)
             .map_err(Into::into)

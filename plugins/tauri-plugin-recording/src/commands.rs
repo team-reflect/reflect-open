@@ -10,7 +10,7 @@ use crate::Result;
 pub(crate) async fn start_recording<R: Runtime>(
     app: AppHandle<R>,
     request: StartRequest,
-) -> Result<()> {
+) -> Result<StartResponse> {
     app.recording().start_recording(request)
 }
 

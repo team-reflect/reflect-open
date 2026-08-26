@@ -1,29 +1,27 @@
 import { useEffect, useRef } from 'react'
 import { listStaged } from '@reflect/core'
 import { isNativeShell } from '@/lib/platform'
-import { claimStagedPath, isStagedPathClaimed } from '@/mobile/use-native-audio-recorder'
+import {
+  claimStagedPath,
+  isStagedPathClaimed,
+  type NativeRecordingPart,
+} from '@/mobile/use-native-audio-recorder'
 
 /**
- * The orphan scan (audio-memos wave 1): staged recordings no live flow owns —
- * from a crash, a webview reload, or a kill while backgrounded — are read
- * back and handed to the capture pipeline on mount and on every foreground,
- * oldest first (`list_staged` sorts by name = by time). The caller's
- * `enqueueStaged` owns deleting the file once the graph write lands; ingest
- * is idempotent by stop time, so a file whose delete failed re-resolves to
- * the same memo identity on the next scan instead of duplicating.
+ * The orphan scan (audio-memos wave 1): staged segments no live flow owns —
+ * from a crash, a webview reload, or a kill while backgrounded — are handed
+ * to the capture pipeline on mount and on every foreground, oldest session
+ * first. Finished segments of the session recording *right now* are picked
+ * up too: they are complete files (`list_staged` excludes the one still being
+ * written), and landing them early is the point. The caller's `enqueuePart`
+ * owns deleting the staged file once the graph write lands; ingest is
+ * idempotent by session and position, so a file whose delete failed
+ * re-resolves to the same segment on the next scan instead of duplicating.
  */
-
-/** A staged native recording, ready for the capture pipeline. */
-export interface StagedRecordingInput {
-  /** The memo's identity timestamp — the file's stop time for re-scans. */
-  recordedAt: Date
-  /** The staging-directory file the capture owns until it lands. */
-  stagedPath: string
-}
 
 /** Mount the launch/foreground orphan scan. */
 export function useStagedRecordingIngest(
-  enqueueStaged: (input: StagedRecordingInput) => void,
+  enqueuePart: (part: NativeRecordingPart) => void,
 ): void {
   const scanningRef = useRef(false)
   useEffect(() => {
@@ -46,7 +44,12 @@ export function useStagedRecordingIngest(
             continue
           }
           claimStagedPath(file.path)
-          enqueueStaged({ recordedAt: new Date(file.modifiedMs), stagedPath: file.path })
+          enqueuePart({
+            stagedPath: file.path,
+            recordedAt: new Date(file.sessionStartedMs),
+            part: file.part,
+            end: file.end,
+          })
         }
       } catch (cause) {
         console.error('audio memo orphan scan failed:', cause)
@@ -65,5 +68,5 @@ export function useStagedRecordingIngest(
       disposed = true
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [enqueueStaged])
+  }, [enqueuePart])
 }

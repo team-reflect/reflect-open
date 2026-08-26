@@ -376,6 +376,22 @@ export async function listPendingAudioMemoSessions(
 }
 
 /**
+ * Graph paths of every segment of one session, oldest first. The cancel
+ * sweep's account of what a session wrote: an in-memory ledger cannot see
+ * segments a previous webview ingested for the same recording.
+ */
+export async function listAudioMemoSegments(
+  memo: AudioMemoIdentity,
+  generation: number,
+): Promise<string[]> {
+  const files = await listDir(AUDIO_MEMOS_DIR, generation)
+  return files
+    .filter((file) => audioMemoPartFromPath(file.path)?.memo.base === memo.base)
+    .map((file) => file.path)
+    .sort()
+}
+
+/**
  * The note declares its base name as an alias so the daily-note link
  * (`[[<base>|…]]`) resolves through the index — and keeps resolving if the
  * user renames the title.

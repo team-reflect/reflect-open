@@ -6,8 +6,11 @@ import {
   type PluginSubscription,
 } from '@reflect/core'
 import { isNativeShell } from '@/lib/platform'
-import { nativeRecordingStatus, stopActiveRecording } from '@/mobile/use-native-audio-recorder'
-import type { StagedRecordingInput } from '@/mobile/use-staged-recording-ingest'
+import {
+  nativeRecordingStatus,
+  stopActiveRecording,
+  type NativeRecordingPart,
+} from '@/mobile/use-native-audio-recorder'
 
 /**
  * The webview side of the native-action handshake (audio-memos wave 3), plus
@@ -36,13 +39,13 @@ const ACTION_CONFIRM_DELAY_MS = 2000
 export interface UseNativeRecordActionOptions {
   /** Start a memo — the provider's usual start (opens the drawer, records). */
   start: () => Promise<void>
-  /** Hand a reconciled recording to the capture pipeline. */
-  enqueueStaged: (input: StagedRecordingInput) => void
+  /** Hand a reconciled segment to the capture pipeline. */
+  enqueuePart: (part: NativeRecordingPart) => void
 }
 
 /** Mount the reconcile-then-handshake lifecycle. */
 export function useNativeRecordAction(options: UseNativeRecordActionOptions): void {
-  const { enqueueStaged } = options
+  const { enqueuePart } = options
   // Read at fire time — the provider's start identity changes across renders.
   const startRef = useRef(options.start)
   useEffect(() => {
@@ -60,9 +63,9 @@ export function useNativeRecordAction(options: UseNativeRecordActionOptions): vo
       try {
         const status = await nativeRecordingStatus()
         if (status.recording) {
-          const result = await stopActiveRecording()
-          if (result !== null) {
-            enqueueStaged({ recordedAt: result.recordedAt, stagedPath: result.stagedPath })
+          const part = await stopActiveRecording()
+          if (part !== null) {
+            enqueuePart(part)
           }
         }
       } catch (cause) {
@@ -111,5 +114,5 @@ export function useNativeRecordAction(options: UseNativeRecordActionOptions): vo
       }
       subscription?.unlisten()
     }
-  }, [enqueueStaged])
+  }, [enqueuePart])
 }

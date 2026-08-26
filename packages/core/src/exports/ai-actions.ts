@@ -136,6 +136,7 @@ export {
   captureAudioMemo,
   captureAudioMemoPart,
   isSilentStop,
+  listAudioMemoSegments,
   listPendingAudioMemoSessions,
   reconcileAudioMemos,
   type AudioMemoIdentity,

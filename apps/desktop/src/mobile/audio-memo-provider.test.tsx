@@ -1,7 +1,7 @@
 import { act, useState, type ReactElement, type ReactNode } from 'react'
 import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { setBridge } from '@reflect/core'
+import { audioMemoIdentity, audioMemoPartPath, setBridge } from '@reflect/core'
 import type {
   AiProvidersState,
   AudioMemoIdentity,
@@ -10,7 +10,7 @@ import type {
   GraphInfo,
   Settings,
 } from '@reflect/core'
-import type { NativeRecorderResult } from '@/mobile/use-native-audio-recorder'
+import type { NativeRecordingPart } from '@/mobile/use-native-audio-recorder'
 
 const captureAudioMemo = vi.hoisted(() =>
   vi.fn<(input: CaptureAudioMemoInput) => Promise<CaptureAudioMemoOutcome>>(),
@@ -57,12 +57,13 @@ const recorderControls = vi.hoisted(() => ({
   startSpy: vi.fn(),
   stopSpy: vi.fn(),
   cancelSpy: vi.fn(),
-  stopResult: null as NativeRecorderResult | null,
+  stopResult: null as NativeRecordingPart | null,
   /** Make start() reject like a denied native permission. */
   failStart: null as string | null,
   options: null as {
-    maxDurationMs: number
-    onNativeStop: (result: NativeRecorderResult | null) => void
+    segmentMs: number
+    onSegment: (part: NativeRecordingPart) => void
+    onNativeStop: (part: NativeRecordingPart | null) => void
   } | null,
 }))
 
@@ -70,7 +71,7 @@ const stagedControls = vi.hoisted(() => ({
   claimed: new Set<string>(),
   deleteStaged: vi.fn<(path: string) => Promise<void>>(),
   recordingStatus: vi.fn<() => Promise<{ recording: boolean; elapsedMs: number }>>(),
-  stopActive: vi.fn<() => Promise<NativeRecorderResult | null>>(),
+  stopActive: vi.fn<() => Promise<NativeRecordingPart | null>>(),
 }))
 
 vi.mock('@reflect/core', async (importOriginal) => ({
@@ -106,8 +107,9 @@ vi.mock('@/mobile/use-native-audio-recorder', () => ({
   releaseStagedPath: (path: string) => stagedControls.claimed.delete(path),
   isStagedPathClaimed: (path: string) => stagedControls.claimed.has(path),
   useNativeAudioRecorder: (options: {
-    maxDurationMs: number
-    onNativeStop: (result: NativeRecorderResult | null) => void
+    segmentMs: number
+    onSegment: (part: NativeRecordingPart) => void
+    onNativeStop: (part: NativeRecordingPart | null) => void
   }) => {
     recorderControls.options = options
     const [status, setStatus] = useState<'idle' | 'requesting' | 'recording'>('idle')
@@ -121,6 +123,7 @@ vi.mock('@/mobile/use-native-audio-recorder', () => ({
           throw recorderControls.failStart
         }
         setStatus('recording')
+        return SESSION_STARTED_AT
       },
       stop: async () => {
         recorderControls.stopSpy()
@@ -162,10 +165,14 @@ function wrapper({ children }: { children: ReactNode }): ReactElement {
   return <MobileAudioMemoProvider graph={GRAPH}>{children}</MobileAudioMemoProvider>
 }
 
-const RECORDING: NativeRecorderResult = {
-  durationMs: 4000,
-  stagedPath: '/staging/recording-1.m4a',
-  recordedAt: new Date(1_700_000_000_000),
+/** Every session in these tests starts here; segments share the timestamp. */
+const SESSION_STARTED_AT = new Date(1_700_000_000_000)
+
+const RECORDING: NativeRecordingPart = {
+  stagedPath: '/staging/recording-1700000000000.part-001-end.m4a',
+  recordedAt: SESSION_STARTED_AT,
+  part: 1,
+  end: true,
 }
 
 const MEMO: AudioMemoIdentity = {
@@ -230,7 +237,7 @@ describe('MobileAudioMemoProvider', () => {
       wrapper,
     })
     expect(result.current.available).toBe(true)
-    expect(recorderControls.options?.maxDurationMs).toBe(10 * 60_000)
+    expect(recorderControls.options?.segmentMs).toBe(20 * 60_000)
 
     await act(async () => {
       result.current.toggle()
@@ -247,7 +254,8 @@ describe('MobileAudioMemoProvider', () => {
     expect(captureAudioMemo).toHaveBeenCalledWith({
       audio: { sourcePath: RECORDING.stagedPath },
       mimeType: 'audio/mp4',
-      recordedAt: expect.any(Date),
+      recordedAt: SESSION_STARTED_AT,
+      segment: { part: 1, end: true },
       generation: 3,
       onCaptured: expect.any(Function),
       onDiscarded: expect.any(Function),
@@ -255,6 +263,65 @@ describe('MobileAudioMemoProvider', () => {
     // The staged file is deleted only after the graph write succeeded.
     expect(stagedControls.deleteStaged).toHaveBeenCalledWith(RECORDING.stagedPath)
     expect(reconcilerControls.fake.schedule).toHaveBeenCalled()
+  })
+
+  it('a rotated segment lands in the graph while the session keeps recording', async () => {
+    const { result } = await renderHook(() => useMobileAudioMemo(), { wrapper })
+
+    await act(async () => {
+      result.current.toggle()
+    })
+    await act(async () => {
+      recorderControls.options?.onSegment({
+        stagedPath: '/staging/recording-1700000000000.part-001.m4a',
+        recordedAt: SESSION_STARTED_AT,
+        part: 1,
+        end: false,
+      })
+    })
+
+    await vi.waitFor(() =>
+      expect(captureAudioMemo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          audio: { sourcePath: '/staging/recording-1700000000000.part-001.m4a' },
+          segment: { part: 1, end: false },
+        }),
+      ),
+    )
+    expect(result.current.phase).toBe('recording')
+  })
+
+  it('discarding a session deletes the segments it already wrote to the graph', async () => {
+    const memo = audioMemoIdentity(SESSION_STARTED_AT, 'audio/mp4')
+    const landed = audioMemoPartPath(memo, 1, false)
+    invoke.mockImplementation(async (command: string) => {
+      if (command === 'dir_list') {
+        return [{ path: landed, size: 1, modifiedMs: 0 }]
+      }
+      return { files: [] }
+    })
+    const { result } = await renderHook(() => useMobileAudioMemo(), { wrapper })
+
+    await act(async () => {
+      result.current.toggle()
+    })
+    await act(async () => {
+      recorderControls.options?.onSegment({
+        stagedPath: '/staging/recording-1700000000000.part-001.m4a',
+        recordedAt: SESSION_STARTED_AT,
+        part: 1,
+        end: false,
+      })
+    })
+    await vi.waitFor(() => expect(captureAudioMemo).toHaveBeenCalled())
+
+    await act(async () => {
+      result.current.cancelRecording()
+    })
+
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('audio_memo_delete', { path: landed, generation: 3 }),
+    )
   })
 
   it('a capture failure keeps the staged file; discard deletes it', async () => {
@@ -307,7 +374,7 @@ describe('MobileAudioMemoProvider', () => {
     expect(stagedControls.deleteStaged).toHaveBeenCalledWith(RECORDING.stagedPath)
   })
 
-  it('a native stop (interruption, cap) is ingested exactly like a user stop', async () => {
+  it('a native stop (interruption, route loss) is ingested exactly like a user stop', async () => {
     const { result } = await renderHook(() => useMobileAudioMemo(), {
       wrapper,
     })
@@ -416,17 +483,23 @@ describe('MobileAudioMemoProvider', () => {
     expect(result.current.phase).toBe('error')
   })
 
-  it('the orphan scan ingests unclaimed staged files by their stop time, then deletes them', async () => {
+  it('the orphan scan ingests unclaimed staged segments under their session, then deletes them', async () => {
     invoke.mockImplementation(async (command: string) => {
       if (command === 'plugin:recording|list_staged') {
         return {
           files: [
             {
-              path: '/staging/recording-old.m4a',
+              path: '/staging/recording-1700000000000.part-001-end.m4a',
+              sessionStartedMs: 1_700_000_000_000,
+              part: 1,
+              end: true,
               modifiedMs: 1_700_000_000_000,
             },
             {
-              path: '/staging/recording-claimed.m4a',
+              path: '/staging/recording-claimed.part-001.m4a',
+              sessionStartedMs: 1_700_000_100_000,
+              part: 1,
+              end: false,
               modifiedMs: 1_700_000_100_000,
             },
           ],
@@ -434,23 +507,28 @@ describe('MobileAudioMemoProvider', () => {
       }
       throw new Error(`unexpected invoke: ${command}`)
     })
-    stagedControls.claimed.add('/staging/recording-claimed.m4a')
+    stagedControls.claimed.add('/staging/recording-claimed.part-001.m4a')
 
     await renderHook(() => useMobileAudioMemo(), { wrapper })
 
     await vi.waitFor(() => expect(captureAudioMemo).toHaveBeenCalledTimes(1))
     expect(captureAudioMemo).toHaveBeenCalledWith(
       expect.objectContaining({
-        audio: { sourcePath: '/staging/recording-old.m4a' },
+        audio: { sourcePath: '/staging/recording-1700000000000.part-001-end.m4a' },
         recordedAt: new Date(1_700_000_000_000),
+        segment: { part: 1, end: true },
         generation: 3,
       }),
     )
     await vi.waitFor(() =>
-      expect(stagedControls.deleteStaged).toHaveBeenCalledWith('/staging/recording-old.m4a'),
+      expect(stagedControls.deleteStaged).toHaveBeenCalledWith(
+        '/staging/recording-1700000000000.part-001-end.m4a',
+      ),
     )
     expect(captureAudioMemo).not.toHaveBeenCalledWith(
-      expect.objectContaining({ audio: { sourcePath: '/staging/recording-claimed.m4a' } }),
+      expect.objectContaining({
+        audio: { sourcePath: '/staging/recording-claimed.part-001.m4a' },
+      }),
     )
   })
 
@@ -471,10 +549,11 @@ describe('MobileAudioMemoProvider', () => {
       recording: true,
       elapsedMs: 30_000,
     })
-    const orphaned: NativeRecorderResult = {
-      durationMs: 30_000,
-      stagedPath: '/staging/recording-orphan.m4a',
+    const orphaned: NativeRecordingPart = {
+      stagedPath: '/staging/recording-1700000050000.part-001-end.m4a',
       recordedAt: new Date(1_700_000_050_000),
+      part: 1,
+      end: true,
     }
     stagedControls.stopActive.mockResolvedValue(orphaned)
 

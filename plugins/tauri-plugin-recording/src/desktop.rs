@@ -14,7 +14,7 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 pub struct Recording<R: Runtime>(AppHandle<R>);
 
 impl<R: Runtime> Recording<R> {
-    pub fn start_recording(&self, _request: StartRequest) -> crate::Result<()> {
+    pub fn start_recording(&self, _request: StartRequest) -> crate::Result<StartResponse> {
         Err(crate::Error::UnsupportedPlatform)
     }
 
