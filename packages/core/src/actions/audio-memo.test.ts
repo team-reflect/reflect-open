@@ -10,7 +10,7 @@ import {
   audioMemoIdentity,
   audioMemoPartFromPath,
   audioMemoPartPath,
-  captureAudioMemo,
+  captureAudioMemoPart,
   isSilentStop,
   reconcileAudioMemos,
   type ReconcileAudioMemosInput,
@@ -171,31 +171,35 @@ describe('audioMemoFromPath', () => {
   })
 })
 
-describe('captureAudioMemo', () => {
-  it('writes the recording base64-encoded under audio-memos/, pinned to the generation', async () => {
-    const outcome = await captureAudioMemo({
+describe('captureAudioMemoPart', () => {
+  it('writes the segment base64-encoded under audio-memos/, pinned to the generation', async () => {
+    const outcome = await captureAudioMemoPart({
       audio: { blob: new Blob(['audio'], { type: 'audio/webm' }) },
       mimeType: 'audio/webm;codecs=opus',
       recordedAt: RECORDED_AT,
+      part: 1,
+      end: false,
       generation: 3,
     })
 
     expect(outcome).toEqual({ ok: true, memo: MEMO })
-    expect(writeAssetMock).toHaveBeenCalledWith(MEMO.audioPath, btoa('audio'), 3)
+    expect(writeAssetMock).toHaveBeenCalledWith(audioMemoPartPath(MEMO, 1, false), btoa('audio'), 3)
   })
 
-  it('imports a recording the recorder already wrote to disk, bytes never crossing the IPC', async () => {
-    const outcome = await captureAudioMemo({
-      audio: { sourcePath: '/staging/recording-1.m4a' },
+  it('imports a segment the recorder already wrote to disk, bytes never crossing the IPC', async () => {
+    const outcome = await captureAudioMemoPart({
+      audio: { sourcePath: '/staging/recording-1.part-002-end.m4a' },
       mimeType: 'audio/mp4',
       recordedAt: RECORDED_AT,
+      part: 2,
+      end: true,
       generation: 3,
     })
 
     expect(outcome.ok).toBe(true)
     expect(importAudioMemoMock).toHaveBeenCalledWith(
-      '/staging/recording-1.m4a',
-      'audio-memos/audio-memo-2026-06-11-153022-845.m4a',
+      '/staging/recording-1.part-002-end.m4a',
+      'audio-memos/audio-memo-2026-06-11-153022-845.part-002-end.m4a',
       3,
     )
     expect(writeAssetMock).not.toHaveBeenCalled()
@@ -204,10 +208,12 @@ describe('captureAudioMemo', () => {
   it('reports a write failure as data — the caller retries with the same recording', async () => {
     writeAssetMock.mockRejectedValue({ kind: 'io', message: 'disk full' })
 
-    const outcome = await captureAudioMemo({
+    const outcome = await captureAudioMemoPart({
       audio: { blob: new Blob(['audio'], { type: 'audio/webm' }) },
       mimeType: 'audio/webm',
       recordedAt: RECORDED_AT,
+      part: 1,
+      end: true,
       generation: 3,
     })
 

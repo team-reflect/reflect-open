@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  captureAudioMemo,
   captureAudioMemoPart,
   errorMessage,
   pickTranscriptionConfig,
@@ -37,8 +36,8 @@ export interface PendingAudioCapture {
   audio: AudioMemoSource
   mimeType: string
   recordedAt: Date
-  /** Session segment placement; absent for a legacy single-file capture. */
-  segment?: { part: number; end: boolean }
+  /** Placement within the recording session this segment belongs to. */
+  segment: { part: number; end: boolean }
   /**
    * Runs after the recording's bytes are durably in the graph — mobile
    * deletes its native staged file here. A failure is logged, never parked:
@@ -196,18 +195,16 @@ export function useAudioMemoPipeline(
         if (capture === undefined) {
           break
         }
-        let outcome: Awaited<ReturnType<typeof captureAudioMemo>>
+        let outcome: Awaited<ReturnType<typeof captureAudioMemoPart>>
         try {
-          outcome = capture.segment
-            ? await captureAudioMemoPart({
-                audio: capture.audio,
-                mimeType: capture.mimeType,
-                recordedAt: capture.recordedAt,
-                part: capture.segment.part,
-                end: capture.segment.end,
-                generation: graph.generation,
-              })
-            : await captureAudioMemo({ ...capture, generation: graph.generation })
+          outcome = await captureAudioMemoPart({
+            audio: capture.audio,
+            mimeType: capture.mimeType,
+            recordedAt: capture.recordedAt,
+            part: capture.segment.part,
+            end: capture.segment.end,
+            generation: graph.generation,
+          })
         } catch (cause) {
           outcome = { ok: false, message: errorMessage(cause) }
         } finally {
