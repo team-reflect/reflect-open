@@ -31,16 +31,12 @@ interface TemplateCreateForm {
   name: string
 }
 
-export function TemplateCreateDialog({ context }: TemplateCreateDialogProps): ReactElement | null {
+export function TemplateCreateDialog({ context }: TemplateCreateDialogProps): ReactElement {
   const { createOpen, closeTemplateCreate } = useNoteTemplates()
-  const { register, handleSubmit, formState } = useForm<TemplateCreateForm>({
+  const { register, handleSubmit, formState, reset } = useForm<TemplateCreateForm>({
     defaultValues: { name: '' },
   })
   const [submitError, setSubmitError] = useState<string | null>(null)
-
-  if (!createOpen) {
-    return null
-  }
 
   const submit = handleSubmit(async (values) => {
     setSubmitError(null)
@@ -59,10 +55,20 @@ export function TemplateCreateDialog({ context }: TemplateCreateDialogProps): Re
 
   return (
     <Dialog
-      open
+      open={createOpen}
       onOpenChange={(isOpen) => {
         if (!isOpen) {
           closeTemplateCreate()
+        }
+      }}
+      onOpenChangeComplete={(isOpen) => {
+        // The component stays mounted across opens, so the previous name,
+        // validation error, and submit error would leak into the next open;
+        // clear them after the exit transition so the fields never blank
+        // mid-fade.
+        if (!isOpen) {
+          reset()
+          setSubmitError(null)
         }
       }}
     >
