@@ -30,17 +30,13 @@ interface TemplatePickerProps {
   context: CommandContext
 }
 
-export function TemplatePicker({ context }: TemplatePickerProps): ReactElement | null {
+export function TemplatePicker({ context }: TemplatePickerProps): ReactElement {
   const { pickerOpen, closeTemplatePicker, openTemplateCreate } = useNoteTemplates()
   const { graph } = useGraph()
   const { data: templates } = useQuery({
     ...createTemplatesQueryOptions(graph?.root),
     enabled: graph !== null && pickerOpen,
   })
-
-  if (!pickerOpen) {
-    return null
-  }
 
   const insert = (path: string): void => {
     closeTemplatePicker()
