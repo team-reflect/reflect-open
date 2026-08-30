@@ -1,4 +1,4 @@
-import type { CloudGraphContext, CloudSafe } from '../checkers'
+import type { CloudGraphContext, CloudSafe } from '../../privacy/checkers'
 import { normalizeChatSystemPrompt } from '../../settings/schema'
 
 /**

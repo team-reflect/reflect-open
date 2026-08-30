@@ -263,6 +263,9 @@ html:root {
      row uses accent-soft, matching the ⌘K palette's selected item. */
   --meowdown-popover-bg: var(--surface);
   --meowdown-popover-hover-bg: var(--accent-soft);
+  --meowdown-hover-card-border: color-mix(in oklab, var(--foreground) 10%, transparent);
+  --meowdown-hover-card-radius: var(--radius-xl);
+  --meowdown-hover-card-shadow: var(--shadow-md);
   --meowdown-danger: var(--destructive);
 }
 
@@ -388,17 +391,6 @@ html:root {
   font-family: var(--font-reading, var(--font-sans));
   font-weight: 650;
   letter-spacing: var(--tracking-snug, -0.01em);
-}
-
-/* Chrome for meowdown's wiki-link hover card (its `className`, passed from
-   note-editor.tsx). Reflect popovers outline with `ring-foreground/10` —
-   stronger than the `--border` hairline meowdown defaults to, which vanishes
-   against the dark canvas — and float on the same DS shadow. Unlayered plain
-   CSS on purpose: the card's CSS-module defaults are unlayered too, so
-   layered Tailwind utilities could not override them. */
-.reflect-hover-card {
-  border-color: color-mix(in oklab, var(--foreground) 10%, transparent);
-  box-shadow: var(--shadow-md);
 }
 
 /* The wiki-link hover card's compact body (wiki-link-hover-preview.tsx).

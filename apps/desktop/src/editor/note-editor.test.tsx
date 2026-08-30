@@ -83,6 +83,27 @@ describe('NoteEditor wiki-link hover card', () => {
   })
 })
 
+describe('NoteEditor link preview', () => {
+  it('forwards host-resolved metadata to the link popup', async () => {
+    const resolveLinkPreview = vi.fn(async () => ({
+      title: 'Example Domain',
+      description: 'An example description.',
+    }))
+    await render(
+      <NoteEditor
+        initialContent="[https://example.com](https://example.com)"
+        resolveLinkPreview={resolveLinkPreview}
+      />,
+    )
+
+    await hover(pmRoot.getByRole('link', { name: 'https://example.com' }))
+    const popover = page.getByTestId('link-popover')
+    await expect.element(popover.getByText('Example Domain')).toBeVisible()
+    await expect.element(popover.getByText('An example description.')).toBeVisible()
+    expect(resolveLinkPreview).toHaveBeenCalledWith('https://example.com')
+  })
+})
+
 describe('NoteEditor time format', () => {
   it('inserts a 12-hour time through /now by default', async () => {
     const handleRef = createRef<NoteEditorHandle>()

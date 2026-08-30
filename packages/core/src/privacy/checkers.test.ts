@@ -3,10 +3,12 @@ import type { RetrievalHit } from '../embeddings/retrieve'
 import {
   assertCloudAllowed,
   cloudSafeAssetDescription,
+  cloudSafeLinkHref,
   cloudSafeNoteContent,
   cloudSafeSearchHits,
   cloudSafeSelection,
   isPrivateNoteError,
+  notePrivate,
   PrivateNoteError,
 } from './checkers'
 
@@ -25,6 +27,28 @@ describe('assertCloudAllowed', () => {
     expect(() => assertCloudAllowed({ path: 'notes/secret.md', isPrivate: true })).toThrow(
       PrivateNoteError,
     )
+  })
+})
+
+describe('cloudSafeLinkHref', () => {
+  it('mints a public note link destination', () => {
+    expect(cloudSafeLinkHref({ path: 'notes/a.md', isPrivate: false }, 'https://example.com')).toBe(
+      'https://example.com',
+    )
+  })
+
+  it('refuses a private note before the destination can be fetched', () => {
+    expect(() =>
+      cloudSafeLinkHref({ path: PRIVATE_PATH, isPrivate: true }, 'https://example.com'),
+    ).toThrow(PrivateNoteError)
+  })
+})
+
+describe('notePrivate', () => {
+  it('reads the shared privacy flag from full note source', () => {
+    expect(notePrivate('---\nprivate: true\n---\nsecret')).toBe(true)
+    expect(notePrivate('---\nprivate: false\n---\npublic')).toBe(false)
+    expect(notePrivate('no frontmatter')).toBe(false)
   })
 })
 
