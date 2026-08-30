@@ -6,6 +6,12 @@
 > relays + drains them on launch/foreground. See
 > [the porting doc](../porting/reflect-mobile/share-extension.md).
 >
+> **Update (2026-08-22):** Chrome captures can optionally use Chrome's built-in
+> on-device Summarizer. The extension queues the raw link first, then sends a
+> same-day deduplicating update with a dedicated summary; summary generation uses
+> no model key or cloud AI provider. Separate desktop BYOK enrichment remains as
+> described below.
+>
 > **Status (2026-06-14): Implemented.** The pipeline below is built end-to-end:
 > `apps/extension` (WXT MV3, popup + queue + ⌘⇧K), `apps/native-host`
 > (`reflect-capture-host`, bundled as a second sidecar), the capture inbox +
@@ -55,8 +61,9 @@ extraction / read-later (deferred), dedup-heavy clipping (basic dedup only).
 
 V1 called a Reflect-hosted `link-description-api`. V2 must not. Instead:
 
-- The **extension** captures and forwards; it stores **no model keys** and makes **no AI
-  calls** — enrichment never happens in the extension.
+- The **extension** captures and forwards; it stores **no model keys** and makes no
+  cloud AI calls. Opt-in page summaries may run in Chrome's built-in on-device model;
+  provider-backed enrichment still never happens in the extension.
 - The **desktop app** owns durable writes, file paths, asset storage, keychain access,
   BYOK AI calls, and the `private: true` check.
 
@@ -107,7 +114,9 @@ Every capture lands in two phases so saving never waits on the network or AI:
 
 1. **Chrome extension** (`apps/extension`, MV3): action button + `⌘⇧P` (or `⌘⇧K` if reserved)
    to capture the active tab's URL, title, user-selected text/highlights, and a
-   screenshot (`captureVisibleTab`). Minimal UI: confirm + optional note. No keys, no AI.
+   screenshot (`captureVisibleTab`). Minimal UI: confirm + optional note and
+   independently selectable page text and on-device page summary (including both
+   together). No extension-held keys or provider-backed AI in this browser flow.
    If the host is missing (app not installed) the extension explains + links the
    download, queues the capture in `chrome.storage`, and retries later. Status states
    are honest: **queued** (spooled into inbox or held in `chrome.storage` — the host
@@ -125,10 +134,16 @@ Every capture lands in two phases so saving never waits on the network or AI:
    manifests for detected browsers on every launch.
 
 3. **Capture inbox + drain (core action).** A platform-agnostic capture envelope (zod)
-   in `actions/capture` — `{url, title, selection?, screenshotRef?, note?, capturedAt,
-   source}` — written identically by the desktop host today and by the future iOS
-   share extension (app-group inbox) / Android intent handler. `drainCaptureInbox`
-   executes these steps **in order**:
+   in `actions/capture` — `{version, id, url, title, selection?, contentText?, summary?,
+   metaDescription?, note?, screenshotRef?, capturedAt, source}` — written identically
+   by the desktop host today and by the future iOS share extension (app-group inbox) /
+   Android intent handler. A Chrome summary capture emits two envelopes in order: the
+   raw link without `summary`, then a new-ID refresh with the same `capturedAt`, URL,
+   selection, note, and screenshot plus `summary` (and `contentText` when selected).
+   Same-day dedup treats them as one capture; if desktop enrichment observes the raw
+   write in between, the managed refresh remains pending for a retry. Capture-flow,
+   drain, and enrichment-race tests pin this contract. `drainCaptureInbox` executes
+   these steps **in order**:
    1. Resolve the capture target (today's daily note, or a chosen note).
    2. **Privacy gate:** if the target is `private: true`, skip all enrichment and all
       outbound traffic (no URL fetch, no meta scrape, no screenshot/selection/note
@@ -191,7 +206,8 @@ Every capture lands in two phases so saving never waits on the network or AI:
 
 ## Key decisions / contracts
 
-- **Desktop owns all writes, AI, and keys; the extension only captures + forwards.**
+- **Desktop owns all writes, provider-backed AI, and keys; the extension only captures,
+  optionally summarizes on-device, and forwards.**
 - **The native-messaging host is a spooler; the capture inbox is the IPC.** Capture
   works with the app closed; no socket, no port, no daemon.
 - **Two-phase write:** raw entry saved synchronously on drain; meta scrape + AI

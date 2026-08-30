@@ -22,6 +22,8 @@ pub struct Envelope {
     pub selection: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
     /// In-page meta description; only the iOS share extension sets it, so a
     /// Chrome wire message carrying one passes through untouched.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -218,8 +220,21 @@ mod tests {
     fn accepts_a_minimal_message() {
         let capture = ValidatedCapture::parse(&payload(|_| {})).unwrap();
         assert_eq!(capture.envelope.title, "Example");
+        assert_eq!(capture.envelope.summary, None);
         assert_eq!(capture.envelope.screenshot_ref, None);
         assert!(capture.screenshot.is_none());
+    }
+
+    #[test]
+    fn preserves_an_on_device_summary() {
+        let capture = ValidatedCapture::parse(&payload(|message| {
+            message["envelope"]["summary"] = "- First key point\n- Second key point".into();
+        }))
+        .unwrap();
+        assert_eq!(
+            capture.envelope.summary.as_deref(),
+            Some("- First key point\n- Second key point")
+        );
     }
 
     #[test]

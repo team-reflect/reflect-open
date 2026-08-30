@@ -16,6 +16,8 @@ export interface CapturedPage {
   selection?: string | undefined
   /** Defuddle-extracted page paragraphs, when the user asks to include them. */
   contentText?: string | undefined
+  /** On-device browser summary of the extracted page text. */
+  summary?: string | undefined
   /** The user's comment from the popup. */
   note?: string | undefined
 }
@@ -52,6 +54,7 @@ export function buildWireMessage(input: BuildWireMessageInput): CaptureWireMessa
       title: input.title.trim(),
       selection: presence(input.selection),
       contentText: presence(input.contentText),
+      summary: presence(input.summary),
       note: presence(input.note),
       capturedAt: input.capturedAt.toISOString(),
       source: 'extension',

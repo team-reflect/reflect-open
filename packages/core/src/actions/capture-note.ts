@@ -32,6 +32,10 @@ const captureNoteMetaSchema = z.object({
   captureHash: z.string(),
   captureSelectionHash: z.string().optional(),
   captureScreenshot: z.string().optional(),
+  /** Identifies the exact managed Page Text block without trusting note markers alone. */
+  capturePageTextHash: z.string().optional(),
+  /** Structured copy used to preserve the managed body section across recaptures. */
+  captureSummary: z.string().optional(),
 })
 
 export type CaptureNoteMeta = z.infer<typeof captureNoteMetaSchema>
@@ -75,6 +79,10 @@ function captureNoteBody(
   if (note) {
     parts.push(`## Note\n\n${note}`)
   }
+  const summary = envelope.summary?.trim()
+  if (summary) {
+    parts.push(`## Summary\n\n${summary}`)
+  }
   const selection = envelope.selection?.trim()
   if (selection) {
     parts.push(`## Selection\n\n${selection}`)
@@ -89,19 +97,29 @@ function captureNoteBody(
   return `${parts.join('\n\n')}\n`
 }
 
-export function capturePageTextFromBody(body: string): string | undefined {
-  const marker = `\n## Page Text\n\n${PAGE_TEXT_START}\n`
-  const markerAt = body.indexOf(marker)
-  if (markerAt === -1) {
+/** Read only a Page Text block whose content matches the structured managed hash. */
+export async function capturePageTextFromBody(
+  body: string,
+  expectedHash: string | undefined,
+): Promise<string | undefined> {
+  if (expectedHash === undefined) {
     return undefined
   }
-  const contentStart = markerAt + marker.length
-  const endAt = body.indexOf(PAGE_TEXT_END, contentStart)
-  if (endAt === -1) {
-    throw new Error('capture note is missing page text end marker')
+  const marker = `\n## Page Text\n\n${PAGE_TEXT_START}\n`
+  let markerAt = body.indexOf(marker)
+  while (markerAt !== -1) {
+    const contentStart = markerAt + marker.length
+    let endAt = body.indexOf(PAGE_TEXT_END, contentStart)
+    while (endAt !== -1) {
+      const content = body.slice(contentStart, endAt).trim()
+      if (content !== '' && (await hashContent(content)) === expectedHash) {
+        return content
+      }
+      endAt = body.indexOf(PAGE_TEXT_END, endAt + PAGE_TEXT_END.length)
+    }
+    markerAt = body.indexOf(marker, contentStart)
   }
-  const content = body.slice(contentStart, endAt).trim()
-  return content === '' ? undefined : content
+  return undefined
 }
 
 function firstSectionStart(body: string): number {
@@ -115,21 +133,45 @@ function firstSectionStart(body: string): number {
   return body.length
 }
 
+interface CaptureNoteSourceOptions {
+  /** Whether this write successfully promoted a screenshot asset. */
+  hasScreenshot: boolean
+  /** Enrichment state for the generated note. */
+  status: CaptureStatus
+  /** Hash distinguishing otherwise-identical captures with different selections. */
+  selectionHash?: string | undefined
+  /** Existing managed capture whose unrelated frontmatter should survive a refresh. */
+  existingSource?: string | undefined
+}
+
 export async function captureNoteSource(
   envelope: CaptureEnvelope,
   identity: CaptureIdentity,
-  options: { hasScreenshot: boolean; status: CaptureStatus; selectionHash?: string | undefined },
+  options: CaptureNoteSourceOptions,
 ): Promise<string> {
   const body = captureNoteBody(envelope, identity, options.hasScreenshot)
-  return upsertFrontmatter(body, {
+  const summary = envelope.summary?.trim()
+  const pageText = envelope.contentText?.trim()
+  const source =
+    options.existingSource === undefined
+      ? body
+      : options.existingSource.slice(0, splitFrontmatter(options.existingSource).bodyOffset) + body
+  return upsertFrontmatter(source, {
     aliases: [identity.base],
     captureUrl: envelope.url,
     capturedAt: envelope.capturedAt,
     captureSource: envelope.source,
     captureStatus: options.status,
+    captureMetadataStatus: undefined,
+    captureDailyFromTitle: undefined,
+    captureFinalizeStatus: undefined,
+    captureProvider: undefined,
+    captureModel: undefined,
     captureHash: await hashContent(body),
     captureSelectionHash: options.selectionHash,
     captureScreenshot: options.hasScreenshot ? identity.assetPath : undefined,
+    capturePageTextHash: pageText ? await hashContent(pageText) : undefined,
+    captureSummary: summary === '' ? undefined : summary,
   })
 }
 

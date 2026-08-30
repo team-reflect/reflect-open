@@ -31,12 +31,15 @@ import {
 } from './capture-identity'
 import {
   inboxEnvelopeSchema,
+  type CaptureEnvelope,
   type InboxEnvelope,
   type TextCaptureEnvelope,
 } from './capture-envelope'
 import {
+  captureDescriptionFromBody,
   captureNoteMeta,
   captureNoteSource,
+  capturePageTextFromBody,
   displayTitle,
   notePrivate,
   noteSource,
@@ -65,12 +68,14 @@ export interface DrainCaptureInboxInput {
 export interface DrainCaptureInboxOutcome {
   /** Spooled envelopes present when the pass started. */
   pending: number
-  /** Captures written (fresh notes plus dedup refreshes). */
+  /** Captures consumed (fresh notes plus handled same-day duplicates). */
   drained: number
   /**
-   * Of `drained`, how many link captures refreshed an existing same-day
-   * entry in place. Text captures never count here: duplicates are allowed
-   * by design (Plan 24), so every text envelope appends.
+   * Of `drained`, how many link captures matched an existing same-day entry.
+   * A match normally refreshes in place; if the note was edited or made
+   * private, the duplicate is discarded instead. Text captures never count
+   * here: duplicates are allowed by design (Plan 24), so every text envelope
+   * appends.
    */
   deduped: number
   /** Unparseable spool files quarantined under `.reflect/inbox-rejected/`. */
@@ -83,6 +88,48 @@ interface SameDayCapture {
   identity: CaptureIdentity
   /** The existing note's display title — what the daily's link text mirrors. */
   title: string
+  /** Existing managed fields survive a later link-only envelope in the same batch. */
+  body: string
+  /** Page text validated against its structured managed-content hash. */
+  pageText?: string | undefined
+  /** Structured summary backing the managed Summary body section. */
+  summary?: string | undefined
+  /** Full source used to preserve unrelated frontmatter during a safe refresh. */
+  source: string
+  /** Whether a refresh can replace the managed body without losing user data. */
+  refreshable: boolean
+}
+
+async function readSameDayCapture(
+  identity: CaptureIdentity,
+  url: string,
+  selectionHash: string | undefined,
+  generation: number,
+): Promise<SameDayCapture | null> {
+  let source: string
+  try {
+    source = await readNote(identity.notePath, generation)
+  } catch (cause) {
+    if (isAppError(cause) && cause.kind === 'notFound') {
+      return null
+    }
+    throw cause
+  }
+  const split = splitFrontmatter(source)
+  const frontmatter = parseFrontmatter(split.raw).data
+  const meta = captureNoteMeta(frontmatter)
+  if (meta === null || meta.captureUrl !== url || meta.captureSelectionHash !== selectionHash) {
+    return null
+  }
+  return {
+    identity,
+    title: parseNote({ path: identity.notePath, source }).title,
+    body: split.body,
+    pageText: await capturePageTextFromBody(split.body, meta.capturePageTextHash),
+    summary: meta.captureSummary,
+    source,
+    refreshable: !frontmatter.private && (await hashContent(split.body)) === meta.captureHash,
+  }
 }
 
 /**
@@ -123,21 +170,23 @@ async function findSameDayCapture(
     if (identity === null) {
       continue
     }
-    let source: string
-    try {
-      source = await readNote(identity.notePath, generation)
-    } catch (cause) {
-      if (isAppError(cause) && cause.kind === 'notFound') {
-        continue
-      }
-      throw cause
-    }
-    const meta = captureNoteMeta(parseFrontmatter(splitFrontmatter(source).raw).data)
-    if (meta && meta.captureUrl === url && meta.captureSelectionHash === selectionHash) {
-      return { identity, title: parseNote({ path: identity.notePath, source }).title }
+    const capture = await readSameDayCapture(identity, url, selectionHash, generation)
+    if (capture !== null) {
+      return capture
     }
   }
   return null
+}
+
+async function removeCaptureSpool(
+  name: string,
+  envelope: CaptureEnvelope,
+  generation: number,
+): Promise<void> {
+  await captureInboxRemove(name, generation)
+  if (envelope.screenshotRef) {
+    await captureInboxRemove(envelope.screenshotRef, generation)
+  }
 }
 
 /**
@@ -204,7 +253,7 @@ export async function drainCaptureInbox(
       const dailySource = await noteSource(daily, input.generation)
       const selection = envelope.selection?.trim()
       const selectionHash = selection ? await hashContent(selection) : undefined
-      const existing = await findSameDayCapture(
+      let existing = await findSameDayCapture(
         dailySource,
         [linksNoteTitle, LINKS_NOTE_TITLE],
         envelope.url,
@@ -213,6 +262,13 @@ export async function drainCaptureInbox(
       )
       const identity = existing?.identity ?? fresh
       const status: CaptureStatus = notePrivate(dailySource) ? 'skipped' : 'pending'
+
+      if (existing !== null && !existing.refreshable) {
+        await removeCaptureSpool(name, envelope, input.generation)
+        drained += 1
+        deduped += 1
+        continue
+      }
 
       let hasScreenshot = false
       if (envelope.screenshotRef) {
@@ -232,16 +288,40 @@ export async function drainCaptureInbox(
         }
       }
 
+      if (existing !== null) {
+        existing = await readSameDayCapture(
+          existing.identity,
+          envelope.url,
+          selectionHash,
+          input.generation,
+        )
+        if (existing === null || !existing.refreshable) {
+          await removeCaptureSpool(name, envelope, input.generation)
+          drained += 1
+          deduped += 1
+          continue
+        }
+      }
+      const mergedEnvelope = existing
+        ? {
+            ...envelope,
+            contentText: envelope.contentText ?? existing.pageText,
+            summary: envelope.summary ?? existing.summary,
+            metaDescription: envelope.metaDescription ?? captureDescriptionFromBody(existing.body),
+          }
+        : envelope
+
       await writeNote(
         identity.notePath,
-        await captureNoteSource(envelope, identity, {
+        await captureNoteSource(mergedEnvelope, identity, {
           hasScreenshot,
           status,
           selectionHash,
+          existingSource: existing?.source,
         }),
         input.generation,
       )
-      const freshTitle = displayTitle(envelope)
+      const freshTitle = displayTitle(mergedEnvelope)
       let updatedDaily = dailySource
       if (existing !== null) {
         // The refresh reset the note's H1 to the fresh tab title; keep the
@@ -260,10 +340,7 @@ export async function drainCaptureInbox(
       if (updatedDaily !== dailySource) {
         await writeNote(daily, updatedDaily, input.generation)
       }
-      await captureInboxRemove(name, input.generation)
-      if (envelope.screenshotRef) {
-        await captureInboxRemove(envelope.screenshotRef, input.generation)
-      }
+      await removeCaptureSpool(name, envelope, input.generation)
       drained += 1
       if (existing !== null) {
         deduped += 1
