@@ -17,14 +17,20 @@ touches a Reflect server, because there isn't one.
 - **Entry point.** The microphone control in the sidebar, with a global
   shortcut (`mod+\`). Lifecycle lives in
   `apps/desktop/src/providers/audio-memo-provider.tsx`.
-- **Capture is durable first.** One recording session runs up to four hours
-  and is stored as twenty-minute segments: the recorder rotates on one open
+- **Capture is durable first.** One recording session runs until the user
+  stops it, stored as twenty-minute segments: the recorder rotates on one open
   microphone stream, each finished segment lands immediately in the graph's
   `audio-memos/` folder as a complete audio file
   (`<base>.part-NNN.<ext>`, the final one `-end`-marked), streamed over raw
   binary IPC. A crash loses at most the segment still being recorded.
   Transcription is a separate, retryable step — a failed or missing
-  transcription never loses the audio.
+  transcription never loses the audio. On iOS the recorder is native
+  (`plugins/tauri-plugin-recording`): it rotates on the same schedule with
+  the app backgrounded and the screen locked, and Rust copies each staged
+  segment into the graph file-to-file, so the audio never enters webview
+  memory. Because nothing stops a session on its own, a notification every
+  thirty minutes reminds the user that the microphone is still live (a toast
+  with a stop control on desktop).
 - **Transcription.** Per segment, then assembled per session: segment-sized
   files fit every provider's single request, so a meeting-length recording
   needs no provider-side large-file mechanism and works on an OpenAI-only

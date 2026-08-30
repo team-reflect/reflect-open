@@ -10,6 +10,7 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -73,11 +74,13 @@ export function DateTimeSection(): ReactElement {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {DATE_FORMAT_VALUES.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {formatFullDate(today, value)}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                {DATE_FORMAT_VALUES.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {formatFullDate(today, value)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>
@@ -95,11 +98,13 @@ export function DateTimeSection(): ReactElement {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {WEEK_START_OPTIONS.map(({ value, label }) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                {WEEK_START_OPTIONS.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>
@@ -118,11 +123,13 @@ export function DateTimeSection(): ReactElement {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {TIME_FORMAT_OPTIONS.map(({ value, label }) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                {TIME_FORMAT_OPTIONS.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>

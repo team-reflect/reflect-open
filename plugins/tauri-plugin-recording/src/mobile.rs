@@ -31,7 +31,7 @@ pub struct Recording<R: Runtime>(PluginHandle<R>);
 impl<R: Runtime> Recording<R> {
     /// Ask for the microphone (prompting if needed) and start recording into
     /// the staging directory. Resolves once the recorder is live.
-    pub fn start_recording(&self, request: StartRequest) -> crate::Result<()> {
+    pub fn start_recording(&self, request: StartRequest) -> crate::Result<StartResponse> {
         self.0
             .run_mobile_plugin("startRecording", request)
             .map_err(Into::into)
@@ -92,13 +92,6 @@ impl<R: Runtime> Recording<R> {
     pub fn list_staged(&self) -> crate::Result<ListStagedResponse> {
         self.0
             .run_mobile_plugin("listStaged", ())
-            .map_err(Into::into)
-    }
-
-    /// A staged file's bytes, base64-encoded.
-    pub fn read_staged(&self, request: StagedPathRequest) -> crate::Result<ReadStagedResponse> {
-        self.0
-            .run_mobile_plugin("readStaged", request)
             .map_err(Into::into)
     }
 

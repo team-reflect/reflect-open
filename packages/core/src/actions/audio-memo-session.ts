@@ -40,8 +40,12 @@ import type { AudioMemoIdentity } from './audio-memo'
  */
 export const AUDIO_MEMO_SEGMENT_MS = 20 * 60_000
 
-/** Auto-stop cap for one recording session: four hours covers most meetings. */
-export const AUDIO_MEMO_MAX_DURATION_MS = 4 * 60 * 60_000
+/**
+ * How often a running session reminds the user that the microphone is still
+ * live. Recording has no duration cap, so this reminder is the only thing
+ * between a forgotten tap and a recorder that runs until the battery dies.
+ */
+export const AUDIO_MEMO_REMINDER_MS = 30 * 60_000
 
 /**
  * Crash fallback for "is this session still being recorded?": with no `-end`

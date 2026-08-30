@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  base64ToBytes,
   cancelRecording,
   deleteStaged,
   errorMessage,
-  readStaged,
   recordingStatus,
   startRecording,
   stopRecording,
+  type RecordingSessionStart,
   subscribeRecordingLevel,
+  subscribeRecordingSegment,
   subscribeRecordingStopped,
+  type RecordingSegmentEvent,
   type RecordingStoppedEvent,
 } from '@reflect/core'
 
@@ -18,12 +19,13 @@ import {
  * status/start/stop/cancel surface over the native recorder plugin
  * (`plugins/tauri-plugin-recording`) instead of the webview's MediaRecorder.
  * Capture is native by design (the V1 lesson): AVAudioRecorder writes
- * straight into a staging directory the plugin owns, and interruptions,
- * route loss, and the duration cap all finalize the file without JS — this
- * hook only *presents* recording state and hands finished files to the
- * capture pipeline. Backgrounding does not stop a recording (the app
- * declares `UIBackgroundModes: audio`); a memo keeps capturing through
- * screen lock and is stopped by the user, the cap, or an interruption.
+ * straight into a staging directory the plugin owns, rotates itself every
+ * segment, and finalizes the file on interruptions and route loss without
+ * JS — this hook only *presents* recording state and hands finished segments
+ * to the capture pipeline. Backgrounding does not stop a recording (the app
+ * declares `UIBackgroundModes: audio`); a session keeps capturing through
+ * screen lock, has no duration limit, and ends only on a user stop or an
+ * interruption.
  *
  * Instead of a `MediaStream` for the waveform, the plugin streams ~10 Hz
  * `recordingLevel` events; the latest level and elapsed time are exposed as
@@ -38,30 +40,40 @@ export const NATIVE_RECORDING_MIME = 'audio/mp4'
 /** Below this a recording is a misclick, not a memo (desktop parity). */
 const MIN_DURATION_MS = 500
 
-export interface NativeRecorderResult {
-  blob: Blob
-  mimeType: string
-  durationMs: number
-  /** The staged file's absolute path — delete it once the blob is durable. */
+/** One finished segment of a recording session, staged and ready to ingest. */
+export interface NativeRecordingPart {
+  /** The staged file's absolute path; delete it once the graph write lands. */
   stagedPath: string
   /**
-   * The recording's stop time (the staged file's mtime), used as the memo's
-   * identity timestamp. Every ingest path — user stop, native stop, and the
-   * orphan scan — keys off this same value, so re-ingesting a file whose
-   * delete failed resolves to the same memo basename rather than a duplicate.
+   * The session's start time, used as the memo's identity timestamp. Every
+   * segment of one session shares it, and it is encoded in the staged
+   * filename — so the live flow and the orphan scan file the same segment
+   * under the same memo basename.
    */
   recordedAt: Date
+  /** 1-based position within the session. */
+  part: number
+  /** True on the session's final segment (its file carries `-end`). */
+  end: boolean
 }
 
 export interface UseNativeAudioRecorderOptions {
-  /** Auto-stop cap, enforced natively so it holds even if JS never wakes. */
-  maxDurationMs: number
+  /** Rotate the recorder this often, natively, so it holds if JS never wakes. */
+  segmentMs: number
   /**
-   * A stop the native side initiated (interruption, route change, the cap):
-   * the file is already staged — treat it exactly like a user stop. `null`
-   * when the recording was too short to keep.
+   * Remind the user this often while the session runs. The plugin owns the
+   * schedule: a session the native side ends must clear the reminder even
+   * when the webview is gone.
    */
-  onNativeStop: (result: NativeRecorderResult | null) => void
+  reminderMs: number
+  /** A segment the recorder rotated away from; the session keeps recording. */
+  onSegment: (part: NativeRecordingPart) => void
+  /**
+   * A stop the native side initiated (interruption, route change): the file
+   * is already staged and `-end`-marked — treat it exactly like a user stop.
+   * `null` when the session was too short to keep.
+   */
+  onNativeStop: (part: NativeRecordingPart | null) => void
 }
 
 export interface UseNativeAudioRecorderValue {
@@ -70,10 +82,13 @@ export interface UseNativeAudioRecorderValue {
   elapsedMs: number
   /** Latest input level 0…1, for the waveform. */
   level: number
-  /** Ask for the microphone and start recording. Rejects when denied. */
-  start: () => Promise<void>
-  /** Stop and read back the recording — `null` for one too short to keep. */
-  stop: () => Promise<NativeRecorderResult | null>
+  /**
+   * Ask for the microphone and start a session. Resolves its identity
+   * timestamp, or `null` when one was already live. Rejects when denied.
+   */
+  start: () => Promise<Date | null>
+  /** Stop and hand back the final segment — `null` for a session too short to keep. */
+  stop: () => Promise<NativeRecordingPart | null>
   /** Stop and discard everything. */
   cancel: () => Promise<void>
 }
@@ -107,12 +122,6 @@ export function isMicDeniedError(cause: unknown): boolean {
   return errorMessage(cause).includes('denied')
 }
 
-/** Read a staged recording back as the pipeline's blob. */
-export async function readStagedRecording(path: string): Promise<Blob> {
-  const base64 = await readStaged(path)
-  return new Blob([base64ToBytes(base64)], { type: NATIVE_RECORDING_MIME })
-}
-
 /** Remove a staged recording once its bytes are durable in the graph. */
 export async function deleteStagedRecording(path: string): Promise<void> {
   await deleteStaged(path)
@@ -130,42 +139,49 @@ export async function nativeRecordingStatus(): Promise<{
 }
 
 /**
- * Stop the live native recording, claim its staged file, and read it back —
- * `null` for one too short to be a memo. The shared machinery behind the
- * hook's `stop` and the provider's mount-time reconcile of a recording that
- * outlived its UI. Rejects when nothing is recording (a native finalize won
- * the race — its `recordingStopped` event delivers the memo instead).
+ * Claim a finalized session's last segment for ingest, or drop it as a
+ * misclick. Only a one-segment session can be too short to keep: a later
+ * segment always ships, however small, because it carries the end marker
+ * without which the session never closes.
  */
-export async function stopActiveRecording(): Promise<NativeRecorderResult | null> {
-  const { path, durationMs, modifiedMs } = await stopRecording()
-  claimStagedPath(path)
-  if (durationMs < MIN_DURATION_MS) {
-    await deleteStagedRecording(path).catch(() => {})
-    releaseStagedPath(path)
+function claimFinalPart(stop: {
+  path: string
+  sessionStartedMs: number
+  part: number
+  durationMs: number
+}): NativeRecordingPart | null {
+  claimStagedPath(stop.path)
+  if (stop.part === 1 && stop.durationMs < MIN_DURATION_MS) {
+    void deleteStagedRecording(stop.path).catch(() => {})
+    releaseStagedPath(stop.path)
     return null
   }
-  try {
-    const blob = await readStagedRecording(path)
-    return {
-      blob,
-      mimeType: NATIVE_RECORDING_MIME,
-      durationMs,
-      stagedPath: path,
-      recordedAt: new Date(modifiedMs),
-    }
-  } catch (cause) {
-    // Leave the file for the orphan scan rather than losing the memo.
-    releaseStagedPath(path)
-    throw cause
+  return {
+    stagedPath: stop.path,
+    recordedAt: new Date(stop.sessionStartedMs),
+    part: stop.part,
+    end: true,
   }
 }
 
 /**
+ * Stop the live native session and claim its final segment — `null` for a
+ * session too short to be a memo. The shared machinery behind the hook's
+ * `stop` and the provider's mount-time reconcile of a recording that
+ * outlived its UI. Rejects when nothing is recording (a native finalize won
+ * the race — its `recordingStopped` event delivers the memo instead).
+ */
+export async function stopActiveRecording(): Promise<NativeRecordingPart | null> {
+  return claimFinalPart(await stopRecording())
+}
+
+/**
  * Drive the native recorder plugin as a React hook. Subscribes to the
- * plugin's `recordingLevel` / `recordingStopped` events for the hook's whole
- * life, exposes `status`/`elapsedMs`/`level` as state, and returns
- * `start`/`stop`/`cancel`. A native-initiated stop (interruption, route
- * change, the duration cap) arrives on `recordingStopped` and is delivered to
+ * plugin's `recordingLevel` / `recordingSegment` / `recordingStopped` events
+ * for the hook's whole life, exposes `status`/`elapsedMs`/`level` as state,
+ * and returns `start`/`stop`/`cancel`. Rotated segments arrive on
+ * `recordingSegment`; a native-initiated stop (interruption, route change)
+ * arrives on `recordingStopped` and is delivered to
  * {@link UseNativeAudioRecorderOptions.onNativeStop}; user-initiated `stop`
  * resolves its own result.
  */
@@ -197,43 +213,24 @@ export function useNativeAudioRecorder(
     }
   }, [])
   /** Guards the stop/cancel invoke gap — mirrors the desktop hook's guard. */
-  const stopPromiseRef = useRef<Promise<NativeRecorderResult | null> | null>(null)
+  const stopPromiseRef = useRef<Promise<NativeRecordingPart | null> | null>(null)
 
   // The plugin's event stream is subscribed for the hook's whole life: level
   // events are ignored unless recording, and a native stop must be heard even
   // if it lands between renders.
   useEffect(() => {
+    const handleSegment = (event: RecordingSegmentEvent): void => {
+      claimStagedPath(event.path)
+      optionsRef.current.onSegment({
+        stagedPath: event.path,
+        recordedAt: new Date(event.sessionStartedMs),
+        part: event.part,
+        end: false,
+      })
+    }
     const handleStopped = (event: RecordingStoppedEvent): void => {
       setStatusBoth('idle')
-      const { path, durationMs, modifiedMs } = event
-      claimStagedPath(path)
-      void (async () => {
-        if (durationMs < MIN_DURATION_MS) {
-          await deleteStagedRecording(path).catch(() => {})
-          releaseStagedPath(path)
-          optionsRef.current.onNativeStop(null)
-          return
-        }
-        try {
-          const blob = await readStagedRecording(path)
-          optionsRef.current.onNativeStop({
-            blob,
-            mimeType: NATIVE_RECORDING_MIME,
-            durationMs,
-            stagedPath: path,
-            recordedAt: new Date(modifiedMs),
-          })
-        } catch (cause) {
-          // Reading it back failed — leave the file staged (released,
-          // so the orphan scan ingests it on the next launch or
-          // foreground instead). Still notify the host so the recording
-          // UI closes: the recorder is already idle, and leaving the
-          // drawer open would strand it.
-          releaseStagedPath(path)
-          console.error('reading a native-stopped recording failed:', cause)
-          optionsRef.current.onNativeStop(null)
-        }
-      })()
+      optionsRef.current.onNativeStop(claimFinalPart(event))
     }
     const levelSubscription = subscribeRecordingLevel((event) => {
       if (statusRef.current === 'recording') {
@@ -241,45 +238,54 @@ export function useNativeAudioRecorder(
         setElapsedMs(event.elapsedMs)
       }
     })
+    const segmentSubscription = subscribeRecordingSegment(handleSegment)
     const stoppedSubscription = subscribeRecordingStopped(handleStopped)
-    void Promise.all([levelSubscription.ready, stoppedSubscription.ready]).catch(
-      (cause: unknown) => {
-        console.error('recording plugin events unavailable:', cause)
-      },
-    )
+    void Promise.all([
+      levelSubscription.ready,
+      segmentSubscription.ready,
+      stoppedSubscription.ready,
+    ]).catch((cause: unknown) => {
+      console.error('recording plugin events unavailable:', cause)
+    })
     return () => {
       levelSubscription.unlisten()
+      segmentSubscription.unlisten()
       stoppedSubscription.unlisten()
     }
   }, [setStatusBoth])
 
-  const start = useCallback(async (): Promise<void> => {
+  const start = useCallback(async (): Promise<Date | null> => {
     if (currentStatus() !== 'idle') {
-      return
+      return null
     }
     setStatusBoth('requesting')
+    let session: RecordingSessionStart
     try {
-      await startRecording({ maxDurationMs: optionsRef.current.maxDurationMs })
+      session = await startRecording({
+        segmentMs: optionsRef.current.segmentMs,
+        reminderMs: optionsRef.current.reminderMs,
+      })
     } catch (cause) {
       setStatusBoth('idle')
       throw cause
     }
-    // A `recordingStopped` event (interruption, immediate cap, permission
-    // race) can flip us back to 'idle' while the start invoke is still in
-    // flight — don't resurrect a recording that already finalized.
+    // A `recordingStopped` event (interruption, permission race) can flip us
+    // back to 'idle' while the start invoke is still in flight — don't
+    // resurrect a recording that already finalized.
     if (currentStatus() === 'requesting') {
       setStatusBoth('recording')
     }
+    return new Date(session.sessionStartedMs)
   }, [currentStatus, setStatusBoth])
 
-  const stop = useCallback((): Promise<NativeRecorderResult | null> => {
+  const stop = useCallback((): Promise<NativeRecordingPart | null> => {
     if (stopPromiseRef.current !== null) {
       return stopPromiseRef.current
     }
     if (statusRef.current !== 'recording') {
       return Promise.resolve(null)
     }
-    const stopped = (async (): Promise<NativeRecorderResult | null> => {
+    const stopped = (async (): Promise<NativeRecordingPart | null> => {
       try {
         return await stopActiveRecording()
       } finally {

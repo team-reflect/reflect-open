@@ -14,7 +14,7 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 pub struct Recording<R: Runtime>(AppHandle<R>);
 
 impl<R: Runtime> Recording<R> {
-    pub fn start_recording(&self, _request: StartRequest) -> crate::Result<()> {
+    pub fn start_recording(&self, _request: StartRequest) -> crate::Result<StartResponse> {
         Err(crate::Error::UnsupportedPlatform)
     }
 
@@ -43,10 +43,6 @@ impl<R: Runtime> Recording<R> {
     }
 
     pub fn list_staged(&self) -> crate::Result<ListStagedResponse> {
-        Err(crate::Error::UnsupportedPlatform)
-    }
-
-    pub fn read_staged(&self, _request: StagedPathRequest) -> crate::Result<ReadStagedResponse> {
         Err(crate::Error::UnsupportedPlatform)
     }
 

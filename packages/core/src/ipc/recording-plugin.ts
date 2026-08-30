@@ -10,11 +10,16 @@ import { definePluginCommand, definePluginEvent, ignoredResult } from './plugin'
  * a field change there must land here in the same review.
  */
 
-/** Mirrors `StopResponse`: a finished recording still in staging. */
+/** Mirrors `StartResponse`: the identity every segment of a session shares. */
+const startResponseSchema = z.object({ sessionStartedMs: z.number() })
+export type RecordingSessionStart = z.infer<typeof startResponseSchema>
+
+/** Mirrors `StopResponse`: a session's final segment, still in staging. */
 const stopResponseSchema = z.object({
   path: z.string(),
+  sessionStartedMs: z.number(),
+  part: z.number(),
   durationMs: z.number(),
-  modifiedMs: z.number(),
 })
 export type RecordingStopResponse = z.infer<typeof stopResponseSchema>
 
@@ -23,19 +28,23 @@ const recordingStatusSchema = z.object({ recording: z.boolean(), elapsedMs: z.nu
 export type RecordingStatus = z.infer<typeof recordingStatusSchema>
 
 /** Mirrors `StagedFile` (one entry of `ListStagedResponse`). */
-const stagedFileSchema = z.object({ path: z.string(), modifiedMs: z.number() })
+const stagedFileSchema = z.object({
+  path: z.string(),
+  sessionStartedMs: z.number(),
+  part: z.number(),
+  end: z.boolean(),
+  modifiedMs: z.number(),
+})
 export type StagedRecordingFile = z.infer<typeof stagedFileSchema>
 
 const listStagedSchema = z.object({ files: z.array(stagedFileSchema) })
-const readStagedSchema = z.object({ base64: z.string() })
 
 // Command args mirror the serde request models (`StartRequest`,
 // `StagedPathRequest`) under the command's `request` parameter.
-const startRecordingCommand = definePluginCommand<{ request: StartRecordingOptions }, unknown>(
-  'recording',
-  'start_recording',
-  ignoredResult,
-)
+const startRecordingCommand = definePluginCommand<
+  { request: StartRecordingOptions },
+  RecordingSessionStart
+>('recording', 'start_recording', startResponseSchema)
 const stopRecordingCommand = definePluginCommand<Record<string, never>, RecordingStopResponse>(
   'recording',
   'stop_recording',
@@ -65,11 +74,6 @@ const listStagedCommand = definePluginCommand<
   Record<string, never>,
   { files: StagedRecordingFile[] }
 >('recording', 'list_staged', listStagedSchema)
-const readStagedCommand = definePluginCommand<{ request: { path: string } }, { base64: string }>(
-  'recording',
-  'read_staged',
-  readStagedSchema,
-)
 const deleteStagedCommand = definePluginCommand<{ request: { path: string } }, unknown>(
   'recording',
   'delete_staged',
@@ -77,13 +81,24 @@ const deleteStagedCommand = definePluginCommand<{ request: { path: string } }, u
 )
 
 export interface StartRecordingOptions {
-  /** Auto-stop cap in ms, enforced natively even if JS never wakes. */
-  maxDurationMs: number
+  /**
+   * Rotate the recorder after this much audio, natively, so rotation holds
+   * even if JS never wakes. Each segment is one staged file.
+   */
+  segmentMs: number
+  /**
+   * Remind the user this often while the session runs. The plugin schedules
+   * the notification itself, so it survives a sleeping webview and is
+   * cleared by whatever ends the session.
+   */
+  reminderMs: number
 }
 
-/** Ask for the microphone and start recording into the plugin's staging dir. */
-export async function startRecording(options: StartRecordingOptions): Promise<void> {
-  await startRecordingCommand({ request: options })
+/** Ask for the microphone and start a recording session. */
+export async function startRecording(
+  options: StartRecordingOptions,
+): Promise<RecordingSessionStart> {
+  return await startRecordingCommand({ request: options })
 }
 
 /** Stop the active recording; rejects when nothing is recording. */
@@ -117,12 +132,6 @@ export async function listStaged(): Promise<StagedRecordingFile[]> {
   return files
 }
 
-/** A staged recording's bytes, base64-encoded. */
-export async function readStaged(path: string): Promise<string> {
-  const { base64 } = await readStagedCommand({ request: { path } })
-  return base64
-}
-
 /** Remove a staged recording once its bytes are durable in the graph. */
 export async function deleteStaged(path: string): Promise<void> {
   await deleteStagedCommand({ request: { path } })
@@ -132,11 +141,20 @@ export async function deleteStaged(path: string): Promise<void> {
 const levelEventSchema = z.object({ level: z.number(), elapsedMs: z.number() })
 export type RecordingLevelEvent = z.infer<typeof levelEventSchema>
 
-/** Mirrors Swift `RecordingStopped` (a native-initiated stop). */
+/** Mirrors Swift `RecordingSegment` (a finished, non-final segment). */
+const segmentEventSchema = z.object({
+  path: z.string(),
+  sessionStartedMs: z.number(),
+  part: z.number(),
+})
+export type RecordingSegmentEvent = z.infer<typeof segmentEventSchema>
+
+/** Mirrors Swift `RecordingStopped` (a native-initiated end of session). */
 const stoppedEventSchema = z.object({
   path: z.string(),
+  sessionStartedMs: z.number(),
+  part: z.number(),
   durationMs: z.number(),
-  modifiedMs: z.number(),
   reason: z.string(),
 })
 export type RecordingStoppedEvent = z.infer<typeof stoppedEventSchema>
@@ -149,6 +167,11 @@ export const subscribeRecordingLevel = definePluginEvent(
   'recording',
   'recordingLevel',
   levelEventSchema,
+)
+export const subscribeRecordingSegment = definePluginEvent(
+  'recording',
+  'recordingSegment',
+  segmentEventSchema,
 )
 export const subscribeRecordingStopped = definePluginEvent(
   'recording',

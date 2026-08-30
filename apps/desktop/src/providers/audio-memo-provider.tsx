@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 import {
-  AUDIO_MEMO_MAX_DURATION_MS,
+  AUDIO_MEMO_REMINDER_MS,
   AUDIO_MEMO_SEGMENT_MS,
   audioMemoIdentity,
   audioMemoPartPath,
@@ -24,6 +24,10 @@ import {
   useAudioRecorder,
   type RecorderSegment,
 } from '@/hooks/use-audio-recorder'
+import {
+  dismissRecordingReminder,
+  showRecordingReminder,
+} from '@/components/audio-memo/recording-reminder'
 import { useAudioMemoPipeline } from '@/hooks/use-audio-memo-pipeline'
 import { useSettings } from '@/providers/settings-provider'
 import { useSidebar } from '@/providers/sidebar-provider'
@@ -111,8 +115,8 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   const handleSegmentRef = useRef<(segment: RecorderSegment) => void>(() => {})
   const recorder = useAudioRecorder({
     segmentMs: AUDIO_MEMO_SEGMENT_MS,
-    maxDurationMs: AUDIO_MEMO_MAX_DURATION_MS,
-    onMaxDuration: () => stopAndSaveRef.current(),
+    reminderMs: AUDIO_MEMO_REMINDER_MS,
+    onReminder: (elapsedMs) => showRecordingReminder(elapsedMs, () => stopAndSaveRef.current()),
     onSegment: (segment) => handleSegmentRef.current(segment),
   })
   // The hook's functions are stable; the wrapper object is not (elapsed ticks
@@ -151,7 +155,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
       session.memo ??= audioMemoIdentity(session.recordedAt, segment.mimeType)
       const path = audioMemoPartPath(session.memo, segment.part, segment.end)
       enqueueCapture({
-        audio: segment.blob,
+        audio: { blob: segment.blob },
         mimeType: segment.mimeType,
         recordedAt: session.recordedAt,
         segment: { part: segment.part, end: segment.end },
@@ -198,6 +202,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
       return
     }
     stoppingRef.current = true
+    dismissRecordingReminder()
     // The stop click commits the memo: flip to 'transcribing' before the stop
     // settles, so an Esc landing in the await gap can't read a lingering
     // 'recording' phase and cancel a recording the user just saved.
@@ -249,6 +254,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   }, [recorder.status, pipeline, stopAndSave, cancelRecorder, start, toggleSidebar])
 
   const cancel = useCallback((): void => {
+    dismissRecordingReminder()
     const session = sessionRef.current
     if (session !== null) {
       // Discard means discard: segments already on disk go too. Segments

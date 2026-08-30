@@ -2,14 +2,24 @@ import {
   createContext,
   useCallback,
   use,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { errorMessage, type GraphInfo } from '@reflect/core'
-import { useAudioMemoPipeline, type PendingAudioCapture } from '@/hooks/use-audio-memo-pipeline'
+import {
+  audioMemoIdentity,
+  audioMemoPartPath,
+  AUDIO_MEMO_REMINDER_MS,
+  AUDIO_MEMO_SEGMENT_MS,
+  deleteAudioMemo,
+  errorMessage,
+  listAudioMemoSegments,
+  type GraphInfo,
+} from '@reflect/core'
+import { useAudioMemoPipeline } from '@/hooks/use-audio-memo-pipeline'
 import { isNativeShell } from '@/lib/platform'
 import type { AudioMemoPhase } from '@/providers/audio-memo-provider'
 import { hapticImpactLight } from '@/mobile/haptics'
@@ -19,13 +29,10 @@ import {
   NATIVE_RECORDING_MIME,
   releaseStagedPath,
   useNativeAudioRecorder,
-  type NativeRecorderResult,
+  type NativeRecordingPart,
 } from '@/mobile/use-native-audio-recorder'
 import { useNativeRecordAction } from '@/mobile/use-native-record-action'
-import {
-  useStagedRecordingIngest,
-  type StagedRecordingInput,
-} from '@/mobile/use-staged-recording-ingest'
+import { useStagedRecordingIngest } from '@/mobile/use-staged-recording-ingest'
 
 /**
  * The mobile React surface for audio memos: the native recorder plugin over
@@ -36,14 +43,15 @@ import {
  *
  * Four mobile-only responsibilities live here:
  *
- * - **Native stops.** Interruptions (calls, Siri), input-route loss, and the
- *   duration cap finalize the recording natively and announce it on the
- *   plugin's `recordingStopped` event — ingested exactly like a user stop.
- *   Backgrounding is deliberately not a stop: `UIBackgroundModes: audio`
+ * - **Segments and native stops.** The recorder rotates itself every
+ *   {@link AUDIO_MEMO_SEGMENT_MS}, announcing each finished segment on the
+ *   plugin's `recordingSegment` event; interruptions (calls, Siri) and
+ *   input-route loss end the session on `recordingStopped`. Both are
+ *   ingested exactly like a user stop. A session has no duration limit, and
+ *   backgrounding is deliberately not a stop: `UIBackgroundModes: audio`
  *   keeps a memo capturing through screen lock (V1 parity).
- * - **The orphan scan** ({@link useStagedRecordingIngest}): staged
- *   recordings whose stop the webview never saw are ingested on mount and
- *   on every foreground.
+ * - **The orphan scan** ({@link useStagedRecordingIngest}): staged segments
+ *   the webview never saw land on mount and on every foreground.
  * - **The live-recording reconcile + native-action handshake**
  *   ({@link useNativeRecordAction}): a recording that outlived its JS is
  *   stopped and saved rather than left a hidden hot microphone, and OS
@@ -84,8 +92,17 @@ interface MobileAudioMemoContextValue {
 
 const MobileAudioMemoContext = createContext<MobileAudioMemoContextValue | null>(null)
 
-/** Auto-stop cap: bounds the transcription payload (desktop parity). */
-const MAX_DURATION_MS = 10 * 60_000
+/**
+ * The live recording session. The graph is its ledger, so this only carries
+ * identity: unlike desktop, a session here can outlive the webview that
+ * started it, and an in-memory list of captured paths would miss whatever a
+ * previous webview ingested for the same recording.
+ */
+interface LiveSession {
+  /** Identity derives from the session's start: every segment shares it. */
+  recordedAt: Date
+  cancelled: boolean
+}
 
 const MIC_DENIED_REASON = 'Microphone access was denied. Allow it for Reflect in the Settings app.'
 
@@ -117,48 +134,81 @@ export function MobileAudioMemoProvider({
   })
   const enqueuePipeline = pipeline.enqueue
 
-  /** Wrap a staged recording as a pipeline capture that owns the file. */
-  const enqueueStaged = useCallback(
-    (input: StagedRecordingInput): void => {
+  const sessionRef = useRef<LiveSession | null>(null)
+  /**
+   * Sessions the user discarded, by identity timestamp. A native discard that
+   * fails to delete a staged segment leaves it for the orphan scan, which
+   * would otherwise resurrect a memo the user threw away on the next
+   * foreground.
+   */
+  const cancelledSessionsRef = useRef<Set<number>>(new Set())
+  const generationRef = useRef(graph.generation)
+  useEffect(() => {
+    generationRef.current = graph.generation
+  })
+
+  /** Wrap a staged segment as a pipeline capture that owns the file. */
+  const enqueuePart = useCallback(
+    (part: NativeRecordingPart): void => {
       const release = async (): Promise<void> => {
         // Always drop the claim, even if the delete fails: a still-claimed
         // path is skipped forever by the orphan scan, so a discarded memo
         // whose delete threw would otherwise reappear on the next launch.
         try {
-          await deleteStagedRecording(input.stagedPath)
+          await deleteStagedRecording(part.stagedPath)
         } finally {
-          releaseStagedPath(input.stagedPath)
+          releaseStagedPath(part.stagedPath)
         }
       }
-      const capture: PendingAudioCapture = {
-        audio: input.blob,
-        mimeType: NATIVE_RECORDING_MIME,
-        recordedAt: input.recordedAt,
-        onCaptured: release,
-        onDiscarded: release,
+      if (cancelledSessionsRef.current.has(part.recordedAt.getTime())) {
+        void release()
+        return
       }
-      enqueuePipeline(capture)
+      const memo = audioMemoIdentity(part.recordedAt, NATIVE_RECORDING_MIME)
+      const path = audioMemoPartPath(memo, part.part, part.end)
+      // Only the live session's segments answer to its cancel: a segment the
+      // orphan scan found from an earlier run must not be swept away by
+      // discarding the recording running now.
+      const session = sessionRef.current
+      const live =
+        session !== null && session.recordedAt.getTime() === part.recordedAt.getTime()
+          ? session
+          : null
+      enqueuePipeline({
+        audio: { sourcePath: part.stagedPath },
+        mimeType: NATIVE_RECORDING_MIME,
+        recordedAt: part.recordedAt,
+        segment: { part: part.part, end: part.end },
+        onCaptured: async () => {
+          // A cancel that swept the directory before this segment's copy
+          // landed has to be honored here instead.
+          if (live?.cancelled === true) {
+            await deleteAudioMemo(path, generationRef.current).catch(() => {})
+          }
+          await release()
+        },
+        onDiscarded: release,
+      })
     },
     [enqueuePipeline],
   )
 
   const onNativeStop = useCallback(
-    (result: NativeRecorderResult | null): void => {
+    (part: NativeRecordingPart | null): void => {
       setDrawerOpen(false)
       setStopping(false)
-      if (result !== null) {
-        enqueueStaged({
-          blob: result.blob,
-          recordedAt: result.recordedAt,
-          stagedPath: result.stagedPath,
-        })
+      if (part !== null) {
+        enqueuePart(part)
       }
+      sessionRef.current = null
     },
-    [enqueueStaged, setDrawerOpen],
+    [enqueuePart, setDrawerOpen],
   )
 
   const recorder = useNativeAudioRecorder({
-    maxDurationMs: MAX_DURATION_MS,
+    segmentMs: AUDIO_MEMO_SEGMENT_MS,
+    reminderMs: AUDIO_MEMO_REMINDER_MS,
+    onSegment: enqueuePart,
     onNativeStop,
   })
   const startRecorder = recorder.start
@@ -179,7 +229,10 @@ export function MobileAudioMemoProvider({
       return
     }
     try {
-      await startRecorder()
+      const recordedAt = await startRecorder()
+      if (recordedAt !== null) {
+        sessionRef.current = { recordedAt, cancelled: false }
+      }
       hapticImpactLight()
     } catch (cause) {
       pipeline.reportError(isMicDeniedError(cause) ? MIC_DENIED_REASON : errorMessage(cause))
@@ -199,14 +252,11 @@ export function MobileAudioMemoProvider({
     setStopping(true)
     setDrawerOpen(false)
     try {
-      const recording = await stopRecorder()
-      if (recording !== null) {
-        enqueueStaged({
-          blob: recording.blob,
-          recordedAt: recording.recordedAt,
-          stagedPath: recording.stagedPath,
-        })
+      const part = await stopRecorder()
+      if (part !== null) {
+        enqueuePart(part)
       }
+      sessionRef.current = null
       hapticImpactLight()
     } catch (cause) {
       // A native stop (interruption, backgrounding) won the race — its
@@ -216,13 +266,36 @@ export function MobileAudioMemoProvider({
       stoppingRef.current = false
       setStopping(false)
     }
-  }, [stopRecorder, enqueueStaged, setDrawerOpen])
+  }, [stopRecorder, enqueuePart, setDrawerOpen])
 
   const cancelRecording = useCallback((): void => {
     setDrawerOpen(false)
-    void cancelRecorder().catch((cause: unknown) => {
-      console.warn('cancel raced a native finalize:', cause)
-    })
+    const session = sessionRef.current
+    if (session !== null) {
+      // Discard means discard: every segment already in the graph goes too.
+      // What is on disk is the only complete account of what this session
+      // wrote, and the flag catches the segments still being copied.
+      session.cancelled = true
+      cancelledSessionsRef.current.add(session.recordedAt.getTime())
+      const memo = audioMemoIdentity(session.recordedAt, NATIVE_RECORDING_MIME)
+      const generation = generationRef.current
+      void (async () => {
+        for (const path of await listAudioMemoSegments(memo, generation)) {
+          await deleteAudioMemo(path, generation).catch(() => {})
+        }
+      })().catch((cause: unknown) => {
+        console.error('discarding the recorded segments failed:', cause)
+      })
+    }
+    void cancelRecorder()
+      .catch((cause: unknown) => {
+        console.warn('cancel raced a native finalize:', cause)
+      })
+      .finally(() => {
+        if (sessionRef.current === session) {
+          sessionRef.current = null
+        }
+      })
   }, [cancelRecorder, setDrawerOpen])
 
   const toggle = useCallback((): void => {
@@ -258,8 +331,8 @@ export function MobileAudioMemoProvider({
     [recorder.status, stopAndSave, cancelRecorder, setDrawerOpen],
   )
 
-  useNativeRecordAction({ start, enqueueStaged })
-  useStagedRecordingIngest(enqueueStaged)
+  useNativeRecordAction({ start, enqueuePart })
+  useStagedRecordingIngest(enqueuePart)
 
   // A live capture owns the surface — a background save's failure parks and
   // shows after the stop, never yanking the waveform mid-recording.

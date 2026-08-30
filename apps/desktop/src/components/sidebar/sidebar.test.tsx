@@ -279,6 +279,7 @@ describe('Sidebar', () => {
     expect(roadmapPreview?.getAttribute('class')).toContain('hover:text-text')
     await roadmap.click()
     await expect.element(roadmap).toHaveAttribute('aria-current', 'page')
+    expect(roadmapPreview?.getAttribute('class')).toContain('dark:text-accent')
   })
 
   it('modifier-click opens a pinned note in a new window without changing routes', async () => {

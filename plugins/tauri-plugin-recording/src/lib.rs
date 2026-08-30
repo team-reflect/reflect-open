@@ -44,7 +44,6 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::actions_ready,
             commands::action_performed,
             commands::list_staged,
-            commands::read_staged,
             commands::delete_staged,
         ])
         .setup(|app, api| {

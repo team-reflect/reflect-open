@@ -244,6 +244,22 @@ export async function deleteAudioMemo(path: string, generation: number): Promise
 }
 
 /**
+ * Copy a recording from an OS path (the mobile recorder's staging directory)
+ * into `audio-memos/` at an exact path. Rust copies file-to-file, so the
+ * bytes never enter webview memory. Idempotent: re-importing a segment that
+ * already landed is a no-op, which is what makes a re-scan after a failed
+ * staged-file delete safe.
+ */
+export async function importAudioMemo(
+  sourcePath: string,
+  path: string,
+  generation: number,
+): Promise<void> {
+  await call('audio_memo_import', { sourcePath, path, generation }, voidSchema)
+  echoLocalWrite({ path, kind: 'upsert', modifiedMs: Date.now() })
+}
+
+/**
  * Open an asset by graph-relative path in the system default application.
  * `generation` pins the request to the graph whose markdown produced the
  * image, so a delayed click after a graph switch cannot open another graph's

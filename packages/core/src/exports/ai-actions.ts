@@ -133,13 +133,13 @@ export {
   audioMemoIdentity,
   audioMemoPartFromPath,
   audioMemoPartPath,
-  captureAudioMemo,
   captureAudioMemoPart,
   isSilentStop,
+  listAudioMemoSegments,
   listPendingAudioMemoSessions,
   reconcileAudioMemos,
   type AudioMemoIdentity,
-  type CaptureAudioMemoInput,
+  type AudioMemoSource,
   type CaptureAudioMemoOutcome,
   type CaptureAudioMemoPartInput,
   type ReconcileAudioMemosInput,
@@ -147,7 +147,7 @@ export {
   type ReconcileStop,
 } from '../actions/audio-memo'
 export {
-  AUDIO_MEMO_MAX_DURATION_MS,
+  AUDIO_MEMO_REMINDER_MS,
   AUDIO_MEMO_SEGMENT_MS,
   type AudioMemoSession,
 } from '../actions/audio-memo-session'
