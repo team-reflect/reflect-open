@@ -4,7 +4,7 @@
   "rules": {
     "typescript/no-explicit-any": "error",
     "import/no-default-export": "error",
-    "import/no-namespace": "error",
+    "import/no-namespace": "error"
   },
   "overrides": [
     {
