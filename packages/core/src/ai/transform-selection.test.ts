@@ -25,9 +25,11 @@ function stream(parts: LanguageModelV3StreamPart[]): LanguageModelV3StreamResult
 function textStream(deltas: string[]): LanguageModelV3StreamResult {
   return stream([
     { type: 'text-start', id: 'text-1' },
-    ...deltas.map(
-      (delta): LanguageModelV3StreamPart => ({ type: 'text-delta', id: 'text-1', delta }),
-    ),
+    ...deltas.map((delta): LanguageModelV3StreamPart => ({
+      type: 'text-delta',
+      id: 'text-1',
+      delta,
+    })),
     { type: 'text-end', id: 'text-1' },
     { type: 'finish', finishReason: { unified: 'stop', raw: undefined }, usage: USAGE },
   ])

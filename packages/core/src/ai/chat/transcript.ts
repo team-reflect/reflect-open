@@ -120,13 +120,12 @@ function settleTools(
   message: string,
   toolCallId?: string,
 ): AssistantPart[] {
-  return parts.map(
-    (part): AssistantPart =>
-      part.kind === 'tool' &&
-      isToolPending(part) &&
-      (toolCallId === undefined || part.call.toolCallId === toolCallId)
-        ? { ...part, error: message }
-        : part,
+  return parts.map((part): AssistantPart =>
+    part.kind === 'tool' &&
+    isToolPending(part) &&
+    (toolCallId === undefined || part.call.toolCallId === toolCallId)
+      ? { ...part, error: message }
+      : part,
   )
 }
 

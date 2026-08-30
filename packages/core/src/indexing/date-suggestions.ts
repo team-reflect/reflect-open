@@ -247,14 +247,12 @@ interface NlUnit {
 
 // Built once at module load — the resolvers take all runtime state as arguments.
 const NL_UNITS: readonly NlUnit[] = [
-  ...WEEKDAYS.map(
-    ({ word, dow }, index): NlUnit => ({
-      word,
-      display: titleCase(word),
-      order: index,
-      resolve: (context, modifier) => resolveWeekday(context.today, dow, modifier),
-    }),
-  ),
+  ...WEEKDAYS.map(({ word, dow }, index): NlUnit => ({
+    word,
+    display: titleCase(word),
+    order: index,
+    resolve: (context, modifier) => resolveWeekday(context.today, dow, modifier),
+  })),
   {
     word: 'week',
     display: 'Week',
