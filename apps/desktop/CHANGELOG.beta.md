@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.11.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.6...v0.11.0-beta.7) (2026-08-30)
+
+
+### Features
+
+* preview and edit web links in notes ([#1165](https://github.com/team-reflect/reflect-open/issues/1165)) ([d1f8bd8](https://github.com/team-reflect/reflect-open/commit/d1f8bd88b7b1033b9cd13939f532f6a3b3537c33))
+
+
+### Bug Fixes
+
+* align the selected item with its trigger ([#1178](https://github.com/team-reflect/reflect-open/issues/1178)) ([5e8e9ec](https://github.com/team-reflect/reflect-open/commit/5e8e9ec9b55a4cb0d589f98cb5a01ff47a7e7a00))
+* update meowdown to ^0.67.0 ([#1181](https://github.com/team-reflect/reflect-open/issues/1181)) ([4593576](https://github.com/team-reflect/reflect-open/commit/45935761859c343f810647f61d9f9160732e6c3e))
+* update meowdown to ^0.67.1 ([#1183](https://github.com/team-reflect/reflect-open/issues/1183)) ([8cf562e](https://github.com/team-reflect/reflect-open/commit/8cf562e12d5fd0e9c83bfb932e64c2d361c65ed1))
+
 ## [0.11.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.5...v0.11.0-beta.6) (2026-08-26)
 
 
