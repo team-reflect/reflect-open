@@ -244,6 +244,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -297,6 +298,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'large',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -326,6 +328,20 @@ describe('SettingsScreen', () => {
     )
     await expect.element(radio(/^large/i)).toBeChecked()
     await expect.element(radio(/^medium/i)).not.toBeChecked()
+  })
+
+  it('reflects and persists an explicit text direction', async () => {
+    stored = { editorTextDirection: 'ltr' }
+    await renderScreen()
+    await expect.element(radio(/^left to right/i)).toBeChecked()
+
+    await pickRadio(/^right to left/i)
+
+    await vi.waitFor(() =>
+      expect(saved.at(-1)).toEqual(expect.objectContaining({ editorTextDirection: 'rtl' })),
+    )
+    await expect.element(radio(/^right to left/i)).toBeChecked()
+    await expect.element(radio(/^left to right/i)).not.toBeChecked()
   })
 
   it('enables full-width notes instantly and persists the preference', async () => {
@@ -364,6 +380,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -438,6 +455,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -491,6 +509,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: false,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -537,6 +556,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -592,6 +612,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -644,6 +665,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -702,6 +724,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -766,6 +789,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -812,6 +836,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -887,6 +912,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -931,6 +957,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -997,6 +1024,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -1053,6 +1081,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -1103,6 +1132,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -1238,6 +1268,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -1300,6 +1331,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,
@@ -1353,6 +1385,7 @@ describe('SettingsScreen', () => {
           editorBulletAfterHeading: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
+          editorTextDirection: 'auto',
           editorFullWidth: false,
           sidebarWidth: 260,
           contextSidebarWidth: 320,

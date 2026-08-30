@@ -13,6 +13,7 @@ export function TaskText({ task }: { task: OpenTask }): ReactElement {
   return (
     <MarkdownPreview
       content={taskContent(task.raw)}
+      textDirection="ltr"
       className="reflect-task-preview pointer-events-none text-sm leading-6"
     />
   )

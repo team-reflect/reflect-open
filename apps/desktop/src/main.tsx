@@ -8,6 +8,7 @@ import { installNativeMenu } from '@/lib/native-menu/menu'
 import { installTauriBridge } from '@/lib/tauri-bridge'
 import { PlatformRoot, warmPlatformRoot } from '@/platform-root'
 import { EditorFullWidthEffect } from '@/providers/editor-full-width'
+import { EditorTextDirectionEffect } from '@/providers/editor-text-direction'
 import { EditorTextSizeEffect } from '@/providers/editor-text-size'
 import { SettingsProvider } from '@/providers/settings-provider'
 import { ThemeProvider } from '@/providers/theme-provider'
@@ -37,6 +38,7 @@ createRoot(rootElement, reactRootOptions).render(
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
         <EditorFullWidthEffect />
+        <EditorTextDirectionEffect />
         <EditorTextSizeEffect />
         <ThemeProvider>
           <PlatformRoot />

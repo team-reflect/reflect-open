@@ -33,13 +33,25 @@ vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({ settings: { dateFormat: 'mdy' } }),
 }))
 vi.mock('@/editor/markdown-preview', () => ({
-  MarkdownPreview: ({ content, className }: { content: string; className?: string }) => {
+  MarkdownPreview: ({
+    content,
+    className,
+    textDirection,
+  }: {
+    content: string
+    className?: string
+    textDirection?: string
+  }) => {
     const strong = /^(.*)\*\*([^*]+)\*\*(.*)$/u.exec(content)
     const before = strong?.[1] ?? ''
     const label = strong?.[2] ?? ''
     const after = strong?.[3] ?? ''
     return (
-      <span data-testid="markdown-preview" className={className}>
+      <span
+        data-testid="markdown-preview"
+        data-text-direction={textDirection}
+        className={className}
+      >
         {strong === null ? (
           content
         ) : (
@@ -508,6 +520,10 @@ describe('TasksScreen', () => {
     const row = await view.findByRole('button', { name: 'ship bold text' })
     expect(row.querySelector('strong')?.textContent).toBe('bold')
     expect(row.textContent).not.toContain('**bold**')
+    expect(row.querySelector('[data-testid="markdown-preview"]')?.getAttribute('dir')).toBe(null)
+    expect(
+      row.querySelector('[data-testid="markdown-preview"]')?.getAttribute('data-text-direction'),
+    ).toBe('ltr')
     await view.unmount()
   })
 

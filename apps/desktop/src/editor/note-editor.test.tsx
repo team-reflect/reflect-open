@@ -63,6 +63,30 @@ describe('NoteEditor markdown syntax mode', () => {
   })
 })
 
+describe('NoteEditor native text direction', () => {
+  it('lets the browser resolve one automatic direction for the whole document', async () => {
+    await render(<NoteEditor initialContent={'English paragraph\n\nפסקה בעברית'} />)
+    await expect.element(pmRoot).toHaveAttribute('dir', 'auto')
+
+    const root = pmRoot.element()
+    expect(root).toBeInstanceOf(HTMLElement)
+    expect(getComputedStyle(root).direction).toBe('ltr')
+
+    const blocks = Array.from(root.children)
+    expect(blocks).toHaveLength(2)
+    expect(blocks.every((block) => !block.hasAttribute('dir'))).toBe(true)
+    expect(blocks.every((block) => getComputedStyle(block).direction === 'ltr')).toBe(true)
+  })
+
+  it('updates an explicit direction without replacing the editor', async () => {
+    const screen = await render(<NoteEditor initialContent="Hello" textDirection="rtl" />)
+    await expect.element(pmRoot).toHaveAttribute('dir', 'rtl')
+
+    await screen.rerender(<NoteEditor initialContent="Hello" textDirection="ltr" />)
+    await expect.element(pmRoot).toHaveAttribute('dir', 'ltr')
+  })
+})
+
 describe('NoteEditor wiki-link hover card', () => {
   it('does not mount the optional card without a host renderer', async () => {
     await render(<NoteEditor initialContent="see [[Note]] here" />)

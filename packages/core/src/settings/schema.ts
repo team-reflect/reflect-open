@@ -75,6 +75,16 @@ export const editorTextSizeSchema = z.enum(['small', 'medium', 'large']).catch('
 export type EditorTextSize = z.infer<typeof editorTextSizeSchema>
 
 /**
+ * How note text is laid out. Every mode applies one direction to the whole
+ * note; `auto` delegates detection to the browser using the note's first strong
+ * character. Display-only — the preference lives in settings and never changes
+ * the stored Markdown.
+ */
+export const editorTextDirectionSchema = z.enum(['auto', 'ltr', 'rtl']).catch('auto')
+
+export type EditorTextDirection = z.infer<typeof editorTextDirectionSchema>
+
+/**
  * Whether note content stretches across the available desktop pane instead
  * of staying in the default centered reading column. Off by default to
  * preserve Reflect Open's existing layout.
@@ -523,6 +533,7 @@ export const settingsSchema = z.looseObject({
   editorBulletAfterHeading: editorBulletAfterHeadingSchema,
   editorSmoothCaretAnimation: editorSmoothCaretAnimationSchema,
   editorTextSize: editorTextSizeSchema,
+  editorTextDirection: editorTextDirectionSchema,
   editorFullWidth: editorFullWidthSchema,
   sidebarWidth: sidebarWidthSchema,
   contextSidebarWidth: contextSidebarWidthSchema,
