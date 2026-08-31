@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.8...v0.11.0-beta.9) (2026-08-31)
+
+
+### Features
+
+* add collapsible iOS capture menu ([#1190](https://github.com/team-reflect/reflect-open/issues/1190)) ([b7247bd](https://github.com/team-reflect/reflect-open/commit/b7247bd0c9ab21547683d8975a3ef2f0488f7bc5))
+
 ## [0.11.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.7...v0.11.0-beta.8) (2026-08-30)
 
 
