@@ -1,6 +1,6 @@
 import type { SyntaxNode } from '@meowdown/markdown'
 import type { Span } from './model'
-import { plainTextOfRange } from './plain-text'
+import { plainTextOfRange, type PlainTextReplacement } from './plain-text'
 
 /**
  * A task's breadcrumbs are the rendered labels of its ancestor `ListItem`
@@ -29,12 +29,20 @@ function listItemBreadcrumbLabel(
   item: SyntaxNode,
   cuts: Span[],
   literalRanges: Span[],
+  replacements: readonly PlainTextReplacement[],
 ): string | null {
   const textblock = listItemLeadTextblock(item)
   if (textblock === null) {
     return null
   }
-  const text = plainTextOfRange(body, textblock.from, textblock.to, cuts, literalRanges)
+  const text = plainTextOfRange(
+    body,
+    textblock.from,
+    textblock.to,
+    cuts,
+    literalRanges,
+    replacements,
+  )
   return text === '' ? null : text
 }
 
@@ -44,6 +52,7 @@ export function taskBreadcrumbs(
   taskNode: SyntaxNode,
   cuts: Span[],
   literalRanges: Span[],
+  replacements: readonly PlainTextReplacement[] = [],
 ): string[] {
   const ownItem = taskNode.parent
   if (ownItem?.name !== 'ListItem') {
@@ -53,7 +62,7 @@ export function taskBreadcrumbs(
   const breadcrumbs: string[] = []
   for (let ancestor = ownItem.parent; ancestor !== null; ancestor = ancestor.parent) {
     if (ancestor.name === 'ListItem') {
-      const text = listItemBreadcrumbLabel(body, ancestor, cuts, literalRanges)
+      const text = listItemBreadcrumbLabel(body, ancestor, cuts, literalRanges, replacements)
       if (text !== null) {
         breadcrumbs.push(text)
       }

@@ -1,14 +1,20 @@
 import type { Span } from './model'
 
+/** Searchable text substituted for a Markdown syntax span that is otherwise removed. */
+export interface PlainTextReplacement extends Span {
+  readonly text: string
+}
+
 /**
- * Plain-text rendering (Plan 03): turn a slice of markdown body into the text a
- * reader sees — emphasis/marker syntax dropped, wiki brackets/pipes flattened,
- * backslash escapes resolved, code spans kept literal. Shared by {@link parseNote}
- * for the whole-body FTS/AI text and by each task's display text, so a task
- * renders exactly as the note's body does.
+ * Plain-text rendering (Plan 03): turn a slice of markdown body into searchable
+ * display text — emphasis/marker syntax dropped, wiki brackets/pipes flattened,
+ * external destinations retained, backslash escapes resolved, code spans kept
+ * literal. Shared by {@link parseNote} for the whole-body FTS/AI text and by each
+ * task's display text, so both surfaces retain the same meaningful content.
  *
  * The walk in `extract.ts` supplies two span sets in body coordinates: `cuts`
- * (syntax ranges to drop — `*emphasis*` marks, the `[ ]` TaskMarker, URLs) and
+ * (syntax ranges to drop — `*emphasis*` marks, the `[ ]` TaskMarker, URLs),
+ * optional replacements for meaningful cut text such as normalized URLs, and
  * `literalRanges` (code regions whose backslashes stay verbatim). This module is
  * pure string surgery over those spans; it does no parsing of its own.
  */
@@ -71,9 +77,13 @@ export function plainTextOfRange(
   end: number,
   cuts: Span[],
   literalRanges: Span[],
+  replacements: readonly PlainTextReplacement[] = [],
 ): string {
   const sorted = [...cuts].sort((a, b) => a.from - b.from)
   const sortedLiteralRanges = [...literalRanges].sort((a, b) => a.from - b.from)
+  const replacementByRange = new Map(
+    replacements.map((replacement) => [`${replacement.from}:${replacement.to}`, replacement.text]),
+  )
   let kept = ''
   let pos = start
   for (const cut of sorted) {
@@ -88,6 +98,9 @@ export function plainTextOfRange(
       kept += appendPlainTextChunk(body, pos, cutFrom, sortedLiteralRanges)
     }
     pos = Math.max(pos, Math.min(end, cut.to))
+    if (cut.from >= start && cut.to <= end) {
+      kept += replacementByRange.get(`${cut.from}:${cut.to}`) ?? ''
+    }
   }
   if (pos < end) {
     kept += appendPlainTextChunk(body, pos, end, sortedLiteralRanges)
@@ -96,6 +109,11 @@ export function plainTextOfRange(
 }
 
 /** Body text minus the cut (syntax) ranges, with wiki brackets/pipes flattened. */
-export function buildPlainText(body: string, cuts: Span[], literalRanges: Span[]): string {
-  return plainTextOfRange(body, 0, body.length, cuts, literalRanges)
+export function buildPlainText(
+  body: string,
+  cuts: Span[],
+  literalRanges: Span[],
+  replacements: readonly PlainTextReplacement[] = [],
+): string {
+  return plainTextOfRange(body, 0, body.length, cuts, literalRanges, replacements)
 }
