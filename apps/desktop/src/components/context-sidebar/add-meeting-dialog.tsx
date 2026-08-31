@@ -48,6 +48,8 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
  * are pre-filled from Apple Contacts by attendee email.
  */
 export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps): ReactElement {
+  const [open, setOpen] = useState(true)
+  const close = (): void => setOpen(false)
   const { settings } = useSettings()
   const { graph } = useGraph()
   const [name, setName] = useState(event.title)
@@ -133,7 +135,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
         startTime: formatTimeOfDay(new Date(event.startsAt), settings.timeFormat),
         generation: graph.generation,
       })
-      onClose()
+      close()
     } catch (cause) {
       setError(errorMessage(cause))
       setSubmitting(false)
@@ -142,8 +144,13 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
 
   return (
     <Dialog
-      open
+      open={open}
       onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          close()
+        }
+      }}
+      onOpenChangeComplete={(isOpen) => {
         if (!isOpen) {
           onClose()
         }
@@ -211,7 +218,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
           </label>
           {error !== null && <InlineAlert tone="error">{error}</InlineAlert>}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={close}>
               Cancel
             </Button>
             <Button type="submit" disabled={!canSubmit}>

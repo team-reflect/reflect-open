@@ -76,32 +76,30 @@ export function DescribeAssetsField(): ReactElement {
           <p className="mt-2 text-xs text-text-muted">Add an AI provider to enable this.</p>
         ) : null}
       </div>
-      {confirming ? (
-        <Dialog
-          open
-          onOpenChange={(isOpen) => {
-            if (!isOpen) setConfirming(false)
-          }}
-        >
-          <DialogContent showCloseButton={false} className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Backfill assets?</DialogTitle>
-              <DialogDescription>
-                Images and PDFs in non-private notes will be sent to your AI provider so their text
-                can appear in search. Assets that already have OCR are skipped.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(false)}>
-                Cancel
-              </Button>
-              <Button type="button" size="sm" onClick={() => void runBackfill()}>
-                Backfill assets
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ) : null}
+      <Dialog
+        open={confirming}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setConfirming(false)
+        }}
+      >
+        <DialogContent showCloseButton={false} className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Backfill assets?</DialogTitle>
+            <DialogDescription>
+              Images and PDFs in non-private notes will be sent to your AI provider so their text
+              can appear in search. Assets that already have OCR are skipped.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(false)}>
+              Cancel
+            </Button>
+            <Button type="button" size="sm" onClick={() => void runBackfill()}>
+              Backfill assets
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SettingsField>
   )
 }

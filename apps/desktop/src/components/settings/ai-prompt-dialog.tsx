@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import type { AiPrompt, AiPromptMode } from '@reflect/core'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,8 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
  * or is inserted below it.
  */
 export function AiPromptDialog({ prompt, onSave, onClose }: AiPromptDialogProps): ReactElement {
+  const [open, setOpen] = useState(true)
+  const close = (): void => setOpen(false)
   const { register, control, handleSubmit, setValue, formState } = useForm<AiPromptDraft>({
     defaultValues: {
       label: prompt?.label ?? '',
@@ -49,14 +51,21 @@ export function AiPromptDialog({ prompt, onSave, onClose }: AiPromptDialogProps)
 
   const submit = handleSubmit((values) => {
     onSave({ label: values.label.trim(), body: values.body.trim(), mode: values.mode })
-    onClose()
+    close()
   })
 
   return (
     <Dialog
-      open
+      open={open}
       onOpenChange={(isOpen) => {
-        if (!isOpen) onClose()
+        if (!isOpen) {
+          close()
+        }
+      }}
+      onOpenChangeComplete={(isOpen) => {
+        if (!isOpen) {
+          onClose()
+        }
       }}
     >
       <DialogContent
@@ -115,7 +124,7 @@ export function AiPromptDialog({ prompt, onSave, onClose }: AiPromptDialogProps)
             </Select>
           </label>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" variant="ghost" onClick={close}>
               Cancel
             </Button>
             <Button type="submit">{prompt === null ? 'Add prompt' : 'Save'}</Button>
