@@ -38,8 +38,8 @@ import { useStagedRecordingIngest } from '@/mobile/use-staged-recording-ingest'
  * The mobile React surface for audio memos: the native recorder plugin over
  * the shared capture pipeline (`useAudioMemoPipeline` — the same serial
  * queue and transcription reconciler desktop uses). Desktop's provider
- * presents recording in a sidebar popover; here it is a bottom drawer plus a
- * mic FAB on the daily spine.
+ * presents recording in a sidebar popover; here it is a bottom drawer plus the
+ * mic action in the Daily capture menu.
  *
  * Four mobile-only responsibilities live here:
  *
@@ -76,7 +76,7 @@ interface MobileAudioMemoContextValue {
   canRetry: boolean
   /** The recording drawer's visibility. */
   drawerOpen: boolean
-  /** FAB tap: idle → record (or key setup); recording → stop & save; error → show it. */
+  /** Audio action tap: idle → record (or key setup); recording → stop & save; error → show it. */
   toggle: () => void
   /** The drawer's stop control — commit the memo. */
   stopAndSave: () => void
@@ -247,8 +247,8 @@ export function MobileAudioMemoProvider({
       return
     }
     stoppingRef.current = true
-    // The stop tap commits the memo: the drawer closes now, and the FAB's
-    // 'transcribing' state carries the progress from here.
+    // The stop tap commits the memo: the drawer closes now, and the capture
+    // menu's mic action reflects the 'transcribing' state when reopened.
     setStopping(true)
     setDrawerOpen(false)
     try {
@@ -305,8 +305,8 @@ export function MobileAudioMemoProvider({
       void cancelRecorder().catch(() => {})
       setDrawerOpen(false)
     } else if (pipeline.error !== null) {
-      // A parked error must never invisibly block recording — the FAB
-      // reopens the drawer, which shows the failure with Retry/Discard.
+      // A parked error must never invisibly block recording — the audio
+      // action reopens the drawer, which shows the failure with Retry/Discard.
       setDrawerOpen(true)
     } else if (recorder.status === 'idle') {
       void start()

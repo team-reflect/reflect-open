@@ -16,8 +16,8 @@ import { useRouter } from '@/routing/router'
  * stop/discard semantics behind `onDrawerOpenChange`.
  *
  * Without an OpenAI/Gemini model the sheet shows key-setup guidance instead
- * of recording controls: the mic FAB stays discoverable, but recording never
- * starts until transcription has a key to run on.
+ * of recording controls: the capture menu's mic action stays discoverable,
+ * but recording never starts until transcription has a key to run on.
  */
 export function RecordingDrawer(): ReactElement {
   const memo = useMobileAudioMemo()

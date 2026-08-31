@@ -136,8 +136,8 @@ vi.mock('@/providers/settings-provider', () => ({
     updateSettingsWith: () => {},
   }),
 }))
-// The daily spine renders the audio-memo FAB; this suite is about screens,
-// not recording — an unavailable memo surface keeps the FAB out of the tree.
+// The daily spine renders the capture menu; this suite is about screens,
+// not recording — an unavailable memo surface keeps its mic action out.
 vi.mock('@/mobile/audio-memo-provider', () => ({
   useMobileAudioMemo: () => ({
     phase: 'idle',
