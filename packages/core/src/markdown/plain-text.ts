@@ -79,8 +79,10 @@ export function plainTextOfRange(
   literalRanges: Span[],
   replacements: readonly PlainTextReplacement[] = [],
 ): string {
-  const sorted = [...cuts].sort((a, b) => a.from - b.from)
-  const sortedLiteralRanges = [...literalRanges].sort((a, b) => a.from - b.from)
+  const sorted = [...cuts].sort((leftSpan, rightSpan) => leftSpan.from - rightSpan.from)
+  const sortedLiteralRanges = [...literalRanges].sort(
+    (leftSpan, rightSpan) => leftSpan.from - rightSpan.from,
+  )
   const replacementByRange = new Map(
     replacements.map((replacement) => [`${replacement.from}:${replacement.to}`, replacement.text]),
   )

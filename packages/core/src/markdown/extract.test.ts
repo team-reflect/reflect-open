@@ -156,9 +156,13 @@ describe('parseNote — links, assets, tags, text', () => {
 
   it('appends normalized external destinations to markdown link text', () => {
     const note = parse(
-      '[Field Jacket Hunter](https://www.alfredorifugio.com/products/field-jacket-hunter?utm_source=Meta#details)',
+      '[Field Jacket Hunter](https://www.alfredorifugio.com/products/field-jacket-hunter?utm_source=Meta#details) ' +
+        '[API](https://example.com/docs%2Fapi%23reference)',
     )
-    expect(note.text).toBe('Field Jacket Hunter (alfredorifugio.com/products/field-jacket-hunter)')
+    expect(note.text).toBe(
+      'Field Jacket Hunter (alfredorifugio.com/products/field-jacket-hunter) ' +
+        'API (example.com/docs/api#reference)',
+    )
   })
 
   it('keeps bare URLs, autolinks, and email addresses searchable without duplication', () => {
