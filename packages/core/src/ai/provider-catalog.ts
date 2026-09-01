@@ -61,9 +61,10 @@ const OPENAI_MODELS: NonEmptyArray<AiModelOption<OpenAIModelId>> = [
   { id: 'gpt-5.4-nano', label: 'GPT-5.4 nano', contextWindow: 400_000 },
 ]
 
-// https://github.com/vercel/ai/blob/ai@7.0.66/packages/anthropic/src/anthropic-language-model-options.ts#L4
+// https://github.com/vercel/ai/blob/ai@7.0.90/packages/anthropic/src/anthropic-language-model-options.ts#L4
 const ANTHROPIC_MODELS: NonEmptyArray<AiModelOption<AnthropicModelId>> = [
   { id: 'claude-fable-5', label: 'Claude Fable 5', contextWindow: 1_000_000 },
+  { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', contextWindow: 1_000_000 },
   { id: 'claude-opus-5', label: 'Claude Opus 5', contextWindow: 1_000_000 },
   { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', contextWindow: 1_000_000 },
   { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', contextWindow: 1_000_000 },
