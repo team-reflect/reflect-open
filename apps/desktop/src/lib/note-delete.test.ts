@@ -20,9 +20,25 @@ afterEach(() => {
 })
 
 describe('deleteOpenNote', () => {
+  it('discards a new note that has not reached disk without trying to trash a file', async () => {
+    const discard = vi.fn()
+    vi.mocked(openSession).mockReturnValue({
+      isUnpersisted: () => true,
+      discard,
+    } as unknown as NoteSession)
+
+    await deleteOpenNote('notes/new.md', 7)
+
+    expect(mockInvoke).not.toHaveBeenCalled()
+    expect(discard).toHaveBeenCalledTimes(1)
+  })
+
   it('trashes the file, then discards its open session so it cannot resurrect', async () => {
     const discard = vi.fn()
-    vi.mocked(openSession).mockReturnValue({ discard } as unknown as NoteSession)
+    vi.mocked(openSession).mockReturnValue({
+      isUnpersisted: () => false,
+      discard,
+    } as unknown as NoteSession)
 
     await deleteOpenNote('notes/keep.md', 7)
 

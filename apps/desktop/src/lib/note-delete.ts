@@ -11,14 +11,20 @@ import { openSession } from '@/editor/open-documents'
  * notes are intentionally blocked: they are the app's chronological spine and
  * cannot be deleted.
  *
- * Delete first, discard second. If the delete fails, the open session is left
- * fully intact so mounted editors keep persisting. Only once the file is in
- * trash do we discard the session; otherwise a normal teardown flush could
- * recreate the deleted file.
+ * A lazy-created note that has never reached disk is deleted by discarding its
+ * session alone. Otherwise delete first, discard second. If the delete fails,
+ * the open session is left fully intact so mounted editors keep persisting.
+ * Only once the file is in trash do we discard the session; otherwise a normal
+ * teardown flush could recreate the deleted file.
  */
 export async function deleteOpenNote(path: string, generation: number): Promise<void> {
   if (isDaily(path)) {
     throw new Error('Daily notes cannot be deleted')
+  }
+  const session = openSession(path)
+  if (session?.isUnpersisted()) {
+    session.discard()
+    return
   }
   await deleteNote(path, generation)
   openSession(path)?.discard()

@@ -503,6 +503,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     content: () => header + buffer,
     liveContent: () => (status === 'ready' ? header + buffer : null),
     isDirty: () => dirty,
+    isUnpersisted: () => status === 'ready' && missing && inFlightWrite === null,
     updateFrontmatter,
     commitFrontmatter,
     commitTaskToggle,

@@ -151,6 +151,13 @@ export interface NoteSession {
    */
   isDirty: () => boolean
   /**
+   * Whether this lazy-created note still exists only in the editor session.
+   * Returns false while loading, once a file is known to exist, or while a
+   * first write is already in flight. An unpersisted session can be discarded
+   * without issuing a filesystem delete.
+   */
+  isUnpersisted: () => boolean
+  /**
    * Patch frontmatter keys (e.g. `aliases`, Plan 07b) without touching the
    * editor: the header is updated in place and saved through the normal
    * pipeline. Returns false (and does nothing) when the session can't take

@@ -450,6 +450,7 @@ describe('missing-note seed (new ordinary notes)', () => {
     expect(ready?.missing).toBe(true)
     expect(ready?.initialContent).toBe(SEED)
     expect(ready?.dirty).toBe(false)
+    expect(h.session.isUnpersisted()).toBe(true)
     expect(h.writes).toEqual([]) // opening never litters the graph
     // The rename tracker baselines on the real (empty) disk content, never
     // the seed, so the first authored title is a birth, not a rename.
@@ -469,6 +470,19 @@ describe('missing-note seed (new ordinary notes)', () => {
 
     expect(h.writes).toEqual([])
     expect(h.snapshots.at(-1)?.dirty).toBe(false)
+  })
+
+  it('a pending first edit can still be discarded without creating a file', async () => {
+    const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# Draft\n')
+    expect(h.session.isUnpersisted()).toBe(true)
+    h.session.discard()
+    await settled()
+
+    expect(h.writes).toEqual([])
   })
 
   it('clearing the seed back to empty writes nothing — the note stays unborn', async () => {
@@ -502,6 +516,7 @@ describe('missing-note seed (new ordinary notes)', () => {
     await settled()
 
     expect(h.writes).toEqual([{ path: 'notes/a.md', contents: '# My Note\n\nFirst line.\n' }])
+    expect(h.session.isUnpersisted()).toBe(false)
     expect(h.snapshots.at(-1)?.missing).toBe(false)
     expect(h.snapshots.at(-1)?.dirty).toBe(false)
   })

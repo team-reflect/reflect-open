@@ -21,6 +21,7 @@ function fakeSession(path: string, log: string[]): NoteSession {
     },
     keepMine: () => {},
     isDirty: () => false,
+    isUnpersisted: () => false,
     loadTheirs: () => {},
     commitFrontmatter: async () => true,
     content: () => '',
