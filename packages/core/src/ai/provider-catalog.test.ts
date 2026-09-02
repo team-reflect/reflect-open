@@ -8,7 +8,8 @@ import {
 
 describe('AI_PROVIDERS', () => {
   it('offers the current Claude lineup in capability order', () => {
-    expect(aiProvider('anthropic').models.slice(0, 3)).toEqual([
+    expect(aiProvider('anthropic').models.slice(0, 4)).toEqual([
+      { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', contextWindow: 1_000_000 },
       { id: 'claude-fable-5', label: 'Claude Fable 5', contextWindow: 1_000_000 },
       { id: 'claude-opus-5', label: 'Claude Opus 5', contextWindow: 1_000_000 },
       { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', contextWindow: 1_000_000 },
