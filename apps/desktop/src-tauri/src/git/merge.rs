@@ -23,8 +23,8 @@ use std::fs;
 use std::path::Path;
 
 use git2::build::CheckoutBuilder;
-use git2::{Index, IndexEntry, MergeOptions, Repository};
-use serde::Serialize;
+use git2::{Index, IndexEntry, MergeOptions, Oid, Repository, ResetType};
+use serde::{Deserialize, Serialize};
 
 use crate::error::AppResult;
 
@@ -34,6 +34,21 @@ use super::repo::{current_branch, ensure_clean_state, open_existing, signature};
 /// the remote one — product language, not branch names.
 const OUR_LABEL: &str = "this device";
 const THEIR_LABEL: &str = "other device";
+
+/// Written before libgit2 enters merge state and removed only after the merge
+/// commit (or a verified rollback) completes. If iOS terminates the process in
+/// that window, the next sync can prove the operation belongs to Reflect,
+/// restore local HEAD, and replay the fetched merge. Foreign CLI merges remain
+/// hands-off.
+const MERGE_RECOVERY_FILE: &str = "REFLECT_MERGE_STATE";
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MergeRecovery {
+    version: u32,
+    local_oid: String,
+    remote_oid: String,
+}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,6 +113,9 @@ fn side_of(entry: Option<IndexEntry>) -> Option<ConflictSide> {
 /// (the sync engine guarantees it): local changes are already committed.
 pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
     let repo = open_existing(root)?;
+    if let Some(outcome) = recover_interrupted_merge(&repo, root)? {
+        return Ok(outcome);
+    }
     ensure_clean_state(&repo)?;
     let branch = current_branch(&repo)?;
     let Ok(remote_oid) = repo.refname_to_id(&format!("refs/remotes/origin/{branch}")) else {
@@ -142,14 +160,12 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
         });
     }
 
-    let mut merge_opts = MergeOptions::new();
-    let mut checkout = CheckoutBuilder::new();
-    checkout
-        .allow_conflicts(true)
-        .conflict_style_merge(true)
-        .our_label(OUR_LABEL)
-        .their_label(THEIR_LABEL);
-    repo.merge(&[&annotated], Some(&mut merge_opts), Some(&mut checkout))?;
+    let local_oid = repo.head()?.peel_to_commit()?.id();
+    write_recovery_marker(&repo, local_oid, remote_oid)?;
+    if let Err(error) = begin_merge(&repo, &annotated) {
+        let _ = rollback_owned_merge(&repo, local_oid);
+        return Err(error);
+    }
 
     // From here the repo carries MERGE_* state; a failure that leaves it
     // behind would trip `ensure_clean_state` on every later cycle and wedge
@@ -157,9 +173,10 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
     // on every path; the next cycle re-derives anything a failed attempt lost.
     let result = complete_merge(&repo, root, remote_oid);
     if result.is_err() {
-        let _ = repo.cleanup_state();
+        let _ = rollback_owned_merge(&repo, local_oid);
     }
     let (conflicted_paths, changed_files) = result?;
+    remove_recovery_marker(&repo)?;
 
     let kind = if conflicted_paths.is_empty() {
         MergeKind::Merged
@@ -171,6 +188,152 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
         conflicted_paths,
         changed_files,
     })
+}
+
+fn begin_merge(repo: &Repository, annotated: &git2::AnnotatedCommit<'_>) -> AppResult<()> {
+    let mut merge_opts = MergeOptions::new();
+    let mut checkout = CheckoutBuilder::new();
+    checkout
+        .allow_conflicts(true)
+        .conflict_style_merge(true)
+        .our_label(OUR_LABEL)
+        .their_label(THEIR_LABEL);
+    repo.merge(&[annotated], Some(&mut merge_opts), Some(&mut checkout))?;
+    Ok(())
+}
+
+/// Recover only a merge carrying Reflect's exact pre-merge marker. The
+/// safest replay point is the committed local parent: it preserves every
+/// local note, discards only libgit2's incomplete checkout/index, and lets the
+/// ordinary deterministic merge path run again from the fetched remote ref.
+fn recover_interrupted_merge(repo: &Repository, root: &Path) -> AppResult<Option<MergeOutcome>> {
+    let Some(recovery) = read_recovery_marker(repo)? else {
+        return Ok(None);
+    };
+    let local_oid = parse_recovery_oid(&recovery.local_oid)?;
+    let remote_oid = parse_recovery_oid(&recovery.remote_oid)?;
+    let head_oid = repo.head()?.peel_to_commit()?.id();
+
+    if merge_commit_has_parents(repo, head_oid, local_oid, remote_oid)? {
+        // The commit made it to HEAD and only process cleanup was interrupted.
+        remove_stale_index_lock(repo)?;
+        repo.cleanup_state()?;
+        remove_recovery_marker(repo)?;
+        let local_tree = repo.find_commit(local_oid)?.tree()?;
+        let merged_tree = repo.find_commit(head_oid)?.tree()?;
+        let mut changed_files = changed_between(repo, Some(&local_tree), &merged_tree)?;
+        stamp_modified_times(root, &mut changed_files);
+        return Ok(Some(MergeOutcome {
+            kind: MergeKind::Merged,
+            conflicted_paths: Vec::new(),
+            changed_files,
+        }));
+    }
+
+    if head_oid != local_oid {
+        return Err(crate::error::AppError::io(
+            "Reflect found an interrupted merge marker, but HEAD no longer matches its protected local commit; no automatic recovery was attempted",
+        ));
+    }
+
+    match repo.state() {
+        git2::RepositoryState::Clean | git2::RepositoryState::Merge => {
+            rollback_owned_merge(repo, local_oid)?;
+            Ok(None)
+        }
+        _ => Ok(None),
+    }
+}
+
+fn write_recovery_marker(repo: &Repository, local_oid: Oid, remote_oid: Oid) -> AppResult<()> {
+    let marker = MergeRecovery {
+        version: 1,
+        local_oid: local_oid.to_string(),
+        remote_oid: remote_oid.to_string(),
+    };
+    let path = repo.path().join(MERGE_RECOVERY_FILE);
+    let temporary = repo.path().join(format!("{MERGE_RECOVERY_FILE}.tmp"));
+    fs::write(
+        &temporary,
+        serde_json::to_vec(&marker).map_err(|error| {
+            crate::error::AppError::io(format!("failed to encode merge recovery marker: {error}"))
+        })?,
+    )?;
+    fs::rename(temporary, path)?;
+    Ok(())
+}
+
+fn read_recovery_marker(repo: &Repository) -> AppResult<Option<MergeRecovery>> {
+    let path = repo.path().join(MERGE_RECOVERY_FILE);
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    let marker: MergeRecovery = serde_json::from_slice(&bytes).map_err(|error| {
+        crate::error::AppError::io(format!("invalid Reflect merge recovery marker: {error}"))
+    })?;
+    if marker.version != 1 {
+        return Err(crate::error::AppError::io(format!(
+            "unsupported Reflect merge recovery marker version {}",
+            marker.version
+        )));
+    }
+    Ok(Some(marker))
+}
+
+fn parse_recovery_oid(value: &str) -> AppResult<Oid> {
+    Oid::from_str(value).map_err(Into::into)
+}
+
+fn merge_commit_has_parents(
+    repo: &Repository,
+    head_oid: Oid,
+    local_oid: Oid,
+    remote_oid: Oid,
+) -> AppResult<bool> {
+    let commit = repo.find_commit(head_oid)?;
+    Ok(commit.parent_count() == 2
+        && commit.parent_ids().any(|oid| oid == local_oid)
+        && commit.parent_ids().any(|oid| oid == remote_oid))
+}
+
+fn remove_stale_index_lock(repo: &Repository) -> AppResult<()> {
+    let path = repo.path().join("index.lock");
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn remove_recovery_marker(repo: &Repository) -> AppResult<()> {
+    let path = repo.path().join(MERGE_RECOVERY_FILE);
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn rollback_owned_merge(repo: &Repository, local_oid: Oid) -> AppResult<()> {
+    remove_stale_index_lock(repo)?;
+    repo.cleanup_state()?;
+    let local = repo.find_object(local_oid, None)?;
+    repo.reset(&local, ResetType::Hard, None)?;
+    remove_recovery_marker(repo)
+}
+
+#[cfg(test)]
+pub(super) fn interrupt_next_merge_for_test(root: &Path) -> AppResult<()> {
+    let repo = open_existing(root)?;
+    ensure_clean_state(&repo)?;
+    let branch = current_branch(&repo)?;
+    let remote_oid = repo.refname_to_id(&format!("refs/remotes/origin/{branch}"))?;
+    let local_oid = repo.head()?.peel_to_commit()?.id();
+    let annotated = repo.find_annotated_commit(remote_oid)?;
+    write_recovery_marker(&repo, local_oid, remote_oid)?;
+    begin_merge(&repo, &annotated)
 }
 
 /// The post-`repo.merge` half: materialize conflicts, commit the merge with

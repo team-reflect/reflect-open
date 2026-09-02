@@ -9,7 +9,7 @@ use git2::{Repository, RepositoryInitOptions};
 use tempfile::{tempdir, TempDir};
 
 use super::commit::commit_all;
-use super::merge::{merge_remote, MergeKind};
+use super::merge::{interrupt_next_merge_for_test, merge_remote, MergeKind};
 use super::remote::{fetch, push};
 use super::{setup, status, MAX_FILE_BYTES};
 
@@ -778,6 +778,78 @@ fn failed_merge_completion_still_clears_the_merge_state() {
         "{merged:?}"
     );
     assert_eq!(read(root_a, "notes/keep.md"), "# Keep\n\nedited on b\n");
+}
+
+#[test]
+fn interrupted_app_merge_is_rolled_back_and_replayed_automatically() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/base.md", "# Base\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/remote.md", "# Remote device\n");
+    commit_all(&root_b, "remote edit", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, "notes/local.md", "# This device\n");
+    commit_all(root_a, "local edit", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+
+    interrupt_next_merge_for_test(root_a).unwrap();
+    let repo = Repository::open(root_a).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Merge);
+    assert!(repo.path().join("REFLECT_MERGE_STATE").is_file());
+    // Model the zero-byte lock left by the physical iPhone interruption.
+    fs::write(repo.path().join("index.lock"), []).unwrap();
+    drop(repo);
+
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
+    assert_eq!(read(root_a, "notes/local.md"), "# This device\n");
+    assert_eq!(read(root_a, "notes/remote.md"), "# Remote device\n");
+    let repo = Repository::open(root_a).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Clean);
+    assert!(!repo.path().join("REFLECT_MERGE_STATE").exists());
+    assert!(!repo.path().join("index.lock").exists());
+    drop(repo);
+    assert!(push(root_a, None).unwrap().pushed);
+}
+
+#[test]
+fn foreign_merge_without_reflect_marker_is_not_touched() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/base.md", "# Base\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/remote.md", "# Remote device\n");
+    commit_all(&root_b, "remote edit", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, "notes/local.md", "# This device\n");
+    commit_all(root_a, "local edit", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    {
+        let repo = Repository::open(root_a).unwrap();
+        let remote_oid = repo.refname_to_id("refs/remotes/origin/main").unwrap();
+        let annotated = repo.find_annotated_commit(remote_oid).unwrap();
+        repo.merge(&[&annotated], None, None).unwrap();
+        assert_eq!(repo.state(), git2::RepositoryState::Merge);
+    }
+
+    let error = merge_remote(root_a).unwrap_err();
+    let crate::error::AppError::Io { message } = error else {
+        panic!("expected an Io error, got {error:?}");
+    };
+    assert!(message.contains("Merge in progress"), "{message}");
+    assert_eq!(
+        Repository::open(root_a).unwrap().state(),
+        git2::RepositoryState::Merge
+    );
 }
 
 #[test]
