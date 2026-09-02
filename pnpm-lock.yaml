@@ -148,8 +148,8 @@ importers:
         specifier: ^2.4.1
         version: 2.4.1
       virtua:
-        specifier: ^0.50.2
-        version: 0.50.2(react-dom@19.2.8)(react@19.2.8)
+        specifier: ^0.51.0
+        version: 0.51.0(react-dom@19.2.8)(react@19.2.8)
       zod:
         specifier: 4.5.4
         version: 4.5.4
@@ -6036,8 +6036,8 @@ packages:
   vfile@6.0.3:
     resolution: {integrity: sha512-KzIbH/9tXat2u30jf+smMwFCsno4wHVdNmzFyL+T/L3UGqqk6JKfVqOFOZEpZSHADH1k40ab6NUIXZq422ov3Q==}
 
-  virtua@0.50.2:
-    resolution: {integrity: sha512-hbIe+T0s/v6GHymFxu5S0j0Y6yLR4aZ3P59XWIxlz212SMDk6lN2qorbn1c9sCJ9BZb+u4hMWmY6XjKqTkfs1g==}
+  virtua@0.51.0:
+    resolution: {integrity: sha512-D4e4lTCaH5ZEb/mA0lN4urI3gMbh8USVzXkgsS1KmOMWFB5aqw79HHWyCxG1uZi6BwIgiIKHiUxcf/PLVYTm1Q==}
     peerDependencies:
       '@angular/common': '>=20.0.0'
       '@angular/core': '>=20.0.0'
@@ -12553,7 +12553,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  virtua@0.50.2(react-dom@19.2.8)(react@19.2.8):
+  virtua@0.51.0(react-dom@19.2.8)(react@19.2.8):
     optionalDependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
