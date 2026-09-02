@@ -159,6 +159,13 @@ mod platform {
     /// of batches.
     const UPDATE_BATCHING_INTERVAL_S: f64 = 2.0;
 
+    /// Graph-local runtime trees that are deliberately excluded from every
+    /// file-sync provider. They have no File Provider identity, so asking a
+    /// ubiquitous metadata query to watch them makes CloudDocs repeatedly
+    /// retry an item it can never resolve. Keep the provider-side query off
+    /// these paths; filtering results later is too late to avoid that work.
+    const SYNC_EXCLUDED_DIRS: [&str; 2] = [".reflect", ".git"];
+
     /// The live query plus everything that must stay alive (and on the main
     /// thread) with it.
     struct Watch {
@@ -315,6 +322,49 @@ mod platform {
         variants
     }
 
+    /// Build the provider-side path predicate for one graph. Each root is
+    /// slash-terminated by [`root_variants`], so the positive clauses cannot
+    /// claim a sibling graph. The exclusions cover both the directory item
+    /// itself and its descendants without blacking out similarly named user
+    /// paths such as `.reflect-old`.
+    fn query_predicate(roots: &[String]) -> Retained<NSPredicate> {
+        let path_key: Retained<NSString> = unsafe { NSMetadataItemPathKey.copy() };
+        let included = (0..roots.len())
+            .map(|_| "(%K BEGINSWITH %@)")
+            .collect::<Vec<_>>()
+            .join(" OR ");
+        let exclusions = roots
+            .iter()
+            .flat_map(|_| SYNC_EXCLUDED_DIRS)
+            .map(|_| "(%K != %@) AND (NOT (%K BEGINSWITH %@))")
+            .collect::<Vec<_>>()
+            .join(" AND ");
+        let format = NSString::from_str(&format!("({included}) AND {exclusions}"));
+
+        let mut arg_list: Vec<Retained<NSString>> = Vec::new();
+        for root in roots {
+            arg_list.push(path_key.copy());
+            arg_list.push(NSString::from_str(root));
+        }
+        for root in roots {
+            for directory in SYNC_EXCLUDED_DIRS {
+                let excluded = format!("{root}{directory}");
+                arg_list.push(path_key.copy());
+                arg_list.push(NSString::from_str(&excluded));
+                arg_list.push(path_key.copy());
+                arg_list.push(NSString::from_str(&format!("{excluded}/")));
+            }
+        }
+        let args = NSArray::from_retained_slice(&arg_list);
+        unsafe {
+            msg_send![
+                objc2::class!(NSPredicate),
+                predicateWithFormat: &*format,
+                argumentArray: &*args
+            ]
+        }
+    }
+
     /// Build, wire, and start the query. Main thread only. Tears down any
     /// live watch first (installs and stops all run here, serially), and
     /// aborts when a later `start`/`stop` has superseded this one's epoch —
@@ -353,26 +403,7 @@ mod platform {
         }
 
         let roots = root_variants(&root);
-        let path_key: Retained<NSString> = unsafe { NSMetadataItemPathKey.copy() };
-        let format = NSString::from_str(
-            &(0..roots.len())
-                .map(|_| "(%K BEGINSWITH %@)")
-                .collect::<Vec<_>>()
-                .join(" OR "),
-        );
-        let mut arg_list: Vec<Retained<NSString>> = Vec::new();
-        for variant in &roots {
-            arg_list.push(path_key.copy());
-            arg_list.push(NSString::from_str(variant));
-        }
-        let args = NSArray::from_retained_slice(&arg_list);
-        let predicate: Retained<NSPredicate> = unsafe {
-            msg_send![
-                objc2::class!(NSPredicate),
-                predicateWithFormat: &*format,
-                argumentArray: &*args
-            ]
-        };
+        let predicate = query_predicate(&roots);
         query.setPredicate(Some(&predicate));
 
         let queue = NSOperationQueue::new();
@@ -895,8 +926,11 @@ mod platform {
     mod tests {
         use super::{
             apply_conflict_delta, apply_update_delta, fold_conflicts_into_view, plan_nudges,
-            root_variants, tracked_note_relpath, ConflictView, ItemState, TrackedState,
+            query_predicate, root_variants, tracked_note_relpath, ConflictView, ItemState,
+            TrackedState,
         };
+        use objc2::runtime::AnyObject;
+        use objc2_foundation::{NSDictionary, NSMetadataItemPathKey, NSString};
         use std::collections::{HashMap, HashSet};
 
         fn state(entries: &[(&str, TrackedState)]) -> HashMap<String, TrackedState> {
@@ -931,6 +965,16 @@ mod platform {
                 .collect();
             shapes.sort();
             shapes
+        }
+
+        fn predicate_matches_path(predicate: &objc2_foundation::NSPredicate, path: &str) -> bool {
+            let value = NSString::from_str(path);
+            let item = NSDictionary::<NSString, NSString>::from_slices(
+                &[unsafe { NSMetadataItemPathKey }],
+                &[&value],
+            );
+            let item: &AnyObject = &item;
+            unsafe { predicate.evaluateWithObject(Some(item)) }
         }
 
         fn conflicted_item(rel: &str) -> ItemState {
@@ -1186,6 +1230,40 @@ mod platform {
             assert!(variants.contains(&canonical));
             let unique: std::collections::BTreeSet<&String> = variants.iter().collect();
             assert_eq!(unique.len(), variants.len(), "variants must not repeat");
+        }
+
+        #[test]
+        fn metadata_query_excludes_sync_excluded_runtime_trees() {
+            let roots = vec![
+                "/var/mobile/Containers/Notes/".to_string(),
+                "/private/var/mobile/Containers/Notes/".to_string(),
+            ];
+            let predicate = query_predicate(&roots);
+
+            for root in &roots {
+                assert!(predicate_matches_path(
+                    &predicate,
+                    &format!("{root}notes/idea.md")
+                ));
+                for directory in [".reflect", ".git"] {
+                    assert!(!predicate_matches_path(
+                        &predicate,
+                        &format!("{root}{directory}")
+                    ));
+                    assert!(!predicate_matches_path(
+                        &predicate,
+                        &format!("{root}{directory}/nested/item")
+                    ));
+                }
+                assert!(predicate_matches_path(
+                    &predicate,
+                    &format!("{root}.reflect-old/note.md")
+                ));
+            }
+            assert!(!predicate_matches_path(
+                &predicate,
+                "/var/mobile/Containers/Notes-old/notes/idea.md"
+            ));
         }
 
         #[test]

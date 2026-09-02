@@ -77,31 +77,19 @@ in CI. What *needs a real container* (and the two-device manual matrix in
 the plan doc) is the `NSMetadataQuery` watch, `NSFileVersion` conflict
 delivery, and download/eviction behavior.
 
-## Known log noise: `BRItemCollectionGatherer - Repeatedly can't watch item`
+## Metadata-query boundary
 
-With a graph open, the app process logs CloudDocs errors — a burst while the
-`NSMetadataQuery` watch gathers, then one round per graph write:
+The live `NSMetadataQuery` predicates out `.reflect` and `.git` before File
+Provider gathers the graph. Both directories are deliberately local-only (see
+`mark_dir_local_only` in `fs/io.rs`) and therefore have no identity in the
+provider database. Filtering them only after delivery is too late: CloudDocs
+tries to install per-item watches first, retries the unresolvable items after
+local runtime writes, and can keep `fileproviderd` busy indefinitely.
 
-```text
-[ERROR] … NSError: NSFileProviderInternalErrorDomain 15 … while gathering
-[CRIT] UNREACHABLE: … BRItemCollectionGatherer - Repeatedly can't watch item …
-```
-
-This is Apple's query machinery tripping over the directories Reflect
-deliberately excludes from sync (`.reflect`, and `.git` on desktop — see
-`mark_dir_local_only` in `fs/io.rs`): they exist on disk inside the watched
-root, but carry no identity in the provider database, so the gatherer's
-per-item watch fails, retries, and gives up with the `UNREACHABLE` fault.
-Any FS event under an excluded tree re-attempts once — on desktop that means
-every note save, because the local Git history engine commits into `.git`.
-
-Verified benign (2026-08-02): touching a file inside `.git` reproduces the
-error within milliseconds, the failing watches are exactly the items sync
-must ignore, and the query demonstrably keeps delivering update rounds (and
-the conflict view keeps functioning) after the faults. Don't chase this
-signature; a real watcher failure looks different — `startQuery` returning
-false (logged as `iCloud metadata query failed to start`, surfaced via the
-`icloud:watch-failed` event) or update rounds ceasing entirely.
+The predicate excludes both directory entries and their descendants for every
+canonical spelling of the graph root. The ordinary `notify` watcher still
+observes the graph on macOS, while the metadata query continues to deliver
+iCloud note state and unresolved-conflict updates on both Apple platforms.
 
 ## Deliberately not here (yet)
 
