@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.9...v0.11.0-beta.10) (2026-09-02)
+
+
+### Features
+
+* add Claude Fable 5.1 support ([#1193](https://github.com/team-reflect/reflect-open/issues/1193)) ([9710a1d](https://github.com/team-reflect/reflect-open/commit/9710a1d23709645876a8649a40c474b6d588cb29))
+* show `//` subject titles by their first segment ([#1196](https://github.com/team-reflect/reflect-open/issues/1196)) ([c3fc643](https://github.com/team-reflect/reflect-open/commit/c3fc6431bce7d410ba94a006cb0278390a03f8cb))
+
 ## [0.11.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.8...v0.11.0-beta.9) (2026-08-31)
 
 
