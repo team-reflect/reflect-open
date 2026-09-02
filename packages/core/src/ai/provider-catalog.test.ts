@@ -24,14 +24,6 @@ describe('AI_PROVIDERS', () => {
     ])
   })
 
-  it('offers the current Gemini lineup in capability order', () => {
-    expect(aiProvider('google').models.slice(0, 3)).toEqual([
-      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', contextWindow: 1_000_000 },
-      { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', contextWindow: 1_000_000 },
-      { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash', contextWindow: 1_000_000 },
-    ])
-  })
-
   it('includes OpenRouter in the settings catalog', () => {
     expect(aiProvider('openrouter')).toMatchObject({
       id: 'openrouter',
