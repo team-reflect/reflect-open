@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.10...v0.11.0-beta.11) (2026-09-02)
+
+
+### Bug Fixes
+
+* build the macOS DMG as a writable image before compressing it ([#1201](https://github.com/team-reflect/reflect-open/issues/1201)) ([e5710a2](https://github.com/team-reflect/reflect-open/commit/e5710a2fb1657eea778e07a2ac4b893e51b9ff51))
+
 ## [0.11.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.9...v0.11.0-beta.10) (2026-09-02)
 
 
