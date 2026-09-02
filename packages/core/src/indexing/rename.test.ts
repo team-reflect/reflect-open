@@ -574,7 +574,7 @@ describe('rewriteLinksForTitleChange — rich titles', () => {
   })
 })
 
-describe('rewriteLinksForTitleChange — `//` titles', () => {
+describe('rewriteLinksForTitleChange: `//` titles', () => {
   it('syncs a display that mirrors the old first segment and keeps other segments', async () => {
     const sourcePath = 'notes/source.md'
     const { io, writes } = fakeIo(
