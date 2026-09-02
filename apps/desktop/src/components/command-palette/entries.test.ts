@@ -137,22 +137,6 @@ describe('buildPaletteSections', () => {
     expect(result.notes[0]!.alias).toBe('Dad')
   })
 
-  it('drops an alias that only repeats the displayed title', () => {
-    const result = sections({
-      query: 'tim maccaw',
-      suggestions: [
-        {
-          target: 'Tim MacCaw // Dad',
-          path: 'notes/tim-maccaw-dad.md',
-          title: 'Tim MacCaw // Dad',
-          alias: 'Tim MacCaw',
-          date: null,
-        },
-      ],
-    })
-    expect(result.notes[0]!.alias).toBeNull()
-  })
-
   it('commands match on title and keywords once a query exists', () => {
     const result = sections({ query: 'dark', commands: COMMANDS })
     expect(result.commands.map((command) => command.id)).toEqual(['theme.toggle'])

@@ -2,6 +2,7 @@ import { useDeferredValue, useRef, useState, type KeyboardEvent, type ReactEleme
 import { Command as CommandPrimitive } from 'cmdk'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
+  aliasHint,
   contactLinkSuggestions,
   displayNoteTitle,
   foldKey,
@@ -229,31 +230,34 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
           onMouseDown={(mouseEvent) => mouseEvent.preventDefault()}
         >
           <CommandList>
-            {entries.map((entry) => (
-              <CommandItem
-                key={entryKey(entry)}
-                value={entryKey(entry)}
-                onSelect={() => select(entry)}
-              >
-                <span className="min-w-0 flex-1 truncate">
-                  {entry.kind === 'create'
-                    ? `Add “${entry.title}”`
-                    : entry.kind === 'suggestion'
-                      ? displayNoteTitle(entry.suggestion.target)
-                      : entryName(entry)}
-                </span>
-                {entry.kind === 'suggestion' && entry.suggestion.alias !== null && (
-                  <span className="truncate text-xs text-text-muted">
-                    {entry.suggestion.alias} → {displayNoteTitle(entry.suggestion.title)}
+            {entries.map((entry) => {
+              const hint = entry.kind === 'suggestion' ? aliasHint(entry.suggestion) : null
+              return (
+                <CommandItem
+                  key={entryKey(entry)}
+                  value={entryKey(entry)}
+                  onSelect={() => select(entry)}
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {entry.kind === 'create'
+                      ? `Add “${entry.title}”`
+                      : entry.kind === 'suggestion'
+                        ? displayNoteTitle(entry.suggestion.target)
+                        : entryName(entry)}
                   </span>
-                )}
-                {entry.kind === 'contact' && (
-                  <span className="truncate text-xs text-text-muted">
-                    {entry.contact.emails[0] ?? entry.contact.phones[0] ?? 'Contact'}
-                  </span>
-                )}
-              </CommandItem>
-            ))}
+                  {entry.kind === 'suggestion' && hint !== null && (
+                    <span className="truncate text-xs text-text-muted">
+                      {hint} → {displayNoteTitle(entry.suggestion.title)}
+                    </span>
+                  )}
+                  {entry.kind === 'contact' && (
+                    <span className="truncate text-xs text-text-muted">
+                      {entry.contact.emails[0] ?? entry.contact.phones[0] ?? 'Contact'}
+                    </span>
+                  )}
+                </CommandItem>
+              )
+            })}
           </CommandList>
         </PopoverContent>
       </CommandPrimitive>

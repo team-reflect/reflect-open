@@ -1,4 +1,4 @@
-import { dailyPath, displayNoteTitle, foldKey, parseSearchQuery } from '@reflect/core'
+import { aliasHint, dailyPath, parseSearchQuery } from '@reflect/core'
 import type { AppCommand } from '@/lib/commands/types'
 import type { FilteredSearchHit, WikiSuggestion } from '@reflect/core'
 
@@ -37,18 +37,6 @@ export interface PaletteSections {
 }
 
 const NOTE_CAP = 12
-
-/**
- * The alias a suggestion matched through, when it adds information beyond the
- * displayed title (a `//` note's first segment is also one of its aliases).
- */
-function shownAlias(suggestion: WikiSuggestion): string | null {
-  const { alias, title } = suggestion
-  if (alias === null || foldKey(alias) === foldKey(displayNoteTitle(title))) {
-    return null
-  }
-  return alias
-}
 
 function matchesCommand(command: AppCommand, query: string): boolean {
   const haystack = [command.title, ...(command.keywords ?? [])].join(' ').toLowerCase()
@@ -137,7 +125,7 @@ export function buildPaletteSections(options: {
         date: suggestion.date,
         snippet: null,
         phrase: suggestion.generated?.phrase ?? null,
-        alias: shownAlias(suggestion),
+        alias: aliasHint(suggestion),
       })
     }
   }

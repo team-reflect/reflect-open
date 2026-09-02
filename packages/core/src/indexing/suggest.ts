@@ -7,7 +7,7 @@
  */
 
 import { foldKey } from '../markdown/keys'
-import { wikiLinkTargetForTitle } from '../markdown/note-title'
+import { displayNoteTitle, wikiLinkTargetForTitle } from '../markdown/note-title'
 import type { DateSuggestion } from './date-suggestions'
 
 /**
@@ -36,6 +36,16 @@ export interface WikiSuggestion {
   date: string | null
   /** Set only on rows the date generator synthesised; see {@link GeneratedDate}. */
   generated?: GeneratedDate
+}
+
+/**
+ * The alias worth naming beside a suggestion's displayed title: the matched
+ * alias unless it only repeats that title (a `//` title's first segment is
+ * also one of its aliases).
+ */
+export function aliasHint(suggestion: Pick<WikiSuggestion, 'alias' | 'title'>): string | null {
+  const { alias, title } = suggestion
+  return alias !== null && foldKey(alias) !== foldKey(displayNoteTitle(title)) ? alias : null
 }
 
 /**
