@@ -522,8 +522,8 @@ function writeUpdaterArtifacts({ flavor, target, updater }) {
   }
 }
 
-/** Build the hdiutil arguments used to create the release DMG. */
-export function createDmgArgs({ dmg, sourceFolder, volumeName }) {
+/** Build the hdiutil arguments used to create the writable DMG that holds the staged app. */
+export function createDmgArgs({ dmg, sizeMb, sourceFolder, volumeName }) {
   return [
     'create',
     '-volname',
@@ -532,9 +532,16 @@ export function createDmgArgs({ dmg, sourceFolder, volumeName }) {
     sourceFolder,
     '-ov',
     '-format',
-    'UDZO',
+    'UDRW',
+    '-size',
+    `${sizeMb}m`,
     dmg,
   ]
+}
+
+/** Build the hdiutil arguments used to compress the writable DMG into the release DMG. */
+export function convertDmgArgs({ dmg, source }) {
+  return ['convert', source, '-format', 'UDZO', '-imagekey', 'zlib-level=9', '-ov', '-o', dmg]
 }
 
 /** Build the codesign arguments used for the DMG container. */
@@ -859,14 +866,27 @@ function createDmg({ flavor, identity, keychain, target }) {
 
     mkdirSync(dirname(dmg), { recursive: true })
     if (existsSync(dmg)) rmSync(dmg)
+    // hdiutil sizes a `-srcfolder` image from the folder's block count plus a slim margin,
+    // and `-format UDZO` streams straight into the compressed image, so the large main binary
+    // intermittently runs out of space inside the image. Build a writable image with explicit
+    // headroom first, then compress it.
+    const usedKb = Number(
+      execFileSync('du', ['-sk', stagingDir], { encoding: 'utf8' }).split('\t')[0],
+    )
+    const sizeMb = Math.ceil(usedKb / 1024) * 2 + 32
+    const writableDmg = join(stagingRoot, 'writable.dmg')
     log(`creating ${basename(dmg)} from ${basename(app)}…`)
     execFileSync(
       'hdiutil',
-      createDmgArgs({ dmg, sourceFolder: stagingDir, volumeName: conf.productName }),
-      {
-        stdio: 'inherit',
-      },
+      createDmgArgs({
+        dmg: writableDmg,
+        sizeMb,
+        sourceFolder: stagingDir,
+        volumeName: conf.productName,
+      }),
+      { stdio: 'inherit' },
     )
+    execFileSync('hdiutil', convertDmgArgs({ dmg, source: writableDmg }), { stdio: 'inherit' })
     log(`signing ${basename(dmg)}…`)
     execFileSync('codesign', signDmgArgs({ dmg, identity, keychain }), { stdio: 'inherit' })
   } finally {

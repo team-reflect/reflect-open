@@ -8,6 +8,7 @@ import {
   assertMacosProfileIdentityEntitlements,
   canLaunchTarget,
   compareReleaseVersions,
+  convertDmgArgs,
   createBetaFeedReleaseArgs,
   createBetaFeedUploadSteps,
   createDmgArgs,
@@ -543,9 +544,14 @@ test('updater manifest includes both macOS release targets', () => {
   }
 })
 
-test('DMG creation uses direct hdiutil packaging', () => {
+test('DMG creation builds a writable image with headroom, then compresses it', () => {
   expect(
-    createDmgArgs({ dmg: 'Reflect.dmg', sourceFolder: '/tmp/stage', volumeName: 'Reflect' }),
+    createDmgArgs({
+      dmg: 'writable.dmg',
+      sizeMb: 178,
+      sourceFolder: '/tmp/stage',
+      volumeName: 'Reflect',
+    }),
   ).toEqual([
     'create',
     '-volname',
@@ -554,7 +560,20 @@ test('DMG creation uses direct hdiutil packaging', () => {
     '/tmp/stage',
     '-ov',
     '-format',
+    'UDRW',
+    '-size',
+    '178m',
+    'writable.dmg',
+  ])
+  expect(convertDmgArgs({ dmg: 'Reflect.dmg', source: 'writable.dmg' })).toEqual([
+    'convert',
+    'writable.dmg',
+    '-format',
     'UDZO',
+    '-imagekey',
+    'zlib-level=9',
+    '-ov',
+    '-o',
     'Reflect.dmg',
   ])
 })
