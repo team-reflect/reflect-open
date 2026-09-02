@@ -55,10 +55,13 @@ export function usePaywallGate(): PaywallGate {
   if (!isAppStoreInstall(environment.value) && !paywallRequested) {
     return 'hide'
   }
-  if (subscription.isLoading || !settingsSettled) {
+  if (!settingsSettled) {
     return 'pending'
   }
-  return settings.paywallSnoozeUntil > appStartTime ? 'hide' : 'show'
+  if (settings.paywallSnoozeUntil > appStartTime) {
+    return 'hide'
+  }
+  return subscription.isLoading ? 'pending' : 'show'
 }
 
 /**

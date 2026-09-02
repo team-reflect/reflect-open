@@ -185,6 +185,27 @@ describe('usePaywallGate', () => {
     await vi.waitFor(() => expect(result.current).toBe('hide'))
   })
 
+  it('lets either confirmed subscription through without waiting on its sibling', async () => {
+    owned = (productId) =>
+      productId.endsWith('.yearly') ? Promise.resolve(true) : never<boolean>()
+    const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+    await vi.waitFor(() => expect(result.current).toBe('hide'))
+  })
+
+  it('stops waiting when StoreKit entitlement lookups time out', async () => {
+    vi.useFakeTimers()
+    try {
+      owned = never
+      const hook = await renderHook(() => usePaywallGate(), { wrapper })
+      expect(hook.result.current).toBe('pending')
+
+      await hook.act(() => vi.advanceTimersByTimeAsync(5_000))
+      expect(hook.result.current).toBe('show')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('refetches entitlements through the TanStack focus path', async () => {
     owned = () => Promise.resolve(false)
     const { result } = await renderHook(() => usePaywallGate(), { wrapper })
@@ -216,6 +237,7 @@ describe('usePaywallGate', () => {
 
   it('respects a live "Remind me later" snooze', async () => {
     stored = { paywallSnoozeUntil: Date.now() + 60_000 }
+    owned = never
     const { result } = await renderHook(() => usePaywallGate(), { wrapper })
     await vi.waitFor(() => expect(result.current).toBe('hide'))
   })
