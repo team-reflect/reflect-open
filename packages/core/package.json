@@ -16,7 +16,7 @@
     "@ai-sdk/google": "^4.0.62",
     "@ai-sdk/openai": "^4.0.56",
     "@ai-sdk/openai-compatible": "^3.0.43",
-    "@meowdown/markdown": "^0.67.2",
+    "@meowdown/markdown": "^0.68.0",
     "@reflect/db": "workspace:*",
     "@reflect/utils": "workspace:*",
     "ai": "^7.0.90",
