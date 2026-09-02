@@ -129,6 +129,13 @@ export function postDisplayTitle(
   )
 }
 
+/**
+ * The full source (frontmatter + body) the drain writes for a capture: the
+ * link template, or — when `post` is set — the post template rendered from
+ * `postFields` (a same-day re-capture merged with the existing note) or
+ * from what the envelope's post block read. The frontmatter carries the
+ * capture identity, status, and the body hash enrichment later verifies.
+ */
 export async function captureNoteSource(
   envelope: CaptureEnvelope,
   identity: CaptureIdentity,

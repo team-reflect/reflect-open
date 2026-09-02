@@ -4,8 +4,11 @@ import type { PostCapturedMessage, PostCaptureResponse } from './messages'
 import { readXCapturePreferences } from './preferences'
 import { clearPostSeen, isPostSeen, markPostSeen } from './seen'
 
+/** Injected dependencies of {@link handlePostCaptured}; production callers omit both. */
 export interface HandlePostCapturedOptions {
+  /** The queue flush to run after enqueueing; defaults to the background's `flushQueue`. */
   flush?: (() => Promise<unknown>) | undefined
+  /** The capture clock (`capturedAt`); defaults to `new Date()`. */
   now?: (() => Date) | undefined
 }
 
