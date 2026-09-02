@@ -492,6 +492,42 @@ describe('nextAliases', () => {
   it('adds the first alias to an empty list', () => {
     expect(nextAliases([], { from: 'Old', to: 'New', previousAutoAlias: null })).toEqual(['Old'])
   })
+
+  it('keeps each segment of a `//` title alongside the whole title', () => {
+    expect(
+      nextAliases([], {
+        from: 'Tim MacCaw // Dad',
+        to: 'Timothy MacCaw // Dad',
+        previousAutoAlias: null,
+      }),
+    ).toEqual(['Tim MacCaw', 'Tim MacCaw // Dad'])
+  })
+
+  it('keeps a segment the rename dropped', () => {
+    expect(
+      nextAliases([], { from: 'Tim MacCaw // Dad', to: 'Tim MacCaw', previousAutoAlias: null }),
+    ).toEqual(['Dad', 'Tim MacCaw // Dad'])
+  })
+
+  it('prunes the previous auto-alias family on a chained rename', () => {
+    expect(
+      nextAliases(['Dad', 'Tim MacCaw // Dad', 'keeper'], {
+        from: 'Tim MacCaw // Da',
+        to: 'Tim MacCaw // D',
+        previousAutoAlias: 'Tim MacCaw // Dad',
+      }),
+    ).toEqual(['keeper', 'Da', 'Tim MacCaw // Da'])
+  })
+
+  it('never prunes an entry the old title still derives', () => {
+    expect(
+      nextAliases(['Dad', 'Tim MacCaw', 'Tim MacCaw // Dad'], {
+        from: 'Timothy MacCaw // Dad',
+        to: 'Timothy MacCaw // Father',
+        previousAutoAlias: 'Tim MacCaw // Dad',
+      }),
+    ).toEqual(['Dad', 'Timothy MacCaw // Dad'])
+  })
 })
 
 describe('rewriteLinksForTitleChange — rich titles', () => {

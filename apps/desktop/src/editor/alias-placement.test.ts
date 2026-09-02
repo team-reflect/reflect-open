@@ -90,6 +90,21 @@ describe('placeOldTitleAlias', () => {
     expect(io.writeNote).not.toHaveBeenCalled()
   })
 
+  it('keeps the segments of a `//` title as aliases through the session channel', async () => {
+    const session = fakeSession({ content: '# Timothy MacCaw\n' })
+    docs.openSession.mockReturnValue(session)
+
+    await placeOldTitleAlias(
+      PATH,
+      { from: 'Tim MacCaw // Dad', to: 'Timothy MacCaw', previousAutoAlias: null },
+      7,
+    )
+
+    expect(session.updateFrontmatter).toHaveBeenCalledWith({
+      aliases: ['Tim MacCaw', 'Dad', 'Tim MacCaw // Dad'],
+    })
+  })
+
   it('computes against the session buffer, preserving concurrently-gained aliases', async () => {
     const session = fakeSession({
       content: '---\naliases:\n  - Gained Elsewhere\n---\n# Old Title\n',
