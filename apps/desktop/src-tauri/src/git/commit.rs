@@ -9,7 +9,7 @@ use serde::Serialize;
 use crate::error::AppResult;
 
 use super::commit_message::message_for_commit;
-use super::repo::{ensure_clean_state, open_existing, signature};
+use super::repo::{ensure_clean_state, open_for_sync, signature};
 
 /// A file whose *changes* were withheld from staging because it is at/above
 /// the size guardrail. Oversized-but-unchanged files are not reported — their
@@ -45,7 +45,7 @@ pub(super) fn commit_all(
     fallback_message: &str,
     max_file_bytes: u64,
 ) -> AppResult<CommitOutcome> {
-    let repo = open_existing(root)?;
+    let repo = open_for_sync(root)?;
     ensure_clean_state(&repo)?;
     // In-memory hard guarantee, independent of any on-disk ignore file: the
     // runtime directory must never enter a backup commit (Plan 21 — a synced

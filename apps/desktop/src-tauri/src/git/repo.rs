@@ -36,6 +36,16 @@ pub(super) fn open_existing(root: &Path) -> AppResult<Repository> {
     Ok(Repository::open(root)?)
 }
 
+/// Open a repository for a sync operation and finish any interrupted merge
+/// that can be proven to belong to Reflect. This preflight runs before
+/// `commit_all`, fetch, merge, push, and status, so recovery cannot be blocked
+/// by a later clean-state guard.
+pub(super) fn open_for_sync(root: &Path) -> AppResult<Repository> {
+    let repo = open_existing(root)?;
+    super::merge::recover_interrupted_merge(&repo)?;
+    Ok(repo)
+}
+
 /// Refuse to operate on a repository mid-operation (a rebase/merge the user
 /// started with the git CLI). Guessing here could destroy their state.
 pub(super) fn ensure_clean_state(repo: &Repository) -> AppResult<()> {

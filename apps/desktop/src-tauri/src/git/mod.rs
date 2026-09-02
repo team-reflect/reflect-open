@@ -69,7 +69,7 @@ fn status(root: &Path) -> AppResult<GitStatus> {
             in_progress: false,
         });
     }
-    let repo = repo::open_existing(root)?;
+    let repo = repo::open_for_sync(root)?;
     let branch = repo::current_branch(&repo).ok();
     let remote_url = repo
         .find_remote("origin")

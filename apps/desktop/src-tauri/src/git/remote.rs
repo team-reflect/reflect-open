@@ -14,7 +14,7 @@ use serde::Serialize;
 
 use crate::error::{AppError, AppResult};
 
-use super::repo::{current_branch, open_existing};
+use super::repo::{current_branch, open_for_sync};
 
 /// Where the local branch stands relative to its last-fetched remote
 /// counterpart (no network — call after `fetch`).
@@ -123,7 +123,7 @@ fn origin(repo: &Repository) -> AppResult<git2::Remote<'_>> {
 /// Fetch `origin` (configured refspecs) and report ahead/behind for the
 /// current branch.
 pub(super) fn fetch(root: &Path, token: Option<String>) -> AppResult<RemoteDelta> {
-    let repo = open_existing(root)?;
+    let repo = open_for_sync(root)?;
     {
         let mut remote = origin(&repo)?;
         let mut opts = FetchOptions::new();
@@ -183,7 +183,7 @@ pub(super) fn clone(url: &str, target: &Path, token: Option<String>) -> AppResul
 /// errors — the sync engine branches on them (non-fast-forward → pull/merge/
 /// retry; anything else → surface the remote's message).
 pub(super) fn push(root: &Path, token: Option<String>) -> AppResult<PushOutcome> {
-    let repo = open_existing(root)?;
+    let repo = open_for_sync(root)?;
     let branch = current_branch(&repo)?;
     let mut remote = origin(&repo)?;
 
