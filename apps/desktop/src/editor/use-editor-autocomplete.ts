@@ -11,6 +11,7 @@ import {
   displayNoteTitle,
   ensurePersonNote,
   errorMessage,
+  foldKey,
   hasBridge,
   isContactsReadable,
   resolveOrCreateNoteWithTitle,
@@ -182,9 +183,13 @@ export function useEditorAutocomplete(): EditorAutocomplete {
         // A rich title reads as its rendered form; the raw form stays the identity.
         const displayedTitle = displayNoteTitle(title)
         const label = date !== null ? formatDayLabel(date, settings.dateFormat) : displayedTitle
+        // An alias that only repeats the displayed title (a `//` note's first
+        // segment) adds nothing as a detail.
+        const shownAlias =
+          alias !== null && foldKey(alias) !== foldKey(displayedTitle) ? alias : null
         const detail =
-          alias !== null
-            ? `${alias} → ${displayedTitle}`
+          shownAlias !== null
+            ? `${shownAlias} → ${displayedTitle}`
             : date !== null
               ? path === null
                 ? `${date} · new`

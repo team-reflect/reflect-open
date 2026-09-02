@@ -116,8 +116,41 @@ describe('buildPaletteSections', () => {
         date: '2026-08-01',
         snippet: null,
         phrase: null,
+        alias: null,
       },
     ])
+  })
+
+  it('carries the alias a title suggestion matched through', () => {
+    const result = sections({
+      query: 'dad',
+      suggestions: [
+        {
+          target: 'Tim MacCaw // Dad',
+          path: 'notes/tim-maccaw-dad.md',
+          title: 'Tim MacCaw // Dad',
+          alias: 'Dad',
+          date: null,
+        },
+      ],
+    })
+    expect(result.notes[0]!.alias).toBe('Dad')
+  })
+
+  it('drops an alias that only repeats the displayed title', () => {
+    const result = sections({
+      query: 'tim maccaw',
+      suggestions: [
+        {
+          target: 'Tim MacCaw // Dad',
+          path: 'notes/tim-maccaw-dad.md',
+          title: 'Tim MacCaw // Dad',
+          alias: 'Tim MacCaw',
+          date: null,
+        },
+      ],
+    })
+    expect(result.notes[0]!.alias).toBeNull()
   })
 
   it('commands match on title and keywords once a query exists', () => {

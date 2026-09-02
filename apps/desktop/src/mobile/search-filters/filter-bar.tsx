@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { X } from 'lucide-react'
-import { foldTag, type NoteTagFacet } from '@reflect/core'
+import { displayNoteTitle, foldTag, type NoteTagFacet } from '@reflect/core'
 import { FilterChip } from './filter-chip'
 import {
   EMPTY_ALL_NOTES_FILTERS,
@@ -36,7 +36,7 @@ function tagsLabel(selected: string[], facets: NoteTagFacet[]): string {
 
 /** A link chip's label: the direction word plus the chosen note. */
 function linkLabel(word: string, note: NoteFilterRef | null): string {
-  return note === null ? word : `${word}: ${note.title}`
+  return note === null ? word : `${word}: ${displayNoteTitle(note.title)}`
 }
 
 /**

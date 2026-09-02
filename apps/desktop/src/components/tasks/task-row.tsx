@@ -6,7 +6,7 @@ import {
   type ReactElement,
 } from 'react'
 import { Circle, CircleCheck } from 'lucide-react'
-import type { OpenTask } from '@reflect/core'
+import { displayNoteTitle, type OpenTask } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
 import { formatDayLabel } from '@/lib/dates'
 import { taskKey } from '@/lib/tasks/task-identity'
@@ -199,7 +199,7 @@ export function TaskRow({
         >
           {task.dailyDate !== null
             ? formatDayLabel(task.dailyDate, settings.dateFormat)
-            : task.noteTitle}
+            : displayNoteTitle(task.noteTitle)}
         </button>
       ) : null}
     </li>

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import type { ConflictedNote } from '@reflect/core'
+import { displayNoteTitle, type ConflictedNote } from '@reflect/core'
 import { ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
@@ -30,7 +30,7 @@ function ConflictedNoteLink({ note }: ConflictedNoteLinkProps): ReactElement {
         }
       >
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium">{note.title}</span>
+          <span className="block truncate font-medium">{displayNoteTitle(note.title)}</span>
           <span className="block truncate text-[11px] opacity-75">{note.path}</span>
         </span>
         <ChevronRight aria-hidden className="size-3.5 shrink-0 opacity-60" strokeWidth={1.75} />

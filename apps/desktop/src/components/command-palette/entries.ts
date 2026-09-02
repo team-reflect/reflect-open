@@ -1,4 +1,4 @@
-import { dailyPath, parseSearchQuery } from '@reflect/core'
+import { dailyPath, displayNoteTitle, foldKey, parseSearchQuery } from '@reflect/core'
 import type { AppCommand } from '@/lib/commands/types'
 import type { FilteredSearchHit, WikiSuggestion } from '@reflect/core'
 
@@ -25,6 +25,8 @@ export interface NoteEntry {
   snippet: string | null
   /** Human label for a generated date suggestion ("Next Friday"); null otherwise. */
   phrase: string | null
+  /** The alias a title suggestion matched through, when not the title itself; null otherwise. */
+  alias: string | null
 }
 
 export interface PaletteSections {
@@ -35,6 +37,18 @@ export interface PaletteSections {
 }
 
 const NOTE_CAP = 12
+
+/**
+ * The alias a suggestion matched through, when it adds information beyond the
+ * displayed title (a `//` note's first segment is also one of its aliases).
+ */
+function shownAlias(suggestion: WikiSuggestion): string | null {
+  const { alias, title } = suggestion
+  if (alias === null || foldKey(alias) === foldKey(displayNoteTitle(title))) {
+    return null
+  }
+  return alias
+}
 
 function matchesCommand(command: AppCommand, query: string): boolean {
   const haystack = [command.title, ...(command.keywords ?? [])].join(' ').toLowerCase()
@@ -92,6 +106,7 @@ export function buildPaletteSections(options: {
         date: hit.dailyDate,
         snippet: hit.snippet,
         phrase: null,
+        alias: null,
       })),
       commands: [],
     }
@@ -122,6 +137,7 @@ export function buildPaletteSections(options: {
         date: suggestion.date,
         snippet: null,
         phrase: suggestion.generated?.phrase ?? null,
+        alias: shownAlias(suggestion),
       })
     }
   }
@@ -136,6 +152,7 @@ export function buildPaletteSections(options: {
         date: hit.dailyDate,
         snippet: hit.snippet,
         phrase: null,
+        alias: null,
       })
     }
   }

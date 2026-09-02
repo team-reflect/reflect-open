@@ -3,6 +3,7 @@ import { Command as CommandPrimitive } from 'cmdk'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
   contactLinkSuggestions,
+  displayNoteTitle,
   foldKey,
   isContactsReadable,
   suggestWikiTargets,
@@ -235,11 +236,15 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
                 onSelect={() => select(entry)}
               >
                 <span className="min-w-0 flex-1 truncate">
-                  {entry.kind === 'create' ? `Add “${entry.title}”` : entryName(entry)}
+                  {entry.kind === 'create'
+                    ? `Add “${entry.title}”`
+                    : entry.kind === 'suggestion'
+                      ? displayNoteTitle(entry.suggestion.target)
+                      : entryName(entry)}
                 </span>
                 {entry.kind === 'suggestion' && entry.suggestion.alias !== null && (
                   <span className="truncate text-xs text-text-muted">
-                    {entry.suggestion.alias} → {entry.suggestion.title}
+                    {entry.suggestion.alias} → {displayNoteTitle(entry.suggestion.title)}
                   </span>
                 )}
                 {entry.kind === 'contact' && (
