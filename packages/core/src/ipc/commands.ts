@@ -185,10 +185,12 @@ export type IcloudSweepOutcome = z.infer<typeof icloudSweepOutcomeSchema>
  * How much of the graph a sweep checks for unresolved versions. `'full'`
  * checks every note and runs store housekeeping — the backstop (resume,
  * adoption baseline). `'candidates'` restricts the per-note version checks
- * to the paths the live metadata watch flags as conflicted; Rust degrades it
- * to a full check whenever the watch cannot answer completely.
+ * to the paths the live metadata watch flags as conflicted (mobile); Rust
+ * degrades it to a full check whenever the watch cannot answer completely.
+ * `'ingested'` restricts them to the sweep's own `ingestedPaths` — desktop's
+ * arrival sweeps, where no metadata watch runs.
  */
-export type IcloudSweepScope = 'full' | 'candidates'
+export type IcloudSweepScope = 'full' | 'candidates' | 'ingested'
 
 /** Options for {@link icloudConflictsScan}. */
 export interface IcloudScanOptions {
@@ -228,13 +230,14 @@ export async function icloudConflictsScan(options: IcloudScanOptions): Promise<I
 const voidResponseSchema = z.null()
 
 /**
- * Start the iCloud metadata-query watch over `root` (Plan 21 Phase 2).
- * `emitFileChanges` turns its snapshot diffs into `index:changed` events —
- * pass true on mobile (no file watcher there), false on desktop. Conflict
- * paths always emit as `icloud:conflicts`.
+ * Start the iCloud metadata-query watch over `root` (Plan 21 Phase 2): its
+ * snapshot diffs emit as `index:changed` batches and conflict paths as
+ * `icloud:conflicts`. Mobile only — desktop's `notify` watcher already
+ * reports iCloud writes, and the query's container-wide gather is what
+ * pinned `fileproviderd` there (issue #1180).
  */
-export async function icloudWatchStart(root: string, emitFileChanges: boolean): Promise<void> {
-  await call('icloud_watch_start', { root, emitFileChanges }, voidResponseSchema)
+export async function icloudWatchStart(root: string): Promise<void> {
+  await call('icloud_watch_start', { root }, voidResponseSchema)
 }
 
 /** Stop the active iCloud watch (graph switch). Idempotent. */

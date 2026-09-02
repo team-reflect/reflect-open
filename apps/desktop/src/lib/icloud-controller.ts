@@ -58,11 +58,13 @@ export interface IcloudControllerOptions {
   /** The open index session; sweep results reindex under it. */
   indexGeneration: number | null
   /**
-   * Emit `index:changed` from the metadata query's snapshot diffs — true on
-   * mobile (the query is the only external-change source there), false on
-   * desktop (the `notify` watcher already reports file events).
+   * Install the native metadata-query watch — true on mobile, where the
+   * query is the only external-change source and the conflict signal; false
+   * on desktop, where the `notify` watcher already reports every iCloud
+   * write and the query's container-wide gather is what pinned
+   * `fileproviderd` (issue #1180; see `icloud/watch.rs`).
    */
-  emitFileChangesFromWatch: boolean
+  metadataWatch: boolean
 }
 
 export interface IcloudController {
@@ -76,24 +78,25 @@ export interface IcloudController {
  * iCloud moves the files itself, so all that's left to own is *conflict*
  * handling and shadow-base bookkeeping.
  *
- * - Starts/stops the native metadata-query watch.
- * - Debounces `icloud:conflicts` signals and external file-change batches
- *   into conflict sweeps (`icloud_conflicts_scan`).
+ * - Debounces external file-change batches into conflict sweeps
+ *   (`icloud_conflicts_scan`), scoped to the arrivals themselves.
  * - Classifies external arrivals (not this device's own writes — tracked via
  *   the own-write echo — and not the sweep's own output) as clean ingests,
  *   which advance the notes' shadow merge bases.
  * - Fans a sweep's rewrites to every file-change subscriber and reindexes
  *   them directly, exactly like the backup controller's pull path.
- * - Sweeps again on resume/focus: the metadata query only covers the app's
- *   own container, so graphs the user placed in the general iCloud Drive
- *   folder get no conflict signal — and a conflict version can appear
- *   without the working file changing, which the `notify` watcher can't see
- *   either. The resume sweep is the backstop for both.
- * - On mobile, restarts the watch on every foreground resume: a long iOS
- *   suspension can sever the query's link to `fileproviderd` and update
- *   delivery never recovers, and the query is the *sole* external-change
- *   source there — a silently dead watch means a Mac edit synced while
- *   backgrounded stays invisible until the app is relaunched.
+ * - Sweeps everything again on resume/focus: a conflict version can appear
+ *   without the working file changing, which no file watcher can see. The
+ *   resume sweep is the backstop for that — on desktop the only one, and
+ *   the same one graphs kept outside the app's container always relied on.
+ * - On mobile only ({@link IcloudControllerOptions.metadataWatch}): starts
+ *   and stops the native metadata-query watch, sweeps promptly on its
+ *   `icloud:conflicts` signal (scoped to the watch's candidate set), and
+ *   restarts the watch on every foreground resume — a long iOS suspension
+ *   can sever the query's link to `fileproviderd` and update delivery never
+ *   recovers, and the query is the *sole* external-change source there, so
+ *   a silently dead watch means a Mac edit synced while backgrounded stays
+ *   invisible until the app is relaunched.
  *
  * Dirty open sessions are deferred (their paths ride `skipPaths`) as a
  * courtesy, not a safety net — even without it, a sweep write lands on disk
@@ -101,7 +104,7 @@ export interface IcloudController {
  * conflict, the same as any external edit.
  */
 export function createIcloudController(options: IcloudControllerOptions): IcloudController {
-  const { graph, indexGeneration, emitFileChangesFromWatch } = options
+  const { graph, indexGeneration, metadataWatch } = options
   let disposed = false
   let baselinePending = true
   const disposers: Array<() => void> = []
@@ -137,9 +140,16 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
    * sweep re-arms `'full'` so the retry is thorough.
    */
   let nextScanScope: IcloudSweepScope = 'full'
+  /**
+   * The narrow scope for arrival-driven sweeps: the watch's candidate set
+   * where a watch runs, else the arrivals themselves. Everything that is
+   * not `'full'` merges to this one value, so a queued replay can never be
+   * narrower than what this surface can actually answer.
+   */
+  const arrivalScope: IcloudSweepScope = metadataWatch ? 'candidates' : 'ingested'
 
   function scanSuspended(): boolean {
-    return emitFileChangesFromWatch && document.visibilityState === 'hidden'
+    return metadataWatch && document.visibilityState === 'hidden'
   }
 
   function scheduleScan(
@@ -156,7 +166,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       const urgency = delayMs <= SCAN_DEBOUNCE_MS ? 'prompt' : 'ingest'
       queuedScan = {
         urgency: urgency === 'prompt' || queuedScan?.urgency === 'prompt' ? 'prompt' : 'ingest',
-        scope: scope === 'full' || queuedScan?.scope === 'full' ? 'full' : 'candidates',
+        scope: scope === 'full' || queuedScan?.scope === 'full' ? 'full' : arrivalScope,
       }
       return
     }
@@ -176,10 +186,10 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
 
   /** Arrival-triggered sweeps: the wide debounce, stretched further to keep
    * {@link INGEST_SCAN_MIN_SPACING_MS} from the previous sweep's end. Scoped
-   * to the watch's conflict candidates — during a bulk sync these fire every
-   * spacing window, and a full per-note version check each time was the
-   * sweep's dominant cost on a large graph. */
-  function scheduleIngestScan(scope: IcloudSweepScope = 'candidates'): void {
+   * to {@link arrivalScope} — during a bulk sync these fire every spacing
+   * window, and a full per-note version check each time was the sweep's
+   * dominant cost on a large graph. */
+  function scheduleIngestScan(scope: IcloudSweepScope = arrivalScope): void {
     const sinceLastScan = Date.now() - lastScanEndedAt
     scheduleScan(
       Math.max(INGEST_SCAN_DEBOUNCE_MS, INGEST_SCAN_MIN_SPACING_MS - sinceLastScan),
@@ -203,7 +213,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     const recordBaseline = baselinePending
     baselinePending = false
     const scope = recordBaseline ? 'full' : nextScanScope
-    nextScanScope = 'candidates' // consumed; the next full trigger re-arms it
+    nextScanScope = arrivalScope // consumed; the next full trigger re-arms it
     try {
       const outcome = await icloudConflictsScan({
         generation: graph.generation,
@@ -270,7 +280,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
         indexGeneration,
         undefined,
         undefined,
-        () => !emitFileChangesFromWatch || document.visibilityState !== 'hidden',
+        () => !metadataWatch || document.visibilityState !== 'hidden',
       ).then((mutations) => {
         if (mutations > 0) {
           throttledInvalidateIndexQueries()
@@ -310,7 +320,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       return // closed mid-restart: never leave a watch running for a dead graph
     }
     try {
-      await icloudWatchStart(graph.root, emitFileChangesFromWatch)
+      await icloudWatchStart(graph.root)
     } catch (err) {
       // Same degradation contract as a failed initial start: freshness
       // rides file-change batches and resume sweeps (this resume already
@@ -325,11 +335,13 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     if (disposed) {
       return
     }
-    try {
-      await icloudWatchStart(graph.root, emitFileChangesFromWatch)
-    } catch (err) {
-      console.error('iCloud watch failed to start:', err)
-      // Sweeps still run off file-change batches; carry on.
+    if (metadataWatch) {
+      try {
+        await icloudWatchStart(graph.root)
+      } catch (err) {
+        console.error('iCloud watch failed to start:', err)
+        // Sweeps still run off file-change batches; carry on.
+      }
     }
     disposers.push(
       subscribeOwnWrites((path) => {
@@ -365,38 +377,37 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
           scheduleIngestScan()
         }),
       )
-      disposers.push(
-        await subscribeIcloudConflicts(() => {
-          if (!disposed) {
-            // The signal and the candidate set come from the same
-            // notification round, so the flagged paths are already in the
-            // watch's view — the prompt sweep needn't re-check every note.
-            scheduleScan(SCAN_DEBOUNCE_MS, 'candidates')
-          }
-        }),
-      )
-      disposers.push(
-        await subscribeIcloudWatchFailed(() => {
-          if (disposed) {
-            return
-          }
-          // The live watch never started (fire-and-forget install failed
-          // after the command returned). Freshness now rides file-change
-          // batches and the resume sweeps — say so loudly for debugging
-          // stale-state reports, and sweep once right away.
-          console.error('iCloud watch failed to start; relying on resume-triggered sweeps')
-          scheduleScan()
-        }),
-      )
+      if (metadataWatch) {
+        disposers.push(
+          await subscribeIcloudConflicts(() => {
+            if (!disposed) {
+              // The signal and the candidate set come from the same
+              // notification round, so the flagged paths are already in the
+              // watch's view — the prompt sweep needn't re-check every note.
+              scheduleScan(SCAN_DEBOUNCE_MS, 'candidates')
+            }
+          }),
+        )
+        disposers.push(
+          await subscribeIcloudWatchFailed(() => {
+            if (disposed) {
+              return
+            }
+            // The live watch never started (fire-and-forget install failed
+            // after the command returned). Freshness now rides file-change
+            // batches and the resume sweeps — say so loudly for debugging
+            // stale-state reports, and sweep once right away.
+            console.error('iCloud watch failed to start; relying on resume-triggered sweeps')
+            scheduleScan()
+          }),
+        )
+      }
     } catch (err) {
       console.error('iCloud change subscriptions failed to start:', err)
     }
     disposers.push(
       ...attachResumeListeners(() => {
-        if (emitFileChangesFromWatch) {
-          // Mobile only: desktop's query survives sleep well enough for its
-          // conflict-signal role, and desktop content freshness rides the
-          // `notify` watcher plus the wake-time reconcile, not this query.
+        if (metadataWatch) {
           void restartWatch()
         }
         scheduleScan()
@@ -415,9 +426,11 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     for (const disposeOne of disposers.splice(0)) {
       disposeOne()
     }
-    void icloudWatchStop().catch(() => {
-      // Shutdown/switch race — the next start replaces the watch anyway.
-    })
+    if (metadataWatch) {
+      void icloudWatchStop().catch(() => {
+        // Shutdown/switch race — the next start replaces the watch anyway.
+      })
+    }
   }
 
   return { start, dispose }
