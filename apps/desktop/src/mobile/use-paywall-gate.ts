@@ -15,9 +15,8 @@ const appStartTime = Date.now()
  *
  * - `show`: render it.
  * - `hide`: let the app through.
- * - `pending`: no answer yet.
  */
-export type PaywallGate = 'pending' | 'show' | 'hide'
+export type PaywallGate = 'show' | 'hide'
 
 /** Whether to render the paywall. */
 export function usePaywallGate(): PaywallGate {
@@ -56,12 +55,12 @@ export function usePaywallGate(): PaywallGate {
     return 'hide'
   }
   if (!settingsSettled) {
-    return 'pending'
+    return 'hide'
   }
   if (settings.paywallSnoozeUntil > appStartTime) {
     return 'hide'
   }
-  return subscription.isLoading ? 'pending' : 'show'
+  return subscription.isLoading ? 'hide' : 'show'
 }
 
 /**

@@ -201,7 +201,7 @@ describe('usePaywallGate', () => {
     await vi.waitFor(() => expect(result.current).toBe('hide'))
   })
 
-  it('stops waiting when StoreKit entitlement lookups time out', async () => {
+  it('shows the app while StoreKit is pending, then the paywall after the timeout', async () => {
     vi.useFakeTimers()
     try {
       let lookupCount = 0
@@ -210,7 +210,7 @@ describe('usePaywallGate', () => {
         return never()
       }
       const hook = await renderHook(() => usePaywallGate(), { wrapper })
-      expect(hook.result.current).toBe('pending')
+      expect(hook.result.current).toBe('hide')
       expect(lookupCount).toBe(2)
 
       await hook.act(() => vi.advanceTimersByTimeAsync(5_000))
@@ -358,10 +358,10 @@ describe('usePaywallGate', () => {
       owned = never
       const { result } = await renderHook(() => usePaywallGate(), { wrapper })
       // A remembered `yearly` would have let this launch straight in.
-      expect(result.current).toBe('pending')
+      expect(result.current).toBe('hide')
     })
 
-    it('waits for live verification before trusting a remembered null', async () => {
+    it('keeps the paywall hidden while verifying a remembered null', async () => {
       await runLaunch('show')
 
       environment = never
@@ -370,7 +370,7 @@ describe('usePaywallGate', () => {
       await vi.waitFor(() =>
         expect(queryClient.getQueryState(queryKeys.iap.entitlements)?.fetchStatus).toBe('fetching'),
       )
-      expect(result.current).toBe('pending')
+      expect(result.current).toBe('hide')
     })
 
     it('does not persist null when one entitlement fails and the sibling is negative', async () => {
