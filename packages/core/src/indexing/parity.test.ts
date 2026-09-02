@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { isNotePath, mayContainNotes } from '../graph/paths'
-import { foldKey, parseNote } from '../markdown'
+import { foldKey, parseNote, subjectDisplayTitle } from '../markdown'
 import { hashContent } from './hash'
 import { buildIndexedNote } from './indexed-note'
 import { buildFtsMatch } from './search-query'
@@ -28,6 +28,8 @@ interface ExpectedNote {
   id: string | null
   title: string
   titleKey: string
+  /** The first `//` segment of the title, shown in place of it. */
+  displayTitle: string
   aliases: string[]
   aliasKeys: string[]
   private: boolean
@@ -83,6 +85,7 @@ async function deriveExpectations(): Promise<ExpectedParity> {
       id: indexed.id,
       title: indexed.title,
       titleKey: indexed.titleKey,
+      displayTitle: subjectDisplayTitle(indexed.title),
       aliases: indexed.aliases.map((alias) => alias.alias),
       aliasKeys: indexed.aliases.map((alias) => alias.aliasKey),
       private: indexed.isPrivate,

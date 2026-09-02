@@ -156,6 +156,21 @@ fn subject_aliases(title: &str) -> Vec<String> {
     aliases
 }
 
+/// The TS `subjectDisplayTitle` (`subject-aliases.ts`): the reader-facing form
+/// of a `//` title, its first non-empty segment, or the title itself when
+/// nothing splits.
+pub fn subject_display_title(title: &str) -> &str {
+    let segments = split_subject_segments(title);
+    if segments.len() < 2 {
+        return title;
+    }
+    segments
+        .iter()
+        .map(|segment| segment.trim())
+        .find(|segment| !segment.is_empty())
+        .unwrap_or(title)
+}
+
 /// End of a `[[…]]` inner span starting at `start`: the byte index of the
 /// closing `]]`, or `None` when a `[`, an unpaired `]`, or a newline
 /// intervenes — the same inner-character rule as the TS
@@ -527,6 +542,26 @@ mod tests {
             subject_aliases("Reflect // https://reflect.app"),
             vec!["Reflect", "https://reflect.app"]
         );
+    }
+
+    /// Parity with `subjectDisplayTitle` (`subject-aliases.ts`): the first
+    /// non-empty segment, else the whole title.
+    #[test]
+    fn subject_display_title_matches_the_ts_derivation() {
+        assert_eq!(
+            subject_display_title("Charlotte MacCaw // Mum"),
+            "Charlotte MacCaw"
+        );
+        assert_eq!(subject_display_title("AAA // BB // CCC CC"), "AAA");
+        assert_eq!(subject_display_title("// Mum"), "Mum");
+        assert_eq!(
+            subject_display_title("Charlotte MacCaw // "),
+            "Charlotte MacCaw"
+        );
+        assert_eq!(subject_display_title(" // "), " // ");
+        assert_eq!(subject_display_title("Charlotte MacCaw"), "Charlotte MacCaw");
+        assert_eq!(subject_display_title("https://reflect.app"), "https://reflect.app");
+        assert_eq!(subject_display_title("a///b"), "a///b");
     }
 
     /// Parity with `projectNoteAliases` (`indexed-note.ts`): frontmatter

@@ -7,7 +7,9 @@
  * derived compatibility layer for imported or v1-style-authored titles. The
  * segments are computed at index time and land in the same `aliases`
  * projection — nothing is migrated into frontmatter, and the title itself
- * stays the literal `//` string.
+ * stays the literal `//` string. Reader-facing surfaces show only its first
+ * segment ({@link subjectDisplayTitle}); the literal string stays the
+ * canonical title, key, and link target.
  *
  * Mirrored by `subject_aliases` in the CLI (`apps/cli/src/note_file.rs`);
  * the parity corpus (`fixtures/parity/`) keeps the two in lockstep.
@@ -47,4 +49,13 @@ export function subjectAliases(title: string): string[] {
     aliases.push(alias)
   }
   return aliases
+}
+
+/**
+ * The reader-facing form of a `//` title: its first non-empty segment, or the
+ * title itself when nothing splits. Display only: the literal title stays the
+ * note's identity everywhere (keys, links, filenames).
+ */
+export function subjectDisplayTitle(title: string): string {
+  return subjectAliases(title)[0] ?? title
 }
