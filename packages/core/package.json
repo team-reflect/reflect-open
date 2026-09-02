@@ -12,21 +12,21 @@
     "test": "vitest run --config ../../vitest.config.ts --project core-browser --project core-node"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.39",
-    "@ai-sdk/google": "^4.0.44",
-    "@ai-sdk/openai": "^4.0.42",
-    "@ai-sdk/openai-compatible": "^3.0.30",
+    "@ai-sdk/anthropic": "^4.0.48",
+    "@ai-sdk/google": "^4.0.62",
+    "@ai-sdk/openai": "^4.0.56",
+    "@ai-sdk/openai-compatible": "^3.0.43",
     "@meowdown/markdown": "^0.67.2",
     "@reflect/db": "workspace:*",
     "@reflect/utils": "workspace:*",
-    "ai": "^7.0.66",
+    "ai": "^7.0.90",
     "kysely": "^0.28.17",
     "ulidx": "^2.4.1",
     "yaml": "^2.9.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@ai-sdk/provider": "^4.0.7",
+    "@ai-sdk/provider": "^4.0.10",
     "@ocavue/tsconfig": "^0.7.1",
     "@vitest/browser-playwright": "^4.1.11",
     "playwright": "^1.62.1",
