@@ -406,12 +406,39 @@ pub(super) fn finish_interrupted_merge_for_test(root: &Path) -> AppResult<()> {
     Ok(())
 }
 
+#[cfg(test)]
+/// Commit an interrupted app merge but intentionally leave libgit2's merge
+/// state and the recovery marker behind, simulating termination immediately
+/// after the two-parent commit becomes durable.
+pub(super) fn commit_interrupted_merge_without_cleanup_for_test(root: &Path) -> AppResult<()> {
+    let repo = open_existing(root)?;
+    let recovery = read_recovery_marker(&repo)
+        .ok_or_else(|| crate::error::AppError::io("missing test recovery marker"))?;
+    let (_, remote_oid) = recovery_oids(&repo, &recovery)
+        .ok_or_else(|| crate::error::AppError::io("invalid test recovery marker"))?;
+    commit_merge(&repo, root, remote_oid)?;
+    Ok(())
+}
+
 /// The post-`repo.merge` half: materialize conflicts, commit with both parents,
 /// and clear the merge state. Shared by the normal and recovery paths. An error
 /// leaves the verified marker and merge state available for a later retry;
 /// successful completion makes the commit durable before cleanup. Returns the
 /// conflicted paths and every file the merge changed relative to local HEAD.
 fn complete_merge(
+    repo: &Repository,
+    root: &Path,
+    remote_oid: git2::Oid,
+) -> AppResult<(Vec<String>, Vec<ChangedFile>)> {
+    let result = commit_merge(repo, root, remote_oid)?;
+    repo.cleanup_state()?;
+    Ok(result)
+}
+
+/// Materialize conflicts and make the durable two-parent merge commit without
+/// clearing libgit2's operation state. Cleanup is deliberately separate so a
+/// later sync can recognize and finish a process interrupted between the two.
+fn commit_merge(
     repo: &Repository,
     root: &Path,
     remote_oid: git2::Oid,
@@ -441,7 +468,6 @@ fn complete_merge(
         &tree,
         &[&local_commit, &remote_commit],
     )?;
-    repo.cleanup_state()?;
     Ok((conflicted_paths, changed_files))
 }
 

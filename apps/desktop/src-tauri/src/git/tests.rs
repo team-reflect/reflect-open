@@ -11,7 +11,8 @@ use tempfile::{tempdir, TempDir};
 
 use super::commit::commit_all;
 use super::merge::{
-    finish_interrupted_merge_for_test, interrupt_next_merge_for_test, merge_remote, MergeKind,
+    commit_interrupted_merge_without_cleanup_for_test, finish_interrupted_merge_for_test,
+    interrupt_next_merge_for_test, merge_remote, MergeKind,
 };
 use super::remote::{fetch, push};
 use super::{setup, status, MAX_FILE_BYTES};
@@ -904,6 +905,47 @@ fn stale_marker_is_dropped_after_head_advances() {
     let repo = Repository::open(root_a).unwrap();
     assert!(!repo.path().join("REFLECT_MERGE_STATE").exists());
     assert_eq!(repo.state(), git2::RepositoryState::Clean);
+}
+
+#[test]
+fn durable_merge_commit_recovers_interrupted_cleanup() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/base.md", "# Base\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/remote.md", "# Remote device\n");
+    commit_all(&root_b, "remote edit", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, "notes/local.md", "# This device\n");
+    commit_all(root_a, "local edit", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    interrupt_next_merge_for_test(root_a).unwrap();
+    commit_interrupted_merge_without_cleanup_for_test(root_a).unwrap();
+
+    let repo = Repository::open(root_a).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Merge);
+    assert_eq!(
+        repo.head()
+            .unwrap()
+            .peel_to_commit()
+            .unwrap()
+            .parent_count(),
+        2
+    );
+    assert!(repo.path().join("REFLECT_MERGE_STATE").is_file());
+    fs::write(repo.path().join("index.lock"), []).unwrap();
+    drop(repo);
+
+    let snapshot = status(root_a).unwrap();
+    assert!(!snapshot.in_progress);
+    let repo = Repository::open(root_a).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Clean);
+    assert!(!repo.path().join("REFLECT_MERGE_STATE").exists());
+    assert!(!repo.path().join("index.lock").exists());
 }
 
 #[test]

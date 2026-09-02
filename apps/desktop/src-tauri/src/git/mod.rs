@@ -69,7 +69,16 @@ fn status(root: &Path) -> AppResult<GitStatus> {
             in_progress: false,
         });
     }
-    let repo = repo::open_for_sync(root)?;
+    // Keep the backup panel informative even when interrupted-merge recovery
+    // cannot finish. Write paths still propagate the recovery error and stay
+    // blocked until the underlying problem is resolved.
+    let repo = match repo::open_for_sync(root) {
+        Ok(repo) => repo,
+        Err(error) => {
+            tracing::warn!(?error, "merge recovery failed during status");
+            repo::open_existing(root)?
+        }
+    };
     let branch = repo::current_branch(&repo).ok();
     let remote_url = repo
         .find_remote("origin")
