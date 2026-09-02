@@ -10,13 +10,20 @@ describe('resolveWikilink', () => {
     expect(resolveWikilink({ target: 'a | b | c' })).toEqual({ target: 'a', display: 'b | c' })
   })
 
-  it('keeps an empty alias as an empty label', () => {
-    expect(resolveWikilink({ target: 'Note|' })).toEqual({ target: 'Note', display: '' })
+  it('falls back to the display title for a blank alias', () => {
+    expect(resolveWikilink({ target: 'Note|' })).toEqual({ target: 'Note', display: 'Note' })
+    expect(resolveWikilink({ target: 'Tim MacCaw // Dad| ' })).toEqual({
+      target: 'Tim MacCaw // Dad',
+      display: 'Tim MacCaw',
+    })
   })
 
   it('shows a bare `//` target by its first segment', () => {
-    expect(resolveWikilink({ target: 'Tim MacCaw // Dad' })).toEqual({ display: 'Tim MacCaw' })
-    expect(resolveWikilink({ target: '// Dad' })).toEqual({ display: 'Dad' })
+    expect(resolveWikilink({ target: 'Tim MacCaw // Dad' })).toEqual({
+      target: 'Tim MacCaw // Dad',
+      display: 'Tim MacCaw',
+    })
+    expect(resolveWikilink({ target: '// Dad' })).toEqual({ target: '// Dad', display: 'Dad' })
   })
 
   it('leaves a plain target and a URL-shaped target alone', () => {
