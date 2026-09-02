@@ -13,7 +13,7 @@ use crate::error::CliError;
 use crate::graph::Graph;
 use crate::index::{detect_staleness, open_read_only, IndexOpen};
 use crate::keys::fold_key;
-use crate::note_file::read_note;
+use crate::note_file::{read_note, subject_display_title};
 use crate::search::{build_fts_match, search_index, SearchHit};
 
 /// The privacy re-check: the index row said public, but the file's own
@@ -71,7 +71,7 @@ pub fn run(graph: &Graph, json: bool, query: &str, limit: usize) -> Result<(), C
         });
     }
     for hit in &hits {
-        println!("{}\t{}", hit.path, hit.title);
+        println!("{}\t{}", hit.path, subject_display_title(&hit.title));
         if !hit.snippet.is_empty() {
             println!("    {}", hit.snippet.replace('\n', " "));
         }

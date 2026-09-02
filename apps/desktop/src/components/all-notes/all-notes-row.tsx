@@ -1,5 +1,5 @@
 import { memo, type MouseEvent, type ReactElement } from 'react'
-import type { NoteListEntry } from '@reflect/core'
+import { displayNoteTitle, type NoteListEntry } from '@reflect/core'
 import { formatRecencyLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import type { ModClickEvent } from '@/lib/windows/open-in-new-window'
@@ -96,7 +96,7 @@ export const AllNotesRow = memo(function AllNotesRow({
           selected ? 'text-accent' : 'text-text',
         )}
       >
-        {note.title}
+        {displayNoteTitle(note.title)}
       </button>
       <span
         className={cn('truncate text-[13px]', selected ? 'text-accent' : 'text-text-secondary')}

@@ -1,5 +1,6 @@
 import { wikiLinkSafe } from './edit'
 import { scanInlineSegments } from './scan'
+import { subjectAliases } from './subject-aliases'
 
 /**
  * Rich-title derivations: a note may legally embed markup in its title
@@ -10,13 +11,16 @@ import { scanInlineSegments } from './scan'
  */
 
 /**
- * The title as a reader sees it: wiki links flatten to their display text
- * (alias, else target) and markdown links to their text, through the canonical
- * grammar — so a `[[x]]` inside a code span stays literal, exactly as the
- * editor renders it.
+ * The title as a reader sees it: a v1 `//` subject reduced to its first
+ * non-empty segment (its first derived alias, so a plain-text first segment
+ * is also a linkable address), then wiki links flattened to their display
+ * text (alias, else target) and markdown links to their text, through the
+ * canonical grammar — so a `[[x]]` inside a code span stays literal, exactly
+ * as the editor renders it. A first segment that carries its own markup is
+ * flattened for reading only; the index derives the raw segment.
  */
 export function displayNoteTitle(title: string): string {
-  return scanInlineSegments(title)
+  return scanInlineSegments(subjectAliases(title)[0] ?? title)
     .map((segment) => {
       switch (segment.kind) {
         case 'text':

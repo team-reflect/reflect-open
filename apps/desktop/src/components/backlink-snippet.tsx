@@ -3,6 +3,7 @@ import { MarkdownView } from '@meowdown/react'
 import type { WikilinkClickHandler } from '@meowdown/core'
 import type { SnippetTask } from '@reflect/core'
 import { useOpenExternalLink } from '@/editor/open-external-link'
+import { resolveWikilink } from '@/editor/resolve-wikilink'
 import { useSnippetTaskToggle } from '@/hooks/use-snippet-task-toggle'
 
 interface BacklinkSnippetProps {
@@ -49,6 +50,7 @@ export function BacklinkSnippet({
         className="reflect-editor"
         markdown={text}
         expandCollapsed
+        resolveWikilink={resolveWikilink}
         onWikilinkClick={onWikilinkClick}
         onLinkClick={openExternalLink}
         {...(onTaskClick ? { onTaskClick } : {})}

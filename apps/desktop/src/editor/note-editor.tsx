@@ -38,6 +38,7 @@ import {
   type LightboxImage,
 } from '@/editor/image-lightbox'
 import { isOpenableExternalUrl } from '@/editor/open-external-link'
+import { resolveWikilink } from '@/editor/resolve-wikilink'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
 import { useLightboxTransition } from '@/editor/use-lightbox-transition'
 import { isDeepLinkUrl } from '@/lib/deep-links/parse'
@@ -471,6 +472,7 @@ export function NoteEditor({
         {...(onPendingReplacementResolve !== undefined ? { onPendingReplacementResolve } : {})}
         {...(onSlashMenuSearch !== undefined ? { onSlashMenuSearch } : {})}
         resolveImageUrl={handleResolveImageUrl}
+        resolveWikilink={resolveWikilink}
         onFilePaste={handleFilePaste}
         {...(resolveFileLink !== undefined ? { resolveFileLink } : {})}
         resolveFileInfo={handleResolveFileInfo}

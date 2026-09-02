@@ -1,3 +1,4 @@
+import { displayNoteTitle } from '../markdown/note-title'
 import type { OpenTask } from './queries'
 
 /**
@@ -23,7 +24,7 @@ export type TaskGroupKind = 'current' | 'overdue' | 'upcoming' | 'note'
 
 export interface TaskGroup {
   kind: TaskGroupKind
-  /** Section heading — the bucket name, or (for `note` groups) the note's title. */
+  /** Section heading — the bucket name, or (for `note` groups) the note's display title. */
   label: string
   /** The note a `note` group's header opens; null for the date buckets. */
   notePath: string | null
@@ -231,7 +232,7 @@ export function groupTasks(tasks: readonly OpenTask[], today: string): TaskGroup
     .map((noteTasks) => ({
       kind: 'note' as const,
       // A `byNote` entry only exists once a task has been pushed into it.
-      label: noteTasks[0]!.noteTitle,
+      label: displayNoteTitle(noteTasks[0]!.noteTitle),
       notePath: noteTasks[0]!.notePath,
       tasks: noteTasks.sort((left, right) => left.markerOffset - right.markerOffset),
     }))

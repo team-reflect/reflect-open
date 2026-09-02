@@ -474,23 +474,71 @@ describe('nextAliases', () => {
       nextAliases(['First', 'keeper'], {
         from: 'Second',
         to: 'Third',
-        previousAutoAlias: 'First',
+        previousAutoAliases: ['First'],
       }),
     ).toEqual(['keeper', 'Second'])
   })
 
   it('does not duplicate an existing alias (case-insensitive)', () => {
     expect(
-      nextAliases(['old title'], { from: 'Old Title', to: 'New', previousAutoAlias: null }),
+      nextAliases(['old title'], { from: 'Old Title', to: 'New', previousAutoAliases: [] }),
     ).toBeNull()
   })
 
   it('returns null when nothing changes', () => {
-    expect(nextAliases([], { from: 'Same', to: 'same', previousAutoAlias: null })).toBeNull()
+    expect(nextAliases([], { from: 'Same', to: 'same', previousAutoAliases: [] })).toBeNull()
   })
 
   it('adds the first alias to an empty list', () => {
-    expect(nextAliases([], { from: 'Old', to: 'New', previousAutoAlias: null })).toEqual(['Old'])
+    expect(nextAliases([], { from: 'Old', to: 'New', previousAutoAliases: [] })).toEqual(['Old'])
+  })
+
+  it('keeps each segment of a `//` title alongside the whole title', () => {
+    expect(
+      nextAliases([], {
+        from: 'Tim MacCaw // Dad',
+        to: 'Timothy MacCaw // Dad',
+        previousAutoAliases: [],
+      }),
+    ).toEqual(['Tim MacCaw', 'Tim MacCaw // Dad'])
+  })
+
+  it('keeps a segment the rename dropped', () => {
+    expect(
+      nextAliases([], { from: 'Tim MacCaw // Dad', to: 'Tim MacCaw', previousAutoAliases: [] }),
+    ).toEqual(['Dad', 'Tim MacCaw // Dad'])
+  })
+
+  it('prunes exactly what the previous rename added on a chained rename', () => {
+    expect(
+      nextAliases(['Dad', 'Tim MacCaw // Dad', 'keeper'], {
+        from: 'Tim MacCaw // Da',
+        to: 'Tim MacCaw // D',
+        previousAutoAliases: ['Dad', 'Tim MacCaw // Dad'],
+      }),
+    ).toEqual(['keeper', 'Da', 'Tim MacCaw // Da'])
+  })
+
+  it('keeps an auto-added alias the user re-spelled', () => {
+    expect(
+      nextAliases(['DAD', 'keeper'], { from: 'Bob', to: 'Carol', previousAutoAliases: ['Dad'] }),
+    ).toEqual(['DAD', 'keeper', 'Bob'])
+  })
+
+  it('keeps an authored alias through a chained rename', () => {
+    const first = nextAliases(['Dad'], {
+      from: 'Tim // Dad',
+      to: 'Tim // Father',
+      previousAutoAliases: [],
+    })
+    expect(first).toEqual(['Dad', 'Tim // Dad'])
+    expect(
+      nextAliases(first ?? [], {
+        from: 'Tim // Father',
+        to: 'Tim // Pa',
+        previousAutoAliases: ['Tim // Dad'],
+      }),
+    ).toEqual(['Dad', 'Father', 'Tim // Father'])
   })
 })
 
@@ -532,9 +580,34 @@ describe('rewriteLinksForTitleChange — rich titles', () => {
       nextAliases([], {
         from: 'Meeting with [[Ada Lovelace|Ada]]',
         to: 'Weekly Sync',
-        previousAutoAlias: null,
+        previousAutoAliases: [],
       }),
     ).toEqual(['Meeting with [[Ada Lovelace|Ada]]'])
+  })
+})
+
+describe('rewriteLinksForTitleChange: `//` titles', () => {
+  it('syncs a display that mirrors the old first segment and keeps other segments', async () => {
+    const sourcePath = 'notes/source.md'
+    const { io, writes } = fakeIo(
+      { [sourcePath]: '- [[Tim MacCaw // Dad|Tim MacCaw]]\n- [[Tim MacCaw // Dad|Dad]]\n' },
+      {
+        resolveByTarget: { 'Tim MacCaw // Dad': 'notes/tim.md' },
+        backlinks: [
+          { sourcePath, targetRaw: 'Tim MacCaw // Dad', alias: 'Tim MacCaw' },
+          { sourcePath, targetRaw: 'Tim MacCaw // Dad', alias: 'Dad' },
+        ],
+      },
+    )
+    await rewriteLinksForTitleChange({
+      path: 'notes/tim.md',
+      from: 'Tim MacCaw // Dad',
+      to: 'Timothy MacCaw // Dad',
+      io,
+    })
+    expect(writes[sourcePath]).toBe(
+      '- [[Timothy MacCaw // Dad|Timothy MacCaw]]\n- [[Timothy MacCaw // Dad|Dad]]\n',
+    )
   })
 })
 

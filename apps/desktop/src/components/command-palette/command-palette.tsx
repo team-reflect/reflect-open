@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { Command } from 'cmdk'
-import { parseHighlights } from '@reflect/core'
+import { displayNoteTitle, parseHighlights } from '@reflect/core'
 import { CalendarDays, FileText } from 'lucide-react'
 import { getIsComposing, isModEvent } from '@meowdown/core'
 import { Kbd } from '@/components/kbd'
@@ -222,11 +222,16 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                                 ? entry.phrase
                                 : entry.date !== null
                                   ? formatDayLabel(entry.date, settings.dateFormat)
-                                  : entry.title}
+                                  : displayNoteTitle(entry.title)}
                             </span>
                             {entry.phrase !== null && entry.date !== null ? (
                               <span className="block truncate text-xs text-text-muted">
                                 {formatDayLabel(entry.date, settings.dateFormat)}
+                              </span>
+                            ) : null}
+                            {entry.alias !== null ? (
+                              <span className="block truncate text-xs text-text-muted">
+                                {entry.alias} → {displayNoteTitle(entry.title)}
                               </span>
                             ) : null}
                             {entry.snippet !== null ? <Snippet snippet={entry.snippet} /> : null}

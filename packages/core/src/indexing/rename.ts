@@ -4,6 +4,7 @@ import { foldKey } from '../markdown/keys'
 import { displayNoteTitle, wikiLinkTargetForTitle } from '../markdown/note-title'
 import type { Resolution } from '../markdown/resolve'
 import { repointPathWikiLinks, retitleWikiLinks } from '../markdown/retitle'
+import { subjectAliases } from '../markdown/subject-aliases'
 import { isWikiLinkSafeText, serializeWikiSuggestionAddress } from './suggest'
 
 /**
@@ -195,25 +196,38 @@ export async function rewriteLinksForTitleChange(
 
 /**
  * The renamed note's `aliases` after a rename, or `null` when nothing changes:
- * the previous auto-added alias (an intermediate title from this session's
- * rename chain) is pruned, and the old title joins so links Reflect couldn't
- * rewrite — and external ones — still resolve.
+ * the aliases the previous rename in this session added (intermediate titles
+ * from the rename chain) are pruned, and the old title joins so links Reflect
+ * couldn't rewrite — and external ones — still resolve. A `//` title joins as
+ * its family (each segment, then the whole title) minus what the new title
+ * still derives, so `[[segment]]` links survive the rename. Only
+ * `previousAutoAliases` are pruned, compared exactly: an alias the user
+ * authored or re-spelled is never mistaken for an auto-added one.
  */
 export function nextAliases(
   current: string[],
-  rename: { from: string; to: string; previousAutoAlias: string | null },
+  rename: { from: string; to: string; previousAutoAliases: readonly string[] },
 ): string[] | null {
-  const { from, to, previousAutoAlias } = rename
-  const next = current.filter(
-    (alias) => previousAutoAlias === null || foldKey(alias) !== foldKey(previousAutoAlias),
-  )
-  const fromKey = foldKey(from)
-  const redundant = foldKey(to) === fromKey || next.some((alias) => foldKey(alias) === fromKey)
-  if (!redundant) {
-    next.push(from)
+  const { from, to, previousAutoAliases } = rename
+  const pruned = new Set(previousAutoAliases)
+  const next = current.filter((alias) => !pruned.has(alias))
+  const kept = new Set(next.map((alias) => foldKey(alias)))
+  const derivable = new Set(aliasFamily(to).map((alias) => foldKey(alias)))
+  for (const alias of aliasFamily(from)) {
+    const key = foldKey(alias)
+    if (derivable.has(key) || kept.has(key)) {
+      continue
+    }
+    kept.add(key)
+    next.push(alias)
   }
   const unchanged = next.length === current.length && next.every((alias, i) => alias === current[i])
   return unchanged ? null : next
+}
+
+/** A title's `//` segments, then the whole title. */
+function aliasFamily(title: string): string[] {
+  return [...subjectAliases(title), title]
 }
 
 /** Data access for {@link rewritePathLinksForMove}, injected like {@link RenameIo}. */

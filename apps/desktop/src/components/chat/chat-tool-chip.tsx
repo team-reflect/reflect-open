@@ -1,6 +1,12 @@
 import { Fragment, type MouseEvent, type ReactElement, type ReactNode } from 'react'
 import { CalendarDays, FileText, History, Paperclip, Search } from 'lucide-react'
-import { isTagName, isToolPending, type AssistantPart, type NoteHitSummary } from '@reflect/core'
+import {
+  displayNoteTitle,
+  isTagName,
+  isToolPending,
+  type AssistantPart,
+  type NoteHitSummary,
+} from '@reflect/core'
 import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker'
 import { Spinner } from '@/components/ui/spinner'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
@@ -59,7 +65,7 @@ function NoteLinks({ notes, onOpen }: NoteLinksProps): ReactElement | null {
             onClick={(event) => onOpen(note.path, event)}
             className="underline-offset-2 hover:text-text hover:underline"
           >
-            {note.title}
+            {displayNoteTitle(note.title)}
           </button>
         </Fragment>
       ))}
@@ -180,7 +186,7 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
     <ChipFrame pending={pending} icon={<FileText aria-hidden className="size-3.5" />}>
       Read{' '}
       {notes.map((note, index) => {
-        const label = note.title ?? note.path
+        const label = note.title !== null ? displayNoteTitle(note.title) : note.path
         return (
           <Fragment key={`${note.path}-${index}`}>
             {index > 0 ? ', ' : ''}

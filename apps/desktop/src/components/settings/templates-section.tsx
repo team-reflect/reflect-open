@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { errorMessage, type TemplateEntry } from '@reflect/core'
+import { displayNoteTitle, errorMessage, type TemplateEntry } from '@reflect/core'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -61,14 +61,14 @@ export function TemplatesSection(): ReactElement {
                   className="min-w-0 flex-1 text-left"
                 >
                   <span className="block truncate text-sm text-text hover:text-accent">
-                    {template.title}
+                    {displayNoteTitle(template.title)}
                   </span>
                   <span className="block truncate text-xs text-text-muted">{template.path}</span>
                 </button>
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Rename ${template.title}`}
+                  aria-label={`Rename ${displayNoteTitle(template.title)}`}
                   onClick={() => setRenaming(template)}
                 >
                   <Pencil aria-hidden strokeWidth={1.75} />
@@ -76,7 +76,7 @@ export function TemplatesSection(): ReactElement {
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Delete ${template.title}`}
+                  aria-label={`Delete ${displayNoteTitle(template.title)}`}
                   onClick={() => setDeleting(template)}
                 >
                   <Trash2 aria-hidden strokeWidth={1.75} />

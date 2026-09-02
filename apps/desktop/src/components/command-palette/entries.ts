@@ -1,4 +1,4 @@
-import { dailyPath, parseSearchQuery } from '@reflect/core'
+import { aliasHint, dailyPath, parseSearchQuery } from '@reflect/core'
 import type { AppCommand } from '@/lib/commands/types'
 import type { FilteredSearchHit, WikiSuggestion } from '@reflect/core'
 
@@ -25,6 +25,8 @@ export interface NoteEntry {
   snippet: string | null
   /** Human label for a generated date suggestion ("Next Friday"); null otherwise. */
   phrase: string | null
+  /** The alias a title suggestion matched through, when not the title itself; null otherwise. */
+  alias: string | null
 }
 
 export interface PaletteSections {
@@ -92,6 +94,7 @@ export function buildPaletteSections(options: {
         date: hit.dailyDate,
         snippet: hit.snippet,
         phrase: null,
+        alias: null,
       })),
       commands: [],
     }
@@ -122,6 +125,7 @@ export function buildPaletteSections(options: {
         date: suggestion.date,
         snippet: null,
         phrase: suggestion.generated?.phrase ?? null,
+        alias: aliasHint(suggestion),
       })
     }
   }
@@ -136,6 +140,7 @@ export function buildPaletteSections(options: {
         date: hit.dailyDate,
         snippet: hit.snippet,
         phrase: null,
+        alias: null,
       })
     }
   }

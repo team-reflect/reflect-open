@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parseNote } from '../markdown'
 import { foldKey } from '../markdown/keys'
 import {
+  aliasHint,
   isWikiLinkSafeText,
   mergeDateSuggestions,
   rankWikiSuggestions,
@@ -77,6 +78,14 @@ describe('rankWikiSuggestions', () => {
   it('honours the limit after merging', () => {
     const titles = Array.from({ length: 10 }, (_, i) => note(`Note ${i}`, i))
     expect(rankWikiSuggestions('note', titles, [], 3)).toHaveLength(3)
+  })
+})
+
+describe('aliasHint', () => {
+  it('names the alias unless it only repeats the displayed title', () => {
+    expect(aliasHint({ alias: 'Dad', title: 'Tim MacCaw // Dad' })).toBe('Dad')
+    expect(aliasHint({ alias: 'tim maccaw', title: 'Tim MacCaw // Dad' })).toBeNull()
+    expect(aliasHint({ alias: null, title: 'Tim MacCaw // Dad' })).toBeNull()
   })
 })
 

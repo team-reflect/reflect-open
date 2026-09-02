@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { FilePlus2, LayoutTemplate } from 'lucide-react'
+import { displayNoteTitle } from '@reflect/core'
 import {
   Command,
   CommandDialog,
@@ -75,7 +76,7 @@ export function TemplatePicker({ context }: TemplatePickerProps): ReactElement {
                   onSelect={() => insert(template.path)}
                 >
                   <LayoutTemplate aria-hidden strokeWidth={1.75} className="text-text-muted" />
-                  <span className="truncate">{template.title}</span>
+                  <span className="truncate">{displayNoteTitle(template.title)}</span>
                 </CommandItem>
               ))}
             </CommandGroup>
