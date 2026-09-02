@@ -196,27 +196,20 @@ export async function rewriteLinksForTitleChange(
 
 /**
  * The renamed note's `aliases` after a rename, or `null` when nothing changes:
- * the previous auto-added alias (an intermediate title from this session's
- * rename chain) is pruned, and the old title joins so links Reflect couldn't
- * rewrite — and external ones — still resolve. A `//` title travels as its
- * family (each segment, then the whole title): the old family joins minus
- * what the new title still derives, so `[[segment]]` links survive the
- * rename, and the previous family is pruned minus what the old title still
- * derived, since the previous rename skipped those rather than adding them.
+ * the aliases the previous rename in this session added (intermediate titles
+ * from the rename chain) are pruned, and the old title joins so links Reflect
+ * couldn't rewrite — and external ones — still resolve. A `//` title joins as
+ * its family (each segment, then the whole title) minus what the new title
+ * still derives, so `[[segment]]` links survive the rename. Only
+ * `previousAutoAliases` are pruned: an alias the user authored is never
+ * mistaken for an auto-added one.
  */
 export function nextAliases(
   current: string[],
-  rename: { from: string; to: string; previousAutoAlias: string | null },
+  rename: { from: string; to: string; previousAutoAliases: readonly string[] },
 ): string[] | null {
-  const { from, to, previousAutoAlias } = rename
-  const fromKeys = new Set(aliasFamily(from).map((alias) => foldKey(alias)))
-  const pruned = new Set(
-    previousAutoAlias === null
-      ? []
-      : aliasFamily(previousAutoAlias)
-          .map((alias) => foldKey(alias))
-          .filter((key) => !fromKeys.has(key)),
-  )
+  const { from, to, previousAutoAliases } = rename
+  const pruned = new Set(previousAutoAliases.map((alias) => foldKey(alias)))
   const next = current.filter((alias) => !pruned.has(foldKey(alias)))
   const kept = new Set(next.map((alias) => foldKey(alias)))
   const derivable = new Set(aliasFamily(to).map((alias) => foldKey(alias)))

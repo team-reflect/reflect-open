@@ -23,7 +23,7 @@ vi.mock('./open-documents', () => ({
 const { placeOldTitleAlias } = await import('./alias-placement')
 
 const PATH = 'notes/subject.md'
-const RENAME = { from: 'Old Title', to: 'New Title', previousAutoAlias: null }
+const RENAME = { from: 'Old Title', to: 'New Title', previousAutoAliases: [] }
 
 beforeEach(() => {
   io.readNote.mockReset()
@@ -88,6 +88,22 @@ describe('placeOldTitleAlias', () => {
     expect(session.updateFrontmatter).not.toHaveBeenCalled()
     expect(session.flush).not.toHaveBeenCalled()
     expect(io.writeNote).not.toHaveBeenCalled()
+  })
+
+  it('returns the aliases it added, for the next rename in the chain to prune', async () => {
+    const session = fakeSession({ content: '---\naliases:\n  - Dad\n---\n# Timothy MacCaw\n' })
+    docs.openSession.mockReturnValue(session)
+
+    const added = await placeOldTitleAlias(
+      PATH,
+      { from: 'Tim MacCaw // Dad', to: 'Timothy MacCaw', previousAutoAliases: [] },
+      7,
+    )
+
+    expect(added).toEqual(['Tim MacCaw', 'Tim MacCaw // Dad'])
+    expect(session.updateFrontmatter).toHaveBeenCalledWith({
+      aliases: ['Dad', 'Tim MacCaw', 'Tim MacCaw // Dad'],
+    })
   })
 
   it('computes against the session buffer, preserving concurrently-gained aliases', async () => {

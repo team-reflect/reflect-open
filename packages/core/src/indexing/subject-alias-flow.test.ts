@@ -23,7 +23,7 @@ describe('v1 subject alias flow', () => {
     const aliases = nextAliases([], {
       from: 'Tim MacCaw // Dad',
       to: 'Timothy MacCaw',
-      previousAutoAlias: null,
+      previousAutoAliases: [],
     })
     expect(aliases).toEqual(['Tim MacCaw', 'Dad', 'Tim MacCaw // Dad'])
     const renamed = upsertFrontmatter('# Timothy MacCaw\n', { aliases: aliases ?? [] })

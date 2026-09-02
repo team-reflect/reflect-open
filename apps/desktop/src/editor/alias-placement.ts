@@ -1,4 +1,11 @@
-import { nextAliases, parseNote, readNote, upsertFrontmatter, writeNote } from '@reflect/core'
+import {
+  foldKey,
+  nextAliases,
+  parseNote,
+  readNote,
+  upsertFrontmatter,
+  writeNote,
+} from '@reflect/core'
 import { openSession } from './open-documents'
 
 /**
@@ -20,45 +27,58 @@ import { openSession } from './open-documents'
 export interface SettledRename {
   from: string
   to: string
-  /** The alias auto-added by this session's previous rename (prune candidate). */
-  previousAutoAlias: string | null
+  /** The aliases this session's previous rename added (pruned, never user-authored ones). */
+  previousAutoAliases: readonly string[]
+}
+
+/** The entries of `next` that `current` did not already carry. */
+function addedAliases(current: readonly string[], next: readonly string[]): string[] {
+  const kept = new Set(current.map((alias) => foldKey(alias)))
+  return next.filter((alias) => !kept.has(foldKey(alias)))
 }
 
 /**
- * Record `rename.from` as an alias on the note at `path`. Aliases are
- * computed against the note's **current** frontmatter at placement time —
- * `aliases` replaces the whole key, and any earlier snapshot can be stale (an
- * external edit adopted mid-rewrite, a racing chained rename): replacing from
- * it would drop concurrently-gained entries. Throws on failure; the caller
- * owns reporting.
+ * Record `rename.from` as an alias on the note at `path`, returning the
+ * aliases that were added (empty when nothing changed) so the next rename in
+ * the chain can prune exactly those. Aliases are computed against the note's
+ * **current** frontmatter at placement time — `aliases` replaces the whole
+ * key, and any earlier snapshot can be stale (an external edit adopted
+ * mid-rewrite, a racing chained rename): replacing from it would drop
+ * concurrently-gained entries. Throws on failure; the caller owns reporting.
  */
 export async function placeOldTitleAlias(
   path: string,
   rename: SettledRename,
   generation: number,
-): Promise<void> {
+): Promise<string[]> {
   const aliasesOf = (source: string): string[] => parseNote({ path, source }).frontmatter.aliases
   const owner = openSession(path)
   let placed = false
+  let added: string[] = []
   if (owner !== null) {
     // Read and patch in the same tick (no await between): atomic against the
     // session. Through its frontmatter channel — the editor view never
     // churns — and flushed rather than riding the debounce: a settle is
     // exactly the moment to persist, and quit-time teardown awaits this.
-    const aliases = nextAliases(aliasesOf(owner.content()), rename)
+    const current = aliasesOf(owner.content())
+    const aliases = nextAliases(current, rename)
     placed = aliases === null || owner.updateFrontmatter({ aliases })
     if (placed && aliases !== null) {
+      added = addedAliases(current, aliases)
       await owner.flush()
     }
   }
   if (!placed) {
     const content = await readNote(path)
-    const aliases = nextAliases(aliasesOf(content), rename)
+    const current = aliasesOf(content)
+    const aliases = nextAliases(current, rename)
     if (aliases !== null) {
       const patched = upsertFrontmatter(content, { aliases })
       if (patched !== content) {
         await writeNote(path, patched, generation)
       }
+      added = addedAliases(current, aliases)
     }
   }
+  return added
 }

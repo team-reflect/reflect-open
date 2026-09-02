@@ -80,6 +80,8 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
   let chain: Promise<void> = Promise.resolve()
   /** Latest source saved or adopted by this session, used only for move ownership. */
   let latestSource = ''
+  /** Aliases the previous rename in this session added, for the next one to prune. */
+  let autoAliases: string[] = []
 
   /**
    * Move the file onto its title's slug path (Plan 17). A failed move leaves
@@ -186,9 +188,19 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
           failures.rewrite = errorMessage(cause)
           console.error('rename link rewrite failed:', cause)
         }
+        // The tracker only marks a continuing chain (the title the previous
+        // rename left behind); what that rename actually added is remembered
+        // here, so a chained rename prunes exactly those and never an alias
+        // the user authored.
+        const previousAutoAliases = rename.previousAutoAlias === null ? [] : autoAliases
+        autoAliases = []
         if (!collision) {
           try {
-            await placeOldTitleAlias(currentPath, { ...rename, from }, gen)
+            autoAliases = await placeOldTitleAlias(
+              currentPath,
+              { from, to: rename.to, previousAutoAliases },
+              gen,
+            )
           } catch (cause) {
             failures.alias = errorMessage(cause)
             console.error('rename alias placement failed:', cause)
