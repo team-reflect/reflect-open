@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.11...v0.11.0-beta.12) (2026-09-02)
+
+
+### Features
+
+* add Gemini 3.8 Flash support ([#1203](https://github.com/team-reflect/reflect-open/issues/1203)) ([5dd39d3](https://github.com/team-reflect/reflect-open/commit/5dd39d333a2980a99c0948183774bf91ffc39a8a))
+
 ## [0.11.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.10...v0.11.0-beta.11) (2026-09-02)
 
 
