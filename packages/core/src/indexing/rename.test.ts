@@ -519,6 +519,12 @@ describe('nextAliases', () => {
     ).toEqual(['keeper', 'Da', 'Tim MacCaw // Da'])
   })
 
+  it('keeps an auto-added alias the user re-spelled', () => {
+    expect(
+      nextAliases(['DAD', 'keeper'], { from: 'Bob', to: 'Carol', previousAutoAliases: ['Dad'] }),
+    ).toEqual(['DAD', 'keeper', 'Bob'])
+  })
+
   it('keeps an authored alias through a chained rename', () => {
     const first = nextAliases(['Dad'], {
       from: 'Tim // Dad',

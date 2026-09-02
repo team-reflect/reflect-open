@@ -201,16 +201,16 @@ export async function rewriteLinksForTitleChange(
  * couldn't rewrite — and external ones — still resolve. A `//` title joins as
  * its family (each segment, then the whole title) minus what the new title
  * still derives, so `[[segment]]` links survive the rename. Only
- * `previousAutoAliases` are pruned: an alias the user authored is never
- * mistaken for an auto-added one.
+ * `previousAutoAliases` are pruned, compared exactly: an alias the user
+ * authored or re-spelled is never mistaken for an auto-added one.
  */
 export function nextAliases(
   current: string[],
   rename: { from: string; to: string; previousAutoAliases: readonly string[] },
 ): string[] | null {
   const { from, to, previousAutoAliases } = rename
-  const pruned = new Set(previousAutoAliases.map((alias) => foldKey(alias)))
-  const next = current.filter((alias) => !pruned.has(foldKey(alias)))
+  const pruned = new Set(previousAutoAliases)
+  const next = current.filter((alias) => !pruned.has(alias))
   const kept = new Set(next.map((alias) => foldKey(alias)))
   const derivable = new Set(aliasFamily(to).map((alias) => foldKey(alias)))
   for (const alias of aliasFamily(from)) {
