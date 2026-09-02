@@ -16,14 +16,6 @@ strictPeerDependencies: true
 
 ignoreWorkspaceRootCheck: true
 
-# The meowdown PR-snapshot builds (pkg.pr.new) reference each other by URL;
-# pin every meowdown package to the same snapshot so one copy is installed.
-blockExoticSubdeps: false
-
-overrides:
-  '@meowdown/core': https://pkg.pr.new/@meowdown/core@533
-  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@533
-
 minimumReleaseAgeExclude:
   - '@meowdown/*'
   - '@prosekit/*'
