@@ -79,7 +79,7 @@
     "urlpattern-polyfill": "^10.1.0",
     "vite": "^8.2.2",
     "vitest": "^4.1.11",
-    "vitest-browser-commands": "^0.2.1",
+    "vitest-browser-commands": "^0.4.1",
     "vitest-browser-react": "^2.2.0",
     "vitest-fail-on-console": "^0.10.1"
   }

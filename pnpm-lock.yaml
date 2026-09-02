@@ -212,8 +212,8 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
       vitest-browser-commands:
-        specifier: ^0.2.1
-        version: 0.2.1(@vitest/browser-playwright@4.1.11)(vitest@4.1.11)
+        specifier: ^0.4.1
+        version: 0.4.1(@vitest/browser-playwright@4.1.11)(@vitest/browser@4.1.11)(playwright@1.62.1)(vite@8.2.2)(vitest@4.1.11)
       vitest-browser-react:
         specifier: ^2.2.0
         version: 2.2.0(@types/react-dom@19.2.5)(@types/react@19.2.18)(react-dom@19.2.8)(react@19.2.8)(vitest@4.1.11)
@@ -6165,13 +6165,22 @@ packages:
       yaml:
         optional: true
 
-  vitest-browser-commands@0.2.1:
-    resolution: {integrity: sha512-SCA6fjcO8uPLIvkzNzT8i0y+eUHx4hthZR2g7PSzHz01iG3qAm+rjfDuD1ot4taABsXolo1WaDByjKFuQ1IVww==}
+  vitest-browser-commands@0.4.1:
+    resolution: {integrity: sha512-tDDmSe8T//anin03G4sGNSOttozSaiO9105nYh8wh4gv8R5vAxiYvj7faSx+g0yg1jMtKzyQPDbUFoRYwJx7Hg==}
     peerDependencies:
-      '@vitest/browser-playwright': ^4.0.3
-      vitest: ^4.0.3
+      '@vitest/browser': ^4.0.0 || ^5.0.0-beta.7
+      '@vitest/browser-playwright': ^4.0.3 || ^5.0.0-beta.7
+      playwright: '*'
+      vite: '*'
+      vitest: ^4.0.3 || ^5.0.0-beta.7
     peerDependenciesMeta:
+      '@vitest/browser':
+        optional: true
       '@vitest/browser-playwright':
+        optional: true
+      playwright:
+        optional: true
+      vite:
         optional: true
       vitest:
         optional: true
@@ -12714,9 +12723,12 @@ snapshots:
       jiti: 2.7.0
       yaml: 2.9.0
 
-  vitest-browser-commands@0.2.1(@vitest/browser-playwright@4.1.11)(vitest@4.1.11):
+  vitest-browser-commands@0.4.1(@vitest/browser-playwright@4.1.11)(@vitest/browser@4.1.11)(playwright@1.62.1)(vite@8.2.2)(vitest@4.1.11):
     optionalDependencies:
+      '@vitest/browser': 4.1.11(vite@8.2.2)(vitest@4.1.11)
       '@vitest/browser-playwright': 4.1.11(playwright@1.62.1)(vite@8.2.2)(vitest@4.1.11)
+      playwright: 1.62.1
+      vite: 8.2.2(@types/node@24.13.3)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.0)
       vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
 
   vitest-browser-react@2.2.0(@types/react-dom@19.2.5)(@types/react@19.2.18)(react-dom@19.2.8)(react@19.2.8)(vitest@4.1.11):
