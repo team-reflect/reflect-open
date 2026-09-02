@@ -246,7 +246,7 @@ pub(super) fn recover_interrupted_merge(repo: &Repository) -> AppResult<()> {
     if merge_commit_has_parents(repo, head_oid, local_oid, remote_oid)? {
         if repo.state() == git2::RepositoryState::Merge && refs_match {
             // The merge commit landed and only cleanup was interrupted.
-            remove_owned_index_lock(repo)?;
+            ensure_index_unlocked(repo)?;
             repo.cleanup_state()?;
         }
         // A different active operation is foreign. Forget our stale marker,
@@ -263,7 +263,7 @@ pub(super) fn recover_interrupted_merge(repo: &Repository) -> AppResult<()> {
     // `repo.merge` already wrote the merge index and checkout before the app
     // was interrupted. Continue from that index: untouched working-tree edits
     // stay unstaged, and edits to a text conflict become its chosen resolution.
-    remove_owned_index_lock(repo)?;
+    ensure_index_unlocked(repo)?;
     let root = repo.workdir().ok_or_else(|| {
         crate::error::AppError::io("the backup repository has no working directory")
     })?;
@@ -357,13 +357,18 @@ fn merge_commit_has_parents(
         && commit.parent_ids().any(|oid| oid == remote_oid))
 }
 
-/// Remove the index lock only after the marker and all three merge refs prove
-/// this exact operation belongs to Reflect.
-fn remove_owned_index_lock(repo: &Repository) -> AppResult<()> {
+/// Refuse recovery while the index is locked. The merge marker proves who
+/// owns the merge state, but it cannot prove who created a later `index.lock`:
+/// a CLI or another process may have acquired it after Reflect stopped. A
+/// generic stale-lock policy belongs at repository open, where ownership can
+/// be established independently of merge recovery.
+fn ensure_index_unlocked(repo: &Repository) -> AppResult<()> {
     let path = repo.path().join("index.lock");
-    match fs::remove_file(path) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+    match path.try_exists() {
+        Ok(false) => Ok(()),
+        Ok(true) => Err(crate::error::AppError::io(
+            "the backup repository index is locked; wait for the other Git operation to finish or remove a confirmed stale .git/index.lock",
+        )),
         Err(error) => Err(error.into()),
     }
 }
@@ -581,7 +586,7 @@ fn resolve_both_edited(
         index.add_path(Path::new(&our.path))?;
         return Ok(vec![our.path]);
     }
-    write_blob(repo, root, &our.path, our.id)?;
+    materialize_blob_if_missing(repo, root, &our.path, our.id)?;
     let copy = conflict_copy_path(&their.path);
     write_blob(repo, root, &copy, their.id)?;
     index.add_path(Path::new(&our.path))?;
@@ -598,9 +603,29 @@ fn resolve_edit_vs_delete(
     index: &mut Index,
     edited: ConflictSide,
 ) -> AppResult<String> {
-    write_blob(repo, root, &edited.path, edited.id)?;
+    materialize_blob_if_missing(repo, root, &edited.path, edited.id)?;
     index.add_path(Path::new(&edited.path))?;
     Ok(edited.path)
+}
+
+/// Restore the selected Git blob only when the merge checkout left no file.
+/// An existing working-tree file may contain an edit made after interruption;
+/// staging it in place preserves that edit instead of replacing it with one of
+/// the pre-crash parents. The two-parent merge commit still retains both raw
+/// versions for recovery and review.
+fn materialize_blob_if_missing(
+    repo: &Repository,
+    root: &Path,
+    rel: &str,
+    id: git2::Oid,
+) -> AppResult<()> {
+    match fs::symlink_metadata(root.join(rel)) {
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            write_blob(repo, root, rel, id)
+        }
+        Err(error) => Err(error.into()),
+    }
 }
 
 fn write_blob(repo: &Repository, root: &Path, rel: &str, id: git2::Oid) -> AppResult<()> {

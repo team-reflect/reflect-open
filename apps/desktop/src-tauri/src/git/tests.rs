@@ -809,8 +809,6 @@ fn interrupted_app_merge_recovers_before_commit_in_engine_order() {
     let repo = Repository::open(root_a).unwrap();
     assert_eq!(repo.state(), git2::RepositoryState::Merge);
     assert!(repo.path().join("REFLECT_MERGE_STATE").is_file());
-    // Model the zero-byte lock left by the physical iPhone interruption.
-    fs::write(repo.path().join("index.lock"), []).unwrap();
     drop(repo);
 
     // The user can keep editing after the process restarts. Recovery must
@@ -844,7 +842,6 @@ fn interrupted_app_merge_recovers_before_commit_in_engine_order() {
     let repo = Repository::open(root_a).unwrap();
     assert_eq!(repo.state(), git2::RepositoryState::Clean);
     assert!(!repo.path().join("REFLECT_MERGE_STATE").exists());
-    assert!(!repo.path().join("index.lock").exists());
     drop(repo);
     assert!(push(root_a, None).unwrap().pushed);
 
@@ -937,7 +934,6 @@ fn durable_merge_commit_recovers_interrupted_cleanup() {
         2
     );
     assert!(repo.path().join("REFLECT_MERGE_STATE").is_file());
-    fs::write(repo.path().join("index.lock"), []).unwrap();
     drop(repo);
 
     let snapshot = status(root_a).unwrap();
@@ -945,7 +941,93 @@ fn durable_merge_commit_recovers_interrupted_cleanup() {
     let repo = Repository::open(root_a).unwrap();
     assert_eq!(repo.state(), git2::RepositoryState::Clean);
     assert!(!repo.path().join("REFLECT_MERGE_STATE").exists());
-    assert!(!repo.path().join("index.lock").exists());
+}
+
+#[test]
+fn owned_merge_never_removes_an_unowned_index_lock() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/base.md", "# Base\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/remote.md", "# Remote device\n");
+    commit_all(&root_b, "remote edit", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, "notes/local.md", "# This device\n");
+    commit_all(root_a, "local edit", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    interrupt_next_merge_for_test(root_a).unwrap();
+
+    let repo = Repository::open(root_a).unwrap();
+    let lock = repo.path().join("index.lock");
+    let marker = repo.path().join("REFLECT_MERGE_STATE");
+    fs::write(&lock, b"foreign operation sentinel").unwrap();
+    drop(repo);
+
+    let error = commit_all(root_a, "must wait", MAX_FILE_BYTES).unwrap_err();
+    let crate::error::AppError::Io { message } = error else {
+        panic!("expected an Io error, got {error:?}");
+    };
+    assert!(message.contains("index is locked"), "{message}");
+    assert_eq!(fs::read(&lock).unwrap(), b"foreign operation sentinel");
+    let repo = Repository::open(root_a).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Merge);
+    assert!(marker.is_file());
+    drop(repo);
+
+    // Once the lock owner finishes, the ordinary engine entry point resumes
+    // the same verified merge and clears only Reflect's own state.
+    fs::remove_file(&lock).unwrap();
+    let outcome = commit_all(root_a, "resume after lock", MAX_FILE_BYTES).unwrap();
+    assert!(!outcome.committed);
+    let repo = Repository::open(root_a).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Clean);
+    assert!(!marker.exists());
+}
+
+#[test]
+fn interrupted_edit_vs_delete_preserves_a_post_crash_edit() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/keep.md", "# Keep\n\noriginal\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/keep.md", "# Keep\n\nedited on b\n");
+    commit_all(&root_b, "b edit", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    fs::remove_file(root_a.join("notes/keep.md")).unwrap();
+    commit_all(root_a, "a delete", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    interrupt_next_merge_for_test(root_a).unwrap();
+
+    // The user edits the conflicted path after relaunch but before the next
+    // sync. Recovery must stage this exact content, not restore B's old blob.
+    write(root_a, "notes/keep.md", "# Keep\n\npost-crash user edit\n");
+    let outcome = commit_all(root_a, "recover and preserve", MAX_FILE_BYTES).unwrap();
+    assert!(!outcome.committed);
+    assert_eq!(
+        read(root_a, "notes/keep.md"),
+        "# Keep\n\npost-crash user edit\n"
+    );
+    let repo = Repository::open(root_a).unwrap();
+    let head = repo.head().unwrap().peel_to_commit().unwrap();
+    assert_eq!(head.parent_count(), 2);
+    let entry = head
+        .tree()
+        .unwrap()
+        .get_path(Path::new("notes/keep.md"))
+        .unwrap();
+    assert_eq!(
+        repo.find_blob(entry.id()).unwrap().content(),
+        b"# Keep\n\npost-crash user edit\n"
+    );
+    assert_eq!(repo.state(), git2::RepositoryState::Clean);
 }
 
 #[test]
