@@ -1,33 +1,25 @@
 import { wikiLinkSafe } from './edit'
 import { scanInlineSegments } from './scan'
-import { subjectDisplayTitle } from './subject-aliases'
+import { subjectAliases } from './subject-aliases'
 
 /**
  * Rich-title derivations: a note may legally embed markup in its title
  * (`Meeting with [[Ada Lovelace|Ada]]`). The raw title stays the note's
- * identity everywhere; these functions derive the reader-facing display
- * form, the flattened form, and the linkable wiki-link target form from it.
- * They are intentionally different renderings — see each doc comment.
+ * identity everywhere; these two functions derive the reader-facing display
+ * form and the linkable wiki-link target form from it. They are intentionally
+ * different renderings — see each doc comment.
  */
 
 /**
- * The title as a reader sees it: a `//` subject reduced to its first segment
- * ({@link subjectDisplayTitle}), then its links flattened
- * ({@link flattenRichTitle}). The split runs on the raw title, so the shown
- * form is always the note's first derived alias, a linkable address.
+ * The title as a reader sees it: a v1 `//` subject reduced to its first
+ * non-empty segment (the note's first derived alias, so the shown form is
+ * always a linkable address), then wiki links flattened to their display text
+ * (alias, else target) and markdown links to their text, through the
+ * canonical grammar — so a `[[x]]` inside a code span stays literal, exactly
+ * as the editor renders it.
  */
 export function displayNoteTitle(title: string): string {
-  return flattenRichTitle(subjectDisplayTitle(title))
-}
-
-/**
- * The title with its markup flattened: wiki links to their display text
- * (alias, else target) and markdown links to their text, through the canonical
- * grammar, so a `[[x]]` inside a code span stays literal, exactly as the
- * editor renders it. A `//` subject keeps every segment.
- */
-export function flattenRichTitle(title: string): string {
-  return scanInlineSegments(title)
+  return scanInlineSegments(subjectAliases(title)[0] ?? title)
     .map((segment) => {
       switch (segment.kind) {
         case 'text':

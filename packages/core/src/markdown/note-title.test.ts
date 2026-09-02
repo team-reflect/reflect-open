@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { displayNoteTitle, flattenRichTitle, wikiLinkTargetForTitle } from './note-title'
+import { displayNoteTitle, wikiLinkTargetForTitle } from './note-title'
 
 describe('displayNoteTitle', () => {
   it('flattens wiki links to their alias and markdown links to their text', () => {
@@ -30,16 +30,6 @@ describe('displayNoteTitle', () => {
 
   it('splits the raw title before flattening its links', () => {
     expect(displayNoteTitle('[[a|b]] // c')).toBe('b')
-  })
-})
-
-describe('flattenRichTitle', () => {
-  it('keeps every `//` segment', () => {
-    expect(flattenRichTitle('Tim MacCaw // Dad')).toBe('Tim MacCaw // Dad')
-  })
-
-  it('flattens links like the display form', () => {
-    expect(flattenRichTitle('Meeting with [[Ada Lovelace|Ada]]')).toBe('Meeting with Ada')
   })
 })
 

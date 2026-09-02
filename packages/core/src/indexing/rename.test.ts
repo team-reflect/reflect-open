@@ -574,6 +574,31 @@ describe('rewriteLinksForTitleChange — rich titles', () => {
   })
 })
 
+describe('rewriteLinksForTitleChange — `//` titles', () => {
+  it('syncs a display that mirrors the old first segment and keeps other segments', async () => {
+    const sourcePath = 'notes/source.md'
+    const { io, writes } = fakeIo(
+      { [sourcePath]: '- [[Tim MacCaw // Dad|Tim MacCaw]]\n- [[Tim MacCaw // Dad|Dad]]\n' },
+      {
+        resolveByTarget: { 'Tim MacCaw // Dad': 'notes/tim.md' },
+        backlinks: [
+          { sourcePath, targetRaw: 'Tim MacCaw // Dad', alias: 'Tim MacCaw' },
+          { sourcePath, targetRaw: 'Tim MacCaw // Dad', alias: 'Dad' },
+        ],
+      },
+    )
+    await rewriteLinksForTitleChange({
+      path: 'notes/tim.md',
+      from: 'Tim MacCaw // Dad',
+      to: 'Timothy MacCaw // Dad',
+      io,
+    })
+    expect(writes[sourcePath]).toBe(
+      '- [[Timothy MacCaw // Dad|Timothy MacCaw]]\n- [[Timothy MacCaw // Dad|Dad]]\n',
+    )
+  })
+})
+
 describe('rewriteLinksForTitleChange — destination guard', () => {
   it('does not rewrite when the new derived target already belongs to another note', async () => {
     const { io, writes } = fakeIo(

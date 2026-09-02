@@ -52,7 +52,7 @@ export {
   TaskStaleError,
 } from './edit'
 export { retitleWikiLinks, type WikiLinkRetitleOptions } from './retitle'
-export { displayNoteTitle, flattenRichTitle, wikiLinkTargetForTitle } from './note-title'
+export { displayNoteTitle, wikiLinkTargetForTitle } from './note-title'
 export { parseTaskMarker } from './task-marker'
 export {
   conflictMarkerBlockCount,
@@ -69,7 +69,7 @@ export { canonicalEmail, canonicalEmails, extractEmailFields, foldEmail } from '
 export { foldFallbackTitleKey, foldKey, foldTag } from './keys'
 export { gistBodyHash, gistFilename } from './gist'
 export { slugForTitle } from './slug'
-export { subjectAliases, subjectDisplayTitle } from './subject-aliases'
+export { subjectAliases } from './subject-aliases'
 export {
   normalizeWikiTarget,
   resolved,

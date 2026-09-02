@@ -156,9 +156,9 @@ fn subject_aliases(title: &str) -> Vec<String> {
     aliases
 }
 
-/// The TS `subjectDisplayTitle` (`subject-aliases.ts`): the reader-facing form
-/// of a `//` title, its first non-empty segment, or the title itself when
-/// nothing splits.
+/// The `//` half of the TS `displayNoteTitle` (`note-title.ts`): the
+/// reader-facing form of a `//` title, its first non-empty segment, or the
+/// title itself when nothing splits.
 pub fn subject_display_title(title: &str) -> &str {
     let segments = split_subject_segments(title);
     if segments.len() < 2 {
@@ -544,8 +544,8 @@ mod tests {
         );
     }
 
-    /// Parity with `subjectDisplayTitle` (`subject-aliases.ts`): the first
-    /// non-empty segment, else the whole title.
+    /// Parity with the `//` half of `displayNoteTitle` (`note-title.ts`): the
+    /// first non-empty segment, else the whole title.
     #[test]
     fn subject_display_title_matches_the_ts_derivation() {
         assert_eq!(

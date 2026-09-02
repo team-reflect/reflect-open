@@ -1,7 +1,7 @@
 import { foldGraphPath } from '../graph/paths'
 import { wikiLinkSafe } from '../markdown/edit'
 import { foldKey } from '../markdown/keys'
-import { flattenRichTitle, wikiLinkTargetForTitle } from '../markdown/note-title'
+import { displayNoteTitle, wikiLinkTargetForTitle } from '../markdown/note-title'
 import type { Resolution } from '../markdown/resolve'
 import { repointPathWikiLinks, retitleWikiLinks } from '../markdown/retitle'
 import { subjectAliases } from '../markdown/subject-aliases'
@@ -84,8 +84,8 @@ export async function rewriteLinksForTitleChange(
   // ever appears inside `[[…]]`. Rewrite in that space.
   const fromTarget = wikiLinkTargetForTitle(from)
   const toTarget = wikiLinkTargetForTitle(to)
-  const fromDisplay = wikiLinkSafe(flattenRichTitle(from))
-  const toDisplay = wikiLinkSafe(flattenRichTitle(to))
+  const fromDisplay = wikiLinkSafe(displayNoteTitle(from))
+  const toDisplay = wikiLinkSafe(displayNoteTitle(to))
 
   // Collision guard: if the old title now resolves to a *different* note (a
   // second note owns it as title or alias), the existing links still point

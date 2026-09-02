@@ -1,5 +1,5 @@
 import type { WikilinkPayload, WikilinkResolution } from '@meowdown/core'
-import { subjectDisplayTitle } from '@reflect/core'
+import { displayNoteTitle } from '@reflect/core'
 
 /**
  * The wiki-link chip rule shared by every meowdown surface: `[[target|alias]]`
@@ -12,6 +12,6 @@ export function resolveWikilink({ target }: WikilinkPayload): WikilinkResolution
   if (pipe !== -1) {
     return { target: target.slice(0, pipe).trim(), display: target.slice(pipe + 1).trim() }
   }
-  const display = subjectDisplayTitle(target)
+  const display = displayNoteTitle(target)
   return display === target ? undefined : { display }
 }
