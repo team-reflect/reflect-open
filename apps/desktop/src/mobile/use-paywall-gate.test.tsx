@@ -33,8 +33,12 @@ let stored: Record<string, unknown>
 let emitPurchaseUpdated: ((payload: unknown) => void) | null
 
 /** A promise that never settles, for the calls a case must not wait on. */
+const rejectNeverPromises = new Set<(reason?: unknown) => void>()
+
 function never<T>(): Promise<T> {
-  return new Promise<T>(() => {})
+  return new Promise<T>((_resolve, reject) => {
+    rejectNeverPromises.add(reject)
+  })
 }
 
 /**
@@ -121,7 +125,12 @@ beforeEach(() => {
   installFakeBridge()
 })
 
-afterEach(() => {
+afterEach(async () => {
+  for (const reject of rejectNeverPromises) {
+    reject(new Error('test cleanup'))
+  }
+  rejectNeverPromises.clear()
+  await Promise.resolve()
   focusManager.setFocused(undefined)
   setBridge(null)
   queryClient.clear()
@@ -195,12 +204,21 @@ describe('usePaywallGate', () => {
   it('stops waiting when StoreKit entitlement lookups time out', async () => {
     vi.useFakeTimers()
     try {
-      owned = never
+      let lookupCount = 0
+      owned = () => {
+        lookupCount += 1
+        return never()
+      }
       const hook = await renderHook(() => usePaywallGate(), { wrapper })
       expect(hook.result.current).toBe('pending')
+      expect(lookupCount).toBe(2)
 
       await hook.act(() => vi.advanceTimersByTimeAsync(5_000))
       expect(hook.result.current).toBe('show')
+
+      void queryClient.refetchQueries({ queryKey: queryKeys.iap.entitlements })
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+      expect(lookupCount).toBe(2)
     } finally {
       vi.useRealTimers()
     }

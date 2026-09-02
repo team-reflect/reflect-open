@@ -18,6 +18,7 @@ const ACTIVE_SUBSCRIPTION_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000
 const ENTITLEMENT_LOOKUP_TIMEOUT_MS = 5_000
 
 type SubscriptionPlan = Exclude<ActiveSubscription, null>
+const pendingEntitlementLookups = new Map<string, Promise<boolean>>()
 
 function readActiveSubscriptionSeed(): ActiveSubscription | undefined {
   const seed = getLocalStorageStore(ACTIVE_SUBSCRIPTION_STORAGE_KEY).getJson(
@@ -52,6 +53,23 @@ function withEntitlementTimeout(operation: Promise<boolean>): Promise<boolean> {
       },
     )
   })
+}
+
+function lookupEntitlement(productId: string): Promise<boolean> {
+  const pending = pendingEntitlementLookups.get(productId)
+  if (pending !== undefined) {
+    return pending
+  }
+
+  const lookup = iapIsOwned(productId)
+  pendingEntitlementLookups.set(productId, lookup)
+  function clearPendingLookup(): void {
+    if (pendingEntitlementLookups.get(productId) === lookup) {
+      pendingEntitlementLookups.delete(productId)
+    }
+  }
+  void lookup.then(clearPendingLookup, clearPendingLookup)
+  return lookup
 }
 
 function resolveActiveSubscription(
@@ -93,10 +111,10 @@ function resolveActiveSubscription(
 
 async function fetchActiveSubscription(): Promise<ActiveSubscription> {
   const subscription = await resolveActiveSubscription([
-    withEntitlementTimeout(iapIsOwned(IAP_PRODUCT_IDS.yearly)).then((owned) =>
+    withEntitlementTimeout(lookupEntitlement(IAP_PRODUCT_IDS.yearly)).then((owned) =>
       owned ? 'yearly' : null,
     ),
-    withEntitlementTimeout(iapIsOwned(IAP_PRODUCT_IDS.monthly)).then((owned) =>
+    withEntitlementTimeout(lookupEntitlement(IAP_PRODUCT_IDS.monthly)).then((owned) =>
       owned ? 'monthly' : null,
     ),
   ])
