@@ -37,6 +37,7 @@ import {
   metadataValue,
   notePrivate,
   noteSource,
+  postCaptureMeta,
   withDescription,
   withScreenshot,
   withTitle,
@@ -44,6 +45,7 @@ import {
 } from './capture-note'
 import type { PageMeta } from '../link-preview/metadata'
 import { scrapePageMeta } from './meta-scrape'
+import { enrichPostCapture, type PostEnrichmentContext } from './post-enrichment'
 
 /**
  * Capture notes still awaiting enrichment, oldest first: well-formed capture
@@ -260,6 +262,12 @@ export async function reconcileCaptureEnrichment(
     }
     return snapshot
   }
+  const postContext: PostEnrichmentContext = {
+    generation: input.generation,
+    stale,
+    currentCapture,
+    skipPending,
+  }
 
   for (const identity of pending) {
     if (stale()) {
@@ -284,6 +292,16 @@ export async function reconcileCaptureEnrichment(
         if (snapshot === null) {
           continue
         }
+      }
+      if (postCaptureMeta(snapshot.meta) !== null) {
+        const result = await enrichPostCapture(postContext, identity, snapshot)
+        if (result === 'stale') {
+          return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
+        }
+        if (result === 'enriched') {
+          enriched += 1
+        }
+        continue
       }
       const metadataComplete = snapshot.meta.captureMetadataStatus === 'done'
       if (metadataComplete && apiKey === null) {

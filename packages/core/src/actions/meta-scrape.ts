@@ -1,5 +1,5 @@
 import { toAppError } from '../errors'
-import { captureMetaFetch, captureOEmbedFetch } from '../graph/commands'
+import { captureMetaFetch, captureJsonFetch } from '../graph/commands'
 import { normalizePageMetaValue, parsePageMeta, type PageMeta } from '../link-preview/metadata'
 import { oembedRequestURL, parseOEmbedAnswer } from './oembed'
 
@@ -14,7 +14,7 @@ import { oembedRequestURL, parseOEmbedAnswer } from './oembed'
 async function scrapeOEmbed(requestURL: string): Promise<PageMeta | null> {
   let json: string
   try {
-    json = await captureOEmbedFetch(requestURL)
+    json = await captureJsonFetch(requestURL)
   } catch (cause) {
     const kind = toAppError(cause).kind
     if (kind === 'network' || kind === 'auth') {

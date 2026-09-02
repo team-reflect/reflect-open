@@ -110,6 +110,70 @@
           "source": "extension"
         }
       }
+    },
+    {
+      "name": "post block, id only (manual capture of a permalink)",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/jack/status/20",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension",
+          "post": {
+            "provider": "x",
+            "id": "20",
+            "trigger": "manual"
+          }
+        }
+      }
+    },
+    {
+      "name": "post block, everything the page could read",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/jack/status/20",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension",
+          "post": {
+            "provider": "x",
+            "id": "20",
+            "trigger": "bookmark",
+            "author": {
+              "name": "jack",
+              "handle": "jack"
+            },
+            "text": "just setting up my twttr",
+            "truncated": false,
+            "postedAt": "2006-03-21T20:50:14.000Z",
+            "media": [
+              {
+                "kind": "image",
+                "url": "https://pbs.twimg.com/media/GJN19MHXQAAeNDq.jpg?name=large",
+                "alt": "A poodle in a chair"
+              },
+              {
+                "kind": "video",
+                "url": "https://pbs.twimg.com/ext_tw_video_thumb/1/pu/img/poster.jpg"
+              }
+            ],
+            "quoted": {
+              "id": "1770825760162353449",
+              "url": "https://x.com/lexfridman/status/1770825760162353449",
+              "author": {
+                "name": "Lex Fridman",
+                "handle": "lexfridman"
+              },
+              "text": "Hello from the future",
+              "postedAt": "2024-03-21T18:00:00.000Z"
+            }
+          }
+        }
+      }
     }
   ],
   "rejected": [
@@ -295,6 +359,219 @@
           "source": "extension"
         },
         "screenshotBase64": ""
+      }
+    },
+    {
+      "name": "post with unknown provider",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/jack/status/20",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension",
+          "post": {
+            "provider": "bluesky",
+            "id": "20",
+            "trigger": "bookmark"
+          }
+        }
+      }
+    },
+    {
+      "name": "post with a non-numeric id",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/jack/status/20",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension",
+          "post": {
+            "provider": "x",
+            "id": "abc",
+            "trigger": "bookmark"
+          }
+        }
+      }
+    },
+    {
+      "name": "post with unknown trigger",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/jack/status/20",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension",
+          "post": {
+            "provider": "x",
+            "id": "20",
+            "trigger": "retweet"
+          }
+        }
+      }
+    },
+    {
+      "name": "post author with a malformed handle",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/jack/status/20",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension",
+          "post": {
+            "provider": "x",
+            "id": "20",
+            "trigger": "bookmark",
+            "author": {
+              "name": "jack",
+              "handle": "@jack"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "post author with a blank name",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/jack/status/20",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension",
+          "post": {
+            "provider": "x",
+            "id": "20",
+            "trigger": "bookmark",
+            "author": {
+              "name": "   ",
+              "handle": "jack"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "post with more than four media",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/jack/status/20",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension",
+          "post": {
+            "provider": "x",
+            "id": "20",
+            "trigger": "bookmark",
+            "media": [
+              {
+                "kind": "image",
+                "url": "https://pbs.twimg.com/media/0.jpg"
+              },
+              {
+                "kind": "image",
+                "url": "https://pbs.twimg.com/media/1.jpg"
+              },
+              {
+                "kind": "image",
+                "url": "https://pbs.twimg.com/media/2.jpg"
+              },
+              {
+                "kind": "image",
+                "url": "https://pbs.twimg.com/media/3.jpg"
+              },
+              {
+                "kind": "image",
+                "url": "https://pbs.twimg.com/media/4.jpg"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "post media over plain http",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/jack/status/20",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension",
+          "post": {
+            "provider": "x",
+            "id": "20",
+            "trigger": "bookmark",
+            "media": [
+              {
+                "kind": "image",
+                "url": "http://pbs.twimg.com/media/a.jpg"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "post media of unknown kind",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/jack/status/20",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension",
+          "post": {
+            "provider": "x",
+            "id": "20",
+            "trigger": "bookmark",
+            "media": [
+              {
+                "kind": "audio",
+                "url": "https://pbs.twimg.com/media/a.jpg"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "quoted post with a malformed timestamp",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/jack/status/20",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension",
+          "post": {
+            "provider": "x",
+            "id": "20",
+            "trigger": "bookmark",
+            "quoted": {
+              "id": "1",
+              "url": "https://x.com/a/status/1",
+              "author": {
+                "name": "a",
+                "handle": "a"
+              },
+              "postedAt": "yesterday"
+            }
+          }
+        }
       }
     }
   ]

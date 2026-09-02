@@ -41,7 +41,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(happy-dom@20.12.0)(vite@8.2.2)
 
   apps/desktop:
     dependencies:
@@ -210,7 +210,7 @@ importers:
         version: 8.2.2(@types/node@24.13.3)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.0)
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(happy-dom@20.12.0)(vite@8.2.2)
       vitest-browser-commands:
         specifier: ^0.4.1
         version: 0.4.1(@vitest/browser-playwright@4.1.11)(@vitest/browser@4.1.11)(playwright@1.62.1)(vite@8.2.2)(vitest@4.1.11)
@@ -254,6 +254,9 @@ importers:
       '@wxt-dev/module-react':
         specifier: ^1.2.2
         version: 1.2.2(@rolldown/plugin-babel@0.2.3)(babel-plugin-react-compiler@1.0.0)(vite@8.2.2)(wxt@0.20.27)
+      happy-dom:
+        specifier: ^20.12.0
+        version: 20.12.0
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
@@ -262,7 +265,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(happy-dom@20.12.0)(vite@8.2.2)
       wxt:
         specifier: ^0.20.27
         version: 0.20.27(@types/node@24.13.3)(eslint@10.9.1)(jiti@2.7.0)(rolldown@1.2.6)(supports-color@7.2.0)(yaml@2.9.0)
@@ -328,7 +331,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(happy-dom@20.12.0)(vite@8.2.2)
 
   packages/db:
     dependencies:
@@ -356,7 +359,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(happy-dom@20.12.0)(vite@8.2.2)
 
   packages/utils:
     devDependencies:
@@ -368,7 +371,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(happy-dom@20.12.0)(vite@8.2.2)
 
 packages:
 
@@ -2282,6 +2285,12 @@ packages:
   '@types/webextension-polyfill@0.12.5':
     resolution: {integrity: sha512-uKSAv6LgcVdINmxXMKBuVIcg/2m5JZugoZO8x20g7j2bXJkPIl/lVGQcDlbV+aXAiTyXT2RA5U5mI4IGCDMQeg==}
 
+  '@types/whatwg-mimetype@3.0.2':
+    resolution: {integrity: sha512-c2AKvDT8ToxLIOUlN51gTiHXflsfIFisS4pO7pDPoKouJCESkhZnEy623gwP9laCy5lnLDAw1vAzu2vM2YLOrA==}
+
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
+
   '@typescript-eslint/eslint-plugin@8.67.0':
     resolution: {integrity: sha512-Un7Heoyj65NREbKAyIrFxeM143NZpExWmy1Nep4DLeQOeLlTeumPjoNKnBrU5D5moWXbPJgRa5Uwcdu0faVNGQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
@@ -2703,6 +2712,10 @@ packages:
 
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
+
+  buffer-image-size@0.6.4:
+    resolution: {integrity: sha512-nEh+kZOPY1w+gcCMobZ6ETUp9WfibndnosbpwB1iJk/8Gt5ZF2bhS6+B6bPYz424KtwsR6Rflc3tCz1/ghX2dQ==}
+    engines: {node: '>=4.0'}
 
   buffer@5.7.1:
     resolution: {integrity: sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==}
@@ -3737,6 +3750,10 @@ packages:
 
   growly@1.3.0:
     resolution: {integrity: sha512-+xGQY0YyAWCnqy7Cd++hc2JqMYzlm0dG30Jd0beaA64sROr8C4nt8Yc9V5Ro3avlSUDTN0ulqP/VBKi1/lLygw==}
+
+  happy-dom@20.12.0:
+    resolution: {integrity: sha512-7uMYJu2SEwwL8vVcKp0C0lnt6d2LSGGe+T+oY79PiCJNNSgFpbxW8n5KuzpDQvrU4mt+fYiK1+Jy7Z2v39YR6g==}
+    engines: {node: '>=20.0.0'}
 
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
@@ -6276,6 +6293,10 @@ packages:
   webpack-virtual-modules@0.6.2:
     resolution: {integrity: sha512-66/V2i5hQanC51vBQKPH4aI8NMAcBW59FVBs+rC7eGHupMyfn34q7rZIE+ETlJ+XTevqfUhVVBgSUNSW2flEUQ==}
 
+  whatwg-mimetype@3.0.0:
+    resolution: {integrity: sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q==}
+    engines: {node: '>=12'}
+
   whatwg-url@5.0.0:
     resolution: {integrity: sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw==}
 
@@ -8480,6 +8501,12 @@ snapshots:
 
   '@types/webextension-polyfill@0.12.5': {}
 
+  '@types/whatwg-mimetype@3.0.2': {}
+
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 24.13.3
+
   '@typescript-eslint/eslint-plugin@8.67.0(@typescript-eslint/parser@8.67.0)(eslint@10.9.1)(supports-color@7.2.0)(typescript@6.0.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
@@ -8675,7 +8702,7 @@ snapshots:
       '@vitest/mocker': 4.1.11(vite@8.2.2)
       playwright: 1.62.1
       tinyrainbow: 3.1.0
-      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
+      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(happy-dom@20.12.0)(vite@8.2.2)
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -8691,7 +8718,7 @@ snapshots:
       pngjs: 7.0.0
       sirv: 3.0.2
       tinyrainbow: 3.1.0
-      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
+      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(happy-dom@20.12.0)(vite@8.2.2)
       ws: 8.21.1
     transitivePeerDependencies:
       - bufferutil
@@ -8997,6 +9024,10 @@ snapshots:
   buffer-equal-constant-time@1.0.1: {}
 
   buffer-from@1.1.2: {}
+
+  buffer-image-size@0.6.4:
+    dependencies:
+      '@types/node': 24.13.3
 
   buffer@5.7.1:
     dependencies:
@@ -10095,6 +10126,19 @@ snapshots:
   graceful-readlink@1.0.1: {}
 
   growly@1.3.0: {}
+
+  happy-dom@20.12.0:
+    dependencies:
+      '@types/node': 24.13.3
+      '@types/whatwg-mimetype': 3.0.2
+      '@types/ws': 8.18.1
+      buffer-image-size: 0.6.4
+      entities: 7.0.1
+      whatwg-mimetype: 3.0.0
+      ws: 8.21.1
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   has-flag@4.0.0: {}
 
@@ -12729,13 +12773,13 @@ snapshots:
       '@vitest/browser-playwright': 4.1.11(playwright@1.62.1)(vite@8.2.2)(vitest@4.1.11)
       playwright: 1.62.1
       vite: 8.2.2(@types/node@24.13.3)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.0)
-      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
+      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(happy-dom@20.12.0)(vite@8.2.2)
 
   vitest-browser-react@2.2.0(@types/react-dom@19.2.5)(@types/react@19.2.18)(react-dom@19.2.8)(react@19.2.8)(vitest@4.1.11):
     dependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
-      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
+      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(happy-dom@20.12.0)(vite@8.2.2)
     optionalDependencies:
       '@types/react': 19.2.18
       '@types/react-dom': 19.2.5(@types/react@19.2.18)
@@ -12745,9 +12789,9 @@ snapshots:
       '@vitest/utils': 4.1.11
       chalk: 5.6.2
       vite: 8.2.2(@types/node@24.13.3)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.0)
-      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
+      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(happy-dom@20.12.0)(vite@8.2.2)
 
-  vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2):
+  vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(happy-dom@20.12.0)(vite@8.2.2):
     dependencies:
       '@vitest/expect': 4.1.11
       '@vitest/mocker': 4.1.11(vite@8.2.2)
@@ -12773,6 +12817,7 @@ snapshots:
       '@opentelemetry/api': 1.9.1
       '@types/node': 24.13.3
       '@vitest/browser-playwright': 4.1.11(playwright@1.62.1)(vite@8.2.2)(vitest@4.1.11)
+      happy-dom: 20.12.0
     transitivePeerDependencies:
       - msw
 
@@ -12827,6 +12872,8 @@ snapshots:
   webidl-conversions@3.0.1: {}
 
   webpack-virtual-modules@0.6.2: {}
+
+  whatwg-mimetype@3.0.0: {}
 
   whatwg-url@5.0.0:
     dependencies:

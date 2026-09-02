@@ -31,6 +31,8 @@ import {
 } from './capture-identity'
 import {
   inboxEnvelopeSchema,
+  type CaptureEnvelope,
+  type CapturedPost,
   type InboxEnvelope,
   type TextCaptureEnvelope,
 } from './capture-envelope'
@@ -40,9 +42,12 @@ import {
   displayTitle,
   notePrivate,
   noteSource,
+  postDisplayTitle,
   retitleDailyEntry,
+  type CaptureNoteMeta,
   type CaptureStatus,
 } from './capture-note'
+import { parsePostUrl } from './post-url'
 
 /** The category note every captured-link section backlinks. */
 const LINKS_NOTE_TITLE = 'Links'
@@ -95,8 +100,7 @@ interface SameDayCapture {
 async function findSameDayCapture(
   dailySource: string,
   sectionTitles: readonly string[],
-  url: string,
-  selectionHash: string | undefined,
+  matches: (meta: CaptureNoteMeta) => boolean,
   generation: number,
 ): Promise<SameDayCapture | null> {
   const { headings, wikiLinks } = parseNote({ path: '', source: dailySource })
@@ -133,11 +137,37 @@ async function findSameDayCapture(
       throw cause
     }
     const meta = captureNoteMeta(parseFrontmatter(splitFrontmatter(source).raw).data)
-    if (meta && meta.captureUrl === url && meta.captureSelectionHash === selectionHash) {
+    if (meta !== null && matches(meta)) {
       return { identity, title: parseNote({ path: identity.notePath, source }).title }
     }
   }
   return null
+}
+
+/**
+ * The post a link envelope captures, when it is one (Plan 25): the block the
+ * producer sent, or — for any post permalink captured without one (⌘⇧K, the
+ * popup, a share) — a `manual` capture with nothing read off the page. Either
+ * way the envelope's URL becomes the canonical permalink so the same post
+ * dedupes across `x.com`/`twitter.com` spellings and share-sheet junk params.
+ */
+function postCapture(envelope: CaptureEnvelope): {
+  envelope: CaptureEnvelope
+  post: CapturedPost | undefined
+} {
+  const permalink = parsePostUrl(envelope.url)
+  if (envelope.post !== undefined) {
+    const handle = envelope.post.author?.handle ?? permalink?.handle ?? null
+    const url = `https://x.com/${handle ?? 'i'}/status/${envelope.post.id}`
+    return { envelope: { ...envelope, url }, post: envelope.post }
+  }
+  if (permalink === null) {
+    return { envelope, post: undefined }
+  }
+  return {
+    envelope: { ...envelope, url: permalink.url },
+    post: { provider: 'x', id: permalink.id, trigger: 'manual' },
+  }
 }
 
 /**
@@ -185,30 +215,36 @@ export async function drainCaptureInbox(
     const name = captureSpoolName(spool.path)
     try {
       const raw = await captureInboxRead(name, input.generation)
-      const envelope = parseEnvelope(raw)
-      if (envelope === null) {
+      const parsed = parseEnvelope(raw)
+      if (parsed === null) {
         await captureInboxReject(name, input.generation)
         await captureInboxReject(name.replace(/\.json$/, '.jpg'), input.generation)
         invalid += 1
         continue
       }
-      if ('kind' in envelope) {
-        await drainTextCapture(envelope, input.generation)
+      if ('kind' in parsed) {
+        await drainTextCapture(parsed, input.generation)
         await captureInboxRemove(name, input.generation)
         drained += 1
         continue
       }
+      const { envelope, post } = postCapture(parsed)
       const fresh = captureIdentity(new Date(envelope.capturedAt), envelope.id)
       const daily = dailyPath(fresh.date)
       const linksNoteTitle = await ensureBacklinkTarget(LINKS_NOTE_TITLE, input.generation)
       const dailySource = await noteSource(daily, input.generation)
       const selection = envelope.selection?.trim()
       const selectionHash = selection ? await hashContent(selection) : undefined
+      // A post is the same post whichever permalink spelling captured it
+      // (a handle-less `/i/status/` share vs the page's `/<handle>/status/`),
+      // so posts dedupe on id; links on URL + selection.
       const existing = await findSameDayCapture(
         dailySource,
         [linksNoteTitle, LINKS_NOTE_TITLE],
-        envelope.url,
-        selectionHash,
+        post === undefined
+          ? (meta) =>
+              meta.captureUrl === envelope.url && meta.captureSelectionHash === selectionHash
+          : (meta) => meta.captureKind === 'post' && meta.postId === post.id,
         input.generation,
       )
       const identity = existing?.identity ?? fresh
@@ -238,10 +274,12 @@ export async function drainCaptureInbox(
           hasScreenshot,
           status,
           selectionHash,
+          post,
         }),
         input.generation,
       )
-      const freshTitle = displayTitle(envelope)
+      const freshTitle =
+        post === undefined ? displayTitle(envelope) : postDisplayTitle(envelope, post)
       let updatedDaily = dailySource
       if (existing !== null) {
         // The refresh reset the note's H1 to the fresh tab title; keep the

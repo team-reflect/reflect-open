@@ -30,6 +30,76 @@ function isHttpUrl(value: string): boolean {
 /** Standard padded base64 (what `btoa`/`captureVisibleTab` produce). */
 const BASE64_RE = /^(?:[A-Z0-9+/]{4})*(?:[A-Z0-9+/]{2}==|[A-Z0-9+/]{3}=)?$/i
 
+function isHttpsUrl(value: string): boolean {
+  return value.startsWith('https://')
+}
+
+/** Cap on a captured post's text (and a quoted post's). */
+export const POST_TEXT_MAX_LENGTH = 10_000
+
+/** Which network a captured post lives on; only X exists today (Plan 25). */
+export const postProviderSchema = z.enum(['x'])
+
+/**
+ * What produced a post capture: the user bookmarking or liking the post on
+ * the page (the opt-in content script), or an explicit capture of a post
+ * permalink (⌘⇧K / the popup). Provenance for the note's frontmatter; the
+ * drain treats all three identically.
+ */
+export const postTriggerSchema = z.enum(['bookmark', 'like', 'manual'])
+
+/** A post's author, as the page or the endpoint names them. */
+export const postAuthorSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  handle: z.string().regex(/^\w{1,50}$/, 'must be an X handle'),
+})
+
+/** One media attachment: the image, or the poster frame of a gif/video. */
+export const postMediaSchema = z.object({
+  kind: z.enum(['image', 'gif', 'video']),
+  /** Remote URL of the image, or of the poster for gif/video. */
+  url: z.url().refine(isHttpsUrl, 'must be an https url'),
+  alt: z.string().max(1000).optional(),
+})
+
+const postIdSchema = z.string().regex(/^\d{1,40}$/, 'must be a post id')
+
+/** A post quoted inside the captured one — one level, never recursive. */
+export const quotedPostSchema = z.object({
+  id: postIdSchema,
+  url: z.url().refine(isHttpUrl, 'must be an http(s) url'),
+  author: postAuthorSchema,
+  text: z.string().max(POST_TEXT_MAX_LENGTH).optional(),
+  postedAt: z.iso.datetime({ offset: true }).optional(),
+})
+
+/**
+ * A captured post (Plan 25). The `id` and `trigger` are the contract; every
+ * other field is what the producer could read from the page and is
+ * best-effort — the desktop's enrichment fetches the post from X's embed
+ * backend and merges the two. A link envelope whose URL is a post permalink
+ * but carries no block is treated as a `manual` capture with nothing read.
+ */
+export const capturedPostSchema = z.object({
+  provider: postProviderSchema,
+  id: postIdSchema,
+  trigger: postTriggerSchema,
+  author: postAuthorSchema.optional(),
+  /** Plain text as rendered: emoji as characters, links as their display text. */
+  text: z.string().max(POST_TEXT_MAX_LENGTH).optional(),
+  /** The page showed a "Show more": `text` is a prefix of the post. */
+  truncated: z.boolean().optional(),
+  postedAt: z.iso.datetime({ offset: true }).optional(),
+  media: z.array(postMediaSchema).max(4).optional(),
+  quoted: quotedPostSchema.optional(),
+})
+
+export type CapturedPost = z.infer<typeof capturedPostSchema>
+export type PostAuthor = z.infer<typeof postAuthorSchema>
+export type PostMedia = z.infer<typeof postMediaSchema>
+export type PostTrigger = z.infer<typeof postTriggerSchema>
+export type QuotedPost = z.infer<typeof quotedPostSchema>
+
 /** One captured page, as spooled into the capture inbox. */
 export const captureEnvelopeSchema = z.object({
   /** Envelope format version; bump on breaking changes. */
@@ -67,6 +137,13 @@ export const captureEnvelopeSchema = z.object({
   capturedAt: z.iso.datetime({ offset: true }),
   /** Where the capture originated. */
   source: captureSourceSchema,
+  /**
+   * The post this capture is, when the producer read one off the page
+   * (Plan 25). Still a link capture — same identity, dedupe, daily bullet,
+   * and privacy gate — but the note body is post-shaped and enrichment
+   * fetches the post instead of scraping meta tags.
+   */
+  post: capturedPostSchema.optional(),
 })
 
 export type CaptureEnvelope = z.infer<typeof captureEnvelopeSchema>

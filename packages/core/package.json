@@ -6,7 +6,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./capture-envelope": "./src/actions/capture-envelope.ts"
+    "./capture-envelope": "./src/actions/capture-envelope.ts",
+    "./post-url": "./src/actions/post-url.ts"
   },
   "scripts": {
     "test": "vitest run --config ../../vitest.config.ts --project core-browser --project core-node"

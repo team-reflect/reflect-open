@@ -10,6 +10,12 @@ app is closed: the host spools into the graph's capture inbox
 (`<graph>/.reflect/inbox/`), and the app drains it on next launch.
 [Plan 11](../../docs/plans/11-link-capture.md) is the design doc.
 
+Optionally, the extension saves the posts you bookmark on X: switch it on in the
+extension's settings (or from the popup while on x.com), grant Chrome's prompt for
+x.com, and every bookmark lands in Reflect as a post note with its text, author,
+date, and images. Off by default; nothing runs on x.com until you turn it on.
+[Plan 25](../../docs/plans/25-x-bookmark-capture.md) is the design doc.
+
 Install the published extension from the
 [Chrome Web Store](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd).
 
@@ -22,6 +28,15 @@ raw note + daily `## [[Links]]` entry now (resolving or creating that category
 note), meta-scrape + BYOK AI title + description async. The extension stores no
 keys and makes no AI or network calls; its only honest status is **queued** — it
 cannot observe the desktop drain.
+
+X bookmarks ride the same path with one more producer in front: a content
+script registered at runtime on x.com (`entrypoints/x-bookmarks.content.ts`)
+watches each post's bookmark/like button flip, reads the post off the page
+(`lib/x/extract-post.ts`), and reports it to the background, which applies the
+switches and a seen-set (`lib/x/`) and enqueues it like any capture. The
+desktop recognizes any post permalink — including a plain ⌘⇧K on one — and
+fetches the post from X's embed backend, merges it with what the page read,
+and downloads the images. No X account, no X API key.
 
 ## Develop
 
@@ -131,6 +146,10 @@ in the [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
 > screenshot of the visible tab. Optionally, tick "Capture page text" to include the
 > page's readable text as well.
 >
+> Optionally, turn on "Save posts you bookmark" to have every post you bookmark on X
+> saved to Reflect with its text, author, date, and images — off by default, and
+> nothing runs on x.com until you switch it on.
+>
 > Captures are handed to the **installed Reflect desktop app** over a local connection
 > on your own machine — there is no Reflect account and no Reflect server in the path.
 > Capturing works even when the app is closed: the link is held and saved automatically
@@ -165,12 +184,16 @@ Each is reviewed individually; every permission below is exercised by the code:
 | `storage` | Queue captures locally so a capture survives the app being closed and retries until it spools. |
 | `unlimitedStorage` | Queued captures embed a screenshot data URL, which can exceed the default storage quota while waiting for the app. |
 | `alarms` | A coarse retry timer so held captures flush once Reflect is installed/launched later. |
+| `*://x.com/*`, `*://twitter.com/*` (**optional**, `optional_host_permissions`) | Requested only when the user switches on "Save posts you bookmark" in the extension's settings or the popup; runs a content script on x.com that watches which posts the user bookmarks or likes and reads those posts off the page. Never requested at install; revoking it switches the feature off. |
 
 ### Data-handling disclosures (Privacy practices tab)
 
 - **Data collected:** *Website content* (the captured page's URL, title, selection,
   screenshot, and — only when opted in — page text). Collected **only on an explicit
-  user action**, never in the background.
+  user action**, never in the background — with one opt-in exception: after the
+  user switches on X bookmark capture and grants x.com, the posts they bookmark
+  (or, if also switched on, like) on x.com are collected at the moment of the
+  bookmark, nothing else on the page.
 - **Where it goes:** to the user's own machine (the local Reflect desktop app). It is
   **not** sent to Reflect or any third party.
 - The three required certifications are all true and can be affirmed:

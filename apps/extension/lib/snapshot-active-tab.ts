@@ -1,6 +1,8 @@
 import { browser, type Browser } from 'wxt/browser'
+import { parsePostUrl } from '@reflect/core/post-url'
 import { isCapturableUrl, type CapturedPage } from './capture-message'
 import { samePageUrl } from './page-text'
+import { tryExtractPostFromTab } from './x/extract-post-from-tab'
 
 /**
  * The result of trying to snapshot the active tab for capture.
@@ -66,9 +68,18 @@ export async function snapshotTab(tab: Browser.tabs.Tab | undefined): Promise<Ca
     }
   }
 
+  // An X permalink also captures the post itself (Plan 25); the desktop
+  // treats the URL as a post either way, so this only adds what the page
+  // shows — the full text of a long post, a protected account's post.
+  const permalink = parsePostUrl(tab.url)
+  const post =
+    canReadLivePage && currentTab.id !== undefined && permalink !== null
+      ? await tryExtractPostFromTab(currentTab.id, permalink.id)
+      : undefined
+
   return {
     status: 'ready',
-    page: { url: tab.url, title: tab.title ?? '', screenshotDataUrl, selection },
+    page: { url: tab.url, title: tab.title ?? '', screenshotDataUrl, selection, post },
     tabId: tab.id,
   }
 }

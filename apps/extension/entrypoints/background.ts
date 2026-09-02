@@ -6,6 +6,11 @@ import { isFlushRequest } from '@/lib/messages'
 import { readIncludePageTextPreference } from '@/lib/popup-preferences'
 import { saveCapture } from '@/lib/save-capture'
 import { snapshotTab } from '@/lib/snapshot-active-tab'
+import { flashBadge } from '@/lib/badge'
+import { handlePostCaptured } from '@/lib/x/capture-post'
+import { isPostCapturedMessage, isPostReleasedMessage } from '@/lib/x/messages'
+import { disableXCapture, syncXContentScript, X_ORIGINS } from '@/lib/x/registration'
+import { clearPostSeen } from '@/lib/x/seen'
 import { tryExtractPageText } from './popup/extract-page-text'
 
 /**
@@ -50,6 +55,31 @@ export default defineBackground(() => {
       })
       return true // responding asynchronously
     }
+    if (isPostCapturedMessage(message)) {
+      handlePostCaptured(message.page).then(
+        (response) => {
+          if (response.saved) {
+            void flashBadge()
+          }
+          sendResponse(response)
+        },
+        (cause: unknown) => {
+          console.error('post capture failed:', cause)
+          sendResponse({ saved: false, reason: 'rejected' })
+        },
+      )
+      return true
+    }
+    if (isPostReleasedMessage(message)) {
+      clearPostSeen(message.id).then(
+        () => sendResponse({ ok: true }),
+        (cause: unknown) => {
+          console.error('post release failed:', cause)
+          sendResponse({ ok: false })
+        },
+      )
+      return true
+    }
     return false
   })
 
@@ -61,12 +91,24 @@ export default defineBackground(() => {
     }
   })
 
+  // Runtime content-script registrations do not survive an extension
+  // update, so the X watcher is re-synced with the preference on install;
+  // a permission revoked in chrome://extensions switches the feature off.
   browser.runtime.onInstalled.addListener(() => {
     void browser.alarms.create(RETRY_ALARM, { periodInMinutes: RETRY_PERIOD_MINUTES })
     void flushQueue()
+    void syncXContentScript().catch((cause: unknown) => {
+      console.error('X capture registration failed:', cause)
+    })
   })
   browser.runtime.onStartup.addListener(() => {
     void flushQueue()
+  })
+  browser.permissions.onRemoved.addListener((removed) => {
+    const origins = removed.origins ?? []
+    if (origins.some((origin) => (X_ORIGINS as readonly string[]).includes(origin))) {
+      void disableXCapture()
+    }
   })
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === RETRY_ALARM) {

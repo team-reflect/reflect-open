@@ -6,7 +6,8 @@ import { wikiLinkSafe } from '../markdown/edit'
 import { upsertFrontmatter } from '../markdown/frontmatter'
 import type { Frontmatter } from '../markdown/model'
 import type { CaptureIdentity } from './capture-identity'
-import type { CaptureEnvelope } from './capture-envelope'
+import { postTriggerSchema, type CaptureEnvelope, type CapturedPost } from './capture-envelope'
+import { postNoteBody, postNoteFields, postNoteTitle } from './post-note'
 
 export { notePrivate } from '../privacy/checkers'
 
@@ -32,6 +33,12 @@ const captureNoteMetaSchema = z.object({
   captureHash: z.string(),
   captureSelectionHash: z.string().optional(),
   captureScreenshot: z.string().optional(),
+  /** Set for post captures (Plan 25); absent on link captures. */
+  captureKind: z.literal('post').optional(),
+  postId: z.string().optional(),
+  postTrigger: postTriggerSchema.optional(),
+  /** The drain-written text is a prefix; enrichment tries to complete it. */
+  postTruncated: z.boolean().optional(),
 })
 
 export type CaptureNoteMeta = z.infer<typeof captureNoteMetaSchema>
@@ -40,6 +47,20 @@ export type CaptureNoteMeta = z.infer<typeof captureNoteMetaSchema>
 export function captureNoteMeta(frontmatter: Frontmatter): CaptureNoteMeta | null {
   const parsed = captureNoteMetaSchema.safeParse(frontmatter)
   return parsed.success ? parsed.data : null
+}
+
+/** The post identity of a post capture note, or `null` for a link capture. */
+export function postCaptureMeta(
+  meta: CaptureNoteMeta,
+): { id: string; trigger: CapturedPost['trigger']; truncated: boolean } | null {
+  if (meta.captureKind !== 'post' || meta.postId === undefined) {
+    return null
+  }
+  return {
+    id: meta.postId,
+    trigger: meta.postTrigger ?? 'manual',
+    truncated: meta.postTruncated === true,
+  }
 }
 
 function urlHost(url: string): string {
@@ -115,12 +136,36 @@ function firstSectionStart(body: string): number {
   return body.length
 }
 
+/** The display title a post capture's note and daily bullet get at drain time. */
+export function postDisplayTitle(envelope: CaptureEnvelope, post: CapturedPost): string {
+  return postNoteTitle(
+    { author: post.author ?? null, text: post.text ?? null },
+    displayTitle(envelope),
+  )
+}
+
 export async function captureNoteSource(
   envelope: CaptureEnvelope,
   identity: CaptureIdentity,
-  options: { hasScreenshot: boolean; status: CaptureStatus; selectionHash?: string | undefined },
+  options: {
+    hasScreenshot: boolean
+    status: CaptureStatus
+    selectionHash?: string | undefined
+    /** Render the post template instead of the link one (Plan 25). */
+    post?: CapturedPost | undefined
+  },
 ): Promise<string> {
-  const body = captureNoteBody(envelope, identity, options.hasScreenshot)
+  const post = options.post
+  const body =
+    post === undefined
+      ? captureNoteBody(envelope, identity, options.hasScreenshot)
+      : postNoteBody(
+          postNoteFields(envelope.url, post, {
+            note: envelope.note,
+            screenshot: options.hasScreenshot ? identity.assetPath : null,
+          }),
+          postDisplayTitle(envelope, post),
+        )
   return upsertFrontmatter(body, {
     aliases: [identity.base],
     captureUrl: envelope.url,
@@ -130,6 +175,14 @@ export async function captureNoteSource(
     captureHash: await hashContent(body),
     captureSelectionHash: options.selectionHash,
     captureScreenshot: options.hasScreenshot ? identity.assetPath : undefined,
+    ...(post === undefined
+      ? {}
+      : {
+          captureKind: 'post',
+          postId: post.id,
+          postTrigger: post.trigger,
+          postTruncated: post.truncated === true ? true : undefined,
+        }),
   })
 }
 

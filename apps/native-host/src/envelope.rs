@@ -32,6 +32,191 @@ pub struct Envelope {
     pub screenshot_ref: Option<String>,
     pub captured_at: String,
     pub source: String,
+    /// The captured post block (Plan 25), mirroring `capturedPostSchema`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub post: Option<Post>,
+}
+
+/// A captured post — `capturedPostSchema` in the TS source of truth. Only
+/// `provider`, `id`, and `trigger` are required; the rest is what the page
+/// could read.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Post {
+    pub provider: String,
+    pub id: String,
+    pub trigger: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<PostAuthor>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncated: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub posted_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media: Option<Vec<PostMedia>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quoted: Option<QuotedPost>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PostAuthor {
+    pub name: String,
+    pub handle: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PostMedia {
+    pub kind: String,
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alt: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuotedPost {
+    pub id: String,
+    pub url: String,
+    pub author: PostAuthor,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub posted_at: Option<String>,
+}
+
+/// zod's `.max(n)` counts UTF-16 code units (`String.prototype.length`), so
+/// the host counts the same way to stay at least as strict.
+fn utf16_len(value: &str) -> usize {
+    value.encode_utf16().count()
+}
+
+const POST_TEXT_MAX_LENGTH: usize = 10_000;
+const POST_MEDIA_MAX: usize = 4;
+
+fn is_post_id(candidate: &str) -> bool {
+    !candidate.is_empty()
+        && candidate.len() <= 40
+        && candidate.chars().all(|c| c.is_ascii_digit())
+}
+
+fn is_post_handle(candidate: &str) -> bool {
+    !candidate.is_empty()
+        && candidate.len() <= 50
+        && candidate
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+fn is_http_url(candidate: &str) -> bool {
+    candidate.starts_with("https://") || candidate.starts_with("http://")
+}
+
+fn validate_author(author: &PostAuthor) -> Result<(), HostError> {
+    let name = author.name.trim();
+    if name.is_empty() || utf16_len(name) > 200 {
+        return Err(HostError::InvalidPayload(
+            "post author name must be 1–200 characters".to_string(),
+        ));
+    }
+    if !is_post_handle(&author.handle) {
+        return Err(HostError::InvalidPayload(format!(
+            "post author handle is malformed: {:?}",
+            author.handle
+        )));
+    }
+    Ok(())
+}
+
+fn validate_optional_text(text: Option<&String>, what: &str) -> Result<(), HostError> {
+    if text.is_some_and(|value| utf16_len(value) > POST_TEXT_MAX_LENGTH) {
+        return Err(HostError::InvalidPayload(format!(
+            "{what} exceeds {POST_TEXT_MAX_LENGTH} characters"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_optional_datetime(value: Option<&String>, what: &str) -> Result<(), HostError> {
+    if value.is_some_and(|candidate| !is_iso_datetime(candidate)) {
+        return Err(HostError::InvalidPayload(format!(
+            "{what} is not an ISO-8601 timestamp"
+        )));
+    }
+    Ok(())
+}
+
+/// The post-block checks mirroring `capturedPostSchema`. The shared fixtures
+/// pin every rule here against the zod side.
+fn validate_post(post: &Post) -> Result<(), HostError> {
+    if post.provider != "x" {
+        return Err(HostError::InvalidPayload(format!(
+            "unknown post provider {:?}",
+            post.provider
+        )));
+    }
+    if !is_post_id(&post.id) {
+        return Err(HostError::InvalidPayload(format!(
+            "post id is not a post id: {:?}",
+            post.id
+        )));
+    }
+    if !matches!(post.trigger.as_str(), "bookmark" | "like" | "manual") {
+        return Err(HostError::InvalidPayload(format!(
+            "unknown post trigger {:?}",
+            post.trigger
+        )));
+    }
+    if let Some(author) = &post.author {
+        validate_author(author)?;
+    }
+    validate_optional_text(post.text.as_ref(), "post text")?;
+    validate_optional_datetime(post.posted_at.as_ref(), "post postedAt")?;
+    if let Some(media) = &post.media {
+        if media.len() > POST_MEDIA_MAX {
+            return Err(HostError::InvalidPayload(format!(
+                "post carries more than {POST_MEDIA_MAX} media"
+            )));
+        }
+        for item in media {
+            if !matches!(item.kind.as_str(), "image" | "gif" | "video") {
+                return Err(HostError::InvalidPayload(format!(
+                    "unknown post media kind {:?}",
+                    item.kind
+                )));
+            }
+            if !item.url.starts_with("https://") {
+                return Err(HostError::InvalidPayload(
+                    "post media url must be https".to_string(),
+                ));
+            }
+            if item.alt.as_ref().is_some_and(|alt| utf16_len(alt) > 1000) {
+                return Err(HostError::InvalidPayload(
+                    "post media alt exceeds 1000 characters".to_string(),
+                ));
+            }
+        }
+    }
+    if let Some(quoted) = &post.quoted {
+        if !is_post_id(&quoted.id) {
+            return Err(HostError::InvalidPayload(format!(
+                "quoted post id is not a post id: {:?}",
+                quoted.id
+            )));
+        }
+        if !is_http_url(&quoted.url) {
+            return Err(HostError::InvalidPayload(
+                "quoted post url must be http(s)".to_string(),
+            ));
+        }
+        validate_author(&quoted.author)?;
+        validate_optional_text(quoted.text.as_ref(), "quoted post text")?;
+        validate_optional_datetime(quoted.posted_at.as_ref(), "quoted post postedAt")?;
+    }
+    Ok(())
 }
 
 /// The extension→host message: envelope plus optional screenshot bytes.
@@ -172,6 +357,9 @@ impl ValidatedCapture {
                 envelope.source
             )));
         }
+        if let Some(post) = &envelope.post {
+            validate_post(post)?;
+        }
 
         let screenshot = match message.screenshot_base64 {
             None => None,
@@ -280,6 +468,42 @@ mod tests {
             }));
             assert!(matches!(result, Err(HostError::InvalidPayload(_))), "{key}");
         }
+    }
+
+    #[test]
+    fn post_block_round_trips_through_the_spooled_envelope() {
+        let capture = ValidatedCapture::parse(&payload(|message| {
+            message["envelope"]["post"] = serde_json::json!({
+                "provider": "x",
+                "id": "20",
+                "trigger": "bookmark",
+                "author": { "name": "jack", "handle": "jack" },
+                "text": "just setting up my twttr",
+                "media": [{ "kind": "image", "url": "https://pbs.twimg.com/media/a.jpg" }],
+            });
+        }))
+        .unwrap();
+        let spooled = serde_json::to_value(&capture.envelope).unwrap();
+        assert_eq!(spooled["post"]["id"], "20");
+        assert_eq!(spooled["post"]["author"]["handle"], "jack");
+        assert_eq!(spooled["post"]["media"][0]["kind"], "image");
+        assert!(spooled["post"].get("quoted").is_none());
+    }
+
+    #[test]
+    fn post_text_length_counts_utf16_units_like_zod() {
+        // 5 001 astral emoji: 5 001 code points, 10 002 UTF-16 units — zod's
+        // `.max(10_000)` rejects it, so the host must too.
+        let text = "😀".repeat(5_001);
+        let result = ValidatedCapture::parse(&payload(|message| {
+            message["envelope"]["post"] = serde_json::json!({
+                "provider": "x",
+                "id": "20",
+                "trigger": "manual",
+                "text": text,
+            });
+        }));
+        assert!(matches!(result, Err(HostError::InvalidPayload(_))));
     }
 
     #[test]

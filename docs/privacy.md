@@ -70,7 +70,13 @@ disk at call time), and it is covered by tests.
   title, your current text selection, a screenshot of the visible tab, and, only when
   you tick "Capture page text", the page's extracted text. Nothing is read in the
   background; the extension requests no broad host permissions and acts on the active
-  tab only at the moment you trigger it.
+  tab only at the moment you trigger it. One opt-in exception: **X bookmark capture**
+  (off by default). Switching it on in the extension's settings asks Chrome for
+  access to `x.com`; from then on a content script runs on x.com only, watches which
+  posts you bookmark (or, if you also switch that on, like), and captures those
+  posts — their text, author, date, and image links — at the moment you bookmark
+  them. It reads nothing else on the page, and revoking the x.com permission switches
+  it off.
 - **When:** when you capture. If the desktop app isn't reachable yet, the capture is
   held in the browser's local extension storage and retried automatically until it
   spools — it is never sent anywhere else in the meantime.
@@ -83,6 +89,13 @@ disk at call time), and it is covered by tests.
   request; `private: true` prevents the request or discards its result. A successful
   image is downscaled and stored as a local JPEG in the graph. Any BYOK AI enrichment
   then follows the provider rules above.
+- For a captured X post (a bookmark, or any post permalink you capture), enrichment
+  asks X's embed backend (`cdn.syndication.twimg.com`, the service behind X's own
+  embeds) for the post by id — no account, no cookies — and downloads the post's
+  images from `pbs.twimg.com` into the graph. Both requests tell X which post you
+  saved, so both sit behind the same gate: a `private: true` daily note means no
+  request at all, and the note keeps only what the page showed. Post captures never
+  make an AI call.
 
 ## Apple Contacts (off by default)
 
