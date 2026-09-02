@@ -47,7 +47,9 @@ export interface AiProviderInfo {
 type KnownId<T> = T extends string ? (string extends T ? never : T) : never
 
 type AnthropicModelId = KnownId<Parameters<AnthropicProvider>[0]>
-type GoogleModelId = KnownId<Parameters<GoogleProvider>[0]>
+// @ai-sdk/google (through 4.0.62) has not added gemini-3.8-flash yet;
+// keep it in the catalog anyway so the picker can send the id verbatim.
+type GoogleModelId = KnownId<Parameters<GoogleProvider>[0]> | 'gemini-3.8-flash'
 type OpenAIModelId = KnownId<Parameters<OpenAIProvider>[0]>
 
 // https://github.com/vercel/ai/blob/ai@7.0.66/packages/openai/src/responses/openai-responses-language-model-options.ts#L88
