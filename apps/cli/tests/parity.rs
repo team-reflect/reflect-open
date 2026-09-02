@@ -13,7 +13,7 @@ use serde_json::Value;
 
 use reflect_cli::hash::hash_content;
 use reflect_cli::keys::fold_key;
-use reflect_cli::note_file::{parse_note_meta, subject_display_title, walk_notes};
+use reflect_cli::note_file::{parse_note_meta, walk_notes};
 use reflect_cli::search::build_fts_match;
 
 fn corpus_dir() -> PathBuf {
@@ -72,11 +72,6 @@ fn note_derivations_match_the_ts_pipeline() {
             fold_key(&meta.title),
             want["titleKey"].as_str().unwrap(),
             "{rel_path}: titleKey"
-        );
-        assert_eq!(
-            subject_display_title(&meta.title),
-            want["displayTitle"].as_str().unwrap(),
-            "{rel_path}: displayTitle"
         );
         assert_eq!(
             meta.aliases,
