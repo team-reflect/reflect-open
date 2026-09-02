@@ -98,9 +98,7 @@ const POST_TEXT_MAX_LENGTH: usize = 10_000;
 const POST_MEDIA_MAX: usize = 4;
 
 fn is_post_id(candidate: &str) -> bool {
-    !candidate.is_empty()
-        && candidate.len() <= 40
-        && candidate.chars().all(|c| c.is_ascii_digit())
+    !candidate.is_empty() && candidate.len() <= 40 && candidate.chars().all(|c| c.is_ascii_digit())
 }
 
 fn is_post_handle(candidate: &str) -> bool {
