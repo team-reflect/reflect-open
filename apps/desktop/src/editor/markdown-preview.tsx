@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
 import { useOpenExternalLink } from '@/editor/open-external-link'
+import { resolveWikilink } from '@/editor/resolve-wikilink'
 import { cn } from '@/lib/utils'
 
 /**
@@ -74,6 +75,7 @@ export function MarkdownPreview({
       markdown={content}
       markMode="hide"
       interactive={interactive}
+      resolveWikilink={resolveWikilink}
       resolveImageUrl={resolveImageUrlStable}
       {...(interactive ? { onLinkClick: openExternalLink } : {})}
       {...(navigates ? { onWikilinkClick: onWikilinkClickStable } : {})}
