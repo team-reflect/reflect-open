@@ -1,4 +1,4 @@
-import { injectIntoOpenXTabs, setXContentScriptRegistered } from './content-script'
+import { injectIntoOpenXTabs, setXContentScriptRegistered, stopInOpenXTabs } from './content-script'
 import { hasXPermission, requestXPermission } from './permission'
 import { readXCapturePreferences, writeXCapturePreferences } from './preferences'
 
@@ -40,8 +40,12 @@ export async function enableXCapture(): Promise<boolean> {
   return true
 }
 
-/** The switch-off flow: preference off, script unregistered. The origins stay granted. */
+/**
+ * The switch-off flow: preference off, script unregistered, and the watchers
+ * already running in open tabs told to stop. The origins stay granted.
+ */
 export async function disableXCapture(): Promise<void> {
   await writeXCapturePreferences({ bookmarks: false, likes: false })
   await setXContentScriptRegistered(false)
+  await stopInOpenXTabs()
 }

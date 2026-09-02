@@ -573,6 +573,69 @@
           }
         }
       }
+    },
+    {
+      "name": "url that does not parse",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://[invalid",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "post media url that does not parse",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/jack/status/20",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension",
+          "post": {
+            "provider": "x",
+            "id": "20",
+            "trigger": "bookmark",
+            "media": [
+              {
+                "kind": "image",
+                "url": "https://[invalid"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "quoted post url with a space in the host",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/jack/status/20",
+          "title": "jack on X",
+          "capturedAt": "2026-09-02T10:15:22.317Z",
+          "source": "extension",
+          "post": {
+            "provider": "x",
+            "id": "20",
+            "trigger": "bookmark",
+            "quoted": {
+              "id": "1",
+              "url": "http://exa mple.com/a/status/1",
+              "author": {
+                "name": "a",
+                "handle": "a"
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

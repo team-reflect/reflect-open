@@ -6,5 +6,10 @@
  * anywhere (`post-note-parse.ts`). Both share `post-note-markup.ts`.
  */
 export { POST_NOTE_MARKUP, type PostNoteFields, type PostNoteMedia } from './post-note-markup'
-export { postNoteBody, postNoteFields, postNoteTitle } from './post-note-render'
+export {
+  postNoteBody,
+  postNoteFields,
+  postNoteTitle,
+  refreshPostNoteFields,
+} from './post-note-render'
 export { capturedPostFromFields, parsePostNoteBody } from './post-note-parse'

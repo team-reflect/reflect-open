@@ -1,12 +1,16 @@
 import { browser } from 'wxt/browser'
 import { defineContentScript } from '#imports'
 import { startBookmarkWatch } from '@/lib/x/bookmark-watch'
+import { isStopXCaptureMessage } from '@/lib/x/messages'
 import { X_ORIGINS } from '@/lib/x/origins'
 import { messageForChange } from '@/lib/x/report'
+
+type StopListener = (message: unknown) => undefined
 
 declare global {
   interface Window {
     __reflectXBookmarksStop?: () => void
+    __reflectXBookmarksStopListener?: StopListener
   }
 }
 
@@ -32,5 +36,21 @@ export default defineContentScript({
       })
     })
     window.__reflectXBookmarksStop = stop
+
+    // Switching the feature off unregisters future injections; this tab's
+    // watcher stops on the background's message.
+    const previousStopListener = window.__reflectXBookmarksStopListener
+    if (previousStopListener) {
+      browser.runtime.onMessage.removeListener(previousStopListener)
+    }
+    const stopListener: StopListener = (message) => {
+      if (isStopXCaptureMessage(message)) {
+        window.__reflectXBookmarksStop?.()
+        delete window.__reflectXBookmarksStop
+      }
+      return
+    }
+    window.__reflectXBookmarksStopListener = stopListener
+    browser.runtime.onMessage.addListener(stopListener)
   },
 })

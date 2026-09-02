@@ -8,7 +8,7 @@ import type { Frontmatter } from '../markdown/model'
 import type { CaptureIdentity } from './capture-identity'
 import type { CaptureEnvelope, CapturedPost } from './capture-envelope'
 import { postFrontmatter, postNoteMetaSchema } from './post-meta'
-import { postNoteBody, postNoteFields, postNoteTitle } from './post-note'
+import { postNoteBody, postNoteFields, postNoteTitle, type PostNoteFields } from './post-note'
 
 export { notePrivate } from '../privacy/checkers'
 
@@ -119,7 +119,10 @@ function firstSectionStart(body: string): number {
 }
 
 /** The display title a post capture's note and daily bullet get at drain time. */
-export function postDisplayTitle(envelope: CaptureEnvelope, post: CapturedPost): string {
+export function postDisplayTitle(
+  envelope: CaptureEnvelope,
+  post: Pick<PostNoteFields, 'author' | 'text'> | CapturedPost,
+): string {
   return postNoteTitle(
     { author: post.author ?? null, text: post.text ?? null },
     displayTitle(envelope),
@@ -135,19 +138,23 @@ export async function captureNoteSource(
     selectionHash?: string | undefined
     /** Render the post template instead of the link one (Plan 25). */
     post?: CapturedPost | undefined
+    /** Prepared fields for a same-day re-capture merged with the existing note. */
+    postFields?: PostNoteFields | undefined
   },
 ): Promise<string> {
   const post = options.post
-  const body =
-    post === undefined
-      ? captureNoteBody(envelope, identity, options.hasScreenshot)
-      : postNoteBody(
-          postNoteFields(envelope.url, post, {
-            note: envelope.note,
-            screenshot: options.hasScreenshot ? identity.assetPath : null,
-          }),
-          postDisplayTitle(envelope, post),
-        )
+  let body: string
+  if (post === undefined) {
+    body = captureNoteBody(envelope, identity, options.hasScreenshot)
+  } else {
+    const fields =
+      options.postFields ??
+      postNoteFields(envelope.url, post, {
+        note: envelope.note,
+        screenshot: options.hasScreenshot ? identity.assetPath : null,
+      })
+    body = postNoteBody(fields, postDisplayTitle(envelope, fields))
+  }
   return upsertFrontmatter(body, {
     aliases: [identity.base],
     captureUrl: envelope.url,

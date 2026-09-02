@@ -10,6 +10,7 @@ import { capturedPostSchema } from '@reflect/core/capture-envelope'
 export const POST_CAPTURED_MESSAGE_TYPE = 'reflect:post-captured'
 export const POST_RELEASED_MESSAGE_TYPE = 'reflect:post-released'
 export const EXTRACT_POST_MESSAGE_TYPE = 'reflect:extract-post'
+export const X_CAPTURE_STOP_MESSAGE_TYPE = 'reflect:x-capture-stop'
 
 /** A post just became bookmarked or liked on the page. */
 export const postCapturedMessageSchema = z.object({
@@ -51,10 +52,23 @@ export const extractPostResponseSchema = z.object({
 })
 export type ExtractPostResponse = z.infer<typeof extractPostResponseSchema>
 
+/** Background → content script: the feature was switched off; stop watching. */
+export const stopXCaptureMessageSchema = z.object({
+  type: z.literal(X_CAPTURE_STOP_MESSAGE_TYPE),
+})
+export type StopXCaptureMessage = z.infer<typeof stopXCaptureMessageSchema>
+
+/** Is `message` a well-formed {@link PostCapturedMessage}? Validates against its schema. */
 export function isPostCapturedMessage(message: unknown): message is PostCapturedMessage {
   return postCapturedMessageSchema.safeParse(message).success
 }
 
+/** Is `message` a well-formed {@link PostReleasedMessage}? Validates against its schema. */
 export function isPostReleasedMessage(message: unknown): message is PostReleasedMessage {
   return postReleasedMessageSchema.safeParse(message).success
+}
+
+/** Is `message` a well-formed {@link StopXCaptureMessage}? Validates against its schema. */
+export function isStopXCaptureMessage(message: unknown): message is StopXCaptureMessage {
+  return stopXCaptureMessageSchema.safeParse(message).success
 }

@@ -13,6 +13,7 @@ import {
   NO_PROVIDERS,
   reconcile,
   scrapeMock,
+  spool,
   wireCaptureMocks,
   writeAssetMock,
 } from './capture-harness'
@@ -132,6 +133,51 @@ describe('drainCaptureInbox for posts', () => {
     expect(note).toContain('## Note\n\ncheck later')
     expect(note).not.toContain('## Screenshot')
     expect(files.get(DAILY)).toContain(`- [[${BASE}|jack (@jack): just setting up my twttr]]`)
+  })
+
+  it('merges a same-day URL-only re-capture into the bookmark note instead of replacing it', async () => {
+    addSpool(envelope({ url: POST_URL, title: 'X', post: PAGE_POST }), { screenshot: false })
+    expect((await drain()).deduped).toBe(0)
+    addSpool(
+      envelope({
+        id: '11111111-2222-4333-8444-555555555555',
+        url: 'https://twitter.com/i/web/status/20',
+        title: 'jack on X',
+        note: 'read this later',
+      }),
+      { screenshot: false },
+    )
+
+    const outcome = await drain()
+
+    expect(outcome.deduped).toBe(1)
+    const note = files.get(IDENTITY.notePath)!
+    expect(note).toContain('# jack (@jack): just setting up my twttr')
+    expect(note).toContain('- Author: [jack](https://x.com/jack) (@jack)')
+    expect(note).toContain('> just setting up my twttr')
+    expect(note).toContain('![](https://pbs.twimg.com/media/page.jpg?name=large)')
+    expect(note).toContain('## Note\n\nread this later')
+    expect(note).toContain(`captureUrl: ${POST_URL}`)
+    expect(note).toContain('postTrigger: bookmark')
+    expect(files.get(DAILY)).toContain(`- [[${BASE}|jack (@jack): just setting up my twttr]]`)
+  })
+
+  it('leaves a same-day post note the user edited untouched', async () => {
+    addSpool(envelope({ url: POST_URL, title: 'X', post: PAGE_POST }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    const edited = `${files.get(IDENTITY.notePath)!}\nMy own thoughts on this.\n`
+    files.set(IDENTITY.notePath, edited)
+    const dailyBefore = files.get(DAILY)
+    addSpool(envelope({ id: '11111111-2222-4333-8444-555555555555', url: POST_URL, title: 'X' }), {
+      screenshot: false,
+    })
+
+    const outcome = await drain()
+
+    expect(outcome).toMatchObject({ drained: 1, deduped: 1, stopped: null })
+    expect(files.get(IDENTITY.notePath)).toBe(edited)
+    expect(files.get(DAILY)).toBe(dailyBefore)
+    expect(spool.size).toBe(0)
   })
 
   it('dedupes the same post across spellings within the day', async () => {

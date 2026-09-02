@@ -138,3 +138,39 @@ export function postNoteFields(
     screenshot: options.screenshot,
   }
 }
+
+/**
+ * The fields for a same-day re-capture of a post that already has a note:
+ * what the new envelope read wins where it has something, the existing note
+ * fills the rest (a bookmark's author/text/media survive a later URL-only
+ * ⌘⇧K), full text beats a truncated preview whichever side has it, and a
+ * user note from the new capture is added.
+ */
+export function refreshPostNoteFields(
+  existing: PostNoteFields,
+  incoming: CapturedPost,
+  options: { url: string; note?: string | undefined; screenshot: string | null },
+): PostNoteFields {
+  const fresh = postNoteFields(options.url, incoming, options)
+  const incomingFull = fresh.text !== null && !fresh.truncated
+  const existingFull = existing.text !== null && !existing.truncated
+  let text: string | null
+  if (incomingFull) {
+    text = fresh.text
+  } else if (existingFull) {
+    text = existing.text
+  } else {
+    text = (fresh.text?.length ?? 0) >= (existing.text?.length ?? 0) ? fresh.text : existing.text
+  }
+  return {
+    url: options.url,
+    author: fresh.author ?? existing.author,
+    postedAt: fresh.postedAt ?? existing.postedAt,
+    text,
+    truncated: text !== null && !incomingFull && !existingFull,
+    media: fresh.media.length > 0 ? fresh.media : existing.media,
+    quoted: fresh.quoted ?? existing.quoted,
+    note: fresh.note ?? existing.note,
+    screenshot: options.screenshot ?? existing.screenshot,
+  }
+}

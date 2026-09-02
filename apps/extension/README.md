@@ -12,8 +12,11 @@ app is closed: the host spools into the graph's capture inbox
 
 Optionally, the extension saves the posts you bookmark on X: switch it on in the
 extension's settings (or from the popup while on x.com), grant Chrome's prompt for
-x.com, and every bookmark lands in Reflect as a post note with its text, author,
-date, and images. Off by default; nothing runs on x.com until you turn it on.
+x.com and twitter.com, and each bookmark (or, if you also switch that on, like)
+lands in Reflect as a post note. The note carries what could be read — text,
+author, date, and images are best effort, filled in from the page and from X's
+embed backend, and a post neither can read still lands as its link. Off by
+default; nothing runs on those sites until you turn it on.
 [Plan 25](../../docs/plans/25-x-bookmark-capture.md) is the design doc.
 
 Install the published extension from the
@@ -146,9 +149,9 @@ in the [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
 > screenshot of the visible tab. Optionally, tick "Capture page text" to include the
 > page's readable text as well.
 >
-> Optionally, turn on "Save posts you bookmark" to have every post you bookmark on X
-> saved to Reflect with its text, author, date, and images — off by default, and
-> nothing runs on x.com until you switch it on.
+> Optionally, turn on "Save posts you bookmark" to have the posts you bookmark on X
+> saved to Reflect — with their text, author, date, and images where those can be
+> read — off by default, and nothing runs on x.com until you switch it on.
 >
 > Captures are handed to the **installed Reflect desktop app** over a local connection
 > on your own machine — there is no Reflect account and no Reflect server in the path.
@@ -184,16 +187,16 @@ Each is reviewed individually; every permission below is exercised by the code:
 | `storage` | Queue captures locally so a capture survives the app being closed and retries until it spools. |
 | `unlimitedStorage` | Queued captures embed a screenshot data URL, which can exceed the default storage quota while waiting for the app. |
 | `alarms` | A coarse retry timer so held captures flush once Reflect is installed/launched later. |
-| `*://x.com/*`, `*://twitter.com/*` (**optional**, `optional_host_permissions`) | Requested only when the user switches on "Save posts you bookmark" in the extension's settings or the popup; runs a content script on x.com that watches which posts the user bookmarks or likes and reads those posts off the page. Never requested at install; revoking it switches the feature off. |
+| `*://*.x.com/*`, `*://*.twitter.com/*` (**optional**, `optional_host_permissions`) | Requested only when the user switches on "Save posts you bookmark" in the extension's settings or the popup; runs a content script on x.com and twitter.com (including `www.`/`mobile.`) that watches which posts the user bookmarks or likes and reads those posts off the page. Never requested at install; revoking it switches the feature off. |
 
 ### Data-handling disclosures (Privacy practices tab)
 
 - **Data collected:** *Website content* (the captured page's URL, title, selection,
   screenshot, and — only when opted in — page text). Collected **only on an explicit
   user action**, never in the background — with one opt-in exception: after the
-  user switches on X bookmark capture and grants x.com, the posts they bookmark
-  (or, if also switched on, like) on x.com are collected at the moment of the
-  bookmark, nothing else on the page.
+  user switches on X bookmark capture and grants x.com/twitter.com, the posts they
+  bookmark (or, if also switched on, like) there are collected at the moment of
+  that bookmark or like, nothing else on the page.
 - **Where it goes:** to the user's own machine (the local Reflect desktop app). It is
   **not** sent to Reflect or any third party.
 - The three required certifications are all true and can be affirmed:

@@ -222,8 +222,8 @@ wins for text when it has more of it** (a long post captured from its permalink
 has the full text; the endpoint only has the preview). When the endpoint fails
 (404, tombstone, 429, or the day X changes it) the page fields are what the note
 gets; when the page extractor fails (X renamed a test id) the endpoint fields
-are. Only when both fail does the note degrade to URL + `Name (@handle)` from
-oEmbed — never a lost bookmark.
+are. Only when both fail does the note degrade to the URL and the tab title —
+never a lost bookmark.
 
 Why not the endpoint alone (id-only capture, like V1 but local)? It would be the
 simplest extension by far, and it is where phase 1 starts. But it cannot see
@@ -294,7 +294,10 @@ export const capturedPostSchema = z.object({
 
 `url` on the envelope is the **canonical** permalink
 `https://x.com/<handle>/status/<id>` (the extension canonicalizes `twitter.com`,
-`/i/web/status/`, and query strings) so same-URL dedupe holds across entry points.
+`/i/web/status/`, and query strings); it is the envelope's and the note's display
+URL. Post **dedupe** does not use it — it keys on the post id (`postId` in the
+note's frontmatter), so a handle-less `/i/status/<id>` share and the page's
+`/<handle>/status/<id>` are one post.
 The serde mirror in `envelope.rs` validates the same bounds (the host must stay at
 least as strict as the drain); new accepted/rejected cases go into
 `capture-envelope.fixtures.json`, never into one side.
@@ -341,10 +344,9 @@ the privacy re-check around every await exactly as the link legs do:
    the remote link (the V1-import precedent).
 4. **Rewrite the note** with the merged post (body, title, daily bullet via the
    existing retitle transaction); `captureStatus` → `done`.
-5. **oEmbed** (`publish.x.com`, a new provider entry whose answer has no `title`
-   and therefore its own parser) runs only when the syndication answer was
-   permanent-failed *and* the page gave no author — it recovers
-   `Name (@handle): text` for the title and nothing more.
+5. **No oEmbed.** The plan first kept `publish.x.com` as a title-only fallback;
+   it was not built. When both the endpoint and the page yield nothing, the note
+   keeps the tab title (or the host) until a later manual re-capture.
 6. **No AI title or description.** `Name (@handle): text…` is a better title than
    any model's guess, and the post *is* the description. (Revisit for long posts;
    it would be one `describePage` call over the note text behind the same gate.)
@@ -382,7 +384,10 @@ Three layers, cheapest first:
    V1's 2 s-debounced snapshot that lost entries when the worker died) and skips a
    post already seen. Un-bookmark clears the key so a deliberate re-bookmark
    captures again. Keys are pruned past a few thousand entries.
-3. **Desktop same-day dedupe** on the canonical URL, as for every link capture.
+3. **Desktop same-day dedupe** on the post id (links dedupe on URL + selection).
+   A same-day re-capture merges into the existing note — what the earlier capture
+   read is kept, a user note is added — and a note the user has edited since is
+   left untouched.
 
 Accepted limitation: re-bookmarking a post from a *different* browser profile on a
 *different* day yields a second note. The correct fix — a `capture_url` column on
@@ -514,9 +519,7 @@ envelope, or ⌘⇧K on a post permalink with today's extension.
   `capture_oembed_fetch`) and `capture_media_fetch` on `fetch_public_image`; TS
   bindings in `graph/commands.ts`.
 - `capture-enrichment.ts`: the post leg (fetch → merge → media → rewrite →
-  `done`; oEmbed title fallback), privacy re-checks around each await.
-- `oembed.ts` + `meta-scrape.ts`: `x` provider on `publish.x.com` with its
-  title-less answer parser.
+  `done`), privacy re-checks around each await. No oEmbed provider (see §4).
 - Tests via `capture-harness.ts`: URL-only capture becomes a full note from a
   mocked syndication answer; page text beats preview text for a `note_tweet`;
   media download rewrites links and is skipped on a private day; tombstone keeps

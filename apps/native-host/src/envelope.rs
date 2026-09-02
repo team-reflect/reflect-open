@@ -109,8 +109,21 @@ fn is_post_handle(candidate: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
+/// The scheme of a URL that parses under the WHATWG rules `z.url()` applies
+/// on the drain side — a prefix check alone would spool `https://[invalid`
+/// only for the drain to quarantine it.
+fn url_scheme(candidate: &str) -> Option<String> {
+    url::Url::parse(candidate)
+        .ok()
+        .map(|parsed| parsed.scheme().to_string())
+}
+
 fn is_http_url(candidate: &str) -> bool {
-    candidate.starts_with("https://") || candidate.starts_with("http://")
+    matches!(url_scheme(candidate).as_deref(), Some("http" | "https"))
+}
+
+fn is_https_url(candidate: &str) -> bool {
+    url_scheme(candidate).as_deref() == Some("https")
 }
 
 fn validate_author(author: &PostAuthor) -> Result<(), HostError> {
@@ -186,9 +199,9 @@ fn validate_post(post: &Post) -> Result<(), HostError> {
                     item.kind
                 )));
             }
-            if !item.url.starts_with("https://") {
+            if !is_https_url(&item.url) {
                 return Err(HostError::InvalidPayload(
-                    "post media url must be https".to_string(),
+                    "post media url must be a valid https url".to_string(),
                 ));
             }
             if item.alt.as_ref().is_some_and(|alt| utf16_len(alt) > 1000) {
@@ -207,7 +220,7 @@ fn validate_post(post: &Post) -> Result<(), HostError> {
         }
         if !is_http_url(&quoted.url) {
             return Err(HostError::InvalidPayload(
-                "quoted post url must be http(s)".to_string(),
+                "quoted post url must be a valid http(s) url".to_string(),
             ));
         }
         validate_author(&quoted.author)?;
@@ -340,8 +353,10 @@ impl ValidatedCapture {
         if !is_uuid(&envelope.id) {
             return Err(HostError::InvalidPayload("id is not a UUID".to_string()));
         }
-        if !envelope.url.starts_with("https://") && !envelope.url.starts_with("http://") {
-            return Err(HostError::InvalidPayload("url must be http(s)".to_string()));
+        if !is_http_url(&envelope.url) {
+            return Err(HostError::InvalidPayload(
+                "url must be a valid http(s) url".to_string(),
+            ));
         }
         if !is_iso_datetime(&envelope.captured_at) {
             return Err(HostError::InvalidPayload(format!(

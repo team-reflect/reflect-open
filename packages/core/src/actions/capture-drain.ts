@@ -31,6 +31,7 @@ import {
 } from './capture-identity'
 import {
   inboxEnvelopeSchema,
+  type CapturedPost,
   type InboxEnvelope,
   type TextCaptureEnvelope,
 } from './capture-envelope'
@@ -45,7 +46,11 @@ import {
   type CaptureNoteMeta,
   type CaptureStatus,
 } from './capture-note'
+import { refreshPostNoteFields } from './post-note-render'
 import { postCaptureOf } from './post-capture'
+import { postCaptureMeta } from './post-meta'
+import { parsePostNoteBody, type PostNoteFields } from './post-note'
+import { parsePostUrl } from './post-url'
 
 /** The category note every captured-link section backlinks. */
 const LINKS_NOTE_TITLE = 'Links'
@@ -142,6 +147,31 @@ async function findSameDayCapture(
   return null
 }
 
+/** What a same-day post re-capture found under the existing note. */
+type ExistingPostNote =
+  | { kind: 'fields'; fields: PostNoteFields; trigger: CapturedPost['trigger'] }
+  /** The body is no longer the template's — the user edited it; leave it alone. */
+  | { kind: 'edited' }
+
+async function existingPostNote(
+  identity: CaptureIdentity,
+  generation: number,
+): Promise<ExistingPostNote> {
+  const source = await noteSource(identity.notePath, generation)
+  const split = splitFrontmatter(source)
+  const meta = captureNoteMeta(parseFrontmatter(split.raw).data)
+  const post = meta === null ? null : postCaptureMeta(meta)
+  try {
+    return {
+      kind: 'fields',
+      fields: parsePostNoteBody(split.body),
+      trigger: post?.trigger ?? 'manual',
+    }
+  } catch {
+    return { kind: 'edited' }
+  }
+}
+
 /**
  * Drain every spooled capture into the graph — phase 1, the durable save.
  * Never throws.
@@ -200,7 +230,8 @@ export async function drainCaptureInbox(
         drained += 1
         continue
       }
-      const { envelope, post } = postCaptureOf(parsed)
+      const resolved = postCaptureOf(parsed)
+      let { envelope, post } = resolved
       const fresh = captureIdentity(new Date(envelope.capturedAt), envelope.id)
       const daily = dailyPath(fresh.date)
       const linksNoteTitle = await ensureBacklinkTarget(LINKS_NOTE_TITLE, input.generation)
@@ -210,20 +241,31 @@ export async function drainCaptureInbox(
       // A post is the same post whichever permalink spelling captured it
       // (a handle-less `/i/status/` share vs the page's `/<handle>/status/`),
       // so posts dedupe on id; links on URL + selection.
+      const postId = post?.id
+      const captureUrl = envelope.url
       const existing = await findSameDayCapture(
         dailySource,
         [linksNoteTitle, LINKS_NOTE_TITLE],
-        post === undefined
-          ? (meta) =>
-              meta.captureUrl === envelope.url && meta.captureSelectionHash === selectionHash
-          : (meta) => meta.captureKind === 'post' && meta.postId === post.id,
+        postId === undefined
+          ? (meta) => meta.captureUrl === captureUrl && meta.captureSelectionHash === selectionHash
+          : (meta) => meta.captureKind === 'post' && meta.postId === postId,
         input.generation,
       )
       const identity = existing?.identity ?? fresh
       const status: CaptureStatus = notePrivate(dailySource) ? 'skipped' : 'pending'
 
+      // A post already captured today is refreshed by merging, never by
+      // replacing: a later URL-only ⌘⇧K must not discard what the bookmark
+      // read (on a private day enrichment never gets to restore it), and a
+      // note the user has edited since is not rewritten at all.
+      const existingPost =
+        post !== undefined && existing !== null
+          ? await existingPostNote(identity, input.generation)
+          : null
+      const rewriteNote = existingPost?.kind !== 'edited'
+
       let hasScreenshot = false
-      if (envelope.screenshotRef) {
+      if (envelope.screenshotRef && rewriteNote) {
         try {
           await promoteCaptureScreenshot(
             envelope.screenshotRef,
@@ -240,18 +282,35 @@ export async function drainCaptureInbox(
         }
       }
 
-      await writeNote(
-        identity.notePath,
-        await captureNoteSource(envelope, identity, {
-          hasScreenshot,
-          status,
-          selectionHash,
-          post,
-        }),
-        input.generation,
-      )
-      const freshTitle =
-        post === undefined ? displayTitle(envelope) : postDisplayTitle(envelope, post)
+      let postFields: PostNoteFields | undefined
+      if (post !== undefined && existingPost?.kind === 'fields') {
+        const keepExistingUrl = parsePostUrl(envelope.url)?.handle === null
+        postFields = refreshPostNoteFields(existingPost.fields, post, {
+          url: keepExistingUrl ? existingPost.fields.url : envelope.url,
+          note: envelope.note,
+          screenshot: hasScreenshot ? identity.assetPath : null,
+        })
+        envelope = { ...envelope, url: postFields.url }
+        post = { ...post, trigger: existingPost.trigger, truncated: postFields.truncated }
+      }
+      if (rewriteNote) {
+        await writeNote(
+          identity.notePath,
+          await captureNoteSource(envelope, identity, {
+            hasScreenshot,
+            status,
+            selectionHash,
+            post,
+            postFields,
+          }),
+          input.generation,
+        )
+      }
+      const freshTitle = !rewriteNote
+        ? (existing?.title ?? displayTitle(envelope))
+        : post === undefined
+          ? displayTitle(envelope)
+          : postDisplayTitle(envelope, postFields ?? post)
       let updatedDaily = dailySource
       if (existing !== null) {
         // The refresh reset the note's H1 to the fresh tab title; keep the

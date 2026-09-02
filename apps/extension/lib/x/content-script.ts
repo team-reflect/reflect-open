@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser'
+import { X_CAPTURE_STOP_MESSAGE_TYPE, type StopXCaptureMessage } from './messages'
 import { X_ORIGINS } from './origins'
 
 /**
@@ -57,6 +58,30 @@ export async function injectIntoOpenXTabs(): Promise<void> {
         })
       } catch (cause) {
         console.warn('could not start X capture in an open tab:', cause)
+      }
+    }),
+  )
+}
+
+/**
+ * Tell every already-injected watcher to stop. Unregistering only prevents
+ * future injections; a tab that already runs the script would keep
+ * reporting. Sent to every tab — the origins may just have been revoked, so
+ * a URL-filtered query is not available — and tabs without the script
+ * simply have no receiver.
+ */
+export async function stopInOpenXTabs(): Promise<void> {
+  const tabs = await browser.tabs.query({})
+  const message: StopXCaptureMessage = { type: X_CAPTURE_STOP_MESSAGE_TYPE }
+  await Promise.all(
+    tabs.map(async (tab) => {
+      if (tab.id === undefined) {
+        return
+      }
+      try {
+        await browser.tabs.sendMessage(tab.id, message)
+      } catch {
+        // No content script in this tab.
       }
     }),
   )

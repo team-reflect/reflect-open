@@ -64,6 +64,26 @@ describe('handlePostCaptured', () => {
     expect(saveMock).toHaveBeenCalledTimes(1)
   })
 
+  it('enqueues a post once when two reports race', async () => {
+    store.set(X_BOOKMARKS_KEY, true)
+    let release: () => void = () => {}
+    saveMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ fate: 'queued' })
+        }),
+    )
+
+    const first = handlePostCaptured(page())
+    const second = handlePostCaptured(page())
+    await vi.waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1))
+    release()
+
+    expect(await first).toEqual({ saved: true, reason: 'queued' })
+    expect(await second).toEqual({ saved: false, reason: 'seen' })
+    expect(saveMock).toHaveBeenCalledTimes(1)
+  })
+
   it('ignores likes unless the likes switch is on', async () => {
     store.set(X_BOOKMARKS_KEY, true)
     const like = page({ ...POST, trigger: 'like' })
