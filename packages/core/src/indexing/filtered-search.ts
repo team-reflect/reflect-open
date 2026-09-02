@@ -334,7 +334,13 @@ export async function searchWithFilters(
     // SQLite returns an unmarked body fragment when only the title matched.
     // That is not a search snippet and would be misleading in the result row.
     snippet: snippet?.includes(HIGHLIGHT_START) === true ? snippet : null,
-    highlightedTitle: highlightTitle(displayNoteTitle(row.title), parsed.text, ftsHighlightedTitle),
+    // The FTS markers describe the complete title; the same display
+    // derivation keeps them aligned with the shortened title they highlight.
+    highlightedTitle: highlightTitle(
+      displayNoteTitle(row.title),
+      parsed.text,
+      ftsHighlightedTitle === null ? null : displayNoteTitle(ftsHighlightedTitle),
+    ),
     isPinned: row.isPinned !== 0,
   }))
 }

@@ -235,6 +235,25 @@ describe('searchWithFilters', () => {
     expect(hit).toMatchObject({ title: 'Tim MacCaw // Dad', highlightedTitle: 'Tim MacCaw' })
   })
 
+  it('keeps a tokenizer-only FTS highlight inside the first segment of a `//` title', async () => {
+    mockInvoke.mockResolvedValueOnce([
+      {
+        path: 'notes/cafe.md',
+        title: 'Café // Alias',
+        daily_date: null,
+        preview: '',
+        mtime: 0,
+        is_pinned: 0,
+        fts_highlighted_title: '\u{1}Café\u{2} // Alias',
+        snippet: null,
+      },
+    ])
+
+    const [hit] = await searchWithFilters(parseSearchQuery('cafe'))
+
+    expect(hit).toMatchObject({ title: 'Café // Alias', highlightedTitle: '\u{1}Café\u{2}' })
+  })
+
   it('folds the exact-title key the way titles were indexed', async () => {
     mockInvoke.mockResolvedValueOnce([])
 
