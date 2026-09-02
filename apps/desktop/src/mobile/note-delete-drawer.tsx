@@ -91,7 +91,7 @@ export function NoteDeleteDrawer({
             </Button>
             <Button
               variant="ghost"
-              className="w-full"
+              className="h-12 w-full text-base"
               disabled={busy}
               onClick={() => handleOpenChange(false)}
             >
