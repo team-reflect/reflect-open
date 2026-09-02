@@ -559,8 +559,14 @@ mod tests {
             "Charlotte MacCaw"
         );
         assert_eq!(subject_display_title(" // "), " // ");
-        assert_eq!(subject_display_title("Charlotte MacCaw"), "Charlotte MacCaw");
-        assert_eq!(subject_display_title("https://reflect.app"), "https://reflect.app");
+        assert_eq!(
+            subject_display_title("Charlotte MacCaw"),
+            "Charlotte MacCaw"
+        );
+        assert_eq!(
+            subject_display_title("https://reflect.app"),
+            "https://reflect.app"
+        );
         assert_eq!(subject_display_title("a///b"), "a///b");
     }
 
