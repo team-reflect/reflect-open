@@ -140,7 +140,7 @@ describe('MobileSettings', () => {
     expect(openUrl).toHaveBeenCalledWith('https://reflect.app/privacy')
   })
 
-  it('writes appearance choices to the settings document', async () => {
+  it('writes appearance and editor choices to the settings document', async () => {
     const user = userEvent
     await mount()
 
@@ -149,6 +149,9 @@ describe('MobileSettings', () => {
 
     await user.click(page.getByRole('radio', { name: 'Large' }))
     expect(updateSettings).toHaveBeenCalledWith({ editorTextSize: 'large' })
+
+    await user.click(page.getByRole('radio', { name: 'RTL' }))
+    expect(updateSettings).toHaveBeenCalledWith({ editorTextDirection: 'rtl' })
   })
 
   it('toggles the editor switches', async () => {

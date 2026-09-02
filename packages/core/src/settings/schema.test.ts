@@ -10,6 +10,7 @@ describe('settingsSchema', () => {
       editorBulletAfterHeading: true,
       editorSmoothCaretAnimation: true,
       editorTextSize: 'small',
+      editorTextDirection: 'auto',
       editorFullWidth: false,
       sidebarWidth: 260,
       contextSidebarWidth: 320,
@@ -41,6 +42,7 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.editorBulletAfterHeading).toBe(true)
     expect(DEFAULT_SETTINGS.editorSmoothCaretAnimation).toBe(true)
     expect(DEFAULT_SETTINGS.editorTextSize).toBe('small')
+    expect(DEFAULT_SETTINGS.editorTextDirection).toBe('auto')
     expect(DEFAULT_SETTINGS.editorFullWidth).toBe(false)
     expect(DEFAULT_SETTINGS.sidebarWidth).toBe(260)
     expect(DEFAULT_SETTINGS.contextSidebarWidth).toBe(320)
@@ -90,6 +92,9 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ editorTextSize: 'small' }).editorTextSize).toBe('small')
     expect(settingsSchema.parse({ editorTextSize: 'medium' }).editorTextSize).toBe('medium')
     expect(settingsSchema.parse({ editorTextSize: 'large' }).editorTextSize).toBe('large')
+    expect(settingsSchema.parse({ editorTextDirection: 'auto' }).editorTextDirection).toBe('auto')
+    expect(settingsSchema.parse({ editorTextDirection: 'ltr' }).editorTextDirection).toBe('ltr')
+    expect(settingsSchema.parse({ editorTextDirection: 'rtl' }).editorTextDirection).toBe('rtl')
     expect(settingsSchema.parse({ editorFullWidth: false }).editorFullWidth).toBe(false)
     expect(settingsSchema.parse({ editorFullWidth: true }).editorFullWidth).toBe(true)
     expect(settingsSchema.parse({ sidebarWidth: 300 }).sidebarWidth).toBe(300)
@@ -169,6 +174,10 @@ describe('settingsSchema', () => {
     )
     expect(settingsSchema.parse({ editorTextSize: 'huge' }).editorTextSize).toBe('small')
     expect(settingsSchema.parse({ editorTextSize: 3 }).editorTextSize).toBe('small')
+    expect(settingsSchema.parse({ editorTextDirection: 'sideways' }).editorTextDirection).toBe(
+      'auto',
+    )
+    expect(settingsSchema.parse({ editorTextDirection: 3 }).editorTextDirection).toBe('auto')
     expect(settingsSchema.parse({ editorFullWidth: 'yes' }).editorFullWidth).toBe(false)
     expect(settingsSchema.parse({ editorFullWidth: 1 }).editorFullWidth).toBe(false)
     expect(settingsSchema.parse({ sidebarWidth: 'wide' }).sidebarWidth).toBe(260)
@@ -228,6 +237,7 @@ describe('settingsSchema', () => {
       editorBulletAfterHeading: true,
       editorSmoothCaretAnimation: true,
       editorTextSize: 'small',
+      editorTextDirection: 'auto',
       editorFullWidth: false,
       sidebarWidth: 260,
       contextSidebarWidth: 320,

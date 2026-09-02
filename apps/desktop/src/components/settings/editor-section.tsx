@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import type { EditorMarkdownSyntax, EditorTextSize } from '@reflect/core'
+import type { EditorMarkdownSyntax, EditorTextDirection, EditorTextSize } from '@reflect/core'
 import { cn } from '@/lib/utils'
 import { useSettings } from '@/providers/settings-provider'
 import { SettingsField } from './field'
@@ -53,6 +53,30 @@ const TEXT_SIZE_OPTIONS: TextSizeOption[] = [
     value: 'large',
     label: 'Large',
     description: 'Comfortable',
+  },
+]
+
+interface TextDirectionOption {
+  value: EditorTextDirection
+  label: string
+  description: string
+}
+
+const TEXT_DIRECTION_OPTIONS: TextDirectionOption[] = [
+  {
+    value: 'auto',
+    label: 'Automatic',
+    description: 'Detect from note content',
+  },
+  {
+    value: 'ltr',
+    label: 'Left to right',
+    description: 'For the whole note',
+  },
+  {
+    value: 'rtl',
+    label: 'Right to left',
+    description: 'For the whole note',
   },
 ]
 
@@ -133,6 +157,48 @@ export function EditorSection(): ReactElement {
                     value={option.value}
                     checked={selected}
                     onChange={() => updateSettings({ editorTextSize: option.value })}
+                    className="mt-0.5 shrink-0 accent-accent"
+                  />
+                </SettingsOptionCard>
+              )
+            })}
+          </div>
+        </div>
+      </SettingsField>
+
+      <SettingsField
+        legend="Text direction"
+        description="Let the browser detect one direction for the whole note, or choose it yourself."
+      >
+        <div className="mt-3 @container">
+          <div className="grid grid-cols-1 gap-2 @xl:grid-cols-3">
+            {TEXT_DIRECTION_OPTIONS.map((option) => {
+              const selected = settings.editorTextDirection === option.value
+              return (
+                <SettingsOptionCard
+                  key={option.value}
+                  selected={selected}
+                  className="items-start justify-between gap-3 px-3 py-2.5"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className={cn(
+                        'block text-sm font-medium',
+                        selected && 'text-accent-soft-text',
+                      )}
+                    >
+                      {option.label}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-text-muted">
+                      {option.description}
+                    </span>
+                  </span>
+                  <input
+                    type="radio"
+                    name="editor-text-direction"
+                    value={option.value}
+                    checked={selected}
+                    onChange={() => updateSettings({ editorTextDirection: option.value })}
                     className="mt-0.5 shrink-0 accent-accent"
                   />
                 </SettingsOptionCard>

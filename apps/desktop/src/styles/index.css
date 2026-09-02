@@ -300,6 +300,26 @@ html:root {
   padding: 0;
   font-size: inherit;
   font-family: var(--font-reading, var(--font-sans));
+  text-align: start;
+}
+
+/* MarkdownView does not expose arbitrary DOM attributes, so its direction
+   lives on a box-less wrapper and is inherited by the rendered root. In auto
+   mode the browser resolves one base direction from the preview's first strong
+   character. Explicit settings override only non-fixed note previews. */
+.reflect-native-direction {
+  display: contents;
+}
+:root[data-editor-text-direction='ltr'] .reflect-native-direction:not([data-fixed-direction]) {
+  direction: ltr;
+}
+:root[data-editor-text-direction='rtl'] .reflect-native-direction:not([data-fixed-direction]) {
+  direction: rtl;
+}
+
+/* Source code remains left-to-right inside an RTL note. */
+.reflect-editor pre {
+  direction: ltr;
 }
 
 /* The primary note editor (the note pane and every daily-stream row, both via
@@ -378,7 +398,7 @@ html:root {
    blinks at the line start as if the ghost text weren't there. */
 .reflect-editor .reflect-title-placeholder::before {
   content: attr(data-placeholder);
-  float: left;
+  float: inline-start;
   height: 0;
   pointer-events: none;
   color: var(--text-muted);
@@ -537,9 +557,9 @@ html:root {
    the `> * + *` reset above relies on). meowdown's muted text already matches
    `--text-secondary`, so we no longer set the color. */
 .reflect-editor blockquote {
-  border-left: 2px solid var(--accent-soft, var(--border));
+  border-inline-start: 2px solid var(--accent-soft, var(--border));
   margin: 0.6em 0;
-  padding-left: 1em;
+  padding-inline-start: 1em;
 }
 
 /* A thematic break is content, not chrome. Keep it at V1's stronger rule
@@ -556,8 +576,18 @@ html:root {
    block keeps Reflect's radius/padding and its block margin. */
 .reflect-editor pre {
   border-radius: var(--radius-md, 6px);
+  direction: ltr;
   margin: 0.6em 0;
   padding: 0.75em 1em;
+  text-align: start;
+  unicode-bidi: isolate;
+}
+.reflect-editor code {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.reflect-editor :where(th, td) {
+  text-align: start;
 }
 
 /* Inline images: meowdown renders `![alt](src)` through a mark view

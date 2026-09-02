@@ -9,6 +9,7 @@ import {
   normalizeChatSystemPrompt,
   type AiPrompt,
   type AiProviderConfig,
+  type EditorTextDirection,
   type EditorTextSize,
   type ThemePreference,
 } from '@reflect/core'
@@ -63,6 +64,12 @@ const TEXT_SIZE_OPTIONS: readonly SegmentedOption<EditorTextSize>[] = [
   { value: 'small', label: 'Small' },
   { value: 'medium', label: 'Medium' },
   { value: 'large', label: 'Large' },
+]
+
+const TEXT_DIRECTION_OPTIONS: readonly SegmentedOption<EditorTextDirection>[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'ltr', label: 'LTR' },
+  { value: 'rtl', label: 'RTL' },
 ]
 
 /**
@@ -204,6 +211,12 @@ export function MobileSettings(): ReactElement {
           </SettingsGroup>
 
           <SettingsGroup header="Editor">
+            <SettingsSegmentedRow
+              label="Text direction"
+              value={settings.editorTextDirection}
+              options={TEXT_DIRECTION_OPTIONS}
+              onChange={(editorTextDirection) => updateSettings({ editorTextDirection })}
+            />
             <SettingsSwitchRow
               label="Smooth caret animation"
               checked={settings.editorSmoothCaretAnimation}

@@ -225,6 +225,7 @@ export function MobileTaskEditSheet({
               markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
               spellCheck={settings.editorSpellCheck}
               smoothCaretAnimation={settings.editorSmoothCaretAnimation}
+              textDirection="ltr"
               timeFormat={settings.timeFormat}
               // A one-line editor has nothing to reorder, so keep the gutter grip off.
               blockHandle={false}

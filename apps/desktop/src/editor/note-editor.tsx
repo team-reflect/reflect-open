@@ -7,7 +7,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react'
-import { errorMessage, type TimeFormat } from '@reflect/core'
+import { errorMessage, type EditorTextDirection, type TimeFormat } from '@reflect/core'
 import type {
   AcceptPendingReplacementOptions,
   ExitBoundaryHandler,
@@ -31,6 +31,7 @@ import {
   type WikilinkSearchHandler,
 } from '@meowdown/react'
 import { EditorInputTraits } from '@/editor/editor-input-traits'
+import { NativeEditorTextDirection } from '@/editor/editor-text-direction'
 import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge'
 import {
   IMAGE_LIGHTBOX_TRANSITION_NAME,
@@ -116,6 +117,8 @@ interface NoteEditorProps {
   spellCheck?: boolean
   /** Whether the caret animates between positions (default on). */
   smoothCaretAnimation?: boolean
+  /** One native direction policy for the entire editor (default auto). */
+  textDirection?: EditorTextDirection
   /**
    * Clock format for the time the `/now` slash command inserts (the
    * `timeFormat` setting). Defaults to `12h`.
@@ -233,6 +236,7 @@ export function NoteEditor({
   markMode = 'hide',
   spellCheck = true,
   smoothCaretAnimation = true,
+  textDirection = 'auto',
   timeFormat = '12h',
   bulletAfterHeading = false,
   blockHandle = false,
@@ -478,6 +482,7 @@ export function NoteEditor({
         onExitBoundary={handleExitBoundary}
       >
         <EditorInputTraits />
+        <NativeEditorTextDirection direction={textDirection} />
         {/* Only a pane that persists files gets the toolbar's attach button;
             `handleFilePaste` is the same handler meowdown pastes through. */}
         <FormattingToolbarBridge

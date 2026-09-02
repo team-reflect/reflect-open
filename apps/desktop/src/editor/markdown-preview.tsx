@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
+import type { EditorTextDirection } from '@reflect/core'
 import { useOpenExternalLink } from '@/editor/open-external-link'
 import { cn } from '@/lib/utils'
 
@@ -33,6 +34,8 @@ interface MarkdownPreviewProps {
   interactive?: boolean
   /** Extra classes for the rendered root. */
   className?: string
+  /** Fixed direction for UI previews; note previews inherit the editor setting. */
+  textDirection?: EditorTextDirection
 }
 
 export function MarkdownPreview({
@@ -41,6 +44,7 @@ export function MarkdownPreview({
   onWikiLinkClick,
   interactive = true,
   className,
+  textDirection,
 }: MarkdownPreviewProps): ReactElement {
   const openExternalLink = useOpenExternalLink()
   // The resolver and click handler are read through refs so a changing prop
@@ -70,14 +74,20 @@ export function MarkdownPreview({
   )
 
   return (
-    <MarkdownView
-      markdown={content}
-      markMode="hide"
-      interactive={interactive}
-      resolveImageUrl={resolveImageUrlStable}
-      {...(interactive ? { onLinkClick: openExternalLink } : {})}
-      {...(navigates ? { onWikilinkClick: onWikilinkClickStable } : {})}
-      className={cn('reflect-editor', className)}
-    />
+    <div
+      className="reflect-native-direction"
+      dir={textDirection ?? 'auto'}
+      {...(textDirection !== undefined ? { 'data-fixed-direction': '' } : {})}
+    >
+      <MarkdownView
+        markdown={content}
+        markMode="hide"
+        interactive={interactive}
+        resolveImageUrl={resolveImageUrlStable}
+        {...(interactive ? { onLinkClick: openExternalLink } : {})}
+        {...(navigates ? { onWikilinkClick: onWikilinkClickStable } : {})}
+        className={cn('reflect-editor', className)}
+      />
+    </div>
   )
 }
