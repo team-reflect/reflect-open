@@ -106,6 +106,27 @@ describe('placeOldTitleAlias', () => {
     })
   })
 
+  it('tracks a segment the previous title still derived once a rename drops it', async () => {
+    // First leg: `Alice // Dad` -> `Bob // Dad` added `Alice` and the whole title
+    // but not `Dad`, which the new title still derived. Second leg: `Dad` is
+    // added for the first time, so it must count as auto-added.
+    const session = fakeSession({
+      content: '---\naliases:\n  - Alice\n  - Alice // Dad\n---\n# Carol\n',
+    })
+    docs.openSession.mockReturnValue(session)
+
+    const added = await placeOldTitleAlias(
+      PATH,
+      { from: 'Bob // Dad', to: 'Carol', previousAutoAliases: ['Alice', 'Alice // Dad'] },
+      7,
+    )
+
+    expect(added).toEqual(['Bob', 'Dad', 'Bob // Dad'])
+    expect(session.updateFrontmatter).toHaveBeenCalledWith({
+      aliases: ['Bob', 'Dad', 'Bob // Dad'],
+    })
+  })
+
   it('computes against the session buffer, preserving concurrently-gained aliases', async () => {
     const session = fakeSession({
       content: '---\naliases:\n  - Gained Elsewhere\n---\n# Old Title\n',
