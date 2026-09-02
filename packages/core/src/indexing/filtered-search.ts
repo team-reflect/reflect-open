@@ -5,6 +5,7 @@ import { literalSearchQuery, type ParsedSearchQuery } from './filter-query'
 import { resolveWikiTarget } from './queries'
 import { HIGHLIGHT_END, HIGHLIGHT_START } from './search'
 import { buildFtsMatch, buildTitleMatchSql } from './search-query'
+import { displayNoteTitle } from '../markdown/note-title'
 import { highlightTitle } from './title-highlight'
 
 /**
@@ -27,7 +28,10 @@ import { highlightTitle } from './title-highlight'
 export interface FilteredSearchHit {
   path: string
   title: string
-  /** Full title with search matches marked; plain when the title did not match. */
+  /**
+   * The title's display form (a `//` subject reduced to its first segment)
+   * with search matches marked; plain when the title did not match.
+   */
   highlightedTitle: string
   dailyDate: string | null
   /** Highlighted body snippet when free text was searched, else null. */
@@ -189,7 +193,7 @@ export async function searchWithFilters(
     const rows = await taggedQuery.execute()
     return rows.map((row) => ({
       ...row,
-      highlightedTitle: row.title,
+      highlightedTitle: displayNoteTitle(row.title),
       snippet: null,
       isPinned: row.isPinned !== 0,
     }))
@@ -260,7 +264,7 @@ export async function searchWithFilters(
     const rows = await recallQuery.execute()
     return rows.map((row) => ({
       ...row,
-      highlightedTitle: row.title,
+      highlightedTitle: displayNoteTitle(row.title),
       snippet: null,
       isPinned: row.isPinned !== 0,
     }))
@@ -330,7 +334,7 @@ export async function searchWithFilters(
     // SQLite returns an unmarked body fragment when only the title matched.
     // That is not a search snippet and would be misleading in the result row.
     snippet: snippet?.includes(HIGHLIGHT_START) === true ? snippet : null,
-    highlightedTitle: highlightTitle(row.title, parsed.text, ftsHighlightedTitle),
+    highlightedTitle: highlightTitle(displayNoteTitle(row.title), parsed.text, ftsHighlightedTitle),
     isPinned: row.isPinned !== 0,
   }))
 }
