@@ -60,6 +60,11 @@ export function captureIdentity(capturedAt: Date, envelopeId: string): CaptureId
   return buildIdentity(base, date)
 }
 
+/** Where a post capture's `n`th media lands: `assets/<capture base>-<n>.jpg` (Plan 25). */
+export function postMediaAssetPath(identity: CaptureIdentity, index: number): string {
+  return assetPath(`${identity.base}-${index + 1}.jpg`)
+}
+
 /**
  * Recover a capture's identity from its note path, or `null` for anything
  * that isn't a well-formed capture note.

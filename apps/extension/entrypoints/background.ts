@@ -9,7 +9,8 @@ import { snapshotTab } from '@/lib/snapshot-active-tab'
 import { flashBadge } from '@/lib/badge'
 import { handlePostCaptured } from '@/lib/x/capture-post'
 import { isPostCapturedMessage, isPostReleasedMessage } from '@/lib/x/messages'
-import { disableXCapture, syncXContentScript, X_ORIGINS } from '@/lib/x/registration'
+import { removesXPermission } from '@/lib/x/permission'
+import { disableXCapture, syncXContentScript } from '@/lib/x/registration'
 import { clearPostSeen } from '@/lib/x/seen'
 import { tryExtractPageText } from './popup/extract-page-text'
 
@@ -23,6 +24,23 @@ import { tryExtractPageText } from './popup/extract-page-text'
 
 const RETRY_ALARM = 'capture-retry'
 const RETRY_PERIOD_MINUTES = 15
+
+/**
+ * Answer a `runtime.onMessage` request from a promise: the resolved value,
+ * or `fallback` after logging a rejection — the caller must still `return
+ * true` from the listener to keep the channel open.
+ */
+function respondWith<T>(
+  work: Promise<T>,
+  sendResponse: (response: T) => void,
+  fallback: T,
+  what: string,
+): void {
+  work.then(sendResponse, (cause: unknown) => {
+    console.error(`${what} failed:`, cause)
+    sendResponse(fallback)
+  })
+}
 
 async function saveTabWithDefaults(tab: Parameters<typeof snapshotTab>[0]): Promise<void> {
   const captured = await snapshotTab(tab)
@@ -49,34 +67,34 @@ async function saveTabWithDefaults(tab: Parameters<typeof snapshotTab>[0]): Prom
 export default defineBackground(() => {
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (isFlushRequest(message)) {
-      flushQueue().then(sendResponse, (cause: unknown) => {
-        console.error('capture flush failed:', cause)
-        sendResponse({ sent: 0, failed: 0, rejectedIds: [], held: -1, holdReason: 'io' })
-      })
+      respondWith(
+        flushQueue(),
+        sendResponse,
+        { sent: 0, failed: 0, rejectedIds: [], held: -1, holdReason: 'io' },
+        'capture flush',
+      )
       return true // responding asynchronously
     }
     if (isPostCapturedMessage(message)) {
-      handlePostCaptured(message.page).then(
-        (response) => {
+      respondWith(
+        handlePostCaptured(message.page).then((response) => {
           if (response.saved) {
             void flashBadge()
           }
-          sendResponse(response)
-        },
-        (cause: unknown) => {
-          console.error('post capture failed:', cause)
-          sendResponse({ saved: false, reason: 'rejected' })
-        },
+          return response
+        }),
+        sendResponse,
+        { saved: false, reason: 'rejected' },
+        'post capture',
       )
       return true
     }
     if (isPostReleasedMessage(message)) {
-      clearPostSeen(message.id).then(
-        () => sendResponse({ ok: true }),
-        (cause: unknown) => {
-          console.error('post release failed:', cause)
-          sendResponse({ ok: false })
-        },
+      respondWith(
+        clearPostSeen(message.id).then(() => ({ ok: true })),
+        sendResponse,
+        { ok: false },
+        'post release',
       )
       return true
     }
@@ -105,8 +123,7 @@ export default defineBackground(() => {
     void flushQueue()
   })
   browser.permissions.onRemoved.addListener((removed) => {
-    const origins = removed.origins ?? []
-    if (origins.some((origin) => (X_ORIGINS as readonly string[]).includes(origin))) {
+    if (removesXPermission(removed)) {
       void disableXCapture()
     }
   })

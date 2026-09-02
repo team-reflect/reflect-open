@@ -1,59 +1,37 @@
-import { toAppError } from '../errors'
-import { captureMediaFetch, writeAsset } from '../graph/commands'
-import { assetPath } from '../graph/paths'
+import type { EnrichmentContext, EnrichmentResult } from './capture-enrichment-context'
 import { persistCaptureEnrichment, type PendingCaptureSnapshot } from './capture-enrichment-write'
 import type { CaptureIdentity } from './capture-identity'
-import { postCaptureMeta } from './capture-note'
+import { localizePostMedia } from './post-media'
 import { mergePost } from './post-merge'
+import { postCaptureMeta, postFrontmatterPatch } from './post-meta'
 import {
   capturedPostFromFields,
   parsePostNoteBody,
   postNoteBody,
   postNoteTitle,
   type PostNoteFields,
-  type PostNoteMedia,
 } from './post-note'
 import { fetchSyndicatedPost } from './post-syndication'
 import { parsePostUrl, postPermalink } from './post-url'
 
 /**
- * The post leg of capture enrichment (Plan 25): fetch the post from X's
- * embed backend, merge it with what the page read, download the media into
- * the graph, and re-render the note from the merged post. No AI — the
- * deterministic `Name (@handle): text…` title beats a model's guess, and the
- * post is its own description. Every await is followed by the same privacy
- * re-check the link legs make, through the context the pass hands in.
+ * The post leg of capture enrichment (Plan 25): read the drain-written note
+ * back, fetch the post from X's embed backend, merge the two, download the
+ * media into the graph, and re-render the note from the merged post. No AI —
+ * the deterministic `Name (@handle): text…` title beats a model's guess, and
+ * the post is its own description. Every await is followed by the same
+ * privacy re-check the link legs make, through the context the pass hands in.
  */
-
-export interface PostEnrichmentContext {
-  generation: number
-  /** Abort gate — the graph session ended. */
-  stale: () => boolean
-  /** Re-read the note and its daily; marks the capture skipped and returns `null` when the gate fails. */
-  currentCapture: (
-    identity: CaptureIdentity,
-    expectedHash?: string,
-  ) => Promise<PendingCaptureSnapshot | null>
-  /** Mark a still-pending capture skipped. */
-  skipPending: (identity: CaptureIdentity) => Promise<void>
-}
-
-export type PostEnrichmentResult = 'enriched' | 'skipped' | 'stale'
-
-/** Where a post's `n`th media lands: `assets/<capture base>-<n>.jpg`. */
-export function postMediaAssetPath(identity: CaptureIdentity, index: number): string {
-  return assetPath(`${identity.base}-${index + 1}.jpg`)
-}
 
 /**
  * Enrich one pending post capture. Transient failures (`network`) propagate
  * so the pass leaves the note pending for retry, exactly like the link legs.
  */
 export async function enrichPostCapture(
-  context: PostEnrichmentContext,
+  context: EnrichmentContext,
   identity: CaptureIdentity,
   initial: PendingCaptureSnapshot,
-): Promise<PostEnrichmentResult> {
+): Promise<EnrichmentResult> {
   const post = postCaptureMeta(initial.meta)
   if (post === null) {
     throw new Error('enrichPostCapture called for a link capture')
@@ -69,45 +47,25 @@ export async function enrichPostCapture(
     await context.skipPending(identity)
     return 'skipped'
   }
-  const page = capturedPostFromFields(fields, { id: post.id, trigger: post.trigger })
+  const page = capturedPostFromFields(fields, post)
 
   const remote = await fetchSyndicatedPost(post.id, post.trigger)
   if (context.stale()) {
     return 'stale'
   }
-  let snapshot = await context.currentCapture(identity)
-  if (snapshot === null) {
+  if ((await context.currentCapture(identity)) === null) {
     return 'skipped'
   }
   const merged = mergePost(page, remote.kind === 'post' ? remote.post : null)
 
-  const media: PostNoteMedia[] = []
-  for (const [index, item] of (merged.media ?? []).entries()) {
-    let src = item.url
-    try {
-      const jpeg = await captureMediaFetch(item.url)
-      if (context.stale()) {
-        return 'stale'
-      }
-      snapshot = await context.currentCapture(identity)
-      if (snapshot === null) {
-        return 'skipped'
-      }
-      const target = postMediaAssetPath(identity, index)
-      await writeAsset(target, jpeg, context.generation)
-      src = target
-    } catch (cause) {
-      if (toAppError(cause).kind === 'network') {
-        throw cause
-      }
-      // Gone, refused, or not an image: the note keeps the remote link.
-    }
-    media.push({ kind: item.kind, src, alt: item.alt ?? '' })
+  const localized = await localizePostMedia(context, identity, merged.media ?? [])
+  if (localized.kind !== 'media') {
+    return localized.kind
   }
   if (context.stale()) {
     return 'stale'
   }
-  snapshot = await context.currentCapture(identity)
+  const snapshot = await context.currentCapture(identity)
   if (snapshot === null) {
     return 'skipped'
   }
@@ -124,7 +82,7 @@ export async function enrichPostCapture(
     postedAt: merged.postedAt ?? null,
     text: merged.text ?? null,
     truncated: merged.truncated === true,
-    media,
+    media: localized.media,
     quoted: merged.quoted ?? null,
     note: fields.note,
     screenshot: fields.screenshot,
@@ -138,10 +96,7 @@ export async function enrichPostCapture(
     toTitle: title,
     status: 'done',
     provider: null,
-    frontmatter: {
-      captureUrl: url,
-      postTruncated: merged.truncated === true ? true : undefined,
-    },
+    frontmatter: { captureUrl: url, ...postFrontmatterPatch(merged) },
     generation: context.generation,
   })
   if (captureHash === null) {

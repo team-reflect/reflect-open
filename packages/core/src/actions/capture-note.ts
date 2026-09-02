@@ -6,7 +6,8 @@ import { wikiLinkSafe } from '../markdown/edit'
 import { upsertFrontmatter } from '../markdown/frontmatter'
 import type { Frontmatter } from '../markdown/model'
 import type { CaptureIdentity } from './capture-identity'
-import { postTriggerSchema, type CaptureEnvelope, type CapturedPost } from './capture-envelope'
+import type { CaptureEnvelope, CapturedPost } from './capture-envelope'
+import { postFrontmatter, postNoteMetaSchema } from './post-meta'
 import { postNoteBody, postNoteFields, postNoteTitle } from './post-note'
 
 export { notePrivate } from '../privacy/checkers'
@@ -33,12 +34,7 @@ const captureNoteMetaSchema = z.object({
   captureHash: z.string(),
   captureSelectionHash: z.string().optional(),
   captureScreenshot: z.string().optional(),
-  /** Set for post captures (Plan 25); absent on link captures. */
-  captureKind: z.literal('post').optional(),
-  postId: z.string().optional(),
-  postTrigger: postTriggerSchema.optional(),
-  /** The drain-written text is a prefix; enrichment tries to complete it. */
-  postTruncated: z.boolean().optional(),
+  ...postNoteMetaSchema.shape,
 })
 
 export type CaptureNoteMeta = z.infer<typeof captureNoteMetaSchema>
@@ -47,20 +43,6 @@ export type CaptureNoteMeta = z.infer<typeof captureNoteMetaSchema>
 export function captureNoteMeta(frontmatter: Frontmatter): CaptureNoteMeta | null {
   const parsed = captureNoteMetaSchema.safeParse(frontmatter)
   return parsed.success ? parsed.data : null
-}
-
-/** The post identity of a post capture note, or `null` for a link capture. */
-export function postCaptureMeta(
-  meta: CaptureNoteMeta,
-): { id: string; trigger: CapturedPost['trigger']; truncated: boolean } | null {
-  if (meta.captureKind !== 'post' || meta.postId === undefined) {
-    return null
-  }
-  return {
-    id: meta.postId,
-    trigger: meta.postTrigger ?? 'manual',
-    truncated: meta.postTruncated === true,
-  }
 }
 
 function urlHost(url: string): string {
@@ -175,14 +157,7 @@ export async function captureNoteSource(
     captureHash: await hashContent(body),
     captureSelectionHash: options.selectionHash,
     captureScreenshot: options.hasScreenshot ? identity.assetPath : undefined,
-    ...(post === undefined
-      ? {}
-      : {
-          captureKind: 'post',
-          postId: post.id,
-          postTrigger: post.trigger,
-          postTruncated: post.truncated === true ? true : undefined,
-        }),
+    ...(post === undefined ? {} : postFrontmatter(post)),
   })
 }
 

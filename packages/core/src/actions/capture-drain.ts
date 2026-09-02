@@ -31,8 +31,6 @@ import {
 } from './capture-identity'
 import {
   inboxEnvelopeSchema,
-  type CaptureEnvelope,
-  type CapturedPost,
   type InboxEnvelope,
   type TextCaptureEnvelope,
 } from './capture-envelope'
@@ -47,7 +45,7 @@ import {
   type CaptureNoteMeta,
   type CaptureStatus,
 } from './capture-note'
-import { parsePostUrl } from './post-url'
+import { postCaptureOf } from './post-capture'
 
 /** The category note every captured-link section backlinks. */
 const LINKS_NOTE_TITLE = 'Links'
@@ -145,32 +143,6 @@ async function findSameDayCapture(
 }
 
 /**
- * The post a link envelope captures, when it is one (Plan 25): the block the
- * producer sent, or — for any post permalink captured without one (⌘⇧K, the
- * popup, a share) — a `manual` capture with nothing read off the page. Either
- * way the envelope's URL becomes the canonical permalink so the same post
- * dedupes across `x.com`/`twitter.com` spellings and share-sheet junk params.
- */
-function postCapture(envelope: CaptureEnvelope): {
-  envelope: CaptureEnvelope
-  post: CapturedPost | undefined
-} {
-  const permalink = parsePostUrl(envelope.url)
-  if (envelope.post !== undefined) {
-    const handle = envelope.post.author?.handle ?? permalink?.handle ?? null
-    const url = `https://x.com/${handle ?? 'i'}/status/${envelope.post.id}`
-    return { envelope: { ...envelope, url }, post: envelope.post }
-  }
-  if (permalink === null) {
-    return { envelope, post: undefined }
-  }
-  return {
-    envelope: { ...envelope, url: permalink.url },
-    post: { provider: 'x', id: permalink.id, trigger: 'manual' },
-  }
-}
-
-/**
  * Drain every spooled capture into the graph — phase 1, the durable save.
  * Never throws.
  */
@@ -228,7 +200,7 @@ export async function drainCaptureInbox(
         drained += 1
         continue
       }
-      const { envelope, post } = postCapture(parsed)
+      const { envelope, post } = postCaptureOf(parsed)
       const fresh = captureIdentity(new Date(envelope.capturedAt), envelope.id)
       const daily = dailyPath(fresh.date)
       const linksNoteTitle = await ensureBacklinkTarget(LINKS_NOTE_TITLE, input.generation)

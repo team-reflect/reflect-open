@@ -1,5 +1,11 @@
-import type { CapturedPost, PostTrigger } from '@reflect/core/capture-envelope'
+import {
+  POST_TEXT_MAX_LENGTH,
+  type CapturedPost,
+  type PostAuthor,
+  type PostTrigger,
+} from '@reflect/core/capture-envelope'
 import { parsePostUrl, type PostPermalink } from '@reflect/core/post-url'
+import { ARTICLE_SELECTOR, testIdSelector, X_TEST_IDS } from './x-markup'
 
 /**
  * Read a post off X's page (Plan 25) — the minimal contract: the id from
@@ -9,10 +15,6 @@ import { parsePostUrl, type PostPermalink } from '@reflect/core/post-url'
  * desktop's enrichment fetches the rest. Media and quoted posts are left to
  * enrichment for now.
  */
-
-export const ARTICLE_SELECTOR = 'article[data-testid="tweet"]'
-
-const POST_TEXT_MAX = 10_000
 
 /** The nested quoted post, when any — never read its text as the article's. */
 function isInsideQuotedPost(element: Element, article: Element): boolean {
@@ -88,8 +90,8 @@ export function renderedText(root: Node): string {
     .trim()
 }
 
-function authorOf(article: Element, handle: string): CapturedPost['author'] | undefined {
-  const userName = firstOwnMatch(article, '[data-testid="User-Name"]')
+function authorOf(article: Element, handle: string): PostAuthor {
+  const userName = firstOwnMatch(article, testIdSelector(X_TEST_IDS.userName))
   if (userName === null) {
     return { name: handle, handle }
   }
@@ -116,19 +118,16 @@ export function extractPost(article: Element, trigger: PostTrigger): CapturedPos
   }
   const post: CapturedPost = { provider: 'x', id: permalink.id, trigger }
   if (permalink.handle !== null) {
-    const author = authorOf(article, permalink.handle)
-    if (author !== undefined) {
-      post.author = author
-    }
+    post.author = authorOf(article, permalink.handle)
   }
-  const textElement = firstOwnMatch(article, '[data-testid="tweetText"]')
+  const textElement = firstOwnMatch(article, testIdSelector(X_TEST_IDS.text))
   if (textElement !== null) {
-    const text = renderedText(textElement).slice(0, POST_TEXT_MAX)
+    const text = renderedText(textElement).slice(0, POST_TEXT_MAX_LENGTH)
     if (text !== '') {
       post.text = text
     }
   }
-  if (firstOwnMatch(article, '[data-testid="tweet-text-show-more-link"]') !== null) {
+  if (firstOwnMatch(article, testIdSelector(X_TEST_IDS.showMore)) !== null) {
     post.truncated = true
   }
   const time = firstOwnMatch(article, 'time[datetime]')

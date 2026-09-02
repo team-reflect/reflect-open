@@ -1,4 +1,5 @@
-import { ARTICLE_SELECTOR, articlePermalink } from './extract-post'
+import { articlePermalink } from './extract-post'
+import { ARTICLE_SELECTOR, testIdSelector, X_TEST_IDS } from './x-markup'
 
 /**
  * Watch X's page for bookmark and like state changes (Plan 25). X renders
@@ -31,9 +32,7 @@ interface PostState {
 const STATE_CAP = 2000
 
 function controlState(article: Element, on: string, off: string): boolean | null {
-  const control = article.querySelector(
-    `button[data-testid="${CSS.escape(on)}"], button[data-testid="${CSS.escape(off)}"]`,
-  )
+  const control = article.querySelector(`button${testIdSelector(on)}, button${testIdSelector(off)}`)
   if (control === null) {
     return null
   }
@@ -43,8 +42,8 @@ function controlState(article: Element, on: string, off: string): boolean | null
 /** The article's current state; `null` where the control is not rendered. */
 export function articleState(article: Element): PostState {
   return {
-    bookmarked: controlState(article, 'removeBookmark', 'bookmark'),
-    liked: controlState(article, 'unlike', 'like'),
+    bookmarked: controlState(article, X_TEST_IDS.removeBookmark, X_TEST_IDS.bookmark),
+    liked: controlState(article, X_TEST_IDS.unlike, X_TEST_IDS.like),
   }
 }
 

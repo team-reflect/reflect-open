@@ -16,12 +16,17 @@ enrichment, privacy gate) and the desktop's bounded web fetch primitives
 
 **Status (2026-09-02): Phases 1–2 implemented** in one PR — the `post` block
 on the envelope (TS + host serde mirror + shared fixtures), the post note
-template and its read-back parser (`post-note.ts`), syndication fetch/merge
-(`post-syndication.ts`, `post-merge.ts`), the drain and enrichment legs
-(`post-enrichment.ts`), the Rust `capture_json_fetch` (generalized from the
-oEmbed fetch) and `capture_media_fetch` commands, and in the extension the
-opt-in permission + runtime-registered watcher (`lib/x/`, the options page,
-the popup nudge, the badge). Two deliberate deltas from the phase text below:
+template and its read-back parser (`post-note-render.ts` / `post-note-parse.ts`
+over the shared `post-note-markup.ts`), the post frontmatter keys
+(`post-meta.ts`), permalink detection for the drain (`post-capture.ts`),
+syndication fetch/merge (`post-syndication.ts`, `post-merge.ts`), the post
+enrichment leg (`post-enrichment.ts`, media in `post-media.ts`), the Rust
+`capture_json_fetch` (generalized from the oEmbed fetch) and
+`capture_media_fetch` commands, and in the extension the opt-in permission +
+runtime-registered watcher (`lib/x/`, the options page, the popup nudge, the
+badge). Landing the post leg also split the enrichment pass: the link legs
+now live in `link-enrichment.ts`, both legs share `capture-enrichment-context.ts`,
+and `reconcileCaptureEnrichment` is list → resume → dispatch by kind → count. Two deliberate deltas from the phase text below:
 posts dedupe on **post id**, not URL (a handle-less `/i/status/` share and the
 page's `/<handle>/status/` are one post), and the manual path (popup / ⌘⇧K on
 a permalink) already sends the minimal page read through the on-demand
