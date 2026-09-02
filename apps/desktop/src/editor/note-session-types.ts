@@ -158,6 +158,16 @@ export interface NoteSession {
    */
   isUnpersisted: () => boolean
   /**
+   * Pause new saves and wait for the initial load plus any write already in
+   * flight before deletion chooses between local discard and filesystem
+   * trash. Returns true when no backing file exists. The caller must finish
+   * with {@link NoteSession.discard} on success or
+   * {@link NoteSession.cancelDelete} when filesystem deletion fails.
+   */
+  prepareDelete: () => Promise<boolean>
+  /** Resume normal persistence after a prepared filesystem deletion fails. */
+  cancelDelete: () => void
+  /**
    * Patch frontmatter keys (e.g. `aliases`, Plan 07b) without touching the
    * editor: the header is updated in place and saved through the normal
    * pipeline. Returns false (and does nothing) when the session can't take

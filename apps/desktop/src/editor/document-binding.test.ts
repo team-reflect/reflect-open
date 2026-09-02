@@ -30,6 +30,8 @@ function fakeSession(path: string) {
     keepMine: () => {},
     isDirty: () => false,
     isUnpersisted: () => false,
+    prepareDelete: async () => false,
+    cancelDelete: () => {},
     loadTheirs: () => {},
     commitFrontmatter: async () => true,
     content: () => '',

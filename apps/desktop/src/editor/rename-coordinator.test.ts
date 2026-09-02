@@ -114,6 +114,8 @@ function fakeSession(content: string): NoteSession & {
     keepMine: () => {},
     isDirty: () => false,
     isUnpersisted: () => false,
+    prepareDelete: async () => false,
+    cancelDelete: () => {},
     loadTheirs: () => {},
     commitFrontmatter: async () => true,
     content: () => content,

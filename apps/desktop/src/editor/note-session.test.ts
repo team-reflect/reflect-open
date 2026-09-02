@@ -172,6 +172,20 @@ describe('createNoteSession', () => {
     expect(writes).toEqual([])
   })
 
+  it('resumes a paused pending save when prepared deletion fails', async () => {
+    const { session, writes } = harness()
+    session.load()
+    await settled()
+
+    session.editorChanged('# Unsaved edit\n')
+    await expect(session.prepareDelete()).resolves.toBe(false)
+    expect(writes).toEqual([])
+
+    session.cancelDelete()
+    await settled()
+    expect(writes).toEqual([{ path: 'notes/a.md', contents: '# Unsaved edit\n' }])
+  })
+
   it('does not re-emit identical snapshots', async () => {
     const { session, snapshots } = harness()
     session.load()

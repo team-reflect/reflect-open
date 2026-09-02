@@ -23,7 +23,7 @@ describe('deleteOpenNote', () => {
   it('discards a new note that has not reached disk without trying to trash a file', async () => {
     const discard = vi.fn()
     vi.mocked(openSession).mockReturnValue({
-      isUnpersisted: () => true,
+      prepareDelete: async () => true,
       discard,
     } as unknown as NoteSession)
 
@@ -36,7 +36,7 @@ describe('deleteOpenNote', () => {
   it('trashes the file, then discards its open session so it cannot resurrect', async () => {
     const discard = vi.fn()
     vi.mocked(openSession).mockReturnValue({
-      isUnpersisted: () => false,
+      prepareDelete: async () => false,
       discard,
     } as unknown as NoteSession)
 
@@ -54,6 +54,22 @@ describe('deleteOpenNote', () => {
     await deleteOpenNote('notes/keep.md', 7)
 
     expect(mockInvoke).toHaveBeenCalledWith('note_delete', { path: 'notes/keep.md', generation: 7 })
+  })
+
+  it('resumes persistence when trashing a prepared session fails', async () => {
+    const cancelDelete = vi.fn()
+    const discard = vi.fn()
+    vi.mocked(openSession).mockReturnValue({
+      prepareDelete: async () => false,
+      cancelDelete,
+      discard,
+    } as unknown as NoteSession)
+    mockInvoke.mockRejectedValue(new Error('disk full'))
+
+    await expect(deleteOpenNote('notes/keep.md', 7)).rejects.toThrow('disk full')
+
+    expect(cancelDelete).toHaveBeenCalledOnce()
+    expect(discard).not.toHaveBeenCalled()
   })
 
   it('refuses to delete a daily note and never touches disk or sessions', async () => {
