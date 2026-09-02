@@ -75,7 +75,11 @@ export function NoteDeleteDrawer({
             It moves to the graph’s trash and disappears from your notes. You can recover it on
             desktop.
           </DrawerDescription>
-          {error !== null ? <p className="text-sm text-destructive">{error}</p> : null}
+          {error !== null ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
           <div className="flex flex-col gap-2 pt-2">
             <Button
               variant="destructive"
