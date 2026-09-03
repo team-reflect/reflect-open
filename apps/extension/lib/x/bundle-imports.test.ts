@@ -24,8 +24,13 @@ const FORBIDDEN = new Set([
 /** Bare specifiers that are part of the runtime, not the bundle. */
 const EXTERNAL = new Set(['wxt/browser', '#imports'])
 
-/** `import type …` (erased) vs any other `import … from '…'`; group 2 is the specifier. */
-const IMPORT_RE = /^import (type\b)?[^'"]*['"]([^'"]+)['"]/gm
+/** Every `import … '…'` statement head; group 1 is the specifier. */
+const IMPORT_RE = /^import [^'"]*['"]([^'"]+)['"]/gm
+
+/** `import type …` is erased by the bundler and adds no edge. */
+function isTypeOnly(statement: string): boolean {
+  return statement.startsWith('import type ')
+}
 
 function coreSubpath(specifier: string): string | null {
   const packageJson = JSON.parse(readFileSync(resolve(CORE_ROOT, 'package.json'), 'utf8')) as {
@@ -68,8 +73,8 @@ function valueImportEdges(entry: string): Array<[string, string]> {
     seen.add(file)
     const source = readFileSync(file, 'utf8')
     for (const match of source.matchAll(IMPORT_RE)) {
-      const [, typeOnly, specifier] = match
-      if (typeOnly || specifier === undefined) {
+      const [statement, specifier] = match
+      if (isTypeOnly(statement) || specifier === undefined) {
         continue
       }
       edges.push([file, specifier])
