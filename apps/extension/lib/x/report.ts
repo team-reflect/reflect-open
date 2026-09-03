@@ -6,7 +6,7 @@ import {
   POST_RELEASED_MESSAGE_TYPE,
   type PostCapturedMessage,
   type PostReleasedMessage,
-} from './messages'
+} from './message-types'
 
 /**
  * Turn a watched transition into the message the content script sends. A

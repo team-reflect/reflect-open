@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser'
 import { defineContentScript } from '#imports'
 import { startBookmarkWatch } from '@/lib/x/bookmark-watch'
-import { isStopXCaptureMessage } from '@/lib/x/messages'
+import { isStopXCaptureMessage } from '@/lib/x/message-types'
 import { X_ORIGINS } from '@/lib/x/origins'
 import { messageForChange } from '@/lib/x/report'
 

@@ -1,36 +1,49 @@
 import { z } from 'zod'
 import { capturedPostSchema } from '@reflect/core/capture-envelope'
+import {
+  EXTRACT_POST_MESSAGE_TYPE,
+  POST_CAPTURED_MESSAGE_TYPE,
+  POST_RELEASED_MESSAGE_TYPE,
+  type ExtractPostRequest,
+  type ExtractPostResponse,
+  type PostCapturedMessage,
+  type PostReleasedMessage,
+} from './message-types'
 
 /**
- * The X content script ↔ background contract (Plan 25). The content script
- * reports every state transition it saw; the background owns the decision
- * (preferences, the seen-set) and the queue.
+ * The validating half of the X message contract (Plan 25), for the
+ * background, the popup, and the on-demand content script — every receiver
+ * of a message that carries a post. The shapes are declared in
+ * `message-types.ts`; each schema is pinned to its interface so the two
+ * cannot drift. The watcher content script imports only `message-types`.
  */
 
-export const POST_CAPTURED_MESSAGE_TYPE = 'reflect:post-captured'
-export const POST_RELEASED_MESSAGE_TYPE = 'reflect:post-released'
-export const EXTRACT_POST_MESSAGE_TYPE = 'reflect:extract-post'
-export const X_CAPTURE_STOP_MESSAGE_TYPE = 'reflect:x-capture-stop'
+export {
+  EXTRACT_POST_MESSAGE_TYPE,
+  POST_CAPTURED_MESSAGE_TYPE,
+  POST_RELEASED_MESSAGE_TYPE,
+  X_CAPTURE_STOP_MESSAGE_TYPE,
+  isStopXCaptureMessage,
+  type ExtractPostRequest,
+  type ExtractPostResponse,
+  type PostCapturedMessage,
+  type PostReleasedMessage,
+  type StopXCaptureMessage,
+} from './message-types'
 
-/** A post just became bookmarked or liked on the page. */
 export const postCapturedMessageSchema = z.object({
   type: z.literal(POST_CAPTURED_MESSAGE_TYPE),
   page: z.object({
-    /** The post permalink, as the page spells it. */
     url: z.url(),
-    /** The tab title — the note's fallback title when nothing was read. */
     title: z.string(),
     post: capturedPostSchema,
   }),
-})
-export type PostCapturedMessage = z.infer<typeof postCapturedMessageSchema>
+}) satisfies z.ZodType<PostCapturedMessage>
 
-/** A post was un-bookmarked (or un-liked): forget it, so a re-bookmark captures. */
 export const postReleasedMessageSchema = z.object({
   type: z.literal(POST_RELEASED_MESSAGE_TYPE),
   id: z.string(),
-})
-export type PostReleasedMessage = z.infer<typeof postReleasedMessageSchema>
+}) satisfies z.ZodType<PostReleasedMessage>
 
 /** What the background did with a reported transition. */
 export const postCaptureResponseSchema = z.object({
@@ -39,24 +52,14 @@ export const postCaptureResponseSchema = z.object({
 })
 export type PostCaptureResponse = z.infer<typeof postCaptureResponseSchema>
 
-/** Popup/shortcut request to the on-demand content script on a permalink page. */
 export const extractPostRequestSchema = z.object({
   type: z.literal(EXTRACT_POST_MESSAGE_TYPE),
-  /** The post id the page is expected to show. */
   id: z.string(),
-})
-export type ExtractPostRequest = z.infer<typeof extractPostRequestSchema>
+}) satisfies z.ZodType<ExtractPostRequest>
 
 export const extractPostResponseSchema = z.object({
   post: capturedPostSchema.nullable(),
-})
-export type ExtractPostResponse = z.infer<typeof extractPostResponseSchema>
-
-/** Background → content script: the feature was switched off; stop watching. */
-export const stopXCaptureMessageSchema = z.object({
-  type: z.literal(X_CAPTURE_STOP_MESSAGE_TYPE),
-})
-export type StopXCaptureMessage = z.infer<typeof stopXCaptureMessageSchema>
+}) satisfies z.ZodType<ExtractPostResponse>
 
 /** Is `message` a well-formed {@link PostCapturedMessage}? Validates against its schema. */
 export function isPostCapturedMessage(message: unknown): message is PostCapturedMessage {
@@ -66,9 +69,4 @@ export function isPostCapturedMessage(message: unknown): message is PostCaptured
 /** Is `message` a well-formed {@link PostReleasedMessage}? Validates against its schema. */
 export function isPostReleasedMessage(message: unknown): message is PostReleasedMessage {
   return postReleasedMessageSchema.safeParse(message).success
-}
-
-/** Is `message` a well-formed {@link StopXCaptureMessage}? Validates against its schema. */
-export function isStopXCaptureMessage(message: unknown): message is StopXCaptureMessage {
-  return stopXCaptureMessageSchema.safeParse(message).success
 }

@@ -1,9 +1,5 @@
-import {
-  POST_TEXT_MAX_LENGTH,
-  type CapturedPost,
-  type PostAuthor,
-  type PostTrigger,
-} from '@reflect/core/capture-envelope'
+import type { CapturedPost, PostAuthor, PostTrigger } from '@reflect/core/capture-envelope'
+import { POST_TEXT_MAX_LENGTH } from '@reflect/core/post-limits'
 import { parsePostUrl, type PostPermalink } from '@reflect/core/post-url'
 import { ARTICLE_SELECTOR, testIdSelector, X_TEST_IDS } from './x-markup'
 

@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./capture-envelope": "./src/actions/capture-envelope.ts",
-    "./post-url": "./src/actions/post-url.ts"
+    "./post-url": "./src/actions/post-url.ts",
+    "./post-limits": "./src/actions/post-limits.ts"
   },
   "scripts": {
     "test": "vitest run --config ../../vitest.config.ts --project core-browser --project core-node"

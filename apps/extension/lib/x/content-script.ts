@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser'
-import { X_CAPTURE_STOP_MESSAGE_TYPE, type StopXCaptureMessage } from './messages'
+import { X_CAPTURE_STOP_MESSAGE_TYPE, type StopXCaptureMessage } from './message-types'
 import { X_ORIGINS } from './origins'
 
 /**

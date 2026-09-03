@@ -26,7 +26,11 @@ enrichment leg (`post-enrichment.ts`, media in `post-media.ts`), the Rust
 runtime-registered watcher (`lib/x/`, the options page, the popup nudge, the
 badge). Landing the post leg also split the enrichment pass: the link legs
 now live in `link-enrichment.ts`, both legs share `capture-enrichment-context.ts`,
-and `reconcileCaptureEnrichment` is list → resume → dispatch by kind → count. Two deliberate deltas from the phase text below:
+and `reconcileCaptureEnrichment` is list → resume → dispatch by kind → count.
+The watcher content script is kept validator-free (8 kB built): its half of
+the message contract is `lib/x/message-types.ts`, size caps come from
+`@reflect/core/post-limits`, and `lib/x/bundle-imports.test.ts` fails on any
+value-level import of zod or the envelope schemas from the watcher. Two deliberate deltas from the phase text below:
 posts dedupe on **post id**, not URL (a handle-less `/i/status/` share and the
 page's `/<handle>/status/` are one post), and the manual path (popup / ⌘⇧K on
 a permalink) already sends the minimal page read through the on-demand
