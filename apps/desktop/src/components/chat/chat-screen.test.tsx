@@ -4,6 +4,7 @@ import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import type { ReactElement } from 'react'
 import {
+  aiProvider,
   cloudSafeGraphContext,
   type AiProviderConfig,
   type ChatModelSelection,
@@ -404,22 +405,15 @@ describe('ChatScreen', () => {
       .getByRole('option')
       .elements()
       .map((option) => option.textContent)
-    // The full curated catalog plus the entry's custom configured model.
     expect(labels).toEqual([
-      'GPT-6 Astra',
-      'GPT-5.6 Sol',
-      'GPT-5.6 Terra',
-      'GPT-5.6 Luna',
-      'GPT-5.5',
-      'GPT-5.4',
-      'GPT-5.4 mini',
-      'GPT-5.4 nano',
-      'gpt-5.1',
+      ...aiProvider('openai').models.map((model) => model.label),
+      MODEL.model,
     ])
   })
 
   it('routes the turn to the picked catalog model', async () => {
     configureModel()
+    const pick = aiProvider('openai').models[1]!
     scriptTurn([
       { type: 'text-delta', text: 'Hi.' },
       { type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] },
@@ -427,23 +421,24 @@ describe('ChatScreen', () => {
     const view = await renderChat()
 
     await view.getByRole('combobox', { name: 'Model' }).click()
-    await page.getByRole('option', { name: 'GPT-5.6 Terra' }).click()
+    await page.getByRole('option', { name: pick.label }).click()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hi{Enter}')
 
     await vi.waitFor(() => expect(streamChat).toHaveBeenCalledTimes(1))
     // Same entry (id → keychain key), with the picked model applied.
-    expect(streamChat.mock.lastCall?.[0].config).toEqual({ ...MODEL, model: 'gpt-5.6-terra' })
+    expect(streamChat.mock.lastCall?.[0].config).toEqual({ ...MODEL, model: pick.id })
   })
 
   it('starts the picker on the model persisted from the last session', async () => {
     configureModel()
-    settingsState.selection = { configId: 'm1', modelId: 'gpt-5.6-luna' }
+    const pick = aiProvider('openai').models[2]!
+    settingsState.selection = { configId: 'm1', modelId: pick.id }
     const view = await renderChat()
 
     await view.getByRole('combobox', { name: 'Model' }).click()
 
-    const picked = page.getByRole('option', { name: 'GPT-5.6 Luna' })
+    const picked = page.getByRole('option', { name: pick.label })
     await expect.element(picked).toHaveAttribute('aria-selected', 'true')
   })
 
