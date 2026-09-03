@@ -25,7 +25,7 @@ export function SidebarPinnedRowPreview({
   return (
     <span
       className={cn(
-        'group flex w-full touch-none items-center rounded-md leading-5 transition-colors duration-[50ms]',
+        'group flex w-full touch-none items-center rounded-md leading-5',
         stateClass,
         overlay && 'shadow-sm',
       )}

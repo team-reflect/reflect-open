@@ -24,7 +24,7 @@ export function SettingsOptionCard({
   return (
     <label
       className={cn(
-        'flex cursor-pointer rounded-lg border transition-colors duration-100',
+        'flex cursor-pointer rounded-lg border',
         'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus-ring',
         selected ? 'border-accent bg-accent-soft' : 'border-border hover:bg-surface-hover',
         className,

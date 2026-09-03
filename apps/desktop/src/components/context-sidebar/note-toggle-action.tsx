@@ -59,11 +59,11 @@ export function NoteToggleAction({
       type="button"
       onClick={() => void toggleActive()}
       disabled={isToggling}
-      className="group relative flex w-full items-center space-x-2 rounded-lg px-3 py-2 text-start transition-colors duration-100 hover:bg-surface-hover disabled:opacity-50"
+      className="group relative flex w-full items-center space-x-2 rounded-lg px-3 py-2 text-start hover:bg-surface-hover disabled:opacity-50"
     >
       <span
         className={cn(
-          'flex h-5 w-5 flex-none items-center justify-center transition-colors duration-100',
+          'flex h-5 w-5 flex-none items-center justify-center',
           isActive ? 'text-accent' : 'text-text-muted group-hover:text-text',
         )}
       >

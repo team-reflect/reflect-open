@@ -39,7 +39,7 @@ export function DailyEventsSection({ date }: DailyEventsSectionProps): ReactElem
               type="button"
               onClick={() => setPendingEvent(event)}
               title="Add to daily note"
-              className="group flex w-full items-center gap-2 rounded-md px-3 py-1 leading-5 text-text-secondary transition-colors duration-100 hover:bg-surface-hover hover:text-text"
+              className="group flex w-full items-center gap-2 rounded-md px-3 py-1 leading-5 text-text-secondary hover:bg-surface-hover hover:text-text"
             >
               <span className="min-w-0 flex-1 truncate text-left text-xs font-medium">
                 {event.title}
