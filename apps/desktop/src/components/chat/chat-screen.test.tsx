@@ -406,6 +406,7 @@ describe('ChatScreen', () => {
       .map((option) => option.textContent)
     // The full curated catalog plus the entry's custom configured model.
     expect(labels).toEqual([
+      'GPT-6 Astra',
       'GPT-5.6 Sol',
       'GPT-5.6 Terra',
       'GPT-5.6 Luna',

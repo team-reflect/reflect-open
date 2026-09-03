@@ -16,8 +16,9 @@ describe('AI_PROVIDERS', () => {
     ])
   })
 
-  it('offers the GPT-5.6 family in capability order', () => {
-    expect(aiProvider('openai').models.slice(0, 3)).toEqual([
+  it('offers GPT-6 Astra ahead of the GPT-5.6 family', () => {
+    expect(aiProvider('openai').models.slice(0, 4)).toEqual([
+      { id: 'gpt-6-astra', label: 'GPT-6 Astra', contextWindow: 1_000_000 },
       { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', contextWindow: 1_000_000 },
       { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', contextWindow: 1_000_000 },
       { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', contextWindow: 1_000_000 },

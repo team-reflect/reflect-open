@@ -51,7 +51,9 @@ type GoogleModelId = KnownId<Parameters<GoogleProvider>[0]>
 type OpenAIModelId = KnownId<Parameters<OpenAIProvider>[0]>
 
 // https://github.com/vercel/ai/blob/ai@7.0.66/packages/openai/src/responses/openai-responses-language-model-options.ts#L88
+// @ts-expect-error gpt-6-astra is not in @ai-sdk/openai yet
 const OPENAI_MODELS: NonEmptyArray<AiModelOption<OpenAIModelId>> = [
+  { id: 'gpt-6-astra', label: 'GPT-6 Astra', contextWindow: 1_000_000 },
   { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', contextWindow: 1_000_000 },
   { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', contextWindow: 1_000_000 },
   { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', contextWindow: 1_000_000 },
