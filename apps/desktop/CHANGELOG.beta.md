@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.11.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.12...v0.11.0-beta.13) (2026-09-03)
+
+
+### Bug Fixes
+
+* improve iOS note deletion ([#1192](https://github.com/team-reflect/reflect-open/issues/1192)) ([0c9d2eb](https://github.com/team-reflect/reflect-open/commit/0c9d2eb173ec8522bf8e9b2a9b4263c2fbad6436))
+* **mobile:** load notes before subscription checks finish ([#1199](https://github.com/team-reflect/reflect-open/issues/1199)) ([113e171](https://github.com/team-reflect/reflect-open/commit/113e171d7456dfe82ce4d5d2c559fbbce4fd7da2))
+* stop the iCloud metadata query from pinning fileproviderd on macOS ([#1208](https://github.com/team-reflect/reflect-open/issues/1208)) ([1fcc0b3](https://github.com/team-reflect/reflect-open/commit/1fcc0b3df9bbd83f9afe578db6aec629e84674ba))
+
 ## [0.11.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.11...v0.11.0-beta.12) (2026-09-02)
 
 
