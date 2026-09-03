@@ -48,10 +48,7 @@ describe('chatModelOptions', () => {
   })
 
   it('groups options consecutively per configured entry', () => {
-    const options = chatModelOptions([
-      config({ id: 'a' }),
-      config({ id: 'b', provider: 'openai' }),
-    ])
+    const options = chatModelOptions([config({ id: 'a' }), config({ id: 'b', provider: 'openai' })])
     const firstOpenAi = options.findIndex((option) => option.configId === 'b')
     expect(options.slice(0, firstOpenAi).every((option) => option.configId === 'a')).toBe(true)
     expect(options.slice(firstOpenAi).every((option) => option.configId === 'b')).toBe(true)
