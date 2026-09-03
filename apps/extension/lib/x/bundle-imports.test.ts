@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 
 /**
  * The X watcher runs on every x.com page once the feature is on, so its
@@ -32,10 +33,12 @@ function isTypeOnly(statement: string): boolean {
   return statement.startsWith('import type ')
 }
 
+const corePackageSchema = z.object({ exports: z.record(z.string(), z.string()) })
+
 function coreSubpath(specifier: string): string | null {
-  const packageJson = JSON.parse(readFileSync(resolve(CORE_ROOT, 'package.json'), 'utf8')) as {
-    exports: Record<string, string>
-  }
+  const packageJson = corePackageSchema.parse(
+    JSON.parse(readFileSync(resolve(CORE_ROOT, 'package.json'), 'utf8')),
+  )
   const relative = packageJson.exports[`.${specifier.slice('@reflect/core'.length)}`]
   return relative === undefined ? null : resolve(CORE_ROOT, relative)
 }

@@ -44,6 +44,12 @@ export interface ExtractPostRequest {
   id: string
 }
 
+/**
+ * The on-demand content script's answer: the post read off the permalink
+ * page, or `null` when the page shows no article for the requested id (a
+ * logged-out render, a deleted post, X markup the extractor cannot read) —
+ * the capture then proceeds by URL alone.
+ */
 export interface ExtractPostResponse {
   post: CapturedPost | null
 }
