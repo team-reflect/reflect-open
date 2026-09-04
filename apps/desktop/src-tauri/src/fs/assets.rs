@@ -127,16 +127,11 @@ pub(super) fn staging_dir(root: &Path) -> AppResult<std::path::PathBuf> {
 
 /// Resolved `assets/` directory for a commit/import destination, traversal-
 /// and generation-guarded.
-fn assets_dir_for(
-    state: &State<GraphState>,
-    generation: u64,
-    name: &str,
-) -> AppResult<std::path::PathBuf> {
+fn assets_dir_for(root: &Path, name: &str) -> AppResult<std::path::PathBuf> {
     ensure_asset_name(name)?;
-    let root = root_for_generation(state, generation)?;
     // Resolve the target through the shared guard even though `name` is
     // already vetted — defense in depth, and it canonicalizes symlink games.
-    resolve(&root, &format!("assets/{name}"))?;
+    resolve(root, &format!("assets/{name}"))?;
     let dir = root.join("assets");
     fs::create_dir_all(&dir)?;
     Ok(dir)
@@ -187,12 +182,12 @@ pub fn asset_upload_append(request: Request<'_>, uploads: State<AssetUploads>) -
 /// under `desired_name` (or the first free `-2`-suffixed variant). Returns the
 /// final graph-relative `assets/…` path.
 #[tauri::command]
-pub fn asset_upload_commit(
+pub async fn asset_upload_commit(
     id: String,
     desired_name: String,
     generation: u64,
-    state: State<GraphState>,
-    uploads: State<AssetUploads>,
+    state: State<'_, GraphState>,
+    uploads: State<'_, AssetUploads>,
 ) -> AppResult<String> {
     let upload = lock_uploads(&uploads)?
         .remove(&id)
@@ -204,11 +199,12 @@ pub fn asset_upload_commit(
     }
     // Pin the root before persisting: after the file lands, a failed root
     // lookup would otherwise skip invalidation and strand a stale catalog.
-    let root = root_for_generation(&state, generation)?;
-    let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
-    let final_name = persist_unique(upload.file, &assets_dir, &desired_name)?;
-    super::invalidate_file_catalog(&state, &root);
-    Ok(format!("assets/{final_name}"))
+    super::mutation::run(state.inner().clone(), generation, move |root| {
+        let assets_dir = assets_dir_for(root, &desired_name)?;
+        let final_name = persist_unique(upload.file, &assets_dir, &desired_name)?;
+        Ok(format!("assets/{final_name}"))
+    })
+    .await
 }
 
 /// Persist a staged upload at an exact target path, creating parent
@@ -242,12 +238,12 @@ fn persist_exact(temp: tempfile::NamedTempFile, target: &Path) -> AppResult<()> 
 /// it. Memo basenames carry millisecond precision; an existing file at
 /// `path` is a bug and fails loudly rather than being clobbered.
 #[tauri::command]
-pub fn asset_upload_commit_path(
+pub async fn asset_upload_commit_path(
     id: String,
     path: String,
     generation: u64,
-    state: State<GraphState>,
-    uploads: State<AssetUploads>,
+    state: State<'_, GraphState>,
+    uploads: State<'_, AssetUploads>,
 ) -> AppResult<()> {
     let upload = lock_uploads(&uploads)?
         .remove(&id)
@@ -257,11 +253,12 @@ pub fn asset_upload_commit_path(
             "upload was started for a different graph session; dropping it",
         ));
     }
-    let root = root_for_generation(&state, generation)?;
-    let target = resolve(&root, &path)?;
-    persist_exact(upload.file, &target)?;
-    super::invalidate_file_catalog(&state, &root);
-    Ok(())
+    super::mutation::run(state.inner().clone(), generation, move |root| {
+        let target = resolve(root, &path)?;
+        persist_exact(upload.file, &target)?;
+        Ok(())
+    })
+    .await
 }
 
 /// Discard an in-flight upload; dropping the temp file deletes it. Idempotent
@@ -276,11 +273,11 @@ pub fn asset_upload_abort(id: String, uploads: State<AssetUploads>) -> AppResult
 /// under `desired_name`, with the same collision policy as uploads. The bytes
 /// never cross the IPC. Returns the final graph-relative `assets/…` path.
 #[tauri::command]
-pub fn asset_import(
+pub async fn asset_import(
     source_path: String,
     desired_name: String,
     generation: u64,
-    state: State<GraphState>,
+    state: State<'_, GraphState>,
 ) -> AppResult<String> {
     let source = Path::new(&source_path);
     if !source.is_file() {
@@ -288,13 +285,15 @@ pub fn asset_import(
             "import source is not a file: {source_path}"
         )));
     }
-    let root = root_for_generation(&state, generation)?;
-    let mut temp = tempfile::NamedTempFile::new_in(staging_dir(&root)?)?;
-    std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
-    let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
-    let final_name = persist_unique(temp, &assets_dir, &desired_name)?;
-    super::invalidate_file_catalog(&state, &root);
-    Ok(format!("assets/{final_name}"))
+    super::mutation::run(state.inner().clone(), generation, move |root| {
+        let source = Path::new(&source_path);
+        let mut temp = tempfile::NamedTempFile::new_in(staging_dir(root)?)?;
+        std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
+        let assets_dir = assets_dir_for(root, &desired_name)?;
+        let final_name = persist_unique(temp, &assets_dir, &desired_name)?;
+        Ok(format!("assets/{final_name}"))
+    })
+    .await
 }
 
 /// Copy `source` into the graph at `target`, staging the bytes under
@@ -325,22 +324,23 @@ fn import_exact(source: &Path, staging: &Path, target: &Path) -> AppResult<()> {
 /// `audio_memo_delete`, and the path *is* the memo's identity, so the
 /// `assets/` collision renaming of [`asset_import`] would corrupt it.
 #[tauri::command]
-pub fn audio_memo_import(
+pub async fn audio_memo_import(
     source_path: String,
     path: String,
     generation: u64,
-    state: State<GraphState>,
+    state: State<'_, GraphState>,
 ) -> AppResult<()> {
     if !path.starts_with("audio-memos/") {
         return Err(AppError::traversal(format!(
             "not an audio memo path: {path}"
         )));
     }
-    let root = root_for_generation(&state, generation)?;
-    let target = resolve(&root, &path)?;
-    import_exact(Path::new(&source_path), &staging_dir(&root)?, &target)?;
-    super::invalidate_file_catalog(&state, &root);
-    Ok(())
+    super::mutation::run(state.inner().clone(), generation, move |root| {
+        let target = resolve(root, &path)?;
+        import_exact(Path::new(&source_path), &staging_dir(root)?, &target)?;
+        Ok(())
+    })
+    .await
 }
 
 #[cfg(test)]

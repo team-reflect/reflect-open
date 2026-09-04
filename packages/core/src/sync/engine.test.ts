@@ -19,8 +19,16 @@ const NON_FAST_FORWARD = {
   nonFastForward: true,
   rejectionMessage: 'fetch first',
 }
-const MERGED = { kind: 'merged', conflictedPaths: [], changedFiles: [] }
+const MERGED = { kind: 'merged', conflictedPaths: [], skippedLargeFiles: [], changedFiles: [] }
 const DELTA = { ahead: 1, behind: 0 }
+const STATUS = {
+  initialized: true,
+  branch: 'main',
+  remoteUrl: '/remote',
+  ahead: 0,
+  behind: 0,
+  inProgress: false,
+}
 
 interface Call {
   command: string
@@ -50,6 +58,8 @@ function defaultResponses(command: string): unknown {
       return DELTA
     case 'git_merge_remote':
       return MERGED
+    case 'git_status':
+      return STATUS
     default:
       return null
   }
@@ -152,7 +162,7 @@ describe('createSyncEngine', () => {
       ['network', { state: 'offline' }],
       ['auth', { state: 'error', errorKind: 'auth' }],
     ] as const) {
-      fakeGit(defaultResponses)
+      const calls = fakeGit(defaultResponses)
       const statuses: SyncStatus[] = []
       const engine = createSyncEngine({
         generation: 1,
@@ -166,6 +176,7 @@ describe('createSyncEngine', () => {
       })
       engine.noteChanged()
       await vi.runAllTimersAsync()
+      expect(commandsOf(calls)).toEqual(['git_commit_all'])
       expect(statuses.at(-1)).toMatchObject(expected)
       engine.stop()
     }
@@ -316,6 +327,7 @@ describe('createSyncEngine', () => {
         ? {
             kind: 'merged',
             conflictedPaths: [],
+            skippedLargeFiles: [],
             changedFiles: [
               { path: 'notes/from-b.md', kind: 'upsert' },
               { path: 'notes/gone.md', kind: 'remove' },
@@ -343,12 +355,48 @@ describe('createSyncEngine', () => {
     engine.stop()
   })
 
+  it('notifies native merge deletions and completes the required push', async () => {
+    const calls = fakeGit((command) =>
+      command === 'git_merge_remote'
+        ? {
+            ...MERGED,
+            changedFiles: [{ path: 'notes/deleted.md', kind: 'remove', modifiedMs: null }],
+          }
+        : defaultResponses(command),
+    )
+    const onRemoteChanges = vi.fn()
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => 'tok',
+      onRemoteChanges,
+      onStatus: (status) => {
+        statuses.push(status)
+      },
+    })
+
+    await engine.syncNow()
+
+    expect(onRemoteChanges).toHaveBeenCalledWith([
+      { path: 'notes/deleted.md', kind: 'remove', modifiedMs: undefined },
+    ])
+    expect(commandsOf(calls)).toEqual([
+      'git_commit_all',
+      'git_fetch',
+      'git_merge_remote',
+      'git_push',
+    ])
+    expect(statuses.at(-1)).toEqual({ state: 'idle' })
+    engine.stop()
+  })
+
   it('continues through push while remote-change handling runs, then waits before idle', async () => {
     const calls = fakeGit((command) =>
       command === 'git_merge_remote'
         ? {
             kind: 'merged',
             conflictedPaths: [],
+            skippedLargeFiles: [],
             changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
           }
         : defaultResponses(command),
@@ -396,6 +444,7 @@ describe('createSyncEngine', () => {
         return {
           kind: 'merged',
           conflictedPaths: [],
+          skippedLargeFiles: [],
           changedFiles: [{ path: `notes/remote-${mergeCount}.md`, kind: 'upsert' }],
         }
       }
@@ -454,6 +503,7 @@ describe('createSyncEngine', () => {
         ? {
             kind: 'merged',
             conflictedPaths: [],
+            skippedLargeFiles: [],
             changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
           }
         : defaultResponses(command),
@@ -505,6 +555,7 @@ describe('createSyncEngine', () => {
         return {
           kind: 'merged',
           conflictedPaths: [],
+          skippedLargeFiles: [],
           changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
         }
       }
@@ -580,6 +631,7 @@ describe('createSyncEngine', () => {
     mergeGate.resolve?.({
       kind: 'merged',
       conflictedPaths: [],
+      skippedLargeFiles: [],
       changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
     })
     await syncing
@@ -595,6 +647,7 @@ describe('createSyncEngine', () => {
         ? {
             kind: 'merged',
             conflictedPaths: [],
+            skippedLargeFiles: [],
             changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
           }
         : defaultResponses(command),
@@ -638,6 +691,7 @@ describe('createSyncEngine', () => {
         ? {
             kind: 'merged',
             conflictedPaths: [],
+            skippedLargeFiles: [],
             changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
           }
         : defaultResponses(command),
@@ -758,7 +812,7 @@ describe('createSyncEngine', () => {
         return { ahead: 0, behind: 0 }
       }
       if (command === 'git_merge_remote') {
-        return { kind: 'upToDate', conflictedPaths: [], changedFiles: [] }
+        return { kind: 'upToDate', conflictedPaths: [], skippedLargeFiles: [], changedFiles: [] }
       }
       return defaultResponses(command)
     })
@@ -766,7 +820,12 @@ describe('createSyncEngine', () => {
 
     await engine.syncNow()
 
-    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_fetch', 'git_merge_remote'])
+    expect(commandsOf(calls)).toEqual([
+      'git_commit_all',
+      'git_fetch',
+      'git_merge_remote',
+      'git_status',
+    ])
     engine.stop()
   })
 
@@ -788,6 +847,48 @@ describe('createSyncEngine', () => {
       'git_merge_remote',
       'git_push',
     ])
+    engine.stop()
+  })
+
+  it('pushes saves committed by the native merge after an initially clean fetch', async () => {
+    const skipped = [{ path: 'assets/new-movie.mp4', size: 200_000_000 }]
+    const calls = fakeGit((command) => {
+      if (command === 'git_commit_all') {
+        return CLEAN_COMMIT
+      }
+      if (command === 'git_fetch') {
+        return { ahead: 0, behind: 0 }
+      }
+      if (command === 'git_merge_remote') {
+        return {
+          kind: 'upToDate',
+          conflictedPaths: [],
+          skippedLargeFiles: skipped,
+          changedFiles: [],
+        }
+      }
+      if (command === 'git_status') {
+        return { ...STATUS, ahead: 1 }
+      }
+      return defaultResponses(command)
+    })
+    const onLargeFilesSkipped = vi.fn()
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => 'tok',
+      onLargeFilesSkipped,
+    })
+
+    await engine.syncNow()
+
+    expect(commandsOf(calls)).toEqual([
+      'git_commit_all',
+      'git_fetch',
+      'git_merge_remote',
+      'git_status',
+      'git_push',
+    ])
+    expect(onLargeFilesSkipped).toHaveBeenCalledWith(skipped)
     engine.stop()
   })
 
@@ -817,6 +918,23 @@ describe('createSyncEngine', () => {
     await vi.runAllTimersAsync()
 
     expect(calls).toHaveLength(0)
+  })
+
+  it('does not issue a commit if a syncing status observer stops the engine', async () => {
+    const calls = fakeGit(defaultResponses)
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => 'tok',
+      onStatus: (status) => {
+        if (status.state === 'syncing') {
+          engine.stop()
+        }
+      },
+    })
+
+    await engine.syncNow()
+
+    expect(calls).toEqual([])
   })
 
   it('passes a missing credential through as a null token (Rust owns the failure)', async () => {
@@ -884,6 +1002,10 @@ describe('createSyncEngine', () => {
     const first = engine.syncNow()
     const second = engine.syncNow()
     const third = engine.syncNow()
+    let completed = false
+    void second.then(() => {
+      completed = true
+    })
     await vi.runAllTimersAsync()
     // Only the first cycle has started; the others coalesced, not interleaved.
     expect(commandsOf(calls)).toEqual([
@@ -895,9 +1017,13 @@ describe('createSyncEngine', () => {
 
     pushGates.shift()?.(PUSHED)
     await vi.runAllTimersAsync()
+    // A manual backup queued mid-cycle must not resolve while its own push
+    // is still in flight.
+    expect(completed).toBe(false)
     pushGates.shift()?.(PUSHED)
     await vi.runAllTimersAsync()
     await Promise.all([first, second, third])
+    expect(completed).toBe(true)
 
     // The two queued requests collapsed into a single full follow-up cycle.
     expect(commandsOf(calls)).toEqual([

@@ -9,9 +9,14 @@
 
 let flusher: (() => Promise<void>) | null = null
 
-/** Install (or clear, with `null`) the active graph's quit-commit hook. */
-export function setBackupFlusher(next: (() => Promise<void>) | null): void {
+/** Install a graph's quit-commit hook; release only this registration on teardown. */
+export function registerBackupFlusher(next: () => Promise<void>): () => void {
   flusher = next
+  return () => {
+    if (flusher === next) {
+      flusher = null
+    }
+  }
 }
 
 /** Run the registered quit-commit, if any. Never throws, never blocks quit. */

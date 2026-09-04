@@ -1,7 +1,7 @@
 //! Stage-everything commit with the large-file guardrail.
 
 use std::cell::RefCell;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use git2::{Index, IndexAddOption};
 use serde::Serialize;
@@ -10,6 +10,7 @@ use crate::error::AppResult;
 
 use super::commit_message::message_for_commit;
 use super::repo::{ensure_clean_state, open_existing, signature};
+use super::runtime;
 
 /// A file whose *changes* were withheld from staging because it is at/above
 /// the size guardrail. Oversized-but-unchanged files are not reported — their
@@ -47,15 +48,16 @@ pub(super) fn commit_all(
 ) -> AppResult<CommitOutcome> {
     let repo = open_existing(root)?;
     ensure_clean_state(&repo)?;
-    // In-memory hard guarantee, independent of any on-disk ignore file: the
-    // runtime directory must never enter a backup commit (Plan 21 — a synced
-    // `.reflect/` is index corruption on every other device).
     repo.add_ignore_rule("/.reflect/")?;
 
     let mut index = repo.index()?;
-    let skipped = add_all_with_size_guard(&mut index, root, max_file_bytes)?;
-
     let parent = repo.head().ok().and_then(|head| head.peel_to_commit().ok());
+    let mut committed_index = Index::new()?;
+    if let Some(parent) = &parent {
+        committed_index.read_tree(&parent.tree()?)?;
+    }
+    runtime::remove_from_index(&mut index)?;
+    let skipped = add_all_with_size_guard(&mut index, &committed_index, root, max_file_bytes)?;
     if parent.is_none() && index.is_empty() {
         return Ok(CommitOutcome {
             committed: false,
@@ -97,6 +99,7 @@ pub(super) fn commit_all(
 /// files whose changes were withheld.
 fn add_all_with_size_guard(
     index: &mut Index,
+    committed_index: &Index,
     root: &Path,
     max_file_bytes: u64,
 ) -> AppResult<Vec<SkippedFile>> {
@@ -110,22 +113,17 @@ fn add_all_with_size_guard(
     // to whole seconds — a same-length edit inside that second is then
     // reported as withheld rather than silently matched, erring toward the
     // warning.
-    let tracked_stats: std::collections::HashMap<String, (u32, i32, u32)> = index
+    let tracked_entries: std::collections::HashMap<Vec<u8>, git2::IndexEntry> = index
         .iter()
-        .map(|entry| {
-            (
-                String::from_utf8_lossy(&entry.path).into_owned(),
-                (
-                    entry.file_size,
-                    entry.mtime.seconds(),
-                    entry.mtime.nanoseconds(),
-                ),
-            )
-        })
+        .map(|entry| (entry.path.clone(), entry))
         .collect();
 
     let skipped: RefCell<Vec<SkippedFile>> = RefCell::new(Vec::new());
+    let withheld: RefCell<Vec<PathBuf>> = RefCell::new(Vec::new());
     let mut size_guard = |path: &Path, _spec: &[u8]| -> i32 {
+        if runtime::is_runtime_path(path) {
+            return 1;
+        }
         let Ok(meta) = root.join(path).metadata() else {
             // Deleted file: let the staging proceed so the removal is recorded.
             return 0;
@@ -141,14 +139,22 @@ fn add_all_with_size_guard(
         let (file_secs, file_nsecs) = mtime
             .map(|duration| (duration.as_secs() as i32, duration.subsec_nanos()))
             .unwrap_or((0, 0));
-        let unchanged = match tracked_stats.get(&rel) {
-            Some(&(size, secs, nsecs)) => {
-                size == meta.len() as u32
-                    && secs == file_secs
-                    && (nsecs == 0 || nsecs == file_nsecs)
+        let committed = committed_index.get_path(path, 0);
+        let unchanged = match committed.as_ref().and_then(|entry| {
+            tracked_entries
+                .get(&entry.path)
+                .map(|tracked| (entry, tracked))
+        }) {
+            Some((entry, tracked)) => {
+                entry.id == tracked.id
+                    && u64::from(tracked.file_size) == meta.len()
+                    && tracked.mtime.seconds() == file_secs
+                    && tracked.mtime.nanoseconds() != 0
+                    && tracked.mtime.nanoseconds() == file_nsecs
             }
             None => false,
         };
+        withheld.borrow_mut().push(path.to_path_buf());
         let mut skipped = skipped.borrow_mut();
         if !unchanged && !skipped.iter().any(|file| file.path == rel) {
             skipped.push(SkippedFile {
@@ -159,11 +165,43 @@ fn add_all_with_size_guard(
         1 // keep the oversized content out of the index either way
     };
 
+    // add_all/update_all can skip their callback for files already staged
+    // with matching stats. Filter the existing index first so pre-staged
+    // oversized additions and updates cannot bypass the size guardrail.
+    index.remove_all(
+        ["*"],
+        Some(&mut |path: &Path, spec: &[u8]| {
+            if size_guard(path, spec) == 1 {
+                0
+            } else {
+                1
+            }
+        }),
+    )?;
     index.add_all(["*"], IndexAddOption::DEFAULT, Some(&mut size_guard))?;
     // add_all stages new + modified paths; update_all records deletions of
     // tracked files whose working copy is gone (and re-checks sizes for
     // tracked files that have since grown past the guardrail).
     index.update_all(["*"], Some(&mut size_guard))?;
+    // A file may already have oversized content staged by another Git tool.
+    // Merely skipping add_all would commit that blob despite the guardrail.
+    // Retain its last committed version, or keep a new large file untracked.
+    for path in withheld.into_inner() {
+        match committed_index.get_path(&path, 0) {
+            Some(entry) => {
+                let restore = tracked_entries
+                    .get(&entry.path)
+                    .filter(|tracked| tracked.id == entry.id)
+                    .unwrap_or(&entry);
+                index.add(restore)?;
+            }
+            None => {
+                if index.get_path(&path, 0).is_some() {
+                    index.remove_path(&path)?;
+                }
+            }
+        }
+    }
     index.write()?;
     Ok(skipped.into_inner())
 }

@@ -219,6 +219,60 @@ describe('createNoteSession', () => {
     expect(snapshots.at(-1)?.dirty).toBe(false)
   })
 
+  it('re-reads a merge notification if a queued save finishes while its read is in flight', async () => {
+    let disk = '# Before sync\n'
+    const read = vi.fn(async () => disk)
+    const writeGate: { resolve: (() => void) | null } = { resolve: null }
+    const readGate: { resolve: ((content: string) => void) | null } = { resolve: null }
+    const applied: string[] = []
+    const session = createNoteSession({
+      path: 'notes/a.md',
+      io: {
+        read,
+        write: async (_path, content) => {
+          await new Promise<void>((resolve) => {
+            writeGate.resolve = resolve
+          })
+          disk = content
+        },
+      },
+      classify: () => 'exact',
+      onSnapshot: () => {},
+      applyContent: (content) => {
+        applied.push(content)
+      },
+    })
+    session.load()
+    await vi.advanceTimersByTimeAsync(0)
+
+    session.editorChanged('# Saved during checkout\n')
+    const saving = session.flush()
+    await vi.advanceTimersByTimeAsync(0)
+    // Checkout lands first; its notification reads those bytes while the
+    // local write is still waiting for the native filesystem guard.
+    disk = '# Pulled contents\n'
+    read.mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          readGate.resolve = resolve
+        }),
+    )
+    session.externalChanged()
+    await vi.advanceTimersByTimeAsync(0)
+
+    writeGate.resolve?.()
+    await saving
+    expect(session.isDirty()).toBe(false)
+    readGate.resolve?.('# Pulled contents\n')
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(disk).toBe('# Saved during checkout\n')
+    expect(session.content()).toBe(disk)
+    expect(applied).toEqual([])
+    expect(read).toHaveBeenCalledTimes(3)
+    session.dispose()
+  })
+
   it('re-gates protection when external content stops being representable', async () => {
     const lossyWhenTasks = (markdown: string): RoundTripFidelity =>
       markdown.includes('+ [ ]') ? 'lossy' : 'exact'

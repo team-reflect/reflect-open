@@ -12,14 +12,18 @@
 //! resolves the root through `crate::fs::root_for_generation`, which fails
 //! when the active graph's generation has since moved (the user switched
 //! graphs after the command was issued). A stale command errors loudly instead
-//! of acting on the new graph, so commands never interleave across graphs.
+//! of acting on the new graph. Repository operations are serialized per root;
+//! local filesystem mutations share a separate checkout lock.
 //! The one exception is `git_clone`, which runs before any graph is open.
 
 mod commit;
 mod commit_message;
 mod merge;
+#[cfg(test)]
+mod merge_tests;
 mod remote;
 mod repo;
+mod runtime;
 #[cfg(test)]
 mod tests;
 
@@ -103,6 +107,8 @@ fn disconnect(root: &Path) -> AppResult<GitStatus> {
 
 fn setup(root: &Path, remote_url: Option<String>, branch: Option<String>) -> AppResult<GitStatus> {
     let repo = repo::open_or_init(root)?;
+    repo::ensure_clean_state(&repo)?;
+    runtime::exclude_from_index(&repo)?;
     repo::ensure_gitignore_defaults(root)?;
     if let Some(url) = remote_url {
         if repo.find_remote("origin").is_ok() {
@@ -118,11 +124,35 @@ fn setup(root: &Path, remote_url: Option<String>, branch: Option<String>) -> App
     status(root)
 }
 
+/// Serialize repository operations without holding the worktree during network
+/// waits, and reject stale queued commands after acquiring the repository lock.
+async fn run_git<T, F>(state: GraphState, generation: u64, action: F) -> AppResult<T>
+where
+    T: Send + 'static,
+    F: FnOnce(&Path, &GraphState) -> AppResult<T> + Send + 'static,
+{
+    run_blocking(move || {
+        let root = crate::fs::root_for_generation(&state, generation)?;
+        crate::fs::mutation::with_repository(&root, || {
+            crate::fs::root_for_generation(&state, generation)?;
+            action(&root, &state)
+        })
+    })
+    .await
+}
+
+/// Snapshot saves that completed during fetch and merge under one local lock.
+fn commit_and_merge(root: &Path) -> AppResult<MergeOutcome> {
+    let snapshot = commit::commit_all(root, "Save changes before sync", MAX_FILE_BYTES)?;
+    let mut outcome = merge::merge_remote(root)?;
+    outcome.skipped_large_files = snapshot.skipped_large_files;
+    Ok(outcome)
+}
+
 /// Snapshot the backup repository (cheap, no network).
 #[tauri::command]
 pub async fn git_status(generation: u64, state: State<'_, GraphState>) -> AppResult<GitStatus> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || status(&root)).await
+    run_git(state.inner().clone(), generation, |root, _| status(root)).await
 }
 
 /// Initialize (or adopt) the graph's repository, optionally point `origin` at
@@ -137,16 +167,22 @@ pub async fn git_setup(
     generation: u64,
     state: State<'_, GraphState>,
 ) -> AppResult<GitStatus> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || setup(&root, remote_url, branch)).await
+    run_git(state.inner().clone(), generation, move |_, state| {
+        crate::fs::mutation::with_generation(state, generation, |root| {
+            setup(root, remote_url, branch)
+        })
+    })
+    .await
 }
 
 /// Stop backing this graph up (drop `origin`; repo, history, and the
 /// machine-level credential all stay).
 #[tauri::command]
 pub async fn git_disconnect(generation: u64, state: State<'_, GraphState>) -> AppResult<GitStatus> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || disconnect(&root)).await
+    run_git(state.inner().clone(), generation, |root, _| {
+        disconnect(root)
+    })
+    .await
 }
 
 /// Clone a backup repository into `path` (restore on a fresh machine). Runs
@@ -164,9 +200,13 @@ pub async fn git_commit_all(
     generation: u64,
     state: State<'_, GraphState>,
 ) -> AppResult<CommitOutcome> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
     let started = std::time::Instant::now();
-    let outcome = run_blocking(move || commit::commit_all(&root, &message, MAX_FILE_BYTES)).await;
+    let outcome = run_git(state.inner().clone(), generation, move |_, state| {
+        crate::fs::mutation::with_generation(state, generation, |root| {
+            commit::commit_all(root, &message, MAX_FILE_BYTES)
+        })
+    })
+    .await;
     if let Ok(outcome) = &outcome {
         tracing::info!(
             committed = outcome.committed,
@@ -185,8 +225,10 @@ pub async fn git_fetch(
     generation: u64,
     state: State<'_, GraphState>,
 ) -> AppResult<RemoteDelta> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || remote::fetch(&root, token)).await
+    run_git(state.inner().clone(), generation, move |root, _| {
+        remote::fetch(root, token)
+    })
+    .await
 }
 
 /// Merge the fetched remote branch; conflicts are committed into the notes as
@@ -196,13 +238,10 @@ pub async fn git_merge_remote(
     generation: u64,
     state: State<'_, GraphState>,
 ) -> AppResult<MergeOutcome> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
-    let outcome = run_blocking(move || merge::merge_remote(&root)).await;
-    // Invalidate on both arms: a failed merge can still have moved the tree
-    // partway through checkout, and a stale catalog would pin the old view.
-    let root = crate::fs::root_for_generation(&state, generation)?;
-    crate::fs::invalidate_file_catalog(&state, &root);
-    outcome
+    run_git(state.inner().clone(), generation, move |_, state| {
+        crate::fs::mutation::with_generation(state, generation, commit_and_merge)
+    })
+    .await
 }
 
 /// Push the current branch to `origin`; rejections come back as data so the
@@ -213,6 +252,8 @@ pub async fn git_push(
     generation: u64,
     state: State<'_, GraphState>,
 ) -> AppResult<PushOutcome> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || remote::push(&root, token)).await
+    run_git(state.inner().clone(), generation, move |root, _| {
+        remote::push(root, token)
+    })
+    .await
 }
