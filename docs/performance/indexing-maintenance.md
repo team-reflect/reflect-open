@@ -71,8 +71,8 @@ semantics rechecked before recording a new checkpoint. Migration 0023 records
 `notes.projection_path`: a moved row keeps its old projection path until normal
 indexing reparses its relative references, even if the bytes and mtime match.
 This marker survives an interrupted pass and is checked by both watcher work and
-reconciliation. The migration reprojects existing asset-bearing notes once to
-repair references left stale by older renames; evicted notes retain their vectors
+reconciliation. The migration reprojects all existing local notes once to repair
+references left stale or unresolved by older renames; evicted notes retain their vectors
 and wait for local content instead of being downloaded for this repair. Rebuild clears derived
 checkpoints and vectors while retaining chat history.
 

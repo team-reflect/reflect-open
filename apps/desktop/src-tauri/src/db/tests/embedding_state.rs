@@ -114,7 +114,7 @@ fn migration_preserves_vectors_and_durable_chat_without_claiming_backfill_succes
             |row| row.get::<_, String>(0)
         )
         .unwrap(),
-        NOTE
+        ""
     );
     let root = tempdir().unwrap();
     assert_eq!(pending_paths(&conn, root.path(), MODEL, VERSION), [NOTE]);
@@ -776,7 +776,7 @@ fn migration_repairs_historical_asset_references_without_hydrating_evicted_notes
     conn.execute_batch(
         "INSERT INTO notes(path, title, title_key, file_hash, mtime)
          VALUES('notes/moved.md', 'Moved', 'moved', 'same', 1000),
-               ('notes/plain.md', 'Plain', 'plain', 'same', 1000);
+               ('notes/archive/previously-unresolved.md', 'Unresolved', 'unresolved', 'same', 1000);
          INSERT INTO assets(note_path, asset_path) VALUES('notes/moved.md', 'old/photo.png');",
     )
     .unwrap();
@@ -790,19 +790,35 @@ fn migration_repairs_historical_asset_references_without_hydrating_evicted_notes
             placeholder: false,
         },
         crate::fs::FileMeta {
-            path: "notes/plain.md".into(),
+            // A historical move can make ../../assets/photo.png resolve even
+            // when the previous projection had no asset row at all.
+            path: "notes/archive/previously-unresolved.md".into(),
             size: 10,
             modified_ms: 1000,
             placeholder: false,
         },
     ];
     let local = scan_reconcile(&conn, &files, 100_000).unwrap();
-    assert_eq!(local.candidates.len(), 1);
-    assert_eq!(local.candidates[0].path, "notes/moved.md");
-    assert!(local.candidates[0].needs_projection);
-    files[0].placeholder = true;
+    assert_eq!(local.candidates.len(), 2);
+    assert!(local
+        .candidates
+        .iter()
+        .all(|candidate| candidate.needs_projection));
+    for file in &mut files {
+        file.placeholder = true;
+    }
     let evicted = scan_reconcile(&conn, &files, 100_000).unwrap();
     assert!(evicted.candidates.is_empty());
     assert!(evicted.stale_placeholders.is_empty());
     assert_eq!(vector_count(&conn), 1);
+    for file in &mut files {
+        file.placeholder = false;
+    }
+    assert_eq!(
+        scan_reconcile(&conn, &files, 100_000)
+            .unwrap()
+            .candidates
+            .len(),
+        2
+    );
 }
