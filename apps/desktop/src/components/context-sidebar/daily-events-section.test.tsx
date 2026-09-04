@@ -152,7 +152,7 @@ describe('DailyEventsSection', () => {
     await vi.waitFor(() => expect(container.textContent).toBe(''))
   })
 
-  it('clicking an event opens the dialog prefilled from the event', async () => {
+  it('opens and focuses a fresh event form on first use and revisit', async () => {
     events = [
       eventAt(9, {
         title: 'Standup',
@@ -169,12 +169,20 @@ describe('DailyEventsSection', () => {
 
     const name = page.getByLabelText('Meeting name')
     await expect.element(name).toHaveValue('Standup')
+    await expect.element(name).toHaveFocus()
     // Suggested attendees: people who haven't declined, excluding the user.
     await expect.element(page.getByText('Ada Lovelace')).toBeInTheDocument()
     expect(page.getByText('Room 4').query()).toBeNull()
     // Recurring events default the create-backlinked-note choice on (v1).
     const checkbox = page.getByRole('checkbox')
     await expect.element(checkbox).toHaveAttribute('aria-checked', 'true')
+
+    await name.fill('Changed title')
+    await userEvent.keyboard('{Escape}')
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
+    await page.getByRole('button', { name: /standup/i }).click()
+    await expect.element(name).toHaveFocus()
+    await expect.element(name).toHaveValue('Standup')
   })
 
   it('submitting writes the meeting through addMeetingToDaily and closes', async () => {

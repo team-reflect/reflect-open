@@ -27,7 +27,7 @@ const CONFIG: AiProviderConfig = {
 /** Install a mock model answering `text`; returns the captured call options. */
 function modelAnswering(text: string): LanguageModelV3CallOptions[] {
   const calls: LanguageModelV3CallOptions[] = []
-  languageModelMock.mockReturnValue(
+  languageModelMock.mockResolvedValue(
     new MockLanguageModelV3({
       doGenerate: async (options) => {
         calls.push(options)
@@ -49,7 +49,7 @@ function modelAnsweringObject(title: string, description: string): LanguageModel
 }
 
 function modelThrowing(error: unknown): void {
-  languageModelMock.mockReturnValue(
+  languageModelMock.mockResolvedValue(
     new MockLanguageModelV3({
       doGenerate: async () => {
         throw error

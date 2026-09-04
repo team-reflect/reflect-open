@@ -1,4 +1,5 @@
-import { streamText, type LanguageModel } from 'ai'
+import { loadAiModule } from './load-ai-module'
+import type { LanguageModel } from 'ai'
 import { errorMessage } from '../errors'
 import type { AiProviderConfig } from '../settings/schema'
 import type { CloudSafe } from '../privacy/checkers'
@@ -56,13 +57,22 @@ export type TransformStreamEvent =
  * one of `complete` (carrying the full accumulated text), `aborted`, or
  * `error`.
  */
-export function transformSelection(
+export async function* transformSelection(
   options: TransformSelectionOptions,
 ): AsyncGenerator<TransformStreamEvent> {
-  return streamTransformTurn(languageModel(options.config, options.apiKey, options.fetchFn), {
-    prompt: renderSelectionPrompt(options.promptBody, options.selection),
-    signal: options.signal,
-  })
+  try {
+    options.signal?.throwIfAborted()
+    const model = await languageModel(options.config, options.apiKey, options.fetchFn)
+    options.signal?.throwIfAborted()
+    yield* streamTransformTurn(model, {
+      prompt: renderSelectionPrompt(options.promptBody, options.selection),
+      signal: options.signal,
+    })
+  } catch (cause) {
+    yield options.signal?.aborted
+      ? { type: 'aborted' }
+      : { type: 'error', message: errorMessage(cause) }
+  }
 }
 
 /** {@link streamTransformTurn}'s options: the rendered prompt plus the abort signal. */
@@ -83,6 +93,8 @@ export async function* streamTransformTurn(
 ): AsyncGenerator<TransformStreamEvent> {
   let text = ''
   try {
+    const { streamText } = await loadAiModule(() => import('ai'))
+    options.signal?.throwIfAborted()
     const result = streamText({
       model,
       instructions: TRANSFORM_SYSTEM_PROMPT,

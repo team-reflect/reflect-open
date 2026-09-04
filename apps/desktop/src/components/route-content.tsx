@@ -1,14 +1,28 @@
 import type { ReactElement } from 'react'
-import { AllNotesScreen } from '@/components/all-notes/all-notes-screen'
-import { ChatScreen } from '@/components/chat/chat-screen'
 import { DailyStream } from '@/components/daily-stream'
+import { createDeferredFeature } from '@/components/deferred-feature'
 import { SearchRoute } from '@/components/search-route'
 import { SingleNoteView } from '@/components/single-note-view'
-import { SettingsNavigator } from '@/components/settings/settings-navigator'
-import { SettingsScreen } from '@/components/settings-screen'
-import { TasksScreen } from '@/components/tasks/tasks-screen'
 import { useRouter } from '@/routing/router'
-import { ScrollRestored } from '@/routing/scroll-restore'
+
+const AllNotesScreen = createDeferredFeature(
+  async () => ({
+    default: (await import('@/components/all-notes/all-notes-screen')).AllNotesScreen,
+  }),
+  { name: 'all notes' },
+)
+const ChatScreen = createDeferredFeature(
+  async () => ({ default: (await import('@/components/chat/chat-screen')).ChatScreen }),
+  { name: 'chat' },
+)
+const TasksScreen = createDeferredFeature(
+  async () => ({ default: (await import('@/components/tasks/tasks-screen')).TasksScreen }),
+  { name: 'tasks' },
+)
+const SettingsRoute = createDeferredFeature(
+  async () => ({ default: (await import('@/components/settings/settings-route')).SettingsRoute }),
+  { name: 'settings' },
+)
 
 /**
  * The route → view mapping (Plan 06): the single place a {@link Route} kind
@@ -49,19 +63,6 @@ export function RouteContent(): ReactElement {
     // The graph-switcher route is a mobile settings sub-screen; on desktop
     // graph switching lives in the sidebar footer, so it renders as settings.
     case 'settings':
-      // The section navigator floats in the left gutter — absolutely
-      // positioned off the centered column so the column never shifts — and
-      // only renders when the container query says the gutter can fit it:
-      // the 42rem column plus a 12rem rail either side, with a little slack.
-      return (
-        <ScrollRestored className="@container h-full overflow-auto px-6 py-8">
-          <div className="relative mx-auto w-full max-w-2xl">
-            <div className="absolute inset-y-0 right-full hidden w-48 pr-8 @min-[68rem]:block">
-              <SettingsNavigator className="sticky top-8" />
-            </div>
-            <SettingsScreen />
-          </div>
-        </ScrollRestored>
-      )
+      return <SettingsRoute />
   }
 }

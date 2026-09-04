@@ -65,6 +65,39 @@ describe('reconcileCaptureEnrichment', () => {
     writeNoteMock.mockClear()
   }
 
+  it('does not send a capture made private while its AI implementation loads', async () => {
+    await drainOne()
+    const transport = vi.fn<typeof fetch>()
+    describeMock.mockImplementation(async (request) => {
+      files.set(IDENTITY.notePath, `---\nprivate: true\n---\n${files.get(IDENTITY.notePath) ?? ''}`)
+      await request.fetchFn?.('https://provider.invalid', { method: 'POST', body: 'capture' })
+      return { title: null, description: 'Never sent' }
+    })
+
+    const outcome = await reconcile({ fetchFn: transport })
+
+    expect(transport).not.toHaveBeenCalled()
+    expect(outcome.enriched).toBe(0)
+    expect(outcome.stopped).toBeNull()
+  })
+
+  it('does not send a capture after a graph switch during AI loading', async () => {
+    await drainOne()
+    let stale = false
+    const transport = vi.fn<typeof fetch>()
+    describeMock.mockImplementation(async (request) => {
+      stale = true
+      await request.fetchFn?.('https://provider.invalid', { method: 'POST', body: 'capture' })
+      return { title: null, description: 'Never sent' }
+    })
+
+    const outcome = await reconcile({ fetchFn: transport, isStale: () => stale })
+
+    expect(transport).not.toHaveBeenCalled()
+    expect(outcome.enriched).toBe(0)
+    expect(outcome.stopped?.reason).toBe('stale')
+  })
+
   it('attaches an Apple link preview to a URL-only capture', async () => {
     addSpool(envelope({ source: 'ios-share', title: '' }), { screenshot: false })
     expect((await drain()).stopped).toBeNull()

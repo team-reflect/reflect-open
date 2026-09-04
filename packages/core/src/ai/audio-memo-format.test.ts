@@ -38,7 +38,7 @@ function modelAnswering(output: { title: string; body: string }): MockLanguageMo
       warnings: [],
     }),
   })
-  languageModelMock.mockReturnValue(model)
+  languageModelMock.mockResolvedValue(model)
   return model
 }
 
@@ -85,7 +85,7 @@ describe('formatAudioMemoTranscript', () => {
   })
 
   it('falls back to the untouched transcript and a local title when the call fails', async () => {
-    languageModelMock.mockReturnValue(
+    languageModelMock.mockResolvedValue(
       new MockLanguageModelV3({
         doGenerate: async () => {
           throw new Error('model unavailable')

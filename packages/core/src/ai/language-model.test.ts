@@ -158,7 +158,7 @@ describe('languageModel', () => {
     const calls: RecordedCall[] = []
 
     await generateText({
-      model: languageModel(OPENAI_CONFIG, 'sk-test', recordingOpenAiFetch(calls)),
+      model: await languageModel(OPENAI_CONFIG, 'sk-test', recordingOpenAiFetch(calls)),
       prompt: 'hello',
       maxRetries: 0,
     })
@@ -173,7 +173,7 @@ describe('languageModel', () => {
     const calls: RecordedCall[] = []
 
     await generateText({
-      model: languageModel(ANTHROPIC_CONFIG, 'sk-ant-test', recordingAnthropicFetch(calls)),
+      model: await languageModel(ANTHROPIC_CONFIG, 'sk-ant-test', recordingAnthropicFetch(calls)),
       prompt: 'hello',
       maxRetries: 0,
     })
@@ -191,7 +191,11 @@ describe('languageModel', () => {
     const calls: RecordedCall[] = []
 
     await generateText({
-      model: languageModel(OPENROUTER_CONFIG, 'sk-or-v1-test', recordingOpenRouterFetch(calls)),
+      model: await languageModel(
+        OPENROUTER_CONFIG,
+        'sk-or-v1-test',
+        recordingOpenRouterFetch(calls),
+      ),
       prompt: 'hello',
       maxRetries: 0,
     })
@@ -207,7 +211,11 @@ describe('languageModel', () => {
     const calls: RecordedCall[] = []
 
     await generateText({
-      model: languageModel(OPENAI_COMPATIBLE_CONFIG, '', recordingOpenAICompatibleFetch(calls)),
+      model: await languageModel(
+        OPENAI_COMPATIBLE_CONFIG,
+        '',
+        recordingOpenAICompatibleFetch(calls),
+      ),
       prompt: 'hello',
       maxRetries: 0,
     })
@@ -229,14 +237,14 @@ describe('languageModel', () => {
       OPENROUTER_CONFIG,
       OPENAI_COMPATIBLE_CONFIG,
     ]) {
-      expect(languageModel(config, APP_REVIEW_STUB_KEY, throwingFetch)).toMatchObject({
+      expect(await languageModel(config, APP_REVIEW_STUB_KEY, throwingFetch)).toMatchObject({
         specificationVersion: 'v3',
         provider: 'reflect-demo',
       })
     }
 
     const result = await generateText({
-      model: languageModel(OPENAI_CONFIG, APP_REVIEW_STUB_KEY, throwingFetch),
+      model: await languageModel(OPENAI_CONFIG, APP_REVIEW_STUB_KEY, throwingFetch),
       prompt: 'hello',
       maxRetries: 0,
     })
