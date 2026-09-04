@@ -292,7 +292,7 @@ fn resolve_conflicts(repo: &Repository, root: &Path, index: &mut Index) -> AppRe
 fn available_copy(root: &Path, index: &Index, path: &str) -> AppResult<String> {
     for number in 1..=10_000 {
         let candidate = conflict_copy_path(path, number);
-        if index.get_path(Path::new(&candidate), 0).is_none()
+        if !index.iter().any(|entry| entry.path == candidate.as_bytes())
             && std::fs::symlink_metadata(root.join(&candidate))
                 .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
         {

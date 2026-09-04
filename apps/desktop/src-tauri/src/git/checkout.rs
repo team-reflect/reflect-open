@@ -223,6 +223,7 @@ fn apply(
                     }))?;
             }
             staged.as_file().sync_all()?;
+            boundary(&change.path, "claim")?;
             staged.persist_noclobber(&target).map_err(|error| {
                 AppError::io(format!("checkout refused {}: {}", change.path, error.error))
             })?;
@@ -522,5 +523,97 @@ mod tests {
         assert!(super::super::commit::commit_all(root.path(), "retry", u64::MAX).is_err());
         assert_eq!(repo.head().unwrap().target(), Some(before));
         assert_eq!(fs::read(root.path().join("a.md")).unwrap(), b"old a");
+    }
+
+    #[test]
+    fn a_conflict_copy_arriving_at_the_final_claim_is_not_overwritten() {
+        let root = tempfile::tempdir().unwrap();
+        let recovery = tempfile::tempdir_in(root.path()).unwrap();
+        let (repo, _, _) = trees(root.path());
+        let mut changes = vec![Change {
+            path: "assets/img (conflict).bin".to_owned(),
+            before: None,
+            after: Some(repo.blob(b"remote image\0").unwrap()),
+            executable: false,
+            moved: false,
+            installed: false,
+        }];
+        let result = apply(
+            &repo,
+            root.path(),
+            recovery.path(),
+            &mut changes,
+            |path, boundary| {
+                if boundary == "claim" {
+                    fs::write(root.path().join(path), b"late intentional attachment\0")?;
+                }
+                Ok(())
+            },
+        );
+        assert!(result.is_err());
+        restore(root.path(), recovery.path(), &changes).unwrap();
+        assert_eq!(
+            fs::read(root.path().join(&changes[0].path)).unwrap(),
+            b"late intentional attachment\0"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_multi_file_install_restores_head_index_and_worktree() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = tempfile::tempdir().unwrap();
+        let (repo, before, after) = trees(root.path());
+        let old = repo.find_commit(before).unwrap().tree().unwrap();
+        let mut index = git2::Index::new().unwrap();
+        index
+            .read_tree(&repo.find_commit(after).unwrap().tree().unwrap())
+            .unwrap();
+        let mut entry = index.get_path(Path::new("a.md"), 0).unwrap();
+        entry.path = b"z/new.md".to_vec();
+        index.add(&entry).unwrap();
+        let new = repo.find_tree(index.write_tree_to(&repo).unwrap()).unwrap();
+        let sig = signature(&repo).unwrap();
+        let target = repo
+            .commit(
+                None,
+                &sig,
+                &sig,
+                "incoming",
+                &new,
+                &[&repo.find_commit(before).unwrap()],
+            )
+            .unwrap();
+        let index_before = fs::read(repo.path().join("index")).unwrap();
+        fs::create_dir(root.path().join("z")).unwrap();
+        fs::set_permissions(root.path().join("z"), fs::Permissions::from_mode(0o555)).unwrap();
+        let result = install(
+            &repo,
+            root.path(),
+            &current_branch(&repo).unwrap(),
+            Some(before),
+            target,
+            Some(&old),
+            &new,
+        );
+        fs::set_permissions(root.path().join("z"), fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(result.is_err());
+        assert_eq!(repo.head().unwrap().target(), Some(before));
+        assert_eq!(fs::read(repo.path().join("index")).unwrap(), index_before);
+        assert_eq!(fs::read(root.path().join("a.md")).unwrap(), b"old a");
+        assert_eq!(fs::read(root.path().join("b.md")).unwrap(), b"old b");
+        assert!(!repo.path().join("reflect-sync/pending").exists());
+        install(
+            &repo,
+            root.path(),
+            &current_branch(&repo).unwrap(),
+            Some(before),
+            target,
+            Some(&old),
+            &new,
+        )
+        .unwrap();
+        assert_eq!(repo.head().unwrap().target(), Some(target));
     }
 }

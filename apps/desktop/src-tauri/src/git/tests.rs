@@ -184,6 +184,29 @@ fn repeated_binary_conflicts_preserve_existing_copies_and_links() {
     );
 }
 
+#[test]
+fn binary_copy_names_reserve_unresolved_edit_delete_conflicts_too() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "assets/img", "base image\0");
+    write(root, "assets/img (conflict)", "base attachment\0");
+    commit_all(root, "base", MAX_FILE_BYTES).unwrap();
+    push(root, None).unwrap();
+    let peer = second_device(&fixture);
+    write(&peer, "assets/img", "remote image\0");
+    write(&peer, "assets/img (conflict)", "remote attachment\0");
+    commit_all(&peer, "peer", MAX_FILE_BYTES).unwrap();
+    push(&peer, None).unwrap();
+    write(root, "assets/img", "local image\0");
+    fs::remove_file(root.join("assets/img (conflict)")).unwrap();
+    commit_all(root, "local", MAX_FILE_BYTES).unwrap();
+    fetch(root, None).unwrap();
+    merge_remote(root).unwrap();
+    assert_eq!(read(root, "assets/img"), "local image\0");
+    assert_eq!(read(root, "assets/img (conflict)"), "remote attachment\0");
+    assert_eq!(read(root, "assets/img (conflict 2)"), "remote image\0");
+}
+
 fn commit_runtime_with_external_git(root: &Path, content: &str) {
     write(root, ".reflect/index.sqlite", content);
     let repo = Repository::open(root).unwrap();
