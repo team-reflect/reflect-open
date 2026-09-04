@@ -1,11 +1,16 @@
-import type { SyntaxNode } from '@meowdown/markdown'
+import { getAutolinkHref, type SyntaxNode } from '@meowdown/markdown'
 import { dateFromDailyPath, isAttachmentPath, isDaily } from '../graph/paths'
 import { parseFrontmatter, splitFrontmatter } from './frontmatter'
 import { parseBody } from './grammar'
 import { foldTag } from './keys'
 import { parseInlineLink } from './link-syntax'
 import { headingLevelOf } from './node-types'
-import { buildPlainText, plainTextOfRange, unescapeMarkdownText } from './plain-text'
+import {
+  buildPlainText,
+  plainTextOfRange,
+  unescapeMarkdownText,
+  type PlainTextReplacement,
+} from './plain-text'
 import { normalizeWikiTarget } from './resolve'
 import { taskBreadcrumbs } from './task-breadcrumbs'
 import { parseTaskMarker } from './task-marker'
@@ -97,6 +102,74 @@ function hostOf(href: string): string | undefined {
     // relative or non-URL href — no domain
   }
   return undefined
+}
+
+function decodeUrlPath(path: string): string {
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
+}
+
+/** Human-readable external destination text for search, or null for local/unsupported hrefs. */
+function searchableExternalDestination(raw: string): string | null {
+  const trimmed = raw.trim()
+  const href = trimmed.startsWith('//') ? `https:${trimmed}` : getAutolinkHref(trimmed)
+  if (href === undefined) {
+    return null
+  }
+
+  let url: URL
+  try {
+    url = new URL(href)
+  } catch {
+    return null
+  }
+
+  if (url.protocol === 'mailto:') {
+    const address = url.pathname
+    try {
+      return decodeURIComponent(address)
+    } catch {
+      return address
+    }
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return null
+  }
+
+  const hostname = url.hostname.replace(/^www\./i, '')
+  const host = url.port === '' ? hostname : `${hostname}:${url.port}`
+  const path = decodeUrlPath(url.pathname)
+  return path === '/' ? host : `${host}${path}`
+}
+
+function destinationReplacement(
+  body: string,
+  urlText: string,
+  parent: SyntaxNode | null,
+): string | null {
+  if (parent?.name === 'Image' || parent?.name === 'LinkReference') {
+    return null
+  }
+  const destination = searchableExternalDestination(urlText)
+  if (destination === null) {
+    return null
+  }
+  if (parent?.name !== 'Link') {
+    return destination
+  }
+
+  const parsed = parseInlineLink(body.slice(parent.from, parent.to))
+  if (parsed === null) {
+    return null
+  }
+  const normalizedLabel = searchableExternalDestination(parsed.text)
+  if (normalizedLabel?.toLowerCase() === destination.toLowerCase()) {
+    return ''
+  }
+  return parsed.text.trim() === '' ? destination : ` (${destination})`
 }
 
 function isAssetHref(href: string): boolean {
@@ -304,6 +377,7 @@ function readTask(
   bodyOffset: number,
   cuts: Span[],
   literalRanges: Span[],
+  replacements: readonly PlainTextReplacement[],
   wikiLinks: WikiLink[],
 ): ParsedTask | null {
   const { from, to } = taskNode
@@ -317,8 +391,8 @@ function readTask(
   const lineEnd = lineEndAfter(body, from)
   const markerOffset = from + bodyOffset
   return {
-    text: plainTextOfRange(body, from, lineEnd, cuts, literalRanges),
-    breadcrumbs: taskBreadcrumbs(body, taskNode, cuts, literalRanges),
+    text: plainTextOfRange(body, from, lineEnd, cuts, literalRanges, replacements),
+    breadcrumbs: taskBreadcrumbs(body, taskNode, cuts, literalRanges, replacements),
     raw: body.slice(from, lineEnd),
     checked: marker.checked,
     markerOffset,
@@ -417,6 +491,7 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
   const cuts: Span[] = [] // body coords — syntax to drop from plain text
   const tagExcluded: Span[] = [] // body coords — regions that don't yield tags
   const literalPlainText: Span[] = [] // body coords — regions that render backslashes literally
+  const plainTextReplacements: PlainTextReplacement[] = []
   const taskNodes: SyntaxNode[] = [] // body coords — `Task` nodes, resolved after the walk
 
   tree.iterate({
@@ -425,6 +500,12 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
 
       if (isSyntaxNode(name)) {
         cuts.push({ from, to })
+      }
+      if (name === 'URL') {
+        const replacement = destinationReplacement(body, body.slice(from, to), node.node.parent)
+        if (replacement !== null) {
+          plainTextReplacements.push({ from, to, text: replacement })
+        }
       }
       if (name === 'Task') {
         // Resolve after the walk: the child `TaskMarker`/emphasis cuts this task
@@ -501,7 +582,15 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
 
   const tasks: ParsedTask[] = []
   for (const taskNode of taskNodes) {
-    const task = readTask(body, taskNode, bodyOffset, cuts, literalPlainText, wikiLinks)
+    const task = readTask(
+      body,
+      taskNode,
+      bodyOffset,
+      cuts,
+      literalPlainText,
+      plainTextReplacements,
+      wikiLinks,
+    )
     if (task) {
       tasks.push(task)
     }
@@ -519,6 +608,6 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
     headings,
     assets,
     tasks,
-    text: buildPlainText(body, cuts, literalPlainText),
+    text: buildPlainText(body, cuts, literalPlainText, plainTextReplacements),
   }
 }

@@ -3,8 +3,8 @@ import { gistBodyHash, parseNote } from '../markdown'
 import { buildIndexedNote, CLAIM_TIER, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that rebuilds classifier link keys', () => {
-    expect(PROJECTION_VERSION).toBe(19)
+  it('carries the projection version that rebuilds searchable external destinations', () => {
+    expect(PROJECTION_VERSION).toBe(20)
   })
 
   it('flattens a parsed note into the index payload', () => {

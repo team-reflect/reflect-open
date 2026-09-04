@@ -154,6 +154,33 @@ describe('parseNote — links, assets, tags, text', () => {
     expect(note.text).toBe('Hi Some bold text with Link alias.')
   })
 
+  it('appends normalized external destinations to markdown link text', () => {
+    const note = parse(
+      '[Field Jacket Hunter](https://www.alfredorifugio.com/products/field-jacket-hunter?utm_source=Meta#details) ' +
+        '[API](https://example.com/docs%2Fapi%23reference)',
+    )
+    expect(note.text).toBe(
+      'Field Jacket Hunter (alfredorifugio.com/products/field-jacket-hunter) ' +
+        'API (example.com/docs/api#reference)',
+    )
+  })
+
+  it('keeps bare URLs, autolinks, and email addresses searchable without duplication', () => {
+    const note = parse(
+      'Visit example.com/shop?campaign=1, <https://www.example.org/about#team>, ' +
+        '<person@example.com>, [support](mailto:help@example.com?subject=Hello), and ' +
+        '[example.net/path](https://www.example.net/path).',
+    )
+    expect(note.text).toBe(
+      'Visit example.com/shop, example.org/about, person@example.com, ' +
+        'support (help@example.com), and example.net/path.',
+    )
+  })
+
+  it('does not append local asset destinations to image alt text', () => {
+    expect(parse('![Quarterly chart](assets/q4-results.png)').text).toBe('Quarterly chart')
+  })
+
   it('keeps markdown escapes literal inside code text', () => {
     const note = parse(
       'Rendered www\\.reddit.com, code `www\\.reddit.com`.\n\n```\nwww\\.reddit.com\n```',
@@ -214,6 +241,19 @@ describe('parseNote — tasks', () => {
     // markerOffset points at the `[` of the checkbox, not the wiki link.
     expect(item.checked).toBe(false)
     expect(item.markerOffset).toBe(2)
+  })
+
+  it('keeps external link destinations in task text and breadcrumbs', () => {
+    const note = parse(
+      '+ Project [site](https://www.example.com/project)\n' +
+        '  + [ ] review [brief](https://example.com/brief)\n',
+    )
+    expect(note.tasks[0]).toEqual(
+      expect.objectContaining({
+        text: 'review brief (example.com/brief)',
+        breadcrumbs: ['Project site (example.com/project)'],
+      }),
+    )
   })
 
   it('offsets the marker past frontmatter', () => {
@@ -346,9 +386,9 @@ describe('parseNote — meowdown grammar recovery & new inline nodes', () => {
     expect(note.text).toBe('mark hi and x+y math')
   })
 
-  it('drops a bare autolinked domain from plain text, same as other URLs', () => {
+  it('keeps a bare autolinked domain in plain text', () => {
     const note = parse('visit google.com today')
-    expect(note.text).toBe('visit today')
+    expect(note.text).toBe('visit google.com today')
   })
 
   it('still extracts #tags next to the new inline nodes', () => {

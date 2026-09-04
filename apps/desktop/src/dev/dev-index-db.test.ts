@@ -127,6 +127,26 @@ describe('createDevIndexDb', () => {
     expect(hits).toEqual([{ path: 'notes/sample.md' }])
   })
 
+  it('finds a note by a normalized external Markdown destination', async () => {
+    const db = await openDb()
+    const path = 'notes/field-jacket-hunter.md'
+    const source =
+      '# Field Jacket Hunter\n\n' +
+      '[Field Jacket Hunter](https://www.alfredorifugio.com/products/field-jacket-hunter?utm_source=Meta)\n'
+    db.applyNote(
+      buildIndexedNote(parseNote({ path, source }), {
+        fileHash: 'field-jacket-hunter-hash',
+        mtime: 1_700_000_000_000,
+        source,
+      }),
+    )
+    installQueryBridge(db)
+
+    await expect(searchNotes('alfredorifugio')).resolves.toEqual([
+      { path, title: 'Field Jacket Hunter' },
+    ])
+  })
+
   it('finds a short Japanese term inside a title as well as a note body', async () => {
     const db = await openDb()
     db.applyNote(
