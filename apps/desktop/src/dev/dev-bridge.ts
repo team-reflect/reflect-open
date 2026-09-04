@@ -282,6 +282,7 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       case 'calendar_list_events':
       case 'contacts_lookup_by_email':
       case 'contacts_lookup_by_name':
+      case 'zotero_search':
         return []
 
       case 'chat_message_save': {

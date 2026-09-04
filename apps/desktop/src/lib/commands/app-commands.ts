@@ -314,6 +314,20 @@ const APP_COMMANDS: AppCommand[] = [
     },
   },
   {
+    id: 'zotero.insert',
+    title: 'Insert Zotero item…',
+    keywords: ['zotero', 'citation', 'paper', 'reference', 'literature', 'library'],
+    // Searches the local Zotero library (Zotero 7's Local API) and inserts a
+    // `[Title](zotero://…)` deep link at the caret of the note the current
+    // route edits. The picker surfaces the "Zotero is not running" state.
+    run: (context) => {
+      if (context.notePath() === null) {
+        return
+      }
+      context.openZoteroPicker()
+    },
+  },
+  {
     id: 'template.new',
     title: 'New template',
     keywords: ['template', 'snippet', 'boilerplate', 'create'],

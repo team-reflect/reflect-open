@@ -94,6 +94,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     openShortcuts: vi.fn(),
     openTemplatePicker: vi.fn(),
     openTemplateCreate: vi.fn(),
+    openZoteroPicker: vi.fn(),
     enableSemanticSearch: vi.fn(),
     ...overrides,
   }

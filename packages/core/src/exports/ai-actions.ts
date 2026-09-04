@@ -242,3 +242,12 @@ export {
   type ReconcileAssetDescriptionsInput,
   type ReconcileAssetDescriptionsOutcome,
 } from '../actions/asset-description'
+export {
+  zoteroSearch,
+  zoteroItemLink,
+  zoteroItemSummary,
+  zoteroAbstractExcerpt,
+  ZOTERO_ABSTRACT_MAX_LENGTH,
+  zoteroItemSchema,
+  type ZoteroItem,
+} from '../zotero/commands'
