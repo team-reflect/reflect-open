@@ -498,8 +498,11 @@ pub async fn capture_screenshot_promote(
     state: State<'_, GraphState>,
 ) -> AppResult<()> {
     let root = root_for_generation(&state, generation)?;
-    let bytes = fs::read(inbox_file(&root, &spool_name)?)?;
-    let jpeg = downscale_jpeg(&bytes, max_dim)?;
+    let jpeg = crate::blocking::run_blocking(move || {
+        let bytes = fs::read(inbox_file(&root, &spool_name)?)?;
+        downscale_jpeg(&bytes, max_dim)
+    })
+    .await?;
     crate::fs::mutation::run(state.inner().clone(), generation, move |root| {
         persist_asset(root, &asset_path, &jpeg)
     })

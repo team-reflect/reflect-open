@@ -41,9 +41,9 @@ runs; withheld updates retain their previous committed version.
 The root `.reflect` directory (including case variants and trailing-dot/space
 filename aliases) is excluded from new Reflect commits and incoming checkouts,
 even when an adopted repository already tracks it. Adoption removes its entries
-from the Git index without deleting
-local files. Restoring through Reflect does not check out another device's
-runtime files. Local SQLite data and durable chat history stay on the device.
+from the Git index without deleting local files. Restoring through Reflect does
+not check out another device's runtime files. Local SQLite data and durable chat
+history stay on the device.
 
 This does not rewrite existing Git history: runtime data already committed in
 older revisions remains in those revisions. Durable chat history is not part of
