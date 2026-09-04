@@ -473,6 +473,8 @@ fn downscale_jpeg(bytes: &[u8], max_dim: u32) -> AppResult<Vec<u8>> {
 }
 
 fn persist_asset(root: &Path, asset_path: &str, bytes: &[u8]) -> AppResult<()> {
+    let gate = crate::fs::mutation::gate(root)?;
+    let _writer = crate::fs::mutation::writer(&gate)?;
     let target = crate::fs::resolve_in_graph(root, asset_path)?;
     let parent = target
         .parent()

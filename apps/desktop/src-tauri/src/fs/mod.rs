@@ -11,6 +11,7 @@ pub mod assets;
 mod import;
 mod import_assets;
 mod io;
+pub(crate) mod mutation;
 mod resolve;
 
 use std::fs;
@@ -482,6 +483,8 @@ pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>
         )));
     }
     let root = root_for_generation(&state, generation)?;
+    let gate = mutation::gate(&root)?;
+    let _writer = mutation::writer(&gate)?;
     let abs = resolve(&root, &path)?;
     // An iCloud-evicted segment exists only as its `.name.icloud` stub —
     // mirror `note_delete` so a cancelled session's evicted parts still
@@ -710,6 +713,8 @@ pub fn note_exists(path: String, state: State<GraphState>) -> AppResult<bool> {
 /// reports failed. One rule, no adoption heuristics; the filename drifts
 /// until the next settled rename retries.
 pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()> {
+    let gate = mutation::gate(root)?;
+    let _writer = mutation::writer(&gate)?;
     let from_abs = resolve(root, from)?;
     let to_abs = resolve(root, to)?;
     // Occupied includes an evicted iCloud note (placeholder only on disk):
@@ -736,6 +741,8 @@ pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()>
 #[tauri::command]
 pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
     let root = root_for_generation(&state, generation)?;
+    let gate = mutation::gate(&root)?;
+    let _writer = mutation::writer(&gate)?;
     let abs = resolve(&root, &path)?;
     // An iCloud-evicted note exists only as its `.name.md.icloud` stub —
     // trashing the logical path would fail and the note would be
@@ -771,6 +778,9 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
 pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> {
     #[cfg(desktop)]
     {
+        let root = root_for_generation(&state, generation)?;
+        let gate = mutation::gate(&root)?;
+        let _writer = mutation::writer(&gate)?;
         // Check-and-invalidate under one lock hold — `root_for_generation`
         // followed by a separate invalidation would leave a window where a
         // pinned write still resolves the doomed root.

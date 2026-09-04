@@ -53,12 +53,15 @@ export const changedFileSchema = z.object({
   path: z.string(),
   kind: z.enum(['upsert', 'remove']),
   /** Last-modified time (epoch ms; upserts only) — real mtime for the reindex. */
-  modifiedMs: z.number().optional(),
+  modifiedMs: z
+    .number()
+    .nullish()
+    .transform((value) => value ?? undefined),
 })
 export type ChangedFile = z.infer<typeof changedFileSchema>
 
 export const mergeOutcomeSchema = z.object({
-  kind: z.enum(['upToDate', 'fastForward', 'merged', 'mergedWithConflicts']),
+  kind: z.enum(['upToDate', 'fastForward', 'merged', 'mergedWithConflicts', 'worktreeChanged']),
   conflictedPaths: z.array(z.string()),
   /**
    * Every file the merge changed. The caller reindexes these directly —
@@ -129,8 +132,9 @@ export async function gitFetch(token: string | null, generation: number): Promis
 
 /**
  * Merge the fetched remote branch. Conflicts are committed into the notes as
- * labeled markers — the repo is never left mid-merge, and the indexer turns
- * the markers into `Needs review` flags.
+ * labeled markers, and the indexer turns them into `Needs review` flags.
+ * `worktreeChanged` is a no-write refusal: snapshot local edits and retry.
+ * Installation failures preserve originals and report recovery instructions.
  */
 export async function gitMergeRemote(generation: number): Promise<MergeOutcome> {
   return await call('git_merge_remote', { generation }, mergeOutcomeSchema)

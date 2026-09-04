@@ -11,10 +11,12 @@
 //! the `generation` the frontend received when its graph was opened and
 //! resolves the root through `crate::fs::root_for_generation`, which fails
 //! when the active graph's generation has since moved (the user switched
-//! graphs after the command was issued). A stale command errors loudly instead
-//! of acting on the new graph, so commands never interleave across graphs.
+//! graphs after the command was issued). Already-issued work can finish on
+//! its captured root, never on the newly opened graph. Local mutations share
+//! the canonical-root filesystem gate; fetch and push never hold that gate.
 //! The one exception is `git_clone`, which runs before any graph is open.
 
+mod checkout;
 mod commit;
 mod commit_message;
 mod merge;
@@ -93,6 +95,10 @@ fn status(root: &Path) -> AppResult<GitStatus> {
 /// its history stay intact (reconnecting re-adds a remote); the machine-level
 /// GitHub credential is untouched — other graphs keep syncing.
 fn disconnect(root: &Path) -> AppResult<GitStatus> {
+    let gate = crate::fs::mutation::gate(root)?;
+    let _mutation = gate
+        .write()
+        .map_err(|_| crate::error::AppError::io("graph mutation gate poisoned"))?;
     let repo = repo::open_existing(root)?;
     if repo.find_remote("origin").is_ok() {
         repo.remote_delete("origin")?;
@@ -102,7 +108,12 @@ fn disconnect(root: &Path) -> AppResult<GitStatus> {
 }
 
 fn setup(root: &Path, remote_url: Option<String>, branch: Option<String>) -> AppResult<GitStatus> {
+    let gate = crate::fs::mutation::gate(root)?;
+    let _mutation = gate
+        .write()
+        .map_err(|_| crate::error::AppError::io("graph mutation gate poisoned"))?;
     let repo = repo::open_or_init(root)?;
+    repo::ensure_clean_state(&repo)?;
     repo::ensure_gitignore_defaults(root)?;
     if let Some(url) = remote_url {
         if repo.find_remote("origin").is_ok() {
@@ -190,7 +201,8 @@ pub async fn git_fetch(
 }
 
 /// Merge the fetched remote branch; conflicts are committed into the notes as
-/// labeled markers (see [`merge`]). The repo is never left mid-merge.
+/// labeled markers (see [`merge`]). Dirty worktrees are refused without writes;
+/// checkout failures preserve originals and report a recovery location.
 #[tauri::command]
 pub async fn git_merge_remote(
     generation: u64,

@@ -20,6 +20,7 @@ const NON_FAST_FORWARD = {
   rejectionMessage: 'fetch first',
 }
 const MERGED = { kind: 'merged', conflictedPaths: [], changedFiles: [] }
+const WORKTREE_CHANGED = { kind: 'worktreeChanged', conflictedPaths: [], changedFiles: [] }
 const DELTA = { ahead: 1, behind: 0 }
 
 interface Call {
@@ -60,6 +61,137 @@ function commandsOf(calls: Call[]): string[] {
 }
 
 describe('createSyncEngine', () => {
+  it('commits a save during fetch before retrying the merge without another fetch', async () => {
+    const fetched = Promise.withResolvers<unknown>()
+    let merges = 0
+    let commits = 0
+    const calls = fakeGit((command) => {
+      if (command === 'git_fetch') {
+        return fetched.promise
+      }
+      if (command === 'git_commit_all') {
+        commits += 1
+        return commits === 1 ? CLEAN_COMMIT : COMMITTED
+      }
+      if (command === 'git_merge_remote') {
+        merges += 1
+        return merges === 1 ? WORKTREE_CHANGED : MERGED
+      }
+      return defaultResponses(command)
+    })
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 17,
+      getToken: async () => null,
+      onStatus: (status) => {
+        statuses.push(status)
+      },
+    })
+    const syncing = engine.syncNow()
+    await vi.waitFor(() => expect(commandsOf(calls)).toContain('git_fetch'))
+    engine.noteChanged()
+    fetched.resolve({ ahead: 0, behind: 1 })
+    await syncing
+    expect(commandsOf(calls)).toEqual([
+      'git_commit_all',
+      'git_fetch',
+      'git_merge_remote',
+      'git_commit_all',
+      'git_merge_remote',
+      'git_push',
+    ])
+    expect(calls.every((call) => call.args['generation'] === 17)).toBe(true)
+    expect(statuses.at(-1)).toEqual({ state: 'idle' })
+    engine.stop()
+  })
+
+  it('pushes a retry snapshot even when another window already merged the remote', async () => {
+    let merges = 0
+    let commits = 0
+    const calls = fakeGit((command) => {
+      if (command === 'git_fetch') {
+        return { ahead: 0, behind: 1 }
+      }
+      if (command === 'git_commit_all') {
+        return ++commits === 1 ? CLEAN_COMMIT : COMMITTED
+      }
+      if (command === 'git_merge_remote') {
+        return ++merges === 1 ? WORKTREE_CHANGED : { ...MERGED, kind: 'upToDate' }
+      }
+      return defaultResponses(command)
+    })
+    const engine = createSyncEngine({ generation: 1, getToken: async () => null })
+    await engine.syncNow()
+    expect(commandsOf(calls).at(-1)).toBe('git_push')
+    engine.stop()
+  })
+
+  it('bounds dirty-worktree retries and never pushes a refused merge', async () => {
+    const calls = fakeGit((command) =>
+      command === 'git_merge_remote' ? WORKTREE_CHANGED : defaultResponses(command),
+    )
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => null,
+      onStatus: (status) => {
+        statuses.push(status)
+      },
+    })
+    await engine.syncNow()
+    expect(commandsOf(calls).filter((command) => command === 'git_merge_remote')).toHaveLength(3)
+    expect(commandsOf(calls)).not.toContain('git_push')
+    expect(statuses.at(-1)).toMatchObject({ state: 'error', errorKind: 'other' })
+    engine.stop()
+  })
+
+  it('stops at the retry commit boundary when the graph is switched', async () => {
+    const snapshot = Promise.withResolvers<unknown>()
+    let commits = 0
+    const calls = fakeGit((command) => {
+      if (command === 'git_commit_all' && ++commits > 1) {
+        return snapshot.promise
+      }
+      return command === 'git_merge_remote' ? WORKTREE_CHANGED : defaultResponses(command)
+    })
+    const engine = createSyncEngine({ generation: 1, getToken: async () => null })
+    const syncing = engine.syncNow()
+    await vi.waitFor(() =>
+      expect(commandsOf(calls).filter((command) => command === 'git_commit_all')).toHaveLength(2),
+    )
+    engine.stop()
+    snapshot.resolve(COMMITTED)
+    await syncing
+    expect(commandsOf(calls)).toEqual([
+      'git_commit_all',
+      'git_fetch',
+      'git_merge_remote',
+      'git_commit_all',
+    ])
+  })
+
+  it('accepts native null mtimes and notifies removals before pushing', async () => {
+    const changes: unknown[] = []
+    fakeGit((command) =>
+      command === 'git_merge_remote'
+        ? {
+            ...MERGED,
+            changedFiles: [{ path: 'notes/deleted.md', kind: 'remove', modifiedMs: null }],
+          }
+        : defaultResponses(command),
+    )
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => null,
+      onRemoteChanges: (batch) => {
+        changes.push(...batch)
+      },
+    })
+    await engine.syncNow()
+    expect(changes).toEqual([{ path: 'notes/deleted.md', kind: 'remove', modifiedMs: undefined }])
+    engine.stop()
+  })
+
   it('debounces edits into one commit→push cycle pinned to the generation', async () => {
     const calls = fakeGit(defaultResponses)
     const statuses: SyncStatus[] = []

@@ -9,7 +9,7 @@ use serde::Serialize;
 use crate::error::AppResult;
 
 use super::commit_message::message_for_commit;
-use super::repo::{ensure_clean_state, open_existing, signature};
+use super::repo::{ensure_clean_state, exclude_runtime, is_runtime, open_existing, signature};
 
 /// A file whose *changes* were withheld from staging because it is at/above
 /// the size guardrail. Oversized-but-unchanged files are not reported — their
@@ -45,6 +45,10 @@ pub(super) fn commit_all(
     fallback_message: &str,
     max_file_bytes: u64,
 ) -> AppResult<CommitOutcome> {
+    let gate = crate::fs::mutation::gate(root)?;
+    let _mutation = gate
+        .write()
+        .map_err(|_| crate::error::AppError::io("graph mutation gate poisoned"))?;
     let repo = open_existing(root)?;
     ensure_clean_state(&repo)?;
     // In-memory hard guarantee, independent of any on-disk ignore file: the
@@ -53,6 +57,7 @@ pub(super) fn commit_all(
     repo.add_ignore_rule("/.reflect/")?;
 
     let mut index = repo.index()?;
+    exclude_runtime(&mut index)?;
     let skipped = add_all_with_size_guard(&mut index, root, max_file_bytes)?;
 
     let parent = repo.head().ok().and_then(|head| head.peel_to_commit().ok());
@@ -126,6 +131,9 @@ fn add_all_with_size_guard(
 
     let skipped: RefCell<Vec<SkippedFile>> = RefCell::new(Vec::new());
     let mut size_guard = |path: &Path, _spec: &[u8]| -> i32 {
+        if is_runtime(path.to_string_lossy().as_bytes()) {
+            return 1;
+        }
         let Ok(meta) = root.join(path).metadata() else {
             // Deleted file: let the staging proceed so the removal is recorded.
             return 0;

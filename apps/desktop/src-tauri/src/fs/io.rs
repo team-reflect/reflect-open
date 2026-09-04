@@ -288,6 +288,8 @@ pub(super) fn atomic_create(
     target: &Path,
     contents: &str,
 ) -> AppResult<AtomicCreateOutcome> {
+    let gate = super::mutation::gate(root)?;
+    let _writer = super::mutation::writer(&gate)?;
     // An evicted iCloud note occupies its logical path through the placeholder
     // alone. `persist_noclobber(target)` cannot see that sibling stub, so keep
     // the shared occupancy check in front of the atomic real-file claim.
@@ -322,6 +324,8 @@ pub(crate) fn atomic_write_bytes(
     target: &Path,
     contents: &[u8],
 ) -> AppResult<Option<u64>> {
+    let gate = super::mutation::gate(root)?;
+    let _writer = super::mutation::writer(&gate)?;
     let tmp = stage_bytes(root, target, contents)?;
     let file = tmp
         .persist(target)

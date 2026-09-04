@@ -104,6 +104,215 @@ fn setup_initializes_main_and_origin() {
 }
 
 #[test]
+fn saved_edit_during_fetch_is_refused_then_merged_without_loss() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/shared.md", "base\n");
+    commit_all(root, "base", MAX_FILE_BYTES).unwrap();
+    push(root, None).unwrap();
+    let peer = second_device(&fixture);
+    write(&peer, "notes/shared.md", "remote revision\n");
+    commit_all(&peer, "remote", MAX_FILE_BYTES).unwrap();
+    push(&peer, None).unwrap();
+    commit_all(root, "before fetch", MAX_FILE_BYTES).unwrap();
+    let repo = Repository::open(root).unwrap();
+    let before = repo.head().unwrap().target();
+    let index_before = fs::read(repo.path().join("index")).unwrap();
+    crate::fs::atomic_write_bytes(root, &root.join("notes/shared.md"), b"saved during fetch\n")
+        .unwrap();
+    fetch(root, None).unwrap();
+
+    let result = merge_remote(root).unwrap();
+    assert!(matches!(result.kind, MergeKind::WorktreeChanged));
+    assert_eq!(read(root, "notes/shared.md"), "saved during fetch\n");
+    assert_eq!(repo.head().unwrap().target(), before);
+    assert_eq!(fs::read(repo.path().join("index")).unwrap(), index_before);
+    commit_all(root, "retry", MAX_FILE_BYTES).unwrap();
+    let result = merge_remote(root).unwrap();
+    assert!(matches!(result.kind, MergeKind::MergedWithConflicts));
+    let content = read(root, "notes/shared.md");
+    assert!(content.contains("saved during fetch"));
+    assert!(content.contains("remote revision"));
+    assert!(push(root, None).unwrap().pushed);
+}
+
+#[test]
+fn repeated_binary_conflicts_preserve_existing_copies_and_links() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "assets/img.bin", "base\0");
+    write(
+        root,
+        "assets/img (conflict).bin",
+        "intentional attachment\0",
+    );
+    write(
+        root,
+        "notes/links.md",
+        "[attachment](../assets/img (conflict).bin)",
+    );
+    commit_all(root, "base", MAX_FILE_BYTES).unwrap();
+    push(root, None).unwrap();
+    let peer = second_device(&fixture);
+    for round in 2..=3 {
+        write(&peer, "assets/img.bin", &format!("remote {round}\0"));
+        commit_all(&peer, "peer", MAX_FILE_BYTES).unwrap();
+        push(&peer, None).unwrap();
+        write(root, "assets/img.bin", &format!("local {round}\0"));
+        commit_all(root, "local", MAX_FILE_BYTES).unwrap();
+        fetch(root, None).unwrap();
+        assert!(matches!(
+            merge_remote(root).unwrap().kind,
+            MergeKind::MergedWithConflicts
+        ));
+        assert_eq!(
+            read(root, &format!("assets/img (conflict {round}).bin")),
+            format!("remote {round}\0")
+        );
+        assert!(push(root, None).unwrap().pushed);
+        fetch(&peer, None).unwrap();
+        merge_remote(&peer).unwrap();
+    }
+    assert_eq!(
+        read(root, "assets/img (conflict).bin"),
+        "intentional attachment\0"
+    );
+    assert_eq!(read(root, "assets/img (conflict 2).bin"), "remote 2\0");
+    assert_eq!(
+        read(root, "notes/links.md"),
+        "[attachment](../assets/img (conflict).bin)"
+    );
+}
+
+fn commit_runtime_with_external_git(root: &Path, content: &str) {
+    write(root, ".reflect/index.sqlite", content);
+    let repo = Repository::open(root).unwrap();
+    let mut index = repo.index().unwrap();
+    index.add_path(Path::new(".reflect/index.sqlite")).unwrap();
+    index.write().unwrap();
+    let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+    let parent = repo.head().unwrap().peel_to_commit().unwrap();
+    let sig = super::repo::signature(&repo).unwrap();
+    repo.commit(
+        Some("HEAD"),
+        &sig,
+        &sig,
+        "external runtime",
+        &tree,
+        &[&parent],
+    )
+    .unwrap();
+}
+
+#[test]
+fn adopted_runtime_is_untracked_without_touching_local_database() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "base");
+    commit_all(root, "base", MAX_FILE_BYTES).unwrap();
+    commit_runtime_with_external_git(root, "old database");
+    write(root, ".reflect/index.sqlite", "private durable chat bytes");
+    write(root, ".reflect/index.sqlite-wal", "local wal");
+    assert!(
+        commit_all(root, "backup", MAX_FILE_BYTES)
+            .unwrap()
+            .committed
+    );
+    assert!(!head_tree_paths(root)
+        .iter()
+        .any(|path| path.starts_with(".reflect/")));
+    assert_eq!(
+        read(root, ".reflect/index.sqlite"),
+        "private durable chat bytes"
+    );
+    assert_eq!(read(root, ".reflect/index.sqlite-wal"), "local wal");
+    assert!(!commit_all(root, "clean", MAX_FILE_BYTES).unwrap().committed);
+}
+
+#[test]
+fn remote_runtime_never_overwrites_an_open_database_or_enters_merge_tree() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "base");
+    commit_all(root, "base", MAX_FILE_BYTES).unwrap();
+    push(root, None).unwrap();
+    let peer = second_device(&fixture);
+    fs::remove_file(root.join(".reflect/index.sqlite")).unwrap();
+    let database = rusqlite::Connection::open(root.join(".reflect/index.sqlite")).unwrap();
+    database.execute_batch("PRAGMA journal_mode=WAL; CREATE TABLE chat_messages (body TEXT); INSERT INTO chat_messages VALUES ('durable chat');").unwrap();
+    let database_before = fs::read(root.join(".reflect/index.sqlite")).unwrap();
+    let wal_before = fs::read(root.join(".reflect/index.sqlite-wal")).unwrap();
+    commit_runtime_with_external_git(&peer, "foreign database");
+    push(&peer, None).unwrap();
+    fetch(root, None).unwrap();
+    let result = merge_remote(root).unwrap();
+    assert!(matches!(result.kind, MergeKind::Merged));
+    assert!(!result
+        .changed_files
+        .iter()
+        .any(|file| file.path.starts_with(".reflect/")));
+    assert_eq!(
+        fs::read(root.join(".reflect/index.sqlite")).unwrap(),
+        database_before
+    );
+    assert_eq!(
+        fs::read(root.join(".reflect/index.sqlite-wal")).unwrap(),
+        wal_before
+    );
+    assert_eq!(
+        database
+            .query_row("SELECT body FROM chat_messages", [], |row| row
+                .get::<_, String>(0))
+            .unwrap(),
+        "durable chat"
+    );
+    assert!(!head_tree_paths(root)
+        .iter()
+        .any(|path| path.starts_with(".reflect/")));
+    assert!(push(root, None).unwrap().pushed);
+}
+
+#[test]
+fn restore_never_materializes_remote_runtime() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "base");
+    commit_all(root, "base", MAX_FILE_BYTES).unwrap();
+    commit_runtime_with_external_git(root, "foreign database");
+    push(root, None).unwrap();
+    let restored = fixture._dir.path().join("restored");
+    super::remote::clone(&fixture.remote_url, &restored, None).unwrap();
+    assert_eq!(read(&restored, "notes/a.md"), "base");
+    assert!(!restored.join(".reflect").exists());
+    assert!(!head_tree_paths(&restored)
+        .iter()
+        .any(|path| path.starts_with(".reflect/")));
+}
+
+#[test]
+fn divergent_runtime_edit_delete_conflict_keeps_the_local_runtime() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "base");
+    commit_all(root, "base", MAX_FILE_BYTES).unwrap();
+    commit_runtime_with_external_git(root, "tracked old runtime");
+    push(root, None).unwrap();
+    let peer = second_device(&fixture);
+    commit_runtime_with_external_git(&peer, "remote changed runtime");
+    push(&peer, None).unwrap();
+    write(root, ".reflect/index.sqlite", "local durable chat");
+    write(root, "notes/local.md", "local note");
+    commit_all(root, "stop tracking runtime", MAX_FILE_BYTES).unwrap();
+    fetch(root, None).unwrap();
+    merge_remote(root).unwrap();
+    assert_eq!(read(root, ".reflect/index.sqlite"), "local durable chat");
+    assert_eq!(read(root, "notes/local.md"), "local note");
+    assert!(!head_tree_paths(root)
+        .iter()
+        .any(|path| path.starts_with(".reflect/")));
+}
+
+#[test]
 fn setup_creates_graph_gitignore_defaults_when_missing() {
     let dir = tempdir().unwrap();
     let root = dir.path().join("graph");

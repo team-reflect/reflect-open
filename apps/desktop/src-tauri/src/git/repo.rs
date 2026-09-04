@@ -39,11 +39,45 @@ pub(super) fn open_existing(root: &Path) -> AppResult<Repository> {
 /// Refuse to operate on a repository mid-operation (a rebase/merge the user
 /// started with the git CLI). Guessing here could destroy their state.
 pub(super) fn ensure_clean_state(repo: &Repository) -> AppResult<()> {
+    if repo.path().join("reflect-sync/pending").exists() {
+        return Err(AppError::io(format!(
+            "an interrupted Git sync needs recovery; original files and index are in {}. Inspect pending before retrying; do not reset --hard",
+            repo.path().join("reflect-sync").display()
+        )));
+    }
     if repo.state() != git2::RepositoryState::Clean {
         return Err(AppError::io(format!(
             "the backup repository has a {:?} in progress; finish or abort it with git first",
             repo.state()
         )));
+    }
+    if repo.index()?.has_conflicts() {
+        return Err(AppError::io(
+            "the Git index has unresolved conflicts; resolve them with git before syncing",
+        ));
+    }
+    Ok(())
+}
+
+/// Runtime data never participates in history or checkout, even when tracked
+/// by an adopted repository. Case folding also protects case-insensitive disks.
+pub(super) fn is_runtime(path: &[u8]) -> bool {
+    path.split(|byte| *byte == b'/')
+        .next()
+        .is_some_and(|part| part.eq_ignore_ascii_case(b".reflect"))
+}
+
+/// Remove runtime entries from every index stage without touching local files.
+pub(super) fn exclude_runtime(index: &mut git2::Index) -> AppResult<()> {
+    let paths: Vec<_> = index
+        .iter()
+        .filter(|entry| is_runtime(&entry.path))
+        .map(|entry| {
+            String::from_utf8(entry.path).map_err(|_| AppError::io("non-UTF-8 runtime path"))
+        })
+        .collect::<AppResult<_>>()?;
+    for path in paths {
+        index.remove_path(Path::new(&path))?;
     }
     Ok(())
 }

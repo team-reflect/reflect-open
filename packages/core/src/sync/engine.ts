@@ -5,6 +5,7 @@ import {
   gitMergeRemote,
   gitPush,
   type ChangedFile,
+  type MergeOutcome,
   type SkippedFile,
 } from './commands'
 
@@ -14,7 +15,7 @@ import {
  * reach the UI — only {@link SyncStatus}.
  *
  * Invariants:
- * - **Never wedged.** Merges commit their conflicts (markers in the note), so
+ * - **Conflicts keep syncing.** Merges commit their conflicts (markers in the note), so
  *   a conflict pauses nothing; the indexer surfaces `Needs review` per note.
  * - **No write loops, no idle network.** Pull-applied file changes re-enter
  *   `noteChanged` via the watcher, but the next cycle finds nothing committed
@@ -314,7 +315,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       // Launch/focus: pick up other devices' changes even with nothing to push.
       const delta = await step(gitFetch(token, options.generation))
       const merged = await merge(remoteChanges)
-      const localOnly = commit.committed || delta.ahead > 0
+      const localOnly = commit.committed || delta.ahead > 0 || merged.committed
       if (!localOnly && (merged.kind === 'upToDate' || merged.kind === 'fastForward')) {
         return // pulled cleanly and have nothing of our own — no push needed
       }
@@ -338,14 +339,30 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   }
 
   /** Merge fetched changes and start any changed-file notification. */
-  async function merge(remoteChanges: (changes: ChangedFile[]) => void): Promise<{ kind: string }> {
-    return await step(gitMergeRemote(options.generation), (outcome) => {
-      // The command may already have rewritten files before suspension. Fan
-      // those changes out before the boundary gate stops subsequent Git work.
-      if (outcome.changedFiles.length > 0) {
-        remoteChanges(outcome.changedFiles)
+  async function merge(
+    remoteChanges: (changes: ChangedFile[]) => void,
+  ): Promise<{ kind: MergeOutcome['kind']; committed: boolean }> {
+    let committed = false
+    for (let attempt = 0; attempt < MAX_PUSH_ATTEMPTS; attempt++) {
+      const outcome = await step(gitMergeRemote(options.generation), (result) => {
+        if (result.changedFiles.length > 0) {
+          remoteChanges(result.changedFiles)
+        }
+      })
+      if (outcome.kind !== 'worktreeChanged') {
+        return { kind: outcome.kind, committed }
       }
-    }) // upToDate is a no-op
+      if (attempt + 1 < MAX_PUSH_ATTEMPTS) {
+        const snapshot = await step(gitCommitAll('Update notes', options.generation))
+        committed ||= snapshot.committed
+        if (snapshot.skippedLargeFiles.length > 0) {
+          options.onLargeFilesSkipped?.(snapshot.skippedLargeFiles)
+        }
+      }
+    }
+    throw new Error(
+      'Local files kept changing during Git sync. Nothing was overwritten; retry when editing pauses.',
+    )
   }
 
   function syncNow(): Promise<void> {

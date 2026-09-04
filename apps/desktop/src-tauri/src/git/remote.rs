@@ -173,9 +173,41 @@ fn count_commits(repo: &Repository, from: git2::Oid) -> AppResult<usize> {
 pub(super) fn clone(url: &str, target: &Path, token: Option<String>) -> AppResult<()> {
     let mut fetch_options = FetchOptions::new();
     fetch_options.remote_callbacks(callbacks_with_credentials(token));
-    git2::build::RepoBuilder::new()
+    let mut checkout = git2::build::CheckoutBuilder::new();
+    checkout.dry_run();
+    let repo = git2::build::RepoBuilder::new()
         .fetch_options(fetch_options)
+        .with_checkout(checkout)
         .clone(url, target)?;
+    if let Ok(head) = repo.head() {
+        let parent = head.peel_to_commit()?;
+        let mut index = git2::Index::new()?;
+        index.read_tree(&parent.tree()?)?;
+        super::repo::exclude_runtime(&mut index)?;
+        let tree = repo.find_tree(index.write_tree_to(&repo)?)?;
+        let target_oid = if tree.id() == parent.tree_id() {
+            parent.id()
+        } else {
+            let sig = super::repo::signature(&repo)?;
+            repo.commit(
+                None,
+                &sig,
+                &sig,
+                "Exclude local Reflect runtime from backup",
+                &tree,
+                &[&parent],
+            )?
+        };
+        super::checkout::install(
+            &repo,
+            target,
+            &current_branch(&repo)?,
+            Some(parent.id()),
+            target_oid,
+            None,
+            &tree,
+        )?;
+    }
     Ok(())
 }
 
