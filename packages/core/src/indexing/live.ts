@@ -223,7 +223,7 @@ export async function applyIndexChanges(
         continue
       }
       const facts = stored.get(change.path)
-      if (matchesTrustedMtime(facts?.mtime, change.modifiedMs, now)) {
+      if (!facts?.needsProjection && matchesTrustedMtime(facts?.mtime, change.modifiedMs, now)) {
         continue // already indexed at this mtime — e.g. the watch's initial gather
       }
       const content = await readNote(change.path)
@@ -231,7 +231,7 @@ export async function applyIndexChanges(
       if (!canApply()) {
         return mutations
       }
-      if (facts?.fileHash === fileHash) {
+      if (facts?.fileHash === fileHash && !facts.needsProjection) {
         // Content unchanged; only the mtime moved. Re-stamp the row so the
         // next pass skips the read — a stored echo-time stamp never matches
         // and would cost this read on every reconcile and every batch.

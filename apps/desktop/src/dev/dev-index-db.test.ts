@@ -540,23 +540,43 @@ describe('createDevIndexDb', () => {
   it('re-applying a note replaces its rows instead of duplicating them', async () => {
     const db = await openDb()
     db.applyNote(sampleNote())
+    const identity = db.query('SELECT rowid FROM note_search', [])
     db.applyNote(sampleNote({ title: 'Renamed Title', titleKey: 'renamed title' }))
 
     const notes = db.query('SELECT title FROM notes', [])
     expect(notes).toEqual([{ title: 'Renamed Title' }])
     const fts = db.query('SELECT count(*) AS hits FROM search_fts', [])
     expect(fts).toEqual([{ hits: 1 }])
+    expect(db.query('SELECT rowid FROM search_fts', [])).toEqual(identity)
+    expect(db.query('SELECT rowid FROM note_search', [])).toEqual(identity)
+  })
+
+  it('assigns independent search identities to duplicate and absent authored ids', async () => {
+    const db = await openDb()
+    db.applyNote(sampleNote())
+    db.applyNote(sampleNote({ path: 'notes/duplicate-id.md' }))
+    db.applyNote(sampleNote({ path: 'notes/no-id.md', id: null }))
+
+    const identities = db.query('SELECT rowid FROM note_search', [])
+    expect(new Set(identities.map((row) => row['rowid'])).size).toBe(3)
+    expect(db.query('SELECT count(*) AS count FROM search_fts', [])).toEqual([{ count: 3 }])
   })
 
   it('moves every row to the new path and refuses an occupied destination', async () => {
     const db = await openDb()
     db.applyNote(sampleNote())
+    const identity = db.query('SELECT rowid FROM note_search', [])
     db.moveNote('notes/sample.md', 'notes/renamed.md')
 
     expect(db.query('SELECT path FROM notes', [])).toEqual([{ path: 'notes/renamed.md' }])
     expect(db.query('SELECT note_path FROM tags', [])).toEqual([{ note_path: 'notes/renamed.md' }])
     expect(db.query('SELECT note_path FROM note_emails', [])).toEqual([
       { note_path: 'notes/renamed.md' },
+    ])
+    expect(db.query('SELECT rowid FROM note_search', [])).toEqual(identity)
+    expect(db.query('SELECT rowid FROM search_fts', [])).toEqual(identity)
+    expect(db.query("SELECT path FROM search_fts WHERE search_fts MATCH 'sync'", [])).toEqual([
+      { path: 'notes/renamed.md' },
     ])
 
     db.applyNote(sampleNote({ path: 'notes/sample.md', id: '01hv3xq7c2dm8k4t9w5e6r1n98' }))
@@ -573,6 +593,7 @@ describe('createDevIndexDb', () => {
 
     expect(db.query('SELECT count(*) AS rows FROM notes', [])).toEqual([{ rows: 0 }])
     expect(db.query('SELECT count(*) AS rows FROM tags', [])).toEqual([{ rows: 0 }])
+    expect(db.query('SELECT count(*) AS rows FROM note_search', [])).toEqual([{ rows: 0 }])
     expect(db.query('SELECT count(*) AS rows FROM search_fts', [])).toEqual([{ rows: 0 }])
   })
 
@@ -634,6 +655,12 @@ describe('createDevIndexDb', () => {
     db.clear()
 
     expect(db.query('SELECT count(*) AS rows FROM notes', [])).toEqual([{ rows: 0 }])
+    expect(db.query('SELECT count(*) AS rows FROM note_search', [])).toEqual([{ rows: 0 }])
     expect(db.query('SELECT count(*) AS rows FROM chat_messages', [])).toEqual([{ rows: 1 }])
+
+    db.applyNote(sampleNote())
+    expect(db.query("SELECT path FROM search_fts WHERE search_fts MATCH 'sync'", [])).toEqual([
+      { path: 'notes/sample.md' },
+    ])
   })
 })

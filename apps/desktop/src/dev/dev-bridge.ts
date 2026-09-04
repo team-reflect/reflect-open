@@ -322,12 +322,14 @@ const MTIME_TRUST_AGE_MS = 5_000
  */
 function reconcileScan(files: DevFileStore, index: DevIndexDb) {
   const stored = new Map(
-    index
-      .query('SELECT path, mtime, file_hash FROM notes', [])
-      .map((row) => [
-        String(row['path']),
-        { mtime: Number(row['mtime']), hash: String(row['file_hash']) },
-      ]),
+    index.query('SELECT path, mtime, file_hash, projection_path FROM notes', []).map((row) => [
+      String(row['path']),
+      {
+        mtime: Number(row['mtime']),
+        hash: String(row['file_hash']),
+        needsProjection: row['projection_path'] !== row['path'],
+      },
+    ]),
   )
   const now = Date.now()
   const listing = files.list()
@@ -336,7 +338,12 @@ function reconcileScan(files: DevFileStore, index: DevIndexDb) {
   for (const file of listing) {
     const facts = stored.get(file.path)
     const settled = now - file.modifiedMs >= MTIME_TRUST_AGE_MS
-    if (settled && facts !== undefined && facts.mtime === file.modifiedMs) {
+    if (
+      settled &&
+      facts !== undefined &&
+      !facts.needsProjection &&
+      facts.mtime === file.modifiedMs
+    ) {
       continue
     }
     candidates.push({
@@ -344,6 +351,7 @@ function reconcileScan(files: DevFileStore, index: DevIndexDb) {
       modifiedMs: file.modifiedMs,
       storedMtime: facts?.mtime ?? null,
       storedHash: facts?.hash ?? null,
+      needsProjection: facts?.needsProjection ?? false,
     })
   }
   const orphans = [...stored]

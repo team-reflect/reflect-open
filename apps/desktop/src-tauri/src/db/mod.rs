@@ -12,6 +12,8 @@
 //! the file loses those.
 
 mod chat_write;
+mod embed_revision;
+mod embed_state;
 mod embed_write;
 mod migrations;
 mod query;
@@ -31,6 +33,7 @@ use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
 
 pub use chat_write::{ChatConversation, ChatMessageRow};
+pub use embed_state::{EmbeddingPreparation, PendingEmbedding};
 pub use embed_write::EmbeddedChunk;
 pub use write::IndexedNote;
 
@@ -563,12 +566,96 @@ pub fn chat_conversation_delete(
     chat_write::delete_conversation(conn, &id)
 }
 
-/// Replace a note's embedding chunk set (diff applied in one transaction;
-/// no-op if stale). Unchanged chunks keep their vectors — the hash-skip.
+/// Discover dirty embedding inputs on the blocking pool. Release the database
+/// locks before probing sidecar metadata so bulk work cannot hold up live writes.
 #[tauri::command]
-pub fn embed_apply(
+pub async fn embed_pending<R: tauri::Runtime>(
+    model_id: String,
+    projection_version: u32,
+    generation: u64,
+    app: tauri::AppHandle<R>,
+) -> AppResult<Vec<PendingEmbedding>> {
+    crate::blocking::run_blocking(move || {
+        let index = app.state::<IndexState>();
+        let root = {
+            let state = lock_state(&index)?;
+            if state.generation != generation {
+                return Ok(Vec::new());
+            }
+            state.root.clone().ok_or_else(AppError::no_graph)?
+        };
+        let sources = {
+            let state = lock_read(&index)?;
+            if state.generation != generation {
+                return Ok(Vec::new());
+            }
+            embed_state::sources(state.conn.as_ref().ok_or_else(AppError::no_graph)?, None)?
+        };
+        let pending = embed_state::pending(sources, &root, &model_id, projection_version)?;
+        if lock_state(&index)?.generation != generation {
+            return Ok(Vec::new());
+        }
+        Ok(pending)
+    })
+    .await
+}
+
+/// Recheck one path before reading it, pinned to the index session.
+#[tauri::command]
+pub fn embed_prepare(
+    path: String,
+    model_id: String,
+    projection_version: u32,
+    generation: u64,
+    index: State<IndexState>,
+) -> AppResult<Option<EmbeddingPreparation>> {
+    let state = lock_state(&index)?;
+    if state.generation != generation {
+        return Ok(None);
+    }
+    embed_state::prepare(
+        state.conn.as_ref().ok_or_else(AppError::no_graph)?,
+        state.root.as_ref().ok_or_else(AppError::no_graph)?,
+        &path,
+        &model_id,
+        projection_version,
+    )
+}
+
+/// Read an embedding input using the index root, including during the gap
+/// between graph_open and index_open. Never materializes evicted content.
+#[tauri::command]
+pub async fn embed_read(
+    path: String,
+    generation: u64,
+    index: State<'_, IndexState>,
+) -> AppResult<crate::fs::LocalNoteRead> {
+    let root = {
+        let state = lock_state(&index)?;
+        if state.generation != generation {
+            return Err(AppError::io("stale embedding read"));
+        }
+        state.root.clone().ok_or_else(AppError::no_graph)?
+    };
+    crate::fs::read_local_at(root, path).await
+}
+
+/// A complete embedding projection and the input snapshot it was built from.
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbedApplyRequest {
     path: String,
     chunks: Vec<EmbeddedChunk>,
+    fingerprint: String,
+    model_id: String,
+    projection_version: u32,
+}
+
+/// Replace chunks and checkpoint their inputs in one transaction. Stale index
+/// sessions and input revisions cannot overwrite newer work.
+#[tauri::command]
+pub fn embed_apply(
+    request: EmbedApplyRequest,
     generation: u64,
     index: State<IndexState>,
     background_tasks: State<BackgroundTaskState>,
@@ -578,9 +665,18 @@ pub fn embed_apply(
     if state.generation != generation {
         return Ok(());
     }
+    let root = state.root.clone().ok_or_else(AppError::no_graph)?;
     let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
     let tx = conn.transaction()?;
-    embed_write::apply_chunks(&tx, &path, &chunks)?;
+    embed_state::apply(
+        &tx,
+        &root,
+        &request.path,
+        &request.fingerprint,
+        &request.model_id,
+        request.projection_version,
+        &request.chunks,
+    )?;
     tx.commit()?;
     Ok(())
 }

@@ -265,17 +265,31 @@ export interface IndexedFileFacts {
   readonly fileHash: string
   /** The mtime stamped on the row — lets a pass skip reading untouched files. */
   readonly mtime: number
+  /** A rename requires path-dependent references to be projected again. */
+  readonly needsProjection: boolean
 }
 
 /**
- * Stored `path → {fileHash, mtime}` map, for reconciliation on open. Loads
+ * Stored content/mtime facts and projection freshness, keyed by path. Loads
  * every note's facts into memory — fine at first-wave graph sizes; revisit with
  * a streamed/keyset scan if graphs grow large (tracked with the Plan 04b
  * watcher).
  */
 export async function getIndexedFileFacts(): Promise<Map<string, IndexedFileFacts>> {
-  const rows = await db.selectFrom('notes').select(['path', 'fileHash', 'mtime']).execute()
-  return new Map(rows.map((row) => [row.path, { fileHash: row.fileHash, mtime: row.mtime }]))
+  const rows = await db
+    .selectFrom('notes')
+    .select(['path', 'fileHash', 'mtime', 'projectionPath'])
+    .execute()
+  return new Map(
+    rows.map((row) => [
+      row.path,
+      {
+        fileHash: row.fileHash,
+        mtime: row.mtime,
+        needsProjection: row.projectionPath !== row.path,
+      },
+    ]),
+  )
 }
 
 /**
@@ -292,10 +306,14 @@ export async function getIndexedFileFactsByPath(
     const rows = await db
       .selectFrom('notes')
       .where('path', 'in', chunk)
-      .select(['path', 'fileHash', 'mtime'])
+      .select(['path', 'fileHash', 'mtime', 'projectionPath'])
       .execute()
     for (const row of rows) {
-      facts.set(row.path, { fileHash: row.fileHash, mtime: row.mtime })
+      facts.set(row.path, {
+        fileHash: row.fileHash,
+        mtime: row.mtime,
+        needsProjection: row.projectionPath !== row.path,
+      })
     }
   }
   return facts

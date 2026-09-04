@@ -117,11 +117,11 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
     },
 
     applyNote: (note) => {
-      removeNote(db, note.path)
+      const previousSearchRowid = removeNoteProjection(db, note.path)
       run(
         db,
-        `INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview)
-         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview, projection_path)
+         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           note.path,
           note.id,
@@ -140,6 +140,7 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
           note.mtime,
           note.mtime,
           note.preview,
+          note.path,
         ],
       )
       run(db, 'INSERT INTO note_text(note_path, text) VALUES(?, ?)', [note.path, note.text])
@@ -207,14 +208,21 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
         )
       }
       const searchBody = note.assetText === '' ? note.text : `${note.text}\n${note.assetText}`
-      run(db, 'INSERT INTO search_fts(path, title, body) VALUES(?, ?, ?)', [
+      const searchRowid = db.selectValue(
+        'INSERT INTO note_search(rowid, note_path) VALUES(?, ?) RETURNING rowid',
+        [previousSearchRowid ?? null, note.path],
+      )
+      run(db, 'INSERT INTO search_fts(rowid, path, title, body) VALUES(?, ?, ?, ?)', [
+        searchRowid,
         note.path,
         note.title,
         searchBody,
       ])
     },
 
-    removeNote: (path) => removeNote(db, path),
+    removeNote: (path) => {
+      removeNoteProjection(db, path)
+    },
 
     moveNote: (from, to) => {
       const occupied = db.selectValue('SELECT 1 FROM notes WHERE path = ?', [to])
@@ -268,7 +276,11 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
         run(db, 'UPDATE assets SET note_path = ? WHERE note_path = ?', [to, from])
         run(db, 'UPDATE tasks SET note_path = ? WHERE note_path = ?', [to, from])
         run(db, 'UPDATE embedding_chunks SET note_path = ? WHERE note_path = ?', [to, from])
-        run(db, 'UPDATE search_fts SET path = ? WHERE path = ?', [to, from])
+        run(
+          db,
+          'UPDATE search_fts SET path = ? WHERE rowid = (SELECT rowid FROM note_search WHERE note_path = ?)',
+          [to, to],
+        )
         db.exec('COMMIT')
       } catch (cause) {
         db.exec('ROLLBACK')
@@ -339,7 +351,11 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
   }
 }
 
-function removeNote(db: Database, path: string): void {
+function removeNoteProjection(db: Database, path: string): SqlValue | undefined {
+  const searchRowid = db.selectValue('SELECT rowid FROM note_search WHERE note_path = ?', [path])
+  if (searchRowid !== undefined) {
+    run(db, 'DELETE FROM search_fts WHERE rowid = ?', [searchRowid])
+  }
   run(db, 'DELETE FROM notes WHERE path = ?', [path])
-  run(db, 'DELETE FROM search_fts WHERE path = ?', [path])
+  return searchRowid
 }

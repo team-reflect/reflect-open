@@ -1,10 +1,17 @@
-import { readNoteLocal } from '../graph/commands'
 import { isTemplatePath } from '../graph/paths'
 import { gatherAssetDescriptionBodies } from '../indexing/asset-description-text'
 import { db } from '../indexing/db'
+import { hashContent } from '../indexing/hash'
 import { parseNote } from '../markdown'
 import { chunkAssetDescriptions, chunkNote } from './chunk'
-import { embedApply, embedRemove, embedTexts, type EmbedChunkPayload } from './commands'
+import {
+  embedApply,
+  embedPending,
+  embedPrepare,
+  embedRead,
+  embedTexts,
+  type EmbedChunkPayload,
+} from './commands'
 
 /**
  * The incremental embedding pass (Plan 09): chunk a note, diff chunk hashes
@@ -18,6 +25,9 @@ import { embedApply, embedRemove, embedTexts, type EmbedChunkPayload } from './c
  * semantic side of hybrid retrieval, not just on keyword matches.
  */
 
+/** Bump when chunking, asset folding, or other embedding projection rules change. */
+export const EMBEDDING_PROJECTION_VERSION = 1
+
 export interface EmbedNoteOptions {
   path: string
   generation: number
@@ -25,22 +35,30 @@ export interface EmbedNoteOptions {
   modelId: string
   /** Pre-loaded content (the watcher path has it); read from disk if absent. */
   content?: string
+  /** Stop work after a graph/model switch or semantic-search disable. */
+  isStale?: (() => boolean) | undefined
 }
 
 /**
  * Bring one note's embeddings up to date. Returns the number of chunks that
- * were (re)embedded — 0 means the hash-skip caught everything.
+ * were (re)embedded; current checkpoints, reusable vectors, and deferred or
+ * cancelled work all return 0.
  */
 export async function embedNote(options: EmbedNoteOptions): Promise<number> {
-  const { path, generation, modelId } = options
-  if (isTemplatePath(path)) {
+  const { path, generation, modelId, isStale } = options
+  if (isStale?.() || isTemplatePath(path)) {
     return 0 // templates are boilerplate — never embedded, never retrieved
+  }
+  const projection = { generation, modelId, projectionVersion: EMBEDDING_PROJECTION_VERSION }
+  const prepared = await embedPrepare(path, projection)
+  if (prepared === null || isStale?.()) {
+    return 0
   }
   let content = options.content
   if (content === undefined) {
-    let read: Awaited<ReturnType<typeof readNoteLocal>>
+    let read: Awaited<ReturnType<typeof embedRead>>
     try {
-      read = await readNoteLocal(path)
+      read = await embedRead(path, generation)
     } catch {
       return 0 // deleted between event and read; the remove path handles it
     }
@@ -54,10 +72,20 @@ export async function embedNote(options: EmbedNoteOptions): Promise<number> {
     }
     content = read.content
   }
+  if (isStale?.() || (await hashContent(content)) !== prepared.fileHash || isStale?.()) {
+    return 0 // the index must first catch up with the bytes we actually read
+  }
 
   const parsed = parseNote({ path, source: content })
-  const gathered = await gatherAssetDescriptionBodies(parsed.assets.map((asset) => asset.path))
-  if (gathered.evicted.length > 0) {
+  const assetPaths = [...new Set(parsed.assets.map((asset) => asset.path))].sort()
+  if (JSON.stringify(assetPaths) !== JSON.stringify([...prepared.assetPaths].sort())) {
+    return 0 // path-relative references changed; wait for the index projection
+  }
+  const gathered = await gatherAssetDescriptionBodies(
+    parsed.assets.map((asset) => asset.path),
+    (descriptionPath) => embedRead(descriptionPath, generation),
+  )
+  if (isStale?.() || gathered.evicted.length > 0) {
     // A referenced sidecar is iCloud-evicted. `embedApply` replaces the
     // note's *entire* chunk set, so applying without that sidecar's body
     // would silently drop its previously embedded chunks — and sidecars are
@@ -70,8 +98,7 @@ export async function embedNote(options: EmbedNoteOptions): Promise<number> {
     ...(await chunkNote(path, content, parsed)),
     ...(await chunkAssetDescriptions(gathered.bodies, content.length + 1)),
   ]
-  if (chunks.length === 0) {
-    await embedRemove(path, generation)
+  if (isStale?.()) {
     return 0
   }
 
@@ -80,11 +107,17 @@ export async function embedNote(options: EmbedNoteOptions): Promise<number> {
   // there are stored rows to pair with (apply_chunks pairs one row per
   // skipped chunk — an unmatched skip is a loud error). A model change makes
   // every chunk "new", so a model switch re-embeds with no extra bookkeeping.
-  const existing = await db
-    .selectFrom('embeddingChunks')
-    .where('notePath', '=', path)
-    .select(['contentHash', 'modelId'])
-    .execute()
+  const existing =
+    chunks.length === 0
+      ? []
+      : await db
+          .selectFrom('embeddingChunks')
+          .where('notePath', '=', path)
+          .select(['contentHash', 'modelId'])
+          .execute()
+  if (isStale?.()) {
+    return 0
+  }
   const available = new Map<string, number>()
   for (const row of existing) {
     const key = `${row.modelId} ${row.contentHash}`
@@ -100,11 +133,14 @@ export async function embedNote(options: EmbedNoteOptions): Promise<number> {
     }
     return false
   })
-  const toEmbed = chunks.filter((_, i) => !skip[i])
+  const toEmbed = chunks.filter((_, index) => !skip[index])
   const vectors = toEmbed.length > 0 ? await embedTexts(toEmbed.map((chunk) => chunk.text)) : []
+  if (isStale?.()) {
+    return 0
+  }
   let vectorAt = 0
 
-  const payload: EmbedChunkPayload[] = chunks.map((chunk, i) => ({
+  const payload: EmbedChunkPayload[] = chunks.map((chunk, index) => ({
     heading: chunk.heading,
     posFrom: chunk.posFrom,
     posTo: chunk.posTo,
@@ -113,42 +149,58 @@ export async function embedNote(options: EmbedNoteOptions): Promise<number> {
     modelId,
     // A non-skipped chunk always has a freshly-embedded vector: `vectors` is
     // exactly as long as the non-skipped chunks, consumed in order here.
-    vector: skip[i] ? null : vectors[vectorAt++]!,
+    vector: skip[index] ? null : vectors[vectorAt++]!,
   }))
-  await embedApply(path, payload, generation)
+  await embedApply(path, payload, { ...projection, fingerprint: prepared.fingerprint })
   return toEmbed.length
 }
 
 /**
- * Backfill every indexed note (initial enable, repair). Serialized; the
- * hash-skip makes re-runs cheap. Reports per-note progress.
+ * Backfill dirty indexed notes (initial enable, repair). Unchanged graphs
+ * need one candidate query and no note reads, chunk queries, or writes.
  */
-export async function backfillEmbeddings(options: {
+export interface BackfillEmbeddingsOptions {
   generation: number
   modelId: string
   onProgress?: (done: number, total: number) => void
   /** Abort between notes (e.g. graph switch). */
   isStale?: () => boolean
-}): Promise<'completed' | 'aborted'> {
-  const { generation, modelId, onProgress, isStale } = options
-  const rows = await db
-    .selectFrom('notes')
-    .where('kind', '!=', 'template')
-    .select('path')
-    .orderBy('path')
-    .execute()
+  /** Serialize each note with live work without making discovery hold the queue. */
+  scheduleNote?: (work: () => Promise<void>) => Promise<void>
+}
+
+/** Process current dirty candidates, checking cancellation between asynchronous stages. */
+export async function backfillEmbeddings(
+  options: BackfillEmbeddingsOptions,
+): Promise<'completed' | 'aborted'> {
+  const { generation, modelId, onProgress, isStale, scheduleNote } = options
+  if (isStale?.()) {
+    return 'aborted'
+  }
+  const rows = await embedPending({
+    generation,
+    modelId,
+    projectionVersion: EMBEDDING_PROJECTION_VERSION,
+  })
   let done = 0
   for (const row of rows) {
     if (isStale?.()) {
       return 'aborted'
     }
     try {
-      await embedNote({ path: row.path, generation, modelId })
+      const work = async (): Promise<void> => {
+        await embedNote({ path: row.path, generation, modelId, isStale })
+      }
+      if (scheduleNote) {
+        await scheduleNote(work)
+      } else {
+        await work()
+      }
     } catch (cause) {
       console.error(`embedding backfill failed for ${row.path}:`, cause)
     }
     done += 1
     onProgress?.(done, rows.length)
   }
-  return 'completed'
+  return isStale?.() ? 'aborted' : 'completed'
 }
