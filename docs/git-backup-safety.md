@@ -38,9 +38,10 @@ conflict. A copy retained after a later sync failure is deliberate recovery data
 The size limit also applies to files staged by another Git tool before Reflect
 runs; withheld updates retain their previous committed version.
 
-The root `.reflect` directory (including case variants) is excluded from new
-Reflect commits and incoming checkouts, even when an adopted repository already
-tracks it. Adoption removes its entries from the Git index without deleting
+The root `.reflect` directory (including case variants and trailing-dot/space
+filename aliases) is excluded from new Reflect commits and incoming checkouts,
+even when an adopted repository already tracks it. Adoption removes its entries
+from the Git index without deleting
 local files. Restoring through Reflect does not check out another device's
 runtime files. Local SQLite data and durable chat history stay on the device.
 

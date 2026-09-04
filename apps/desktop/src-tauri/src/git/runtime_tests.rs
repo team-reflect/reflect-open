@@ -254,3 +254,130 @@ fn size_guard_withholds_already_staged_large_additions_and_updates() {
         b"too large to back up"
     );
 }
+
+const RUNTIME_ALIASES: [&str; 3] = [".reflect.", ".reflect ", ".ReFlEcT. . "];
+
+/// Construct foreign history directly from objects. Windows cannot create these
+/// literal directory names, but it can fetch them from a different filesystem.
+fn foreign_commit_with_runtime_aliases(repo: &Repository) {
+    let parent = repo.head().unwrap().peel_to_commit().unwrap();
+    let previous = parent.tree().unwrap();
+    let mut root = repo.treebuilder(Some(&previous)).unwrap();
+    let runtime_blob = repo.blob(b"foreign runtime bytes").unwrap();
+    let mut runtime = repo.treebuilder(None).unwrap();
+    runtime
+        .insert("index.sqlite", runtime_blob, 0o100644)
+        .unwrap();
+    let runtime_tree = runtime.write().unwrap();
+    for alias in RUNTIME_ALIASES {
+        root.insert(alias, runtime_tree, 0o040000).unwrap();
+    }
+    let tree = repo.find_tree(root.write().unwrap()).unwrap();
+    let signature = git2::Signature::now("Other client", "other@example.com").unwrap();
+    repo.commit(
+        Some("HEAD"),
+        &signature,
+        &signature,
+        "Foreign runtime aliases",
+        &tree,
+        &[&parent],
+    )
+    .unwrap();
+    let mut index = repo.index().unwrap();
+    index.read_tree(&tree).unwrap();
+    index.write().unwrap();
+}
+
+fn assert_no_runtime_aliases(repo: &Repository) {
+    let tree = repo.head().unwrap().peel_to_tree().unwrap();
+    let mut index = repo.index().unwrap();
+    index.read(true).unwrap();
+    for alias in RUNTIME_ALIASES {
+        assert!(tree.get_name(alias).is_none(), "{alias}");
+        assert!(
+            index
+                .get_path(Path::new(&format!("{alias}/index.sqlite")), 0)
+                .is_none(),
+            "{alias}"
+        );
+    }
+    assert_no_runtime(repo);
+}
+
+#[test]
+fn runtime_classification_reserves_windows_aliases_without_lossy_decoding() {
+    for path in [
+        ".reflect",
+        ".REFLECT/index.sqlite",
+        ".reflect./index.sqlite",
+        ".reflect /index.sqlite-wal",
+        ".ReFlEcT. . /index.sqlite-shm",
+    ] {
+        assert!(super::is_runtime_path(Path::new(path)), "{path}");
+    }
+    for path in [
+        "notes/.reflect/index.sqlite",
+        ".reflect-backup/a",
+        ".reflect.backup/a",
+        "notes/a.md",
+    ] {
+        assert!(!super::is_runtime_path(Path::new(path)), "{path}");
+    }
+    assert!(!super::is_runtime_name(b".reflect\xff"));
+    assert!(!super::is_runtime_name(b"... "));
+}
+
+#[test]
+fn adopting_tracked_runtime_aliases_preserves_the_local_database() {
+    let directory = tempdir().unwrap();
+    let repo = init(directory.path());
+    write(directory.path(), "notes/a.md", b"portable note\n");
+    foreign_commit(&repo);
+    foreign_commit_with_runtime_aliases(&repo);
+    write(
+        directory.path(),
+        ".reflect/index.sqlite",
+        b"durable local chat history",
+    );
+    write(
+        directory.path(),
+        ".reflect/index.sqlite-wal",
+        b"uncheckpointed local chat",
+    );
+
+    setup(directory.path(), None, None).unwrap();
+    commit_all(directory.path(), "Backup", MAX_FILE_BYTES).unwrap();
+
+    assert_no_runtime_aliases(&repo);
+    assert_eq!(
+        fs::read(directory.path().join(".reflect/index.sqlite")).unwrap(),
+        b"durable local chat history"
+    );
+    assert_eq!(
+        fs::read(directory.path().join(".reflect/index.sqlite-wal")).unwrap(),
+        b"uncheckpointed local chat"
+    );
+}
+
+#[test]
+fn clone_excludes_foreign_runtime_aliases_before_checkout() {
+    let directory = tempdir().unwrap();
+    let source = directory.path().join("source");
+    let repo = init(&source);
+    write(&source, "notes/a.md", b"portable note\n");
+    foreign_commit(&repo);
+    foreign_commit_with_runtime_aliases(&repo);
+    let target = directory.path().join("restored");
+
+    remote::clone(source.to_str().unwrap(), &target, None).unwrap();
+
+    assert_no_runtime_aliases(&Repository::open(&target).unwrap());
+    assert!(!target.join(".reflect").exists());
+    for alias in RUNTIME_ALIASES {
+        assert!(!target.join(alias).exists(), "{alias}");
+    }
+    assert_eq!(
+        fs::read(target.join("notes/a.md")).unwrap(),
+        b"portable note\n"
+    );
+}

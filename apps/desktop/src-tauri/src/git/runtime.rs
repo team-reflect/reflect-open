@@ -7,15 +7,20 @@ use git2::{Index, Repository, Tree};
 use crate::error::AppResult;
 
 /// Whether a graph-relative path addresses the reserved runtime directory.
-/// Case variants are reserved too because macOS and Windows commonly use
-/// case-insensitive filesystems.
+/// Case variants and Windows trailing-dot/space aliases are reserved on every
+/// platform so a portable backup cannot address another device's live database.
 pub(super) fn is_runtime_path(path: &Path) -> bool {
-    path.components().next().is_some_and(|component| {
-        component
-            .as_os_str()
-            .to_string_lossy()
-            .eq_ignore_ascii_case(".reflect")
-    })
+    path.components()
+        .next()
+        .is_some_and(|component| is_runtime_name(component.as_os_str().as_encoded_bytes()))
+}
+
+fn is_runtime_name(name: &[u8]) -> bool {
+    let end = name
+        .iter()
+        .rposition(|byte| *byte != b'.' && *byte != b' ')
+        .map_or(0, |position| position + 1);
+    name[..end].eq_ignore_ascii_case(b".reflect")
 }
 
 /// Remove runtime entries from the index without touching their working copies.
@@ -51,7 +56,7 @@ pub(super) fn without_runtime<'repo>(
 ) -> AppResult<Tree<'repo>> {
     let mut builder = repo.treebuilder(Some(tree))?;
     for entry in tree.iter() {
-        if entry.name_bytes().eq_ignore_ascii_case(b".reflect") {
+        if is_runtime_name(entry.name_bytes()) {
             builder.remove(entry.name_bytes())?;
         }
     }

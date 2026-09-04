@@ -355,6 +355,41 @@ describe('createSyncEngine', () => {
     engine.stop()
   })
 
+  it('notifies native merge deletions and completes the required push', async () => {
+    const calls = fakeGit((command) =>
+      command === 'git_merge_remote'
+        ? {
+            ...MERGED,
+            changedFiles: [{ path: 'notes/deleted.md', kind: 'remove', modifiedMs: null }],
+          }
+        : defaultResponses(command),
+    )
+    const onRemoteChanges = vi.fn()
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => 'tok',
+      onRemoteChanges,
+      onStatus: (status) => {
+        statuses.push(status)
+      },
+    })
+
+    await engine.syncNow()
+
+    expect(onRemoteChanges).toHaveBeenCalledWith([
+      { path: 'notes/deleted.md', kind: 'remove', modifiedMs: undefined },
+    ])
+    expect(commandsOf(calls)).toEqual([
+      'git_commit_all',
+      'git_fetch',
+      'git_merge_remote',
+      'git_push',
+    ])
+    expect(statuses.at(-1)).toEqual({ state: 'idle' })
+    engine.stop()
+  })
+
   it('continues through push while remote-change handling runs, then waits before idle', async () => {
     const calls = fakeGit((command) =>
       command === 'git_merge_remote'
