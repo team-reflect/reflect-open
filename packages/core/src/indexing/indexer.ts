@@ -203,13 +203,13 @@ async function applySplitBatch(
   notes: IndexedNote[],
   generation: number,
   onSkippedNote?: (note: SkippedIndexedNote) => void,
+  onApplied?: (notes: readonly IndexedNote[]) => void,
 ): Promise<number> {
   if (notes.length === 0) {
     return 0
   }
   try {
     await applyIndexedNotes(notes, generation)
-    return notes.length
   } catch (cause) {
     if (notes.length === 1) {
       if (onSkippedNote === undefined) {
@@ -219,9 +219,18 @@ async function applySplitBatch(
       return 0
     }
     const midpoint = Math.ceil(notes.length / 2)
-    const first = await applySplitBatch(notes.slice(0, midpoint), generation, onSkippedNote)
-    return first + (await applySplitBatch(notes.slice(midpoint), generation, onSkippedNote))
+    const first = await applySplitBatch(
+      notes.slice(0, midpoint),
+      generation,
+      onSkippedNote,
+      onApplied,
+    )
+    return (
+      first + (await applySplitBatch(notes.slice(midpoint), generation, onSkippedNote, onApplied))
+    )
   }
+  onApplied?.(notes)
+  return notes.length
 }
 
 /** A shared accumulator for bulk index writes — see {@link createIndexApplyBatch}. */
@@ -241,10 +250,14 @@ export interface IndexApplyBatch {
  * degrade refused batches through {@link applySplitBatch}'s halving retry so
  * failures attribute to single notes. Callers own *when* to flush early —
  * e.g. before a remove that must not be overtaken by queued upserts.
+ * `onApplied` receives only successfully committed projections, including
+ * successful halves of a split batch. Live callers notify their full event
+ * batch separately; bulk passes use this to notify embedding followers.
  */
 export function createIndexApplyBatch(
   generation: number,
   onSkippedNote?: (note: SkippedIndexedNote) => void,
+  onApplied?: (notes: readonly IndexedNote[]) => void,
 ): IndexApplyBatch {
   let batch: IndexedNote[] = []
   let appliedCount = 0
@@ -254,7 +267,7 @@ export function createIndexApplyBatch(
     }
     const notes = batch
     batch = []
-    appliedCount += await applySplitBatch(notes, generation, onSkippedNote)
+    appliedCount += await applySplitBatch(notes, generation, onSkippedNote, onApplied)
   }
   return {
     add: async (note) => {
@@ -328,7 +341,12 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
     return
   }
   const files = await listFiles()
-  const batch = createIndexApplyBatch(generation, onSkippedNote)
+  const batch = createIndexApplyBatch(generation, onSkippedNote, (notes) => {
+    emitIndexApplied(
+      notes.map((note) => ({ path: note.path, kind: 'upsert' })),
+      generation,
+    )
+  })
   const evicted: string[] = []
   let done = 0
   let worked = 0
@@ -435,11 +453,15 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
     // pass works through the readable candidates.
     onStalePlaceholders?.(scan.stalePlaceholders)
   }
-  /** Stored facts per candidate path; healed moves graft the orphan's in. */
-  const facts = new Map<string, { mtime: number; fileHash: string }>()
+  /** Stored facts per candidate path; moved rows always need fresh projection. */
+  const facts = new Map<string, { mtime: number; fileHash: string; needsProjection: boolean }>()
   for (const candidate of scan.candidates) {
     if (candidate.storedMtime !== null && candidate.storedHash !== null) {
-      facts.set(candidate.path, { mtime: candidate.storedMtime, fileHash: candidate.storedHash })
+      facts.set(candidate.path, {
+        mtime: candidate.storedMtime,
+        fileHash: candidate.storedHash,
+        needsProjection: candidate.needsProjection,
+      })
     }
   }
   /** Rows to drop at the end: scan orphans, minus heals, plus TOCTOU ghosts. */
@@ -472,12 +494,16 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
         console.error(`id-based move failed (${move.from} → ${move.to}):`, err)
         continue
       }
-      // The moved row carries the old path's facts: the main pass re-indexes
-      // at the new path only if the content actually changed in transit.
+      // Identical bytes can resolve attachments differently at the new path.
+      // Refresh that projection while keeping the content-keyed vectors.
       const orphan = removals.get(move.from)
       removals.delete(move.from)
       if (orphan !== undefined) {
-        facts.set(move.to, { mtime: orphan.storedMtime, fileHash: orphan.storedHash })
+        facts.set(move.to, {
+          mtime: orphan.storedMtime,
+          fileHash: orphan.storedHash,
+          needsProjection: true,
+        })
       }
       onMoved?.(move.from, move.to)
     }
@@ -489,7 +515,12 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
     return
   }
 
-  const batch = createIndexApplyBatch(generation, onSkippedNote)
+  const batch = createIndexApplyBatch(generation, onSkippedNote, (notes) => {
+    emitIndexApplied(
+      notes.map((note) => ({ path: note.path, kind: 'upsert' })),
+      generation,
+    )
+  })
   const touches = createMtimeTouchBatch(generation)
   const total = scan.candidates.length
   let done = 0
@@ -524,7 +555,7 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
       }
     }
     const fileHash = await hashContent(content)
-    if (stored?.fileHash === fileHash) {
+    if (stored?.fileHash === fileHash && !stored.needsProjection) {
       // Content unchanged. If the stored mtime doesn't match the listing (an
       // echo-time stamp, or a provider rewrote it), re-stamp it so the next
       // pass takes the read-free path — left alone it mismatches forever.

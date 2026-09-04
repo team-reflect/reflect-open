@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { embedNote, embedRemove, isNotePath, subscribeIndexApplied } from '@reflect/core'
+import { embedNote, isNotePath, subscribeIndexApplied } from '@reflect/core'
 import {
   backfillEmbeddingsVisibly,
   consumeLegacySemanticOptIn,
@@ -18,16 +18,15 @@ import { useSettings } from '@/providers/settings-provider'
  *   untouched — at launch for users who opted in earlier (the cache makes
  *   that instant) and the moment the setting flips on (the one place the
  *   first download starts);
- * - run one incremental backfill per graph-open once `ready` (hash-skip makes
- *   this cheap when nothing changed);
+ * - select dirty embedding work once per graph-open after `ready`;
  * - follow the index: changed notes re-embed, deleted notes drop vectors.
- *   Work is serialized on one queue so passes can't interleave.
+ *   Live paths coalesce and run between bulk notes on one serialized queue.
  *
  * The follow trigger is `subscribeIndexApplied` — the post-apply signal — not
- * the raw watcher stream, for two reasons. Ordering: `embed_apply` drops
- * chunks for paths without a `notes` row, so embedding a brand-new note off
- * the raw file event could race its index apply and lose the chunks until the
- * next backfill; post-apply, the row is always there. Coverage: asset
+ * the raw watcher stream, for two reasons. Ordering: embedding commands
+ * require an indexed note revision, so embedding a brand-new note off the
+ * raw file event could race its index apply and skip the note until the next
+ * backfill; post-apply, the row is always there. Coverage: asset
  * description writes re-index their referencing notes *outside* the watcher
  * pipeline (`reindexNotesReferencing` emits the same signal), and those notes
  * must re-embed for the description text to reach semantic search.
@@ -35,7 +34,7 @@ import { useSettings } from '@/providers/settings-provider'
  * Backfill and follow work need the runtime `ready` *and* the setting on:
  * disabling semantic search pauses embedding work immediately (the loaded
  * model just idles for the rest of the session), and re-enabling catches up
- * via the cheap hash-skip backfill.
+ * via the persisted dirty-work check.
  */
 export function EmbeddingsSync(): null {
   const { graph, indexGeneration } = useGraph()
@@ -43,7 +42,7 @@ export function EmbeddingsSync(): null {
   const status = useEmbedStatus()
   const queue = useRef<Promise<void>>(Promise.resolve())
 
-  // embed_apply/embed_remove are gated on the INDEX session generation, not
+  // Embedding commands are gated on the INDEX session generation, not
   // the file-write generation in GraphInfo — the counters are independent.
   const generation = indexGeneration
   const root = graph?.root ?? null
@@ -79,21 +78,44 @@ export function EmbeddingsSync(): null {
       return
     }
     let active = true
+    let liveQueued = false
+    const pending = new Set<string>()
+    const isStale = (): boolean => !active
 
-    queue.current = queue.current
-      .then(() => {
-        if (!active) {
-          return
+    const drainLive = async (): Promise<void> => {
+      while (active && pending.size > 0) {
+        const path = pending.values().next().value
+        if (path === undefined) {
+          break
         }
-        return backfillEmbeddingsVisibly({ generation, modelId, isStale: () => !active }).then(
-          () => {},
-        )
+        pending.delete(path)
+        try {
+          await embedNote({ path, generation, modelId, isStale })
+        } catch (cause) {
+          console.error(`embedding sync failed for ${path}:`, cause)
+        }
+      }
+    }
+
+    const scheduleNote = (work: () => Promise<void>): Promise<void> => {
+      const scheduled = queue.current.then(async () => {
+        await drainLive()
+        if (active) {
+          await work()
+        }
       })
-      .catch((cause) => {
-        // A rejection here must not poison the queue (later change items
-        // chain off this promise) nor masquerade as a per-change failure.
-        console.error('embedding backfill failed:', cause)
-      })
+      // The backfill reports this note's failure; the next queued note can
+      // still run, and its failed checkpoint remains retryable.
+      queue.current = scheduled.catch(() => {})
+      return scheduled
+    }
+
+    // Let the ready workspace render before starting bulk maintenance.
+    const backfillTimer = setTimeout(() => {
+      // Candidate discovery does not own the write/inference queue: live
+      // saves can proceed while native scans asset-description revisions.
+      void backfillEmbeddingsVisibly({ generation, modelId, isStale, scheduleNote })
+    }, 0)
 
     const unlisten = subscribeIndexApplied((changes, appliedGeneration) => {
       if (!active || appliedGeneration !== generation) {
@@ -103,23 +125,27 @@ export function EmbeddingsSync(): null {
         if (!isNotePath(change.path)) {
           continue // asset-file changes ride the same batches — never embedded
         }
-        queue.current = queue.current
-          .then(() => {
-            if (!active) {
-              return
-            }
-            return change.kind === 'remove'
-              ? embedRemove(change.path, generation)
-              : embedNote({ path: change.path, generation, modelId }).then(() => {})
-          })
-          .catch((cause) => {
-            console.error(`embedding sync failed for ${change.path}:`, cause)
-          })
+        if (change.kind === 'remove') {
+          // The index transaction already removed vectors; a delayed remove
+          // here could erase a newly recreated note at the same path.
+          pending.delete(change.path)
+        } else {
+          pending.add(change.path)
+        }
+      }
+      if (!liveQueued && pending.size > 0) {
+        liveQueued = true
+        queue.current = queue.current.then(async () => {
+          await drainLive()
+          liveQueued = false
+        })
       }
     })
 
     return () => {
       active = false
+      clearTimeout(backfillTimer)
+      pending.clear()
       unlisten()
     }
   }, [enabled, ready, generation, root, modelId])

@@ -4924,6 +4924,7 @@ dependencies = [
  "tracing-subscriber",
  "trash",
  "walkdir",
+ "windows-sys 0.61.2",
  "xattr",
  "zip 8.6.0",
 ]

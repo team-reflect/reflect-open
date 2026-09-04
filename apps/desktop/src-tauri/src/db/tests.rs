@@ -2,6 +2,9 @@
 //! together against a migrated in-memory database, the same shape the commands
 //! compose at runtime.
 
+mod embedding_state;
+mod fts;
+
 use reflect_index_schema::LATEST_SCHEMA_VERSION;
 use rusqlite::Connection;
 use serde_json::Value;

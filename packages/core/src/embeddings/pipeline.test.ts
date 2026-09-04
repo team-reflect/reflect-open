@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { hashContent } from '../indexing/hash'
 import { setBridge } from '../ipc/bridge'
-import { embedNote } from './pipeline'
+import { parseNote } from '../markdown'
+import { backfillEmbeddings, EMBEDDING_PROJECTION_VERSION, embedNote } from './pipeline'
 
 afterEach(() => {
   setBridge(null)
@@ -28,12 +30,45 @@ function fakePipelineBridge(options: {
   evicted?: boolean
   /** Sidecar paths (`<asset>.reflect.md`) to report as iCloud-evicted. */
   evictedSidecars?: string[]
+  current?: boolean
+  indexedContent?: string
+  indexedAssets?: string[]
+  pendingPaths?: string[]
+  onCommand?: (command: string) => void
+  failApplyOnce?: boolean
 }) {
+  const commands: string[] = []
   const embedded: string[][] = []
   const applied: { path: string; chunks: AppliedChunk[] }[] = []
+  let failApply = options.failApplyOnce === true
   setBridge({
     invoke: async (command, args) => {
-      if (command === 'note_read_local') {
+      commands.push(command)
+      options.onCommand?.(command)
+      if (command === 'embed_pending') {
+        expect(args).toEqual({
+          generation: 1,
+          modelId: MODEL,
+          projectionVersion: EMBEDDING_PROJECTION_VERSION,
+        })
+        return (options.pendingPaths ?? []).map((path) => ({ path, fingerprint: 'revision' }))
+      }
+      if (command === 'embed_prepare') {
+        if (options.current === true) {
+          return null
+        }
+        return {
+          fingerprint: 'revision',
+          fileHash: await hashContent(options.indexedContent ?? options.content),
+          assetPaths:
+            options.indexedAssets ??
+            parseNote({ path: 'notes/a.md', source: options.content }).assets.map(
+              (asset) => asset.path,
+            ),
+        }
+      }
+      if (command === 'embed_read') {
+        expect(args).toMatchObject({ generation: 1 })
         const path = (args as { path: string }).path
         if (path.endsWith('.reflect.md')) {
           if (options.evictedSidecars?.includes(path) === true) {
@@ -59,7 +94,20 @@ function fakePipelineBridge(options: {
         return texts.map(() => [0.5, 0.5])
       }
       if (command === 'embed_apply') {
-        const { path, chunks } = args as { path: string; chunks: AppliedChunk[] }
+        expect(args).toMatchObject({
+          generation: 1,
+          request: {
+            fingerprint: 'revision',
+            modelId: MODEL,
+            projectionVersion: EMBEDDING_PROJECTION_VERSION,
+          },
+        })
+        if (failApply) {
+          failApply = false
+          throw { kind: 'io', message: 'temporary write failure' }
+        }
+        const { path, chunks } = (args as { request: { path: string; chunks: AppliedChunk[] } })
+          .request
         applied.push({ path, chunks })
         return null
       }
@@ -71,12 +119,75 @@ function fakePipelineBridge(options: {
     },
     listen: async () => () => {},
   })
-  return { embedded, applied }
+  return { commands, embedded, applied }
 }
 
 const MODEL = 'all-MiniLM-L6-v2'
 
 describe('embedNote', () => {
+  it('does no note reads, chunk queries, inference, or writes for a current checkpoint', async () => {
+    const { commands } = fakePipelineBridge({ content: '# One\n', storedRows: [], current: true })
+    expect(await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })).toBe(0)
+    expect(commands).toEqual(['embed_prepare'])
+  })
+
+  it('waits for the index to catch up if file bytes no longer match its revision', async () => {
+    const { commands } = fakePipelineBridge({
+      content: '# Newly saved text\n',
+      indexedContent: '# Previous text\n',
+      storedRows: [],
+    })
+    await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })
+    expect(commands).toEqual(['embed_prepare', 'embed_read'])
+  })
+
+  it('waits for reindexing when a rename changes path-relative asset references', async () => {
+    const { commands } = fakePipelineBridge({
+      content: '# Note\n\n![Photo](assets/new.png)\n',
+      indexedAssets: ['assets/old.png'],
+      storedRows: [],
+    })
+    await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })
+    expect(commands).toEqual(['embed_prepare', 'embed_read'])
+  })
+
+  it.each(['embed_read', 'db_query', 'embed_texts'])(
+    'abandons stale work after %s without applying or continuing inference',
+    async (stopAt) => {
+      let stale = false
+      const { commands, applied } = fakePipelineBridge({
+        content: '# One\n\nAlpha text.\n',
+        storedRows: [],
+        onCommand: (command) => {
+          if (command === stopAt) {
+            stale = true
+          }
+        },
+      })
+      await embedNote({
+        path: 'notes/a.md',
+        generation: 1,
+        modelId: MODEL,
+        isStale: () => stale,
+      })
+      expect(applied).toEqual([])
+      expect(commands.at(-1)).toBe(stopAt)
+    },
+  )
+
+  it('leaves a failed apply retryable', async () => {
+    const { commands, applied } = fakePipelineBridge({
+      content: '# One\n\nAlpha text.\n',
+      storedRows: [],
+      failApplyOnce: true,
+    })
+    const options = { path: 'notes/a.md', generation: 1, modelId: MODEL }
+    await expect(embedNote(options)).rejects.toMatchObject({ kind: 'io' })
+    await embedNote(options)
+    expect(commands.filter((command) => command === 'embed_prepare')).toHaveLength(2)
+    expect(applied).toHaveLength(1)
+  })
+
   it('never embeds a template — boilerplate must not reach retrieval', async () => {
     const { embedded, applied } = fakePipelineBridge({
       content: '# Journal\n\nMood:\n\nGratitude:\n',
@@ -146,6 +257,29 @@ describe('embedNote', () => {
     expect(second.embedded).toHaveLength(1)
   })
 
+  it('applies moved offsets and removed chunks even when no new vectors are needed', async () => {
+    const retained = '# One\n\nAlpha text.\n\n'
+    const original = fakePipelineBridge({
+      content: `${retained}# Two\n\nBeta text.\n`,
+      storedRows: [],
+    })
+    await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })
+    const oldChunks = original.applied[0]!.chunks
+    const frontmatter = '---\ntitle: Changed metadata\n---\n'
+    const updated = fakePipelineBridge({
+      content: frontmatter + retained,
+      storedRows: oldChunks.map((chunk) => ({ content_hash: chunk.contentHash, model_id: MODEL })),
+    })
+    expect(await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })).toBe(0)
+    expect(updated.embedded).toEqual([])
+    expect(updated.applied[0]!.chunks).toHaveLength(1)
+    expect(updated.applied[0]!.chunks[0]).toMatchObject({
+      posFrom: frontmatter.length,
+      contentHash: oldChunks[0]!.contentHash,
+      vector: null,
+    })
+  })
+
   it('duplicate-hash chunks only skip as many embeds as rows exist', async () => {
     // Two byte-identical sections (above the runt-merge threshold) produce
     // two chunks with one hash.
@@ -169,11 +303,12 @@ describe('embedNote', () => {
     expect(sent.filter((chunk) => chunk.vector !== null)).toHaveLength(1)
   })
 
-  it('an emptied note drops its chunks via embed_remove', async () => {
-    const { applied } = fakePipelineBridge({ content: '\n', storedRows: [] })
+  it('an emptied note checkpoints its empty chunk set without a chunk query', async () => {
+    const { applied, commands } = fakePipelineBridge({ content: '\n', storedRows: [] })
     const count = await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })
     expect(count).toBe(0)
     expect(applied).toEqual([{ path: 'notes/a.md', chunks: [] }])
+    expect(commands).toEqual(['embed_prepare', 'embed_read', 'embed_apply'])
   })
 
   const IMAGE_NOTE = '# Trip\n\nSome notes about the day.\n\n![photo](assets/pic.png)\n'
@@ -257,5 +392,56 @@ describe('embedNote', () => {
     const count = await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })
     expect(count).toBe(1)
     expect(second.embedded).toEqual([['Now a snowy mountain pass.']])
+  })
+})
+
+describe('backfillEmbeddings', () => {
+  it('makes unchanged backfill a single native candidate query', async () => {
+    const { commands } = fakePipelineBridge({ content: '', storedRows: [], pendingPaths: [] })
+    expect(await backfillEmbeddings({ generation: 1, modelId: MODEL })).toBe('completed')
+    expect(commands).toEqual(['embed_pending'])
+  })
+
+  it('lets live work run before each dirty candidate and reports dirty-only progress', async () => {
+    const { commands } = fakePipelineBridge({
+      content: '# One\n',
+      storedRows: [],
+      pendingPaths: ['notes/a.md', 'notes/b.md'],
+    })
+    const scheduleNote = vi.fn(async (work: () => Promise<void>) => {
+      commands.push('live-work')
+      await work()
+    })
+    const onProgress = vi.fn()
+    await backfillEmbeddings({ generation: 1, modelId: MODEL, scheduleNote, onProgress })
+    expect(commands.filter((command) => command === 'embed_read')).toHaveLength(2)
+    expect(commands.filter((command) => ['embed_prepare', 'live-work'].includes(command))).toEqual([
+      'live-work',
+      'embed_prepare',
+      'live-work',
+      'embed_prepare',
+    ])
+    expect(onProgress.mock.calls).toEqual([
+      [1, 2],
+      [2, 2],
+    ])
+  })
+
+  it('stops when the session changes while selecting pending work', async () => {
+    let stale = false
+    const { commands } = fakePipelineBridge({
+      content: '',
+      storedRows: [],
+      pendingPaths: ['notes/a.md'],
+      onCommand: (command) => {
+        if (command === 'embed_pending') {
+          stale = true
+        }
+      },
+    })
+    expect(await backfillEmbeddings({ generation: 1, modelId: MODEL, isStale: () => stale })).toBe(
+      'aborted',
+    )
+    expect(commands).toEqual(['embed_pending'])
   })
 })

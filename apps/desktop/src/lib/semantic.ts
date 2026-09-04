@@ -3,6 +3,7 @@ import {
   embedEnsure,
   embedStatus,
   subscribeEmbedStatus,
+  type BackfillEmbeddingsOptions,
   type EmbedStatus,
 } from '@reflect/core'
 
@@ -89,12 +90,10 @@ export async function ensureEmbeddingsVisibly(): Promise<EmbedStatus> {
   }
 }
 
-/** Embed every indexed note (incremental — the hash-skip makes re-runs cheap). */
-export async function backfillEmbeddingsVisibly(options: {
-  generation: number
-  modelId: string
-  isStale?: () => boolean
-}): Promise<'completed' | 'aborted' | 'failed'> {
+/** Bring dirty indexed notes up to date, preserving the visible failure contract. */
+export async function backfillEmbeddingsVisibly(
+  options: BackfillEmbeddingsOptions,
+): Promise<'completed' | 'aborted' | 'failed'> {
   try {
     return await backfillEmbeddings(options)
   } catch {

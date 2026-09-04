@@ -126,7 +126,8 @@ export async function readNote(path: string, generation?: number): Promise<strin
   return await call('note_read', { path, generation }, z.string())
 }
 
-const localNoteReadSchema = z.discriminatedUnion('kind', [
+/** Shared native result for local-only reads pinned to graph or index sessions. */
+export const localNoteReadSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('content'), content: z.string() }),
   z.object({ kind: z.literal('evicted') }),
 ])

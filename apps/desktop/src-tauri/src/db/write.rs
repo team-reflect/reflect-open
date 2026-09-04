@@ -4,7 +4,7 @@
 //! plain functions over a [`Connection`] so the command layer ([`super`]) owns
 //! transactions and generation gating while these stay directly unit-testable.
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Deserialize;
 
 use crate::error::AppResult;
@@ -134,17 +134,18 @@ pub(super) struct IndexedTask {
 /// Replace all rows for `note.path` with its current projection. Caller wraps
 /// this in a transaction; statements are cached so a batch rebuild reuses them.
 ///
-/// We clear the note via `remove_note` (which deletes the `notes` row and lets
-/// `ON DELETE CASCADE` clear every child table) and then insert fresh rows.
+/// We delete the `notes` row via `remove_note_projection`, let `ON DELETE
+/// CASCADE` clear every child table, and then insert fresh rows.
 /// The schema's foreign keys — not a hand-maintained `DELETE` list here — are the
 /// single source of truth for what belongs to a note, so new child tables (Plan
-/// 09 embeddings, etc.) need no change to this function.
+/// 09 embeddings, etc.) need no change to this function. The FTS identity is
+/// carried through replacement so it never depends on the user-authored id.
 pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()> {
-    remove_note(conn, &note.path)?;
+    let search_rowid = remove_note_projection(conn, &note.path)?;
 
     conn.prepare_cached(
-        "INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview)
-         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15, ?16)",
+        "INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview, projection_path)
+         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15, ?16, ?1)",
     )?
     .execute(params![
         note.path,
@@ -249,8 +250,11 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
     } else {
         format!("{}\n{}", note.text, note.asset_text)
     };
-    conn.prepare_cached("INSERT INTO search_fts(path, title, body) VALUES(?1, ?2, ?3)")?
-        .execute(params![note.path, note.title, search_body])?;
+    let search_rowid: i64 = conn
+        .prepare_cached("INSERT INTO note_search(rowid, note_path) VALUES(?1, ?2) RETURNING rowid")?
+        .query_row(params![search_rowid, note.path], |row| row.get(0))?;
+    conn.prepare_cached("INSERT INTO search_fts(rowid, path, title, body) VALUES(?1, ?2, ?3, ?4)")?
+        .execute(params![search_rowid, note.path, note.title, search_body])?;
     Ok(())
 }
 
@@ -295,6 +299,8 @@ pub(super) fn move_note(
             "cannot move note: {to} is already indexed"
         )));
     }
+    // Keep projection_path at its last parsed location. The watcher/reconcile
+    // must refresh path-relative references even when bytes and mtime match.
     let moved = conn
         .prepare_cached("UPDATE notes SET path = ?2, path_key = ?3 WHERE path = ?1")?
         .execute(params![from, to, address.path_key])?;
@@ -337,10 +343,16 @@ pub(super) fn move_note(
         .execute(params![from, to])?;
     conn.prepare_cached("UPDATE tasks SET note_path = ?2 WHERE note_path = ?1")?
         .execute(params![from, to])?;
+    conn.prepare_cached("UPDATE embedding_state SET note_path = ?2 WHERE note_path = ?1")?
+        .execute(params![from, to])?;
     conn.prepare_cached("UPDATE embedding_chunks SET note_path = ?2 WHERE note_path = ?1")?
         .execute(params![from, to])?;
-    conn.prepare_cached("UPDATE search_fts SET path = ?2 WHERE path = ?1")?
-        .execute(params![from, to])?;
+    // note_search follows notes.path through ON UPDATE CASCADE.
+    conn.prepare_cached(
+        "UPDATE search_fts SET path = ?1
+         WHERE rowid = (SELECT rowid FROM note_search WHERE note_path = ?1)",
+    )?
+    .execute(params![to])?;
     Ok(())
 }
 
@@ -350,7 +362,7 @@ pub(super) fn move_note(
 pub(super) fn clear_index(conn: &Connection) -> AppResult<()> {
     conn.execute_batch(
         "DELETE FROM notes; DELETE FROM search_fts;
-         DELETE FROM embedding_vectors; DELETE FROM embedding_chunks;",
+         DELETE FROM embedding_vectors; DELETE FROM embedding_chunks; DELETE FROM embedding_state;",
     )?;
     Ok(())
 }
@@ -369,9 +381,22 @@ pub(super) fn touch_note(conn: &Connection, path: &str, mtime: i64) -> AppResult
 /// Drop every row belonging to `path` (the `notes` row cascades to child
 /// tables; `search_fts` is standalone).
 pub(super) fn remove_note(conn: &Connection, path: &str) -> AppResult<()> {
+    remove_note_projection(conn, path)?;
+    Ok(())
+}
+
+/// Return the internal search identity so replacement can preserve it even
+/// though deleting notes cascades to the path-to-rowid mapping.
+fn remove_note_projection(conn: &Connection, path: &str) -> AppResult<Option<i64>> {
+    let search_rowid: Option<i64> = conn
+        .prepare_cached("SELECT rowid FROM note_search WHERE note_path = ?1")?
+        .query_row(params![path], |row| row.get(0))
+        .optional()?;
+    if let Some(search_rowid) = search_rowid {
+        conn.prepare_cached("DELETE FROM search_fts WHERE rowid = ?1")?
+            .execute(params![search_rowid])?;
+    }
     conn.prepare_cached("DELETE FROM notes WHERE path = ?1")?
         .execute(params![path])?;
-    conn.prepare_cached("DELETE FROM search_fts WHERE path = ?1")?
-        .execute(params![path])?;
-    Ok(())
+    Ok(search_rowid)
 }
