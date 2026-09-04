@@ -7,8 +7,8 @@ use crate::error::{AppError, AppResult};
 type Locks = HashMap<PathBuf, Weak<RwLock<()>>>;
 
 /// One gate per canonical graph, shared by all windows and native writers.
-/// Network operations never acquire this gate. Writers fail promptly during
-/// a checkout instead of blocking the UI; their caller retains the unsaved edit.
+/// Network operations never acquire this gate. Synchronous writers refuse
+/// promptly; note saves wait on the blocking pool and revalidate their session.
 pub(crate) fn gate(root: &Path) -> AppResult<Arc<RwLock<()>>> {
     static LOCKS: OnceLock<Mutex<Locks>> = OnceLock::new();
     let root = root.canonicalize()?;
@@ -37,6 +37,63 @@ pub(crate) fn writer(gate: &RwLock<()>) -> AppResult<RwLockReadGuard<'_, ()>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn note_save_waits_for_checkout_then_writes_the_complete_buffer() {
+        let graph = tempfile::tempdir().unwrap();
+        let gate = gate(graph.path()).unwrap();
+        let checkout = gate.write().unwrap();
+        let root = graph.path().to_path_buf();
+        let (started, waiting) = std::sync::mpsc::channel();
+        let (finished, result) = std::sync::mpsc::channel();
+        let writer = std::thread::spawn(move || {
+            started.send(()).unwrap();
+            finished
+                .send(crate::fs::io::write_note(
+                    &root,
+                    "note.md",
+                    "queued saved edit",
+                    || Ok(()),
+                ))
+                .unwrap();
+        });
+        waiting.recv().unwrap();
+        assert!(result.try_recv().is_err());
+        std::fs::write(graph.path().join("note.md"), "incoming checkout").unwrap();
+        drop(checkout);
+        result.recv().unwrap().unwrap();
+        writer.join().unwrap();
+        assert_eq!(
+            std::fs::read(graph.path().join("note.md")).unwrap(),
+            b"queued saved edit"
+        );
+    }
+
+    #[test]
+    fn queued_note_save_revalidates_its_generation_after_checkout() {
+        let graph = tempfile::tempdir().unwrap();
+        let gate = gate(graph.path()).unwrap();
+        let checkout = gate.write().unwrap();
+        let current = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let validation = current.clone();
+        let root = graph.path().to_path_buf();
+        let (started, waiting) = std::sync::mpsc::channel();
+        let writer = std::thread::spawn(move || {
+            started.send(()).unwrap();
+            crate::fs::io::write_note(&root, "note.md", "stale edit", || {
+                if validation.load(std::sync::atomic::Ordering::SeqCst) {
+                    Ok(())
+                } else {
+                    Err(AppError::io("graph switched"))
+                }
+            })
+        });
+        waiting.recv().unwrap();
+        current.store(false, std::sync::atomic::Ordering::SeqCst);
+        drop(checkout);
+        assert!(writer.join().unwrap().is_err());
+        assert!(!graph.path().join("note.md").exists());
+    }
 
     #[test]
     fn checkout_refuses_writes_promptly_across_handles_but_not_other_graphs() {

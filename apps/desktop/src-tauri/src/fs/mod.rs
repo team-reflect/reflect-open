@@ -24,9 +24,7 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::error::{AppError, AppResult};
 
-use self::io::{
-    atomic_create, atomic_write, bootstrap, collect_files, initialize_runtime, AtomicCreateOutcome,
-};
+use self::io::{atomic_create, bootstrap, collect_files, initialize_runtime, AtomicCreateOutcome};
 use self::resolve::resolve;
 
 /// Cancellation flag for the running Reflect V1 import, managed as Tauri
@@ -417,16 +415,22 @@ pub async fn note_read_local(
 /// with the value a later `list_files` will report — a `Date.now()` stamp
 /// never matches and costs a re-read on every reconcile.
 #[tauri::command]
-pub fn note_write(
+pub async fn note_write(
     path: String,
     contents: String,
     generation: u64,
-    state: State<GraphState>,
+    app: tauri::AppHandle,
 ) -> AppResult<Option<u64>> {
-    let root = root_for_generation(&state, generation)?;
-    let modified_ms = atomic_write(&root, &resolve(&root, &path)?, &contents)?;
-    invalidate_file_catalog(&state, &root);
-    Ok(modified_ms)
+    crate::blocking::run_blocking(move || {
+        let state = app.state::<GraphState>();
+        let root = root_for_generation(&state, generation)?;
+        let modified_ms = io::write_note(&root, &path, &contents, || {
+            root_for_generation(&state, generation).map(|_| ())
+        })?;
+        invalidate_file_catalog(&state, &root);
+        Ok(modified_ms)
+    })
+    .await
 }
 
 /// Atomically create a note only when `path` is still free. Unlike

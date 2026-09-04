@@ -268,8 +268,30 @@ fn set_local_only_xattrs(dir: &Path) -> Vec<String> {
 
 /// Atomically write `contents` to `target` inside the graph at `root`.
 /// Returns the persisted file's mtime (see [`atomic_write_bytes`]).
+#[cfg(test)]
 pub(super) fn atomic_write(root: &Path, target: &Path, contents: &str) -> AppResult<Option<u64>> {
     atomic_write_bytes(root, target, contents.as_bytes())
+}
+
+/// Run on the blocking pool: saves wait for local checkout, then revalidate the
+/// graph session before writing. This keeps quit-time flushes from losing a
+/// dirty buffer merely because a merge held the gate.
+pub(super) fn write_note(
+    root: &Path,
+    path: &str,
+    contents: &str,
+    validate: impl FnOnce() -> AppResult<()>,
+) -> AppResult<Option<u64>> {
+    let gate = super::mutation::gate(root)?;
+    let _writer = gate
+        .read()
+        .map_err(|_| AppError::io("graph mutation gate poisoned"))?;
+    validate()?;
+    persist_bytes(
+        root,
+        &super::resolve::resolve(root, path)?,
+        contents.as_bytes(),
+    )
 }
 
 /// Result of an atomic create-if-absent attempt.
@@ -326,6 +348,10 @@ pub(crate) fn atomic_write_bytes(
 ) -> AppResult<Option<u64>> {
     let gate = super::mutation::gate(root)?;
     let _writer = super::mutation::writer(&gate)?;
+    persist_bytes(root, target, contents)
+}
+
+fn persist_bytes(root: &Path, target: &Path, contents: &[u8]) -> AppResult<Option<u64>> {
     let tmp = stage_bytes(root, target, contents)?;
     let file = tmp
         .persist(target)

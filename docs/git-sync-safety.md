@@ -6,8 +6,9 @@ Fetch and push do not hold the graph filesystem gate. Editing remains enabled
 while the network runs. Commits and merge installation take an exclusive gate
 keyed by the canonical graph root, shared across windows. Native note writes,
 creation, renames, deletion, and screenshot writes participate in that gate.
-A save attempted during installation fails promptly rather than blocking the
-UI; the unsaved editor buffer remains available to retry.
+Note saves wait on the blocking pool rather than blocking the UI or failing a
+quit-time flush. The graph generation is revalidated after waiting. Other
+synchronous mutations refuse promptly during installation and can be retried.
 
 The native merge checks for pending local changes after acquiring the gate.
 An edit saved during fetch produces a no-write `worktreeChanged` result.
@@ -56,8 +57,10 @@ An open SQLite database, WAL, and durable chat tables therefore remain local.
 Sanitizing a fetched tree creates a normal descendant commit so the exclusion
 can be pushed without rewriting history.
 
-Previously published runtime bytes still exist in old Git history. This
-change does not rewrite or purge that history.
+Existing commits containing runtime bytes remain in history, including commits
+created before adoption; they can still be included in a normal history push.
+This change excludes future trees, not historical objects. Removing historical
+runtime data requires a separate, explicitly authorized history rewrite.
 
 ## Recovery
 
