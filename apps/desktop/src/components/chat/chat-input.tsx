@@ -23,7 +23,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { imageFilesFrom } from '@/lib/chat-attachments'
 import { groupModelOptions } from '@/lib/chat-model-groups'
 import { keybindingFor } from '@/lib/commands/app-commands'
-import { focusUnlessInert } from '@/lib/focus-unless-inert'
+import { requestSurfaceFocus } from '@/lib/request-surface-focus'
 import { useChatSession } from '@/providers/chat-provider'
 import { ChatHistoryMenu } from './chat-history-menu'
 
@@ -41,7 +41,7 @@ const NEW_CHAT_BINDING = keybindingFor('chat.new')
 export function ChatInput(): ReactElement {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
-    focusUnlessInert(inputRef.current)
+    return requestSurfaceFocus(inputRef.current)
   }, [])
   const {
     turns,
