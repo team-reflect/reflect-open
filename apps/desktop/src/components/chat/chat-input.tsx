@@ -1,4 +1,4 @@
-import { useMemo, type ReactElement } from 'react'
+import { useEffect, useMemo, useRef, type ReactElement } from 'react'
 import { ArrowUp, Plus, Square, X } from 'lucide-react'
 import { getIsComposing } from '@meowdown/core'
 import { ShortcutKeys } from '@/components/shortcut-keys'
@@ -23,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { imageFilesFrom } from '@/lib/chat-attachments'
 import { groupModelOptions } from '@/lib/chat-model-groups'
 import { keybindingFor } from '@/lib/commands/app-commands'
+import { focusUnlessInert } from '@/lib/focus-unless-inert'
 import { useChatSession } from '@/providers/chat-provider'
 import { ChatHistoryMenu } from './chat-history-menu'
 
@@ -38,6 +39,10 @@ const NEW_CHAT_BINDING = keybindingFor('chat.new')
  * conversations; "New chat" appears once there's a conversation to leave.
  */
 export function ChatInput(): ReactElement {
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    focusUnlessInert(inputRef.current)
+  }, [])
   const {
     turns,
     status,
@@ -107,6 +112,7 @@ export function ChatInput(): ReactElement {
           </AttachmentGroup>
         ) : null}
         <textarea
+          ref={inputRef}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
@@ -133,7 +139,6 @@ export function ChatInput(): ReactElement {
           placeholder="Ask about your notes…"
           aria-label="Chat message"
           rows={2}
-          autoFocus
           /* Opts out of the global :focus-visible outline (styles/index.css);
              the wrapper's focus-within border is the focus treatment here. */
           data-slot="textarea"

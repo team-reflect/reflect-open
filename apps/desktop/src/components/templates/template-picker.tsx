@@ -1,54 +1,22 @@
 import type { ReactElement } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { FilePlus2, LayoutTemplate } from 'lucide-react'
-import { displayNoteTitle } from '@reflect/core'
-import {
-  Command,
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { noteEditorHandleFor } from '@/editor/editor-handle-registry'
+import { createDeferredFeature } from '@/components/deferred-feature'
+import { CommandDialog } from '@/components/ui/command'
 import type { CommandContext } from '@/lib/commands/types'
-import { insertTemplate } from '@/lib/note-templates'
-import { createTemplatesQueryOptions } from '@/lib/query-options'
-import { useGraph } from '@/providers/graph-provider'
 import { useNoteTemplates } from '@/providers/note-templates-provider'
 
-/**
- * The "Insert template…" picker (docs/porting/note-templates.md): the graph's
- * templates A→Z, chosen with the palette's keyboard model, inserted verbatim
- * (frontmatter stripped) at the cursor of the note the command targeted. The
- * ever-present "New template" row is also the feature's front door when the
- * graph has no templates yet.
- */
+const TemplatePickerContent = createDeferredFeature(
+  async () => ({ default: (await import('./template-picker-content')).TemplatePickerContent }),
+  { name: 'templates' },
+)
 
 interface TemplatePickerProps {
   /** The command capabilities (the same context the palette runs with). */
   context: CommandContext
 }
 
+/** The keyboard-accessible picker for inserting a template at the cursor. */
 export function TemplatePicker({ context }: TemplatePickerProps): ReactElement {
-  const { pickerOpen, closeTemplatePicker, openTemplateCreate } = useNoteTemplates()
-  const { graph } = useGraph()
-  const { data: templates } = useQuery({
-    ...createTemplatesQueryOptions(graph?.root),
-    enabled: graph !== null && pickerOpen,
-  })
-
-  const insert = (path: string): void => {
-    closeTemplatePicker()
-    const target = context.notePath()
-    if (target === null) {
-      return // the command opens the picker only where a note is being edited
-    }
-    // `insertTemplate` owns all feedback — a missing editor (protected or
-    // still-loading note) and a failed read both surface as failed operations.
-    void insertTemplate(path, noteEditorHandleFor(target))
-  }
+  const { pickerOpen, closeTemplatePicker } = useNoteTemplates()
 
   return (
     <CommandDialog
@@ -61,34 +29,7 @@ export function TemplatePicker({ context }: TemplatePickerProps): ReactElement {
       title="Insert template"
       description="Choose a template to insert at the cursor"
     >
-      <Command>
-        <CommandInput placeholder="Insert template…" />
-        <CommandList>
-          <CommandEmpty>No templates</CommandEmpty>
-          {templates !== undefined && templates.length > 0 ? (
-            <CommandGroup>
-              {templates.map((template) => (
-                <CommandItem
-                  key={template.path}
-                  // Title + path: cmdk matches on the value, and duplicate
-                  // titles across files must stay distinct rows.
-                  value={`${template.title} ${template.path}`}
-                  onSelect={() => insert(template.path)}
-                >
-                  <LayoutTemplate aria-hidden strokeWidth={1.75} className="text-text-muted" />
-                  <span className="truncate">{displayNoteTitle(template.title)}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          ) : null}
-          <CommandGroup forceMount>
-            <CommandItem forceMount value="new-template" onSelect={openTemplateCreate}>
-              <FilePlus2 aria-hidden strokeWidth={1.75} className="text-text-muted" />
-              New template
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
-      </Command>
+      <TemplatePickerContent context={context} />
     </CommandDialog>
   )
 }

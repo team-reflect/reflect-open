@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -128,6 +129,17 @@ export function useEditorAiMenu({
       setRunMode(null)
     }
   }, [sessionEpoch])
+
+  // Loading a provider can outlive the user marking this note private.
+  // Revoke the pending run before it can send or reveal a delayed result.
+  useLayoutEffect(() => {
+    if (isPrivate && runRef.current !== null) {
+      runRef.current.controller.abort()
+      runRef.current = null
+      setRunMode(null)
+      editorRef.current?.discardPendingReplacement()
+    }
+  }, [isPrivate, editorRef])
 
   const streamRun = useCallback(
     async (

@@ -5,6 +5,7 @@ import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
+import { focusUnlessInert } from '@/lib/focus-unless-inert'
 import { queryKeys } from '@/lib/query-client'
 import type { ModClickEvent } from '@/lib/windows/open-in-new-window'
 import { useListSelection } from '@/lib/selection/use-list-selection'
@@ -121,7 +122,7 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   // Move focus into the surface on mount so the shortcuts work the moment you
   // navigate here, without first clicking the list (mirrors the Tasks view).
   useEffect(() => {
-    rootRef.current?.focus({ preventScroll: true })
+    focusUnlessInert(rootRef.current, { preventScroll: true })
   }, [])
 
   return (

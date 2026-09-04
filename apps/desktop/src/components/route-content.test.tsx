@@ -7,7 +7,7 @@ import { setBridge, upsertFrontmatter } from '@reflect/core'
 import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider'
 import { flushOpenDocuments } from '@/editor/open-documents'
 import type { NoteEditorHandle } from '@/editor/note-editor'
-import { RouterProvider } from '@/routing/router'
+import { RouterProvider, useRouter } from '@/routing/router'
 import type { Route } from '@/routing/route'
 import { setPlatformSurface } from '@/lib/platform-surface'
 import '@/test-utils/locator'
@@ -172,6 +172,17 @@ function PaletteProbe(): ReactElement {
   return <output data-testid="palette">{JSON.stringify({ open, query })}</output>
 }
 
+function NavigationProbe(): ReactElement {
+  const { navigate } = useRouter()
+  return (
+    <>
+      <button onClick={() => navigate({ kind: 'today' })}>Go to daily</button>
+      <button onClick={() => navigate({ kind: 'allNotes', tag: null })}>Go to all notes</button>
+      <button onClick={() => navigate({ kind: 'tasks' })}>Go to tasks</button>
+    </>
+  )
+}
+
 function renderRoute(route: Route) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -180,6 +191,7 @@ function renderRoute(route: Route) {
         <PaletteProvider>
           <RouteContent />
           <PaletteProbe />
+          <NavigationProbe />
         </PaletteProvider>
       </RouterProvider>
     </QueryClientProvider>,
@@ -320,7 +332,22 @@ describe('RouteContent', () => {
     await expect.element(page.getByRole('button', { name: '#book' })).toBeVisible()
     await expect.element(page.getByText('Subject')).toBeVisible()
     await expect.element(page.getByText('No notes yet.')).toBeVisible()
+    await expect.element(page.getByLabelText('All notes')).toHaveFocus()
     await view.unmount()
+  })
+
+  it('focuses secondary lists after their first load and when revisiting them', async () => {
+    await renderRoute({ kind: 'today' })
+    await page.getByRole('button', { name: 'Go to tasks' }).click()
+    await expect.element(page.getByLabelText('Tasks', { exact: true })).toHaveFocus()
+
+    await page.getByRole('button', { name: 'Go to daily' }).click()
+    await expect.element(page.getByTestId('daily-stream')).toBeInTheDocument()
+    await page.getByRole('button', { name: 'Go to all notes' }).click()
+    await expect.element(page.getByLabelText('All notes')).toHaveFocus()
+
+    await page.getByRole('button', { name: 'Go to tasks' }).click()
+    await expect.element(page.getByLabelText('Tasks', { exact: true })).toHaveFocus()
   })
 
   it('arriving on a search route opens the palette pre-filled over the stream', async () => {

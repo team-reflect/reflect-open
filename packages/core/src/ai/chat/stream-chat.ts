@@ -1,4 +1,5 @@
-import { isStepCount, streamText, type LanguageModel, type ModelMessage } from 'ai'
+import { loadAiModule } from '../load-ai-module'
+import type { LanguageModel, ModelMessage } from 'ai'
 import { errorMessage } from '../../errors'
 import { languageModel } from '../language-model'
 import { modelContextWindow } from '../provider-catalog'
@@ -78,24 +79,33 @@ export type ChatStreamEvent =
  * trims its oldest turns here rather than erroring at the provider. See
  * {@link streamChatTurn} for the stream's contract.
  */
-export function streamChat(options: StreamChatOptions): AsyncGenerator<ChatStreamEvent> {
-  const messages = fitToContextWindow(options.messages, {
-    contextWindow: modelContextWindow(options.config.provider, options.config.model),
-    systemPrompt: chatSystemPrompt({
+export async function* streamChat(options: StreamChatOptions): AsyncGenerator<ChatStreamEvent> {
+  try {
+    options.signal?.throwIfAborted()
+    const messages = fitToContextWindow(options.messages, {
+      contextWindow: modelContextWindow(options.config.provider, options.config.model),
+      systemPrompt: chatSystemPrompt({
+        today: options.today,
+        context: options.context,
+        semanticSearchEnabled: options.semanticSearchEnabled,
+        customSystemPrompt: options.customSystemPrompt,
+      }),
+    })
+    const model = await languageModel(options.config, options.apiKey, options.fetchFn)
+    options.signal?.throwIfAborted()
+    yield* streamChatTurn(model, {
+      messages,
       today: options.today,
-      context: options.context,
       semanticSearchEnabled: options.semanticSearchEnabled,
       customSystemPrompt: options.customSystemPrompt,
-    }),
-  })
-  return streamChatTurn(languageModel(options.config, options.apiKey, options.fetchFn), {
-    messages,
-    today: options.today,
-    semanticSearchEnabled: options.semanticSearchEnabled,
-    customSystemPrompt: options.customSystemPrompt,
-    context: options.context,
-    signal: options.signal,
-  })
+      context: options.context,
+      signal: options.signal,
+    })
+  } catch (cause) {
+    yield options.signal?.aborted
+      ? { type: 'aborted', messages: [] }
+      : { type: 'error', message: errorMessage(cause), messages: [] }
+  }
 }
 
 /** {@link streamChatTurn}'s options: {@link StreamChatOptions} minus provider wiring. */
@@ -145,6 +155,8 @@ export async function* streamChatTurn(
       : [...stepMessages, { role: 'assistant', content: pendingText }]
 
   try {
+    const { isStepCount, streamText } = await loadAiModule(() => import('ai'))
+    options.signal?.throwIfAborted()
     const result = streamText({
       model,
       instructions: chatSystemPrompt({

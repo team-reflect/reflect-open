@@ -114,11 +114,59 @@ const PRIVATE_HIT: RetrievalHit = {
 }
 
 describe('streamChat', () => {
+  it('does not start a provider request when stopped while the model loads', async () => {
+    const controller = new AbortController()
+    const loading = Promise.withResolvers<Awaited<ReturnType<typeof languageModel>>>()
+    const model = new MockLanguageModelV3({ doStream: sequence([textTurn('never')]) })
+    languageModelMock.mockReturnValueOnce(loading.promise)
+    const events = collect(
+      streamChat({
+        config: { id: 'cfg', provider: 'openai', model: 'gpt-5.5', keyHint: 'test' },
+        apiKey: 'sk-test',
+        fetchFn: globalThis.fetch,
+        messages: [{ role: 'user', content: 'hello' }],
+        today: '2026-09-04',
+        semanticSearchEnabled: false,
+        customSystemPrompt: '',
+        context: null,
+        signal: controller.signal,
+      }),
+    )
+    controller.abort()
+    loading.resolve(model)
+
+    expect(await events).toEqual([{ type: 'aborted', messages: [] }])
+    expect(model.doStreamCalls).toHaveLength(0)
+  })
+
+  it('normalizes a model-loading failure and permits a later turn', async () => {
+    const options = {
+      config: { id: 'cfg', provider: 'openai' as const, model: 'gpt-5.5', keyHint: 'test' },
+      apiKey: 'sk-test',
+      fetchFn: globalThis.fetch,
+      messages: [{ role: 'user' as const, content: 'hello' }],
+      today: '2026-09-04',
+      semanticSearchEnabled: false,
+      customSystemPrompt: '',
+      context: null,
+    }
+    languageModelMock.mockRejectedValueOnce(new Error('model chunk unavailable'))
+    expect(await collect(streamChat(options))).toEqual([
+      { type: 'error', message: 'model chunk unavailable', messages: [] },
+    ])
+
+    const model = new MockLanguageModelV3({ doStream: sequence([textTurn('loaded')]) })
+    languageModelMock.mockResolvedValueOnce(model)
+    const events = await collect(streamChat(options))
+    expect(events[0]).toEqual({ type: 'text-delta', text: 'loaded' })
+    expect(events.at(-1)?.type).toBe('complete')
+  })
+
   it('uses the custom system prompt for context accounting and the provider request', async () => {
     const customSystemPrompt = 'sentinel-custom-system-prompt-01jxq3'
     const messages: ModelMessage[] = [{ role: 'user', content: 'hello' }]
     const model = new MockLanguageModelV3({ doStream: sequence([textTurn('hi')]) })
-    languageModelMock.mockReturnValue(model)
+    languageModelMock.mockResolvedValue(model)
 
     await collect(
       streamChat({

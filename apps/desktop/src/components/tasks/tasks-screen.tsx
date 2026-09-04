@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
+import { focusUnlessInert } from '@/lib/focus-unless-inert'
 import { useRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { sameTask, taskKey } from '@/lib/tasks/task-identity'
 import type { InsertTaskTarget } from '@/lib/tasks/task-insert-target'
@@ -235,7 +236,7 @@ export function TasksScreen(): ReactElement {
   // you navigate here — without it, focus would linger on the sidebar link that
   // navigated, where the scoping guard (rightly) backs the shortcuts off.
   useEffect(() => {
-    rootRef.current?.focus({ preventScroll: true })
+    focusUnlessInert(rootRef.current, { preventScroll: true })
   }, [])
 
   return (

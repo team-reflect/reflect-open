@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react'
+import { focusUnlessInert } from '@/lib/focus-unless-inert'
 
 export interface ArrivalFocusOptions {
   /** The router's navigation counter — bumped on every `navigate`. */
@@ -31,7 +32,9 @@ export function useArrivalFocus({
     seenSeq.current = arrivalSeq
     if (newArrival && arrivalFocusEditor) {
       const element = target.current
-      element?.focus()
+      if (!focusUnlessInert(element)) {
+        return
+      }
       if (
         selectText &&
         (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)

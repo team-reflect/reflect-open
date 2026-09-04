@@ -1,14 +1,31 @@
 import type { ReactElement } from 'react'
+import { createDeferredFeature } from '@/components/deferred-feature'
 import { useToday } from '@/lib/use-today'
-import { MobileAllNotes } from '@/mobile/screens/all-notes'
-import { MobileChat } from '@/mobile/screens/chat'
 import { MobileDaily } from '@/mobile/screens/daily'
-import { MobileGraphs } from '@/mobile/screens/graphs'
 import { MobileNote } from '@/mobile/screens/note'
-import { MobileSettings } from '@/mobile/screens/settings'
-import { MobileTasks } from '@/mobile/screens/tasks'
 import type { AllNotesFilters } from '@/mobile/search-filters/filter-state'
 import type { Route } from '@/routing/route'
+
+const MobileAllNotes = createDeferredFeature(
+  async () => ({ default: (await import('@/mobile/screens/all-notes')).MobileAllNotes }),
+  { name: 'all notes' },
+)
+const MobileChat = createDeferredFeature(
+  async () => ({ default: (await import('@/mobile/screens/chat')).MobileChat }),
+  { name: 'chat' },
+)
+const MobileTasks = createDeferredFeature(
+  async () => ({ default: (await import('@/mobile/screens/tasks')).MobileTasks }),
+  { name: 'tasks' },
+)
+const MobileSettings = createDeferredFeature(
+  async () => ({ default: (await import('@/mobile/screens/settings')).MobileSettings }),
+  { name: 'settings' },
+)
+const MobileGraphs = createDeferredFeature(
+  async () => ({ default: (await import('@/mobile/screens/graphs')).MobileGraphs }),
+  { name: 'graphs' },
+)
 
 interface MobileScreenProps {
   /**
