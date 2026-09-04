@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.48",
-    "@ai-sdk/google": "^4.0.62",
+    "@ai-sdk/google": "^4.0.63",
     "@ai-sdk/openai": "^4.0.56",
     "@ai-sdk/openai-compatible": "^3.0.43",
     "@meowdown/markdown": "^0.68.0",
