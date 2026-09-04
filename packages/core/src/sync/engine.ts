@@ -5,6 +5,7 @@ import {
   gitMergeRemote,
   gitPush,
   type ChangedFile,
+  type CommitOutcome,
   type MergeOutcome,
   type SkippedFile,
 } from './commands'
@@ -296,10 +297,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     remoteChanges: (changes: ChangedFile[]) => void,
   ): Promise<void> {
     const token = options.localOnly === true ? null : await step(options.getToken())
-    const commit = await step(gitCommitAll('Update notes', options.generation))
-    if (commit.skippedLargeFiles.length > 0) {
-      options.onLargeFilesSkipped?.(commit.skippedLargeFiles)
-    }
+    const commit = await step(gitCommitAll('Update notes', options.generation), reportSkippedFiles)
     if (options.localOnly === true) {
       return // the commit is the whole cycle — the repo has no remote
     }
@@ -353,11 +351,11 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         return { kind: outcome.kind, committed }
       }
       if (attempt + 1 < MAX_PUSH_ATTEMPTS) {
-        const snapshot = await step(gitCommitAll('Update notes', options.generation))
+        const snapshot = await step(
+          gitCommitAll('Update notes', options.generation),
+          reportSkippedFiles,
+        )
         committed ||= snapshot.committed
-        if (snapshot.skippedLargeFiles.length > 0) {
-          options.onLargeFilesSkipped?.(snapshot.skippedLargeFiles)
-        }
       }
     }
     throw new Error(
@@ -367,6 +365,13 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   function syncNow(): Promise<void> {
     return run('full')
+  }
+
+  /** Run commit notifications inside the step's cancellation/suppression boundary. */
+  function reportSkippedFiles(outcome: CommitOutcome): void {
+    if (outcome.skippedLargeFiles.length > 0) {
+      options.onLargeFilesSkipped?.(outcome.skippedLargeFiles)
+    }
   }
 
   function stop(): void {

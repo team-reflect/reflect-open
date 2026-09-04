@@ -125,6 +125,7 @@ pub(super) fn install(
     Ok(())
 }
 
+/// Preflight the complete diff so predictable failures happen before any move.
 fn plan(
     repo: &Repository,
     root: &Path,
@@ -178,6 +179,7 @@ fn plan(
     Ok(changes)
 }
 
+/// Keep displaced inodes alive and atomically claim replacements, never truncate.
 fn apply(
     repo: &Repository,
     root: &Path,
@@ -235,6 +237,7 @@ fn apply(
     Ok(())
 }
 
+/// Roll back in reverse order while retaining any file another writer installed.
 fn restore(root: &Path, recovery: &Path, changes: &[Change]) -> AppResult<()> {
     for change in changes.iter().rev() {
         let target = checked_path(root, &change.path)?;
@@ -258,10 +261,12 @@ fn restore(root: &Path, recovery: &Path, changes: &[Change]) -> AppResult<()> {
     Ok(())
 }
 
+/// Compare bytes, not stat-cache hints, before risking a working-tree replacement.
 fn verify(repo: &Repository, path: &Path, expected: Option<Oid>) -> AppResult<()> {
     let matches = match (fs::symlink_metadata(path), expected) {
         (Ok(metadata), Some(expected)) if metadata.is_file() => {
-            fs::read(path)? == repo.find_blob(expected)?.content()
+            let blob = repo.find_blob(expected)?;
+            metadata.len() == blob.size() as u64 && fs::read(path)? == blob.content()
         }
         (Err(error), None) if error.kind() == std::io::ErrorKind::NotFound => true,
         (Err(error), _) if error.kind() != std::io::ErrorKind::NotFound => return Err(error.into()),
@@ -276,6 +281,7 @@ fn verify(repo: &Repository, path: &Path, expected: Option<Oid>) -> AppResult<()
     Ok(())
 }
 
+/// Refuse paths that could redirect an installation into metadata or symlinks.
 fn checked_path(root: &Path, path: &str) -> AppResult<PathBuf> {
     if path.contains('\\') || path.contains(':') {
         return Err(AppError::io(format!(
@@ -302,6 +308,7 @@ fn checked_path(root: &Path, path: &str) -> AppResult<PathBuf> {
     Ok(target)
 }
 
+/// Establish recovery evidence before starting any destructive rename.
 fn write_synced(path: &Path, bytes: &[u8]) -> AppResult<()> {
     let mut file = File::options().create_new(true).write(true).open(path)?;
     file.write_all(bytes)?;
@@ -310,6 +317,7 @@ fn write_synced(path: &Path, bytes: &[u8]) -> AppResult<()> {
     Ok(())
 }
 
+/// Persist directory-entry updates where directory fsync is supported.
 fn sync_parent(path: &Path) -> AppResult<()> {
     #[cfg(unix)]
     File::open(
@@ -322,6 +330,7 @@ fn sync_parent(path: &Path) -> AppResult<()> {
     Ok(())
 }
 
+/// Replace an index as a complete file while the caller holds index.lock.
 fn replace_file(path: &Path, bytes: &[u8]) -> AppResult<()> {
     let mut staged = tempfile::NamedTempFile::new_in(
         path.parent()

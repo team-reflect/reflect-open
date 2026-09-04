@@ -62,9 +62,13 @@ pub(super) fn ensure_clean_state(repo: &Repository) -> AppResult<()> {
 /// Runtime data never participates in history or checkout, even when tracked
 /// by an adopted repository. Case folding also protects case-insensitive disks.
 pub(super) fn is_runtime(path: &[u8]) -> bool {
-    path.split(|byte| *byte == b'/')
-        .next()
-        .is_some_and(|part| part.eq_ignore_ascii_case(b".reflect"))
+    path.split(|byte| *byte == b'/').next().is_some_and(|part| {
+        let end = part
+            .iter()
+            .rposition(|byte| *byte != b'.' && *byte != b' ')
+            .map_or(0, |position| position + 1);
+        part[..end].eq_ignore_ascii_case(b".reflect")
+    })
 }
 
 /// Remove runtime entries from every index stage without touching local files.
@@ -129,4 +133,30 @@ pub(super) fn signature(repo: &Repository) -> AppResult<Signature<'static>> {
 /// bootstrap already writes these, but setup may adopt an existing repository.
 pub(super) fn ensure_gitignore_defaults(root: &Path) -> AppResult<()> {
     graph_gitignore::ensure_defaults(root)
+}
+
+#[cfg(test)]
+mod runtime_tests {
+    use super::is_runtime;
+
+    #[test]
+    fn reserves_case_and_windows_trailing_dot_space_aliases() {
+        for path in [
+            ".reflect/index.sqlite",
+            ".REFLECT/index.sqlite-wal",
+            ".reflect./index.sqlite",
+            ".ReFlEcT . ./chat",
+            ".reflect",
+        ] {
+            assert!(is_runtime(path.as_bytes()), "{path}");
+        }
+        for path in [
+            "notes/.reflect.md",
+            ".reflect-notes/a.md",
+            "notes/a.md",
+            ".../note",
+        ] {
+            assert!(!is_runtime(path.as_bytes()), "{path}");
+        }
+    }
 }

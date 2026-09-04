@@ -46,6 +46,7 @@ pub struct MergeOutcome {
     pub changed_files: Vec<ChangedFile>,
 }
 
+/// No-write outcomes must never emit speculative file changes to the editor.
 fn unchanged(kind: MergeKind) -> MergeOutcome {
     MergeOutcome {
         kind,
@@ -171,6 +172,7 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
     })
 }
 
+/// The operation-state check alone says nothing about saves made during fetch.
 fn has_local_changes(repo: &Repository, include_untracked: bool) -> AppResult<bool> {
     let mut options = git2::StatusOptions::new();
     options
@@ -183,6 +185,7 @@ fn has_local_changes(repo: &Repository, include_untracked: bool) -> AppResult<bo
         .any(|entry| !is_runtime(entry.path_bytes()) && entry.status() != git2::Status::CURRENT))
 }
 
+/// Report installed content changes, never runtime exclusions that left disk alone.
 fn changed_between(
     repo: &Repository,
     old: Option<&git2::Tree>,
@@ -217,10 +220,12 @@ fn changed_between(
     Ok(changes)
 }
 
+/// Refuse unrepresentable paths rather than lossy-converting them to other names.
 fn path_of(entry: &IndexEntry) -> AppResult<&str> {
     std::str::from_utf8(&entry.path).map_err(|_| AppError::io("non-UTF-8 conflict path"))
 }
 
+/// Resolve index stages without reading a potentially racing working copy.
 fn stage(index: &mut Index, mut entry: IndexEntry, id: git2::Oid) -> AppResult<()> {
     index.remove_path(Path::new(path_of(&entry)?))?;
     entry.id = id;
@@ -229,6 +234,7 @@ fn stage(index: &mut Index, mut entry: IndexEntry, id: git2::Oid) -> AppResult<(
     Ok(())
 }
 
+/// Preserve both edited versions in blobs before touching the live working tree.
 fn resolve_conflicts(repo: &Repository, root: &Path, index: &mut Index) -> AppResult<Vec<String>> {
     let conflicts = index.conflicts()?.collect::<Result<Vec<_>, _>>()?;
     let mut paths = Vec::new();
@@ -289,6 +295,7 @@ fn resolve_conflicts(repo: &Repository, root: &Path, index: &mut Index) -> AppRe
     Ok(paths)
 }
 
+/// Reserve names in every merge stage; installation supplies the atomic disk claim.
 fn available_copy(root: &Path, index: &Index, path: &str) -> AppResult<String> {
     for number in 1..=10_000 {
         let candidate = conflict_copy_path(path, number);
@@ -302,6 +309,7 @@ fn available_copy(root: &Path, index: &Index, path: &str) -> AppResult<String> {
     Err(AppError::io("too many conflict copies; no free filename"))
 }
 
+/// Suffix only the basename so dotted directories cannot relocate a conflict copy.
 fn conflict_copy_path(rel: &str, number: usize) -> String {
     let path = Path::new(rel);
     let file = path.file_name().unwrap_or_default().to_string_lossy();

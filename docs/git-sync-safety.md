@@ -88,3 +88,5 @@ interrupted process. Do not use `git reset --hard` to dismiss the error.
 
 Recovery archives can be removed manually after all writers have stopped and
 their contents have been checked. They are local-only and are not pushed.
+From the graph root, inspect their total size with
+`du -sh "$(git rev-parse --git-dir)/reflect-sync"` before deciding what to retain.

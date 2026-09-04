@@ -52,7 +52,7 @@ export type RemoteDelta = z.infer<typeof remoteDeltaSchema>
 export const changedFileSchema = z.object({
   path: z.string(),
   kind: z.enum(['upsert', 'remove']),
-  /** Last-modified time (epoch ms; upserts only) — real mtime for the reindex. */
+  /** Real mtime when the native filesystem supplies it; unavailable metadata must not discard a landed merge. */
   modifiedMs: z
     .number()
     .nullish()

@@ -61,6 +61,47 @@ function commandsOf(calls: Call[]): string[] {
 }
 
 describe('createSyncEngine', () => {
+  it.each([
+    { retry: false, stop: true },
+    { retry: true, stop: true },
+    { retry: false, stop: false },
+    { retry: true, stop: false },
+  ])('respects skipped-file callback cancellation: %j', async ({ retry, stop }) => {
+    let commits = 0
+    let allowed = true
+    const calls = fakeGit((command) => {
+      if (command === 'git_commit_all') {
+        commits += 1
+        return retry && commits === 1
+          ? CLEAN_COMMIT
+          : {
+              ...COMMITTED,
+              skippedLargeFiles: [{ path: 'assets/large.bin', size: 100_000_000 }],
+            }
+      }
+      return command === 'git_merge_remote' ? WORKTREE_CHANGED : defaultResponses(command)
+    })
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => null,
+      canStartCycle: () => allowed,
+      onLargeFilesSkipped: () => {
+        if (stop) {
+          engine.stop()
+        } else {
+          allowed = false
+        }
+      },
+    })
+    await engine.syncNow()
+    expect(commandsOf(calls)).toEqual(
+      retry
+        ? ['git_commit_all', 'git_fetch', 'git_merge_remote', 'git_commit_all']
+        : ['git_commit_all'],
+    )
+    engine.stop()
+  })
+
   it('commits a save during fetch before retrying the merge without another fetch', async () => {
     const fetched = Promise.withResolvers<unknown>()
     let merges = 0
