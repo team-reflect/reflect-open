@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0-beta.14](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.13...v0.11.0-beta.14) (2026-09-04)
+
+
+### Features
+
+* add GPT-6 Astra support ([#1213](https://github.com/team-reflect/reflect-open/issues/1213)) ([e051828](https://github.com/team-reflect/reflect-open/commit/e0518283d2c48166c788b80a72efad76865279d1))
+
+
+### Bug Fixes
+
+* make list hover feedback instant ([#1211](https://github.com/team-reflect/reflect-open/issues/1211)) ([87e01ba](https://github.com/team-reflect/reflect-open/commit/87e01bacde6a4178e9aa5e6ed747790f0429a7d0))
+
 ## [0.11.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.12...v0.11.0-beta.13) (2026-09-03)
 
 
