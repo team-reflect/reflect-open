@@ -8,7 +8,7 @@ describe('AI_PROVIDERS', () => {
         id: provider.id,
         models: provider.models.map(model => model.id),
       })
-    )).toMatchInlineSnapshot(`
+    )).toEqual(
       [
         {
           "id": "openai",
@@ -63,7 +63,7 @@ describe('AI_PROVIDERS', () => {
           ],
         },
       ]
-    `)
+    )
   })
 })
 
