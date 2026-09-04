@@ -6,6 +6,12 @@ import { isFlushRequest } from '@/lib/messages'
 import { readIncludePageTextPreference } from '@/lib/popup-preferences'
 import { saveCapture } from '@/lib/save-capture'
 import { snapshotTab } from '@/lib/snapshot-active-tab'
+import { flashBadge } from '@/lib/badge'
+import { handlePostCaptured } from '@/lib/x/capture-post'
+import { isPostCapturedMessage, isPostReleasedMessage } from '@/lib/x/messages'
+import { removesXPermission } from '@/lib/x/permission'
+import { disableXCapture, syncXContentScript } from '@/lib/x/registration'
+import { clearPostSeen } from '@/lib/x/seen'
 import { tryExtractPageText } from './popup/extract-page-text'
 
 /**
@@ -18,6 +24,23 @@ import { tryExtractPageText } from './popup/extract-page-text'
 
 const RETRY_ALARM = 'capture-retry'
 const RETRY_PERIOD_MINUTES = 15
+
+/**
+ * Answer a `runtime.onMessage` request from a promise: the resolved value,
+ * or `fallback` after logging a rejection — the caller must still `return
+ * true` from the listener to keep the channel open.
+ */
+function respondWith<T>(
+  work: Promise<T>,
+  sendResponse: (response: T) => void,
+  fallback: T,
+  what: string,
+): void {
+  work.then(sendResponse, (cause: unknown) => {
+    console.error(`${what} failed:`, cause)
+    sendResponse(fallback)
+  })
+}
 
 async function saveTabWithDefaults(tab: Parameters<typeof snapshotTab>[0]): Promise<void> {
   const captured = await snapshotTab(tab)
@@ -44,11 +67,36 @@ async function saveTabWithDefaults(tab: Parameters<typeof snapshotTab>[0]): Prom
 export default defineBackground(() => {
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (isFlushRequest(message)) {
-      flushQueue().then(sendResponse, (cause: unknown) => {
-        console.error('capture flush failed:', cause)
-        sendResponse({ sent: 0, failed: 0, rejectedIds: [], held: -1, holdReason: 'io' })
-      })
+      respondWith(
+        flushQueue(),
+        sendResponse,
+        { sent: 0, failed: 0, rejectedIds: [], held: -1, holdReason: 'io' },
+        'capture flush',
+      )
       return true // responding asynchronously
+    }
+    if (isPostCapturedMessage(message)) {
+      respondWith(
+        handlePostCaptured(message.page).then((response) => {
+          if (response.saved) {
+            void flashBadge()
+          }
+          return response
+        }),
+        sendResponse,
+        { saved: false, reason: 'rejected' },
+        'post capture',
+      )
+      return true
+    }
+    if (isPostReleasedMessage(message)) {
+      respondWith(
+        clearPostSeen(message.id).then(() => ({ ok: true })),
+        sendResponse,
+        { ok: false },
+        'post release',
+      )
+      return true
     }
     return false
   })
@@ -61,12 +109,23 @@ export default defineBackground(() => {
     }
   })
 
+  // Runtime content-script registrations do not survive an extension
+  // update, so the X watcher is re-synced with the preference on install;
+  // a permission revoked in chrome://extensions switches the feature off.
   browser.runtime.onInstalled.addListener(() => {
     void browser.alarms.create(RETRY_ALARM, { periodInMinutes: RETRY_PERIOD_MINUTES })
     void flushQueue()
+    void syncXContentScript().catch((cause: unknown) => {
+      console.error('X capture registration failed:', cause)
+    })
   })
   browser.runtime.onStartup.addListener(() => {
     void flushQueue()
+  })
+  browser.permissions.onRemoved.addListener((removed) => {
+    if (removesXPermission(removed)) {
+      void disableXCapture()
+    }
   })
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === RETRY_ALARM) {

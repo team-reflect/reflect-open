@@ -6,7 +6,9 @@ import { wikiLinkSafe } from '../markdown/edit'
 import { upsertFrontmatter } from '../markdown/frontmatter'
 import type { Frontmatter } from '../markdown/model'
 import type { CaptureIdentity } from './capture-identity'
-import type { CaptureEnvelope } from './capture-envelope'
+import type { CaptureEnvelope, CapturedPost } from './capture-envelope'
+import { postFrontmatter, postNoteMetaSchema } from './post-meta'
+import { postNoteBody, postNoteFields, postNoteTitle, type PostNoteFields } from './post-note'
 
 export { notePrivate } from '../privacy/checkers'
 
@@ -32,6 +34,7 @@ const captureNoteMetaSchema = z.object({
   captureHash: z.string(),
   captureSelectionHash: z.string().optional(),
   captureScreenshot: z.string().optional(),
+  ...postNoteMetaSchema.shape,
 })
 
 export type CaptureNoteMeta = z.infer<typeof captureNoteMetaSchema>
@@ -115,12 +118,50 @@ function firstSectionStart(body: string): number {
   return body.length
 }
 
+/** The display title a post capture's note and daily bullet get at drain time. */
+export function postDisplayTitle(
+  envelope: CaptureEnvelope,
+  post: Pick<PostNoteFields, 'author' | 'text'> | CapturedPost,
+): string {
+  return postNoteTitle(
+    { author: post.author ?? null, text: post.text ?? null },
+    displayTitle(envelope),
+  )
+}
+
+/**
+ * The full source (frontmatter + body) the drain writes for a capture: the
+ * link template, or — when `post` is set — the post template rendered from
+ * `postFields` (a same-day re-capture merged with the existing note) or
+ * from what the envelope's post block read. The frontmatter carries the
+ * capture identity, status, and the body hash enrichment later verifies.
+ */
 export async function captureNoteSource(
   envelope: CaptureEnvelope,
   identity: CaptureIdentity,
-  options: { hasScreenshot: boolean; status: CaptureStatus; selectionHash?: string | undefined },
+  options: {
+    hasScreenshot: boolean
+    status: CaptureStatus
+    selectionHash?: string | undefined
+    /** Render the post template instead of the link one (Plan 25). */
+    post?: CapturedPost | undefined
+    /** Prepared fields for a same-day re-capture merged with the existing note. */
+    postFields?: PostNoteFields | undefined
+  },
 ): Promise<string> {
-  const body = captureNoteBody(envelope, identity, options.hasScreenshot)
+  const post = options.post
+  let body: string
+  if (post === undefined) {
+    body = captureNoteBody(envelope, identity, options.hasScreenshot)
+  } else {
+    const fields =
+      options.postFields ??
+      postNoteFields(envelope.url, post, {
+        note: envelope.note,
+        screenshot: options.hasScreenshot ? identity.assetPath : null,
+      })
+    body = postNoteBody(fields, postDisplayTitle(envelope, fields))
+  }
   return upsertFrontmatter(body, {
     aliases: [identity.base],
     captureUrl: envelope.url,
@@ -130,6 +171,7 @@ export async function captureNoteSource(
     captureHash: await hashContent(body),
     captureSelectionHash: options.selectionHash,
     captureScreenshot: options.hasScreenshot ? identity.assetPath : undefined,
+    ...(post === undefined ? {} : postFrontmatter(post)),
   })
 }
 

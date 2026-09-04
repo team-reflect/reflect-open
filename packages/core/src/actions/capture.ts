@@ -22,3 +22,13 @@ export {
   type ReconcileCaptureEnrichmentInput,
   type ReconcileCaptureEnrichmentOutcome,
 } from './capture-enrichment'
+export {
+  capturedPostSchema,
+  type CapturedPost,
+  type PostAuthor,
+  type PostMedia,
+  type PostTrigger,
+  type QuotedPost,
+} from './capture-envelope'
+export { isPostUrl, parsePostUrl, postPermalink, type PostPermalink } from './post-url'
+export { postCaptureMeta, type PostCaptureMeta } from './post-meta'

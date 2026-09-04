@@ -1,21 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readIncludePageTextPreference, writeIncludePageTextPreference } from './popup-preferences'
 
-const store = new Map<string, unknown>()
+const store = vi.hoisted(() => new Map<string, unknown>())
 
-vi.mock('wxt/browser', () => ({
+vi.mock('wxt/browser', async () => ({
   browser: {
-    storage: {
-      local: {
-        get: (key: string) => Promise.resolve(store.has(key) ? { [key]: store.get(key) } : {}),
-        set: (items: Record<string, unknown>) => {
-          for (const [key, value] of Object.entries(items)) {
-            store.set(key, value)
-          }
-          return Promise.resolve()
-        },
-      },
-    },
+    storage: { local: (await import('./test-utils/storage-mock')).createStorageLocalMock(store) },
   },
 }))
 

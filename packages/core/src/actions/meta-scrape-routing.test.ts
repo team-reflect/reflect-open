@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReflectError } from '../errors'
-import { captureMetaFetch, captureOEmbedFetch } from '../graph/commands'
+import { captureMetaFetch, captureJsonFetch } from '../graph/commands'
 import { scrapePageMeta } from './meta-scrape'
 
 vi.mock('../graph/commands', () => ({
   captureMetaFetch: vi.fn(),
-  captureOEmbedFetch: vi.fn(),
+  captureJsonFetch: vi.fn(),
 }))
 
-const oembedFetchMock = vi.mocked(captureOEmbedFetch)
+const jsonFetchMock = vi.mocked(captureJsonFetch)
 const metaFetchMock = vi.mocked(captureMetaFetch)
 
 const VIDEO_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
@@ -27,7 +27,7 @@ beforeEach(() => {
 
 describe('scrapePageMeta', () => {
   it('resolves a claimed URL through oEmbed without touching the HTML fetch', async () => {
-    oembedFetchMock.mockResolvedValue(OEMBED_ANSWER)
+    jsonFetchMock.mockResolvedValue(OEMBED_ANSWER)
 
     const meta = await scrapePageMeta(VIDEO_URL)
 
@@ -36,12 +36,12 @@ describe('scrapePageMeta', () => {
       description: null,
       siteName: 'YouTube',
     })
-    expect(oembedFetchMock).toHaveBeenCalledWith(REQUEST_URL)
+    expect(jsonFetchMock).toHaveBeenCalledWith(REQUEST_URL)
     expect(metaFetchMock).not.toHaveBeenCalled()
   })
 
   it('falls back to the HTML scrape when the endpoint refuses the id', async () => {
-    oembedFetchMock.mockRejectedValue(new ReflectError('io', 'answered 400'))
+    jsonFetchMock.mockRejectedValue(new ReflectError('io', 'answered 400'))
     metaFetchMock.mockRejectedValue(new ReflectError('parse', 'fallback reached'))
 
     await expect(scrapePageMeta(VIDEO_URL)).rejects.toMatchObject({
@@ -50,7 +50,7 @@ describe('scrapePageMeta', () => {
   })
 
   it('falls back to the HTML scrape when the answer does not parse', async () => {
-    oembedFetchMock.mockResolvedValue('not json')
+    jsonFetchMock.mockResolvedValue('not json')
     metaFetchMock.mockRejectedValue(new ReflectError('parse', 'fallback reached'))
 
     await expect(scrapePageMeta(VIDEO_URL)).rejects.toMatchObject({
@@ -59,7 +59,7 @@ describe('scrapePageMeta', () => {
   })
 
   it('falls back to the HTML scrape when the answer has a blank title', async () => {
-    oembedFetchMock.mockResolvedValue('{"title":"   "}')
+    jsonFetchMock.mockResolvedValue('{"title":"   "}')
     metaFetchMock.mockRejectedValue(new ReflectError('parse', 'fallback reached'))
 
     await expect(scrapePageMeta(VIDEO_URL)).rejects.toMatchObject({
@@ -68,7 +68,7 @@ describe('scrapePageMeta', () => {
   })
 
   it('propagates a transient oEmbed failure for retry', async () => {
-    oembedFetchMock.mockRejectedValue(new ReflectError('network', 'offline'))
+    jsonFetchMock.mockRejectedValue(new ReflectError('network', 'offline'))
 
     await expect(scrapePageMeta(VIDEO_URL)).rejects.toMatchObject({ kind: 'network' })
     expect(metaFetchMock).not.toHaveBeenCalled()
@@ -80,6 +80,6 @@ describe('scrapePageMeta', () => {
     await expect(scrapePageMeta('https://example.com/article')).rejects.toMatchObject({
       message: 'fallback reached',
     })
-    expect(oembedFetchMock).not.toHaveBeenCalled()
+    expect(jsonFetchMock).not.toHaveBeenCalled()
   })
 })

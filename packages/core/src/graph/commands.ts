@@ -426,13 +426,23 @@ export async function captureMetaFetch(url: string): Promise<string> {
 }
 
 /**
- * Fetch an oEmbed endpoint's JSON answer as text. The Rust side only bounds
- * the transport (https only, JSON only, a small byte cap, no redirects);
- * which URLs are oEmbed endpoints is policy in `actions/oembed`. The privacy
+ * Fetch a JSON endpoint's answer as text — an oEmbed answer, or X's embed
+ * backend for post captures. The Rust side only bounds the transport (https
+ * only, JSON only, a small byte cap, no redirects); which URLs are asked is
+ * policy in `actions/oembed` and `actions/post-syndication`. The privacy
  * gate runs before any call here, exactly as for {@link captureMetaFetch}.
  */
-export async function captureOEmbedFetch(url: string): Promise<string> {
-  return await call('capture_oembed_fetch', { url }, z.string())
+export async function captureJsonFetch(url: string): Promise<string> {
+  return await call('capture_json_fetch', { url }, z.string())
+}
+
+/**
+ * Download one public image for a post capture and return it as a
+ * downscaled base64 JPEG (Plan 25). Public-internet destinations and raster
+ * content types only; the privacy gate runs before any call here.
+ */
+export async function captureMediaFetch(url: string): Promise<string> {
+  return await call('capture_media_fetch', { url }, z.string())
 }
 
 /** The recently-opened graphs, newest first. */

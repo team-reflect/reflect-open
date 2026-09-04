@@ -3,7 +3,7 @@ import { z } from 'zod'
 /**
  * oEmbed policy for link capture: which capture URLs have an oEmbed answer
  * worth asking for, where to ask, and what a valid answer looks like. The
- * Rust `capture_oembed_fetch` primitive only bounds the transport (https,
+ * Rust `capture_json_fetch` primitive only bounds the transport (https,
  * JSON, a small byte cap, no redirects); everything provider-shaped lives
  * here, so supporting another provider is a TypeScript-only change: one more
  * entry in `OEMBED_PROVIDERS`.
