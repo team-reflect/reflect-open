@@ -1635,6 +1635,86 @@ fn apply_chunks_for_an_unindexed_path_is_a_cleaning_no_op() {
 
 // ---- note_move (Plan 17) ----------------------------------------------------
 
+#[test]
+fn indexed_move_rechecks_session_and_compensates_file_collisions() {
+    use tauri::Manager;
+
+    let app = tauri::test::mock_builder()
+        .build(tauri::test::mock_context(tauri::test::noop_assets()))
+        .unwrap();
+    app.manage(crate::fs::GraphState::default());
+    app.manage(super::IndexState::default());
+    app.manage(crate::background_task::BackgroundTaskState::default());
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    std::fs::create_dir(root.join("notes")).unwrap();
+    std::fs::write(root.join("notes/a.md"), "local note\n").unwrap();
+    let graph = app.state::<crate::fs::GraphState>();
+    {
+        let mut inner = graph.0.lock().unwrap();
+        inner.root = Some(root.to_path_buf());
+        inner.generation = 2;
+    }
+    super::index_open(app.state(), app.state(), app.state()).unwrap();
+    let index = app.state::<super::IndexState>();
+    {
+        let state = super::lock_state(&index).unwrap();
+        index_note(state.conn.as_ref().unwrap(), "notes/a.md");
+    }
+    let request = super::NoteMoveRequest {
+        from: "notes/a.md".to_owned(),
+        to: "notes/b.md".to_owned(),
+        from_address: moved_address("notes/a.md"),
+        to_address: moved_address("notes/b.md"),
+    };
+
+    crate::fs::mutation::with_root(root, || {
+        // A graph switch occurred before the queued main-thread callback ran.
+        assert!(
+            super::move_note_indexed_on_main_thread(app.handle(), &graph, 1, &request).is_err()
+        );
+        // A new graph can also be active before its index has been rebound.
+        super::lock_state(&index)?.root = None;
+        assert!(
+            super::move_note_indexed_on_main_thread(app.handle(), &graph, 2, &request).is_err()
+        );
+        assert!(root.join("notes/a.md").exists());
+        assert!(!root.join("notes/b.md").exists());
+        super::lock_state(&index)?.root = Some(root.to_path_buf());
+        super::move_note_indexed_on_main_thread(app.handle(), &graph, 2, &request)
+    })
+    .unwrap();
+    assert_eq!(
+        std::fs::read(root.join("notes/b.md")).unwrap(),
+        b"local note\n"
+    );
+    assert!(!root.join("notes/a.md").exists());
+
+    std::fs::write(root.join("notes/c.md"), "occupied\n").unwrap();
+    let collision = super::NoteMoveRequest {
+        from: "notes/b.md".to_owned(),
+        to: "notes/c.md".to_owned(),
+        from_address: moved_address("notes/b.md"),
+        to_address: moved_address("notes/c.md"),
+    };
+    assert!(crate::fs::mutation::with_root(root, || {
+        super::move_note_indexed_on_main_thread(app.handle(), &graph, 2, &collision)
+    })
+    .is_err());
+    assert_eq!(
+        std::fs::read(root.join("notes/b.md")).unwrap(),
+        b"local note\n"
+    );
+    assert_eq!(
+        std::fs::read(root.join("notes/c.md")).unwrap(),
+        b"occupied\n"
+    );
+    let state = super::lock_state(&index).unwrap();
+    let rows = run_query(state.conn.as_ref().unwrap(), "SELECT path FROM notes", &[]).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["path"], "notes/b.md");
+}
+
 fn move_in_txn(conn: &mut Connection, from: &str, to: &str) -> crate::error::AppResult<()> {
     let tx = conn.transaction()?;
     tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;

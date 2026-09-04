@@ -45,7 +45,8 @@ remote is adopted automatically.
 ## When it fails
 
 Failures surface in Settings → Backup (and the sidebar dot) and retry on
-focus — sync never wedges.
+focus. See [Git backup and recovery](./git-backup-safety.md) for save ordering,
+conflict copies, runtime exclusion, and interrupted operations.
 
 - **"the SSH agent offered no key this host accepts"** — `ssh-add` your key,
   confirm `ssh -T git@<host>` works, refocus Reflect.

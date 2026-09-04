@@ -490,17 +490,20 @@ fn persist_asset(root: &Path, asset_path: &str, bytes: &[u8]) -> AppResult<()> {
 /// not move — the drain removes spool files only after the note is written,
 /// so a crash mid-drain re-runs cleanly.
 #[tauri::command]
-pub fn capture_screenshot_promote(
+pub async fn capture_screenshot_promote(
     spool_name: String,
     asset_path: String,
     max_dim: u32,
     generation: u64,
-    state: State<GraphState>,
+    state: State<'_, GraphState>,
 ) -> AppResult<()> {
     let root = root_for_generation(&state, generation)?;
     let bytes = fs::read(inbox_file(&root, &spool_name)?)?;
     let jpeg = downscale_jpeg(&bytes, max_dim)?;
-    persist_asset(&root, &asset_path, &jpeg)
+    crate::fs::mutation::run(state.inner().clone(), generation, move |root| {
+        persist_asset(root, &asset_path, &jpeg)
+    })
+    .await
 }
 
 /// Ask the platform link-preview service for one representative image and

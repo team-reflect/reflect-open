@@ -20,15 +20,17 @@
 //! ```
 
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 
 use git2::build::CheckoutBuilder;
-use git2::{Index, IndexEntry, MergeOptions, Repository};
+use git2::{Index, IndexEntry, MergeFileInput, MergeFileOptions, Repository};
 use serde::Serialize;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 
 use super::repo::{current_branch, ensure_clean_state, open_existing, signature};
+use super::runtime::{is_runtime_path, remove_from_index, without_runtime};
 
 /// Conflict-marker labels. "this device" is the local side, "other device"
 /// the remote one — product language, not branch names.
@@ -78,137 +80,213 @@ pub struct MergeOutcome {
     /// Deletions carry `modified_ms: None`; upserts carry the written file's
     /// real mtime.
     pub changed_files: Vec<ChangedFile>,
+    /// Saves withheld by the size guard during the commit immediately before merge.
+    pub skipped_large_files: Vec<super::commit::SkippedFile>,
 }
 
-/// One side of an index conflict, lifted out of the index so the borrow ends
-/// before we mutate it.
-struct ConflictSide {
-    path: String,
-    id: git2::Oid,
-}
-
-fn side_of(entry: Option<IndexEntry>) -> Option<ConflictSide> {
-    entry.map(|entry| ConflictSide {
-        path: String::from_utf8_lossy(&entry.path).into_owned(),
-        id: entry.id,
-    })
-}
-
-/// Merge the fetched `origin/<branch>` into the local branch. Pre-condition
-/// (the sync engine guarantees it): local changes are already committed.
+/// Merge the fetched `origin/<branch>` into the local branch. The native
+/// wrapper commits pending saves under the same worktree mutation lock held
+/// throughout this call. Safe checkout also rejects conflicting dirty files
+/// left by the size guard or another filesystem writer.
 pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
     let repo = open_existing(root)?;
     ensure_clean_state(&repo)?;
     let branch = current_branch(&repo)?;
-    let Ok(remote_oid) = repo.refname_to_id(&format!("refs/remotes/origin/{branch}")) else {
-        // A brand-new (empty) backup repo has no remote branch until the
-        // first push creates it. Nothing to merge is success, not an error —
-        // the launch cycle (commit → fetch → merge → push) must fall through
-        // to that push.
-        return Ok(MergeOutcome {
-            kind: MergeKind::UpToDate,
-            conflicted_paths: Vec::new(),
-            changed_files: Vec::new(),
-        });
+    let remote_oid = match repo.refname_to_id(&format!("refs/remotes/origin/{branch}")) {
+        Ok(oid) => oid,
+        Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(up_to_date()),
+        Err(error) => return Err(error.into()),
     };
+
+    // Ref locks fail before checkout if another Git process is updating HEAD.
+    // Keep the old ref reachable until all working-tree and index writes succeed.
+    let refname = format!("refs/heads/{branch}");
+    let mut transaction = repo.transaction()?;
+    transaction.lock_ref("HEAD")?;
+    transaction.lock_ref(&refname)?;
+    if current_branch(&repo)? != branch {
+        return Err(AppError::io(
+            "the backup branch changed during sync; retry backup",
+        ));
+    }
     let annotated = repo.find_annotated_commit(remote_oid)?;
     let (analysis, _) = repo.merge_analysis(&[&annotated])?;
-
     if analysis.is_up_to_date() {
-        return Ok(MergeOutcome {
-            kind: MergeKind::UpToDate,
-            conflicted_paths: Vec::new(),
-            changed_files: Vec::new(),
-        });
+        return Ok(up_to_date());
     }
 
-    if analysis.is_unborn() || analysis.is_fast_forward() {
-        // Capture the outgoing tree before the ref moves (None on unborn).
-        let old_tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
-        let new_tree = repo.find_commit(remote_oid)?.tree()?;
-        let mut changed_files = changed_between(&repo, old_tree.as_ref(), &new_tree)?;
-        let refname = format!("refs/heads/{branch}");
-        repo.reference(&refname, remote_oid, true, "reflect sync: fast-forward")?;
-        repo.set_head(&refname)?;
-        // Force is safe here: the pre-merge invariant is a committed working
-        // tree, so there is nothing uncommitted to clobber.
-        repo.checkout_head(Some(CheckoutBuilder::new().force()))?;
-        // Stamp mtimes only now — the checkout above is what wrote the files.
-        stamp_modified_times(root, &mut changed_files);
-        return Ok(MergeOutcome {
-            kind: MergeKind::FastForward,
-            conflicted_paths: Vec::new(),
-            changed_files,
-        });
-    }
-
-    let mut merge_opts = MergeOptions::new();
-    let mut checkout = CheckoutBuilder::new();
-    checkout
-        .allow_conflicts(true)
-        .conflict_style_merge(true)
-        .our_label(OUR_LABEL)
-        .their_label(THEIR_LABEL);
-    repo.merge(&[&annotated], Some(&mut merge_opts), Some(&mut checkout))?;
-
-    // From here the repo carries MERGE_* state; a failure that leaves it
-    // behind would trip `ensure_clean_state` on every later cycle and wedge
-    // sync until a manual repair — exactly what this design forbids. Clear it
-    // on every path; the next cycle re-derives anything a failed attempt lost.
-    let result = complete_merge(&repo, root, remote_oid);
-    if result.is_err() {
-        let _ = repo.cleanup_state();
-    }
-    let (conflicted_paths, changed_files) = result?;
-
-    let kind = if conflicted_paths.is_empty() {
-        MergeKind::Merged
-    } else {
-        MergeKind::MergedWithConflicts
+    let remote_commit = repo.find_commit(remote_oid)?;
+    let local_commit = match repo.head() {
+        Ok(head) => Some(head.peel_to_commit()?),
+        Err(error) if error.code() == git2::ErrorCode::UnbornBranch => None,
+        Err(error) => return Err(error.into()),
     };
+    let old_tree = local_commit
+        .as_ref()
+        .map(|commit| without_runtime(&repo, &commit.tree()?))
+        .transpose()?;
+    let sig = signature(&repo)?;
+    let (new_oid, tree, kind, conflicted_paths) =
+        if analysis.is_unborn() || analysis.is_fast_forward() {
+            let remote_tree = remote_commit.tree()?;
+            let tree = without_runtime(&repo, &remote_tree)?;
+            // A fetched tree may track another device's runtime database. Preserve
+            // its history, but make the new local tip exclude that directory.
+            let new_oid = if tree.id() == remote_tree.id() {
+                remote_oid
+            } else {
+                repo.commit(
+                    None,
+                    &sig,
+                    &sig,
+                    "Exclude device-local runtime files from backup",
+                    &tree,
+                    &[&remote_commit],
+                )?
+            };
+            (new_oid, tree, MergeKind::FastForward, Vec::new())
+        } else {
+            let local_commit = local_commit
+                .as_ref()
+                .ok_or_else(|| AppError::io("the backup branch has no local commit to merge"))?;
+            // Compute and resolve the complete merge in memory. No MERGE_* files
+            // or conflicted disk index can survive a failure and wedge later syncs.
+            let mut index = repo.merge_commits(local_commit, &remote_commit, None)?;
+            remove_from_index(&mut index)?;
+            let conflicted_paths = resolve_conflicts(&repo, root, &mut index)?;
+            let tree = repo.find_tree(index.write_tree_to(&repo)?)?;
+            let (kind, message) = if conflicted_paths.is_empty() {
+                (MergeKind::Merged, "Merge changes from other devices")
+            } else {
+                (
+                    MergeKind::MergedWithConflicts,
+                    "Merge changes from other devices (conflicts to review)",
+                )
+            };
+            let new_oid = repo.commit(
+                None,
+                &sig,
+                &sig,
+                message,
+                &tree,
+                &[local_commit, &remote_commit],
+            )?;
+            (new_oid, tree, kind, conflicted_paths)
+        };
+
+    let mut changed_files = changed_between(&repo, old_tree.as_ref(), &tree)?;
+    let existing_additions =
+        matching_additions(&repo, root, old_tree.as_ref(), &tree, &changed_files)?;
+    let checkout_paths: Vec<_> = changed_files
+        .iter()
+        .filter(|change| {
+            !existing_additions
+                .iter()
+                .any(|entry| entry.path == change.path.as_bytes())
+        })
+        .collect();
+    if !checkout_paths.is_empty() {
+        let mut checkout = CheckoutBuilder::new();
+        checkout
+            .safe()
+            .overwrite_ignored(false)
+            .disable_pathspec_match(true);
+        // Restrict the checkout to the sanitized tree diff. In particular,
+        // removing a previously tracked .reflect entry must never unlink the
+        // local SQLite database or durable chat history.
+        for change in checkout_paths {
+            checkout.path(&change.path);
+        }
+        repo.checkout_tree(tree.as_object(), Some(&mut checkout))?;
+    }
+    let mut index = repo.index()?;
+    for entry in existing_additions {
+        index.add(&entry)?;
+    }
+    remove_from_index(&mut index)?;
+    index.write()?;
+    transaction.set_target(
+        &refname,
+        new_oid,
+        Some(&sig),
+        "reflect sync: integrate remote changes",
+    )?;
+    transaction.commit()?;
+    stamp_modified_times(root, &mut changed_files);
     Ok(MergeOutcome {
         kind,
         conflicted_paths,
         changed_files,
+        skipped_large_files: Vec::new(),
     })
 }
 
-/// The post-`repo.merge` half: materialize conflicts, commit the merge with
-/// both parents, and clear the merge state. Split out so [`merge_remote`] can
-/// guarantee `cleanup_state` runs even when any step here fails. Returns the
-/// conflicted paths and every file the merge changed relative to local HEAD.
-fn complete_merge(
+/// Libgit2 treats any existing file at an added path as a checkout conflict,
+/// even when its bytes already match. Admit those additions without rewriting
+/// them: this covers atomically claimed conflict copies and the scaffold's
+/// identical .gitignore when adopting an unborn repository.
+fn matching_additions(
     repo: &Repository,
     root: &Path,
-    remote_oid: git2::Oid,
-) -> AppResult<(Vec<String>, Vec<ChangedFile>)> {
-    let mut index = repo.index()?;
-    let conflicted_paths = resolve_conflicts(repo, root, &mut index)?;
-    index.write()?;
+    old: Option<&git2::Tree>,
+    target: &git2::Tree,
+    changes: &[ChangedFile],
+) -> AppResult<Vec<IndexEntry>> {
+    let current_index = repo.index()?;
+    let mut target_index = Index::new()?;
+    target_index.read_tree(target)?;
+    let mut matches = Vec::new();
+    for change in changes {
+        if !matches!(change.kind, ChangeKind::Upsert) {
+            continue;
+        }
+        let path = Path::new(&change.path);
+        if let Some(old) = old {
+            match old.get_path(path) {
+                Ok(_) => continue,
+                Err(error) if error.code() == git2::ErrorCode::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        let Some(entry) = target_index.get_path(path, 0) else {
+            continue;
+        };
+        if entry.mode != 0o100644 {
+            continue;
+        }
+        if current_index
+            .get_path(path, 0)
+            .is_some_and(|staged| staged.id != entry.id || staged.mode != entry.mode)
+        {
+            continue;
+        }
+        let target = root.join(path);
+        let metadata = match target.symlink_metadata() {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.into()),
+        };
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if metadata.permissions().mode() & 0o111 != 0 {
+                continue;
+            }
+        }
+        if metadata.file_type().is_file() && repo.blob_path(&target)? == entry.id {
+            matches.push(entry);
+        }
+    }
+    Ok(matches)
+}
 
-    let tree = repo.find_tree(index.write_tree()?)?;
-    let local_commit = repo.head()?.peel_to_commit()?;
-    let remote_commit = repo.find_commit(remote_oid)?;
-    // The working tree is final here (merge checkout + conflict resolution
-    // wrote everything), so the stamped mtimes are the files' real ones.
-    let mut changed_files = changed_between(repo, Some(&local_commit.tree()?), &tree)?;
-    stamp_modified_times(root, &mut changed_files);
-    let sig = signature(repo)?;
-    let message = if conflicted_paths.is_empty() {
-        "Merge changes from other devices"
-    } else {
-        "Merge changes from other devices (conflicts to review)"
-    };
-    repo.commit(
-        Some("HEAD"),
-        &sig,
-        &sig,
-        message,
-        &tree,
-        &[&local_commit, &remote_commit],
-    )?;
-    repo.cleanup_state()?;
-    Ok((conflicted_paths, changed_files))
+fn up_to_date() -> MergeOutcome {
+    MergeOutcome {
+        kind: MergeKind::UpToDate,
+        conflicted_paths: Vec::new(),
+        changed_files: Vec::new(),
+        skipped_large_files: Vec::new(),
+    }
 }
 
 /// Diff two trees into the watcher's change shape: what the merge wrote or
@@ -229,7 +307,10 @@ fn changed_between(
         };
         if let Some(path) = file.path() {
             out.push(ChangedFile {
-                path: path.to_string_lossy().replace('\\', "/"),
+                path: path
+                    .to_str()
+                    .ok_or_else(|| AppError::io("backup contains a non-UTF-8 file path"))?
+                    .to_owned(),
                 kind: if removed {
                     ChangeKind::Remove
                 } else {
@@ -258,112 +339,179 @@ fn stamp_modified_times(root: &Path, changes: &mut [ChangedFile]) {
     }
 }
 
-/// Turn every index conflict into committed working-tree content:
-///
-/// - **text vs text** — the merge checkout already wrote labeled markers into
-///   the file; stage it as-is (the user resolves by editing the note);
-/// - **edit vs delete** — keep the edited version, never silently delete;
-/// - **binary vs binary** — keep ours in place and the other device's copy
-///   alongside (`name (conflict).ext`);
-/// - **deleted on both** — confirm the removal.
+/// Resolve conflicted blobs in the in-memory index. Only binary conflict
+/// copies are materialized here, using an atomic no-clobber claim. A failed
+/// later checkout may leave that copy untracked; retaining it is intentional.
 fn resolve_conflicts(repo: &Repository, root: &Path, index: &mut Index) -> AppResult<Vec<String>> {
-    if !index.has_conflicts() {
-        return Ok(Vec::new());
-    }
-
-    struct OwnedConflict {
-        our: Option<ConflictSide>,
-        their: Option<ConflictSide>,
-        ancestor: Option<ConflictSide>,
-    }
-    let conflicts: Vec<OwnedConflict> = index
-        .conflicts()?
-        .filter_map(Result::ok)
-        .map(|conflict| OwnedConflict {
-            our: side_of(conflict.our),
-            their: side_of(conflict.their),
-            ancestor: side_of(conflict.ancestor),
-        })
-        .collect();
-
+    let conflicts = index.conflicts()?.collect::<Result<Vec<_>, _>>()?;
     let mut conflicted_paths = Vec::new();
     for conflict in conflicts {
+        let paths = [&conflict.ancestor, &conflict.our, &conflict.their]
+            .into_iter()
+            .flatten()
+            .map(entry_path)
+            .collect::<AppResult<std::collections::BTreeSet<_>>>()?;
+        for path in paths {
+            index.conflict_remove(Path::new(path))?;
+        }
         match (conflict.our, conflict.their) {
             (Some(our), Some(their)) => {
-                conflicted_paths.extend(resolve_both_edited(repo, root, index, our, their)?);
+                conflicted_paths.extend(resolve_both_edited(
+                    repo,
+                    root,
+                    index,
+                    conflict.ancestor,
+                    our,
+                    their,
+                )?);
             }
             (Some(edited), None) | (None, Some(edited)) => {
-                conflicted_paths.push(resolve_edit_vs_delete(repo, root, index, edited)?);
+                conflicted_paths.push(entry_path(&edited)?.to_owned());
+                add_resolved(index, edited)?;
             }
-            (None, None) => {
-                if let Some(ancestor) = conflict.ancestor {
-                    index.remove_path(Path::new(&ancestor.path))?;
-                }
-            }
+            (None, None) => {}
         }
     }
     Ok(conflicted_paths)
 }
 
-/// Both sides changed the file. Text: the merge checkout already wrote the
-/// labeled marker file, so staging the working copy clears the conflict
-/// entries. Binary: markers would corrupt the bytes — keep ours in place and
-/// write the other device's version alongside (`name (conflict).ext`).
+fn entry_path(entry: &IndexEntry) -> AppResult<&str> {
+    std::str::from_utf8(&entry.path)
+        .map_err(|_| AppError::io("backup contains a conflict with a non-UTF-8 path"))
+}
+
+fn add_resolved(index: &mut Index, mut entry: IndexEntry) -> AppResult<()> {
+    // Entries obtained from conflicts carry stage 1/2/3 bits. Resolved blobs
+    // must be written at stage zero, independent of their original side.
+    entry.flags &= !0x3000;
+    index.add(&entry)?;
+    Ok(())
+}
+
 fn resolve_both_edited(
     repo: &Repository,
     root: &Path,
     index: &mut Index,
-    our: ConflictSide,
-    their: ConflictSide,
+    ancestor: Option<IndexEntry>,
+    mut our: IndexEntry,
+    mut their: IndexEntry,
 ) -> AppResult<Vec<String>> {
-    let binary = repo.find_blob(our.id)?.is_binary() || repo.find_blob(their.id)?.is_binary();
-    if !binary {
-        index.add_path(Path::new(&our.path))?;
-        return Ok(vec![our.path]);
+    let our_path = entry_path(&our)?.to_owned();
+    let their_path = entry_path(&their)?.to_owned();
+    let our_blob = repo.find_blob(our.id)?;
+    let their_blob = repo.find_blob(their.id)?;
+    if our_path != their_path {
+        add_resolved(index, our)?;
+        add_resolved(index, their)?;
+        return Ok(vec![our_path, their_path]);
     }
-    write_blob(repo, root, &our.path, our.id)?;
-    let copy = conflict_copy_path(&their.path);
-    write_blob(repo, root, &copy, their.id)?;
-    index.add_path(Path::new(&our.path))?;
-    index.add_path(Path::new(&copy))?;
-    Ok(vec![our.path, copy])
+    let binary = our_blob.is_binary()
+        || their_blob.is_binary()
+        || our.mode & 0o170000 != 0o100000
+        || their.mode & 0o170000 != 0o100000;
+    if binary {
+        let copy = claim_conflict_copy(root, index, &their_path, their_blob.content())?;
+        their.path = copy.as_bytes().to_vec();
+        // A symlink's raw target is preserved as a regular conflict attachment.
+        their.mode = 0o100644;
+        add_resolved(index, our)?;
+        add_resolved(index, their)?;
+        return Ok(vec![our_path, copy]);
+    }
+    let ancestor_blob = ancestor
+        .as_ref()
+        .map(|entry| repo.find_blob(entry.id))
+        .transpose()?;
+    let mut base = MergeFileInput::new();
+    base.content(
+        ancestor_blob
+            .as_ref()
+            .map(|blob| blob.content())
+            .unwrap_or(&[]),
+    );
+    let mut ours = MergeFileInput::new();
+    ours.path(our_path.as_str()).content(our_blob.content());
+    let mut theirs = MergeFileInput::new();
+    theirs
+        .path(their_path.as_str())
+        .content(their_blob.content());
+    let mut options = MergeFileOptions::new();
+    options
+        .our_label(OUR_LABEL)
+        .their_label(THEIR_LABEL)
+        .style_standard(true);
+    let merged = git2::merge_file(&base, &ours, &theirs, Some(&mut options))?;
+    our.id = repo.blob(merged.content())?;
+    our.file_size = u32::try_from(merged.content().len())
+        .map_err(|_| AppError::io("merged note exceeds the Git index size limit"))?;
+    add_resolved(index, our)?;
+    Ok(vec![our_path])
 }
 
-/// One side edited what the other deleted (either direction): restore and
-/// stage the edited version — sync must never silently delete a note someone
-/// touched. The user removes it again if the deletion was intentional.
-fn resolve_edit_vs_delete(
-    repo: &Repository,
-    root: &Path,
-    index: &mut Index,
-    edited: ConflictSide,
-) -> AppResult<String> {
-    write_blob(repo, root, &edited.path, edited.id)?;
-    index.add_path(Path::new(&edited.path))?;
-    Ok(edited.path)
-}
-
-fn write_blob(repo: &Repository, root: &Path, rel: &str, id: git2::Oid) -> AppResult<()> {
-    let blob = repo.find_blob(id)?;
-    let target = root.join(rel);
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent)?;
+fn claim_conflict_copy(root: &Path, index: &Index, rel: &str, content: &[u8]) -> AppResult<String> {
+    let parent = Path::new(rel).parent().unwrap_or(Path::new(""));
+    if parent.components().any(|component| {
+        !matches!(component, std::path::Component::Normal(_))
+            || component.as_os_str().eq_ignore_ascii_case(".git")
+    }) || is_runtime_path(Path::new(rel))
+    {
+        return Err(AppError::io(
+            "backup conflict has an unsafe attachment path",
+        ));
     }
-    fs::write(target, blob.content())?;
-    Ok(())
+    let parent = root.join(parent);
+    let existing = parent
+        .ancestors()
+        .find(|ancestor| ancestor.exists())
+        .ok_or_else(|| AppError::io("backup conflict attachment directory is unavailable"))?;
+    if !existing.canonicalize()?.starts_with(root.canonicalize()?) {
+        return Err(AppError::io(
+            "backup conflict attachment directory is outside the graph",
+        ));
+    }
+    fs::create_dir_all(&parent)?;
+    let mut pending = tempfile::NamedTempFile::new_in(parent)?;
+    pending.write_all(content)?;
+    pending.as_file().sync_all()?;
+    for number in 1.. {
+        let copy = conflict_copy_path(rel, number);
+        let directory_prefix = format!("{copy}/");
+        if index.iter().any(|entry| {
+            entry.path.eq_ignore_ascii_case(copy.as_bytes())
+                || entry
+                    .path
+                    .get(..directory_prefix.len())
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case(directory_prefix.as_bytes()))
+        }) {
+            continue;
+        }
+        match pending.persist_noclobber(root.join(&copy)) {
+            Ok(_) => return Ok(copy),
+            Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => {
+                pending = error.file;
+            }
+            Err(error) => return Err(error.error.into()),
+        }
+    }
+    unreachable!("the conflict copy counter cannot exhaust")
 }
 
 /// `assets/img.png` → `assets/img (conflict).png`; no extension → appended.
 /// Splits on the basename only — a dot in a *directory* name (`assets.v1/x`)
 /// must not relocate the copy out of the file's directory.
-fn conflict_copy_path(rel: &str) -> String {
+fn conflict_copy_path(rel: &str, number: usize) -> String {
     let (dir, file) = match rel.rsplit_once('/') {
         Some((dir, file)) => (Some(dir), file),
         None => (None, rel),
     };
+    let suffix = if number == 1 {
+        "conflict".to_owned()
+    } else {
+        format!("conflict {number}")
+    };
     let renamed = match file.rsplit_once('.') {
-        Some((stem, ext)) if !stem.is_empty() => format!("{stem} (conflict).{ext}"),
-        _ => format!("{file} (conflict)"),
+        Some((stem, ext)) if !stem.is_empty() => format!("{stem} ({suffix}).{ext}"),
+        _ => format!("{file} ({suffix})"),
     };
     match dir {
         Some(dir) => format!("{dir}/{renamed}"),
@@ -378,22 +526,64 @@ mod path_tests {
     #[test]
     fn conflict_copies_stay_in_their_directory() {
         assert_eq!(
-            conflict_copy_path("assets/img.png"),
+            conflict_copy_path("assets/img.png", 1),
             "assets/img (conflict).png"
         );
         assert_eq!(
-            conflict_copy_path("assets.v1/img"),
+            conflict_copy_path("assets.v1/img", 1),
             "assets.v1/img (conflict)"
         );
         assert_eq!(
-            conflict_copy_path("assets.v1/img.png"),
+            conflict_copy_path("assets.v1/img.png", 1),
             "assets.v1/img (conflict).png"
         );
-        assert_eq!(conflict_copy_path("topfile.bin"), "topfile (conflict).bin");
-        assert_eq!(conflict_copy_path("noext"), "noext (conflict)");
         assert_eq!(
-            conflict_copy_path("assets/.hidden"),
+            conflict_copy_path("topfile.bin", 1),
+            "topfile (conflict).bin"
+        );
+        assert_eq!(conflict_copy_path("noext", 1), "noext (conflict)");
+        assert_eq!(
+            conflict_copy_path("assets/.hidden", 1),
             "assets/.hidden (conflict)"
         );
+    }
+
+    #[test]
+    fn concurrent_binary_copy_claims_never_replace_another_copy() {
+        let directory = tempfile::tempdir().unwrap();
+        let existing = directory.path().join("image (conflict).bin");
+        std::fs::write(&existing, b"existing attachment").unwrap();
+        let ready = std::sync::Barrier::new(6);
+        std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..6)
+                .map(|number| {
+                    let directory = directory.path();
+                    let ready = &ready;
+                    scope.spawn(move || {
+                        let index = git2::Index::new().unwrap();
+                        let content = format!("remote attachment {number}");
+                        ready.wait();
+                        let copy = super::claim_conflict_copy(
+                            directory,
+                            &index,
+                            "image.bin",
+                            content.as_bytes(),
+                        )
+                        .unwrap();
+                        assert_eq!(
+                            std::fs::read_to_string(directory.join(&copy)).unwrap(),
+                            content
+                        );
+                        copy
+                    })
+                })
+                .collect();
+            let paths: std::collections::HashSet<_> = handles
+                .into_iter()
+                .map(|handle| handle.join().unwrap())
+                .collect();
+            assert_eq!(paths.len(), 6);
+        });
+        assert_eq!(std::fs::read(existing).unwrap(), b"existing attachment");
     }
 }

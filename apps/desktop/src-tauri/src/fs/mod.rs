@@ -11,11 +11,12 @@ pub mod assets;
 mod import;
 mod import_assets;
 mod io;
+pub(crate) mod mutation;
 mod resolve;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use tauri::{Emitter, Manager, State};
@@ -83,8 +84,8 @@ pub struct GraphInner {
 }
 
 /// Tauri-managed state holding the currently open graph (root + generation).
-#[derive(Default)]
-pub struct GraphState(pub Mutex<GraphInner>);
+#[derive(Clone, Default)]
+pub struct GraphState(pub Arc<Mutex<GraphInner>>);
 
 /// Identity of an open graph, returned to the frontend.
 #[derive(Serialize)]
@@ -196,10 +197,7 @@ pub(crate) fn current_graph_info(state: &State<GraphState>) -> AppResult<GraphIn
 /// issued for. A stale generation means the graph was switched after the
 /// command was enqueued — the mutation must be rejected (loudly), or it would
 /// land in the *new* graph's same-named file.
-pub(crate) fn root_for_generation(
-    state: &State<GraphState>,
-    generation: u64,
-) -> AppResult<PathBuf> {
+pub(crate) fn root_for_generation(state: &GraphState, generation: u64) -> AppResult<PathBuf> {
     let inner = lock_graph(state)?;
     if inner.generation != generation {
         return Err(AppError::io(
@@ -292,14 +290,21 @@ pub async fn graph_import_reflect_v1_zip(
     // Writing is fast and local; throttle the events to ~100 per import so a
     // large graph doesn't flood the webview.
     let mut last_emitted = 0usize;
-    let summary = import::finalize_import(&root, prepared, downloads, |done, total| {
-        let step = (total / 100).max(1);
-        if done == total || done >= last_emitted + step {
-            last_emitted = done;
-            emit_import_progress(&app, "writing", done, total);
+    let cancelled = cancel.flag();
+    let summary = mutation::run(state.inner().clone(), generation, move |root| {
+        // Cancellation may arrive while this import waits for Git checkout.
+        if cancelled.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(AppError::io("import cancelled"));
         }
-    })?;
-    invalidate_file_catalog(&state, &root);
+        import::finalize_import(root, prepared, downloads, |done, total| {
+            let step = (total / 100).max(1);
+            if done == total || done >= last_emitted + step {
+                last_emitted = done;
+                emit_import_progress(&app, "writing", done, total);
+            }
+        })
+    })
+    .await?;
     Ok(summary)
 }
 
@@ -416,57 +421,60 @@ pub async fn note_read_local(
 /// with the value a later `list_files` will report — a `Date.now()` stamp
 /// never matches and costs a re-read on every reconcile.
 #[tauri::command]
-pub fn note_write(
+pub async fn note_write(
     path: String,
     contents: String,
     generation: u64,
-    state: State<GraphState>,
+    state: State<'_, GraphState>,
 ) -> AppResult<Option<u64>> {
-    let root = root_for_generation(&state, generation)?;
-    let modified_ms = atomic_write(&root, &resolve(&root, &path)?, &contents)?;
-    invalidate_file_catalog(&state, &root);
-    Ok(modified_ms)
+    mutation::run(state.inner().clone(), generation, move |root| {
+        let modified_ms = atomic_write(root, &resolve(root, &path)?, &contents)?;
+        Ok(modified_ms)
+    })
+    .await
 }
 
 /// Atomically create a note only when `path` is still free. Unlike
 /// [`note_write`], this is a no-clobber claim: a concurrent sync checkout or
 /// creator wins as `Collision`, with its file left byte-for-byte intact.
 #[tauri::command]
-pub fn note_create(
+pub async fn note_create(
     path: String,
     contents: String,
     generation: u64,
-    state: State<GraphState>,
+    state: State<'_, GraphState>,
 ) -> AppResult<NoteCreateOutcome> {
-    let root = root_for_generation(&state, generation)?;
-    let target = resolve(&root, &path)?;
-    match atomic_create(&root, &target, &contents)? {
-        AtomicCreateOutcome::Created(modified_ms) => {
-            invalidate_file_catalog(&state, &root);
-            Ok(NoteCreateOutcome::Created { modified_ms })
+    mutation::run(state.inner().clone(), generation, move |root| {
+        let target = resolve(root, &path)?;
+        match atomic_create(root, &target, &contents)? {
+            AtomicCreateOutcome::Created(modified_ms) => {
+                Ok(NoteCreateOutcome::Created { modified_ms })
+            }
+            AtomicCreateOutcome::Collision => Ok(NoteCreateOutcome::Collision),
         }
-        AtomicCreateOutcome::Collision => Ok(NoteCreateOutcome::Collision),
-    }
+    })
+    .await
 }
 
 /// Atomically write a binary asset (pasted/dropped image) by graph-relative
 /// path. Contents arrive base64-encoded — Tauri IPC args are JSON, and pasted
 /// images are small enough that the ~33% encoding overhead is irrelevant.
 #[tauri::command]
-pub fn asset_write(
+pub async fn asset_write(
     path: String,
     contents_base64: String,
     generation: u64,
-    state: State<GraphState>,
+    state: State<'_, GraphState>,
 ) -> AppResult<()> {
-    use base64::Engine;
-    let root = root_for_generation(&state, generation)?;
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(contents_base64.as_bytes())
-        .map_err(|err| AppError::io(format!("invalid base64 asset payload: {err}")))?;
-    atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)?;
-    invalidate_file_catalog(&state, &root);
-    Ok(())
+    mutation::run(state.inner().clone(), generation, move |root| {
+        use base64::Engine;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(contents_base64.as_bytes())
+            .map_err(|err| AppError::io(format!("invalid base64 asset payload: {err}")))?;
+        atomic_write_bytes(root, &resolve(root, &path)?, &bytes)?;
+        Ok(())
+    })
+    .await
 }
 
 /// Delete one recording under `audio-memos/`: cancelling a recording session
@@ -475,29 +483,35 @@ pub fn asset_write(
 /// file-delete IPC. Idempotent — a segment deleted twice (or never written)
 /// is fine.
 #[tauri::command]
-pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
-    if !path.starts_with("audio-memos/") {
-        return Err(AppError::traversal(format!(
-            "not an audio memo path: {path}"
-        )));
-    }
-    let root = root_for_generation(&state, generation)?;
-    let abs = resolve(&root, &path)?;
-    // An iCloud-evicted segment exists only as its `.name.icloud` stub —
-    // mirror `note_delete` so a cancelled session's evicted parts still
-    // delete (Plan 21).
-    let target = if abs.exists() {
-        abs
-    } else {
-        eviction_placeholder(&abs)
-            .filter(|stub| stub.exists())
-            .unwrap_or(abs)
-    };
-    match fs::remove_file(target) {
-        Ok(()) => Ok(()),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(err) => Err(err.into()),
-    }
+pub async fn audio_memo_delete(
+    path: String,
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<()> {
+    mutation::run(state.inner().clone(), generation, move |root| {
+        if !path.starts_with("audio-memos/") {
+            return Err(AppError::traversal(format!(
+                "not an audio memo path: {path}"
+            )));
+        }
+        let abs = resolve(root, &path)?;
+        // An iCloud-evicted segment exists only as its `.name.icloud` stub —
+        // mirror `note_delete` so a cancelled session's evicted parts still
+        // delete (Plan 21).
+        let target = if abs.exists() {
+            abs
+        } else {
+            eviction_placeholder(&abs)
+                .filter(|stub| stub.exists())
+                .unwrap_or(abs)
+        };
+        match fs::remove_file(target) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(err.into()),
+        }
+    })
+    .await
 }
 
 /// The per-segment transcript cache lives under `.reflect/transcripts/`:
@@ -709,6 +723,7 @@ pub fn note_exists(path: String, state: State<GraphState>) -> AppResult<bool> {
 /// deleted or overwritten, the caller compensates, and the rename simply
 /// reports failed. One rule, no adoption heuristics; the filename drifts
 /// until the next settled rename retries.
+/// The caller must hold the graph's worktree mutation scope.
 pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()> {
     let from_abs = resolve(root, from)?;
     let to_abs = resolve(root, to)?;
@@ -734,27 +749,32 @@ pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()>
 /// `.reflect/trash/` instead (Plan 19), the same recoverability promise, and
 /// `.reflect/` is already excluded from sync and indexing.
 #[tauri::command]
-pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
-    let root = root_for_generation(&state, generation)?;
-    let abs = resolve(&root, &path)?;
-    // An iCloud-evicted note exists only as its `.name.md.icloud` stub —
-    // trashing the logical path would fail and the note would be
-    // undeletable. Removing the stub deletes the iCloud item (Plan 21).
-    let target = if abs.exists() {
-        abs
-    } else {
-        eviction_placeholder(&abs)
-            .filter(|stub| stub.exists())
-            .unwrap_or(abs)
-    };
-    #[cfg(desktop)]
-    os_trash_delete(&target)?;
-    #[cfg(mobile)]
-    move_to_graph_trash(&root, &target)?;
-    // A deleted note's sync ancestor is meaningless — drop it (Plan 21).
-    crate::conflict::shadow::ShadowStore::new(&root).forget(&path);
-    invalidate_file_catalog(&state, &root);
-    Ok(())
+pub async fn note_delete(
+    path: String,
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<()> {
+    mutation::run(state.inner().clone(), generation, move |root| {
+        let abs = resolve(root, &path)?;
+        // An iCloud-evicted note exists only as its `.name.md.icloud` stub —
+        // trashing the logical path would fail and the note would be
+        // undeletable. Removing the stub deletes the iCloud item (Plan 21).
+        let target = if abs.exists() {
+            abs
+        } else {
+            eviction_placeholder(&abs)
+                .filter(|stub| stub.exists())
+                .unwrap_or(abs)
+        };
+        #[cfg(desktop)]
+        os_trash_delete(&target)?;
+        #[cfg(mobile)]
+        move_to_graph_trash(root, &target)?;
+        // A deleted note's sync ancestor is meaningless — drop it (Plan 21).
+        crate::conflict::shadow::ShadowStore::new(root).forget(&path);
+        Ok(())
+    })
+    .await
 }
 
 /// Move the open graph's **entire directory** to the OS trash (recoverable)
@@ -768,33 +788,42 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
 /// never trash the newly opened graph. Desktop-only: mobile's fixed roots
 /// have no OS trash and no delete UI.
 #[tauri::command]
-pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> {
+pub async fn graph_delete(generation: u64, state: State<'_, GraphState>) -> AppResult<()> {
     #[cfg(desktop)]
     {
-        // Check-and-invalidate under one lock hold — `root_for_generation`
-        // followed by a separate invalidation would leave a window where a
-        // pinned write still resolves the doomed root.
-        let root = {
-            let mut inner = lock_graph(&state)?;
-            if inner.generation != generation {
-                return Err(AppError::io(
-                    "the graph changed since this command was issued; dropping it",
-                ));
-            }
-            let root = inner.root.take().ok_or_else(AppError::no_graph)?;
-            inner.generation += 1;
-            inner.catalog = None;
-            inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
-            root
-        };
-        os_trash_delete(&root)?;
-        // Recents is a convenience cache (same stance as `activate`): the
-        // directory is already in the trash, so a failure to persist must not
-        // report the delete as failed. A stale entry fails loudly on open.
-        if let Err(err) = crate::recents::forget(&root.to_string_lossy()) {
-            tracing::warn!(?err, "failed to forget deleted graph");
-        }
-        Ok(())
+        let state = state.inner().clone();
+        crate::blocking::run_blocking(move || {
+            let root = root_for_generation(&state, generation)?;
+            mutation::with_repository(&root, || {
+                mutation::with_generation(&state, generation, |_| {
+                    // Check-and-invalidate under one lock hold — `root_for_generation`
+                    // followed by a separate invalidation would leave a window where a
+                    // pinned write still resolves the doomed root.
+                    let root = {
+                        let mut inner = lock_graph(&state)?;
+                        if inner.generation != generation {
+                            return Err(AppError::io(
+                                "the graph changed since this command was issued; dropping it",
+                            ));
+                        }
+                        let root = inner.root.take().ok_or_else(AppError::no_graph)?;
+                        inner.generation += 1;
+                        inner.catalog = None;
+                        inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
+                        root
+                    };
+                    os_trash_delete(&root)?;
+                    // Recents is a convenience cache (same stance as `activate`): the
+                    // directory is already in the trash, so a failure to persist must not
+                    // report the delete as failed. A stale entry fails loudly on open.
+                    if let Err(err) = crate::recents::forget(&root.to_string_lossy()) {
+                        tracing::warn!(?err, "failed to forget deleted graph");
+                    }
+                    Ok(())
+                })
+            })
+        })
+        .await
     }
     #[cfg(mobile)]
     {
@@ -1034,15 +1063,15 @@ mod transcript_cache_tests {
 mod file_catalog_tests {
     use super::{file_catalog, file_catalog_with, invalidate_file_catalog, GraphInner, GraphState};
     use std::fs;
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex};
 
     fn graph_at(root: &std::path::Path, generation: u64) -> GraphState {
-        GraphState(Mutex::new(GraphInner {
+        GraphState(Arc::new(Mutex::new(GraphInner {
             generation,
             root: Some(root.to_path_buf()),
             catalog: None,
             catalog_revision: 0,
-        }))
+        })))
     }
 
     #[test]

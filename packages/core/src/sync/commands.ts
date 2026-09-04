@@ -60,6 +60,8 @@ export type ChangedFile = z.infer<typeof changedFileSchema>
 export const mergeOutcomeSchema = z.object({
   kind: z.enum(['upToDate', 'fastForward', 'merged', 'mergedWithConflicts']),
   conflictedPaths: z.array(z.string()),
+  /** Files withheld when saves made during fetch are committed before merging. */
+  skippedLargeFiles: z.array(skippedFileSchema),
   /**
    * Every file the merge changed. The caller reindexes these directly —
    * pulls must not depend on the file watcher being up (on launch it may

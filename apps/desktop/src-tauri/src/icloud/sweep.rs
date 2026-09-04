@@ -122,11 +122,10 @@ pub async fn icloud_conflicts_scan(
 ) -> AppResult<SweepOutcome> {
     let started = std::time::Instant::now();
     let root = crate::fs::root_for_generation(&state, generation)?;
-    let sweep_root = root.clone();
-    let outcome = crate::blocking::run_blocking(move || {
+    let outcome = crate::fs::mutation::run(state.inner().clone(), generation, move |root| {
         let candidates = conflict_candidates(scope, &ingested_paths);
         run_sweep(
-            &sweep_root,
+            root,
             &skip_paths,
             &ingested_paths,
             record_baseline,
