@@ -408,3 +408,109 @@ fn binary_copy_avoids_incoming_case_aliases_and_directories() {
         );
     }
 }
+
+#[test]
+fn retry_preserves_a_conflict_copy_edited_after_failed_checkout() {
+    let fixture = fixture();
+    write(&fixture.origin, "notes/shared.md", "remote note\n");
+    write(&fixture.origin, "assets/image.bin", b"remote attachment\0");
+    commit(&fixture.origin);
+    write(&fixture.local, "notes/shared.md", "local note\n");
+    write(&fixture.local, "assets/image.bin", b"local attachment\0");
+    let original = commit(&fixture.local);
+    fetch(&fixture.local);
+    write(&fixture.local, "notes/shared.md", "unsaved to Git\n");
+    assert!(merge_remote(&fixture.local).is_err());
+    assert_eq!(head(&fixture.local), original);
+
+    let copy = "assets/image (conflict).bin";
+    assert_eq!(
+        fs::read(fixture.local.join(copy)).unwrap(),
+        b"remote attachment\0"
+    );
+    write(&fixture.local, copy, b"edited recovery copy\0");
+    let saved = commit(&fixture.local);
+    assert_eq!(blob(&fixture.local, saved, copy), b"edited recovery copy\0");
+    assert!(matches!(
+        merge_remote(&fixture.local).unwrap().kind,
+        MergeKind::MergedWithConflicts
+    ));
+    let merged = head(&fixture.local);
+    for (path, contents) in [
+        (copy, b"edited recovery copy\0".as_slice()),
+        ("assets/image (conflict 2).bin", b"remote attachment\0"),
+        ("assets/image.bin", b"local attachment\0"),
+    ] {
+        assert_eq!(fs::read(fixture.local.join(path)).unwrap(), contents);
+        assert_eq!(blob(&fixture.local, merged, path), contents);
+    }
+    let repo = Repository::open(&fixture.local).unwrap();
+    assert_eq!(
+        repo.head()
+            .unwrap()
+            .peel_to_commit()
+            .unwrap()
+            .parent_id(0)
+            .unwrap(),
+        saved
+    );
+    assert_eq!(repo.state(), git2::RepositoryState::Clean);
+    assert!(!repo.index().unwrap().has_conflicts());
+}
+
+#[test]
+fn deletion_after_failed_checkout_is_snapshotted_before_retry() {
+    let fixture = fixture();
+    write(&fixture.origin, "notes/shared.md", "remote note\n");
+    commit(&fixture.origin);
+    write(&fixture.local, "notes/shared.md", "local note\n");
+    let original = commit(&fixture.local);
+    fetch(&fixture.local);
+    write(
+        &fixture.local,
+        "notes/shared.md",
+        "autosave before failure\n",
+    );
+    assert!(merge_remote(&fixture.local).is_err());
+    assert_eq!(head(&fixture.local), original);
+    assert_eq!(
+        Repository::open(&fixture.local).unwrap().state(),
+        git2::RepositoryState::Clean
+    );
+
+    fs::remove_file(fixture.local.join("notes/shared.md")).unwrap();
+    let saved = commit(&fixture.local);
+    assert!(!fixture.local.join("notes/shared.md").exists());
+    let repo = Repository::open(&fixture.local).unwrap();
+    assert!(repo
+        .find_commit(saved)
+        .unwrap()
+        .tree()
+        .unwrap()
+        .get_path(Path::new("notes/shared.md"))
+        .is_err());
+    drop(repo);
+
+    // This is a new edit/delete conflict, not recovery resurrecting a file
+    // before its deletion was saved. Both decisions remain in merge parents.
+    assert!(matches!(
+        merge_remote(&fixture.local).unwrap().kind,
+        MergeKind::MergedWithConflicts
+    ));
+    let repo = Repository::open(&fixture.local).unwrap();
+    let merged = repo.head().unwrap().peel_to_commit().unwrap();
+    assert_eq!(merged.parent_id(0).unwrap(), saved);
+    assert!(merged
+        .parent(0)
+        .unwrap()
+        .tree()
+        .unwrap()
+        .get_path(Path::new("notes/shared.md"))
+        .is_err());
+    assert_eq!(
+        blob(&fixture.local, merged.id(), "notes/shared.md"),
+        b"remote note\n"
+    );
+    assert_eq!(repo.state(), git2::RepositoryState::Clean);
+    assert!(!repo.index().unwrap().has_conflicts());
+}
