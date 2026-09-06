@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.0-beta.16](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.15...v0.11.0-beta.16) (2026-09-06)
+
+
+### Features
+
+* discover Reflect apps from the graph menu ([#1221](https://github.com/team-reflect/reflect-open/issues/1221)) ([c67bb29](https://github.com/team-reflect/reflect-open/commit/c67bb299ebd1290551f9fd8e71ccbabfa48f54aa))
+* open Reflect Academy from the graph menu ([#1222](https://github.com/team-reflect/reflect-open/issues/1222)) ([0997d4e](https://github.com/team-reflect/reflect-open/commit/0997d4edda8cfdfd439eb5dbf0874a8c6addba19))
+
 ## [0.11.0-beta.15](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.14...v0.11.0-beta.15) (2026-09-06)
 
 
