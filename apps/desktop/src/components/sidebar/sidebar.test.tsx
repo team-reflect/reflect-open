@@ -430,7 +430,7 @@ describe('Sidebar', () => {
       1,
       'https://apps.apple.com/us/app/reflect-open/id6787385615',
     )
-    await dialog.getByRole('button', { name: 'Get browser extension' }).click()
+    await dialog.getByRole('button', { name: 'Get Chrome extension' }).click()
     expect(openUrl).toHaveBeenNthCalledWith(
       2,
       'https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd',
