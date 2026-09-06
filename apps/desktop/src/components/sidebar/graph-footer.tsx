@@ -1,8 +1,9 @@
-import type { ReactElement } from 'react'
+import { useRef, useState, type ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
-import { Check, FolderOpen, LocateFixed, Settings } from 'lucide-react'
+import { Check, FolderOpen, LocateFixed, PanelsTopLeft, Settings } from 'lucide-react'
 import { GraphSwatch } from '@/components/graph-swatch'
+import { ReflectAppsDialog } from '@/components/reflect-apps-dialog'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { Button } from '@/components/ui/button'
 import {
@@ -68,6 +69,8 @@ interface GraphFooterProps {
 }
 
 export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement {
+  const [appsOpen, setAppsOpen] = useState(false)
+  const graphTriggerRef = useRef<HTMLButtonElement>(null)
   const { recents, indexing, openRecent, chooseGraph } = useGraph()
   const { colorFor, setColor } = useGraphColors()
   const currentColor = colorFor(graph.root) ?? DEFAULT_GRAPH_COLOR
@@ -86,6 +89,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
               <DropdownMenuTrigger
                 render={
                   <Button
+                    ref={graphTriggerRef}
                     type="button"
                     variant="ghost"
                     className="group h-auto min-w-0 flex-1 justify-start gap-2.5 px-1.5 py-1 text-left"
@@ -198,6 +202,11 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
             <Settings aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">User settings</span>
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setAppsOpen(true)} className={MENU_ITEM_CLASS}>
+            <PanelsTopLeft aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">Get Reflect apps…</span>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <Tooltip>
@@ -225,6 +234,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
           Settings {SETTINGS_BINDING && <ShortcutKeys binding={SETTINGS_BINDING} />}
         </TooltipContent>
       </Tooltip>
+      <ReflectAppsDialog open={appsOpen} onOpenChange={setAppsOpen} finalFocus={graphTriggerRef} />
     </div>
   )
 }

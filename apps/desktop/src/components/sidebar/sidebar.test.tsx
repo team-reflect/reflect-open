@@ -1,5 +1,5 @@
 import { render } from 'vitest-browser-react'
-import { page } from 'vitest/browser'
+import { page, userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -18,6 +18,7 @@ import { expectLocatorToHaveCount } from '@/test-utils/expect'
 
 const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async () => []))
 const revealItemInDir = vi.hoisted(() => vi.fn<(path: string) => Promise<void>>(async () => {}))
+const openUrl = vi.hoisted(() => vi.fn<(url: string) => Promise<void>>(async () => {}))
 const openRouteInNewWindow = vi.hoisted(() => vi.fn<(route: NoteRoute) => Promise<boolean>>())
 const openRecent = vi.hoisted(() => vi.fn())
 const pickAndOpen = vi.hoisted(() => vi.fn())
@@ -46,7 +47,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   hasBridge: () => true,
   getPinnedNotes,
 }))
-vi.mock('@tauri-apps/plugin-opener', () => ({ revealItemInDir }))
+vi.mock('@tauri-apps/plugin-opener', () => ({ revealItemInDir, openUrl }))
 vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
   openRouteInNewWindow,
@@ -119,6 +120,7 @@ beforeEach(() => {
   audioMemo.unavailableReason = null
   audioMemo.toggle.mockReset()
   revealItemInDir.mockClear()
+  openUrl.mockClear()
   openRouteInNewWindow.mockReset().mockResolvedValue(true)
   openRecent.mockClear()
   pickAndOpen.mockClear()
@@ -411,6 +413,52 @@ describe('Sidebar', () => {
     await page.getByRole('menuitem', { name: /user settings/i }).click()
 
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'settings' }))
+  })
+
+  it('the graph menu offers the iOS app and Chrome extension in their stores', async () => {
+    const { view } = await renderSidebar()
+
+    await view.getByRole('button', { name: /Notes/ }).click()
+    await page.getByRole('menuitem', { name: 'Get Reflect apps…' }).click()
+
+    const dialog = page.getByRole('dialog', { name: 'Take Reflect with you' })
+    await expect.element(dialog).toBeVisible()
+    await expect.element(page.getByRole('menu')).not.toBeInTheDocument()
+
+    await dialog.getByRole('button', { name: 'Get iOS app' }).click()
+    expect(openUrl).toHaveBeenNthCalledWith(
+      1,
+      'https://apps.apple.com/us/app/reflect-open/id6787385615',
+    )
+    await dialog.getByRole('button', { name: 'Get Chrome extension' }).click()
+    expect(openUrl).toHaveBeenNthCalledWith(
+      2,
+      'https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd',
+    )
+
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect.element(dialog).not.toBeInTheDocument()
+  })
+
+  it('opens the apps dialog from the keyboard and restores graph focus on Escape', async () => {
+    const { view } = await renderSidebar()
+    const graphTrigger = view.getByRole('button', { name: /Notes/ })
+    graphTrigger.element().focus()
+    await userEvent.keyboard('{Enter}')
+    await userEvent.keyboard('Get Reflect apps')
+    await expect.element(page.getByRole('menuitem', { name: 'Get Reflect apps…' })).toHaveFocus()
+    await userEvent.keyboard('{Enter}')
+
+    const dialog = page.getByRole('dialog', { name: 'Take Reflect with you' })
+    await expect.element(dialog).toBeVisible()
+    await vi.waitFor(() => expect(dialog.element().contains(document.activeElement)).toBe(true))
+
+    await userEvent.keyboard('{Escape}')
+    await expect.element(dialog).not.toBeInTheDocument()
+    await expect.element(graphTrigger).toHaveFocus()
+
+    await userEvent.keyboard('{Enter}')
+    await expect.element(page.getByRole('menuitem', { name: 'Get Reflect apps…' })).toBeVisible()
   })
 
   it('the graph footer opens the current graph in the system file manager', async () => {
