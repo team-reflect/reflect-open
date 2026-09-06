@@ -202,7 +202,10 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
             <span className="min-w-0 flex-1 truncate">User settings</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setAppsOpen(true)} className={MENU_ITEM_CLASS}>
+          <DropdownMenuItem
+            onClick={() => setAppsOpen(true)}
+            className={cn(MENU_ITEM_CLASS, 'min-h-10')}
+          >
             <PanelsTopLeft aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">Get Reflect apps…</span>
           </DropdownMenuItem>
