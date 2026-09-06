@@ -406,11 +406,11 @@ describe('Sidebar', () => {
     expect(pickAndOpen).not.toHaveBeenCalled()
   })
 
-  it('the graph footer opens user settings from the graph menu', async () => {
+  it('the graph footer opens preferences from the graph menu', async () => {
     const { view, navigate } = await renderSidebar()
 
     await view.getByRole('button', { name: /Notes/ }).click()
-    await page.getByRole('menuitem', { name: /user settings/i }).click()
+    await page.getByRole('menuitem', { name: 'Preferences' }).click()
 
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'settings' }))
   })

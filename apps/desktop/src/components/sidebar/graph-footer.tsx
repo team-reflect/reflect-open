@@ -36,7 +36,7 @@ import { useGraph } from '@/providers/graph-provider'
 import { useSync, type BackupState } from '@/providers/sync-provider'
 import { useRouter } from '@/routing/router'
 
-const MENU_ITEM_CLASS = 'gap-2 px-2 py-1.5 text-[13px] text-text-secondary'
+const MENU_ITEM_CLASS = 'h-8 gap-2 px-2 py-0 text-[13px] text-text-secondary'
 const SETTINGS_BINDING = keybindingFor('settings.open')
 
 function graphSwitchBindingFor(index: number): string | null {
@@ -202,24 +202,22 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
               <span className="min-w-0 flex-1 truncate">Open another graph…</span>
             </DropdownMenuItem>
           ) : null}
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => void runCommand('settings.open', context)}
             className={MENU_ITEM_CLASS}
           >
             <Settings aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">User settings</span>
+            <span className="min-w-0 flex-1 truncate">Preferences</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setAppsOpen(true)}
-            className={cn(MENU_ITEM_CLASS, 'min-h-10')}
-          >
+          <DropdownMenuItem onClick={() => setAppsOpen(true)} className={MENU_ITEM_CLASS}>
             <PanelsTopLeft aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">Get Reflect apps…</span>
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => openUrlSync('https://reflect.academy')}
-            className={cn(MENU_ITEM_CLASS, 'min-h-10')}
+            className={MENU_ITEM_CLASS}
           >
             <GraduationCap aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">Reflect Academy</span>
