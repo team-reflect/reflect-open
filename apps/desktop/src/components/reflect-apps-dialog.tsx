@@ -1,5 +1,5 @@
 import type { ReactElement, RefObject } from 'react'
-import { ArrowUpRight, Globe, Smartphone, X } from 'lucide-react'
+import { ArrowUpRight, Globe, Smartphone, X, type LucideIcon } from 'lucide-react'
 import reflectAppsHero from '@/assets/reflect-apps-hero.png'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,12 +13,21 @@ import {
 import { openUrlSync } from '@/lib/open-url'
 
 interface ReflectAppsDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  finalFocus: RefObject<HTMLButtonElement | null>
+  readonly open: boolean
+  readonly onOpenChange: (open: boolean) => void
+  readonly finalFocus: RefObject<HTMLButtonElement | null>
 }
 
-const REFLECT_APPS = [
+interface ReflectApp {
+  readonly name: string
+  readonly platform: string
+  readonly description: string
+  readonly action: string
+  readonly url: string
+  readonly icon: LucideIcon
+}
+
+const REFLECT_APPS: readonly ReflectApp[] = [
   {
     name: 'Reflect for iOS',
     platform: 'iPhone & iPad',

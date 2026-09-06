@@ -55,19 +55,18 @@ function backupDot(backup: BackupState): { className: string; label: string } | 
   }
 }
 
-/**
- * The sidebar footer: the graph's color swatch and name on the left — a
- * dropdown menu for switching to a recent graph, recoloring this graph, or
- * the OS folder picker. The swatch pulses while the graph indexes; a small
- * dot reports backup state. The menu content matches the trigger width, so
- * it stays inset from the sidebar edges.
- */
 interface GraphFooterProps {
   graph: GraphInfo
   /** Commands run with this — the same context the palette/shortcuts use. */
   context: CommandContext
 }
 
+/**
+ * The sidebar footer: the graph's color swatch and name open a dropdown for
+ * switching and recoloring graphs, settings, and companion app installs.
+ * The swatch pulses while the graph indexes; a small dot reports backup state.
+ * Menu content matches the trigger width to stay inset from the sidebar edges.
+ */
 export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement {
   const [appsOpen, setAppsOpen] = useState(false)
   const graphTriggerRef = useRef<HTMLButtonElement>(null)
