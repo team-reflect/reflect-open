@@ -38,9 +38,9 @@ const REFLECT_APPS: readonly ReflectApp[] = [
   },
   {
     name: 'Reflect Capture',
-    platform: 'Chrome extension',
+    platform: 'Browser extension',
     description: 'Send pages, highlights, and links to your daily note.',
-    action: 'Get Chrome extension',
+    action: 'Get browser extension',
     url: 'https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd',
     icon: Globe,
   },
@@ -86,7 +86,7 @@ export function ReflectAppsDialog({
               Take Reflect with you
             </DialogTitle>
             <DialogDescription className="leading-relaxed text-pretty text-text-secondary">
-              Take notes on the go. Save what you find in Chrome.
+              Take notes on the go. Save what you find while browsing.
             </DialogDescription>
           </DialogHeader>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">

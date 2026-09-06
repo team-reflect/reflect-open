@@ -415,7 +415,7 @@ describe('Sidebar', () => {
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'settings' }))
   })
 
-  it('the graph menu offers the iOS app and Chrome extension in their stores', async () => {
+  it('the graph menu offers the iOS app and browser extension in their stores', async () => {
     const { view } = await renderSidebar()
 
     await view.getByRole('button', { name: /Notes/ }).click()
@@ -430,7 +430,7 @@ describe('Sidebar', () => {
       1,
       'https://apps.apple.com/us/app/reflect-open/id6787385615',
     )
-    await dialog.getByRole('button', { name: 'Get Chrome extension' }).click()
+    await dialog.getByRole('button', { name: 'Get browser extension' }).click()
     expect(openUrl).toHaveBeenNthCalledWith(
       2,
       'https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd',
