@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0-beta.15](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.14...v0.11.0-beta.15) (2026-09-06)
+
+
+### Features
+
+* add `gemini-pro-latest` and `gemini-flash-latest` models ([#1219](https://github.com/team-reflect/reflect-open/issues/1219)) ([827f489](https://github.com/team-reflect/reflect-open/commit/827f489ce024da77d40ab7760a69b3e4c4c5f108))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.68.1 ([#1197](https://github.com/team-reflect/reflect-open/issues/1197)) ([81b6f04](https://github.com/team-reflect/reflect-open/commit/81b6f04c0b15dc1380539de5b065412c64d9bfff))
+
 ## [0.11.0-beta.14](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.13...v0.11.0-beta.14) (2026-09-04)
 
 
