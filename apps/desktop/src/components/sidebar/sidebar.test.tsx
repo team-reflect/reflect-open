@@ -46,7 +46,10 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   hasBridge: () => true,
   getPinnedNotes,
 }))
-vi.mock('@tauri-apps/plugin-opener', () => ({ revealItemInDir }))
+vi.mock('@tauri-apps/plugin-opener', () => ({
+  revealItemInDir,
+  openUrl: vi.fn(async () => {}),
+}))
 vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
   openRouteInNewWindow,
