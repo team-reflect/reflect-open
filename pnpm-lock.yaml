@@ -125,7 +125,7 @@ importers:
         version: 8.6.0(react@19.2.8)
       lucide-react:
         specifier: ^1.37.0
-        version: 1.37.0(react@19.2.8)
+        version: 1.38.0(react@19.2.8)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -278,8 +278,8 @@ importers:
         specifier: ^4.0.63
         version: 4.0.63(zod@4.5.4)
       '@ai-sdk/openai':
-        specifier: ^4.0.56
-        version: 4.0.56(zod@4.5.4)
+        specifier: ^4.0.57
+        version: 4.0.59(zod@4.5.4)
       '@ai-sdk/openai-compatible':
         specifier: ^3.0.43
         version: 3.0.43(zod@4.5.4)
@@ -293,8 +293,8 @@ importers:
         specifier: workspace:*
         version: link:../utils
       ai:
-        specifier: ^7.0.90
-        version: 7.0.90(zod@4.5.4)
+        specifier: ^7.0.93
+        version: 7.0.93(zod@4.5.4)
       kysely:
         specifier: ^0.28.17
         version: 0.28.17
@@ -381,8 +381,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/gateway@4.0.72':
-    resolution: {integrity: sha512-iNNgagJ0+Ow1kdOFSyKPRk8kTh7qwhLZPLFdbXw4KMbMMF7JLzWlBSkyMSjh6U4O6D4D+76xj0HGws4JTLNeYA==}
+  '@ai-sdk/gateway@4.0.75':
+    resolution: {integrity: sha512-HOnhw3oXtBnboBF7kAKipjToCN6+5w6EuukiUKiULcxBitS+vbHRRv9IUBcq+Z1wkXcJjfywKrt5r++I6OYyXg==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -399,8 +399,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/openai@4.0.56':
-    resolution: {integrity: sha512-q/GyXWeYUJFk76JIlgwp1yMEvEFPFT/ueKHTazbYI+tQ/8ZTTTdkL1y6bWN06zCIusbpt7laiKytFV+37JZsgA==}
+  '@ai-sdk/openai@4.0.59':
+    resolution: {integrity: sha512-k9qS5GbERLOsrMw+qOIKrGhgu0QWkc5f9GTGf7my+xlUsMdZY24hZWAT0JHgBAg9FdvE7lWD7wi85eDyioGuUQ==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -2525,8 +2525,8 @@ packages:
     resolution: {integrity: sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==}
     engines: {node: '>= 6.0.0'}
 
-  ai@7.0.90:
-    resolution: {integrity: sha512-cvG7Od3DPlnnljkIXP1CQ8wABOfDqV1uBFWemBjGupiqcQD8O9SSg5m4FL+GiMA47NN7dxIJnaw8/uowwN+D2g==}
+  ai@7.0.93:
+    resolution: {integrity: sha512-CJss6zb9mlltk/mCr8qom20NBnqEQxVawkqwtT62tCwsxilZpXfHNRMRwcS3XRpzdP1kEluVuDBUayYWEEd95g==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -4433,11 +4433,6 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
-
-  lucide-react@1.37.0:
-    resolution: {integrity: sha512-LPsB4rD1TD6wZu1djKOf9vUnS1jTNaHbolXebXDgiTdb6jeA1agIJhJsIybCmjKmQClcOaal1o1OaiYahEftyQ==}
-    peerDependencies:
-      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   lucide-react@1.38.0:
     resolution: {integrity: sha512-xZCyBd/wiVUDactoCc+42TjL0aB7EBOXsuX+tjz+W/sGzw2KhHpL1NOH3FIaVUcpimvUBpIYfz34Ofj9S5JEzQ==}
@@ -6440,7 +6435,7 @@ snapshots:
       '@ai-sdk/provider-utils': 5.0.36(zod@4.5.4)
       zod: 4.5.4
 
-  '@ai-sdk/gateway@4.0.72(zod@4.5.4)':
+  '@ai-sdk/gateway@4.0.75(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.10
       '@ai-sdk/provider-utils': 5.0.36(zod@4.5.4)
@@ -6459,7 +6454,7 @@ snapshots:
       '@ai-sdk/provider-utils': 5.0.36(zod@4.5.4)
       zod: 4.5.4
 
-  '@ai-sdk/openai@4.0.56(zod@4.5.4)':
+  '@ai-sdk/openai@4.0.59(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.10
       '@ai-sdk/provider-utils': 5.0.36(zod@4.5.4)
@@ -8822,9 +8817,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  ai@7.0.90(zod@4.5.4):
+  ai@7.0.93(zod@4.5.4):
     dependencies:
-      '@ai-sdk/gateway': 4.0.72(zod@4.5.4)
+      '@ai-sdk/gateway': 4.0.75(zod@4.5.4)
       '@ai-sdk/provider': 4.0.10
       '@ai-sdk/provider-utils': 5.0.36(zod@4.5.4)
       zod: 4.5.4
@@ -10709,10 +10704,6 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
-
-  lucide-react@1.37.0(react@19.2.8):
-    dependencies:
-      react: 19.2.8
 
   lucide-react@1.38.0(react@19.2.8):
     dependencies:
