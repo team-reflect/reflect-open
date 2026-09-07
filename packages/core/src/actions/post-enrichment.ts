@@ -85,6 +85,7 @@ export async function enrichPostCapture(
     media: localized.media,
     quoted: merged.quoted ?? null,
     note: fields.note,
+    selection: fields.selection,
     screenshot: fields.screenshot,
   }
   const title = postNoteTitle(enrichedFields, snapshot.title)

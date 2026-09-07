@@ -31,6 +31,8 @@ export interface PostNoteFields {
   quoted: QuotedPost | null
   /** The user's note from the capture UI. */
   note: string | null
+  /** The page selection a manual capture carried. */
+  selection: string | null
   /** Graph-relative screenshot asset, when the capture carried one. */
   screenshot: string | null
 }
@@ -45,5 +47,6 @@ export const POST_NOTE_MARKUP = {
   watch: 'Watch on X',
   quoting: '**Quoting**',
   noteHeading: '## Note',
+  selectionHeading: '## Selection',
   screenshotHeading: '## Screenshot',
 } as const

@@ -263,6 +263,9 @@ export async function drainCaptureInbox(
           ? await existingPostNote(identity, input.generation)
           : null
       const rewriteNote = existingPost?.kind !== 'edited'
+      if (envelope.screenshotRef && !rewriteNote) {
+        console.warn(`post capture ${identity.base} was edited; the new screenshot is dropped`)
+      }
 
       let hasScreenshot = false
       if (envelope.screenshotRef && rewriteNote) {
@@ -288,6 +291,7 @@ export async function drainCaptureInbox(
         postFields = refreshPostNoteFields(existingPost.fields, post, {
           url: keepExistingUrl ? existingPost.fields.url : envelope.url,
           note: envelope.note,
+          selection: envelope.selection,
           screenshot: hasScreenshot ? identity.assetPath : null,
         })
         envelope = { ...envelope, url: postFields.url }

@@ -118,10 +118,21 @@ export function parsePostNoteBody(body: string): PostNoteFields & { title: strin
   let media: PostNoteMedia[] = []
   let quoted: QuotedPost | null = null
   let note: string | null = null
+  let selection: string | null = null
   let screenshot: string | null = null
   let quotingHeader: QuotedPost | null = null
-  let noteBlocks: string[] | null = null
+  let section: 'note' | 'selection' | null = null
+  const sectionBlocks: string[] = []
   let expectingScreenshot = false
+  const closeSection = (): void => {
+    if (section === 'note') {
+      note = sectionBlocks.join('\n\n')
+    } else if (section === 'selection') {
+      selection = sectionBlocks.join('\n\n')
+    }
+    section = null
+    sectionBlocks.length = 0
+  }
   const readMore = readMoreLine(url)
 
   for (const block of blocks) {
@@ -135,19 +146,22 @@ export function parsePostNoteBody(body: string): PostNoteFields & { title: strin
       continue
     }
     if (block === markup.screenshotHeading) {
-      if (noteBlocks !== null) {
-        note = noteBlocks.join('\n\n')
-        noteBlocks = null
-      }
+      closeSection()
       expectingScreenshot = true
       continue
     }
     if (block === markup.noteHeading) {
-      noteBlocks = []
+      closeSection()
+      section = 'note'
       continue
     }
-    if (noteBlocks !== null) {
-      noteBlocks.push(block)
+    if (block === markup.selectionHeading) {
+      closeSection()
+      section = 'selection'
+      continue
+    }
+    if (section !== null) {
+      sectionBlocks.push(block)
       continue
     }
     const quoting = parseQuotingHeader(block)
@@ -176,13 +190,23 @@ export function parsePostNoteBody(body: string): PostNoteFields & { title: strin
     }
     throw new Error('post note has an unrecognized block')
   }
-  if (noteBlocks !== null) {
-    note = noteBlocks.join('\n\n')
-  }
+  closeSection()
   if (expectingScreenshot) {
     throw new Error('post note screenshot section is missing its image')
   }
-  return { title, url, author, postedAt, text, truncated, media, quoted, note, screenshot }
+  return {
+    title,
+    url,
+    author,
+    postedAt,
+    text,
+    truncated,
+    media,
+    quoted,
+    note,
+    selection,
+    screenshot,
+  }
 }
 
 /**

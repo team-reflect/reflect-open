@@ -6,6 +6,7 @@ import {
   postNoteBody,
   postNoteFields,
   postNoteTitle,
+  refreshPostNoteFields,
   type PostNoteFields,
 } from './post-note'
 
@@ -14,7 +15,7 @@ const URL = 'https://x.com/jack/status/20'
 const FULL: PostNoteFields = {
   url: URL,
   author: { name: 'jack', handle: 'jack' },
-  postedAt: '2006-03-21T20:50:14.000Z',
+  postedAt: '2006-03-21T12:50:14.000Z',
   text: 'just setting up my twttr\n\nsecond paragraph with a [link](https://example.com)',
   truncated: false,
   media: [
@@ -28,6 +29,7 @@ const FULL: PostNoteFields = {
     text: 'Hello from the future',
   },
   note: 'check later',
+  selection: 'a highlighted reply',
   screenshot: 'assets/capture-2026-06-11-153022-845-7c9e.jpg',
 }
 
@@ -58,6 +60,10 @@ describe('postNoteBody', () => {
         '',
         'check later',
         '',
+        '## Selection',
+        '',
+        'a highlighted reply',
+        '',
         '## Screenshot',
         '',
         '![jack (@jack): just setting up my twttr](assets/capture-2026-06-11-153022-845-7c9e.jpg)',
@@ -76,6 +82,7 @@ describe('postNoteBody', () => {
       media: [],
       quoted: null,
       note: null,
+      selection: null,
       screenshot: null,
     }
     expect(postNoteBody(fields, 'x.com')).toBe(`# x.com\n\n- URL: ${URL}\n- Type: #tweet\n`)
@@ -98,7 +105,8 @@ describe('postNoteBody', () => {
 describe('parsePostNoteBody', () => {
   it('round-trips the full template', () => {
     const title = 'jack (@jack): just setting up my twttr'
-    const parsed = parsePostNoteBody(postNoteBody(FULL, title))
+    const body = postNoteBody(FULL, title)
+    const parsed = parsePostNoteBody(body)
     expect(parsed).toEqual({
       ...FULL,
       title,
@@ -108,6 +116,7 @@ describe('parsePostNoteBody', () => {
         { kind: 'video', src: 'https://pbs.twimg.com/ext_tw_video_thumb/1/poster.jpg', alt: '' },
       ],
     })
+    expect(postNoteBody(parsed, title)).toBe(body)
   })
 
   it('round-trips the sparse shapes', () => {
@@ -120,6 +129,7 @@ describe('parsePostNoteBody', () => {
       media: [],
       quoted: null,
       note: 'one\n\ntwo',
+      selection: null,
       screenshot: null,
     }
     expect(parsePostNoteBody(postNoteBody(sparse, 'x.com'))).toEqual({ ...sparse, title: 'x.com' })
@@ -135,6 +145,17 @@ describe('parsePostNoteBody', () => {
       },
     }
     expect(parsePostNoteBody(postNoteBody(quotedOnly, 'T'))).toEqual({ ...quotedOnly, title: 'T' })
+
+    const selectionOnly: PostNoteFields = {
+      ...sparse,
+      truncated: false,
+      note: null,
+      selection: 'x',
+    }
+    expect(parsePostNoteBody(postNoteBody(selectionOnly, 'T'))).toEqual({
+      ...selectionOnly,
+      title: 'T',
+    })
   })
 
   it('rejects a body the template did not produce', () => {
@@ -170,6 +191,32 @@ describe('postNoteTitle', () => {
   })
 })
 
+describe('refreshPostNoteFields', () => {
+  const incoming: CapturedPost = { provider: 'x', id: '20', trigger: 'manual' }
+
+  it('appends the new note and selection after the existing ones', () => {
+    const refreshed = refreshPostNoteFields(FULL, incoming, {
+      url: URL,
+      note: 'second thought',
+      selection: 'another reply',
+      screenshot: null,
+    })
+    expect(refreshed.note).toBe('check later\n\nsecond thought')
+    expect(refreshed.selection).toBe('a highlighted reply\n\nanother reply')
+    expect(refreshed.author).toEqual(FULL.author)
+  })
+
+  it('keeps a section written once when the same capture drains twice', () => {
+    const refreshed = refreshPostNoteFields(FULL, incoming, {
+      url: URL,
+      note: 'check later',
+      screenshot: null,
+    })
+    expect(refreshed.note).toBe('check later')
+    expect(refreshed.selection).toBe('a highlighted reply')
+  })
+})
+
 describe('postNoteFields / capturedPostFromFields', () => {
   it('maps a captured post to fields and back, dropping localized media', () => {
     const post: CapturedPost = {
@@ -178,7 +225,7 @@ describe('postNoteFields / capturedPostFromFields', () => {
       trigger: 'bookmark',
       author: { name: 'jack', handle: 'jack' },
       text: 'hi',
-      postedAt: '2006-03-21T20:50:14.000Z',
+      postedAt: '2006-03-21T12:50:14.000Z',
       media: [{ kind: 'gif', url: 'https://pbs.twimg.com/tweet_video_thumb/a.jpg', alt: 'loop' }],
     }
     const fields = postNoteFields(URL, post, { note: ' n ', screenshot: null })

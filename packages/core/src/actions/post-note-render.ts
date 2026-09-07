@@ -1,6 +1,7 @@
 import { normalizedPageTitle } from '../ai/describe-page'
 import { wikiLinkSafe } from '../markdown/edit'
 import type { CapturedPost, PostAuthor } from './capture-envelope'
+import { captureLocalDate } from './capture-identity'
 import { POST_NOTE_MARKUP, type PostNoteFields } from './post-note-markup'
 import { profileUrl } from './post-url'
 
@@ -26,10 +27,19 @@ function firstLine(text: string): string {
   )
 }
 
-/** `2006-03-21` from an ISO timestamp, or the raw value when unparseable. */
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * The local calendar day of an ISO timestamp (the day the note filename and
+ * daily note use), a date already rendered as is, or the raw value when
+ * unparseable.
+ */
 function postedDate(postedAt: string): string {
+  if (DATE_ONLY_RE.test(postedAt)) {
+    return postedAt
+  }
   const date = new Date(postedAt)
-  return Number.isNaN(date.getTime()) ? postedAt : date.toISOString().slice(0, 10)
+  return Number.isNaN(date.getTime()) ? postedAt : captureLocalDate(date)
 }
 
 /** `Name (@handle)`, as the title and the quoting line spell an author. */
@@ -110,6 +120,9 @@ export function postNoteBody(fields: PostNoteFields, title: string): string {
   if (fields.note !== null && fields.note.trim() !== '') {
     parts.push(`${markup.noteHeading}\n\n${fields.note.trim()}`)
   }
+  if (fields.selection !== null && fields.selection.trim() !== '') {
+    parts.push(`${markup.selectionHeading}\n\n${fields.selection.trim()}`)
+  }
   if (fields.screenshot !== null) {
     parts.push(`${markup.screenshotHeading}\n\n![${title}](${fields.screenshot})`)
   }
@@ -120,7 +133,7 @@ export function postNoteBody(fields: PostNoteFields, title: string): string {
 export function postNoteFields(
   url: string,
   post: CapturedPost,
-  options: { note?: string | undefined; screenshot: string | null },
+  options: { note?: string | undefined; selection?: string | undefined; screenshot: string | null },
 ): PostNoteFields {
   return {
     url,
@@ -135,8 +148,17 @@ export function postNoteFields(
     })),
     quoted: post.quoted ?? null,
     note: options.note?.trim() ? options.note.trim() : null,
+    selection: options.selection?.trim() ? options.selection.trim() : null,
     screenshot: options.screenshot,
   }
+}
+
+/** Both sections, the earlier one first; the same text twice is one. */
+function joinSections(existing: string | null, fresh: string | null): string | null {
+  if (existing === null || fresh === null || existing === fresh) {
+    return fresh ?? existing
+  }
+  return `${existing}\n\n${fresh}`
 }
 
 /**
@@ -144,12 +166,17 @@ export function postNoteFields(
  * what the new envelope read wins where it has something, the existing note
  * fills the rest (a bookmark's author/text/media survive a later URL-only
  * ⌘⇧K), full text beats a truncated preview whichever side has it, and a
- * user note from the new capture is added.
+ * user note or selection from the new capture is appended to the existing one.
  */
 export function refreshPostNoteFields(
   existing: PostNoteFields,
   incoming: CapturedPost,
-  options: { url: string; note?: string | undefined; screenshot: string | null },
+  options: {
+    url: string
+    note?: string | undefined
+    selection?: string | undefined
+    screenshot: string | null
+  },
 ): PostNoteFields {
   const fresh = postNoteFields(options.url, incoming, options)
   const incomingFull = fresh.text !== null && !fresh.truncated
@@ -170,7 +197,8 @@ export function refreshPostNoteFields(
     truncated: text !== null && !incomingFull && !existingFull,
     media: fresh.media.length > 0 ? fresh.media : existing.media,
     quoted: fresh.quoted ?? existing.quoted,
-    note: fresh.note ?? existing.note,
+    note: joinSections(existing.note, fresh.note),
+    selection: joinSections(existing.selection, fresh.selection),
     screenshot: options.screenshot ?? existing.screenshot,
   }
 }

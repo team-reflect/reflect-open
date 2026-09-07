@@ -11,6 +11,7 @@ import {
   jsonFetchMock,
   mediaFetchMock,
   NO_PROVIDERS,
+  promoteMock,
   reconcile,
   scrapeMock,
   spool,
@@ -55,7 +56,7 @@ const BASE = IDENTITY.base
 
 const JACK_ANSWER = JSON.stringify({
   __typename: 'Tweet',
-  created_at: '2006-03-21T20:50:14.000Z',
+  created_at: '2006-03-21T12:50:14.000Z',
   display_text_range: [0, 24],
   entities: {},
   id_str: '20',
@@ -114,7 +115,7 @@ describe('drainCaptureInbox for posts', () => {
         url: 'https://x.com/i/web/status/20',
         title: 'X',
         note: 'check later',
-        post: { ...PAGE_POST, truncated: true, postedAt: '2006-03-21T20:50:14.000Z' },
+        post: { ...PAGE_POST, truncated: true, postedAt: '2006-03-21T12:50:14.000Z' },
       }),
       { screenshot: false },
     )
@@ -162,6 +163,48 @@ describe('drainCaptureInbox for posts', () => {
     expect(files.get(DAILY)).toContain(`- [[${BASE}|jack (@jack): just setting up my twttr]]`)
   })
 
+  it('keeps both user notes when a same-day re-capture carries one too', async () => {
+    addSpool(envelope({ url: POST_URL, title: 'X', note: 'first note', post: PAGE_POST }), {
+      screenshot: false,
+    })
+    expect((await drain()).stopped).toBeNull()
+    addSpool(
+      envelope({
+        id: '11111111-2222-4333-8444-555555555555',
+        url: POST_URL,
+        title: 'X',
+        note: 'second note',
+      }),
+      { screenshot: false },
+    )
+
+    expect((await drain()).deduped).toBe(1)
+
+    expect(files.get(IDENTITY.notePath)).toContain('## Note\n\nfirst note\n\nsecond note\n')
+  })
+
+  it('keeps a manual capture selection in its own section and does not hash it', async () => {
+    addSpool(
+      envelope({
+        url: POST_URL,
+        title: 'X',
+        note: 'why',
+        selection: 'a highlighted reply',
+        contentText: 'the whole page',
+      }),
+      { screenshot: false },
+    )
+
+    expect((await drain()).stopped).toBeNull()
+
+    const note = files.get(IDENTITY.notePath)!
+    expect(note).toContain('## Note\n\nwhy\n\n## Selection\n\na highlighted reply\n')
+    expect(note).not.toContain('## Page Text')
+    expect(note).not.toContain('captureSelectionHash')
+    expect((await reconcile({ providers: NO_PROVIDERS })).enriched).toBe(1)
+    expect(files.get(IDENTITY.notePath)).toContain('## Selection\n\na highlighted reply\n')
+  })
+
   it('leaves a same-day post note the user edited untouched', async () => {
     addSpool(envelope({ url: POST_URL, title: 'X', post: PAGE_POST }), { screenshot: false })
     expect((await drain()).stopped).toBeNull()
@@ -178,6 +221,24 @@ describe('drainCaptureInbox for posts', () => {
     expect(files.get(IDENTITY.notePath)).toBe(edited)
     expect(files.get(DAILY)).toBe(dailyBefore)
     expect(spool.size).toBe(0)
+  })
+
+  it('drops the screenshot of a re-capture whose note the user edited', async () => {
+    addSpool(envelope({ url: POST_URL, title: 'X', post: PAGE_POST }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    const edited = `${files.get(IDENTITY.notePath)!}\nMy own thoughts on this.\n`
+    files.set(IDENTITY.notePath, edited)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    addSpool(envelope({ id: '11111111-2222-4333-8444-555555555555', url: POST_URL, title: 'X' }))
+
+    const outcome = await drain()
+
+    expect(outcome).toMatchObject({ drained: 1, deduped: 1, stopped: null })
+    expect(files.get(IDENTITY.notePath)).toBe(edited)
+    expect(promoteMock).not.toHaveBeenCalled()
+    expect(spool.size).toBe(0)
+    expect(warn).toHaveBeenCalledOnce()
+    warn.mockRestore()
   })
 
   it('dedupes the same post across spellings within the day', async () => {

@@ -142,6 +142,7 @@ export async function captureNoteSource(
   options: {
     hasScreenshot: boolean
     status: CaptureStatus
+    /** Link captures only: posts dedupe on their id, not on the selection. */
     selectionHash?: string | undefined
     /** Render the post template instead of the link one (Plan 25). */
     post?: CapturedPost | undefined
@@ -158,6 +159,7 @@ export async function captureNoteSource(
       options.postFields ??
       postNoteFields(envelope.url, post, {
         note: envelope.note,
+        selection: envelope.selection,
         screenshot: options.hasScreenshot ? identity.assetPath : null,
       })
     body = postNoteBody(fields, postDisplayTitle(envelope, fields))
@@ -169,7 +171,7 @@ export async function captureNoteSource(
     captureSource: envelope.source,
     captureStatus: options.status,
     captureHash: await hashContent(body),
-    captureSelectionHash: options.selectionHash,
+    captureSelectionHash: post === undefined ? options.selectionHash : undefined,
     captureScreenshot: options.hasScreenshot ? identity.assetPath : undefined,
     ...(post === undefined ? {} : postFrontmatter(post)),
   })

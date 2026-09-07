@@ -389,15 +389,20 @@ Three layers, cheapest first:
    post already seen. Un-bookmark clears the key so a deliberate re-bookmark
    captures again. Keys are pruned past a few thousand entries.
 3. **Desktop same-day dedupe** on the post id (links dedupe on URL + selection).
-   A same-day re-capture merges into the existing note — what the earlier capture
-   read is kept, a user note is added — and a note the user has edited since is
-   left untouched.
+   A same-day re-capture merges into the existing note: what the earlier capture
+   read is kept, a new user note or selection is appended to the existing section,
+   and a note the user has edited since is left untouched.
 
 Accepted limitation: re-bookmarking a post from a *different* browser profile on a
 *different* day yields a second note. The correct fix — a `capture_url` column on
 the `notes` projection so the drain can dedupe any link capture across time — is
 a small index-schema migration that benefits ⌘⇧K captures too; it is a
 follow-up, not a prerequisite.
+
+Accepted limitation: because an edited note is never rewritten, a same-day
+re-capture of that post cannot add its screenshot either; the drain drops the
+spooled image and logs a warning. Page text ("include page text") is not
+rendered for post captures at all: the post's own text is the body.
 
 ### 7. Note shape
 
@@ -436,6 +441,10 @@ captureHash: …
 ## Note
 
 (the popup's optional note, manual captures only)
+
+## Selection
+
+(the page selection, manual captures only)
 ```
 
 Decisions inside the template, each reversible:
