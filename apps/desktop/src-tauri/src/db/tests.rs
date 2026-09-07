@@ -677,6 +677,30 @@ fn reapplying_a_note_replaces_its_rows() {
 }
 
 #[test]
+fn has_content_lands_on_the_notes_row_and_is_queryable() {
+    let conn = migrated();
+    let mut blank = note("daily/2026-06-02.md", "2026-06-02", vec![]);
+    blank.kind = "daily".to_string();
+    blank.daily_date = Some("2026-06-02".to_string());
+    blank.has_content = false;
+    apply_note(&conn, &blank).unwrap();
+    let mut written = note("daily/2026-06-01.md", "2026-06-01", vec![]);
+    written.kind = "daily".to_string();
+    written.daily_date = Some("2026-06-01".to_string());
+    apply_note(&conn, &written).unwrap();
+
+    let dotted = run_query(
+        &conn,
+        "SELECT daily_date FROM notes WHERE daily_date IS NOT NULL AND has_content = 1
+         ORDER BY daily_date",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(dotted.len(), 1);
+    assert_eq!(dotted[0]["daily_date"], Value::from("2026-06-01"));
+}
+
+#[test]
 fn reconcile_scan_classifies_candidates_orphans_and_skips() {
     let conn = migrated();
     let now: u64 = 100_000;
