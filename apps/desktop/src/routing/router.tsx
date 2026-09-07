@@ -1,5 +1,6 @@
 import {
   createContext,
+  startTransition,
   useCallback,
   use,
   useEffect,
@@ -195,32 +196,34 @@ export function RouterProvider({
       // repopulates it.
       scrollBySurface.current.delete(surface)
     }
-    setHistory((current) => {
-      const currentEntry = current.stack[current.index]!
-      if (routesEqual(currentEntry.route, target)) {
-        if (restored !== undefined) {
-          scrollById.current.set(currentEntry.id, restored)
-        } else {
-          // No stack growth — but this is still an explicit arrival: forget the
-          // entry's saved offset so the view re-anchors to its target instead of
-          // restoring the old scroll position.
-          scrollById.current.delete(currentEntry.id)
+    startTransition(() => {
+      setHistory((current) => {
+        const currentEntry = current.stack[current.index]!
+        if (routesEqual(currentEntry.route, target)) {
+          if (restored !== undefined) {
+            scrollById.current.set(currentEntry.id, restored)
+          } else {
+            // No stack growth — but this is still an explicit arrival: forget the
+            // entry's saved offset so the view re-anchors to its target instead of
+            // restoring the old scroll position.
+            scrollById.current.delete(currentEntry.id)
+          }
+          return current
         }
-        return current
-      }
-      const dropped = current.stack.slice(current.index + 1)
-      for (const entry of dropped) {
-        scrollById.current.delete(entry.id) // truncated branch — free its offsets
-      }
-      const id = nextId.current++
-      if (restored !== undefined) {
-        scrollById.current.set(id, restored) // seed the fresh entry with the surface offset
-      }
-      const stack = [...current.stack.slice(0, current.index + 1), { id, route: target }]
-      return { stack, index: stack.length - 1 }
+        const dropped = current.stack.slice(current.index + 1)
+        for (const entry of dropped) {
+          scrollById.current.delete(entry.id) // truncated branch — free its offsets
+        }
+        const id = nextId.current++
+        if (restored !== undefined) {
+          scrollById.current.set(id, restored) // seed the fresh entry with the surface offset
+        }
+        const stack = [...current.stack.slice(0, current.index + 1), { id, route: target }]
+        return { stack, index: stack.length - 1 }
+      })
+      setArrivalSeq((seq) => seq + 1)
+      setArrivalFocusEditor(options?.focusEditor === true)
     })
-    setArrivalSeq((seq) => seq + 1)
-    setArrivalFocusEditor(options?.focusEditor === true)
   }, [])
 
   const back = useCallback((): void => {
@@ -228,10 +231,12 @@ export function RouterProvider({
       return // nothing behind us — must not advance the navigation revision
     }
     navigationRevisionRef.current += 1
-    setArrivalFocusEditor(false) // history moves are never focus arrivals
-    setHistory((current) =>
-      current.index > 0 ? { ...current, index: current.index - 1 } : current,
-    )
+    startTransition(() => {
+      setArrivalFocusEditor(false) // history moves are never focus arrivals
+      setHistory((current) =>
+        current.index > 0 ? { ...current, index: current.index - 1 } : current,
+      )
+    })
   }, [])
 
   const forward = useCallback((): void => {
@@ -239,10 +244,14 @@ export function RouterProvider({
       return
     }
     navigationRevisionRef.current += 1
-    setArrivalFocusEditor(false)
-    setHistory((current) =>
-      current.index < current.stack.length - 1 ? { ...current, index: current.index + 1 } : current,
-    )
+    startTransition(() => {
+      setArrivalFocusEditor(false)
+      setHistory((current) =>
+        current.index < current.stack.length - 1
+          ? { ...current, index: current.index + 1 }
+          : current,
+      )
+    })
   }, [])
 
   // A note file move (Plan 17) rewrites every history entry that points at
