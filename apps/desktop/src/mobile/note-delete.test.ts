@@ -59,6 +59,7 @@ function lazySession(write: (path: string, contents: string) => Promise<void>): 
         throw { kind: 'notFound', message: 'missing' }
       },
       write,
+      writeIfRevision: null,
     },
     classify: () => 'exact',
     onSnapshot: (snapshot) => {
