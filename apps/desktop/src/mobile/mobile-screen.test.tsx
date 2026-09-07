@@ -350,7 +350,7 @@ describe('MobileShell', () => {
     expect(todayButton.element().hasAttribute('inert')).toBe(false)
 
     await user.click(view.getByRole('button', { name: 'Today' }))
-    expect(view.getByRole('button', { name: 'Today' }).query()).toBeNull()
+    await waitFor(() => expect(view.getByRole('button', { name: 'Today' }).query()).toBeNull())
     expect(todayButton.element().classList.contains('opacity-0')).toBe(true)
     expect(todayButton.element().hasAttribute('inert')).toBe(true)
     expect(
@@ -528,24 +528,28 @@ describe('MobileShell', () => {
     const view = await mount({ kind: 'today' })
 
     await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
-    expect(
-      view
-        .getByRole('button', { name: dayCellLabel(other) })
-        .element()
-        .getAttribute('aria-current'),
-    ).toBe('date')
+    await waitFor(() =>
+      expect(
+        view
+          .getByRole('button', { name: dayCellLabel(other) })
+          .element()
+          .getAttribute('aria-current'),
+      ).toBe('date'),
+    )
 
     await user.click(view.getByRole('button', { name: 'All' }))
     await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
     await expect.element(view.getByText('No notes yet')).toHaveTextContent('No notes yet')
 
     await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
-    expect(
-      view
-        .getByRole('button', { name: dayCellLabel(other) })
-        .element()
-        .getAttribute('aria-current'),
-    ).toBe('date')
+    await waitFor(() =>
+      expect(
+        view
+          .getByRole('button', { name: dayCellLabel(other) })
+          .element()
+          .getAttribute('aria-current'),
+      ).toBe('date'),
+    )
   })
 
   it('double-tapping Daily opens today and focuses the daily editor at its end', async () => {
@@ -668,9 +672,11 @@ describe('MobileShell', () => {
     if (box === null) {
       throw new Error('task search box did not render')
     }
-    await waitFor(() => expect(document.activeElement).toBe(box))
-    expect(box.selectionStart).toBe(0)
-    expect(box.selectionEnd).toBe(box.value.length)
+    await waitFor(() => {
+      expect(document.activeElement).toBe(box)
+      expect(box.selectionStart).toBe(0)
+      expect(box.selectionEnd).toBe(box.value.length)
+    })
   })
 
   it('hides the tab bar while the software keyboard is up (V1: the keyboard covered it)', async () => {
@@ -874,8 +880,8 @@ describe('MobileStack transitions & back-swipe', () => {
     await user.click(view.getByRole('button', { name: 'Back' }))
     // Popping reveals the still-mounted source, re-seats today beneath it,
     // and slides the destination out — three layers, briefly.
+    await waitFor(() => expect(stackLayers(view)).toHaveLength(3))
     const layers = stackLayers(view)
-    expect(layers).toHaveLength(3)
     expect(layers.at(-1)!.className).toContain('mobile-stack-slide-out')
     expect(page.elementLocator(visibleLayer(view)).getByRole('heading').element().textContent).toBe(
       'Edit note',
