@@ -1,4 +1,3 @@
-import { loadAiModule } from './load-ai-module'
 import { z } from 'zod'
 import type { AiProvidersState } from './provider-config'
 import type { AiProviderConfig } from '../settings/schema'
@@ -142,7 +141,7 @@ export async function generateAudioMemoTitle(
     return fallback
   }
   try {
-    const { generateText, Output } = await loadAiModule(() => import('@reflect/dynamic-modules/ai'))
+    const { generateText, Output } = await import('@reflect/dynamic-modules/ai')
     const result = await generateText({
       model: await languageModel(titleConfig, request.credentials.apiKey, request.fetchFn ?? fetch),
       output: Output.object({ schema: audioMemoTitleSchema }),

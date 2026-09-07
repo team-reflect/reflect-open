@@ -1,4 +1,3 @@
-import { loadAiModule } from './load-ai-module'
 import { z } from 'zod'
 import {
   audioMemoEnrichmentConfig,
@@ -95,7 +94,7 @@ export async function formatAudioMemoTranscript(
   }
 
   try {
-    const { generateText, Output } = await loadAiModule(() => import('@reflect/dynamic-modules/ai'))
+    const { generateText, Output } = await import('@reflect/dynamic-modules/ai')
     const result = await generateText({
       model: await languageModel(config, request.credentials.apiKey, request.fetchFn ?? fetch),
       output: Output.object({ schema: formattedAudioMemoSchema }),

@@ -1,4 +1,3 @@
-import { loadAiModule } from './load-ai-module'
 import type {
   LanguageModelV3,
   LanguageModelV3StreamPart,
@@ -54,9 +53,7 @@ export function createDemoModel(): LanguageModelV3 {
         warnings: [],
       }),
     doStream: async () => {
-      const { simulateReadableStream } = await loadAiModule(
-        () => import('@reflect/dynamic-modules/ai'),
-      )
+      const { simulateReadableStream } = await import('@reflect/dynamic-modules/ai')
       return {
         stream: simulateReadableStream<LanguageModelV3StreamPart>({
           chunkDelayInMs: 10,

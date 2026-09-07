@@ -1,4 +1,3 @@
-import { loadAiModule } from './load-ai-module'
 import type { LanguageModel } from '@reflect/dynamic-modules/ai'
 import type { AiProviderConfig } from '../settings/schema'
 import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers'
@@ -24,15 +23,11 @@ export async function languageModel(
   }
   switch (config.provider) {
     case 'openai': {
-      const { createOpenAI } = await loadAiModule(
-        () => import('@reflect/dynamic-modules/ai-sdk/openai'),
-      )
+      const { createOpenAI } = await import('@reflect/dynamic-modules/ai-sdk/openai')
       return createOpenAI({ apiKey, fetch: fetchFn })(config.model)
     }
     case 'anthropic': {
-      const { createAnthropic } = await loadAiModule(
-        () => import('@reflect/dynamic-modules/ai-sdk/anthropic'),
-      )
+      const { createAnthropic } = await import('@reflect/dynamic-modules/ai-sdk/anthropic')
       return createAnthropic({
         apiKey,
         fetch: fetchFn,
@@ -40,15 +35,11 @@ export async function languageModel(
       })(config.model)
     }
     case 'google': {
-      const { createGoogle } = await loadAiModule(
-        () => import('@reflect/dynamic-modules/ai-sdk/google'),
-      )
+      const { createGoogle } = await import('@reflect/dynamic-modules/ai-sdk/google')
       return createGoogle({ apiKey, fetch: fetchFn })(config.model)
     }
     case 'openrouter': {
-      const { createOpenAI } = await loadAiModule(
-        () => import('@reflect/dynamic-modules/ai-sdk/openai'),
-      )
+      const { createOpenAI } = await import('@reflect/dynamic-modules/ai-sdk/openai')
       return createOpenAI({
         apiKey,
         fetch: fetchFn,
@@ -58,9 +49,8 @@ export async function languageModel(
       }).chat(config.model)
     }
     case 'openai-compatible': {
-      const { createOpenAICompatible } = await loadAiModule(
-        () => import('@reflect/dynamic-modules/ai-sdk/openai-compatible'),
-      )
+      const { createOpenAICompatible } =
+        await import('@reflect/dynamic-modules/ai-sdk/openai-compatible')
       return createOpenAICompatible({
         name: OPENAI_COMPATIBLE_PROVIDER_ID,
         baseURL: config.baseUrl,

@@ -1,4 +1,3 @@
-import { loadAiModule } from './load-ai-module'
 import type { UserContent } from '@reflect/dynamic-modules/ai'
 import { z } from 'zod'
 import { ReflectError } from '../errors'
@@ -156,7 +155,7 @@ export function normalizedPageTitle(candidate: string): string | null {
  * itself.
  */
 export async function describePage(request: DescribePageRequest): Promise<PageEnrichment> {
-  const sdk = await loadAiModule(() => import('@reflect/dynamic-modules/ai'))
+  const sdk = await import('@reflect/dynamic-modules/ai')
   const content: UserContent = [{ type: 'text', text: describePrompt(request) }]
   if (request.screenshotBase64) {
     content.push({
