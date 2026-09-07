@@ -73,9 +73,10 @@ export function SyncProvider({ graph, children }: SyncProviderProps): ReactEleme
   }, [graph, indexGeneration])
 
   // iCloud-hosted graphs additionally get the conflict lifecycle (Plan 21):
-  // the metadata-query watch, debounced conflict sweeps, and shadow-base
-  // bookkeeping. Same per-(graph, index session) shape as the backup
-  // controller; a graph outside iCloud mounts nothing.
+  // debounced conflict sweeps and shadow-base bookkeeping, plus — on mobile
+  // only — the metadata-query watch that stands in for the file watcher.
+  // Same per-(graph, index session) shape as the backup controller; a graph
+  // outside iCloud mounts nothing.
   const bridgeReady = useBridgeReady()
   useMainWindowEffect(() => {
     if (!bridgeReady || !isICloudRoot(graph.root)) {
@@ -84,7 +85,7 @@ export function SyncProvider({ graph, children }: SyncProviderProps): ReactEleme
     const icloud = createIcloudController({
       graph,
       indexGeneration,
-      emitFileChangesFromWatch: isMobileSurface(),
+      metadataWatch: isMobileSurface(),
     })
     void icloud.start()
     return () => {

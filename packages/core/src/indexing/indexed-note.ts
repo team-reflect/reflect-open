@@ -7,6 +7,7 @@ import {
   isDaily,
   isTemplatePath,
 } from '../graph/paths'
+import { hasSearchableChar } from '../lib/searchable-char'
 import {
   detectConflictMarkers,
   extractEmailFields,
@@ -88,8 +89,11 @@ import { serializeWikiSuggestionAddress } from './suggest'
  * and `.md` stripped; '' for strict-path, self, and refused targets), so the
  * backlinks view's name join matches navigation. Existing rows carry the raw
  * fold and must reproject.
+ * 20 - `notes.has_content` records whether a note would render blank, and
+ * `search_fts.body` now carries the raw Markdown body, so every note must
+ * reproject.
  */
-export const PROJECTION_VERSION = 19
+export const PROJECTION_VERSION = 20
 
 /**
  * Precedence of the spellings a note answers to (`note_claims.tier`): the
@@ -204,6 +208,8 @@ export const indexedNoteSchema = z.object({
   pinnedOrder: z.number().nullable(),
   /** The file carries Git conflict markers from a sync merge (Plan 12). */
   hasConflict: z.boolean(),
+  /** The note is not blank: it has display text, or a body the FTS can match. */
+  hasContent: z.boolean(),
   /** The published gist's html url, or null when the note has none. */
   gistUrl: z.string().nullable(),
   /** The body changed since it was last published to the gist. */
@@ -376,9 +382,10 @@ export function buildIndexedNote(
       parsed.frontmatter.gist !== undefined && gistBodyHash(body) !== parsed.frontmatter.gist.hash,
     fileHash: meta.fileHash,
     mtime: meta.mtime,
-    text: parsed.text,
+    text: body,
     assetText: meta.assetText ?? '',
-    preview: previewSnippet(parsed.text, parsed.title),
+    preview: previewSnippet(parsed.displayText, parsed.title),
+    hasContent: parsed.displayText !== '' || hasSearchableChar(body),
     links: [...wikiLinks, ...mdLinks],
     tags: parsed.tags.map((tag) => ({ tag, tagKey: foldTag(tag) })),
     aliases,

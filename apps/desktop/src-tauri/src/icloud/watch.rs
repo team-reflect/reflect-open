@@ -1,15 +1,29 @@
 //! The iCloud change watcher: an `NSMetadataQuery` over the graph (Plan 21
-//! Phase 2).
+//! Phase 2). **Mobile only.**
 //!
-//! Two jobs, per platform:
+//! On iOS this query is the *sole* external-change source — there is no file
+//! watcher on mobile — so its snapshot diffs become the standard
+//! `index:changed` batches the indexer and open sessions already consume,
+//! and its `HasUnresolvedConflicts` flags are the conflict signal that
+//! triggers a prompt, candidate-scoped sweep.
 //!
-//! - **iOS**: the *sole* external-change source. There is no file watcher on
-//!   mobile — this query's snapshot diffs become the standard `index:changed`
-//!   batches the indexer and open sessions already consume.
-//! - **Both Apple platforms**: the conflict signal. A conflict version
-//!   appearing does not necessarily touch the working file, so the desktop
-//!   `notify` watcher alone would sit silent; the query's
-//!   `HasUnresolvedConflicts` flag is what triggers a sweep promptly.
+//! Desktop deliberately never installs it (issue #1180). The `notify` watcher
+//! already reports every iCloud write there as a plain FS event, and the
+//! query's cost is not confined to the graph: CloudDocs gathers the app's
+//! *entire* ubiquity container whatever the predicate says, building one
+//! observed collection per directory — including the sync-excluded
+//! `.reflect/` and `.git/` trees (`fs::io::mark_dir_local_only`), which carry
+//! no provider identity. Each of those fails with
+//! `NSFileProviderInternalErrorDomain 15`, is retried, and is finally given
+//! up on (`BRItemCollectionGatherer - Repeatedly can't watch item`), and every
+//! retry reloads the whole item tree through `fileproviderd`. macOS 26 bounds
+//! that at a handful of rounds per excluded directory; on macOS 15 the reload
+//! cycle was observed never to settle, pinning `fileproviderd` near 200% CPU
+//! for as long as the app stayed open. Excluding the trees from the
+//! predicate, restricting `searchItems`, or naming them `.nosync` changes
+//! nothing — the gather is scoped by the container, not by the query (see
+//! `docs/icloud-sync.md`). Desktop conflict handling rides the sweeps
+//! instead: arrival-scoped after external writes, full on resume.
 //!
 //! Threading follows the platform contract: the query starts/stops on the
 //! main thread (kept there via `MainThreadBound`), results are delivered on a
@@ -31,17 +45,11 @@
 
 use crate::error::AppResult;
 
-/// Command: watch the graph at `root` for iCloud changes. `emit_file_changes`
-/// turns snapshot diffs into `index:changed` events — pass `true` on mobile
-/// (no watcher there), `false` on desktop (the `notify` watcher already
-/// reports file events; double delivery is harmless but wasteful). Conflict
-/// paths always emit as `icloud:conflicts`.
+/// Command: watch the graph at `root` for iCloud changes — snapshot diffs
+/// emit as `index:changed` batches, conflict paths as `icloud:conflicts`.
+/// Mobile only: the module docs explain why desktop never calls this.
 #[tauri::command]
-pub async fn icloud_watch_start(
-    root: String,
-    emit_file_changes: bool,
-    app: tauri::AppHandle,
-) -> AppResult<()> {
+pub async fn icloud_watch_start(root: String, app: tauri::AppHandle) -> AppResult<()> {
     // Whether the query's scope actually covers this root — it lists the
     // app's own ubiquity container only, so for any other iCloud path (a
     // desktop graph in the user's general iCloud Drive) the gather produces
@@ -57,7 +65,7 @@ pub async fn icloud_watch_start(
             .await
             .unwrap_or(false)
     };
-    platform::start(app, root, emit_file_changes, authoritative)
+    platform::start(app, root, authoritative)
 }
 
 /// See [`icloud_watch_start`]: `root` lives inside the app's own ubiquity
@@ -250,19 +258,12 @@ mod platform {
     /// (dropping observer tokens does not deregister them).
     static EPOCH: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-    pub fn start(
-        app: tauri::AppHandle,
-        root: String,
-        emit_file_changes: bool,
-        authoritative: bool,
-    ) -> AppResult<()> {
+    pub fn start(app: tauri::AppHandle, root: String, authoritative: bool) -> AppResult<()> {
         use std::sync::atomic::Ordering;
         let epoch = EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
         let handle = app.clone();
-        app.run_on_main_thread(move || {
-            install(handle, root, emit_file_changes, authoritative, epoch)
-        })
-        .map_err(|err| AppError::io(format!("failed to reach the main thread: {err}")))
+        app.run_on_main_thread(move || install(handle, root, authoritative, epoch))
+            .map_err(|err| AppError::io(format!("failed to reach the main thread: {err}")))
     }
 
     pub fn stop(app: tauri::AppHandle) -> AppResult<()> {
@@ -320,13 +321,7 @@ mod platform {
     /// aborts when a later `start`/`stop` has superseded this one's epoch —
     /// so rapid graph switches can never leave two queries running or
     /// install a watch after its graph closed.
-    fn install(
-        app: tauri::AppHandle,
-        root: String,
-        emit_file_changes: bool,
-        authoritative: bool,
-        epoch: u64,
-    ) {
+    fn install(app: tauri::AppHandle, root: String, authoritative: bool, epoch: u64) {
         use std::sync::atomic::Ordering;
         let mtm = MainThreadMarker::new().expect("run_on_main_thread is the main thread");
         teardown_active(mtm);
@@ -389,7 +384,7 @@ mod platform {
         let handler_roots = roots.clone();
         let emit_app = app.clone();
         let block = RcBlock::new(move |notification: NonNull<NSNotification>| {
-            handle_notification(&app, &handler_roots, emit_file_changes, epoch, notification);
+            handle_notification(&app, &handler_roots, epoch, notification);
         });
         let center = NSNotificationCenter::defaultCenter();
         let query_object: &AnyObject = &query;
@@ -630,7 +625,6 @@ mod platform {
     fn handle_notification(
         app: &tauri::AppHandle,
         roots: &[String],
-        emit_file_changes: bool,
         epoch: u64,
         notification: NonNull<NSNotification>,
     ) {
@@ -668,11 +662,11 @@ mod platform {
                 let root = std::path::Path::new(root.trim_end_matches('/'));
                 crate::fs::invalidate_file_catalog(&state, root);
             }
-            if emit_file_changes && is_update {
+            if is_update {
                 let _ = app.emit("index:changed", round.changes);
             }
         }
-        if emit_file_changes && !is_update {
+        if !is_update {
             // The gather round diffs against an empty snapshot, so its
             // "changes" are every downloaded note in the graph — not news,
             // just the watch coming up. Emitting them sent an O(graph)
@@ -1225,12 +1219,7 @@ mod platform {
 
     /// No iCloud metadata queries off Apple platforms — honest no-ops so the
     /// command surface never branches.
-    pub fn start(
-        _app: tauri::AppHandle,
-        _root: String,
-        _emit_file_changes: bool,
-        _authoritative: bool,
-    ) -> AppResult<()> {
+    pub fn start(_app: tauri::AppHandle, _root: String, _authoritative: bool) -> AppResult<()> {
         Ok(())
     }
 

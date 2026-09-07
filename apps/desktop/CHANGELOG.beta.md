@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.11.0-beta.16](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.15...v0.11.0-beta.16) (2026-09-06)
+
+
+### Features
+
+* discover Reflect apps from the graph menu ([#1221](https://github.com/team-reflect/reflect-open/issues/1221)) ([c67bb29](https://github.com/team-reflect/reflect-open/commit/c67bb299ebd1290551f9fd8e71ccbabfa48f54aa))
+* open Reflect Academy from the graph menu ([#1222](https://github.com/team-reflect/reflect-open/issues/1222)) ([0997d4e](https://github.com/team-reflect/reflect-open/commit/0997d4edda8cfdfd439eb5dbf0874a8c6addba19))
+
+## [0.11.0-beta.15](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.14...v0.11.0-beta.15) (2026-09-06)
+
+
+### Features
+
+* add `gemini-pro-latest` and `gemini-flash-latest` models ([#1219](https://github.com/team-reflect/reflect-open/issues/1219)) ([827f489](https://github.com/team-reflect/reflect-open/commit/827f489ce024da77d40ab7760a69b3e4c4c5f108))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.68.1 ([#1197](https://github.com/team-reflect/reflect-open/issues/1197)) ([81b6f04](https://github.com/team-reflect/reflect-open/commit/81b6f04c0b15dc1380539de5b065412c64d9bfff))
+
+## [0.11.0-beta.14](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.13...v0.11.0-beta.14) (2026-09-04)
+
+
+### Features
+
+* add GPT-6 Astra support ([#1213](https://github.com/team-reflect/reflect-open/issues/1213)) ([e051828](https://github.com/team-reflect/reflect-open/commit/e0518283d2c48166c788b80a72efad76865279d1))
+
+
+### Bug Fixes
+
+* make list hover feedback instant ([#1211](https://github.com/team-reflect/reflect-open/issues/1211)) ([87e01ba](https://github.com/team-reflect/reflect-open/commit/87e01bacde6a4178e9aa5e6ed747790f0429a7d0))
+
+## [0.11.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.12...v0.11.0-beta.13) (2026-09-03)
+
+
+### Bug Fixes
+
+* improve iOS note deletion ([#1192](https://github.com/team-reflect/reflect-open/issues/1192)) ([0c9d2eb](https://github.com/team-reflect/reflect-open/commit/0c9d2eb173ec8522bf8e9b2a9b4263c2fbad6436))
+* **mobile:** load notes before subscription checks finish ([#1199](https://github.com/team-reflect/reflect-open/issues/1199)) ([113e171](https://github.com/team-reflect/reflect-open/commit/113e171d7456dfe82ce4d5d2c559fbbce4fd7da2))
+* stop the iCloud metadata query from pinning fileproviderd on macOS ([#1208](https://github.com/team-reflect/reflect-open/issues/1208)) ([1fcc0b3](https://github.com/team-reflect/reflect-open/commit/1fcc0b3df9bbd83f9afe578db6aec629e84674ba))
+
 ## [0.11.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.11...v0.11.0-beta.12) (2026-09-02)
 
 

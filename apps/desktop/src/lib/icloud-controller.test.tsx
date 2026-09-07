@@ -101,11 +101,12 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-function controller(overrides: { emit?: boolean } = {}) {
+/** A desktop controller by default; `watch: true` is the mobile shape. */
+function controller(overrides: { watch?: boolean } = {}) {
   active = createIcloudController({
     graph: GRAPH,
     indexGeneration: 3,
-    emitFileChangesFromWatch: overrides.emit ?? false,
+    metadataWatch: overrides.watch ?? false,
   })
   return active
 }
@@ -151,19 +152,38 @@ describe('isICloudRoot', () => {
 })
 
 describe('createIcloudController', () => {
-  it('starts the watch and runs one baseline sweep', async () => {
-    const icloud = controller({ emit: true })
+  it('mobile starts the watch and runs one baseline sweep', async () => {
+    const icloud = controller({ watch: true })
     await icloud.start()
     await settleScan()
 
     const watchStart = invoked.find(([command]) => command === 'icloud_watch_start')
-    expect(watchStart?.[1]).toMatchObject({ root: GRAPH.root, emitFileChanges: true })
+    expect(watchStart?.[1]).toEqual({ root: GRAPH.root })
     expect(scanCalls).toHaveLength(1)
     expect(scanCalls[0]).toMatchObject({ recordBaseline: true, ingestedPaths: [] })
 
     icloud.dispose()
     active = null
     expect(invoked.some(([command]) => command === 'icloud_watch_stop')).toBe(true)
+  })
+
+  it('desktop never installs the metadata watch (#1180)', async () => {
+    // The container-wide NSMetadataQuery gather is what pinned fileproviderd
+    // on iCloud-backed desktop graphs; the notify watcher already covers
+    // freshness there, so the watch must never start — not on start, not on
+    // resume — and there is nothing to stop on dispose.
+    const icloud = controller()
+    await icloud.start()
+    await settleScan()
+    window.dispatchEvent(new Event('focus'))
+    await settleScan()
+    icloud.dispose()
+    active = null
+
+    const commands = invoked.map(([command]) => command)
+    expect(commands).not.toContain('icloud_watch_start')
+    expect(commands).not.toContain('icloud_watch_stop')
+    expect(scanCalls).toHaveLength(2) // baseline + resume: the sweeps still run
   })
 
   it('external upserts become base ingests; this device’s own writes never do', async () => {
@@ -217,7 +237,7 @@ describe('createIcloudController', () => {
   it('defers mobile baseline, conflict, and ingest scans until foreground', async () => {
     const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
     try {
-      const icloud = controller({ emit: true })
+      const icloud = controller({ watch: true })
       await icloud.start()
       await settleScan()
       expect(scanCalls).toHaveLength(0)
@@ -245,7 +265,7 @@ describe('createIcloudController', () => {
     // A long iOS suspension can kill NSMetadataQuery update delivery, and on
     // mobile the query is the sole external-change source — the resume must
     // reinstall it or remote edits stay invisible until relaunch.
-    const icloud = controller({ emit: true })
+    const icloud = controller({ watch: true })
     await icloud.start()
     await settleScan()
     invoked.length = 0
@@ -258,27 +278,13 @@ describe('createIcloudController', () => {
     const startAt = commands.indexOf('icloud_watch_start')
     expect(stopAt).toBeGreaterThanOrEqual(0)
     expect(startAt).toBeGreaterThan(stopAt)
-    expect(invoked[startAt]?.[1]).toMatchObject({ root: GRAPH.root, emitFileChanges: true })
-  })
-
-  it('a desktop resume sweeps without restarting the watch', async () => {
-    const icloud = controller()
-    await icloud.start()
-    await settleScan()
-    invoked.length = 0
-
-    window.dispatchEvent(new Event('focus'))
-    await settleScan()
-
-    expect(invoked.some(([command]) => command === 'icloud_watch_stop')).toBe(false)
-    expect(invoked.some(([command]) => command === 'icloud_watch_start')).toBe(false)
-    expect(scanCalls).toHaveLength(2) // baseline + the resume sweep itself
+    expect(invoked[startAt]?.[1]).toEqual({ root: GRAPH.root })
   })
 
   it('preserves desktop baseline scanning while the document is hidden', async () => {
     const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
     try {
-      const icloud = controller({ emit: false })
+      const icloud = controller({ watch: false })
       await icloud.start()
       await settleScan()
 
@@ -289,8 +295,8 @@ describe('createIcloudController', () => {
     }
   })
 
-  it('scopes sweeps: full for baseline and resume, candidates for signals and ingests', async () => {
-    const icloud = controller()
+  it('mobile scopes sweeps: full for baseline and resume, candidates for signals and ingests', async () => {
+    const icloud = controller({ watch: true })
     await icloud.start()
     await settleScan()
     expect(scanCalls[0]?.scope).toBe('full') // the adoption baseline is the backstop
@@ -308,8 +314,31 @@ describe('createIcloudController', () => {
     expect(scanCalls[3]?.scope).toBe('full') // resume re-checks everything
   })
 
-  it('a failed candidates sweep retries at full scope', async () => {
+  it('desktop scopes arrival sweeps to the arrivals and never listens for watch signals', async () => {
     const icloud = controller()
+    await icloud.start()
+    await settleScan()
+    expect(scanCalls[0]?.scope).toBe('full') // the adoption baseline is the backstop
+
+    // Without a watch there is no candidate set to trust: the arrivals
+    // themselves are the only notes a just-landed remote edit can have
+    // conflicted, so the sweep checks exactly those — never the whole graph
+    // per batch, and never the (unanswerable) candidates scope.
+    emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 }])
+    await settleScan(INGEST_SETTLE_MS)
+    expect(scanCalls[1]).toMatchObject({ scope: 'ingested', ingestedPaths: ['notes/external.md'] })
+
+    // No watch runs, so its signals are never subscribed to.
+    expect(listeners.has('icloud:conflicts')).toBe(false)
+    expect(listeners.has('icloud:watch-failed')).toBe(false)
+
+    window.dispatchEvent(new Event('focus'))
+    await settleScan()
+    expect(scanCalls[2]?.scope).toBe('full') // resume re-checks everything
+  })
+
+  it('a failed candidates sweep retries at full scope', async () => {
+    const icloud = controller({ watch: true })
     await icloud.start()
     await settleScan() // baseline (full) out of the way
 
@@ -322,6 +351,24 @@ describe('createIcloudController', () => {
     await settleScan()
     // Whatever failed, the retry must be thorough.
     expect(scanCalls[2]?.scope).toBe('full')
+  })
+
+  it('a failed desktop arrival sweep retries at full scope', async () => {
+    const icloud = controller()
+    await icloud.start()
+    await settleScan() // baseline (full) out of the way
+
+    scanResults.push(new Error('container hiccup'))
+    emitFileChanges([{ path: 'notes/one.md', kind: 'upsert', modifiedMs: 1 }])
+    await settleScan(INGEST_SETTLE_MS)
+    expect(scanCalls[1]?.scope).toBe('ingested')
+
+    emitFileChanges([{ path: 'notes/two.md', kind: 'upsert', modifiedMs: 2 }])
+    await settleScan(INGEST_SETTLE_MS)
+    expect(scanCalls[2]).toMatchObject({
+      scope: 'full',
+      ingestedPaths: expect.arrayContaining(['notes/one.md', 'notes/two.md']),
+    })
   })
 
   it('a failed sweep re-queues its ingests and the adoption baseline', async () => {
@@ -365,7 +412,7 @@ describe('createIcloudController', () => {
 
   it('a conflict signal caught mid-sweep replays on the prompt window', async () => {
     scanResults.push('hang')
-    const icloud = controller()
+    const icloud = controller({ watch: true })
     await icloud.start()
     await settleScan() // the baseline sweep starts — and hangs
     expect(scanCalls).toHaveLength(1)
@@ -388,7 +435,7 @@ describe('createIcloudController', () => {
 
   it('a mid-sweep resume keeps its full scope through the replay', async () => {
     scanResults.push('hang')
-    const icloud = controller()
+    const icloud = controller({ watch: true })
     await icloud.start()
     await settleScan() // the baseline sweep starts — and hangs
     expect(scanCalls).toHaveLength(1)
@@ -417,11 +464,11 @@ describe('createIcloudController', () => {
 
     await settleScan(INGEST_SETTLE_MS)
     expect(scanCalls).toHaveLength(2)
-    expect(scanCalls[1]?.ingestedPaths).toEqual(['notes/late.md'])
+    expect(scanCalls[1]).toMatchObject({ scope: 'ingested', ingestedPaths: ['notes/late.md'] })
   })
 
   it('conflict signals and resume events schedule deduped sweeps', async () => {
-    const icloud = controller()
+    const icloud = controller({ watch: true })
     await icloud.start()
     await settleScan() // baseline
 

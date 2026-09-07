@@ -50,7 +50,7 @@ export const AllNotesRow = memo(function AllNotesRow({
       }}
       onDoubleClick={(event) => onOpen(note.path, event)}
       className={cn(
-        'group/row relative h-12 cursor-default select-none transition-colors duration-100',
+        'group/row relative h-12 cursor-default select-none',
         ALL_NOTES_GRID,
         selected
           ? 'border-y border-accent/20 bg-accent-soft text-text dark:border-accent/10 dark:text-text'

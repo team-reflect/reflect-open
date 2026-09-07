@@ -57,6 +57,7 @@ fn note(path: &str, title: &str, links: Vec<IndexedLink>) -> IndexedNote {
         is_pinned: false,
         pinned_order: None,
         has_conflict: false,
+        has_content: true,
         gist_url: None,
         gist_stale: false,
         file_hash: "h".to_string(),
@@ -526,7 +527,7 @@ fn templates_are_invisible_to_backlink_resolution() {
 }
 
 #[test]
-fn asset_description_text_is_searchable_but_stays_out_of_preview_and_note_text() {
+fn asset_description_text_is_searchable_but_stays_out_of_the_preview() {
     let conn = migrated();
     // The note body says nothing about a waterfall; only the asset description
     // (folded into the FTS body, Plan 20) does.
@@ -555,7 +556,7 @@ fn asset_description_text_is_searchable_but_stays_out_of_preview_and_note_text()
     .unwrap();
     assert_eq!(body_hits.len(), 1);
 
-    // The asset text never leaks into the preview or the AI-reachable note_text.
+    // The asset text never leaks into the preview.
     let preview: String = conn
         .query_row(
             "SELECT preview FROM notes WHERE path = 'notes/a.md'",
@@ -566,17 +567,6 @@ fn asset_description_text_is_searchable_but_stays_out_of_preview_and_note_text()
     assert!(
         !preview.contains("waterfall"),
         "preview must not carry asset text"
-    );
-    let note_body: String = conn
-        .query_row(
-            "SELECT text FROM note_text WHERE note_path = 'notes/a.md'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert!(
-        !note_body.contains("waterfall"),
-        "note_text must not carry asset text"
     );
 }
 
@@ -684,6 +674,30 @@ fn reapplying_a_note_replaces_its_rows() {
     let rows = run_query(&conn, "SELECT target_key FROM links", &[]).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["target_key"], Value::from("z"));
+}
+
+#[test]
+fn has_content_lands_on_the_notes_row_and_is_queryable() {
+    let conn = migrated();
+    let mut blank = note("daily/2026-06-02.md", "2026-06-02", vec![]);
+    blank.kind = "daily".to_string();
+    blank.daily_date = Some("2026-06-02".to_string());
+    blank.has_content = false;
+    apply_note(&conn, &blank).unwrap();
+    let mut written = note("daily/2026-06-01.md", "2026-06-01", vec![]);
+    written.kind = "daily".to_string();
+    written.daily_date = Some("2026-06-01".to_string());
+    apply_note(&conn, &written).unwrap();
+
+    let dotted = run_query(
+        &conn,
+        "SELECT daily_date FROM notes WHERE daily_date IS NOT NULL AND has_content = 1
+         ORDER BY daily_date",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(dotted.len(), 1);
+    assert_eq!(dotted[0]["daily_date"], Value::from("2026-06-01"));
 }
 
 #[test]
@@ -845,7 +859,6 @@ fn clear_cascades_to_child_tables() {
     // Deleting notes cascades to children; search_fts is cleared explicitly.
     for table in [
         "notes",
-        "note_text",
         "links",
         "tags",
         "aliases",
@@ -1044,7 +1057,7 @@ fn kind_invariant_migration_wipes_the_projection_for_reindex() {
 
     migrate(&mut conn).expect("migrate to latest");
 
-    for table in ["notes", "note_text", "links", "tags", "tasks", "search_fts"] {
+    for table in ["notes", "links", "tags", "tasks", "search_fts"] {
         let count: i64 = conn
             .query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
                 row.get(0)
@@ -1680,12 +1693,8 @@ fn move_note_migrates_every_row_and_preserves_derived_state() {
     .unwrap();
     assert!(gone.is_empty());
 
-    // Children followed: text, outgoing links, FTS, embedding chunks (vectors kept).
+    // Children followed: outgoing links, FTS, embedding chunks (vectors kept).
     for (sql, expected) in [
-        (
-            "SELECT count(*) AS n FROM note_text WHERE note_path = 'notes/kept-title.md'",
-            1,
-        ),
         (
             "SELECT count(*) AS n FROM links WHERE source_path = 'notes/kept-title.md'",
             1,

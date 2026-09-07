@@ -3,9 +3,9 @@ import type { Span } from './model'
 /**
  * Plain-text rendering (Plan 03): turn a slice of markdown body into the text a
  * reader sees — emphasis/marker syntax dropped, wiki brackets/pipes flattened,
- * backslash escapes resolved, code spans kept literal. Shared by {@link parseNote}
- * for the whole-body FTS/AI text and by each task's display text, so a task
- * renders exactly as the note's body does.
+ * backslash escapes resolved, code spans kept literal. A display projection
+ * and only that: it feeds the UI slots that render a plain string rather than
+ * Markdown (the All Notes row preview, task rows and their breadcrumbs).
  *
  * The walk in `extract.ts` supplies two span sets in body coordinates: `cuts`
  * (syntax ranges to drop — `*emphasis*` marks, the `[ ]` TaskMarker, URLs) and
