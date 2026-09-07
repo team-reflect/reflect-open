@@ -46,17 +46,6 @@ pub(super) fn apply_chunks(
     note_path: &str,
     chunks: &[EmbeddedChunk],
 ) -> AppResult<()> {
-    // Chunks only exist for indexed notes. The embedding pipeline runs on its
-    // own queue, so a slow in-flight embed can land after index_remove
-    // deleted the note — without this guard it would reinsert vectors for a
-    // dead path (which surface as stale text if the path is later reused).
-    let note_exists: bool = conn
-        .prepare_cached("SELECT EXISTS(SELECT 1 FROM notes WHERE path = ?1)")?
-        .query_row(params![note_path], |row| row.get(0))?;
-    if !note_exists {
-        return remove_chunks(conn, note_path); // hygiene: drop any leftovers
-    }
-
     // Existing rows by content hash (a note rarely has duplicate-hash chunks;
     // if it does, rows pair up by position order — both forms are identical).
     let mut existing: Vec<(i64, String, String)> = conn

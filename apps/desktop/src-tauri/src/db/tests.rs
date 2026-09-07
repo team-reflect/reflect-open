@@ -1638,17 +1638,6 @@ fn stored_vectors_round_trip_through_vec_to_json() {
     );
 }
 
-#[test]
-fn apply_chunks_for_an_unindexed_path_is_a_cleaning_no_op() {
-    // The embed pipeline can race index_remove: a late embed_apply for a
-    // deleted note must not reinsert vectors for a dead path.
-    let conn = migrated();
-    let result = apply_chunks(&conn, "notes/gone.md", &[chunk("g1", Some(vec384(0.1)))]);
-    assert!(result.is_ok());
-    assert_eq!(chunk_rows(&conn), vec![]);
-    assert_eq!(vector_count(&conn), 0);
-}
-
 // ---- note_move (Plan 17) ----------------------------------------------------
 
 fn move_in_txn(conn: &mut Connection, from: &str, to: &str) -> crate::error::AppResult<()> {
