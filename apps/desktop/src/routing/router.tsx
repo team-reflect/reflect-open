@@ -176,7 +176,7 @@ export function RouterProvider({
   // eslint-disable-next-line react-hooks/refs
   historyPosition.current = { index: history.index, length: history.stack.length }
 
-  const navigate = useCallback((route: Route, options?: NavigateOptions) => {
+  const navigate = useCallback((route: Route, options?: NavigateOptions) : void => {
     navigationRevisionRef.current += 1
     const target = normalizeRoute(route)
     const surface = scrollSurfaceForRoute(target)
@@ -223,7 +223,7 @@ export function RouterProvider({
     setArrivalFocusEditor(options?.focusEditor === true)
   }, [])
 
-  const back = useCallback(() => {
+  const back = useCallback((): void => {
     if (historyPosition.current.index === 0) {
       return // nothing behind us — must not advance the navigation revision
     }
@@ -234,7 +234,7 @@ export function RouterProvider({
     )
   }, [])
 
-  const forward = useCallback(() => {
+  const forward = useCallback((): void  => {
     if (historyPosition.current.index >= historyPosition.current.length - 1) {
       return
     }
