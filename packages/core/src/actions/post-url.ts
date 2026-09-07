@@ -25,6 +25,11 @@ const X_HOSTS = new Set([
   'mobile.twitter.com',
 ])
 
+/** Is this URL host one of X's, in any of its spellings? */
+export function isXHost(host: string): boolean {
+  return X_HOSTS.has(host)
+}
+
 /** X handles: 1–15 in practice, but the platform accepts up to 50 word characters. */
 export const POST_HANDLE_RE = /^\w{1,50}$/
 

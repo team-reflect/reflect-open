@@ -5,6 +5,7 @@ import {
   POST_MEDIA_MAX,
   POST_TEXT_MAX_LENGTH,
 } from './post-limits'
+import { POST_HANDLE_RE, POST_ID_RE } from './post-url'
 
 /**
  * The platform-agnostic capture envelope (Plan 11): the contract between
@@ -13,7 +14,7 @@ import {
  * sibling screenshot) into the graph's capture inbox; the iOS share
  * extension writes the same shape into the App Group inbox the main app
  * relays on foreground. This module is deliberately browser-safe — it imports nothing
- * but zod and the dependency-free `post-limits`, and the extension consumes it
+ * but zod and the dependency-free `post-limits` and `post-url`, and the extension consumes it
  * through the package's `./capture-envelope` subpath without pulling the rest of
  * core.
  *
@@ -57,7 +58,7 @@ export const postTriggerSchema = z.enum(['bookmark', 'like', 'manual'])
 /** A post's author, as the page or the endpoint names them. */
 export const postAuthorSchema = z.object({
   name: z.string().trim().min(1).max(POST_AUTHOR_NAME_MAX_LENGTH),
-  handle: z.string().regex(/^\w{1,50}$/, 'must be an X handle'),
+  handle: z.string().regex(POST_HANDLE_RE, 'must be an X handle'),
 })
 
 /** One media attachment: the image, or the poster frame of a gif/video. */
@@ -68,7 +69,7 @@ export const postMediaSchema = z.object({
   alt: z.string().max(POST_MEDIA_ALT_MAX_LENGTH).optional(),
 })
 
-const postIdSchema = z.string().regex(/^\d{1,40}$/, 'must be a post id')
+const postIdSchema = z.string().regex(POST_ID_RE, 'must be a post id')
 
 /** A post quoted inside the captured one — one level, never recursive. */
 export const quotedPostSchema = z.object({

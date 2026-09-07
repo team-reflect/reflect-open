@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react'
 import { browser } from 'wxt/browser'
+import { isXHost } from '@reflect/core/post-url'
 import { readQueue } from '@/lib/flush'
 import type { FlushResult } from '@/lib/messages'
 import { saveCapture } from '@/lib/save-capture'
@@ -25,8 +26,6 @@ type SaveState =
   | { phase: 'failed'; message: string }
 
 const RELEASES_URL = 'https://github.com/team-reflect/reflect-open/releases/latest'
-
-const X_HOSTS = new Set(['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'])
 
 function holdMessage(result: FlushResult): string {
   switch (result.holdReason) {
@@ -125,7 +124,7 @@ export function CapturePopup(): ReactElement {
   const busy = save.phase === 'saving' || !includePageTextPreferenceLoaded
   // On X with automatic bookmark capture still off, offer it once here; the
   // click is the user gesture Chrome's permission prompt needs (Plan 25).
-  const offerXCapture = X_HOSTS.has(host) && xCapture.preferences?.bookmarks === false
+  const offerXCapture = isXHost(host) && xCapture.preferences?.bookmarks === false
 
   function onIncludePageTextChange(checked: boolean): void {
     includePageTextTouched.current = true
