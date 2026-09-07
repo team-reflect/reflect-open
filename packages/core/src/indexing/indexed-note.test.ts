@@ -3,8 +3,8 @@ import { gistBodyHash, parseNote } from '../markdown'
 import { buildIndexedNote, CLAIM_TIER, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that rebuilds classifier link keys', () => {
-    expect(PROJECTION_VERSION).toBe(19)
+  it('carries the projection version that rebuilds has_content and the FTS body', () => {
+    expect(PROJECTION_VERSION).toBe(20)
   })
 
   it('flattens a parsed note into the index payload', () => {
@@ -150,6 +150,34 @@ describe('buildIndexedNote', () => {
       source,
     })
     expect(withoutText.assetText).toBe('')
+  })
+
+  it('flags a note as empty only when nothing would render', () => {
+    const hasContentOf = (source: string): boolean =>
+      buildIndexedNote(parseNote({ path: 'daily/2026-06-09.md', source }), {
+        fileHash: 'h',
+        mtime: 0,
+        source,
+      }).hasContent
+
+    expect(hasContentOf('')).toBe(false)
+    expect(hasContentOf('\n  \n')).toBe(false)
+    expect(hasContentOf('---\nprivate: true\n---\n')).toBe(false)
+    // The Tasks screen's "+" writes this before anything is typed.
+    expect(hasContentOf('+ [ ] \n')).toBe(false)
+
+    expect(hasContentOf('Bought milk\n')).toBe(true)
+    expect(hasContentOf('+ [ ] buy milk\n')).toBe(true)
+    expect(hasContentOf('#gym\n')).toBe(true)
+    expect(hasContentOf('See [[Foo]]\n')).toBe(true)
+    // A body that is only a reference extracts to '', but it still carries
+    // tokens the FTS body can match.
+    expect(hasContentOf('![](assets/beach.png)\n')).toBe(true)
+    expect(hasContentOf('https://example.com/shop\n')).toBe(true)
+    expect(hasContentOf('<https://example.com/shop>\n')).toBe(true)
+    expect(hasContentOf('[](notes/foo.md)\n')).toBe(true)
+    // No token at all, but a reader still sees it.
+    expect(hasContentOf('🎉\n')).toBe(true)
   })
 
   it('marks daily notes with their date and carries no id', () => {

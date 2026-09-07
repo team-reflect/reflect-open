@@ -88,8 +88,11 @@ import { serializeWikiSuggestionAddress } from './suggest'
  * and `.md` stripped; '' for strict-path, self, and refused targets), so the
  * backlinks view's name join matches navigation. Existing rows carry the raw
  * fold and must reproject.
+ * 20 - `notes.has_content` replaces the dropped `note_text` table as the "is
+ * this note blank" signal, and `search_fts.body` now carries the raw Markdown
+ * body, so every note must reproject.
  */
-export const PROJECTION_VERSION = 19
+export const PROJECTION_VERSION = 20
 
 /**
  * Precedence of the spellings a note answers to (`note_claims.tier`): the
@@ -204,6 +207,8 @@ export const indexedNoteSchema = z.object({
   pinnedOrder: z.number().nullable(),
   /** The file carries Git conflict markers from a sync merge (Plan 12). */
   hasConflict: z.boolean(),
+  /** The note renders as something: display text, an asset, or a link. */
+  hasContent: z.boolean(),
   /** The published gist's html url, or null when the note has none. */
   gistUrl: z.string().nullable(),
   /** The body changed since it was last published to the gist. */
@@ -313,6 +318,12 @@ export function projectNoteClaims(
 }
 
 /**
+ * A letter or a digit: one token the FTS body could ever match. Markdown
+ * scaffolding alone (`+ [ ] `, `---`, `>`) has none.
+ */
+const SEARCHABLE_CHAR_RE = /[\p{L}\p{N}]/u
+
+/**
  * Flatten a parsed note into the index payload. `meta.source` is the raw
  * markdown the note was parsed from — conflict markers are detected on it
  * (not on the extracted plain text, which may reshape marker lines).
@@ -379,6 +390,7 @@ export function buildIndexedNote(
     text: parsed.text,
     assetText: meta.assetText ?? '',
     preview: previewSnippet(parsed.text, parsed.title),
+    hasContent: parsed.text !== '' || SEARCHABLE_CHAR_RE.test(body),
     links: [...wikiLinks, ...mdLinks],
     tags: parsed.tags.map((tag) => ({ tag, tagKey: foldTag(tag) })),
     aliases,

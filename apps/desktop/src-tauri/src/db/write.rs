@@ -31,6 +31,9 @@ pub struct IndexedNote {
     pub(super) pinned_order: Option<f64>,
     /// The file carries Git conflict markers (sync merge, Plan 12).
     pub(super) has_conflict: bool,
+    /// The note renders as something (display text, an asset, or a link), so
+    /// the calendar can skip a day whose daily note is blank.
+    pub(super) has_content: bool,
     /// The published GitHub Gist's html url, when the note has one.
     pub(super) gist_url: Option<String>,
     /// The body changed since it was last published to the gist.
@@ -143,8 +146,8 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
     remove_note(conn, &note.path)?;
 
     conn.prepare_cached(
-        "INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview)
-         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15, ?16)",
+        "INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview, has_content)
+         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15, ?16, ?17)",
     )?
     .execute(params![
         note.path,
@@ -163,9 +166,8 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
         note.file_hash,
         note.mtime,
         note.preview,
+        i64::from(note.has_content),
     ])?;
-    conn.prepare_cached("INSERT INTO note_text(note_path, text) VALUES(?1, ?2)")?
-        .execute(params![note.path, note.text])?;
     {
         let mut stmt = conn.prepare_cached(
             "INSERT INTO links(source_path, kind, target_raw, target_key, target_path_key, alias, pos_from, pos_to)
@@ -323,8 +325,6 @@ pub(super) fn move_note(
         )?
         .execute(params![to, address.basename_key, claim_tier::BASENAME])?;
     }
-    conn.prepare_cached("UPDATE note_text SET note_path = ?2 WHERE note_path = ?1")?
-        .execute(params![from, to])?;
     conn.prepare_cached("UPDATE links SET source_path = ?2 WHERE source_path = ?1")?
         .execute(params![from, to])?;
     conn.prepare_cached("UPDATE tags SET note_path = ?2 WHERE note_path = ?1")?

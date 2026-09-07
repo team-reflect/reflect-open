@@ -31,6 +31,7 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
     isPinned: false,
     pinnedOrder: null,
     hasConflict: false,
+    hasContent: true,
     gistUrl: null,
     gistStale: false,
     fileHash: 'hash-1',
