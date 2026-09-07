@@ -1,12 +1,26 @@
-import type { ReactElement } from 'react'
-import { AllNotesScreenDynamic } from '@/components/all-notes/all-notes-screen-dynamic'
-import { ChatScreenDynamic } from '@/components/chat/chat-screen-dynamic'
+import { lazy, Suspense, type ReactElement } from 'react'
 import { DailyStream } from '@/components/daily-stream'
+import { LoadingScreen } from '@/components/loading-screen'
 import { SearchRoute } from '@/components/search-route'
 import { SingleNoteView } from '@/components/single-note-view'
-import { SettingsRouteDynamic } from '@/components/settings/settings-route-dynamic'
-import { TasksScreenDynamic } from '@/components/tasks/tasks-screen-dynamic'
 import { useRouter } from '@/routing/router'
+
+const AllNotesScreen = lazy(() =>
+  import('@/components/all-notes/all-notes-screen').then((module) => ({
+    default: module.AllNotesScreen,
+  })),
+)
+const ChatScreen = lazy(() =>
+  import('@/components/chat/chat-screen').then((module) => ({ default: module.ChatScreen })),
+)
+const SettingsRoute = lazy(() =>
+  import('@/components/settings/settings-route').then((module) => ({
+    default: module.SettingsRoute,
+  })),
+)
+const TasksScreen = lazy(() =>
+  import('@/components/tasks/tasks-screen').then((module) => ({ default: module.TasksScreen })),
+)
 
 /**
  * The route → view mapping (Plan 06): the single place a {@link Route} kind
@@ -18,7 +32,7 @@ import { useRouter } from '@/routing/router'
  * today tracking so route arrivals and the highlighted current day use the
  * same clock.
  */
-export function RouteContent(): ReactElement {
+function RouteContentBody(): ReactElement {
   const { route } = useRouter()
   switch (route.kind) {
     case 'today':
@@ -32,21 +46,29 @@ export function RouteContent(): ReactElement {
     case 'allNotes':
       // Owns its scroll container (virtualized table + fixed header), so no
       // ScrollRestored wrapper — same shape as the daily stream.
-      return <AllNotesScreenDynamic tag={route.tag} />
+      return <AllNotesScreen tag={route.tag} />
     case 'tasks':
       // Owns its scroll container (a grouped list with a fixed header), so no
       // ScrollRestored wrapper — same shape as All Notes.
-      return <TasksScreenDynamic />
+      return <TasksScreen />
     case 'search':
       return <SearchRoute query={route.query} />
     case 'chat':
       // Owns its scroll container (the message list pins to the bottom while
       // streaming), so no ScrollRestored wrapper — same shape as All Notes.
-      return <ChatScreenDynamic />
+      return <ChatScreen />
     case 'graphs':
     // The graph-switcher route is a mobile settings sub-screen; on desktop
     // graph switching lives in the sidebar footer, so it renders as settings.
     case 'settings':
-      return <SettingsRouteDynamic />
+      return <SettingsRoute />
   }
+}
+
+export function RouteContent(): ReactElement {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <RouteContentBody />
+    </Suspense>
+  )
 }

@@ -1,14 +1,26 @@
-import type { ReactElement } from 'react'
+import { lazy, Suspense, type ReactElement } from 'react'
+import { LoadingScreen } from '@/components/loading-screen'
 import { useToday } from '@/lib/use-today'
-import { MobileAllNotesDynamic } from '@/mobile/screens/all-notes-dynamic'
-import { MobileChatDynamic } from '@/mobile/screens/chat-dynamic'
 import { MobileDaily } from '@/mobile/screens/daily'
-import { MobileGraphsDynamic } from '@/mobile/screens/graphs-dynamic'
 import { MobileNote } from '@/mobile/screens/note'
-import { MobileSettingsDynamic } from '@/mobile/screens/settings-dynamic'
-import { MobileTasksDynamic } from '@/mobile/screens/tasks-dynamic'
 import type { AllNotesFilters } from '@/mobile/search-filters/filter-state'
 import type { Route } from '@/routing/route'
+
+const MobileAllNotes = lazy(() =>
+  import('@/mobile/screens/all-notes').then((module) => ({ default: module.MobileAllNotes })),
+)
+const MobileChat = lazy(() =>
+  import('@/mobile/screens/chat').then((module) => ({ default: module.MobileChat })),
+)
+const MobileGraphs = lazy(() =>
+  import('@/mobile/screens/graphs').then((module) => ({ default: module.MobileGraphs })),
+)
+const MobileSettings = lazy(() =>
+  import('@/mobile/screens/settings').then((module) => ({ default: module.MobileSettings })),
+)
+const MobileTasks = lazy(() =>
+  import('@/mobile/screens/tasks').then((module) => ({ default: module.MobileTasks })),
+)
 
 interface MobileScreenProps {
   /**
@@ -33,7 +45,7 @@ interface MobileScreenProps {
  * an app left open overnight rolls to the new day's note at midnight instead
  * of editing yesterday's.
  */
-export function MobileScreen({
+function MobileScreenBody({
   route,
   allQuery,
   onAllQueryChange,
@@ -51,7 +63,7 @@ export function MobileScreen({
       return <MobileNote key={route.path} path={route.path} />
     case 'allNotes':
       return (
-        <MobileAllNotesDynamic
+        <MobileAllNotes
           query={allQuery}
           onQueryChange={onAllQueryChange}
           tag={route.tag}
@@ -64,7 +76,7 @@ export function MobileScreen({
       // history shapes with desktop) renders as the All tab; the shell seeds
       // the live query from the entry.
       return (
-        <MobileAllNotesDynamic
+        <MobileAllNotes
           query={allQuery}
           onQueryChange={onAllQueryChange}
           tag={null}
@@ -73,14 +85,22 @@ export function MobileScreen({
         />
       )
     case 'tasks':
-      return <MobileTasksDynamic key="tasks" />
+      return <MobileTasks key="tasks" />
     case 'chat':
-      return <MobileChatDynamic key="chat" />
+      return <MobileChat key="chat" />
     case 'settings':
-      return <MobileSettingsDynamic key="settings" />
+      return <MobileSettings key="settings" />
     case 'graphs':
-      return <MobileGraphsDynamic key="graphs" />
+      return <MobileGraphs key="graphs" />
     default:
       return <MobileDaily key="daily" date={today} />
   }
+}
+
+export function MobileScreen(props: MobileScreenProps): ReactElement {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <MobileScreenBody {...props} />
+    </Suspense>
+  )
 }
