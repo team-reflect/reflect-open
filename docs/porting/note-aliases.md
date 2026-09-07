@@ -37,6 +37,15 @@ aliases:
   complete H1 remains the canonical title while `Tim MacCaw` and `Dad` are
   derived into the rebuildable alias projection. The markdown file is not
   rewritten.
+- Reader-facing surfaces show a `//` title by its first segment, as v1 did:
+  All Notes, the ⌘K palette, backlink and similar-note lists, task groups, the
+  window title, wiki-link chips, and the `reflect search` listing all read
+  `Tim MacCaw`. The complete H1 stays the canonical title, resolution key,
+  link target, and filename slug; the editor still shows the full H1, which
+  remains the place to edit the segments. A chip for `[[Tim MacCaw // Dad]]`
+  reads `Tim MacCaw`, and `[[Tim MacCaw // Dad|Dad]]` keeps its authored
+  `Dad`. When the ⌘K palette matched through a segment, the row shows
+  `Dad → Tim MacCaw` under the title.
 - `[[Dad]]` resolves to that note and counts as its backlink. Choosing the
   `Dad` autocomplete match normally writes `[[Tim MacCaw // Dad|Dad]]`, so the
   editor displays the alias the user chose. Unlike v1's ID-backed links, this
@@ -60,7 +69,9 @@ aliases:
   only its `Dad` segment is still a normal title rename. It can rename the
   markdown file and rewrite graph links; `//` is compatibility syntax, not a
   separately stored alias field. Use frontmatter `aliases` when that distinction
-  matters.
+  matters. A rename records each old segment as well as the old title, so
+  `[[Dad]]` and `[[Tim MacCaw]]` keep resolving after the H1 becomes
+  `# Timothy MacCaw`; segments the new title still carries are not recorded.
 - Daily notes may carry frontmatter or derived `//` aliases. Their calendar
   date remains the strongest address for the ISO-date key.
 - Markdown wikilinks additionally support display text via
@@ -71,7 +82,7 @@ aliases:
 
 | v1                                               | v2                                                              |
 | ------------------------------------------------ | --------------------------------------------------------------- |
-| `Title // Alias1 // Alias2` in the H1            | Supported directly; segments become derived index aliases       |
+| `Title // Alias1 // Alias2` in the H1            | Supported directly; segments become derived index aliases and `Title` is the displayed title |
 | Existing links keep working by stable target ID  | Textual links are rewritten; old title is preserved as alias    |
 | No alias UI beyond the title bar                 | `//` remains available; frontmatter aliases are also editable   |
 | Daily links target the note's stable identity    | Date wins its key; daily notes may also project aliases         |

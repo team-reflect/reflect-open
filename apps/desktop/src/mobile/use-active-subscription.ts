@@ -1,92 +1,171 @@
 import { useEffect } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { IAP_PRODUCT_IDS, iapIsOwned, subscribeIapPurchaseUpdated } from '@reflect/core'
+import { z } from 'zod'
+import { getLocalStorageStore } from '@/lib/local-storage'
+import { queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
-const ENTITLEMENT_QUERY_KEY_YEARLY = ['iap-entitlement-yearly']
-const ENTITLEMENT_QUERY_KEY_MONTHLY = ['iap-entitlement-monthly']
+const activeSubscriptionSchema = z.enum(['yearly', 'monthly']).nullable()
+type ActiveSubscription = z.infer<typeof activeSubscriptionSchema>
 
-/**
- * Drop the cached entitlement answers so both queries refetch from StoreKit.
- * The purchase and restore flows must call this after their command
- * resolves: the plugin resolves `purchase` directly and only emits
- * `purchaseUpdated` from its `Transaction.updates` listener, which StoreKit
- * does not feed for in-app purchases, so waiting for the event would leave a
- * paying customer stuck on the paywall.
- */
-export async function invalidateEntitlementQueries(queryClient: QueryClient): Promise<void> {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_YEARLY }),
-    queryClient.invalidateQueries({ queryKey: ENTITLEMENT_QUERY_KEY_MONTHLY }),
-  ])
+const activeSubscriptionSeedSchema = z.object({
+  value: activeSubscriptionSchema,
+  updatedAt: z.number(),
+})
+const ACTIVE_SUBSCRIPTION_STORAGE_KEY = 'reflect.iap.active-subscription'
+const ACTIVE_SUBSCRIPTION_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000
+const ENTITLEMENT_LOOKUP_TIMEOUT_MS = 5_000
+
+type SubscriptionPlan = Exclude<ActiveSubscription, null>
+const pendingEntitlementLookups = new Map<string, Promise<boolean>>()
+
+function readActiveSubscriptionSeed(): ActiveSubscription | undefined {
+  const seed = getLocalStorageStore(ACTIVE_SUBSCRIPTION_STORAGE_KEY).getJson(
+    activeSubscriptionSeedSchema,
+  )
+  return seed !== undefined && Date.now() - seed.updatedAt <= ACTIVE_SUBSCRIPTION_MAX_AGE_MS
+    ? seed.value
+    : undefined
 }
 
-/**
- * The shared StoreKit entitlement queries: which subscription product this
- * device owns, if any. StoreKit answers from its local transaction cache, so
- * this is fast and works offline once a transaction exists. Only iOS needs a
- * subscription (`needSubscription`): elsewhere the queries stay idle and
- * `activeSubscription` stays null.
- *
- * `pending` is true until an answer exists: a positive from either query
- * settles it immediately (a known subscription must never wait on, or lose
- * to, the sibling product's lookup), otherwise both queries have to settle.
- * A settled failure counts as an answer with `activeSubscription` null, not
- * as pending forever.
- */
-export function useActiveSubscription(): {
-  needSubscription: boolean
-  activeSubscription: 'yearly' | 'monthly' | null
-  pending: boolean
-} {
-  const { platform } = useGraph()
-  const needSubscription = platform === 'ios'
-  const queryClient = useQueryClient()
-
-  const yearlyQuery = useQuery({
-    queryKey: ENTITLEMENT_QUERY_KEY_YEARLY,
-    queryFn: () => iapIsOwned(IAP_PRODUCT_IDS.yearly),
-    staleTime: 60_000,
-    enabled: needSubscription,
+function writeActiveSubscriptionSeed(value: ActiveSubscription): void {
+  getLocalStorageStore(ACTIVE_SUBSCRIPTION_STORAGE_KEY).setJson(activeSubscriptionSeedSchema, {
+    value,
+    updatedAt: Date.now(),
   })
+}
 
-  const monthlyQuery = useQuery({
-    queryKey: ENTITLEMENT_QUERY_KEY_MONTHLY,
-    queryFn: () => iapIsOwned(IAP_PRODUCT_IDS.monthly),
-    staleTime: 60_000,
-    enabled: needSubscription,
+function withEntitlementTimeout(operation: Promise<boolean>): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('StoreKit entitlement lookup timed out'))
+    }, ENTITLEMENT_LOOKUP_TIMEOUT_MS)
+
+    void operation.then(
+      (value) => {
+        clearTimeout(timeout)
+        resolve(value)
+      },
+      (error: unknown) => {
+        clearTimeout(timeout)
+        reject(error)
+      },
+    )
   })
+}
 
-  // Two refresh paths beyond the initial fetch: renewals, offer-code
-  // redemptions, and purchases finished outside the app arrive as
-  // `purchaseUpdated` events, and every return to the foreground re-checks,
-  // so an entitlement that expired or appeared while the process was
-  // suspended is picked up without a relaunch. (`staleTime` alone schedules
-  // nothing, and the shared query client turns focus refetching off.)
-  useEffect(() => {
-    if (!needSubscription) return
-    const subscription = subscribeIapPurchaseUpdated(() => {
-      void invalidateEntitlementQueries(queryClient)
-    })
-    // Fail loud in the log, soft in behavior: without the event stream the
-    // entitlement still refreshes on the next foreground, just not instantly.
-    subscription.ready.catch((err: unknown) => {
-      console.error('subscribing to purchaseUpdated failed', err)
-    })
-    const onVisibilityChange = (): void => {
-      if (document.visibilityState === 'visible') {
-        void invalidateEntitlementQueries(queryClient)
+function lookupEntitlement(productId: string): Promise<boolean> {
+  const pending = pendingEntitlementLookups.get(productId)
+  if (pending !== undefined) {
+    return pending
+  }
+
+  const lookup = iapIsOwned(productId)
+  pendingEntitlementLookups.set(productId, lookup)
+  function clearPendingLookup(): void {
+    if (pendingEntitlementLookups.get(productId) === lookup) {
+      pendingEntitlementLookups.delete(productId)
+    }
+  }
+  void lookup.then(clearPendingLookup, clearPendingLookup)
+  return lookup
+}
+
+function resolveActiveSubscription(
+  lookups: readonly Promise<SubscriptionPlan | null>[],
+): Promise<ActiveSubscription> {
+  return new Promise((resolve, reject) => {
+    let pending = lookups.length
+    const errors: unknown[] = []
+
+    function settleEmptyLookup(): void {
+      pending -= 1
+      if (pending !== 0) {
+        return
+      }
+      if (errors.length > 0) {
+        reject(errors[0])
+      } else {
+        resolve(null)
       }
     }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => {
-      subscription.unlisten()
-      document.removeEventListener('visibilitychange', onVisibilityChange)
+
+    for (const lookup of lookups) {
+      void lookup.then(
+        (plan) => {
+          if (plan !== null) {
+            resolve(plan)
+            return
+          }
+          settleEmptyLookup()
+        },
+        (error: unknown) => {
+          errors.push(error)
+          settleEmptyLookup()
+        },
+      )
     }
-  }, [needSubscription, queryClient])
+  })
+}
 
-  const activeSubscription = yearlyQuery.data ? 'yearly' : monthlyQuery.data ? 'monthly' : null
-  const pending = activeSubscription === null && (yearlyQuery.isPending || monthlyQuery.isPending)
+async function fetchActiveSubscription(): Promise<ActiveSubscription> {
+  const subscription = await resolveActiveSubscription([
+    withEntitlementTimeout(lookupEntitlement(IAP_PRODUCT_IDS.yearly)).then((owned) =>
+      owned ? 'yearly' : null,
+    ),
+    withEntitlementTimeout(lookupEntitlement(IAP_PRODUCT_IDS.monthly)).then((owned) =>
+      owned ? 'monthly' : null,
+    ),
+  ])
+  writeActiveSubscriptionSeed(subscription)
+  return subscription
+}
 
-  return { needSubscription, activeSubscription, pending }
+/** Invalidate both entitlement products through their shared prefix. */
+export async function invalidateEntitlements(queryClient: QueryClient): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: queryKeys.iap.entitlements })
+}
+
+/** The live or startup-seeded active subscription. */
+export function useActiveSubscription(): {
+  value: ActiveSubscription
+  isLoading: boolean
+  isError: boolean
+  invalidate: VoidFunction
+} {
+  const { platform } = useGraph()
+  const enabled = platform === 'ios'
+  const queryClient = useQueryClient()
+  const query = useQuery({
+    queryKey: queryKeys.iap.entitlements,
+    queryFn: fetchActiveSubscription,
+    initialData: readActiveSubscriptionSeed,
+    initialDataUpdatedAt: 0,
+    staleTime: 60_000,
+    refetchOnWindowFocus: 'always',
+    retry: false,
+    enabled,
+  })
+
+  useEffect(() => {
+    if (!enabled) {
+      return
+    }
+    const subscription = subscribeIapPurchaseUpdated(() => {
+      void invalidateEntitlements(queryClient)
+    })
+    subscription.ready.catch((error: unknown) => {
+      console.error('subscribing to purchaseUpdated failed', error)
+    })
+    return subscription.unlisten
+  }, [enabled, queryClient])
+
+  return {
+    value: query.data ?? null,
+    isLoading:
+      query.isLoading || (query.data === null && query.dataUpdatedAt === 0 && query.isFetching),
+    isError: query.isError && query.data == null,
+    invalidate: () => void invalidateEntitlements(queryClient),
+  }
 }

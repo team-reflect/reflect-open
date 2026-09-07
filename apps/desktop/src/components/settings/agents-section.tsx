@@ -1,5 +1,5 @@
-import { useState, type ReactElement } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
 import {
   agentSkillInstall,
@@ -13,7 +13,20 @@ import { SettingsSection } from '@/components/settings/section'
 import { Button } from '@/components/ui/button'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { isMacosDesktop } from '@/lib/platform'
+import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
+
+interface AgentSkillAction {
+  action: 'install' | 'uninstall'
+  generation: number
+  root: string
+}
+
+function writeAgentSkill(variables: AgentSkillAction): Promise<AgentSkillStatus> {
+  return variables.action === 'uninstall'
+    ? agentSkillUninstall(variables.generation)
+    : agentSkillInstall(variables.generation)
+}
 
 /**
  * Settings → Agents: one-click install of a per-graph agent skill under
@@ -25,36 +38,33 @@ import { useGraph } from '@/providers/graph-provider'
 export function AgentsSection(): ReactElement | null {
   const { graph } = useGraph()
   const queryClient = useQueryClient()
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const queryKey = ['agent-skill', graph?.root]
+  const queryKey = queryKeys.agentSkill.status(graph?.root)
   const bridgeReady = useBridgeReady()
   const { data: status } = useQuery({
     queryKey,
     queryFn: agentSkillStatus,
     enabled: bridgeReady && isMacosDesktop && graph !== null,
   })
+  const mutation = useMutation({
+    mutationKey: mutationKeys.agentSkill.write(graph?.root),
+    scope: { id: mutationScopeIds.agentSkillWrite(graph?.root) },
+    mutationFn: writeAgentSkill,
+    onSuccess: (nextStatus, variables) => {
+      queryClient.setQueryData(queryKeys.agentSkill.status(variables.root), nextStatus)
+    },
+  })
 
   if (!isMacosDesktop || graph === null) {
     return null
   }
 
-  async function run(action: (generation: number) => Promise<AgentSkillStatus>): Promise<void> {
-    if (graph === null) {
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      queryClient.setQueryData(queryKey, await action(graph.generation))
-    } catch (caught) {
-      setError(errorMessage(caught))
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const installed = status?.installState === 'current'
+  const isCurrentMutation = mutation.variables?.root === graph.root
+  const actionPending = isCurrentMutation && mutation.isPending
+  const actionError =
+    isCurrentMutation && mutation.error !== null ? errorMessage(mutation.error) : null
+  const mutate = (action: AgentSkillAction['action']): void =>
+    mutation.mutate({ action, generation: graph.generation, root: graph.root })
   return (
     <SettingsSection id="agents">
       <SettingsField
@@ -78,7 +88,7 @@ export function AgentsSection(): ReactElement | null {
                     Installed
                   </span>
                 ) : (
-                  <Button size="xs" disabled={busy} onClick={() => void run(agentSkillInstall)}>
+                  <Button size="xs" disabled={actionPending} onClick={() => mutate('install')}>
                     {status.installState === 'stale' ? 'Update skill' : 'Install skill'}
                   </Button>
                 )}
@@ -86,15 +96,17 @@ export function AgentsSection(): ReactElement | null {
                   <Button
                     size="xs"
                     variant="outline"
-                    disabled={busy}
-                    onClick={() => void run(agentSkillUninstall)}
+                    disabled={actionPending}
+                    onClick={() => mutate('uninstall')}
                   >
                     Remove
                   </Button>
                 ) : null}
               </div>
             )}
-            {error !== null ? <p className="text-xs text-destructive">{error}</p> : null}
+            {actionError !== null ? (
+              <p className="text-xs text-destructive">{actionError}</p>
+            ) : null}
           </div>
         ) : null}
       </SettingsField>

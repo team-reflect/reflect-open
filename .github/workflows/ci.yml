@@ -196,13 +196,6 @@ jobs:
       # set `tauri ios` builds with.
       - name: Check iOS library
         run: cargo check -p reflect-open --lib --target aarch64-apple-ios --no-default-features
-        env:
-          # The Xcode build exports the project's deployment target; there is
-          # no Xcode around `cargo check`, and without it plugin Swift is
-          # compiled for a 13.0 floor (`tauri-utils`' swift-rs default)
-          # instead of the app's real one. Keep in sync with
-          # `deploymentTarget` in ios.project.yml.
-          IPHONEOS_DEPLOYMENT_TARGET: '16.0'
 
   # A single job for branch protection to require, instead of listing every
   # job (and every matrix shard) as a required status check.

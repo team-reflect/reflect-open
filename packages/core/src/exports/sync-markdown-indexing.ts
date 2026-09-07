@@ -174,6 +174,7 @@ export {
   listRecentNotes,
   getPinnedNotes,
   searchNotes,
+  aliasHint,
   suggestWikiTargets,
   suggestWikiLinkTargets,
   suggestTags,

@@ -3,8 +3,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { UserRound } from 'lucide-react'
 import { errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button'
-import { suggestedContactQueryKey, useSuggestedContact } from '@/hooks/use-suggested-contact'
+import { useSuggestedContact } from '@/hooks/use-suggested-contact'
 import { addContactToNote, ignoreContactSuggestion } from '@/lib/note-contact'
+import { queryKeys } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -48,7 +49,7 @@ export function SuggestedContactCard({
       // Ignore — which skipped the mark — computes the renamed title's own
       // suggestion instead of suppressing it until the next disk write.
       await queryClient.invalidateQueries({
-        queryKey: suggestedContactQueryKey(graph?.root, path),
+        queryKey: queryKeys.index.suggestedContact(graph?.root, path),
       })
     } catch (cause) {
       setError(errorMessage(cause))

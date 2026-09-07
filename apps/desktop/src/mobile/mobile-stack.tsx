@@ -144,7 +144,7 @@ function presentLayer(
   }
   // Resting layers carry no transform at all: a transform would turn the
   // layer into the containing block for `position: fixed` descendants (the
-  // daily screen's new-note button, floating editor UI) and shift them.
+  // daily screen's capture menu, floating editor UI) and shift them.
   return { style: base }
 }
 

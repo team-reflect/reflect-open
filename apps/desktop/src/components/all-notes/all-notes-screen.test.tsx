@@ -5,7 +5,7 @@ import { render } from 'vitest-browser-react'
 import type { ReactElement } from 'react'
 import { setBridge } from '@reflect/core'
 import { resetOperations, useOperations } from '@/lib/operations'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { expectLocatorToHaveCount } from '@/test-utils/expect'
 import { AllNotesScreen } from './all-notes-screen'
@@ -235,6 +235,29 @@ describe('AllNotesScreen', () => {
     await view.unmount()
   })
 
+  it('shows a `//` subject by its first segment', async () => {
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command !== 'db_query') {
+        return null
+      }
+      const sql = String(args['sql'])
+      if (sql.includes('group by')) {
+        return facetRows
+      }
+      if (sql.includes('"preview"')) {
+        return [
+          { path: 'notes/tim-maccaw-dad.md', title: 'Tim MacCaw // Dad', mtime: 0, preview: '' },
+        ]
+      }
+      return []
+    })
+    const view = await renderScreen()
+
+    await expect.element(view.getByText('Tim MacCaw', { exact: true })).toBeInTheDocument()
+    expect(view.getByText('Tim MacCaw // Dad').query()).toBeNull()
+    await view.unmount()
+  })
+
   it('opens a note when its row is clicked', async () => {
     const view = await renderScreen()
 
@@ -318,26 +341,23 @@ describe('AllNotesScreen', () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     })
-    client.setQueryData(
-      [INDEX_QUERY_SCOPE, '/g', 'all-notes', null],
-      [
-        {
-          path: 'notes/health.md',
-          title: 'Health Stacked',
-          snippet: 'Shop your health goals.',
-          tags: ['link'],
-          mtime: HEALTH_MTIME,
-        },
-        {
-          path: 'notes/tokyo.md',
-          title: 'Tokyo Gâteau',
-          snippet: 'Dandelion chocolate.',
-          tags: ['link'],
-          mtime: TOKYO_MTIME,
-        },
-      ],
-    )
-    client.setQueryData([INDEX_QUERY_SCOPE, '/g', 'all-notes-tags'], facetRows)
+    client.setQueryData(queryKeys.index.allNotesWithTag('/g', null), [
+      {
+        path: 'notes/health.md',
+        title: 'Health Stacked',
+        snippet: 'Shop your health goals.',
+        tags: ['link'],
+        mtime: HEALTH_MTIME,
+      },
+      {
+        path: 'notes/tokyo.md',
+        title: 'Tokyo Gâteau',
+        snippet: 'Dandelion chocolate.',
+        tags: ['link'],
+        mtime: TOKYO_MTIME,
+      },
+    ])
+    client.setQueryData(queryKeys.index.allNotesTags('/g'), facetRows)
 
     const view = await renderScreen(client)
 

@@ -2,11 +2,15 @@
 
 Reflect's native audio-memo recorder for iOS. The design rule it exists for:
 capture must not depend on the webview. `AVAudioRecorder` writes AAC mono
-`.m4a` files into a staging directory the plugin owns; interruptions, input
-route loss, the duration cap, Siri, and the Live Activity stop button all
-finalize the file natively. The webview ingests staged files into the graph
-when it can (including a launch-time orphan scan) and deletes them only
-afterwards, so a crash anywhere in the chain loses nothing.
+`.m4a` files into a staging directory the plugin owns, rotating itself every
+segment (`recording-<sessionStartMs>.part-NNN[-end].m4a`), so a session has
+no length limit; interruptions, input route loss, Siri, and the Live Activity
+stop button all finalize the current segment natively and mark it as the
+session's last. The webview ingests staged segments into the graph when it
+can (including a launch-time orphan scan, which regroups a crash's leftovers
+from the filenames alone) and deletes them only afterwards, so a crash costs
+at most the segment that was still being recorded, whose container never got
+its finalizing write.
 
 Mobile-only: `apps/desktop/src-tauri` depends on this crate for iOS/Android
 targets only and registers it under `#[cfg(mobile)]`; desktop records through
@@ -49,6 +53,7 @@ Adding, renaming, or removing a command must update, in the same PR:
    `packages/core/src/ipc/recording-plugin.ts` (they mirror `src/models.rs`
    and the Swift event structs field by field).
 
-Events (`recordingLevel`, `recordingStopped`, `nativeAction`) ride the
+Events (`recordingLevel`, `recordingSegment`, `recordingStopped`,
+`nativeAction`) ride the
 built-in `registerListener`/`remove_listener` commands, which is why those
 two stay in `build.rs` `COMMANDS` and `permissions/default.toml`.

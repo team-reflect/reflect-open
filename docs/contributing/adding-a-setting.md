@@ -61,22 +61,32 @@ const { settings, updateSettings, updateSettingsWith } = useSettings()
 
 Semantics you get for free from the provider (and must not re-implement):
 
-- **Instant apply.** `updateSettings` merges into local state immediately;
-  defaults are usable before the disk load settles, so there is no loading
-  gate to handle.
-- **Async, ordered persistence.** Writes are chained in apply order, trail
-  hydration (nothing is written before the disk document has been read), and
-  save the full merged document. Failures surface through the operations
-  status UI and retry on the next change or the quit flush.
+- **Instant simple patches.** `updateSettings` applies over defaults while the
+  disk load is pending. After hydration, it updates the current document in the
+  TanStack Query cache.
+- **Async, ordered persistence.** Each hydrated cache update submits its full
+  immutable document to a scoped TanStack Query mutation. The scope serializes
+  writes in apply order, and nothing is submitted before the disk document has
+  been read. Failures keep the optimistic cache value, surface through the
+  operations status UI, and leave it dirty for the next change or quit flush
+  to retry.
 - **Functional updates for read-modify-write.** Use `updateSettingsWith` for
   list/object edits or anything derived from the current document. Updaters
   dispatched before hydration are queued and replayed over the loaded
   document, so an early edit cannot accidentally compute from defaults and
   wipe the stored value.
+- **One runtime document.** After a successful load, `useSettings()` and
+  imperative readers of `queryKeys.settings.all` observe the same Query cache
+  document. The settings JSON remains the durable source. Quit and background
+  flushes drain submitted mutations, then retry and await the current document
+  when its last save was not confirmed.
 - **Load-sensitive side effects must await hydration.** If a settings entry is
   paired with state elsewhere (for example an OS-keychain secret), call
   `whenSettingsLoaded()` before writing the other half. If the initial load
   failed, settings are session-only and the paired write would be stranded.
+- **Load failure is session-only.** Simple and functional updates still apply
+  over defaults for the current session, but the provider never writes over an
+  unreadable or corrupt settings document.
 - **No save button.** Settings apply live — design your control accordingly.
 
 ## 3. Add the control

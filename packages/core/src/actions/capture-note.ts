@@ -3,10 +3,12 @@ import { isAppError } from '../errors'
 import { readNote } from '../graph/commands'
 import { hashContent } from '../indexing/hash'
 import { wikiLinkSafe } from '../markdown/edit'
-import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
+import { upsertFrontmatter } from '../markdown/frontmatter'
 import type { Frontmatter } from '../markdown/model'
 import type { CaptureIdentity } from './capture-identity'
 import type { CaptureEnvelope } from './capture-envelope'
+
+export { notePrivate } from '../privacy/checkers'
 
 /**
  * Enrichment lifecycle of a capture note, in its frontmatter. `skipped` means
@@ -141,10 +143,6 @@ export async function noteSource(path: string, generation: number): Promise<stri
     }
     throw cause
   }
-}
-
-export function notePrivate(source: string): boolean {
-  return parseFrontmatter(splitFrontmatter(source).raw).data.private
 }
 
 export function metadataValue(text: string): string {

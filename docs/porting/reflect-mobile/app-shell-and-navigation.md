@@ -66,9 +66,10 @@ export, recovery-kit creation, sign out, delete account.
   Tasks is post-release (see [tasks](./tasks.md)). Screens render over a
   subset of the typed `Route` union — no URL router at all, so the
   `NavCapturing`/`RouteToStoreSyncing` glue has no equivalent.
-- **No FAB menu.** Per the 2026-06-12 product call the daily note *is*
-  the capture surface; a single `+` button opens a fresh untitled note via
-  desktop's ⌘N seed/ghost-title flow. Record moves to the audio wave.
+- **The capture FAB is compact by default.** A single persistent `+` expands
+  vertically to **Create note** and **Record audio**, then collapses after an
+  action. Create note uses desktop's ⌘N seed/ghost-title flow; recording opens
+  the native audio drawer.
 - **Most boot gates vanish.** No auth, no encryption unlock, no version
   gate, no Firestore initial sync. What remains: onboarding
   (`onboarding-screen.tsx`: Start fresh / Connect GitHub with device flow,
@@ -107,7 +108,7 @@ not already present:
 | ------------------------------------------- | ------------------------------------------------------------ |
 | Ionic tabs Daily / Tasks / All              | Daily / All tab shell; Tasks post-release                    |
 | react-router v5 URLs (`/:graph/…`)          | Typed `Route` union subset, no URL router                    |
-| FAB → create note / record                  | `+` button → untitled note; record arrives with audio wave   |
+| FAB → create note / record                  | `+` speed dial → untitled note or native audio drawer        |
 | Boot gates (auth/unlock/version/sync)       | Onboarding (fresh / GitHub clone) + graph open only          |
 | Profile card modal                          | Settings sheet (graph, GitHub, sync status, version)         |
 | Graph switcher                              | Shipped via Plan 21 — settings-sheet Switch graph across container graphs |

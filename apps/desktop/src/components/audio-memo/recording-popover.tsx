@@ -3,7 +3,7 @@ import { RecordingWaveform } from '@/components/audio-memo/recording-waveform'
 import { Button } from '@/components/ui/button'
 import { PopoverContent } from '@/components/ui/popover'
 import { Spinner } from '@/components/ui/spinner'
-import { audioMemoCapWarning, formatRecordingElapsed } from '@/lib/recording-time'
+import { formatRecordingElapsed } from '@/lib/recording-time'
 import { useAudioMemo } from '@/providers/audio-memo-provider'
 
 /**
@@ -23,7 +23,6 @@ export function RecordingPopover({
   anchor?: ComponentProps<typeof PopoverContent>['anchor']
 }): ReactElement {
   const memo = useAudioMemo()
-  const capWarning = memo.phase === 'recording' ? audioMemoCapWarning(memo.elapsedMs) : null
 
   return (
     <PopoverContent
@@ -59,9 +58,6 @@ export function RecordingPopover({
           <span className="text-sm font-medium tabular-nums">
             {formatRecordingElapsed(memo.elapsedMs)}
           </span>
-          {capWarning === null ? null : (
-            <span className="text-xs text-text-muted">{capWarning}</span>
-          )}
         </div>
       )}
     </PopoverContent>

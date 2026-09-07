@@ -14,7 +14,14 @@ import { enrichSessionTranscript } from '../ai/audio-memo-transcript'
 import { AUDIO_EXTENSION_BY_MIME, baseMimeType } from '../ai/transcribe'
 import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from '../ai/app-review-demo'
 import { bytesToBase64 } from '../lib/base64'
-import { listDir, listFiles, readNote, writeAsset, writeNote } from '../graph/commands'
+import {
+  importAudioMemo,
+  listDir,
+  listFiles,
+  readNote,
+  writeAsset,
+  writeNote,
+} from '../graph/commands'
 import { writeAssetStreamed } from '../graph/assets'
 import { hasBinaryIpc } from '../ipc/bridge'
 import {
@@ -36,9 +43,9 @@ import { ensureBacklinkTarget } from './backlink-target'
  * raw-first, like the capture-inbox spool: the recording itself is the durable
  * artifact, and transcription is async enrichment that can fail and retry freely.
  *
- * 1. **Capture** ({@link captureAudioMemo}): the recording is written to
- *    `audio-memos/audio-memo-<date>-<time>.<ext>` — local, instant, no
- *    network. The sync engine commits it like any other change.
+ * 1. **Capture** ({@link captureAudioMemoPart}): each segment is written to
+ *    `audio-memos/audio-memo-<date>-<time>.part-NNN.<ext>` — local, instant,
+ *    no network. The sync engine commits it like any other change.
  * 2. **Reconcile** ({@link reconcileAudioMemos}): a memo's transcription is a
  *    note with the **same basename** (`notes/<base>.md`). Any memo without
  *    one resolves or creates the `Audio memos` category note, is transcribed
@@ -102,9 +109,11 @@ const MIME_BY_EXTENSION: Record<string, string> = Object.fromEntries(
  * them. The optional `part` suffix is a session segment (see
  * `audio-memo-session`): `-end` marks the final segment of a cleanly stopped
  * session, and a legacy suffix-free file reads as a one-part closed session.
+ * Part numbers are zero-padded to three digits and grow past it: a session
+ * has no duration cap, so `part-1000` must parse like `part-999`.
  */
 const MEMO_PATH_RE =
-  /^audio-memos\/(audio-memo-(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})(\d{2})-\d{3})(?:\.part-(\d{3})(-end)?)?\.([a-z0-9]+)$/
+  /^audio-memos\/(audio-memo-(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})(\d{2})-\d{3})(?:\.part-(\d{3,})(-end)?)?\.([a-z0-9]+)$/
 
 function pad(value: number, width: number): string {
   return String(value).padStart(width, '0')
@@ -202,16 +211,11 @@ export function audioMemoPartPath(memo: AudioMemoIdentity, part: number, end: bo
   return audioMemoPath(`${memo.base}.part-${pad(part, 3)}${end ? '-end' : ''}.${extension}`)
 }
 
-export interface CaptureAudioMemoInput {
-  /** The recording, as the recorder produced it. */
-  audio: Blob
-  /** The recording's MIME type, possibly with codec parameters. */
-  mimeType: string
-  /** When the recording stopped — names the asset and picks the daily note. */
-  recordedAt: Date
-  /** `GraphInfo.generation` — pins the write to the issuing graph. */
-  generation: number
-}
+/**
+ * A recording's bytes: held in webview memory, or sitting at an OS path only
+ * Rust can read (the mobile recorder writes its segments straight to disk).
+ */
+export type AudioMemoSource = { blob: Blob } | { sourcePath: string }
 
 /** Expected failures are data: the caller retries with the same recording. */
 export type CaptureAudioMemoOutcome =
@@ -222,31 +226,29 @@ export type CaptureAudioMemoOutcome =
  * Persist one recording into the graph — the durable step, no network. The
  * transcription happens later, in {@link reconcileAudioMemos}.
  */
-async function writeAudioMemoAsset(path: string, audio: Blob, generation: number): Promise<void> {
+async function writeAudioMemoAsset(
+  path: string,
+  audio: AudioMemoSource,
+  generation: number,
+): Promise<void> {
+  if ('sourcePath' in audio) {
+    // The recorder already wrote the file: Rust copies it in file-to-file, so
+    // a meeting-length segment never enters webview memory.
+    await importAudioMemo(audio.sourcePath, path, generation)
+    return
+  }
   if (hasBinaryIpc()) {
-    await writeAssetStreamed(path, audio, generation)
+    await writeAssetStreamed(path, audio.blob, generation)
     return
   }
   // Browser dev's in-memory bridge has no binary transport; recordings there
   // are short enough for the base64 JSON route.
-  await writeAsset(path, bytesToBase64(new Uint8Array(await audio.arrayBuffer())), generation)
-}
-
-export async function captureAudioMemo(
-  input: CaptureAudioMemoInput,
-): Promise<CaptureAudioMemoOutcome> {
-  const memo = audioMemoIdentity(input.recordedAt, input.mimeType)
-  try {
-    await writeAudioMemoAsset(memo.audioPath, input.audio, input.generation)
-  } catch (cause) {
-    return { ok: false, message: errorMessage(cause) }
-  }
-  return { ok: true, memo }
+  await writeAsset(path, bytesToBase64(new Uint8Array(await audio.blob.arrayBuffer())), generation)
 }
 
 export interface CaptureAudioMemoPartInput {
   /** One finished segment, as the recorder produced it. */
-  audio: Blob
+  audio: AudioMemoSource
   /** The segment's MIME type, possibly with codec parameters. */
   mimeType: string
   /** When the *session* started — every part shares the session identity. */
@@ -344,6 +346,21 @@ export async function listPendingAudioMemoSessions(
     }
   }
   return pending
+}
+
+/**
+ * Graph paths of every segment of one session, in listing order. The cancel
+ * sweep's account of what a session wrote: an in-memory ledger cannot see
+ * segments a previous webview ingested for the same recording.
+ */
+export async function listAudioMemoSegments(
+  memo: AudioMemoIdentity,
+  generation: number,
+): Promise<string[]> {
+  const files = await listDir(AUDIO_MEMOS_DIR, generation)
+  return files
+    .filter((file) => audioMemoPartFromPath(file.path)?.memo.base === memo.base)
+    .map((file) => file.path)
 }
 
 /**

@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import type { SlashMenuItem, SlashMenuSearchHandler } from '@meowdown/react'
-import { hasBridge, listTemplates } from '@reflect/core'
+import { displayNoteTitle, hasBridge, listTemplates } from '@reflect/core'
 import { insertTemplate } from '@/lib/note-templates'
 import { useGraph } from '@/providers/graph-provider'
 import type { NoteEditorHandle } from './note-editor'
@@ -31,7 +31,7 @@ export function useTemplateSlashItems(
       const templates = await listTemplates()
       return templates.map((template) => ({
         id: template.path,
-        label: template.title,
+        label: displayNoteTitle(template.title),
         // v1 parity: typing `/template` lists every template, whatever its name.
         keywords: ['template'],
         onSelect: () => {

@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useConnectGithubWizard, type ConnectWizardStep } from '@/hooks/use-connect-github-wizard'
-import { useRestoreFocus } from '@/hooks/use-restore-focus'
 
 interface ConnectGithubDialogProps {
   /** A suggested name for a newly created backup repo (from the graph name). */
@@ -41,8 +40,6 @@ export function ConnectGithubDialog({
   pollIntervalMs = 3000,
 }: ConnectGithubDialogProps): ReactElement {
   const wizard = useConnectGithubWizard({ suggestedRepoName, onClose, pollIntervalMs })
-
-  useRestoreFocus()
 
   return (
     <Dialog

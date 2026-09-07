@@ -1,4 +1,4 @@
-import { useEffect, type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import {
   AI_PROVIDERS,
@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -69,20 +70,6 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
     onAdd,
     onDone: onClose,
   })
-
-  // The dialog is conditionally mounted by its parent (not kept alive with
-  // open=false), so Radix's Presence/onCloseAutoFocus path is bypassed when
-  // Cancel or a successful submit calls onClose() directly.  Capturing focus
-  // here and restoring it in the cleanup ensures the opener always gets focus
-  // back regardless of which close path runs.
-  useEffect(() => {
-    const opener = document.activeElement
-    return () => {
-      if (opener instanceof HTMLElement) {
-        opener.focus()
-      }
-    }
-  }, [])
 
   const providerId = useWatch({ control, name: 'provider' })
   const selectedModel = useWatch({ control, name: 'model' })
@@ -138,11 +125,13 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {AI_PROVIDERS.map((candidate) => (
-                  <SelectItem key={candidate.id} value={candidate.id}>
-                    {candidate.label}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  {AI_PROVIDERS.map((candidate) => (
+                    <SelectItem key={candidate.id} value={candidate.id}>
+                      {candidate.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>

@@ -6,6 +6,7 @@ import type {
   WikilinkSearchHandler,
 } from '@meowdown/react'
 import {
+  aliasHint,
   contactLinkSuggestions,
   contactDetailsMarkdown,
   displayNoteTitle,
@@ -169,7 +170,7 @@ export function useEditorAutocomplete(): EditorAutocomplete {
             },
           }
         }
-        const { title, alias, date, path, generated, insertText: target } = entry.suggestion
+        const { title, date, path, generated, insertText: target } = entry.suggestion
         // A generated date leads with its phrase ("Next Friday"), resolved day
         // as the detail; everything else keeps the title/alias/daily form.
         if (generated !== undefined && date !== null) {
@@ -182,9 +183,10 @@ export function useEditorAutocomplete(): EditorAutocomplete {
         // A rich title reads as its rendered form; the raw form stays the identity.
         const displayedTitle = displayNoteTitle(title)
         const label = date !== null ? formatDayLabel(date, settings.dateFormat) : displayedTitle
+        const shownAlias = aliasHint(entry.suggestion)
         const detail =
-          alias !== null
-            ? `${alias} → ${displayedTitle}`
+          shownAlias !== null
+            ? `${shownAlias} → ${displayedTitle}`
             : date !== null
               ? path === null
                 ? `${date} · new`

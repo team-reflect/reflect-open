@@ -12,11 +12,15 @@ class FakeMediaRecorder {
     return this.supported.includes(type)
   }
 
+  /** While true, `stop()` flushes but withholds `onstop` until released. */
+  static holdStop = false
+
   ondataavailable: ((event: { data: Blob }) => void) | null = null
   onstop: (() => void) | null = null
   state: RecordingState = 'inactive'
   stopCalls = 0
   readonly mimeType: string
+  private heldStop: (() => void) | null = null
 
   constructor(_stream: MediaStream, options?: { mimeType?: string }) {
     if (FakeMediaRecorder.failConstruction) {
@@ -34,7 +38,17 @@ class FakeMediaRecorder {
     this.stopCalls += 1
     this.state = 'inactive'
     this.ondataavailable?.({ data: new Blob(['audio-bytes']) })
+    if (FakeMediaRecorder.holdStop) {
+      this.heldStop = () => this.onstop?.()
+      return
+    }
     this.onstop?.()
+  }
+
+  releaseStop(): void {
+    const held = this.heldStop
+    this.heldStop = null
+    held?.()
   }
 }
 
@@ -52,6 +66,7 @@ beforeEach(() => {
   FakeMediaRecorder.instances = []
   FakeMediaRecorder.supported = ['audio/mp4']
   FakeMediaRecorder.failConstruction = false
+  FakeMediaRecorder.holdStop = false
   vi.stubGlobal('MediaRecorder', FakeMediaRecorder)
   vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } })
   getUserMedia.mockReset()
@@ -281,12 +296,39 @@ describe('useAudioRecorder', () => {
     expect(result.current.status).toBe('idle')
   })
 
-  it('fires onMaxDuration once when the cap is reached', async () => {
+  it('a flush that outlives a tick does not queue extra rotations', async () => {
     getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
-    const onMaxDuration = vi.fn()
-    const { result } = await renderHook(() =>
-      useAudioRecorder({ maxDurationMs: 1000, onMaxDuration }),
-    )
+    const onSegment = vi.fn()
+    FakeMediaRecorder.holdStop = true
+    const { result } = await renderHook(() => useAudioRecorder({ segmentMs: 1000, onSegment }))
+
+    await act(async () => {
+      await result.current.start()
+    })
+    // Cross the boundary, then keep ticking while the first flush is stuck:
+    // the segment counter cannot advance until it lands.
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+    act(() => {
+      vi.advanceTimersByTime(600)
+    })
+
+    FakeMediaRecorder.holdStop = false
+    await act(async () => {
+      FakeMediaRecorder.instances[0]!.releaseStop()
+    })
+
+    expect(onSegment).toHaveBeenCalledTimes(1)
+    // One replacement recorder, still live — not a run of near-empty stubs.
+    expect(FakeMediaRecorder.instances).toHaveLength(2)
+    expect(FakeMediaRecorder.instances[1]!.stopCalls).toBe(0)
+  })
+
+  it('reminds the user on every interval boundary', async () => {
+    getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
+    const onReminder = vi.fn()
+    const { result } = await renderHook(() => useAudioRecorder({ reminderMs: 1000, onReminder }))
 
     await act(async () => {
       await result.current.start()
@@ -294,30 +336,34 @@ describe('useAudioRecorder', () => {
     act(() => {
       vi.advanceTimersByTime(999)
     })
-    expect(onMaxDuration).not.toHaveBeenCalled()
+    expect(onReminder).not.toHaveBeenCalled()
     act(() => {
-      vi.advanceTimersByTime(5000)
+      vi.advanceTimersByTime(1)
     })
-    expect(onMaxDuration).toHaveBeenCalledTimes(1)
+    expect(onReminder).toHaveBeenCalledTimes(1)
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+    expect(onReminder).toHaveBeenCalledTimes(2)
   })
 
-  it('stopping before the cap disarms it', async () => {
+  it('a clock jump past several boundaries reminds once', async () => {
     getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
-    const onMaxDuration = vi.fn()
-    const { result } = await renderHook(() =>
-      useAudioRecorder({ maxDurationMs: 1000, onMaxDuration }),
-    )
+    const onReminder = vi.fn()
+    const { result } = await renderHook(() => useAudioRecorder({ reminderMs: 1000, onReminder }))
 
     await act(async () => {
       await result.current.start()
     })
-    await act(async () => {
-      await result.current.stop()
-    })
+    // The machine slept through three boundaries: the elapsed clock jumps
+    // without the tick firing in between.
     act(() => {
-      vi.advanceTimersByTime(5000)
+      vi.setSystemTime(Date.now() + 3000)
+      vi.advanceTimersByTime(200)
     })
-    expect(onMaxDuration).not.toHaveBeenCalled()
+
+    expect(onReminder).toHaveBeenCalledTimes(1)
+    expect(onReminder).toHaveBeenCalledWith(3200)
   })
 
   it('unmount releases the microphone', async () => {

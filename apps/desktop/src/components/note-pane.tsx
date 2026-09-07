@@ -29,6 +29,7 @@ import { useNoteDocument } from '@/editor/use-note-document'
 import { useTagNavigation } from '@/editor/use-tag-navigation'
 import { useTemplateSlashItems } from '@/editor/use-template-slash-items'
 import { useMarkdownLinkNavigation } from '@/editor/use-markdown-link-navigation'
+import { useLinkPreview } from '@/editor/use-link-preview'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { useWikiLinkHoverPreview } from '@/editor/use-wiki-link-hover-preview'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
@@ -133,6 +134,7 @@ export function NotePaneComponent({
   const { graph } = useGraph()
   const { settings } = useSettings()
   const generation = graph?.generation ?? null
+  const graphKey = graph?.root ?? null
   const dailyNote = isDaily(path)
   const lazyCreate = lazy && (dailyNote || isUntitledNotePath(path))
   // Templates rename via file operations only (settings, or outside the app):
@@ -176,6 +178,19 @@ export function NotePaneComponent({
   const onNoteLinkClick = useMarkdownLinkNavigation(generation, path)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
+  const linkPreviewSession = useMemo(
+    () =>
+      generation === null || graphKey === null
+        ? null
+        : {
+            path,
+            generation,
+            graphKey,
+            sessionEpoch: document.sessionEpoch,
+          },
+    [path, generation, graphKey, document.sessionEpoch],
+  )
+  const resolveLinkPreview = useLinkPreview(linkPreviewSession)
 
   const bindEditor = document.bindEditor
   const aiEditorRef = useRef<NoteEditorHandle | null>(null)
@@ -361,6 +376,7 @@ export function NotePaneComponent({
         resolveFileInfo={resolveFileInfo}
         onWikiLinkClick={onWikiLinkClick}
         onNoteLinkClick={onNoteLinkClick}
+        {...(resolveLinkPreview !== undefined ? { resolveLinkPreview } : {})}
         {...(generation !== null && !isTouchEditorSurface() ? { renderWikilinkHoverCard } : {})}
         onTagClick={onTagClick}
         onWikilinkSearch={onWikilinkSearch}

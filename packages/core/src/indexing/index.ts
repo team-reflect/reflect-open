@@ -116,6 +116,7 @@ export {
   type RecentNotesOptions,
 } from './note-list'
 export {
+  aliasHint,
   rankWikiSuggestions,
   mergeDateSuggestions,
   serializeWikiSuggestionAddress,

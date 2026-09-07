@@ -297,6 +297,52 @@ pub fn asset_import(
     Ok(format!("assets/{final_name}"))
 }
 
+/// Copy `source` into the graph at `target`, staging the bytes under
+/// `.reflect/tmp/` so the watcher never sees a partial file.
+///
+/// Idempotent by construction, in both directions: a segment's path encodes
+/// its session and position, so an existing target *is* that same segment,
+/// and a source that is already gone means an earlier ingest moved it (or a
+/// cancelled session swept it away while this capture sat in the queue).
+/// Neither is a failure worth parking the capture queue behind.
+fn import_exact(source: &Path, staging: &Path, target: &Path) -> AppResult<()> {
+    if super::file_occupied(target) {
+        return Ok(());
+    }
+    if !source.is_file() {
+        tracing::warn!(?source, "audio memo import source is gone");
+        return Ok(());
+    }
+    let mut temp = tempfile::NamedTempFile::new_in(staging)?;
+    std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
+    persist_exact(temp, target)
+}
+
+/// Copy a recording the OS gave us a real path for (the iOS recorder's
+/// staging directory) into `audio-memos/` at an exact path. The bytes never
+/// enter webview memory, which is what makes meeting-length segments
+/// affordable on a phone. The destination is fenced to `audio-memos/` like
+/// `audio_memo_delete`, and the path *is* the memo's identity, so the
+/// `assets/` collision renaming of [`asset_import`] would corrupt it.
+#[tauri::command]
+pub fn audio_memo_import(
+    source_path: String,
+    path: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<()> {
+    if !path.starts_with("audio-memos/") {
+        return Err(AppError::traversal(format!(
+            "not an audio memo path: {path}"
+        )));
+    }
+    let root = root_for_generation(&state, generation)?;
+    let target = resolve(&root, &path)?;
+    import_exact(Path::new(&source_path), &staging_dir(&root)?, &target)?;
+    super::invalidate_file_catalog(&state, &root);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -386,6 +432,42 @@ mod tests {
         let temp = temp_in(graph.path(), b"second");
         assert!(persist_exact(temp, &target).is_err());
         assert_eq!(fs::read(&target).unwrap(), b"first");
+    }
+
+    #[test]
+    fn import_copies_the_source_to_the_exact_target() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let source = temp_in(graph.path(), b"segment bytes");
+        let target = graph.path().join("audio-memos/memo.part-001.m4a");
+        import_exact(source.path(), &staging_dir(graph.path()).unwrap(), &target).unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"segment bytes");
+    }
+
+    #[test]
+    fn import_skips_a_source_that_is_already_gone() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let target = graph.path().join("audio-memos/memo.part-001.m4a");
+        import_exact(
+            &graph.path().join("staging/vanished.m4a"),
+            &staging_dir(graph.path()).unwrap(),
+            &target,
+        )
+        .unwrap();
+        assert!(!target.exists());
+    }
+
+    #[test]
+    fn import_leaves_an_existing_target_alone() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let target = graph.path().join("audio-memos/memo.part-001.m4a");
+        fs::create_dir_all(target.parent().unwrap()).unwrap();
+        fs::write(&target, b"already landed").unwrap();
+        let source = temp_in(graph.path(), b"second copy");
+        import_exact(source.path(), &staging_dir(graph.path()).unwrap(), &target).unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"already landed");
     }
 
     #[test]

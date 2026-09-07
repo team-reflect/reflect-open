@@ -60,13 +60,11 @@ export function createDemoModel(): LanguageModelV3 {
           chunks: [
             { type: 'stream-start', warnings: [] },
             { type: 'text-start', id: 'demo-reply' },
-            ...DEMO_REPLY_TEXT.split(/(?<=\s)/).map(
-              (delta): LanguageModelV3StreamPart => ({
-                type: 'text-delta',
-                id: 'demo-reply',
-                delta,
-              }),
-            ),
+            ...DEMO_REPLY_TEXT.split(/(?<=\s)/).map((delta): LanguageModelV3StreamPart => ({
+              type: 'text-delta',
+              id: 'demo-reply',
+              delta,
+            })),
             { type: 'text-end', id: 'demo-reply' },
             {
               type: 'finish',

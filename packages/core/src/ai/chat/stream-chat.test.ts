@@ -8,7 +8,7 @@ import type {
 } from '@ai-sdk/provider'
 import type { RetrievalHit } from '../../embeddings/retrieve'
 import { chunkAssetDescriptionsWithAttribution } from '../../embeddings/chunk'
-import { cloudSafeGraphContext } from '../checkers'
+import { cloudSafeGraphContext } from '../../privacy/checkers'
 import { languageModel } from '../language-model'
 import { fitToContextWindow } from './context-window'
 import { MAX_STEPS, streamChat, streamChatTurn, type ChatStreamEvent } from './stream-chat'

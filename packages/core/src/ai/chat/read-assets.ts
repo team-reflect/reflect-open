@@ -9,7 +9,7 @@ import {
   isPrivateNoteError,
   type CloudAssetDescription,
   type CloudSafe,
-} from '../checkers'
+} from '../../privacy/checkers'
 
 /**
  * The read_assets tool's executor (Plan 20 meets Plan 10): resolve an

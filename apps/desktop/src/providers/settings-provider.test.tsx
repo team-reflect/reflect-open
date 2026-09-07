@@ -1,11 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
-import type { ReactNode } from 'react'
-import { setBridge, type AiProviderConfig } from '@reflect/core'
+import { StrictMode, type ReactNode } from 'react'
+import { setBridge, type AiProviderConfig, type Settings } from '@reflect/core'
 import { resetOperations, useOperations } from '@/lib/operations'
 import { flushSettings } from '@/lib/settings-flush'
-import { SETTINGS_QUERY_KEY, SettingsProvider, useSettings } from './settings-provider'
+import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client'
+import { createSettingsQueryOptions } from '@/lib/query-options'
+import { deferred, type Deferred } from '@/test-utils/deferred'
+import { SettingsProvider, useSettings } from './settings-provider'
 
 /**
  * Exercises the hydration + overrides contract: defaults while the load is in
@@ -15,12 +18,16 @@ import { SETTINGS_QUERY_KEY, SettingsProvider, useSettings } from './settings-pr
  */
 
 let stored: Record<string, unknown>
-let saved: unknown[]
+let saved: Settings[]
 let failSaves: boolean
 let failLoad: boolean
 /** When set, `settings_load` blocks until {@link releaseLoad} is called. */
 let pendingLoad: (() => void) | null
 let gateLoad: boolean
+let loadCalls: number
+let gateSaves: boolean
+let pendingSaves: Deferred<void>[]
+let saveAttempts: Settings[]
 
 function releaseLoad(): void {
   pendingLoad?.()
@@ -32,11 +39,15 @@ function installFakeBridge(): void {
   failSaves = false
   failLoad = false
   gateLoad = false
+  gateSaves = false
   pendingLoad = null
+  pendingSaves = []
+  saveAttempts = []
   setBridge({
     invoke: async (command, args) => {
       switch (command) {
         case 'settings_load':
+          loadCalls += 1
           if (failLoad) {
             throw { kind: 'io', message: 'corrupt store' }
           }
@@ -47,10 +58,17 @@ function installFakeBridge(): void {
           }
           return stored
         case 'settings_save':
-          if (failSaves) {
+          saveAttempts.push(args['settings'] as Settings)
+          const shouldFail = failSaves
+          if (gateSaves) {
+            const pending = deferred<void>()
+            pendingSaves.push(pending)
+            await pending.promise
+          }
+          if (shouldFail) {
             throw { kind: 'io', message: 'disk full' }
           }
-          saved.push(args['settings'])
+          saved.push(args['settings'] as Settings)
           return null
         default:
           return null
@@ -72,13 +90,17 @@ function wrapper({ children }: { children: ReactNode }) {
 
 /** Resolves once the initial settings_load has populated the query cache. */
 async function loadSettled(): Promise<void> {
-  await vi.waitFor(() => expect(queryClient.getQueryData(SETTINGS_QUERY_KEY)).toBeDefined())
+  await vi.waitFor(() => expect(queryClient.getQueryData(queryKeys.settings.all)).toBeDefined())
 }
 
 beforeEach(() => {
   stored = {}
+  loadCalls = 0
   queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    defaultOptions: {
+      mutations: { networkMode: 'always' },
+      queries: { retry: false, staleTime: Infinity },
+    },
   })
   installFakeBridge()
 })
@@ -98,8 +120,25 @@ describe('SettingsProvider', () => {
     expect(result.current.settings.editorMarkdownSyntax).toBe('hide')
     releaseLoad()
     await vi.waitFor(() => expect(result.current.settings.editorMarkdownSyntax).toBe('show'))
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(result.current.settings)
     // Hydration alone must not write the store back.
     expect(saved).toEqual([])
+  })
+
+  it('keeps imperative loading pending until the disk read settles', async () => {
+    stored = { editorMarkdownSyntax: 'show' }
+    gateLoad = true
+    await renderHook(() => useSettings(), { wrapper })
+
+    const settled = vi.fn()
+    const loading = queryClient.ensureQueryData(createSettingsQueryOptions())
+    void loading.then(settled)
+    await vi.waitFor(() => expect(pendingLoad).not.toBeNull())
+    expect(settled).not.toHaveBeenCalled()
+
+    releaseLoad()
+    await expect(loading).resolves.toMatchObject({ editorMarkdownSyntax: 'show' })
+    expect(settled).toHaveBeenCalledOnce()
   })
 
   it('normalizes an invalid persisted value to its default', async () => {
@@ -113,6 +152,7 @@ describe('SettingsProvider', () => {
     stored = { allNotesFilterTags: ['book', 'person'] }
     const { result, act } = await renderHook(() => useSettings(), { wrapper })
     await loadSettled()
+    const before = queryClient.getQueryData(queryKeys.settings.all)
 
     // Same value, new instance — a consumer writing back what it read must
     // not count as a change (reference equality would).
@@ -123,6 +163,7 @@ describe('SettingsProvider', () => {
       await flushSettings()
     })
     expect(saved).toEqual([])
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(before)
 
     // A genuinely changed array still persists.
     await act(() => {
@@ -170,6 +211,7 @@ describe('SettingsProvider', () => {
     stored = { graphColors: { '/graphs/work': 'teal' } }
     const { result, act } = await renderHook(() => useSettings(), { wrapper })
     await loadSettled()
+    const before = queryClient.getQueryData(queryKeys.settings.all)
 
     // Same entries, new instance — re-choosing the current color rebuilds the
     // record without changing it; that must not count as a change.
@@ -180,6 +222,7 @@ describe('SettingsProvider', () => {
       await flushSettings()
     })
     expect(saved).toEqual([])
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(before)
 
     // A genuinely changed record still persists.
     await act(() => {
@@ -200,6 +243,7 @@ describe('SettingsProvider', () => {
     })
     // Applied synchronously — plain React state, no IO in the way.
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(result.current.settings)
     // The persisted document keeps unknown keys (newer-version settings survive).
     await vi.waitFor(() =>
       expect(saved).toEqual([
@@ -238,6 +282,63 @@ describe('SettingsProvider', () => {
         },
       ]),
     )
+  })
+
+  it('uses the shared settings mutation key, scope, and retry policy', async () => {
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
+    await loadSettled()
+    await expect(result.current.whenSettingsLoaded()).resolves.toBe('loaded')
+
+    await act(() => {
+      result.current.updateSettings({ editorMarkdownSyntax: 'show' })
+    })
+    await vi.waitFor(() => expect(saved).toHaveLength(1))
+
+    const mutation = queryClient.getMutationCache().getAll().at(-1)
+    expect(mutation?.options).toMatchObject({
+      mutationKey: mutationKeys.settings.save,
+      networkMode: 'always',
+      retry: 0,
+      scope: { id: mutationScopeIds.settingsSave },
+    })
+  })
+
+  it('serializes rapid saves and leaves disk equal to the query cache', async () => {
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
+    await loadSettled()
+    await expect(result.current.whenSettingsLoaded()).resolves.toBe('loaded')
+    gateSaves = true
+
+    await act(() => {
+      result.current.updateSettings({ editorMarkdownSyntax: 'show' })
+    })
+    await vi.waitFor(() => expect(saveAttempts).toHaveLength(1))
+    expect(saveAttempts[0]).toMatchObject({
+      editorFullWidth: false,
+      editorMarkdownSyntax: 'show',
+    })
+
+    let flushed = false
+    await act(async () => {
+      const flushing = flushSettings().then(() => {
+        flushed = true
+      })
+      result.current.updateSettings({ editorFullWidth: true })
+      expect(saveAttempts).toHaveLength(1)
+      pendingSaves[0]?.resolve()
+      await vi.waitFor(() => expect(saveAttempts).toHaveLength(2))
+      expect(flushed).toBe(false)
+      pendingSaves[1]?.resolve()
+      await flushing
+    })
+    expect(saveAttempts[1]).toMatchObject({
+      editorFullWidth: true,
+      editorMarkdownSyntax: 'show',
+    })
+
+    expect(flushed).toBe(true)
+    expect(saved).toEqual(saveAttempts)
+    expect(saved.at(-1)).toBe(queryClient.getQueryData(queryKeys.settings.all))
   })
 
   it('an update racing the initial load wins and keeps passthrough keys', async () => {
@@ -297,6 +398,28 @@ describe('SettingsProvider', () => {
       ]),
     )
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')
+  })
+
+  it('keeps a simple patch dispatched as the disk query settles', async () => {
+    stored = { editorMarkdownSyntax: 'hide', futureKey: true }
+    gateLoad = true
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
+    const loading = queryClient.ensureQueryData(createSettingsQueryOptions())
+    void loading.then(() => {
+      result.current.updateSettings({ editorMarkdownSyntax: 'show' })
+    })
+
+    await act(async () => {
+      releaseLoad()
+      await loading
+    })
+    await vi.waitFor(() => expect(result.current.settings.editorMarkdownSyntax).toBe('show'))
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(result.current.settings)
+    await vi.waitFor(() =>
+      expect(saved).toEqual([
+        expect.objectContaining({ editorMarkdownSyntax: 'show', futureKey: true }),
+      ]),
+    )
   })
 
   it('compounding updates racing the initial load flush as one document', async () => {
@@ -372,6 +495,50 @@ describe('SettingsProvider', () => {
       }))
     })
     expect(result.current.settings.aiProviders).toEqual([])
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(result.current.settings)
+  })
+
+  it('merges disk, preload patches, and queued updaters in order', async () => {
+    const persisted: AiProviderConfig = {
+      id: 'a',
+      provider: 'openai',
+      model: 'gpt-5.1',
+      keyHint: '11111',
+    }
+    const added: AiProviderConfig = {
+      id: 'b',
+      provider: 'anthropic',
+      model: 'claude-opus-4-8',
+      keyHint: '22222',
+    }
+    stored = { aiProviders: [persisted], futureKey: true }
+    gateLoad = true
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
+
+    await act(() => {
+      result.current.updateSettings({ editorMarkdownSyntax: 'show' })
+      result.current.updateSettingsWith((current) => ({
+        aiProviders: [...current.aiProviders, added],
+      }))
+      result.current.updateSettingsWith((current) => ({
+        aiProviders: current.aiProviders.filter((provider) => provider.id !== persisted.id),
+      }))
+    })
+    expect(result.current.settings.editorMarkdownSyntax).toBe('show')
+    expect(result.current.settings.aiProviders).toEqual([])
+
+    await act(() => releaseLoad())
+    await vi.waitFor(() => expect(result.current.settings.aiProviders).toEqual([added]))
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBe(result.current.settings)
+    await vi.waitFor(() =>
+      expect(saved).toEqual([
+        expect.objectContaining({
+          editorMarkdownSyntax: 'show',
+          aiProviders: [added],
+          futureKey: true,
+        }),
+      ]),
+    )
   })
 
   it('a read-modify-write racing the initial load replays over the loaded document', async () => {
@@ -419,6 +586,10 @@ describe('SettingsProvider', () => {
     }
     failLoad = true
     const { result, act } = await renderHook(() => useSettings(), { wrapper })
+    await vi.waitFor(() =>
+      expect(queryClient.getQueryState(queryKeys.settings.all)?.status).toBe('error'),
+    )
+    const loadError = queryClient.getQueryState(queryKeys.settings.all)?.error
 
     await act(() => {
       result.current.updateSettingsWith((current) => ({
@@ -432,6 +603,10 @@ describe('SettingsProvider', () => {
       await flushSettings()
     })
     expect(saved).toEqual([])
+    expect(queryClient.getQueryState(queryKeys.settings.all)?.status).toBe('error')
+    expect(queryClient.getQueryState(queryKeys.settings.all)?.error).toBe(loadError)
+    expect(queryClient.getQueryData(queryKeys.settings.all)).toBeUndefined()
+    expect(queryClient.getMutationCache().getAll()).toHaveLength(0)
   })
 
   it('with no bridge (browser dev) the load settles as failed instead of hanging', async () => {
@@ -448,6 +623,7 @@ describe('SettingsProvider', () => {
     })
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')
     expect(saved).toEqual([])
+    expect(queryClient.getMutationCache().getAll()).toHaveLength(0)
   })
 
   it('keeps the applied value and surfaces a failed save as an operation', async () => {
@@ -456,6 +632,7 @@ describe('SettingsProvider', () => {
       { wrapper },
     )
     await loadSettled()
+    await expect(result.current.whenSettingsLoaded()).resolves.toBe('loaded')
 
     failSaves = true
     await act(() => {
@@ -483,8 +660,7 @@ describe('SettingsProvider', () => {
     await vi.waitFor(() => expect(result.current.operations).toHaveLength(1))
     expect(saved).toEqual([])
 
-    // Disk recovered; re-applying the same value must re-attempt the write —
-    // `lastPersisted` only advances on a *confirmed* save.
+    // Disk recovered; dirty state makes the same value re-attempt the write.
     failSaves = false
     await act(() => {
       result.current.updateSettings({ editorMarkdownSyntax: 'show' })
@@ -525,6 +701,41 @@ describe('SettingsProvider', () => {
         },
       ]),
     )
+  })
+
+  it('continues a queued save after an earlier save fails', async () => {
+    const { result, act } = await renderHook(
+      () => ({ ...useSettings(), operations: useOperations() }),
+      { wrapper },
+    )
+    await loadSettled()
+    await expect(result.current.whenSettingsLoaded()).resolves.toBe('loaded')
+    failSaves = true
+    gateSaves = true
+
+    await act(() => {
+      result.current.updateSettings({ editorMarkdownSyntax: 'show' })
+    })
+    await vi.waitFor(() => expect(saveAttempts).toHaveLength(1))
+    await act(() => {
+      result.current.updateSettings({ editorFullWidth: true })
+    })
+    expect(saveAttempts).toHaveLength(1)
+
+    failSaves = false
+    pendingSaves[0]?.resolve()
+    await vi.waitFor(() => expect(saveAttempts).toHaveLength(2))
+    pendingSaves[1]?.resolve()
+    await act(async () => {
+      await flushSettings()
+    })
+
+    expect(result.current.operations).toMatchObject([
+      { label: 'Saving settings', status: 'failed', message: 'disk full' },
+    ])
+    expect(saved).toEqual([saveAttempts[1]])
+    expect(saved[0]).toBe(queryClient.getQueryData(queryKeys.settings.all))
+    expect(saveAttempts).toHaveLength(2)
   })
 
   it('the quit flush persists changes a failed save left unconfirmed', async () => {
@@ -581,6 +792,55 @@ describe('SettingsProvider', () => {
     ])
   })
 
+  it('the quit flush drains a pending failure, retries, and awaits the retry', async () => {
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
+    await loadSettled()
+    await expect(result.current.whenSettingsLoaded()).resolves.toBe('loaded')
+    failSaves = true
+    gateSaves = true
+
+    await act(() => {
+      result.current.updateSettings({ editorMarkdownSyntax: 'show' })
+    })
+    await vi.waitFor(() => expect(saveAttempts).toHaveLength(1))
+
+    let flushed = false
+    await act(async () => {
+      const flushing = flushSettings().then(() => {
+        flushed = true
+      })
+      failSaves = false
+      pendingSaves[0]?.resolve()
+      await vi.waitFor(() => expect(saveAttempts).toHaveLength(2))
+      expect(flushed).toBe(false)
+      pendingSaves[1]?.resolve()
+      await flushing
+    })
+
+    expect(flushed).toBe(true)
+    expect(saved).toEqual([saveAttempts[1]])
+    expect(saved[0]).toBe(queryClient.getQueryData(queryKeys.settings.all))
+  })
+
+  it('handles an in-flight save rejection after the provider unmounts', async () => {
+    const view = await renderHook(() => useSettings(), { wrapper })
+    await loadSettled()
+    await expect(view.result.current.whenSettingsLoaded()).resolves.toBe('loaded')
+    failSaves = true
+    gateSaves = true
+
+    await view.act(() => {
+      view.result.current.updateSettings({ editorMarkdownSyntax: 'show' })
+    })
+    await vi.waitFor(() => expect(saveAttempts).toHaveLength(1))
+    await view.unmount()
+    pendingSaves[0]?.resolve()
+
+    await vi.waitFor(() =>
+      expect(queryClient.isMutating({ mutationKey: mutationKeys.settings.save })).toBe(0),
+    )
+  })
+
   it('surfaces a failed load and keeps changes session-only', async () => {
     failLoad = true
     const { result, act } = await renderHook(
@@ -603,5 +863,35 @@ describe('SettingsProvider', () => {
       await flushSettings()
     })
     expect(saved).toEqual([])
+  })
+
+  it('does not repeat load, updater drain, or save in StrictMode', async () => {
+    const added: AiProviderConfig = {
+      id: 'b',
+      provider: 'anthropic',
+      model: 'claude-opus-4-8',
+      keyHint: '22222',
+    }
+    gateLoad = true
+    const strictWrapper = ({ children }: { children: ReactNode }) => (
+      <StrictMode>
+        <QueryClientProvider client={queryClient}>
+          <SettingsProvider>{children}</SettingsProvider>
+        </QueryClientProvider>
+      </StrictMode>
+    )
+    const { result, act } = await renderHook(() => useSettings(), { wrapper: strictWrapper })
+
+    await act(() => {
+      result.current.updateSettingsWith((current) => ({
+        aiProviders: [...current.aiProviders, added],
+      }))
+      releaseLoad()
+    })
+    await vi.waitFor(() => expect(result.current.settings.aiProviders).toEqual([added]))
+    await expect(result.current.whenSettingsLoaded()).resolves.toBe('loaded')
+    await vi.waitFor(() => expect(saved).toHaveLength(1))
+    expect(loadCalls).toBe(1)
+    expect(saved[0]).toMatchObject({ aiProviders: [added] })
   })
 })

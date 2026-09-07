@@ -46,6 +46,7 @@ beforeEach(() => {
   vi.useRealTimers()
   vi.clearAllMocks()
   memo.phase = 'recording'
+  memo.elapsedMs = 65_000
   memo.hasTranscriptionConfig = true
   memo.error = null
   memo.drawerOpen = true
@@ -57,6 +58,13 @@ afterEach(async () => {
 afterEach(() => vi.useRealTimers())
 
 describe('RecordingDrawer', () => {
+  it('counts past an hour: a session has no duration limit', async () => {
+    memo.elapsedMs = 65 * 60_000 + 3000
+    const view = await render(<RecordingDrawer />)
+
+    await expect.element(view.getByText('1:05:03')).toBeVisible()
+  })
+
   it('requires a second tap before discarding a live recording', async () => {
     const view = await render(<RecordingDrawer />)
 

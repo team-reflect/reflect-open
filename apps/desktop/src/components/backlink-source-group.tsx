@@ -1,6 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { WikilinkClickHandler } from '@meowdown/core'
+import { displayNoteTitle } from '@reflect/core'
 import { BacklinkSnippet } from '@/components/backlink-snippet'
 import type { BacklinkSource } from '@/lib/group-backlinks'
 import type { ModClickEvent } from '@/lib/windows/open-in-new-window'
@@ -69,14 +70,14 @@ export function BacklinkSourceGroup({
           onClick={(event) => onOpen(source.path, event)}
           className="min-w-0 cursor-pointer truncate text-left text-xs text-accent"
         >
-          {source.title}
+          {displayNoteTitle(source.title)}
         </button>
 
         {source.snippets.length > 0 ? (
           <button
             type="button"
             aria-expanded={expanded}
-            aria-label={`${expanded ? 'Collapse' : 'Expand'} references from ${source.title}`}
+            aria-label={`${expanded ? 'Collapse' : 'Expand'} references from ${displayNoteTitle(source.title)}`}
             onClick={() => setExpanded(!expanded)}
             className="absolute inset-y-0 -left-5 flex items-center text-text-muted opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
           >

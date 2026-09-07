@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import type { OpenTask } from '@reflect/core'
 import { convertTaskToBullet, deleteTask, editTask, insertTask, toggleTask } from '@/lib/note-task'
+import { mutationKeys } from '@/lib/query-client'
 import { editAndToggleError, isEditAndToggleError } from '@/lib/tasks/edit-and-toggle-error'
 import {
   archiveRecentlyCompleted,
@@ -106,6 +107,7 @@ export function useTaskActions(): TaskActions {
   const contextInsert = useTaskContextInsert()
 
   const completeMutation = useMutation({
+    mutationKey: mutationKeys.tasks.complete(graph?.root),
     mutationFn: async (tasks: OpenTask[]) => {
       const generation = graph?.generation
       if (generation === undefined) {
@@ -136,6 +138,7 @@ export function useTaskActions(): TaskActions {
   })
 
   const reopenMutation = useMutation({
+    mutationKey: mutationKeys.tasks.reopen(graph?.root),
     mutationFn: async (tasks: OpenTask[]) => {
       const generation = graph?.generation
       if (generation === undefined) {
@@ -160,6 +163,7 @@ export function useTaskActions(): TaskActions {
   })
 
   const deleteMutation = useMutation({
+    mutationKey: mutationKeys.tasks.delete(graph?.root),
     mutationFn: async (tasks: OpenTask[]) => {
       const generation = graph?.generation
       if (generation === undefined) {
@@ -193,6 +197,7 @@ export function useTaskActions(): TaskActions {
   })
 
   const editMutation = useMutation({
+    mutationKey: mutationKeys.tasks.edit(graph?.root),
     mutationFn: ({ task, content }: { task: OpenTask; content: string }) => {
       const generation = graph?.generation
       if (generation === undefined) {
@@ -214,6 +219,7 @@ export function useTaskActions(): TaskActions {
   })
 
   const scheduleMutation = useMutation({
+    mutationKey: mutationKeys.tasks.schedule(graph?.root),
     mutationFn: async ({ tasks, isoDate }: { tasks: OpenTask[]; isoDate: string | null }) => {
       const generation = graph?.generation
       if (generation === undefined) {
@@ -241,6 +247,7 @@ export function useTaskActions(): TaskActions {
   })
 
   const convertMutation = useMutation({
+    mutationKey: mutationKeys.tasks.convert(graph?.root),
     mutationFn: async (tasks: OpenTask[]) => {
       const generation = graph?.generation
       if (generation === undefined) {
@@ -277,6 +284,7 @@ export function useTaskActions(): TaskActions {
   })
 
   const editAndConvertMutation = useMutation({
+    mutationKey: mutationKeys.tasks.editAndConvert(graph?.root),
     mutationFn: async ({ task, content }: { task: OpenTask; content: string }) => {
       const generation = graph?.generation
       if (generation === undefined) {
@@ -304,6 +312,7 @@ export function useTaskActions(): TaskActions {
   })
 
   const insertMutation = useMutation({
+    mutationKey: mutationKeys.tasks.insert(graph?.root),
     mutationFn: (target: InsertTaskTarget) => {
       const generation = graph?.generation
       if (generation === undefined) {
@@ -315,6 +324,7 @@ export function useTaskActions(): TaskActions {
   })
 
   const editAndToggleMutation = useMutation({
+    mutationKey: mutationKeys.tasks.editAndToggle(graph?.root),
     mutationFn: async ({ task, content }: { task: OpenTask; content: string }) => {
       const generation = graph?.generation
       if (generation === undefined) {

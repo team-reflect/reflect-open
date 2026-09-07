@@ -4,7 +4,7 @@ import { isDaily, relatedNotes, type RetrievalHit } from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { readNoteSource } from '@/lib/note-frontmatter'
 import { isOstensiblyEmptyNoteSource } from '@/lib/note-emptiness'
-import { INDEX_QUERY_SCOPE, SIMILAR_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -47,7 +47,7 @@ export function useSimilarNotes(path: string): RetrievalHit[] {
   const bridgeAvailable = useBridgeReady()
   const dailyNote = isDaily(path)
   const { data: dailyNoteIsEmpty } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'daily-empty', path],
+    queryKey: queryKeys.index.dailyEmpty(graph?.root, path),
     queryFn: async () => isOstensiblyEmptyNoteSource(await readNoteSource(path)),
     enabled: bridgeAvailable && graph !== null && dailyNote && settings.semanticSearchEnabled,
   })
@@ -60,7 +60,7 @@ export function useSimilarNotes(path: string): RetrievalHit[] {
   useEffect(() => {
     if (dailyNoteIsEmpty === true) {
       queryClient.removeQueries({
-        queryKey: [SIMILAR_QUERY_SCOPE, graphRoot, path],
+        queryKey: queryKeys.similar.note(graphRoot, path),
         exact: true,
       })
     }
@@ -71,7 +71,7 @@ export function useSimilarNotes(path: string): RetrievalHit[] {
     settings.semanticSearchEnabled &&
     (!dailyNote || dailyNoteIsEmpty === false)
   const { data } = useQuery({
-    queryKey: [SIMILAR_QUERY_SCOPE, graph?.root, path],
+    queryKey: queryKeys.similar.note(graph?.root, path),
     queryFn: () => relatedNotes(path, SIMILAR_NOTES_LIMIT),
     enabled,
     staleTime: (query) => ((query.state.data?.length ?? 0) > 0 ? Infinity : 0),

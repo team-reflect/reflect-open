@@ -6,7 +6,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { setBridge } from '@reflect/core'
 import { GraphProvider, useGraph } from './graph-provider'
 import { SettingsProvider } from './settings-provider'
-import { ICLOUD_STATUS_QUERY_KEY, queryClient as appQueryClient } from '@/lib/query-client'
+import { queryClient as appQueryClient, queryKeys } from '@/lib/query-client'
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }))
 vi.mock('@/lib/platform', async (importOriginal) => ({
@@ -266,7 +266,7 @@ describe('GraphProvider open sequencing', () => {
 
     // The chooser's listing was cached before the delete; without the drop it
     // would keep showing the deleted graph (queries never go stale on their own).
-    appQueryClient.setQueryData(ICLOUD_STATUS_QUERY_KEY, {
+    appQueryClient.setQueryData(queryKeys.icloud.status, {
       available: true,
       documentsRoot: '/icloud/Documents',
       existingGraphRoots: ['/known'],
@@ -278,7 +278,7 @@ describe('GraphProvider open sequencing', () => {
 
     expect(invokeLog).toContain('graph_delete')
     expect(result.current.status).toBe('choosing')
-    expect(appQueryClient.getQueryData(ICLOUD_STATUS_QUERY_KEY)).toBeUndefined()
+    expect(appQueryClient.getQueryData(queryKeys.icloud.status)).toBeUndefined()
   })
 
   it('returns to the graph chooser without opening the folder picker', async () => {

@@ -152,3 +152,30 @@ describe('BacklinkSnippet task checkboxes', () => {
     await view.unmount()
   })
 })
+
+describe('BacklinkSnippet wiki-link chips', () => {
+  it('labels chips through the host resolver and reports the full target', async () => {
+    const onWikilinkClick = vi.fn()
+    const view = await render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <BacklinkSnippet
+          text={'- see [[Tim MacCaw // Dad|Dad]] and [[Tim MacCaw // Dad]]'}
+          notePath="notes/meeting.md"
+          tasks={[]}
+          onWikilinkClick={onWikilinkClick}
+          resolveImageUrl={() => undefined}
+        />
+      </QueryClientProvider>,
+    )
+    const chips = view.getByTestId('wikilink')
+    await expect.element(chips.first()).toHaveTextContent(/^Dad$/)
+    await expect.element(chips.last()).toHaveTextContent(/^Tim MacCaw$/)
+    await chips.first().click()
+    expect(onWikilinkClick).toHaveBeenCalledWith(
+      expect.objectContaining({ target: 'Tim MacCaw // Dad' }),
+    )
+    await view.unmount()
+  })
+})

@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import type { OpenTask } from '@reflect/core'
 import { toggleTask } from '@/lib/note-task'
+import { mutationKeys } from '@/lib/query-client'
 import {
   forgetRecentlyCompleted,
   hasRecentlyCompleted,
@@ -39,6 +40,7 @@ export function useTaskCheckboxAction(): TaskCheckboxAction {
   const root = graph?.root ?? null
 
   const mutation = useMutation({
+    mutationKey: mutationKeys.tasks.checkboxToggle(graph?.root),
     mutationFn: ({ task, generation }: ToggleTaskInput) => toggleTask(task, generation),
     onMutate: async ({ task }: ToggleTaskInput): Promise<ToggleTaskContext> => {
       const snapshot = await cache.snapshot()

@@ -6,6 +6,7 @@ import { InlineAlert } from '@/components/inline-alert'
 import { Spinner } from '@/components/ui/spinner'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { graphNameFromRoot } from '@/lib/graph-names'
+import { queryKeys } from '@/lib/query-client'
 import { NewGraphDrawer } from '@/mobile/new-graph-drawer'
 import { MobileScreenHeader } from '@/mobile/screen-header'
 import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list'
@@ -32,9 +33,10 @@ export function MobileGraphs(): ReactElement {
 
   const bridgeReady = useBridgeReady()
   const { data: storage } = useQuery({
-    queryKey: ['mobile-storage'],
+    queryKey: queryKeys.mobile.storage,
     queryFn: mobileStorage,
     enabled: bridgeReady,
+    // The graph list can change outside the app between visits.
     refetchOnMount: 'always',
   })
 

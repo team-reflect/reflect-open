@@ -7,7 +7,7 @@ import {
   useNoteRowOverlay,
 } from '@/hooks/note-row-overlay'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
 export interface NoteRowState {
@@ -32,7 +32,7 @@ export function useNoteRowState(path: string): NoteRowState {
   const generation = graph?.generation
   const bridgeReady = useBridgeReady()
   const { data, isFetched } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'note', path],
+    queryKey: queryKeys.index.note(graph?.root, path),
     queryFn: async () => (await getNote(path)) ?? null,
     enabled: bridgeReady && graph !== null,
   })

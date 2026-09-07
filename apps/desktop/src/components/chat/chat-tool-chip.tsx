@@ -9,6 +9,7 @@ import {
   Search,
 } from 'lucide-react'
 import {
+  displayNoteTitle,
   isTagName,
   isToolPending,
   type AssistantPart,
@@ -73,7 +74,7 @@ function NoteLinks({ notes, onOpen }: NoteLinksProps): ReactElement | null {
             onClick={(event) => onOpen(note.path, event)}
             className="underline-offset-2 hover:text-text hover:underline"
           >
-            {note.title}
+            {displayNoteTitle(note.title)}
           </button>
         </Fragment>
       ))}
@@ -302,7 +303,7 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
     <ChipFrame pending={pending} icon={<FileText aria-hidden className="size-3.5" />}>
       Read{' '}
       {notes.map((note, index) => {
-        const label = note.title ?? note.path
+        const label = note.title !== null ? displayNoteTitle(note.title) : note.path
         return (
           <Fragment key={`${note.path}-${index}`}>
             {index > 0 ? ', ' : ''}

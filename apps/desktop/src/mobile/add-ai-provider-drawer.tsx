@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -124,11 +125,13 @@ function AddAiProviderSheet({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {AI_PROVIDERS.map((candidate) => (
-                <SelectItem key={candidate.id} value={candidate.id}>
-                  {candidate.label}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                {AI_PROVIDERS.map((candidate) => (
+                  <SelectItem key={candidate.id} value={candidate.id}>
+                    {candidate.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>
@@ -162,11 +165,13 @@ function AddAiProviderSheet({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {provider.models.map((candidate) => (
-                  <SelectItem key={candidate.id} value={candidate.id}>
-                    {candidate.label}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  {provider.models.map((candidate) => (
+                    <SelectItem key={candidate.id} value={candidate.id}>
+                      {candidate.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           )}

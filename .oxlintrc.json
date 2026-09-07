@@ -4,8 +4,7 @@
   "rules": {
     "typescript/no-explicit-any": "error",
     "import/no-default-export": "error",
-    "import/no-namespace": "error",
-    "eslint/max-lines": ["warn", 500]
+    "import/no-namespace": "error"
   },
   "overrides": [
     {

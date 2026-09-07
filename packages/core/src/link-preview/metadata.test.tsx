@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parsePageMeta } from './meta-scrape'
+import { parseLinkPreviewMeta, parsePageMeta } from './metadata'
 
 describe('parsePageMeta', () => {
   it('prefers OpenGraph tags over the document fallbacks', () => {
@@ -66,5 +66,50 @@ describe('parsePageMeta', () => {
       `<html><head><meta name="description" content="${'x'.repeat(2000)}"></head></html>`,
     )
     expect(meta.description).toHaveLength(500)
+  })
+})
+
+describe('parseLinkPreviewMeta', () => {
+  it('resolves a declared raster icon against the final page URL', () => {
+    const meta = parseLinkPreviewMeta(
+      `
+        <html><head>
+          <meta property="og:title" content="  Example   title ">
+          <meta name="description" content="A description">
+          <link rel="apple-touch-icon" href="../icons/touch.png">
+        </head></html>
+      `,
+      'https://example.com/articles/page',
+    )
+    expect(meta).toEqual({
+      title: 'Example title',
+      description: 'A description',
+      iconUrl: 'https://example.com/icons/touch.png',
+    })
+  })
+
+  it('ignores declared SVG icons and falls back to favicon.ico', () => {
+    const meta = parseLinkPreviewMeta(
+      '<title>Example</title><link rel="icon" type="image/svg+xml" href="/icon.svg">',
+      'https://example.com/path',
+    )
+    expect(meta?.iconUrl).toBe('https://example.com/favicon.ico')
+  })
+
+  it('requires a title and caps display fields', () => {
+    expect(
+      parseLinkPreviewMeta('<meta name="description" content="Only body">', 'https://x.test'),
+    ).toBeNull()
+    const meta = parseLinkPreviewMeta(
+      `<title>${'t'.repeat(400)}</title><meta name="description" content="${'d'.repeat(500)}">`,
+      'https://x.test',
+    )
+    expect(meta?.title).toHaveLength(200)
+    expect(meta?.description).toHaveLength(300)
+  })
+
+  it('rejects metadata whose final page URL is not HTTP(S)', () => {
+    expect(parseLinkPreviewMeta('<title>Example</title>', 'file:///tmp/page')).toBeNull()
+    expect(parseLinkPreviewMeta('<title>Example</title>', 'not a URL')).toBeNull()
   })
 })

@@ -383,4 +383,24 @@ describe('CommandPalette', () => {
     await userEvent.keyboard('{Enter}')
     await expect.element(view.getByTestId('route')).toHaveTextContent('2026-06-09')
   })
+
+  it('shows a `//` note by its first segment and names the alias it matched through', async () => {
+    suggestWikiTargets.mockResolvedValue([
+      {
+        target: 'Tim MacCaw // Dad',
+        path: 'notes/tim-maccaw-dad.md',
+        title: 'Tim MacCaw // Dad',
+        alias: 'Dad',
+        date: null,
+      },
+    ])
+    searchWithFilters.mockResolvedValue([])
+    const { view } = await renderPalette('dad')
+    await expect.element(view.getByText('Tim MacCaw', { exact: true })).toBeInTheDocument()
+    await expect.element(view.getByText('Dad → Tim MacCaw')).toBeInTheDocument()
+    expect(view.getByText('Tim MacCaw // Dad').query()).toBeNull()
+
+    await userEvent.keyboard('{Enter}')
+    await expect.element(view.getByTestId('route')).toHaveTextContent('notes/tim-maccaw-dad.md')
+  })
 })

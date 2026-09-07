@@ -3,7 +3,7 @@ import { errorMessage } from '../../errors'
 import { languageModel } from '../language-model'
 import { modelContextWindow } from '../provider-catalog'
 import type { AiProviderConfig } from '../../settings/schema'
-import type { CloudGraphContext, CloudSafe } from '../checkers'
+import type { CloudGraphContext, CloudSafe } from '../../privacy/checkers'
 import { fitToContextWindow } from './context-window'
 import { chatSystemPrompt } from './system-prompt'
 import {

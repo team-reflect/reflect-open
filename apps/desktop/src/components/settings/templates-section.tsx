@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { errorMessage, listTemplates, type TemplateEntry } from '@reflect/core'
+import { displayNoteTitle, errorMessage, type TemplateEntry } from '@reflect/core'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,7 +16,7 @@ import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { deleteOpenNote } from '@/lib/note-delete'
 import { renameTemplate } from '@/lib/note-templates'
 import { startOperation } from '@/lib/operations'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { createTemplatesQueryOptions } from '@/lib/query-options'
 import { useGraph } from '@/providers/graph-provider'
 import { useNoteTemplates } from '@/providers/note-templates-provider'
 import { SettingsField } from './field'
@@ -36,8 +36,7 @@ export function TemplatesSection(): ReactElement {
   const [renaming, setRenaming] = useState<TemplateEntry | null>(null)
   const [deleting, setDeleting] = useState<TemplateEntry | null>(null)
   const { data: templates } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'templates'],
-    queryFn: listTemplates,
+    ...createTemplatesQueryOptions(graph?.root),
     enabled: graph !== null,
   })
 
@@ -62,14 +61,14 @@ export function TemplatesSection(): ReactElement {
                   className="min-w-0 flex-1 text-left"
                 >
                   <span className="block truncate text-sm text-text hover:text-accent">
-                    {template.title}
+                    {displayNoteTitle(template.title)}
                   </span>
                   <span className="block truncate text-xs text-text-muted">{template.path}</span>
                 </button>
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Rename ${template.title}`}
+                  aria-label={`Rename ${displayNoteTitle(template.title)}`}
                   onClick={() => setRenaming(template)}
                 >
                   <Pencil aria-hidden strokeWidth={1.75} />
@@ -77,7 +76,7 @@ export function TemplatesSection(): ReactElement {
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Delete ${template.title}`}
+                  aria-label={`Delete ${displayNoteTitle(template.title)}`}
                   onClick={() => setDeleting(template)}
                 >
                   <Trash2 aria-hidden strokeWidth={1.75} />

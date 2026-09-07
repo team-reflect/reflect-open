@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { useRouter } from '@/routing/router'
 
 /**
- * One note, opened from a wiki link, the new-note button, or (later) search
+ * One note, opened from a wiki link, the new-note action, or (later) search
  * (Plan 19). Lazy like the desktop note route, so a link to a not-yet-created
  * note opens an empty editor and the file is born on the first keystroke; a
  * fresh untitled note (`+`, V1 parity) autofocuses so the keyboard is up and

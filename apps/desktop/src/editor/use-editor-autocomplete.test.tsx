@@ -143,6 +143,39 @@ describe('useEditorAutocomplete', () => {
     expect(operationFail).not.toHaveBeenCalled()
   })
 
+  it('labels a `//` note by its first segment and details only an informative alias', async () => {
+    suggestWikiLinkTargets.mockResolvedValue({
+      suggestions: [
+        {
+          target: 'Tim MacCaw // Dad',
+          path: 'notes/tim-maccaw-dad.md',
+          title: 'Tim MacCaw // Dad',
+          alias: 'Dad',
+          date: null,
+          insertText: 'Tim MacCaw // Dad|Dad',
+        },
+        {
+          target: 'Charlotte MacCaw // Mum',
+          path: 'notes/charlotte-maccaw-mum.md',
+          title: 'Charlotte MacCaw // Mum',
+          alias: 'Charlotte MacCaw',
+          date: null,
+          insertText: 'Charlotte MacCaw // Mum|Charlotte MacCaw',
+        },
+      ],
+      claimedTargetKeys: [],
+      queryReadsAsDate: false,
+    })
+    const { result } = await renderHook(() => useEditorAutocomplete())
+
+    const items = await result.current.onWikilinkSearch('maccaw')
+    expect(items.slice(0, 2)).toMatchObject([
+      { target: 'Tim MacCaw // Dad|Dad', label: 'Tim MacCaw', detail: 'Dad → Tim MacCaw' },
+      { target: 'Charlotte MacCaw // Mum|Charlotte MacCaw', label: 'Charlotte MacCaw' },
+    ])
+    expect(items[1]).not.toHaveProperty('detail')
+  })
+
   it('uses an existing email owner as the Contact row target', async () => {
     settingsState.contactsEnabled = true
     const contact = {

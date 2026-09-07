@@ -25,7 +25,7 @@ const startOperation = vi.hoisted(() =>
  * The mobile note actions drawer: pin/share/delete already live here; this
  * suite adds privacy parity coverage against mocked index state and canonical
  * toggle helpers so close/reopen and failure rollback are exercised directly.
- * Delete routes through the shared {@link NoteDeleteDialog}; the graph comes
+ * Delete routes through the shared {@link NoteDeleteDrawer}; the graph comes
  * from a mutable store so the no-graph failure path can be exercised too.
  *
  * The real drawer's drag/animation is covered elsewhere and on-device. This
@@ -78,8 +78,14 @@ vi.mock('@/components/ui/drawer', async () => {
     },
     DrawerContent: ({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) => {
       const { open } = useDrawerContext()
-      return open ? <div {...props}>{children}</div> : null
+      return open ? (
+        <div role="dialog" data-slot="drawer-content" {...props}>
+          {children}
+        </div>
+      ) : null
     },
+    DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    DrawerDescription: ({ children }: { children?: ReactNode }) => <p>{children}</p>,
     DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
   }
 })
@@ -268,6 +274,7 @@ describe('NoteActionsMenu', () => {
     await view.getByRole('button', { name: 'Delete' }).click()
 
     const dialog = page.getByRole('dialog')
+    await expect.element(dialog).toHaveAttribute('data-slot', 'drawer-content')
     await dialog.getByRole('button', { name: 'Delete' }).click()
 
     await vi.waitFor(() => expect(deleteOpenNote).toHaveBeenCalledWith('notes/meeting.md', 7))

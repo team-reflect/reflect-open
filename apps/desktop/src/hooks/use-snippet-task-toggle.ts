@@ -4,6 +4,7 @@ import { errorMessage, type SnippetTask } from '@reflect/core'
 import type { TaskClickHandler, TaskClickPayload } from '@meowdown/react'
 import { toggleTask } from '@/lib/note-task'
 import { startOperation } from '@/lib/operations'
+import { mutationKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
 interface SnippetToggleInput {
@@ -46,6 +47,7 @@ export function useSnippetTaskToggle(
   const { graph } = useGraph()
 
   const mutation = useMutation({
+    mutationKey: mutationKeys.tasks.snippetToggle(graph?.root),
     mutationFn: ({ notePath: path, task, generation }: SnippetToggleInput) =>
       toggleTask({ notePath: path, markerOffset: task.markerOffset, raw: task.raw }, generation),
     onError: (cause, { task }) => {

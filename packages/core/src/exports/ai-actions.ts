@@ -58,7 +58,7 @@ export {
   type CloudSafe,
   type CloudSearchHit,
   type CloudSendable,
-} from '../ai/checkers'
+} from '../privacy/checkers'
 export {
   buildNoteTools,
   MAX_DAILY_NOTE_DAYS,
@@ -169,13 +169,13 @@ export {
   audioMemoIdentity,
   audioMemoPartFromPath,
   audioMemoPartPath,
-  captureAudioMemo,
   captureAudioMemoPart,
   isSilentStop,
+  listAudioMemoSegments,
   listPendingAudioMemoSessions,
   reconcileAudioMemos,
   type AudioMemoIdentity,
-  type CaptureAudioMemoInput,
+  type AudioMemoSource,
   type CaptureAudioMemoOutcome,
   type CaptureAudioMemoPartInput,
   type ReconcileAudioMemosInput,
@@ -183,7 +183,7 @@ export {
   type ReconcileStop,
 } from '../actions/audio-memo'
 export {
-  AUDIO_MEMO_MAX_DURATION_MS,
+  AUDIO_MEMO_REMINDER_MS,
   AUDIO_MEMO_SEGMENT_MS,
   type AudioMemoSession,
 } from '../actions/audio-memo-session'
@@ -221,7 +221,8 @@ export {
   type ReconcileCaptureEnrichmentInput,
   type ReconcileCaptureEnrichmentOutcome,
 } from '../actions/capture'
-export { parsePageMeta, scrapePageMeta, type PageMeta } from '../actions/meta-scrape'
+export { parsePageMeta, type PageMeta } from '../link-preview/metadata'
+export { scrapePageMeta } from '../actions/meta-scrape'
 export {
   calendarAuthorizationStatus,
   canReadCalendars,

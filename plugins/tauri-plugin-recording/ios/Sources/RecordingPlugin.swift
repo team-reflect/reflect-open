@@ -1,6 +1,7 @@
 import AVFoundation
 import Tauri
 import UIKit
+import UserNotifications
 import WebKit
 
 #if canImport(ActivityKit)
@@ -15,18 +16,33 @@ struct RecordingLevel: Encodable {
   let elapsedMs: Double
 }
 
+/// The payload of the `recordingSegment` event: a finished segment of a
+/// session that is still recording. The final segment never arrives here (a
+/// webview stop resolves its own invoke, a native stop fires
+/// `recordingStopped`), so every segment is announced exactly once.
+struct RecordingSegment: Encodable {
+  /// Absolute path of the staged `.m4a`.
+  let path: String
+  /// The session's identity timestamp in epoch ms, shared by every segment.
+  let sessionStartedMs: Double
+  /// 1-based position within the session.
+  let part: Int
+}
+
 /// The payload of the `recordingStopped` event — a stop the *native* side
-/// initiated (interruption, route change, the duration cap, or an encoder
+/// initiated (interruption, route change, a remote stop, or an encoder
 /// error). A stop the webview asked for resolves its own invoke instead and
 /// never fires this event.
 struct RecordingStopped: Encodable {
-  /// Absolute path of the staged `.m4a`.
+  /// Absolute path of the staged `.m4a`, already `-end`-marked.
   let path: String
+  /// The session's identity timestamp in epoch ms, shared by every segment.
+  let sessionStartedMs: Double
+  /// 1-based position of this final segment.
+  let part: Int
+  /// The whole session's recorded length, not this segment's.
   let durationMs: Double
-  /// The staged file's modification time in epoch ms — the memo's identity
-  /// timestamp (see `StopResponse.modifiedMs`).
-  let modifiedMs: Double
-  /// `interruption` | `routeChange` | `maxDuration` | `error`
+  /// `interruption` | `routeChange` | `remote` | `error`
   let reason: String
 }
 
@@ -35,6 +51,7 @@ struct RecordingStopped: Encodable {
 /// its UI (a reload or crash mid-memo) and stop-and-save it.
 struct RecordingStatus: Encodable {
   let recording: Bool
+  /// The session's recorded length so far, across every segment.
   let elapsedMs: Double
 }
 
@@ -50,20 +67,27 @@ struct QueueActionArgs: Decodable {
   let action: String
 }
 
-/// `stopRecording`'s response.
+/// `stopRecording`'s response: the session's final segment.
 struct StopResponse: Encodable {
+  /// Absolute path of the staged `.m4a`, already `-end`-marked.
   let path: String
+  /// The session's identity timestamp in epoch ms, shared by every segment.
+  let sessionStartedMs: Double
+  /// 1-based position of this final segment.
+  let part: Int
+  /// The whole session's recorded length.
   let durationMs: Double
-  /// The staged file's modification time in epoch ms — its stop time, and
-  /// the memo's identity timestamp. The same value the orphan scan reads via
-  /// `listStaged`, so a recording re-ingested after a failed delete resolves
-  /// to the same memo basename instead of a duplicate.
-  let modifiedMs: Double
 }
 
 struct StagedFile: Encodable {
   let path: String
-  /// Modification time in epoch milliseconds — effectively the stop time.
+  /// The session every sibling segment shares, parsed out of the filename.
+  let sessionStartedMs: Double
+  /// 1-based position within the session.
+  let part: Int
+  /// True on a segment the recorder finalized as its session's last.
+  let end: Bool
+  /// Modification time in epoch milliseconds.
   let modifiedMs: Double
 }
 
@@ -71,14 +95,18 @@ struct ListStagedResponse: Encodable {
   let files: [StagedFile]
 }
 
-struct ReadStagedResponse: Encodable {
-  let base64: String
+struct StartArgs: Decodable {
+  /// Rotate the recorder after this much audio; each segment lands as its own
+  /// complete `.m4a`, so a session has no length limit.
+  let segmentMs: Double
+  /// Remind the user this often while the session runs.
+  let reminderMs: Double
 }
 
-struct StartArgs: Decodable {
-  /// Auto-stop cap in milliseconds, enforced natively via
-  /// `record(forDuration:)` so it holds even if the webview never wakes.
-  let maxDurationMs: Double
+/// `startRecording`'s response: the identity the webview files this session's
+/// segments under.
+struct StartResponse: Encodable {
+  let sessionStartedMs: Double
 }
 
 struct StagedPathArgs: Decodable {
@@ -109,7 +137,6 @@ class RecordingPlugin: Plugin {
   private enum NativeStopReason: String {
     case interruption
     case routeChange
-    case maxDuration
     case error
     /// Siri "stop" or the Live Activity's stop button (in-process intents).
     case remote
@@ -135,6 +162,11 @@ class RecordingPlugin: Plugin {
   /// microphone on days after the tap that asked for it is a surprise no
   /// user reads as their own action.
   private static let pendingActionMaxAgeSeconds: TimeInterval = 15 * 60
+  /// The repeating "still recording" reminder's request id; one per app, so a
+  /// later delivery replaces the banner instead of stacking another one.
+  private static let reminderRequestId = "app.reflect.recording.reminder"
+  /// `UNTimeIntervalNotificationTrigger` refuses anything under a minute.
+  private static let minimumReminderSeconds: TimeInterval = 60
 
   /// The delegate-hook target for OS callbacks that carry no plugin context.
   private static weak var shared: RecordingPlugin?
@@ -142,12 +174,24 @@ class RecordingPlugin: Plugin {
   private var recorder: AVAudioRecorder?
   private var meterTimer: Timer?
   private var delegateProxy: RecorderDelegateProxy?
-  /// Recorded milliseconds, captured before `stop()` zeroes `currentTime`.
+  /// The live session's identity timestamp in epoch ms: the memo every
+  /// segment belongs to, and the staged filenames' session key. 0 between
+  /// sessions.
+  private var sessionStartedMs: Double = 0
+  /// 1-based index of the segment being recorded (0 between sessions).
+  private var partIndex = 0
+  /// Rotate the recorder after this much audio.
+  private var segmentMs: Double = 0
+  /// Finished segments' total duration: `currentTime` restarts at zero every
+  /// rotation, but the UI counts the whole session.
+  private var elapsedBeforeSegmentMs: Double = 0
+  /// The current segment's recorded milliseconds, captured before `stop()`
+  /// zeroes `currentTime`.
   private var stoppedDurationMs: Double = 0
-  /// Refreshed by the meter timer — the duration fallback for stops that
-  /// never pass through `finalize` (the cap firing the delegate directly),
-  /// where `currentTime` already reads 0.
-  private var lastMeteredDurationMs: Double = 0
+  /// Refreshed by the meter timer — the current segment's duration fallback
+  /// for stops that never pass through `finalize` (a rotation boundary firing
+  /// the delegate directly), where `currentTime` already reads 0.
+  private var lastMeteredSegmentMs: Double = 0
   /// The webview's `stopRecording` invoke, resolved when the file finalizes.
   private var pendingStop: Invoke?
   /// The webview's `cancelRecording` invoke — finalize, then delete.
@@ -211,9 +255,11 @@ class RecordingPlugin: Plugin {
     Self.installShortcutHandler()
     // A crash mid-recording leaves its Live Activity counting on the lock
     // screen with nothing behind it (the orphan scan saves the audio, but
-    // nobody ended the activity). Nothing can be legitimately live at plugin
-    // load, so end them all.
+    // nobody ended the activity), and its reminder still firing every half
+    // hour. A recording cannot outlive the app process, so nothing can be
+    // legitimately live at plugin load: clear both.
     endStaleLiveActivities()
+    clearReminder()
   }
 
   // MARK: - Commands
@@ -240,8 +286,8 @@ class RecordingPlugin: Plugin {
             return
           }
           do {
-            try self.beginRecording(maxDurationMs: args.maxDurationMs)
-            invoke.resolve()
+            try self.beginSession(segmentMs: args.segmentMs, reminderMs: args.reminderMs)
+            invoke.resolve(StartResponse(sessionStartedMs: self.sessionStartedMs))
           } catch {
             self.deactivateAudioSession()
             invoke.reject("recording failed to start: \(error.localizedDescription)")
@@ -292,7 +338,7 @@ class RecordingPlugin: Plugin {
       invoke.resolve(
         RecordingStatus(
           recording: recorder != nil,
-          elapsedMs: (recorder?.currentTime ?? 0) * 1000
+          elapsedMs: recorder.map { self.elapsedBeforeSegmentMs + $0.currentTime * 1000 } ?? 0
         ))
     }
   }
@@ -308,32 +354,24 @@ class RecordingPlugin: Plugin {
           options: [.skipsHiddenFiles]
         )
         let files: [StagedFile] = urls.compactMap { url in
-          // The in-flight recording's file is not staged output yet.
-          guard url.standardizedFileURL.path != live else { return nil }
+          let path = url.standardizedFileURL.path
+          // The in-flight segment's file is not staged output yet.
+          guard path != live else { return nil }
           let modified =
             (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
             .contentModificationDate ?? Date(timeIntervalSince1970: 0)
-          return StagedFile(
-            path: url.standardizedFileURL.path,
-            modifiedMs: modified.timeIntervalSince1970 * 1000
-          )
+          return Self.stagedInfo(path: path, modifiedMs: modified.timeIntervalSince1970 * 1000)
         }
-        invoke.resolve(ListStagedResponse(files: files.sorted { $0.path < $1.path }))
+        // Oldest session first, and within one session the segments in order:
+        // part numbers are not fixed-width, so sorting by name would put
+        // `part-1000` before `part-999`.
+        invoke.resolve(
+          ListStagedResponse(
+            files: files.sorted {
+              ($0.sessionStartedMs, $0.part) < ($1.sessionStartedMs, $1.part)
+            }))
       } catch {
         invoke.reject("listing staged recordings failed: \(error.localizedDescription)")
-      }
-    }
-  }
-
-  @objc public func readStaged(_ invoke: Invoke) throws {
-    let args = try invoke.parseArgs(StagedPathArgs.self)
-    DispatchQueue.main.async {
-      do {
-        let url = try self.stagedURL(for: args.path)
-        let data = try Data(contentsOf: url)
-        invoke.resolve(ReadStagedResponse(base64: data.base64EncodedString()))
-      } catch {
-        invoke.reject("reading staged recording failed: \(error.localizedDescription)")
       }
     }
   }
@@ -355,14 +393,44 @@ class RecordingPlugin: Plugin {
 
   // MARK: - Recording lifecycle (main queue)
 
-  private func beginRecording(maxDurationMs: Double) throws {
+  /// Open the audio session and start its first segment. Everything that
+  /// belongs to the *session* rather than to one segment lives here: the
+  /// audio session, the idle-timer hold, the meter timer, and the Live
+  /// Activity all survive rotations untouched.
+  private func beginSession(segmentMs: Double, reminderMs: Double) throws {
     let audioSession = AVAudioSession.sharedInstance()
     try audioSession.setCategory(.record, mode: .default, options: [.allowBluetoothHFP])
     try audioSession.setActive(true)
 
-    let directory = try stagingDirectory()
-    let name = "recording-\(Int(Date().timeIntervalSince1970 * 1000)).m4a"
-    let url = directory.appendingPathComponent(name)
+    // Whole milliseconds: the staged filenames carry `Int(sessionStartedMs)`,
+    // so the events must not report a fraction the filenames cannot.
+    self.sessionStartedMs = (Date().timeIntervalSince1970 * 1000).rounded(.down)
+    self.segmentMs = segmentMs
+    self.partIndex = 0
+    self.elapsedBeforeSegmentMs = 0
+    do {
+      try startSegment()
+    } catch {
+      resetSession()
+      throw error
+    }
+    // The screen must not sleep mid-memo (V1 parity).
+    UIApplication.shared.isIdleTimerDisabled = true
+    self.meterTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) {
+      [weak self] _ in
+      self?.emitLevel()
+    }
+    startLiveActivity()
+    scheduleReminder(intervalMs: reminderMs)
+  }
+
+  /// Start the next segment on the already-open audio session.
+  /// `record(forDuration:)` ends it natively at the rotation boundary, so
+  /// rotation holds with the app backgrounded and the webview asleep.
+  private func startSegment() throws {
+    let part = partIndex + 1
+    let url = try stagingDirectory().appendingPathComponent(
+      Self.stagedName(sessionStartedMs: sessionStartedMs, part: part, end: false))
     // AAC mono 44.1 kHz — the V1 recorder's format, and the `.m4a` container
     // the transcription providers accept (`AUDIO_EXTENSION_BY_MIME`).
     let settings: [String: Any] = [
@@ -382,8 +450,10 @@ class RecordingPlugin: Plugin {
     )
     recorder.delegate = proxy
     recorder.isMeteringEnabled = true
-    guard recorder.record(forDuration: maxDurationMs / 1000) else {
-      deactivateAudioSession()
+    guard recorder.record(forDuration: segmentMs / 1000) else {
+      // A refused start may still have created the file: leaving it behind
+      // would give the session a phantom segment with no end marker.
+      try? FileManager.default.removeItem(at: url)
       throw NSError(
         domain: "app.reflect.recording", code: 1,
         userInfo: [NSLocalizedDescriptionKey: "the audio recorder refused to start"])
@@ -391,16 +461,95 @@ class RecordingPlugin: Plugin {
 
     self.recorder = recorder
     self.delegateProxy = proxy
+    self.partIndex = part
     self.nativeStopReason = nil
     self.stoppedDurationMs = 0
-    self.lastMeteredDurationMs = 0
-    // The screen must not sleep mid-memo (V1 parity).
-    UIApplication.shared.isIdleTimerDisabled = true
-    self.meterTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) {
-      [weak self] _ in
-      self?.emitLevel()
+    self.lastMeteredSegmentMs = 0
+  }
+
+  /// `recording-<sessionStartMs>.part-NNN[-end].m4a`. Session identity,
+  /// segment position, and the end marker all live in the name, so a crash
+  /// orphan regroups into one session from the staging directory alone.
+  private static func stagedName(sessionStartedMs: Double, part: Int, end: Bool) -> String {
+    let position = String(format: "%03d", part)
+    return "recording-\(Int(sessionStartedMs)).part-\(position)\(end ? "-end" : "").m4a"
+  }
+
+  /// Parse a staged filename back into its session identity and position. A
+  /// legacy name (`recording-<ms>.m4a`, written before segmented sessions)
+  /// reads as a one-part closed session keyed by the file's mtime, which is
+  /// the identity the webview already ingests those under: an upgrade with an
+  /// orphan pending must not re-ingest it under a second name.
+  private static func stagedInfo(path: String, modifiedMs: Double) -> StagedFile? {
+    let name = URL(fileURLWithPath: path).lastPathComponent
+    guard name.hasPrefix("recording-"), name.hasSuffix(".m4a") else { return nil }
+    let body = name.dropFirst("recording-".count).dropLast(".m4a".count)
+    let fields = body.split(separator: ".", omittingEmptySubsequences: false)
+    guard let first = fields.first, let session = Double(String(first)) else { return nil }
+    if fields.count == 1 {
+      return StagedFile(
+        path: path, sessionStartedMs: modifiedMs, part: 1, end: true, modifiedMs: modifiedMs)
     }
-    startLiveActivity()
+    guard fields.count == 2, fields[1].hasPrefix("part-") else { return nil }
+    let end = fields[1].hasSuffix("-end")
+    // A session has no length limit, so the position is not fixed-width:
+    // strip the prefix and the marker, then read whatever digits remain.
+    var digits = fields[1].dropFirst("part-".count)
+    if end {
+      digits = digits.dropLast("-end".count)
+    }
+    guard let part = Int(digits), part > 0 else { return nil }
+    return StagedFile(
+      path: path, sessionStartedMs: session, part: part, end: end, modifiedMs: modifiedMs)
+  }
+
+  /// Rename a finished segment to carry the session's end marker. The marker
+  /// must live in the filename, not only in the event: a crash between the
+  /// finalize and the webview's ingest would otherwise leave the session
+  /// looking open until the age fallback closes it half an hour later.
+  private func markEnded(_ path: String) -> String {
+    let url = URL(fileURLWithPath: path)
+    let ended = url.deletingLastPathComponent().appendingPathComponent(
+      Self.stagedName(sessionStartedMs: sessionStartedMs, part: partIndex, end: true))
+    do {
+      try FileManager.default.moveItem(at: url, to: ended)
+      return ended.standardizedFileURL.path
+    } catch {
+      Logger.error("marking the session's final segment failed: \(error)")
+      return path
+    }
+  }
+
+  /// Delete every staged segment of the live session: a cancel must leave
+  /// nothing for the orphan scan to resurrect.
+  private func discardSession() throws {
+    let directory = try stagingDirectory()
+    let prefix = "recording-\(Int(sessionStartedMs))."
+    let urls = try FileManager.default.contentsOfDirectory(
+      at: directory, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
+    for url in urls where url.lastPathComponent.hasPrefix(prefix) {
+      try FileManager.default.removeItem(at: url)
+    }
+  }
+
+  private func resetSession() {
+    sessionStartedMs = 0
+    partIndex = 0
+    segmentMs = 0
+    elapsedBeforeSegmentMs = 0
+    stoppedDurationMs = 0
+    lastMeteredSegmentMs = 0
+    nativeStopReason = nil
+  }
+
+  private func emitSegment(path: String, part: Int) {
+    do {
+      try trigger(
+        "recordingSegment",
+        data: RecordingSegment(path: path, sessionStartedMs: sessionStartedMs, part: part))
+    } catch {
+      Logger.error("recordingSegment event failed to serialize: \(error)")
+    }
   }
 
   /// Capture the duration and ask the recorder to finalize the file; the
@@ -416,34 +565,56 @@ class RecordingPlugin: Plugin {
   private func recorderDidFinish(successfully: Bool) {
     guard let recorder = self.recorder else { return }
     let path = recorder.url.standardizedFileURL.path
-    // `record(forDuration:)` hitting the cap lands here with no local cause
-    // recorded — every other path set its reason (or a pending invoke) first.
-    let reason =
-      nativeStopReason ?? (!successfully ? .error : .maxDuration)
-    let durationMs = stoppedDurationMs > 0 ? stoppedDurationMs : lastMeteredDurationMs
-
+    let segmentDurationMs = stoppedDurationMs > 0 ? stoppedDurationMs : lastMeteredSegmentMs
+    let sessionDurationMs = elapsedBeforeSegmentMs + segmentDurationMs
     self.recorder = nil
     self.delegateProxy = nil
-    self.nativeStopReason = nil
+
+    // A segment that ended on its own boundary is a rotation, not a stop: the
+    // audio session, the idle-timer hold, the meter timer, and the Live
+    // Activity all stay as they are.
+    let rotating =
+      successfully && nativeStopReason == nil && pendingStop == nil && pendingCancel == nil
+    if rotating {
+      let finishedPart = partIndex
+      elapsedBeforeSegmentMs = sessionDurationMs
+      do {
+        try startSegment()
+        emitSegment(path: path, part: finishedPart)
+        return
+      } catch {
+        // Nothing is recording now: fall through to the teardown below and
+        // close the session on the segment that just landed, rather than
+        // leave the audio session, the meter timer, the idle-timer hold, the
+        // Live Activity, and the reminder running behind a dead recorder.
+        Logger.error("rotating to the next segment failed: \(error)")
+        nativeStopReason = .error
+      }
+    }
+
+    if !successfully && nativeStopReason == nil {
+      nativeStopReason = .error
+    }
     self.meterTimer?.invalidate()
     self.meterTimer = nil
     UIApplication.shared.isIdleTimerDisabled = false
     deactivateAudioSession()
     endLiveActivity()
+    clearReminder()
 
     if let cancel = pendingCancel {
       pendingCancel = nil
       // Cancel must be durable: a file left in staging would be resurrected as
-      // a memo by the orphan scan, undoing the discard. Report the failure so
-      // the caller can surface it rather than silently keeping the recording.
+      // a memo by the orphan scan, undoing the discard. Every segment of the
+      // session goes, not only the one that was recording. Report the failure
+      // so the caller can surface it rather than silently keeping the audio.
       do {
-        if FileManager.default.fileExists(atPath: path) {
-          try FileManager.default.removeItem(atPath: path)
-        }
+        try discardSession()
         cancel.resolve()
       } catch {
         cancel.reject("discarding the recording failed: \(error.localizedDescription)")
       }
+      resetSession()
       return
     }
     if let stop = pendingStop {
@@ -455,34 +626,38 @@ class RecordingPlugin: Plugin {
       } else {
         stop.resolve(
           StopResponse(
-            path: path, durationMs: durationMs, modifiedMs: Self.fileModifiedMs(path)))
+            path: markEnded(path), sessionStartedMs: sessionStartedMs, part: partIndex,
+            durationMs: sessionDurationMs))
       }
+      resetSession()
       return
     }
-    // A native-initiated stop: the file is staged output now — tell the
-    // webview if it is alive; the orphan scan covers it if it is not.
+    endSession(path: path, durationMs: sessionDurationMs)
+  }
+
+  /// Announce a session the native side ended: the final segment is staged
+  /// output now — tell the webview if it is alive; the orphan scan covers it
+  /// if it is not.
+  private func endSession(path: String, durationMs: Double) {
+    // Every path that lands here set a reason first (a rotation is the only
+    // causeless finish, and it returns above), so the fallback is a formality.
+    let reason = nativeStopReason ?? .error
+    let finalPath = markEnded(path)
     do {
       try trigger(
         "recordingStopped",
         data: RecordingStopped(
-          path: path, durationMs: durationMs, modifiedMs: Self.fileModifiedMs(path),
-          reason: reason.rawValue))
+          path: finalPath, sessionStartedMs: sessionStartedMs, part: partIndex,
+          durationMs: durationMs, reason: reason.rawValue))
     } catch {
       Logger.error("recordingStopped event failed to serialize: \(error)")
     }
-  }
-
-  /// The staged file's modification time in epoch milliseconds — the memo's
-  /// identity timestamp, matching what `listStaged` reports for the same file.
-  private static func fileModifiedMs(_ path: String) -> Double {
-    let attributes = try? FileManager.default.attributesOfItem(atPath: path)
-    let modified = attributes?[.modificationDate] as? Date
-    return (modified ?? Date()).timeIntervalSince1970 * 1000
+    resetSession()
   }
 
   private func emitLevel() {
     guard let recorder = self.recorder, recorder.isRecording else { return }
-    lastMeteredDurationMs = recorder.currentTime * 1000
+    lastMeteredSegmentMs = recorder.currentTime * 1000
     // A suspended webview can't drain events — keep tracking the duration
     // above, but only emit while the app is in the foreground.
     guard !isBackgrounded else { return }
@@ -492,7 +667,8 @@ class RecordingPlugin: Plugin {
     do {
       try trigger(
         "recordingLevel",
-        data: RecordingLevel(level: level, elapsedMs: lastMeteredDurationMs))
+        data: RecordingLevel(
+          level: level, elapsedMs: elapsedBeforeSegmentMs + lastMeteredSegmentMs))
     } catch {
       Logger.error("recordingLevel event failed to serialize: \(error)")
     }
@@ -640,6 +816,57 @@ class RecordingPlugin: Plugin {
       }
     class_addMethod(
       delegateClass, selector, imp_implementationWithBlock(block), "v@:@@@?")
+  }
+
+  // MARK: - Recording reminder
+
+  /// Remind the user that a recording is still running. Recording has no
+  /// duration cap, so this repeating notification is the only thing between a
+  /// forgotten tap and a microphone that runs until the battery dies. The
+  /// plugin owns the schedule rather than the webview: a session the native
+  /// side ends (a call, an encoder error) has to clear it even when the
+  /// webview is gone.
+  private func scheduleReminder(intervalMs: Double) {
+    let interval = max(intervalMs / 1000, Self.minimumReminderSeconds)
+    let center = UNUserNotificationCenter.current()
+    // Asked on the first recording rather than at launch, and never blocking:
+    // a denial is not an error, it just leaves the Live Activity as the only
+    // running indicator.
+    center.requestAuthorization(options: [.alert]) { granted, error in
+      if let error {
+        Logger.error("recording reminder authorization failed: \(error)")
+        return
+      }
+      guard granted else { return }
+      DispatchQueue.main.async {
+        // The session may have ended while the permission prompt was up.
+        guard self.recorder != nil else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Reflect is still recording"
+        content.body = "Open Reflect to stop the recording."
+        // Silent on purpose: the microphone is live, and an alert tone would
+        // land in the recording itself. The elapsed time lives on the Live
+        // Activity, since a repeating request cannot carry a changing body.
+        content.sound = nil
+        let request = UNNotificationRequest(
+          identifier: Self.reminderRequestId,
+          content: content,
+          trigger: UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: true)
+        )
+        center.add(request) { error in
+          if let error {
+            Logger.error("scheduling the recording reminder failed: \(error)")
+          }
+        }
+      }
+    }
+  }
+
+  /// Clear the reminder and any banner it already delivered.
+  private func clearReminder() {
+    let center = UNUserNotificationCenter.current()
+    center.removePendingNotificationRequests(withIdentifiers: [Self.reminderRequestId])
+    center.removeDeliveredNotifications(withIdentifiers: [Self.reminderRequestId])
   }
 
   // MARK: - Live Activity

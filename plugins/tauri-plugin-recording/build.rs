@@ -9,7 +9,6 @@ const COMMANDS: &[&str] = &[
     "actions_ready",
     "action_performed",
     "list_staged",
-    "read_staged",
     "delete_staged",
     "registerListener",
     "remove_listener",

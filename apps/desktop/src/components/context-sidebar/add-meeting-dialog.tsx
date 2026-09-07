@@ -56,17 +56,6 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // The dialog is conditionally mounted by its parent, bypassing Radix's
-  // onCloseAutoFocus path — restore the opener's focus on unmount ourselves.
-  useEffect(() => {
-    const opener = document.activeElement
-    return () => {
-      if (opener instanceof HTMLElement) {
-        opener.focus()
-      }
-    }
-  }, [])
-
   // Upgrade the prefilled chips once attendee resolution answers: an invite
   // email an existing note owns swaps the calendar's spelling for the note
   // title, so the chip shows exactly what submit will link. Chips are merged

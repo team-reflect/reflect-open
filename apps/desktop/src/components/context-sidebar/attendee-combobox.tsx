@@ -2,7 +2,9 @@ import { useDeferredValue, useRef, useState, type KeyboardEvent, type ReactEleme
 import { Command as CommandPrimitive } from 'cmdk'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
+  aliasHint,
   contactLinkSuggestions,
+  displayNoteTitle,
   foldKey,
   isContactsReadable,
   suggestWikiTargets,
@@ -18,7 +20,7 @@ import {
 } from '@/editor/wiki-autocomplete-entries'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -89,7 +91,7 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
     isFetching,
     isPlaceholderData,
   } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'attendee-suggestions', searchTerm, contactsInMenu],
+    queryKey: queryKeys.index.attendeeSuggestions(graph?.root, searchTerm, contactsInMenu),
     queryFn: async () => {
       const [suggestions, contacts] = await Promise.all([
         suggestWikiTargets(searchTerm, SUGGESTION_LIMIT),
@@ -228,27 +230,34 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
           onMouseDown={(mouseEvent) => mouseEvent.preventDefault()}
         >
           <CommandList>
-            {entries.map((entry) => (
-              <CommandItem
-                key={entryKey(entry)}
-                value={entryKey(entry)}
-                onSelect={() => select(entry)}
-              >
-                <span className="min-w-0 flex-1 truncate">
-                  {entry.kind === 'create' ? `Add “${entry.title}”` : entryName(entry)}
-                </span>
-                {entry.kind === 'suggestion' && entry.suggestion.alias !== null && (
-                  <span className="truncate text-xs text-text-muted">
-                    {entry.suggestion.alias} → {entry.suggestion.title}
+            {entries.map((entry) => {
+              const hint = entry.kind === 'suggestion' ? aliasHint(entry.suggestion) : null
+              return (
+                <CommandItem
+                  key={entryKey(entry)}
+                  value={entryKey(entry)}
+                  onSelect={() => select(entry)}
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {entry.kind === 'create'
+                      ? `Add “${entry.title}”`
+                      : entry.kind === 'suggestion'
+                        ? displayNoteTitle(entry.suggestion.target)
+                        : entryName(entry)}
                   </span>
-                )}
-                {entry.kind === 'contact' && (
-                  <span className="truncate text-xs text-text-muted">
-                    {entry.contact.emails[0] ?? entry.contact.phones[0] ?? 'Contact'}
-                  </span>
-                )}
-              </CommandItem>
-            ))}
+                  {entry.kind === 'suggestion' && hint !== null && (
+                    <span className="truncate text-xs text-text-muted">
+                      {hint} → {displayNoteTitle(entry.suggestion.title)}
+                    </span>
+                  )}
+                  {entry.kind === 'contact' && (
+                    <span className="truncate text-xs text-text-muted">
+                      {entry.contact.emails[0] ?? entry.contact.phones[0] ?? 'Contact'}
+                    </span>
+                  )}
+                </CommandItem>
+              )
+            })}
           </CommandList>
         </PopoverContent>
       </CommandPrimitive>

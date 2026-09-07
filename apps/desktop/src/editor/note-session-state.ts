@@ -59,6 +59,8 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   let saveChain: Promise<void> = Promise.resolve()
   /** Serializes out-of-editor body transactions against one another. */
   let bodyMutationChain: Promise<void> = Promise.resolve()
+  /** Settles when the current initial load has committed its state. */
+  let loadPromise: Promise<void> = Promise.resolve()
   /**
    * Content of the write currently in flight (set when dispatched, before the
    * write resolves). The watcher event for our own save can arrive before the
@@ -73,6 +75,8 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   /** A watcher event arrived during the load; replay reconciliation after it. */
   let missedChange = false
   let disposed = false
+  /** True while deletion has paused this session's persistence pipeline. */
+  let deleting = false
   // Set by `discard` — tells `dispose` to skip its flush (the file is being
   // deleted, so rewriting it would recreate it).
   let discarded = false
@@ -129,7 +133,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     // conflict likewise pauses all saves: writing the buffer before the user
     // chooses Keep mine / Load theirs would clobber the external change and
     // defeat the non-destructive flow.
-    if (discarded || io.write === null || !dirty || isProtected || conflict !== null) {
+    if (discarded || deleting || io.write === null || !dirty || isProtected || conflict !== null) {
       return
     }
     const write = io.write
@@ -140,7 +144,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         // have reverted or kept typing, or the session may have been discarded
         // for a delete. (After dispose the buffer is frozen, so this same step
         // doubles as the final flush.)
-        if (discarded || !dirty || isProtected || conflict !== null) {
+        if (discarded || deleting || !dirty || isProtected || conflict !== null) {
           return
         }
         const content = header + buffer
@@ -166,6 +170,9 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   }
 
   function scheduleSave(): void {
+    if (deleting) {
+      return
+    }
     if (saveTimer !== null) {
       clearTimeout(saveTimer)
     }
@@ -358,7 +365,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     conflict = null
     error = null
     emit()
-    void (async () => {
+    loadPromise = (async () => {
       try {
         if (!(await claimOwnership(path))) {
           return
@@ -406,6 +413,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         }
       }
     })()
+    void loadPromise
   }
 
   async function claimOwnership(target: string): Promise<boolean> {
@@ -954,6 +962,24 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     void releaseAllOwnership()
   }
 
+  async function prepareDelete(): Promise<boolean> {
+    deleting = true
+    cancelScheduledSave()
+    await loadPromise
+    await saveChain
+    return status === 'ready' && missing && inFlightWrite === null
+  }
+
+  function cancelDelete(): void {
+    if (!deleting || discarded) {
+      return
+    }
+    deleting = false
+    if (!disposed && dirty) {
+      scheduleSave()
+    }
+  }
+
   return {
     ownerId: io.ownership?.ownerId ?? null,
     get path() {
@@ -971,6 +997,9 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     liveContent: () => (status === 'ready' ? header + buffer : null),
     readFreshContent,
     isDirty: () => dirty,
+    isUnpersisted: () => status === 'ready' && missing && inFlightWrite === null,
+    prepareDelete,
+    cancelDelete,
     updateFrontmatter,
     commitFrontmatter,
     commitTaskToggle,

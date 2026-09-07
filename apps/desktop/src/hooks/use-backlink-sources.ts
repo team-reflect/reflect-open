@@ -8,7 +8,7 @@ import {
 } from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { groupBacklinksBySource, type BacklinkSource } from '@/lib/group-backlinks'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
 const BACKLINK_SOURCES_PER_PAGE = 10
@@ -80,7 +80,7 @@ export function useBacklinkSources(path: string): BacklinkSources {
     isFetchingNextPage,
     isFetchNextPageError,
   } = useInfiniteQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'backlinks', path],
+    queryKey: queryKeys.index.backlinks(graph?.root, path),
     queryFn: ({ pageParam }) =>
       getBacklinksWithContext(path, {
         cursor: pageParam,

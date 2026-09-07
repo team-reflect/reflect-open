@@ -13,7 +13,7 @@ import {
   useKeyboardFieldReveal,
   useKeyboardHeightVar,
 } from '@/mobile/use-keyboard'
-import { useShouldShowPaywall } from '@/mobile/use-should-show-paywall'
+import { usePaywallGate } from '@/mobile/use-paywall-gate'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics'
 import { CaptureProvider } from '@/providers/capture-provider'
 import { ChatProvider } from '@/providers/chat-provider'
@@ -35,7 +35,7 @@ import { RouterProvider } from '@/routing/router'
  */
 export function MobileApp(): ReactElement {
   const { status, graph, error, needsOnboarding } = useGraph()
-  const shouldShowPaywall = useShouldShowPaywall()
+  const paywallGate = usePaywallGate()
   useKeyboardHeightVar()
   useKeyboardFieldReveal()
   useKeyboardCaretReveal()
@@ -53,17 +53,12 @@ export function MobileApp(): ReactElement {
     return installBackgroundFlush()
   }, [])
 
-  // The subscription gate deliberately comes before everything else,
-  // onboarding included: the paywall is the first screen of a fresh install,
-  // and onboarding runs after a purchase or "Remind me later" lifts the
-  // gate. While the gate is still deciding (entitlement queries, settings
-  // hydration) hold the loading screen instead of flashing the paywall at a
-  // subscribed or snoozed user.
-  if (shouldShowPaywall === 'show') {
+  // Subscription verification runs beside startup, never in its critical
+  // path: while StoreKit or settings are unresolved the gate stays hidden and
+  // the local app boots normally. A settled negative answer can replace the
+  // current surface with the paywall later; a purchase or snooze lifts it.
+  if (paywallGate === 'show') {
     return <PaywallScreen />
-  }
-  if (shouldShowPaywall === 'pending') {
-    return <LoadingScreen />
   }
 
   if (status === 'ready' && graph) {

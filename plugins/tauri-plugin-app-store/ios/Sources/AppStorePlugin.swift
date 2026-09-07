@@ -12,13 +12,15 @@ class AppStorePlugin: Plugin {
   // block, the bridge only a throwing async method generates; a plain
   // `async` method would take a zero-argument block and mismatch that ABI.
   @objc public func getEnvironment(_ invoke: Invoke) async throws {
-    guard let result = try? await AppTransaction.shared,
-      case .verified(let transaction) = result
-    else {
-      invoke.resolve(["environment": "Production"])
-      return
+    if #available(iOS 16.0, *) {
+      if let result = try? await AppTransaction.shared,
+        case .verified(let transaction) = result
+      {
+        invoke.resolve(["environment": transaction.environment.rawValue])
+        return
+      }
     }
-    invoke.resolve(["environment": transaction.environment.rawValue])
+    invoke.resolve(["environment": "Production"])
   }
 }
 

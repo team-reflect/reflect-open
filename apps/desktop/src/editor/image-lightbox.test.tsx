@@ -10,18 +10,16 @@ function installMatchMedia(reducedMotion: boolean): void {
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     writable: true,
-    value: vi.fn(
-      (query: string): MediaQueryList => ({
-        matches: reducedMotion && query === '(prefers-reduced-motion: reduce)',
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      }),
-    ),
+    value: vi.fn((query: string): MediaQueryList => ({
+      matches: reducedMotion && query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
   })
 }
 

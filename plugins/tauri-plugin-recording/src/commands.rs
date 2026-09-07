@@ -10,7 +10,7 @@ use crate::Result;
 pub(crate) async fn start_recording<R: Runtime>(
     app: AppHandle<R>,
     request: StartRequest,
-) -> Result<()> {
+) -> Result<StartResponse> {
     app.recording().start_recording(request)
 }
 
@@ -55,15 +55,6 @@ pub(crate) async fn recording_status<R: Runtime>(
 #[command]
 pub(crate) async fn list_staged<R: Runtime>(app: AppHandle<R>) -> Result<ListStagedResponse> {
     app.recording().list_staged()
-}
-
-/// A staged recording's bytes, base64-encoded for the capture pipeline.
-#[command]
-pub(crate) async fn read_staged<R: Runtime>(
-    app: AppHandle<R>,
-    request: StagedPathRequest,
-) -> Result<ReadStagedResponse> {
-    app.recording().read_staged(request)
 }
 
 /// Remove a staged recording once its bytes are durably in the graph.

@@ -42,7 +42,8 @@ import {
   withTitle,
   type CaptureNoteMeta,
 } from './capture-note'
-import { scrapePageMeta, type PageMeta } from './meta-scrape'
+import type { PageMeta } from '../link-preview/metadata'
+import { scrapePageMeta } from './meta-scrape'
 
 /**
  * Capture notes still awaiting enrichment, oldest first: well-formed capture

@@ -19,13 +19,13 @@ export function SidebarPinnedRowPreview({
     : overlay
       ? 'bg-white text-text-secondary'
       : active
-        ? 'bg-surface-hover text-text-secondary dark:bg-transparent'
+        ? 'bg-surface-hover text-text-secondary dark:bg-transparent dark:text-accent'
         : 'text-text-secondary hover:bg-surface-hover hover:text-text'
 
   return (
     <span
       className={cn(
-        'group flex w-full touch-none items-center rounded-md leading-5 transition-colors duration-[50ms]',
+        'group flex w-full touch-none items-center rounded-md leading-5',
         stateClass,
         overlay && 'shadow-sm',
       )}

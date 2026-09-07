@@ -1,5 +1,6 @@
 import { toAppError } from '../errors'
 import { captureMetaFetch, captureOEmbedFetch } from '../graph/commands'
+import { normalizePageMetaValue, parsePageMeta, type PageMeta } from '../link-preview/metadata'
 import { oembedRequestURL, parseOEmbedAnswer } from './oembed'
 
 /**
@@ -9,44 +10,6 @@ import { oembedRequestURL, parseOEmbedAnswer } from './oembed'
  * and the OpenGraph basics out of the HTML. Parsing uses `DOMParser`
  * (native in the webview; tests run in a real browser), never regex over HTML.
  */
-
-export interface PageMeta {
-  /** `og:title`, falling back to `<title>`. */
-  title: string | null
-  /** `og:description`, falling back to `<meta name="description">`. */
-  description: string | null
-  /** `og:site_name`. */
-  siteName: string | null
-}
-
-/** Caps how much of a meta value survives — these render inline in notes. */
-const MAX_META_CHARS = 500
-
-function clean(value: string | null | undefined): string | null {
-  const collapsed = value?.replaceAll(/\s+/g, ' ').trim() ?? ''
-  if (collapsed === '') {
-    return null
-  }
-  return collapsed.slice(0, MAX_META_CHARS)
-}
-
-function metaContent(document: Document, selector: string): string | null {
-  return clean(document.querySelector(selector)?.getAttribute('content'))
-}
-
-/** Extract {@link PageMeta} from an HTML document's text. Never throws. */
-export function parsePageMeta(html: string): PageMeta {
-  const document = new DOMParser().parseFromString(html, 'text/html')
-  return {
-    title:
-      metaContent(document, 'meta[property="og:title"]') ??
-      clean(document.querySelector('title')?.textContent),
-    description:
-      metaContent(document, 'meta[property="og:description"]') ??
-      metaContent(document, 'meta[name="description"]'),
-    siteName: metaContent(document, 'meta[property="og:site_name"]'),
-  }
-}
 
 async function scrapeOEmbed(requestURL: string): Promise<PageMeta | null> {
   let json: string
@@ -66,13 +29,13 @@ async function scrapeOEmbed(requestURL: string): Promise<PageMeta | null> {
   if (answer === null) {
     return null
   }
-  const title = clean(answer.title)
+  const title = normalizePageMetaValue(answer.title)
   if (title === null) {
     return null
   }
   // oEmbed has no description field; the capture keeps none until (and
   // unless) the AI leg writes one, now grounded in this real title.
-  return { title, description: null, siteName: clean(answer.providerName) }
+  return { title, description: null, siteName: normalizePageMetaValue(answer.providerName) }
 }
 
 /**

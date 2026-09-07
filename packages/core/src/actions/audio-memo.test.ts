@@ -8,7 +8,9 @@ import type {
 import {
   audioMemoFromPath,
   audioMemoIdentity,
-  captureAudioMemo,
+  audioMemoPartFromPath,
+  audioMemoPartPath,
+  captureAudioMemoPart,
   isSilentStop,
   reconcileAudioMemos,
   type ReconcileAudioMemosInput,
@@ -16,6 +18,7 @@ import {
 } from './audio-memo'
 import { APP_REVIEW_STUB_KEY } from '../ai/app-review-demo'
 import {
+  importAudioMemo,
   listDir,
   listFiles,
   readAsset,
@@ -38,6 +41,7 @@ const formatAudioMemoTranscriptMock = vi.hoisted(() =>
 const ensureBacklinkTargetMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../graph/commands', () => ({
+  importAudioMemo: vi.fn(),
   listDir: vi.fn(),
   listFiles: vi.fn(),
   readAsset: vi.fn(),
@@ -71,6 +75,7 @@ const listFilesMock = vi.mocked(listFiles)
 const readAssetMock = vi.mocked(readAsset)
 const readNoteMock = vi.mocked(readNote)
 const writeAssetMock = vi.mocked(writeAsset)
+const importAudioMemoMock = vi.mocked(importAudioMemo)
 const readTranscriptCacheMock = vi.mocked(readTranscriptCache)
 const writeTranscriptCacheMock = vi.mocked(writeTranscriptCache)
 const writeNoteMock = vi.mocked(writeNote)
@@ -151,6 +156,12 @@ describe('audioMemoFromPath', () => {
     expect(audioMemoFromPath(MEMO.audioPath)).toEqual(MEMO)
   })
 
+  it('parses a part number that outgrew three digits', () => {
+    const path = 'audio-memos/audio-memo-2026-06-11-153022-845.part-1000.webm'
+    expect(audioMemoPartFromPath(path)).toEqual({ memo: MEMO, part: 1000, end: false })
+    expect(audioMemoPartPath(MEMO, 1000, false)).toBe(path)
+  })
+
   it('rejects everything that is not a well-formed memo recording', () => {
     expect(audioMemoFromPath('audio-memos/voice-note.mp3')).toBeNull()
     expect(audioMemoFromPath('audio-memos/audio-memo-2026-13-40-153022-845.webm')).toBeNull()
@@ -160,26 +171,49 @@ describe('audioMemoFromPath', () => {
   })
 })
 
-describe('captureAudioMemo', () => {
-  it('writes the recording base64-encoded under audio-memos/, pinned to the generation', async () => {
-    const outcome = await captureAudioMemo({
-      audio: new Blob(['audio'], { type: 'audio/webm' }),
+describe('captureAudioMemoPart', () => {
+  it('writes the segment base64-encoded under audio-memos/, pinned to the generation', async () => {
+    const outcome = await captureAudioMemoPart({
+      audio: { blob: new Blob(['audio'], { type: 'audio/webm' }) },
       mimeType: 'audio/webm;codecs=opus',
       recordedAt: RECORDED_AT,
+      part: 1,
+      end: false,
       generation: 3,
     })
 
     expect(outcome).toEqual({ ok: true, memo: MEMO })
-    expect(writeAssetMock).toHaveBeenCalledWith(MEMO.audioPath, btoa('audio'), 3)
+    expect(writeAssetMock).toHaveBeenCalledWith(audioMemoPartPath(MEMO, 1, false), btoa('audio'), 3)
+  })
+
+  it('imports a segment the recorder already wrote to disk, bytes never crossing the IPC', async () => {
+    const outcome = await captureAudioMemoPart({
+      audio: { sourcePath: '/staging/recording-1.part-002-end.m4a' },
+      mimeType: 'audio/mp4',
+      recordedAt: RECORDED_AT,
+      part: 2,
+      end: true,
+      generation: 3,
+    })
+
+    expect(outcome.ok).toBe(true)
+    expect(importAudioMemoMock).toHaveBeenCalledWith(
+      '/staging/recording-1.part-002-end.m4a',
+      'audio-memos/audio-memo-2026-06-11-153022-845.part-002-end.m4a',
+      3,
+    )
+    expect(writeAssetMock).not.toHaveBeenCalled()
   })
 
   it('reports a write failure as data — the caller retries with the same recording', async () => {
     writeAssetMock.mockRejectedValue({ kind: 'io', message: 'disk full' })
 
-    const outcome = await captureAudioMemo({
-      audio: new Blob(['audio'], { type: 'audio/webm' }),
+    const outcome = await captureAudioMemoPart({
+      audio: { blob: new Blob(['audio'], { type: 'audio/webm' }) },
       mimeType: 'audio/webm',
       recordedAt: RECORDED_AT,
+      part: 1,
+      end: true,
       generation: 3,
     })
 

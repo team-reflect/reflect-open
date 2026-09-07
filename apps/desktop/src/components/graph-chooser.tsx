@@ -11,7 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { useGraphColors } from '@/hooks/use-graph-colors'
 import { cleanGraphName, graphNameFromRoot, isGraphNameTaken } from '@/lib/graph-names'
-import { ICLOUD_STATUS_QUERY_KEY } from '@/lib/query-client'
+import { queryKeys } from '@/lib/query-client'
 import { graphColorCss } from '@/lib/graph-colors'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
@@ -91,7 +91,7 @@ export function GraphChooser(): ReactElement {
               return (
                 <li
                   key={recent.root}
-                  className="group flex items-center justify-between gap-2 rounded-md px-2 py-1.5 transition-colors duration-100 hover:bg-surface-hover"
+                  className="group flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-surface-hover"
                 >
                   <button
                     type="button"
@@ -204,7 +204,7 @@ function IcloudCard({
   const nameId = useId()
   const bridgeReady = useBridgeReady()
   const { data: status } = useQuery({
-    queryKey: ICLOUD_STATUS_QUERY_KEY,
+    queryKey: queryKeys.icloud.status,
     queryFn: icloudStatus,
     enabled: bridgeReady,
   })

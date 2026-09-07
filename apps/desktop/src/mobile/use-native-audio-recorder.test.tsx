@@ -18,20 +18,27 @@ const pluginEvents = {
   },
 }
 
-function base64Of(text: string): string {
-  return btoa(text)
-}
-
+const onSegment = vi.fn()
 const onNativeStop = vi.fn()
 
+/** Every session in these tests starts here; its segments share the stamp. */
+const SESSION_STARTED_MS = 1_700_000_000_000
+
 async function renderRecorder() {
-  return await renderHook(() => useNativeAudioRecorder({ maxDurationMs: 600_000, onNativeStop }))
+  return await renderHook(() =>
+    useNativeAudioRecorder({
+      segmentMs: 20 * 60_000,
+      reminderMs: 30 * 60_000,
+      onSegment,
+      onNativeStop,
+    }),
+  )
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   pluginEvents.handlers.clear()
-  invoke.mockResolvedValue(undefined)
+  invoke.mockResolvedValue({ sessionStartedMs: SESSION_STARTED_MS })
   // A fresh bridge object per test: the shared plugin-event registration in
   // core is keyed by bridge identity, so reusing one object would leak
   // listeners across tests.
@@ -49,18 +56,43 @@ afterEach(() => {
 })
 
 describe('useNativeAudioRecorder', () => {
-  it('start invokes the plugin with the cap and flips to recording', async () => {
+  it('start invokes the plugin with the segment length and flips to recording', async () => {
     const { result } = await renderRecorder()
     expect(result.current.status).toBe('idle')
 
+    const started: Array<Date | null> = []
     await act(async () => {
-      await result.current.start()
+      started.push(await result.current.start())
     })
 
     expect(invoke).toHaveBeenCalledWith('plugin:recording|start_recording', {
-      request: { maxDurationMs: 600_000 },
+      request: { segmentMs: 20 * 60_000, reminderMs: 30 * 60_000 },
     })
+    expect(started[0]).toEqual(new Date(SESSION_STARTED_MS))
     expect(result.current.status).toBe('recording')
+  })
+
+  it('a rotated segment reaches onSegment and is claimed', async () => {
+    const path = '/staging/recording-1700000000000.part-001.m4a'
+    await renderRecorder()
+    await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingSegment')).toBe(true))
+
+    act(() => {
+      pluginEvents.emit('recordingSegment', {
+        path,
+        sessionStartedMs: SESSION_STARTED_MS,
+        part: 1,
+      })
+    })
+
+    expect(onSegment).toHaveBeenCalledWith({
+      stagedPath: path,
+      recordedAt: new Date(SESSION_STARTED_MS),
+      part: 1,
+      end: false,
+    })
+    expect(isStagedPathClaimed(path)).toBe(true)
+    releaseStagedPath(path)
   })
 
   it('a rejected start resets to idle and rethrows for the caller', async () => {
@@ -75,17 +107,14 @@ describe('useNativeAudioRecorder', () => {
     expect(result.current.status).toBe('idle')
   })
 
-  it('stop reads the staged file back, claims it, and returns the blob', async () => {
+  it('stop claims the staged file and hands back its path', async () => {
     const path = '/staging/stop-normal.m4a'
     invoke.mockImplementation(async (command: string) => {
       if (command === 'plugin:recording|start_recording') {
-        return
+        return { sessionStartedMs: SESSION_STARTED_MS }
       }
       if (command === 'plugin:recording|stop_recording') {
-        return { path, durationMs: 4000, modifiedMs: 1_700_000_000_000 }
-      }
-      if (command === 'plugin:recording|read_staged') {
-        return { base64: base64Of('audio-bytes') }
+        return { path, sessionStartedMs: SESSION_STARTED_MS, part: 2, durationMs: 4000 }
       }
       throw new Error(`unexpected invoke: ${command}`)
     })
@@ -102,23 +131,22 @@ describe('useNativeAudioRecorder', () => {
     const stopped = results[0]
     expect(stopped).not.toBeNull()
     expect(stopped?.stagedPath).toBe(path)
-    expect(stopped?.durationMs).toBe(4000)
-    expect(stopped?.mimeType).toBe('audio/mp4')
-    // The memo's identity timestamp is the staged file's mtime, not wall clock.
-    expect(stopped?.recordedAt).toEqual(new Date(1_700_000_000_000))
-    expect(await stopped?.blob.text()).toBe('audio-bytes')
+    expect(stopped?.part).toBe(2)
+    expect(stopped?.end).toBe(true)
+    // The memo's identity timestamp is the session's start, not wall clock.
+    expect(stopped?.recordedAt).toEqual(new Date(SESSION_STARTED_MS))
     expect(isStagedPathClaimed(path)).toBe(true)
     expect(result.current.status).toBe('idle')
     releaseStagedPath(path)
   })
 
-  it('a too-short stop deletes the staged file and returns null', async () => {
+  it('a too-short one-segment stop deletes the staged file and returns null', async () => {
     const path = '/staging/stop-short.m4a'
     invoke.mockImplementation(async (command: string) => {
       if (command === 'plugin:recording|stop_recording') {
-        return { path, durationMs: 300, modifiedMs: 1_700_000_000_000 }
+        return { path, sessionStartedMs: SESSION_STARTED_MS, part: 1, durationMs: 300 }
       }
-      return
+      return { sessionStartedMs: SESSION_STARTED_MS }
     })
     const { result } = await renderRecorder()
 
@@ -156,14 +184,8 @@ describe('useNativeAudioRecorder', () => {
     expect(result.current.elapsedMs).toBe(1200)
   })
 
-  it('a native stop reads the file back and hands it to onNativeStop', async () => {
+  it('a native stop hands the staged path to onNativeStop', async () => {
     const path = '/staging/native-stop.m4a'
-    invoke.mockImplementation(async (command: string) => {
-      if (command === 'plugin:recording|read_staged') {
-        return { base64: base64Of('native-bytes') }
-      }
-      return
-    })
     const { result } = await renderRecorder()
     await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
     await act(async () => {
@@ -173,27 +195,27 @@ describe('useNativeAudioRecorder', () => {
     await act(async () => {
       pluginEvents.emit('recordingStopped', {
         path,
+        sessionStartedMs: SESSION_STARTED_MS,
+        part: 3,
         durationMs: 5000,
-        modifiedMs: 1_700_000_000_000,
         reason: 'interruption',
       })
     })
 
     expect(result.current.status).toBe('idle')
     await vi.waitFor(() =>
-      expect(onNativeStop).toHaveBeenCalledWith(
-        expect.objectContaining({
-          stagedPath: path,
-          durationMs: 5000,
-          recordedAt: new Date(1_700_000_000_000),
-        }),
-      ),
+      expect(onNativeStop).toHaveBeenCalledWith({
+        stagedPath: path,
+        recordedAt: new Date(SESSION_STARTED_MS),
+        part: 3,
+        end: true,
+      }),
     )
     expect(isStagedPathClaimed(path)).toBe(true)
     releaseStagedPath(path)
   })
 
-  it('a too-short native stop deletes the file and reports null', async () => {
+  it('a too-short one-segment native stop deletes the file and reports null', async () => {
     const path = '/staging/native-short.m4a'
     await renderRecorder()
     await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
@@ -201,8 +223,9 @@ describe('useNativeAudioRecorder', () => {
     await act(async () => {
       pluginEvents.emit('recordingStopped', {
         path,
+        sessionStartedMs: SESSION_STARTED_MS,
+        part: 1,
         durationMs: 200,
-        modifiedMs: 1_700_000_000_000,
         reason: 'interruption',
       })
     })
@@ -214,32 +237,6 @@ describe('useNativeAudioRecorder', () => {
     expect(isStagedPathClaimed(path)).toBe(false)
   })
 
-  it('a failed read-back after a native stop releases the claim and closes the UI', async () => {
-    const path = '/staging/native-unreadable.m4a'
-    invoke.mockImplementation(async (command: string) => {
-      if (command === 'plugin:recording|read_staged') {
-        throw new Error('io error')
-      }
-      return
-    })
-    await renderRecorder()
-    await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
-
-    await act(async () => {
-      pluginEvents.emit('recordingStopped', {
-        path,
-        durationMs: 5000,
-        modifiedMs: 1_700_000_000_000,
-        reason: 'error',
-      })
-    })
-
-    // The file is left staged (released) for the orphan scan, but the host is
-    // still notified so the recording UI closes rather than stranding.
-    await vi.waitFor(() => expect(isStagedPathClaimed(path)).toBe(false))
-    expect(onNativeStop).toHaveBeenCalledWith(null)
-  })
-
   it('a native stop landing during start does not resurrect the recording', async () => {
     const path = '/staging/stop-during-start.m4a'
     let releaseStart: () => void = () => {}
@@ -248,14 +245,14 @@ describe('useNativeAudioRecorder', () => {
         await new Promise<void>((resolve) => {
           releaseStart = resolve
         })
-        return
+        return { sessionStartedMs: SESSION_STARTED_MS }
       }
       return
     })
     const { result } = await renderRecorder()
     await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
 
-    let startPromise: Promise<void> = Promise.resolve()
+    let startPromise: Promise<Date | null> = Promise.resolve(null)
     await act(async () => {
       startPromise = result.current.start()
       await Promise.resolve()
@@ -267,8 +264,9 @@ describe('useNativeAudioRecorder', () => {
     await act(async () => {
       pluginEvents.emit('recordingStopped', {
         path,
+        sessionStartedMs: SESSION_STARTED_MS,
+        part: 1,
         durationMs: 200,
-        modifiedMs: 1_700_000_000_000,
         reason: 'interruption',
       })
       releaseStart()

@@ -6,7 +6,7 @@ import {
   type ReactElement,
 } from 'react'
 import { Circle, CircleCheck } from 'lucide-react'
-import type { OpenTask } from '@reflect/core'
+import { displayNoteTitle, type OpenTask } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
 import { formatDayLabel } from '@/lib/dates'
 import { taskKey } from '@/lib/tasks/task-identity'
@@ -123,7 +123,7 @@ export function TaskRow({
       data-task-key={taskKey(task)}
       onClick={selectFromRow}
       className={cn(
-        'group/task flex min-h-10 items-start gap-3 border-b border-border bg-surface px-4 py-2 transition-colors duration-100 lg:px-12',
+        'group/task flex min-h-10 items-start gap-3 border-b border-border bg-surface px-4 py-2 lg:px-12',
         !editing && 'cursor-pointer',
         selected
           ? 'bg-accent-soft ring-1 ring-inset ring-accent/20 dark:ring-accent/10'
@@ -199,7 +199,7 @@ export function TaskRow({
         >
           {task.dailyDate !== null
             ? formatDayLabel(task.dailyDate, settings.dateFormat)
-            : task.noteTitle}
+            : displayNoteTitle(task.noteTitle)}
         </button>
       ) : null}
     </li>

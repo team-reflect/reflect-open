@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { listTemplates } from '@reflect/core'
 import { FilePlus2, LayoutTemplate } from 'lucide-react'
+import { displayNoteTitle } from '@reflect/core'
 import {
   Command,
   CommandDialog,
@@ -14,7 +14,7 @@ import {
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { insertTemplate } from '@/lib/note-templates'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { createTemplatesQueryOptions } from '@/lib/query-options'
 import { useGraph } from '@/providers/graph-provider'
 import { useNoteTemplates } from '@/providers/note-templates-provider'
 
@@ -31,18 +31,13 @@ interface TemplatePickerProps {
   context: CommandContext
 }
 
-export function TemplatePicker({ context }: TemplatePickerProps): ReactElement | null {
+export function TemplatePicker({ context }: TemplatePickerProps): ReactElement {
   const { pickerOpen, closeTemplatePicker, openTemplateCreate } = useNoteTemplates()
   const { graph } = useGraph()
   const { data: templates } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'templates'],
-    queryFn: listTemplates,
+    ...createTemplatesQueryOptions(graph?.root),
     enabled: graph !== null && pickerOpen,
   })
-
-  if (!pickerOpen) {
-    return null
-  }
 
   const insert = (path: string): void => {
     closeTemplatePicker()
@@ -81,7 +76,7 @@ export function TemplatePicker({ context }: TemplatePickerProps): ReactElement |
                   onSelect={() => insert(template.path)}
                 >
                   <LayoutTemplate aria-hidden strokeWidth={1.75} className="text-text-muted" />
-                  <span className="truncate">{template.title}</span>
+                  <span className="truncate">{displayNoteTitle(template.title)}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

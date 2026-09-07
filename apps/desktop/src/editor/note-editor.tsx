@@ -14,6 +14,7 @@ import type {
   FileClickHandler,
   FileInfoResolver,
   FileLinkResolver,
+  LinkPreviewResolver,
   MarkMode,
   SearchStatus,
   StartPendingReplacementOptions,
@@ -37,6 +38,7 @@ import {
   type LightboxImage,
 } from '@/editor/image-lightbox'
 import { isOpenableExternalUrl } from '@/editor/open-external-link'
+import { resolveWikilink } from '@/editor/resolve-wikilink'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
 import { useLightboxTransition } from '@/editor/use-lightbox-transition'
 import { isDeepLinkUrl } from '@/lib/deep-links/parse'
@@ -169,6 +171,8 @@ interface NoteEditorProps {
    * authored href; the handler owns source-relative resolution.
    */
   onNoteLinkClick?: (options: { href: string; openInNewWindow: boolean }) => void
+  /** Resolve privacy-gated metadata for an HTTP(S) link popup. */
+  readonly resolveLinkPreview?: LinkPreviewResolver
   /**
    * Resolve the passive body of Meowdown's editor-scoped wiki-link hover
    * card. Resolving `null` (missing, ambiguous, or unavailable targets)
@@ -241,6 +245,7 @@ export function NoteEditor({
   resolveFileInfo,
   onWikiLinkClick,
   onNoteLinkClick,
+  resolveLinkPreview,
   renderWikilinkHoverCard,
   onTagClick,
   onWikilinkSearch,
@@ -458,6 +463,7 @@ export function NoteEditor({
         onWikilinkClick={handleWikilinkClick}
         onTagClick={handleTagClick}
         onLinkClick={handleLinkClick}
+        {...(resolveLinkPreview !== undefined ? { resolveLinkPreview } : {})}
         onImageClick={handleImageClick}
         {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}
         {...(onTagSearch !== undefined ? { onTagSearch } : {})}
@@ -466,6 +472,7 @@ export function NoteEditor({
         {...(onPendingReplacementResolve !== undefined ? { onPendingReplacementResolve } : {})}
         {...(onSlashMenuSearch !== undefined ? { onSlashMenuSearch } : {})}
         resolveImageUrl={handleResolveImageUrl}
+        resolveWikilink={resolveWikilink}
         onFilePaste={handleFilePaste}
         {...(resolveFileLink !== undefined ? { resolveFileLink } : {})}
         resolveFileInfo={handleResolveFileInfo}
@@ -479,9 +486,7 @@ export function NoteEditor({
           {...(saveFile !== undefined ? { saveFile: handleFilePaste } : {})}
         />
         {renderWikilinkHoverCard !== undefined ? (
-          <WikilinkHoverCard className="reflect-hover-card">
-            {renderWikilinkHoverCard}
-          </WikilinkHoverCard>
+          <WikilinkHoverCard>{renderWikilinkHoverCard}</WikilinkHoverCard>
         ) : null}
         {children}
       </MeowdownEditor>

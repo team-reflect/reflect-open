@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
 import { toast } from '@/components/ui/toast'
 import { IAP_PRODUCT_IDS, iapGetProducts, iapPurchase, iapRestorePurchases } from '@reflect/core'
@@ -7,14 +7,18 @@ import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { openUrlSync } from '@/lib/open-url'
+import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
-import { invalidateEntitlementQueries } from '@/mobile/use-active-subscription'
+import { useActiveSubscription } from '@/mobile/use-active-subscription'
 import { useSettings } from '@/providers/settings-provider'
 
-/** Which control kicked off the in-flight action (onboarding's PendingChoice
- * pattern): every button disables, only the initiator shows progress. */
-type PendingAction = 'monthly' | 'yearly' | 'restore' | null
+type PurchasePlan = 'monthly' | 'yearly'
+
+interface PurchaseVariables {
+  plan: PurchasePlan
+  productId: string
+}
 
 /** How long "Remind me later" keeps the paywall dismissed. */
 const SNOOZE_MS = 24 * 60 * 60 * 1000
@@ -31,14 +35,12 @@ const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
 const MEMBER_STOPGAP_UNTIL = Date.parse('2026-09-11')
 
 export function PaywallScreen(): ReactElement {
-  const queryClient = useQueryClient()
+  const subscription = useActiveSubscription()
   const { updateSettings } = useSettings()
-  const [pending, setPending] = useState<PendingAction>(null)
-  const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
-  const [plan, setPlan] = useState<'monthly' | 'yearly'>('yearly')
+  const [selectedPlan, setSelectedPlan] = useState<PurchasePlan>('yearly')
 
   const products = useQuery({
-    queryKey: ['iap-products'],
+    queryKey: queryKeys.iap.products,
     queryFn: () => iapGetProducts([IAP_PRODUCT_IDS.yearly, IAP_PRODUCT_IDS.monthly]),
   })
   const yearly =
@@ -49,26 +51,41 @@ export function PaywallScreen(): ReactElement {
     products.status === 'error' ||
     (products.status === 'success' && (yearly === null || monthly === null))
   const selectedPrice =
-    plan === 'yearly'
+    selectedPlan === 'yearly'
       ? `${yearly?.formattedPrice ?? ''}/year`
       : `${monthly?.formattedPrice ?? ''}/month`
 
-  const subscribe = async () => {
-    const product = plan === 'yearly' ? yearly : monthly
+  const purchaseMutation = useMutation({
+    mutationKey: mutationKeys.iap.purchase,
+    scope: { id: mutationScopeIds.iapAction },
+    mutationFn: (variables: PurchaseVariables) => iapPurchase(variables.productId),
+    onSuccess: subscription.invalidate,
+  })
+  const restoreMutation = useMutation({
+    mutationKey: mutationKeys.iap.restore,
+    scope: { id: mutationScopeIds.iapAction },
+    mutationFn: iapRestorePurchases,
+    onSuccess: (count) => {
+      if (count > 0) {
+        subscription.invalidate()
+      }
+    },
+  })
+  const actionPending = purchaseMutation.isPending || restoreMutation.isPending
+  const purchasingPlan = purchaseMutation.isPending
+    ? (purchaseMutation.variables?.plan ?? null)
+    : null
+  const restoreFeedback = restoreMutation.isError
+    ? 'Restore failed. Check your connection and try again.'
+    : restoreMutation.data === 0
+      ? 'No previous purchase found for this Apple account.'
+      : null
+
+  const subscribe = () => {
+    const product = selectedPlan === 'yearly' ? yearly : monthly
     if (product === null) return
-    setPending(plan)
-    try {
-      await iapPurchase(product.productId)
-      // The plugin resolves `purchase` without emitting `purchaseUpdated`
-      // (see invalidateEntitlementQueries), so refetch here: the fresh
-      // entitlement flips the gate in mobile-app.tsx and unmounts this
-      // screen, no navigation needed.
-      await invalidateEntitlementQueries(queryClient)
-    } catch {
-      // Cancelled or failed; the StoreKit sheet already told the user.
-    } finally {
-      setPending(null)
-    }
+    restoreMutation.reset()
+    purchaseMutation.mutate({ plan: selectedPlan, productId: product.productId })
   }
 
   // Stopgap while reflect.app/claim-reflect-open is not live: members get a
@@ -90,21 +107,9 @@ export function PaywallScreen(): ReactElement {
     updateSettings({ paywallSnoozeUntil: Date.now() + MEMBER_SNOOZE_MS })
   }
 
-  const restore = async () => {
-    setPending('restore')
-    setRestoreMessage(null)
-    try {
-      const count = await iapRestorePurchases()
-      if (count === 0) {
-        setRestoreMessage('No previous purchase found for this Apple account.')
-      } else {
-        await invalidateEntitlementQueries(queryClient)
-      }
-    } catch {
-      setRestoreMessage('Restore failed. Check your connection and try again.')
-    } finally {
-      setPending(null)
-    }
+  const restore = () => {
+    purchaseMutation.reset()
+    restoreMutation.mutate()
   }
 
   return (
@@ -151,27 +156,25 @@ export function PaywallScreen(): ReactElement {
                 title="Yearly"
                 price={`${yearly.formattedPrice ?? ''} / year`}
                 badge="Best value"
-                selected={plan === 'yearly'}
-                disabled={pending !== null}
-                onSelect={() => setPlan('yearly')}
+                selected={selectedPlan === 'yearly'}
+                disabled={actionPending}
+                onSelect={() => setSelectedPlan('yearly')}
               />
               <PlanCard
                 title="Monthly"
                 price={`${monthly.formattedPrice ?? ''} / month`}
-                selected={plan === 'monthly'}
-                disabled={pending !== null}
-                onSelect={() => setPlan('monthly')}
+                selected={selectedPlan === 'monthly'}
+                disabled={actionPending}
+                onSelect={() => setSelectedPlan('monthly')}
               />
             </div>
             <div className="flex flex-col gap-2">
               <Button
                 className="h-12 rounded-xl text-base"
-                disabled={pending !== null}
-                onClick={() => void subscribe()}
+                disabled={actionPending}
+                onClick={subscribe}
               >
-                {pending === 'monthly' || pending === 'yearly' ? (
-                  <Spinner className="size-4" />
-                ) : null}
+                {purchasingPlan !== null ? <Spinner className="size-4" /> : null}
                 Start 7-day free trial
               </Button>
               <p className="text-center text-xs leading-5 text-text-muted">
@@ -187,7 +190,7 @@ export function PaywallScreen(): ReactElement {
           <button
             type="button"
             className="text-sm text-text-secondary underline disabled:opacity-50"
-            disabled={pending !== null}
+            disabled={actionPending}
             onClick={memberContinue}
           >
             Already a Reflect member? Get your first year free
@@ -198,7 +201,7 @@ export function PaywallScreen(): ReactElement {
           <button
             type="button"
             className="text-sm text-text-muted underline disabled:opacity-50"
-            disabled={pending !== null}
+            disabled={actionPending}
             onClick={() => updateSettings({ paywallSnoozeUntil: Date.now() + SNOOZE_MS })}
           >
             Remind me later
@@ -206,13 +209,13 @@ export function PaywallScreen(): ReactElement {
           <button
             type="button"
             className="text-sm text-text-muted underline disabled:opacity-50"
-            disabled={pending !== null}
-            onClick={() => void restore()}
+            disabled={actionPending}
+            onClick={restore}
           >
-            {pending === 'restore' ? 'Restoring…' : 'Restore Purchases'}
+            {restoreMutation.isPending ? 'Restoring…' : 'Restore Purchases'}
           </button>
-          {restoreMessage !== null ? (
-            <p className="text-center text-sm text-text-muted">{restoreMessage}</p>
+          {restoreFeedback !== null ? (
+            <p className="text-center text-sm text-text-muted">{restoreFeedback}</p>
           ) : null}
         </div>
 
