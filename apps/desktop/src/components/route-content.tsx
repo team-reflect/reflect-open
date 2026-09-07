@@ -5,22 +5,22 @@ import { SearchRoute } from '@/components/search-route'
 import { SingleNoteView } from '@/components/single-note-view'
 import { useRouter } from '@/routing/router'
 
-const AllNotesScreen = lazy(() =>
-  import('@/components/all-notes/all-notes-screen').then((module) => ({
-    default: module.AllNotesScreen,
-  })),
-)
-const ChatScreen = lazy(() =>
-  import('@/components/chat/chat-screen').then((module) => ({ default: module.ChatScreen })),
-)
-const SettingsRoute = lazy(() =>
-  import('@/components/settings/settings-route').then((module) => ({
-    default: module.SettingsRoute,
-  })),
-)
-const TasksScreen = lazy(() =>
-  import('@/components/tasks/tasks-screen').then((module) => ({ default: module.TasksScreen })),
-)
+const AllNotesScreen = lazy(async () => {
+  const { AllNotesScreen } = await import('@/components/all-notes/all-notes-screen')
+  return { default: AllNotesScreen }
+})
+const ChatScreen = lazy(async () => {
+  const { ChatScreen } = await import('@/components/chat/chat-screen')
+  return { default: ChatScreen }
+})
+const SettingsRoute = lazy(async () => {
+  const { SettingsRoute } = await import('@/components/settings/settings-route')
+  return { default: SettingsRoute }
+})
+const TasksScreen = lazy(async () => {
+  const { TasksScreen } = await import('@/components/tasks/tasks-screen')
+  return { default: TasksScreen }
+})
 
 /**
  * The route → view mapping (Plan 06): the single place a {@link Route} kind

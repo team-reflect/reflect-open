@@ -6,21 +6,26 @@ import { MobileNote } from '@/mobile/screens/note'
 import type { AllNotesFilters } from '@/mobile/search-filters/filter-state'
 import type { Route } from '@/routing/route'
 
-const MobileAllNotes = lazy(() =>
-  import('@/mobile/screens/all-notes').then((module) => ({ default: module.MobileAllNotes })),
-)
-const MobileChat = lazy(() =>
-  import('@/mobile/screens/chat').then((module) => ({ default: module.MobileChat })),
-)
-const MobileGraphs = lazy(() =>
-  import('@/mobile/screens/graphs').then((module) => ({ default: module.MobileGraphs })),
-)
-const MobileSettings = lazy(() =>
-  import('@/mobile/screens/settings').then((module) => ({ default: module.MobileSettings })),
-)
-const MobileTasks = lazy(() =>
-  import('@/mobile/screens/tasks').then((module) => ({ default: module.MobileTasks })),
-)
+const MobileAllNotes = lazy(async () => {
+  const { MobileAllNotes } = await import('@/mobile/screens/all-notes')
+  return { default: MobileAllNotes }
+})
+const MobileChat = lazy(async () => {
+  const { MobileChat } = await import('@/mobile/screens/chat')
+  return { default: MobileChat }
+})
+const MobileGraphs = lazy(async () => {
+  const { MobileGraphs } = await import('@/mobile/screens/graphs')
+  return { default: MobileGraphs }
+})
+const MobileSettings = lazy(async () => {
+  const { MobileSettings } = await import('@/mobile/screens/settings')
+  return { default: MobileSettings }
+})
+const MobileTasks = lazy(async () => {
+  const { MobileTasks } = await import('@/mobile/screens/tasks')
+  return { default: MobileTasks }
+})
 
 interface MobileScreenProps {
   /**
