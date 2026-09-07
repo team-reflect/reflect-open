@@ -62,7 +62,7 @@ fn note(path: &str, title: &str, links: Vec<IndexedLink>) -> IndexedNote {
         gist_stale: false,
         file_hash: "h".to_string(),
         mtime: 0,
-        text: format!("{title} body"),
+        search_text: format!("{title} body"),
         asset_text: String::new(),
         preview: "body".to_string(),
         links,
@@ -532,7 +532,7 @@ fn asset_description_text_is_searchable_but_stays_out_of_the_preview() {
     // The note body says nothing about a waterfall; only the asset description
     // (folded into the FTS body, Plan 20) does.
     let mut sample = note("notes/a.md", "Trip", vec![]);
-    sample.text = "Trip planning".to_string();
+    sample.search_text = "Trip planning".to_string();
     sample.preview = "Trip planning".to_string();
     sample.asset_text = "A photo of a waterfall in a green canyon.".to_string();
     apply_note(&conn, &sample).unwrap();

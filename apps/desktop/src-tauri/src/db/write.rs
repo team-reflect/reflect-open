@@ -40,9 +40,10 @@ pub struct IndexedNote {
     pub(super) gist_stale: bool,
     pub(super) file_hash: String,
     pub(super) mtime: i64,
-    pub(super) text: String,
+    /// The note's raw Markdown body (frontmatter stripped): the FTS `body`.
+    pub(super) search_text: String,
     /// Description text of referenced assets (Plan 20), folded into the FTS
-    /// `body` only — never `note_text`, `preview`, or anything AI-reachable.
+    /// `body` only, never into `preview` or anything AI-reachable.
     #[serde(default)]
     pub(super) asset_text: String,
     pub(super) preview: String,
@@ -242,14 +243,14 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
             ])?;
         }
     }
-    // The FTS body carries the note text plus any referenced assets' description
-    // text (Plan 20), so a query matching a description surfaces the note. Only
-    // the search index is enriched — `note_text`, `preview`, and AI-reachable
-    // text above stay the note body alone.
+    // The FTS body carries the note's raw Markdown plus any referenced assets'
+    // description text (Plan 20), so a query matching a description surfaces
+    // the note. Only the search index is enriched: `preview` and everything
+    // AI-reachable stay the note body alone.
     let search_body = if note.asset_text.is_empty() {
-        note.text.clone()
+        note.search_text.clone()
     } else {
-        format!("{}\n{}", note.text, note.asset_text)
+        format!("{}\n{}", note.search_text, note.asset_text)
     };
     conn.prepare_cached("INSERT INTO search_fts(path, title, body) VALUES(?1, ?2, ?3)")?
         .execute(params![note.path, note.title, search_body])?;

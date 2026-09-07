@@ -36,7 +36,7 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
     gistStale: false,
     fileHash: 'hash-1',
     mtime: 1_700_000_000_000,
-    text: 'Sample Note body about local-first sync',
+    searchText: 'Sample Note body about local-first sync',
     assetText: '',
     preview: 'body about local-first sync',
     links: [
@@ -128,6 +128,26 @@ describe('createDevIndexDb', () => {
     expect(hits).toEqual([{ path: 'notes/sample.md' }])
   })
 
+  it('finds a note by a URL it links to', async () => {
+    const db = await openDb()
+    const path = 'notes/field-jacket-hunter.md'
+    const source =
+      '# Field Jacket Hunter\n\n' +
+      '[Field Jacket Hunter](https://www.alfredorifugio.com/products/field-jacket-hunter?utm_source=Meta)\n'
+    db.applyNote(
+      buildIndexedNote(parseNote({ path, source }), {
+        fileHash: 'field-jacket-hunter-hash',
+        mtime: 1_700_000_000_000,
+        source,
+      }),
+    )
+    installQueryBridge(db)
+
+    await expect(searchNotes('alfredorifugio')).resolves.toEqual([
+      { path, title: 'Field Jacket Hunter' },
+    ])
+  })
+
   it('finds a short Japanese term inside a title as well as a note body', async () => {
     const db = await openDb()
     db.applyNote(
@@ -137,7 +157,7 @@ describe('createDevIndexDb', () => {
         title: '来週の東京旅行計画',
         titleKey: '来週の東京旅行計画',
         isPinned: false,
-        text: 'An otherwise unrelated body.',
+        searchText: 'An otherwise unrelated body.',
         preview: 'An otherwise unrelated body.',
         mtime: 100,
       }),
@@ -149,7 +169,7 @@ describe('createDevIndexDb', () => {
         title: '別のノート',
         titleKey: '別のノート',
         isPinned: true,
-        text: 'An otherwise unrelated 東京 body token.',
+        searchText: 'An otherwise unrelated 東京 body token.',
         preview: 'An otherwise unrelated 東京 body token.',
         mtime: 200,
       }),
@@ -197,7 +217,7 @@ describe('createDevIndexDb', () => {
         title: 'Car maintenance log',
         titleKey: 'car maintenance log',
         isPinned: false,
-        text: 'An otherwise unrelated body.',
+        searchText: 'An otherwise unrelated body.',
         preview: 'An otherwise unrelated body.',
         tags: [],
         mtime: 100,
@@ -210,7 +230,7 @@ describe('createDevIndexDb', () => {
         title: 'Weekend car wash',
         titleKey: 'weekend car wash',
         isPinned: false,
-        text: 'An otherwise unrelated body.',
+        searchText: 'An otherwise unrelated body.',
         preview: 'An otherwise unrelated body.',
         tags: [],
         mtime: 50,
@@ -223,7 +243,7 @@ describe('createDevIndexDb', () => {
         title: 'Oscar party plans',
         titleKey: 'oscar party plans',
         isPinned: false,
-        text: 'An otherwise unrelated body.',
+        searchText: 'An otherwise unrelated body.',
         preview: 'An otherwise unrelated body.',
         tags: [],
         mtime: 300,
@@ -236,7 +256,7 @@ describe('createDevIndexDb', () => {
         title: 'Garage',
         titleKey: 'garage',
         isPinned: false,
-        text: 'The car needs new brakes.',
+        searchText: 'The car needs new brakes.',
         preview: 'The car needs new brakes.',
         tags: [],
         mtime: 200,
@@ -272,7 +292,7 @@ describe('createDevIndexDb', () => {
         id: '01hv3xq7c2dm8k4t9w5e6r1n87',
         title: 'Security rollout',
         titleKey: 'security rollout',
-        text: 'The plan covers authentication migration.',
+        searchText: 'The plan covers authentication migration.',
         preview: 'The plan covers authentication migration.',
         tags: [],
       }),
@@ -310,7 +330,7 @@ describe('createDevIndexDb', () => {
         id: '01hv3xq7c2dm8k4t9w5e6r1n92',
         title: 'Meeting Notes',
         titleKey: 'meeting notes',
-        text: 'Agenda items for the sync.',
+        searchText: 'Agenda items for the sync.',
         preview: 'Agenda items for the sync.',
         tags: [],
       }),
@@ -335,7 +355,7 @@ describe('createDevIndexDb', () => {
         id: '01hv3xq7c2dm8k4t9w5e6r1n96',
         title: '来週の東京旅行計画',
         titleKey: '来週の東京旅行計画',
-        text: 'An otherwise unrelated body.',
+        searchText: 'An otherwise unrelated body.',
         preview: 'An otherwise unrelated body.',
         tags: [],
       }),
@@ -346,7 +366,7 @@ describe('createDevIndexDb', () => {
         id: '01hv3xq7c2dm8k4t9w5e6r1n97',
         title: '.hidden files',
         titleKey: '.hidden files',
-        text: 'An otherwise unrelated body.',
+        searchText: 'An otherwise unrelated body.',
         preview: 'An otherwise unrelated body.',
         tags: [],
       }),
@@ -373,7 +393,7 @@ describe('createDevIndexDb', () => {
         title: 'Tim MacCaw Extended Project Planning',
         titleKey: 'tim maccaw extended project planning',
         isPinned: true,
-        text: 'An otherwise unrelated body.',
+        searchText: 'An otherwise unrelated body.',
         preview: 'An otherwise unrelated body.',
         tags: [],
         mtime: 100,
@@ -386,7 +406,7 @@ describe('createDevIndexDb', () => {
         title: 'Tim MacRae',
         titleKey: 'tim macrae',
         isPinned: false,
-        text: 'An otherwise unrelated body.',
+        searchText: 'An otherwise unrelated body.',
         preview: 'An otherwise unrelated body.',
         tags: [],
         mtime: 200,
@@ -410,7 +430,7 @@ describe('createDevIndexDb', () => {
         id: '01hv3xq7c2dm8k4t9w5e6r1n90',
         title: 'Café Alpha',
         titleKey: 'café alpha',
-        text: 'An otherwise unrelated body.',
+        searchText: 'An otherwise unrelated body.',
         preview: 'An otherwise unrelated body.',
         tags: [],
       }),
@@ -421,7 +441,7 @@ describe('createDevIndexDb', () => {
         id: '01hv3xq7c2dm8k4t9w5e6r1n88',
         title: 'Car, car',
         titleKey: 'car, car',
-        text: 'An otherwise unrelated body.',
+        searchText: 'An otherwise unrelated body.',
         preview: 'An otherwise unrelated body.',
         tags: [],
       }),
@@ -432,7 +452,7 @@ describe('createDevIndexDb', () => {
         id: '01hv3xq7c2dm8k4t9w5e6r1n89',
         title: 'Unrelated note',
         titleKey: 'unrelated note',
-        text: 'A cafe appears in this body.',
+        searchText: 'A cafe appears in this body.',
         preview: 'A cafe appears in this body.',
         tags: [],
       }),
@@ -469,7 +489,7 @@ describe('createDevIndexDb', () => {
         id: '01hv3xq7c2dm8k4t9w5e6r1n97',
         title: 'Tim MacCaw',
         titleKey: 'tim maccaw',
-        text: 'An otherwise unrelated body.',
+        searchText: 'An otherwise unrelated body.',
         preview: 'An otherwise unrelated body.',
         tags: [],
       }),
@@ -495,7 +515,7 @@ describe('createDevIndexDb', () => {
         id: '01hv3xq7c2dm8k4t9w5e6r1n89',
         title: 'Tim MacCaw',
         titleKey: 'tim maccaw',
-        text: 'The mac migration is documented here.',
+        searchText: 'The mac migration is documented here.',
         preview: 'The mac migration is documented here.',
         tags: [],
       }),

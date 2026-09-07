@@ -28,7 +28,7 @@ function projection(path: string, mtime: number, fileHash: string): IndexedNote 
     gistStale: false,
     fileHash,
     mtime,
-    text: 'body',
+    searchText: 'body',
     assetText: '',
     preview: 'body',
     links: [],
