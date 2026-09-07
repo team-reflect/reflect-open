@@ -1,6 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { WikilinkClickHandler } from '@meowdown/core'
+import { displayNoteTitle } from '@reflect/core'
 import { BacklinkSnippet } from '@/components/backlink-snippet'
 import type { BacklinkSource } from '@/lib/group-backlinks'
 import { cn } from '@/lib/utils'
@@ -63,14 +64,14 @@ export function IncomingBacklinkGroup({
           onClick={() => onOpen(source.path)}
           className="flex min-h-11 min-w-0 flex-1 items-center text-left text-sm text-accent"
         >
-          <span className="truncate">{source.title}</span>
+          <span className="truncate">{displayNoteTitle(source.title)}</span>
         </button>
 
         {source.snippets.length > 0 ? (
           <button
             type="button"
             aria-expanded={expanded}
-            aria-label={`${expanded ? 'Collapse' : 'Expand'} references from ${source.title}`}
+            aria-label={`${expanded ? 'Collapse' : 'Expand'} references from ${displayNoteTitle(source.title)}`}
             onClick={() => setExpanded(!expanded)}
             className="flex size-11 shrink-0 items-center justify-center text-text-muted"
           >

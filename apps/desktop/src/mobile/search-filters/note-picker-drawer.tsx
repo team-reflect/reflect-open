@@ -1,6 +1,6 @@
 import { useDeferredValue, useState, type ReactElement } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { parseSearchQuery, searchWithFilters } from '@reflect/core'
+import { displayNoteTitle, parseSearchQuery, searchWithFilters } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
@@ -83,7 +83,7 @@ export function NotePickerDrawer({
                 onClick={() => pick({ path: hit.path, title: hit.title })}
                 className="flex h-12 w-full items-center border-b border-border text-left text-base last:border-b-0"
               >
-                <span className="min-w-0 flex-1 truncate">{hit.title}</span>
+                <span className="min-w-0 flex-1 truncate">{displayNoteTitle(hit.title)}</span>
               </button>
             ))}
           </div>

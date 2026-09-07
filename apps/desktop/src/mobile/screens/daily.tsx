@@ -1,10 +1,7 @@
 import { useCallback, type ReactElement } from 'react'
-import { untitledNotePath } from '@reflect/core'
-import { Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { useToday } from '@/lib/use-today'
-import { AudioMemoFab } from '@/mobile/audio-memo-fab'
 import { CalendarStrip } from '@/mobile/calendar-strip'
+import { DailyCaptureMenu } from '@/mobile/daily-capture-menu'
 import { DayCarousel } from '@/mobile/day-carousel'
 import { useDailyArrivals } from '@/mobile/use-daily-arrivals'
 import { useSwipeTarget } from '@/mobile/use-swipe-target'
@@ -15,9 +12,8 @@ import { useRouter } from '@/routing/router'
  * over a swipeable day carousel of daily notes. The strip and the carousel
  * stay in lockstep through `date` — tapping a strip day or swiping the
  * carousel both navigate a daily route, which flows back as `date` (though
- * mid-swipe the strip briefly leads, following the gesture's target day). The
- * new-note button floats above it all (V1: the daily note is the capture
- * surface; `+` opens a fresh untitled note via desktop's ⌘N seed flow).
+ * mid-swipe the strip briefly leads, following the gesture's target day). A
+ * floating `+` expands into new-note and audio-memo capture actions.
  *
  * Mounted once for the daily surface (a stable key in `MobileScreen`), so a
  * day change scrolls the carousel rather than remounting it.
@@ -75,18 +71,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
         onSelect={select}
         onTarget={followSwipeTarget}
       />
-      <Button
-        size="icon"
-        aria-label="New note"
-        className="fixed right-4 z-40 size-12 rounded-full shadow-lg"
-        style={{
-          bottom: 'calc(max(env(safe-area-inset-bottom), var(--keyboard-height, 0px)) + 4.25rem)',
-        }}
-        onClick={() => navigate({ kind: 'note', path: untitledNotePath() })}
-      >
-        <Plus className="size-6" />
-      </Button>
-      <AudioMemoFab />
+      <DailyCaptureMenu />
     </div>
   )
 }

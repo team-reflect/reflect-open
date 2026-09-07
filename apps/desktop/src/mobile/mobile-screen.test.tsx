@@ -111,6 +111,7 @@ vi.mock('@/components/ui/drawer', () => ({
     open ? <div data-testid="drawer">{children}</div> : null,
   DrawerContent: ({ children }: { children?: import('react').ReactNode }) => <div>{children}</div>,
   DrawerBody: ({ children }: { children?: import('react').ReactNode }) => <div>{children}</div>,
+  DrawerDescription: ({ children }: { children?: import('react').ReactNode }) => <p>{children}</p>,
   DrawerTitle: ({ children }: { children?: import('react').ReactNode }) => <h2>{children}</h2>,
   DrawerTrigger: ({ children }: { children?: import('react').ReactNode }) => <>{children}</>,
 }))
@@ -136,8 +137,8 @@ vi.mock('@/providers/settings-provider', () => ({
     updateSettingsWith: () => {},
   }),
 }))
-// The daily spine renders the audio-memo FAB; this suite is about screens,
-// not recording — an unavailable memo surface keeps the FAB out of the tree.
+// The daily spine renders the capture menu; this suite is about screens,
+// not recording — an unavailable memo surface keeps its mic action out.
 vi.mock('@/mobile/audio-memo-provider', () => ({
   useMobileAudioMemo: () => ({
     phase: 'idle',

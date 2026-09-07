@@ -32,7 +32,10 @@ export interface TitleRename {
    */
   from: string | null
   to: string
-  /** The alias auto-added by this session's previous rename (prune candidate). */
+  /**
+   * The title this session's previous rename left behind, or `null` when this
+   * rename starts a new chain (a first rename, or external content re-baselined).
+   */
   previousAutoAlias: string | null
 }
 
@@ -105,9 +108,9 @@ export function createTitleRenameTracker(options: TitleRenameTrackerOptions): Ti
       to: pending,
       previousAutoAlias: baselineTitle === null ? null : previousAutoAlias,
     }
-    // The title we just renamed away from becomes this session's auto-alias —
-    // a follow-up rename prunes it instead of accreting one alias per edit.
-    // A birth (`from: null`) leaves no alias behind, so the chain stays empty.
+    // The title we just renamed away from marks the chain: a follow-up rename
+    // prunes what this one added instead of accreting one alias per edit. A
+    // birth (`from: null`) leaves no alias behind, so the chain stays empty.
     previousAutoAlias = baselineTitle
     baselineTitle = pending
     pending = null

@@ -175,6 +175,85 @@ describe('searchWithFilters', () => {
     expect(params).toContain(' quokka')
   })
 
+  it('shows a `//` title by its first segment on the recall feeds', async () => {
+    const row = {
+      path: 'notes/tim-maccaw-dad.md',
+      title: 'Tim MacCaw // Dad',
+      daily_date: null,
+      preview: '',
+      mtime: 0,
+      is_pinned: 0,
+    }
+    mockInvoke.mockResolvedValueOnce([row])
+    mockInvoke.mockResolvedValueOnce([row])
+
+    const [recall] = await searchWithFilters(parseSearchQuery('is:pinned'))
+    const [tagged] = await searchWithFilters(parseSearchQuery('#Family'))
+
+    expect(recall).toMatchObject({ title: 'Tim MacCaw // Dad', highlightedTitle: 'Tim MacCaw' })
+    expect(tagged).toMatchObject({ title: 'Tim MacCaw // Dad', highlightedTitle: 'Tim MacCaw' })
+  })
+
+  it('highlights the first segment of a `//` title on text search', async () => {
+    mockInvoke.mockResolvedValueOnce([
+      {
+        path: 'notes/tim-maccaw-dad.md',
+        title: 'Tim MacCaw // Dad',
+        daily_date: null,
+        preview: '',
+        mtime: 0,
+        is_pinned: 0,
+        fts_highlighted_title: '\u{1}Tim\u{2} MacCaw // Dad',
+        snippet: null,
+      },
+    ])
+
+    const [hit] = await searchWithFilters(parseSearchQuery('tim'))
+
+    expect(hit).toMatchObject({
+      title: 'Tim MacCaw // Dad',
+      highlightedTitle: '\u{1}Tim\u{2} MacCaw',
+    })
+  })
+
+  it('shows a `//` title plain when only an alias segment matched', async () => {
+    mockInvoke.mockResolvedValueOnce([
+      {
+        path: 'notes/tim-maccaw-dad.md',
+        title: 'Tim MacCaw // Dad',
+        daily_date: null,
+        preview: '',
+        mtime: 0,
+        is_pinned: 0,
+        fts_highlighted_title: 'Tim MacCaw // \u{1}Dad\u{2}',
+        snippet: null,
+      },
+    ])
+
+    const [hit] = await searchWithFilters(parseSearchQuery('dad'))
+
+    expect(hit).toMatchObject({ title: 'Tim MacCaw // Dad', highlightedTitle: 'Tim MacCaw' })
+  })
+
+  it('keeps a tokenizer-only FTS highlight inside the first segment of a `//` title', async () => {
+    mockInvoke.mockResolvedValueOnce([
+      {
+        path: 'notes/cafe.md',
+        title: 'Café // Alias',
+        daily_date: null,
+        preview: '',
+        mtime: 0,
+        is_pinned: 0,
+        fts_highlighted_title: '\u{1}Café\u{2} // Alias',
+        snippet: null,
+      },
+    ])
+
+    const [hit] = await searchWithFilters(parseSearchQuery('cafe'))
+
+    expect(hit).toMatchObject({ title: 'Café // Alias', highlightedTitle: '\u{1}Café\u{2}' })
+  })
+
   it('folds the exact-title key the way titles were indexed', async () => {
     mockInvoke.mockResolvedValueOnce([])
 

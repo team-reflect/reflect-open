@@ -79,9 +79,28 @@ pub enum SweepScope {
     /// ([`crate::icloud::watch::conflicted_paths`]) — each check is a
     /// synchronous file-coordination round-trip to `fileproviderd`, and a
     /// bulk-sync arrival sweep over a large graph paid one per note for a
-    /// listing the query already has. Degrades to `Full` whenever the watch
-    /// cannot answer completely (not installed, or pre-gather).
+    /// listing the query already has. Mobile's signal and arrival sweeps.
+    /// Degrades to `Full` whenever the watch cannot answer completely (not
+    /// installed, or pre-gather).
     Candidates,
+    /// Restrict the version checks to this sweep's `ingested_paths` — the
+    /// notes external writes just landed on. Desktop's arrival sweeps: no
+    /// metadata watch runs there (see [`crate::icloud::watch`]), and a
+    /// conflict whose remote side became the working file is by definition
+    /// among the arrivals. A conflict version that never touches the working
+    /// file is the resume sweep's (`Full`) job, exactly as for graphs kept
+    /// outside the app's container.
+    Ingested,
+}
+
+/// The version-check candidate set for `scope` ([`run_sweep`]'s
+/// `conflict_candidates`): `None` checks every note.
+fn conflict_candidates(scope: SweepScope, ingested_paths: &[String]) -> Option<HashSet<String>> {
+    match scope {
+        SweepScope::Full => None,
+        SweepScope::Candidates => crate::icloud::watch::conflicted_paths(),
+        SweepScope::Ingested => Some(ingested_paths.iter().cloned().collect()),
+    }
 }
 
 /// Command: run a conflict sweep over the generation-pinned graph.
@@ -105,10 +124,7 @@ pub async fn icloud_conflicts_scan(
     let root = crate::fs::root_for_generation(&state, generation)?;
     let sweep_root = root.clone();
     let outcome = crate::blocking::run_blocking(move || {
-        let candidates = match scope {
-            SweepScope::Full => None,
-            SweepScope::Candidates => crate::icloud::watch::conflicted_paths(),
-        };
+        let candidates = conflict_candidates(scope, &ingested_paths);
         run_sweep(
             &sweep_root,
             &skip_paths,
@@ -964,6 +980,26 @@ mod tests {
         // …and the next full sweep prunes it.
         run_sweep(root.path(), &[], &[], false, None).unwrap();
         assert!(ShadowStore::new(root.path()).base("notes/a.md").is_none());
+    }
+
+    #[test]
+    fn ingested_scope_checks_exactly_the_arrivals_and_full_checks_everything() {
+        let arrivals = vec!["notes/a.md".to_string(), "daily/2026-07-04.md".to_string()];
+        assert_eq!(
+            super::conflict_candidates(SweepScope::Ingested, &arrivals),
+            Some(arrivals.iter().cloned().collect::<HashSet<_>>())
+        );
+        assert_eq!(
+            super::conflict_candidates(SweepScope::Full, &arrivals),
+            None
+        );
+        // No metadata watch is installed in a test process (nor ever on
+        // desktop): the candidate scope must degrade to a full check, never
+        // to an empty one.
+        assert_eq!(
+            super::conflict_candidates(SweepScope::Candidates, &arrivals),
+            None
+        );
     }
 
     #[test]

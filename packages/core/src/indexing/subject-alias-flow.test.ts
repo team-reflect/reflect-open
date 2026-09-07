@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseNote } from '../markdown'
+import { parseNote, upsertFrontmatter } from '../markdown'
 import { setBridge } from '../ipc/bridge'
 import {
   applyProjection,
@@ -15,9 +15,42 @@ import {
   suggestWikiLinkTargets,
   suggestWikiTargets,
 } from './queries'
-import { rewriteLinksForTitleChange } from './rename'
+import { nextAliases, rewriteLinksForTitleChange } from './rename'
 
 describe('v1 subject alias flow', () => {
+  it('keeps `[[segment]]` links resolving after a `//` title is renamed away', async () => {
+    const database = openMigratedIndex()
+    const aliases = nextAliases([], {
+      from: 'Tim MacCaw // Dad',
+      to: 'Timothy MacCaw',
+      previousAutoAliases: [],
+    })
+    expect(aliases).toEqual(['Tim MacCaw', 'Dad', 'Tim MacCaw // Dad'])
+    const renamed = upsertFrontmatter('# Timothy MacCaw\n', { aliases: aliases ?? [] })
+    applyProjection(database, project('notes/tim-maccaw-dad.md', renamed, 20))
+    applyProjection(
+      database,
+      project('notes/family.md', '# Family\n\nCall [[Dad]] or [[Tim MacCaw]].\n', 10),
+    )
+    connectIndex(database)
+
+    try {
+      for (const target of ['Dad', 'Tim MacCaw', 'Tim MacCaw // Dad', 'Timothy MacCaw']) {
+        await expect(resolveWikiTarget(target)).resolves.toEqual({
+          kind: 'resolved',
+          ref: 'notes/tim-maccaw-dad.md',
+        })
+      }
+      await expect(getBacklinks('notes/tim-maccaw-dad.md')).resolves.toMatchObject([
+        { sourcePath: 'notes/family.md', targetRaw: 'Dad' },
+        { sourcePath: 'notes/family.md', targetRaw: 'Tim MacCaw' },
+      ])
+    } finally {
+      setBridge(null)
+      database.close()
+    }
+  })
+
   it('retitles a display reached through a stable subject alias', async () => {
     const database = openMigratedIndex()
     const subjectPath = 'notes/capture.md'

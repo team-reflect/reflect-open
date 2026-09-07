@@ -889,6 +889,7 @@ describe('SettingsProvider', () => {
       releaseLoad()
     })
     await vi.waitFor(() => expect(result.current.settings.aiProviders).toEqual([added]))
+    await expect(result.current.whenSettingsLoaded()).resolves.toBe('loaded')
     await vi.waitFor(() => expect(saved).toHaveLength(1))
     expect(loadCalls).toBe(1)
     expect(saved[0]).toMatchObject({ aiProviders: [added] })

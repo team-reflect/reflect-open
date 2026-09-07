@@ -497,7 +497,7 @@ describe('MobileAudioMemoProvider', () => {
     expect(result.current.canRetry).toBe(false)
   })
 
-  it('a parked error reopens the drawer from the FAB instead of blocking silently', async () => {
+  it('a parked error reopens the drawer from the audio action instead of blocking silently', async () => {
     captureAudioMemoPart.mockResolvedValue({ ok: false, message: 'disk full' })
     const { result } = await renderHook(() => useMobileAudioMemo(), {
       wrapper,
@@ -681,7 +681,7 @@ describe('MobileAudioMemoProvider', () => {
       wrapper,
     })
 
-    // The FAB stays visible (available) so the feature is discoverable; only
+    // The audio action stays available so the feature is discoverable; only
     // the recording itself waits for a key.
     expect(result.current.available).toBe(true)
     expect(result.current.hasTranscriptionConfig).toBe(false)

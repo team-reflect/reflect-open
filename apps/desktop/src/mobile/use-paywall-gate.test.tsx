@@ -33,8 +33,12 @@ let stored: Record<string, unknown>
 let emitPurchaseUpdated: ((payload: unknown) => void) | null
 
 /** A promise that never settles, for the calls a case must not wait on. */
+const rejectNeverPromises = new Set<(reason?: unknown) => void>()
+
 function never<T>(): Promise<T> {
-  return new Promise<T>(() => {})
+  return new Promise<T>((_resolve, reject) => {
+    rejectNeverPromises.add(reject)
+  })
 }
 
 /**
@@ -121,7 +125,12 @@ beforeEach(() => {
   installFakeBridge()
 })
 
-afterEach(() => {
+afterEach(async () => {
+  for (const reject of rejectNeverPromises) {
+    reject(new Error('test cleanup'))
+  }
+  rejectNeverPromises.clear()
+  await Promise.resolve()
   focusManager.setFocused(undefined)
   setBridge(null)
   queryClient.clear()
@@ -185,6 +194,36 @@ describe('usePaywallGate', () => {
     await vi.waitFor(() => expect(result.current).toBe('hide'))
   })
 
+  it('lets either confirmed subscription through without waiting on its sibling', async () => {
+    owned = (productId) =>
+      productId.endsWith('.yearly') ? Promise.resolve(true) : never<boolean>()
+    const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+    await vi.waitFor(() => expect(result.current).toBe('hide'))
+  })
+
+  it('shows the app while StoreKit is pending, then the paywall after the timeout', async () => {
+    vi.useFakeTimers()
+    try {
+      let lookupCount = 0
+      owned = () => {
+        lookupCount += 1
+        return never()
+      }
+      const hook = await renderHook(() => usePaywallGate(), { wrapper })
+      expect(hook.result.current).toBe('hide')
+      expect(lookupCount).toBe(2)
+
+      await hook.act(() => vi.advanceTimersByTimeAsync(5_000))
+      expect(hook.result.current).toBe('show')
+
+      void queryClient.refetchQueries({ queryKey: queryKeys.iap.entitlements })
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+      expect(lookupCount).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('refetches entitlements through the TanStack focus path', async () => {
     owned = () => Promise.resolve(false)
     const { result } = await renderHook(() => usePaywallGate(), { wrapper })
@@ -216,6 +255,7 @@ describe('usePaywallGate', () => {
 
   it('respects a live "Remind me later" snooze', async () => {
     stored = { paywallSnoozeUntil: Date.now() + 60_000 }
+    owned = never
     const { result } = await renderHook(() => usePaywallGate(), { wrapper })
     await vi.waitFor(() => expect(result.current).toBe('hide'))
   })
@@ -318,10 +358,10 @@ describe('usePaywallGate', () => {
       owned = never
       const { result } = await renderHook(() => usePaywallGate(), { wrapper })
       // A remembered `yearly` would have let this launch straight in.
-      expect(result.current).toBe('pending')
+      expect(result.current).toBe('hide')
     })
 
-    it('waits for live verification before trusting a remembered null', async () => {
+    it('keeps the paywall hidden while verifying a remembered null', async () => {
       await runLaunch('show')
 
       environment = never
@@ -330,7 +370,7 @@ describe('usePaywallGate', () => {
       await vi.waitFor(() =>
         expect(queryClient.getQueryState(queryKeys.iap.entitlements)?.fetchStatus).toBe('fetching'),
       )
-      expect(result.current).toBe('pending')
+      expect(result.current).toBe('hide')
     })
 
     it('does not persist null when one entitlement fails and the sibling is negative', async () => {

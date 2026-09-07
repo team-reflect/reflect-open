@@ -235,6 +235,29 @@ describe('AllNotesScreen', () => {
     await view.unmount()
   })
 
+  it('shows a `//` subject by its first segment', async () => {
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command !== 'db_query') {
+        return null
+      }
+      const sql = String(args['sql'])
+      if (sql.includes('group by')) {
+        return facetRows
+      }
+      if (sql.includes('"preview"')) {
+        return [
+          { path: 'notes/tim-maccaw-dad.md', title: 'Tim MacCaw // Dad', mtime: 0, preview: '' },
+        ]
+      }
+      return []
+    })
+    const view = await renderScreen()
+
+    await expect.element(view.getByText('Tim MacCaw', { exact: true })).toBeInTheDocument()
+    expect(view.getByText('Tim MacCaw // Dad').query()).toBeNull()
+    await view.unmount()
+  })
+
   it('opens a note when its row is clicked', async () => {
     const view = await renderScreen()
 

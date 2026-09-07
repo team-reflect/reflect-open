@@ -94,7 +94,9 @@ retain their bm25 score. Requires the index: if `.reflect/index.sqlite` is missi
 the exit code is `4` — open the graph in Reflect to build it; the CLI never runs the
 indexer. If files on disk diverge from the index (checked by mtime, then content
 hash), a staleness warning goes to stderr and `"stale": true` is set — results
-still return.
+still return. The human-readable listing shows a v1-style `Title // Alias`
+note by its first segment, as the app does; `--json` keeps the complete title
+in `title`.
 
 ```jsonc
 // reflect search "meeting notes" --json

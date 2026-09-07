@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { Virtualizer } from 'virtua'
 import { toggleNotePinned } from '@/lib/note-pin'
-import { NoteDeleteDialog } from '@/mobile/note-delete-dialog'
+import { NoteDeleteDrawer } from '@/mobile/note-delete-drawer'
 import { NOTE_ROW_HEIGHT, SwipeableNoteRow, type NoteRowModel } from '@/mobile/swipeable-note-row'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -59,7 +59,7 @@ export function NoteRowList({ rows, onOpen, onDeleted }: NoteRowListProps): Reac
         </Virtualizer>
       </div>
       {deletePath !== null ? (
-        <NoteDeleteDialog
+        <NoteDeleteDrawer
           key={deletePath}
           path={deletePath}
           open

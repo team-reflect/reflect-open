@@ -30,6 +30,19 @@ export type SettingsLoadOutcome = 'loaded' | 'failed'
 type SettingsUpdater = (current: Settings) => Partial<Settings>
 const SettingsContext = createContext<SettingsContextValue | null>(null)
 
+interface SettingsLoad {
+  readonly promise: Promise<SettingsLoadOutcome>
+  readonly resolve: (outcome: SettingsLoadOutcome) => void
+}
+
+function createSettingsLoad(): SettingsLoad {
+  let resolveLoad: (outcome: SettingsLoadOutcome) => void = () => {}
+  const promise = new Promise<SettingsLoadOutcome>((resolve) => {
+    resolveLoad = resolve
+  })
+  return { promise, resolve: resolveLoad }
+}
+
 export function SettingsProvider({ children }: { children: ReactNode }): ReactElement {
   const bridgeReady = useBridgeReady()
   const queryClient = useQueryClient()
@@ -43,21 +56,15 @@ export function SettingsProvider({ children }: { children: ReactNode }): ReactEl
   const pendingUpdaters = useRef<SettingsUpdater[] | null>([])
   const [sessionSettings, setSessionSettings] = useState<Settings | null>(null)
 
-  const resolveLoad = useRef<(outcome: SettingsLoadOutcome) => void>(() => {})
-  const [loadPromise] = useState(
-    () =>
-      new Promise<SettingsLoadOutcome>((resolve) => {
-        resolveLoad.current = resolve
-      }),
-  )
-  const whenSettingsLoaded = (): Promise<SettingsLoadOutcome> => loadPromise
+  const [settingsLoad] = useState(createSettingsLoad)
+  const whenSettingsLoaded = (): Promise<SettingsLoadOutcome> => settingsLoad.promise
   const loadState =
     pendingUpdaters.current !== null ? 'pending' : settingsQuery.isSuccess ? 'loaded' : 'failed'
   useEffect(() => {
     if (loadState !== 'pending') {
-      resolveLoad.current(loadState)
+      settingsLoad.resolve(loadState)
     }
-  }, [loadState])
+  }, [loadState, settingsLoad])
 
   const dirty = useRef(false)
   const lastSubmission = useRef<Promise<void>>(Promise.resolve())

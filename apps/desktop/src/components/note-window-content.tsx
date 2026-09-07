@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { dailyPath } from '@reflect/core'
+import { dailyPath, displayNoteTitle } from '@reflect/core'
 import { NoteFindBar } from '@/components/note-find-bar'
 import { RouteContent } from '@/components/route-content'
 import { SingleNoteView } from '@/components/single-note-view'
@@ -32,7 +32,9 @@ export function NoteWindowContent(): ReactElement {
     dailyDate !== null
       ? formatDayLabel(dailyDate, settings.dateFormat)
       : route.kind === 'note'
-        ? (noteRow?.title ?? null)
+        ? noteRow
+          ? displayNoteTitle(noteRow.title)
+          : null
         : null,
   )
 

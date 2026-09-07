@@ -79,4 +79,4 @@ those were desktop-only or nonexistent in V1.
 | Quick-edit modal (edit without opening)     | Port: bottom sheet over the task's note session                |
 | Square checkbox + haptic + strikethrough    | Port as-is                                                     |
 | Filters modal                               | Follow desktop's filter set                                    |
-| FAB hidden in Tasks                         | n/a (no FAB in v2)                                             |
+| FAB hidden in Tasks                         | Daily-only capture menu is not mounted in Tasks                |

@@ -10,16 +10,13 @@ import { useSettings } from '@/providers/settings-provider'
 
 const appStartTime = Date.now()
 
-/**
- * What the gate says to do with the paywall.
- *
- * - `show`: render it.
- * - `hide`: let the app through.
- * - `pending`: no answer yet.
- */
-export type PaywallGate = 'pending' | 'show' | 'hide'
+/** Paywall visibility: `show` replaces the app; `hide` leaves the app visible. */
+export type PaywallGate = 'show' | 'hide'
 
-/** Whether to render the paywall. */
+/**
+ * Whether to render the paywall. Unsettled settings or subscription checks
+ * return `hide` so verification never blocks app startup.
+ */
 export function usePaywallGate(): PaywallGate {
   const { platform } = useGraph()
   const subscription = useActiveSubscription()
@@ -55,10 +52,13 @@ export function usePaywallGate(): PaywallGate {
   if (!isAppStoreInstall(environment.value) && !paywallRequested) {
     return 'hide'
   }
-  if (subscription.isLoading || !settingsSettled) {
-    return 'pending'
+  if (!settingsSettled) {
+    return 'hide'
   }
-  return settings.paywallSnoozeUntil > appStartTime ? 'hide' : 'show'
+  if (settings.paywallSnoozeUntil > appStartTime) {
+    return 'hide'
+  }
+  return subscription.isLoading ? 'hide' : 'show'
 }
 
 /**

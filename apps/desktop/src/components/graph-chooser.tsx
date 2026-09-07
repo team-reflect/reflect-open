@@ -91,7 +91,7 @@ export function GraphChooser(): ReactElement {
               return (
                 <li
                   key={recent.root}
-                  className="group flex items-center justify-between gap-2 rounded-md px-2 py-1.5 transition-colors duration-100 hover:bg-surface-hover"
+                  className="group flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-surface-hover"
                 >
                   <button
                     type="button"

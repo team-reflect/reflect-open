@@ -8,7 +8,7 @@ import { usePinnedNotes } from '@/hooks/use-pinned-notes'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
 import { useBridgedNoteToggle } from '@/lib/notes/use-bridged-note-toggle'
-import { NoteDeleteDialog } from '@/mobile/note-delete-dialog'
+import { NoteDeleteDrawer } from '@/mobile/note-delete-drawer'
 import { shareNote } from '@/mobile/share'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -127,7 +127,7 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
         </DrawerContent>
       </Drawer>
 
-      <NoteDeleteDialog
+      <NoteDeleteDrawer
         path={path}
         open={confirmingDelete}
         onOpenChange={setConfirmingDelete}

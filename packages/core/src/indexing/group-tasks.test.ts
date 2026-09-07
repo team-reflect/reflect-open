@@ -158,6 +158,14 @@ describe('groupTasks', () => {
     expect(groups.map((group) => group.kind)).toEqual(['upcoming'])
   })
 
+  it('labels a note group with the display form of a `//` title', () => {
+    const groups = groupTasks(
+      [task({ notePath: 'notes/tim.md', noteTitle: 'Tim MacCaw // Dad', text: 'call' })],
+      TODAY,
+    )
+    expect(groups.map((group) => group.label)).toEqual(['Tim MacCaw'])
+  })
+
   it('groups an undated task (no due date, regular note) under its note', () => {
     const groups = groupTasks(
       [
