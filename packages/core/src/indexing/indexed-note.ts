@@ -216,15 +216,10 @@ export const indexedNoteSchema = z.object({
   gistStale: z.boolean(),
   fileHash: z.string(),
   mtime: z.number(),
-  /**
-   * The note's raw Markdown body (frontmatter stripped), indexed as
-   * `search_fts.body`. Raw on purpose: the FTS tokenizer splits on Markdown
-   * punctuation anyway, so search need not depend on the display projection.
-   */
-  searchText: z.string(),
+  text: z.string(),
   /**
    * Description text of the note's referenced assets (Plan 20), folded into the
-   * FTS `body` only, not the preview and nothing AI-reachable (chat reaches
+   * FTS `body` only — not the preview or the note text AI reads (chat reaches
    * descriptions solely via the read_assets tool and its live privacy gate).
    * Empty when the note has no described assets.
    */
@@ -387,7 +382,7 @@ export function buildIndexedNote(
       parsed.frontmatter.gist !== undefined && gistBodyHash(body) !== parsed.frontmatter.gist.hash,
     fileHash: meta.fileHash,
     mtime: meta.mtime,
-    searchText: body,
+    text: body,
     assetText: meta.assetText ?? '',
     preview: previewSnippet(parsed.displayText, parsed.title),
     hasContent: parsed.displayText !== '' || hasSearchableChar(body),

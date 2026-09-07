@@ -238,8 +238,7 @@ export interface ParsedNote {
   tasks: ParsedTask[]
   /**
    * One-line plain text of the body, for UI slots that render a plain string
-   * rather than Markdown (the All Notes row preview, task rows). Not a search
-   * input: `search_fts.body` indexes the raw Markdown instead.
+   * rather than Markdown (the All Notes row preview, task rows).
    */
   displayText: string
 }

@@ -6,7 +6,6 @@ import type { Span } from './model'
  * backslash escapes resolved, code spans kept literal. A display projection
  * and only that: it feeds the UI slots that render a plain string rather than
  * Markdown (the All Notes row preview, task rows and their breadcrumbs).
- * Search reads the raw Markdown body instead (`search_fts.body`).
  *
  * The walk in `extract.ts` supplies two span sets in body coordinates: `cuts`
  * (syntax ranges to drop — `*emphasis*` marks, the `[ ]` TaskMarker, URLs) and

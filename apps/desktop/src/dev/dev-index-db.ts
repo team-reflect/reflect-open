@@ -143,7 +143,7 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
           note.hasContent,
         ],
       )
-      run(db, 'INSERT INTO note_text(note_path, text) VALUES(?, ?)', [note.path, note.searchText])
+      run(db, 'INSERT INTO note_text(note_path, text) VALUES(?, ?)', [note.path, note.text])
       for (const link of note.links) {
         run(
           db,
@@ -207,8 +207,7 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
           ],
         )
       }
-      const searchBody =
-        note.assetText === '' ? note.searchText : `${note.searchText}\n${note.assetText}`
+      const searchBody = note.assetText === '' ? note.text : `${note.text}\n${note.assetText}`
       run(db, 'INSERT INTO search_fts(path, title, body) VALUES(?, ?, ?)', [
         note.path,
         note.title,
