@@ -135,14 +135,14 @@ pub(super) struct IndexedTask {
 /// Replace all rows for `note.path` with its current projection. Caller wraps
 /// this in a transaction; statements are cached so a batch rebuild reuses them.
 ///
-/// We delete the `notes` row via `remove_note_projection`, let `ON DELETE
-/// CASCADE` clear every child table, and then insert fresh rows.
+/// We delete the `notes` row via `remove_note`, let `ON DELETE CASCADE` clear
+/// every child table, and then insert fresh rows.
 /// The schema's foreign keys — not a hand-maintained `DELETE` list here — are the
 /// single source of truth for what belongs to a note, so new child tables (Plan
 /// 09 embeddings, etc.) need no change to this function. The FTS identity is
 /// carried through replacement so it never depends on the user-authored id.
 pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()> {
-    let search_rowid = remove_note_projection(conn, &note.path)?;
+    let search_rowid = remove_note(conn, &note.path)?;
 
     conn.prepare_cached(
         "INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview, has_content, projection_path)
@@ -377,15 +377,10 @@ pub(super) fn touch_note(conn: &Connection, path: &str, mtime: i64) -> AppResult
 }
 
 /// Drop every row belonging to `path` (the `notes` row cascades to child
-/// tables; `search_fts` is standalone).
-pub(super) fn remove_note(conn: &Connection, path: &str) -> AppResult<()> {
-    remove_note_projection(conn, path)?;
-    Ok(())
-}
-
-/// Return the internal search identity so replacement can preserve it even
-/// though deleting notes cascades to the path-to-rowid mapping.
-fn remove_note_projection(conn: &Connection, path: &str) -> AppResult<Option<i64>> {
+/// tables; `search_fts` is standalone, deleted by rowid). Returns the search
+/// rowid so replacement can preserve it even though deleting the note cascades
+/// to the path-to-rowid mapping.
+pub(super) fn remove_note(conn: &Connection, path: &str) -> AppResult<Option<i64>> {
     let search_rowid: Option<i64> = conn
         .prepare_cached("SELECT rowid FROM note_search WHERE note_path = ?1")?
         .query_row(params![path], |row| row.get(0))
