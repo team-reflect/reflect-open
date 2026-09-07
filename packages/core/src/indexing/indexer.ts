@@ -203,7 +203,6 @@ async function applySplitBatch(
   notes: IndexedNote[],
   generation: number,
   onSkippedNote?: (note: SkippedIndexedNote) => void,
-  onApplied?: (notes: readonly IndexedNote[]) => void,
 ): Promise<number> {
   if (notes.length === 0) {
     return 0
@@ -219,17 +218,9 @@ async function applySplitBatch(
       return 0
     }
     const midpoint = Math.ceil(notes.length / 2)
-    const first = await applySplitBatch(
-      notes.slice(0, midpoint),
-      generation,
-      onSkippedNote,
-      onApplied,
-    )
-    return (
-      first + (await applySplitBatch(notes.slice(midpoint), generation, onSkippedNote, onApplied))
-    )
+    const first = await applySplitBatch(notes.slice(0, midpoint), generation, onSkippedNote)
+    return first + (await applySplitBatch(notes.slice(midpoint), generation, onSkippedNote))
   }
-  onApplied?.(notes)
   return notes.length
 }
 
@@ -250,14 +241,10 @@ export interface IndexApplyBatch {
  * degrade refused batches through {@link applySplitBatch}'s halving retry so
  * failures attribute to single notes. Callers own *when* to flush early —
  * e.g. before a remove that must not be overtaken by queued upserts.
- * `onApplied` receives only successfully committed projections, including
- * successful halves of a split batch. Live callers notify their full event
- * batch separately; bulk passes use this to notify embedding followers.
  */
 export function createIndexApplyBatch(
   generation: number,
   onSkippedNote?: (note: SkippedIndexedNote) => void,
-  onApplied?: (notes: readonly IndexedNote[]) => void,
 ): IndexApplyBatch {
   let batch: IndexedNote[] = []
   let appliedCount = 0
@@ -267,7 +254,7 @@ export function createIndexApplyBatch(
     }
     const notes = batch
     batch = []
-    appliedCount += await applySplitBatch(notes, generation, onSkippedNote, onApplied)
+    appliedCount += await applySplitBatch(notes, generation, onSkippedNote)
   }
   return {
     add: async (note) => {
@@ -341,12 +328,7 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
     return
   }
   const files = await listFiles()
-  const batch = createIndexApplyBatch(generation, onSkippedNote, (notes) => {
-    emitIndexApplied(
-      notes.map((note) => ({ path: note.path, kind: 'upsert' })),
-      generation,
-    )
-  })
+  const batch = createIndexApplyBatch(generation, onSkippedNote)
   const evicted: string[] = []
   let done = 0
   let worked = 0
@@ -515,12 +497,7 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
     return
   }
 
-  const batch = createIndexApplyBatch(generation, onSkippedNote, (notes) => {
-    emitIndexApplied(
-      notes.map((note) => ({ path: note.path, kind: 'upsert' })),
-      generation,
-    )
-  })
+  const batch = createIndexApplyBatch(generation, onSkippedNote)
   const touches = createMtimeTouchBatch(generation)
   const total = scan.candidates.length
   let done = 0

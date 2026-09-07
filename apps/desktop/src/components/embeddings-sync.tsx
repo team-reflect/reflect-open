@@ -18,7 +18,9 @@ import { useSettings } from '@/providers/settings-provider'
  *   untouched — at launch for users who opted in earlier (the cache makes
  *   that instant) and the moment the setting flips on (the one place the
  *   first download starts);
- * - select dirty embedding work once per graph-open after `ready`;
+ * - select dirty embedding work once `ready` and the index reconcile has
+ *   finished, and again after every later reconcile, so notes a reconcile
+ *   just wrote are already in the candidate query;
  * - follow the index: changed notes re-embed, deleted notes drop vectors.
  *   Live paths coalesce and run between bulk notes on one serialized queue.
  *
@@ -37,7 +39,7 @@ import { useSettings } from '@/providers/settings-provider'
  * via the persisted dirty-work check.
  */
 export function EmbeddingsSync(): null {
-  const { graph, indexGeneration } = useGraph()
+  const { graph, indexGeneration, indexing } = useGraph()
   const { settings, updateSettings } = useSettings()
   const status = useEmbedStatus()
   const queue = useRef<Promise<void>>(Promise.resolve())
@@ -69,12 +71,22 @@ export function EmbeddingsSync(): null {
     }
   }, [enabled, status.status])
 
-  // One backfill per (graph, model) once ready, then live post-apply
-  // follow-up. `enabled` is part of the gate so a mid-session disable tears
-  // this down: pending queue items see `active` go false and skip, and the
-  // subscription drops.
+  // One discovery pass per (graph, model, reconcile) once ready, then live
+  // post-apply follow-up. `enabled` is part of the gate so a mid-session
+  // disable tears this down: pending queue items see `active` go false and
+  // skip, and the subscription drops. `indexing` is part of it too: while a
+  // reconcile runs, embedding work would race the notes it is still writing,
+  // and a discovery started before it finished would miss them. Waiting for
+  // the reconcile to end and rerunning discovery afterwards covers both.
   useEffect(() => {
-    if (!enabled || !ready || generation === null || root === null || modelId === null) {
+    if (
+      !enabled ||
+      !ready ||
+      indexing ||
+      generation === null ||
+      root === null ||
+      modelId === null
+    ) {
       return
     }
     let active = true
@@ -148,7 +160,7 @@ export function EmbeddingsSync(): null {
       pending.clear()
       unlisten()
     }
-  }, [enabled, ready, generation, root, modelId])
+  }, [enabled, ready, indexing, generation, root, modelId])
 
   return null
 }

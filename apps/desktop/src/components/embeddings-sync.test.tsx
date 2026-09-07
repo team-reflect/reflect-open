@@ -28,10 +28,12 @@ const semantic = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/semantic', () => semantic)
 
+const graphState = vi.hoisted(() => ({ indexing: false }))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({
     graph: { root: '/g', name: 'g', generation: 1 },
     indexGeneration: 7,
+    indexing: graphState.indexing,
   }),
 }))
 const semanticSetting = vi.hoisted(() => ({ enabled: true }))
@@ -50,6 +52,7 @@ const unlisten = vi.fn()
 
 beforeEach(() => {
   semanticSetting.enabled = true
+  graphState.indexing = false
   onApplied = null
   unlisten.mockClear()
   core.embedNote.mockReset().mockResolvedValue(0)
@@ -208,6 +211,25 @@ describe('EmbeddingsSync', () => {
     await flushQueue()
     expect(core.embedNote).not.toHaveBeenCalled()
     expect(core.embedRemove).not.toHaveBeenCalled()
+  })
+
+  it('waits for the index reconcile to finish, then rediscovers after every reconcile', async () => {
+    graphState.indexing = true
+    const view = await render(<EmbeddingsSync />)
+    await flushQueue()
+    expect(semantic.backfillEmbeddingsVisibly).not.toHaveBeenCalled()
+    expect(core.subscribeIndexApplied).not.toHaveBeenCalled()
+
+    graphState.indexing = false
+    await view.rerender(<EmbeddingsSync />)
+    await vi.waitFor(() => expect(semantic.backfillEmbeddingsVisibly).toHaveBeenCalledTimes(1))
+
+    graphState.indexing = true
+    await view.rerender(<EmbeddingsSync />)
+    await vi.waitFor(() => expect(unlisten).toHaveBeenCalled())
+    graphState.indexing = false
+    await view.rerender(<EmbeddingsSync />)
+    await vi.waitFor(() => expect(semantic.backfillEmbeddingsVisibly).toHaveBeenCalledTimes(2))
   })
 
   it('starts no embedding work while semantic search is disabled', async () => {

@@ -3,7 +3,7 @@ import { setBridge } from '../ipc/bridge'
 import { getBacklinks, resolveWikiTarget } from './queries'
 import { searchNotes } from './filtered-search'
 import { hashContent } from './hash'
-import { indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
+import { PROJECTION_VERSION } from './indexed-note'
 import {
   indexNote,
   rebuildIndex,
@@ -14,7 +14,6 @@ import {
 } from './indexer'
 import { subscribeIndexApplied } from './index-applied'
 import { applyIndexChanges } from './live'
-import { backfillEmbeddings, embedNote } from '../embeddings/pipeline'
 
 // Install a fake bridge so both core's `call` and the Kysely runner resolve
 // against an in-test fake — exercises the pipeline + the Kysely→db_query bridge.
@@ -268,39 +267,6 @@ describe('rebuildIndex', () => {
 
     expect(skipped).toEqual([{ path: 'notes/bad.md', message: 'unexpected end of hex escape' }])
     expect(mockInvoke.mock.calls.some(([command]) => command === 'index_meta_set')).toBe(true)
-  })
-
-  it('notifies followers only for successfully committed halves of a split rebuild batch', async () => {
-    const notified: string[] = []
-    mockInvoke.mockImplementation(async (command, args) => {
-      if (command === 'list_files') {
-        return ['notes/good.md', 'notes/bad.md', 'notes/other.md'].map((path) => ({
-          path,
-          size: 1,
-          modifiedMs: 1,
-        }))
-      }
-      if (command === 'note_read') {
-        return '# Body'
-      }
-      if (command === 'index_apply_batch') {
-        const notes = indexedNoteSchema.array().parse(args['notes'])
-        if (notes.some((note) => note.path === 'notes/bad.md')) {
-          throw new Error('Invalid note')
-        }
-      }
-      return null
-    })
-    const unsubscribe = subscribeIndexApplied((changes, generation) => {
-      expect(generation).toBe(4)
-      notified.push(...changes.map((change) => change.path))
-    })
-    try {
-      await rebuildIndex({ generation: 4, onSkippedNote: () => {} })
-    } finally {
-      unsubscribe()
-    }
-    expect(notified).toEqual(['notes/good.md', 'notes/other.md'])
   })
 
   it('throws a single-note write failure when no skip callback is registered', async () => {
@@ -677,71 +643,6 @@ describe('reconcileIndex move healing (Plan 17)', () => {
 })
 
 describe('reconcileIndex over the native scan delta', () => {
-  it('notifies embedding followers when startup discovery finished before reconcile applied new notes', async () => {
-    const content = '# New note\n\nContent indexed after embedding discovery.'
-    const fileHash = await hashContent(content)
-    const order: string[] = []
-    const pendingWork: Promise<number>[] = []
-    mockInvoke.mockImplementation(async (command) => {
-      if (command === 'embed_pending') {
-        return []
-      }
-      if (command === 'index_reconcile_scan') {
-        return {
-          total: 1,
-          candidates: [
-            {
-              path: 'notes/a.md',
-              modifiedMs: 1,
-              storedMtime: null,
-              storedHash: null,
-              needsProjection: false,
-            },
-          ],
-          orphans: [],
-          stalePlaceholders: [],
-        }
-      }
-      if (command === 'note_read') {
-        return content
-      }
-      if (command === 'index_apply_batch') {
-        order.push('indexed')
-      }
-      if (command === 'embed_prepare') {
-        expect(order).toEqual(['indexed'])
-        return { fingerprint: 'fresh-inputs', fileHash, assetPaths: [] }
-      }
-      if (command === 'embed_read') {
-        return { kind: 'content', content }
-      }
-      if (command === 'db_query') {
-        return []
-      }
-      if (command === 'embed_texts') {
-        return [[0.1, 0.2, 0.3]]
-      }
-      if (command === 'embed_apply') {
-        order.push('embedded')
-      }
-      return null
-    })
-    await backfillEmbeddings({ generation: 4, modelId: 'test-model' })
-    expect(order).toEqual([])
-    const unsubscribe = subscribeIndexApplied((changes, generation) => {
-      for (const change of changes) {
-        pendingWork.push(embedNote({ path: change.path, generation, modelId: 'test-model' }))
-      }
-    })
-    try {
-      await reconcileIndex({ generation: 4 })
-      await Promise.all(pendingWork)
-    } finally {
-      unsubscribe()
-    }
-    expect(order).toEqual(['indexed', 'embedded'])
-  })
-
   it.each(['watcher', 'reconcile'] as const)(
     '%s reprojects a renamed note despite matching content and settled mtime',
     async (pass) => {
