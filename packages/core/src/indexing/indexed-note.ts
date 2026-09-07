@@ -88,8 +88,8 @@ import { serializeWikiSuggestionAddress } from './suggest'
  * and `.md` stripped; '' for strict-path, self, and refused targets), so the
  * backlinks view's name join matches navigation. Existing rows carry the raw
  * fold and must reproject.
- * 20 - normalized external Markdown destinations are retained in plain text,
- * so unchanged notes must rebuild `note_text`, previews, tasks, and FTS rows.
+ * 20 - link destinations are kept in plain text, so unchanged notes must
+ * rebuild `note_text`, previews, tasks, and FTS rows.
  */
 export const PROJECTION_VERSION = 20
 

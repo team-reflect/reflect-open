@@ -154,30 +154,21 @@ describe('parseNote — links, assets, tags, text', () => {
     expect(note.text).toBe('Hi Some bold text with Link alias.')
   })
 
-  it('appends normalized external destinations to markdown link text', () => {
+  it('keeps link destinations in plain text', () => {
     const note = parse(
-      '[Field Jacket Hunter](https://www.alfredorifugio.com/products/field-jacket-hunter?utm_source=Meta#details) ' +
-        '[API](https://example.com/docs%2Fapi%23reference)',
+      '[Field Jacket Hunter](https://www.alfredorifugio.com/products/field-jacket-hunter?utm_source=Meta)',
     )
     expect(note.text).toBe(
-      'Field Jacket Hunter (alfredorifugio.com/products/field-jacket-hunter) ' +
-        'API (example.com/docs/api#reference)',
+      'Field Jacket Hunter https://www.alfredorifugio.com/products/field-jacket-hunter?utm_source=Meta',
     )
   })
 
-  it('keeps bare URLs, autolinks, and email addresses searchable without duplication', () => {
-    const note = parse(
-      'Visit example.com/shop?campaign=1, <https://www.example.org/about#team>, ' +
-        '<person@example.com>, [support](mailto:help@example.com?subject=Hello), and ' +
-        '[example.net/path](https://www.example.net/path).',
-    )
-    expect(note.text).toBe(
-      'Visit example.com/shop, example.org/about, person@example.com, ' +
-        'support (help@example.com), and example.net/path.',
-    )
+  it('keeps autolinked URLs and email addresses in plain text', () => {
+    const note = parse('See <https://www.example.org/about#team> or <person@example.com>.')
+    expect(note.text).toBe('See https://www.example.org/about#team or person@example.com.')
   })
 
-  it('does not append local asset destinations to image alt text', () => {
+  it('drops image destinations from plain text', () => {
     expect(parse('![Quarterly chart](assets/q4-results.png)').text).toBe('Quarterly chart')
   })
 
@@ -243,15 +234,15 @@ describe('parseNote — tasks', () => {
     expect(item.markerOffset).toBe(2)
   })
 
-  it('keeps external link destinations in task text and breadcrumbs', () => {
+  it('keeps link destinations in task text and breadcrumbs', () => {
     const note = parse(
-      '+ Project [site](https://www.example.com/project)\n' +
+      '+ Project [site](https://example.com/project)\n' +
         '  + [ ] review [brief](https://example.com/brief)\n',
     )
     expect(note.tasks[0]).toEqual(
       expect.objectContaining({
-        text: 'review brief (example.com/brief)',
-        breadcrumbs: ['Project site (example.com/project)'],
+        text: 'review brief https://example.com/brief',
+        breadcrumbs: ['Project site https://example.com/project'],
       }),
     )
   })

@@ -3,7 +3,7 @@ import { gistBodyHash, parseNote } from '../markdown'
 import { buildIndexedNote, CLAIM_TIER, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that rebuilds searchable external destinations', () => {
+  it('carries the projection version that rebuilds link destinations in plain text', () => {
     expect(PROJECTION_VERSION).toBe(20)
   })
 

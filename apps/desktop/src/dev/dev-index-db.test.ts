@@ -127,7 +127,7 @@ describe('createDevIndexDb', () => {
     expect(hits).toEqual([{ path: 'notes/sample.md' }])
   })
 
-  it('finds a note by a normalized external Markdown destination', async () => {
+  it('finds a note by a linked URL', async () => {
     const db = await openDb()
     const path = 'notes/field-jacket-hunter.md'
     const source =
