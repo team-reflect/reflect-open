@@ -89,9 +89,9 @@ import { serializeWikiSuggestionAddress } from './suggest'
  * and `.md` stripped; '' for strict-path, self, and refused targets), so the
  * backlinks view's name join matches navigation. Existing rows carry the raw
  * fold and must reproject.
- * 20 - `notes.has_content` replaces the dropped `note_text` table as the "is
- * this note blank" signal, and `search_fts.body` now carries the raw Markdown
- * body, so every note must reproject.
+ * 20 - `notes.has_content` records whether a note would render blank, and
+ * `search_fts.body` now carries the raw Markdown body, so every note must
+ * reproject.
  */
 export const PROJECTION_VERSION = 20
 
