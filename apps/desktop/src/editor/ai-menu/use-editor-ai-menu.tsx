@@ -130,8 +130,6 @@ export function useEditorAiMenu({
     }
   }, [sessionEpoch])
 
-  // Loading a provider can outlive the user marking this note private.
-  // Revoke the pending run before it can send or reveal a delayed result.
   useLayoutEffect(() => {
     if (isPrivate && runRef.current !== null) {
       runRef.current.controller.abort()
