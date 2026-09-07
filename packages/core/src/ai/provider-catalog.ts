@@ -50,9 +50,8 @@ type AnthropicModelId = KnownId<Parameters<AnthropicProvider>[0]>
 type GoogleModelId = KnownId<Parameters<GoogleProvider>[0]>
 type OpenAIModelId = KnownId<Parameters<OpenAIProvider>[0]>
 
-// https://github.com/vercel/ai/blob/ai@7.0.66/packages/openai/src/responses/openai-responses-language-model-options.ts#L88
+// https://github.com/vercel/ai/blob/ai@7.0.93/packages/openai/src/responses/openai-responses-language-model-options.ts#L88
 const OPENAI_MODELS: NonEmptyArray<AiModelOption<OpenAIModelId>> = [
-  // @ts-expect-error gpt-6-astra is not in @ai-sdk/openai yet
   { id: 'gpt-6-astra', label: 'GPT-6 Astra', contextWindow: 1_000_000 },
   { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', contextWindow: 1_000_000 },
   { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', contextWindow: 1_000_000 },
@@ -63,7 +62,7 @@ const OPENAI_MODELS: NonEmptyArray<AiModelOption<OpenAIModelId>> = [
   { id: 'gpt-5.4-nano', label: 'GPT-5.4 nano', contextWindow: 400_000 },
 ]
 
-// https://github.com/vercel/ai/blob/ai@7.0.90/packages/anthropic/src/anthropic-language-model-options.ts#L4
+// https://github.com/vercel/ai/blob/ai@7.0.93/packages/anthropic/src/anthropic-language-model-options.ts#L4
 const ANTHROPIC_MODELS: NonEmptyArray<AiModelOption<AnthropicModelId>> = [
   { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', contextWindow: 1_000_000 },
   { id: 'claude-fable-5', label: 'Claude Fable 5', contextWindow: 1_000_000 },
@@ -74,9 +73,11 @@ const ANTHROPIC_MODELS: NonEmptyArray<AiModelOption<AnthropicModelId>> = [
   { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', contextWindow: 200_000 },
 ]
 
-// https://github.com/vercel/ai/blob/ai@7.0.66/packages/google/src/google-language-model-options.ts#L8
+// https://github.com/vercel/ai/blob/ai@7.0.93/packages/google/src/google-language-model-options.ts#L8
 const GOOGLE_MODELS: NonEmptyArray<AiModelOption<GoogleModelId>> = [
+  { id: 'gemini-pro-latest', label: 'Gemini Pro Latest', contextWindow: 1_000_000 },
   { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', contextWindow: 1_000_000 },
+  { id: 'gemini-flash-latest', label: 'Gemini Flash Latest', contextWindow: 1_000_000 },
   { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', contextWindow: 1_000_000 },
   { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash', contextWindow: 1_000_000 },
   { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', contextWindow: 1_000_000 },

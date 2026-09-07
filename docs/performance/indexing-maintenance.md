@@ -6,7 +6,7 @@ parsed, queried and applied every note even when no inference was needed.
 
 ## FTS identity
 
-Migration 0021 introduces `note_search`, with a unique indexed note path and an
+Migration 0023 introduces `note_search`, with a unique indexed note path and an
 integer FTS rowid. Replacement preserves that identity; rename moves its path.
 The optional user-authored `notes.id` is independent. Existing FTS rows, ranking,
 snippets and durable chat history survive migration. Rebuild clears the mapping
@@ -39,7 +39,7 @@ Its timings are not application startup or save-latency predictions.
 
 ## Embedding checkpoints
 
-Migration 0022 adds `embedding_state`, written atomically with a successful
+Migration 0024 adds `embedding_state`, written atomically with a successful
 complete chunk projection, including an empty chunk set. A fingerprint includes
 note path, indexed content hash, model, embedding projection version and referenced
 description-file revisions. Path is included because relative asset resolution
@@ -67,7 +67,7 @@ The live queue coalesces repeated paths, runs during bulk candidate discovery,
 and drains between bulk notes. Native note
 deletion already removes chunks and checkpoints atomically, so a delayed frontend
 remove cannot wipe a newly recreated note. Rename preserves vectors, with path
-semantics rechecked before recording a new checkpoint. Migration 0023 records
+semantics rechecked before recording a new checkpoint. Migration 0025 records
 `notes.projection_path`: a moved row keeps its old projection path until normal
 indexing reparses its relative references, even if the bytes and mtime match.
 This marker survives an interrupted pass and is checked by both watcher work and

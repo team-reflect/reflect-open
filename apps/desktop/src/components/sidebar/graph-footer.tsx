@@ -1,8 +1,16 @@
-import type { ReactElement } from 'react'
+import { useRef, useState, type ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
-import { Check, FolderOpen, LocateFixed, Settings } from 'lucide-react'
+import {
+  Check,
+  FolderOpen,
+  GraduationCap,
+  LocateFixed,
+  PanelsTopLeft,
+  Settings,
+} from 'lucide-react'
 import { GraphSwatch } from '@/components/graph-swatch'
+import { ReflectAppsDialog } from '@/components/reflect-apps-dialog'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,13 +29,14 @@ import { keybindingFor } from '@/lib/commands/app-commands'
 import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { DEFAULT_GRAPH_COLOR, GRAPH_COLOR_OPTIONS } from '@/lib/graph-colors'
+import { openUrlSync } from '@/lib/open-url'
 import { cn } from '@/lib/utils'
 import { isMainWindow } from '@/lib/windows/window-role'
 import { useGraph } from '@/providers/graph-provider'
 import { useSync, type BackupState } from '@/providers/sync-provider'
 import { useRouter } from '@/routing/router'
 
-const MENU_ITEM_CLASS = 'gap-2 px-2 py-1.5 text-[13px] text-text-secondary'
+const MENU_ITEM_CLASS = 'h-8 gap-2 px-2 py-0 text-[13px] text-text-secondary'
 const SETTINGS_BINDING = keybindingFor('settings.open')
 
 function graphSwitchBindingFor(index: number): string | null {
@@ -54,20 +63,21 @@ function backupDot(backup: BackupState): { className: string; label: string } | 
   }
 }
 
-/**
- * The sidebar footer: the graph's color swatch and name on the left — a
- * dropdown menu for switching to a recent graph, recoloring this graph, or
- * the OS folder picker. The swatch pulses while the graph indexes; a small
- * dot reports backup state. The menu content matches the trigger width, so
- * it stays inset from the sidebar edges.
- */
 interface GraphFooterProps {
   graph: GraphInfo
   /** Commands run with this — the same context the palette/shortcuts use. */
   context: CommandContext
 }
 
+/**
+ * The sidebar footer: the graph's color swatch and name open a dropdown for
+ * switching and recoloring graphs, settings, companion app installs, and Reflect Academy.
+ * The swatch pulses while the graph indexes; a small dot reports backup state.
+ * Menu content matches the trigger width to stay inset from the sidebar edges.
+ */
 export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement {
+  const [appsOpen, setAppsOpen] = useState(false)
+  const graphTriggerRef = useRef<HTMLButtonElement>(null)
   const { recents, indexing, openRecent, chooseGraph } = useGraph()
   const { colorFor, setColor } = useGraphColors()
   const currentColor = colorFor(graph.root) ?? DEFAULT_GRAPH_COLOR
@@ -86,6 +96,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
               <DropdownMenuTrigger
                 render={
                   <Button
+                    ref={graphTriggerRef}
                     type="button"
                     variant="ghost"
                     className="group h-auto min-w-0 flex-1 justify-start gap-2.5 px-1.5 py-1 text-left"
@@ -191,12 +202,25 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
               <span className="min-w-0 flex-1 truncate">Open another graph…</span>
             </DropdownMenuItem>
           ) : null}
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => void runCommand('settings.open', context)}
             className={MENU_ITEM_CLASS}
           >
             <Settings aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">User settings</span>
+            <span className="min-w-0 flex-1 truncate">Preferences</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setAppsOpen(true)} className={MENU_ITEM_CLASS}>
+            <PanelsTopLeft aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">Get Reflect apps…</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => openUrlSync('https://reflect.academy')}
+            className={MENU_ITEM_CLASS}
+          >
+            <GraduationCap aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">Reflect Academy</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -225,6 +249,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
           Settings {SETTINGS_BINDING && <ShortcutKeys binding={SETTINGS_BINDING} />}
         </TooltipContent>
       </Tooltip>
+      <ReflectAppsDialog open={appsOpen} onOpenChange={setAppsOpen} finalFocus={graphTriggerRef} />
     </div>
   )
 }

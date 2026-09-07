@@ -214,6 +214,9 @@ describe('usePaywallGate', () => {
       expect(lookupCount).toBe(2)
 
       await hook.act(() => vi.advanceTimersByTimeAsync(5_000))
+      // The observer hears about the timeout on TanStack's zero-delay notify
+      // timer, which a fake clock schedules for the next tick.
+      await hook.act(() => vi.advanceTimersByTimeAsync(1))
       expect(hook.result.current).toBe('show')
 
       void queryClient.refetchQueries({ queryKey: queryKeys.iap.entitlements })
@@ -250,13 +253,6 @@ describe('usePaywallGate', () => {
 
     owned = (productId) => Promise.resolve(productId.endsWith('.monthly'))
     emitPurchaseUpdated?.({ productId: 'app.reflect.ios.pro.monthly' })
-    await vi.waitFor(() => expect(result.current).toBe('hide'))
-  })
-
-  it('respects a live "Remind me later" snooze', async () => {
-    stored = { paywallSnoozeUntil: Date.now() + 60_000 }
-    owned = never
-    const { result } = await renderHook(() => usePaywallGate(), { wrapper })
     await vi.waitFor(() => expect(result.current).toBe('hide'))
   })
 

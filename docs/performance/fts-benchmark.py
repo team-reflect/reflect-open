@@ -12,7 +12,7 @@ import sys
 import time
 
 ROOT = pathlib.Path(sys.argv[1])
-MIGRATION = (ROOT / "crates/index-schema/migrations/0021_search_fts_identity.sql").read_text()
+MIGRATION = (ROOT / "crates/index-schema/migrations/0023_search_fts_identity.sql").read_text()
 
 
 def connect(mode):

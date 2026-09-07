@@ -9,7 +9,6 @@ import { PaywallScreen } from './paywall-screen'
 
 const mocks = vi.hoisted(() => ({
   invalidate: vi.fn(),
-  updateSettings: vi.fn(),
 }))
 
 vi.mock('@/mobile/use-active-subscription', () => ({
@@ -19,10 +18,6 @@ vi.mock('@/mobile/use-active-subscription', () => ({
     isError: false,
     invalidate: mocks.invalidate,
   }),
-}))
-
-vi.mock('@/providers/settings-provider', () => ({
-  useSettings: () => ({ updateSettings: mocks.updateSettings }),
 }))
 
 const YEARLY_PRODUCT = {
@@ -66,7 +61,6 @@ beforeEach(() => {
   })
   setBridge({ invoke, listen: async () => () => {} })
   mocks.invalidate.mockReset()
-  mocks.updateSettings.mockReset()
 })
 
 afterEach(async () => {
@@ -107,7 +101,6 @@ describe('PaywallScreen purchase mutation', () => {
     await expect
       .element(view.getByRole('button', { name: /Already a Reflect member/ }))
       .toBeDisabled()
-    await expect.element(view.getByRole('button', { name: 'Remind me later' })).toBeDisabled()
     await expect.element(view.getByRole('button', { name: 'Restore Purchases' })).toBeDisabled()
     expect(view.container.querySelector('button svg.animate-spin')).not.toBeNull()
     expect(invoke).toHaveBeenCalledWith('plugin:iap|purchase', {

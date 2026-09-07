@@ -72,7 +72,7 @@ fn indexed_asset_note(conn: &Connection, root: &Path) {
 fn migration_preserves_vectors_and_durable_chat_without_claiming_backfill_success() {
     let mut conn = open_in_memory().unwrap();
     conn.execute_batch("PRAGMA foreign_keys=ON").unwrap();
-    migrate_to(&mut conn, 21).unwrap();
+    migrate_to(&mut conn, 23).unwrap();
     conn.execute_batch(
         "INSERT INTO notes(path, title, title_key, file_hash)
          VALUES('notes/a.md', 'A', 'a', 'hash');
@@ -772,7 +772,7 @@ fn command_reads_use_the_index_root_and_stale_generations_cannot_mutate_success(
 fn migration_repairs_historical_asset_references_without_hydrating_evicted_notes() {
     let mut conn = open_in_memory().unwrap();
     conn.execute_batch("PRAGMA foreign_keys=ON").unwrap();
-    migrate_to(&mut conn, 22).unwrap();
+    migrate_to(&mut conn, 24).unwrap();
     conn.execute_batch(
         "INSERT INTO notes(path, title, title_key, file_hash, mtime)
          VALUES('notes/moved.md', 'Moved', 'moved', 'same', 1000),

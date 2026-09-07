@@ -236,6 +236,9 @@ export interface ParsedNote {
   assets: AssetRef[]
   /** Reflect task items in document order — the Tasks projection (Plan 18). */
   tasks: ParsedTask[]
-  /** Plain-text rendering of the body for FTS (Plan 08) + AI context (Plan 10). */
-  text: string
+  /**
+   * One-line plain text of the body, for UI slots that render a plain string
+   * rather than Markdown (the All Notes row preview, task rows).
+   */
+  displayText: string
 }

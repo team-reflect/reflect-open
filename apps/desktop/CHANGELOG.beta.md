@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.11.0-beta.17](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.16...v0.11.0-beta.17) (2026-09-07)
+
+
+### Features
+
+* **mobile:** remove the paywall snooze ([#1226](https://github.com/team-reflect/reflect-open/issues/1226)) ([bff2474](https://github.com/team-reflect/reflect-open/commit/bff2474bfc6b3aacd5bf5613e139e2a89f439aa9))
+
+
+### Bug Fixes
+
+* make graph menu rows consistent and separate Preferences ([#1224](https://github.com/team-reflect/reflect-open/issues/1224)) ([740b5d6](https://github.com/team-reflect/reflect-open/commit/740b5d6393a572fbc6bbe61f10d8644c91346355))
+* track whether a note has content ([#1227](https://github.com/team-reflect/reflect-open/issues/1227)) ([d358f91](https://github.com/team-reflect/reflect-open/commit/d358f9142c98a1dd0170e383d79542a2cc7010d1))
+
+## [0.11.0-beta.16](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.15...v0.11.0-beta.16) (2026-09-06)
+
+
+### Features
+
+* discover Reflect apps from the graph menu ([#1221](https://github.com/team-reflect/reflect-open/issues/1221)) ([c67bb29](https://github.com/team-reflect/reflect-open/commit/c67bb299ebd1290551f9fd8e71ccbabfa48f54aa))
+* open Reflect Academy from the graph menu ([#1222](https://github.com/team-reflect/reflect-open/issues/1222)) ([0997d4e](https://github.com/team-reflect/reflect-open/commit/0997d4edda8cfdfd439eb5dbf0874a8c6addba19))
+
+## [0.11.0-beta.15](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.14...v0.11.0-beta.15) (2026-09-06)
+
+
+### Features
+
+* add `gemini-pro-latest` and `gemini-flash-latest` models ([#1219](https://github.com/team-reflect/reflect-open/issues/1219)) ([827f489](https://github.com/team-reflect/reflect-open/commit/827f489ce024da77d40ab7760a69b3e4c4c5f108))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.68.1 ([#1197](https://github.com/team-reflect/reflect-open/issues/1197)) ([81b6f04](https://github.com/team-reflect/reflect-open/commit/81b6f04c0b15dc1380539de5b065412c64d9bfff))
+
 ## [0.11.0-beta.14](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.13...v0.11.0-beta.14) (2026-09-04)
 
 

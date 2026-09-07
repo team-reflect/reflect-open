@@ -31,6 +31,7 @@ pub struct IndexedNote {
     pub(super) pinned_order: Option<f64>,
     /// The file carries Git conflict markers (sync merge, Plan 12).
     pub(super) has_conflict: bool,
+    pub(super) has_content: bool,
     /// The published GitHub Gist's html url, when the note has one.
     pub(super) gist_url: Option<String>,
     /// The body changed since it was last published to the gist.
@@ -39,7 +40,7 @@ pub struct IndexedNote {
     pub(super) mtime: i64,
     pub(super) text: String,
     /// Description text of referenced assets (Plan 20), folded into the FTS
-    /// `body` only — never `note_text`, `preview`, or anything AI-reachable.
+    /// `body` only — never `preview` or anything AI-reachable.
     #[serde(default)]
     pub(super) asset_text: String,
     pub(super) preview: String,
@@ -144,8 +145,8 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
     let search_rowid = remove_note_projection(conn, &note.path)?;
 
     conn.prepare_cached(
-        "INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview, projection_path)
-         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15, ?16, ?1)",
+        "INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview, has_content, projection_path)
+         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15, ?16, ?17, ?1)",
     )?
     .execute(params![
         note.path,
@@ -164,9 +165,8 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
         note.file_hash,
         note.mtime,
         note.preview,
+        i64::from(note.has_content),
     ])?;
-    conn.prepare_cached("INSERT INTO note_text(note_path, text) VALUES(?1, ?2)")?
-        .execute(params![note.path, note.text])?;
     {
         let mut stmt = conn.prepare_cached(
             "INSERT INTO links(source_path, kind, target_raw, target_key, target_path_key, alias, pos_from, pos_to)
@@ -243,8 +243,8 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
     }
     // The FTS body carries the note text plus any referenced assets' description
     // text (Plan 20), so a query matching a description surfaces the note. Only
-    // the search index is enriched — `note_text`, `preview`, and AI-reachable
-    // text above stay the note body alone.
+    // the search index is enriched — `preview` and the AI-reachable text above
+    // stay the note body alone.
     let search_body = if note.asset_text.is_empty() {
         note.text.clone()
     } else {
@@ -329,8 +329,6 @@ pub(super) fn move_note(
         )?
         .execute(params![to, address.basename_key, claim_tier::BASENAME])?;
     }
-    conn.prepare_cached("UPDATE note_text SET note_path = ?2 WHERE note_path = ?1")?
-        .execute(params![from, to])?;
     conn.prepare_cached("UPDATE links SET source_path = ?2 WHERE source_path = ?1")?
         .execute(params![from, to])?;
     conn.prepare_cached("UPDATE tags SET note_path = ?2 WHERE note_path = ?1")?
