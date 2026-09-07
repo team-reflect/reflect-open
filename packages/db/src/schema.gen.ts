@@ -120,6 +120,7 @@ export interface Notes {
   gistStale: Generated<number>;
   gistUrl: string | null;
   hasConflict: Generated<number>;
+  hasContent: Generated<number>;
   id: string | null;
   isPinned: Generated<number>;
   isPrivate: Generated<number>;
@@ -132,11 +133,6 @@ export interface Notes {
   title: string;
   titleKey: string;
   updatedAt: Generated<number>;
-}
-
-export interface NoteText {
-  notePath: string;
-  text: string;
 }
 
 export interface SearchFts {
@@ -175,7 +171,6 @@ export interface DB {
   noteEmails: NoteEmails;
   noteKeys: NoteKeys;
   notes: Notes;
-  noteText: NoteText;
   searchFts: SearchFts;
   tags: Tags;
   tasks: Tasks;

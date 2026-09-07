@@ -14,7 +14,7 @@ describe('parseNote — wiki links', () => {
       { target: '2026-06-09', alias: undefined },
     ])
     const first = note.wikiLinks[0]!
-    expect(note.text.slice(0)).toContain('Charlotte')
+    expect(note.displayText.slice(0)).toContain('Charlotte')
     expect(first.from).toBe('See '.length)
     expect(first.to).toBe('See [[Charlotte]]'.length)
   })
@@ -24,7 +24,7 @@ describe('parseNote — wiki links', () => {
     expect(note.wikiLinks.map((w) => ({ target: w.target, alias: w.alias }))).toEqual([
       { target: 'www.reddit.com/r/test', alias: 'www.reddit.com' },
     ])
-    expect(note.text).toBe('See www.reddit.com/r/test www.reddit.com.')
+    expect(note.displayText).toBe('See www.reddit.com/r/test www.reddit.com.')
   })
 
   it('does not match wiki links inside code spans or empty brackets', () => {
@@ -53,7 +53,7 @@ describe('parseNote — headings & title', () => {
     expect(note.headings[0]).toEqual(
       expect.objectContaining({ text: 'www.reddit.com/r/test', slug: 'wwwredditcomrtest' }),
     )
-    expect(note.text).toBe('www.reddit.com/r/test body')
+    expect(note.displayText).toBe('www.reddit.com/r/test body')
   })
 
   it('derives title from frontmatter, else first H1, else filename/date', () => {
@@ -151,14 +151,14 @@ describe('parseNote — links, assets, tags, text', () => {
 
   it('produces collapsed plain text (markup stripped, wiki target+alias kept)', () => {
     const note = parse('# Hi\n\nSome **bold** text with [[Link|alias]].')
-    expect(note.text).toBe('Hi Some bold text with Link alias.')
+    expect(note.displayText).toBe('Hi Some bold text with Link alias.')
   })
 
   it('keeps markdown escapes literal inside code text', () => {
     const note = parse(
       'Rendered www\\.reddit.com, code `www\\.reddit.com`.\n\n```\nwww\\.reddit.com\n```',
     )
-    expect(note.text).toBe(
+    expect(note.displayText).toBe(
       String.raw`Rendered www.reddit.com, code www\.reddit.com. www\.reddit.com`,
     )
   })
@@ -343,12 +343,12 @@ describe('parseNote — meowdown grammar recovery & new inline nodes', () => {
 
   it('strips highlight and inline-math marks from plain text, like other marks', () => {
     const note = parse('mark ==hi== and $x+y$ math')
-    expect(note.text).toBe('mark hi and x+y math')
+    expect(note.displayText).toBe('mark hi and x+y math')
   })
 
   it('drops a bare autolinked domain from plain text, same as other URLs', () => {
     const note = parse('visit google.com today')
-    expect(note.text).toBe('visit today')
+    expect(note.displayText).toBe('visit today')
   })
 
   it('still extracts #tags next to the new inline nodes', () => {

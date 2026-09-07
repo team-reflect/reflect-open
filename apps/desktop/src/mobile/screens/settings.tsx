@@ -319,23 +319,23 @@ export function MobileSettings(): ReactElement {
                 label="Plan"
                 value={
                   subscription.value === 'monthly'
-                    ? 'Reflect Pro Monthly'
+                    ? 'Monthly'
                     : subscription.value === 'yearly'
-                      ? 'Reflect Pro Yearly'
-                      : 'Free'
+                      ? 'Yearly'
+                      : subscription.isLoading
+                        ? 'Checking…'
+                        : 'Not subscribed'
                 }
               />
               {subscription.value === null ? (
-                // Clearing the snooze flips usePaywallGate back to
-                // 'show', so the gate in mobile-app.tsx replaces the app with
-                // the paywall immediately. The request is what makes that work
-                // outside the App Store, where the gate otherwise never shows
-                // the paywall at all.
+                // The request flips usePaywallGate to 'show', so the gate in
+                // mobile-app.tsx replaces the app with the paywall immediately.
+                // It is what makes that work outside the App Store, where the
+                // gate otherwise never shows the paywall at all.
                 <SettingsActionRow
-                  label="Upgrade to Pro"
+                  label="Subscribe"
                   onPress={() => {
                     setPaywallRequested(true)
-                    updateSettings({ paywallSnoozeUntil: 0 })
                   }}
                 />
               ) : (

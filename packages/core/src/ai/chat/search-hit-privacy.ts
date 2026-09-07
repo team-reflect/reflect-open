@@ -116,11 +116,12 @@ async function resolveHit(
     }
   }
 
+  const body = splitFrontmatter(source).body
   const titleProof = lexicalProof(query, parsed.title)
-  const bodyProof = lexicalProof(query, parsed.text)
+  const bodyProof = lexicalProof(query, body)
   if (titleProof || bodyProof) {
     return {
-      hit: liveHit(bodyProof ? liveNoteExcerpt(parsed.text) : '', null),
+      hit: liveHit(bodyProof ? liveNoteExcerpt(body) : '', null),
       assets: [],
     }
   }

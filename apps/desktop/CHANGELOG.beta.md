@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0-beta.17](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.16...v0.11.0-beta.17) (2026-09-07)
+
+
+### Features
+
+* **mobile:** remove the paywall snooze ([#1226](https://github.com/team-reflect/reflect-open/issues/1226)) ([bff2474](https://github.com/team-reflect/reflect-open/commit/bff2474bfc6b3aacd5bf5613e139e2a89f439aa9))
+
+
+### Bug Fixes
+
+* make graph menu rows consistent and separate Preferences ([#1224](https://github.com/team-reflect/reflect-open/issues/1224)) ([740b5d6](https://github.com/team-reflect/reflect-open/commit/740b5d6393a572fbc6bbe61f10d8644c91346355))
+* track whether a note has content ([#1227](https://github.com/team-reflect/reflect-open/issues/1227)) ([d358f91](https://github.com/team-reflect/reflect-open/commit/d358f9142c98a1dd0170e383d79542a2cc7010d1))
+
 ## [0.11.0-beta.16](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.15...v0.11.0-beta.16) (2026-09-06)
 
 

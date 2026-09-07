@@ -213,7 +213,7 @@ describe('search_notes', () => {
       {
         path: 'notes/public.md',
         title: 'Public note',
-        snippet: 'Public note a public diary body',
+        snippet: '# Public note a public diary body',
         heading: null,
       },
     ])
