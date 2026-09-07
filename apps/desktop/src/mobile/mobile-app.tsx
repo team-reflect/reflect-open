@@ -56,7 +56,7 @@ export function MobileApp(): ReactElement {
   // Subscription verification runs beside startup, never in its critical
   // path: while StoreKit or settings are unresolved the gate stays hidden and
   // the local app boots normally. A settled negative answer can replace the
-  // current surface with the paywall later; a purchase or snooze lifts it.
+  // current surface with the paywall later; a purchase lifts it.
   if (paywallGate === 'show') {
     return <PaywallScreen />
   }

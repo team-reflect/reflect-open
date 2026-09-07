@@ -1,7 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
-import { toast } from '@/components/ui/toast'
 import { IAP_PRODUCT_IDS, iapGetProducts, iapPurchase, iapRestorePurchases } from '@reflect/core'
 import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button'
@@ -11,7 +10,6 @@ import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
 import { useActiveSubscription } from '@/mobile/use-active-subscription'
-import { useSettings } from '@/providers/settings-provider'
 
 type PurchasePlan = 'monthly' | 'yearly'
 
@@ -20,23 +18,11 @@ interface PurchaseVariables {
   productId: string
 }
 
-/** How long "Remind me later" keeps the paywall dismissed. */
-const SNOOZE_MS = 24 * 60 * 60 * 1000
-
-/** How long the member button keeps the paywall dismissed while the
- * free-year claim flow is not live yet. */
-const MEMBER_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000
-
 /** V1 web page that hands a paying Reflect member their free-year offer code. */
 const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
 
-/** When the free-week stopgap self-expires (30 days after it was written,
- * 2026-08-12). After this the member button opens the claim page instead. */
-const MEMBER_STOPGAP_UNTIL = Date.parse('2026-09-11')
-
 export function PaywallScreen(): ReactElement {
   const subscription = useActiveSubscription()
-  const { updateSettings } = useSettings()
   const [selectedPlan, setSelectedPlan] = useState<PurchasePlan>('yearly')
 
   const products = useQuery({
@@ -86,25 +72,6 @@ export function PaywallScreen(): ReactElement {
     if (product === null) return
     restoreMutation.reset()
     purchaseMutation.mutate({ plan: selectedPlan, productId: product.productId })
-  }
-
-  // Stopgap while reflect.app/claim-reflect-open is not live: members get a
-  // week free and the paywall asks again when it lapses. The toast outlives
-  // this screen (its Toaster mounts in mobile-root.tsx, outside the gate),
-  // and the snooze write unmounts the paywall immediately. Past the stopgap
-  // deadline the button opens the claim page, so a stale build stops handing
-  // out free weeks once the real flow exists.
-  const memberContinue = () => {
-    if (Date.now() > MEMBER_STOPGAP_UNTIL) {
-      openUrlSync(CLAIM_FREE_YEAR_URL)
-      return
-    }
-    toast.add({
-      title: 'Enjoy Reflect free for now',
-      description: "We'll ask about your free year again once codes are ready.",
-      timeout: 6000,
-    })
-    updateSettings({ paywallSnoozeUntil: Date.now() + MEMBER_SNOOZE_MS })
   }
 
   const restore = () => {
@@ -191,20 +158,9 @@ export function PaywallScreen(): ReactElement {
             type="button"
             className="text-sm text-text-secondary underline disabled:opacity-50"
             disabled={actionPending}
-            onClick={memberContinue}
+            onClick={() => openUrlSync(CLAIM_FREE_YEAR_URL)}
           >
             Already a Reflect member? Get your first year free
-          </button>
-          {/* First-rollout escape hatch: dismissing writes a snooze timestamp
-              and the gate in mobile-app.tsx unmounts this screen, so a broken
-              store never locks anyone out of their notes. */}
-          <button
-            type="button"
-            className="text-sm text-text-muted underline disabled:opacity-50"
-            disabled={actionPending}
-            onClick={() => updateSettings({ paywallSnoozeUntil: Date.now() + SNOOZE_MS })}
-          >
-            Remind me later
           </button>
           <button
             type="button"

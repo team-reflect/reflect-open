@@ -253,13 +253,6 @@ describe('usePaywallGate', () => {
     await vi.waitFor(() => expect(result.current).toBe('hide'))
   })
 
-  it('respects a live "Remind me later" snooze', async () => {
-    stored = { paywallSnoozeUntil: Date.now() + 60_000 }
-    owned = never
-    const { result } = await renderHook(() => usePaywallGate(), { wrapper })
-    await vi.waitFor(() => expect(result.current).toBe('hide'))
-  })
-
   it('stays out of the way off iOS', async () => {
     graphState.platform = 'desktop'
     const { result } = await renderHook(() => usePaywallGate(), { wrapper })
