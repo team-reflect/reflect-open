@@ -322,7 +322,7 @@ export function MobileSettings(): ReactElement {
                     ? 'Reflect Pro Monthly'
                     : subscription.value === 'yearly'
                       ? 'Reflect Pro Yearly'
-                      : 'Free'
+                      : 'Free trial'
                 }
               />
               {subscription.value === null ? (
