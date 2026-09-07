@@ -214,6 +214,9 @@ describe('usePaywallGate', () => {
       expect(lookupCount).toBe(2)
 
       await hook.act(() => vi.advanceTimersByTimeAsync(5_000))
+      // The observer hears about the timeout on TanStack's zero-delay notify
+      // timer, which a fake clock schedules for the next tick.
+      await hook.act(() => vi.advanceTimersByTimeAsync(1))
       expect(hook.result.current).toBe('show')
 
       void queryClient.refetchQueries({ queryKey: queryKeys.iap.entitlements })
