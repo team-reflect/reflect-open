@@ -6,7 +6,7 @@ import {
 } from '../ai/describe-page'
 import { defaultAiProvider, type AiProvidersState } from '../ai/provider-config'
 import { aiApiKeyForConfig } from '../ai/secrets'
-import { errorMessage, isAppError, toAppError } from '../errors'
+import { errorMessage, isAppError, ReflectError, toAppError } from '../errors'
 import {
   captureLinkPreview,
   listFiles,
@@ -15,7 +15,7 @@ import {
   writeAsset,
   writeNote,
 } from '../graph/commands'
-import { dailyPath } from '../graph/paths'
+import { assetPath, dailyPath } from '../graph/paths'
 import { hashContent } from '../indexing/hash'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
 import type { AiProviderConfig } from '../settings/schema'
@@ -43,6 +43,7 @@ import {
   type CaptureNoteMeta,
 } from './capture-note'
 import type { PageMeta } from '../link-preview/metadata'
+import { enrichXCapture } from './x-enrichment'
 import { scrapePageMeta } from './meta-scrape'
 
 /**
@@ -54,7 +55,10 @@ export async function listPendingCaptures(generation: number): Promise<CaptureId
   const candidates = files
     .map((file) => captureFromPath(file.path))
     .filter((identity): identity is CaptureIdentity => identity !== null)
-    .sort((first, second) => first.base.localeCompare(second.base))
+    .sort(
+      (first, second) =>
+        first.date.localeCompare(second.date) || first.base.localeCompare(second.base),
+    )
   const pending: CaptureIdentity[] = []
   for (const identity of candidates) {
     let source: string
@@ -83,6 +87,8 @@ export interface ReconcileCaptureEnrichmentInput {
   fetchFn?: typeof fetch
   /** Abort gate, checked between notes and after every slow await. */
   isStale?: () => boolean
+  /** Unsaved editor content defers processing without marking the note skipped. */
+  isNoteDirty?: (path: string) => boolean
   /** Observes how many captures need enrichment, before work starts. */
   onPending?: (count: number) => void
 }
@@ -196,17 +202,22 @@ export async function reconcileCaptureEnrichment(
   const config = defaultAiProvider(input.providers)
   let apiKey: string | null = null
   let providerStop: ReconcileStop | null = null
-  if (config !== null) {
-    try {
-      apiKey = await aiApiKeyForConfig(config)
-    } catch (cause) {
-      const error = toAppError(cause)
-      providerStop = { reason: error.kind, message: error.message }
-    }
-    if (apiKey === null && providerStop === null) {
-      providerStop = {
-        reason: 'config',
-        message: `The API key for the configured ${config.provider} model is missing from the keychain.`,
+  let providerResolved = false
+  const resolveProvider = async (): Promise<void> => {
+    if (providerResolved) return
+    providerResolved = true
+    if (config !== null) {
+      try {
+        apiKey = await aiApiKeyForConfig(config)
+      } catch (cause) {
+        const error = toAppError(cause)
+        providerStop = { reason: error.kind, message: error.message }
+      }
+      if (apiKey === null && providerStop === null) {
+        providerStop = {
+          reason: 'config',
+          message: `The API key for the configured ${config.provider} model is missing from the keychain.`,
+        }
       }
     }
   }
@@ -222,11 +233,18 @@ export async function reconcileCaptureEnrichment(
     skipped,
     stopped,
   })
+  const canWrite = (identity: CaptureIdentity): boolean =>
+    !stale() &&
+    input.isNoteDirty?.(identity.notePath) !== true &&
+    input.isNoteDirty?.(dailyPath(identity.date)) !== true
   const markSkipped = async (source: string, identity: CaptureIdentity): Promise<void> => {
+    if (!canWrite(identity)) return
+    const meta = captureNoteMeta(parseFrontmatter(splitFrontmatter(source).raw).data)
     await writeNote(
       identity.notePath,
       upsertFrontmatter(source, {
         captureStatus: 'skipped',
+        ...(meta?.captureKind === 'x' ? { captureInput: undefined } : {}),
         captureDailyFromTitle: undefined,
         captureFinalizeStatus: undefined,
       }),
@@ -234,26 +252,27 @@ export async function reconcileCaptureEnrichment(
     )
     skipped += 1
   }
-  const skipPending = async (identity: CaptureIdentity): Promise<void> => {
-    const snapshot = await readPendingCaptureSnapshot(identity, input.generation)
-    if (snapshot !== null) {
-      await markSkipped(snapshot.source, identity)
-    }
-  }
   const currentCapture = async (
     identity: CaptureIdentity,
     expectedHash?: string,
+    expectedMeta?: CaptureNoteMeta,
   ): Promise<PendingCaptureSnapshot | null> => {
+    if (!canWrite(identity)) return null
     const snapshot = await readPendingCaptureSnapshot(identity, input.generation)
     if (snapshot === null) {
       return null
     }
     const dailySource = await noteSource(dailyPath(identity.date), input.generation)
     const bodyHash = await hashContent(snapshot.body)
+    if (!canWrite(identity)) return null
     if (
       snapshot.isPrivate ||
       notePrivate(dailySource) ||
-      bodyHash !== (expectedHash ?? snapshot.meta.captureHash)
+      bodyHash !== (expectedHash ?? snapshot.meta.captureHash) ||
+      (expectedMeta !== undefined &&
+        (snapshot.meta.captureKind !== expectedMeta.captureKind ||
+          snapshot.meta.captureId !== expectedMeta.captureId ||
+          JSON.stringify(snapshot.meta.captureInput) !== JSON.stringify(expectedMeta.captureInput)))
     ) {
       await markSkipped(snapshot.source, identity)
       return null
@@ -270,10 +289,15 @@ export async function reconcileCaptureEnrichment(
       if (snapshot === null) {
         continue
       }
+      if (identity.base.startsWith('capture-x-') && snapshot.meta.captureKind !== 'x') {
+        throw new ReflectError('parse', `Invalid X capture metadata in ${identity.notePath}`)
+      }
       if (hasCaptureWriteTransaction(snapshot.meta)) {
-        const finalized = await finishCaptureWrite(identity, input.generation)
+        const finalized = await finishCaptureWrite(identity, input.generation, () =>
+          canWrite(identity),
+        )
         if (finalized === null) {
-          await skipPending(identity)
+          await currentCapture(identity)
           continue
         }
         if (finalized === 'done') {
@@ -285,6 +309,21 @@ export async function reconcileCaptureEnrichment(
           continue
         }
       }
+      if (snapshot.meta.captureKind === 'x') {
+        const initial = snapshot
+        if (
+          await enrichXCapture({
+            identity,
+            generation: input.generation,
+            snapshot: initial,
+            current: () => currentCapture(identity, initial.meta.captureHash, initial.meta),
+            canWrite: () => canWrite(identity),
+          })
+        )
+          enriched += 1
+        continue
+      }
+      await resolveProvider()
       const metadataComplete = snapshot.meta.captureMetadataStatus === 'done'
       if (metadataComplete && apiKey === null) {
         if (config !== null) {
@@ -300,9 +339,10 @@ export async function reconcileCaptureEnrichment(
           status: 'done',
           provider: null,
           generation: input.generation,
+          canWrite: () => canWrite(identity),
         })
         if (captureHash === null) {
-          await skipPending(identity)
+          await currentCapture(identity)
           continue
         }
         enriched += 1
@@ -353,8 +393,8 @@ export async function reconcileCaptureEnrichment(
       let previewScreenshot: string | null = null
       if (previewImage !== null) {
         try {
-          await writeAsset(identity.assetPath, previewImage, input.generation)
-          previewScreenshot = identity.assetPath
+          await writeAsset(assetPath(`${identity.base}.jpg`), previewImage, input.generation)
+          previewScreenshot = assetPath(`${identity.base}.jpg`)
         } catch {
           // A preview is optional; metadata enrichment still completes when
           // the local asset cannot be persisted.
@@ -403,9 +443,10 @@ export async function reconcileCaptureEnrichment(
           provider: null,
           screenshot: previewScreenshot ?? undefined,
           generation: input.generation,
+          canWrite: () => canWrite(identity),
         })
         if (captureHash === null) {
-          await skipPending(identity)
+          await currentCapture(identity)
           continue
         }
         if (titleChanged) {
@@ -418,9 +459,10 @@ export async function reconcileCaptureEnrichment(
             status: 'done',
             provider: null,
             generation: input.generation,
+            canWrite: () => canWrite(identity),
           })
           if (finalizedHash === null) {
-            await skipPending(identity)
+            await currentCapture(identity)
             continue
           }
         }
@@ -440,9 +482,10 @@ export async function reconcileCaptureEnrichment(
           provider: null,
           screenshot: previewScreenshot ?? undefined,
           generation: input.generation,
+          canWrite: () => canWrite(identity),
         })
         if (persistedHash === null) {
-          await skipPending(identity)
+          await currentCapture(identity)
           continue
         }
         metadataHash = persistedHash
@@ -504,9 +547,10 @@ export async function reconcileCaptureEnrichment(
         status: 'done',
         provider: usedAi ? config : null,
         generation: input.generation,
+        canWrite: () => canWrite(identity),
       })
       if (captureHash === null) {
-        await skipPending(identity)
+        await currentCapture(identity)
         continue
       }
       enriched += 1

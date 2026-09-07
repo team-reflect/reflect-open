@@ -1,4 +1,5 @@
-import type { CaptureWireMessage } from '@reflect/core/capture-envelope'
+import type { CaptureWireMessage, XEnvelope } from '@reflect/core/capture-envelope'
+import { CAPTURE_ENVELOPE_MAX_BYTES } from '@reflect/core/x-post'
 
 /**
  * Build the extension→host wire message from what the popup captured. The
@@ -8,6 +9,7 @@ import type { CaptureWireMessage } from '@reflect/core/capture-envelope'
  */
 
 export interface CapturedPage {
+  x?: XEnvelope['x'] | undefined
   url: string
   title: string
   /** `tabs.captureVisibleTab`'s data URL, when the page allowed a screenshot. */
@@ -44,18 +46,50 @@ export interface BuildWireMessageInput extends CapturedPage {
 }
 
 export function buildWireMessage(input: BuildWireMessageInput): CaptureWireMessage {
+  const common = {
+    id: input.id,
+    url: input.url,
+    title: input.title.trim(),
+    selection: presence(input.selection),
+    note: presence(input.note),
+    capturedAt: input.capturedAt.toISOString(),
+    source: 'extension' as const,
+  }
+  const envelope = input.x
+    ? { ...common, version: 2 as const, x: { ...input.x } }
+    : { ...common, version: 1 as const, contentText: presence(input.contentText) }
+  function oversized(): boolean {
+    const spooled = {
+      ...envelope,
+      ...(input.screenshotDataUrl ? { screenshotRef: `${input.id}.jpg` } : {}),
+    }
+    return new TextEncoder().encode(JSON.stringify(spooled)).length > CAPTURE_ENVELOPE_MAX_BYTES
+  }
+  if (envelope.version === 2 && oversized()) {
+    const { quote: _quote, images: _images, ...post } = envelope.x.post
+    envelope.x.post = post
+    if (oversized() && post.text) {
+      const original = post.text.value
+      let lower = 0
+      let upper = original.length
+      while (lower < upper) {
+        const middle = Math.ceil((lower + upper) / 2)
+        envelope.x.post.text = { value: original.slice(0, middle), complete: false }
+        if (oversized()) upper = middle - 1
+        else lower = middle
+      }
+      const value = original.slice(0, lower).replace(/[\uD800-\uDBFF]$/, '')
+      if (value) envelope.x.post.text = { value, complete: false }
+      else delete envelope.x.post.text
+    }
+    if (oversized()) {
+      throw new Error(
+        'This post capture is too large. Shorten the note or selection and try again.',
+      )
+    }
+  }
   return {
-    envelope: {
-      version: 1,
-      id: input.id,
-      url: input.url,
-      title: input.title.trim(),
-      selection: presence(input.selection),
-      contentText: presence(input.contentText),
-      note: presence(input.note),
-      capturedAt: input.capturedAt.toISOString(),
-      source: 'extension',
-    },
+    envelope,
     screenshotBase64: input.screenshotDataUrl
       ? dataUrlToBase64(input.screenshotDataUrl)
       : undefined,

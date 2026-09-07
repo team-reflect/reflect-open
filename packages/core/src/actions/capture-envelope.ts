@@ -1,4 +1,11 @@
 import { z } from 'zod'
+import {
+  CAPTURE_ENVELOPE_MAX_BYTES,
+  X_IMAGE_LIMIT,
+  X_QUOTE_MAX_LENGTH,
+  X_TEXT_MAX_LENGTH,
+  xPostId,
+} from './x-post'
 
 /**
  * The platform-agnostic capture envelope (Plan 11): the contract between
@@ -6,8 +13,8 @@ import { z } from 'zod'
  * native-messaging host writes one `<id>.json` envelope (plus an optional
  * sibling screenshot) into the graph's capture inbox; the iOS share
  * extension writes the same shape into the App Group inbox the main app
- * relays on foreground. This module is deliberately browser-safe — it imports nothing
- * but zod, and the extension consumes it through the package's
+ * relays on foreground. This browser-safe module imports Zod and lightweight URL
+ * helpers. The extension consumes it through the package's
  * `./capture-envelope` subpath without pulling the rest of core.
  *
  * This TS schema is the single source of truth; the Rust host's serde structs
@@ -31,7 +38,8 @@ function isHttpUrl(value: string): boolean {
 const BASE64_RE = /^(?:[A-Z0-9+/]{4})*(?:[A-Z0-9+/]{2}==|[A-Z0-9+/]{3}=)?$/i
 
 /** One captured page, as spooled into the capture inbox. */
-export const captureEnvelopeSchema = z.object({
+const linkCaptureEnvelopeSchema = z.object({
+  x: z.never().optional(),
   /** Envelope format version; bump on breaking changes. */
   version: z.literal(1),
   /**
@@ -69,6 +77,82 @@ export const captureEnvelopeSchema = z.object({
   source: captureSourceSchema,
 })
 
+const xAuthorSchema = z.strictObject({
+  name: z.string().min(1).max(200),
+  handle: z.string().min(1).max(32),
+})
+
+const xTextSchema = z.strictObject({
+  value: z.string().min(1).max(X_TEXT_MAX_LENGTH),
+  complete: z.boolean(),
+})
+
+const xPostIdSchema = z.string().regex(/^\d{1,20}$/)
+
+/** A bounded snapshot of a post and one quoted post. */
+export const xPostSchema = z.strictObject({
+  id: xPostIdSchema,
+  author: xAuthorSchema.optional(),
+  text: xTextSchema.optional(),
+  images: z
+    .array(
+      z.strictObject({
+        url: z.url().max(2048).refine(isHttpUrl),
+        alt: z.string().max(2000).optional(),
+      }),
+    )
+    .max(X_IMAGE_LIMIT)
+    .optional(),
+  quote: z
+    .strictObject({
+      id: xPostIdSchema,
+      author: xAuthorSchema.optional(),
+      text: xTextSchema.extend({ value: z.string().min(1).max(X_QUOTE_MAX_LENGTH) }).optional(),
+    })
+    .optional(),
+})
+
+export type XPost = z.infer<typeof xPostSchema>
+
+const xCaptureEnvelopeObject = linkCaptureEnvelopeSchema.extend({
+  version: z.literal(2),
+  source: z.literal('extension'),
+  contentText: z.never().optional(),
+  metaDescription: z.never().optional(),
+  x: z.strictObject({
+    trigger: z.enum(['manual', 'bookmark', 'like']),
+    day: z.iso.date(),
+    post: xPostSchema,
+  }),
+})
+
+export type XEnvelope = z.infer<typeof xCaptureEnvelopeObject>
+
+function validXCapture(envelope: XEnvelope): boolean {
+  return (
+    xPostId(envelope.url) === envelope.x.post.id &&
+    (envelope.screenshotRef === undefined || envelope.screenshotRef === `${envelope.id}.jpg`) &&
+    (envelope.x.trigger === 'manual' ||
+      (envelope.note === undefined &&
+        envelope.selection === undefined &&
+        envelope.screenshotRef === undefined))
+  )
+}
+
+function withinSpoolLimit(envelope: unknown): boolean {
+  return new TextEncoder().encode(JSON.stringify(envelope)).byteLength <= CAPTURE_ENVELOPE_MAX_BYTES
+}
+
+/** X capture is versioned separately so older hosts cannot silently discard its snapshot. */
+export const xCaptureEnvelopeSchema = xCaptureEnvelopeObject
+  .refine(validXCapture, 'X capture identity or trigger payload is invalid')
+  .refine(withinSpoolLimit, 'capture envelope exceeds 64 KiB')
+
+export const captureEnvelopeSchema = z.discriminatedUnion('version', [
+  linkCaptureEnvelopeSchema,
+  xCaptureEnvelopeSchema,
+])
+
 export type CaptureEnvelope = z.infer<typeof captureEnvelopeSchema>
 export type CaptureSource = z.infer<typeof captureSourceSchema>
 
@@ -78,11 +162,23 @@ export type CaptureSource = z.infer<typeof captureSourceSchema>
  * `screenshotRef` before writing the envelope. Kept here so the extension and
  * the host tests share one definition of the wire shape.
  */
-export const captureWireMessageSchema = z.object({
-  envelope: captureEnvelopeSchema.omit({ screenshotRef: true }),
-  /** JPEG screenshot bytes, base64 (no data-URL prefix). */
-  screenshotBase64: z.string().min(1).regex(BASE64_RE, 'must be base64').optional(),
-})
+export const captureWireMessageSchema = z
+  .object({
+    envelope: z.discriminatedUnion('version', [
+      linkCaptureEnvelopeSchema.omit({ screenshotRef: true }),
+      xCaptureEnvelopeObject.omit({ screenshotRef: true }).refine(validXCapture),
+    ]),
+    /** JPEG screenshot bytes, base64 (no data-URL prefix). */
+    screenshotBase64: z.string().min(1).regex(BASE64_RE, 'must be base64').optional(),
+  })
+  .refine((wire) => {
+    if (wire.envelope.version !== 2) return true
+    if (wire.envelope.x.trigger !== 'manual' && wire.screenshotBase64 !== undefined) return false
+    return withinSpoolLimit({
+      ...wire.envelope,
+      ...(wire.screenshotBase64 === undefined ? {} : { screenshotRef: `${wire.envelope.id}.jpg` }),
+    })
+  }, 'X capture payload is invalid or exceeds 64 KiB')
 
 export type CaptureWireMessage = z.infer<typeof captureWireMessageSchema>
 
@@ -124,6 +220,7 @@ export const textCaptureSourceSchema = z.enum(['deep-link', 'ios-share', 'ios-in
  * smuggle extra markdown blocks into the graph.
  */
 export const textCaptureEnvelopeSchema = z.object({
+  x: z.never().optional(),
   /** Envelope format version; bump on breaking changes. */
   version: z.literal(1),
   /** Producer-generated UUID — names the spool file (same rule as link captures). */

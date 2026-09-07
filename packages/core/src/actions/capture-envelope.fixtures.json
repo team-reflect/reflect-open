@@ -110,6 +110,132 @@
           "source": "extension"
         }
       }
+    },
+    {
+      "name": "X manual snapshot",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "manual",
+            "day": "2026-09-07",
+            "post": {
+              "id": "1234567890123456789",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          },
+          "note": "## Note\n\nMy own heading",
+          "selection": "selected text"
+        },
+        "screenshotBase64": "aGVsbG8="
+      }
+    },
+    {
+      "name": "X automatic bookmark",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "bookmark",
+            "day": "2026-09-07",
+            "post": {
+              "id": "1234567890123456789",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "X legacy web status permalink",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://mobile.twitter.com/i/web/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "bookmark",
+            "day": "2026-09-07",
+            "post": {
+              "id": "1234567890123456789",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "rejected": [
@@ -295,6 +421,532 @@
           "source": "extension"
         },
         "screenshotBase64": ""
+      }
+    },
+    {
+      "name": "X snapshot incorrectly labelled v1",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "manual",
+            "day": "2026-09-07",
+            "post": {
+              "id": "1234567890123456789",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          },
+          "note": "## Note\n\nMy own heading",
+          "selection": "selected text"
+        }
+      }
+    },
+    {
+      "name": "X post does not match URL",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "manual",
+            "day": "2026-09-07",
+            "post": {
+              "id": "4",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          },
+          "note": "## Note\n\nMy own heading",
+          "selection": "selected text"
+        }
+      }
+    },
+    {
+      "name": "X post URL on unrelated host",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com.evil.test/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "manual",
+            "day": "2026-09-07",
+            "post": {
+              "id": "1234567890123456789",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          },
+          "note": "## Note\n\nMy own heading",
+          "selection": "selected text"
+        }
+      }
+    },
+    {
+      "name": "X invalid capture day",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "manual",
+            "day": "2026-02-30",
+            "post": {
+              "id": "1234567890123456789",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          },
+          "note": "## Note\n\nMy own heading",
+          "selection": "selected text"
+        }
+      }
+    },
+    {
+      "name": "X recursive quote",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "manual",
+            "day": "2026-09-07",
+            "post": {
+              "id": "1234567890123456789",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                },
+                "quote": {
+                  "id": "3"
+                }
+              }
+            }
+          },
+          "note": "## Note\n\nMy own heading",
+          "selection": "selected text"
+        }
+      }
+    },
+    {
+      "name": "X automatic annotation",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "like",
+            "day": "2026-09-07",
+            "post": {
+              "id": "1234567890123456789",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          },
+          "note": "## Note\n\nMy own heading",
+          "selection": "selected text"
+        }
+      }
+    },
+    {
+      "name": "X automatic screenshot",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "bookmark",
+            "day": "2026-09-07",
+            "post": {
+              "id": "1234567890123456789",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          }
+        },
+        "screenshotBase64": "aGVsbG8="
+      }
+    },
+    {
+      "name": "X redundant page text",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "manual",
+            "day": "2026-09-07",
+            "post": {
+              "id": "1234567890123456789",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          },
+          "note": "## Note\n\nMy own heading",
+          "selection": "selected text",
+          "contentText": "extra"
+        }
+      }
+    },
+    {
+      "name": "X missing text completeness",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "manual",
+            "day": "2026-09-07",
+            "post": {
+              "id": "1234567890123456789",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂"
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          },
+          "note": "## Note\n\nMy own heading",
+          "selection": "selected text"
+        }
+      }
+    },
+    {
+      "name": "X null author",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "manual",
+            "day": "2026-09-07",
+            "post": {
+              "id": "1234567890123456789",
+              "author": null,
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          },
+          "note": "## Note\n\nMy own heading",
+          "selection": "selected text"
+        }
+      }
+    },
+    {
+      "name": "X null annotation",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "manual",
+            "day": "2026-09-07",
+            "post": {
+              "id": "1234567890123456789",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg",
+                  "alt": "An example"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          },
+          "note": null,
+          "selection": "selected text"
+        }
+      }
+    },
+    {
+      "name": "X too many images",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://x.com/i/status/1234567890123456789",
+          "title": "Captured post",
+          "capturedAt": "2026-09-07T11:20:00Z",
+          "source": "extension",
+          "x": {
+            "trigger": "manual",
+            "day": "2026-09-07",
+            "post": {
+              "id": "1234567890123456789",
+              "author": {
+                "name": "Example",
+                "handle": "example"
+              },
+              "text": {
+                "value": "First line\n\n下一段 🙂",
+                "complete": true
+              },
+              "images": [
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg"
+                },
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg"
+                },
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg"
+                },
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg"
+                },
+                {
+                  "url": "https://pbs.twimg.com/media/example.jpg"
+                }
+              ],
+              "quote": {
+                "id": "1234567890123456788",
+                "text": {
+                  "value": "Quoted paragraph",
+                  "complete": false
+                }
+              }
+            }
+          },
+          "note": "## Note\n\nMy own heading",
+          "selection": "selected text"
+        }
       }
     }
   ]

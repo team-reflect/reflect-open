@@ -1,3 +1,6 @@
+import { xPostSchema, type XPost } from '@reflect/core/capture-envelope'
+import { xPostId } from '@reflect/core/x-post'
+import { X_CONTENT_SCRIPT } from './x-config'
 import { browser, type Browser } from 'wxt/browser'
 import { isCapturableUrl, type CapturedPage } from './capture-message'
 import { samePageUrl } from './page-text'
@@ -66,9 +69,38 @@ export async function snapshotTab(tab: Browser.tabs.Tab | undefined): Promise<Ca
     }
   }
 
+  const postId = xPostId(tab.url)
+  let post: XPost | undefined
+  if (canReadLivePage && xPostId(tab.url)) {
+    try {
+      await browser.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: [X_CONTENT_SCRIPT],
+      })
+      const response: unknown = await browser.tabs.sendMessage(tab.id, {
+        type: 'x:read',
+        url: tab.url,
+      })
+      if (typeof response === 'object' && response !== null && 'post' in response) {
+        const parsed = xPostSchema.safeParse(response.post)
+        if (parsed.success && parsed.data.id === xPostId(tab.url)) post = parsed.data
+      }
+    } catch {
+      /* A restricted or unloaded article still saves its canonical URL. */
+    }
+  }
+  if (postId) post ??= { id: postId }
+  const now = new Date()
+  const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   return {
     status: 'ready',
-    page: { url: tab.url, title: tab.title ?? '', screenshotDataUrl, selection },
+    page: {
+      url: tab.url,
+      title: tab.title ?? '',
+      screenshotDataUrl,
+      selection,
+      ...(post ? { x: { trigger: 'manual', day, post } } : {}),
+    },
     tabId: tab.id,
   }
 }

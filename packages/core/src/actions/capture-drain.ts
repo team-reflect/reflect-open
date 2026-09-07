@@ -8,7 +8,7 @@ import {
   readNote,
   writeNote,
 } from '../graph/commands'
-import { dailyPath, notePath } from '../graph/paths'
+import { assetPath, dailyPath, notePath } from '../graph/paths'
 import { hashContent } from '../indexing/hash'
 import {
   appendListItem,
@@ -20,6 +20,7 @@ import {
 import { parseNote } from '../markdown/extract'
 import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter'
+import { drainXCapture } from './x-capture'
 import type { ReconcileStop } from './audio-memo'
 import { ensureBacklinkTarget } from './backlink-target'
 import {
@@ -58,6 +59,8 @@ export interface DrainCaptureInboxInput {
   generation: number
   /** Abort gate, checked between spool files (graph switch / unmount). */
   isStale?: () => boolean
+  /** Defer X writes while either note has an unsaved editor buffer. */
+  isNoteDirty?: (path: string) => boolean
   /** Clock for the orphan sweep; injectable for tests. */
   now?: () => number
 }
@@ -133,7 +136,12 @@ async function findSameDayCapture(
       throw cause
     }
     const meta = captureNoteMeta(parseFrontmatter(splitFrontmatter(source).raw).data)
-    if (meta && meta.captureUrl === url && meta.captureSelectionHash === selectionHash) {
+    if (
+      meta &&
+      meta.captureKind !== 'x' &&
+      meta.captureUrl === url &&
+      meta.captureSelectionHash === selectionHash
+    ) {
       return { identity, title: parseNote({ path: identity.notePath, source }).title }
     }
   }
@@ -198,6 +206,14 @@ export async function drainCaptureInbox(
         drained += 1
         continue
       }
+      if (envelope.version === 2) {
+        const result = await drainXCapture(envelope, name, input)
+        if (result !== 'deferred') {
+          drained += 1
+          if (result === 'existing') deduped += 1
+        }
+        continue
+      }
       const fresh = captureIdentity(new Date(envelope.capturedAt), envelope.id)
       const daily = dailyPath(fresh.date)
       const linksNoteTitle = await ensureBacklinkTarget(LINKS_NOTE_TITLE, input.generation)
@@ -219,7 +235,7 @@ export async function drainCaptureInbox(
         try {
           await promoteCaptureScreenshot(
             envelope.screenshotRef,
-            identity.assetPath,
+            assetPath(`${identity.base}.jpg`),
             SCREENSHOT_MAX_DIM,
             input.generation,
           )

@@ -5,7 +5,8 @@
 //! envelope id names files on disk.
 
 use base64::Engine;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use url::Url;
 
 use crate::HostError;
 
@@ -28,10 +29,204 @@ pub struct Envelope {
     pub meta_description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_deserializing, skip_serializing_if = "Option::is_none")]
     pub screenshot_ref: Option<String>,
     pub captured_at: String,
     pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    x: Option<XCapture>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct XCapture {
+    trigger: XTrigger,
+    day: String,
+    post: XPost,
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+enum XTrigger {
+    Manual,
+    Bookmark,
+    Like,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct XAuthor {
+    name: String,
+    handle: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct XText {
+    value: String,
+    complete: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct XImage {
+    url: String,
+    #[serde(
+        default,
+        deserialize_with = "optional_value",
+        skip_serializing_if = "Option::is_none"
+    )]
+    alt: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct XQuote {
+    id: String,
+    #[serde(
+        default,
+        deserialize_with = "optional_value",
+        skip_serializing_if = "Option::is_none"
+    )]
+    author: Option<XAuthor>,
+    #[serde(
+        default,
+        deserialize_with = "optional_value",
+        skip_serializing_if = "Option::is_none"
+    )]
+    text: Option<XText>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct XPost {
+    id: String,
+    #[serde(
+        default,
+        deserialize_with = "optional_value",
+        skip_serializing_if = "Option::is_none"
+    )]
+    author: Option<XAuthor>,
+    #[serde(
+        default,
+        deserialize_with = "optional_value",
+        skip_serializing_if = "Option::is_none"
+    )]
+    text: Option<XText>,
+    #[serde(
+        default,
+        deserialize_with = "optional_value",
+        skip_serializing_if = "Option::is_none"
+    )]
+    images: Option<Vec<XImage>>,
+    #[serde(
+        default,
+        deserialize_with = "optional_value",
+        skip_serializing_if = "Option::is_none"
+    )]
+    quote: Option<XQuote>,
+}
+
+fn optional_value<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
+}
+
+fn bounded(value: &str, maximum: usize) -> bool {
+    value.encode_utf16().count() <= maximum
+}
+
+fn is_post_id(value: &str) -> bool {
+    (1..=20).contains(&value.len()) && value.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+fn valid_author(author: &Option<XAuthor>) -> bool {
+    author.as_ref().is_none_or(|author| {
+        !author.name.is_empty()
+            && !author.handle.is_empty()
+            && bounded(&author.name, 200)
+            && bounded(&author.handle, 32)
+    })
+}
+
+fn is_http_url(value: &str) -> bool {
+    (value.starts_with("http://") || value.starts_with("https://"))
+        && Url::parse(value).is_ok_and(|url| url.host_str().is_some())
+}
+
+fn post_url_matches(value: &str, id: &str) -> bool {
+    let Ok(url) = Url::parse(value) else {
+        return false;
+    };
+    if !matches!(url.scheme(), "http" | "https")
+        || !matches!(
+            url.host_str(),
+            Some(
+                "x.com"
+                    | "www.x.com"
+                    | "mobile.x.com"
+                    | "twitter.com"
+                    | "www.twitter.com"
+                    | "mobile.twitter.com"
+            )
+        )
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.port().is_some()
+    {
+        return false;
+    }
+    let path = url.path().strip_suffix('/').unwrap_or(url.path());
+    let segments: Vec<&str> = path.split('/').collect();
+    let (handle, candidate, suffix) = match segments.as_slice() {
+        ["", "i", "web", "status", candidate, suffix @ ..] => ("i", *candidate, suffix),
+        ["", handle, "status", candidate, suffix @ ..] => (*handle, *candidate, suffix),
+        _ => return false,
+    };
+    let valid_suffix = match suffix {
+        [] => true,
+        ["photo" | "video", index] => {
+            !index.is_empty() && index.bytes().all(|byte| byte.is_ascii_digit())
+        }
+        _ => false,
+    };
+    valid_suffix
+        && !handle.is_empty()
+        && handle
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        && candidate == id
+}
+
+fn valid_x_capture(capture: &XCapture, url: &str) -> bool {
+    let post = &capture.post;
+    is_iso_datetime(&format!("{}T00:00:00Z", capture.day))
+        && is_post_id(&post.id)
+        && post_url_matches(url, &post.id)
+        && valid_author(&post.author)
+        && post
+            .text
+            .as_ref()
+            .is_none_or(|text| !text.value.is_empty() && bounded(&text.value, 20_000))
+        && post.images.as_ref().is_none_or(|images| {
+            images.len() <= 4
+                && images.iter().all(|image| {
+                    bounded(&image.url, 2048)
+                        && is_http_url(&image.url)
+                        && image.alt.as_ref().is_none_or(|alt| bounded(alt, 2000))
+                })
+        })
+        && post.quote.as_ref().is_none_or(|quote| {
+            is_post_id(&quote.id)
+                && valid_author(&quote.author)
+                && quote
+                    .text
+                    .as_ref()
+                    .is_none_or(|text| !text.value.is_empty() && bounded(&text.value, 5000))
+        })
 }
 
 /// The extension→host message: envelope plus optional screenshot bytes.
@@ -144,15 +339,50 @@ impl ValidatedCapture {
     /// Parse and validate one wire payload. Every rejection is an
     /// `invalid-payload` ack with a reason the extension can surface.
     pub fn parse(payload: &[u8]) -> Result<Self, HostError> {
-        let message: WireMessage = serde_json::from_slice(payload)
+        let value: serde_json::Value = serde_json::from_slice(payload)
+            .map_err(|error| HostError::InvalidPayload(format!("malformed message: {error}")))?;
+        let raw_envelope = &value["envelope"];
+        if raw_envelope["version"] == 1 && raw_envelope.get("x").is_some() {
+            return Err(HostError::InvalidPayload("version 1 cannot carry x".into()));
+        }
+        let message = WireMessage::deserialize(&value)
             .map_err(|error| HostError::InvalidPayload(format!("malformed message: {error}")))?;
         let mut envelope = message.envelope;
 
-        if envelope.version != 1 {
+        if !matches!(envelope.version, 1 | 2) {
             return Err(HostError::InvalidPayload(format!(
                 "unsupported envelope version {}",
                 envelope.version
             )));
+        }
+        if envelope.version == 2 {
+            let capture = envelope
+                .x
+                .as_ref()
+                .ok_or_else(|| HostError::InvalidPayload("version 2 requires x".into()))?;
+            if !valid_x_capture(capture, &envelope.url) {
+                return Err(HostError::InvalidPayload("invalid X capture".into()));
+            }
+            if raw_envelope.get("contentText").is_some()
+                || raw_envelope.get("metaDescription").is_some()
+                || ["note", "selection"].iter().any(|field| {
+                    raw_envelope
+                        .get(field)
+                        .is_some_and(serde_json::Value::is_null)
+                })
+                || value
+                    .get("screenshotBase64")
+                    .is_some_and(serde_json::Value::is_null)
+                || (capture.trigger != XTrigger::Manual
+                    && (["note", "selection"]
+                        .iter()
+                        .any(|field| raw_envelope.get(field).is_some())
+                        || value.get("screenshotBase64").is_some()))
+            {
+                return Err(HostError::InvalidPayload(
+                    "unexpected X capture fields".into(),
+                ));
+            }
         }
         if !is_uuid(&envelope.id) {
             return Err(HostError::InvalidPayload("id is not a UUID".to_string()));
@@ -187,6 +417,15 @@ impl ValidatedCapture {
             ),
         };
         envelope.screenshot_ref = screenshot.is_some().then(|| format!("{}.jpg", envelope.id));
+        if envelope.version == 2 {
+            let bytes = serde_json::to_vec(&envelope)
+                .map_err(|error| HostError::InvalidPayload(error.to_string()))?;
+            if bytes.len() > 64 * 1024 {
+                return Err(HostError::InvalidPayload(
+                    "X envelope exceeds 64 KiB".into(),
+                ));
+            }
+        }
 
         Ok(ValidatedCapture {
             envelope,
@@ -320,6 +559,47 @@ mod tests {
         }
     }
 
+    #[test]
+    fn x_envelope_cap_counts_utf8_bytes_after_screenshot_stamping() {
+        let fixtures: serde_json::Value = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../packages/core/src/actions/capture-envelope.fixtures.json"
+        )))
+        .unwrap();
+        let fixture = fixtures["accepted"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["name"] == "X manual snapshot")
+            .unwrap();
+        for screenshot in [None, Some("aGVsbG8=")] {
+            let mut message = fixture["message"].clone();
+            message.as_object_mut().unwrap().remove("screenshotBase64");
+            if let Some(encoded) = screenshot {
+                message["screenshotBase64"] = encoded.into();
+            }
+            message["envelope"]["title"] = "a".repeat(22_000).into();
+            let capture = ValidatedCapture::parse(message.to_string().as_bytes()).unwrap();
+            assert_eq!(capture.screenshot.is_some(), screenshot.is_some());
+            message["envelope"]["title"] = "界".repeat(22_000).into();
+            assert!(matches!(
+                ValidatedCapture::parse(message.to_string().as_bytes()),
+                Err(HostError::InvalidPayload(_))
+            ));
+        }
+        let mut message = fixture["message"].clone();
+        message["envelope"]["title"] = "".into();
+        let overhead = serde_json::to_vec(&message["envelope"]).unwrap().len();
+        message["envelope"]["title"] = "a".repeat(64 * 1024 - overhead).into();
+        message.as_object_mut().unwrap().remove("screenshotBase64");
+        assert!(ValidatedCapture::parse(message.to_string().as_bytes()).is_ok());
+        message["screenshotBase64"] = "aGVsbG8=".into();
+        assert!(matches!(
+            ValidatedCapture::parse(message.to_string().as_bytes()),
+            Err(HostError::InvalidPayload(_))
+        ));
+    }
+
     /// The other half lives in `capture-envelope.parity.test.ts` — the same
     /// fixtures through the zod source of truth. Together they pin the
     /// invariant that the host never spools an envelope the drain would
@@ -333,11 +613,16 @@ mod tests {
         .unwrap();
         for case in fixtures["accepted"].as_array().unwrap() {
             let payload = case["message"].to_string();
-            assert!(
-                ValidatedCapture::parse(payload.as_bytes()).is_ok(),
-                "accepted fixture {} must parse",
-                case["name"]
-            );
+            let capture = ValidatedCapture::parse(payload.as_bytes())
+                .unwrap_or_else(|error| panic!("accepted fixture {}: {error:?}", case["name"]));
+            if let Some(expected) = case["message"]["envelope"].get("x") {
+                let spooled = serde_json::to_value(&capture.envelope).unwrap();
+                assert_eq!(
+                    &spooled["x"], expected,
+                    "fixture {} lost X data",
+                    case["name"]
+                );
+            }
         }
         for case in fixtures["rejected"].as_array().unwrap() {
             let payload = case["message"].to_string();

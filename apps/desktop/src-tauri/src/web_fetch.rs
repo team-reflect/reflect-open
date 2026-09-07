@@ -90,6 +90,9 @@ pub(crate) fn classify_fetch_status(url: &str, status: StatusCode) -> Option<App
     if status.is_server_error() || status == StatusCode::TOO_MANY_REQUESTS {
         return Some(AppError::Network { message });
     }
+    if matches!(status, StatusCode::NOT_FOUND | StatusCode::GONE) {
+        return Some(AppError::not_found(message));
+    }
     Some(AppError::io(message))
 }
 

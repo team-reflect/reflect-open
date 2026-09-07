@@ -27,6 +27,8 @@ const RELEASES_URL = 'https://github.com/team-reflect/reflect-open/releases/late
 
 function holdMessage(result: FlushResult): string {
   switch (result.holdReason) {
+    case 'upgrade-required':
+      return 'Upgrade and launch Reflect to save X posts. This capture is kept for retry.'
     case 'no-host':
       return 'Install Reflect to finish saving — the capture is kept and retries automatically.'
     case 'no-graph':
@@ -89,6 +91,7 @@ export function CapturePopup(): ReactElement {
       const outcome = await saveCapture(
         {
           ...captured.page,
+          ...(includePageText ? { x: undefined } : {}),
           contentText,
           note,
           id: crypto.randomUUID(),
@@ -176,7 +179,7 @@ export function CapturePopup(): ReactElement {
       {save.phase === 'held' ? (
         <p className="text-xs text-text-muted">
           {holdMessage(save.result)}{' '}
-          {save.result.holdReason === 'no-host' ? (
+          {save.result.holdReason === 'no-host' || save.result.holdReason === 'upgrade-required' ? (
             <a
               href={RELEASES_URL}
               target="_blank"
@@ -194,6 +197,16 @@ export function CapturePopup(): ReactElement {
           {heldCount} earlier {heldCount === 1 ? 'capture' : 'captures'} waiting for Reflect.
         </p>
       ) : null}
+      <p className="text-xs text-text-muted">
+        The queue holds 50 captures. At capacity, the oldest is removed.
+      </p>
+      <button
+        type="button"
+        className="text-xs text-accent"
+        onClick={() => void browser.runtime.openOptionsPage()}
+      >
+        X capture settings
+      </button>
     </form>
   )
 }

@@ -8,7 +8,8 @@ then hand off to the **installed desktop app** through a local native-messaging
 host. No Reflect-hosted services are involved, and capture works even while the
 app is closed: the host spools into the graph's capture inbox
 (`<graph>/.reflect/inbox/`), and the app drains it on next launch.
-[Plan 11](../../docs/plans/11-link-capture.md) is the design doc.
+[Plan 11](../../docs/plans/11-link-capture.md) describes link capture.
+[Plan 25](../../docs/plans/25-x-capture.md) describes X snapshots.
 
 Install the published extension from the
 [Chrome Web Store](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd).
@@ -61,8 +62,8 @@ allowlisted by) the native-messaging host. Check, in order:
    ("Open Reflect and pick a graph first") means the host ran but has no active
    graph to spool into.
 
-The capture is never lost while held — it stays queued and retries automatically
-once the host is reachable.
+Held captures retry when the host is reachable. The queue retains at most 50
+captures and drops the oldest when it reaches capacity.
 
 ## The unpacked ID is pinned — and the store ID is not the same
 
@@ -104,7 +105,7 @@ in the [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
 
 ### Build & upload
 
-1. `pnpm --filter @reflect/extension check` (typecheck + lint) and
+1. `pnpm check` (workspace typecheck + lint) and
    `pnpm --filter @reflect/extension test` — both must be green.
 2. `pnpm --filter @reflect/extension zip` → upload
    `.output/reflect-capture-<version>-chrome.zip`. This artifact omits the manifest
@@ -165,15 +166,40 @@ Each is reviewed individually; every permission below is exercised by the code:
 | `storage` | Queue captures locally so a capture survives the app being closed and retries until it spools. |
 | `unlimitedStorage` | Queued captures embed a screenshot data URL, which can exceed the default storage quota while waiting for the app. |
 | `alarms` | A coarse retry timer so held captures flush once Reflect is installed/launched later. |
+| Optional X/Twitter hosts | Observe bookmark/like actions after the user enables automatic capture and grants site access. |
 
 ### Data-handling disclosures (Privacy practices tab)
 
 - **Data collected:** *Website content* (the captured page's URL, title, selection,
-  screenshot, and — only when opted in — page text). Collected **only on an explicit
-  user action**, never in the background.
+  screenshot, and opted-in page text). Collected after a manual save or an enabled
+  bookmark/like action on X.
 - **Where it goes:** to the user's own machine (the local Reflect desktop app). It is
   **not** sent to Reflect or any third party.
 - The three required certifications are all true and can be affirmed:
   1. Data is **not** sold to third parties.
   2. Data is **not** used or transferred for purposes unrelated to the single purpose.
   3. Data is **not** used or transferred to determine creditworthiness or for lending.
+
+## X snapshots
+
+Saving a status page captures its post text, author, image previews, and quote
+without requiring page-text extraction. Each manual save is a separate snapshot.
+Selection, screenshot, and your note are preserved. Selecting **Capture page text**
+uses ordinary page capture instead.
+
+**X capture settings** offers experimental automatic bookmark capture and optional
+likes. Both are off by default and request access to X only when enabled. They
+observe new actions on open pages, not bookmark history. Automatic captures share
+one note per post and local calendar day; unbookmarking does not delete a note.
+The page adapter uses observed public X article/ARIA markup and legacy test IDs.
+Logged-in action confirmation and every X layout still require browser validation.
+
+The extension queue holds 50 captures; at capacity the oldest is dropped. An older
+Reflect host keeps X captures queued with an upgrade prompt while ordinary page
+captures continue. Upgrade and launch Reflect, then use **Retry pending captures**.
+
+Optional host permissions `https://*.x.com/*` and `https://*.twitter.com/*` are used
+only for automatic action observation. Manual saves use temporary `activeTab`
+access. The background owns settings, registration, open-tab injection, and durable
+enqueue acknowledgements. The content script has no delivery ledger or network
+client; its DOM observation and bounded acknowledgement retries end when stopped.

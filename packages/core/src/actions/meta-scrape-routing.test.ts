@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReflectError } from '../errors'
-import { captureMetaFetch, captureOEmbedFetch } from '../graph/commands'
+import { captureMetaFetch, captureJsonFetch } from '../graph/commands'
 import { scrapePageMeta } from './meta-scrape'
 
 vi.mock('../graph/commands', () => ({
   captureMetaFetch: vi.fn(),
-  captureOEmbedFetch: vi.fn(),
+  captureJsonFetch: vi.fn(),
 }))
 
-const oembedFetchMock = vi.mocked(captureOEmbedFetch)
+const oembedFetchMock = vi.mocked(captureJsonFetch)
 const metaFetchMock = vi.mocked(captureMetaFetch)
 
 const VIDEO_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'

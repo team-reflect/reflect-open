@@ -1,6 +1,7 @@
 import { browser } from 'wxt/browser'
 import { defineBackground } from '#imports'
 import { SAVE_CURRENT_PAGE_COMMAND } from '@/lib/commands'
+import { installXCaptureHandlers } from '@/lib/x-capture'
 import { flushQueue } from '@/lib/flush'
 import { isFlushRequest } from '@/lib/messages'
 import { readIncludePageTextPreference } from '@/lib/popup-preferences'
@@ -24,12 +25,14 @@ async function saveTabWithDefaults(tab: Parameters<typeof snapshotTab>[0]): Prom
   if (captured.status !== 'ready') {
     return
   }
-  const contentText = (await readIncludePageTextPreference())
+  const includePageText = await readIncludePageTextPreference()
+  const contentText = includePageText
     ? await tryExtractPageText(captured.tabId, captured.page.url)
     : undefined
   const outcome = await saveCapture(
     {
       ...captured.page,
+      ...(includePageText ? { x: undefined } : {}),
       contentText,
       id: crypto.randomUUID(),
       capturedAt: new Date(),
@@ -42,6 +45,7 @@ async function saveTabWithDefaults(tab: Parameters<typeof snapshotTab>[0]): Prom
 }
 
 export default defineBackground(() => {
+  installXCaptureHandlers()
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (isFlushRequest(message)) {
       flushQueue().then(sendResponse, (cause: unknown) => {

@@ -48,6 +48,9 @@ export async function sendToHost(wire: CaptureWireMessage): Promise<SendOutcome>
   }
   switch (ack.data.code) {
     case 'invalid-payload':
+      if (wire.envelope.version === 2 && ack.data.message === 'unsupported envelope version 2') {
+        return { kind: 'held', reason: 'upgrade-required', message: ack.data.message }
+      }
       return { kind: 'rejected', message: ack.data.message }
     case 'no-graph':
       return { kind: 'held', reason: 'no-graph', message: ack.data.message }

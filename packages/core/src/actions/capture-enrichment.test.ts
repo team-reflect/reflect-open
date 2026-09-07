@@ -11,6 +11,7 @@ import {
   files,
   getSecretMock,
   IDENTITY,
+  SCREENSHOT,
   linkPreviewMock,
   NO_PROVIDERS,
   readAssetMock,
@@ -31,6 +32,9 @@ vi.mock('../graph/commands', () => ({
   captureInboxReject: vi.fn(),
   captureInboxRemove: vi.fn(),
   captureLinkPreview: vi.fn(),
+  captureJsonFetch: vi.fn(),
+  captureMediaFetch: vi.fn(),
+  createNoteIfAbsent: vi.fn(),
   listFiles: vi.fn(),
   promoteCaptureScreenshot: vi.fn(),
   readAsset: vi.fn(),
@@ -58,7 +62,9 @@ beforeEach(() => {
 })
 
 describe('reconcileCaptureEnrichment', () => {
-  async function drainOne(overrides: Partial<CaptureEnvelope> = {}): Promise<void> {
+  async function drainOne(
+    overrides: Partial<Extract<CaptureEnvelope, { version: 1 }>> = {},
+  ): Promise<void> {
     addSpool(envelope(overrides))
     const outcome = await drain()
     expect(outcome.stopped).toBeNull()
@@ -80,10 +86,10 @@ describe('reconcileCaptureEnrichment', () => {
 
     expect(outcome).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
     expect(linkPreviewMock).toHaveBeenCalledWith(CAPTURE_URL)
-    expect(writeAssetMock).toHaveBeenCalledWith(IDENTITY.assetPath, btoa('preview-jpeg'), 3)
+    expect(writeAssetMock).toHaveBeenCalledWith(SCREENSHOT, btoa('preview-jpeg'), 3)
     const note = files.get(IDENTITY.notePath) ?? ''
-    expect(note).toContain(`captureScreenshot: ${IDENTITY.assetPath}`)
-    expect(note).toContain(`![An article from metadata](${IDENTITY.assetPath})`)
+    expect(note).toContain(`captureScreenshot: ${SCREENSHOT}`)
+    expect(note).toContain(`![An article from metadata](${SCREENSHOT})`)
     expect(note).toContain('captureStatus: done')
   })
 
@@ -96,7 +102,7 @@ describe('reconcileCaptureEnrichment', () => {
     const outcome = await reconcile()
 
     expect(outcome.enriched).toBe(1)
-    expect(readAssetMock).toHaveBeenCalledWith(IDENTITY.assetPath, 3)
+    expect(readAssetMock).toHaveBeenCalledWith(SCREENSHOT, 3)
     expect(describeMock).toHaveBeenCalledWith(
       expect.objectContaining({ screenshotBase64: btoa('jpeg-bytes') }),
     )
@@ -125,7 +131,7 @@ describe('reconcileCaptureEnrichment', () => {
 
     expect(outcome.enriched).toBe(1)
     expect(linkPreviewMock).toHaveBeenCalledWith(CAPTURE_URL)
-    expect(writeAssetMock).toHaveBeenCalledWith(IDENTITY.assetPath, btoa('preview-jpeg'), 3)
+    expect(writeAssetMock).toHaveBeenCalledWith(SCREENSHOT, btoa('preview-jpeg'), 3)
   })
 
   it('continues metadata enrichment when the link preview request fails', async () => {
@@ -362,7 +368,7 @@ describe('reconcileCaptureEnrichment', () => {
       const pendingNote = files.get(IDENTITY.notePath) ?? ''
       expect(pendingNote).toContain('# A title available immediately')
       expect(pendingNote).toContain('- Description: A description available immediately.')
-      expect(pendingNote).toContain(`![A title available immediately](${IDENTITY.assetPath})`)
+      expect(pendingNote).toContain(`![A title available immediately](${SCREENSHOT})`)
       expect(pendingNote).toContain('captureStatus: pending')
       expect(files.get(DAILY)).toContain('|A title available immediately]]')
       expect(describeMock).toHaveBeenCalledTimes(1)
@@ -811,7 +817,7 @@ describe('reconcileCaptureEnrichment', () => {
     const note = files.get(IDENTITY.notePath) ?? ''
     expect(note).toContain('# A Cleaned Up Article')
     expect(note).not.toContain('# An article')
-    expect(note).toContain(`![A Cleaned Up Article](${IDENTITY.assetPath})`)
+    expect(note).toContain(`![A Cleaned Up Article](${SCREENSHOT})`)
     expect(note).toContain('captureStatus: done')
     expect(note).toContain('captureProvider: openai')
     const daily = files.get(DAILY) ?? ''

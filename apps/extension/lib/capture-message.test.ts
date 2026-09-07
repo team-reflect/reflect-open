@@ -56,3 +56,39 @@ describe('buildWireMessage', () => {
     expect(message.screenshotBase64).toBeUndefined()
   })
 })
+
+it('rejects a multibyte X envelope before a save can enter an unreadable queue', () => {
+  expect(() =>
+    buildWireMessage({
+      id: ID,
+      capturedAt: CAPTURED_AT,
+      url: 'https://x.com/i/status/123',
+      title: 'Post',
+      note: '文'.repeat(25_000),
+      x: {
+        trigger: 'manual',
+        day: '2026-09-07',
+        post: { id: '123', text: { value: '文'.repeat(5000), complete: true } },
+      },
+    }),
+  ).toThrow('too large')
+})
+
+it('reduces recoverable post text before touching a user annotation at the byte limit', () => {
+  const note = '文'.repeat(15_000)
+  const message = buildWireMessage({
+    id: ID,
+    capturedAt: CAPTURED_AT,
+    url: 'https://x.com/i/status/123',
+    title: 'Post',
+    note,
+    x: {
+      trigger: 'manual',
+      day: '2026-09-07',
+      post: { id: '123', text: { value: '文'.repeat(20_000), complete: true } },
+    },
+  })
+  expect(captureWireMessageSchema.safeParse(message).success).toBe(true)
+  expect(message.envelope.note).toBe(note)
+  expect(message.envelope.version === 2 && message.envelope.x.post.text?.complete).toBe(false)
+})

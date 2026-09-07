@@ -11,7 +11,6 @@ describe('captureIdentity', () => {
       base: 'capture-2026-06-11-153022-845-7c9e',
       date: '2026-06-11',
       notePath: 'notes/capture-2026-06-11-153022-845-7c9e.md',
-      assetPath: 'assets/capture-2026-06-11-153022-845-7c9e.jpg',
     })
   })
 

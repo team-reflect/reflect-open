@@ -1,3 +1,4 @@
+import { X_ORIGINS } from './lib/x-config.ts'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'wxt'
 import { SAVE_CURRENT_PAGE_COMMAND } from './lib/commands.ts'
@@ -45,6 +46,7 @@ export default defineConfig({
       'unlimitedStorage',
       'alarms',
     ],
+    optional_host_permissions: X_ORIGINS,
     commands: {
       [SAVE_CURRENT_PAGE_COMMAND]: {
         suggested_key: { default: 'Ctrl+Shift+K', mac: 'Command+Shift+K' },

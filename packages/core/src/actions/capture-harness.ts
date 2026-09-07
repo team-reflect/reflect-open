@@ -7,6 +7,9 @@ import {
   captureInboxReject,
   captureInboxRemove,
   captureLinkPreview,
+  captureJsonFetch,
+  captureMediaFetch,
+  createNoteIfAbsent,
   listFiles,
   promoteCaptureScreenshot,
   readAsset,
@@ -41,6 +44,9 @@ export const inboxListMock = vi.mocked(captureInboxList)
 export const inboxReadMock = vi.mocked(captureInboxRead)
 export const inboxRejectMock = vi.mocked(captureInboxReject)
 export const inboxRemoveMock = vi.mocked(captureInboxRemove)
+export const jsonFetchMock = vi.mocked(captureJsonFetch)
+export const mediaFetchMock = vi.mocked(captureMediaFetch)
+export const createNoteMock = vi.mocked(createNoteIfAbsent)
 export const linkPreviewMock = vi.mocked(captureLinkPreview)
 export const listFilesMock = vi.mocked(listFiles)
 export const promoteMock = vi.mocked(promoteCaptureScreenshot)
@@ -61,6 +67,7 @@ export const NO_PROVIDERS: AiProvidersState = { providers: [], defaultProviderId
 /** 2026-06-11 15:30:22.845 local — every derived name is asserted from it. */
 export const CAPTURED_AT = new Date(2026, 5, 11, 15, 30, 22, 845)
 export const IDENTITY = captureIdentity(CAPTURED_AT, '7c9e6679-7425-40de-944b-e07fc1f90ae7')
+export const SCREENSHOT = 'assets/capture-2026-06-11-153022-845-7c9e.jpg'
 export const DAILY = 'daily/2026-06-11.md'
 export const CAPTURE_URL = 'https://example.com/article'
 
@@ -73,7 +80,9 @@ export const spool = new Map<string, { contents: string; modifiedMs: number }>()
 /** What `captureInboxReject` moved into `.reflect/inbox-rejected/`. */
 export const rejected = new Map<string, string>()
 
-export function envelope(overrides: Partial<CaptureEnvelope> = {}): CaptureEnvelope {
+export function envelope(
+  overrides: Partial<Extract<CaptureEnvelope, { version: 1 }>> = {},
+): Extract<CaptureEnvelope, { version: 1 }> {
   return {
     version: 1,
     id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
@@ -158,6 +167,13 @@ export function wireCaptureMocks(): void {
   writeAssetMock.mockImplementation(async (path, contentsBase64) => {
     files.set(path, contentsBase64)
   })
+  createNoteMock.mockImplementation(async (path, contents) => {
+    if (files.has(path)) return { kind: 'collision' }
+    files.set(path, contents)
+    return { kind: 'created', modifiedMs: 0 }
+  })
+  jsonFetchMock.mockResolvedValue('{}')
+  mediaFetchMock.mockResolvedValue(btoa('image'))
   linkPreviewMock.mockResolvedValue(null)
   getSecretMock.mockResolvedValue('sk-live-key')
   scrapeMock.mockResolvedValue({ title: 'An article', description: null, siteName: null })

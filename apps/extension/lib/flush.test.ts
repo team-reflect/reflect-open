@@ -149,3 +149,27 @@ describe('flushQueue', () => {
     expect(await readQueue()).toEqual([])
   })
 })
+
+it('retains an unsupported X capture while delivering the following ordinary page', async () => {
+  const first = wire(FIRST)
+  first.envelope = {
+    id: FIRST,
+    version: 2,
+    source: 'extension',
+    title: 'Post',
+    capturedAt: '2026-09-07T00:00:00Z',
+    url: 'https://x.com/i/status/123',
+    x: { trigger: 'manual', day: '2026-09-07', post: { id: '123' } },
+  }
+  await enqueueCapture(first)
+  await enqueueCapture(wire(SECOND))
+  sendMock.mockResolvedValueOnce({
+    kind: 'held',
+    reason: 'upgrade-required',
+    message: 'unsupported envelope version 2',
+  })
+  const result = await flushQueue()
+  expect(result).toMatchObject({ sent: 1, held: 1, failed: 0, holdReason: 'upgrade-required' })
+  expect((await readQueue()).map((entry) => entry.wire.envelope.id)).toEqual([FIRST])
+  expect(sendMock.mock.calls.map(([entry]) => entry.envelope.id)).toEqual([FIRST, SECOND])
+})

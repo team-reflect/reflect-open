@@ -8,6 +8,7 @@ import {
   envelope,
   files,
   IDENTITY,
+  SCREENSHOT,
   inboxRemoveMock,
   promoteMock,
   rejected,
@@ -26,6 +27,9 @@ vi.mock('../graph/commands', () => ({
   captureInboxReject: vi.fn(),
   captureInboxRemove: vi.fn(),
   captureLinkPreview: vi.fn(),
+  captureJsonFetch: vi.fn(),
+  captureMediaFetch: vi.fn(),
+  createNoteIfAbsent: vi.fn(),
   listFiles: vi.fn(),
   promoteCaptureScreenshot: vi.fn(),
   readAsset: vi.fn(),
@@ -61,7 +65,7 @@ describe('drainCaptureInbox', () => {
     expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 0, invalid: 0, stopped: null })
     expect(promoteMock).toHaveBeenCalledWith(
       '7c9e6679-7425-40de-944b-e07fc1f90ae7.jpg',
-      IDENTITY.assetPath,
+      SCREENSHOT,
       1600,
       3,
     )
@@ -75,7 +79,7 @@ describe('drainCaptureInbox', () => {
     expect(note).not.toContain('Highlights')
     expect(note).toContain('## Note\n\ncheck later')
     expect(note).toContain('## Selection\n\nquoted text')
-    expect(note).toContain(`## Screenshot\n\n![An article](${IDENTITY.assetPath})`)
+    expect(note).toContain(`## Screenshot\n\n![An article](${SCREENSHOT})`)
 
     const daily = files.get(DAILY)
     expect(daily).toContain('## [[Links]]')
