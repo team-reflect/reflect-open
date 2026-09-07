@@ -5,8 +5,6 @@ export async function loadAiModule<Module>(load: () => Promise<Module>): Promise
   try {
     return await load()
   } catch (cause) {
-    const error = new ReflectError('network', 'Could not load AI components. Please try again.')
-    error.cause = cause
-    throw error
+    throw new ReflectError('network', 'Could not load AI components. Please try again.', { cause })
   }
 }

@@ -30,8 +30,8 @@ export type AppError = z.infer<typeof appErrorSchema>
 export class ReflectError extends Error {
   readonly kind: AppError['kind']
 
-  constructor(kind: AppError['kind'], message: string) {
-    super(message)
+  constructor(kind: AppError['kind'], message: string, options?: ErrorOptions) {
+    super(message, options)
     this.name = 'ReflectError'
     this.kind = kind
   }
