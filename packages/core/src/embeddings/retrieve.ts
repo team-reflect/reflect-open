@@ -22,14 +22,13 @@ export interface RetrievalHit {
   snippet: string
   heading: string | null
   isPrivate: boolean
-  /** Local-only evidence used to re-prove a hit against live source before AI sees it. */
+  /** Local-only evidence for re-proving a hit against live source. */
   evidence: RetrievalEvidence
 }
 
 /**
- * Index evidence for one retrieval hit. Asset candidates are deliberately
- * paths only; descriptions are read and privacy-classified live at the AI
- * boundary instead of trusting indexed text or privacy flags.
+ * Index evidence for one retrieval hit. Asset candidates are paths only:
+ * indexed description text and privacy flags are never trusted.
  */
 export type RetrievalEvidence =
   | { kind: 'lexical'; assetPaths: string[] }

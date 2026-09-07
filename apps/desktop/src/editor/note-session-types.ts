@@ -34,10 +34,7 @@ export interface NoteBodyMutationOptions {
   readonly expectedRevision: string
   /** Rewrites only the body; frontmatter is retained byte-for-byte by the session. */
   readonly transform: (body: string) => string
-  /**
-   * Awaited after the result is computed but before editor or disk state changes.
-   * AI callers use this boundary to durably journal the intended mutation.
-   */
+  /** Awaited after the result is computed but before editor or disk state changes. */
   readonly onPrepared?: ((preparation: NoteBodyMutationPreparation) => Promise<void>) | undefined
 }
 
@@ -136,9 +133,9 @@ export interface NoteSessionIo {
    */
   write: ((path: string, contents: string) => Promise<void>) | null
   /**
-   * Full-source compare-and-swap used by AI apply and Undo. The expected
-   * revision always describes persisted bytes, never the possibly-dirty live
-   * editor buffer. `null` when the graph has no writable generation.
+   * Full-source compare-and-swap. The expected revision always describes
+   * persisted bytes, never the possibly-dirty live editor buffer. `null` when
+   * the graph has no writable generation.
    */
   writeIfRevision:
     | ((
@@ -147,10 +144,7 @@ export interface NoteSessionIo {
         expectedRevision: string,
       ) => Promise<NoteRevisionWriteOutcome>)
     | null
-  /**
-   * Native live-buffer claim retained from before the initial read through
-   * the final flush. Omitted in pure tests and non-native read-only surfaces.
-   */
+  /** Native live-buffer claim retained from before the initial read through the final flush. */
   ownership?: {
     readonly ownerId: string
     readonly claim: (path: string) => Promise<void>

@@ -188,9 +188,8 @@ export async function chunkAssetDescriptions(
 }
 
 /**
- * The attributed form of {@link chunkAssetDescriptions}. Retrieval uses this
- * to prove which live asset description produced a stored semantic chunk;
- * the embedding index keeps the historical attribution-free row shape.
+ * The attributed form of {@link chunkAssetDescriptions}; the embedding index
+ * keeps the attribution-free row shape.
  */
 export async function chunkAssetDescriptionsWithAttribution(
   bodies: readonly AssetDescriptionBody[],

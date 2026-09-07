@@ -27,7 +27,7 @@ export interface NotePathOperationQueue {
   run: <Result>(path: string, operation: () => Promise<Result>) => Promise<Result>
 }
 
-/** Create a graph-scoped, per-path operation queue for AI apply and Undo work. */
+/** Create a graph-scoped, per-path operation queue. */
 export function createNotePathOperationQueue(): NotePathOperationQueue {
   const tails = new Map<string, Promise<void>>()
 

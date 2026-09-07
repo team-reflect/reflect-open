@@ -108,9 +108,9 @@ export class PreparedNoteCreationRefusal extends Error {
 /**
  * Create a titled note with the regular identity and collision-family policy,
  * awaiting `onPrepared` before the no-clobber filesystem claim. Existing
- * candidates are skipped before journaling. If a racing creator claims the
- * prepared candidate, this call fails rather than journaling a second path
- * for the same logical operation; a retry receives a new tool-call identity.
+ * candidates are skipped before `onPrepared`. If a racing creator claims the
+ * prepared candidate, this call fails rather than preparing a second path for
+ * the same operation.
  */
 export async function createNoteWithTitlePrepared(
   title: string,

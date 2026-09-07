@@ -214,10 +214,9 @@ fn run_sweep(
             }
         }
         if let Err(err) = crate::fs::with_file_mutation_lock(root, || {
-            // Re-read every version only after acquiring the same graph lock
-            // as editor/AI writes. Resolution, note replacement, and shadow
-            // bookkeeping are one compound mutation; nested atomic writes
-            // reuse this thread's already-held lock.
+            // Resolution, note replacement, and shadow bookkeeping are one
+            // compound mutation under the graph lock; nested atomic writes
+            // reuse this thread's held lock.
             let abs = root.join(&file.path);
             let scan = unresolved_versions(&abs);
             if scan.none() {

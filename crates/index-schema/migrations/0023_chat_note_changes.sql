@@ -5,9 +5,7 @@
 ALTER TABLE chat_messages ADD COLUMN permission_mode TEXT NOT NULL DEFAULT 'read'
   CHECK (permission_mode IN ('read', 'readWrite'));
 
--- NULL means a legacy turn whose provenance was never recorded. The chat
--- history builder treats that as unknown instead of incorrectly assuming the
--- turn had no note or asset sources.
+-- NULL: a legacy turn whose provenance was never recorded (unknown, not empty).
 ALTER TABLE chat_messages ADD COLUMN source_provenance TEXT;
 
 CREATE TABLE chat_note_changes (

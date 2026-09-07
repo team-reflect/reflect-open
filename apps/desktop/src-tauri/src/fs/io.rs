@@ -30,9 +30,8 @@ use super::FileMeta;
 /// file extends the same critical section across concurrently running Reflect
 /// flavors/processes that have the graph open.
 static FILE_MUTATION_LOCK: Mutex<()> = Mutex::new(());
-// This budget must cover whole-graph Git checkout and merge critical sections,
-// not just individual note writes. Keep a finite ceiling so a wedged process
-// cannot block every other Reflect flavor indefinitely.
+// Long enough for whole-graph critical sections, finite so a wedged process
+// cannot block every other Reflect process indefinitely.
 const FILE_MUTATION_LOCK_TIMEOUT: Duration = Duration::from_secs(60);
 const FILE_MUTATION_LOCK_RETRY_DELAY: Duration = Duration::from_millis(10);
 thread_local! {
@@ -110,7 +109,7 @@ fn with_opened_file_mutation_lock<T>(
         &expected_lock_identity,
     );
     // Identity handles are only needed across the wait and validation. Drop
-    // them before a graph-delete closure tries to move the directory.
+    // them before the operation runs: an open handle would pin the directory.
     drop(expected_lock_identity);
     drop(expected_root_identity);
     if !lock_is_current {

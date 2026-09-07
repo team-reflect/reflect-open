@@ -85,9 +85,8 @@ export function createDocumentBinding(): DocumentBinding {
     // `flush()` may synchronously report reconciled editor input through the
     // change callback. Keep the target discoverable for that re-entry, then
     // unregister this webview-local lookup before a replacement session binds.
-    // The native owner claim is intentionally different: `dispose()` retains
-    // it until this final flush settles, so chat cannot route to stale disk in
-    // the unregister-to-write window.
+    // The native owner claim is released later, by `dispose()`, once this
+    // final flush has settled.
     if (session === target) {
       session = null
       coordinator = null

@@ -183,9 +183,7 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): AnyNoteTool
     assetReferencingNotePathsFn: assetRefsFn,
   })
 
-  // A write tool may use only a revision this turn's read_notes call minted.
-  // The second live read in the mutation preparer still catches changes after
-  // that read; this map prevents guessed or historic revisions from writing.
+  // Only a revision minted by this turn's read_notes call may authorize a write.
   const readGrants = new Map<string, NoteReadGrant>()
 
   const readTools: NoteTools = {

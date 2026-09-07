@@ -174,7 +174,7 @@ async function prepareBodyMutation(
   }
 }
 
-/** Pure exact-anchor splice used by `edit_note` and its focused tests. */
+/** Pure exact-anchor splice. */
 export function applyExactReplacements(
   body: string,
   replacements: readonly ExactNoteReplacement[],

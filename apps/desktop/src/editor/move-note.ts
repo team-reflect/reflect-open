@@ -48,8 +48,7 @@ export async function moveNoteCarryingSession(
         try {
           owner.discard()
         } catch {
-          // Preserve the original move failure even if a test seam or future
-          // session implementation makes fail-closed cleanup fallible.
+          // The original move failure stays the reported cause.
         }
       } finally {
         // Repair lookup identity even when native ownership rollback fails.

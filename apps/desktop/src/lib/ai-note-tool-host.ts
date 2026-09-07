@@ -198,12 +198,9 @@ export function createDesktopChatNoteToolHost(
             path,
             {
               open: async (session) => {
-                // Reconcile a generation-pinned disk read with the live editor.
-                // A dirty buffer plus different disk bytes parks a conflict and
-                // returns no source; a clean buffer adopts the disk source. If
-                // disk became private, returning that authoritative source lets
-                // core's local privacy gate refuse it without publishing the
-                // stale public buffer.
+                // A dirty buffer that disagrees with disk yields no source. If
+                // disk became private, that authoritative source is returned
+                // instead of the stale public buffer.
                 const { fresh, persistedSource } = await readFreshOpenNote(
                   session,
                   path,

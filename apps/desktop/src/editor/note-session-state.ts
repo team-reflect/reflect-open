@@ -80,7 +80,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   // Set by `discard` — tells `dispose` to skip its flush (the file is being
   // deleted, so rewriting it would recreate it).
   let discarded = false
-  /** A move temporarily retains both paths so AI cannot enter its IPC gap. */
+  /** A move retains both paths until the filesystem move has landed. */
   const claimedPaths = new Set<string>()
 
   let lastEmitted: NoteSessionSnapshot | null = null
@@ -632,9 +632,9 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
 
         const beforeSource = header + buffer
         const beforeRevision = await hashContent(beforeSource)
-        // Hashing and the durable prepare callback both yield to the editor. Any
-        // intervening keystroke invalidates this operation instead of being folded
-        // into a change the model never saw.
+        // Hashing and the prepare callback both yield to the editor. Any
+        // intervening keystroke invalidates this operation instead of being
+        // folded into it.
         if (header + buffer !== beforeSource || beforeRevision !== options.expectedRevision) {
           const currentSource = header + buffer
           return { status: 'stale', currentRevision: await hashContent(currentSource) }

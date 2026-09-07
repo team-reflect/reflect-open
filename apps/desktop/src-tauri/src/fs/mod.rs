@@ -47,9 +47,7 @@ pub(crate) use self::io::file_occupied;
 /// backup repo must never ride a file-sync provider — Plan 21).
 pub(crate) use self::io::mark_dir_local_only;
 pub(crate) use self::io::modified_ms;
-/// Serialize a compound native graph mutation with ordinary atomic note
-/// writes. Git checkout/merge uses this wrapper because libgit2 writes the
-/// working tree directly rather than through [`atomic_write_bytes`].
+/// Serialize a compound native graph mutation with ordinary atomic note writes.
 pub(crate) fn with_file_mutation_lock<T>(
     root: &Path,
     operation: impl FnOnce() -> AppResult<T>,
@@ -578,10 +576,8 @@ pub fn note_write(
 }
 
 /// Atomically replace a note only when its complete current source still has
-/// `expected_revision`. This is a local compare-and-swap primitive for AI
-/// edits and guarded Undo; policy such as privacy/title preservation remains
-/// in TypeScript, while path eligibility and the byte-level guard are enforced
-/// again here at the capability boundary.
+/// `expected_revision`. Path eligibility and the byte-level guard are enforced
+/// here; content policy is not.
 #[tauri::command]
 pub fn note_write_if_revision(
     path: String,
@@ -1086,8 +1082,7 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
 }
 
 /// Move a note to recoverable trash only when its complete current source is
-/// still the version the caller reviewed. Used solely to Undo AI-created notes
-/// without deleting user edits that landed afterward.
+/// still the version the caller reviewed.
 #[tauri::command]
 pub fn note_trash_if_revision(
     path: String,

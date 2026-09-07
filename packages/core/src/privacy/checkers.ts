@@ -183,7 +183,7 @@ export function cloudSafeGraphContext(context: CloudGraphContext): CloudSafe<Clo
 export interface CloudNoteContent {
   path: string
   title: string
-  /** SHA-256 of the complete source, used as the write tool's compare token. */
+  /** SHA-256 of the complete source. */
   revision: string
   content: string
   truncated: boolean

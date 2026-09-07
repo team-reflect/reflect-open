@@ -380,9 +380,8 @@ pub(super) fn finalize_import(
         }
         super::with_file_mutation_lock(root, || {
             // Planning reads existing note bytes and may choose a daily-note
-            // merge. Keep that read/decision/write under the same graph lock
-            // as editor and AI mutations; the nested atomic persist reuses
-            // this thread's already-held lock.
+            // merge, so read, decision, and write share one graph lock; the
+            // nested atomic persist reuses this thread's held lock.
             match plan_note_entry(root, entry, &mut names, &claimed)? {
                 NotePlan::SkipIdentical => skipped_files += 1,
                 NotePlan::Write { relative, renamed } => {

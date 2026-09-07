@@ -223,8 +223,8 @@ impl NoteWindowOwnershipState {
         first_error.map_or(Ok(()), Err)
     }
 
-    /// Called from an AI critical section that already holds the graph's
-    /// cross-process mutation lock. Probe failures deliberately return false.
+    /// Requires the graph's cross-process mutation lock to be held. Probe
+    /// failures deliberately return false.
     pub(crate) fn ai_access_available(
         &self,
         root: &Path,
