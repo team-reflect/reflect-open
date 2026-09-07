@@ -38,6 +38,7 @@ function fakePipelineBridge(options: {
   failApplyOnce?: boolean
 }) {
   const commands: string[] = []
+  const reads: Record<string, unknown>[] = []
   const embedded: string[][] = []
   const applied: { path: string; chunks: AppliedChunk[] }[] = []
   let failApply = options.failApplyOnce === true
@@ -68,7 +69,9 @@ function fakePipelineBridge(options: {
         }
       }
       if (command === 'embed_read') {
-        expect(args).toMatchObject({ generation: 1 })
+        // Not asserted here: the read runs inside a try/catch that turns any
+        // throw into "note gone", which would hide a failed expectation.
+        reads.push(args)
         const path = (args as { path: string }).path
         if (path.endsWith('.reflect.md')) {
           if (options.evictedSidecars?.includes(path) === true) {
@@ -119,7 +122,7 @@ function fakePipelineBridge(options: {
     },
     listen: async () => () => {},
   })
-  return { commands, embedded, applied }
+  return { commands, reads, embedded, applied }
 }
 
 const MODEL = 'all-MiniLM-L6-v2'
@@ -132,13 +135,14 @@ describe('embedNote', () => {
   })
 
   it('waits for the index to catch up if file bytes no longer match its revision', async () => {
-    const { commands } = fakePipelineBridge({
+    const { commands, reads } = fakePipelineBridge({
       content: '# Newly saved text\n',
       indexedContent: '# Previous text\n',
       storedRows: [],
     })
     await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })
     expect(commands).toEqual(['embed_prepare', 'embed_read'])
+    expect(reads).toEqual([{ path: 'notes/a.md', generation: 1 }])
   })
 
   it('waits for reindexing when a rename changes path-relative asset references', async () => {
