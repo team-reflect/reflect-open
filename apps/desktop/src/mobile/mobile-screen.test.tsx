@@ -338,12 +338,14 @@ describe('MobileShell', () => {
     expect(todayButton.element().hasAttribute('inert')).toBe(true)
 
     await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
-    expect(
-      view
-        .getByRole('button', { name: dayCellLabel(other) })
-        .element()
-        .getAttribute('aria-current'),
-    ).toBe('date')
+    await waitFor(() =>
+      expect(
+        view
+          .getByRole('button', { name: dayCellLabel(other) })
+          .element()
+          .getAttribute('aria-current'),
+      ).toBe('date'),
+    )
     expect(
       view.getByRole('button', { name: 'Today' }).element().classList.contains('opacity-100'),
     ).toBe(true)
@@ -470,7 +472,7 @@ describe('MobileShell', () => {
     const view = await mount({ kind: 'today' }, { kind: 'daily', date: farDay })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
-    expect(shownMonth(view)).toBe(monthLabel(monthOf(farDay)))
+    await waitFor(() => expect(shownMonth(view)).toBe(monthLabel(monthOf(farDay))))
     await waitFor(() => {
       const editors = view.getByTestId('fake-editor').elements()
       expect(editors.some((editor) => editor.textContent?.includes('far future plans'))).toBe(true)
@@ -483,10 +485,10 @@ describe('MobileShell', () => {
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
-    expect(view.getByRole('heading').element().textContent).toBe('Edit note')
+    await waitFor(() => expect(view.getByRole('heading').element().textContent).toBe('Edit note'))
 
     await user.click(view.getByRole('button', { name: 'Back' }))
-    expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso())))
+    await waitFor(() => expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso()))))
   })
 
   it('never focuses the destination editor on navigation (keyboard stays down)', async () => {
@@ -622,12 +624,14 @@ describe('MobileShell', () => {
     const view = await mount({ kind: 'daily', date: other })
 
     await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
-    expect(
-      view
-        .getByRole('button', { name: dayCellLabel(other) })
-        .element()
-        .getAttribute('aria-current'),
-    ).toBe('date')
+    await waitFor(() =>
+      expect(
+        view
+          .getByRole('button', { name: dayCellLabel(other) })
+          .element()
+          .getAttribute('aria-current'),
+      ).toBe('date'),
+    )
     expect(
       view
         .getByRole('button', { name: dayCellLabel(today) })
@@ -764,7 +768,7 @@ describe('MobileShell', () => {
     })
 
     await user.click(view.getByRole('button', { name: 'Back' }))
-    expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso())))
+    await waitFor(() => expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso()))))
   })
 })
 
@@ -814,8 +818,8 @@ describe('MobileStack transitions & back-swipe', () => {
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
+    await waitFor(() => expect(stackLayers(view)).toHaveLength(2))
     const layers = stackLayers(view)
-    expect(layers).toHaveLength(2)
     const [origin, entering] = layers
     expect(entering!.className).toContain('mobile-stack-slide-in')
     expect(origin!.getAttribute('aria-hidden')).toBe('true')
@@ -839,7 +843,7 @@ describe('MobileStack transitions & back-swipe', () => {
 
     await user.click(view.getByRole('button', { name: 'Back' }))
     // Daily is current again immediately; the note lingers only to animate out.
-    expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso())))
+    await waitFor(() => expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso()))))
     const exiting = stackLayers(view).at(-1)!
     expect(exiting.className).toContain('mobile-stack-slide-out')
     expect(exiting.getAttribute('aria-hidden')).toBe('true')
@@ -854,6 +858,7 @@ describe('MobileStack transitions & back-swipe', () => {
     expect(stackLayers(view)).toHaveLength(1)
 
     await user.click(view.getByRole('button', { name: 'All' }))
+    await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
     const layers = stackLayers(view)
     expect(layers).toHaveLength(1)
     expect(layers[0]!.className).not.toContain('mobile-stack-slide-in')
@@ -908,10 +913,12 @@ describe('MobileStack transitions & back-swipe', () => {
       const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
 
       await user.click(view.getByRole('button', { name: 'probe-navigate' }))
+      await waitFor(() => expect(view.getByRole('heading').element().textContent).toBe('Edit note'))
       expect(stackLayers(view).at(-1)!.className).not.toContain('mobile-stack-slide-in')
 
       await user.click(view.getByRole('button', { name: 'Back' }))
       // No exit animation: the note is gone the moment the route changes.
+      await waitFor(() => expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso()))))
       expect(stackLayers(view)).toHaveLength(1)
     } finally {
       globalThis.matchMedia = originalMatchMedia
