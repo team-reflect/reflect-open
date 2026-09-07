@@ -1,5 +1,5 @@
-import { diffLines } from 'diff'
-import { parseNote, splitFrontmatter, type ChatNoteChange } from '@reflect/core'
+import { parseNote, type ChatNoteChange } from '@reflect/core'
+import { changedLineStatistics } from '@/lib/changed-lines'
 
 export interface ChatNoteChangeGroup {
   readonly path: string
@@ -29,7 +29,7 @@ export function groupChatNoteChanges(changes: readonly ChatNoteChange[]): ChatNo
     const ordered = pathChanges.toSorted((left, right) => left.sequence - right.sequence)
     const first = ordered[0]!
     const last = ordered.at(-1)!
-    const statistics = lineStatistics(first.beforeSource, last.afterSource)
+    const statistics = changedLineStatistics(first.beforeSource, last.afterSource)
     groups.push({
       path,
       title: parseNote({ path, source: last.afterSource }).title,
@@ -57,30 +57,4 @@ function groupState(changes: readonly ChatNoteChange[]): ChatNoteChangeGroup['st
     return 'applied'
   }
   return 'undone'
-}
-
-function lineStatistics(
-  beforeSource: string | null,
-  afterSource: string,
-): { addedLines: number; removedLines: number } {
-  const beforeBody = beforeSource === null ? '' : splitFrontmatter(beforeSource).body
-  const afterBody = splitFrontmatter(afterSource).body
-  let addedLines = 0
-  let removedLines = 0
-  for (const part of diffLines(beforeBody, afterBody)) {
-    if (part.added) {
-      addedLines += physicalLineCount(part.value)
-    } else if (part.removed) {
-      removedLines += physicalLineCount(part.value)
-    }
-  }
-  return { addedLines, removedLines }
-}
-
-function physicalLineCount(value: string): number {
-  if (value === '') {
-    return 0
-  }
-  const newlineCount = value.match(/\n/g)?.length ?? 0
-  return newlineCount + (value.endsWith('\n') ? 0 : 1)
 }

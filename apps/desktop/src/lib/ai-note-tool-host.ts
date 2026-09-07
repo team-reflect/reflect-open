@@ -1,4 +1,3 @@
-import { diffLines } from 'diff'
 import {
   chatNoteChangesForTurn,
   createNoteWithTitlePrepared,
@@ -36,6 +35,7 @@ import {
 import { openSession } from '@/editor/open-documents'
 import type { NoteBodyMutationResult, NoteFreshContent, NoteSession } from '@/editor/note-session'
 import { checkRoundTrip } from '@/editor/roundtrip'
+import { changedLineStatistics } from './changed-lines'
 import {
   createNotePathOperationQueue,
   routeNoteOperation,
@@ -530,7 +530,13 @@ export function createDesktopChatNoteToolHost(
           if (!(await finalizeAppliedChange(dependencies, options, changeId))) {
             return failedChangeFinalization()
           }
-          return successfulMutation(changeId, creation.path, creation.revision, '', creation.source)
+          return successfulMutation(
+            changeId,
+            creation.path,
+            creation.revision,
+            null,
+            creation.source,
+          )
         } catch (cause) {
           if (preparation.journalAttempted) {
             const definitiveRefusal = cause instanceof PreparedNoteCreationRefusal
@@ -553,7 +559,7 @@ export function createDesktopChatNoteToolHost(
                 changeId,
                 preparedCreation.path,
                 preparedCreation.revision,
-                '',
+                null,
                 preparedCreation.source,
               )
             }
@@ -1281,37 +1287,10 @@ function successfulMutation(
   changeId: string,
   path: string,
   revision: string,
-  beforeSource: string,
+  beforeSource: string | null,
   afterSource: string,
 ): Extract<NoteMutationOutput, { ok: true }> {
-  const statistics = changedLineStatistics(beforeSource, afterSource)
-  return { ok: true, changeId, path, revision, ...statistics }
-}
-
-function changedLineStatistics(
-  beforeSource: string,
-  afterSource: string,
-): { addedLines: number; removedLines: number } {
-  const beforeBody = beforeSource === '' ? '' : splitFrontmatter(beforeSource).body
-  const afterBody = splitFrontmatter(afterSource).body
-  let addedLines = 0
-  let removedLines = 0
-  for (const part of diffLines(beforeBody, afterBody)) {
-    if (part.added) {
-      addedLines += physicalLineCount(part.value)
-    } else if (part.removed) {
-      removedLines += physicalLineCount(part.value)
-    }
-  }
-  return { addedLines, removedLines }
-}
-
-function physicalLineCount(value: string): number {
-  if (value === '') {
-    return 0
-  }
-  const newlineCount = value.match(/\n/g)?.length ?? 0
-  return newlineCount + (value.endsWith('\n') ? 0 : 1)
+  return { ok: true, changeId, path, revision, ...changedLineStatistics(beforeSource, afterSource) }
 }
 
 async function bestEffortState(
