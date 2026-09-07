@@ -14,6 +14,9 @@ import {
   type NoteToolDeps,
   type NoteToolResult,
 } from './tools'
+import type { ChatNoteToolHost } from './note-mutations'
+import type { ChatPermissionMode } from './permissions'
+import type { ChatSourceRef } from './transcript'
 
 /**
  * The streaming chat engine (Plan 10, read-only first wave): one BYOK call
@@ -32,6 +35,9 @@ import {
  * mid-gather (see {@link streamChatTurn}).
  */
 export const MAX_STEPS = 12
+
+const SOURCE_REVALIDATION_ERROR =
+  'A note source is no longer available to AI. The turn stopped before sending another request.'
 
 export interface StreamChatOptions {
   /** The provider entry to call, with `model` set to the model id to use. */
@@ -59,6 +65,21 @@ export interface StreamChatOptions {
   context: CloudSafe<CloudGraphContext> | null
   /** Aborts the provider call mid-stream (the UI's stop button). */
   signal?: AbortSignal
+  /** Capability captured when the user sent this turn. */
+  permissionMode?: ChatPermissionMode
+  /** Live note host; mutation tools require it in Read & write mode. */
+  noteHost?: ChatNoteToolHost
+  /**
+   * Rebuild the provider-safe initial messages immediately before every model
+   * step. The result includes the current user message; contaminated history
+   * suffixes must already be omitted, and history excluded before the turn
+   * must never be added back. A shorter result is safe on the first step; if
+   * it changes after a model response exists, the turn stops instead of
+   * replaying that response on a different provenance base.
+   */
+  revalidateHistory: () => Promise<ModelMessage[]>
+  /** Revalidate one current-turn tool source against the freshest live graph state. */
+  validateSource: (source: ChatSourceRef) => Promise<boolean>
 }
 
 /** One normalized event in a chat turn's stream. */
@@ -79,15 +100,19 @@ export type ChatStreamEvent =
  * {@link streamChatTurn} for the stream's contract.
  */
 export function streamChat(options: StreamChatOptions): AsyncGenerator<ChatStreamEvent> {
-  const messages = fitToContextWindow(options.messages, {
+  const contextWindowOptions = {
     contextWindow: modelContextWindow(options.config.provider, options.config.model),
     systemPrompt: chatSystemPrompt({
       today: options.today,
       context: options.context,
       semanticSearchEnabled: options.semanticSearchEnabled,
       customSystemPrompt: options.customSystemPrompt,
+      permissionMode: options.permissionMode ?? 'read',
     }),
-  })
+  }
+  const fitMessages = (messages: ModelMessage[]): ModelMessage[] =>
+    fitToContextWindow(messages, contextWindowOptions)
+  const messages = fitMessages(options.messages)
   return streamChatTurn(languageModel(options.config, options.apiKey, options.fetchFn), {
     messages,
     today: options.today,
@@ -95,6 +120,10 @@ export function streamChat(options: StreamChatOptions): AsyncGenerator<ChatStrea
     customSystemPrompt: options.customSystemPrompt,
     context: options.context,
     signal: options.signal,
+    permissionMode: options.permissionMode ?? 'read',
+    noteHost: options.noteHost,
+    revalidateHistory: async () => fitMessages(await options.revalidateHistory()),
+    validateSource: options.validateSource,
   })
 }
 
@@ -114,6 +143,14 @@ export interface ChatTurnOptions {
   signal?: AbortSignal | undefined
   /** Test seam for the note tools' effects. */
   toolDeps?: NoteToolDeps | undefined
+  /** Capability captured when the user sent this turn. */
+  permissionMode?: ChatPermissionMode | undefined
+  /** Live note host; mutation tools require it in Read & write mode. */
+  noteHost?: ChatNoteToolHost | undefined
+  /** Provider-safe initial messages, rebuilt before every model step. */
+  revalidateHistory: () => Promise<ModelMessage[]>
+  /** Fresh live eligibility check for a current-turn tool source. */
+  validateSource: (source: ChatSourceRef) => Promise<boolean>
 }
 
 /**
@@ -130,9 +167,13 @@ export async function* streamChatTurn(
   model: LanguageModel,
   options: ChatTurnOptions,
 ): AsyncGenerator<ChatStreamEvent> {
+  const observedSources = new Map<string, ChatSourceRef>()
   const tools = buildNoteTools({
     ...options.toolDeps,
     semanticSearchEnabled: options.semanticSearchEnabled,
+    permissionMode: options.permissionMode ?? 'read',
+    ...(options.noteHost === undefined ? {} : { noteHost: options.noteHost }),
+    observeSource: (source) => observedSources.set(`${source.kind}:${source.path}`, source),
   })
 
   // Messages for all *completed* steps (cumulative, assistant/tool pairs)…
@@ -143,6 +184,12 @@ export async function* streamChatTurn(
     pendingText === ''
       ? stepMessages
       : [...stepMessages, { role: 'assistant', content: pendingText }]
+  // Freeze the exact provider-facing history established by the first step.
+  // Comparing only its length is insufficient after context fitting: removing
+  // a newly-private suffix can pull older, previously-trimmed turns into the
+  // same number of message slots. Replaying completed step messages on that
+  // different base could resend text derived from the now-private history.
+  let firstStepInitialMessagesFingerprint: string | null = null
 
   try {
     const result = streamText({
@@ -152,6 +199,7 @@ export async function* streamChatTurn(
         context: options.context,
         semanticSearchEnabled: options.semanticSearchEnabled,
         customSystemPrompt: options.customSystemPrompt,
+        permissionMode: options.permissionMode ?? 'read',
       }),
       messages: options.messages,
       tools,
@@ -161,7 +209,34 @@ export async function* streamChatTurn(
       // tools when the ceiling fires ends on a tool result with no reply — the
       // user sees tool activity, then silence. `stepNumber` counts completed
       // steps, so the last step that runs is `MAX_STEPS - 1`.
-      prepareStep: ({ stepNumber }) => (stepNumber >= MAX_STEPS - 1 ? { toolChoice: 'none' } : {}),
+      prepareStep: async ({ stepNumber, responseMessages }) => {
+        try {
+          const [revalidatedInitialMessages, ...sourceVerdicts] = await Promise.all([
+            options.revalidateHistory(),
+            ...[...observedSources.values()].map(
+              async (source) => await options.validateSource(source),
+            ),
+          ])
+          if (sourceVerdicts.some((allowed) => !allowed)) {
+            throw new Error(SOURCE_REVALIDATION_ERROR)
+          }
+          const historyFingerprint = JSON.stringify(revalidatedInitialMessages)
+          if (
+            firstStepInitialMessagesFingerprint !== null &&
+            historyFingerprint !== firstStepInitialMessagesFingerprint
+          ) {
+            throw new Error(SOURCE_REVALIDATION_ERROR)
+          }
+          firstStepInitialMessagesFingerprint ??= historyFingerprint
+          return {
+            messages: [...revalidatedInitialMessages, ...responseMessages],
+            ...(stepNumber >= MAX_STEPS - 1 ? { toolChoice: 'none' as const } : {}),
+          }
+        } catch {
+          throw new Error(SOURCE_REVALIDATION_ERROR)
+        }
+      },
+      onError: () => undefined,
       ...(options.signal !== undefined ? { abortSignal: options.signal } : {}),
       // `step.response.messages` holds only the messages that step created,
       // so the running history is accumulated here rather than assigned.
@@ -189,7 +264,7 @@ export async function* streamChatTurn(
           break
         }
         case 'tool-result': {
-          const toolResult = noteToolResult(part)
+          const toolResult = noteToolResult(part, [...observedSources.values()])
           if (toolResult) {
             yield { type: 'tool-result', result: toolResult }
           }

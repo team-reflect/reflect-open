@@ -84,8 +84,9 @@ export function createDocumentBinding(): DocumentBinding {
     const settled = target.flush()
     // `flush()` may synchronously report reconciled editor input through the
     // change callback. Keep the target discoverable for that re-entry, then
-    // release ownership before any asynchronous write settles or a replacement
-    // session binds.
+    // unregister this webview-local lookup before a replacement session binds.
+    // The native owner claim is released later, by `dispose()`, once this
+    // final flush has settled.
     if (session === target) {
       session = null
       coordinator = null

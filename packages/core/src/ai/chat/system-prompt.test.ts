@@ -142,4 +142,30 @@ describe('chatSystemPrompt', () => {
 
     expect(prompt).not.toContain('User-configured system prompt')
   })
+
+  it('explains that read-only turns cannot mutate notes', () => {
+    const prompt = chatSystemPrompt({
+      today: '2026-06-12',
+      context: null,
+      semanticSearchEnabled: true,
+      customSystemPrompt: '',
+      permissionMode: 'read',
+    })
+    expect(prompt).toContain('This turn is read-only')
+    expect(prompt).toContain('enable Read & write')
+    expect(prompt).not.toContain('Use edit_note')
+  })
+
+  it('teaches write-enabled turns to read before using body-only tools', () => {
+    const prompt = chatSystemPrompt({
+      today: '2026-06-12',
+      context: null,
+      semanticSearchEnabled: true,
+      customSystemPrompt: '',
+      permissionMode: 'readWrite',
+    })
+    expect(prompt).toContain('call read_notes')
+    expect(prompt).toContain('Use edit_note')
+    expect(prompt).toContain('Never attempt to change frontmatter, titles, paths, or private notes')
+  })
 })

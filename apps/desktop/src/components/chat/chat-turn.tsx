@@ -5,7 +5,9 @@ import { Marker, MarkerContent } from '@/components/ui/marker'
 import { Message, MessageContent, MessageFooter, MessageGroup } from '@/components/ui/message'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { assistantReplyMarkdown } from '@/lib/chat-copy'
+import { useChatSession } from '@/providers/chat-provider'
 import { ChatAssistantPart } from './chat-assistant-part'
+import { ChatChangeSummary } from './chat-change-summary'
 import { ChatCopyButton } from './chat-copy-button'
 import { ChatUserAttachments } from './chat-user-attachments'
 
@@ -32,6 +34,7 @@ interface ChatTurnProps {
  * tools or errored has nothing to copy, so it gets none.
  */
 export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
+  const { changesByTurn, undoTurnChanges, undoNoteChanges } = useChatSession()
   const navigateWikiLink = useWikiLinkNavigation(null)
   const lastIndex = turn.parts.length - 1
   const replyMarkdown = turn.status === 'done' ? assistantReplyMarkdown(turn) : null
@@ -48,6 +51,9 @@ export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
               </BubbleContent>
             </Bubble>
           ) : null}
+          <span className="text-[11px] text-text-muted">
+            {turn.permissionMode === 'readWrite' ? 'Read & write' : 'Read only'}
+          </span>
         </MessageContent>
       </Message>
 
@@ -72,6 +78,13 @@ export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
             <MessageFooter className="pointer-events-none -mt-1 opacity-0 transition-opacity duration-100 group-hover/assistant-response:pointer-events-auto group-hover/assistant-response:opacity-100 group-focus-within/assistant-response:pointer-events-auto group-focus-within/assistant-response:opacity-100">
               <ChatCopyButton text={replyMarkdown} />
             </MessageFooter>
+          ) : null}
+          {turn.status === 'done' ? (
+            <ChatChangeSummary
+              changes={changesByTurn[turn.id] ?? []}
+              onUndoTurn={async () => await undoTurnChanges(turn.id)}
+              onUndoPath={async (path) => await undoNoteChanges(turn.id, path)}
+            />
           ) : null}
         </MessageContent>
       </Message>

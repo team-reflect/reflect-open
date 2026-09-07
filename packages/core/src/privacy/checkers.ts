@@ -183,6 +183,8 @@ export function cloudSafeGraphContext(context: CloudGraphContext): CloudSafe<Clo
 export interface CloudNoteContent {
   path: string
   title: string
+  /** SHA-256 of the complete source. */
+  revision: string
   content: string
   truncated: boolean
 }
@@ -200,6 +202,7 @@ export function cloudSafeNoteContent(
   return mint({
     path: note.path,
     title: note.title,
+    revision: note.revision,
     content: note.content,
     truncated: note.truncated,
   })

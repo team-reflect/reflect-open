@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { isAppError } from '../../errors'
+import { isNotePath, isTemplatePath } from '../../graph/paths'
+import { hashContent } from '../../indexing/hash'
 import { parseNote } from '../../markdown/extract'
 import { splitFrontmatter } from '../../markdown/frontmatter'
 import {
@@ -59,6 +61,9 @@ export interface ReadNoteDeps {
  */
 export function buildReadOneNote(deps: ReadNoteDeps) {
   return async function readOneNote(path: string): Promise<ReadNoteResult> {
+    if (!isNotePath(path) || isTemplatePath(path)) {
+      return { ok: false, path, error: 'This path is not a readable note.' }
+    }
     let source: string
     try {
       source = await deps.readNoteFn(path)
@@ -71,6 +76,7 @@ export function buildReadOneNote(deps: ReadNoteDeps) {
     const parsed = parseNote({ path, source })
     const { body } = splitFrontmatter(source)
     const truncated = body.length > MAX_NOTE_CONTENT_CHARS
+    const revision = await hashContent(source)
     try {
       return {
         ok: true,
@@ -78,6 +84,7 @@ export function buildReadOneNote(deps: ReadNoteDeps) {
           path,
           isPrivate: parsed.frontmatter.private,
           title: parsed.title,
+          revision,
           content: truncated ? body.slice(0, MAX_NOTE_CONTENT_CHARS) : body,
           truncated,
         }),

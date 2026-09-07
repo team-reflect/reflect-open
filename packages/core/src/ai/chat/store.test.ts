@@ -24,6 +24,7 @@ afterEach(() => {
 
 const turn: ChatTurn = {
   id: 'turn-1',
+  permissionMode: 'read',
   userText: 'what is this?',
   attachments: [
     {
@@ -42,6 +43,10 @@ const turn: ChatTurn = {
         toolCallId: 'tool-1',
         query: 'cat',
         hits: [{ path: 'notes/a.md', title: 'Cats' }],
+        sourceProvenance: [
+          { kind: 'note', path: 'notes/a.md' },
+          { kind: 'asset', path: 'assets/cat.png' },
+        ],
       },
       error: null,
     },
@@ -49,6 +54,10 @@ const turn: ChatTurn = {
     { kind: 'notice', tone: 'info', text: 'Stopped.' },
   ],
   responseMessages: [{ role: 'assistant', content: 'A cat, per [[Cats]].' }],
+  sourceProvenance: [
+    { kind: 'note', path: 'notes/a.md' },
+    { kind: 'asset', path: 'assets/cat.png' },
+  ],
   status: 'done',
 }
 
@@ -65,10 +74,12 @@ describe('saveChatMessage', () => {
       message: {
         id: 'turn-1',
         conversationId: 'conv-1',
+        permissionMode: 'read',
         userText: 'what is this?',
         attachments: JSON.stringify(turn.attachments),
         parts: JSON.stringify(turn.parts),
         responseMessages: JSON.stringify(turn.responseMessages),
+        sourceProvenance: JSON.stringify(turn.sourceProvenance),
         createdMs: 2_000,
       },
       generation: 7,
@@ -80,10 +91,12 @@ describe('loadChatMessages', () => {
   function messageRow(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
     return {
       id: 'turn-1',
+      permission_mode: turn.permissionMode,
       user_text: turn.userText,
       attachments: JSON.stringify(turn.attachments),
       parts: JSON.stringify(turn.parts),
       response_messages: JSON.stringify(turn.responseMessages),
+      source_provenance: JSON.stringify(turn.sourceProvenance),
       ...overrides,
     }
   }
@@ -143,5 +156,88 @@ describe('loadChatMessages', () => {
         error: null,
       },
     ])
+  })
+
+  it('restores asset and note-mutation tool parts', async () => {
+    const toolParts = [
+      {
+        kind: 'tool',
+        call: { tool: 'assets', toolCallId: 'asset-1', paths: ['assets/cat.png'] },
+        result: {
+          tool: 'assets',
+          toolCallId: 'asset-1',
+          assets: [{ path: 'assets/cat.png', error: null }],
+        },
+        error: null,
+      },
+      {
+        kind: 'tool',
+        call: { tool: 'edit', toolCallId: 'edit-1', path: 'notes/a.md', replacements: 1 },
+        result: {
+          tool: 'edit',
+          toolCallId: 'edit-1',
+          outcome: {
+            ok: true,
+            changeId: 'change-1',
+            path: 'notes/a.md',
+            revision: 'a'.repeat(64),
+            addedLines: 1,
+            removedLines: 1,
+          },
+        },
+        error: null,
+      },
+    ]
+    invoke.mockResolvedValue([messageRow({ parts: JSON.stringify(toolParts) })])
+    const [restored] = await loadChatMessages('conv-1')
+    expect(restored?.parts).toEqual(toolParts)
+  })
+
+  it('defaults legacy permission to read and derives known provenance', async () => {
+    const readParts = [
+      {
+        kind: 'tool',
+        call: { tool: 'read', toolCallId: 'read-1', paths: ['notes/a.md'] },
+        result: {
+          tool: 'read',
+          toolCallId: 'read-1',
+          notes: [{ path: 'notes/a.md', title: 'Cats', error: null }],
+        },
+        error: null,
+      },
+    ]
+    invoke.mockResolvedValue([
+      messageRow({
+        permission_mode: null,
+        source_provenance: null,
+        parts: JSON.stringify(readParts),
+      }),
+    ])
+    const [restored] = await loadChatMessages('conv-1')
+    expect(restored?.permissionMode).toBe('read')
+    expect(restored?.sourceProvenance).toEqual([{ kind: 'note', path: 'notes/a.md' }])
+  })
+
+  it('loads a legacy search result but marks its missing asset attribution unknown', async () => {
+    const legacySearchParts = [
+      {
+        kind: 'tool',
+        call: { tool: 'search', toolCallId: 'search-1', query: 'cat' },
+        result: {
+          tool: 'search',
+          toolCallId: 'search-1',
+          query: 'cat',
+          hits: [{ path: 'notes/a.md', title: 'Cats' }],
+        },
+        error: null,
+      },
+    ]
+    invoke.mockResolvedValue([
+      messageRow({ source_provenance: null, parts: JSON.stringify(legacySearchParts) }),
+    ])
+
+    const [restored] = await loadChatMessages('conv-1')
+    expect(restored?.parts).toMatchObject([{ result: { tool: 'search', sourceProvenance: null } }])
+    expect(restored?.sourceProvenance).toBeNull()
   })
 })

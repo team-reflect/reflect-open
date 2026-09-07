@@ -1,5 +1,12 @@
 import { createContext, use } from 'react'
-import type { AiProviderConfig, ChatModelOption, ChatModelSelection, ChatTurn } from '@reflect/core'
+import type {
+  AiProviderConfig,
+  ChatModelOption,
+  ChatModelSelection,
+  ChatPermissionMode,
+  ChatNoteChange,
+  ChatTurn,
+} from '@reflect/core'
 import type { ChatAttachment } from '@/lib/chat-attachments'
 
 /**
@@ -9,7 +16,7 @@ import type { ChatAttachment } from '@/lib/chat-attachments'
  * its own; the session semantics live with the provider.
  */
 
-export type ChatStatus = 'idle' | 'streaming'
+export type ChatStatus = 'idle' | 'streaming' | 'mutating'
 
 export interface ChatContextValue {
   turns: ChatTurn[]
@@ -29,6 +36,16 @@ export interface ChatContextValue {
    * default.
    */
   selectModel: (selection: ChatModelSelection | null) => void
+  /** The tools the next turn may use. This grant is never restored from history. */
+  permissionMode: ChatPermissionMode
+  /** Change the next turn's permission while no turn is running. */
+  setPermissionMode: (mode: ChatPermissionMode) => void
+  /** Durable note changes grouped by the turn that caused them. */
+  changesByTurn: Readonly<Record<string, readonly ChatNoteChange[]>>
+  /** Guardedly undo every still-applied note change from one turn. */
+  undoTurnChanges: (turnId: string) => Promise<void>
+  /** Guardedly undo one path's still-applied changes from one turn. */
+  undoNoteChanges: (turnId: string, path: string) => Promise<void>
   /**
    * The composer's unsent text. Provider state, not composer state, so it
    * survives the screen unmounting — on mobile every tab switch unmounts the

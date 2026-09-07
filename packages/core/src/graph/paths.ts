@@ -258,7 +258,7 @@ export function mayContainNotes(path: string): boolean {
 
 /** Is this graph-relative path a note template (`.md` under `templates/`)? */
 export function isTemplatePath(path: string): boolean {
-  return path.startsWith(`${TEMPLATES_DIR}/`) && isNotePath(path)
+  return asciiLowerCase(path.split('/')[0] ?? '') === TEMPLATES_DIR && isNotePath(path)
 }
 
 /** Extract the ISO date from a daily-note path, or `null` if it isn't one. */

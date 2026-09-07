@@ -45,6 +45,7 @@ export type FileMeta = z.infer<typeof fileMetaSchema>
 export const noteCreateOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('created'), modifiedMs: z.number().nullable() }),
   z.object({ kind: z.literal('collision') }),
+  z.object({ kind: z.literal('blocked') }),
 ])
 export type NoteCreateOutcome = z.infer<typeof noteCreateOutcomeSchema>
 

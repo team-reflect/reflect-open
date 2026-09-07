@@ -114,6 +114,7 @@ describe('graph paths', () => {
 
   it('recognizes template paths', () => {
     expect(isTemplatePath('templates/journal.md')).toBe(true)
+    expect(isTemplatePath('Templates/journal.md')).toBe(true)
     expect(isTemplatePath('templates/journal.txt')).toBe(false)
     expect(isTemplatePath('notes/journal.md')).toBe(false)
   })
