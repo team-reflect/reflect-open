@@ -41,7 +41,9 @@ describe('dailyDatesInRange', () => {
     const sql = String(args['sql'])
     expect(sql).toContain('daily_date')
     expect(sql).toContain('is not null')
-    expect(args['params']).toEqual(['2026-06-01', '2026-06-30'])
+    // An empty daily file must not mark the day: it can never be cleared.
+    expect(sql).toContain('has_content')
+    expect(args['params']).toEqual(['2026-06-01', '2026-06-30', 1])
   })
 
   it('returns an empty list when no daily notes exist in the range', async () => {

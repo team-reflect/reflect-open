@@ -175,9 +175,13 @@ export async function getDuplicateNoteIds(): Promise<DuplicateIdGroup[]> {
 }
 
 /**
- * ISO dates within `[start, end]` (inclusive) that have an indexed daily note,
- * ascending. Daily files are created lazily on first write, so an indexed row
- * means the day has real content — this powers the calendar's day markers.
+ * ISO dates within `[start, end]` (inclusive) whose daily note has content,
+ * ascending — the calendar's day markers.
+ *
+ * A daily file being on disk is not enough. Several paths create one before
+ * anything is written to it (and an import can bring a whole run of empty
+ * ones), while nothing in the app deletes a daily note, so a marker keyed on
+ * the file alone would be permanent and unclearable.
  */
 export async function dailyDatesInRange(start: string, end: string): Promise<string[]> {
   const rows = await db
@@ -185,6 +189,7 @@ export async function dailyDatesInRange(start: string, end: string): Promise<str
     .where('dailyDate', 'is not', null)
     .where('dailyDate', '>=', start)
     .where('dailyDate', '<=', end)
+    .where('hasContent', '=', 1)
     .select('dailyDate')
     .orderBy('dailyDate')
     .execute()

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   buildIndexedNote,
+  dailyDatesInRange,
   parseHighlights,
   parseNote,
   parseSearchQuery,
@@ -126,6 +127,30 @@ describe('createDevIndexDb', () => {
 
     const hits = db.query("SELECT path FROM search_fts WHERE search_fts MATCH 'sync'", [])
     expect(hits).toEqual([{ path: 'notes/sample.md' }])
+  })
+
+  it('marks only the calendar days whose daily note has content', async () => {
+    const db = await openDb()
+    for (const [path, source] of [
+      ['daily/2026-06-01.md', 'Bought milk\n'],
+      ['daily/2026-06-02.md', '\n'],
+      ['daily/2026-06-03.md', '+ [ ] \n'],
+      ['daily/2026-06-04.md', '![](assets/beach.png)\n'],
+    ] as const) {
+      db.applyNote(
+        buildIndexedNote(parseNote({ path, source }), {
+          fileHash: `hash-${path}`,
+          mtime: 1_700_000_000_000,
+          source,
+        }),
+      )
+    }
+    installQueryBridge(db)
+
+    await expect(dailyDatesInRange('2026-06-01', '2026-06-30')).resolves.toEqual([
+      '2026-06-01',
+      '2026-06-04',
+    ])
   })
 
   it('finds a note by a URL it links to', async () => {
