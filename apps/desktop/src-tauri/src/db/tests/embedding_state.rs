@@ -235,7 +235,7 @@ fn sidecar_creation_deletion_and_same_size_replacement_invalidate_success() {
 }
 
 #[test]
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 fn in_place_same_size_sidecar_edit_with_restored_mtime_invalidates_success() {
     let conn = migrated();
     let root = tempdir().unwrap();

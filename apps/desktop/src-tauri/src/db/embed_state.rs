@@ -95,9 +95,7 @@ fn asset_revision(root: &Path, asset: &str) -> AppResult<Option<String>> {
     let absolute = resolve_in_graph(root, &format!("{asset}.reflect.md"))?;
     match std::fs::metadata(&absolute) {
         Ok(metadata) if is_dataless(&metadata) => Ok(None),
-        Ok(metadata) => Ok(Some(super::embed_revision::metadata_revision(
-            &absolute, &metadata,
-        )?)),
+        Ok(metadata) => Ok(Some(super::embed_revision::metadata_revision(&metadata)?)),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             if eviction_placeholder(&absolute).is_some_and(|stub| stub.exists()) {
                 Ok(None)
