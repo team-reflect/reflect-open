@@ -3,12 +3,10 @@ import type { Span } from './model'
 /**
  * Plain-text rendering (Plan 03): turn a slice of markdown body into the text a
  * reader sees — emphasis/marker syntax dropped, wiki brackets/pipes flattened,
- * backslash escapes resolved, code spans kept literal. This is a display
- * projection, and only that: it feeds the UI slots that render a plain string
- * rather than Markdown (the All Notes row preview, task rows and their
- * breadcrumbs). Search does not read it and must not, so that how a preview
- * reads never becomes a question about recall: `search_fts.body` indexes the
- * raw Markdown body.
+ * backslash escapes resolved, code spans kept literal. A display projection
+ * and only that: it feeds the UI slots that render a plain string rather than
+ * Markdown (the All Notes row preview, task rows and their breadcrumbs).
+ * Search reads the raw Markdown body instead (`search_fts.body`).
  *
  * The walk in `extract.ts` supplies two span sets in body coordinates: `cuts`
  * (syntax ranges to drop — `*emphasis*` marks, the `[ ]` TaskMarker, URLs) and

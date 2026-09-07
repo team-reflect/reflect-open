@@ -207,7 +207,7 @@ export const indexedNoteSchema = z.object({
   pinnedOrder: z.number().nullable(),
   /** The file carries Git conflict markers from a sync merge (Plan 12). */
   hasConflict: z.boolean(),
-  /** The note renders as something: display text, an asset, or a link. */
+  /** The note is not blank: it has display text, or a body the FTS can match. */
   hasContent: z.boolean(),
   /** The published gist's html url, or null when the note has none. */
   gistUrl: z.string().nullable(),
@@ -217,10 +217,8 @@ export const indexedNoteSchema = z.object({
   mtime: z.number(),
   /**
    * The note's raw Markdown body (frontmatter stripped), indexed as
-   * `search_fts.body`. Raw rather than display text on purpose: the FTS
-   * tokenizer splits on Markdown punctuation anyway, so stripping syntax buys
-   * no recall, and the search index must not depend on how a preview is
-   * formatted.
+   * `search_fts.body`. Raw on purpose: the FTS tokenizer splits on Markdown
+   * punctuation anyway, so search need not depend on the display projection.
    */
   searchText: z.string(),
   /**
@@ -324,10 +322,7 @@ export function projectNoteClaims(
   return claims
 }
 
-/**
- * A letter or a digit: one token the FTS body could ever match. Markdown
- * scaffolding alone (`+ [ ] `, `---`, `>`) has none.
- */
+/** Bare scaffolding (`+ [ ] `, `> `) has no letter or digit; a reference does. */
 const SEARCHABLE_CHAR_RE = /[\p{L}\p{N}]/u
 
 /**

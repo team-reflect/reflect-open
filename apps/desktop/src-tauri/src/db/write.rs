@@ -31,8 +31,6 @@ pub struct IndexedNote {
     pub(super) pinned_order: Option<f64>,
     /// The file carries Git conflict markers (sync merge, Plan 12).
     pub(super) has_conflict: bool,
-    /// The note renders as something (display text, an asset, or a link), so
-    /// the calendar can skip a day whose daily note is blank.
     pub(super) has_content: bool,
     /// The published GitHub Gist's html url, when the note has one.
     pub(super) gist_url: Option<String>,
