@@ -6,20 +6,14 @@ import { useArrivalFocus, type ArrivalFocusOptions } from './use-arrival-focus'
 
 interface ArrivalFocusProbeProps extends Omit<ArrivalFocusOptions, 'target'> {
   inert?: boolean
-  baseUiInert?: boolean
   hidden?: boolean
 }
 
-function ArrivalFocusProbe({
-  inert,
-  baseUiInert,
-  hidden,
-  ...options
-}: ArrivalFocusProbeProps): ReactElement {
+function ArrivalFocusProbe({ inert, hidden, ...options }: ArrivalFocusProbeProps): ReactElement {
   const target = useRef<HTMLInputElement>(null)
   useArrivalFocus({ ...options, target })
   return (
-    <div inert={inert} data-base-ui-inert={baseUiInert ? '' : undefined} aria-hidden={hidden}>
+    <div inert={inert} aria-hidden={hidden}>
       <input ref={target} aria-label="Arrival target" defaultValue="Existing query" />
     </div>
   )
@@ -79,7 +73,6 @@ describe('useArrivalFocus', () => {
 
   it.each([
     { name: 'a native inert container', props: { inert: true } },
-    { name: 'a Base UI inert container', props: { baseUiInert: true } },
     { name: 'an aria-hidden container', props: { hidden: true } },
   ])('does not focus an arrival behind $name', async ({ props }) => {
     const { focus } = await mountFocus({

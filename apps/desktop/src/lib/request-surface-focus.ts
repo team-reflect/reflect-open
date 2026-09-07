@@ -3,20 +3,24 @@ interface SurfaceFocusOptions extends FocusOptions {
   onFocused?: () => void
 }
 
-const INERT_SELECTOR = '[inert], [data-base-ui-inert], [aria-hidden="true"]'
-const MODAL_SELECTOR = ':is([role="dialog"], [role="alertdialog"]):is([data-open], [data-closed])'
+const INERT_SELECTOR = '[inert], [aria-hidden="true"]'
+const MODAL_SELECTOR = ':is([role="dialog"], [role="alertdialog"])[data-open]'
+const INTENT_EVENTS = ['pointerdown', 'keydown', 'focusin'] as const
 
 /**
- * Focus a newly arrived surface, waiting for an already-open modal to finish
- * closing when necessary. Only blocked requests observe the captured modal's
- * lifetime; cleanup cancels a request when its route or arrival is superseded.
+ * Focuses a newly arrived surface, waiting for any open dialog to close first
+ * and cancelling if the user acts before then. A dialog that is already closing
+ * does not block, because Base UI removes `aria-hidden` from outside elements as
+ * soon as `open` flips false and does not return focus to the trigger when focus
+ * has already moved elsewhere.
  */
 export function requestSurfaceFocus(
   element: HTMLElement | null,
   { selectText = false, onFocused, ...focusOptions }: SurfaceFocusOptions = {},
 ): () => void {
+  if (element === null) return () => {}
   const focus = (): void => {
-    element?.focus(focusOptions)
+    element.focus(focusOptions)
     if (
       selectText &&
       (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)
@@ -25,7 +29,6 @@ export function requestSurfaceFocus(
     }
     onFocused?.()
   }
-  if (element === null) return () => {}
   const inert = element.closest(INERT_SELECTOR) !== null
   if (!inert && element.closest(MODAL_SELECTOR) !== null) {
     focus()
@@ -36,73 +39,50 @@ export function requestSurfaceFocus(
   if (element.closest('[inert]') !== null) return () => {}
 
   const document = element.ownerDocument
-  const blockers = [...document.querySelectorAll<HTMLElement>(MODAL_SELECTOR)].filter(
-    (popup) => !popup.hidden && !popup.contains(element),
-  )
+  const openDialogs = (): HTMLElement[] =>
+    [...document.querySelectorAll<HTMLElement>(MODAL_SELECTOR)].filter(
+      (popup) => !popup.contains(element),
+    )
+  const blockers = openDialogs()
   if (blockers.length === 0) {
     if (!inert) focus()
     return () => {}
   }
-  const portals = blockers.map((popup) => popup.closest('[data-base-ui-portal]') ?? popup)
-  const settled = (): boolean => blockers.every((popup) => !popup.isConnected || popup.hidden)
-  let cancelled = false
+  const settled = (): boolean =>
+    blockers.every((popup) => !popup.isConnected || !popup.hasAttribute('data-open'))
+  const insideBlocker = (target: EventTarget | null): boolean =>
+    target instanceof Node && blockers.some((popup) => popup.contains(target))
   let frame: number | null = null
-  let restoredFocus: EventTarget | null = null
 
   const cancel = (): void => {
-    cancelled = true
     observer.disconnect()
     if (frame !== null) cancelAnimationFrame(frame)
-    document.removeEventListener('pointerdown', onIntent, { capture: true })
-    document.removeEventListener('keydown', onIntent, { capture: true })
-    document.removeEventListener('focusin', onFocus, { capture: true })
+    for (const type of INTENT_EVENTS) {
+      document.removeEventListener(type, onIntent, { capture: true })
+    }
   }
-  const insideBlocker = (target: EventTarget | null): boolean =>
-    target instanceof Node && portals.some((portal) => portal.contains(target))
   const onIntent = (event: Event): void => {
     if (!insideBlocker(event.target)) cancel()
   }
-  const onFocus = (event: FocusEvent): void => {
-    if (insideBlocker(event.target)) return
-    // Base UI restores the old focus once after unmount. A later focus change
-    // is newer intent and must win over the pending route request.
-    if (!settled() || restoredFocus !== null) {
-      cancel()
-    } else {
-      restoredFocus = event.target
-    }
-  }
   const observer = new MutationObserver(() => {
-    if (cancelled || frame !== null || !settled()) return
-    observer.disconnect()
-    // Popup removal precedes Base UI's queued return-focus microtask. The next
-    // frame orders the destination focus after that restoration, without
-    // guessing the dialog's animation duration.
+    if (!settled()) return
+    cancel()
     frame = requestAnimationFrame(() => {
-      if (cancelled) return
-      cancel()
       if (
         element.isConnected &&
         element.closest(INERT_SELECTOR) === null &&
-        ![...document.querySelectorAll<HTMLElement>(MODAL_SELECTOR)].some(
-          (popup) => !popup.hidden && !popup.contains(element),
-        )
+        openDialogs().length === 0
       ) {
         focus()
       }
     })
   })
   for (const popup of blockers) {
-    for (
-      let ancestor: HTMLElement | null = popup;
-      ancestor !== null;
-      ancestor = ancestor.parentElement
-    ) {
-      observer.observe(ancestor, { childList: true, attributes: true, attributeFilter: ['hidden'] })
+    observer.observe(popup, { attributes: true, attributeFilter: ['data-open'] })
+    for (let ancestor = popup.parentNode; ancestor !== null; ancestor = ancestor.parentNode) {
+      observer.observe(ancestor, { childList: true })
     }
   }
-  document.addEventListener('pointerdown', onIntent, { capture: true })
-  document.addEventListener('keydown', onIntent, { capture: true })
-  document.addEventListener('focusin', onFocus, { capture: true })
+  for (const type of INTENT_EVENTS) document.addEventListener(type, onIntent, { capture: true })
   return cancel
 }

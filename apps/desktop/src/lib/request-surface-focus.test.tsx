@@ -47,23 +47,15 @@ function LateFeature({
 function ModalFocusHarness({
   children,
   nextDialogOnClose = false,
-  onRestoreFocus,
 }: {
   children: ReactNode
   nextDialogOnClose?: boolean
-  onRestoreFocus?: () => void
 }): ReactElement {
   const [modal, setModal] = useState<'first' | 'second' | null>('first')
   const previousRef = useRef<HTMLButtonElement>(null)
   return (
     <>
-      <button
-        ref={previousRef}
-        autoFocus
-        onFocus={() => {
-          if (modal === null) onRestoreFocus?.()
-        }}
-      >
+      <button ref={previousRef} autoFocus>
         Previous surface
       </button>
       {children}
@@ -73,10 +65,12 @@ function ModalFocusHarness({
           if (!open) setModal(nextDialogOnClose ? 'second' : null)
         }}
       >
-        <DialogContent {...(nextDialogOnClose ? {} : { finalFocus: previousRef })}>
+        <DialogContent>
           <DialogTitle>Quick capture</DialogTitle>
           <DialogDescription>Add a note.</DialogDescription>
-          <input aria-label="Dialog input" autoFocus />
+          {/* No `autoFocus`: React would focus this input during the popup's own
+              commit, before Base UI records the element to return focus to. */}
+          <input aria-label="Dialog input" />
         </DialogContent>
       </Dialog>
       <Dialog
@@ -88,7 +82,7 @@ function ModalFocusHarness({
         <DialogContent finalFocus={previousRef}>
           <DialogTitle>Newer dialog</DialogTitle>
           <DialogDescription>A newer action.</DialogDescription>
-          <input aria-label="Newer input" autoFocus />
+          <input aria-label="Newer input" />
         </DialogContent>
       </Dialog>
     </>
@@ -121,7 +115,7 @@ describe('requestSurfaceFocus', () => {
     expect(target?.selectionEnd).toBe('Existing query'.length)
   })
 
-  it('also waits when the feature loads during the dialog exit animation', async () => {
+  it('focuses immediately while the dialog is still animating out, and keeps focus after it unmounts', async () => {
     const loading = deferred<void>()
     await render(
       <ModalFocusHarness>
@@ -129,20 +123,21 @@ describe('requestSurfaceFocus', () => {
       </ModalFocusHarness>,
     )
     await expect.element(page.getByRole('textbox', { name: 'Dialog input' })).toHaveFocus()
+    // The test browser runs with reduced motion, which collapses the dialog's
+    // CSS exit animation, so a paused WAAPI animation holds the popup in its
+    // closing state instead.
     const popup = page.getByRole('dialog').element()
     const exitAnimation = popup.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1000 })
     exitAnimation.pause()
     await userEvent.keyboard('{Escape}')
     await vi.waitFor(() => expect(popup.hasAttribute('data-closed')).toBe(true))
     loading.resolve()
-    await vi.waitFor(() => {
-      const target = document.querySelector('[aria-label="Background search"]')
-      expect(target).not.toBeNull()
-      expect(target?.closest('[inert], [data-base-ui-inert], [aria-hidden="true"]')).toBeNull()
-    })
-    await expect.element(page.getByRole('textbox', { name: 'Background search' })).not.toHaveFocus()
-    exitAnimation.finish()
     await expect.element(page.getByRole('textbox', { name: 'Background search' })).toHaveFocus()
+    expect(popup.isConnected).toBe(true)
+    exitAnimation.finish()
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
+    await expect.element(page.getByRole('textbox', { name: 'Background search' })).toHaveFocus()
+    await expect.element(page.getByRole('button', { name: 'Previous surface' })).not.toHaveFocus()
   })
 
   it('preserves a blocked arrival through StrictMode effect cleanup', async () => {
@@ -229,26 +224,5 @@ describe('requestSurfaceFocus', () => {
     await expect.element(page.getByRole('textbox', { name: 'Newer input' })).toHaveFocus()
     await userEvent.keyboard('{Escape}')
     await expect.element(page.getByRole('button', { name: 'Previous surface' })).toHaveFocus()
-  })
-
-  it('respects newer focus chosen after the modal restores its previous target', async () => {
-    const loading = deferred<void>()
-    await render(
-      <ModalFocusHarness
-        onRestoreFocus={() =>
-          document.querySelector<HTMLInputElement>('[aria-label="New action"]')?.focus()
-        }
-      >
-        <LateFeature ready={loading.promise} label="Background search" />
-        <input aria-label="New action" />
-      </ModalFocusHarness>,
-    )
-    await expect.element(page.getByRole('textbox', { name: 'Dialog input' })).toHaveFocus()
-    loading.resolve()
-    await vi.waitFor(() =>
-      expect(document.querySelector('[aria-label="Background search"]')).not.toBeNull(),
-    )
-    await userEvent.keyboard('{Escape}')
-    await expect.element(page.getByRole('textbox', { name: 'New action' })).toHaveFocus()
   })
 })
