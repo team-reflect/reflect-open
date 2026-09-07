@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { convertArrayToReadableStream, MockLanguageModelV3 } from '@reflect/dynamic-modules/ai/test'
+import { convertArrayToReadableStream, MockLanguageModelV3 } from '@reflect/modules/ai/test'
 import type {
   LanguageModelV3StreamPart,
   LanguageModelV3StreamResult,

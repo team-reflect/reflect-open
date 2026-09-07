@@ -141,7 +141,7 @@ export async function generateAudioMemoTitle(
     return fallback
   }
   try {
-    const { generateText, Output } = await import('@reflect/dynamic-modules/ai')
+    const { generateText, Output } = await import('@reflect/modules/ai')
     const result = await generateText({
       model: await languageModel(titleConfig, request.credentials.apiKey, request.fetchFn ?? fetch),
       output: Output.object({ schema: audioMemoTitleSchema }),

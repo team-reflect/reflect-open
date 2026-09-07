@@ -11,7 +11,7 @@
       "path": "../db/tsconfig.json"
     },
     {
-      "path": "../dynamic-modules/tsconfig.json"
+      "path": "../modules/tsconfig.json"
     },
     {
       "path": "../utils/tsconfig.json"

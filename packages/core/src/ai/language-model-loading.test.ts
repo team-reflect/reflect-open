@@ -4,21 +4,21 @@ import { APP_REVIEW_STUB_KEY } from './app-review-demo'
 
 const loaded = vi.hoisted(() => new Set<string>())
 
-vi.mock('@reflect/dynamic-modules/ai-sdk/openai', async (original) => {
+vi.mock('@reflect/modules/ai-sdk/openai', async (original) => {
   loaded.add('openai')
-  return await original<typeof import('@reflect/dynamic-modules/ai-sdk/openai')>()
+  return await original<typeof import('@reflect/modules/ai-sdk/openai')>()
 })
-vi.mock('@reflect/dynamic-modules/ai-sdk/anthropic', async (original) => {
+vi.mock('@reflect/modules/ai-sdk/anthropic', async (original) => {
   loaded.add('anthropic')
-  return await original<typeof import('@reflect/dynamic-modules/ai-sdk/anthropic')>()
+  return await original<typeof import('@reflect/modules/ai-sdk/anthropic')>()
 })
-vi.mock('@reflect/dynamic-modules/ai-sdk/google', async (original) => {
+vi.mock('@reflect/modules/ai-sdk/google', async (original) => {
   loaded.add('google')
-  return await original<typeof import('@reflect/dynamic-modules/ai-sdk/google')>()
+  return await original<typeof import('@reflect/modules/ai-sdk/google')>()
 })
-vi.mock('@reflect/dynamic-modules/ai-sdk/openai-compatible', async (original) => {
+vi.mock('@reflect/modules/ai-sdk/openai-compatible', async (original) => {
   loaded.add('openai-compatible')
-  return await original<typeof import('@reflect/dynamic-modules/ai-sdk/openai-compatible')>()
+  return await original<typeof import('@reflect/modules/ai-sdk/openai-compatible')>()
 })
 
 it('loads no SDK for configuration or demo mode, then only each selected implementation', async () => {

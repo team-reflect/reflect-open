@@ -1,4 +1,4 @@
-import type { LanguageModel, ModelMessage } from '@reflect/dynamic-modules/ai'
+import type { LanguageModel, ModelMessage } from '@reflect/modules/ai'
 import { errorMessage } from '../../errors'
 import { languageModel } from '../language-model'
 import { modelContextWindow } from '../provider-catalog'
@@ -154,7 +154,7 @@ export async function* streamChatTurn(
       : [...stepMessages, { role: 'assistant', content: pendingText }]
 
   try {
-    const { isStepCount, streamText } = await import('@reflect/dynamic-modules/ai')
+    const { isStepCount, streamText } = await import('@reflect/modules/ai')
     options.signal?.throwIfAborted()
     const result = streamText({
       model,

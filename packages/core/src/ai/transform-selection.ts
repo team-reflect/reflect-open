@@ -1,4 +1,4 @@
-import type { LanguageModel } from '@reflect/dynamic-modules/ai'
+import type { LanguageModel } from '@reflect/modules/ai'
 import { errorMessage } from '../errors'
 import type { AiProviderConfig } from '../settings/schema'
 import type { CloudSafe } from '../privacy/checkers'
@@ -92,7 +92,7 @@ export async function* streamTransformTurn(
 ): AsyncGenerator<TransformStreamEvent> {
   let text = ''
   try {
-    const { streamText } = await import('@reflect/dynamic-modules/ai')
+    const { streamText } = await import('@reflect/modules/ai')
     options.signal?.throwIfAborted()
     const result = streamText({
       model,

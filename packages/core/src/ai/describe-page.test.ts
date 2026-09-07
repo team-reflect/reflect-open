@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { APICallError } from '@reflect/dynamic-modules/ai'
-import { MockLanguageModelV3 } from '@reflect/dynamic-modules/ai/test'
+import { APICallError } from '@reflect/modules/ai'
+import { MockLanguageModelV3 } from '@reflect/modules/ai/test'
 import type { LanguageModelV3CallOptions, LanguageModelV3Usage } from '@ai-sdk/provider'
 import type { AiProviderConfig } from '../settings/schema'
 import { describePage, isDescriptionRejected } from './describe-page'

@@ -1,4 +1,4 @@
-import { generateText } from '@reflect/dynamic-modules/ai'
+import { generateText } from '@reflect/modules/ai'
 import { describe, expect, it } from 'vitest'
 import type { AiProviderConfig } from '../settings/schema'
 import {

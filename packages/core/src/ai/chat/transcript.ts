@@ -1,4 +1,4 @@
-import type { ModelMessage } from '@reflect/dynamic-modules/ai'
+import type { ModelMessage } from '@reflect/modules/ai'
 import type { ChatStreamEvent } from './stream-chat'
 import type { NoteToolCall, NoteToolResult } from './tools'
 

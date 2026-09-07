@@ -1,4 +1,4 @@
-import { generateText, streamText } from '@reflect/dynamic-modules/ai'
+import { generateText, streamText } from '@reflect/modules/ai'
 import { describe, expect, it } from 'vitest'
 import type { AiProviderConfig } from '../settings/schema'
 import { APP_REVIEW_STUB_KEY, createDemoModel, DEMO_REPLY_TEXT } from './app-review-demo'

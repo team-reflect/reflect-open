@@ -277,9 +277,9 @@ importers:
       '@reflect/db':
         specifier: workspace:*
         version: link:../db
-      '@reflect/dynamic-modules':
+      '@reflect/modules':
         specifier: workspace:*
-        version: link:../dynamic-modules
+        version: link:../modules
       '@reflect/utils':
         specifier: workspace:*
         version: link:../utils
@@ -346,7 +346,7 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
 
-  packages/dynamic-modules:
+  packages/modules:
     dependencies:
       '@ai-sdk/anthropic':
         specifier: ^4.0.48

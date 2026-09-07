@@ -14,7 +14,7 @@
   "dependencies": {
     "@meowdown/markdown": "^0.68.1",
     "@reflect/db": "workspace:*",
-    "@reflect/dynamic-modules": "workspace:*",
+    "@reflect/modules": "workspace:*",
     "@reflect/utils": "workspace:*",
     "kysely": "^0.28.17",
     "ulidx": "^2.4.1",

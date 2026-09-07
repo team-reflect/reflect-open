@@ -53,7 +53,7 @@ export function createDemoModel(): LanguageModelV3 {
         warnings: [],
       }),
     doStream: async () => {
-      const { simulateReadableStream } = await import('@reflect/dynamic-modules/ai')
+      const { simulateReadableStream } = await import('@reflect/modules/ai')
       return {
         stream: simulateReadableStream<LanguageModelV3StreamPart>({
           chunkDelayInMs: 10,
