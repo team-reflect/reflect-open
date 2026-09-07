@@ -1,4 +1,4 @@
-import { errorMessage, isAppError, ReflectError, toAppError, type AppError } from '../errors'
+import { errorMessage, isAppError, toAppError, type AppError } from '../errors'
 import {
   pickTranscriptionConfig,
   resolveTranscriptionTarget,
@@ -623,15 +623,7 @@ export async function reconcileAudioMemos(
             enrichmentCredentials,
             formatTranscript: input.formatTranscript,
             fallbackTitle: memo.title,
-            fetchFn: (request, init) => {
-              if (stale()) {
-                throw new ReflectError(
-                  'network',
-                  'the graph session ended before the provider request',
-                )
-              }
-              return (input.fetchFn ?? fetch)(request, init)
-            },
+            fetchFn: input.fetchFn,
           })
           title = enriched.title
           body = enriched.body

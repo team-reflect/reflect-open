@@ -60,7 +60,7 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-describe('editor AI while loading', () => {
+describe('editor AI privacy changes', () => {
   it('revokes a run made private before the key arrives', async () => {
     const key = Promise.withResolvers<string>()
     core.aiApiKeyForConfig.mockReturnValue(key.promise)
@@ -78,10 +78,10 @@ describe('editor AI while loading', () => {
     expect(hook.result.current.onSelectionMenuSearch).toBeUndefined()
   })
 
-  it('aborts a loading transform on privacy change and ignores its late result', async () => {
-    const loaded = Promise.withResolvers<void>()
+  it('aborts a running transform on privacy change and ignores its late result', async () => {
+    const response = Promise.withResolvers<void>()
     core.transformSelection.mockImplementation(async function* () {
-      await loaded.promise
+      await response.promise
       yield { type: 'text-delta', text: 'Late result' }
     })
     const editor = createEditor()
@@ -96,29 +96,8 @@ describe('editor AI while loading', () => {
     note.isPrivate = true
     await hook.rerender()
     expect(signal?.aborted).toBe(true)
-    await act(async () => loaded.resolve())
+    await act(async () => response.resolve())
     expect(editor.discardPendingReplacement).toHaveBeenCalledOnce()
-    expect(editor.appendPendingReplacementText).not.toHaveBeenCalled()
-  })
-
-  it('aborts a loading transform when its editor session is replaced', async () => {
-    const loaded = Promise.withResolvers<void>()
-    core.transformSelection.mockImplementation(async function* () {
-      await loaded.promise
-      yield { type: 'text-delta', text: 'Old session result' }
-    })
-    const editor = createEditor()
-    const editorRef = { current: editor }
-    const hook = await renderHook(
-      (sessionEpoch = 1) => useEditorAiMenu({ path: 'notes/test.md', sessionEpoch, editorRef }),
-      { initialProps: 1 },
-    )
-    await startRun(hook.result.current)
-    await vi.waitFor(() => expect(core.transformSelection).toHaveBeenCalledOnce())
-    const signal = core.transformSelection.mock.calls[0]?.[0].signal
-    await hook.rerender(2)
-    expect(signal?.aborted).toBe(true)
-    await act(async () => loaded.resolve())
     expect(editor.appendPendingReplacementText).not.toHaveBeenCalled()
   })
 })

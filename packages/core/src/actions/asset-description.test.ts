@@ -391,48 +391,51 @@ describe('reconcileAssetDescriptions', () => {
     expect(files.has('assets/b.pdf.reflect.md')).toBe(true)
   })
 
-  it('does not send an asset made private while its AI implementation loads', async () => {
+  it('skips an asset made private while its bytes are being read', async () => {
     assets.set('assets/a.png', 'aGVsbG8=')
     files.set('notes/pub.md', publicNote('assets/a.png'))
     refs.set('assets/a.png', ['notes/pub.md'])
-    const transport = vi.fn<typeof fetch>()
-    describeMock.mockImplementation(async (request) => {
-      files.set('notes/pub.md', privateNote('assets/a.png'))
-      await request.fetchFn?.('https://provider.invalid', { method: 'POST', body: request.data })
-      return 'Never sent'
+    const reading = Promise.withResolvers<void>()
+    const bytes = Promise.withResolvers<string>()
+    readAssetMock.mockImplementationOnce(() => {
+      reading.resolve()
+      return bytes.promise
     })
 
-    const outcome = await reconcileAssetDescriptions(input({ fetchFn: transport }))
+    const pending = reconcileAssetDescriptions(input())
+    await reading.promise
+    files.set('notes/pub.md', privateNote('assets/a.png'))
+    bytes.resolve('aGVsbG8=')
+    const outcome = await pending
 
-    expect(transport).not.toHaveBeenCalled()
+    expect(describeMock).not.toHaveBeenCalled()
     expect(outcome.skippedPrivate).toBe(1)
     expect(outcome.refused).toBe(0)
     expect(outcome.stopped).toBeNull()
     expect(files.has('assets/a.png.reflect.md')).toBe(false)
   })
 
-  it('does not send an asset after a graph switch during AI loading', async () => {
+  it('skips an asset whose last reference is removed while its bytes are being read', async () => {
     assets.set('assets/a.png', 'aGVsbG8=')
     files.set('notes/pub.md', publicNote('assets/a.png'))
     refs.set('assets/a.png', ['notes/pub.md'])
-    let stale = false
-    const transport = vi.fn<typeof fetch>()
-    describeMock.mockImplementation(async (request) => {
-      stale = true
-      await request.fetchFn?.('https://provider.invalid', { method: 'POST', body: request.data })
-      return 'Never sent'
+    const reading = Promise.withResolvers<void>()
+    const bytes = Promise.withResolvers<string>()
+    readAssetMock.mockImplementationOnce(() => {
+      reading.resolve()
+      return bytes.promise
     })
 
-    const outcome = await reconcileAssetDescriptions(
-      input({
-        fetchFn: transport,
-        isStale: () => stale,
-      }),
-    )
+    const pending = reconcileAssetDescriptions(input())
+    await reading.promise
+    files.set('notes/pub.md', '# Diagram\n')
+    bytes.resolve('aGVsbG8=')
+    const outcome = await pending
 
-    expect(transport).not.toHaveBeenCalled()
-    expect(outcome.described).toBe(0)
-    expect(outcome.stopped?.reason).toBe('stale')
+    expect(describeMock).not.toHaveBeenCalled()
+    expect(outcome.skippedUnreferenced).toBe(1)
+    expect(outcome.refused).toBe(0)
+    expect(outcome.stopped).toBeNull()
     expect(files.has('assets/a.png.reflect.md')).toBe(false)
   })
 

@@ -1,12 +1,8 @@
-import {
-  describeAsset,
-  isAssetDescriptionRejected,
-  AssetDescriptionRejectedError,
-} from '../ai/describe-asset'
+import { describeAsset, isAssetDescriptionRejected } from '../ai/describe-asset'
 import { defaultAiProvider, type AiProvidersState } from '../ai/provider-config'
 import { aiApiKeyForConfig } from '../ai/secrets'
 import { base64ToBytes } from '../lib/base64'
-import { errorMessage, isAppError, ReflectError, toAppError } from '../errors'
+import { errorMessage, isAppError, toAppError } from '../errors'
 import { listDir, readAsset, readNote, writeNote } from '../graph/commands'
 import { ASSETS_DIR, descriptionPathFor } from '../graph/paths'
 import type { FileMeta } from '../graph/schemas'
@@ -21,7 +17,7 @@ import {
   readManagedDescription,
   type ManagedDescription,
 } from './asset-description-helpers'
-import { classifyAsset, type AssetVerdict } from './asset-privacy'
+import { classifyAsset } from './asset-privacy'
 export {
   assetTypeFor,
   base64ByteLength,
@@ -241,40 +237,29 @@ async function processAsset(assetPath: string, ctx: AssetContext): Promise<Asset
     return { kind: 'stop', stopped: STALE }
   }
 
-  const requestGate: { verdict: AssetVerdict } = { verdict: 'send' }
+  const currentVerdict = await classifyAsset(assetPath, ctx.generation)
+  if (ctx.isStale()) {
+    return { kind: 'stop', stopped: STALE }
+  }
+  if (currentVerdict === 'skip-private') {
+    return { kind: 'skipped', reason: 'private' }
+  }
+  if (currentVerdict === 'skip-unreferenced') {
+    return { kind: 'skipped', reason: 'unreferenced' }
+  }
+
   let body: string
   try {
     body = await describeAsset({
       config: ctx.config,
       apiKey: ctx.apiKey,
-      fetchFn: async (request, init) => {
-        if (ctx.isStale()) {
-          throw new ReflectError('network', 'the graph session ended before the provider request')
-        }
-        requestGate.verdict = await classifyAsset(assetPath, ctx.generation)
-        if (requestGate.verdict !== 'send') {
-          throw new AssetDescriptionRejectedError('the asset is no longer public')
-        }
-        if (ctx.isStale()) {
-          throw new ReflectError('network', 'the graph session ended before the provider request')
-        }
-        return await (ctx.fetchFn ?? fetch)(request, init)
-      },
+      fetchFn: ctx.fetchFn,
       kind: assetType.kind,
       mediaType: assetType.mediaType,
       data: assetType.kind === 'svg' ? utf8FromBase64(base64) : base64,
       filename: basename(assetPath),
     })
   } catch (cause) {
-    if (ctx.isStale()) {
-      return { kind: 'stop', stopped: STALE }
-    }
-    if (requestGate.verdict === 'skip-private') {
-      return { kind: 'skipped', reason: 'private' }
-    }
-    if (requestGate.verdict === 'skip-unreferenced') {
-      return { kind: 'skipped', reason: 'unreferenced' }
-    }
     if (isAssetDescriptionRejected(cause)) {
       return { kind: 'refused' } // permanent — log only, no failure description
     }
