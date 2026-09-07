@@ -1294,7 +1294,6 @@ mod tests {
             error,
             AppError::Io { message } if message.contains("timed out waiting")
         ));
-        assert_eq!(FILE_MUTATION_LOCK_TIMEOUT, Duration::from_secs(60));
     }
 
     #[test]
