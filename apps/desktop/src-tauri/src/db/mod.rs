@@ -591,11 +591,10 @@ pub async fn embed_pending<R: tauri::Runtime>(
             }
             embed_state::sources(state.conn.as_ref().ok_or_else(AppError::no_graph)?, None)?
         };
-        let pending = embed_state::pending(sources, &root, &model_id, projection_version)?;
-        if lock_state(&index)?.generation != generation {
-            return Ok(Vec::new());
-        }
-        Ok(pending)
+        // No recheck after the probes: every write this feeds (`embed_apply`)
+        // gates on the generation itself, so a superseded pass wastes at most
+        // one stat sweep.
+        embed_state::pending(sources, &root, &model_id, projection_version)
     })
     .await
 }
@@ -622,8 +621,13 @@ pub fn embed_prepare(
     )
 }
 
-/// Read an embedding input using the index root, including during the gap
-/// between graph_open and index_open. Never materializes evicted content.
+/// Read an embedding input under the index root rather than the graph root.
+/// During a graph switch `graph_open` swaps the graph root before `index_open`
+/// bumps this generation; an in-flight pass reading through the graph root in
+/// that gap would fetch the new graph's file at the same relative path. Note
+/// bytes are hash-checked against the index afterwards, but sidecar bodies are
+/// not, so a same-path sidecar with different content could be embedded under
+/// the old graph's fingerprint. Never materializes evicted content.
 #[tauri::command]
 pub async fn embed_read(
     path: String,
