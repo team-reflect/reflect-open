@@ -7,8 +7,8 @@ import { OPENAI_COMPATIBLE_PROVIDER_ID } from './openai-compatible'
 import { OPENROUTER_BASE_URL, openRouterAttributionHeaders } from './openrouter'
 
 /**
- * Load only the selected provider SDK and build its model for a BYOK entry.
- * This is the one place provider ids map to SDK factories. Shared by the chat engine
+ * Build the AI SDK model instance for a configured BYOK entry — the one place
+ * provider ids map to SDK factories. Shared by the chat engine
  * (`chat/stream-chat`) and one-shot calls like the link-capture page
  * description (`describe-page`).
  */

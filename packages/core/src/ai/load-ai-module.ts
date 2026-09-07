@@ -1,6 +1,6 @@
 import { ReflectError } from '../errors'
 
-/** Load an AI implementation, preserving the retryable error contract for background work. */
+/** A load failure is reported as a retryable network error. */
 export async function loadAiModule<Module>(load: () => Promise<Module>): Promise<Module> {
   try {
     return await load()
