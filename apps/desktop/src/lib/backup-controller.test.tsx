@@ -8,6 +8,7 @@ import {
 } from '@reflect/core'
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
 import { setPlatformSurface } from '@/lib/platform-surface'
+import { flushBackup } from './backup-flush'
 import { createBackupController, type BackupState } from './backup-controller'
 
 // providerFetch routes GitHub API calls through the Tauri HTTP plugin
@@ -28,7 +29,12 @@ const GRAPH: GraphInfo = { root: '/g', name: 'G', generation: 3 }
 
 const AUTH = JSON.stringify({ kind: 'pat', token: 'ghp_abc' })
 const CLEAN_COMMIT = { committed: false, sha: null, ahead: 0, skippedLargeFiles: [] }
-const UP_TO_DATE = { kind: 'upToDate', conflictedPaths: [], changedFiles: [] }
+const UP_TO_DATE = {
+  kind: 'upToDate',
+  conflictedPaths: [],
+  skippedLargeFiles: [],
+  changedFiles: [],
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -38,6 +44,9 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 interface FakeOptions {
+  /** Hold each listed command's first call until `releaseCommand(command)`. */
+  gateCommands?: string[]
+  failDisconnect?: boolean
   auth?: string | null
   /** Hold the direct index write until `releaseIndexApply()` (the convergence barrier). */
   gateIndexApply?: boolean
@@ -83,16 +92,31 @@ function fakeBridge(options: FakeOptions = {}) {
   let indexApplyCount = 0
   const mergeOutcomes = [...(options.mergeOutcomes ?? [])]
   const pushOutcomes = [...(options.pushOutcomes ?? [])]
+  const gates = new Map<string, { promise: Promise<void>; release: () => void }>()
+  for (const command of options.gateCommands ?? []) {
+    let release = (): void => {}
+    const promise = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    gates.set(command, { promise, release })
+  }
+  const gated = new Set<string>()
   setBridge({
     invoke: async (command, args) => {
       calls.push(command)
       invocations.push({ command, args })
+      const statusAtCall = { ...status }
+      const gate = gates.get(command)
+      if (gate !== undefined && !gated.has(command)) {
+        gated.add(command)
+        await gate.promise
+      }
       switch (command) {
         case 'git_status':
           if (options.failStatus === true) {
             throw { kind: 'io', message: 'broken repo' }
           }
-          return status
+          return statusAtCall
         case 'git_setup':
           status.initialized = true
           status.remoteUrl = typeof args['remoteUrl'] === 'string' ? args['remoteUrl'] : null
@@ -135,6 +159,9 @@ function fakeBridge(options: FakeOptions = {}) {
           }
           return null
         case 'git_disconnect':
+          if (options.failDisconnect === true) {
+            throw { kind: 'io', message: 'disconnect failed' }
+          }
           status.remoteUrl = null
           return status
         default:
@@ -159,6 +186,7 @@ function fakeBridge(options: FakeOptions = {}) {
     status,
     releaseListen: () => releaseListen?.(),
     releaseIndexApply: () => releaseIndexApply?.(),
+    releaseCommand: (command: string) => gates.get(command)?.release(),
   }
 }
 
@@ -373,6 +401,51 @@ describe('createBackupController', () => {
     controller.dispose()
   })
 
+  it('ignores an older connection probe after a newer start has adopted the graph', async () => {
+    const { calls, status, releaseCommand } = fakeBridge({ gateCommands: ['git_status'] })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: null })
+    const firstStart = controller.start()
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_status')
+    })
+
+    status.remoteUrl = null
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(commitCount(calls)).toBe(1)
+    })
+    releaseCommand('git_status')
+    await firstStart
+
+    expect(controller.getState()).toEqual({ phase: 'disconnected' })
+    expect(commitCount(calls)).toBe(1)
+    expect(calls).not.toContain('git_fetch')
+    controller.dispose()
+  })
+
+  it('an old graph controller cannot clear the current graph quit-commit hook', async () => {
+    const { invocations } = fakeBridge({ remoteUrl: null })
+    const first = createBackupController({ graph: GRAPH, indexGeneration: null })
+    const second = createBackupController({
+      graph: { ...GRAPH, generation: 4 },
+      indexGeneration: null,
+    })
+    await first.start()
+    await second.start()
+    await vi.waitFor(() => {
+      expect(invocations.filter(({ command }) => command === 'git_commit_all')).toHaveLength(2)
+    })
+    first.dispose()
+    invocations.length = 0
+
+    await flushBackup()
+
+    expect(invocations).toEqual([
+      { command: 'git_commit_all', args: { message: 'Update notes', generation: 4 } },
+    ])
+    second.dispose()
+  })
+
   it('local history keeps committing on edits — still with no network', async () => {
     // A repo without a remote (e.g. after disconnectGraph) needs no git_setup.
     const { calls } = fakeBridge({ auth: null, remoteUrl: null })
@@ -422,6 +495,51 @@ describe('createBackupController', () => {
 
     expect(calls).toContain('git_disconnect')
     expect(controller.getState()).toEqual({ phase: 'disconnected' })
+    controller.dispose()
+  })
+
+  it.each(['disconnectGraph', 'signOut'] as const)(
+    '%s stops an in-flight fetch before awaiting the connection change',
+    async (action) => {
+      const command = action === 'disconnectGraph' ? 'git_disconnect' : 'secret_delete'
+      const { calls, releaseCommand } = fakeBridge({ gateCommands: ['git_fetch', command] })
+      const controller = createBackupController({ graph: GRAPH, indexGeneration: null })
+      await controller.start()
+      await vi.waitFor(() => {
+        expect(calls).toContain('git_fetch')
+      })
+
+      const updating = controller[action]()
+      await vi.waitFor(() => {
+        expect(calls).toContain(command)
+      })
+      releaseCommand('git_fetch')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(calls).not.toContain('git_merge_remote')
+      expect(calls).not.toContain('git_push')
+      releaseCommand(command)
+      await updating
+      expect(controller.getState()).toEqual({ phase: 'disconnected' })
+      controller.dispose()
+    },
+  )
+
+  it('restores the sync lifecycle when disconnect fails', async () => {
+    const { calls } = fakeBridge({ failDisconnect: true })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: null })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_fetch')
+    })
+
+    await expect(controller.disconnectGraph()).rejects.toMatchObject({
+      message: 'disconnect failed',
+    })
+    await vi.waitFor(() => {
+      expect(calls.filter((command) => command === 'git_fetch')).toHaveLength(2)
+    })
+    expect(controller.getState()).toMatchObject({ phase: 'connected' })
     controller.dispose()
   })
 
@@ -660,6 +778,7 @@ describe('createBackupController', () => {
       mergeOutcome: {
         kind: 'merged',
         conflictedPaths: [],
+        skippedLargeFiles: [],
         changedFiles: [
           { path: 'notes/from-b.md', kind: 'upsert', modifiedMs: 123 },
           { path: 'daily/2026-06-11.md', kind: 'remove' },
@@ -706,8 +825,13 @@ describe('createBackupController', () => {
     const { calls, releaseIndexApply } = fakeBridge({
       gateIndexApply: true,
       mergeOutcomes: [
-        { kind: 'merged', conflictedPaths: [], changedFiles: [firstChange] },
-        { kind: 'merged', conflictedPaths: [], changedFiles: [secondChange] },
+        { kind: 'merged', conflictedPaths: [], skippedLargeFiles: [], changedFiles: [firstChange] },
+        {
+          kind: 'merged',
+          conflictedPaths: [],
+          skippedLargeFiles: [],
+          changedFiles: [secondChange],
+        },
       ],
       pushOutcomes: [
         { pushed: false, nonFastForward: true, rejectionMessage: 'fetch first' },
@@ -755,11 +879,13 @@ describe('createBackupController', () => {
         {
           kind: 'merged',
           conflictedPaths: [],
+          skippedLargeFiles: [],
           changedFiles: [{ path: 'notes/from-remote-1.md', kind: 'upsert', modifiedMs: 123 }],
         },
         {
           kind: 'merged',
           conflictedPaths: [],
+          skippedLargeFiles: [],
           changedFiles: [{ path: 'notes/from-remote-2.md', kind: 'upsert', modifiedMs: 456 }],
         },
       ],
@@ -792,6 +918,7 @@ describe('createBackupController', () => {
       mergeOutcome: {
         kind: 'fastForward',
         conflictedPaths: [],
+        skippedLargeFiles: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
     })
@@ -823,6 +950,7 @@ describe('createBackupController', () => {
       mergeOutcome: {
         kind: 'fastForward',
         conflictedPaths: [],
+        skippedLargeFiles: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
     })
@@ -851,6 +979,7 @@ describe('createBackupController', () => {
         mergeOutcome: {
           kind: 'merged',
           conflictedPaths: [],
+          skippedLargeFiles: [],
           changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
         },
       })

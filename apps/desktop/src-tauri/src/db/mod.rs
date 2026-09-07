@@ -301,19 +301,51 @@ pub struct NoteMoveRequest {
     from_address: write::MovedNoteAddress,
 }
 
+/// Move a note and its index rows after waiting for checkout off the main thread.
 #[tauri::command]
-pub fn note_move_indexed<R: tauri::Runtime>(
+pub async fn note_move_indexed<R: tauri::Runtime>(
     request: NoteMoveRequest,
     generation: u64,
     app: tauri::AppHandle<R>,
-    graph: State<GraphState>,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
+    graph: State<'_, GraphState>,
 ) -> AppResult<()> {
+    let graph = graph.inner().clone();
+    crate::fs::mutation::run(graph.clone(), generation, move |_| {
+        // Acquire the worktree off-thread, then retain the existing short main-
+        // thread SQLite section: its iOS background assertion cannot expire
+        // until the native callback returns and releases the database lock.
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        let callback_app = app.clone();
+        app.run_on_main_thread(move || {
+            let outcome =
+                move_note_indexed_on_main_thread(&callback_app, &graph, generation, &request);
+            let _ = sender.send(outcome);
+        })
+        .map_err(|error| AppError::io(format!("could not schedule note move: {error}")))?;
+        receiver
+            .recv()
+            .map_err(|_| AppError::io("the application closed before the note move completed"))?
+    })
+    .await
+}
+
+/// Complete the indexed rename on the main thread while the worker owns the
+/// worktree scope. Recheck both graph and index after the queued callback runs.
+fn move_note_indexed_on_main_thread<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    graph: &GraphState,
+    generation: u64,
+    request: &NoteMoveRequest,
+) -> AppResult<()> {
+    let root = crate::fs::root_for_generation(graph, generation)?;
+    let background_tasks = app.state::<BackgroundTaskState>();
     let _background_task = background_task::scoped(&background_tasks, "Reflect note move");
-    let root = crate::fs::root_for_generation(&graph, generation)?;
+    let index = app.state::<IndexState>();
     {
         let mut state = lock_state(&index)?;
+        if state.root.as_deref() != Some(root.as_path()) {
+            return Err(AppError::io("the graph index changed before the note move"));
+        }
         let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
         move_rows(conn, &request.from, &request.to, &request.to_address)?;
         if let Err(err) = crate::fs::move_note_file(&root, &request.from, &request.to) {
@@ -329,9 +361,9 @@ pub fn note_move_indexed<R: tauri::Runtime>(
             return Err(err);
         }
     }
-    crate::fs::invalidate_file_catalog(&graph, &root);
-    emit_index_written(&app);
-    emit_note_moved(&app, &request.from, &request.to);
+    crate::fs::invalidate_file_catalog(graph, &root);
+    emit_index_written(app);
+    emit_note_moved(app, &request.from, &request.to);
     Ok(())
 }
 

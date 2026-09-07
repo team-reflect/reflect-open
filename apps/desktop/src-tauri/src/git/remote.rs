@@ -14,7 +14,8 @@ use serde::Serialize;
 
 use crate::error::{AppError, AppResult};
 
-use super::repo::{current_branch, open_existing};
+use super::repo::{current_branch, open_existing, signature};
+use super::runtime;
 
 /// Where the local branch stands relative to its last-fetched remote
 /// counterpart (no network — call after `fetch`).
@@ -173,9 +174,41 @@ fn count_commits(repo: &Repository, from: git2::Oid) -> AppResult<usize> {
 pub(super) fn clone(url: &str, target: &Path, token: Option<String>) -> AppResult<()> {
     let mut fetch_options = FetchOptions::new();
     fetch_options.remote_callbacks(callbacks_with_credentials(token));
-    git2::build::RepoBuilder::new()
+    let mut no_checkout = git2::build::CheckoutBuilder::new();
+    no_checkout.dry_run();
+    let repo = git2::build::RepoBuilder::new()
         .fetch_options(fetch_options)
+        .with_checkout(no_checkout)
         .clone(url, target)?;
+    let parent = match repo.head() {
+        Ok(head) => head.peel_to_commit()?,
+        Err(error) if error.code() == git2::ErrorCode::UnbornBranch => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    let tree = runtime::without_runtime(&repo, &parent.tree()?)?;
+    let mut checkout = git2::build::CheckoutBuilder::new();
+    checkout
+        .safe()
+        .recreate_missing(true)
+        .overwrite_ignored(false);
+    // No checkout has run, so excluding runtime here prevents even a transient
+    // copy of another device's SQLite database or chat history on restore.
+    repo.checkout_tree(tree.as_object(), Some(&mut checkout))?;
+    let mut index = repo.index()?;
+    index.read_tree(&tree)?;
+    index.write()?;
+    if tree.id() != parent.tree_id() {
+        let signature = signature(&repo)?;
+        repo.commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            "Exclude device-local runtime data from backup",
+            &tree,
+            &[&parent],
+        )?;
+    }
+    runtime::exclude_from_index(&repo)?;
     Ok(())
 }
 

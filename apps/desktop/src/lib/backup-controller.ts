@@ -25,7 +25,7 @@ import {
   type SyncStatus,
   type Unlisten,
 } from '@reflect/core'
-import { setBackupFlusher } from '@/lib/backup-flush'
+import { registerBackupFlusher } from '@/lib/backup-flush'
 import { invalidateGithubAuth } from '@/lib/github-auth-state'
 import { startOperation } from '@/lib/operations'
 import { isNativeShell } from '@/lib/platform'
@@ -135,11 +135,16 @@ export function createBackupController(options: BackupControllerOptions): Backup
   let disposed = false
   let engine: SyncEngine | null = null
   let unlisten: Unlisten | null = null
+  let releaseBackupFlusher: (() => void) | null = null
   const domDisposers: Array<() => void> = []
   /** Serializes direct index writes without delaying synchronous file-change fanout. */
   let remoteIndexTail: Promise<void> = Promise.resolve()
-  /** Invalidates index work that was queued before a controller teardown/restart. */
+  /** Invalidates pending startup and index work after a teardown/restart. */
   let remoteIndexEpoch = 0
+
+  function isCurrent(epoch: number): boolean {
+    return !disposed && epoch === remoteIndexEpoch
+  }
 
   function setState(next: BackupState): void {
     if (disposed) {
@@ -161,7 +166,8 @@ export function createBackupController(options: BackupControllerOptions): Backup
     for (const dispose of domDisposers.splice(0)) {
       dispose()
     }
-    setBackupFlusher(null)
+    releaseBackupFlusher?.()
+    releaseBackupFlusher = null
   }
 
   function onRemoteChanges(changes: ChangedFile[]): void | Promise<void> {
@@ -214,7 +220,11 @@ export function createBackupController(options: BackupControllerOptions): Backup
    * quit-time flusher. Returns false when teardown or a restart won the race
    * against the subscribe — the engine is already stopped in that case.
    */
-  async function adoptEngine(next: SyncEngine): Promise<boolean> {
+  async function adoptEngine(next: SyncEngine, epoch: number): Promise<boolean> {
+    if (!isCurrent(epoch)) {
+      next.stop()
+      return false
+    }
     engine = next
     // Spooled capture envelopes (`.reflect/inbox/`) are git-ignored and
     // drained within seconds — they must not tick the commit debounce. The
@@ -224,14 +234,14 @@ export function createBackupController(options: BackupControllerOptions): Backup
         next.noteChanged()
       }
     })
-    if (disposed || engine !== next) {
+    if (!isCurrent(epoch) || engine !== next) {
       subscription()
       next.stop()
       return false
     }
     unlisten = subscription
     // Quit-time commit (local only — never a network push on the way out).
-    setBackupFlusher(async () => {
+    releaseBackupFlusher = registerBackupFlusher(async () => {
       await gitCommitAll('Update notes', generation)
     })
     return true
@@ -258,15 +268,18 @@ export function createBackupController(options: BackupControllerOptions): Backup
    * instruction for fixing that remote, and losing it to a watcher that
    * happened not to come up would be the worse trade.
    */
-  async function startLocalHistory(initialized: boolean): Promise<void> {
+  async function startLocalHistory(initialized: boolean, epoch: number): Promise<void> {
     // Real git on a real folder — a shell capability the browser-dev bridge
     // honestly lacks, so don't start (and noisily fail) the commit loop there.
-    if (isMobileSurface() || !isNativeShell()) {
+    if (!isCurrent(epoch) || isMobileSurface() || !isNativeShell()) {
       return
     }
     try {
       if (!initialized) {
         await gitSetup(null, null, generation)
+      }
+      if (!isCurrent(epoch)) {
+        return
       }
       const next = createSyncEngine({
         generation,
@@ -280,11 +293,14 @@ export function createBackupController(options: BackupControllerOptions): Backup
           }
         },
       })
-      if (!(await adoptEngine(next))) {
+      if (!(await adoptEngine(next, epoch)) || !isCurrent(epoch)) {
         return
       }
       void next.syncNow() // first snapshot: commit whatever is already pending
     } catch (error) {
+      if (!isCurrent(epoch)) {
+        return
+      }
       // `adoptEngine` assigns the engine before its first await, so a
       // half-built lifecycle takes the same teardown as every other failure.
       // No zombie engine keeps timers alive behind the caller's state.
@@ -295,6 +311,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
 
   async function start(): Promise<void> {
     teardown()
+    const epoch = remoteIndexEpoch
     if (disposed) {
       return
     }
@@ -311,12 +328,12 @@ export function createBackupController(options: BackupControllerOptions): Backup
           return null
         }),
       ])
-      if (disposed) {
+      if (!isCurrent(epoch)) {
         return
       }
       if (!status.initialized || status.remoteUrl === null) {
         setState({ phase: 'disconnected' })
-        await startLocalHistory(status.initialized)
+        await startLocalHistory(status.initialized, epoch)
         return
       }
       const remoteUrl = status.remoteUrl
@@ -326,7 +343,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
         // Generic remotes adopt without it — their credentials live with the
         // user's own git tooling (ssh agent), not in our keychain.
         setState({ phase: 'disconnected' })
-        await startLocalHistory(status.initialized)
+        await startLocalHistory(status.initialized, epoch)
         return
       }
       if (repo === null && /^https?:\/\//i.test(remoteUrl)) {
@@ -346,7 +363,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
               'HTTPS isn’t supported for this host yet — switch the remote to its SSH form: git remote set-url origin git@<host>:<owner>/<repo>.git',
           },
         })
-        await startLocalHistory(status.initialized)
+        await startLocalHistory(status.initialized, epoch)
         return
       }
       const next = createSyncEngine({
@@ -372,7 +389,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
         onRemoteChanges,
       })
       setState({ phase: 'connected', remoteUrl, repo, status: { state: 'idle' } })
-      if (!(await adoptEngine(next))) {
+      if (!(await adoptEngine(next, epoch)) || !isCurrent(epoch)) {
         return
       }
 
@@ -407,6 +424,9 @@ export function createBackupController(options: BackupControllerOptions): Backup
 
       void next.syncNow() // launch pull: pick up other devices' changes
     } catch (error) {
+      if (!isCurrent(epoch)) {
+        return
+      }
       // Any partially-built lifecycle is torn down whole — no zombie engine
       // keeps timers or git work running behind a disconnected UI.
       teardown()
@@ -426,8 +446,24 @@ export function createBackupController(options: BackupControllerOptions): Backup
   }
 
   async function connectRemote(remoteUrl: string, branch: string): Promise<void> {
-    await gitSetup(remoteUrl, branch, generation)
-    await start()
+    await updateConnection(() => gitSetup(remoteUrl, branch, generation))
+  }
+
+  async function updateConnection(update: () => Promise<unknown>): Promise<void> {
+    if (disposed) {
+      return
+    }
+    // Stop before the first await: an in-flight fetch can otherwise finish
+    // and push using the old credential or a newly reassigned origin.
+    teardown()
+    const epoch = remoteIndexEpoch
+    try {
+      await update()
+    } finally {
+      if (isCurrent(epoch)) {
+        await start()
+      }
+    }
   }
 
   return {
@@ -469,13 +505,13 @@ export function createBackupController(options: BackupControllerOptions): Backup
       return 'connected'
     },
     disconnectGraph: async () => {
-      await gitDisconnect(generation)
-      await start()
+      await updateConnection(() => gitDisconnect(generation))
     },
     signOut: async () => {
-      await clearGithubAuth()
-      invalidateGithubAuth()
-      await start()
+      await updateConnection(async () => {
+        await clearGithubAuth()
+        invalidateGithubAuth()
+      })
     },
     backUpNow: async () => {
       await engine?.syncNow()

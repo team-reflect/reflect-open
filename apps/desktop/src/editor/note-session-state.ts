@@ -49,6 +49,8 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   /** Serializes writes so a flush can't interleave with a debounced save. */
   let saveChain: Promise<void> = Promise.resolve()
+  /** Invalidates external reads captured before a local save finished. */
+  let writeRevision = 0
   /** Settles when the current initial load has committed its state. */
   let loadPromise: Promise<void> = Promise.resolve()
   /**
@@ -127,6 +129,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         inFlightWrite = content
         try {
           await write(path, content)
+          writeRevision += 1
           disk = content
           dirty = header + buffer !== content
           missing = false // the landed write created the file if it was missing
@@ -240,6 +243,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
    * external-change path).
    */
   async function reconcileFromDisk(): Promise<void> {
+    const readRevision = writeRevision
     let content: string
     try {
       content = await io.read(path)
@@ -247,6 +251,13 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       return // deleted/unreadable between event and read; nothing to reconcile
     }
     if (disposed) {
+      return
+    }
+    if (readRevision !== writeRevision) {
+      // A save queued behind Git checkout may finish before the checkout's
+      // read response arrives. Re-read instead of accepting those older bytes
+      // into an editor that the save has just marked clean.
+      await reconcileFromDisk()
       return
     }
     if (content === disk || content === inFlightWrite) {
@@ -404,6 +415,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     const patched = upsertFrontmatter(conflict, frontmatterPatchToYaml(patch))
     if (patched !== conflict) {
       await io.write(path, patched)
+      writeRevision += 1
       conflict = patched
       disk = patched
       emit()

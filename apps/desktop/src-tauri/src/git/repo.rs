@@ -45,6 +45,11 @@ pub(super) fn ensure_clean_state(repo: &Repository) -> AppResult<()> {
             repo.state()
         )));
     }
+    if repo.index()?.has_conflicts() {
+        return Err(AppError::io(
+            "the backup repository has unresolved index conflicts; finish or abort them with git first",
+        ));
+    }
     Ok(())
 }
 

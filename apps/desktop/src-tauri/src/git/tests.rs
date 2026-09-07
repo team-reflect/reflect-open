@@ -740,7 +740,7 @@ fn rename_rename_conflict_keeps_both_names_and_confirms_the_removal() {
 
 #[cfg(unix)]
 #[test]
-fn failed_merge_completion_still_clears_the_merge_state() {
+fn failed_checkout_leaves_no_merge_state_and_recovers_after_repair() {
     use std::os::unix::fs::PermissionsExt;
 
     let fixture = fixture();
@@ -758,8 +758,8 @@ fn failed_merge_completion_still_clears_the_merge_state() {
     commit_all(root_a, "a delete", MAX_FILE_BYTES).unwrap();
     fetch(root_a, None).unwrap();
 
-    // Make restoring the surviving edit fail mid-completion: the notes
-    // directory refuses new files, so write_blob cannot recreate keep.md.
+    // Make checkout of the surviving edit fail: the notes directory refuses
+    // new files, so checkout cannot recreate keep.md.
     let notes_dir = root_a.join("notes");
     fs::set_permissions(&notes_dir, fs::Permissions::from_mode(0o555)).unwrap();
     let result = merge_remote(root_a);
@@ -948,4 +948,116 @@ fn diverging_renames_keep_both_files_and_never_wedge() {
     assert!(read(root_a, "notes/title-a.md").contains("Title A"));
     assert!(read(root_a, "notes/title-b.md").contains("Title B"));
     assert!(push(root_a, None).unwrap().pushed);
+}
+
+fn graph_state(root: &Path) -> crate::fs::GraphState {
+    let graph = crate::fs::GraphState::default();
+    {
+        let mut inner = graph.0.lock().unwrap();
+        inner.generation = 1;
+        inner.root = Some(root.to_path_buf());
+    }
+    graph
+}
+
+#[test]
+fn sync_snapshots_note_saved_during_fetch_before_merging() {
+    let fixture = fixture();
+    write(&fixture.graph_a, "notes/race.md", "base\n");
+    commit_all(&fixture.graph_a, "initial", MAX_FILE_BYTES).unwrap();
+    push(&fixture.graph_a, None).unwrap();
+    let local = second_device(&fixture);
+    let graph = graph_state(&local);
+    write(&fixture.graph_a, "notes/race.md", "remote revision\n");
+    commit_all(&fixture.graph_a, "remote", MAX_FILE_BYTES).unwrap();
+    push(&fixture.graph_a, None).unwrap();
+    commit_all(&local, "before fetch", MAX_FILE_BYTES).unwrap();
+
+    // A save is permitted while fetch owns the repository, but no worktree lock.
+    crate::fs::mutation::with_repository(&local, || {
+        crate::fs::mutation::with_generation(&graph, 1, |root| {
+            crate::fs::atomic_write_bytes(
+                root,
+                &root.join("notes/race.md"),
+                b"local edit saved during fetch\n",
+            )?;
+            Ok(())
+        })?;
+        fetch(&local, None)
+    })
+    .unwrap();
+    let outcome = tauri::async_runtime::block_on(super::run_git(graph, 1, |_, state| {
+        crate::fs::mutation::with_generation(state, 1, super::commit_and_merge)
+    }))
+    .unwrap();
+    assert!(matches!(outcome.kind, MergeKind::MergedWithConflicts));
+    let content = read(&local, "notes/race.md");
+    assert!(content.contains("local edit saved during fetch"));
+    assert!(content.contains("remote revision"));
+    let repo = Repository::open(&local).unwrap();
+    let merged = repo.head().unwrap().peel_to_commit().unwrap();
+    assert_eq!(merged.parent_count(), 2);
+}
+
+#[test]
+fn save_queued_during_checkout_lands_after_the_remote_revision_is_committed() {
+    use std::sync::mpsc;
+    use std::thread;
+    use std::time::Duration;
+
+    let fixture = fixture();
+    write(&fixture.graph_a, "notes/race.md", "base\n");
+    commit_all(&fixture.graph_a, "initial", MAX_FILE_BYTES).unwrap();
+    push(&fixture.graph_a, None).unwrap();
+    let local = second_device(&fixture);
+    let graph = graph_state(&local);
+    write(&fixture.graph_a, "notes/race.md", "remote revision\n");
+    commit_all(&fixture.graph_a, "remote", MAX_FILE_BYTES).unwrap();
+    push(&fixture.graph_a, None).unwrap();
+    fetch(&local, None).unwrap();
+
+    let (attempting_tx, attempting_rx) = mpsc::channel();
+    let (saved_tx, saved_rx) = mpsc::channel();
+    let writer_graph = graph.clone();
+    let writer = crate::fs::mutation::with_generation(&graph, 1, |root| {
+        // Pause at the commit/checkout boundary with the production scope held.
+        commit_all(root, "before checkout", MAX_FILE_BYTES)?;
+        let writer = thread::spawn(move || {
+            attempting_tx.send(()).unwrap();
+            crate::fs::mutation::with_generation(&writer_graph, 1, |root| {
+                crate::fs::atomic_write_bytes(
+                    root,
+                    &root.join("notes/race.md"),
+                    b"save queued during checkout\n",
+                )?;
+                saved_tx.send(()).unwrap();
+                Ok(())
+            })
+        });
+        attempting_rx.recv().unwrap();
+        assert!(saved_rx.recv_timeout(Duration::from_millis(100)).is_err());
+        let outcome = merge_remote(root)?;
+        assert!(matches!(outcome.kind, MergeKind::FastForward));
+        assert_eq!(read(root, "notes/race.md"), "remote revision\n");
+        Ok(writer)
+    })
+    .unwrap();
+    writer.join().unwrap().unwrap();
+    saved_rx.recv().unwrap();
+    assert_eq!(
+        read(&local, "notes/race.md"),
+        "save queued during checkout\n"
+    );
+    let repo = Repository::open(&local).unwrap();
+    let tree = repo.head().unwrap().peel_to_tree().unwrap();
+    let entry = tree.get_path(Path::new("notes/race.md")).unwrap();
+    assert_eq!(
+        repo.find_blob(entry.id()).unwrap().content(),
+        b"remote revision\n"
+    );
+    assert!(
+        commit_all(&local, "save after checkout", MAX_FILE_BYTES)
+            .unwrap()
+            .committed
+    );
 }
