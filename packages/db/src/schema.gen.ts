@@ -114,11 +114,6 @@ export interface Notes {
   updatedAt: Generated<number>;
 }
 
-export interface NoteText {
-  notePath: string;
-  text: string;
-}
-
 export interface SearchFts {
   body: string | null;
   path: string | null;
@@ -154,7 +149,6 @@ export interface DB {
   noteEmails: NoteEmails;
   noteKeys: NoteKeys;
   notes: Notes;
-  noteText: NoteText;
   searchFts: SearchFts;
   tags: Tags;
   tasks: Tasks;
