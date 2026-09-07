@@ -1,5 +1,5 @@
 import { loadAiModule } from './load-ai-module'
-import type { UserContent } from 'ai'
+import type { UserContent } from '@reflect/dynamic-modules/ai'
 import { ReflectError } from '../errors'
 import type { AiProviderConfig } from '../settings/schema'
 import { languageModel } from './language-model'
@@ -60,7 +60,7 @@ export function isAssetDescriptionRejected(value: unknown): value is AssetDescri
 
 function classify(
   cause: unknown,
-  sdk: Pick<typeof import('../chunks/ai-chunk'), 'APICallError'>,
+  sdk: Pick<typeof import('@reflect/dynamic-modules/ai'), 'APICallError'>,
 ): Error {
   if (sdk.APICallError.isInstance(cause)) {
     const status = cause.statusCode ?? 0
@@ -110,7 +110,7 @@ function describePrompt(kind: AssetKind, filename: string): string {
  * (`maxRetries: 0`).
  */
 export async function describeAsset(request: DescribeAssetRequest): Promise<string> {
-  const sdk = await loadAiModule(() => import('../chunks/ai-chunk'))
+  const sdk = await loadAiModule(() => import('@reflect/dynamic-modules/ai'))
   const content: UserContent = [
     { type: 'text', text: describePrompt(request.kind, request.filename) },
   ]

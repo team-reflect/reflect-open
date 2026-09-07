@@ -1,4 +1,4 @@
-import type { Tool, TypedToolCall, TypedToolResult } from 'ai'
+import type { Tool, TypedToolCall, TypedToolResult } from '@reflect/dynamic-modules/ai'
 import { z } from 'zod'
 import { readNote } from '../../graph/commands'
 import { retrieve, type RetrievalHit, type RetrieveOptions } from '../../embeddings/retrieve'

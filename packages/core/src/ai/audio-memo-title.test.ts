@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MockLanguageModelV3 } from 'ai/test'
+import { MockLanguageModelV3 } from '@reflect/dynamic-modules/ai/test'
 import type { LanguageModelV3Usage } from '@ai-sdk/provider'
 import type { AiProviderConfig } from '../settings/schema'
 import { generateAudioMemoTitle, pickAudioMemoEnrichmentConfig } from './audio-memo-title'

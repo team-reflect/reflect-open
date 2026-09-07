@@ -1,0 +1,25 @@
+{
+  "name": "@reflect/dynamic-modules",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./ai": "./src/ai.ts",
+    "./ai/test": "./src/ai/test.ts",
+    "./ai-sdk/anthropic": "./src/ai-sdk/anthropic.ts",
+    "./ai-sdk/google": "./src/ai-sdk/google.ts",
+    "./ai-sdk/openai": "./src/ai-sdk/openai.ts",
+    "./ai-sdk/openai-compatible": "./src/ai-sdk/openai-compatible.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.48",
+    "@ai-sdk/google": "^4.0.63",
+    "@ai-sdk/openai": "^4.0.57",
+    "@ai-sdk/openai-compatible": "^3.0.43",
+    "ai": "^7.0.93"
+  },
+  "devDependencies": {
+    "@ocavue/tsconfig": "^0.7.1",
+    "typescript": "~6.0.3"
+  }
+}

@@ -1,4 +1,4 @@
-import type { ModelMessage } from 'ai'
+import type { ModelMessage } from '@reflect/dynamic-modules/ai'
 
 /**
  * The moving context window: fit a conversation's model-facing history into

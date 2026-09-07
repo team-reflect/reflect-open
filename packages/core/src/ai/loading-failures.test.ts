@@ -4,10 +4,10 @@ import { describeAsset } from './describe-asset'
 import { describePage } from './describe-page'
 import { languageModel } from './language-model'
 
-vi.mock('ai', () => {
+vi.mock('@reflect/dynamic-modules/ai', () => {
   throw new Error('AI SDK chunk unavailable')
 })
-vi.mock('@ai-sdk/openai', () => {
+vi.mock('@reflect/dynamic-modules/ai-sdk/openai', () => {
   throw new Error('provider chunk unavailable')
 })
 

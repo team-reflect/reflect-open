@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ModelMessage } from 'ai'
+import type { ModelMessage } from '@reflect/dynamic-modules/ai'
 import { estimateTokens, fitToContextWindow } from './context-window'
 
 /**

@@ -124,7 +124,7 @@ export {
   fitToContextWindow,
   type ContextWindowOptions,
 } from '../ai/chat/context-window'
-export type { ModelMessage as ChatModelMessage } from 'ai'
+export type { ModelMessage as ChatModelMessage } from '@reflect/dynamic-modules/ai'
 export { base64ToBytes } from '../lib/base64'
 export { isTranscriptionRejected, TranscriptionRejectedError } from '../ai/transcribe-http'
 export { transcribeAudio, type TranscriptionRequest } from '../ai/transcribe'

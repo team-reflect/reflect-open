@@ -1,5 +1,5 @@
 import { loadAiModule } from '../load-ai-module'
-import type { LanguageModel, ModelMessage } from 'ai'
+import type { LanguageModel, ModelMessage } from '@reflect/dynamic-modules/ai'
 import { errorMessage } from '../../errors'
 import { languageModel } from '../language-model'
 import { modelContextWindow } from '../provider-catalog'
@@ -155,7 +155,9 @@ export async function* streamChatTurn(
       : [...stepMessages, { role: 'assistant', content: pendingText }]
 
   try {
-    const { isStepCount, streamText } = await loadAiModule(() => import('../../chunks/ai-chunk'))
+    const { isStepCount, streamText } = await loadAiModule(
+      () => import('@reflect/dynamic-modules/ai'),
+    )
     options.signal?.throwIfAborted()
     const result = streamText({
       model,

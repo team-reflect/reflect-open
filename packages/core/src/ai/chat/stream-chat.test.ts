@@ -1,6 +1,6 @@
-import type { ModelMessage } from 'ai'
+import type { ModelMessage } from '@reflect/dynamic-modules/ai'
 import { describe, expect, it, vi } from 'vitest'
-import { convertArrayToReadableStream, MockLanguageModelV3 } from 'ai/test'
+import { convertArrayToReadableStream, MockLanguageModelV3 } from '@reflect/dynamic-modules/ai/test'
 import type {
   LanguageModelV3StreamPart,
   LanguageModelV3StreamResult,

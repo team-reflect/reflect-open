@@ -1,6 +1,6 @@
-import type { AnthropicProvider } from '@ai-sdk/anthropic'
-import type { GoogleProvider } from '@ai-sdk/google'
-import type { OpenAIProvider } from '@ai-sdk/openai'
+import type { AnthropicProvider } from '@reflect/dynamic-modules/ai-sdk/anthropic'
+import type { GoogleProvider } from '@reflect/dynamic-modules/ai-sdk/google'
+import type { OpenAIProvider } from '@reflect/dynamic-modules/ai-sdk/openai'
 import type { AiProviderId } from '../settings/schema'
 
 import { DEFAULT_OPENAI_COMPATIBLE_MODEL } from './openai-compatible'

@@ -1,4 +1,4 @@
-import { MockLanguageModelV3 } from 'ai/test'
+import { MockLanguageModelV3 } from '@reflect/dynamic-modules/ai/test'
 import { describe, expect, it, vi } from 'vitest'
 import { cloudSafeSelection } from '../privacy/checkers'
 import { languageModel } from './language-model'

@@ -271,30 +271,18 @@ importers:
 
   packages/core:
     dependencies:
-      '@ai-sdk/anthropic':
-        specifier: ^4.0.48
-        version: 4.0.48(zod@4.5.4)
-      '@ai-sdk/google':
-        specifier: ^4.0.63
-        version: 4.0.63(zod@4.5.4)
-      '@ai-sdk/openai':
-        specifier: ^4.0.57
-        version: 4.0.59(zod@4.5.4)
-      '@ai-sdk/openai-compatible':
-        specifier: ^3.0.43
-        version: 3.0.43(zod@4.5.4)
       '@meowdown/markdown':
         specifier: ^0.68.1
         version: 0.68.1
       '@reflect/db':
         specifier: workspace:*
         version: link:../db
+      '@reflect/dynamic-modules':
+        specifier: workspace:*
+        version: link:../dynamic-modules
       '@reflect/utils':
         specifier: workspace:*
         version: link:../utils
-      ai:
-        specifier: ^7.0.93
-        version: 7.0.93(zod@4.5.4)
       kysely:
         specifier: ^0.28.17
         version: 0.28.17
@@ -357,6 +345,31 @@ importers:
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2)
+
+  packages/dynamic-modules:
+    dependencies:
+      '@ai-sdk/anthropic':
+        specifier: ^4.0.48
+        version: 4.0.48(zod@4.5.4)
+      '@ai-sdk/google':
+        specifier: ^4.0.63
+        version: 4.0.63(zod@4.5.4)
+      '@ai-sdk/openai':
+        specifier: ^4.0.57
+        version: 4.0.59(zod@4.5.4)
+      '@ai-sdk/openai-compatible':
+        specifier: ^3.0.43
+        version: 3.0.43(zod@4.5.4)
+      ai:
+        specifier: ^7.0.93
+        version: 7.0.93(zod@4.5.4)
+    devDependencies:
+      '@ocavue/tsconfig':
+        specifier: ^0.7.1
+        version: 0.7.1
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
 
   packages/utils:
     devDependencies:

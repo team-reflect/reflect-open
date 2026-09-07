@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { ModelMessage } from 'ai'
+import type { ModelMessage } from '@reflect/dynamic-modules/ai'
 import { db } from '../../indexing/db'
 import { call } from '../../ipc/invoke'
 import type { AssistantPart, ChatTurn } from './transcript'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ToolExecutionOptions } from 'ai'
+import type { ToolExecutionOptions } from '@reflect/dynamic-modules/ai'
 import type { RetrievalHit, RetrieveOptions } from '../../embeddings/retrieve'
 import type { DailyNoteRow, DailyNotesRange } from '../../indexing/queries'
 import type { RecentNoteRow, RecentNotesOptions } from '../../indexing/note-list'
