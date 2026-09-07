@@ -206,7 +206,8 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
           ],
         )
       }
-      const searchBody = note.assetText === '' ? note.searchText : `${note.searchText}\n${note.assetText}`
+      const searchBody =
+        note.assetText === '' ? note.searchText : `${note.searchText}\n${note.assetText}`
       run(db, 'INSERT INTO search_fts(path, title, body) VALUES(?, ?, ?)', [
         note.path,
         note.title,
