@@ -319,10 +319,12 @@ export function MobileSettings(): ReactElement {
                 label="Plan"
                 value={
                   subscription.value === 'monthly'
-                    ? 'Reflect Pro Monthly'
+                    ? 'Monthly'
                     : subscription.value === 'yearly'
-                      ? 'Reflect Pro Yearly'
-                      : 'Free trial'
+                      ? 'Yearly'
+                      : subscription.isLoading
+                        ? 'Checking…'
+                        : 'Not subscribed'
                 }
               />
               {subscription.value === null ? (
@@ -331,7 +333,7 @@ export function MobileSettings(): ReactElement {
                 // It is what makes that work outside the App Store, where the
                 // gate otherwise never shows the paywall at all.
                 <SettingsActionRow
-                  label="Upgrade to Pro"
+                  label="Subscribe"
                   onPress={() => {
                     setPaywallRequested(true)
                   }}
