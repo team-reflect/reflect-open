@@ -88,7 +88,7 @@ export {
   type NoteMutationOutput,
   type PreparedChatNoteChange,
 } from '../ai/chat/note-mutations'
-export { DEFAULT_CHAT_PERMISSION_MODE, type ChatPermissionMode } from '../ai/chat/permissions'
+export type { ChatPermissionMode } from '../ai/chat/permissions'
 export {
   MAX_NOTE_CONTENT_CHARS,
   MAX_READ_NOTES,
