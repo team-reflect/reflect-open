@@ -65,8 +65,10 @@ describe('listNotes', () => {
     const [command, args] = mockInvoke.mock.calls[0]!
     expect(command).toBe('db_query')
     const sql = String(args['sql'])
-    // The snippet is the stored projection column, not a per-query derivation.
+    // The snippet is the stored projection column — no note_text join, no
+    // per-query derivation.
     expect(sql).toContain('"preview"')
+    expect(sql).not.toContain('note_text')
     // `kind = 'note'` excludes dailies (the stream is their home) and templates.
     expect(sql).toContain('"notes"."kind" = ?')
     // Pinned notes lead (explicit order first), then recency — V1's list

@@ -143,6 +143,7 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
           note.hasContent,
         ],
       )
+      run(db, 'INSERT INTO note_text(note_path, text) VALUES(?, ?)', [note.path, note.searchText])
       for (const link of note.links) {
         run(
           db,
@@ -261,6 +262,7 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
             )
           }
         }
+        run(db, 'UPDATE note_text SET note_path = ? WHERE note_path = ?', [to, from])
         run(db, 'UPDATE links SET source_path = ? WHERE source_path = ?', [to, from])
         run(db, 'UPDATE tags SET note_path = ? WHERE note_path = ?', [to, from])
         run(db, 'UPDATE aliases SET note_path = ? WHERE note_path = ?', [to, from])

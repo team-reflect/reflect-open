@@ -167,6 +167,8 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
         note.preview,
         i64::from(note.has_content),
     ])?;
+    conn.prepare_cached("INSERT INTO note_text(note_path, text) VALUES(?1, ?2)")?
+        .execute(params![note.path, note.search_text])?;
     {
         let mut stmt = conn.prepare_cached(
             "INSERT INTO links(source_path, kind, target_raw, target_key, target_path_key, alias, pos_from, pos_to)
@@ -324,6 +326,8 @@ pub(super) fn move_note(
         )?
         .execute(params![to, address.basename_key, claim_tier::BASENAME])?;
     }
+    conn.prepare_cached("UPDATE note_text SET note_path = ?2 WHERE note_path = ?1")?
+        .execute(params![from, to])?;
     conn.prepare_cached("UPDATE links SET source_path = ?2 WHERE source_path = ?1")?
         .execute(params![from, to])?;
     conn.prepare_cached("UPDATE tags SET note_path = ?2 WHERE note_path = ?1")?
