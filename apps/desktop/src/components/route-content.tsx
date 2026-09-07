@@ -1,14 +1,12 @@
 import type { ReactElement } from 'react'
-import { AllNotesScreen } from '@/components/all-notes/all-notes-screen'
-import { ChatScreen } from '@/components/chat/chat-screen'
+import { AllNotesScreenDynamic } from '@/components/all-notes/all-notes-screen-dynamic'
+import { ChatScreenDynamic } from '@/components/chat/chat-screen-dynamic'
 import { DailyStream } from '@/components/daily-stream'
 import { SearchRoute } from '@/components/search-route'
 import { SingleNoteView } from '@/components/single-note-view'
-import { SettingsNavigator } from '@/components/settings/settings-navigator'
-import { SettingsScreen } from '@/components/settings-screen'
-import { TasksScreen } from '@/components/tasks/tasks-screen'
+import { SettingsRouteDynamic } from '@/components/settings/settings-route-dynamic'
+import { TasksScreenDynamic } from '@/components/tasks/tasks-screen-dynamic'
 import { useRouter } from '@/routing/router'
-import { ScrollRestored } from '@/routing/scroll-restore'
 
 /**
  * The route → view mapping (Plan 06): the single place a {@link Route} kind
@@ -34,34 +32,21 @@ export function RouteContent(): ReactElement {
     case 'allNotes':
       // Owns its scroll container (virtualized table + fixed header), so no
       // ScrollRestored wrapper — same shape as the daily stream.
-      return <AllNotesScreen tag={route.tag} />
+      return <AllNotesScreenDynamic tag={route.tag} />
     case 'tasks':
       // Owns its scroll container (a grouped list with a fixed header), so no
       // ScrollRestored wrapper — same shape as All Notes.
-      return <TasksScreen />
+      return <TasksScreenDynamic />
     case 'search':
       return <SearchRoute query={route.query} />
     case 'chat':
       // Owns its scroll container (the message list pins to the bottom while
       // streaming), so no ScrollRestored wrapper — same shape as All Notes.
-      return <ChatScreen />
+      return <ChatScreenDynamic />
     case 'graphs':
     // The graph-switcher route is a mobile settings sub-screen; on desktop
     // graph switching lives in the sidebar footer, so it renders as settings.
     case 'settings':
-      // The section navigator floats in the left gutter — absolutely
-      // positioned off the centered column so the column never shifts — and
-      // only renders when the container query says the gutter can fit it:
-      // the 42rem column plus a 12rem rail either side, with a little slack.
-      return (
-        <ScrollRestored className="@container h-full overflow-auto px-6 py-8">
-          <div className="relative mx-auto w-full max-w-2xl">
-            <div className="absolute inset-y-0 right-full hidden w-48 pr-8 @min-[68rem]:block">
-              <SettingsNavigator className="sticky top-8" />
-            </div>
-            <SettingsScreen />
-          </div>
-        </ScrollRestored>
-      )
+      return <SettingsRouteDynamic />
   }
 }

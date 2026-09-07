@@ -1,12 +1,12 @@
 import type { ReactElement } from 'react'
 import { useToday } from '@/lib/use-today'
-import { MobileAllNotes } from '@/mobile/screens/all-notes'
-import { MobileChat } from '@/mobile/screens/chat'
+import { MobileAllNotesDynamic } from '@/mobile/screens/all-notes-dynamic'
+import { MobileChatDynamic } from '@/mobile/screens/chat-dynamic'
 import { MobileDaily } from '@/mobile/screens/daily'
-import { MobileGraphs } from '@/mobile/screens/graphs'
+import { MobileGraphsDynamic } from '@/mobile/screens/graphs-dynamic'
 import { MobileNote } from '@/mobile/screens/note'
-import { MobileSettings } from '@/mobile/screens/settings'
-import { MobileTasks } from '@/mobile/screens/tasks'
+import { MobileSettingsDynamic } from '@/mobile/screens/settings-dynamic'
+import { MobileTasksDynamic } from '@/mobile/screens/tasks-dynamic'
 import type { AllNotesFilters } from '@/mobile/search-filters/filter-state'
 import type { Route } from '@/routing/route'
 
@@ -51,7 +51,7 @@ export function MobileScreen({
       return <MobileNote key={route.path} path={route.path} />
     case 'allNotes':
       return (
-        <MobileAllNotes
+        <MobileAllNotesDynamic
           query={allQuery}
           onQueryChange={onAllQueryChange}
           tag={route.tag}
@@ -64,7 +64,7 @@ export function MobileScreen({
       // history shapes with desktop) renders as the All tab; the shell seeds
       // the live query from the entry.
       return (
-        <MobileAllNotes
+        <MobileAllNotesDynamic
           query={allQuery}
           onQueryChange={onAllQueryChange}
           tag={null}
@@ -73,13 +73,13 @@ export function MobileScreen({
         />
       )
     case 'tasks':
-      return <MobileTasks key="tasks" />
+      return <MobileTasksDynamic key="tasks" />
     case 'chat':
-      return <MobileChat key="chat" />
+      return <MobileChatDynamic key="chat" />
     case 'settings':
-      return <MobileSettings key="settings" />
+      return <MobileSettingsDynamic key="settings" />
     case 'graphs':
-      return <MobileGraphs key="graphs" />
+      return <MobileGraphsDynamic key="graphs" />
     default:
       return <MobileDaily key="daily" date={today} />
   }
