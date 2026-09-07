@@ -92,77 +92,34 @@ jobs:
           REFLECT_TEST_BROWSER: ${{ matrix.config.browser }}
 
   rust:
-    name: fmt · clippy · test (Rust)
+    name: fmt · clippy (Rust)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      # Tauri v2 build dependencies (the crate links the WebView + GTK stack).
-      - name: Install Tauri system dependencies
-        run: |
-          PACKAGES="\
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libxdo-dev \
-            libssl-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            patchelf"
-          echo "Installing Tauri system dependencies..."
-          if sudo apt-get install -y $PACKAGES; then
-            echo "Tauri system dependencies installed successfully without apt-get update."
-          else
-            echo "Initial installation failed. Running apt-get update and retrying..."
-            sudo apt-get update
-            sudo apt-get install -y $PACKAGES
-          fi
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+      - name: Set up the Rust workspace
+        uses: ./.github/actions/setup-rust
         with:
           components: rustfmt, clippy
-
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          # A failed clippy/test run still compiled the dependency tree; save it
-          # so the next push doesn't pay the cold-build cost again.
-          cache-on-failure: true
-
-      # ort-sys (fastembed → ort) downloads prebuilt ONNX Runtime binaries at
-      # build time and extracts them to ~/.cache/ort.pyke.io — outside target/,
-      # so rust-cache never captures them and every run re-downloads. The build
-      # script skips the download when the extracted dir is already present.
-      # Entries are content-addressed (dfbin/<target>/<hash>), so restoring a
-      # stale cache after an ort upgrade is safe — it just downloads anew.
-      - name: Cache ONNX Runtime binaries
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ort.pyke.io
-          key: ort-bin-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            ort-bin-${{ runner.os }}-
-
-      # Without this, actions/cache warns at save time on builds that never
-      # trigger the ort download (the path wouldn't exist).
-      - name: Ensure ort cache dir exists
-        run: mkdir -p ~/.cache/ort.pyke.io
-
-      # tauri-build requires the sidecar to exist before the desktop crate's
-      # build script runs (clippy/test compile it), so stage the CLI first.
-      - name: Stage the reflect CLI sidecar
-        run: node apps/desktop/scripts/build-sidecar.mjs
 
       - name: Format check
         run: cargo fmt --all -- --check
 
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
+
+  rust-test:
+    name: test (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up the Rust workspace
+        uses: ./.github/actions/setup-rust
 
       - name: Test
         run: cargo test --workspace
@@ -204,7 +161,7 @@ jobs:
     timeout-minutes: 10
 
     if: always()
-    needs: [node, test, rust, apple-rust]
+    needs: [node, test, rust, rust-test, apple-rust]
 
     steps:
       - name: Verify that all jobs succeeded

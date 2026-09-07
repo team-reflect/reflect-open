@@ -1,0 +1,73 @@
+name: Set up the Rust workspace
+description: Installs the Tauri system dependencies, the Rust toolchain, the cargo and ONNX Runtime caches, and stages the CLI sidecar. Linux runners only.
+
+inputs:
+  components:
+    description: Comma-separated rustup components to install alongside the toolchain.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    # Tauri v2 build dependencies (the crate links the WebView + GTK stack).
+    - name: Install Tauri system dependencies
+      shell: bash
+      run: |
+        PACKAGES="\
+          libwebkit2gtk-4.1-dev \
+          libayatana-appindicator3-dev \
+          librsvg2-dev \
+          libxdo-dev \
+          libssl-dev \
+          build-essential \
+          curl \
+          wget \
+          file \
+          patchelf"
+        echo "Installing Tauri system dependencies..."
+        if sudo apt-get install -y $PACKAGES; then
+          echo "Tauri system dependencies installed successfully without apt-get update."
+        else
+          echo "Initial installation failed. Running apt-get update and retrying..."
+          sudo apt-get update
+          sudo apt-get install -y $PACKAGES
+        fi
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+      with:
+        components: ${{ inputs.components }}
+
+    - name: Cache cargo build
+      uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      with:
+        # A failed clippy/test run still compiled the dependency tree; save it
+        # so the next push doesn't pay the cold-build cost again.
+        cache-on-failure: true
+
+    # ort-sys (fastembed → ort) downloads prebuilt ONNX Runtime binaries at
+    # build time and extracts them to ~/.cache/ort.pyke.io — outside target/,
+    # so rust-cache never captures them and every run re-downloads. The build
+    # script skips the download when the extracted dir is already present.
+    # Entries are content-addressed (dfbin/<target>/<hash>), so restoring a
+    # stale cache after an ort upgrade is safe — it just downloads anew.
+    - name: Cache ONNX Runtime binaries
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ort.pyke.io
+        key: ort-bin-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+        restore-keys: |
+          ort-bin-${{ runner.os }}-
+
+    # Without this, actions/cache warns at save time on builds that never
+    # trigger the ort download (the path wouldn't exist).
+    - name: Ensure ort cache dir exists
+      shell: bash
+      run: mkdir -p ~/.cache/ort.pyke.io
+
+    # tauri-build requires the sidecar to exist before the desktop crate's
+    # build script runs (clippy/test compile it), so stage the CLI first.
+    - name: Stage the reflect CLI sidecar
+      shell: bash
+      run: node apps/desktop/scripts/build-sidecar.mjs
