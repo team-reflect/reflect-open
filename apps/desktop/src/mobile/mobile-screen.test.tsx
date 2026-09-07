@@ -417,7 +417,7 @@ describe('MobileShell', () => {
     await user.click(view.getByRole('button', { name: monthLabel(pickedMonth) }))
 
     expect(view.getByTestId('drawer').query()).toBeNull()
-    expect(shownMonth(view)).toBe(monthLabel(pickedMonth))
+    await waitFor(() => expect(shownMonth(view)).toBe(monthLabel(pickedMonth)))
     const firstDay = `${pickedMonth}-01`
     expect(
       view
@@ -437,12 +437,14 @@ describe('MobileShell', () => {
     await user.click(view.getByRole('button', { name: monthLabel(monthOf(today)) }))
 
     expect(view.getByTestId('drawer').query()).toBeNull()
-    expect(
-      view
-        .getByRole('button', { name: dayCellLabel(today) })
-        .element()
-        .getAttribute('aria-current'),
-    ).toBe('date')
+    await waitFor(() =>
+      expect(
+        view
+          .getByRole('button', { name: dayCellLabel(today) })
+          .element()
+          .getAttribute('aria-current'),
+      ).toBe('date'),
+    )
     expect(view.getByRole('button', { name: 'Today' }).query()).toBeNull()
   })
 
