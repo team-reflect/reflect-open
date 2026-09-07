@@ -1,8 +1,8 @@
 # Incremental search maintenance
 
-The September 4, 2026 audit found two independent sources of unnecessary work:
-FTS mutations selected an `UNINDEXED` path, and semantic backfill still read,
-parsed, queried and applied every note even when no inference was needed.
+Two independent sources of unnecessary work on large graphs: FTS mutations
+selected an `UNINDEXED` path, and semantic backfill still read, parsed, queried
+and applied every note even when no inference was needed.
 
 ## FTS identity
 
@@ -12,30 +12,26 @@ The optional user-authored `notes.id` is independent. Existing FTS rows, ranking
 snippets and durable chat history survive migration. Rebuild clears the mapping
 through its note foreign key and reconstructs it alongside FTS.
 
-Synthetic in-memory SQLite 3.53.4 measurements on macOS arm64, including the new
-mapping's maintenance:
+`EXPLAIN QUERY PLAN` shows the difference: `DELETE FROM search_fts WHERE path = ?`
+plans as `INDEX 0:` (no usable constraint, a full scan) while the rowid form
+plans as `INDEX 0:=`. Replacing every FTS row of an already populated
+in-memory index (debug build, macOS arm64, SQLite 3.53.4, short synthetic
+bodies), by path versus by rowid:
 
-| Operation | Previous path scan | Indexed mapping |
-| --- | ---: | ---: |
-| Populate 2,000 notes | 0.2026 s | 0.0273 s |
-| Populate 10,000 notes | 4.8805 s | 0.1502 s |
-| Replace 10,000 notes | 10.1995 s | 0.1760 s |
-| Remove the last of 50,000 notes (median) | 4.3785 ms | 0.0105 ms |
+| Notes | Delete by path | Delete by rowid |
+| ---: | ---: | ---: |
+| 2,000 | 1.06 s | 0.03 s |
+| 10,000 | 24.8 s | 0.14 s |
 
-An existing-note removal used 11,111 / 110,111 / 550,111 SQLite VM instructions
-at 1k / 10k / 50k notes before the change. The mapping path used 157 at each size;
-a missing-note removal used 20. These counts isolate the removed scan, rather
-than depending solely on timing.
-
-Reproduce from the repository root:
+Reproduce with the ignored Rust benchmark:
 
 ```sh
-python3 docs/performance/fts-benchmark.py "$PWD"
+pnpm --filter @reflect/desktop sidecar
+cargo test -p reflect-open benchmark_fts_replacement_by_path_versus_rowid -- --ignored --nocapture
 ```
 
-The SQL harness uses short synthetic bodies and the production mapping migration.
-It excludes other note projection tables, native invocation, disk I/O and UI work.
-Its timings are not application startup or save-latency predictions.
+It measures only the FTS delete and insert, not the other projection tables,
+IPC or UI work, so it is not a startup or save-latency prediction.
 
 ## Embedding checkpoints
 
@@ -63,17 +59,21 @@ content and raced changes remain eligible for a later pass. A graph's first pass
 after upgrading establishes checkpoints using retained vectors; later clean
 passes avoid per-note processing.
 
-The live queue coalesces repeated paths, runs during bulk candidate discovery,
-and drains between bulk notes. Native note
+Discovery runs once the index reconcile has finished and again after every
+later reconcile, so notes a reconcile wrote are already candidates; bulk index
+passes do not broadcast the index-applied signal (its other subscriber, the
+asset-description controller, must only see watcher batches). The live queue
+coalesces repeated paths, runs during bulk candidate discovery, and drains
+between bulk notes. Native note
 deletion already removes chunks and checkpoints atomically, so a delayed frontend
 remove cannot wipe a newly recreated note. Rename preserves vectors, with path
 semantics rechecked before recording a new checkpoint. Migration 0025 records
 `notes.projection_path`: a moved row keeps its old projection path until normal
 indexing reparses its relative references, even if the bytes and mtime match.
 This marker survives an interrupted pass and is checked by both watcher work and
-reconciliation. The migration reprojects all existing local notes once to repair
-references left stale or unresolved by older renames; evicted notes retain their vectors
-and wait for local content instead of being downloaded for this repair. Rebuild clears derived
+reconciliation. The migration stamps existing rows as projected at their current
+path; the projection version bump that shipped before it already rebuilt every
+row, so upgrading does not reproject the graph. Rebuild clears derived
 checkpoints and vectors while retaining chat history.
 
 This does not change provider routing: embedding inference remains local, and
@@ -84,15 +84,14 @@ battery measurements were made.
 
 ## Embedding measurements
 
-The actual TypeScript pipeline was measured with 10,000 synthetic 1,136-byte
-notes and instant mocked native IPC. The audit baseline took 10.07 seconds and
-made 10,000 reads, 10,001 queries, 10,000 applies and zero inference calls.
-After this change, a clean graph made one candidate-selection call and zero
-prepares, note reads, chunk queries, applies or inference calls. With ten dirty
-notes among 10,000, it made ten prepares, reads, chunk queries and applies,
-without new inference because the chunk hashes still matched. TS-only times
-ranged from 0.14–0.29 ms clean and 8.88–19.22 ms for ten dirty notes; these exclude native candidate
-selection and must not be interpreted as full backfill time.
+The TypeScript pipeline was measured with 10,000 synthetic 1,136-byte notes
+and instant mocked native IPC. Before this change a clean graph made 10,000
+reads, 10,001 queries, 10,000 applies and zero inference calls. After it, a
+clean graph makes one candidate-selection call and zero prepares, note reads,
+chunk queries, applies or inference calls; ten dirty notes among 10,000 make
+ten prepares, reads, chunk queries and applies, without new inference because
+the chunk hashes still match. `pipeline.work-count.test.ts` asserts these
+counts on every CI run.
 
 A separate native debug-build benchmark includes the real SQLite discovery
 query and input hashing. With no asset references, it took 6.84 ms for 1,000
@@ -101,7 +100,7 @@ clean notes and 63.71 ms for 10,000; one dirty note returned one candidate at
 are independent observations, not an end-to-end measurement.
 
 ```sh
-pnpm test --run packages/core/src/embeddings/pipeline.benchmark.test.ts
+pnpm test --run packages/core/src/embeddings/pipeline.work-count.test.ts
 pnpm --filter @reflect/desktop sidecar
 cargo test -p reflect-open benchmark_clean_and_single_dirty_discovery -- --ignored --nocapture
 ```

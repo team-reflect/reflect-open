@@ -4,7 +4,7 @@ import { backfillEmbeddings } from './pipeline'
 import { chunkNote } from './chunk'
 import { hashContent } from '../indexing/hash'
 
-test('incremental embedding backfill work counts', async () => {
+test('a backfill touches only dirty notes and never infers when chunk hashes match', async () => {
   const content =
     '# Daily planning\n\n' +
     Array.from(
@@ -14,7 +14,6 @@ test('incremental embedding backfill work counts', async () => {
     ).join('')
   const chunks = await chunkNote('notes/example.md', content)
   const fileHash = await hashContent(content)
-  const results = []
   for (const count of [1_000, 10_000]) {
     for (const dirtyCount of [0, 10]) {
       const notes = Array.from({ length: count }, (_, index) => ({
@@ -65,16 +64,7 @@ test('incremental embedding backfill work counts', async () => {
           throw new Error('Unexpected ' + command)
         },
       })
-      const start = performance.now()
       await backfillEmbeddings({ generation: 1, modelId: 'test-model' })
-      const result = {
-        notes: count,
-        dirtyNotes: dirtyCount,
-        contentBytes: content.length,
-        chunks: chunks.length,
-        milliseconds: performance.now() - start,
-        ...stats,
-      }
       expect(stats).toEqual({
         candidateQueries: 1,
         prepares: dirtyCount,
@@ -83,8 +73,6 @@ test('incremental embedding backfill work counts', async () => {
         applies: dirtyCount,
         inferences: 0,
       })
-      results.push(result)
-      console.log('BACKFILL', JSON.stringify(result))
     }
   }
   setBridge(null)

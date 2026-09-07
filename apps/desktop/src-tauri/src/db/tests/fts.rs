@@ -212,3 +212,54 @@ fn fts_path_resolution_uses_a_covering_index() {
     );
     assert!(plan.contains("(note_path=?)"), "{plan}");
 }
+
+#[test]
+#[ignore = "synthetic FTS maintenance benchmark; run explicitly with --ignored --nocapture"]
+fn benchmark_fts_replacement_by_path_versus_rowid() {
+    for count in [2_000usize, 10_000] {
+        let conn = migrated();
+        let transaction = conn.unchecked_transaction().unwrap();
+        for ordinal in 0..count {
+            apply_note(
+                &transaction,
+                &note(&format!("notes/{ordinal}.md"), "Title", vec![]),
+            )
+            .unwrap();
+        }
+        transaction.commit().unwrap();
+        for mode in ["path", "rowid"] {
+            let started = std::time::Instant::now();
+            let transaction = conn.unchecked_transaction().unwrap();
+            for ordinal in 0..count {
+                let path = format!("notes/{ordinal}.md");
+                if mode == "path" {
+                    transaction
+                        .execute("DELETE FROM search_fts WHERE path = ?1", [&path])
+                        .unwrap();
+                    transaction
+                        .execute(
+                            "INSERT INTO search_fts(path, title, body) VALUES(?1, 'Title', 'body')",
+                            [&path],
+                        )
+                        .unwrap();
+                } else {
+                    let rowid = search_rowid(&transaction, &path);
+                    transaction
+                        .execute("DELETE FROM search_fts WHERE rowid = ?1", [rowid])
+                        .unwrap();
+                    transaction
+                        .execute(
+                            "INSERT INTO search_fts(rowid, path, title, body) VALUES(?1, ?2, 'Title', 'body')",
+                            rusqlite::params![rowid, path],
+                        )
+                        .unwrap();
+                }
+            }
+            transaction.commit().unwrap();
+            println!(
+                "FTS_REPLACE notes={count} mode={mode} elapsed_ms={:.1}",
+                started.elapsed().as_secs_f64() * 1_000.0
+            );
+        }
+    }
+}
