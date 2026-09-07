@@ -72,7 +72,11 @@ export async function embedNote(options: EmbedNoteOptions): Promise<number> {
     }
     content = read.content
   }
-  if (isStale?.() || (await hashContent(content)) !== prepared.fileHash || isStale?.()) {
+  if (isStale?.()) {
+    return 0
+  }
+  const fileHash = await hashContent(content)
+  if (isStale?.() || fileHash !== prepared.fileHash) {
     return 0 // the index must first catch up with the bytes we actually read
   }
 
