@@ -176,7 +176,7 @@ export function RouterProvider({
   // eslint-disable-next-line react-hooks/refs
   historyPosition.current = { index: history.index, length: history.stack.length }
 
-  const navigate = useCallback((route: Route, options?: NavigateOptions) : void => {
+  const navigate = useCallback((route: Route, options?: NavigateOptions): void => {
     navigationRevisionRef.current += 1
     const target = normalizeRoute(route)
     const surface = scrollSurfaceForRoute(target)
@@ -234,7 +234,7 @@ export function RouterProvider({
     )
   }, [])
 
-  const forward = useCallback((): void  => {
+  const forward = useCallback((): void => {
     if (historyPosition.current.index >= historyPosition.current.length - 1) {
       return
     }
