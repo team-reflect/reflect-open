@@ -282,7 +282,7 @@ describe('reconcileAudioMemos', () => {
         config: { ...PROVIDERS.providers[0], model: 'gpt-5.4-nano' },
         apiKey: 'sk-live-key',
       },
-      fetchFn: undefined,
+      fetchFn: expect.any(Function),
       transcript: 'memo transcript',
       fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
     })
@@ -300,7 +300,7 @@ describe('reconcileAudioMemos', () => {
         config: { ...PROVIDERS.providers[0], model: 'gpt-5.4-nano' },
         apiKey: 'sk-live-key',
       },
-      fetchFn: undefined,
+      fetchFn: expect.any(Function),
       transcript: 'memo transcript',
       fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
     })
@@ -339,7 +339,7 @@ describe('reconcileAudioMemos', () => {
         config: { ...ANTHROPIC_CONFIG, model: 'claude-haiku-4-5' },
         apiKey: 'sk-ant-live-key',
       },
-      fetchFn: undefined,
+      fetchFn: expect.any(Function),
       transcript: 'memo transcript',
       fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
     })
@@ -707,6 +707,30 @@ describe('reconcileAudioMemos', () => {
       stopped: { reason: 'stale' },
     })
     expect(formatAudioMemoTranscriptMock).not.toHaveBeenCalled()
+    expect(writeNoteMock).not.toHaveBeenCalled()
+  })
+
+  it('does not send a transcript after a graph switch during AI loading', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+    let stale = false
+    const transport = vi.fn<typeof fetch>()
+    formatAudioMemoTranscriptMock.mockImplementation(async (request) => {
+      stale = true
+      await request.fetchFn?.('https://provider.invalid', {
+        method: 'POST',
+        body: request.transcript,
+      })
+      return { title: 'Never sent', body: 'Never sent' }
+    })
+
+    const outcome = await reconcile({
+      formatTranscript: true,
+      fetchFn: transport,
+      isStale: () => stale,
+    })
+
+    expect(transport).not.toHaveBeenCalled()
+    expect(outcome.stopped?.reason).toBe('stale')
     expect(writeNoteMock).not.toHaveBeenCalled()
   })
 

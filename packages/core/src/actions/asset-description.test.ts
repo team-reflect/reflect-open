@@ -391,6 +391,51 @@ describe('reconcileAssetDescriptions', () => {
     expect(files.has('assets/b.pdf.reflect.md')).toBe(true)
   })
 
+  it('does not send an asset made private while its AI implementation loads', async () => {
+    assets.set('assets/a.png', 'aGVsbG8=')
+    files.set('notes/pub.md', publicNote('assets/a.png'))
+    refs.set('assets/a.png', ['notes/pub.md'])
+    const transport = vi.fn<typeof fetch>()
+    describeMock.mockImplementation(async (request) => {
+      files.set('notes/pub.md', privateNote('assets/a.png'))
+      await request.fetchFn?.('https://provider.invalid', { method: 'POST', body: request.data })
+      return 'Never sent'
+    })
+
+    const outcome = await reconcileAssetDescriptions(input({ fetchFn: transport }))
+
+    expect(transport).not.toHaveBeenCalled()
+    expect(outcome.skippedPrivate).toBe(1)
+    expect(outcome.refused).toBe(0)
+    expect(outcome.stopped).toBeNull()
+    expect(files.has('assets/a.png.reflect.md')).toBe(false)
+  })
+
+  it('does not send an asset after a graph switch during AI loading', async () => {
+    assets.set('assets/a.png', 'aGVsbG8=')
+    files.set('notes/pub.md', publicNote('assets/a.png'))
+    refs.set('assets/a.png', ['notes/pub.md'])
+    let stale = false
+    const transport = vi.fn<typeof fetch>()
+    describeMock.mockImplementation(async (request) => {
+      stale = true
+      await request.fetchFn?.('https://provider.invalid', { method: 'POST', body: request.data })
+      return 'Never sent'
+    })
+
+    const outcome = await reconcileAssetDescriptions(
+      input({
+        fetchFn: transport,
+        isStale: () => stale,
+      }),
+    )
+
+    expect(transport).not.toHaveBeenCalled()
+    expect(outcome.described).toBe(0)
+    expect(outcome.stopped?.reason).toBe('stale')
+    expect(files.has('assets/a.png.reflect.md')).toBe(false)
+  })
+
   it('stops the pass on a transient (network) provider error for a later retry', async () => {
     assets.set('assets/a.png', 'aGVsbG8=')
     files.set('notes/pub.md', publicNote('assets/a.png'))

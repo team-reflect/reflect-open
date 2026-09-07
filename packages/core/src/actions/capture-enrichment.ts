@@ -1,12 +1,13 @@
 import {
   describePage,
+  DescriptionRejectedError,
   isDescriptionRejected,
   normalizedPageTitle,
   type PageEnrichment,
 } from '../ai/describe-page'
 import { defaultAiProvider, type AiProvidersState } from '../ai/provider-config'
 import { aiApiKeyForConfig } from '../ai/secrets'
-import { errorMessage, isAppError, toAppError } from '../errors'
+import { errorMessage, isAppError, ReflectError, toAppError } from '../errors'
 import {
   captureLinkPreview,
   listFiles,
@@ -470,7 +471,18 @@ export async function reconcileCaptureEnrichment(
       const generated: PageEnrichment | null = await generateEnrichment({
         config,
         apiKey,
-        fetchFn: input.fetchFn,
+        fetchFn: async (request, init) => {
+          if (stale()) {
+            throw new ReflectError('network', 'the graph session ended before the provider request')
+          }
+          if ((await currentCapture(identity, metadataHash)) === null) {
+            throw new DescriptionRejectedError('the capture changed before the provider request')
+          }
+          if (stale()) {
+            throw new ReflectError('network', 'the graph session ended before the provider request')
+          }
+          return await (input.fetchFn ?? fetch)(request, init)
+        },
         meta: snapshot.meta,
         title: snapshot.title,
         scraped: pageMeta,
@@ -511,6 +523,9 @@ export async function reconcileCaptureEnrichment(
       }
       enriched += 1
     } catch (cause) {
+      if (stale()) {
+        return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
+      }
       const error = toAppError(cause)
       // A transient failure — offline, a rate-limited page, an unavailable
       // provider — leaves this capture pending for the next pass, but must
