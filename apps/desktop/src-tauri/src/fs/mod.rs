@@ -41,6 +41,7 @@ pub(crate) use self::io::atomic_write_bytes;
 /// "Occupied" probe (real file OR eviction placeholder), shared with the
 /// iCloud sweep's collision folding — an evicted canonical note must not be
 /// treated as a free slot (Plan 21).
+pub(crate) use self::io::ensure_real_directory;
 pub(crate) use self::io::file_occupied;
 /// Sync-exclusion marking, shared with `git::repo` (a freshly initialized
 /// backup repo must never ride a file-sync provider — Plan 21).

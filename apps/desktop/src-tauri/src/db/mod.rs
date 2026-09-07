@@ -22,7 +22,6 @@ mod write;
 
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 use rusqlite::{params, Connection};
@@ -31,7 +30,8 @@ use tauri::{Manager, State};
 
 use crate::background_task::{self, BackgroundTaskState};
 use crate::error::{AppError, AppResult};
-use crate::fs::GraphState;
+use crate::fs::{ensure_real_directory, GraphState};
+use crate::lease::{new_session_id, open_existing_real_lease_file, open_real_lease_file};
 
 pub use chat_write::{
     ChatConversation, ChatMessageRow, ChatNoteChangeInput, ChatNoteChangeRow, ChatNoteChangeState,
@@ -74,17 +74,8 @@ struct ChatJournalLease {
 
 impl ChatJournalSession {
     fn activate_graph(&self, root: &Path) -> AppResult<()> {
-        static NEXT_SESSION: AtomicU64 = AtomicU64::new(1);
         let root = root.canonicalize()?;
-        let epoch_nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|duration| duration.as_nanos())
-            .unwrap_or(0);
-        let id = format!(
-            "{}-{epoch_nanos}-{}",
-            std::process::id(),
-            NEXT_SESSION.fetch_add(1, Ordering::Relaxed)
-        );
+        let id = new_session_id();
         let runtime_dir = root.join(".reflect");
         ensure_real_directory(&runtime_dir)?;
         let lease_dir = runtime_dir.join("chat-journal-leases");
@@ -169,63 +160,6 @@ fn release_chat_journal_lease(lease: ChatJournalLease) {
     let _ = lease.file.unlock();
     drop(lease.file);
     let _ = fs::remove_file(lease.path);
-}
-
-fn ensure_real_directory(path: &Path) -> AppResult<()> {
-    match fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.file_type().is_dir() => Ok(()),
-        Ok(_) => Err(AppError::traversal(format!(
-            "chat journal lease path must be a real directory: {}",
-            path.display()
-        ))),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => match fs::create_dir(path) {
-            Ok(()) => Ok(()),
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                ensure_real_directory(path)
-            }
-            Err(error) => Err(error.into()),
-        },
-        Err(error) => Err(error.into()),
-    }
-}
-
-fn open_real_lease_file(path: &Path) -> AppResult<File> {
-    loop {
-        match open_existing_real_lease_file(path)? {
-            Some(file) => return Ok(file),
-            None => match fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create_new(true)
-                .open(path)
-            {
-                Ok(file) => return Ok(file),
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                Err(error) => return Err(error.into()),
-            },
-        }
-    }
-}
-
-fn open_existing_real_lease_file(path: &Path) -> AppResult<Option<File>> {
-    match fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.file_type().is_file() => {
-            let file = fs::OpenOptions::new().read(true).write(true).open(path)?;
-            if !file.metadata()?.is_file() {
-                return Err(AppError::traversal(format!(
-                    "chat journal lease path must be a real file: {}",
-                    path.display()
-                )));
-            }
-            Ok(Some(file))
-        }
-        Ok(_) => Err(AppError::traversal(format!(
-            "chat journal lease path must be a real file: {}",
-            path.display()
-        ))),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(error.into()),
-    }
 }
 
 /// The open index connection plus its monotonic generation, kept **under one

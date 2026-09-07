@@ -9,7 +9,6 @@
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 use sha2::{Digest, Sha256};
@@ -18,7 +17,8 @@ use tauri::State;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::error::{AppError, AppResult};
-use crate::fs::{self as graph_fs, GraphState};
+use crate::fs::{self as graph_fs, ensure_real_directory, GraphState};
+use crate::lease::{new_session_id, open_existing_real_lease_file, open_real_lease_file};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct LeaseKey {
@@ -53,17 +53,8 @@ pub struct NoteWindowOwnershipState {
 
 impl Default for NoteWindowOwnershipState {
     fn default() -> Self {
-        static NEXT_SESSION: AtomicU64 = AtomicU64::new(1);
-        let epoch_nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|duration| duration.as_nanos())
-            .unwrap_or(0);
         Self {
-            process_session: format!(
-                "{}-{epoch_nanos}-{}",
-                std::process::id(),
-                NEXT_SESSION.fetch_add(1, Ordering::Relaxed)
-            ),
+            process_session: new_session_id(),
             inner: Mutex::new(OwnershipInner::default()),
         }
     }
@@ -463,63 +454,6 @@ fn lease_directory(root: &Path, identity: &str) -> PathBuf {
     let digest = Sha256::digest(identity.as_bytes());
     let hash: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
     root.join(".reflect").join("note-owners").join(hash)
-}
-
-fn ensure_real_directory(path: &Path) -> AppResult<()> {
-    match fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.file_type().is_dir() => Ok(()),
-        Ok(_) => Err(AppError::traversal(format!(
-            "note ownership lease path must be a real directory: {}",
-            path.display()
-        ))),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => match fs::create_dir(path) {
-            Ok(()) => Ok(()),
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                ensure_real_directory(path)
-            }
-            Err(error) => Err(error.into()),
-        },
-        Err(error) => Err(error.into()),
-    }
-}
-
-fn open_real_lease_file(path: &Path) -> AppResult<File> {
-    loop {
-        match open_existing_real_lease_file(path)? {
-            Some(file) => return Ok(file),
-            None => match fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create_new(true)
-                .open(path)
-            {
-                Ok(file) => return Ok(file),
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                Err(error) => return Err(error.into()),
-            },
-        }
-    }
-}
-
-fn open_existing_real_lease_file(path: &Path) -> AppResult<Option<File>> {
-    match fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.file_type().is_file() => {
-            let file = fs::OpenOptions::new().read(true).write(true).open(path)?;
-            if !file.metadata()?.is_file() {
-                return Err(AppError::traversal(format!(
-                    "note ownership lease path must be a real file: {}",
-                    path.display()
-                )));
-            }
-            Ok(Some(file))
-        }
-        Ok(_) => Err(AppError::traversal(format!(
-            "note ownership lease path must be a real file: {}",
-            path.display()
-        ))),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(error.into()),
-    }
 }
 
 #[cfg(test)]

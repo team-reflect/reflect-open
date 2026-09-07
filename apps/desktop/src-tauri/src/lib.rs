@@ -28,6 +28,7 @@ mod fs;
 mod git;
 mod graph_gitignore;
 mod icloud;
+mod lease;
 mod link_preview;
 mod menu;
 mod note_ownership;

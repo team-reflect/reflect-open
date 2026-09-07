@@ -334,7 +334,7 @@ fn ensure_runtime_directory(root: &Path) -> AppResult<()> {
 
 /// Create one directory component without accepting a pre-existing symlink.
 /// The parent must already be a verified real directory.
-pub(super) fn ensure_real_directory(path: &Path) -> AppResult<()> {
+pub(crate) fn ensure_real_directory(path: &Path) -> AppResult<()> {
     match fs::symlink_metadata(path) {
         Ok(metadata) if metadata.file_type().is_dir() => Ok(()),
         Ok(_) => Err(AppError::traversal(format!(
