@@ -61,6 +61,23 @@ describe('extractPost', () => {
     })
   })
 
+  it('reads the display name off the profile link', () => {
+    const post = extractPost(
+      article(`<div data-testid="User-Name"><a href="/jack"><span>Jack Dorsey</span></a><a href="/jack"><span>@jack</span></a></div>
+        <a href="/jack/status/20"><time datetime="2006-03-21T20:50:14.000Z">x</time></a>`),
+      'bookmark',
+    )
+    expect(post?.author).toEqual({ name: 'Jack Dorsey', handle: 'jack' })
+  })
+
+  it('ignores status links that are not the timestamp anchor', () => {
+    const post = extractPost(
+      article(`<div data-testid="tweetText"><a href="/ann/status/1">a link</a></div>${ACTIONS}`),
+      'bookmark',
+    )
+    expect(post).toBeNull()
+  })
+
   it('falls back to the handle as the name and captures by id alone when needed', () => {
     const bare = extractPost(
       article(`<a href="/i/web/status/20"><time datetime="bogus">x</time></a>`),

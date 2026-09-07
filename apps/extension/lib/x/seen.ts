@@ -3,8 +3,8 @@ import { browser } from 'wxt/browser'
 
 /**
  * Posts this browser already captured (Plan 25), one storage key per post
- * (`seen:x:<id>` → the capture time) — written the moment a capture is
- * enqueued, so a service worker torn down a second later loses nothing (V1
+ * (`seen:x:<id>` → the capture time) — written as soon as a capture is
+ * queued, so a service worker torn down a second later loses nothing (V1
  * kept this in a debounced snapshot and did). Un-bookmarking clears the key,
  * so a deliberate re-bookmark captures again; scrolling past a post already
  * bookmarked never reaches here (the watcher only reports transitions).

@@ -29,11 +29,8 @@ function firstOwnMatch(article: Element, selector: string): Element | null {
 
 /** The article's permalink (the anchor around its timestamp). */
 export function articlePermalink(article: Element): PostPermalink | null {
-  const candidates = [
-    ...Array.from(article.querySelectorAll('time'), (time) => time.closest('a')),
-    ...Array.from(article.querySelectorAll('a[href*="/status/"]')),
-  ]
-  for (const anchor of candidates) {
+  for (const time of article.querySelectorAll('time')) {
+    const anchor = time.closest('a')
     if (anchor === null || isInsideQuotedPost(anchor, article)) {
       continue
     }

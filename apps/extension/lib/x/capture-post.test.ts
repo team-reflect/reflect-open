@@ -93,7 +93,7 @@ describe('handlePostCaptured', () => {
     await expect(handlePostCaptured(like)).resolves.toMatchObject({ saved: true })
   })
 
-  it('forgets a post the host rejected, so a retry is possible', async () => {
+  it('never remembers a post the host rejected, so a retry is possible', async () => {
     store.set(X_BOOKMARKS_KEY, true)
     saveMock.mockResolvedValue({ fate: 'rejected' })
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -103,7 +103,7 @@ describe('handlePostCaptured', () => {
     errorSpy.mockRestore()
   })
 
-  it('forgets a post whose enqueue threw', async () => {
+  it('never remembers a post whose enqueue threw', async () => {
     store.set(X_BOOKMARKS_KEY, true)
     saveMock.mockRejectedValue(new Error('storage full'))
 

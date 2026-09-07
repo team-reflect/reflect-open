@@ -65,6 +65,34 @@ describe('startBookmarkWatch', () => {
     expect(changes.at(-1)).toMatchObject({ id: '1', action: 'bookmark', active: false })
   })
 
+  it('carries the state across a re-render that drops the buttons', async () => {
+    button('1', 'bookmark').remove()
+    await settle()
+    document
+      .querySelector('#post-1')!
+      .insertAdjacentHTML('beforeend', '<button data-testid="removeBookmark"></button>')
+    await settle()
+
+    expect(changes.map((change) => [change.id, change.action, change.active])).toEqual([
+      ['1', 'bookmark', true],
+    ])
+  })
+
+  it('never reports a post whose buttons only rendered after first sight', async () => {
+    const main = document.querySelector('main')!
+    main.insertAdjacentHTML(
+      'beforeend',
+      '<article data-testid="tweet" role="article" id="post-3"><a href="/jack/status/3"><time datetime="2006-03-21T20:50:14.000Z">x</time></a></article>',
+    )
+    await settle()
+    document
+      .querySelector('#post-3')!
+      .insertAdjacentHTML('beforeend', '<button data-testid="removeBookmark"></button>')
+    await settle()
+
+    expect(changes).toEqual([])
+  })
+
   it('never reports posts that were already bookmarked on first sight', async () => {
     const main = document.querySelector('main')!
     main.insertAdjacentHTML('beforeend', articleHtml('3', { bookmarked: true, liked: true }))

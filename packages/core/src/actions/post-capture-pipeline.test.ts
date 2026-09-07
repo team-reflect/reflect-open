@@ -347,6 +347,29 @@ describe('reconcileCaptureEnrichment for posts', () => {
     expect(mediaFetchMock).toHaveBeenCalledWith('https://pbs.twimg.com/media/page.jpg?name=large')
   })
 
+  it('clears postTruncated once the endpoint supplies the full text', async () => {
+    await drainPost({ post: { ...PAGE_POST, text: 'just setting', truncated: true } })
+    expect(files.get(IDENTITY.notePath)).toContain('postTruncated: true')
+    jsonFetchMock.mockResolvedValue(JACK_ANSWER)
+
+    await reconcile({ providers: NO_PROVIDERS })
+
+    const note = files.get(IDENTITY.notePath)!
+    expect(note).not.toContain('postTruncated')
+    expect(note).toContain('> just setting up my twttr\n')
+  })
+
+  it('leaves the capture pending on a transient media failure', async () => {
+    await drainPost()
+    jsonFetchMock.mockResolvedValue(PHOTO_ANSWER)
+    mediaFetchMock.mockRejectedValue(new ReflectError('network', 'offline'))
+
+    const outcome = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(outcome).toMatchObject({ enriched: 0, stopped: { reason: 'network' } })
+    expect(files.get(IDENTITY.notePath)).toContain('captureStatus: pending')
+  })
+
   it('leaves the capture pending on a transient endpoint failure', async () => {
     await drainPost()
     jsonFetchMock.mockRejectedValue(new ReflectError('network', 'answered 429'))
@@ -412,6 +435,35 @@ describe('reconcileCaptureEnrichment for posts', () => {
     expect(files.get(IDENTITY.notePath)).toContain(
       '![](https://pbs.twimg.com/media/page.jpg?name=large)',
     )
+  })
+
+  it('stops before any media request when the day turns private after the endpoint answered', async () => {
+    await drainPost()
+    jsonFetchMock.mockImplementation(async () => {
+      files.set(DAILY, `---\nprivate: true\n---\n${files.get(DAILY)!}`)
+      return PHOTO_ANSWER
+    })
+
+    const outcome = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(outcome).toMatchObject({ enriched: 0, skipped: 1 })
+    expect(mediaFetchMock).not.toHaveBeenCalled()
+    expect(files.get(IDENTITY.notePath)).toContain('captureStatus: skipped')
+  })
+
+  it('writes no asset when the day turns private mid-download', async () => {
+    await drainPost()
+    jsonFetchMock.mockResolvedValue(PHOTO_ANSWER)
+    mediaFetchMock.mockImplementation(async () => {
+      files.set(DAILY, `---\nprivate: true\n---\n${files.get(DAILY)!}`)
+      return btoa('one')
+    })
+
+    const outcome = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(outcome).toMatchObject({ enriched: 0, skipped: 1 })
+    expect(writeAssetMock).not.toHaveBeenCalled()
+    expect(files.get(IDENTITY.notePath)).toContain('captureStatus: skipped')
   })
 
   it('skips a capture edited since the drain, touching nothing', async () => {

@@ -206,6 +206,13 @@ describe('refreshPostNoteFields', () => {
     expect(refreshed.author).toEqual(FULL.author)
   })
 
+  it('keeps the full text when the re-capture only read a preview', () => {
+    const preview: CapturedPost = { ...incoming, text: 'just setting', truncated: true }
+    const refreshed = refreshPostNoteFields(FULL, preview, { url: URL, screenshot: null })
+    expect(refreshed.text).toBe(FULL.text)
+    expect(refreshed.truncated).toBe(false)
+  })
+
   it('keeps a section written once when the same capture drains twice', () => {
     const refreshed = refreshPostNoteFields(FULL, incoming, {
       url: URL,
