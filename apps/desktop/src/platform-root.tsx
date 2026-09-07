@@ -3,12 +3,14 @@ import { getAppPlatform, hasBridge, isMobilePlatform, type AppPlatform } from '@
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { warmMobileStorage } from '@/lib/mobile-boot-warm'
 
-const DesktopRoot = lazy(() =>
-  import('@/desktop-root').then((module) => ({ default: module.DesktopRoot })),
-)
-const MobileRoot = lazy(() =>
-  import('@/mobile/mobile-root').then((module) => ({ default: module.MobileRoot })),
-)
+const DesktopRoot = lazy(async () => {
+  const { DesktopRoot } = await import('@/desktop-root')
+  return { default: DesktopRoot }
+})
+const MobileRoot = lazy(async () => {
+  const { MobileRoot } = await import('@/mobile/mobile-root')
+  return { default: MobileRoot }
+})
 
 // The platform IPC round-trip is a build-time constant (the Rust shell's
 // compile-time platform tag), so it is resolved once and memoized. It must be
