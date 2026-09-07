@@ -41,7 +41,7 @@ export function renderXPostNote(
     parts.push(
       local
         ? `![${plainText(image.alt ?? 'Post image')}](${local})`
-        : `[Image source](<${encodeURI(image.url).replaceAll('>', '%3E')}>)`,
+        : `[Image source](<${new URL(image.url).href}>)`,
     )
   }
   if (input.note) parts.push(`## Note\n\n${input.note}`)

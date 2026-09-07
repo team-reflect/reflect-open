@@ -49,7 +49,7 @@ const SECOND_ID = '39c287a8-1f4e-437f-a96b-1bb8554e7990'
 const DAY = 'daily/2026-09-07.md'
 const AUTO_PATH = 'notes/capture-x-2026-09-07-1234567890123456789.md'
 const MANUAL_PATH = `notes/capture-x-2026-09-07-manual-${FIRST_ID}.md`
-const PHOTO = 'https://pbs.twimg.com/media/first.jpg'
+const PHOTO = 'https://pbs.twimg.com/media/first%20photo.jpg'
 const SECOND_PHOTO = 'https://pbs.twimg.com/media/second.jpg'
 
 function capture(overrides: Partial<XEnvelope> = {}): XEnvelope {
