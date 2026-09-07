@@ -7,6 +7,7 @@ import {
   isDaily,
   isTemplatePath,
 } from '../graph/paths'
+import { hasSearchableChar } from '../lib/searchable-char'
 import {
   detectConflictMarkers,
   extractEmailFields,
@@ -322,9 +323,6 @@ export function projectNoteClaims(
   return claims
 }
 
-/** Bare scaffolding (`+ [ ] `, `> `) has no letter or digit; a reference does. */
-const SEARCHABLE_CHAR_RE = /[\p{L}\p{N}]/u
-
 /**
  * Flatten a parsed note into the index payload. `meta.source` is the raw
  * markdown the note was parsed from — conflict markers are detected on it
@@ -392,7 +390,7 @@ export function buildIndexedNote(
     searchText: body,
     assetText: meta.assetText ?? '',
     preview: previewSnippet(parsed.displayText, parsed.title),
-    hasContent: parsed.displayText !== '' || SEARCHABLE_CHAR_RE.test(body),
+    hasContent: parsed.displayText !== '' || hasSearchableChar(body),
     links: [...wikiLinks, ...mdLinks],
     tags: parsed.tags.map((tag) => ({ tag, tagKey: foldTag(tag) })),
     aliases,
