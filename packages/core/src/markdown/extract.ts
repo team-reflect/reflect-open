@@ -519,6 +519,6 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
     headings,
     assets,
     tasks,
-    text: buildPlainText(body, cuts, literalPlainText),
+    displayText: buildPlainText(body, cuts, literalPlainText),
   }
 }
