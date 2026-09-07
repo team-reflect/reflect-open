@@ -94,7 +94,7 @@ async function runFlush(): Promise<FlushResult> {
         [queueKey(id)]: { ...entry, attempts: entry.attempts + 1 },
       })
       holdReason = outcome.reason
-      break
+      if (outcome.reason !== 'upgrade-required') break
     }
   }
 

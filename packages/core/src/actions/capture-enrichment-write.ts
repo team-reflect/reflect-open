@@ -40,6 +40,9 @@ interface PersistCaptureEnrichmentInput {
   provider: AiProviderConfig | null
   screenshot?: string | undefined
   generation: number
+  expectedInput?: unknown
+  expectedCaptureId?: string
+  canWrite?: (() => boolean) | undefined
 }
 
 interface CaptureWriteTransaction {
@@ -100,7 +103,9 @@ export function hasCaptureWriteTransaction(meta: CaptureNoteMeta): boolean {
 export async function finishCaptureWrite(
   identity: CaptureIdentity,
   generation: number,
+  canWrite: () => boolean = () => true,
 ): Promise<Exclude<CaptureStatus, 'skipped'> | null> {
+  if (!canWrite()) return null
   let snapshot = await readPendingCaptureSnapshot(identity, generation)
   if (snapshot === null) {
     return null
@@ -110,9 +115,12 @@ export async function finishCaptureWrite(
     return null
   }
   const expectedHash = snapshot.meta.captureHash
+  const expectedInput = JSON.stringify(snapshot.meta.captureInput)
+  const expectedCaptureId = snapshot.meta.captureId
   const dailyNotePath = dailyPath(identity.date)
   let dailySource = await noteSource(dailyNotePath, generation)
   if (
+    !canWrite() ||
     snapshot.isPrivate ||
     notePrivate(dailySource) ||
     (await hashContent(snapshot.body)) !== expectedHash
@@ -126,6 +134,7 @@ export async function finishCaptureWrite(
     snapshot.title,
   )
   if (retitled !== dailySource) {
+    if (!canWrite()) return null
     await writeNote(dailyNotePath, retitled, generation)
   }
 
@@ -137,16 +146,23 @@ export async function finishCaptureWrite(
     currentTransaction === null ||
     currentTransaction.fromTitle !== transaction.fromTitle ||
     currentTransaction.status !== transaction.status ||
+    snapshot.meta.captureId !== expectedCaptureId ||
+    JSON.stringify(snapshot.meta.captureInput) !== expectedInput ||
+    !canWrite() ||
     snapshot.isPrivate ||
     notePrivate(dailySource) ||
     (await hashContent(snapshot.body)) !== expectedHash
   ) {
     return null
   }
+  if (!canWrite()) return null
   await writeNote(
     identity.notePath,
     upsertFrontmatter(snapshot.source, {
       captureStatus: transaction.status,
+      ...(snapshot.meta.captureKind === 'x' && transaction.status === 'done'
+        ? { captureInput: undefined }
+        : {}),
       captureDailyFromTitle: undefined,
       captureFinalizeStatus: undefined,
     }),
@@ -163,12 +179,19 @@ export async function finishCaptureWrite(
 export async function persistCaptureEnrichment(
   input: PersistCaptureEnrichmentInput,
 ): Promise<string | null> {
+  const canWrite = input.canWrite ?? (() => true)
+  if (!canWrite()) return null
   const captureHash = await hashContent(input.body)
   const snapshot = await readPendingCaptureSnapshot(input.identity, input.generation)
   const dailySource = await noteSource(dailyPath(input.identity.date), input.generation)
   if (
     snapshot === null ||
     snapshot.title !== input.fromTitle ||
+    (input.expectedCaptureId !== undefined &&
+      snapshot.meta.captureId !== input.expectedCaptureId) ||
+    (input.expectedInput !== undefined &&
+      JSON.stringify(snapshot.meta.captureInput) !== JSON.stringify(input.expectedInput)) ||
+    !canWrite() ||
     snapshot.isPrivate ||
     notePrivate(dailySource) ||
     (await hashContent(snapshot.body)) !== input.expectedHash
@@ -177,10 +200,14 @@ export async function persistCaptureEnrichment(
   }
   const reassembled = snapshot.source.slice(0, snapshot.bodyOffset) + input.body
   const titleChanged = input.toTitle !== input.fromTitle
+  if (!canWrite()) return null
   await writeNote(
     input.identity.notePath,
     upsertFrontmatter(reassembled, {
       captureStatus: titleChanged ? 'pending' : input.status,
+      ...(snapshot.meta.captureKind === 'x' && input.status === 'done' && !titleChanged
+        ? { captureInput: undefined }
+        : {}),
       captureMetadataStatus: 'done',
       captureHash,
       captureProvider: input.provider?.provider,
@@ -191,7 +218,10 @@ export async function persistCaptureEnrichment(
     }),
     input.generation,
   )
-  if (titleChanged && (await finishCaptureWrite(input.identity, input.generation)) === null) {
+  if (
+    titleChanged &&
+    (await finishCaptureWrite(input.identity, input.generation, canWrite)) === null
+  ) {
     return null
   }
   return captureHash

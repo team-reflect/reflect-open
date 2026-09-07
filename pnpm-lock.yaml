@@ -251,6 +251,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.5
         version: 19.2.5(@types/react@19.2.18)
+      '@vitest/browser-playwright':
+        specifier: ^4.1.11
+        version: 4.1.11(playwright@1.62.1)(vite@8.2.2)(vitest@4.1.11)
       '@wxt-dev/module-react':
         specifier: ^1.2.2
         version: 1.2.2(@rolldown/plugin-babel@0.2.3)(babel-plugin-react-compiler@1.0.0)(vite@8.2.2)(wxt@0.20.27)

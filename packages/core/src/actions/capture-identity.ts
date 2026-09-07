@@ -1,4 +1,4 @@
-import { assetPath, dailyPath, notePath } from '../graph/paths'
+import { dailyPath, notePath } from '../graph/paths'
 
 const INBOX_PREFIX = '.reflect/inbox/'
 
@@ -12,16 +12,14 @@ export function captureSpoolName(path: string): string {
   return path.startsWith(INBOX_PREFIX) ? path.slice(INBOX_PREFIX.length) : path
 }
 
-/** Everything derivable from a capture's timestamped base name. */
+/** Capture note and Daily references derived from its filename. */
 export interface CaptureIdentity {
-  /** `capture-2026-06-12-153022-845` — note filename, alias, asset stem. */
+  /** Filename stem and stable wiki-link target. */
   base: string
   /** Local ISO day of the capture — the daily note that links it. */
   date: string
   /** Graph-relative path of the capture note, `notes/<base>.md`. */
   notePath: string
-  /** Graph-relative path of the promoted screenshot, `assets/<base>.jpg`. */
-  assetPath: string
 }
 
 const CAPTURE_PATH_RE =
@@ -44,7 +42,6 @@ function buildIdentity(base: string, date: string): CaptureIdentity {
     base,
     date,
     notePath: notePath(base),
-    assetPath: assetPath(`${base}.jpg`),
   }
 }
 
@@ -65,6 +62,18 @@ export function captureIdentity(capturedAt: Date, envelopeId: string): CaptureId
  * that isn't a well-formed capture note.
  */
 export function captureFromPath(path: string): CaptureIdentity | null {
+  const xMatch =
+    /^notes\/(capture-x-(\d{4}-\d{2}-\d{2})-(?:\d{1,20}|manual-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}))\.md$/.exec(
+      path,
+    )
+  if (xMatch?.[1] && xMatch[2]) {
+    try {
+      dailyPath(xMatch[2])
+      return buildIdentity(xMatch[1], xMatch[2])
+    } catch {
+      return null
+    }
+  }
   const match = CAPTURE_PATH_RE.exec(path)
   if (match === null) {
     return null

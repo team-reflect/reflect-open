@@ -26,7 +26,7 @@ export function isFlushRequest(message: unknown): message is FlushRequest {
  * `no-graph`: Reflect has never opened a graph; `io`: the host failed to
  * spool — all retried on the next flush trigger.
  */
-export const holdReasonSchema = z.enum(['no-host', 'no-graph', 'io'])
+export const holdReasonSchema = z.enum(['no-host', 'no-graph', 'io', 'upgrade-required'])
 export type HoldReason = z.infer<typeof holdReasonSchema>
 
 /** The flush outcome the popup renders. */

@@ -42,10 +42,10 @@ fn is_raster_content_type(content_type: &str) -> bool {
     )
 }
 
-fn validate_raster_content_type(url: &str, content_type: &str) -> AppResult<()> {
+pub(crate) fn validate_raster_content_type(url: &str, content_type: &str) -> AppResult<()> {
     if !is_raster_content_type(content_type) {
         return Err(AppError::parse(format!(
-            "{url} is not a supported raster favicon ({content_type})"
+            "{url} is not a supported raster image ({content_type})"
         )));
     }
     Ok(())

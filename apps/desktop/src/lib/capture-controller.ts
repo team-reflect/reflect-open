@@ -10,6 +10,7 @@ import {
   type AiProvidersState,
   type ReconcileStop,
 } from '@reflect/core'
+import { openSession } from '@/editor/open-documents'
 import { createBackgroundReconciler } from '@/lib/background-reconciler'
 import { startOperation } from '@/lib/operations'
 import { providerFetch } from '@/lib/provider-fetch'
@@ -96,7 +97,12 @@ export function createCaptureController(options: CaptureControllerOptions): Capt
         return
       }
     }
-    const drained = await drainCaptureInbox({ generation: options.generation, isStale })
+    const isNoteDirty = (path: string): boolean => openSession(path)?.isDirty() === true
+    const drained = await drainCaptureInbox({
+      generation: options.generation,
+      isStale,
+      isNoteDirty,
+    })
     surfaceStop('Saving link capture', drained.stopped)
     if (isStale()) {
       return
@@ -106,6 +112,7 @@ export function createCaptureController(options: CaptureControllerOptions): Capt
       generation: options.generation,
       fetchFn: providerFetch,
       isStale,
+      isNoteDirty,
     })
     surfaceStop('Enriching link capture', enriched.stopped)
   }

@@ -60,29 +60,36 @@ disk at call time), and it is covered by tests.
 
 ## Browser capture (the Chrome extension)
 
-- **Where:** nowhere on the network. The **Reflect Capture** extension hands each
-  capture to a local native-messaging host (`reflect-capture-host`) that the desktop
-  app registers on your machine; the host spools it to the capture inbox on disk
-  (`<graph>/.reflect/inbox/`) and the app drains it on next launch. **No Reflect-hosted
-  server, no third party, and no other destination is ever contacted** — the extension
-  stores no keys and makes no AI or network calls of its own.
-- **What:** only the page you explicitly capture (toolbar button or ⌘⇧K) — its URL,
-  title, your current text selection, a screenshot of the visible tab, and, only when
-  you tick "Capture page text", the page's extracted text. Nothing is read in the
-  background; the extension requests no broad host permissions and acts on the active
-  tab only at the moment you trigger it.
-- **When:** when you capture. If the desktop app isn't reachable yet, the capture is
-  held in the browser's local extension storage and retried automatically until it
-  spools — it is never sent anywhere else in the meantime.
-- Once a capture lands in your graph, the desktop app's rules above apply unchanged:
-  enrichment may request the captured URL directly to read page metadata. On macOS and
-  iOS, Reflect also asks Apple's LinkPresentation framework for one representative
-  image when the capture has no screenshot. These requests go to the captured website
-  and any redirects or subresources selected by the operating system, never through a
-  Reflect server. The app re-reads the capture and daily note before and after each
-  request; `private: true` prevents the request or discards its result. A successful
-  image is downscaled and stored as a local JPEG in the graph. Any BYOK AI enrichment
-  then follows the provider rules above.
+- **Where:** the extension sends captures only to the local native-messaging host,
+  which writes them into the selected graph's inbox. It stores no keys and makes no
+  AI or network requests of its own. The desktop's enrichment requests are described below.
+- **What:** manual captures include the URL, title, selection, optional annotation,
+  screenshot and opted-in page text. A manual X capture can include the post text,
+  author, quote and image URLs from the page. Optional automatic X capture observes
+  new bookmark/like actions on X pages and records the corresponding post snapshot;
+  it does not import activity history or read other sites in the background.
+- **Permissions:** manual capture uses temporary active-tab access. Ongoing X access
+  is optional, off by default, and requested when the user enables automatic capture.
+  Turning it off or revoking permission stops admission of new automatic captures.
+- **When:** manual saves, or explicit X actions while automatic capture is enabled.
+  The local queue retries while the desktop is unavailable. It retains at most 50
+  captures, dropping the oldest at capacity.
+- **Ordinary page enrichment:** the desktop may request the captured URL for metadata.
+  On Apple platforms it may ask LinkPresentation for a representative image when no
+  screenshot exists. Requests go to the website and its redirects/subresources.
+  BYOK AI enrichment follows the provider rules above.
+- **X enrichment:** the desktop requests the captured post ID from
+  `cdn.syndication.twimg.com` and downloads up to four image/preview URLs supplied by
+  the page or response, usually from `pbs.twimg.com`. These requests disclose the
+  post ID or media URL and the device's network address. User annotations are not
+  sent to X, and X snapshots do not use an AI provider. Missing remote content leaves
+  the captured page text and source links available locally.
+- **Privacy:** capture and Daily privacy are checked before requests and again before
+  using their results. A private Daily creates a private capture without enrichment.
+  Remote media is initially an ordinary link, so opening that raw note does not
+  automatically load its images. A privacy change stops subsequent requests and
+  discards pending results; it cannot retract a request already started. Completed
+  X notes are not refreshed by later automatic actions.
 
 ## Apple Contacts (off by default)
 
@@ -160,7 +167,8 @@ API keys and tokens live in the **OS keychain only** — never in markdown, neve
 | Backup | Your git repository | Yes — including private notes | Yes (needs connecting) |
 | Key validation | The provider | No | — (only when adding a key) |
 | Update check | GitHub Releases | No | On in packaged builds |
-| Browser capture | Nowhere (local host on disk) | — (stays on your machine) | — (only when you capture) |
+| Browser capture | Local native host on disk | Stays on your machine | Manual save or opt-in X action |
 | Capture metadata and preview | The captured website, via Reflect and Apple LinkPresentation | URL only; private captures are blocked | No (after an explicit capture) |
+| X post enrichment | X syndication and captured image hosts | Post ID/media URL; private captures are blocked | After a manual save or opt-in automatic action |
 | Contacts lookup | Nowhere (on-device OS store) | — (stays on your machine) | Yes (opt-in) |
 | Exception diagnostics | Sentry | No — free-form messages and context are redacted | No (official releases) |

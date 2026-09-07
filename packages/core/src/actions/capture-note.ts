@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { isAppError } from '../errors'
+import { assetPath } from '../graph/paths'
 import { readNote } from '../graph/commands'
 import { hashContent } from '../indexing/hash'
 import { wikiLinkSafe } from '../markdown/edit'
@@ -22,6 +23,9 @@ export type CaptureStatus = 'pending' | 'done' | 'skipped'
 
 const captureNoteMetaSchema = z.object({
   captureUrl: z.string(),
+  captureKind: z.literal('x').optional(),
+  captureId: z.guid().optional(),
+  captureInput: z.unknown().optional(),
   captureStatus: z.enum(['pending', 'done', 'skipped']),
   /** The metadata attempt completed, including a permanently unsuitable page. */
   captureMetadataStatus: z.literal('done').optional(),
@@ -84,7 +88,7 @@ function captureNoteBody(
     parts.push(`## Page Text\n\n${PAGE_TEXT_START}\n${contentText}\n${PAGE_TEXT_END}`)
   }
   if (hasScreenshot) {
-    parts.push(`## Screenshot\n\n![${title}](${identity.assetPath})`)
+    parts.push(`## Screenshot\n\n![${title}](${assetPath(`${identity.base}.jpg`)})`)
   }
   return `${parts.join('\n\n')}\n`
 }
@@ -129,7 +133,7 @@ export async function captureNoteSource(
     captureStatus: options.status,
     captureHash: await hashContent(body),
     captureSelectionHash: options.selectionHash,
-    captureScreenshot: options.hasScreenshot ? identity.assetPath : undefined,
+    captureScreenshot: options.hasScreenshot ? assetPath(`${identity.base}.jpg`) : undefined,
   })
 }
 
