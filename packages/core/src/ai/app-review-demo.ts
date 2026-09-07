@@ -54,7 +54,7 @@ export function createDemoModel(): LanguageModelV3 {
         warnings: [],
       }),
     doStream: async () => {
-      const { simulateReadableStream } = await loadAiModule(() => import('ai'))
+      const { simulateReadableStream } = await loadAiModule(() => import('../chunks/ai-chunk'))
       return {
         stream: simulateReadableStream<LanguageModelV3StreamPart>({
           chunkDelayInMs: 10,

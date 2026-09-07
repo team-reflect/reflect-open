@@ -58,7 +58,10 @@ export function isAssetDescriptionRejected(value: unknown): value is AssetDescri
   return value instanceof AssetDescriptionRejectedError
 }
 
-function classify(cause: unknown, sdk: Pick<typeof import('ai'), 'APICallError'>): Error {
+function classify(
+  cause: unknown,
+  sdk: Pick<typeof import('../chunks/ai-chunk'), 'APICallError'>,
+): Error {
   if (sdk.APICallError.isInstance(cause)) {
     const status = cause.statusCode ?? 0
     if (status === 401 || status === 403) {
@@ -107,7 +110,7 @@ function describePrompt(kind: AssetKind, filename: string): string {
  * (`maxRetries: 0`).
  */
 export async function describeAsset(request: DescribeAssetRequest): Promise<string> {
-  const sdk = await loadAiModule(() => import('ai'))
+  const sdk = await loadAiModule(() => import('../chunks/ai-chunk'))
   const content: UserContent = [
     { type: 'text', text: describePrompt(request.kind, request.filename) },
   ]

@@ -93,7 +93,7 @@ export async function* streamTransformTurn(
 ): AsyncGenerator<TransformStreamEvent> {
   let text = ''
   try {
-    const { streamText } = await loadAiModule(() => import('ai'))
+    const { streamText } = await loadAiModule(() => import('../chunks/ai-chunk'))
     options.signal?.throwIfAborted()
     const result = streamText({
       model,

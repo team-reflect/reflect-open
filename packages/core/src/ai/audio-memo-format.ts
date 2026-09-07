@@ -95,7 +95,7 @@ export async function formatAudioMemoTranscript(
   }
 
   try {
-    const { generateText, Output } = await loadAiModule(() => import('ai'))
+    const { generateText, Output } = await loadAiModule(() => import('../chunks/ai-chunk'))
     const result = await generateText({
       model: await languageModel(config, request.credentials.apiKey, request.fetchFn ?? fetch),
       output: Output.object({ schema: formattedAudioMemoSchema }),

@@ -155,7 +155,7 @@ export async function* streamChatTurn(
       : [...stepMessages, { role: 'assistant', content: pendingText }]
 
   try {
-    const { isStepCount, streamText } = await loadAiModule(() => import('ai'))
+    const { isStepCount, streamText } = await loadAiModule(() => import('../../chunks/ai-chunk'))
     options.signal?.throwIfAborted()
     const result = streamText({
       model,

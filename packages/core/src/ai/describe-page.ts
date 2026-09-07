@@ -84,7 +84,7 @@ export function isDescriptionRejected(value: unknown): value is DescriptionRejec
 
 function classify(
   cause: unknown,
-  sdk: Pick<typeof import('ai'), 'APICallError' | 'NoObjectGeneratedError'>,
+  sdk: Pick<typeof import('../chunks/ai-chunk'), 'APICallError' | 'NoObjectGeneratedError'>,
 ): Error {
   if (sdk.APICallError.isInstance(cause)) {
     const status = cause.statusCode ?? 0
@@ -153,7 +153,7 @@ export function normalizedPageTitle(candidate: string): string | null {
  * itself.
  */
 export async function describePage(request: DescribePageRequest): Promise<PageEnrichment> {
-  const sdk = await loadAiModule(() => import('ai'))
+  const sdk = await loadAiModule(() => import('../chunks/ai-chunk'))
   const content: UserContent = [{ type: 'text', text: describePrompt(request) }]
   if (request.screenshotBase64) {
     content.push({

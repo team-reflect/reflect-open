@@ -24,11 +24,13 @@ export async function languageModel(
   }
   switch (config.provider) {
     case 'openai': {
-      const { createOpenAI } = await loadAiModule(() => import('@ai-sdk/openai'))
+      const { createOpenAI } = await loadAiModule(() => import('../chunks/aisdk-openai-chunk'))
       return createOpenAI({ apiKey, fetch: fetchFn })(config.model)
     }
     case 'anthropic': {
-      const { createAnthropic } = await loadAiModule(() => import('@ai-sdk/anthropic'))
+      const { createAnthropic } = await loadAiModule(
+        () => import('../chunks/aisdk-anthropic-chunk'),
+      )
       return createAnthropic({
         apiKey,
         fetch: fetchFn,
@@ -36,11 +38,11 @@ export async function languageModel(
       })(config.model)
     }
     case 'google': {
-      const { createGoogle } = await loadAiModule(() => import('@ai-sdk/google'))
+      const { createGoogle } = await loadAiModule(() => import('../chunks/aisdk-google-chunk'))
       return createGoogle({ apiKey, fetch: fetchFn })(config.model)
     }
     case 'openrouter': {
-      const { createOpenAI } = await loadAiModule(() => import('@ai-sdk/openai'))
+      const { createOpenAI } = await loadAiModule(() => import('../chunks/aisdk-openai-chunk'))
       return createOpenAI({
         apiKey,
         fetch: fetchFn,
@@ -51,7 +53,7 @@ export async function languageModel(
     }
     case 'openai-compatible': {
       const { createOpenAICompatible } = await loadAiModule(
-        () => import('@ai-sdk/openai-compatible'),
+        () => import('../chunks/aisdk-openai-compatible-chunk'),
       )
       return createOpenAICompatible({
         name: OPENAI_COMPATIBLE_PROVIDER_ID,
