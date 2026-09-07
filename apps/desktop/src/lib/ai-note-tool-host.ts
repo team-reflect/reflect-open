@@ -148,8 +148,6 @@ export interface DesktopChatNoteToolHost extends ChatNoteToolHost {
   settled: () => Promise<void>
 }
 
-class StalePreparedMutationError extends Error {}
-
 class GuardedAiReadError extends Error {
   constructor(readonly kind: 'blocked' | 'missing') {
     super(kind === 'blocked' ? 'note is owned by another live editor' : 'note is missing')
@@ -250,6 +248,7 @@ export function createDesktopChatNoteToolHost(
         let journalAttempted = false
         let requesterOwnerId: string | undefined
         const createdMs = dependencies.now()
+        const beforeRevision = await hashContent(input.beforeSource)
         const preparedChange: PrepareChatNoteChangeInput = {
           id: changeId,
           conversationId: options.conversationId,
@@ -260,7 +259,7 @@ export function createDesktopChatNoteToolHost(
           operation: input.kind,
           beforeSource: input.beforeSource,
           afterSource: input.afterSource,
-          beforeRevision: input.expectedRevision,
+          beforeRevision,
           afterRevision: await hashContent(input.afterSource),
           createdMs,
         }
@@ -281,25 +280,11 @@ export function createDesktopChatNoteToolHost(
             {
               open: async (session) => {
                 requesterOwnerId = session.ownerId ?? undefined
-                const beforeBody = splitFrontmatter(input.beforeSource).body
                 const afterBody = splitFrontmatter(input.afterSource).body
                 return await session.commitBodyMutation({
-                  expectedRevision: input.expectedRevision,
-                  transform: (body) => {
-                    if (body !== beforeBody) {
-                      throw new StalePreparedMutationError('the live note changed')
-                    }
-                    return afterBody
-                  },
-                  onPrepared: async (preparation) => {
-                    if (
-                      preparation.beforeSource !== input.beforeSource ||
-                      preparation.intendedSource !== input.afterSource
-                    ) {
-                      throw new StalePreparedMutationError('the live note changed')
-                    }
-                    await journal()
-                  },
+                  expectedRevision: beforeRevision,
+                  transform: () => afterBody,
+                  onPrepared: journal,
                 })
               },
               closed: async () => {
@@ -307,7 +292,7 @@ export function createDesktopChatNoteToolHost(
                 return await dependencies.writeNoteIfRevision(
                   input.path,
                   input.afterSource,
-                  input.expectedRevision,
+                  beforeRevision,
                   options.graphGeneration,
                 )
               },
@@ -467,9 +452,7 @@ export function createDesktopChatNoteToolHost(
               errorMessage(cause),
             )
           }
-          return cause instanceof StalePreparedMutationError
-            ? failure('stale', 'The note changed. Read it again before editing.')
-            : failure('failed', 'The note could not be changed.')
+          return failure('failed', 'The note could not be changed.')
         }
       }),
     )

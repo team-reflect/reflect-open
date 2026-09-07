@@ -53,7 +53,6 @@ export interface ApplyChatNoteChangeInput {
   title: string
   beforeSource: string
   afterSource: string
-  expectedRevision: string
 }
 
 /** New-note request handed to the host, which owns collision-safe creation. */
@@ -82,7 +81,6 @@ export type PreparedChatNoteChange =
       title: string
       beforeSource: string
       afterSource: string
-      revision: string
     }
   | Extract<NoteMutationOutput, { ok: false }>
 
@@ -173,7 +171,6 @@ async function prepareBodyMutation(
     title: beforeNote.title,
     beforeSource,
     afterSource,
-    revision: beforeRevision,
   }
 }
 

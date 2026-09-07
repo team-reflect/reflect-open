@@ -211,7 +211,6 @@ describe('write-mode note tools', () => {
       expect.objectContaining({
         kind: 'edit',
         toolCallId: 'tool-1',
-        expectedRevision: revision,
         beforeSource: source,
         afterSource: '# Atlas\n\nNew plan.\n',
       }),

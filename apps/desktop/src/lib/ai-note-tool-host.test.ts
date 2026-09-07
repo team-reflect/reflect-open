@@ -186,7 +186,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: BEFORE,
         afterSource: AFTER,
-        expectedRevision,
       }),
     ).resolves.toEqual({
       ok: true,
@@ -254,7 +253,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: BEFORE,
         afterSource: AFTER,
-        expectedRevision,
       }),
     ).resolves.toMatchObject({ ok: true, path: 'notes/project.md' })
 
@@ -315,7 +313,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: BEFORE,
         afterSource: AFTER,
-        expectedRevision: await hashContent(BEFORE),
       }),
     ).resolves.toEqual({
       ok: false,
@@ -343,7 +340,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: BEFORE,
         afterSource: AFTER,
-        expectedRevision: await hashContent(BEFORE),
       }),
     ).resolves.toEqual({
       ok: false,
@@ -373,7 +369,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: BEFORE,
         afterSource: AFTER,
-        expectedRevision: await hashContent(BEFORE),
       }),
     ).resolves.toMatchObject({ ok: true, path: 'notes/project.md' })
 
@@ -411,7 +406,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: BEFORE,
         afterSource: AFTER,
-        expectedRevision: await hashContent(BEFORE),
       }),
     ).resolves.toMatchObject({ ok: true, path: 'notes/project.md' })
     expect(readNoteForAi).toHaveBeenCalledWith('notes/project.md', 7, 'owner-live')
@@ -432,7 +426,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: BEFORE,
         afterSource: AFTER,
-        expectedRevision: await hashContent(BEFORE),
       }),
     ).resolves.toMatchObject({ ok: false, code: 'failed' })
     expect(setup.dependencies.setChangeState).toHaveBeenCalledWith(
@@ -456,7 +449,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: BEFORE,
         afterSource: AFTER,
-        expectedRevision: await hashContent(BEFORE),
       }),
     ).resolves.toMatchObject({ ok: false, code: 'failed' })
     expect(setup.dependencies.setChangeState).toHaveBeenCalledWith(
@@ -619,7 +611,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: BEFORE,
         afterSource: AFTER,
-        expectedRevision: await hashContent(BEFORE),
       }),
     ).resolves.toEqual({
       ok: false,
@@ -666,7 +657,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: BEFORE,
         afterSource: AFTER,
-        expectedRevision: await hashContent(BEFORE),
       }),
     ).resolves.toMatchObject({ ok: true, path: 'notes/project.md' })
     expect(setChangeState).toHaveBeenCalledTimes(2)
@@ -692,7 +682,6 @@ describe('createDesktopChatNoteToolHost', () => {
       title: 'Project',
       beforeSource: BEFORE,
       afterSource: AFTER,
-      expectedRevision: await hashContent(BEFORE),
     })
     await writeStarted.promise
 
@@ -720,7 +709,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: privateSource,
         afterSource: privateSource.replace('Before', 'After'),
-        expectedRevision: await hashContent(privateSource),
       }),
     ).resolves.toMatchObject({ ok: false, code: 'private' })
     expect(setup.dependencies.prepareChange).not.toHaveBeenCalled()
@@ -767,7 +755,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: BEFORE,
         afterSource: AFTER,
-        expectedRevision: await hashContent(BEFORE),
       }),
     ).resolves.toMatchObject({ ok: false, code: 'unavailable' })
     expect(setup.dependencies.prepareChange).not.toHaveBeenCalled()
@@ -785,7 +772,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: BEFORE,
         afterSource: AFTER,
-        expectedRevision: await hashContent(BEFORE),
       }),
     ).resolves.toMatchObject({ ok: false, code: 'unavailable' })
     await expect(
@@ -819,7 +805,6 @@ describe('createDesktopChatNoteToolHost', () => {
         title: 'Project',
         beforeSource: BEFORE,
         afterSource: AFTER,
-        expectedRevision: 'before-revision',
       })
 
     const firstMutation = mutation(first.host, 'notes/shared.md')

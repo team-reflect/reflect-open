@@ -111,7 +111,6 @@ export function buildWriteNoteTools(
             title: prepared.title,
             beforeSource: prepared.beforeSource,
             afterSource: prepared.afterSource,
-            expectedRevision: prepared.revision,
           }),
         )
         observeSuccessfulMutation(outcome, observeSource)
@@ -145,7 +144,6 @@ export function buildWriteNoteTools(
             title: prepared.title,
             beforeSource: prepared.beforeSource,
             afterSource: prepared.afterSource,
-            expectedRevision: prepared.revision,
           }),
         )
         observeSuccessfulMutation(outcome, observeSource)
