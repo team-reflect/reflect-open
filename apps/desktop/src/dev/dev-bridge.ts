@@ -27,10 +27,7 @@ const createArgsSchema = writeArgsSchema.extend({
   generation: z.number().int().nonnegative(),
   requesterOwnerId: z.string().optional(),
 })
-const revisionWriteArgsSchema = createArgsSchema.extend({
-  expectedRevision: z.string(),
-  requesterOwnerId: z.string().optional(),
-})
+const revisionWriteArgsSchema = createArgsSchema.extend({ expectedRevision: z.string() })
 const revisionTrashArgsSchema = z.object({
   path: z.string(),
   expectedRevision: z.string(),
