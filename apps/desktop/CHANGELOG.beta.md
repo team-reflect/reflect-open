@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.11.0...v0.12.0-beta) (2026-09-07)
+
+
+### Features
+
+* change graph colors from each graph menu row ([#1234](https://github.com/team-reflect/reflect-open/issues/1234)) ([8cbc3bb](https://github.com/team-reflect/reflect-open/commit/8cbc3bbd8e21b5f86a2f1db5d6b7988d980d5695))
+
+
+### Bug Fixes
+
+* load the AI SDK and provider packages on demand ([#1230](https://github.com/team-reflect/reflect-open/issues/1230)) ([7013ce0](https://github.com/team-reflect/reflect-open/commit/7013ce0d1bffa2dd15c0a658ac512549a337b702))
+
 ## [0.11.0-beta.17](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.16...v0.11.0-beta.17) (2026-09-07)
 
 
