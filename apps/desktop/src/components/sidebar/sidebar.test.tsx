@@ -125,6 +125,7 @@ beforeEach(() => {
   openRecent.mockClear()
   pickAndOpen.mockClear()
   chooseGraph.mockClear()
+  updateSettingsWith.mockClear()
   openNativeContextMenu.mockClear()
   unpinNote.mockClear()
 })
@@ -392,7 +393,7 @@ describe('Sidebar', () => {
     const { view } = await renderSidebar()
 
     await view.getByRole('button', { name: /Notes/ }).click()
-    const work = page.getByRole('menuitem', { name: 'Work' })
+    const work = page.getByRole('menuitem', { name: 'Work', exact: true })
     await expect.element(work).toBeVisible()
     expect(
       [...work.element().querySelectorAll('kbd')].map((keycap) => keycap.textContent),
@@ -470,17 +471,53 @@ describe('Sidebar', () => {
     expect(revealItemInDir).toHaveBeenCalledWith('/notes')
   })
 
-  it('the graph footer recolors the current graph', async () => {
+  it.each([
+    { name: 'Notes', root: '/notes' },
+    { name: 'Work', root: '/work' },
+  ])('recolors $name from its swatch without switching graphs', async ({ name, root }) => {
     const { view } = await renderSidebar()
 
     await view.getByRole('button', { name: /Notes/ }).click()
-    await page.getByRole('menuitem', { name: 'Graph color' }).click()
-    await page.getByRole('menuitem', { name: 'Teal' }).click()
-    await vi.waitFor(() => expect(updateSettingsWith).toHaveBeenCalled())
+    await expect
+      .element(page.getByRole('menuitem', { name: 'Graph color', exact: true }))
+      .not.toBeInTheDocument()
+    await page.getByRole('menuitem', { name: `Change color for ${name}` }).click()
+    await expect
+      .element(page.getByRole('menuitemradio', { name: 'Indigo' }))
+      .toHaveAttribute('aria-checked', 'true')
+    await page.getByRole('menuitemradio', { name: 'Teal' }).click()
+    await expect.element(page.getByRole('menuitemradio', { name: 'Teal' })).not.toBeInTheDocument()
+    expect(updateSettingsWith).toHaveBeenCalledTimes(1)
+    expect(openRecent).not.toHaveBeenCalled()
 
-    // The patch composes over the latest settings at apply time — feed the
-    // updater a document and check the record it builds.
     const updater = updateSettingsWith.mock.lastCall?.[0]
-    expect(updater?.(DEFAULT_SETTINGS)).toEqual({ graphColors: { '/notes': 'teal' } })
+    expect(updater?.({ ...DEFAULT_SETTINGS, graphColors: { '/other': 'red' } })).toEqual({
+      graphColors: { '/other': 'red', [root]: 'teal' },
+    })
+  })
+
+  it('opens and dismisses a graph color menu from the keyboard', async () => {
+    const { view } = await renderSidebar()
+    view.getByRole('button', { name: /Notes/ }).element().focus()
+    await userEvent.keyboard('{ArrowDown}')
+    const swatch = page.getByRole('menuitem', { name: 'Change color for Notes' })
+    await expect.element(swatch).toHaveFocus()
+    await userEvent.keyboard('{ArrowRight}')
+    await expect.element(page.getByRole('menuitemradio', { name: 'Indigo' })).toHaveFocus()
+    await userEvent.keyboard('{Escape}')
+    await expect.element(swatch).toHaveFocus()
+    await expect.element(swatch).toBeVisible()
+    expect(updateSettingsWith).not.toHaveBeenCalled()
+
+    await userEvent.keyboard('{ArrowRight}')
+    await expect.element(page.getByRole('menuitemradio', { name: 'Indigo' })).toHaveFocus()
+    await userEvent.keyboard('{ArrowDown}')
+    await expect.element(page.getByRole('menuitemradio', { name: 'Blue' })).toHaveFocus()
+    await userEvent.keyboard('{Enter}')
+    await vi.waitFor(() => expect(updateSettingsWith).toHaveBeenCalledTimes(1))
+    expect(updateSettingsWith.mock.lastCall?.[0](DEFAULT_SETTINGS)).toEqual({
+      graphColors: { '/notes': 'blue' },
+    })
+    expect(openRecent).not.toHaveBeenCalled()
   })
 })

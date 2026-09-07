@@ -1,26 +1,17 @@
 import { useRef, useState, type ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
-import {
-  Check,
-  FolderOpen,
-  GraduationCap,
-  LocateFixed,
-  PanelsTopLeft,
-  Settings,
-} from 'lucide-react'
+import { FolderOpen, GraduationCap, LocateFixed, PanelsTopLeft, Settings } from 'lucide-react'
 import { GraphSwatch } from '@/components/graph-swatch'
 import { ReflectAppsDialog } from '@/components/reflect-apps-dialog'
 import { ShortcutKeys } from '@/components/shortcut-keys'
+import { GraphMenuItem } from '@/components/sidebar/graph-menu-item'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -28,7 +19,6 @@ import { useGraphColors } from '@/hooks/use-graph-colors'
 import { keybindingFor } from '@/lib/commands/app-commands'
 import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
-import { DEFAULT_GRAPH_COLOR, GRAPH_COLOR_OPTIONS } from '@/lib/graph-colors'
 import { openUrlSync } from '@/lib/open-url'
 import { cn } from '@/lib/utils'
 import { isMainWindow } from '@/lib/windows/window-role'
@@ -79,8 +69,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
   const [appsOpen, setAppsOpen] = useState(false)
   const graphTriggerRef = useRef<HTMLButtonElement>(null)
   const { recents, indexing, openRecent, chooseGraph } = useGraph()
-  const { colorFor, setColor } = useGraphColors()
-  const currentColor = colorFor(graph.root) ?? DEFAULT_GRAPH_COLOR
+  const { colorFor } = useGraphColors()
   const { backup } = useSync()
   const { route } = useRouter()
   const dot = backupDot(backup)
@@ -132,58 +121,20 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
           <TooltipContent>{graph.root}</TooltipContent>
         </Tooltip>
         <DropdownMenuContent aria-label="Switch graph" side="top" sideOffset={6}>
-          {recents.map((recent, index) => {
-            const current = recent.root === graph.root
-            const binding = graphSwitchBindingFor(index)
-            return (
-              <Tooltip key={recent.root}>
-                <TooltipTrigger
-                  delay={700}
-                  render={
-                    <DropdownMenuItem
-                      onClick={() => {
-                        if (!current) {
-                          void openRecent(recent.root)
-                        }
-                      }}
-                      className={MENU_ITEM_CLASS}
-                    >
-                      <GraphSwatch color={colorFor(recent.root)} className="size-3.5 rounded" />
-                      <span className="min-w-0 flex-1 truncate">{recent.name}</span>
-                      {current ? (
-                        <Check aria-hidden className="size-3.5 shrink-0 text-accent" />
-                      ) : binding !== null ? (
-                        <ShortcutKeys binding={binding} className="text-[10px]" />
-                      ) : null}
-                    </DropdownMenuItem>
-                  }
-                />
-                <TooltipContent side="right">{recent.root}</TooltipContent>
-              </Tooltip>
-            )
-          })}
+          {recents.map((recent, index) => (
+            <GraphMenuItem
+              key={recent.root}
+              graph={recent}
+              current={recent.root === graph.root}
+              binding={graphSwitchBindingFor(index)}
+              onSelect={() => {
+                if (recent.root !== graph.root) {
+                  void openRecent(recent.root)
+                }
+              }}
+            />
+          ))}
           {recents.length > 0 ? <DropdownMenuSeparator /> : null}
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger className={MENU_ITEM_CLASS}>
-              <GraphSwatch color={currentColor} className="size-3.5 rounded" />
-              <span className="min-w-0 flex-1 truncate">Graph color</span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent aria-label="Graph color">
-              {GRAPH_COLOR_OPTIONS.map((option) => (
-                <DropdownMenuItem
-                  key={option.id}
-                  onClick={() => setColor(graph.root, option.id)}
-                  className={MENU_ITEM_CLASS}
-                >
-                  <GraphSwatch color={option.id} className="size-3.5 rounded" />
-                  <span className="min-w-0 flex-1">{option.label}</span>
-                  {option.id === currentColor ? (
-                    <Check aria-hidden className="size-3.5 shrink-0 text-accent" />
-                  ) : null}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
           <DropdownMenuItem
             onClick={() => {
               void revealItemInDir(graph.root).catch((cause: unknown) => {

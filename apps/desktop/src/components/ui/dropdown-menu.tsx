@@ -99,11 +99,14 @@ function DropdownMenuSub({ ...props }: MenuPrimitive.SubmenuRoot.Props) {
 }
 
 function DropdownMenuSubTrigger({
+  showChevron = true,
   className,
   inset,
   children,
   ...props
 }: MenuPrimitive.SubmenuTrigger.Props & {
+  /** Hide the trailing arrow for compact, icon-only submenu triggers. */
+  showChevron?: boolean
   inset?: boolean
 }) {
   return (
@@ -117,7 +120,7 @@ function DropdownMenuSubTrigger({
       {...props}
     >
       {children}
-      <ChevronRightIcon className="ml-auto" />
+      {showChevron ? <ChevronRightIcon className="ml-auto" /> : null}
     </MenuPrimitive.SubmenuTrigger>
   )
 }
