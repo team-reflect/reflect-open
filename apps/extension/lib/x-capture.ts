@@ -73,7 +73,8 @@ async function reconcile(
         : {}),
     }
   }
-  if (registrations.length) await browser.scripting.unregisterContentScripts({ ids: [SCRIPT_ID] })
+  if (registrations.length > 0)
+    await browser.scripting.unregisterContentScripts({ ids: [SCRIPT_ID] })
   const tabs = await browser.tabs.query({})
   await Promise.allSettled(
     tabs.map(async (tab) => {
@@ -133,7 +134,7 @@ export function installXCaptureHandlers(): void {
     return true
   })
   const refresh = () => {
-    void serialize(async () => reconcile(await readSettings())).catch((cause: unknown) =>
+    void serialize(async () => await reconcile(await readSettings())).catch((cause: unknown) =>
       console.error('X capture settings failed:', cause),
     )
   }

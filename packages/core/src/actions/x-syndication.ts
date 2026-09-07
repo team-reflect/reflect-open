@@ -4,7 +4,7 @@ import { captureJsonFetch } from '../graph/commands'
 import { xPostSchema, type XPost } from './capture-envelope'
 
 const postSchema = z.object({
-  id_str: z.string().regex(/^[0-9]{1,20}$/),
+  id_str: z.string().regex(/^\d{1,20}$/),
   text: z.string().optional(),
   display_text_range: z
     .tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])
@@ -95,7 +95,7 @@ export async function fetchSyndicatedXPost(id: string): Promise<XPost | null> {
     }))
   const parsed = xPostSchema.safeParse({
     ...normalizedPost(post, 20_000),
-    ...(images.length ? { images } : {}),
+    ...(images.length > 0 ? { images } : {}),
     ...(post.quoted_tweet ? { quote: normalizedPost(post.quoted_tweet, 5000) } : {}),
   })
   return parsed.success ? parsed.data : null

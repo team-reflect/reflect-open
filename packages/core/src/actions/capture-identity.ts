@@ -63,7 +63,7 @@ export function captureIdentity(capturedAt: Date, envelopeId: string): CaptureId
  */
 export function captureFromPath(path: string): CaptureIdentity | null {
   const xMatch =
-    /^notes\/(capture-x-(\d{4}-\d{2}-\d{2})-(?:[0-9]{1,20}|manual-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}))\.md$/.exec(
+    /^notes\/(capture-x-(\d{4}-\d{2}-\d{2})-(?:\d{1,20}|manual-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}))\.md$/.exec(
       path,
     )
   if (xMatch?.[1] && xMatch[2]) {

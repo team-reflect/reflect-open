@@ -240,7 +240,7 @@ describe('X capture snapshots', () => {
     )
     getSecretMock.mockRejectedValue(new ReflectError('auth', 'keychain locked'))
     expect((await reconcile()).enriched).toBe(1)
-    expect(source()).toContain('The complete text from the page\\.')
+    expect(source()).toContain(String.raw`The complete text from the page\.`)
     expect(source()).not.toContain('Short preview')
     expect(source()).toContain(`![Post image](assets/capture-${FIRST_ID}-1.jpg)`)
     expect(source()).toContain('## Note\n\nKeep my Markdown')

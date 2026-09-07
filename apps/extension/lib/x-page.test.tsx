@@ -56,8 +56,7 @@ it('ignores selected icons and unrelated mutations, then captures a confirmed us
   button.addEventListener('click', () => button.setAttribute('aria-pressed', 'true'))
   await userEvent.click(page.getByRole('button', { name: 'Bookmark' }))
   await vi.waitFor(() => expect(capture).toHaveBeenCalledTimes(1))
-  expect(capture.mock.calls[0]?.[0].id).toBe('123')
-  expect(capture.mock.calls[0]?.[1]).toBe('bookmark')
+  expect(capture).toHaveBeenCalledWith(expect.objectContaining({ id: '123' }), 'bookmark')
 })
 
 it('stops observing after cleanup and a replacement watcher handles keyboard activation once', async () => {

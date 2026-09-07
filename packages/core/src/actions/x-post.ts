@@ -30,7 +30,7 @@ export function xPostId(value: string): string | null {
     return null
   }
   return (
-    /^\/(?:[a-zA-Z0-9_]+|i\/web)\/status\/(\d{1,20})(?:\/(?:photo|video)\/\d+)?\/?$/.exec(
+    /^\/(?:\w+|i\/web)\/status\/(\d{1,20})(?:\/(?:photo|video)\/\d+)?\/?$/.exec(
       url.pathname,
     )?.[1] ?? null
   )

@@ -41,7 +41,7 @@ export function readXArticle(article: Element, includeQuote = true): XPost | und
   )
   const handle = (
     author?.textContent ?? authorLinks.map((element) => element.textContent).join(' ')
-  ).match(/@([A-Za-z0-9_]{1,32})/)?.[1]
+  ).match(/@(\w{1,32})/)?.[1]
   const name = (
     author?.querySelector('a span')?.textContent ??
     authorLinks.find((element) => element.textContent?.trim() && !element.textContent.includes('@'))
@@ -75,7 +75,7 @@ export function readXArticle(article: Element, includeQuote = true): XPost | und
     id,
     ...(handle && name ? { author: { name, handle } } : {}),
     ...(text ? { text } : {}),
-    ...(images.length ? { images } : {}),
+    ...(images.length > 0 ? { images } : {}),
     ...(quotePost
       ? {
           quote: {
@@ -125,7 +125,7 @@ export function watchXActions(onCapture: (post: XPost, trigger: Trigger) => void
         ownElements(
           action.article,
           `[data-testid="${selected}"], button[aria-label="${action.trigger === 'bookmark' ? 'Bookmark' : 'Like'}"][aria-pressed="true"]`,
-        ).length
+        ).length > 0
       ) {
         pending.delete(key)
         const post = readXArticle(action.article)
@@ -161,8 +161,8 @@ export function watchXActions(onCapture: (post: XPost, trigger: Trigger) => void
     timer = setTimeout(confirm, 3100)
   }
 
-  document.addEventListener('click', onAction, true)
-  document.addEventListener('keydown', onAction, true)
+  document.addEventListener('click', onAction, { capture: true })
+  document.addEventListener('keydown', onAction, { capture: true })
   return () => {
     document.removeEventListener('click', onAction, true)
     document.removeEventListener('keydown', onAction, true)

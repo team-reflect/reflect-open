@@ -4,7 +4,7 @@ import type { XCaptureInput } from './x-capture'
 import { xPostUrl } from './x-post'
 
 function plainText(value: string): string {
-  return value.replaceAll(/[\\`*_{}\[\]()#+\-.!|<>]/g, '\\$&')
+  return value.replaceAll(/[\\`*_{}[\]()#+\-.!|<>]/g, String.raw`\$&`)
 }
 
 /** A stable, readable heading even when only the post URL was captured. */
