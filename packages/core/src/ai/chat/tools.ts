@@ -1,4 +1,4 @@
-import { tool, type Tool, type TypedToolCall, type TypedToolResult } from 'ai'
+import type { Tool, TypedToolCall, TypedToolResult } from 'ai'
 import { z } from 'zod'
 import { readNote } from '../../graph/commands'
 import { retrieve, type RetrievalHit, type RetrieveOptions } from '../../embeddings/retrieve'
@@ -171,7 +171,7 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
   })
 
   return {
-    search_notes: tool({
+    search_notes: {
       description: searchNotesDescription(options.semanticSearchEnabled !== false),
       inputSchema: searchNotesInput,
       execute: async ({ query, limit }): Promise<SearchNotesOutput> => {
@@ -182,9 +182,9 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
         })
         return { hits: await cloudSafeSearchHits(hits, isPrivateLive) }
       },
-    }),
+    },
 
-    list_recent_notes: tool({
+    list_recent_notes: {
       description:
         'List the most recently edited notes, newest first — call it with no tag to see ' +
         'what the user wrote or worked on lately. Pass a tag only to narrow to notes ' +
@@ -204,9 +204,9 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
           notes: await cloudSafeNoteListings(rows.map(listingCandidate), isPrivateLive),
         }
       },
-    }),
+    },
 
-    list_daily_notes: tool({
+    list_daily_notes: {
       description:
         'List the daily notes (the user’s journal, one note per day) in an inclusive date ' +
         'range, most recent first. Only days the user wrote on appear. Returns at most ' +
@@ -222,9 +222,9 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
           truncated,
         }
       },
-    }),
+    },
 
-    read_notes: tool({
+    read_notes: {
       description:
         'Read the full markdown content of one or more notes by their graph-relative ' +
         'paths (from search_notes results). Pass every note you need in a single call ' +
@@ -233,9 +233,9 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
       execute: async ({ paths }): Promise<ReadNotesOutput> => {
         return { notes: await Promise.all(paths.map(readOneNote)) }
       },
-    }),
+    },
 
-    read_assets: tool({
+    read_assets: {
       description:
         'Read the stored text description and OCR transcription of image or PDF ' +
         'attachments that notes embed as assets/… markdown links, e.g. ' +
@@ -246,7 +246,7 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
       execute: async ({ paths }): Promise<ReadAssetsOutput> => {
         return { assets: await Promise.all(paths.map(readOneAsset)) }
       },
-    }),
+    },
   }
 }
 

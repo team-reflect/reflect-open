@@ -1,4 +1,4 @@
-import { generateText, Output } from 'ai'
+import { loadAiModule } from './load-ai-module'
 import { z } from 'zod'
 import type { AiProvidersState } from './provider-config'
 import type { AiProviderConfig } from '../settings/schema'
@@ -142,8 +142,9 @@ export async function generateAudioMemoTitle(
     return fallback
   }
   try {
+    const { generateText, Output } = await loadAiModule(() => import('ai'))
     const result = await generateText({
-      model: languageModel(titleConfig, request.credentials.apiKey, request.fetchFn ?? fetch),
+      model: await languageModel(titleConfig, request.credentials.apiKey, request.fetchFn ?? fetch),
       output: Output.object({ schema: audioMemoTitleSchema }),
       prompt: titlePrompt(request.transcript),
       abortSignal: AbortSignal.timeout(TITLE_TIMEOUT_MS),

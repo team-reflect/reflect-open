@@ -1,4 +1,5 @@
-import { APICallError, generateText, type UserContent } from 'ai'
+import { loadAiModule } from './load-ai-module'
+import type { UserContent } from 'ai'
 import { ReflectError } from '../errors'
 import type { AiProviderConfig } from '../settings/schema'
 import { languageModel } from './language-model'
@@ -57,8 +58,8 @@ export function isAssetDescriptionRejected(value: unknown): value is AssetDescri
   return value instanceof AssetDescriptionRejectedError
 }
 
-function classify(cause: unknown): Error {
-  if (APICallError.isInstance(cause)) {
+function classify(cause: unknown, sdk: Pick<typeof import('ai'), 'APICallError'>): Error {
+  if (sdk.APICallError.isInstance(cause)) {
     const status = cause.statusCode ?? 0
     if (status === 401 || status === 403) {
       return new ReflectError('auth', `the provider rejected the API key (${status})`)
@@ -106,6 +107,7 @@ function describePrompt(kind: AssetKind, filename: string): string {
  * (`maxRetries: 0`).
  */
 export async function describeAsset(request: DescribeAssetRequest): Promise<string> {
+  const sdk = await loadAiModule(() => import('ai'))
   const content: UserContent = [
     { type: 'text', text: describePrompt(request.kind, request.filename) },
   ]
@@ -122,14 +124,14 @@ export async function describeAsset(request: DescribeAssetRequest): Promise<stri
     content.push({ type: 'text', text: `SVG source:\n${request.data.slice(0, MAX_SVG_CHARS)}` })
   }
   try {
-    const result = await generateText({
-      model: languageModel(request.config, request.apiKey, request.fetchFn ?? fetch),
+    const result = await sdk.generateText({
+      model: await languageModel(request.config, request.apiKey, request.fetchFn ?? fetch),
       messages: [{ role: 'user', content }],
       abortSignal: AbortSignal.timeout(DESCRIBE_TIMEOUT_MS),
       maxRetries: 0,
     })
     return result.text.trim()
   } catch (cause) {
-    throw classify(cause)
+    throw classify(cause, sdk)
   }
 }
