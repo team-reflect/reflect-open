@@ -4,8 +4,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { NoteRow } from '@reflect/core'
 import {
   applyNoteRowOverlay,
+  clearNoteRowOverlay,
   getNoteRowOverlay,
+  pinOverlays,
   reconcileNoteRowOverlay,
+  reconcilePinOverlays,
   resetNoteRowOverlays,
   setNoteRowOverlay,
   useNoteRowOverlay,
@@ -151,5 +154,73 @@ describe('resetNoteRowOverlays', () => {
 
     act(() => resetNoteRowOverlays())
     expect(result.current).toBeNull()
+  })
+})
+
+describe('clearNoteRowOverlay', () => {
+  it('drops only the named field, leaving another action\'s assertion', () => {
+    setNoteRowOverlay('notes/a.md', GEN, { gistUrl: URL, isPinned: true })
+
+    clearNoteRowOverlay('notes/a.md', GEN, { isPinned: true })
+
+    expect(getNoteRowOverlay('notes/a.md', GEN)).toEqual({ gistUrl: URL })
+  })
+
+  it('drops the whole entry once nothing is left', () => {
+    setNoteRowOverlay('notes/a.md', GEN, { isPrivate: true })
+
+    clearNoteRowOverlay('notes/a.md', GEN, { isPrivate: true })
+
+    expect(getNoteRowOverlay('notes/a.md', GEN)).toBeNull()
+  })
+
+  it('ignores a generation the entry was not written under', () => {
+    setNoteRowOverlay('notes/a.md', GEN, { isPinned: true })
+
+    clearNoteRowOverlay('notes/a.md', GEN + 1, { isPinned: true })
+
+    expect(getNoteRowOverlay('notes/a.md', GEN)).toEqual({ isPinned: true })
+  })
+})
+
+describe('pin assertions', () => {
+  it('reports every asserted pin on the generation', () => {
+    setNoteRowOverlay('notes/a.md', GEN, { isPinned: true })
+    setNoteRowOverlay('notes/b.md', GEN, { isPinned: false })
+    setNoteRowOverlay('notes/c.md', GEN, { gistUrl: URL })
+    setNoteRowOverlay('notes/d.md', GEN + 1, { isPinned: true })
+
+    expect(pinOverlays(GEN)).toEqual([
+      { path: 'notes/a.md', isPinned: true },
+      { path: 'notes/b.md', isPinned: false },
+    ])
+  })
+
+  it('retires an assertion the shelf has caught up to, and holds one it has not', () => {
+    setNoteRowOverlay('notes/a.md', GEN, { isPinned: true })
+    setNoteRowOverlay('notes/b.md', GEN, { isPinned: true })
+
+    reconcilePinOverlays(GEN, new Set(['notes/a.md']))
+
+    expect(getNoteRowOverlay('notes/a.md', GEN)).toBeNull()
+    expect(getNoteRowOverlay('notes/b.md', GEN)).toEqual({ isPinned: true })
+  })
+
+  it('retires an unpin assertion once the shelf drops the note', () => {
+    setNoteRowOverlay('notes/a.md', GEN, { isPinned: false })
+
+    reconcilePinOverlays(GEN, new Set(['notes/a.md']))
+    expect(getNoteRowOverlay('notes/a.md', GEN)).toEqual({ isPinned: false })
+
+    reconcilePinOverlays(GEN, new Set())
+    expect(getNoteRowOverlay('notes/a.md', GEN)).toBeNull()
+  })
+
+  it('keeps another action\'s assertion when the pin half retires', () => {
+    setNoteRowOverlay('notes/a.md', GEN, { isPinned: true, gistUrl: URL })
+
+    reconcilePinOverlays(GEN, new Set(['notes/a.md']))
+
+    expect(getNoteRowOverlay('notes/a.md', GEN)).toEqual({ gistUrl: URL })
   })
 })

@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  getNoteRowOverlay,
+  resetNoteRowOverlays,
+  setNoteRowOverlay,
+} from '@/hooks/note-row-overlay'
 import type { NoteSession } from '@/editor/note-session'
 
 const readNote = vi.hoisted(() => vi.fn<(path: string) => Promise<string>>())
@@ -19,6 +24,7 @@ beforeEach(() => {
   writeNote.mockClear()
   openSession.mockReset()
   openSession.mockReturnValue(null)
+  resetNoteRowOverlays()
 })
 
 function fakeSession(content: string, canCommit = true, liveContent: string | null = content) {
@@ -139,5 +145,54 @@ describe('reorderPinnedNotes', () => {
 
     expect(commitFrontmatter).toHaveBeenCalledWith({ pinned: 0 })
     expect(writeNote).not.toHaveBeenCalled()
+  })
+})
+
+describe('pin assertions', () => {
+  it('asserts the new pin state before the write lands', async () => {
+    // The whole point of asserting inside the write: ⌘O and the palette carry
+    // no optimism of their own, so every reader has to see the flip from here.
+    readNote.mockResolvedValue('# A\n')
+    let landed!: () => void
+    writeNote.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          landed = resolve
+        }),
+    )
+
+    const toggled = toggleNotePinned('notes/a.md', 3)
+    await vi.waitFor(() => expect(getNoteRowOverlay('notes/a.md', 3)).toEqual({ isPinned: true }))
+
+    landed()
+    await expect(toggled).resolves.toBe(true)
+    expect(getNoteRowOverlay('notes/a.md', 3)).toEqual({ isPinned: true })
+  })
+
+  it('asserts the unpin an explicit unpin performs', async () => {
+    readNote.mockResolvedValue('---\npinned: true\n---\n# A\n')
+
+    await unpinNote('notes/a.md', 3)
+
+    expect(getNoteRowOverlay('notes/a.md', 3)).toEqual({ isPinned: false })
+  })
+
+  it('retracts the assertion when the write fails', async () => {
+    readNote.mockResolvedValue('# A\n')
+    writeNote.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
+
+    await expect(toggleNotePinned('notes/a.md', 3)).rejects.toMatchObject({ kind: 'io' })
+
+    expect(getNoteRowOverlay('notes/a.md', 3)).toBeNull()
+  })
+
+  it('leaves another action\'s assertion on the same note alone', async () => {
+    setNoteRowOverlay('notes/a.md', 3, { gistUrl: 'https://gist.example/1' })
+    readNote.mockResolvedValue('# A\n')
+    writeNote.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
+
+    await expect(toggleNotePinned('notes/a.md', 3)).rejects.toMatchObject({ kind: 'io' })
+
+    expect(getNoteRowOverlay('notes/a.md', 3)).toEqual({ gistUrl: 'https://gist.example/1' })
   })
 })

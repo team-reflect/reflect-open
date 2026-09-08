@@ -21,10 +21,6 @@ interface NoteToggleActionProps {
   keybinding?: string | null
   /** Optional tooltip explaining the flag's meaning. */
   tooltip?: string
-  /** Optional side-effect for surfaces that also expose this flag elsewhere. */
-  applyOptimistic?: (active: boolean) => void
-  /** Optional reconciliation for optimistic side effects after a failed write. */
-  onFailure?: () => void
 }
 
 /**
@@ -42,16 +38,12 @@ export function NoteToggleAction({
   failureLabel,
   keybinding = null,
   tooltip,
-  applyOptimistic,
-  onFailure,
 }: NoteToggleActionProps): ReactElement {
   const { isActive, isToggling, toggleActive } = useBridgedNoteToggle({
     path,
     indexActive,
     toggle,
     failureLabel,
-    applyOptimistic,
-    onFailure,
   })
 
   const button = (

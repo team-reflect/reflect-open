@@ -12,10 +12,6 @@ export interface UseBridgedNoteToggleOptions {
   readonly toggle: (path: string, generation: number) => Promise<boolean>
   /** Operation label for surfaced write failures. */
   readonly failureLabel: string | ((active: boolean) => string)
-  /** Optional side-effect for surfaces that mirror the same state elsewhere. */
-  readonly applyOptimistic?: ((active: boolean) => void) | undefined
-  /** Optional reconciliation after a failed optimistic side-effect. */
-  readonly onFailure?: (() => void) | undefined
 }
 
 export interface BridgedNoteToggle {
@@ -44,14 +40,17 @@ function resolvedFailureLabel(
  * or local write echo catches up. The toggle result is fresher than the index,
  * so holding it locally prevents a stale second tap from silently undoing the
  * user's action.
+ *
+ * The *shared* optimism belongs to the write itself (`toggleNotePinned` and
+ * `toggleNotePrivate` assert their result as a note-row overlay, so a keyboard
+ * or palette flip moves every surface too). This hook keeps only what is local
+ * to one button: its in-flight guard, and its own view of the flag.
  */
 export function useBridgedNoteToggle({
   path,
   indexActive,
   toggle,
   failureLabel,
-  applyOptimistic,
-  onFailure,
 }: UseBridgedNoteToggleOptions): BridgedNoteToggle {
   const { graph } = useGraph()
   const [isToggling, setIsToggling] = useState(false)
@@ -70,20 +69,13 @@ export function useBridgedNoteToggle({
     }
 
     const activeBeforeToggle = isActive
-    const optimisticActive = !activeBeforeToggle
-    applyOptimistic?.(optimisticActive)
-    setPending({ path, active: optimisticActive })
+    setPending({ path, active: !activeBeforeToggle })
     setIsToggling(true)
 
     try {
-      const active = await toggle(path, generation)
-      if (active !== optimisticActive) {
-        applyOptimistic?.(active)
-      }
-      setPending({ path, active })
+      setPending({ path, active: await toggle(path, generation) })
     } catch (cause) {
       setPending(null)
-      onFailure?.()
       startOperation(resolvedFailureLabel(failureLabel, activeBeforeToggle)).fail(
         errorMessage(cause),
       )

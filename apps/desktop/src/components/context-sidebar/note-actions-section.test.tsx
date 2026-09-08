@@ -2,9 +2,7 @@ import { render } from 'vitest-browser-react'
 import { page, userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PinnedNote } from '@reflect/core'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { queryKeys } from '@/lib/query-client'
 import { RouterProvider } from '@/routing/router'
 import { NoteActionsSection } from './note-actions-section'
 
@@ -38,7 +36,7 @@ vi.mock('@/providers/graph-provider', () => ({
 
 async function renderSection(path: string, showTrash = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const view = await render(
+  return await render(
     <TooltipProvider>
       <QueryClientProvider client={client}>
         <RouterProvider initialRoute={{ kind: 'note', path }}>
@@ -47,7 +45,6 @@ async function renderSection(path: string, showTrash = false) {
       </QueryClientProvider>
     </TooltipProvider>,
   )
-  return { ...view, client }
 }
 
 beforeEach(() => {
@@ -62,8 +59,8 @@ beforeEach(() => {
   isApplePlatform.mockReturnValue(false)
 })
 
-function noteRow(path: string, isPrivate: boolean, title = 'A') {
-  return { path, title, dailyDate: null, isPrivate }
+function noteRow(path: string, isPrivate: boolean, title = 'A', isPinned = false) {
+  return { path, title, dailyDate: null, isPinned, isPrivate }
 }
 
 describe('NoteActionsSection pin toggle', () => {
@@ -77,10 +74,8 @@ describe('NoteActionsSection pin toggle', () => {
     await view.unmount()
   })
 
-  it('offers Un-pin this note when the index lists the note as pinned', async () => {
-    getPinnedNotes.mockResolvedValue([
-      { path: 'daily/2026-06-10.md', title: 'June 10th, 2026', dailyDate: '2026-06-10' },
-    ])
+  it('offers Un-pin this note when the index row reports the note pinned', async () => {
+    getNote.mockResolvedValue(noteRow('daily/2026-06-10.md', false, 'June 10th, 2026', true))
     const view = await renderSection('daily/2026-06-10.md')
     await expect.element(view.getByText('Un-pin this note')).toBeInTheDocument()
     await userEvent.click(view.getByRole('button', { name: /Un-pin this note/ }))
@@ -101,34 +96,7 @@ describe('NoteActionsSection pin toggle', () => {
     await view.unmount()
   })
 
-  it('optimistically adds a newly pinned note after explicitly ordered pins', async () => {
-    getPinnedNotes.mockResolvedValue([
-      { path: 'notes/zeta.md', title: 'Zeta', dailyDate: null, pinnedOrder: 0 },
-      { path: 'notes/alpha.md', title: 'Alpha', dailyDate: null, pinnedOrder: 1 },
-    ])
-    getNote.mockResolvedValue(noteRow('notes/mid.md', false, 'Mid'))
-    const view = await renderSection('notes/mid.md')
-    const queryKey = queryKeys.index.pinnedNotes('/g')
-    await vi.waitFor(() =>
-      expect(view.client.getQueryData<PinnedNote[]>(queryKey)?.map((note) => note.title)).toEqual([
-        'Zeta',
-        'Alpha',
-      ]),
-    )
-
-    await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
-
-    await vi.waitFor(() =>
-      expect(view.client.getQueryData<PinnedNote[]>(queryKey)?.map((note) => note.title)).toEqual([
-        'Zeta',
-        'Alpha',
-        'Mid',
-      ]),
-    )
-    await view.unmount()
-  })
-
-  it('invalidates pinned notes when an optimistic pin fails', async () => {
+  it('restores the pin label when a write fails', async () => {
     let rejectToggle!: (cause: unknown) => void
     toggleNotePinned.mockImplementationOnce(
       () =>
@@ -137,14 +105,12 @@ describe('NoteActionsSection pin toggle', () => {
         }),
     )
     const view = await renderSection('notes/a.md')
-    await vi.waitFor(() => expect(getPinnedNotes).toHaveBeenCalledTimes(1))
 
     await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
     await expect.element(view.getByText('Un-pin this note')).toBeInTheDocument()
     rejectToggle({ kind: 'io', message: 'disk on fire' })
 
     await expect.element(view.getByText('Pin this note', { exact: true })).toBeInTheDocument()
-    await vi.waitFor(() => expect(getPinnedNotes).toHaveBeenCalledTimes(2))
     expect(startOperation).toHaveBeenCalledWith('Updating pin')
     expect(operationFail).toHaveBeenCalled()
     await view.unmount()

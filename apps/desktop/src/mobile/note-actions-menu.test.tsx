@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GraphInfo } from '@reflect/core'
 
 const useNoteRowState = vi.hoisted(() => vi.fn())
-const usePinnedNotes = vi.hoisted(() => vi.fn())
 const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
 const toggleNotePrivate = vi.hoisted(() => vi.fn(async () => true))
 const deleteOpenNote = vi.hoisted(() => vi.fn(async () => {}))
@@ -116,7 +115,6 @@ vi.mock('@/providers/graph-provider', async () => {
   }
 })
 vi.mock('@/hooks/use-note-row', () => ({ useNoteRowState }))
-vi.mock('@/hooks/use-pinned-notes', () => ({ usePinnedNotes }))
 vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
 vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
 vi.mock('@/lib/note-delete', () => ({ deleteOpenNote }))
@@ -129,25 +127,23 @@ let currentNoteRow: {
   path: string
   title: string
   dailyDate: string | null
+  isPinned: boolean
   isPrivate: boolean
 } | null
 let currentNoteRowSettled: boolean
-let currentPinnedNotes: Array<{ path: string; title: string; dailyDate: string | null }>
 
-function noteRow(path: string, isPrivate: boolean, title = 'Meeting') {
-  return { path, title, dailyDate: null, isPrivate }
+function noteRow(path: string, isPrivate: boolean, title = 'Meeting', isPinned = false) {
+  return { path, title, dailyDate: null, isPinned, isPrivate }
 }
 
 beforeEach(() => {
   graphStore.set({ root: '/g', name: 'g', generation: 7 })
   currentNoteRow = noteRow('notes/meeting.md', false)
   currentNoteRowSettled = true
-  currentPinnedNotes = []
   useNoteRowState.mockImplementation(() => ({
     row: currentNoteRow,
     settled: currentNoteRowSettled,
   }))
-  usePinnedNotes.mockImplementation(() => currentPinnedNotes)
   toggleNotePinned.mockReset().mockResolvedValue(true)
   toggleNotePrivate.mockReset().mockResolvedValue(true)
   deleteOpenNote.mockReset().mockResolvedValue(undefined)
@@ -255,6 +251,15 @@ describe('NoteActionsMenu', () => {
 
     await vi.waitFor(() => expect(toggleNotePinned).toHaveBeenCalledWith('notes/meeting.md', 7))
     await expect.element(view.getByRole('button', { name: 'Pin' })).not.toBeInTheDocument()
+  })
+
+  it('offers Unpin when the index row reports the note pinned', async () => {
+    currentNoteRow = noteRow('notes/meeting.md', false, 'Meeting', true)
+    const { view } = await mount()
+
+    await openActions()
+
+    await expect.element(view.getByRole('button', { name: 'Unpin' })).toBeInTheDocument()
   })
 
   it('keeps the share action intact and closes the drawer', async () => {

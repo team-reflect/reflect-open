@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { getNoteRowOverlay, resetNoteRowOverlays } from '@/hooks/note-row-overlay'
 import type { NoteSession } from '@/editor/note-session'
 
 const readNote = vi.hoisted(() => vi.fn<(path: string) => Promise<string>>())
@@ -19,6 +20,7 @@ beforeEach(() => {
   writeNote.mockClear()
   openSession.mockReset()
   openSession.mockReturnValue(null)
+  resetNoteRowOverlays()
 })
 
 function fakeSession(content: string, canCommit = true, liveContent: string | null = content) {
@@ -96,5 +98,33 @@ describe('toggleNotePrivate', () => {
     readNote.mockRejectedValue({ kind: 'io', message: 'disk on fire' })
     await expect(toggleNotePrivate('notes/a.md', 3)).rejects.toMatchObject({ kind: 'io' })
     expect(writeNote).not.toHaveBeenCalled()
+  })
+})
+
+describe('privacy assertions', () => {
+  it('asserts the new privacy flag before the write lands', async () => {
+    readNote.mockResolvedValue('# A\n')
+    let landed!: () => void
+    writeNote.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          landed = resolve
+        }),
+    )
+
+    const toggled = toggleNotePrivate('notes/a.md', 3)
+    await vi.waitFor(() => expect(getNoteRowOverlay('notes/a.md', 3)).toEqual({ isPrivate: true }))
+
+    landed()
+    await expect(toggled).resolves.toBe(true)
+  })
+
+  it('retracts the assertion when the write fails', async () => {
+    readNote.mockResolvedValue('# A\n')
+    writeNote.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
+
+    await expect(toggleNotePrivate('notes/a.md', 3)).rejects.toMatchObject({ kind: 'io' })
+
+    expect(getNoteRowOverlay('notes/a.md', 3)).toBeNull()
   })
 })
