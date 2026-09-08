@@ -6,7 +6,12 @@ import { parseNote } from '../markdown/extract'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
 import type { AiProviderConfig } from '../settings/schema'
 import type { CaptureIdentity } from './capture-identity'
-import { isXCapturePath, xCaptureFrontmatter, xCaptureMeta, type XCaptureMeta } from './x-capture-note'
+import {
+  isXCapturePath,
+  xCaptureFrontmatter,
+  xCaptureMeta,
+  type XCaptureMeta,
+} from './x-capture-note'
 import {
   captureNoteMeta,
   notePrivate,
@@ -171,11 +176,15 @@ export async function persistCaptureEnrichment(
   const snapshot = await readPendingCaptureSnapshot(input.identity, input.generation)
   const dailySource = await noteSource(dailyPath(input.identity.date), input.generation)
   const expected = input.expectedCapture
-  if (expected && (xCaptureFrontmatter(dailySource).private
-    || snapshot?.meta.captureKind !== expected.captureKind
-    || snapshot.meta.captureDay !== expected.captureDay
-    || snapshot.meta.captureUrl !== expected.captureUrl
-    || input.identity.date !== expected.captureDay)) return null
+  if (
+    expected &&
+    (xCaptureFrontmatter(dailySource).private ||
+      snapshot?.meta.captureKind !== expected.captureKind ||
+      snapshot.meta.captureDay !== expected.captureDay ||
+      snapshot.meta.captureUrl !== expected.captureUrl ||
+      input.identity.date !== expected.captureDay)
+  )
+    return null
   if (
     snapshot === null ||
     snapshot.title !== input.fromTitle ||

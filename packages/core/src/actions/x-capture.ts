@@ -1,8 +1,18 @@
 import { isAppError, ReflectError } from '../errors'
-import { captureInboxRemove, createNoteIfAbsent, promoteCaptureScreenshot, readNote, writeNote } from '../graph/commands'
+import {
+  captureInboxRemove,
+  createNoteIfAbsent,
+  promoteCaptureScreenshot,
+  readNote,
+  writeNote,
+} from '../graph/commands'
 import { dailyPath } from '../graph/paths'
 import { hashContent } from '../indexing/hash'
-import { appendListItemUnderBacklinkedHeading, upgradeSectionHeadingBacklink, wikiLinkSafe } from '../markdown/edit'
+import {
+  appendListItemUnderBacklinkedHeading,
+  upgradeSectionHeadingBacklink,
+  wikiLinkSafe,
+} from '../markdown/edit'
 import { parseNote } from '../markdown/extract'
 import { splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
 import { ensureBacklinkTarget } from './backlink-target'
@@ -10,7 +20,15 @@ import type { CaptureEnvelope } from './capture-envelope'
 import { persistCaptureEnrichment } from './capture-enrichment-write'
 import { captureLocalDate, type CaptureIdentity } from './capture-identity'
 import { noteSource } from './capture-note'
-import { appendXText, xCaptureFromSource, xCaptureFrontmatter, xCaptureIdentity, xCaptureMeta, xCaptureSource, type XCaptureMeta } from './x-capture-note'
+import {
+  appendXText,
+  xCaptureFromSource,
+  xCaptureFrontmatter,
+  xCaptureIdentity,
+  xCaptureMeta,
+  xCaptureSource,
+  type XCaptureMeta,
+} from './x-capture-note'
 import { xPostId } from './x-post'
 import { fetchXText } from './x-syndication'
 
@@ -29,8 +47,11 @@ interface XCapture {
 }
 
 function canTouch(identity: CaptureIdentity, input: XCaptureInput): boolean {
-  return !input.isStale?.() && !input.isNoteDirty?.(identity.notePath)
-    && !input.isNoteDirty?.(dailyPath(identity.date))
+  return (
+    !input.isStale?.() &&
+    !input.isNoteDirty?.(identity.notePath) &&
+    !input.isNoteDirty?.(dailyPath(identity.date))
+  )
 }
 
 async function readXCapture(path: string, generation: number): Promise<XCapture | null> {
@@ -42,8 +63,11 @@ async function readXCapture(path: string, generation: number): Promise<XCapture 
     throw cause
   }
   return {
-    source, identity: xCaptureFromSource(path, source), meta: xCaptureMeta(source),
-    body: splitFrontmatter(source).body, title: parseNote({ path, source }).title,
+    source,
+    identity: xCaptureFromSource(path, source),
+    meta: xCaptureMeta(source),
+    body: splitFrontmatter(source).body,
+    title: parseNote({ path, source }).title,
   }
 }
 
@@ -76,7 +100,12 @@ export async function drainXCapture(
     let screenshot: 'none' | 'saved' | 'missing' = 'none'
     if (envelope.screenshotRef) {
       try {
-        await promoteCaptureScreenshot(envelope.screenshotRef, identity.assetPath, 1600, input.generation)
+        await promoteCaptureScreenshot(
+          envelope.screenshotRef,
+          identity.assetPath,
+          1600,
+          input.generation,
+        )
         screenshot = 'saved'
       } catch (cause) {
         if (!isAppError(cause) || (cause.kind !== 'notFound' && cause.kind !== 'parse')) throw cause
@@ -99,7 +128,9 @@ export async function drainXCapture(
   if (!parseNote({ path, source }).wikiLinks.some((link) => link.target === identity.base)) {
     const updated = appendListItemUnderBacklinkedHeading(
       upgradeSectionHeadingBacklink(source, linksTitle, ['Links']),
-      linksTitle, `[[${identity.base}|${wikiLinkSafe(winner.title)}]]`, ['Links'],
+      linksTitle,
+      `[[${identity.base}|${wikiLinkSafe(winner.title)}]]`,
+      ['Links'],
     )
     if (!canTouch(identity, input)) return 'deferred'
     await writeNote(path, updated, input.generation)
@@ -123,13 +154,26 @@ export async function enrichXCapture(
     const daily = await readDaily(snapshot.identity, input.generation)
     const hash = await hashContent(snapshot.body)
     if (!canTouch(identity, input) || !canTouch(snapshot.identity, input)) return null
-    if (xCaptureFrontmatter(snapshot.source).private || xCaptureFrontmatter(daily).private
-      || snapshot.identity.date !== identity.date || hash !== snapshot.meta.captureHash
-      || (expected && (hash !== expected.meta.captureHash
-        || snapshot.meta.captureUrl !== expected.meta.captureUrl))) {
+    if (
+      xCaptureFrontmatter(snapshot.source).private ||
+      xCaptureFrontmatter(daily).private ||
+      snapshot.identity.date !== identity.date ||
+      hash !== snapshot.meta.captureHash ||
+      (expected &&
+        (hash !== expected.meta.captureHash ||
+          snapshot.meta.captureUrl !== expected.meta.captureUrl))
+    ) {
       const latest = await readXCapture(identity.notePath, input.generation)
-      if (latest?.meta.captureStatus === 'pending' && canTouch(identity, input) && canTouch(latest.identity, input)) {
-        await writeNote(identity.notePath, upsertFrontmatter(latest.source, { captureStatus: 'skipped' }), input.generation)
+      if (
+        latest?.meta.captureStatus === 'pending' &&
+        canTouch(identity, input) &&
+        canTouch(latest.identity, input)
+      ) {
+        await writeNote(
+          identity.notePath,
+          upsertFrontmatter(latest.source, { captureStatus: 'skipped' }),
+          input.generation,
+        )
         skipped = true
       }
       return null
@@ -144,9 +188,15 @@ export async function enrichXCapture(
     const snapshot = await current(before)
     if (snapshot) {
       const hash = await persistCaptureEnrichment({
-        identity, expectedHash: before.meta.captureHash, expectedCapture: before.meta,
-        body: appendXText(snapshot.body, post), fromTitle: snapshot.title, toTitle: snapshot.title,
-        status: 'done', provider: null, generation: input.generation,
+        identity,
+        expectedHash: before.meta.captureHash,
+        expectedCapture: before.meta,
+        body: appendXText(snapshot.body, post),
+        fromTitle: snapshot.title,
+        toTitle: snapshot.title,
+        status: 'done',
+        provider: null,
+        generation: input.generation,
         canWrite: () => canTouch(identity, input),
       })
       if (hash !== null) return 'enriched'

@@ -12,5 +12,5 @@ export function hasXPermission(): Promise<boolean> {
 export async function setXPermission(enabled: boolean): Promise<boolean> {
   if (enabled) await browser.permissions.request({ origins: X_ORIGINS })
   else await browser.permissions.remove({ origins: X_ORIGINS })
-  return hasXPermission()
+  return await hasXPermission()
 }

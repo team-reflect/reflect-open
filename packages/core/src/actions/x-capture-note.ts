@@ -10,7 +10,8 @@ import { captureNoteMeta, metadataValue, type CaptureNoteMeta } from './capture-
 import { xPostId, xPostURL } from './x-post'
 import type { XText } from './x-syndication'
 
-const X_PATH = /^notes\/capture-x-text-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.md$/
+const X_PATH =
+  /^notes\/capture-x-text-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.md$/
 
 /** Recognize the reserved filename family, including damaged identities. */
 export function isXCapturePath(path: string): boolean {
@@ -42,8 +43,13 @@ export interface XCaptureMeta extends CaptureNoteMeta {
 /** Validate the persisted X lifecycle without interpreting its Markdown body. */
 export function xCaptureMeta(source: string): XCaptureMeta {
   const meta = captureNoteMeta(xCaptureFrontmatter(source))
-  if (!meta || meta.captureKind !== 'x-text' || !meta.captureDay
-    || !z.iso.date().safeParse(meta.captureDay).success || xPostId(meta.captureUrl) === null) {
+  if (
+    !meta ||
+    meta.captureKind !== 'x-text' ||
+    !meta.captureDay ||
+    !z.iso.date().safeParse(meta.captureDay).success ||
+    xPostId(meta.captureUrl) === null
+  ) {
     throw new ReflectError('parse', 'The X capture metadata is missing or invalid.')
   }
   return { ...meta, captureKind: 'x-text', captureDay: meta.captureDay }
@@ -58,7 +64,10 @@ export function xCaptureFromSource(path: string, source: string): CaptureIdentit
 
 /** Quote external plain text without activating Markdown images, HTML or links. */
 export function xPlainMarkdown(text: string): string {
-  return text.replace(/[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]/g, '\\$&')
+  return text.replaceAll(
+    /[\u{21}-\u{2F}\u{3A}-\u{40}\u{5B}-\u{60}\u{7B}-\u{7E}]/gu,
+    String.raw`\$&`,
+  )
 }
 
 /** Render the raw, durable capture once, preserving the user's annotation. */
@@ -78,8 +87,10 @@ export async function xCaptureSource(
     parts.push(`- Description: ${xPlainMarkdown(metadataValue(envelope.metaDescription))}`)
   }
   if (envelope.note?.trim()) parts.push(`## Note\n\n${envelope.note}`)
-  if (envelope.selection?.trim()) parts.push(`## Selection\n\n${xPlainMarkdown(envelope.selection)}`)
-  if (envelope.contentText?.trim()) parts.push(`## Page Text\n\n${xPlainMarkdown(envelope.contentText)}`)
+  if (envelope.selection?.trim())
+    parts.push(`## Selection\n\n${xPlainMarkdown(envelope.selection)}`)
+  if (envelope.contentText?.trim())
+    parts.push(`## Page Text\n\n${xPlainMarkdown(envelope.contentText)}`)
   if (screenshot === 'saved') parts.push(`## Screenshot\n\n![Screenshot](${identity.assetPath})`)
   if (screenshot === 'missing') parts.push('The captured screenshot was unavailable.')
   const body = `${parts.join('\n\n')}\n`
@@ -104,9 +115,13 @@ export function appendXText(body: string, post: XText | null): string {
   if (post === null) {
     parts.push('No public text was available. Open the original post using the URL above.')
   } else {
-    if (post.author) parts.push(`Author: ${xPlainMarkdown(post.author.name)} (@${xPlainMarkdown(post.author.handle)})`)
+    if (post.author)
+      parts.push(
+        `Author: ${xPlainMarkdown(post.author.name)} (@${xPlainMarkdown(post.author.handle)})`,
+      )
     parts.push(xPlainMarkdown(post.text))
-    if (post.truncated) parts.push('Only a preview was available. Open the original post for the full text.')
+    if (post.truncated)
+      parts.push('Only a preview was available. Open the original post for the full text.')
   }
   return body + (body.endsWith('\n') ? '\n' : '\n\n') + parts.join('\n\n') + '\n'
 }

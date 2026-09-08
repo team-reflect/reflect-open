@@ -12,13 +12,25 @@ export interface XText {
 const tweetSchema = z.object({
   id_str: z.string(),
   text: z.string(),
-  display_text_range: z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]).optional(),
+  display_text_range: z
+    .tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])
+    .optional(),
   user: z.object({ name: z.string(), screen_name: z.string() }).optional(),
-  entities: z.object({ urls: z.array(z.object({ url: z.string().min(1), expanded_url: z.string() })).optional() }).optional(),
+  entities: z
+    .object({
+      urls: z.array(z.object({ url: z.string().min(1), expanded_url: z.string() })).optional(),
+    })
+    .optional(),
   truncated: z.boolean().optional(),
   note_tweet: z.unknown().optional(),
 })
-const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" }
+const ENTITIES: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+}
 
 /** Read only public post text from the bounded syndication response. */
 export function parseXText(value: unknown, id: string): XText | null {
@@ -33,16 +45,21 @@ export function parseXText(value: unknown, id: string): XText | null {
     if (start <= end && end <= points.length) text = points.slice(start, end).join('')
     else truncated = true
   }
-  for (const entity of tweet.entities?.urls ?? []) text = text.replaceAll(entity.url, () => entity.expanded_url)
-  text = text.replace(/&(?:amp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity] ?? entity).trim()
+  for (const entity of tweet.entities?.urls ?? [])
+    text = text.replaceAll(entity.url, () => entity.expanded_url)
+  text = text.replaceAll(/&(?:amp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity] ?? entity).trim()
   if (!text) return null
   const limited = Array.from(text)
   return {
     text: limited.slice(0, 20_000).join(''),
-    ...(tweet.user ? { author: {
-      name: Array.from(tweet.user.name).slice(0, 200).join(''),
-      handle: Array.from(tweet.user.screen_name).slice(0, 100).join(''),
-    } } : {}),
+    ...(tweet.user
+      ? {
+          author: {
+            name: Array.from(tweet.user.name).slice(0, 200).join(''),
+            handle: Array.from(tweet.user.screen_name).slice(0, 100).join(''),
+          },
+        }
+      : {}),
     truncated: truncated || limited.length > 20_000,
   }
 }
@@ -51,7 +68,7 @@ export function parseXText(value: unknown, id: string): XText | null {
 export async function fetchXText(id: string): Promise<XText | null> {
   if (!X_POST_ID.test(id)) throw new Error('invalid X post ID')
   // Matches react-tweet's public syndication token algorithm.
-  const token = ((Number(id) / 1e15) * Math.PI).toString(36).replace(/0+|\./g, '')
+  const token = ((Number(id) / 1e15) * Math.PI).toString(36).replaceAll(/0+|\./g, '')
   const url = new URL('https://cdn.syndication.twimg.com/tweet-result')
   url.search = new URLSearchParams({ id, lang: 'en', token }).toString()
   let raw: string

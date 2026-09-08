@@ -65,11 +65,16 @@ export async function listPendingCaptures(generation: number): Promise<CaptureId
       if (isAppError(cause) && cause.kind === 'notFound') continue
       throw cause
     }
-    const meta = isX ? xCaptureMeta(source) : captureNoteMeta(parseFrontmatter(splitFrontmatter(source).raw).data)
+    const meta = isX
+      ? xCaptureMeta(source)
+      : captureNoteMeta(parseFrontmatter(splitFrontmatter(source).raw).data)
     const identity = isX ? xCaptureFromSource(file.path, source) : legacy
     if (identity && meta?.captureStatus === 'pending') pending.push(identity)
   }
-  pending.sort((first, second) => first.date.localeCompare(second.date) || first.base.localeCompare(second.base))
+  pending.sort(
+    (first, second) =>
+      first.date.localeCompare(second.date) || first.base.localeCompare(second.base),
+  )
   return pending
 }
 

@@ -131,8 +131,14 @@ export function CapturePopup(): ReactElement {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3 p-3">
-      <a href={browser.runtime.getURL('/options.html')} target="_blank" rel="noreferrer"
-        className="self-end text-xs text-text-muted underline">Settings</a>
+      <a
+        href={browser.runtime.getURL('/options.html')}
+        target="_blank"
+        rel="noreferrer"
+        className="self-end text-xs text-text-muted underline"
+      >
+        Settings
+      </a>
       {page.screenshotDataUrl ? (
         <img
           src={page.screenshotDataUrl}

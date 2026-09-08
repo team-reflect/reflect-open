@@ -98,7 +98,11 @@ export function createCaptureController(options: CaptureControllerOptions): Capt
       }
     }
     const isNoteDirty = (path: string): boolean => openSession(path)?.isDirty() === true
-    const drained = await drainCaptureInbox({ generation: options.generation, isStale, isNoteDirty })
+    const drained = await drainCaptureInbox({
+      generation: options.generation,
+      isStale,
+      isNoteDirty,
+    })
     surfaceStop('Saving link capture', drained.stopped)
     if (isStale()) {
       return
