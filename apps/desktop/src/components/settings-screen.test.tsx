@@ -1192,6 +1192,7 @@ describe('SettingsScreen', () => {
     await section.getByRole('button', { name: /add prompt/i }).click()
     const dialog = page.getByRole('dialog', { name: /add prompt/i })
     const promptBody = dialog.getByPlaceholder(/Translate the following/)
+    await expect.element(promptBody).toBeInTheDocument()
 
     expect(dialog.element().className).toContain('max-h-[calc(100dvh-2rem)]')
     expect(dialog.element().className).toContain('overflow-y-auto')
