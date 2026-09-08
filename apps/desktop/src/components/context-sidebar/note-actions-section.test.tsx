@@ -28,7 +28,7 @@ vi.mock('@/lib/keybindings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/keybindings')>()),
   isApplePlatform,
 }))
-vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
+vi.mock('@/lib/note-pin', () => ({ toggleNotePinned, unpinNote: vi.fn(async () => {}) }))
 vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
 vi.mock('@/lib/note-delete', () => ({ deleteOpenNote }))
 vi.mock('@/lib/operations', () => ({ startOperation }))
@@ -108,7 +108,9 @@ describe('NoteActionsSection pin toggle', () => {
     await vi.waitFor(() => expect(getPinnedNotes).toHaveBeenCalledTimes(1))
     await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
     await expect.element(view.getByText('Un-pin this note')).toBeInTheDocument()
-    expect(view.client.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'))?.[0]?.path).toBe('notes/a.md')
+    expect(
+      view.client.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'))?.[0]?.path,
+    ).toBe('notes/a.md')
     write.resolve(true)
     await write.promise
     await view.unmount()

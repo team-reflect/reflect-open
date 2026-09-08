@@ -26,7 +26,13 @@ export function NoteRowList({ rows, onOpen, onDeleted }: NoteRowListProps): Reac
 
   const togglePin = (row: NoteRowModel): void => {
     if (graph !== null) {
-      void runPinAction({ queryClient, root: graph.root, generation: graph.generation, path: row.path, kind: 'toggle' })
+      void runPinAction({
+        queryClient,
+        root: graph.root,
+        generation: graph.generation,
+        path: row.path,
+        kind: 'toggle',
+      })
     }
   }
 

@@ -1,11 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query-client'
-import type { PinnedNote } from '@reflect/core'
+import type { GraphInfo, PinnedNote } from '@reflect/core'
 import { act, type ReactElement, type ReactNode } from 'react'
 import { cleanup, render } from 'vitest-browser-react'
 import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GraphInfo } from '@reflect/core'
 
 const useNoteRowState = vi.hoisted(() => vi.fn())
 const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
@@ -123,7 +122,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   hasBridge: () => true,
   getPinnedNotes: async () => [],
 }))
-vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
+vi.mock('@/lib/note-pin', () => ({ toggleNotePinned, unpinNote: vi.fn(async () => {}) }))
 vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
 vi.mock('@/lib/note-delete', () => ({ deleteOpenNote }))
 vi.mock('@/mobile/share', () => ({ shareNote }))
@@ -164,9 +163,15 @@ afterEach(async () => {
 })
 
 async function mount(path = 'notes/meeting.md', onDeleted = vi.fn()) {
-  const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } })
+  const client = new QueryClient({
+    defaultOptions: { queries: { staleTime: Infinity, retry: false } },
+  })
   client.setQueryData(queryKeys.index.pinnedNotes('/g'), [])
-  const view = await render(<QueryClientProvider client={client}><NoteActionsMenu path={path} onDeleted={onDeleted} /></QueryClientProvider>)
+  const view = await render(
+    <QueryClientProvider client={client}>
+      <NoteActionsMenu path={path} onDeleted={onDeleted} />
+    </QueryClientProvider>,
+  )
   return { view, onDeleted, client }
 }
 
@@ -258,9 +263,13 @@ describe('NoteActionsMenu', () => {
     const { view, client } = await mount()
     await openActions()
     await view.getByRole('button', { name: 'Pin', exact: true }).click()
-    expect(client.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'))?.[0]?.path).toBe('notes/meeting.md')
+    expect(client.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'))?.[0]?.path).toBe(
+      'notes/meeting.md',
+    )
     await openActions()
-    await expect.element(view.getByRole('button', { name: 'Unpin', exact: true })).toBeInTheDocument()
+    await expect
+      .element(view.getByRole('button', { name: 'Unpin', exact: true }))
+      .toBeInTheDocument()
     write.resolve(true)
     await write.promise
   })

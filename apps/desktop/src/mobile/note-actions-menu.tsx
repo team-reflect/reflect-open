@@ -55,7 +55,13 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
 
   const pin = (): void => {
     if (graph !== null) {
-      void runPinAction({ queryClient, root: graph.root, generation: graph.generation, path, kind: 'toggle' })
+      void runPinAction({
+        queryClient,
+        root: graph.root,
+        generation: graph.generation,
+        path,
+        kind: 'toggle',
+      })
     }
   }
 

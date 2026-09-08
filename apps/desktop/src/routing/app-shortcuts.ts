@@ -227,7 +227,11 @@ export function useAppShortcuts(): CommandContext {
       togglePin: async () => {
         const root = graphRootRef.current
         const generation = generationRef.current
-        const path = focusedNotePathForRoute(routeRef.current, todayIso(), focusedDailyDateRef.current)
+        const path = focusedNotePathForRoute(
+          routeRef.current,
+          todayIso(),
+          focusedDailyDateRef.current,
+        )
         if (root !== null && generation !== null && path !== null) {
           await runPinAction({ queryClient, root, generation, path, kind: 'toggle' })
         }

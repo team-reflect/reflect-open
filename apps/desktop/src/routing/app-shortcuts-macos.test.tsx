@@ -71,15 +71,15 @@ function shortcutsHook(client = new QueryClient()) {
     {
       wrapper: ({ children }: { children: ReactNode }) => (
         <QueryClientProvider client={client}>
-        <RouterProvider>
-          <PaletteProvider>
-            <ShortcutsProvider>
-              <NoteTemplatesProvider>
-                <SidebarProvider>{children}</SidebarProvider>
-              </NoteTemplatesProvider>
-            </ShortcutsProvider>
-          </PaletteProvider>
-        </RouterProvider>
+          <RouterProvider>
+            <PaletteProvider>
+              <ShortcutsProvider>
+                <NoteTemplatesProvider>
+                  <SidebarProvider>{children}</SidebarProvider>
+                </NoteTemplatesProvider>
+              </ShortcutsProvider>
+            </PaletteProvider>
+          </RouterProvider>
         </QueryClientProvider>
       ),
     },

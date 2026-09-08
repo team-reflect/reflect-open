@@ -1,4 +1,4 @@
-import type { PinnedNote } from '@reflect/core'
+import type { GraphInfo, PinnedNote } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client'
 import { FocusedDailyProvider, useSetFocusedDailyDate } from '@/providers/focused-daily-provider'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -15,8 +15,10 @@ import { useAppShortcuts } from './app-shortcuts'
 import { RouterProvider, useRouter } from './router'
 
 const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
-const graphState = vi.hoisted(() => ({ graph: { root: '/g', name: 'g', generation: 1 } as { root: string; name: string; generation: number } | null }))
-vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
+const graphState = vi.hoisted((): { graph: GraphInfo | null } => ({
+  graph: { root: '/g', name: 'g', generation: 1 },
+}))
+vi.mock('@/lib/note-pin', () => ({ toggleNotePinned, unpinNote: vi.fn(async () => {}) }))
 
 const newChat = vi.hoisted(() => vi.fn())
 const openRecent = vi.hoisted(() => vi.fn())
@@ -98,15 +100,17 @@ function shortcutsHook(client = new QueryClient()) {
     {
       wrapper: ({ children }: { children: ReactNode }) => (
         <QueryClientProvider client={client}>
-        <RouterProvider>
-          <PaletteProvider>
-            <ShortcutsProvider>
-              <NoteTemplatesProvider>
-                <SidebarProvider><FocusedDailyProvider>{children}</FocusedDailyProvider></SidebarProvider>
-              </NoteTemplatesProvider>
-            </ShortcutsProvider>
-          </PaletteProvider>
-        </RouterProvider>
+          <RouterProvider>
+            <PaletteProvider>
+              <ShortcutsProvider>
+                <NoteTemplatesProvider>
+                  <SidebarProvider>
+                    <FocusedDailyProvider>{children}</FocusedDailyProvider>
+                  </SidebarProvider>
+                </NoteTemplatesProvider>
+              </ShortcutsProvider>
+            </PaletteProvider>
+          </RouterProvider>
         </QueryClientProvider>
       ),
     },
@@ -146,7 +150,9 @@ describe('app shortcuts', () => {
     await act(() => press('o'))
     expect(toggleNotePinned).toHaveBeenCalledTimes(1)
     write.resolve(true)
-    await act(async () => { await write.promise })
+    await act(async () => {
+      await write.promise
+    })
   })
 
   it('palette pin targets the focused daily note through the same context', async () => {
@@ -156,7 +162,9 @@ describe('app shortcuts', () => {
     await act(() => result.current.setFocusedDailyDate('2026-09-07'))
     await act(() => result.current.context.togglePin())
     expect(toggleNotePinned).toHaveBeenCalledWith('daily/2026-09-07.md', 1)
-    expect(client.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'))?.[0]?.dailyDate).toBe('2026-09-07')
+    expect(
+      client.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'))?.[0]?.dailyDate,
+    ).toBe('2026-09-07')
   })
 
   it('pin no-ops on note-less routes and without a graph', async () => {

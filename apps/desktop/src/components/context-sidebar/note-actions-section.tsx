@@ -31,9 +31,8 @@ const GIST_KEYBINDING = keybindingFor('note.publishGist')
  * "Note actions" as a context-sidebar section: mouse-reachable counterparts
  * to the note-scoped commands — pin/unpin and the `private` flag. Shared by
  * the daily and note context sidebars; dailies are valid targets for both.
- * Each action reflects the index's state (the pin from the same query as the
- * sidebar's Pinned section, privacy from the note's own row), bridged by the
- * last toggle's result while the watcher catches up.
+ * Pin reads the shared shelf cache, updated immediately by every pin entrypoint.
+ * Privacy bridges the indexed note row with the last local toggle result.
  */
 export function NoteActionsSection({
   path,
@@ -46,7 +45,13 @@ export function NoteActionsSection({
   const queryClient = useQueryClient()
   const togglePin = async (): Promise<void> => {
     if (graph !== null) {
-      await runPinAction({ queryClient, root: graph.root, generation: graph.generation, path, kind: 'toggle' })
+      await runPinAction({
+        queryClient,
+        root: graph.root,
+        generation: graph.generation,
+        path,
+        kind: 'toggle',
+      })
     }
   }
 
