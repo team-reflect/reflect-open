@@ -54,4 +54,3 @@ export function insertPinnedNote(pinned: readonly PinnedNote[], note: PinnedNote
   bare.sort(comparePinnedNote)
   return [...ordered, ...bare]
 }
-

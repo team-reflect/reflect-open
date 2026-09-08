@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { runPinAction } from '@/lib/notes/pin-action'
 import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider'
 import { registerKeymap } from '@/editor/keymap'
@@ -160,6 +162,7 @@ function isNativeMacosMenuCommand(commandId: string): boolean {
  */
 export function useAppShortcuts(): CommandContext {
   const { route, navigate, back, forward, clearScrollState } = useRouter()
+  const queryClient = useQueryClient()
   const focusedDailyDate = useFocusedDailyDate()
   const { resolvedTheme, setTheme } = useTheme()
   const { graph, recents, openRecent } = useGraph()
@@ -221,6 +224,14 @@ export function useAppShortcuts(): CommandContext {
       // the daily views it falls back to the routed note.
       notePath: () =>
         focusedNotePathForRoute(routeRef.current, todayIso(), focusedDailyDateRef.current),
+      togglePin: async () => {
+        const root = graphRootRef.current
+        const generation = generationRef.current
+        const path = focusedNotePathForRoute(routeRef.current, todayIso(), focusedDailyDateRef.current)
+        if (root !== null && generation !== null && path !== null) {
+          await runPinAction({ queryClient, root, generation, path, kind: 'toggle' })
+        }
+      },
       back,
       forward,
       clearScrollState,
@@ -256,6 +267,7 @@ export function useAppShortcuts(): CommandContext {
       },
     }),
     [
+      queryClient,
       navigate,
       back,
       forward,

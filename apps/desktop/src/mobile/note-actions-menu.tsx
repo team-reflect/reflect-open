@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 import { useNoteRowState } from '@/hooks/use-note-row'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes'
-import { toggleNotePinned } from '@/lib/note-pin'
+import { useQueryClient } from '@tanstack/react-query'
+import { runPinAction } from '@/lib/notes/pin-action'
 import { toggleNotePrivate } from '@/lib/note-private'
 import { useBridgedNoteToggle } from '@/lib/notes/use-bridged-note-toggle'
 import { NoteDeleteDrawer } from '@/mobile/note-delete-drawer'
@@ -31,6 +32,7 @@ interface NoteActionsMenuProps {
  */
 export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): ReactElement {
   const { graph } = useGraph()
+  const queryClient = useQueryClient()
   const isPinned = usePinnedNotes().some((note) => note.path === path)
   const { row: noteRow, settled: privacyReady } = useNoteRowState(path)
   const [actionsOpen, setActionsOpen] = useState(false)
@@ -53,7 +55,7 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
 
   const pin = (): void => {
     if (graph !== null) {
-      void toggleNotePinned(path, graph.generation).catch(() => {})
+      void runPinAction({ queryClient, root: graph.root, generation: graph.generation, path, kind: 'toggle' })
     }
   }
 

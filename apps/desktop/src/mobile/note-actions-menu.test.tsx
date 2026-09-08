@@ -1,3 +1,6 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/query-client'
+import type { PinnedNote } from '@reflect/core'
 import { act, type ReactElement, type ReactNode } from 'react'
 import { cleanup, render } from 'vitest-browser-react'
 import { page } from 'vitest/browser'
@@ -5,7 +8,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GraphInfo } from '@reflect/core'
 
 const useNoteRowState = vi.hoisted(() => vi.fn())
-const usePinnedNotes = vi.hoisted(() => vi.fn())
 const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
 const toggleNotePrivate = vi.hoisted(() => vi.fn(async () => true))
 const deleteOpenNote = vi.hoisted(() => vi.fn(async () => {}))
@@ -116,7 +118,11 @@ vi.mock('@/providers/graph-provider', async () => {
   }
 })
 vi.mock('@/hooks/use-note-row', () => ({ useNoteRowState }))
-vi.mock('@/hooks/use-pinned-notes', () => ({ usePinnedNotes }))
+vi.mock('@reflect/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@reflect/core')>()),
+  hasBridge: () => true,
+  getPinnedNotes: async () => [],
+}))
 vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
 vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
 vi.mock('@/lib/note-delete', () => ({ deleteOpenNote }))
@@ -132,7 +138,6 @@ let currentNoteRow: {
   isPrivate: boolean
 } | null
 let currentNoteRowSettled: boolean
-let currentPinnedNotes: Array<{ path: string; title: string; dailyDate: string | null }>
 
 function noteRow(path: string, isPrivate: boolean, title = 'Meeting') {
   return { path, title, dailyDate: null, isPrivate }
@@ -142,12 +147,10 @@ beforeEach(() => {
   graphStore.set({ root: '/g', name: 'g', generation: 7 })
   currentNoteRow = noteRow('notes/meeting.md', false)
   currentNoteRowSettled = true
-  currentPinnedNotes = []
   useNoteRowState.mockImplementation(() => ({
     row: currentNoteRow,
     settled: currentNoteRowSettled,
   }))
-  usePinnedNotes.mockImplementation(() => currentPinnedNotes)
   toggleNotePinned.mockReset().mockResolvedValue(true)
   toggleNotePrivate.mockReset().mockResolvedValue(true)
   deleteOpenNote.mockReset().mockResolvedValue(undefined)
@@ -161,8 +164,10 @@ afterEach(async () => {
 })
 
 async function mount(path = 'notes/meeting.md', onDeleted = vi.fn()) {
-  const view = await render(<NoteActionsMenu path={path} onDeleted={onDeleted} />)
-  return { view, onDeleted }
+  const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } })
+  client.setQueryData(queryKeys.index.pinnedNotes('/g'), [])
+  const view = await render(<QueryClientProvider client={client}><NoteActionsMenu path={path} onDeleted={onDeleted} /></QueryClientProvider>)
+  return { view, onDeleted, client }
 }
 
 async function openActions(): Promise<void> {
@@ -245,6 +250,19 @@ describe('NoteActionsMenu', () => {
     await view.getByRole('button', { name: 'Lock note' }).click()
 
     await vi.waitFor(() => expect(toggleNotePrivate).toHaveBeenCalledWith('notes/meeting.md', 7))
+  })
+
+  it('shows Unpin on reopening while the pin write is still pending', async () => {
+    const write = Promise.withResolvers<boolean>()
+    toggleNotePinned.mockReturnValueOnce(write.promise)
+    const { view, client } = await mount()
+    await openActions()
+    await view.getByRole('button', { name: 'Pin', exact: true }).click()
+    expect(client.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'))?.[0]?.path).toBe('notes/meeting.md')
+    await openActions()
+    await expect.element(view.getByRole('button', { name: 'Unpin', exact: true })).toBeInTheDocument()
+    write.resolve(true)
+    await write.promise
   })
 
   it('keeps the pin action intact and closes the drawer', async () => {

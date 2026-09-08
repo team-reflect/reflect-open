@@ -14,6 +14,7 @@ function fakeContext(overrides?: Partial<CommandContext>): CommandContext {
     back: vi.fn(),
     forward: vi.fn(),
     clearScrollState: vi.fn(),
+    togglePin: vi.fn(async () => {}),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),

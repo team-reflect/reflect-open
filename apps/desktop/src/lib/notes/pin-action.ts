@@ -1,9 +1,20 @@
-import { errorMessage, type FilteredSearchHit, type NoteListEntry, type NoteRow, type PinnedNote } from '@reflect/core'
+import {
+  errorMessage,
+  type FilteredSearchHit,
+  type NoteListEntry,
+  type NoteRow,
+  type PinnedNote,
+} from '@reflect/core'
 import type { QueryClient } from '@tanstack/react-query'
 import { toggleNotePinned, unpinNote } from '@/lib/note-pin'
 import { startOperation } from '@/lib/operations'
 import { queryKeys } from '@/lib/query-client'
-import { insertPinnedNote, invalidatePinnedNotesCache, pinnedNoteFor, updatePinnedNotesCache } from './pinned-notes-cache'
+import {
+  insertPinnedNote,
+  invalidatePinnedNotesCache,
+  pinnedNoteFor,
+  updatePinnedNotesCache,
+} from './pinned-notes-cache'
 
 interface PinActionInput {
   queryClient: QueryClient
@@ -26,11 +37,11 @@ function applyPinnedState(input: PinActionInput, note: PinnedNote, isPinned: boo
   })
   queryClient.setQueriesData<NoteListEntry[]>(
     { queryKey: queryKeys.index.allNotes(root) },
-    (rows) => rows?.map((row) => row.path === path ? { ...row, isPinned } : row),
+    (rows) => rows?.map((row) => (row.path === path ? { ...row, isPinned } : row)),
   )
   queryClient.setQueriesData<FilteredSearchHit[]>(
     { queryKey: queryKeys.index.mobileAllNotes(root) },
-    (rows) => rows?.map((row) => row.path === path ? { ...row, isPinned } : row),
+    (rows) => rows?.map((row) => (row.path === path ? { ...row, isPinned } : row)),
   )
 }
 
@@ -43,9 +54,10 @@ export async function runPinAction(input: PinActionInput): Promise<void> {
   }
   pendingPins.add(key)
   try {
-    const previous = queryClient.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes(root))
+    const previous = queryClient
+      .getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes(root))
       ?.find((note) => note.path === path)
-    const row = queryClient.getQueryData<NoteRow>(queryKeys.index.note(root, path))
+    const row = queryClient.getQueryData<NoteRow | null>(queryKeys.index.note(root, path))
     const preview = input.note ?? previous ?? pinnedNoteFor(path, row ?? null)
     const predicted = kind === 'unpin' ? false : previous === undefined
     applyPinnedState(input, preview, predicted)

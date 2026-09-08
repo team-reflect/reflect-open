@@ -1,3 +1,7 @@
+import type { PinnedNote } from '@reflect/core'
+import { queryKeys } from '@/lib/query-client'
+import { FocusedDailyProvider, useSetFocusedDailyDate } from '@/providers/focused-daily-provider'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { renderHook } from 'vitest-browser-react'
@@ -9,6 +13,10 @@ import { ShortcutsProvider, useShortcuts } from '@/providers/shortcuts-provider'
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider'
 import { useAppShortcuts } from './app-shortcuts'
 import { RouterProvider, useRouter } from './router'
+
+const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
+const graphState = vi.hoisted(() => ({ graph: { root: '/g', name: 'g', generation: 1 } as { root: string; name: string; generation: number } | null }))
+vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
 
 const newChat = vi.hoisted(() => vi.fn())
 const openRecent = vi.hoisted(() => vi.fn())
@@ -37,7 +45,7 @@ vi.mock('@/lib/platform', () => ({ isMacosDesktop: false, isNativeShell: () => f
 
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({
-    graph: { root: '/g', name: 'g', generation: 1 },
+    graph: graphState.graph,
     recents: [
       { root: '/g', name: 'g', openedMs: 3 },
       { root: '/work', name: 'Work', openedMs: 2 },
@@ -65,6 +73,8 @@ vi.mock('@/providers/chat-provider', () => ({
 registerAppCommands() // production does this in main.tsx
 
 beforeEach(() => {
+  graphState.graph = { root: '/g', name: 'g', generation: 1 }
+  toggleNotePinned.mockReset().mockResolvedValue(true)
   openRecent.mockClear()
   openRouteInNewWindow.mockClear()
   openNoteFindForPath.mockClear()
@@ -72,11 +82,13 @@ beforeEach(() => {
   findPreviousInNote.mockClear()
 })
 
-function shortcutsHook() {
+function shortcutsHook(client = new QueryClient()) {
   return renderHook(
     () => {
-      useAppShortcuts()
+      const context = useAppShortcuts()
       return {
+        context,
+        setFocusedDailyDate: useSetFocusedDailyDate(),
         router: useRouter(),
         palette: usePalette(),
         shortcuts: useShortcuts(),
@@ -85,15 +97,17 @@ function shortcutsHook() {
     },
     {
       wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={client}>
         <RouterProvider>
           <PaletteProvider>
             <ShortcutsProvider>
               <NoteTemplatesProvider>
-                <SidebarProvider>{children}</SidebarProvider>
+                <SidebarProvider><FocusedDailyProvider>{children}</FocusedDailyProvider></SidebarProvider>
               </NoteTemplatesProvider>
             </ShortcutsProvider>
           </PaletteProvider>
         </RouterProvider>
+        </QueryClientProvider>
       ),
     },
   )
@@ -118,6 +132,43 @@ function pressFrom(target: EventTarget, key: string, options: KeyboardEventInit 
 }
 
 describe('app shortcuts', () => {
+  it('CMD+O updates the shelf before the file write resolves', async () => {
+    const client = new QueryClient()
+    const key = queryKeys.index.pinnedNotes('/g')
+    client.setQueryData(key, [])
+    const write = Promise.withResolvers<boolean>()
+    toggleNotePinned.mockReturnValueOnce(write.promise)
+    const { result, act } = await shortcutsHook(client)
+    await act(() => result.current.router.navigate({ kind: 'note', path: 'notes/a.md' }))
+    await act(() => press('o'))
+    expect(client.getQueryData<PinnedNote[]>(key)?.map((note) => note.path)).toEqual(['notes/a.md'])
+    expect(toggleNotePinned).toHaveBeenCalledWith('notes/a.md', 1)
+    await act(() => press('o'))
+    expect(toggleNotePinned).toHaveBeenCalledTimes(1)
+    write.resolve(true)
+    await act(async () => { await write.promise })
+  })
+
+  it('palette pin targets the focused daily note through the same context', async () => {
+    const client = new QueryClient()
+    const { result, act } = await shortcutsHook(client)
+    await act(() => result.current.router.navigate({ kind: 'daily', date: '2026-09-08' }))
+    await act(() => result.current.setFocusedDailyDate('2026-09-07'))
+    await act(() => result.current.context.togglePin())
+    expect(toggleNotePinned).toHaveBeenCalledWith('daily/2026-09-07.md', 1)
+    expect(client.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'))?.[0]?.dailyDate).toBe('2026-09-07')
+  })
+
+  it('pin no-ops on note-less routes and without a graph', async () => {
+    const { result, act } = await shortcutsHook()
+    await act(() => result.current.router.navigate({ kind: 'settings' }))
+    await act(() => press('o'))
+    graphState.graph = null
+    await act(() => result.current.router.navigate({ kind: 'note', path: 'notes/a.md' }))
+    await act(() => press('o'))
+    expect(toggleNotePinned).not.toHaveBeenCalled()
+  })
+
   it('registers the command keybindings in the central keymap registry', () => {
     const bindings = listRegisteredBindings()
     for (const key of [

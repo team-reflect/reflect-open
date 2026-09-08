@@ -19,7 +19,13 @@ beforeEach(() => {
 
 function setup() {
   const queryClient = new QueryClient()
-  const input = { queryClient, root: '/g', generation: 7, path: 'notes/a.md', kind: 'toggle' as const }
+  const input = {
+    queryClient,
+    root: '/g',
+    generation: 7,
+    path: 'notes/a.md',
+    kind: 'toggle' as const,
+  }
   const shelfKey = queryKeys.index.pinnedNotes('/g')
   const desktopKey = queryKeys.index.allNotesWithTag('/g', null)
   const mobileKey = queryKeys.index.mobileAllNotesWithSearch('/g', { text: '' })
@@ -29,7 +35,16 @@ function setup() {
     { path: input.path, title: 'A', snippet: '', tags: [], mtime: 0, isPinned: false },
   ])
   queryClient.setQueryData<FilteredSearchHit[]>(mobileKey, [
-    { path: input.path, title: 'A', highlightedTitle: 'A', dailyDate: null, snippet: null, preview: '', mtime: 0, isPinned: false },
+    {
+      path: input.path,
+      title: 'A',
+      highlightedTitle: 'A',
+      dailyDate: null,
+      snippet: null,
+      preview: '',
+      mtime: 0,
+      isPinned: false,
+    },
   ])
   return { input, queryClient, shelfKey, desktopKey, mobileKey, note }
 }
@@ -90,6 +105,8 @@ describe('runPinAction', () => {
     queryClient.setQueryData(otherKey, [note])
     await runPinAction(input)
     expect(queryClient.getQueryData(otherKey)).toEqual([note])
-    expect(queryClient.getQueryData(queryKeys.index.allNotesWithTag('/g', 'uncached'))).toBeUndefined()
+    expect(
+      queryClient.getQueryData(queryKeys.index.allNotesWithTag('/g', 'uncached')),
+    ).toBeUndefined()
   })
 })

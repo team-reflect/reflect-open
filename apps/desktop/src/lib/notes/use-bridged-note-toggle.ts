@@ -12,10 +12,6 @@ export interface UseBridgedNoteToggleOptions {
   readonly toggle: (path: string, generation: number) => Promise<boolean>
   /** Operation label for surfaced write failures. */
   readonly failureLabel: string | ((active: boolean) => string)
-  /** Optional side-effect for surfaces that mirror the same state elsewhere. */
-  readonly applyOptimistic?: ((active: boolean) => void) | undefined
-  /** Optional reconciliation after a failed optimistic side-effect. */
-  readonly onFailure?: (() => void) | undefined
 }
 
 export interface BridgedNoteToggle {
@@ -50,8 +46,6 @@ export function useBridgedNoteToggle({
   indexActive,
   toggle,
   failureLabel,
-  applyOptimistic,
-  onFailure,
 }: UseBridgedNoteToggleOptions): BridgedNoteToggle {
   const { graph } = useGraph()
   const [isToggling, setIsToggling] = useState(false)
@@ -71,19 +65,14 @@ export function useBridgedNoteToggle({
 
     const activeBeforeToggle = isActive
     const optimisticActive = !activeBeforeToggle
-    applyOptimistic?.(optimisticActive)
     setPending({ path, active: optimisticActive })
     setIsToggling(true)
 
     try {
       const active = await toggle(path, generation)
-      if (active !== optimisticActive) {
-        applyOptimistic?.(active)
-      }
       setPending({ path, active })
     } catch (cause) {
       setPending(null)
-      onFailure?.()
       startOperation(resolvedFailureLabel(failureLabel, activeBeforeToggle)).fail(
         errorMessage(cause),
       )

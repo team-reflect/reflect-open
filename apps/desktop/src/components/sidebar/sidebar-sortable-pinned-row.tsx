@@ -4,11 +4,10 @@ import { CSS } from '@dnd-kit/utilities'
 import { useQueryClient } from '@tanstack/react-query'
 import { displayNoteTitle, errorMessage } from '@reflect/core'
 import type { PinnedNote } from '@reflect/core'
-import { invalidatePinnedNotesCache, updatePinnedNotesCache } from '@/lib/notes/pinned-notes-cache'
+import { runPinAction } from '@/lib/notes/pin-action'
 import { formatDayLabel } from '@/lib/dates'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { openNativeContextMenu } from '@/lib/native-menu/context-menu'
-import { unpinNote } from '@/lib/note-pin'
 import { startOperation } from '@/lib/operations'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -54,12 +53,13 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
           {
             text: 'Unpin Note',
             action: () => {
-              updatePinnedNotesCache(queryClient, graph.root, (current) =>
-                current?.filter((pinnedNote) => pinnedNote.path !== note.path),
-              )
-
-              void unpinNote(note.path, graph.generation).catch(() => {
-                invalidatePinnedNotesCache(queryClient, graph.root)
+              void runPinAction({
+                queryClient,
+                root: graph.root,
+                generation: graph.generation,
+                path: note.path,
+                kind: 'unpin',
+                note,
               })
             },
           },
@@ -68,7 +68,7 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
         startOperation('Opening note menu').fail(errorMessage(cause))
       })
     },
-    [graph, note.path, queryClient],
+    [graph, note, queryClient],
   )
 
   return (

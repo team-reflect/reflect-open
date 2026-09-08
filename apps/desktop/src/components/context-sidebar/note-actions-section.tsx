@@ -1,12 +1,14 @@
 import type { ReactElement } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Lock } from 'lucide-react'
 import { PinIcon } from '@/components/icons/pin-icon'
 import { useNoteRow } from '@/hooks/use-note-row'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes'
 import { keybindingFor } from '@/lib/commands/app-commands'
-import { toggleNotePinned } from '@/lib/note-pin'
+import { runPinAction } from '@/lib/notes/pin-action'
+import { useGraph } from '@/providers/graph-provider'
 import { toggleNotePrivate } from '@/lib/note-private'
-import { useOptimisticPinToggle } from '@/lib/notes/use-optimistic-pin-toggle'
+import { NoteActionButton } from './note-action-button'
 import { NoteGistAction } from './note-gist-action'
 import { NoteTrashAction } from './note-trash-action'
 import { NoteToggleAction } from './note-toggle-action'
@@ -40,20 +42,22 @@ export function NoteActionsSection({
   const isPinned = usePinnedNotes().some((note) => note.path === path)
   const noteRow = useNoteRow(path)
   const isPrivate = noteRow?.isPrivate ?? false
-  const { applyOptimisticPin, invalidateOptimisticPin } = useOptimisticPinToggle(path, noteRow)
+  const { graph } = useGraph()
+  const queryClient = useQueryClient()
+  const togglePin = async (): Promise<void> => {
+    if (graph !== null) {
+      await runPinAction({ queryClient, root: graph.root, generation: graph.generation, path, kind: 'toggle' })
+    }
+  }
 
   return (
     <SidebarSection storageKey="note-actions" title="Note actions">
-      <NoteToggleAction
-        path={path}
-        indexActive={isPinned}
-        toggle={toggleNotePinned}
+      <NoteActionButton
+        isActive={isPinned}
+        onClick={togglePin}
         icon={<PinIcon width={20} height={20} />}
         labels={{ active: 'Un-pin this note', inactive: 'Pin this note' }}
-        failureLabel="Updating pin"
         keybinding={PIN_KEYBINDING}
-        applyOptimistic={applyOptimisticPin}
-        onFailure={invalidateOptimisticPin}
       />
       <NoteToggleAction
         path={path}

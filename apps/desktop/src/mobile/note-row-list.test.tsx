@@ -1,9 +1,15 @@
+import type { FilteredSearchHit, PinnedNote } from '@reflect/core'
+import { queryKeys } from '@/lib/query-client'
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { useState, type ReactElement } from 'react'
 import { render } from 'vitest-browser-react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { pointer, swipe, translateX } from '@/test-utils/swipe'
 import { NoteRowList } from './note-row-list'
 import { SwipeableNoteRow, type NoteRowModel } from './swipeable-note-row'
+
+const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
+vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
 
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({ settings: { dateFormat: 'mdy', timeFormat: '12h' } }),
@@ -47,13 +53,42 @@ function SwipeHarness({ note = row() }: { note?: NoteRowModel }): ReactElement {
   )
 }
 
+const mobileKey = queryKeys.index.mobileAllNotesWithSearch('/g', { text: '' })
+
+function CachedNoteList(): ReactElement {
+  const { data = [] } = useQuery<FilteredSearchHit[]>({ queryKey: mobileKey, enabled: false })
+  return <NoteRowList rows={data.map((hit) => row({ isPinned: hit.isPinned }))} onOpen={onOpen} onDeleted={onDelete} />
+}
+
 beforeEach(() => {
+  toggleNotePinned.mockReset().mockResolvedValue(true)
   onOpen.mockReset()
   onTogglePin.mockReset()
   onDelete.mockReset()
 })
 
 describe('NoteRowList', () => {
+  it('a swipe pin updates the cached row marker while persistence is pending', async () => {
+    const client = new QueryClient()
+    client.setQueryData<FilteredSearchHit[]>(mobileKey, [{
+      path: 'notes/alpha.md', title: 'Alpha', highlightedTitle: 'Alpha', dailyDate: null,
+      snippet: null, preview: '', mtime: 0, isPinned: false,
+    }])
+    const write = Promise.withResolvers<boolean>()
+    toggleNotePinned.mockReturnValueOnce(write.promise)
+    const view = await render(<QueryClientProvider client={client}><div style={{ width: 360, height: 300, display: 'flex' }}><CachedNoteList /></div></QueryClientProvider>)
+    const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
+    const rect = surface.getBoundingClientRect()
+    swipe(surface, { x: rect.right - 20, y: rect.top + 32 }, { x: rect.right - 120, y: rect.top + 32 })
+    await view.getByRole('button', { name: 'Pin Alpha', exact: true }).click()
+    expect(client.getQueryData<FilteredSearchHit[]>(mobileKey)?.[0]?.isPinned).toBe(true)
+    expect(client.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'))?.[0]?.path).toBe('notes/alpha.md')
+    await expect.element(view.getByText('Pinned', { exact: true })).toBeInTheDocument()
+    expect(toggleNotePinned).toHaveBeenCalledWith('notes/alpha.md', 1)
+    write.resolve(true)
+    await write.promise
+  })
+
   it('renders title search matches with the snippet highlight treatment', async () => {
     const row: NoteRowModel = {
       path: 'notes/tim-maccaw.md',
@@ -67,7 +102,7 @@ describe('NoteRowList', () => {
       snippet: [],
     }
 
-    const view = await render(<NoteRowList rows={[row]} onOpen={() => {}} onDeleted={() => {}} />)
+    const view = await render(<QueryClientProvider client={new QueryClient()}><NoteRowList rows={[row]} onOpen={() => {}} onDeleted={() => {}} /></QueryClientProvider>)
     const match = view.getByText('Tim Mac')
 
     await expect.element(match).toBeInTheDocument()

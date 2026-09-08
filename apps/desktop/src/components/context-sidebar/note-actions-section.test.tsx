@@ -101,6 +101,19 @@ describe('NoteActionsSection pin toggle', () => {
     await view.unmount()
   })
 
+  it('updates the button and shelf while the pin write is still pending', async () => {
+    const write = Promise.withResolvers<boolean>()
+    toggleNotePinned.mockReturnValueOnce(write.promise)
+    const view = await renderSection('notes/a.md')
+    await vi.waitFor(() => expect(getPinnedNotes).toHaveBeenCalledTimes(1))
+    await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
+    await expect.element(view.getByText('Un-pin this note')).toBeInTheDocument()
+    expect(view.client.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'))?.[0]?.path).toBe('notes/a.md')
+    write.resolve(true)
+    await write.promise
+    await view.unmount()
+  })
+
   it('optimistically adds a newly pinned note after explicitly ordered pins', async () => {
     getPinnedNotes.mockResolvedValue([
       { path: 'notes/zeta.md', title: 'Zeta', dailyDate: null, pinnedOrder: 0 },

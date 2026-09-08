@@ -19,6 +19,8 @@ export interface CommandContext {
    * describes — so a command and the sidebar never target different days.
    */
   notePath: () => string | null
+  /** Toggle the focused note pin with immediate shared feedback. */
+  togglePin: () => Promise<void>
   back: () => void
   forward: () => void
   /** Discard the current view's saved scroll offsets so it re-anchors when revisited. */

@@ -37,6 +37,12 @@ const openNativeContextMenu = vi.hoisted(() =>
     options.items[0]?.action()
   }),
 )
+const operationFail = vi.hoisted(() => vi.fn())
+const startOperation = vi.hoisted(() => vi.fn(() => ({ fail: operationFail })))
+vi.mock('@/lib/operations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/operations')>()),
+  startOperation,
+}))
 const unpinNote = vi.hoisted(() => vi.fn(async () => {}))
 const updateSettingsWith = vi.hoisted(() =>
   vi.fn<(updater: (current: Settings) => Partial<Settings>) => void>(),
@@ -127,6 +133,8 @@ beforeEach(() => {
   chooseGraph.mockClear()
   updateSettingsWith.mockClear()
   openNativeContextMenu.mockClear()
+  operationFail.mockClear()
+  startOperation.mockClear()
   unpinNote.mockClear()
 })
 
@@ -140,6 +148,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     back: vi.fn(),
     forward: vi.fn(),
     clearScrollState: vi.fn(),
+    togglePin: vi.fn(async () => {}),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
@@ -366,6 +375,8 @@ describe('Sidebar', () => {
 
     await vi.waitFor(() => expect(unpinNote).toHaveBeenCalledWith('notes/rust.md', 1))
     await expect.element(view.getByRole('button', { name: 'Rust' })).toBeInTheDocument()
+    expect(startOperation).toHaveBeenCalledExactlyOnceWith('Updating pin')
+    expect(operationFail).toHaveBeenCalledExactlyOnceWith('disk failed')
   })
 
   it('history arrows walk the router stack and disable at its edges', async () => {
