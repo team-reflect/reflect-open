@@ -186,7 +186,7 @@ describe('pin assertions', () => {
     expect(getNoteRowOverlay('notes/a.md', 3)).toBeNull()
   })
 
-  it('leaves another action\'s assertion on the same note alone', async () => {
+  it("leaves another action's assertion on the same note alone", async () => {
     setNoteRowOverlay('notes/a.md', 3, { gistUrl: 'https://gist.example/1' })
     readNote.mockResolvedValue('# A\n')
     writeNote.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })

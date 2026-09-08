@@ -158,7 +158,7 @@ describe('resetNoteRowOverlays', () => {
 })
 
 describe('clearNoteRowOverlay', () => {
-  it('drops only the named field, leaving another action\'s assertion', () => {
+  it("drops only the named field, leaving another action's assertion", () => {
     setNoteRowOverlay('notes/a.md', GEN, { gistUrl: URL, isPinned: true })
 
     clearNoteRowOverlay('notes/a.md', GEN, { isPinned: true })
@@ -216,7 +216,7 @@ describe('pin assertions', () => {
     expect(getNoteRowOverlay('notes/a.md', GEN)).toBeNull()
   })
 
-  it('keeps another action\'s assertion when the pin half retires', () => {
+  it("keeps another action's assertion when the pin half retires", () => {
     setNoteRowOverlay('notes/a.md', GEN, { isPinned: true, gistUrl: URL })
 
     reconcilePinOverlays(GEN, new Set(['notes/a.md']))

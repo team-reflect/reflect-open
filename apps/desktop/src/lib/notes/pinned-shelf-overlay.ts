@@ -47,14 +47,12 @@ export function withPinOverlays(
   )
   const added = overlays
     .filter((overlay) => overlay.isPinned && !listed.has(overlay.path))
-    .map(
-      (overlay): PinnedNote => ({
-        path: overlay.path,
-        title: titleFromPath(overlay.path),
-        dailyDate: dateFromDailyPath(overlay.path),
-        pinnedOrder: null,
-      }),
-    )
+    .map((overlay): PinnedNote => ({
+      path: overlay.path,
+      title: titleFromPath(overlay.path),
+      dailyDate: dateFromDailyPath(overlay.path),
+      pinnedOrder: null,
+    }))
   const kept = pinned.filter((note) => !removed.has(note.path))
   if (added.length === 0) {
     return kept

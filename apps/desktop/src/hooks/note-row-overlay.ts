@@ -76,15 +76,17 @@ const overlays = new Map<string, OverlayEntry>()
 const listeners = new Set<() => void>()
 
 /**
- * Bumped on every overlay change. `useSyncExternalStore` needs a snapshot that
- * is `Object.is`-stable between emits, which a number always is and a freshly
- * derived array never would be, so readers that derive a *list* subscribe to
- * this counter and memoize their derivation on it.
+ * {@link pinOverlays}'s result per generation, rebuilt lazily after each change.
+ * `useSyncExternalStore` demands an `Object.is`-stable snapshot between emits,
+ * which a freshly derived array never is, and memoizing at the call site does
+ * not work: the React Compiler infers a memo's dependencies from what its body
+ * actually reads, so a hand-written "revision" dependency the body ignores is
+ * dropped and the derivation never re-runs. The cache belongs here instead.
  */
-let revision = 0
+let pinOverlaySnapshots: Map<number, PinOverlay[]> | null = null
 
 function emit(): void {
-  revision += 1
+  pinOverlaySnapshots = null
   for (const listener of listeners) {
     listener()
   }
@@ -266,15 +268,23 @@ export interface PinOverlay {
   readonly isPinned: boolean
 }
 
+/** The stable "nothing asserted" result, so a reader can't churn on a fresh []. */
+const NO_PIN_OVERLAYS: PinOverlay[] = []
+
 /**
  * Every overlay on `generation` that asserts a pin state, for the sidebar's
  * pinned shelf: it lists notes by path and has no row query to merge over, so
- * it reads the assertions directly. Not reactive on its own — pair it with
- * {@link useNoteRowOverlayRevision}.
+ * it reads the assertions directly. The result is cached until the next change
+ * (see {@link pinOverlaySnapshots}); subscribe to it with {@link usePinOverlays}.
  */
 export function pinOverlays(generation: number | undefined): PinOverlay[] {
   if (generation === undefined) {
-    return []
+    return NO_PIN_OVERLAYS
+  }
+  pinOverlaySnapshots ??= new Map()
+  const cached = pinOverlaySnapshots.get(generation)
+  if (cached !== undefined) {
+    return cached
   }
   const asserted: PinOverlay[] = []
   for (const [path, entry] of overlays) {
@@ -282,6 +292,7 @@ export function pinOverlays(generation: number | undefined): PinOverlay[] {
       asserted.push({ path, isPinned: entry.overlay.isPinned })
     }
   }
+  pinOverlaySnapshots.set(generation, asserted)
   return asserted
 }
 
@@ -291,12 +302,9 @@ export function pinOverlays(generation: number | undefined): PinOverlay[] {
  * row for, and pinning a note does not open it, so without this a pin on a note
  * that is never opened would hold its assertion for the life of the graph.
  */
-export function reconcilePinOverlays(
-  generation: number,
-  pinnedPaths: ReadonlySet<string>,
-): void {
+export function reconcilePinOverlays(generation: number, pinnedPaths: ReadonlySet<string>): void {
   let changed = false
-  for (const [path, entry] of [...overlays]) {
+  for (const [path, entry] of overlays) {
     const asserted = entry.overlay.isPinned
     if (entry.generation !== generation || asserted === undefined) {
       continue
@@ -342,13 +350,10 @@ export function applyNoteRowOverlay(
   return { ...row, ...overlay }
 }
 
-/**
- * Subscribe a component to the overlay store as a whole, as a counter it can
- * memoize on. For {@link pinOverlays} and any other reader that derives a
- * fresh object per call; a per-path reader wants {@link useNoteRowOverlay}.
- */
-export function useNoteRowOverlayRevision(): number {
-  return useSyncExternalStore(subscribe, () => revision)
+/** Subscribe a component to every pin assertion on `generation`. */
+export function usePinOverlays(generation: number | undefined): PinOverlay[] {
+  const getSnapshot = useCallback(() => pinOverlays(generation), [generation])
+  return useSyncExternalStore(subscribe, getSnapshot)
 }
 
 /** Subscribe a component to `path`'s overlay on `generation`; `null` when none. */

@@ -20,10 +20,9 @@ describe('withPinOverlays', () => {
     // Toggling a pin on writes a bare `pinned: true`, so the new note belongs
     // in the unordered group — never ahead of a note the user dragged.
     expect(
-      withPinOverlays(
-        [ZETA, ALPHA],
-        [{ path: 'notes/mid.md', isPinned: true }],
-      ).map((pinned) => pinned.title),
+      withPinOverlays([ZETA, ALPHA], [{ path: 'notes/mid.md', isPinned: true }]).map(
+        (pinned) => pinned.title,
+      ),
     ).toEqual(['Zeta', 'Alpha', 'mid'])
   })
 
@@ -49,7 +48,12 @@ describe('withPinOverlays', () => {
 
   it('carries the daily date of an asserted daily note', () => {
     expect(withPinOverlays([], [{ path: 'daily/2026-06-10.md', isPinned: true }])).toEqual([
-      { path: 'daily/2026-06-10.md', title: '2026-06-10', dailyDate: '2026-06-10', pinnedOrder: null },
+      {
+        path: 'daily/2026-06-10.md',
+        title: '2026-06-10',
+        dailyDate: '2026-06-10',
+        pinnedOrder: null,
+      },
     ])
   })
 })

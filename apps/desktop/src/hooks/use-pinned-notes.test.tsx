@@ -32,13 +32,15 @@ const ROADMAP: PinnedNote = {
   pinnedOrder: null,
 }
 
+let client: QueryClient
+
 function wrapper({ children }: { children: ReactNode }) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>
 }
 
 beforeEach(() => {
   resetNoteRowOverlays()
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   getPinnedNotes.mockReset().mockResolvedValue([])
   readNote.mockReset().mockResolvedValue('# Roadmap\n')
   writeNote.mockReset().mockResolvedValue(undefined)
@@ -53,42 +55,39 @@ describe('usePinnedNotes', () => {
     // The regression: ⌘O and the palette carry no optimism of their own, so
     // before the assertion moved into `toggleNotePinned` this shelf sat on the
     // stale index for a watcher round trip plus an invalidation window.
-    const view = renderHook(() => usePinnedNotes(), { wrapper })
+    const { result } = await renderHook(() => usePinnedNotes(), { wrapper })
     await vi.waitFor(() => expect(getPinnedNotes).toHaveBeenCalled())
-    expect(view.result.current).toEqual([])
+    expect(result.current).toEqual([])
 
     await toggleNotePinned('notes/roadmap.md', 7)
 
     await vi.waitFor(() =>
-      expect(view.result.current.map((note) => note.path)).toEqual(['notes/roadmap.md']),
+      expect(result.current.map((note) => note.path)).toEqual(['notes/roadmap.md']),
     )
-    view.unmount()
   })
 
   it('hides a note unpinned through the write while the index still lists it', async () => {
     getPinnedNotes.mockResolvedValue([ROADMAP])
     readNote.mockResolvedValue('---\npinned: true\n---\n# Roadmap\n')
-    const view = renderHook(() => usePinnedNotes(), { wrapper })
-    await vi.waitFor(() => expect(view.result.current).toHaveLength(1))
+    const { result } = await renderHook(() => usePinnedNotes(), { wrapper })
+    await vi.waitFor(() => expect(result.current).toHaveLength(1))
 
     await toggleNotePinned('notes/roadmap.md', 7)
 
-    await vi.waitFor(() => expect(view.result.current).toEqual([]))
-    view.unmount()
+    await vi.waitFor(() => expect(result.current).toEqual([]))
   })
 
   it('does not double-list the note once the index agrees', async () => {
-    const view = renderHook(() => usePinnedNotes(), { wrapper })
+    const { result } = await renderHook(() => usePinnedNotes(), { wrapper })
     await vi.waitFor(() => expect(getPinnedNotes).toHaveBeenCalled())
 
     await toggleNotePinned('notes/roadmap.md', 7)
-    await vi.waitFor(() => expect(view.result.current).toHaveLength(1))
+    await vi.waitFor(() => expect(result.current).toHaveLength(1))
 
-    // The watcher catches up: the shelf query now reports the note itself.
+    // The watcher catches up and the shelf query reports the note itself.
     getPinnedNotes.mockResolvedValue([ROADMAP])
-    view.rerender()
+    await client.invalidateQueries()
 
-    await vi.waitFor(() => expect(view.result.current).toEqual([ROADMAP]))
-    view.unmount()
+    await vi.waitFor(() => expect(result.current).toEqual([ROADMAP]))
   })
 })

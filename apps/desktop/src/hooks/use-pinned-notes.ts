@@ -1,11 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getPinnedNotes, type PinnedNote } from '@reflect/core'
-import {
-  pinOverlays,
-  reconcilePinOverlays,
-  useNoteRowOverlayRevision,
-} from '@/hooks/note-row-overlay'
+import { reconcilePinOverlays, usePinOverlays } from '@/hooks/note-row-overlay'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { withPinOverlays } from '@/lib/notes/pinned-shelf-overlay'
 import { queryKeys } from '@/lib/query-client'
@@ -33,8 +29,7 @@ export function usePinnedNotes(): PinnedNote[] {
     enabled: bridgeReady && graph !== null,
   })
   const indexed = data ?? NONE
-  const revision = useNoteRowOverlayRevision()
-  const overlays = useMemo(() => pinOverlays(generation), [generation, revision])
+  const overlays = usePinOverlays(generation)
 
   // Retire the assertions this list has caught up to. An effect, not a
   // render-time mutation: the store is shared, and writing it during render

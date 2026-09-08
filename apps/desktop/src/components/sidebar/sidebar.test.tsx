@@ -15,6 +15,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { UpdateProvider } from '@/providers/update-provider'
 import { RouterProvider } from '@/routing/router'
 import { expectLocatorToHaveCount } from '@/test-utils/expect'
+import { resetNoteRowOverlays } from '@/hooks/note-row-overlay'
 
 const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async () => []))
 const revealItemInDir = vi.hoisted(() => vi.fn<(path: string) => Promise<void>>(async () => {}))
@@ -37,7 +38,8 @@ const openNativeContextMenu = vi.hoisted(() =>
     options.items[0]?.action()
   }),
 )
-const unpinNote = vi.hoisted(() => vi.fn(async () => {}))
+const readNote = vi.hoisted(() => vi.fn(async () => '---\npinned: true\n---\n# Rust\n'))
+const writeNote = vi.hoisted(() => vi.fn(async () => {}))
 const updateSettingsWith = vi.hoisted(() =>
   vi.fn<(updater: (current: Settings) => Partial<Settings>) => void>(),
 )
@@ -46,6 +48,8 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
   getPinnedNotes,
+  readNote,
+  writeNote,
 }))
 vi.mock('@tauri-apps/plugin-opener', () => ({ revealItemInDir, openUrl }))
 vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
@@ -53,10 +57,6 @@ vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
   openRouteInNewWindow,
 }))
 vi.mock('@/lib/native-menu/context-menu', () => ({ openNativeContextMenu }))
-vi.mock('@/lib/note-pin', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/note-pin')>()),
-  unpinNote,
-}))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({
     graph: GRAPH,
@@ -127,7 +127,10 @@ beforeEach(() => {
   chooseGraph.mockClear()
   updateSettingsWith.mockClear()
   openNativeContextMenu.mockClear()
-  unpinNote.mockClear()
+  readNote.mockClear().mockResolvedValue('---\npinned: true\n---\n# Rust\n')
+  writeNote.mockClear().mockResolvedValue(undefined)
+  // The pin assertions `unpinNote` records live in a module-level store.
+  resetNoteRowOverlays()
 })
 
 async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?: Route) {
@@ -353,18 +356,18 @@ describe('Sidebar', () => {
       }),
     )
     await expectLocatorToHaveCount(view.getByRole('button', { name: 'Rust' }), 0)
-    expect(unpinNote).toHaveBeenCalledWith('notes/rust.md', 1)
+    expect(writeNote).toHaveBeenCalledWith('notes/rust.md', '# Rust\n', 1)
   })
 
   it('restores an optimistically removed pinned row when unpin fails', async () => {
-    unpinNote.mockRejectedValueOnce(new Error('disk failed'))
+    writeNote.mockRejectedValueOnce(new Error('disk failed'))
     getPinnedNotes.mockResolvedValue([{ path: 'notes/rust.md', title: 'Rust', dailyDate: null }])
     const { view } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
     await rust.click({ button: 'right' })
 
-    await vi.waitFor(() => expect(unpinNote).toHaveBeenCalledWith('notes/rust.md', 1))
+    await vi.waitFor(() => expect(writeNote).toHaveBeenCalled())
     await expect.element(view.getByRole('button', { name: 'Rust' })).toBeInTheDocument()
   })
 
