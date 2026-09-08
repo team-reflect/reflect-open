@@ -7,7 +7,6 @@ import {
 } from '@/components/ui/dialog'
 import type { CommandContext } from '@/lib/commands/types'
 import { useNoteTemplates } from '@/providers/note-templates-provider'
-import { once } from '@ocavue/utils'
 import { lazy, Suspense, useState, type ReactElement } from 'react'
 
 /**
@@ -22,12 +21,10 @@ interface TemplateCreateDialogProps {
   context: CommandContext
 }
 
-const loadTemplateCreateForm = once(async () => {
+const TemplateCreateForm = lazy(async () => {
   const { TemplateCreateForm } = await import('@/components/templates/template-create-form')
   return { default: TemplateCreateForm }
 })
-
-const TemplateCreateForm = lazy(loadTemplateCreateForm)
 
 export function TemplateCreateDialog({ context }: TemplateCreateDialogProps): ReactElement {
   const { createOpen, closeTemplateCreate } = useNoteTemplates()
