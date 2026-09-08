@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta...v0.12.0-beta.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* load desktop and mobile secondary screens on demand ([#1235](https://github.com/team-reflect/reflect-open/issues/1235)) ([4a8ec26](https://github.com/team-reflect/reflect-open/commit/4a8ec2616db0e6daff366bb34228bc27d2e87a0d))
+* show pin and privacy changes immediately ([#1245](https://github.com/team-reflect/reflect-open/issues/1245)) ([4bb745c](https://github.com/team-reflect/reflect-open/commit/4bb745c7534284502def2bfe8bd955b0fd06430f))
+
 ## [0.12.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.11.0...v0.12.0-beta) (2026-09-07)
 
 
