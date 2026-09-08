@@ -105,6 +105,7 @@ function noteRow(isPrivate: boolean): NoteRow {
     path: 'notes/a.md',
     title: 'A',
     dailyDate: null,
+    isPinned: false,
     isPrivate,
     hasConflict: false,
     gistUrl: null,

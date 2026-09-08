@@ -32,6 +32,7 @@ const NOTE = {
   path: 'notes/clash.md',
   title: 'Clash',
   dailyDate: null,
+  isPinned: false,
   isPrivate: false,
   hasConflict: true,
   gistUrl: null,

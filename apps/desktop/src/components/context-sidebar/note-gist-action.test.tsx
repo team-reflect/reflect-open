@@ -29,6 +29,7 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
     path: 'notes/a.md',
     title: 'A',
     dailyDate: null,
+    isPinned: false,
     isPrivate: false,
     hasConflict: false,
     gistUrl: null,

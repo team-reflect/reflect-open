@@ -38,6 +38,7 @@ const NOTE_ROW = {
   path: 'notes/standup.md',
   title: 'Standup',
   dailyDate: null,
+  isPinned: false,
   isPrivate: false,
   hasConflict: true,
   gistUrl: null,

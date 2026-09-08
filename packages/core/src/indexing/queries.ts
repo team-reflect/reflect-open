@@ -84,6 +84,12 @@ export interface NoteRow {
   title: string
   dailyDate: string | null
   /**
+   * The `pinned` frontmatter flag, however it was written: a bare `pinned:
+   * true` and an explicit `pinned: <order>` both read as pinned here. The
+   * shelf's ordering lives in {@link getPinnedNotes}; this is membership only.
+   */
+  isPinned: boolean
+  /**
    * The `private: true` frontmatter flag — a hard block on sending content to
    * external services. SQLite stores it as `0|1`; this getter maps it to a real
    * boolean at the read boundary so privacy checks can't be tripped up by a
@@ -103,11 +109,21 @@ export async function getNote(path: string): Promise<NoteRow | undefined> {
   const row = await db
     .selectFrom('notes')
     .where('path', '=', path)
-    .select(['path', 'title', 'dailyDate', 'isPrivate', 'hasConflict', 'gistUrl', 'gistStale'])
+    .select([
+      'path',
+      'title',
+      'dailyDate',
+      'isPinned',
+      'isPrivate',
+      'hasConflict',
+      'gistUrl',
+      'gistStale',
+    ])
     .executeTakeFirst()
   return row
     ? {
         ...row,
+        isPinned: row.isPinned !== 0,
         isPrivate: row.isPrivate !== 0,
         hasConflict: row.hasConflict !== 0,
         gistStale: row.gistStale !== 0,

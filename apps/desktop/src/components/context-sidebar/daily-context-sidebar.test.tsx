@@ -64,6 +64,7 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
     path: 'daily/2026-06-09.md',
     title: '2026-06-09',
     dailyDate: '2026-06-09',
+    isPinned: false,
     isPrivate: false,
     hasConflict: false,
     gistUrl: null,
