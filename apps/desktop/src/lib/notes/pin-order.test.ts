@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PinnedNote } from '@reflect/core'
-import { planPinReorder, renumberPinShelf, usablePinOrder } from './pin-order'
+import { nextPinOrder, planPinReorder, renumberPinShelf, usablePinOrder } from './pin-order'
 
 const HI = 2 ** 31 - 1
 
@@ -19,6 +19,29 @@ describe('usablePinOrder', () => {
     // `pinned: 0` is a real order, and the shelf writer used to start there.
     expect([0, 1024, HI].every(usablePinOrder)).toBe(true)
     expect([null, undefined, -1, HI + 1, 1.5, NaN].some(usablePinOrder)).toBe(false)
+  })
+})
+
+describe('nextPinOrder', () => {
+  it('opens the shelf at one gap', () => {
+    expect(nextPinOrder([])).toBe(1024)
+    expect(nextPinOrder(shelf(null))).toBe(1024)
+  })
+
+  it('steps past a shelf the old writer numbered from zero', () => {
+    expect(nextPinOrder(shelf(0, 1))).toBe(1025)
+  })
+
+  it('steps a gap past the highest order, wherever it sits', () => {
+    expect(nextPinOrder(shelf(1024, 5000, 2048))).toBe(6024)
+  })
+
+  it('ignores orders it cannot reason about', () => {
+    expect(nextPinOrder(shelf(1024, null))).toBe(2048)
+  })
+
+  it('clamps at the top of the range', () => {
+    expect(nextPinOrder(shelf(HI))).toBe(HI)
   })
 })
 

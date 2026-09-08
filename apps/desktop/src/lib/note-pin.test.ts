@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NoteSession } from '@/editor/note-session'
+import { queryKeys } from '@/lib/query-client'
 
 const readNote = vi.hoisted(() => vi.fn<(path: string) => Promise<string>>())
 const writeNote = vi.hoisted(() => vi.fn(async () => {}))
@@ -47,6 +48,18 @@ describe('toggleNotePinned', () => {
     readNote.mockResolvedValue('# A\n')
     await expect(toggleNotePinned(input())).resolves.toBeUndefined()
     expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\npinned: true\n---\n# A\n', 3)
+  })
+
+  it('numbers the pin a gap past the shelf it joins', async () => {
+    client.setQueryData(queryKeys.index.pinnedNotes('/g'), [
+      { path: 'notes/b.md', title: 'B', dailyDate: null, pinnedOrder: 1024 },
+      { path: 'notes/c.md', title: 'C', dailyDate: null, pinnedOrder: 2048 },
+    ])
+    readNote.mockResolvedValue('# A\n')
+
+    await expect(toggleNotePinned(input())).resolves.toBeUndefined()
+
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\npinned: 3072\n---\n# A\n', 3)
   })
 
   it('unpins on disk by removing the key (back to no frontmatter)', async () => {

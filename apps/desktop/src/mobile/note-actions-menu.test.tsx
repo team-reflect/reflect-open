@@ -314,7 +314,7 @@ describe('NoteActionsMenu', () => {
     await view.getByRole('button', { name: 'Pin' }).click()
 
     await vi.waitFor(() =>
-      expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/meeting.md', { pinned: true }, 7),
+      expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/meeting.md', { pinned: 1024 }, 7),
     )
     await expect.element(view.getByRole('button', { name: 'Pin' })).not.toBeInTheDocument()
   })

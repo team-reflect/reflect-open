@@ -33,6 +33,18 @@ export function usablePinOrder(order: number | null | undefined): order is numbe
   )
 }
 
+/** The order for a note joining `shelf`, one gap past the highest one there. */
+export function nextPinOrder(shelf: readonly PinnedNote[]): number {
+  let highest: number | null = null
+  for (const note of shelf) {
+    const order = note.pinnedOrder
+    if (usablePinOrder(order) && (highest === null || order > highest)) {
+      highest = order
+    }
+  }
+  return highest === null ? GAP : Math.min(highest + GAP, HI)
+}
+
 /**
  * The writes that put `movedPath` where `shelf` now has it: one note's order
  * when a whole number fits between its new neighbours, else a renumbered shelf.
