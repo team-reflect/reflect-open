@@ -22,13 +22,13 @@
     "tauri:build:beta": "tauri build --config src-tauri/tauri.beta.conf.json"
   },
   "dependencies": {
-    "@base-ui/react": "^1.7.0",
+    "@base-ui/react": "^1.8.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@meowdown/core": "^0.68.1",
-    "@meowdown/react": "^0.68.1",
-    "@ocavue/utils": "^1.7.0",
+    "@meowdown/core": "^0.68.2",
+    "@meowdown/react": "^0.68.2",
+    "@ocavue/utils": "^1.8.0",
     "@reflect/core": "workspace:*",
     "@reflect/db": "workspace:*",
     "@reflect/design-system": "workspace:*",
@@ -68,7 +68,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/cli": "^2.11.4",
     "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.5",
+    "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/browser-playwright": "^4.1.11",
     "babel-plugin-react-compiler": "^1.0.0",
@@ -80,7 +80,7 @@
     "vite": "^8.2.2",
     "vitest": "^4.1.11",
     "vitest-browser-commands": "^0.4.1",
-    "vitest-browser-react": "^2.2.0",
+    "vitest-browser-react": "^2.3.0",
     "vitest-fail-on-console": "^0.10.1"
   }
 }
