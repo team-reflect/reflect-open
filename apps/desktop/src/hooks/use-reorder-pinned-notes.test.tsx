@@ -5,10 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PinnedNote } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client'
 import { deferred } from '@/test-utils/deferred'
+import type { PinOrderWrite } from '@/lib/notes/pin-order'
 import { useReorderPinnedNotes } from './use-reorder-pinned-notes'
 
 const reorderPinnedNotes = vi.hoisted(() =>
-  vi.fn<(notes: readonly PinnedNote[], generation: number) => Promise<void>>(),
+  vi.fn<(writes: readonly PinOrderWrite[], generation: number) => Promise<void>>(),
 )
 vi.mock('@/lib/note-pin', () => ({ reorderPinnedNotes }))
 
@@ -17,13 +18,15 @@ const graphState: {
 } = vi.hoisted(() => ({ graph: { generation: 7, root: '/graphs/personal' } }))
 vi.mock('@/providers/graph-provider', () => ({ useGraph: () => graphState }))
 
-const NOTE_A = { dailyDate: null, path: 'a.md', title: 'A' } satisfies PinnedNote
-const NOTE_B = { dailyDate: null, path: 'b.md', title: 'B' } satisfies PinnedNote
-const NOTE_C = { dailyDate: null, path: 'c.md', title: 'C' } satisfies PinnedNote
+const NOTE_A = { dailyDate: null, path: 'a.md', title: 'A', pinnedOrder: 1024 } satisfies PinnedNote
+const NOTE_B = { dailyDate: null, path: 'b.md', title: 'B', pinnedOrder: 2048 } satisfies PinnedNote
+const NOTE_C = { dailyDate: null, path: 'c.md', title: 'C', pinnedOrder: 3072 } satisfies PinnedNote
 const NOTES = [NOTE_A, NOTE_B, NOTE_C] as const
-const FIRST_ORDER = [NOTE_B, NOTE_A, NOTE_C]
-const SECOND_ORDER = [NOTE_B, NOTE_C, NOTE_A]
-const THIRD_ORDER = [NOTE_C, NOTE_A, NOTE_B]
+// A dropped between two neighbours takes the midpoint; dropped last it opens a
+// fresh gap past the note it landed behind.
+const FIRST_ORDER = [NOTE_B, { ...NOTE_A, pinnedOrder: 2560 }, NOTE_C]
+const SECOND_ORDER = [NOTE_B, NOTE_C, { ...NOTE_A, pinnedOrder: 4096 }]
+const THIRD_ORDER = [NOTE_C, { ...NOTE_A, pinnedOrder: 4096 }, { ...NOTE_B, pinnedOrder: 5120 }]
 
 let queryClient: QueryClient
 
@@ -108,13 +111,32 @@ describe('useReorderPinnedNotes', () => {
     await vi.waitFor(() => expect(queryClient.isMutating()).toBe(0))
 
     expect(reorderPinnedNotes.mock.calls).toEqual([
-      [FIRST_ORDER, 7],
-      [SECOND_ORDER, 7],
-      [THIRD_ORDER, 7],
+      [[{ path: 'a.md', order: 2560 }], 7],
+      [[{ path: 'a.md', order: 4096 }], 7],
+      [[{ path: 'b.md', order: 5120 }], 7],
     ])
     expect(invalidateQueries).not.toHaveBeenCalled()
     expect(queryClient.getQueryData(queryKeys.index.pinnedNotes('/graphs/personal'))).toEqual(
       THIRD_ORDER,
+    )
+  })
+
+  it('renumbers the whole shelf when a neighbour carries no order', async () => {
+    const bare = [
+      { dailyDate: null, path: 'a.md', title: 'A' },
+      { dailyDate: null, path: 'b.md', title: 'B' },
+    ] satisfies PinnedNote[]
+    queryClient.setQueryData(queryKeys.index.pinnedNotes('/graphs/personal'), bare)
+    const hook = await renderReorder(bare)
+
+    await hook.act(() => hook.result.current('a.md', 'b.md'))
+
+    expect(reorderPinnedNotes).toHaveBeenCalledExactlyOnceWith(
+      [
+        { path: 'b.md', order: 1024 },
+        { path: 'a.md', order: 2048 },
+      ],
+      7,
     )
   })
 

@@ -128,28 +128,28 @@ describe('unpinNote', () => {
 })
 
 describe('reorderPinnedNotes', () => {
-  it('writes dense numeric pin orders to each pinned note', async () => {
+  it('writes each planned pin order', async () => {
     readNote.mockResolvedValue('# A\n')
 
     await reorderPinnedNotes(
       [
-        { path: 'notes/c.md', title: 'C', dailyDate: null },
-        { path: 'notes/a.md', title: 'A', dailyDate: null },
+        { path: 'notes/c.md', order: 1024 },
+        { path: 'notes/a.md', order: 1536 },
       ],
       3,
     )
 
-    expect(writeNote).toHaveBeenCalledWith('notes/c.md', '---\npinned: 0\n---\n# A\n', 3)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\npinned: 1\n---\n# A\n', 3)
+    expect(writeNote).toHaveBeenCalledWith('notes/c.md', '---\npinned: 1024\n---\n# A\n', 3)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\npinned: 1536\n---\n# A\n', 3)
   })
 
   it('routes open notes through their sessions', async () => {
     const { session, commitFrontmatter } = fakeSession('# A\n')
     openSession.mockReturnValue(session)
 
-    await reorderPinnedNotes([{ path: 'notes/a.md', title: 'A', dailyDate: null }], 3)
+    await reorderPinnedNotes([{ path: 'notes/a.md', order: 1024 }], 3)
 
-    expect(commitFrontmatter).toHaveBeenCalledWith({ pinned: 0 })
+    expect(commitFrontmatter).toHaveBeenCalledWith({ pinned: 1024 })
     expect(writeNote).not.toHaveBeenCalled()
   })
 })

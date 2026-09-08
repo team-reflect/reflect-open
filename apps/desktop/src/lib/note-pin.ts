@@ -16,6 +16,7 @@ import {
   pinnedNoteFor,
   updatePinnedNotesCache,
 } from './notes/pinned-notes-cache'
+import type { PinOrderWrite } from './notes/pin-order'
 import type { NoteActionInput } from './notes/types'
 
 /** Toggle pin with shared optimistic feedback and save-error reporting. Markdown owns the final state. */
@@ -88,10 +89,10 @@ async function updatePin(input: NoteActionInput, kind: 'toggle' | 'unpin'): Prom
 }
 
 export async function reorderPinnedNotes(
-  notes: readonly PinnedNote[],
+  writes: readonly PinOrderWrite[],
   generation: number,
 ): Promise<void> {
   await Promise.all(
-    notes.map((note, order) => commitNoteFrontmatter(note.path, { pinned: order }, generation)),
+    writes.map((write) => commitNoteFrontmatter(write.path, { pinned: write.order }, generation)),
   )
 }
