@@ -25,13 +25,16 @@ import type { NoteRow } from '@reflect/core'
 /**
  * Index-row fields an action may assert ahead of the re-index. Publishing
  * yields a concrete `gistUrl` and a fresh `gistStale: false`; unpublishing
- * yields `gistUrl: null`. These overlays are short-lived read-model facts that
+ * yields `gistUrl: null`. A pin or privacy flip yields the flag it just wrote
+ * to frontmatter. These overlays are short-lived read-model facts that
  * retire as soon as the index catches up. As a *stored* value every field is
  * concrete — {@link definedFields} strips any `undefined` before it lands.
  */
 export interface NoteRowOverlay {
   readonly gistUrl?: string | null
   readonly gistStale?: boolean
+  readonly isPinned?: boolean
+  readonly isPrivate?: boolean
 }
 
 /**
@@ -43,6 +46,20 @@ export interface NoteRowOverlay {
 export interface NoteRowOverlayPatch {
   readonly gistUrl?: string | null | undefined
   readonly gistStale?: boolean | undefined
+  readonly isPinned?: boolean | undefined
+  readonly isPrivate?: boolean | undefined
+}
+
+/**
+ * Which fields {@link clearNoteRowOverlay} should drop. Named per field rather
+ * than taken as a list so a caller can only ask for a field that exists, and
+ * so retracting one action's assertion cannot touch another's.
+ */
+export interface NoteRowOverlayFields {
+  readonly gistUrl?: boolean
+  readonly gistStale?: boolean
+  readonly isPinned?: boolean
+  readonly isPrivate?: boolean
 }
 
 type MutableNoteRowOverlay = {
@@ -58,7 +75,16 @@ interface OverlayEntry {
 const overlays = new Map<string, OverlayEntry>()
 const listeners = new Set<() => void>()
 
+/**
+ * Bumped on every overlay change. `useSyncExternalStore` needs a snapshot that
+ * is `Object.is`-stable between emits, which a number always is and a freshly
+ * derived array never would be, so readers that derive a *list* subscribe to
+ * this counter and memoize their derivation on it.
+ */
+let revision = 0
+
 function emit(): void {
+  revision += 1
   for (const listener of listeners) {
     listener()
   }
@@ -79,6 +105,12 @@ function definedFields(patch: NoteRowOverlayPatch): NoteRowOverlay {
   }
   if (patch.gistStale !== undefined) {
     result.gistStale = patch.gistStale
+  }
+  if (patch.isPinned !== undefined) {
+    result.isPinned = patch.isPinned
+  }
+  if (patch.isPrivate !== undefined) {
+    result.isPrivate = patch.isPrivate
   }
   return result
 }
@@ -147,21 +179,35 @@ export function reconcileNoteRowOverlay(
   if (entry === undefined || entry.generation !== generation || row === null) {
     return
   }
+  const { gistUrl, gistStale, isPinned, isPrivate } = entry.overlay
   const remaining: MutableNoteRowOverlay = {}
   let retired = false
-  for (const key of Object.keys(entry.overlay) as (keyof NoteRowOverlay)[]) {
-    if (row[key] === entry.overlay[key]) {
+  if (gistUrl !== undefined) {
+    if (row.gistUrl === gistUrl) {
       retired = true
-    } else if (key === 'gistUrl') {
-      const gistUrl = entry.overlay.gistUrl
-      if (gistUrl !== undefined) {
-        remaining.gistUrl = gistUrl
-      }
     } else {
-      const gistStale = entry.overlay.gistStale
-      if (gistStale !== undefined) {
-        remaining.gistStale = gistStale
-      }
+      remaining.gistUrl = gistUrl
+    }
+  }
+  if (gistStale !== undefined) {
+    if (row.gistStale === gistStale) {
+      retired = true
+    } else {
+      remaining.gistStale = gistStale
+    }
+  }
+  if (isPinned !== undefined) {
+    if (row.isPinned === isPinned) {
+      retired = true
+    } else {
+      remaining.isPinned = isPinned
+    }
+  }
+  if (isPrivate !== undefined) {
+    if (row.isPrivate === isPrivate) {
+      retired = true
+    } else {
+      remaining.isPrivate = isPrivate
     }
   }
   if (!retired) {
@@ -173,6 +219,103 @@ export function reconcileNoteRowOverlay(
     overlays.set(path, { generation, overlay: remaining })
   }
   emit()
+}
+
+/**
+ * Drop the named fields for `path` without waiting for the index: the write
+ * that asserted them failed, so the assertion must not stand. Fields the
+ * caller does not name are left alone, because a pin and a publish can hold
+ * assertions on one note at the same time.
+ */
+export function clearNoteRowOverlay(
+  path: string,
+  generation: number,
+  fields: NoteRowOverlayFields,
+): void {
+  const entry = overlays.get(path)
+  if (entry === undefined || entry.generation !== generation) {
+    return
+  }
+  const remaining: MutableNoteRowOverlay = { ...entry.overlay }
+  if (fields.gistUrl === true) {
+    delete remaining.gistUrl
+  }
+  if (fields.gistStale === true) {
+    delete remaining.gistStale
+  }
+  if (fields.isPinned === true) {
+    delete remaining.isPinned
+  }
+  if (fields.isPrivate === true) {
+    delete remaining.isPrivate
+  }
+  if (Object.keys(remaining).length === Object.keys(entry.overlay).length) {
+    return // nothing the caller named was actually asserted
+  }
+  if (Object.keys(remaining).length === 0) {
+    overlays.delete(path)
+  } else {
+    overlays.set(path, { generation, overlay: remaining })
+  }
+  emit()
+}
+
+/** One note's asserted pin state, for readers that show a list rather than a row. */
+export interface PinOverlay {
+  readonly path: string
+  readonly isPinned: boolean
+}
+
+/**
+ * Every overlay on `generation` that asserts a pin state, for the sidebar's
+ * pinned shelf: it lists notes by path and has no row query to merge over, so
+ * it reads the assertions directly. Not reactive on its own — pair it with
+ * {@link useNoteRowOverlayRevision}.
+ */
+export function pinOverlays(generation: number | undefined): PinOverlay[] {
+  if (generation === undefined) {
+    return []
+  }
+  const asserted: PinOverlay[] = []
+  for (const [path, entry] of overlays) {
+    if (entry.generation === generation && entry.overlay.isPinned !== undefined) {
+      asserted.push({ path, isPinned: entry.overlay.isPinned })
+    }
+  }
+  return asserted
+}
+
+/**
+ * Retire pin assertions the freshly-read pinned shelf already agrees with.
+ * {@link reconcileNoteRowOverlay} only runs for a note something is rendering a
+ * row for, and pinning a note does not open it, so without this a pin on a note
+ * that is never opened would hold its assertion for the life of the graph.
+ */
+export function reconcilePinOverlays(
+  generation: number,
+  pinnedPaths: ReadonlySet<string>,
+): void {
+  let changed = false
+  for (const [path, entry] of [...overlays]) {
+    const asserted = entry.overlay.isPinned
+    if (entry.generation !== generation || asserted === undefined) {
+      continue
+    }
+    if (asserted !== pinnedPaths.has(path)) {
+      continue // the shelf has not caught up yet; hold the assertion
+    }
+    const remaining: MutableNoteRowOverlay = { ...entry.overlay }
+    delete remaining.isPinned
+    if (Object.keys(remaining).length === 0) {
+      overlays.delete(path)
+    } else {
+      overlays.set(path, { generation, overlay: remaining })
+    }
+    changed = true
+  }
+  if (changed) {
+    emit()
+  }
 }
 
 /** Drop every overlay — graph teardown reclaims memory (correctness is by generation). */
@@ -197,6 +340,15 @@ export function applyNoteRowOverlay(
     return row
   }
   return { ...row, ...overlay }
+}
+
+/**
+ * Subscribe a component to the overlay store as a whole, as a counter it can
+ * memoize on. For {@link pinOverlays} and any other reader that derives a
+ * fresh object per call; a per-path reader wants {@link useNoteRowOverlay}.
+ */
+export function useNoteRowOverlayRevision(): number {
+  return useSyncExternalStore(subscribe, () => revision)
 }
 
 /** Subscribe a component to `path`'s overlay on `generation`; `null` when none. */
