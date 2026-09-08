@@ -87,10 +87,11 @@ describe('NoteActionsSection pin toggle', () => {
     getPinnedNotes.mockResolvedValue([
       { path: 'daily/2026-06-10.md', title: 'June 10th, 2026', dailyDate: '2026-06-10' },
     ])
+    noteSource.value = '---\npinned: true\n---\n# A\n'
     const view = await renderSection('daily/2026-06-10.md')
     await expect.element(view.getByText('Un-pin this note')).toBeInTheDocument()
     await userEvent.click(view.getByRole('button', { name: /Un-pin this note/ }))
-    expect(commitNoteFrontmatter).toHaveBeenCalledWith('daily/2026-06-10.md', { pinned: true }, 7)
+    expect(commitNoteFrontmatter).toHaveBeenCalledWith('daily/2026-06-10.md', { pinned: false }, 7)
     await view.unmount()
   })
 
