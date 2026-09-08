@@ -389,26 +389,38 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     if (io.write === null) {
       return false
     }
+    const previousHeader = header
     if (!updateFrontmatter(patch)) {
       return false
     }
-    if (conflict === null) {
-      await flush()
+    const attemptedHeader = header
+    try {
+      if (conflict === null) {
+        const shouldPersist = dirty
+        await flush()
+        if (shouldPersist && error !== null) {
+          throw new Error(error)
+        }
+      } else {
+        // Keep both conflict resolutions consistent with the persisted flag.
+        const patched = upsertFrontmatter(conflict, frontmatterPatchToYaml(patch))
+        if (patched !== conflict) {
+          await io.write(path, patched)
+          conflict = patched
+          disk = patched
+          emit()
+        }
+      }
       return true
-    }
-    // Saves are paused: the patch above rides the in-memory header (landing
-    // with "keep mine"), so make the other half land too — patch the parked
-    // content and write it through. The park refreshes in place, so "load
-    // theirs" adopts the patched bytes, and recording the write in `disk`
-    // makes the watcher's echo a recognized no-op.
-    const patched = upsertFrontmatter(conflict, frontmatterPatchToYaml(patch))
-    if (patched !== conflict) {
-      await io.write(path, patched)
-      conflict = patched
-      disk = patched
+    } catch (cause) {
+      // Preserve body edits and any newer metadata change made during the write.
+      if (header === attemptedHeader) {
+        header = previousHeader
+      }
+      dirty = header + buffer !== disk
       emit()
+      throw cause
     }
-    return true
   }
 
   /**

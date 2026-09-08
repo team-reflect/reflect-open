@@ -29,6 +29,7 @@ interface Harness {
 }
 
 function harness(options?: {
+  beforeWrite?: () => Promise<void>
   write?: false
   classify?: (markdown: string) => RoundTripFidelity
   /** `null` simulates a missing file: reads throw the notFound AppError. */
@@ -56,6 +57,7 @@ function harness(options?: {
         options?.write === false
           ? null
           : async (path, contents) => {
+              await options?.beforeWrite?.()
               if (writeFailure !== null) {
                 throw new Error(writeFailure)
               }
@@ -387,6 +389,74 @@ describe('frontmatter ownership (Plan 07b)', () => {
     // Flushed, not riding the save debounce.
     expect(h.writes.at(-1)?.contents).toBe('---\npinned: true\n---\n# Hello\n')
     expect(h.snapshots.at(-1)?.dirty).toBe(false)
+  })
+
+  it('commitFrontmatter rejects a failed save without dropping newer body edits', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const writeStarted = Promise.withResolvers<void>()
+    const writeFinished = Promise.withResolvers<void>()
+    const h = harness({
+      beforeWrite: () => {
+        writeStarted.resolve()
+        return writeFinished.promise
+      },
+    })
+    try {
+      h.session.load()
+      await settled()
+      h.failWrites('disk full')
+      const commit = h.session.commitFrontmatter({ pinned: true })
+      const rejected = expect(commit).rejects.toThrow('disk full')
+      await writeStarted.promise
+      h.session.editorChanged('# Typed during pin\n')
+      writeFinished.resolve()
+      await rejected
+
+      expect(h.session.content()).toBe('# Typed during pin\n')
+      expect(h.snapshots.at(-1)?.dirty).toBe(true)
+      expect(h.snapshots.at(-1)?.error).toBe('disk full')
+      h.failWrites(null)
+      await h.session.flush()
+      expect(h.writes.at(-1)?.contents).toBe('# Typed during pin\n')
+    } finally {
+      h.session.discard()
+      consoleError.mockRestore()
+    }
+  })
+
+  it('a no-op frontmatter commit does not report an earlier save error', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const h = harness()
+    try {
+      h.session.load()
+      await settled()
+      h.failWrites('disk full')
+      await expect(h.session.commitFrontmatter({ pinned: true })).rejects.toThrow('disk full')
+      expect(h.session.content()).toBe('# Hello\n')
+      expect(h.snapshots.at(-1)?.dirty).toBe(false)
+      await expect(h.session.commitFrontmatter({})).resolves.toBe(true)
+      expect(h.writes).toEqual([])
+    } finally {
+      h.session.discard()
+      consoleError.mockRestore()
+    }
+  })
+
+  it('a failed conflict patch restores the header and leaves the conflict intact', async () => {
+    const h = harness()
+    h.session.load()
+    await settled()
+    h.session.editorChanged('# Mine\n')
+    h.setDisk('# Theirs\n')
+    h.session.externalChanged()
+    await settled()
+    h.failWrites('disk full')
+
+    await expect(h.session.commitFrontmatter({ pinned: true })).rejects.toThrow('disk full')
+    expect(h.session.content()).toBe('# Mine\n')
+    expect(h.snapshots.at(-1)?.conflict).toBe('# Theirs\n')
+    expect(h.snapshots.at(-1)?.dirty).toBe(true)
+    h.session.discard()
   })
 
   it('commitFrontmatter declines when the session has no write channel', async () => {
