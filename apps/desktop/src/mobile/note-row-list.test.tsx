@@ -8,8 +8,11 @@ import { pointer, swipe, translateX } from '@/test-utils/swipe'
 import { NoteRowList } from './note-row-list'
 import { SwipeableNoteRow, type NoteRowModel } from './swipeable-note-row'
 
-const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
-vi.mock('@/lib/note-pin', () => ({ toggleNotePinned, unpinNote: vi.fn(async () => {}) }))
+const commitNoteFrontmatter = vi.hoisted(() => vi.fn(async () => {}))
+vi.mock('@/lib/note-frontmatter', () => ({
+  commitNoteFrontmatter,
+  readNoteSource: async () => '# A\n',
+}))
 
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({ settings: { dateFormat: 'mdy', timeFormat: '12h' } }),
@@ -71,7 +74,7 @@ function CachedNoteList(): ReactElement {
 }
 
 beforeEach(() => {
-  toggleNotePinned.mockReset().mockResolvedValue(true)
+  commitNoteFrontmatter.mockReset().mockResolvedValue(undefined)
   onOpen.mockReset()
   onTogglePin.mockReset()
   onDelete.mockReset()
@@ -92,8 +95,8 @@ describe('NoteRowList', () => {
         isPinned: false,
       },
     ])
-    const write = Promise.withResolvers<boolean>()
-    toggleNotePinned.mockReturnValueOnce(write.promise)
+    const write = Promise.withResolvers<void>()
+    commitNoteFrontmatter.mockReturnValueOnce(write.promise)
     const view = await render(
       <QueryClientProvider client={client}>
         <div style={{ width: 360, height: 300, display: 'flex' }}>
@@ -117,8 +120,8 @@ describe('NoteRowList', () => {
       'notes/alpha.md',
     )
     await expect.element(view.getByText('Pinned', { exact: true })).toBeInTheDocument()
-    expect(toggleNotePinned).toHaveBeenCalledWith('notes/alpha.md', 1)
-    write.resolve(true)
+    expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/alpha.md', { pinned: true }, 1)
+    write.resolve()
     await write.promise
   })
 

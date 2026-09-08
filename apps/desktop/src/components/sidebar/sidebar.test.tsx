@@ -43,7 +43,11 @@ vi.mock('@/lib/operations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/operations')>()),
   startOperation,
 }))
-const unpinNote = vi.hoisted(() => vi.fn(async () => {}))
+const commitNoteFrontmatter = vi.hoisted(() => vi.fn(async () => {}))
+vi.mock('@/lib/note-frontmatter', () => ({
+  commitNoteFrontmatter,
+  readNoteSource: async () => '# Rust\n',
+}))
 const updateSettingsWith = vi.hoisted(() =>
   vi.fn<(updater: (current: Settings) => Partial<Settings>) => void>(),
 )
@@ -59,10 +63,7 @@ vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
   openRouteInNewWindow,
 }))
 vi.mock('@/lib/native-menu/context-menu', () => ({ openNativeContextMenu }))
-vi.mock('@/lib/note-pin', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/note-pin')>()),
-  unpinNote,
-}))
+
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({
     graph: GRAPH,
@@ -135,7 +136,7 @@ beforeEach(() => {
   openNativeContextMenu.mockClear()
   operationFail.mockClear()
   startOperation.mockClear()
-  unpinNote.mockClear()
+  commitNoteFrontmatter.mockClear()
 })
 
 async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?: Route) {
@@ -149,6 +150,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     forward: vi.fn(),
     clearScrollState: vi.fn(),
     togglePin: vi.fn(async () => {}),
+    togglePrivate: vi.fn(async () => {}),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
@@ -362,18 +364,20 @@ describe('Sidebar', () => {
       }),
     )
     await expectLocatorToHaveCount(view.getByRole('button', { name: 'Rust' }), 0)
-    expect(unpinNote).toHaveBeenCalledWith('notes/rust.md', 1)
+    expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1)
   })
 
   it('restores an optimistically removed pinned row when unpin fails', async () => {
-    unpinNote.mockRejectedValueOnce(new Error('disk failed'))
+    commitNoteFrontmatter.mockRejectedValueOnce(new Error('disk failed'))
     getPinnedNotes.mockResolvedValue([{ path: 'notes/rust.md', title: 'Rust', dailyDate: null }])
     const { view } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
     await rust.click({ button: 'right' })
 
-    await vi.waitFor(() => expect(unpinNote).toHaveBeenCalledWith('notes/rust.md', 1))
+    await vi.waitFor(() =>
+      expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1),
+    )
     await expect.element(view.getByRole('button', { name: 'Rust' })).toBeInTheDocument()
     expect(startOperation).toHaveBeenCalledExactlyOnceWith('Updating pin')
     expect(operationFail).toHaveBeenCalledExactlyOnceWith('disk failed')

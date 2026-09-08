@@ -27,6 +27,7 @@ async function renderDialog(): Promise<CommandContext> {
     forward: vi.fn(),
     clearScrollState: vi.fn(),
     togglePin: vi.fn(async () => {}),
+    togglePrivate: vi.fn(async () => {}),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),

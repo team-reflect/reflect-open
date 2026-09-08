@@ -1,15 +1,8 @@
-import {
-  errorMessage,
-  getNote,
-  randomNotePath,
-  toggleDevtools,
-  untitledNotePath,
-} from '@reflect/core'
+import { errorMessage, randomNotePath, toggleDevtools, untitledNotePath } from '@reflect/core'
 import { attachFilesToNote } from '@/lib/attach-files'
 import { runCopyNotePath } from '@/lib/note-copy-path'
 import { runCopyDeepLink } from '@/lib/note-deep-link'
 import { runGistPublish } from '@/lib/note-gist'
-import { toggleNotePrivate } from '@/lib/note-private'
 import { startOperation } from '@/lib/operations'
 import { isNativeShell } from '@/lib/platform'
 import { rebuildIndexVisibly } from '@/lib/rebuild-index'
@@ -187,23 +180,7 @@ const APP_COMMANDS: AppCommand[] = [
     // note's content to AI or any other external service — of the note the
     // current route edits. No default keybinding: the palette keeps it
     // keyboard-reachable without spending a shortcut.
-    run: async (context) => {
-      const generation = context.generation()
-      const path = context.notePath()
-      if (generation === null || path === null) {
-        return
-      }
-      // Read the current flag first so a failure is surfaced with the toggle's
-      // actual direction — the sidebar's Lock/Unlock wording — instead of a
-      // fixed "private" label that misreads when the user is unlocking.
-      let wasPrivate = false
-      try {
-        wasPrivate = (await getNote(path))?.isPrivate ?? false
-        await toggleNotePrivate(path, generation)
-      } catch (cause) {
-        startOperation(wasPrivate ? 'Unlocking note' : 'Locking note').fail(errorMessage(cause))
-      }
-    },
+    run: (context) => context.togglePrivate(),
   },
   {
     id: 'note.publishGist',

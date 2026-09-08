@@ -1,4 +1,4 @@
-import type { GraphInfo, PinnedNote } from '@reflect/core'
+import type { GraphInfo, NoteRow, PinnedNote } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client'
 import { FocusedDailyProvider, useSetFocusedDailyDate } from '@/providers/focused-daily-provider'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -14,11 +14,14 @@ import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider'
 import { useAppShortcuts } from './app-shortcuts'
 import { RouterProvider, useRouter } from './router'
 
-const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
+const commitNoteFrontmatter = vi.hoisted(() => vi.fn(async () => {}))
 const graphState = vi.hoisted((): { graph: GraphInfo | null } => ({
   graph: { root: '/g', name: 'g', generation: 1 },
 }))
-vi.mock('@/lib/note-pin', () => ({ toggleNotePinned, unpinNote: vi.fn(async () => {}) }))
+vi.mock('@/lib/note-frontmatter', () => ({
+  commitNoteFrontmatter,
+  readNoteSource: async () => '# A\n',
+}))
 
 const newChat = vi.hoisted(() => vi.fn())
 const openRecent = vi.hoisted(() => vi.fn())
@@ -76,7 +79,7 @@ registerAppCommands() // production does this in main.tsx
 
 beforeEach(() => {
   graphState.graph = { root: '/g', name: 'g', generation: 1 }
-  toggleNotePinned.mockReset().mockResolvedValue(true)
+  commitNoteFrontmatter.mockReset().mockResolvedValue(undefined)
   openRecent.mockClear()
   openRouteInNewWindow.mockClear()
   openNoteFindForPath.mockClear()
@@ -140,16 +143,16 @@ describe('app shortcuts', () => {
     const client = new QueryClient()
     const key = queryKeys.index.pinnedNotes('/g')
     client.setQueryData(key, [])
-    const write = Promise.withResolvers<boolean>()
-    toggleNotePinned.mockReturnValueOnce(write.promise)
+    const write = Promise.withResolvers<void>()
+    commitNoteFrontmatter.mockReturnValueOnce(write.promise)
     const { result, act } = await shortcutsHook(client)
     await act(() => result.current.router.navigate({ kind: 'note', path: 'notes/a.md' }))
     await act(() => press('o'))
     expect(client.getQueryData<PinnedNote[]>(key)?.map((note) => note.path)).toEqual(['notes/a.md'])
-    expect(toggleNotePinned).toHaveBeenCalledWith('notes/a.md', 1)
+    expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/a.md', { pinned: true }, 1)
     await act(() => press('o'))
-    expect(toggleNotePinned).toHaveBeenCalledTimes(1)
-    write.resolve(true)
+    expect(commitNoteFrontmatter).toHaveBeenCalledTimes(1)
+    write.resolve()
     await act(async () => {
       await write.promise
     })
@@ -161,20 +164,52 @@ describe('app shortcuts', () => {
     await act(() => result.current.router.navigate({ kind: 'daily', date: '2026-09-08' }))
     await act(() => result.current.setFocusedDailyDate('2026-09-07'))
     await act(() => result.current.context.togglePin())
-    expect(toggleNotePinned).toHaveBeenCalledWith('daily/2026-09-07.md', 1)
+    expect(commitNoteFrontmatter).toHaveBeenCalledWith('daily/2026-09-07.md', { pinned: true }, 1)
     expect(
       client.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'))?.[0]?.dailyDate,
     ).toBe('2026-09-07')
   })
 
-  it('pin no-ops on note-less routes and without a graph', async () => {
+  it('palette privacy updates the focused daily note cache before the write resolves', async () => {
+    const client = new QueryClient()
+    const queryKey = queryKeys.index.note('/g', 'daily/2026-09-07.md')
+    client.setQueryData<NoteRow>(queryKey, {
+      path: 'daily/2026-09-07.md',
+      title: 'Daily',
+      dailyDate: '2026-09-07',
+      isPrivate: false,
+      hasConflict: false,
+      gistUrl: null,
+      gistStale: false,
+    })
+    const write = Promise.withResolvers<void>()
+    commitNoteFrontmatter.mockReturnValueOnce(write.promise)
+    const { result, act } = await shortcutsHook(client)
+    await act(() => result.current.router.navigate({ kind: 'daily', date: '2026-09-08' }))
+    await act(() => result.current.setFocusedDailyDate('2026-09-07'))
+    const action = result.current.context.togglePrivate()
+    await vi.waitFor(() =>
+      expect(commitNoteFrontmatter).toHaveBeenCalledWith(
+        'daily/2026-09-07.md',
+        { private: true },
+        1,
+      ),
+    )
+    expect(client.getQueryData<NoteRow>(queryKey)?.isPrivate).toBe(true)
+    write.resolve()
+    await action
+  })
+
+  it('pin and privacy no-op on note-less routes and without a graph', async () => {
     const { result, act } = await shortcutsHook()
     await act(() => result.current.router.navigate({ kind: 'settings' }))
     await act(() => press('o'))
+    await act(() => result.current.context.togglePrivate())
     graphState.graph = null
     await act(() => result.current.router.navigate({ kind: 'note', path: 'notes/a.md' }))
     await act(() => press('o'))
-    expect(toggleNotePinned).not.toHaveBeenCalled()
+    await act(() => result.current.context.togglePrivate())
+    expect(commitNoteFrontmatter).not.toHaveBeenCalled()
   })
 
   it('registers the command keybindings in the central keymap registry', () => {

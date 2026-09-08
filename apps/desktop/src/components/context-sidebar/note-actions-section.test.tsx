@@ -1,8 +1,9 @@
+import { upsertFrontmatter, type PinnedNote } from '@reflect/core'
+import { frontmatterPatchToYaml, type FrontmatterPatch } from '@/editor/note-session'
 import { render } from 'vitest-browser-react'
 import { page, userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PinnedNote } from '@reflect/core'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { queryKeys } from '@/lib/query-client'
 import { RouterProvider } from '@/routing/router'
@@ -10,8 +11,12 @@ import { NoteActionsSection } from './note-actions-section'
 
 const getPinnedNotes = vi.hoisted(() => vi.fn())
 const getNote = vi.hoisted(() => vi.fn())
-const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
-const toggleNotePrivate = vi.hoisted(() => vi.fn(async () => true))
+const noteSource = vi.hoisted(() => ({ value: '# A\n' }))
+const readNoteSource = vi.hoisted(() => vi.fn(async () => noteSource.value))
+const commitNoteFrontmatter = vi.hoisted(() =>
+  vi.fn<(path: string, patch: FrontmatterPatch, generation: number) => Promise<void>>(),
+)
+vi.mock('@/lib/note-frontmatter', () => ({ readNoteSource, commitNoteFrontmatter }))
 const deleteOpenNote = vi.hoisted(() => vi.fn(async () => {}))
 const operationFail = vi.hoisted(() => vi.fn())
 const startOperation = vi.hoisted(() =>
@@ -28,8 +33,6 @@ vi.mock('@/lib/keybindings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/keybindings')>()),
   isApplePlatform,
 }))
-vi.mock('@/lib/note-pin', () => ({ toggleNotePinned, unpinNote: vi.fn(async () => {}) }))
-vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
 vi.mock('@/lib/note-delete', () => ({ deleteOpenNote }))
 vi.mock('@/lib/operations', () => ({ startOperation }))
 vi.mock('@/providers/graph-provider', () => ({
@@ -53,9 +56,12 @@ async function renderSection(path: string, showTrash = false) {
 beforeEach(() => {
   window.sessionStorage.clear()
   getPinnedNotes.mockReset().mockResolvedValue([])
-  getNote.mockReset().mockResolvedValue(undefined)
-  toggleNotePinned.mockReset().mockResolvedValue(true)
-  toggleNotePrivate.mockReset().mockResolvedValue(true)
+  getNote.mockReset().mockResolvedValue(noteRow('notes/a.md', false))
+  noteSource.value = '# A\n'
+  readNoteSource.mockReset().mockImplementation(async () => noteSource.value)
+  commitNoteFrontmatter.mockReset().mockImplementation(async (_path, patch) => {
+    noteSource.value = upsertFrontmatter(noteSource.value, frontmatterPatchToYaml(patch))
+  })
   deleteOpenNote.mockReset().mockResolvedValue(undefined)
   startOperation.mockClear()
   operationFail.mockClear()
@@ -73,7 +79,7 @@ describe('NoteActionsSection pin toggle', () => {
     // The mocked platform is non-Apple, so Mod renders as Ctrl.
     expect(button.element().textContent).toContain('CtrlO')
     await userEvent.click(button)
-    expect(toggleNotePinned).toHaveBeenCalledWith('notes/a.md', 7)
+    expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/a.md', { pinned: true }, 7)
     await view.unmount()
   })
 
@@ -84,7 +90,7 @@ describe('NoteActionsSection pin toggle', () => {
     const view = await renderSection('daily/2026-06-10.md')
     await expect.element(view.getByText('Un-pin this note')).toBeInTheDocument()
     await userEvent.click(view.getByRole('button', { name: /Un-pin this note/ }))
-    expect(toggleNotePinned).toHaveBeenCalledWith('daily/2026-06-10.md', 7)
+    expect(commitNoteFrontmatter).toHaveBeenCalledWith('daily/2026-06-10.md', { pinned: true }, 7)
     await view.unmount()
   })
 
@@ -94,16 +100,16 @@ describe('NoteActionsSection pin toggle', () => {
     // The index still reports unpinned; the toggle's resolved state bridges
     // the watcher round-trip so a second click can't invert the user's intent.
     await expect.element(view.getByText('Un-pin this note')).toBeInTheDocument()
-    toggleNotePinned.mockResolvedValueOnce(false)
+    noteSource.value = '---\npinned: true\n---\n# A\n'
     await userEvent.click(view.getByRole('button', { name: /Un-pin this note/ }))
     await expect.element(view.getByText('Pin this note', { exact: true })).toBeInTheDocument()
-    expect(toggleNotePinned).toHaveBeenCalledTimes(2)
+    expect(commitNoteFrontmatter).toHaveBeenCalledTimes(2)
     await view.unmount()
   })
 
   it('updates the button and shelf while the pin write is still pending', async () => {
-    const write = Promise.withResolvers<boolean>()
-    toggleNotePinned.mockReturnValueOnce(write.promise)
+    const write = Promise.withResolvers<void>()
+    commitNoteFrontmatter.mockReturnValueOnce(write.promise)
     const view = await renderSection('notes/a.md')
     await vi.waitFor(() => expect(getPinnedNotes).toHaveBeenCalledTimes(1))
     await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
@@ -111,7 +117,7 @@ describe('NoteActionsSection pin toggle', () => {
     expect(
       view.client.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'))?.[0]?.path,
     ).toBe('notes/a.md')
-    write.resolve(true)
+    write.resolve()
     await write.promise
     await view.unmount()
   })
@@ -145,9 +151,9 @@ describe('NoteActionsSection pin toggle', () => {
 
   it('invalidates pinned notes when an optimistic pin fails', async () => {
     let rejectToggle!: (cause: unknown) => void
-    toggleNotePinned.mockImplementationOnce(
+    commitNoteFrontmatter.mockImplementationOnce(
       () =>
-        new Promise<boolean>((_resolve, reject) => {
+        new Promise<void>((_resolve, reject) => {
           rejectToggle = reject
         }),
     )
@@ -170,16 +176,17 @@ describe('NoteActionsSection private toggle', () => {
   it('offers Lock note and toggles on click', async () => {
     const view = await renderSection('notes/a.md')
     await userEvent.click(view.getByRole('button', { name: /Lock note/ }))
-    expect(toggleNotePrivate).toHaveBeenCalledWith('notes/a.md', 7)
+    expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/a.md', { private: true }, 7)
     await view.unmount()
   })
 
   it('offers Unlock note when the index reports the note private', async () => {
     getNote.mockResolvedValue(noteRow('daily/2026-06-10.md', true))
+    noteSource.value = '---\nprivate: true\n---\n# A\n'
     const view = await renderSection('daily/2026-06-10.md')
     await expect.element(view.getByText('Unlock note')).toBeInTheDocument()
     await userEvent.click(view.getByRole('button', { name: /Unlock note/ }))
-    expect(toggleNotePrivate).toHaveBeenCalledWith('daily/2026-06-10.md', 7)
+    expect(commitNoteFrontmatter).toHaveBeenCalledWith('daily/2026-06-10.md', { private: false }, 7)
     await view.unmount()
   })
 
@@ -187,15 +194,33 @@ describe('NoteActionsSection private toggle', () => {
     const view = await renderSection('notes/a.md')
     await userEvent.click(view.getByRole('button', { name: /Lock note/ }))
     await expect.element(view.getByText('Unlock note')).toBeInTheDocument()
-    toggleNotePrivate.mockResolvedValueOnce(false)
+    noteSource.value = '---\nprivate: true\n---\n# A\n'
     await userEvent.click(view.getByRole('button', { name: /Unlock note/ }))
     await expect.element(view.getByText('Lock note', { exact: true })).toBeInTheDocument()
-    expect(toggleNotePrivate).toHaveBeenCalledTimes(2)
+    expect(commitNoteFrontmatter).toHaveBeenCalledTimes(2)
+    await view.unmount()
+  })
+
+  it('shares an externally triggered privacy toggle with the button while saving', async () => {
+    const { toggleNotePrivate } = await import('@/lib/note-private')
+    const write = Promise.withResolvers<void>()
+    commitNoteFrontmatter.mockReturnValueOnce(write.promise)
+    const view = await renderSection('notes/a.md')
+    await vi.waitFor(() => expect(getNote).toHaveBeenCalledOnce())
+    const action = toggleNotePrivate({
+      queryClient: view.client,
+      root: '/g',
+      generation: 7,
+      path: 'notes/a.md',
+    })
+    await expect.element(view.getByText('Unlock note')).toBeInTheDocument()
+    write.resolve()
+    await action
     await view.unmount()
   })
 
   it('restores the private label when a write fails', async () => {
-    toggleNotePrivate.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
+    commitNoteFrontmatter.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
     const view = await renderSection('notes/a.md')
     await userEvent.click(view.getByRole('button', { name: /Lock note/ }))
     await expect.element(view.getByText('Lock note', { exact: true })).toBeInTheDocument()

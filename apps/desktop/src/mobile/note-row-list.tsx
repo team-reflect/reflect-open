@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { Virtualizer } from 'virtua'
 import { useQueryClient } from '@tanstack/react-query'
-import { runPinAction } from '@/lib/notes/pin-action'
+import { toggleNotePinned } from '@/lib/note-pin'
 import { NoteDeleteDrawer } from '@/mobile/note-delete-drawer'
 import { NOTE_ROW_HEIGHT, SwipeableNoteRow, type NoteRowModel } from '@/mobile/swipeable-note-row'
 import { useGraph } from '@/providers/graph-provider'
@@ -26,12 +26,11 @@ export function NoteRowList({ rows, onOpen, onDeleted }: NoteRowListProps): Reac
 
   const togglePin = (row: NoteRowModel): void => {
     if (graph !== null) {
-      void runPinAction({
+      void toggleNotePinned({
         queryClient,
         root: graph.root,
         generation: graph.generation,
         path: row.path,
-        kind: 'toggle',
       })
     }
   }

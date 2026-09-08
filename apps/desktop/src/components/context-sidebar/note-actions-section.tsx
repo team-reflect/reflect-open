@@ -5,13 +5,12 @@ import { PinIcon } from '@/components/icons/pin-icon'
 import { useNoteRow } from '@/hooks/use-note-row'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes'
 import { keybindingFor } from '@/lib/commands/app-commands'
-import { runPinAction } from '@/lib/notes/pin-action'
+import { toggleNotePinned } from '@/lib/note-pin'
 import { useGraph } from '@/providers/graph-provider'
 import { toggleNotePrivate } from '@/lib/note-private'
 import { NoteActionButton } from './note-action-button'
 import { NoteGistAction } from './note-gist-action'
 import { NoteTrashAction } from './note-trash-action'
-import { NoteToggleAction } from './note-toggle-action'
 import { SidebarSection } from './sidebar-section'
 
 interface NoteActionsSectionProps {
@@ -32,7 +31,7 @@ const GIST_KEYBINDING = keybindingFor('note.publishGist')
  * to the note-scoped commands — pin/unpin and the `private` flag. Shared by
  * the daily and note context sidebars; dailies are valid targets for both.
  * Pin reads the shared shelf cache, updated immediately by every pin entrypoint.
- * Privacy bridges the indexed note row with the last local toggle result.
+ * Privacy reads the note row cache shared by the palette and mobile actions.
  */
 export function NoteActionsSection({
   path,
@@ -45,13 +44,18 @@ export function NoteActionsSection({
   const queryClient = useQueryClient()
   const togglePin = async (): Promise<void> => {
     if (graph !== null) {
-      await runPinAction({
+      await toggleNotePinned({
         queryClient,
         root: graph.root,
         generation: graph.generation,
         path,
-        kind: 'toggle',
       })
+    }
+  }
+
+  const togglePrivate = async (): Promise<void> => {
+    if (graph !== null) {
+      await toggleNotePrivate({ queryClient, root: graph.root, generation: graph.generation, path })
     }
   }
 
@@ -64,16 +68,14 @@ export function NoteActionsSection({
         labels={{ active: 'Un-pin this note', inactive: 'Pin this note' }}
         keybinding={PIN_KEYBINDING}
       />
-      <NoteToggleAction
-        path={path}
-        indexActive={isPrivate}
-        toggle={toggleNotePrivate}
+      <NoteActionButton
+        isActive={isPrivate}
+        onClick={togglePrivate}
         icon={<Lock size={14} aria-hidden />}
         labels={{
           active: 'Unlock note',
           inactive: 'Lock note',
         }}
-        failureLabel="Updating privacy"
         keybinding={PRIVATE_KEYBINDING}
         tooltip="Locks this note out of AI. Backup and sync still include it."
       />

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { runPinAction } from '@/lib/notes/pin-action'
+import { toggleNotePinned } from '@/lib/note-pin'
+import { toggleNotePrivate } from '@/lib/note-private'
 import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider'
 import { registerKeymap } from '@/editor/keymap'
@@ -233,7 +234,19 @@ export function useAppShortcuts(): CommandContext {
           focusedDailyDateRef.current,
         )
         if (root !== null && generation !== null && path !== null) {
-          await runPinAction({ queryClient, root, generation, path, kind: 'toggle' })
+          await toggleNotePinned({ queryClient, root, generation, path })
+        }
+      },
+      togglePrivate: async () => {
+        const root = graphRootRef.current
+        const generation = generationRef.current
+        const path = focusedNotePathForRoute(
+          routeRef.current,
+          todayIso(),
+          focusedDailyDateRef.current,
+        )
+        if (root !== null && generation !== null && path !== null) {
+          await toggleNotePrivate({ queryClient, root, generation, path })
         }
       },
       back,

@@ -4,7 +4,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useQueryClient } from '@tanstack/react-query'
 import { displayNoteTitle, errorMessage } from '@reflect/core'
 import type { PinnedNote } from '@reflect/core'
-import { runPinAction } from '@/lib/notes/pin-action'
+import { unpinNote } from '@/lib/note-pin'
 import { formatDayLabel } from '@/lib/dates'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { openNativeContextMenu } from '@/lib/native-menu/context-menu'
@@ -53,13 +53,11 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
           {
             text: 'Unpin Note',
             action: () => {
-              void runPinAction({
+              void unpinNote({
                 queryClient,
                 root: graph.root,
                 generation: graph.generation,
                 path: note.path,
-                kind: 'unpin',
-                note,
               })
             },
           },

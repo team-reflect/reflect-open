@@ -21,6 +21,8 @@ export interface CommandContext {
   notePath: () => string | null
   /** Toggle the focused note pin with immediate shared feedback. */
   togglePin: () => Promise<void>
+  /** Toggle the focused note privacy with immediate shared feedback. */
+  togglePrivate: () => Promise<void>
   back: () => void
   forward: () => void
   /** Discard the current view's saved scroll offsets so it re-anchors when revisited. */

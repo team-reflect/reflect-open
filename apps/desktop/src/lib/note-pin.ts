@@ -1,36 +1,90 @@
-import { isPinned, parseNote, type PinnedNote } from '@reflect/core'
+import {
+  errorMessage,
+  isPinned,
+  parseNote,
+  type FilteredSearchHit,
+  type NoteListEntry,
+  type NoteRow,
+  type PinnedNote,
+} from '@reflect/core'
 import { commitNoteFrontmatter, readNoteSource } from '@/lib/note-frontmatter'
+import { startOperation } from '@/lib/operations'
+import { queryKeys } from '@/lib/query-client'
+import {
+  insertPinnedNote,
+  invalidatePinnedNotesCache,
+  pinnedNoteFor,
+  updatePinnedNotesCache,
+} from './notes/pinned-notes-cache'
+import type { NoteActionInput } from './notes/types'
 
-/**
- * Toggle a note's `pinned` frontmatter flag. Markdown is the source of truth:
- * the flag lands in the file, the watcher re-indexes it, and the sidebar's
- * Pinned section follows from the index — no UI-side pin state. Toggling off
- * always clears any explicit `pinned: <order>`; toggling on writes a bare
- * `pinned: true` (drag reorder writes orders).
- *
- * Reads the current state and writes the flip through {@link readNoteSource} /
- * {@link commitNoteFrontmatter} — the shared session-or-disk channel that keeps
- * our own write from parking a conflict under a dirty buffer (and never reads a
- * still-loading buffer). `pinned: false` deletes the key: unpinned is the
- * absence of the flag, so a note whose only metadata was the pin returns to
- * having no frontmatter at all.
- *
- * Returns the note's new pinned state.
- */
-export async function toggleNotePinned(path: string, generation: number): Promise<boolean> {
-  const source = await readNoteSource(path)
-  const pinned = !isPinned(parseNote({ path, source }).frontmatter)
-  await commitNoteFrontmatter(path, { pinned }, generation)
-  return pinned
+/** Toggle pin with shared optimistic feedback and save-error reporting. Markdown owns the final state. */
+export async function toggleNotePinned(input: NoteActionInput): Promise<void> {
+  await updatePin(input, 'toggle')
 }
 
-/**
- * Remove a note from the pinned shelf without reading its current state.
- * Directional UI, such as a native "Unpin Note" menu item, must not call the
- * toggle path because a stale index could otherwise turn the action into a pin.
- */
-export async function unpinNote(path: string, generation: number): Promise<void> {
-  await commitNoteFrontmatter(path, { pinned: false }, generation)
+/** Remove a pin directionally, even when the cached shelf is stale. */
+export async function unpinNote(input: NoteActionInput): Promise<void> {
+  await updatePin(input, 'unpin')
+}
+
+const pendingPins = new Set<string>()
+
+function applyPinnedState(input: NoteActionInput, note: PinnedNote, isPinned: boolean): void {
+  const { queryClient, root, path } = input
+  updatePinnedNotesCache(queryClient, root, (current = []) => {
+    if (!isPinned) {
+      return current.filter((entry) => entry.path !== path)
+    }
+    return current.some((entry) => entry.path === path) ? current : insertPinnedNote(current, note)
+  })
+  queryClient.setQueriesData<NoteListEntry[]>(
+    { queryKey: queryKeys.index.allNotes(root) },
+    (rows) => rows?.map((row) => (row.path === path ? { ...row, isPinned } : row)),
+  )
+  queryClient.setQueriesData<FilteredSearchHit[]>(
+    { queryKey: queryKeys.index.mobileAllNotes(root) },
+    (rows) => rows?.map((row) => (row.path === path ? { ...row, isPinned } : row)),
+  )
+}
+
+async function updatePin(input: NoteActionInput, kind: 'toggle' | 'unpin'): Promise<void> {
+  const { queryClient, root, generation, path } = input
+  const key = JSON.stringify([root, generation, path])
+  if (pendingPins.has(key)) {
+    return
+  }
+  pendingPins.add(key)
+  try {
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: queryKeys.index.pinnedNotes(root) }),
+      queryClient.cancelQueries({ queryKey: queryKeys.index.allNotes(root) }),
+      queryClient.cancelQueries({ queryKey: queryKeys.index.mobileAllNotes(root) }),
+    ])
+    const previous = queryClient
+      .getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes(root))
+      ?.find((note) => note.path === path)
+    const row = queryClient.getQueryData<NoteRow | null>(queryKeys.index.note(root, path))
+    const preview = previous ?? pinnedNoteFor(path, row ?? null)
+    const predicted = kind === 'unpin' ? false : previous === undefined
+    applyPinnedState(input, preview, predicted)
+
+    const actual =
+      kind === 'unpin'
+        ? false
+        : !isPinned(parseNote({ path, source: await readNoteSource(path) }).frontmatter)
+    await commitNoteFrontmatter(path, { pinned: actual }, generation)
+    if (actual !== predicted) {
+      applyPinnedState(input, preview, actual)
+    }
+  } catch (cause) {
+    invalidatePinnedNotesCache(queryClient, root)
+    void queryClient.invalidateQueries({ queryKey: queryKeys.index.allNotes(root) })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.index.mobileAllNotes(root) })
+    startOperation('Updating pin').fail(errorMessage(cause))
+  } finally {
+    pendingPins.delete(key)
+  }
 }
 
 export async function reorderPinnedNotes(
