@@ -87,6 +87,9 @@ pub(crate) fn classify_fetch_status(url: &str, status: StatusCode) -> Option<App
         return None;
     }
     let message = format!("{url} answered {status}");
+    if status == StatusCode::NOT_FOUND || status == StatusCode::GONE {
+        return Some(AppError::NotFound { message });
+    }
     if status.is_server_error() || status == StatusCode::TOO_MANY_REQUESTS {
         return Some(AppError::Network { message });
     }

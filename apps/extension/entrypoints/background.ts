@@ -7,6 +7,7 @@ import { readIncludePageTextPreference } from '@/lib/popup-preferences'
 import { saveCapture } from '@/lib/save-capture'
 import { snapshotTab } from '@/lib/snapshot-active-tab'
 import { tryExtractPageText } from './popup/extract-page-text'
+import { installXBookmarkListener } from '@/lib/x-bookmarks'
 
 /**
  * The MV3 service worker owns retries and the shortcut fast path. Every
@@ -42,6 +43,7 @@ async function saveTabWithDefaults(tab: Parameters<typeof snapshotTab>[0]): Prom
 }
 
 export default defineBackground(() => {
+  installXBookmarkListener()
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (isFlushRequest(message)) {
       flushQueue().then(sendResponse, (cause: unknown) => {

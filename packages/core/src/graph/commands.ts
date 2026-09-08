@@ -426,13 +426,13 @@ export async function captureMetaFetch(url: string): Promise<string> {
 }
 
 /**
- * Fetch an oEmbed endpoint's JSON answer as text. The Rust side only bounds
+ * Fetch an endpoint's JSON answer as text. The Rust side only bounds
  * the transport (https only, JSON only, a small byte cap, no redirects);
- * which URLs are oEmbed endpoints is policy in `actions/oembed`. The privacy
+ * endpoint selection belongs to the action requesting it. The privacy
  * gate runs before any call here, exactly as for {@link captureMetaFetch}.
  */
-export async function captureOEmbedFetch(url: string): Promise<string> {
-  return await call('capture_oembed_fetch', { url }, z.string())
+export async function captureJsonFetch(url: string): Promise<string> {
+  return await call('capture_json_fetch', { url }, z.string())
 }
 
 /** The recently-opened graphs, newest first. */

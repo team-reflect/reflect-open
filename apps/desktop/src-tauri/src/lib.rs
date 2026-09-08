@@ -374,7 +374,7 @@ pub fn run() {
             capture::capture_screenshot_promote,
             capture::capture_link_preview,
             capture::capture_meta_fetch,
-            capture::capture_oembed_fetch,
+            capture::capture_json_fetch,
             editor_link_preview::link_preview_fetch_html,
             editor_link_preview::link_preview_fetch_icon,
             git::git_status,
