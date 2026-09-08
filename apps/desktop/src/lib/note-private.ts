@@ -1,4 +1,5 @@
 import { parseNote } from '@reflect/core'
+import { clearNoteRowOverlay, setNoteRowOverlay } from '@/hooks/note-row-overlay'
 import { commitNoteFrontmatter, readNoteSource } from '@/lib/note-frontmatter'
 
 /**
@@ -13,15 +14,22 @@ import { commitNoteFrontmatter, readNoteSource } from '@/lib/note-frontmatter'
  * Reads the current state and writes the flip through {@link readNoteSource} /
  * {@link commitNoteFrontmatter}, exactly like `toggleNotePinned`: the shared
  * session-or-disk channel keeps our own write from parking a conflict under a
- * dirty buffer (and never reads a still-loading buffer). Toggling off removes
- * the key entirely — not-private is the absence of the flag, and frontmatter
- * stays minimal.
+ * dirty buffer (and never reads a still-loading buffer). It asserts the new
+ * flag as a note-row overlay for the same reason too — the palette command and
+ * the two toggle buttons all funnel through here, so this is the one place an
+ * assertion reaches every one of them.
  *
  * Returns the note's new private state.
  */
 export async function toggleNotePrivate(path: string, generation: number): Promise<boolean> {
   const source = await readNoteSource(path)
   const isPrivate = !parseNote({ path, source }).frontmatter.private
-  await commitNoteFrontmatter(path, { private: isPrivate }, generation)
+  setNoteRowOverlay(path, generation, { isPrivate })
+  try {
+    await commitNoteFrontmatter(path, { private: isPrivate }, generation)
+  } catch (cause) {
+    clearNoteRowOverlay(path, generation, { isPrivate: true })
+    throw cause
+  }
   return isPrivate
 }
