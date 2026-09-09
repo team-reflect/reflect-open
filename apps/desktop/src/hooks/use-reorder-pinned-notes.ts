@@ -47,12 +47,15 @@ export function useReorderPinnedNotes(
       if (activeIndex === -1 || overIndex === -1 || activeIndex === overIndex) {
         return
       }
-      const next = updatePinOrder(arrayMove([...pinned], activeIndex, overIndex), activePath)
-      const orders = new Map(pinned.map((note) => [note.path, note.pinnedOrder]))
-      const renumbered = next.filter((note) => note.pinnedOrder !== orders.get(note.path))
-      // An in-flight read would otherwise land on top of the new orders, and
-      // the next drop would average against the ones it replaced. Not awaited:
-      // the shelf has to repaint on this frame.
+
+      // Move the note in the array.
+      const moved: PinnedNote[] = arrayMove([...pinned], activeIndex, overIndex)
+
+      // Update `note.pinnedOrder` in the moved note.
+      const renumbered: PinnedNote[] | null = updatePinOrder(moved, activePath)
+
+      const next: PinnedNote[] = renumbered ?? moved
+
       void queryClient.cancelQueries({ queryKey: queryKeys.index.pinnedNotes(graph.root) })
       updatePinnedNotesCache(queryClient, graph.root, () => next)
       mutate({ generation: graph.generation, root: graph.root, notes: renumbered })

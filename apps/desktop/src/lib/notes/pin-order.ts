@@ -13,7 +13,7 @@ const LO = 0
 const HI = 2 ** 31 - 1
 
 export function isValidPinOrder(order: number | null | undefined): order is number {
-  return typeof order === 'number' && Number.isSafeInteger(order) && order >= LO && order <= HI
+  return order != null && Number.isSafeInteger(order) && order >= LO && order <= HI
 }
 
 export function getNextPinOrder(shelf: readonly PinnedNote[]): number {
@@ -29,15 +29,19 @@ export function getNextPinOrder(shelf: readonly PinnedNote[]): number {
 
 /**
  * Number `shelf` so its orders ascend the way its notes now sit, renumbering
- * the whole shelf when the moved note has no number to take.
+ * the whole shelf when the moved note has no number to take. Returns a new
+ * array, leaving the original untouched.
  */
-export function planPinReorder(shelf: readonly PinnedNote[], movedPath: string): PinnedNote[] {
-  if (shelf.length <= 1) {
+export function updatePinOrder(
+  shelf: readonly PinnedNote[],
+  movedPath: string,
+): PinnedNote[] | null {
+  if (isSorted(shelf)) {
     return [...shelf]
   }
   const moved = shelf.findIndex((note) => note.path === movedPath)
   if (moved === -1) {
-    return [...shelf]
+    return renumberPinOrder(shelf)
   }
   const order = getOrderBetween(
     getSafePinnedOrder(shelf[moved - 1]),
@@ -46,19 +50,17 @@ export function planPinReorder(shelf: readonly PinnedNote[], movedPath: string):
   const next = shelf.map((note, index) =>
     index === moved && order !== null ? { ...note, pinnedOrder: order } : note,
   )
-  return isShelfNumbered(next) ? next : renumberPinShelf(next)
+  return isSorted(next) ? next : renumberPinOrder(next)
 }
 
-/** Space every note a gap apart. */
-export function renumberPinShelf(shelf: readonly PinnedNote[]): PinnedNote[] {
+export function renumberPinOrder(shelf: readonly PinnedNote[]): PinnedNote[] {
   const minStep = 1
   const maxStep = GAP
   const step = clamp(Math.floor(HI / (shelf.length + 1)), minStep, maxStep)
   return shelf.map((note, index) => ({ ...note, pinnedOrder: step * (index + 1) }))
 }
 
-/** Whether every note carries an order and they ascend. */
-function isShelfNumbered(shelf: readonly PinnedNote[]): boolean {
+function isSorted(shelf: readonly PinnedNote[]): boolean {
   let previous: number | null = null
   for (const note of shelf) {
     const order = note.pinnedOrder
