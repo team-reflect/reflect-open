@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.1...v0.12.0-beta.2) (2026-09-09)
+
+
+### Bug Fixes
+
+* **mobile:** recognize a sandbox install when the app transaction is unavailable ([#1249](https://github.com/team-reflect/reflect-open/issues/1249)) ([2e584d0](https://github.com/team-reflect/reflect-open/commit/2e584d0d6b7c88853cb0fa52e50f55183c33d1e7))
+* **mobile:** stop a failed StoreKit probe from reading as an App Store install ([#1248](https://github.com/team-reflect/reflect-open/issues/1248)) ([ee4eff5](https://github.com/team-reflect/reflect-open/commit/ee4eff58e396a066b6904384a1a0df91fa12c205))
+
 ## [0.12.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta...v0.12.0-beta.1) (2026-09-08)
 
 
