@@ -5,11 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PinnedNote } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client'
 import { deferred } from '@/test-utils/deferred'
-import type { PinOrderWrite } from '@/lib/notes/pin-order'
 import { useReorderPinnedNotes } from './use-reorder-pinned-notes'
 
 const reorderPinnedNotes = vi.hoisted(() =>
-  vi.fn<(writes: readonly PinOrderWrite[], generation: number) => Promise<void>>(),
+  vi.fn<(notes: readonly PinnedNote[], generation: number) => Promise<void>>(),
 )
 vi.mock('@/lib/note-pin', () => ({ reorderPinnedNotes }))
 
@@ -111,9 +110,9 @@ describe('useReorderPinnedNotes', () => {
     await vi.waitFor(() => expect(queryClient.isMutating()).toBe(0))
 
     expect(reorderPinnedNotes.mock.calls).toEqual([
-      [[{ path: 'a.md', order: 2560 }], 7],
-      [[{ path: 'a.md', order: 4096 }], 7],
-      [[{ path: 'b.md', order: 5120 }], 7],
+      [[{ ...NOTE_A, pinnedOrder: 2560 }], 7],
+      [[{ ...NOTE_A, pinnedOrder: 4096 }], 7],
+      [[{ ...NOTE_B, pinnedOrder: 5120 }], 7],
     ])
     expect(invalidateQueries).not.toHaveBeenCalled()
     expect(queryClient.getQueryData(queryKeys.index.pinnedNotes('/graphs/personal'))).toEqual(
@@ -133,8 +132,8 @@ describe('useReorderPinnedNotes', () => {
 
     expect(reorderPinnedNotes).toHaveBeenCalledExactlyOnceWith(
       [
-        { path: 'b.md', order: 1024 },
-        { path: 'a.md', order: 2048 },
+        { ...bare[1], pinnedOrder: 1024 },
+        { ...bare[0], pinnedOrder: 2048 },
       ],
       7,
     )

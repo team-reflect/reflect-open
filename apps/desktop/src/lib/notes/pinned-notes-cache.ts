@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { dateFromDailyPath, type NoteRow, type PinnedNote } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client'
-import { usablePinOrder } from './pin-order'
+import { isValidPinOrder } from './pin-order'
 
 /**
  * Apply an optimistic update to the pinned-notes cache. The markdown/index
@@ -43,12 +43,12 @@ export function pinnedNoteFor(path: string, row: NoteRow | null): PinnedNote {
 export function insertPinnedNote(pinned: readonly PinnedNote[], note: PinnedNote): PinnedNote[] {
   const existing = pinned.filter((pinnedNote) => pinnedNote.path !== note.path)
   const order = note.pinnedOrder
-  if (!usablePinOrder(order)) {
+  if (!isValidPinOrder(order)) {
     return [...existing, note]
   }
   const at = existing.findIndex((pinnedNote) => {
     const existingOrder = pinnedNote.pinnedOrder
-    return !usablePinOrder(existingOrder) || existingOrder > order
+    return !isValidPinOrder(existingOrder) || existingOrder > order
   })
   return at === -1 ? [...existing, note] : [...existing.slice(0, at), note, ...existing.slice(at)]
 }

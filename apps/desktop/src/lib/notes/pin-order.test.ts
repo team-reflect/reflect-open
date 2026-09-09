@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PinnedNote } from '@reflect/core'
-import { nextPinOrder, planPinReorder, renumberPinShelf, usablePinOrder } from './pin-order'
+import { getNextPinOrder, isValidPinOrder, planPinReorder, renumberPinShelf } from './pin-order'
 
 const HI = 2 ** 31 - 1
 
@@ -14,84 +14,81 @@ function shelf(...orders: (number | null)[]): PinnedNote[] {
   }))
 }
 
-describe('usablePinOrder', () => {
+describe('isValidPinOrder', () => {
   it('accepts whole numbers in range and rejects everything else', () => {
     // `pinned: 0` is a real order, and the shelf writer used to start there.
-    expect([0, 1024, HI].every(usablePinOrder)).toBe(true)
-    expect([null, undefined, -1, HI + 1, 1.5, NaN].some(usablePinOrder)).toBe(false)
+    expect([0, 1024, HI].every(isValidPinOrder)).toBe(true)
+    expect([null, undefined, -1, HI + 1, 1.5, NaN].some(isValidPinOrder)).toBe(false)
   })
 })
 
-describe('nextPinOrder', () => {
+describe('getNextPinOrder', () => {
   it('opens the shelf at one gap', () => {
-    expect(nextPinOrder([])).toBe(1024)
-    expect(nextPinOrder(shelf(null))).toBe(1024)
+    expect(getNextPinOrder([])).toBe(1024)
+    expect(getNextPinOrder(shelf(null))).toBe(1024)
   })
 
   it('steps past a shelf the old writer numbered from zero', () => {
-    expect(nextPinOrder(shelf(0, 1))).toBe(1025)
+    expect(getNextPinOrder(shelf(0, 1))).toBe(1025)
   })
 
   it('steps a gap past the highest order, wherever it sits', () => {
-    expect(nextPinOrder(shelf(1024, 5000, 2048))).toBe(6024)
+    expect(getNextPinOrder(shelf(1024, 5000, 2048))).toBe(6024)
   })
 
   it('ignores orders it cannot reason about', () => {
-    expect(nextPinOrder(shelf(1024, null))).toBe(2048)
+    expect(getNextPinOrder(shelf(1024, null))).toBe(2048)
   })
 
   it('clamps at the top of the range', () => {
-    expect(nextPinOrder(shelf(HI))).toBe(HI)
+    expect(getNextPinOrder(shelf(HI))).toBe(HI)
   })
 })
 
 describe('planPinReorder', () => {
-  it('writes only the moved note when a whole number fits between its neighbours', () => {
-    expect(planPinReorder(shelf(1024, 3072, 2048), '1.md')).toEqual([{ path: '1.md', order: 1536 }])
+  it('renumbers only the moved note when a whole number fits between its neighbours', () => {
+    expect(planPinReorder(shelf(1024, 3072, 2048), '1.md')).toEqual(shelf(1024, 1536, 2048))
   })
 
   it('halves downwards for a note dropped first', () => {
-    expect(planPinReorder(shelf(2048, 1024), '0.md')).toEqual([{ path: '0.md', order: 512 }])
+    expect(planPinReorder(shelf(2048, 1024), '0.md')).toEqual(shelf(512, 1024))
   })
 
   it('opens a fresh gap for a note dropped last rather than jumping to the top', () => {
-    expect(planPinReorder(shelf(2048, 1024), '1.md')).toEqual([{ path: '1.md', order: 3072 }])
+    expect(planPinReorder(shelf(2048, 1024), '1.md')).toEqual(shelf(2048, 3072))
   })
 
-  it('renumbers when the neighbours are already adjacent', () => {
-    expect(planPinReorder(shelf(1024, 9999, 1025), '1.md')).toEqual([
-      { path: '1.md', order: 2048 },
-      { path: '2.md', order: 3072 },
-    ])
+  it('renumbers the shelf when the neighbours are already adjacent', () => {
+    expect(planPinReorder(shelf(1024, 9999, 1025), '1.md')).toEqual(shelf(1024, 2048, 3072))
   })
 
-  it('renumbers when a neighbour is a bare pin', () => {
-    expect(planPinReorder(shelf(1024, null, 3072), '0.md')).toEqual([{ path: '1.md', order: 2048 }])
+  it('renumbers the shelf when a neighbour is a bare pin', () => {
+    expect(planPinReorder(shelf(1024, null, 3072), '0.md')).toEqual(shelf(1024, 2048, 3072))
   })
 
   it('renumbers rather than pushing past the top of the range', () => {
-    expect(planPinReorder(shelf(HI, 1024), '1.md')).toEqual([
-      { path: '0.md', order: 1024 },
-      { path: '1.md', order: 2048 },
-    ])
+    expect(planPinReorder(shelf(HI, 1024), '1.md')).toEqual(shelf(1024, 2048))
   })
 
   it('leaves an unknown path alone', () => {
-    expect(planPinReorder(shelf(1024), 'missing.md')).toEqual([])
+    expect(planPinReorder(shelf(1024, 2048), 'missing.md')).toEqual(shelf(1024, 2048))
+  })
+
+  it('leaves a shelf that cannot be reordered alone', () => {
+    expect(planPinReorder(shelf(9999), '0.md')).toEqual(shelf(9999))
   })
 })
 
 describe('renumberPinShelf', () => {
-  it('spaces the shelf a gap apart and skips the notes already sitting right', () => {
-    expect(renumberPinShelf(shelf(1024, 5000, 3072))).toEqual([{ path: '1.md', order: 2048 }])
+  it('spaces the shelf a gap apart', () => {
+    expect(renumberPinShelf(shelf(1024, 5000, 3072))).toEqual(shelf(1024, 2048, 3072))
   })
 
   it('stays in range and strictly ascending across a long shelf', () => {
-    const written = renumberPinShelf(shelf(...Array.from({ length: 200 }, () => null)))
-    expect(written).toHaveLength(200)
-    expect(written.every((write) => usablePinOrder(write.order))).toBe(true)
-    expect(
-      written.every((write, index) => index === 0 || write.order > written[index - 1]!.order),
-    ).toBe(true)
+    const orders = renumberPinShelf(shelf(...Array.from({ length: 200 }, () => null)))
+      .map((note) => note.pinnedOrder)
+      .filter(isValidPinOrder)
+    expect(orders).toHaveLength(200)
+    expect(orders.every((order, index) => index === 0 || order > orders[index - 1]!)).toBe(true)
   })
 })

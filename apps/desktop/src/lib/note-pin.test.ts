@@ -146,8 +146,8 @@ describe('reorderPinnedNotes', () => {
 
     await reorderPinnedNotes(
       [
-        { path: 'notes/c.md', order: 1024 },
-        { path: 'notes/a.md', order: 1536 },
+        { path: 'notes/c.md', title: 'C', dailyDate: null, pinnedOrder: 1024 },
+        { path: 'notes/a.md', title: 'A', dailyDate: null, pinnedOrder: 1536 },
       ],
       3,
     )
@@ -160,7 +160,10 @@ describe('reorderPinnedNotes', () => {
     const { session, commitFrontmatter } = fakeSession('# A\n')
     openSession.mockReturnValue(session)
 
-    await reorderPinnedNotes([{ path: 'notes/a.md', order: 1024 }], 3)
+    await reorderPinnedNotes(
+      [{ path: 'notes/a.md', title: 'A', dailyDate: null, pinnedOrder: 1024 }],
+      3,
+    )
 
     expect(commitFrontmatter).toHaveBeenCalledWith({ pinned: 1024 })
     expect(writeNote).not.toHaveBeenCalled()

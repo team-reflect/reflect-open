@@ -16,7 +16,7 @@ import {
   pinnedNoteFor,
   updatePinnedNotesCache,
 } from './notes/pinned-notes-cache'
-import { nextPinOrder, type PinOrderWrite } from './notes/pin-order'
+import { getNextPinOrder, isValidPinOrder } from './notes/pin-order'
 import type { NoteActionInput } from './notes/types'
 
 /** Toggle pin with shared optimistic feedback and save-error reporting. Markdown owns the final state. */
@@ -67,7 +67,7 @@ async function updatePin(input: NoteActionInput, kind: 'toggle' | 'unpin'): Prom
     const row = queryClient.getQueryData<NoteRow | null>(queryKeys.index.note(root, path))
     // A shelf that has never loaded can't say what the next order is. `true`
     // still pins; the note sorts last until a reorder numbers it.
-    const pin = shelf === undefined ? true : nextPinOrder(shelf)
+    const pin = shelf === undefined ? true : getNextPinOrder(shelf)
     const preview = previous ?? {
       ...pinnedNoteFor(path, row ?? null),
       pinnedOrder: pin === true ? null : pin,
@@ -94,10 +94,15 @@ async function updatePin(input: NoteActionInput, kind: 'toggle' | 'unpin'): Prom
 }
 
 export async function reorderPinnedNotes(
-  writes: readonly PinOrderWrite[],
+  notes: readonly PinnedNote[],
   generation: number,
 ): Promise<void> {
   await Promise.all(
-    writes.map((write) => commitNoteFrontmatter(write.path, { pinned: write.order }, generation)),
+    notes.map(async (note) => {
+      const order = note.pinnedOrder
+      if (isValidPinOrder(order)) {
+        await commitNoteFrontmatter(note.path, { pinned: order }, generation)
+      }
+    }),
   )
 }
