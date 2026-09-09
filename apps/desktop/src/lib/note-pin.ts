@@ -16,7 +16,6 @@ import {
   pinnedNoteFor,
   updatePinnedNotesCache,
 } from './notes/pinned-notes-cache'
-import { nextPinOrder, type PinOrderWrite } from './notes/pin-order'
 import type { NoteActionInput } from './notes/types'
 
 /** Toggle pin with shared optimistic feedback and save-error reporting. Markdown owns the final state. */
@@ -62,16 +61,11 @@ async function updatePin(input: NoteActionInput, kind: 'toggle' | 'unpin'): Prom
       queryClient.cancelQueries({ queryKey: queryKeys.index.allNotes(root) }),
       queryClient.cancelQueries({ queryKey: queryKeys.index.mobileAllNotes(root) }),
     ])
-    const shelf = queryClient.getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes(root))
-    const previous = shelf?.find((note) => note.path === path)
+    const previous = queryClient
+      .getQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes(root))
+      ?.find((note) => note.path === path)
     const row = queryClient.getQueryData<NoteRow | null>(queryKeys.index.note(root, path))
-    // A shelf that has never loaded can't say what the next order is. `true`
-    // still pins; the note sorts last until a reorder numbers it.
-    const pin = shelf === undefined ? true : nextPinOrder(shelf)
-    const preview = previous ?? {
-      ...pinnedNoteFor(path, row ?? null),
-      pinnedOrder: pin === true ? null : pin,
-    }
+    const preview = previous ?? pinnedNoteFor(path, row ?? null)
     const predicted = kind === 'unpin' ? false : previous === undefined
     applyPinnedState(input, preview, predicted)
 
@@ -79,7 +73,7 @@ async function updatePin(input: NoteActionInput, kind: 'toggle' | 'unpin'): Prom
       kind === 'unpin'
         ? false
         : !isPinned(parseNote({ path, source: await readNoteSource(path) }).frontmatter)
-    await commitNoteFrontmatter(path, { pinned: actual ? pin : false }, generation)
+    await commitNoteFrontmatter(path, { pinned: actual }, generation)
     if (actual !== predicted) {
       applyPinnedState(input, preview, actual)
     }
@@ -94,10 +88,10 @@ async function updatePin(input: NoteActionInput, kind: 'toggle' | 'unpin'): Prom
 }
 
 export async function reorderPinnedNotes(
-  writes: readonly PinOrderWrite[],
+  notes: readonly PinnedNote[],
   generation: number,
 ): Promise<void> {
   await Promise.all(
-    writes.map((write) => commitNoteFrontmatter(write.path, { pinned: write.order }, generation)),
+    notes.map((note, order) => commitNoteFrontmatter(note.path, { pinned: order }, generation)),
   )
 }

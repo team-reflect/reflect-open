@@ -28,7 +28,7 @@ function setup() {
   const shelfKey = queryKeys.index.pinnedNotes('/g')
   const desktopKey = queryKeys.index.allNotesWithTag('/g', null)
   const mobileKey = queryKeys.index.mobileAllNotesWithSearch('/g', { text: '' })
-  const note: PinnedNote = { path: input.path, title: 'a', dailyDate: null, pinnedOrder: 1024 }
+  const note: PinnedNote = { path: input.path, title: 'a', dailyDate: null, pinnedOrder: null }
   queryClient.setQueryData<PinnedNote[]>(shelfKey, [])
   queryClient.setQueryData<NoteListEntry[]>(desktopKey, [
     { path: input.path, title: 'A', snippet: '', tags: [], mtime: 0, isPinned: false },
@@ -60,7 +60,7 @@ describe('pin feedback', () => {
     expect(queryClient.getQueryData(shelfKey)).toEqual([note])
     expect(queryClient.getQueryData<NoteListEntry[]>(desktopKey)?.[0]?.isPinned).toBe(true)
     expect(queryClient.getQueryData<FilteredSearchHit[]>(mobileKey)?.[0]?.isPinned).toBe(true)
-    expect(commitNoteFrontmatter).toHaveBeenCalledWith(input.path, { pinned: 1024 }, 7)
+    expect(commitNoteFrontmatter).toHaveBeenCalledWith(input.path, { pinned: true }, 7)
 
     // A second entrypoint in this window must not issue a competing write.
     await toggleNotePinned(input)

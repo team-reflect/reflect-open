@@ -1,7 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { dateFromDailyPath, type NoteRow, type PinnedNote } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client'
-import { usablePinOrder } from './pin-order'
 
 /**
  * Apply an optimistic update to the pinned-notes cache. The markdown/index
@@ -35,20 +34,23 @@ export function pinnedNoteFor(path: string, row: NoteRow | null): PinnedNote {
   }
 }
 
-/**
- * Place `note` on the cached shelf where the index would sort it: numbered
- * pins in ascending order, bare `pinned: true` after them. A bare note lands
- * last rather than in its title position, and the next refetch settles it.
- */
+function comparePinnedNote(left: PinnedNote, right: PinnedNote): number {
+  const titleOrder = left.title.localeCompare(right.title, undefined, { sensitivity: 'base' })
+  return titleOrder === 0 ? left.path.localeCompare(right.path) : titleOrder
+}
+
+/** Keep explicit pin order, then sort unordered pins by title. */
 export function insertPinnedNote(pinned: readonly PinnedNote[], note: PinnedNote): PinnedNote[] {
   const existing = pinned.filter((pinnedNote) => pinnedNote.path !== note.path)
-  const order = note.pinnedOrder
-  if (!usablePinOrder(order)) {
-    return [...existing, note]
-  }
-  const at = existing.findIndex((pinnedNote) => {
-    const existingOrder = pinnedNote.pinnedOrder
-    return !usablePinOrder(existingOrder) || existingOrder > order
-  })
-  return at === -1 ? [...existing, note] : [...existing.slice(0, at), note, ...existing.slice(at)]
+  const ordered = existing.filter(
+    (pinnedNote) => pinnedNote.pinnedOrder !== null && pinnedNote.pinnedOrder !== undefined,
+  )
+  const bare = [
+    ...existing.filter(
+      (pinnedNote) => pinnedNote.pinnedOrder === null || pinnedNote.pinnedOrder === undefined,
+    ),
+    note,
+  ]
+  bare.sort(comparePinnedNote)
+  return [...ordered, ...bare]
 }
