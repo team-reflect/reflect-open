@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 /** Bound for a bookmark wire message, in UTF-8 bytes. */
 export const BOOKMARK_MAX_BYTES = 8192
-export const postIdSchema = z.string().regex(/^[1-9][0-9]{0,19}$/)
+export const postIdSchema = z.string().regex(/^[1-9]\d{0,19}$/)
 
 /** URL-only bookmark capture, bound to a paired local graph. */
 export const bookmarkEnvelopeSchema = z
@@ -48,7 +48,7 @@ export function getBookmarkPostId(value: string): string | undefined {
     )
       return undefined
     const match =
-      /^\/(?:[A-Za-z0-9_]+|i\/web)\/status\/([1-9][0-9]{0,19})(?:\/(?:photo|video)\/[0-9]+)?\/?$/.exec(
+      /^\/(?:\w+|i\/web)\/status\/([1-9]\d{0,19})(?:\/(?:photo|video)\/\d+)?\/?$/.exec(
         url.pathname,
       )
     return match?.[1]
