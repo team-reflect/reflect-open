@@ -10,14 +10,29 @@ import { useGraph } from '@/providers/graph-provider'
 const appStoreEnvironmentSchema = z.enum(['Production', 'Sandbox', 'Xcode']).nullable()
 export type AppStoreEnvironment = z.infer<typeof appStoreEnvironmentSchema>
 
+/**
+ * The channels worth remembering across launches. A remembered `Production`
+ * reads exactly like no seed at all, so storing it can only let one launch's
+ * answer outlive that launch.
+ */
+const rememberedEnvironmentSchema = z.enum(['Sandbox', 'Xcode'])
+
 const APP_STORE_ENVIRONMENT_STORAGE_KEY = 'reflect.app-store.environment'
 
 function readAppStoreEnvironmentSeed(): AppStoreEnvironment | undefined {
-  return getLocalStorageStore(APP_STORE_ENVIRONMENT_STORAGE_KEY).getJson(appStoreEnvironmentSchema)
+  return getLocalStorageStore(APP_STORE_ENVIRONMENT_STORAGE_KEY).getJson(
+    rememberedEnvironmentSchema,
+  )
 }
 
 function writeAppStoreEnvironmentSeed(value: AppStoreEnvironment): void {
-  getLocalStorageStore(APP_STORE_ENVIRONMENT_STORAGE_KEY).setJson(appStoreEnvironmentSchema, value)
+  const store = getLocalStorageStore(APP_STORE_ENVIRONMENT_STORAGE_KEY)
+  const remembered = rememberedEnvironmentSchema.safeParse(value)
+  if (remembered.success) {
+    store.setJson(rememberedEnvironmentSchema, remembered.data)
+  } else {
+    store.set(null)
+  }
 }
 
 async function fetchAppStoreEnvironment(): Promise<AppStoreEnvironment> {

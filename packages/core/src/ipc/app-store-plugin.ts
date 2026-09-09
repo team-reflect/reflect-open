@@ -18,9 +18,8 @@ const getEnvironmentCommand = definePluginCommand<Record<string, never>, { envir
  * Which channel installed this build, per StoreKit 2's
  * `AppTransaction.environment`: `'Production'` (App Store), `'Sandbox'`
  * (TestFlight or a development install), or `'Xcode'` (a
- * StoreKit-configuration run). Fail-closed: probe errors and non-iOS
- * platforms answer `'Production'`, and callers must treat unknown values
- * the same way, so a failure can never misclassify a paying customer.
+ * StoreKit-configuration run). Rejects when the probe cannot answer, so an
+ * unanswered probe stays distinguishable from a named channel.
  */
 export async function getAppStoreEnvironment(): Promise<string> {
   return (await getEnvironmentCommand({})).environment
