@@ -79,7 +79,7 @@ describe('NoteActionsSection pin toggle', () => {
     // The mocked platform is non-Apple, so Mod renders as Ctrl.
     expect(button.element().textContent).toContain('CtrlO')
     await userEvent.click(button)
-    expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/a.md', { pinned: 1024 }, 7)
+    expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/a.md', { pinned: true }, 7)
     await view.unmount()
   })
 

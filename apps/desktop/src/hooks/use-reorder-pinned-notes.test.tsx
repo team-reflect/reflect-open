@@ -17,15 +17,13 @@ const graphState: {
 } = vi.hoisted(() => ({ graph: { generation: 7, root: '/graphs/personal' } }))
 vi.mock('@/providers/graph-provider', () => ({ useGraph: () => graphState }))
 
-const NOTE_A = { dailyDate: null, path: 'a.md', title: 'A', pinnedOrder: 1024 } satisfies PinnedNote
-const NOTE_B = { dailyDate: null, path: 'b.md', title: 'B', pinnedOrder: 2048 } satisfies PinnedNote
-const NOTE_C = { dailyDate: null, path: 'c.md', title: 'C', pinnedOrder: 3072 } satisfies PinnedNote
+const NOTE_A = { dailyDate: null, path: 'a.md', title: 'A' } satisfies PinnedNote
+const NOTE_B = { dailyDate: null, path: 'b.md', title: 'B' } satisfies PinnedNote
+const NOTE_C = { dailyDate: null, path: 'c.md', title: 'C' } satisfies PinnedNote
 const NOTES = [NOTE_A, NOTE_B, NOTE_C] as const
-// A dropped between two neighbours takes the midpoint; dropped last it opens a
-// fresh gap past the note it landed behind.
-const FIRST_ORDER = [NOTE_B, { ...NOTE_A, pinnedOrder: 2560 }, NOTE_C]
-const SECOND_ORDER = [NOTE_B, NOTE_C, { ...NOTE_A, pinnedOrder: 4096 }]
-const THIRD_ORDER = [NOTE_C, { ...NOTE_A, pinnedOrder: 4096 }, { ...NOTE_B, pinnedOrder: 5120 }]
+const FIRST_ORDER = [NOTE_B, NOTE_A, NOTE_C]
+const SECOND_ORDER = [NOTE_B, NOTE_C, NOTE_A]
+const THIRD_ORDER = [NOTE_C, NOTE_A, NOTE_B]
 
 let queryClient: QueryClient
 
@@ -110,32 +108,13 @@ describe('useReorderPinnedNotes', () => {
     await vi.waitFor(() => expect(queryClient.isMutating()).toBe(0))
 
     expect(reorderPinnedNotes.mock.calls).toEqual([
-      [[{ ...NOTE_A, pinnedOrder: 2560 }], 7],
-      [[{ ...NOTE_A, pinnedOrder: 4096 }], 7],
-      [[{ ...NOTE_B, pinnedOrder: 5120 }], 7],
+      [FIRST_ORDER, 7],
+      [SECOND_ORDER, 7],
+      [THIRD_ORDER, 7],
     ])
     expect(invalidateQueries).not.toHaveBeenCalled()
     expect(queryClient.getQueryData(queryKeys.index.pinnedNotes('/graphs/personal'))).toEqual(
       THIRD_ORDER,
-    )
-  })
-
-  it('renumbers the whole shelf when a neighbour carries no order', async () => {
-    const bare = [
-      { dailyDate: null, path: 'a.md', title: 'A' },
-      { dailyDate: null, path: 'b.md', title: 'B' },
-    ] satisfies PinnedNote[]
-    queryClient.setQueryData(queryKeys.index.pinnedNotes('/graphs/personal'), bare)
-    const hook = await renderReorder(bare)
-
-    await hook.act(() => hook.result.current('a.md', 'b.md'))
-
-    expect(reorderPinnedNotes).toHaveBeenCalledExactlyOnceWith(
-      [
-        { ...bare[1], pinnedOrder: 1024 },
-        { ...bare[0], pinnedOrder: 2048 },
-      ],
-      7,
     )
   })
 

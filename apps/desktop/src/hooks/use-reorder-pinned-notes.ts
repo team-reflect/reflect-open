@@ -3,15 +3,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { arrayMove } from '@dnd-kit/sortable'
 import type { PinnedNote } from '@reflect/core'
 import { reorderPinnedNotes } from '@/lib/note-pin'
-import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client'
+import { mutationKeys, mutationScopeIds } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
-import { planPinReorder } from '@/lib/notes/pin-order'
 import { invalidatePinnedNotesCache, updatePinnedNotesCache } from '@/lib/notes/pinned-notes-cache'
 
 interface ReorderPinnedNotesVariables {
   generation: number
-  root: string
   notes: readonly PinnedNote[]
+  root: string
 }
 
 export function useReorderPinnedNotes(
@@ -47,17 +46,9 @@ export function useReorderPinnedNotes(
       if (activeIndex === -1 || overIndex === -1 || activeIndex === overIndex) {
         return
       }
-      // The new orders go into the cache, not just the new positions: the next
-      // drop averages against them while this one is still on its way to disk.
-      const next = planPinReorder(arrayMove([...pinned], activeIndex, overIndex), activePath)
-      const orders = new Map(pinned.map((note) => [note.path, note.pinnedOrder]))
-      const renumbered = next.filter((note) => note.pinnedOrder !== orders.get(note.path))
-      // An in-flight read would otherwise land on top of the new orders, and
-      // the next drop would average against the ones it replaced. Not awaited:
-      // the shelf has to repaint on this frame.
-      void queryClient.cancelQueries({ queryKey: queryKeys.index.pinnedNotes(graph.root) })
-      updatePinnedNotesCache(queryClient, graph.root, () => next)
-      mutate({ generation: graph.generation, root: graph.root, notes: renumbered })
+      const reordered = arrayMove([...pinned], activeIndex, overIndex)
+      updatePinnedNotesCache(queryClient, graph.root, () => reordered)
+      mutate({ generation: graph.generation, notes: reordered, root: graph.root })
     },
     [graph, mutate, pinned, queryClient],
   )
