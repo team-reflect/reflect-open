@@ -149,7 +149,7 @@ describe('app shortcuts', () => {
     await act(() => result.current.router.navigate({ kind: 'note', path: 'notes/a.md' }))
     await act(() => press('o'))
     expect(client.getQueryData<PinnedNote[]>(key)?.map((note) => note.path)).toEqual(['notes/a.md'])
-    expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/a.md', { pinned: true }, 1)
+    expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/a.md', { pinned: 1024 }, 1)
     await act(() => press('o'))
     expect(commitNoteFrontmatter).toHaveBeenCalledTimes(1)
     write.resolve()
