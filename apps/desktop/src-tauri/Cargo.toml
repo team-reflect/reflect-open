@@ -26,7 +26,7 @@ tauri-build = { version = "2.6.3", features = [] }
 # `devtools` compiles the web inspector into release builds too (it is otherwise
 # debug-only), so a shipped app stays debuggable — see `src/devtools.rs`.
 tauri = { workspace = true, features = ["devtools"] }
-tauri-plugin-opener = "2.5.4"
+tauri-plugin-opener = "2.5.5"
 # Decodes `reflect-asset://` request paths (`fs/asset_protocol.rs`); the same
 # crate tauri itself uses for its protocol URLs.
 percent-encoding = "2.3.2"
@@ -43,7 +43,7 @@ reflect-graph-paths = { workspace = true }
 tempfile = { workspace = true }
 sha2 = { workspace = true }
 dirs = "6.0.0"
-tauri-plugin-dialog = "2.7.2"
+tauri-plugin-dialog = "2.7.3"
 base64 = "0.23.0"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
@@ -65,7 +65,7 @@ git2 = { version = "0.21.0", default-features = false, features = [
 ] }
 # unsafe-headers lets provider-fetch.ts pass an explicit empty Origin, which
 # the plugin treats as "send no Origin header" (see providerFetch's doc).
-tauri-plugin-http = { version = "2.5.9", features = ["unsafe-headers"] }
+tauri-plugin-http = { version = "2.6.0", features = ["unsafe-headers"] }
 # Link capture (Plan 11): screenshot downscale + the bounded meta-scrape fetch.
 # reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
 image = { version = "0.25.10", default-features = false, features = [
@@ -163,7 +163,7 @@ tauri-plugin-app-store = { path = "../../../plugins/tauri-plugin-app-store" }
 # semantic search is desktop-only in the first mobile wave), and OS-trash
 # deletes (mobile moves into the graph-local `.reflect/trash/` instead).
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2.10.1"
+tauri-plugin-updater = "2.11.0"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-window-state = "2.4.1"
 trash = "5.2.6"
@@ -176,8 +176,8 @@ walkdir = "2.5.0"
 # Direct dependency on fastembed's own downloader, used to pre-fetch the
 # embedding model with byte-level progress (fastembed downloads silently).
 hf-hub = { version = "0.5.0", default-features = false, features = ["ureq", "native-tls"] }
-tauri-plugin-deep-link = "2.4.9"
-tauri-plugin-single-instance = { version = "2.4.3", features = ["deep-link"] }
+tauri-plugin-deep-link = "2.4.10"
+tauri-plugin-single-instance = { version = "2.4.4", features = ["deep-link"] }
 
 [target.'cfg(all(not(any(target_os = "android", target_os = "ios")), not(all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
 fastembed = "5.13.0"
