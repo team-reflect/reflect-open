@@ -165,20 +165,20 @@ export function MobileAllNotes({
           />
         </MobileSearchHeaderContent>
         <div className="pb-2">
-          pending !== null ? (
-          <TagSuggestions
-            facets={matchingTagFacets(facets ?? [], pending.partial)}
-            onPick={addPendingTag}
-          />
+          {pending !== null ? (
+            <TagSuggestions
+              facets={matchingTagFacets(facets ?? [], pending.partial)}
+              onPick={addPendingTag}
+            />
           ) : (
-          <FilterBar
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            facets={facets ?? []}
-            routeTag={tag}
-            onClearRouteTag={() => navigate({ kind: 'allNotes', tag: null })}
-          />
-          )
+            <FilterBar
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              facets={facets ?? []}
+              routeTag={tag}
+              onClearRouteTag={() => navigate({ kind: 'allNotes', tag: null })}
+            />
+          )}
         </div>
       </MobileSearchHeader>
       {/* Undefined hits mean "still fetching" only while the query can run —
