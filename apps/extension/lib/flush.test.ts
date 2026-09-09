@@ -4,37 +4,11 @@ import { enqueueCapture, flushQueue, readQueue } from './flush'
 import { sendToHost, type SendOutcome } from './native'
 
 /** In-memory `chrome.storage.local` faithful to get(null)/set/remove. */
-const store = new Map<string, unknown>()
+const store = vi.hoisted(() => new Map<string, unknown>())
 
-vi.mock('wxt/browser', () => ({
+vi.mock('wxt/browser', async () => ({
   browser: {
-    storage: {
-      local: {
-        get: (keys: string | string[] | null) => {
-          if (keys === null) {
-            return Promise.resolve(Object.fromEntries(store))
-          }
-          const wanted = Array.isArray(keys) ? keys : [keys]
-          return Promise.resolve(
-            Object.fromEntries(
-              wanted.filter((key) => store.has(key)).map((key) => [key, store.get(key)]),
-            ),
-          )
-        },
-        set: (items: Record<string, unknown>) => {
-          for (const [key, value] of Object.entries(items)) {
-            store.set(key, value)
-          }
-          return Promise.resolve()
-        },
-        remove: (keys: string | string[]) => {
-          for (const key of Array.isArray(keys) ? keys : [keys]) {
-            store.delete(key)
-          }
-          return Promise.resolve()
-        },
-      },
-    },
+    storage: { local: (await import('./test-utils/storage-mock')).createStorageLocalMock(store) },
   },
 }))
 vi.mock('./native', () => ({

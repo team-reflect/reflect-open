@@ -70,7 +70,15 @@ disk at call time), and it is covered by tests.
   title, your current text selection, a screenshot of the visible tab, and, only when
   you tick "Capture page text", the page's extracted text. Nothing is read in the
   background; the extension requests no broad host permissions and acts on the active
-  tab only at the moment you trigger it.
+  tab only at the moment you trigger it. One opt-in exception: **X bookmark capture**
+  (off by default). Switching it on in the extension's settings asks Chrome for
+  access to `x.com` and `twitter.com` (including their `www.`/`mobile.` subdomains);
+  from then on a content script runs on those sites only, watches which posts you
+  bookmark (or, if you also switch that on, like), and at the moment of that bookmark
+  or like queues the post — its id, plus whatever author, text, and date it could read
+  off the page. It reads nothing else on the page, and revoking the permission
+  switches it off and stops the watchers in open tabs. Images are not read by the
+  extension; the desktop app may fetch them later (below).
 - **When:** when you capture. If the desktop app isn't reachable yet, the capture is
   held in the browser's local extension storage and retried automatically until it
   spools — it is never sent anywhere else in the meantime.
@@ -83,6 +91,13 @@ disk at call time), and it is covered by tests.
   request; `private: true` prevents the request or discards its result. A successful
   image is downscaled and stored as a local JPEG in the graph. Any BYOK AI enrichment
   then follows the provider rules above.
+- For a captured X post (a bookmark, or any post permalink you capture), enrichment
+  asks X's embed backend (`cdn.syndication.twimg.com`, the service behind X's own
+  embeds) for the post by id — no account, no cookies — and downloads the post's
+  images from `pbs.twimg.com` into the graph. Both requests tell X which post you
+  saved, so both sit behind the same gate: a `private: true` daily note means no
+  request at all, and the note keeps only what the page showed. Post captures never
+  make an AI call.
 
 ## Apple Contacts (off by default)
 
@@ -160,7 +175,8 @@ API keys and tokens live in the **OS keychain only** — never in markdown, neve
 | Backup | Your git repository | Yes — including private notes | Yes (needs connecting) |
 | Key validation | The provider | No | — (only when adding a key) |
 | Update check | GitHub Releases | No | On in packaged builds |
-| Browser capture | Nowhere (local host on disk) | — (stays on your machine) | — (only when you capture) |
+| Browser capture (transport) | Nowhere (local host on disk) | — (stays on your machine) | — (only when you capture, or when a post you bookmark is captured after opt-in) |
 | Capture metadata and preview | The captured website, via Reflect and Apple LinkPresentation | URL only; private captures are blocked | No (after an explicit capture) |
+| X post enrichment | X's embed backend (`cdn.syndication.twimg.com`) and image host (`pbs.twimg.com`) | The post id only; private-day captures are blocked | No (after a post capture) |
 | Contacts lookup | Nowhere (on-device OS store) | — (stays on your machine) | Yes (opt-in) |
 | Exception diagnostics | Sentry | No — free-form messages and context are redacted | No (official releases) |

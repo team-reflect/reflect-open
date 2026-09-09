@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react'
 import { browser } from 'wxt/browser'
+import { isXHost } from '@reflect/core/post-url'
 import { readQueue } from '@/lib/flush'
 import type { FlushResult } from '@/lib/messages'
 import { saveCapture } from '@/lib/save-capture'
@@ -7,6 +8,7 @@ import {
   readIncludePageTextPreference,
   writeIncludePageTextPreference,
 } from '@/lib/popup-preferences'
+import { useXCapture } from '@/lib/x/use-x-capture'
 import { tryExtractPageText } from './extract-page-text'
 import { useCapturedPage } from './use-captured-page'
 
@@ -44,6 +46,7 @@ export function CapturePopup(): ReactElement {
   const [includePageTextPreferenceLoaded, setIncludePageTextPreferenceLoaded] = useState(false)
   const [save, setSave] = useState<SaveState>({ phase: 'idle' })
   const [heldCount, setHeldCount] = useState(0)
+  const xCapture = useXCapture()
 
   useEffect(() => {
     void readQueue().then((queue) => setHeldCount(queue.length))
@@ -119,6 +122,9 @@ export function CapturePopup(): ReactElement {
   const { page } = captured
   const host = new URL(page.url).host
   const busy = save.phase === 'saving' || !includePageTextPreferenceLoaded
+  // On X with automatic bookmark capture still off, offer it once here; the
+  // click is the user gesture Chrome's permission prompt needs (Plan 25).
+  const offerXCapture = isXHost(host) && xCapture.preferences?.bookmarks === false
 
   function onIncludePageTextChange(checked: boolean): void {
     includePageTextTouched.current = true
@@ -173,6 +179,19 @@ export function CapturePopup(): ReactElement {
       >
         {save.phase === 'saving' ? 'Saving…' : 'Save to Reflect'}
       </button>
+      {offerXCapture ? (
+        <p className="text-xs text-text-muted">
+          Save your X bookmarks automatically.{' '}
+          <button
+            type="button"
+            disabled={xCapture.busy}
+            onClick={() => void xCapture.enable()}
+            className="text-accent underline disabled:opacity-60"
+          >
+            Turn on
+          </button>
+        </p>
+      ) : null}
       {save.phase === 'held' ? (
         <p className="text-xs text-text-muted">
           {holdMessage(save.result)}{' '}

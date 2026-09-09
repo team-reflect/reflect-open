@@ -1,4 +1,4 @@
-import type { CaptureWireMessage } from '@reflect/core/capture-envelope'
+import type { CapturedPost, CaptureWireMessage } from '@reflect/core/capture-envelope'
 
 /**
  * Build the extension→host wire message from what the popup captured. The
@@ -18,6 +18,8 @@ export interface CapturedPage {
   contentText?: string | undefined
   /** The user's comment from the popup. */
   note?: string | undefined
+  /** The post read off an X page, when the page is one (Plan 25). */
+  post?: CapturedPost | undefined
 }
 
 /** Only http(s) pages are capturable — the envelope (and product) contract. */
@@ -55,6 +57,7 @@ export function buildWireMessage(input: BuildWireMessageInput): CaptureWireMessa
       note: presence(input.note),
       capturedAt: input.capturedAt.toISOString(),
       source: 'extension',
+      post: input.post,
     },
     screenshotBase64: input.screenshotDataUrl
       ? dataUrlToBase64(input.screenshotDataUrl)

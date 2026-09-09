@@ -4,6 +4,7 @@ import {
   captureEnvelopeSchema,
   captureWireMessageSchema,
   inboxEnvelopeSchema,
+  POST_TEXT_MAX_LENGTH,
   textCaptureEnvelopeSchema,
   TEXT_CAPTURE_MAX_LENGTH,
 } from './capture-envelope'
@@ -59,6 +60,58 @@ describe('captureEnvelopeSchema', () => {
     ['unknown source', { ...VALID, source: 'carrier-pigeon' }],
   ])('rejects %s', (_label, candidate) => {
     expect(captureEnvelopeSchema.safeParse(candidate).success).toBe(false)
+  })
+})
+
+const VALID_POST = {
+  provider: 'x',
+  id: '20',
+  trigger: 'bookmark',
+}
+
+describe('captureEnvelopeSchema post block', () => {
+  it('accepts the id-only block and the full block', () => {
+    expect(captureEnvelopeSchema.safeParse({ ...VALID, post: VALID_POST }).success).toBe(true)
+    const full = {
+      ...VALID_POST,
+      author: { name: 'jack', handle: 'jack' },
+      text: 'just setting up my twttr',
+      truncated: false,
+      postedAt: '2006-03-21T20:50:14.000Z',
+      media: [{ kind: 'image', url: 'https://pbs.twimg.com/media/a.jpg', alt: 'A poodle' }],
+      quoted: {
+        id: '1',
+        url: 'https://x.com/a/status/1',
+        author: { name: 'A', handle: 'a' },
+        text: 'quoted',
+      },
+    }
+    expect(captureEnvelopeSchema.parse({ ...VALID, post: full }).post).toEqual(full)
+  })
+
+  it.each([
+    ['unknown provider', { ...VALID_POST, provider: 'bluesky' }],
+    ['non-numeric id', { ...VALID_POST, id: 'abc' }],
+    ['unknown trigger', { ...VALID_POST, trigger: 'retweet' }],
+    ['malformed handle', { ...VALID_POST, author: { name: 'jack', handle: '@jack' } }],
+    ['blank author name', { ...VALID_POST, author: { name: '  ', handle: 'jack' } }],
+    ['over-cap text', { ...VALID_POST, text: 'a'.repeat(POST_TEXT_MAX_LENGTH + 1) }],
+    [
+      'http media',
+      { ...VALID_POST, media: [{ kind: 'image', url: 'http://pbs.twimg.com/a.jpg' }] },
+    ],
+    [
+      'five media',
+      {
+        ...VALID_POST,
+        media: Array.from({ length: 5 }, (_, index) => ({
+          kind: 'image',
+          url: `https://pbs.twimg.com/media/${index}.jpg`,
+        })),
+      },
+    ],
+  ])('rejects a post block with %s', (_label, post) => {
+    expect(captureEnvelopeSchema.safeParse({ ...VALID, post }).success).toBe(false)
   })
 })
 

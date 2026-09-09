@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'wxt'
 import { SAVE_CURRENT_PAGE_COMMAND } from './lib/commands.ts'
+import { X_ORIGINS } from './lib/x/origins.ts'
 
 /**
  * Pins the extension ID (`dlbliojklpickgimjdmjjdnbjdiomjik`) for **unpacked**
@@ -27,6 +28,26 @@ const isStoreBuild = process.env['WXT_STORE_BUILD'] === 'true'
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   vite: () => ({ plugins: [tailwindcss()] }),
+  hooks: {
+    // WXT lifts a runtime-registered content script's `matches` into
+    // `host_permissions`, which would make the X origins an install-time
+    // grant. They must stay optional: nothing runs on x.com until the user
+    // switches the feature on and Chrome's prompt is accepted.
+    'build:manifestGenerated': (_wxt, manifest) => {
+      const optional = new Set<string>(X_ORIGINS)
+      const lifted: unknown = manifest.host_permissions
+      const kept = Array.isArray(lifted)
+        ? lifted.filter(
+            (origin): origin is string => typeof origin === 'string' && !optional.has(origin),
+          )
+        : []
+      if (kept.length > 0) {
+        manifest.host_permissions = kept
+      } else {
+        delete manifest.host_permissions
+      }
+    },
+  },
   // A stable, human-readable store artifact: `reflect-capture-<version>-chrome.zip`.
   zip: { name: 'reflect-capture' },
   manifest: {
@@ -45,6 +66,10 @@ export default defineConfig({
       'unlimitedStorage',
       'alarms',
     ],
+    // X bookmark capture (Plan 25) is opt-in: the origins are requested from
+    // the options page / popup when the user switches it on, and the content
+    // script is registered at runtime only then (`lib/x/registration.ts`).
+    optional_host_permissions: [...X_ORIGINS],
     commands: {
       [SAVE_CURRENT_PAGE_COMMAND]: {
         suggested_key: { default: 'Ctrl+Shift+K', mac: 'Command+Shift+K' },

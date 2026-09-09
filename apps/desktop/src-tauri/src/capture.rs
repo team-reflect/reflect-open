@@ -17,7 +17,7 @@ use crate::error::{AppError, AppResult};
 use crate::fs::{current_root, modified_ms, root_for_generation, FileMeta, GraphState};
 #[cfg(test)]
 use crate::web_fetch::classify_fetch_status;
-use crate::web_fetch::{fetch_capture_html, fetch_capture_json};
+use crate::web_fetch::{fetch_capture_html, fetch_capture_json, fetch_public_image};
 
 /// The native-messaging host name browsers route on; must match the name the
 /// extension passes to `runtime.sendNativeMessage`.
@@ -534,24 +534,52 @@ pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
     Ok(String::from_utf8_lossy(&response.body).into_owned())
 }
 
-// ---- oEmbed fetch ---------------------------------------------------------------
+// ---- bounded JSON fetch ----------------------------------------------------------
 
-/// oEmbed answers are ~1 KB of JSON; anything past this cap is not an oEmbed
-/// answer, and a truncated one would be unparseable, so oversize is an error
-/// rather than a cut.
-const OEMBED_FETCH_MAX_BYTES: usize = 64 * 1024;
+/// JSON answers the capture pipeline asks for (an oEmbed answer, X's embed
+/// backend) are a few KB; anything past this cap is not one, and a truncated
+/// answer would be unparseable, so oversize is an error rather than a cut.
+const JSON_FETCH_MAX_BYTES: usize = 64 * 1024;
 
-/// Fetch an oEmbed endpoint's JSON answer for the capture meta scrape. Which
-/// URLs are oEmbed endpoints is policy and lives in `@reflect/core`
-/// (`actions/oembed`), behind the same privacy gate as `capture_meta_fetch`;
-/// this side only bounds the transport, strictly tighter than the HTML
-/// fetch: https only, JSON only, a small byte cap, and no redirects (oEmbed
-/// endpoints answer directly, so a redirect is a failure).
+/// Fetch a JSON endpoint's answer for the capture policy layer in
+/// `@reflect/core` (`actions/oembed`, `actions/post-syndication`), behind
+/// the same privacy gate as `capture_meta_fetch`; this side only bounds the
+/// transport, strictly tighter than the HTML fetch: https only, JSON only, a
+/// small byte cap, and no redirects (these endpoints answer directly, so a
+/// redirect is a failure).
 #[tauri::command]
-pub async fn capture_oembed_fetch(url: String) -> AppResult<String> {
-    let response = fetch_capture_json(&url, OEMBED_FETCH_MAX_BYTES).await?;
+pub async fn capture_json_fetch(url: String) -> AppResult<String> {
+    let response = fetch_capture_json(&url, JSON_FETCH_MAX_BYTES).await?;
     String::from_utf8(response.body)
         .map_err(|err| AppError::parse(format!("{url} answered non-UTF-8: {err}")))
+}
+
+// ---- media fetch --------------------------------------------------------------------
+
+/// Cap on one downloaded post image; X serves `name=large` renditions well
+/// under this.
+const MEDIA_FETCH_MAX_BYTES: usize = 10 * 1024 * 1024;
+
+/// Download one public image for a post capture (Plan 25) and return it as a
+/// downscaled base64 JPEG for the policy layer to persist after its
+/// post-request privacy check. Public-internet destinations only, raster
+/// content types only, the same size limits as screenshot promotion.
+#[tauri::command]
+pub async fn capture_media_fetch(url: String) -> AppResult<String> {
+    use base64::Engine;
+
+    let response = fetch_public_image(
+        &url,
+        MEDIA_FETCH_MAX_BYTES,
+        crate::editor_link_preview::validate_raster_content_type,
+    )
+    .await?;
+    let jpeg = tauri::async_runtime::spawn_blocking(move || {
+        downscale_jpeg(&response.body, CAPTURE_IMAGE_LONG_EDGE)
+    })
+    .await
+    .map_err(|err| AppError::io(format!("media fetch task failed: {err}")))??;
+    Ok(base64::engine::general_purpose::STANDARD.encode(jpeg))
 }
 
 #[cfg(test)]

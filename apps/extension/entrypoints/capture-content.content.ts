@@ -7,12 +7,16 @@ import {
   samePageUrl,
   type ExtractPageTextResponse,
 } from '@/lib/page-text'
+import { extractPost, findArticleForPost } from '@/lib/x/extract-post'
+import { extractPostRequestSchema, type ExtractPostResponse } from '@/lib/x/messages'
 
 type PageTextListener = (message: unknown) => Promise<ExtractPageTextResponse> | undefined
+type ExtractPostListener = (message: unknown) => Promise<ExtractPostResponse> | undefined
 
 declare global {
   interface Window {
     __reflectCaptureTextListener?: PageTextListener
+    __reflectExtractPostListener?: ExtractPostListener
   }
 }
 
@@ -112,5 +116,23 @@ export default defineContentScript({
     }
     window.__reflectCaptureTextListener = listener
     browser.runtime.onMessage.addListener(listener)
+
+    // On an X permalink page the popup / shortcut also ask for the post
+    // itself (Plan 25) — the same read the bookmark watcher makes.
+    const previousPostListener = window.__reflectExtractPostListener
+    if (previousPostListener) {
+      browser.runtime.onMessage.removeListener(previousPostListener)
+    }
+    const postListener: ExtractPostListener = (message) => {
+      const request = extractPostRequestSchema.safeParse(message)
+      if (!request.success) {
+        return
+      }
+      const article = findArticleForPost(document, request.data.id)
+      const post = article === null ? null : extractPost(article, 'manual')
+      return Promise.resolve({ post })
+    }
+    window.__reflectExtractPostListener = postListener
+    browser.runtime.onMessage.addListener(postListener)
   },
 })

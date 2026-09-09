@@ -39,6 +39,8 @@ interface PersistCaptureEnrichmentInput {
   status: Exclude<CaptureStatus, 'skipped'>
   provider: AiProviderConfig | null
   screenshot?: string | undefined
+  /** Extra frontmatter keys to upsert alongside the checkpoint (`undefined` deletes). */
+  frontmatter?: Record<string, unknown> | undefined
   generation: number
 }
 
@@ -180,6 +182,7 @@ export async function persistCaptureEnrichment(
   await writeNote(
     input.identity.notePath,
     upsertFrontmatter(reassembled, {
+      ...input.frontmatter,
       captureStatus: titleChanged ? 'pending' : input.status,
       captureMetadataStatus: 'done',
       captureHash,

@@ -81,6 +81,8 @@ before the editor, and the editor lands before search/AI.
 | 21 | [iCloud Drive sync](21-icloud-drive-sync.md) | **Shipped (2026-07-04).** iCloud Drive as the primary consumer sync path: graphs in the app's iCloud container, deterministic resolution ladder over per-device shadow bases (markers as the fallback), `.reflect/`/`.git/` sync-exclusion, iCloud-first onboarding on both platforms with multi-graph lists + the mobile switcher; git remotes stay the self-managed path. AI-assisted resolution deferred |
 | 22 | [Mobile GitHub connect](22-mobile-github-connect.md) | **Implemented; device pass pending.** The connect front door for local (non-iCloud) graphs on iOS: shared wizard hook, `ConnectGithubDrawer`, Settings entry point — no new sync mechanism |
 | 23 | [Mobile AI chat](23-mobile-ai-chat.md) | The Plan 10 chat on iOS as a fourth tab: same engine/store/privacy gate, mobile composer + history/model sheets, per-device BYOK provider settings, lexical-only `search_notes`; streaming-on-iOS spike gates the build |
+| 24 | [Quick Note Intent](24-quick-note-intent.md) | **Implemented; device pass pending.** Siri / Shortcuts / Action-button one-liners as a new producer for the Plan 11 inbox (`kind: append`), coalescing into one daily bullet list |
+| 25 | [X bookmark capture](25-x-bookmark-capture.md) | **Phases 1–2 implemented; logged-in device pass pending.** Bookmarking a post on X captures it as a post note (text, author, media) through the Plan 11 inbox: opt-in content script watches the bookmark flip, a `post` block on the link envelope, desktop-side fetch from X's syndication endpoint merged with page fields + media download; any post URL capture (⌘⇧K) yields the same note |
 
 ## Milestone map
 

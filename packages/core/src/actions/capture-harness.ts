@@ -1,4 +1,5 @@
 import { vi } from 'vitest'
+import { ReflectError } from '../errors'
 import { describePage } from '../ai/describe-page'
 import type { AiProvidersState } from '../ai/provider-config'
 import {
@@ -6,7 +7,9 @@ import {
   captureInboxRead,
   captureInboxReject,
   captureInboxRemove,
+  captureJsonFetch,
   captureLinkPreview,
+  captureMediaFetch,
   listFiles,
   promoteCaptureScreenshot,
   readAsset,
@@ -42,6 +45,8 @@ export const inboxReadMock = vi.mocked(captureInboxRead)
 export const inboxRejectMock = vi.mocked(captureInboxReject)
 export const inboxRemoveMock = vi.mocked(captureInboxRemove)
 export const linkPreviewMock = vi.mocked(captureLinkPreview)
+export const jsonFetchMock = vi.mocked(captureJsonFetch)
+export const mediaFetchMock = vi.mocked(captureMediaFetch)
 export const listFilesMock = vi.mocked(listFiles)
 export const promoteMock = vi.mocked(promoteCaptureScreenshot)
 export const readAssetMock = vi.mocked(readAsset)
@@ -159,6 +164,8 @@ export function wireCaptureMocks(): void {
     files.set(path, contentsBase64)
   })
   linkPreviewMock.mockResolvedValue(null)
+  jsonFetchMock.mockRejectedValue(new ReflectError('io', 'answered 404'))
+  mediaFetchMock.mockResolvedValue(btoa('media-jpeg'))
   getSecretMock.mockResolvedValue('sk-live-key')
   scrapeMock.mockResolvedValue({ title: 'An article', description: null, siteName: null })
   describeMock.mockResolvedValue({ title: null, description: 'An AI description of the page.' })
