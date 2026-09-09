@@ -415,15 +415,33 @@ pub async fn note_read_local(
 /// platform can't provide one) so the caller's index echo can stamp the row
 /// with the value a later `list_files` will report — a `Date.now()` stamp
 /// never matches and costs a re-read on every reconcile.
+static NOTE_WRITE_LOCK: Mutex<()> = Mutex::new(());
+
 #[tauri::command]
 pub fn note_write(
     path: String,
     contents: String,
     generation: u64,
+    check_contents: Option<bool>,
+    expected_contents: Option<String>,
     state: State<GraphState>,
 ) -> AppResult<Option<u64>> {
     let root = root_for_generation(&state, generation)?;
-    let modified_ms = atomic_write(&root, &resolve(&root, &path)?, &contents)?;
+    let _guard = NOTE_WRITE_LOCK
+        .lock()
+        .map_err(|_| AppError::io("note write lock poisoned"))?;
+    let target = resolve(&root, &path)?;
+    if check_contents == Some(true) {
+        let current = match io::read_note_no_follow(&root, &target) {
+            Ok(value) => Some(value),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error.into()),
+        };
+        if current != expected_contents {
+            return Err(AppError::io("Note changed on disk; reload before retrying"));
+        }
+    }
+    let modified_ms = atomic_write(&root, &target, &contents)?;
     invalidate_file_catalog(&state, &root);
     Ok(modified_ms)
 }

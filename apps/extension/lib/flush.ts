@@ -1,9 +1,9 @@
 import { browser } from 'wxt/browser'
-import type { CaptureWireMessage } from '@reflect/core/capture-envelope'
+import type { ExtensionCaptureWire } from '@reflect/core/capture-envelope'
 import type { FlushResult } from './messages'
 import { sendToHost } from './native'
 import {
-  overCap,
+  QUEUE_CAP,
   queueKey,
   QUEUE_KEY_PREFIX,
   queuedCaptureSchema,
@@ -36,14 +36,29 @@ export async function readQueue(): Promise<QueuedCapture[]> {
 }
 
 /** Persist a capture — the durable step before any flush. Cap-enforced. */
-export async function enqueueCapture(wire: CaptureWireMessage): Promise<void> {
-  const entry: QueuedCapture = { wire, queuedAt: Date.now(), attempts: 0 }
-  await browser.storage.local.set({ [queueKey(wire.envelope.id)]: entry })
-  const dropped = overCap(await readQueue())
-  if (dropped.length > 0) {
-    console.warn(`capture queue at cap: dropping ${dropped.length} oldest capture(s)`)
-    await browser.storage.local.remove(dropped.map((old) => queueKey(old.wire.envelope.id)))
-  }
+let enqueueTail = Promise.resolve()
+
+/** Only the background worker calls this serialized admission boundary. */
+export function enqueueCapture(wire: ExtensionCaptureWire): Promise<void> {
+  const next = enqueueTail.then(async () => {
+    const entries = await readQueue()
+    if (entries.some((entry) => entry.wire.envelope.id === wire.envelope.id)) return
+    const bytes = new TextEncoder().encode(JSON.stringify([...entries, wire])).length
+    if (entries.length >= QUEUE_CAP || bytes > 64 * 1024 * 1024) {
+      await browser.storage.local.set({
+        captureQueueError: 'Capture paused: queue full. This capture was not saved.',
+      })
+      throw new Error(
+        'Capture queue full. Existing captures are kept; retry after they are delivered.',
+      )
+    }
+    await browser.storage.local.set({
+      [queueKey(wire.envelope.id)]: { wire, queuedAt: Date.now(), attempts: 0 },
+    })
+    await browser.storage.local.remove('captureQueueError')
+  })
+  enqueueTail = next.catch(() => {})
+  return next
 }
 
 let tail: Promise<FlushResult> | null = null
@@ -64,11 +79,12 @@ let tail: Promise<FlushResult> | null = null
 export function flushQueue(): Promise<FlushResult> {
   const next = tail === null ? runFlush() : tail.then(runFlush, runFlush)
   tail = next
-  void next.finally(() => {
+  const cleanup = (): void => {
     if (tail === next) {
       tail = null
     }
-  })
+  }
+  void next.then(cleanup, cleanup)
   return next
 }
 
@@ -84,16 +100,28 @@ async function runFlush(): Promise<FlushResult> {
     if (outcome.kind === 'queued') {
       await browser.storage.local.remove(queueKey(id))
       sent += 1
-    } else if (outcome.kind === 'rejected') {
+    } else if (outcome.kind === 'rejected' && entry.wire.envelope.kind !== 'x-bookmark') {
       console.error(`capture ${id} dropped — the host rejected it: ${outcome.message}`)
       await browser.storage.local.remove(queueKey(id))
       rejectedIds.push(id)
     } else {
-      console.warn(`captures held (${outcome.reason}): ${outcome.message}`)
+      const reason = outcome.kind === 'rejected' ? 'invalid-payload' : outcome.reason
+      console.warn(`captures held (${reason}): ${outcome.message}`)
       await browser.storage.local.set({
         [queueKey(id)]: { ...entry, attempts: entry.attempts + 1 },
       })
-      holdReason = outcome.reason
+      if (reason === 'graph-mismatch' || reason === 'unsupported-version') {
+        const stored = await browser.storage.local.get('bookmarkSettings')
+        const settings = stored['bookmarkSettings']
+        if (typeof settings === 'object' && settings !== null) {
+          await browser.storage.local.set({
+            bookmarkSettings: { ...settings, enabled: false },
+            bookmarkError:
+              'Automatic capture paused. Open the paired graph or update Reflect, then pair again.',
+          })
+        }
+      }
+      holdReason = reason
       break
     }
   }

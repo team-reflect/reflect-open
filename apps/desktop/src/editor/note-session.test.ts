@@ -1035,3 +1035,20 @@ describe('commitTaskToBullet', () => {
     )
   })
 })
+
+describe('commitSourceEdit', () => {
+  it('keeps dirty body text while committing metadata and a bookmark together', async () => {
+    const h = harness()
+    h.session.load()
+    await settled()
+    h.session.editorChanged('# My unsaved thought\n')
+    expect(
+      await h.session.commitSourceEdit(
+        (source) => `---\nreceipt: saved\n---\n${source}\n[X post](https://x.com/i/status/20)\n`,
+      ),
+    ).toBe(true)
+    expect(h.writes.at(-1)?.contents).toContain('# My unsaved thought')
+    expect(h.writes.at(-1)?.contents).toContain('receipt: saved')
+    expect(h.writes.at(-1)?.contents).toContain('https://x.com/i/status/20')
+  })
+})

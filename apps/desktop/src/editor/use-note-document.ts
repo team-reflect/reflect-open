@@ -116,12 +116,12 @@ export function useNoteDocument(
           io: {
             read: readNote,
             write: canWrite
-              ? (forPath, contents) => {
+              ? (forPath, contents, expectedContents) => {
                   const current = generationRef.current
                   if (current === null) {
                     return Promise.reject(new Error('no graph generation available for save'))
                   }
-                  return writeNote(forPath, contents, current)
+                  return writeNote(forPath, contents, current, expectedContents)
                 }
               : null,
           },

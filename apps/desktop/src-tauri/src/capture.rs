@@ -51,10 +51,17 @@ fn pointer_path() -> AppResult<PathBuf> {
     Ok(base.join("reflect-open").join("capture-pointer.json"))
 }
 
+fn bookmark_graph_id(root: &Path) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(root.to_string_lossy().as_bytes()))
+}
+
 fn pointer_json(root: &Path) -> String {
     serde_json::json!({
         "version": 1,
         "graphRoot": root.to_string_lossy(),
+        "bookmarkVersion": 2,
+        "targetGraphId": bookmark_graph_id(root),
     })
     .to_string()
 }
@@ -152,6 +159,20 @@ fn host_binary_path() -> AppResult<PathBuf> {
         .parent()
         .ok_or_else(|| AppError::io("executable has no parent directory"))?;
     Ok(dir.join(HOST_BINARY))
+}
+
+/// Check a bookmark's paired graph before applying a spooled capture.
+#[tauri::command]
+pub fn capture_bookmark_check(
+    target_graph_id: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<()> {
+    let root = root_for_generation(&state, generation)?;
+    if bookmark_graph_id(&root) != target_graph_id {
+        return Err(AppError::io("Bookmark belongs to another graph"));
+    }
+    Ok(())
 }
 
 /// Point the capture host at the active graph and register browser manifests.

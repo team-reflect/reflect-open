@@ -126,7 +126,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         const content = header + buffer
         inFlightWrite = content
         try {
-          await write(path, content)
+          await write(path, content, missing ? null : disk)
           disk = content
           dirty = header + buffer !== content
           missing = false // the landed write created the file if it was missing
@@ -456,9 +456,11 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     // thrown). Revert and surface the failure: it persists, or nothing changes.
     if (shouldPersist && error !== null) {
       const message = error
-      header = previousHeader
-      buffer = previousBuffer
-      applyToEditor(previousBuffer)
+      if (header === doc.header) header = previousHeader
+      if (buffer === doc.body) {
+        buffer = previousBuffer
+        applyToEditor(previousBuffer)
+      }
       dirty = header + buffer !== disk
       error = null
       emit()
@@ -551,6 +553,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     commitTaskRemove,
     commitTaskToBullet,
     commitBodyAppend,
+    commitSourceEdit: commitBodyEdit,
     dispose,
     discard,
   }

@@ -1,3 +1,4 @@
+import type { BookmarkEnvelope } from './bookmark-envelope'
 import { errorMessage, isAppError, toAppError } from '../errors'
 import {
   captureInboxList,
@@ -56,6 +57,8 @@ const ORPHAN_SPOOL_MAX_AGE_MS = 60 * 60 * 1000
 export interface DrainCaptureInboxInput {
   /** `GraphInfo.generation` — pins every read and write to the issuing graph. */
   generation: number
+  /** Transactional bookmark writer supplied by the document host. */
+  writeBookmark?: (envelope: BookmarkEnvelope) => Promise<void>
   /** Abort gate, checked between spool files (graph switch / unmount). */
   isStale?: () => boolean
   /** Clock for the orphan sweep; injectable for tests. */
@@ -192,7 +195,14 @@ export async function drainCaptureInbox(
         invalid += 1
         continue
       }
-      if ('kind' in envelope) {
+      if (envelope.kind === 'x-bookmark') {
+        if (!input.writeBookmark) throw new Error('Bookmark writer is unavailable; update Reflect')
+        await input.writeBookmark(envelope)
+        await captureInboxRemove(name, input.generation)
+        drained += 1
+        continue
+      }
+      if (envelope.kind !== undefined) {
         await drainTextCapture(envelope, input.generation)
         await captureInboxRemove(name, input.generation)
         drained += 1

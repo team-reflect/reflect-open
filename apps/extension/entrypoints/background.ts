@@ -1,7 +1,10 @@
+import { z } from 'zod'
+import { extensionCaptureWireSchema, postIdSchema } from '@reflect/core/capture-envelope'
+import { registerBookmarkObserver, saveBookmark, recordBookmarkError } from '@/lib/x-bookmarks'
 import { browser } from 'wxt/browser'
 import { defineBackground } from '#imports'
 import { SAVE_CURRENT_PAGE_COMMAND } from '@/lib/commands'
-import { flushQueue } from '@/lib/flush'
+import { enqueueCapture, flushQueue } from '@/lib/flush'
 import { isFlushRequest } from '@/lib/messages'
 import { readIncludePageTextPreference } from '@/lib/popup-preferences'
 import { saveCapture } from '@/lib/save-capture'
@@ -41,8 +44,44 @@ async function saveTabWithDefaults(tab: Parameters<typeof snapshotTab>[0]): Prom
   }
 }
 
+const enqueueRequestSchema = z.object({
+  type: z.literal('enqueue'),
+  wire: extensionCaptureWireSchema,
+})
+const bookmarkRequestSchema = z.object({ type: z.literal('save-bookmark'), postId: postIdSchema })
+
 export default defineBackground(() => {
+  registerBookmarkObserver()
+  browser.permissions.onAdded.addListener(registerBookmarkObserver)
+  browser.permissions.onRemoved.addListener(() => {
+    void browser.storage.local
+      .get('bookmarkSettings')
+      .then(async (stored) => {
+        const settings = stored['bookmarkSettings']
+        if (typeof settings === 'object' && settings !== null)
+          await browser.storage.local.set({ bookmarkSettings: { ...settings, enabled: false } })
+      })
+      .catch(recordBookmarkError)
+  })
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    const enqueue = enqueueRequestSchema.safeParse(message)
+    const bookmark = bookmarkRequestSchema.safeParse(message)
+    if (enqueue.success || bookmark.success) {
+      const task = enqueue.success
+        ? enqueueCapture(enqueue.data.wire)
+        : bookmark.success
+          ? saveBookmark(bookmark.data.postId, 'manual')
+          : Promise.resolve()
+      void task.then(
+        () => sendResponse({ ok: true }),
+        (cause: unknown) =>
+          sendResponse({
+            ok: false,
+            message: cause instanceof Error ? cause.message : 'Capture failed',
+          }),
+      )
+      return true
+    }
     if (isFlushRequest(message)) {
       flushQueue().then(sendResponse, (cause: unknown) => {
         console.error('capture flush failed:', cause)

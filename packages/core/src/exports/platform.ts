@@ -164,6 +164,7 @@ export {
   readNoteLocal,
   type LocalNoteRead,
   writeNote,
+  checkBookmarkGraph,
   createNoteIfAbsent,
   writeAsset,
   readAsset,

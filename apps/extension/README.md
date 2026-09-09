@@ -177,3 +177,30 @@ Each is reviewed individually; every permission below is exercised by the code:
   1. Data is **not** sold to third parties.
   2. Data is **not** used or transferred for purposes unrelated to the single purpose.
   3. Data is **not** used or transferred to determine creditworthiness or for lending.
+
+## X bookmarks (experimental)
+
+Pair the extension with the graph selected in an updated Reflect desktop app.
+On an X post permalink, **Save post link to daily note** saves just that post URL.
+The optional **Record new bookmark requests** setting requests access to x.com
+and observes new CreateBookmark requests in this Chrome profile, across its X
+accounts. A request is a save intent, not confirmation that X accepted it.
+Historical bookmarks and unbookmark deletions are not synchronized.
+
+Bookmarks go directly into the capture-day daily note under `X bookmarks`. No
+per-post notes, screenshots, page text, AI enrichment, or media downloads are
+created. Links are the default; optional online tweet previews contact X.
+Private daily notes always receive plain links. Neither mode archives tweet text.
+
+Accepted captures survive browser restarts. A full queue rejects new captures
+without deleting earlier ones; retry after delivery. Graph mismatch pauses
+automatic capture. Open the previously paired graph to deliver old captures,
+then pair again for new ones. Moving a graph changes its local pairing identity.
+Only a host `queued` acknowledgement removes a capture from the browser queue;
+it does not certify that the desktop has written the daily note.
+
+Before release, verify real X button/menu/keyboard coverage, optional permission
+revocation and worker suspension with DevTools closed, native messaging with both
+unpacked and store extension IDs, queue saturation, graph switching, and offline
+restart. Test a dirty daily note and a crash after writing it but before removing
+the inbox file. Keep automatic capture experimental until these checks pass.

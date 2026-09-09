@@ -19,6 +19,11 @@ import {
   type WindowBootstrap,
 } from './schemas'
 
+/** Verify a bookmark's paired graph against the active native graph session. */
+export async function checkBookmarkGraph(targetGraphId: string, generation: number): Promise<void> {
+  await call('capture_bookmark_check', { targetGraphId, generation }, z.null())
+}
+
 /** Commands that return `()` from Rust serialize as `null` over IPC. */
 const voidSchema = z.null()
 
@@ -158,8 +163,22 @@ export async function readNoteLocal(path: string, generation?: number): Promise<
  * re-read on every pass. `Date.now()` is a fallback for a platform that
  * can't report one.
  */
-export async function writeNote(path: string, contents: string, generation: number): Promise<void> {
-  const modifiedMs = await call('note_write', { path, contents, generation }, z.number().nullable())
+export async function writeNote(
+  path: string,
+  contents: string,
+  generation: number,
+  expectedContents?: string | null,
+): Promise<void> {
+  const modifiedMs = await call(
+    'note_write',
+    {
+      path,
+      contents,
+      generation,
+      ...(expectedContents === undefined ? {} : { checkContents: true, expectedContents }),
+    },
+    z.number().nullable(),
+  )
   echoLocalWrite({ path, kind: 'upsert', modifiedMs: modifiedMs ?? Date.now() })
 }
 

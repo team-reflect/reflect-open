@@ -50,7 +50,7 @@ pub struct ValidatedCapture {
 
 /// Strict UUID shape (8-4-4-4-12 hex). The id names the spool files, so this
 /// doubles as the path-safety guard — no separators, no dots, no traversal.
-fn is_uuid(candidate: &str) -> bool {
+pub(crate) fn is_uuid(candidate: &str) -> bool {
     let groups: Vec<&str> = candidate.split('-').collect();
     let lengths = [8, 4, 4, 4, 12];
     groups.len() == lengths.len()
@@ -84,7 +84,7 @@ fn days_in_month(year: u32, month: u32) -> u32 {
 /// must be **at least as strict** here as the drain's zod schema
 /// (`capture-envelope.ts`), or it would spool envelopes the drain can only
 /// quarantine; the shared fixtures pin the two together.
-fn is_iso_datetime(candidate: &str) -> bool {
+pub(crate) fn is_iso_datetime(candidate: &str) -> bool {
     let Some((date, rest)) = candidate.split_once('T') else {
         return false;
     };
@@ -144,6 +144,11 @@ impl ValidatedCapture {
     /// Parse and validate one wire payload. Every rejection is an
     /// `invalid-payload` ack with a reason the extension can surface.
     pub fn parse(payload: &[u8]) -> Result<Self, HostError> {
+        let value: serde_json::Value = serde_json::from_slice(payload)
+            .map_err(|_| HostError::InvalidPayload("Invalid capture JSON".into()))?;
+        if value["envelope"].get("kind").is_some() {
+            return Err(HostError::InvalidPayload("Unexpected capture kind".into()));
+        }
         let message: WireMessage = serde_json::from_slice(payload)
             .map_err(|error| HostError::InvalidPayload(format!("malformed message: {error}")))?;
         let mut envelope = message.envelope;

@@ -45,6 +45,8 @@ export default defineConfig({
       'unlimitedStorage',
       'alarms',
     ],
+    optional_permissions: ['webRequest'],
+    optional_host_permissions: ['https://x.com/*'],
     commands: {
       [SAVE_CURRENT_PAGE_COMMAND]: {
         suggested_key: { default: 'Ctrl+Shift+K', mac: 'Command+Shift+K' },

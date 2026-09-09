@@ -174,6 +174,8 @@ export {
   captureIdentity,
   captureNoteMeta,
   drainCaptureInbox,
+  appendBookmark,
+  type BookmarkEnvelope,
   isCaptureSpoolPath,
   listPendingCaptures,
   reconcileCaptureEnrichment,

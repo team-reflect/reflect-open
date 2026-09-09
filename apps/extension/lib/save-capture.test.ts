@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { enqueueCapture, readQueue } from './flush'
+import { buildWireMessage } from './capture-message'
 import { queueKey } from './queue'
 import { saveCapture } from './save-capture'
 
@@ -81,4 +83,22 @@ describe('saveCapture', () => {
 
     expect(outcome).toEqual({ fate: 'rejected' })
   })
+})
+
+it('serializes concurrent admission and preserves every accepted capture at capacity', async () => {
+  const results = await Promise.allSettled(
+    Array.from({ length: 51 }, (_, index) =>
+      enqueueCapture(
+        buildWireMessage({
+          ...captureInput(),
+          id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+        }),
+      ),
+    ),
+  )
+  expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(50)
+  expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1)
+  const queue = await readQueue()
+  expect(queue).toHaveLength(50)
+  expect(queue.some((entry) => entry.wire.envelope.id.endsWith('000000000000'))).toBe(true)
 })

@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser'
-import { captureAckSchema, type CaptureWireMessage } from '@reflect/core/capture-envelope'
+import { captureAckSchema, type ExtensionCaptureWire } from '@reflect/core/capture-envelope'
 import type { HoldReason } from './messages'
 
 /**
@@ -27,7 +27,7 @@ export type SendOutcome =
  */
 const NO_HOST_PATTERN = /not found|forbidden|not installed/i
 
-export async function sendToHost(wire: CaptureWireMessage): Promise<SendOutcome> {
+export async function sendToHost(wire: ExtensionCaptureWire): Promise<SendOutcome> {
   let raw: unknown
   try {
     raw = await browser.runtime.sendNativeMessage(HOST_NAME, wire)
@@ -51,6 +51,9 @@ export async function sendToHost(wire: CaptureWireMessage): Promise<SendOutcome>
       return { kind: 'rejected', message: ack.data.message }
     case 'no-graph':
       return { kind: 'held', reason: 'no-graph', message: ack.data.message }
+    case 'unsupported-version':
+    case 'graph-mismatch':
+      return { kind: 'held', reason: ack.data.code, message: ack.data.message }
     case 'io':
       return { kind: 'held', reason: 'io', message: ack.data.message }
   }

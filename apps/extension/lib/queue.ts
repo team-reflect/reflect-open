@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { captureWireMessageSchema } from '@reflect/core/capture-envelope'
+import { extensionCaptureWireSchema } from '@reflect/core/capture-envelope'
 
 /**
  * The pending-capture queue, persisted in `chrome.storage.local` under **one
@@ -12,7 +12,7 @@ import { captureWireMessageSchema } from '@reflect/core/capture-envelope'
  */
 
 export const queuedCaptureSchema = z.object({
-  wire: captureWireMessageSchema,
+  wire: extensionCaptureWireSchema,
   /** Epoch ms when the capture entered the queue. */
   queuedAt: z.number(),
   /** Send attempts so far — surfaced in the popup's pending count tooltip. */
