@@ -244,8 +244,12 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     let content: string
     try {
       content = await io.read(path)
-    } catch {
-      return // deleted/unreadable between event and read; nothing to reconcile
+    } catch (cause) {
+      if (!disposed && isAppError(cause) && cause.kind === 'notFound') {
+        missing = true
+        emit()
+      }
+      return // preserve the buffer if the file disappeared or cannot be read
     }
     if (disposed) {
       return
@@ -352,6 +356,10 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   }
 
   function keepMine(): void {
+    if (conflict !== null) {
+      disk = conflict
+      missing = false
+    }
     conflict = null
     dirty = true // force the rewrite even if content drifted equal
     emit()

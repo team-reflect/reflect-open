@@ -64,6 +64,8 @@ function harness(options?: {
               if (writeFailure !== null) {
                 throw new Error(writeFailure)
               }
+              if (expected !== undefined && expected !== disk)
+                throw { kind: 'io', message: 'Note changed on disk; reload before retrying' }
               writes.push({ path, contents })
               disk = contents
             },
@@ -1080,13 +1082,16 @@ it('parks an external revision when a checked autosave fails', async () => {
     await settled()
     h.session.editorChanged('# My unsaved text\n')
     h.setDisk('# Capture wrote here\n')
-    h.failWrites('Note changed on disk; reload before retrying')
     await h.session.flush()
     expect(h.snapshots.at(-1)?.conflict).toBe('# Capture wrote here\n')
     expect(h.session.content()).toBe('# My unsaved text\n')
     expect(h.writes).toEqual([])
     await h.session.flush()
     expect(h.expectedContents).toHaveLength(1)
+    h.session.keepMine()
+    await h.session.flush()
+    expect(h.expectedContents.at(-1)).toBe('# Capture wrote here\n')
+    expect(h.writes.at(-1)?.contents).toBe('# My unsaved text\n')
   } finally {
     h.session.discard()
     log.mockRestore()

@@ -1,12 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { saveBookmark, parseCreateBookmark, type BookmarkRequest } from './x-bookmarks'
+import {
+  captureBookmarkRequest,
+  saveBookmark,
+  parseCreateBookmark,
+  type BookmarkRequest,
+} from './x-bookmarks'
 import { browser } from 'wxt/browser'
 import { enqueueCapture } from './flush'
 import { readBookmarkSettings, invalidateBookmarkCapture } from './bookmark-settings'
+const { tabMock, permissionMock } = vi.hoisted(() => ({
+  tabMock: vi.fn(async () => ({ incognito: false })),
+  permissionMock: vi.fn(async () => true),
+}))
 vi.mock('wxt/browser', () => ({
   browser: {
-    tabs: { get: vi.fn(async () => ({ incognito: false })) },
-    permissions: { contains: vi.fn(async () => true) },
+    tabs: { get: tabMock },
+    permissions: { contains: permissionMock },
   },
 }))
 vi.mock('./flush', () => ({
@@ -70,9 +79,7 @@ describe('CreateBookmark observer', () => {
 it.each(['manual', 'request-intent'] as const)(
   'refuses %s bookmarks from incognito tabs in a spanning worker',
   async (evidence) => {
-    vi.mocked(browser.tabs.get).mockResolvedValueOnce({ incognito: true } as Awaited<
-      ReturnType<typeof browser.tabs.get>
-    >)
+    tabMock.mockResolvedValueOnce({ incognito: true })
     await expect(saveBookmark('20', evidence, 1)).rejects.toThrow('incognito')
     expect(enqueueCapture).not.toHaveBeenCalled()
   },
@@ -80,7 +87,7 @@ it.each(['manual', 'request-intent'] as const)(
 
 it('invalidates an old request even if opt-in is turned off then on during permission lookup', async () => {
   const permission = Promise.withResolvers<boolean>()
-  vi.mocked(browser.permissions.contains).mockReturnValueOnce(permission.promise)
+  permissionMock.mockReturnValueOnce(permission.promise)
   const save = saveBookmark('20', 'request-intent', 1)
   await vi.waitFor(() => expect(browser.permissions.contains).toHaveBeenCalled())
   invalidateBookmarkCapture()
@@ -101,11 +108,21 @@ it('checks permission before preferences and invalidates pending admission', asy
   })
   const save = saveBookmark('20', 'request-intent', 1)
   await reached.promise
-  expect(vi.mocked(browser.permissions.contains).mock.invocationCallOrder[0]).toBeLessThan(
+  expect(permissionMock.mock.invocationCallOrder[0]).toBeLessThan(
     vi.mocked(readBookmarkSettings).mock.invocationCallOrder[0]!,
   )
   invalidateBookmarkCapture()
   release.resolve()
   await save
   expect(admitted).toBe(false)
+})
+
+it('does not inspect request bodies when capture is disabled', async () => {
+  vi.mocked(readBookmarkSettings).mockResolvedValueOnce({ enabled: false, presentation: 'link' })
+  const body = vi.fn(() => request().requestBody)
+  const details = { ...request(), timeStamp: Date.now() }
+  Object.defineProperty(details, 'requestBody', { get: body })
+  await captureBookmarkRequest(details)
+  expect(body).not.toHaveBeenCalled()
+  expect(enqueueCapture).not.toHaveBeenCalled()
 })

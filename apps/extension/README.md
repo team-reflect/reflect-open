@@ -215,3 +215,11 @@ revocation and worker suspension with DevTools closed, native messaging with bot
 unpacked and store extension IDs, queue saturation, graph switching, and offline
 restart. Test a dirty daily note and a crash after writing it but before removing
 the inbox file. Keep automatic capture experimental until these checks pass.
+
+Two broader release limitations remain: checked note writes serialize Reflect's
+own writers, but cannot lock out an uncooperative external sync process between
+the comparison and rename. Also, changing an existing note to private does not
+currently suppress previously stored remote embeds in every editor/preview
+surface. The preview option must not ship until that renderer privacy gate is
+implemented and tested. These require filesystem coordination and renderer work
+beyond bookmark ingestion; passing capture tests alone does not close them.

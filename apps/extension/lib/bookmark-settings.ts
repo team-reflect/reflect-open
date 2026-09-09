@@ -11,7 +11,10 @@ export const bookmarkSettingsSchema = z.object({
 })
 export type BookmarkSettings = z.infer<typeof bookmarkSettingsSchema>
 
+let settingsWrite = Promise.resolve()
+
 export async function readBookmarkSettings(): Promise<BookmarkSettings> {
+  await settingsWrite
   const stored = await browser.storage.local.get(BOOKMARK_SETTINGS_KEY)
   const result = bookmarkSettingsSchema.safeParse(stored[BOOKMARK_SETTINGS_KEY])
   return result.success ? result.data : { enabled: false, presentation: 'link' }
@@ -40,7 +43,18 @@ export function bookmarkCaptureGeneration(): number {
 }
 
 /** Called only by the background, including permission revocation. */
-export async function writeBookmarkSettings(settings: BookmarkSettings): Promise<void> {
+export function writeBookmarkSettings(settings: BookmarkSettings): Promise<void> {
   invalidateBookmarkCapture()
-  await browser.storage.local.set({ [BOOKMARK_SETTINGS_KEY]: settings })
+  const next = settingsWrite
+    .then(async () => {
+      await browser.storage.local.set({ [BOOKMARK_SETTINGS_KEY]: settings })
+      if (!settings.enabled)
+        await browser.permissions.remove({
+          permissions: ['webRequest'],
+          origins: ['https://x.com/*'],
+        })
+    })
+    .finally(invalidateBookmarkCapture)
+  settingsWrite = next.catch(() => {})
+  return next
 }

@@ -8,12 +8,14 @@ import { sendToHost, type SendOutcome } from './native'
 
 /** In-memory `chrome.storage.local` faithful to get(null)/set/remove. */
 const store = new Map<string, unknown>()
+const { bytesMock } = vi.hoisted(() => ({ bytesMock: vi.fn(async () => 0) }))
 
 vi.mock('wxt/browser', () => ({
   browser: {
+    permissions: { remove: vi.fn(async () => true) },
     storage: {
       local: {
-        getBytesInUse: vi.fn(async () => 0),
+        getBytesInUse: bytesMock,
         get: (keys: string | string[] | null) => {
           if (keys === null) {
             return Promise.resolve(Object.fromEntries(store))
@@ -155,6 +157,7 @@ describe('flushQueue', () => {
 })
 
 const bookmark = bookmarkWireSchema.parse(fixtures.accepted[0])
+bookmark.envelope.id = FIRST
 
 it.each(['graph-mismatch', 'unsupported-version', 'invalid-payload'] as const)(
   'parks %s without blocking page captures, including after restart',
@@ -186,7 +189,7 @@ it.each(['graph-mismatch', 'unsupported-version', 'invalid-payload'] as const)(
 
 it('refuses the byte budget without removing accepted data', async () => {
   await enqueueCapture(bookmark)
-  vi.mocked(browser.storage.local.getBytesInUse).mockResolvedValueOnce(64 * 1024 * 1024)
+  bytesMock.mockResolvedValueOnce(64 * 1024 * 1024)
   await expect(enqueueCapture(wire(SECOND))).rejects.toThrow('queue full')
   expect(await readQueue()).toHaveLength(1)
   await flushQueue()
@@ -223,7 +226,7 @@ it('replays the same event after a lost ACK and discards only the selected entry
 
 it('rechecks admission after asynchronous capacity reads', async () => {
   const capacity = Promise.withResolvers<number>()
-  vi.mocked(browser.storage.local.getBytesInUse).mockReturnValueOnce(capacity.promise)
+  bytesMock.mockReturnValueOnce(capacity.promise)
   let allowed = true
   const admission = enqueueCapture(bookmark, () => allowed)
   await vi.waitFor(() => expect(browser.storage.local.getBytesInUse).toHaveBeenCalled())

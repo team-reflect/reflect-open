@@ -6,7 +6,12 @@ import {
   invalidateBookmarkCapture,
 } from '@/lib/bookmark-settings'
 import { extensionCaptureWireSchema, postIdSchema } from '@reflect/core/capture-envelope'
-import { registerBookmarkObserver, saveBookmark, recordBookmarkError } from '@/lib/x-bookmarks'
+import {
+  registerBookmarkObserver,
+  unregisterBookmarkObserver,
+  saveBookmark,
+  recordBookmarkError,
+} from '@/lib/x-bookmarks'
 import { browser } from 'wxt/browser'
 import { defineBackground } from '#imports'
 import { SAVE_CURRENT_PAGE_COMMAND } from '@/lib/commands'
@@ -70,6 +75,7 @@ export default defineBackground(() => {
   browser.permissions.onAdded.addListener(registerBookmarkObserver)
   browser.permissions.onRemoved.addListener(() => {
     invalidateBookmarkCapture()
+    unregisterBookmarkObserver()
     void readBookmarkSettings()
       .then((settings) => writeBookmarkSettings({ ...settings, enabled: false }))
       .catch(recordBookmarkError)
@@ -102,10 +108,13 @@ export default defineBackground(() => {
       return true
     }
     if (isFlushRequest(message)) {
-      flushQueue(true).then(sendResponse, (cause: unknown) => {
-        console.error('capture flush failed:', cause)
-        sendResponse({ sent: 0, failed: 0, rejectedIds: [], held: -1, holdReason: 'io' })
-      })
+      flushQueue(z.object({ retryParked: z.literal(true) }).safeParse(message).success).then(
+        sendResponse,
+        (cause: unknown) => {
+          console.error('capture flush failed:', cause)
+          sendResponse({ sent: 0, failed: 0, rejectedIds: [], held: -1, holdReason: 'io' })
+        },
+      )
       return true // responding asynchronously
     }
     return false

@@ -16,7 +16,7 @@ export async function commitBookmark(
 ): Promise<void> {
   await checkBookmarkGraph(envelope.targetGraphId, generation)
   const path = dailyPath(envelope.captureDate)
-  const owner = openSession(path)
+  const owner = openSession(path, generation)
   if (owner !== null) {
     if (!(await owner.commitSourceEdit((source) => appendBookmark(source, envelope)))) {
       throw new Error('Resolve or finish loading the daily note before saving bookmarks')
@@ -31,7 +31,7 @@ export async function commitBookmark(
     source = null
   }
   // A document may have opened while the filesystem read was pending.
-  const opened = openSession(path)
+  const opened = openSession(path, generation)
   if (opened !== null) {
     if (!(await opened.commitSourceEdit((current) => appendBookmark(current, envelope)))) {
       throw new Error('The daily note is busy; bookmark remains queued')

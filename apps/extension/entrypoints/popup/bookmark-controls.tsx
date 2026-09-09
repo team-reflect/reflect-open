@@ -164,7 +164,10 @@ export function BookmarkControls({ url, tabId }: { url: string; tabId: number })
           className="text-left text-xs text-accent underline"
           onClick={() => {
             void perform(async () => {
-              const response = await browser.runtime.sendMessage({ type: 'flush' })
+              const response = await browser.runtime.sendMessage({
+                type: 'flush',
+                retryParked: true,
+              })
               const result = z.object({ held: z.number() }).parse(response)
               setMessage(
                 result.held

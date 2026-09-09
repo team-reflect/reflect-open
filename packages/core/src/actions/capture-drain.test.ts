@@ -640,7 +640,7 @@ describe('drainCaptureInbox (text captures)', () => {
 it.each([true, false])(
   'isolates bookmark write failure (permanent=%s) from later page captures',
   async (permanent) => {
-    const bookmark = fixtures.spooled[0]!
+    const bookmark = { ...fixtures.spooled[0]!, id: '00000000-0000-4000-8000-000000000001' }
     const name = `${bookmark.id}.json`
     spool.set(name, { contents: JSON.stringify(bookmark), modifiedMs: -1 })
     addSpool(envelope())

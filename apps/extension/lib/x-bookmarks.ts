@@ -124,14 +124,27 @@ export function registerBookmarkObserver(): void {
   }
 }
 
+/** Stop delivery of request bodies when the optional permission is revoked. */
+export function unregisterBookmarkObserver(): void {
+  browser.webRequest?.onBeforeRequest.removeListener(onBookmarkRequest)
+}
+
 function onBookmarkRequest(
   details: Parameters<Parameters<typeof browser.webRequest.onBeforeRequest.addListener>[0]>[0],
 ): undefined {
+  void captureBookmarkRequest(details).catch(recordBookmarkError)
+}
+
+/** Gate body inspection as well as persistence on the current opt-in. */
+export async function captureBookmarkRequest(
+  details: BookmarkRequest & { timeStamp: number },
+): Promise<void> {
+  const generation = bookmarkCaptureGeneration()
+  const settings = await readBookmarkSettings()
+  if (!settings.enabled || generation !== bookmarkCaptureGeneration()) return
   const postId = parseCreateBookmark(details)
-  if (postId === undefined) return
-  void saveBookmark(postId, 'request-intent', details.tabId, new Date(details.timeStamp)).catch(
-    recordBookmarkError,
-  )
+  if (postId !== undefined)
+    await saveBookmark(postId, 'request-intent', details.tabId, new Date(details.timeStamp))
 }
 
 export async function recordBookmarkError(cause: unknown): Promise<void> {
