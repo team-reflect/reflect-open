@@ -47,10 +47,9 @@ export function getBookmarkPostId(value: string): string | undefined {
       url.password
     )
       return undefined
-    const match =
-      /^\/(?:\w+|i\/web)\/status\/([1-9]\d{0,19})(?:\/(?:photo|video)\/\d+)?\/?$/.exec(
-        url.pathname,
-      )
+    const match = /^\/(?:\w+|i\/web)\/status\/([1-9]\d{0,19})(?:\/(?:photo|video)\/\d+)?\/?$/.exec(
+      url.pathname,
+    )
     return match?.[1]
   } catch {
     return undefined
