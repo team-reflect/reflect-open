@@ -143,35 +143,34 @@ export function MobileAllNotes({
       className="flex h-full w-screen flex-col"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <MobileSearchHeader
-      >
+      <MobileSearchHeader>
         <MobileSearchHeaderContent>
-        {tag !== null && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="-ml-2 size-10 shrink-0"
-            aria-label="Back"
-            onClick={back}
-          >
-            <ChevronLeft />
-          </Button>
-        )}
-        <SearchInput
-          ref={searchInputRef}
-          placeholder="Search anything…"
-          aria-label="Search notes"
-          value={query}
-          onValueChange={onQueryChange}
+          {tag !== null && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-ml-2 size-10 shrink-0"
+              aria-label="Back"
+              onClick={back}
+            >
+              <ChevronLeft />
+            </Button>
+          )}
+          <SearchInput
+            ref={searchInputRef}
+            placeholder="Search anything…"
+            aria-label="Search notes"
+            value={query}
+            onValueChange={onQueryChange}
           />
         </MobileSearchHeaderContent>
         <div className="pb-2">
-        pending !== null ? (
+          pending !== null ? (
           <TagSuggestions
             facets={matchingTagFacets(facets ?? [], pending.partial)}
             onPick={addPendingTag}
           />
-        ) : (
+          ) : (
           <FilterBar
             filters={filters}
             onFiltersChange={onFiltersChange}

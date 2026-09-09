@@ -145,35 +145,35 @@ export function MobileTasks(): ReactElement {
     >
       <MobileSearchHeader>
         <MobileSearchHeaderContent>
-        <SearchInput
-          ref={searchInputRef}
-          placeholder="Search tasks…"
-          aria-label="Search tasks"
-          value={query}
-          onValueChange={setQuery}
-        />
-        {recentlyCompleted.length > 0 ? (
+          <SearchInput
+            ref={searchInputRef}
+            placeholder="Search tasks…"
+            aria-label="Search tasks"
+            value={query}
+            onValueChange={setQuery}
+          />
+          {recentlyCompleted.length > 0 ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-10 shrink-0"
+              aria-label={`Archive ${recentlyCompleted.length} completed`}
+              onClick={archiveCompleted}
+            >
+              <Archive />
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             size="icon"
             className="size-10 shrink-0"
-            aria-label={`Archive ${recentlyCompleted.length} completed`}
-            onClick={archiveCompleted}
+            aria-label="Task filters"
+            onClick={() => {
+              hapticImpactLight()
+              setFiltersOpen(true)
+            }}
           >
-            <Archive />
-          </Button>
-        ) : null}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-10 shrink-0"
-          aria-label="Task filters"
-          onClick={() => {
-            hapticImpactLight()
-            setFiltersOpen(true)
-          }}
-        >
-          <SlidersHorizontal />
+            <SlidersHorizontal />
           </Button>
         </MobileSearchHeaderContent>
       </MobileSearchHeader>
