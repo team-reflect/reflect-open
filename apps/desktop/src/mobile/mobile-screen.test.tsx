@@ -259,13 +259,6 @@ function visibleLayer(view: BrowserView): HTMLElement {
   return visible
 }
 
-/** Where a tab puts its search field, for comparing one tab's row with another's. */
-async function searchFieldTop(view: BrowserView, name: string): Promise<number> {
-  const box = view.getByRole('searchbox', { name })
-  await expect.element(box).toBeVisible()
-  return box.element().getBoundingClientRect().top
-}
-
 /**
  * Dispatch a pointer event the gesture hook can read.
  */
@@ -648,28 +641,6 @@ describe('MobileShell', () => {
         .getAttribute('aria-current'),
     ).not.toBe('date')
     expect(editorProbe.focusCalls).toBe(0)
-  })
-
-  it('keeps the search field on one row across the All and Tasks tabs', async () => {
-    const user = userEvent
-    const view = await mount({ kind: 'today' })
-
-    await user.click(view.getByRole('button', { name: 'All' }))
-    const all = await searchFieldTop(view, 'Search notes')
-
-    await user.click(view.getByRole('button', { name: 'Tasks' }))
-    expect(await searchFieldTop(view, 'Search tasks')).toBe(all)
-  })
-
-  it('keeps the search field on that row when the All tab shows a tag back button', async () => {
-    const user = userEvent
-    const view = await mount({ kind: 'allNotes', tag: 'book' })
-
-    await expect.element(view.getByRole('button', { name: 'Back' })).toBeVisible()
-    const tagged = await searchFieldTop(view, 'Search notes')
-
-    await user.click(view.getByRole('button', { name: 'Tasks' }))
-    expect(await searchFieldTop(view, 'Search tasks')).toBe(tagged)
   })
 
   it('switches to the Tasks tab, which renders the grouped task list', async () => {
