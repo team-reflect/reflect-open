@@ -4,6 +4,7 @@ import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import { setBridge, type AppPlatform } from '@reflect/core'
 import { usePaywallRequested } from '@/hooks/use-paywall-requested'
+import { resetLocalStorageStores } from '@/lib/local-storage'
 import { queryKeys } from '@/lib/query-client'
 import { SettingsProvider } from '@/providers/settings-provider'
 import { usePaywallGate, type PaywallGate } from './use-paywall-gate'
@@ -118,6 +119,7 @@ beforeEach(() => {
   stored = {}
   emitPurchaseUpdated = null
   localStorage.clear()
+  resetLocalStorageStores()
   sessionStorage.clear()
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
@@ -413,6 +415,30 @@ describe('usePaywallGate', () => {
       expect(result.current).toBe('hide')
       probe.settle('Production')
       await vi.waitFor(() => expect(result.current).toBe('show'))
+    })
+
+    it('does not answer from a channel an older build remembered as Production', async () => {
+      // Written by hand: this build never remembers `Production`, because a
+      // remembered `Production` reads exactly like no seed at all.
+      localStorage.setItem('reflect.app-store.environment', JSON.stringify('Production'))
+      resetLocalStorageStores()
+      environment = never
+
+      await renderHook(() => usePaywallGate(), { wrapper })
+
+      expect(queryClient.getQueryData(queryKeys.appStore.environment)).toBeUndefined()
+    })
+
+    it('forgets a remembered channel once the probe answers Production', async () => {
+      environment = () => Promise.resolve('Sandbox')
+      await runLaunch('hide')
+      environment = () => Promise.resolve('Production')
+      await runLaunch('show')
+
+      environment = never
+      await renderHook(() => usePaywallGate(), { wrapper })
+
+      expect(queryClient.getQueryData(queryKeys.appStore.environment)).toBeUndefined()
     })
   })
 })
