@@ -1,4 +1,4 @@
-import { act } from 'react'
+import { act, StrictMode } from 'react'
 import { renderHook } from 'vitest-browser-react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenTask } from '@reflect/core'
@@ -40,6 +40,18 @@ beforeEach(() => {
 })
 
 describe('useTaskSheetFinalizer', () => {
+  it('keeps a new empty task editable through StrictMode mounting and deletes it on real abandonment', async () => {
+    const empty = task({ text: '', raw: '[ ] ' })
+    const { unmount } = await renderHook(() => useTaskSheetFinalizer(deps({ task: empty })), {
+      wrapper: StrictMode,
+    })
+    expect(remove).not.toHaveBeenCalled()
+    expect(edit).not.toHaveBeenCalled()
+
+    await unmount()
+    expect(remove).toHaveBeenCalledExactlyOnceWith([empty])
+  })
+
   it('keeps the baseline frozen at open: a live-row rewrite does not turn an untouched draft into an edit', async () => {
     const { result, rerender } = await renderHook(
       (props: TaskSheetFinalizerDeps = deps()) => useTaskSheetFinalizer(props),
