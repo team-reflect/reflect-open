@@ -26,12 +26,17 @@ function blockStartingAt(root: SyntaxNode, offset: number): SyntaxNode | null {
  * such list — rather than only a list flush against the heading — keeps one
  * category's entries in one list even when the section opens with prose.
  */
-function sectionList(heading: SyntaxNode): SyntaxNode | null {
+function sectionList(
+  heading: SyntaxNode,
+  source: string,
+  bodyOffset: number,
+  kind: ListItemKind,
+): SyntaxNode | null {
   for (let block = heading.nextSibling; block !== null; block = block.nextSibling) {
     if (headingLevelOf(block) !== null) {
       return null
     }
-    if (isBulletList(block)) {
+    if (isBulletList(block) && joinMark(kind, listMark(source, bodyOffset, block)) !== null) {
       return block
     }
   }
@@ -62,22 +67,43 @@ function listMark(source: string, bodyOffset: number, list: SyntaxNode): string 
  * the list being extended, not to the caller.
  */
 export function appendListItemAtHeading(source: string, target: Heading, content: string): string {
+  return insertListItemAtHeading(source, target, content, 'bullet').source
+}
+
+interface HeadingListInsertion {
+  readonly source: string
+  readonly insertionOffset: number
+  readonly itemOffset: number
+}
+
+/** Insert a list item of the given kind, returning its source splice coordinates. */
+export function insertListItemAtHeading(
+  source: string,
+  target: Heading,
+  content: string,
+  kind: ListItemKind,
+): HeadingListInsertion {
   const { body, bodyOffset } = splitFrontmatter(source)
   const heading = blockStartingAt(parseBody(body).topNode, target.from - bodyOffset)
   if (heading === null || headingLevelOf(heading) === null) {
     throw new Error('a list item target must be a top-level heading')
   }
 
-  const list = sectionList(heading)
+  const list = sectionList(heading, source, bodyOffset, kind)
   const following = list === null ? heading.nextSibling : list.nextSibling
   const anchor = offsetBeforeLineEnding(source, bodyOffset + (list?.to ?? heading.to))
   const tail = bodyOffset + (following?.from ?? body.length)
   const lineEnding = lineEndingAt(source, anchor)
-  const item = `${list === null ? DEFAULT_LIST_MARK : listMark(source, bodyOffset, list)} ${content.trim()}`
+  const payload = kind === 'bullet' ? content.trim() : `[ ] ${content.trim()}`
+  const item = `${list === null ? ownMark(kind) : listMark(source, bodyOffset, list)} ${payload}`
 
   if (list !== null) {
     const suffix = source.slice(anchor)
-    return source.slice(0, anchor) + lineEnding + item + (suffix || lineEnding)
+    return {
+      source: source.slice(0, anchor) + lineEnding + item + (suffix || lineEnding),
+      insertionOffset: anchor,
+      itemOffset: anchor + lineEnding.length,
+    }
   }
 
   // Starting the list: reuse the gap that already followed the heading so the
@@ -90,7 +116,11 @@ export function appendListItemAtHeading(source: string, target: Heading, content
       : existingGap.includes(lineEnding.repeat(2))
         ? existingGap
         : lineEnding.repeat(2)
-  return source.slice(0, anchor) + lineEnding.repeat(2) + item + suffix + source.slice(tail)
+  return {
+    source: source.slice(0, anchor) + lineEnding.repeat(2) + item + suffix + source.slice(tail),
+    insertionOffset: anchor,
+    itemOffset: anchor + lineEnding.length * 2,
+  }
 }
 
 /** The same item, as the whole body of a section that does not exist yet. */
