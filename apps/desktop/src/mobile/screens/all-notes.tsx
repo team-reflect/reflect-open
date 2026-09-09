@@ -21,7 +21,7 @@ import {
   type AllNotesFilters,
 } from '@/mobile/search-filters/filter-state'
 import { NoteRowList } from '@/mobile/note-row-list'
-import { MobileSearchHeader } from '@/mobile/search-header'
+import { MobileSearchHeader, MobileSearchHeaderContent } from '@/mobile/search-header'
 import { SearchInput } from '@/mobile/search-input'
 import type { NoteRowModel } from '@/mobile/swipeable-note-row'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus'
@@ -144,23 +144,8 @@ export function MobileAllNotes({
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <MobileSearchHeader
-        below={
-          pending !== null ? (
-            <TagSuggestions
-              facets={matchingTagFacets(facets ?? [], pending.partial)}
-              onPick={addPendingTag}
-            />
-          ) : (
-            <FilterBar
-              filters={filters}
-              onFiltersChange={onFiltersChange}
-              facets={facets ?? []}
-              routeTag={tag}
-              onClearRouteTag={() => navigate({ kind: 'allNotes', tag: null })}
-            />
-          )
-        }
       >
+        <MobileSearchHeaderContent>
         {tag !== null && (
           <Button
             variant="ghost"
@@ -178,7 +163,24 @@ export function MobileAllNotes({
           aria-label="Search notes"
           value={query}
           onValueChange={onQueryChange}
-        />
+          />
+        </MobileSearchHeaderContent>
+        <div className="pb-2">
+        pending !== null ? (
+          <TagSuggestions
+            facets={matchingTagFacets(facets ?? [], pending.partial)}
+            onPick={addPendingTag}
+          />
+        ) : (
+          <FilterBar
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            facets={facets ?? []}
+            routeTag={tag}
+            onClearRouteTag={() => navigate({ kind: 'allNotes', tag: null })}
+          />
+          )
+        </div>
       </MobileSearchHeader>
       {/* Undefined hits mean "still fetching" only while the query can run —
           with no bridge/graph it never will, and the empty state is honest. */}
