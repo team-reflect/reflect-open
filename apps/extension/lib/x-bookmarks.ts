@@ -103,14 +103,28 @@ export async function saveBookmark(
 export function registerBookmarkObserver(): void {
   const event = browser.webRequest?.onBeforeRequest
   if (!event || event.hasListener(onBookmarkRequest)) return
-  event.addListener(onBookmarkRequest, { urls: ['https://x.com/i/api/graphql/*/CreateBookmark'] }, [
-    'requestBody',
-  ])
+  try {
+    event.addListener(
+      onBookmarkRequest,
+      { urls: ['https://x.com/i/api/graphql/*/CreateBookmark'] },
+      ['requestBody'],
+    )
+  } catch {
+    // Optional permission may not exist yet on this worker's first start.
+    void browser.permissions
+      .contains({ permissions: ['webRequest'], origins: ['https://x.com/*'] })
+      .then(async (granted) => {
+        if (granted)
+          await recordBookmarkError(
+            new Error('Bookmark observer could not start. Reload the extension.'),
+          )
+      }, recordBookmarkError)
+  }
 }
 
 function onBookmarkRequest(
   details: Parameters<Parameters<typeof browser.webRequest.onBeforeRequest.addListener>[0]>[0],
-): void {
+): undefined {
   const postId = parseCreateBookmark(details)
   if (postId === undefined) return
   void saveBookmark(postId, 'request-intent', new Date(details.timeStamp)).catch(
@@ -121,6 +135,8 @@ function onBookmarkRequest(
 export async function recordBookmarkError(cause: unknown): Promise<void> {
   const message =
     cause instanceof Error ? cause.message : 'Bookmark capture failed; open the popup to retry.'
-  await browser.storage.local.set({ bookmarkError: message })
-  await browser.action.setBadgeText({ text: '!' })
+  await Promise.allSettled([
+    browser.storage.local.set({ bookmarkError: message }),
+    browser.action.setBadgeText({ text: '!' }),
+  ])
 }

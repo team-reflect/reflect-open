@@ -53,7 +53,12 @@ fn pointer_path() -> AppResult<PathBuf> {
 
 fn bookmark_graph_id(root: &Path) -> String {
     use sha2::{Digest, Sha256};
-    format!("{:x}", Sha256::digest(root.to_string_lossy().as_bytes()))
+    use std::fmt::Write;
+    let mut encoded = String::with_capacity(64);
+    for byte in Sha256::digest(root.to_string_lossy().as_bytes()) {
+        let _ = write!(encoded, "{byte:02x}");
+    }
+    encoded
 }
 
 fn pointer_json(root: &Path) -> String {

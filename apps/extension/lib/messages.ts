@@ -1,10 +1,6 @@
 import { z } from 'zod'
 
-/**
- * The popup ↔ background message contract. The popup persists the capture to
- * the queue itself, then sends `flush` — the queue (not the message) is the
- * source of truth, so a popup window closing mid-roundtrip loses nothing.
- */
+/** Popup requests are admitted and delivered by the background worker. */
 
 /** Ask the background to flush the queue now. */
 export interface FlushRequest {

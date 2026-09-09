@@ -1,3 +1,4 @@
+import { readQueue } from '@/lib/flush'
 import { useEffect, useState, type ReactElement } from 'react'
 import { z } from 'zod'
 import { browser } from 'wxt/browser'
@@ -17,6 +18,7 @@ export function BookmarkControls({ url }: { url: string }): ReactElement {
   })
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(true)
+  const [discardPending, setDiscardPending] = useState(false)
   const postId = getBookmarkPostId(url)
   useEffect(() => {
     let active = true
@@ -158,6 +160,53 @@ export function BookmarkControls({ url }: { url: string }): ReactElement {
       >
         Retry pending captures
       </button>
+      <details className="text-xs text-text-muted">
+        <summary>Pending capture recovery</summary>
+        <div className="flex flex-col gap-2 py-2">
+          <button
+            type="button"
+            className="text-left text-accent underline"
+            onClick={() => {
+              void perform(async () => {
+                const queue = await readQueue()
+                const downloadUrl = URL.createObjectURL(
+                  new Blob([JSON.stringify(queue, null, 2)], { type: 'application/json' }),
+                )
+                const anchor = document.createElement('a')
+                anchor.href = downloadUrl
+                anchor.download = 'reflect-pending-captures.json'
+                anchor.click()
+                setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000)
+              })
+            }}
+          >
+            Export pending captures
+          </button>
+          <button
+            type="button"
+            className="text-left text-destructive underline"
+            onClick={() => {
+              if (!discardPending) {
+                setDiscardPending(true)
+                return
+              }
+              void perform(async () => {
+                z.object({ held: z.literal(0) }).parse(
+                  await browser.runtime.sendMessage({ type: 'discard-captures' }),
+                )
+                setDiscardPending(false)
+                setMessage(
+                  'Pending browser captures discarded. Captures already queued with Reflect are kept.',
+                )
+              })
+            }}
+          >
+            {discardPending
+              ? 'Confirm: discard all pending browser captures'
+              : 'Discard pending browser captures'}
+          </button>
+        </div>
+      </details>
       {message ? (
         <p role="status" className="text-xs text-text-muted">
           {message}

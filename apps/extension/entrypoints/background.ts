@@ -4,7 +4,7 @@ import { registerBookmarkObserver, saveBookmark, recordBookmarkError } from '@/l
 import { browser } from 'wxt/browser'
 import { defineBackground } from '#imports'
 import { SAVE_CURRENT_PAGE_COMMAND } from '@/lib/commands'
-import { enqueueCapture, flushQueue } from '@/lib/flush'
+import { discardQueuedCaptures, enqueueCapture, flushQueue } from '@/lib/flush'
 import { isFlushRequest } from '@/lib/messages'
 import { readIncludePageTextPreference } from '@/lib/popup-preferences'
 import { saveCapture } from '@/lib/save-capture'
@@ -79,6 +79,12 @@ export default defineBackground(() => {
             ok: false,
             message: cause instanceof Error ? cause.message : 'Capture failed',
           }),
+      )
+      return true
+    }
+    if (z.object({ type: z.literal('discard-captures') }).safeParse(message).success) {
+      void discardQueuedCaptures().then(sendResponse, () =>
+        sendResponse({ error: 'Could not discard captures' }),
       )
       return true
     }

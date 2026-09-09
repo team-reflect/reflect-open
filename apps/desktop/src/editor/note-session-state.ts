@@ -440,6 +440,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     if (io.write === null || disposed || isProtected || status !== 'ready' || conflict !== null) {
       return false
     }
+    reconcilePendingEditorInput?.()
     const previousHeader = header
     const previousBuffer = buffer
     const doc = splitDoc(transform(header + buffer))

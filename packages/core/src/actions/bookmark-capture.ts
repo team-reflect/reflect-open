@@ -15,12 +15,14 @@ const receiptSchema = z
 /** Append a post and its delivery receipt in the same daily-note revision. */
 export function appendBookmark(source: string, envelope: BookmarkEnvelope): string {
   const split = splitFrontmatter(source)
-  if (source.startsWith('---\n') && split.raw === null)
+  if (/^---[ \t]*\r?\n/.test(source) && split.raw === null)
     throw new Error('Unclosed daily note frontmatter')
   const metadata = parseFrontmatter(split.raw)
   if (metadata.warning) throw new Error('Invalid daily note frontmatter')
   const stored = metadata.data['reflectBookmarkReceipts']
-  const receipts = receiptSchema.parse(stored ?? { schemaVersion: 1, events: {} })
+  const receipts = receiptSchema.parse(
+    stored === undefined ? { schemaVersion: 1, events: {} } : stored,
+  )
   if (envelope.id in receipts.events) {
     if (receipts.events[envelope.id] !== envelope.postId)
       throw new Error('Bookmark receipt ID conflict')

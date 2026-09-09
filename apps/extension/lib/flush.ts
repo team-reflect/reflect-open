@@ -11,13 +11,7 @@ import {
   type QueuedCapture,
 } from './queue'
 
-/**
- * Queue persistence + the flush driver, shared by the background (which owns
- * retries) and the popup (which enqueues before asking for a flush). Every
- * capture lives under its own storage key, so the popup's enqueue and the
- * background's per-entry removals are independent atomic writes — no shared
- * snapshot is ever written back (see `lib/queue.ts`).
- */
+/** Background-owned queue admission and delivery; popup reads are read-only. */
 
 /** Every queued capture, oldest first. Unreadable entries are skipped. */
 export async function readQueue(): Promise<QueuedCapture[]> {
@@ -77,7 +71,20 @@ let tail: Promise<FlushResult> | null = null
  * storage read, so the occasional chained extra pass costs nothing.
  */
 export function flushQueue(): Promise<FlushResult> {
-  const next = tail === null ? runFlush() : tail.then(runFlush, runFlush)
+  return scheduleQueuePass(runFlush)
+}
+
+/** Explicitly discard pending captures after any in-flight delivery settles. */
+export function discardQueuedCaptures(): Promise<FlushResult> {
+  return scheduleQueuePass(async () => {
+    const entries = await readQueue()
+    await browser.storage.local.remove(entries.map((entry) => queueKey(entry.wire.envelope.id)))
+    return { sent: 0, failed: 0, rejectedIds: [], held: 0, holdReason: null }
+  })
+}
+
+function scheduleQueuePass(pass: () => Promise<FlushResult>): Promise<FlushResult> {
+  const next = tail === null ? pass() : tail.then(pass, pass)
   tail = next
   const cleanup = (): void => {
     if (tail === next) {
