@@ -409,14 +409,14 @@ pub async fn note_read_local(
     .await
 }
 
+static NOTE_WRITE_LOCK: Mutex<()> = Mutex::new(());
+
 /// Atomically write a note's markdown by graph-relative path. `generation` pins
 /// the write to the graph it was issued for (see `root_for_generation`).
 /// Returns the written file's on-disk mtime (epoch ms, `None` when the
 /// platform can't provide one) so the caller's index echo can stamp the row
 /// with the value a later `list_files` will report — a `Date.now()` stamp
 /// never matches and costs a re-read on every reconcile.
-static NOTE_WRITE_LOCK: Mutex<()> = Mutex::new(());
-
 #[tauri::command]
 pub fn note_write(
     path: String,
@@ -427,23 +427,39 @@ pub fn note_write(
     state: State<GraphState>,
 ) -> AppResult<Option<u64>> {
     let root = root_for_generation(&state, generation)?;
+    let target = resolve(&root, &path)?;
+    let modified_ms = write_note_revision(
+        &root,
+        &target,
+        &contents,
+        check_contents == Some(true),
+        expected_contents.as_deref(),
+    )?;
+    invalidate_file_catalog(&state, &root);
+    Ok(modified_ms)
+}
+
+fn write_note_revision(
+    root: &Path,
+    target: &Path,
+    contents: &str,
+    checked: bool,
+    expected: Option<&str>,
+) -> AppResult<Option<u64>> {
     let _guard = NOTE_WRITE_LOCK
         .lock()
         .map_err(|_| AppError::io("note write lock poisoned"))?;
-    let target = resolve(&root, &path)?;
-    if check_contents == Some(true) {
-        let current = match io::read_note_no_follow(&root, &target) {
+    if checked {
+        let current = match io::read_note_no_follow(root, target) {
             Ok(value) => Some(value),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
             Err(error) => return Err(error.into()),
         };
-        if current != expected_contents {
+        if current.as_deref() != expected {
             return Err(AppError::io("Note changed on disk; reload before retrying"));
         }
     }
-    let modified_ms = atomic_write(&root, &target, &contents)?;
-    invalidate_file_catalog(&state, &root);
-    Ok(modified_ms)
+    atomic_write(root, target, contents)
 }
 
 /// Atomically create a note only when `path` is still free. Unlike
@@ -457,6 +473,9 @@ pub fn note_create(
     state: State<GraphState>,
 ) -> AppResult<NoteCreateOutcome> {
     let root = root_for_generation(&state, generation)?;
+    let _guard = NOTE_WRITE_LOCK
+        .lock()
+        .map_err(|_| AppError::io("note write lock poisoned"))?;
     let target = resolve(&root, &path)?;
     match atomic_create(&root, &target, &contents)? {
         AtomicCreateOutcome::Created(modified_ms) => {
@@ -1249,5 +1268,47 @@ mod move_tests {
 
         assert_eq!(url.scheme(), "file");
         assert!(url.as_str().contains("Reflect%20Cat%20Photo.png"));
+    }
+}
+
+#[cfg(test)]
+mod note_revision_tests {
+    use super::*;
+
+    #[test]
+    fn stale_revision_does_not_replace_newer_text() {
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("daily.md");
+        fs::write(&target, "user edited this").unwrap();
+        assert!(write_note_revision(
+            directory.path(),
+            &target,
+            "bookmark",
+            true,
+            Some("old text")
+        )
+        .is_err());
+        assert_eq!(fs::read_to_string(&target).unwrap(), "user edited this");
+        write_note_revision(
+            directory.path(),
+            &target,
+            "user edited this\nbookmark",
+            true,
+            Some("user edited this"),
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read_to_string(&target).unwrap(),
+            "user edited this\nbookmark"
+        );
+    }
+
+    #[test]
+    fn missing_revision_never_clobbers_an_existing_daily() {
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("daily.md");
+        write_note_revision(directory.path(), &target, "first", true, None).unwrap();
+        assert!(write_note_revision(directory.path(), &target, "second", true, None).is_err());
+        assert_eq!(fs::read_to_string(&target).unwrap(), "first");
     }
 }

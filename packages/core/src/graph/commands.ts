@@ -157,6 +157,9 @@ export async function readNoteLocal(path: string, generation?: number): Promise<
  * `GraphInfo`) pins the write to the graph it was issued for — Rust rejects it
  * if the graph switched in between.
  *
+ * `expectedContents` rejects a stale source revision; null requires a missing
+ * file, while omission keeps an unconditional write.
+ *
  * The echo carries the file's on-disk mtime, which Rust returns from the
  * write: the index row it produces must compare equal to a later `listFiles`
  * mtime, or the reconcile's read-free skip never fires and the note is
