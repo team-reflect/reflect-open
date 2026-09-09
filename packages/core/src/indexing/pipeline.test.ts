@@ -37,7 +37,15 @@ beforeEach(() => {
         // Mirrors the default list_files: one arrival needing a read.
         return {
           total: 1,
-          candidates: [{ path: 'notes/a.md', modifiedMs: 5, storedMtime: null, storedHash: null }],
+          candidates: [
+            {
+              path: 'notes/a.md',
+              modifiedMs: 5,
+              storedMtime: null,
+              storedHash: null,
+              needsProjection: false,
+            },
+          ],
           orphans: [],
           stalePlaceholders: [],
         }
@@ -366,7 +374,9 @@ describe('applyIndexChanges (watcher dispatch)', () => {
     mockInvoke.mockImplementation(async (command, args) => {
       const sql = String(args['sql'] ?? '')
       if (command === 'db_query' && sql.includes('file_hash')) {
-        return [{ path: 'notes/a.md', file_hash: 'stored', mtime: 1_000 }]
+        return [
+          { path: 'notes/a.md', file_hash: 'stored', mtime: 1_000, projection_path: 'notes/a.md' },
+        ]
       }
       if (command === 'db_query') {
         return []
@@ -394,7 +404,14 @@ describe('applyIndexChanges (watcher dispatch)', () => {
     mockInvoke.mockImplementation(async (command, args) => {
       const sql = String(args['sql'] ?? '')
       if (command === 'db_query' && sql.includes('file_hash')) {
-        return [{ path: 'notes/a.md', file_hash: await hashContent(content), mtime: 1_000 }]
+        return [
+          {
+            path: 'notes/a.md',
+            file_hash: await hashContent(content),
+            mtime: 1_000,
+            projection_path: 'notes/a.md',
+          },
+        ]
       }
       if (command === 'db_query') {
         return []
@@ -431,7 +448,14 @@ describe('applyIndexChanges (watcher dispatch)', () => {
       mockInvoke.mockImplementation(async (command, args) => {
         const sql = String(args['sql'] ?? '')
         if (command === 'db_query' && sql.includes('file_hash')) {
-          return [{ path: 'notes/a.md', file_hash: 'stale', mtime: now - 10 }]
+          return [
+            {
+              path: 'notes/a.md',
+              file_hash: 'stale',
+              mtime: now - 10,
+              projection_path: 'notes/a.md',
+            },
+          ]
         }
         if (command === 'db_query') {
           return []
@@ -503,8 +527,9 @@ describe('Kysely → db_query bridge', () => {
 
 describe('reconcileIndex move healing (Plan 17)', () => {
   const OLD = 'notes/01arz3ndektsv4rrffq69g5fav.md'
-  const NEW = 'notes/meeting-notes.md'
-  const CONTENT = '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Meeting Notes\n'
+  const NEW = 'notes/meetings/meeting-notes.md'
+  const CONTENT =
+    '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Meeting Notes\n![Photo](./photo.png)\n'
 
   /** A graph where OLD's row remains but the file now lives at NEW. */
   function renameFake(options: { storedHash: string; content?: string }) {
@@ -514,7 +539,15 @@ describe('reconcileIndex move healing (Plan 17)', () => {
       if (command === 'index_reconcile_scan') {
         return {
           total: 1,
-          candidates: [{ path: NEW, modifiedMs: 9, storedMtime: null, storedHash: null }],
+          candidates: [
+            {
+              path: NEW,
+              modifiedMs: 9,
+              storedMtime: null,
+              storedHash: null,
+              needsProjection: false,
+            },
+          ],
           orphans: [{ path: OLD, storedMtime: 1, storedHash: options.storedHash }],
           stalePlaceholders: [],
         }
@@ -524,6 +557,10 @@ describe('reconcileIndex move healing (Plan 17)', () => {
           return options.content ?? CONTENT
         }
         throw { kind: 'notFound', message: 'missing' }
+      }
+      if (command === 'note_read_local') {
+        expect(args['path']).toBe('notes/meetings/photo.png.reflect.md')
+        return { kind: 'content', content: 'The destination image description.' }
       }
       if (command === 'db_query') {
         if (((args['params'] as unknown[]) ?? []).includes(OLD)) {
@@ -536,7 +573,7 @@ describe('reconcileIndex move healing (Plan 17)', () => {
     return calls
   }
 
-  it('moves the rows and skips the re-index when content is unchanged', async () => {
+  it('reprojects unchanged moved content using destination asset references', async () => {
     const calls = renameFake({ storedHash: await hashContent(CONTENT) })
 
     await reconcileIndex({ generation: 4 })
@@ -550,10 +587,15 @@ describe('reconcileIndex move healing (Plan 17)', () => {
       generation: 4,
       toAddress: { pathKey: NEW.toLowerCase(), basenameKey: 'meeting-notes', dailyDate: null },
     })
-    // The moved row carried its hash: identical content means no re-apply —
-    // and crucially no remove, so embeddings survived.
-    expect(commands).not.toContain('index_apply')
-    expect(commands).not.toContain('index_apply_batch')
+    const apply = calls.find(([command]) => command === 'index_apply_batch')
+    expect(apply?.[1]['notes']).toEqual([
+      expect.objectContaining({
+        path: NEW,
+        fileHash: await hashContent(CONTENT),
+        assets: ['notes/meetings/photo.png'],
+        assetText: 'The destination image description.',
+      }),
+    ])
     expect(commands).not.toContain('index_remove')
   })
 
@@ -601,6 +643,63 @@ describe('reconcileIndex move healing (Plan 17)', () => {
 })
 
 describe('reconcileIndex over the native scan delta', () => {
+  it.each(['watcher', 'reconcile'] as const)(
+    '%s reprojects a renamed note despite matching content and settled mtime',
+    async (pass) => {
+      const path = 'notes/meetings/renamed.md'
+      const content = '# Meeting\n\n![Photo](./photo.png)'
+      const fileHash = await hashContent(content)
+      mockInvoke.mockImplementation(async (command, args) => {
+        if (command === 'index_reconcile_scan') {
+          return {
+            total: 1,
+            candidates: [
+              {
+                path,
+                modifiedMs: 1_000,
+                storedMtime: 1_000,
+                storedHash: fileHash,
+                needsProjection: true,
+              },
+            ],
+            orphans: [],
+            stalePlaceholders: [],
+          }
+        }
+        if (command === 'db_query') {
+          return [{ path, file_hash: fileHash, mtime: 1_000, projection_path: 'notes/original.md' }]
+        }
+        if (command === 'note_read') {
+          expect(args['path']).toBe(path)
+          return content
+        }
+        if (command === 'note_read_local') {
+          expect(args['path']).toBe('notes/meetings/photo.png.reflect.md')
+          return { kind: 'content', content: 'Description from the destination directory.' }
+        }
+        return null
+      })
+
+      if (pass === 'watcher') {
+        expect(await applyIndexChanges([{ path, kind: 'upsert', modifiedMs: 1_000 }], 4)).toBe(1)
+      } else {
+        await reconcileIndex({ generation: 4 })
+      }
+
+      const apply = mockInvoke.mock.calls.find(([command]) => command === 'index_apply_batch')
+      expect(apply?.[1]['notes']).toEqual([
+        expect.objectContaining({
+          path,
+          fileHash,
+          assets: ['notes/meetings/photo.png'],
+          assetText: 'Description from the destination directory.',
+        }),
+      ])
+      expect(mockInvoke.mock.calls.map(([command]) => command)).not.toContain('index_touch')
+      expect(mockInvoke.mock.calls.map(([command]) => command)).not.toContain('index_remove')
+    },
+  )
+
   it('does nothing when the scan reports no delta — the healthy-open path', async () => {
     // Mtime-matched files never leave Rust (the scan's own tests cover the
     // classification); an empty delta must cost no reads, no writes, and no
@@ -640,7 +739,15 @@ describe('reconcileIndex over the native scan delta', () => {
       if (command === 'index_reconcile_scan') {
         return {
           total: 1,
-          candidates: [{ path: 'notes/a.md', modifiedMs: 2_000, storedMtime: 1_000, storedHash }],
+          candidates: [
+            {
+              path: 'notes/a.md',
+              modifiedMs: 2_000,
+              storedMtime: 1_000,
+              storedHash,
+              needsProjection: false,
+            },
+          ],
           orphans: [],
           stalePlaceholders: [],
         }
@@ -684,7 +791,13 @@ describe('reconcileIndex over the native scan delta', () => {
         return {
           total: 2,
           candidates: [
-            { path: 'notes/changed.md', modifiedMs: 2_000, storedMtime: 1_000, storedHash: 'old' },
+            {
+              path: 'notes/changed.md',
+              modifiedMs: 2_000,
+              storedMtime: 1_000,
+              storedHash: 'old',
+              needsProjection: false,
+            },
           ],
           orphans: [{ path: 'notes/gone.md', storedMtime: 1_000, storedHash: 'gone' }],
           stalePlaceholders: [],
@@ -715,7 +828,13 @@ describe('reconcileIndex over the native scan delta', () => {
         return {
           total: 1,
           candidates: [
-            { path: 'notes/ghost.md', modifiedMs: 2_000, storedMtime: 1_000, storedHash: 'h' },
+            {
+              path: 'notes/ghost.md',
+              modifiedMs: 2_000,
+              storedMtime: 1_000,
+              storedHash: 'h',
+              needsProjection: false,
+            },
           ],
           orphans: [],
           stalePlaceholders: [],

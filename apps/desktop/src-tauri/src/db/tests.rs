@@ -2,6 +2,9 @@
 //! together against a migrated in-memory database, the same shape the commands
 //! compose at runtime.
 
+mod embedding_state;
+mod fts;
+
 use reflect_index_schema::LATEST_SCHEMA_VERSION;
 use rusqlite::Connection;
 use serde_json::Value;
@@ -1633,17 +1636,6 @@ fn stored_vectors_round_trip_through_vec_to_json() {
         knn[0].get("note_path").unwrap().as_str().unwrap(),
         "notes/a.md"
     );
-}
-
-#[test]
-fn apply_chunks_for_an_unindexed_path_is_a_cleaning_no_op() {
-    // The embed pipeline can race index_remove: a late embed_apply for a
-    // deleted note must not reinsert vectors for a dead path.
-    let conn = migrated();
-    let result = apply_chunks(&conn, "notes/gone.md", &[chunk("g1", Some(vec384(0.1)))]);
-    assert!(result.is_ok());
-    assert_eq!(chunk_rows(&conn), vec![]);
-    assert_eq!(vector_count(&conn), 0);
 }
 
 // ---- note_move (Plan 17) ----------------------------------------------------

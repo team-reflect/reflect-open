@@ -395,6 +395,47 @@ describe('applyIndexChanges move healing (Plan 17)', () => {
     expect(note.mtime).toBe(42)
   })
 
+  it('reprojects relative asset descriptions after an unchanged external directory move', async () => {
+    const destination = 'notes/meetings/renamed.md'
+    const content = `${CONTENT}\n![Photo](./photo.png)`
+    const calls: Array<[string, Record<string, unknown>]> = []
+    fakeBridge(async (command, args) => {
+      calls.push([command, args])
+      if (command === 'db_query') {
+        return Array.isArray(args['params']) && args['params'].includes(OLD)
+          ? [{ path: OLD, id: '01abcdefghjkmnpqrstvwxyz00' }]
+          : []
+      }
+      if (command === 'note_read') {
+        expect(args['path']).toBe(destination)
+        return content
+      }
+      if (command === 'note_read_local') {
+        expect(args['path']).toBe('notes/meetings/photo.png.reflect.md')
+        return { kind: 'content', content: 'Description at the new relative path.' }
+      }
+      return null
+    })
+
+    await applyIndexChanges(
+      [
+        { path: OLD, kind: 'remove' },
+        { path: destination, kind: 'upsert', modifiedMs: 42 },
+      ],
+      7,
+    )
+
+    expect(calls.find(([command]) => command === 'index_apply')?.[1]['note']).toEqual(
+      expect.objectContaining({
+        path: destination,
+        assets: ['notes/meetings/photo.png'],
+        assetText: 'Description at the new relative path.',
+      }),
+    )
+    expect(calls.map(([command]) => command)).toContain('index_move')
+    expect(calls.map(([command]) => command)).not.toContain('index_remove')
+  })
+
   it('announces the heal via onMoved so the app can follow', async () => {
     renameBridge()
     const moves: Array<[string, string]> = []

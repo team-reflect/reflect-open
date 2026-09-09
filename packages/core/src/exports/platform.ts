@@ -74,6 +74,9 @@ export {
   embedStatus,
   embedEnsure,
   embedTexts,
+  embedPending,
+  embedPrepare,
+  embedRead,
   embedApply,
   embedRemove,
   subscribeEmbedStatus,
@@ -81,8 +84,15 @@ export {
   type EmbedStatus,
   type EmbedProgress,
   type EmbedChunkPayload,
+  type EmbedProjection,
 } from '../embeddings/commands'
-export { embedNote, backfillEmbeddings } from '../embeddings/pipeline'
+export {
+  embedNote,
+  backfillEmbeddings,
+  EMBEDDING_PROJECTION_VERSION,
+  type BackfillEmbeddingsOptions,
+  type EmbedNoteOptions,
+} from '../embeddings/pipeline'
 export {
   retrieve,
   relatedNotes,

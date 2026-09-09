@@ -51,9 +51,11 @@ export interface AssetDescriptionGather {
  * that crosses the cap is kept whole — consumers apply their own final cap).
  * Reads are unpinned, matching the indexer's own note reads (the *write* is
  * generation-pinned, so a graph switch drops the stale row regardless).
+ * Callers may supply a session-pinned reader when their projection requires it.
  */
 export async function gatherAssetDescriptionBodies(
   assetPaths: readonly string[],
+  readLocal: typeof readNoteLocal = readNoteLocal,
 ): Promise<AssetDescriptionGather> {
   const bodies: AssetDescriptionBody[] = []
   const evicted: string[] = []
@@ -69,7 +71,7 @@ export async function gatherAssetDescriptionBodies(
     seen.add(assetPath)
     let read: Awaited<ReturnType<typeof readNoteLocal>>
     try {
-      read = await readNoteLocal(descriptionPathFor(assetPath))
+      read = await readLocal(descriptionPathFor(assetPath))
     } catch (cause) {
       if (isAppError(cause) && cause.kind === 'notFound') {
         continue // no description for this asset (not generated yet, or none)

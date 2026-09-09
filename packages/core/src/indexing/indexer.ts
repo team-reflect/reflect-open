@@ -209,7 +209,6 @@ async function applySplitBatch(
   }
   try {
     await applyIndexedNotes(notes, generation)
-    return notes.length
   } catch (cause) {
     if (notes.length === 1) {
       if (onSkippedNote === undefined) {
@@ -222,6 +221,7 @@ async function applySplitBatch(
     const first = await applySplitBatch(notes.slice(0, midpoint), generation, onSkippedNote)
     return first + (await applySplitBatch(notes.slice(midpoint), generation, onSkippedNote))
   }
+  return notes.length
 }
 
 /** A shared accumulator for bulk index writes — see {@link createIndexApplyBatch}. */
@@ -435,11 +435,15 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
     // pass works through the readable candidates.
     onStalePlaceholders?.(scan.stalePlaceholders)
   }
-  /** Stored facts per candidate path; healed moves graft the orphan's in. */
-  const facts = new Map<string, { mtime: number; fileHash: string }>()
+  /** Stored facts per candidate path; moved rows always need fresh projection. */
+  const facts = new Map<string, { mtime: number; fileHash: string; needsProjection: boolean }>()
   for (const candidate of scan.candidates) {
     if (candidate.storedMtime !== null && candidate.storedHash !== null) {
-      facts.set(candidate.path, { mtime: candidate.storedMtime, fileHash: candidate.storedHash })
+      facts.set(candidate.path, {
+        mtime: candidate.storedMtime,
+        fileHash: candidate.storedHash,
+        needsProjection: candidate.needsProjection,
+      })
     }
   }
   /** Rows to drop at the end: scan orphans, minus heals, plus TOCTOU ghosts. */
@@ -472,12 +476,16 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
         console.error(`id-based move failed (${move.from} → ${move.to}):`, err)
         continue
       }
-      // The moved row carries the old path's facts: the main pass re-indexes
-      // at the new path only if the content actually changed in transit.
+      // Identical bytes can resolve attachments differently at the new path.
+      // Refresh that projection while keeping the content-keyed vectors.
       const orphan = removals.get(move.from)
       removals.delete(move.from)
       if (orphan !== undefined) {
-        facts.set(move.to, { mtime: orphan.storedMtime, fileHash: orphan.storedHash })
+        facts.set(move.to, {
+          mtime: orphan.storedMtime,
+          fileHash: orphan.storedHash,
+          needsProjection: true,
+        })
       }
       onMoved?.(move.from, move.to)
     }
@@ -524,7 +532,7 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
       }
     }
     const fileHash = await hashContent(content)
-    if (stored?.fileHash === fileHash) {
+    if (stored?.fileHash === fileHash && !stored.needsProjection) {
       // Content unchanged. If the stored mtime doesn't match the listing (an
       // echo-time stamp, or a provider rewrote it), re-stamp it so the next
       // pass takes the read-free path — left alone it mismatches forever.

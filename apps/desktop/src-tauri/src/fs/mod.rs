@@ -381,6 +381,12 @@ pub async fn note_read_local(
     state: State<'_, GraphState>,
 ) -> AppResult<LocalNoteRead> {
     let root = root_for(&state, generation)?;
+    read_local_at(root, path).await
+}
+
+/// Read local bytes under an already pinned graph root. Embedding reads use
+/// the index root so graph_open cannot redirect a superseded pass.
+pub(crate) async fn read_local_at(root: PathBuf, path: String) -> AppResult<LocalNoteRead> {
     let abs = resolve(&root, &path)?;
     let read_root = root;
     crate::blocking::run_blocking(move || {
