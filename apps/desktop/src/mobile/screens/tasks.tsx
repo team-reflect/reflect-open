@@ -18,6 +18,7 @@ import {
 import { useTaskActions } from '@/lib/tasks/use-task-actions'
 import { useToday } from '@/lib/use-today'
 import { hapticImpactLight } from '@/mobile/haptics'
+import { MobileSearchHeader } from '@/mobile/search-header'
 import { SearchInput } from '@/mobile/search-input'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet'
 import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer'
@@ -142,7 +143,7 @@ export function MobileTasks(): ReactElement {
       className="flex h-full w-screen flex-col"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <header className="flex shrink-0 items-center gap-1 border-b border-border px-4 pb-2 pt-1">
+      <MobileSearchHeader>
         <SearchInput
           ref={searchInputRef}
           placeholder="Search tasks…"
@@ -173,7 +174,7 @@ export function MobileTasks(): ReactElement {
         >
           <SlidersHorizontal />
         </Button>
-      </header>
+      </MobileSearchHeader>
       {isError ? (
         <p role="alert" className="px-4 py-6 text-sm text-text-muted">
           Couldn’t load tasks.
