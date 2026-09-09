@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import type { AssistantPart, ChatTurn } from '@reflect/core'
+import type { AssistantPart } from '@reflect/core'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Marker, MarkerContent } from '@/components/ui/marker'
 import { MarkdownPreview } from '@/editor/markdown-preview'
@@ -7,33 +7,18 @@ import { cn } from '@/lib/utils'
 import { ChatToolChip } from './chat-tool-chip'
 
 interface ChatAssistantPartProps {
-  index: number
-  lastIndex: number
   part: AssistantPart
-  status: ChatTurn['status']
   onWikiLinkClick: (options: { target: string; openInNewWindow: boolean }) => void
 }
 
 /**
- * One assistant transcript part: streaming text, settled markdown, tool
+ * One assistant transcript part: live markdown, tool
  * activity, or a terminal notice.
  */
-export function ChatAssistantPart({
-  index,
-  lastIndex,
-  part,
-  status,
-  onWikiLinkClick,
-}: ChatAssistantPartProps): ReactElement {
+export function ChatAssistantPart({ part, onWikiLinkClick }: ChatAssistantPartProps): ReactElement {
   switch (part.kind) {
     case 'text':
-      return status === 'streaming' && index === lastIndex ? (
-        <Bubble variant="ghost" className="max-w-full">
-          <BubbleContent className="reflect-chat-message max-w-full text-text">
-            <div className="whitespace-pre-wrap">{part.text}</div>
-          </BubbleContent>
-        </Bubble>
-      ) : (
+      return (
         <Bubble variant="ghost" className="max-w-full">
           <BubbleContent className="max-w-full text-text">
             <MarkdownPreview
