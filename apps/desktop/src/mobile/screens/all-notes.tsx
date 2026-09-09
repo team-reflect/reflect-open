@@ -21,7 +21,7 @@ import {
   type AllNotesFilters,
 } from '@/mobile/search-filters/filter-state'
 import { NoteRowList } from '@/mobile/note-row-list'
-import { MobileSearchHeader, MobileSearchHeaderContent } from '@/mobile/search-header'
+import { MobileSearchHeader } from '@/mobile/search-header'
 import { SearchInput } from '@/mobile/search-input'
 import type { NoteRowModel } from '@/mobile/swipeable-note-row'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus'
@@ -143,8 +143,18 @@ export function MobileAllNotes({
       className="flex h-full w-screen flex-col"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <MobileSearchHeader>
-        <MobileSearchHeaderContent>
+      <MobileSearchHeader
+        search={
+          <SearchInput
+            ref={searchInputRef}
+            placeholder="Search anything…"
+            aria-label="Search notes"
+            value={query}
+            onValueChange={onQueryChange}
+          />
+        }
+      >
+        <div className="flex min-w-0 items-center gap-1">
           {tag !== null && (
             <Button
               variant="ghost"
@@ -156,29 +166,22 @@ export function MobileAllNotes({
               <ChevronLeft />
             </Button>
           )}
-          <SearchInput
-            ref={searchInputRef}
-            placeholder="Search anything…"
-            aria-label="Search notes"
-            value={query}
-            onValueChange={onQueryChange}
-          />
-        </MobileSearchHeaderContent>
-        <div className="pb-2">
-          {pending !== null ? (
-            <TagSuggestions
-              facets={matchingTagFacets(facets ?? [], pending.partial)}
-              onPick={addPendingTag}
-            />
-          ) : (
-            <FilterBar
-              filters={filters}
-              onFiltersChange={onFiltersChange}
-              facets={facets ?? []}
-              routeTag={tag}
-              onClearRouteTag={() => navigate({ kind: 'allNotes', tag: null })}
-            />
-          )}
+          <div className="min-w-0 flex-1">
+            {pending !== null ? (
+              <TagSuggestions
+                facets={matchingTagFacets(facets ?? [], pending.partial)}
+                onPick={addPendingTag}
+              />
+            ) : (
+              <FilterBar
+                filters={filters}
+                onFiltersChange={onFiltersChange}
+                facets={facets ?? []}
+                routeTag={tag}
+                onClearRouteTag={() => navigate({ kind: 'allNotes', tag: null })}
+              />
+            )}
+          </div>
         </div>
       </MobileSearchHeader>
       {/* Undefined hits mean "still fetching" only while the query can run —
