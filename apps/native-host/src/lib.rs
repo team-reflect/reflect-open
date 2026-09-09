@@ -78,7 +78,7 @@ fn ack_json(outcome: &Result<(), HostError>) -> Vec<u8> {
 fn handle_message(payload: &[u8], pointer_path: &Path) -> Result<(), HostError> {
     let value: serde_json::Value = serde_json::from_slice(payload)
         .map_err(|_| HostError::InvalidPayload("Invalid capture JSON".into()))?;
-    if value["envelope"]["kind"] == "x-bookmark" || value["envelope"]["version"] == 2 {
+    if value["envelope"]["kind"] == "x-bookmark" {
         return bookmark::spool(payload, pointer_path);
     }
     let capture = ValidatedCapture::parse(payload)?;

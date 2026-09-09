@@ -139,7 +139,6 @@ export function CapturePopup(): ReactElement {
 
   return (
     <>
-      <BookmarkControls url={page.url} />
       <form onSubmit={onSubmit} className="flex flex-col gap-3 p-3">
         {page.screenshotDataUrl ? (
           <img
@@ -207,6 +206,7 @@ export function CapturePopup(): ReactElement {
           </p>
         ) : null}
       </form>
+      <BookmarkControls url={page.url} tabId={captured.tabId} />
     </>
   )
 }

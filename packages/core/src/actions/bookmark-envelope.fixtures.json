@@ -13,6 +13,20 @@
         "evidence": "manual",
         "presentation": "link"
       }
+    },
+    {
+      "envelope": {
+        "version": 2,
+        "kind": "x-bookmark",
+        "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        "source": "extension",
+        "postId": "20",
+        "capturedAt": "2026-09-09T04:00:00Z",
+        "captureDate": "2026-09-09",
+        "targetGraphId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence": "request-intent",
+        "presentation": "embed"
+      }
     }
   ],
   "rejected": [
@@ -114,6 +128,32 @@
         "evidence": "confirmed",
         "presentation": "link"
       }
+    }
+  ],
+  "spooled": [
+    {
+      "version": 2,
+      "kind": "x-bookmark",
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "source": "extension",
+      "postId": "20",
+      "capturedAt": "2026-09-09T04:00:00Z",
+      "captureDate": "2026-09-09",
+      "targetGraphId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence": "manual",
+      "presentation": "link"
+    },
+    {
+      "version": 2,
+      "kind": "x-bookmark",
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "source": "extension",
+      "postId": "20",
+      "capturedAt": "2026-09-09T04:00:00Z",
+      "captureDate": "2026-09-09",
+      "targetGraphId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence": "request-intent",
+      "presentation": "embed"
     }
   ]
 }

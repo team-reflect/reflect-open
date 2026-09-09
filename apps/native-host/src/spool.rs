@@ -88,6 +88,7 @@ pub(crate) fn atomic_write(
     tmp.as_file().sync_all().map_err(io_error)?;
     tmp.persist(directory.join(filename))
         .map_err(|error| HostError::Io(format!("spool rename failed: {}", error.error)))?;
+    #[cfg(unix)]
     std::fs::File::open(directory)
         .and_then(|file| file.sync_all())
         .map_err(io_error)?;

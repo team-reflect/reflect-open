@@ -2,6 +2,7 @@ import { browser } from 'wxt/browser'
 import type { ExtensionCaptureWire } from '@reflect/core/capture-envelope'
 import type { FlushResult } from './messages'
 import { sendToHost } from './native'
+import { readBookmarkSettings, writeBookmarkSettings } from './bookmark-settings'
 import {
   QUEUE_CAP,
   queueKey,
@@ -33,12 +34,21 @@ export async function readQueue(): Promise<QueuedCapture[]> {
 let enqueueTail = Promise.resolve()
 
 /** Only the background worker calls this serialized admission boundary. */
-export function enqueueCapture(wire: ExtensionCaptureWire): Promise<void> {
+export function enqueueCapture(
+  wire: ExtensionCaptureWire,
+  allowed: () => boolean = () => true,
+): Promise<void> {
   const next = enqueueTail.then(async () => {
     const entries = await readQueue()
     if (entries.some((entry) => entry.wire.envelope.id === wire.envelope.id)) return
-    const bytes = new TextEncoder().encode(JSON.stringify([...entries, wire])).length
-    if (entries.length >= QUEUE_CAP || bytes > 64 * 1024 * 1024) {
+    const key = queueKey(wire.envelope.id)
+    const entry = { wire, queuedAt: Date.now(), attempts: 0 }
+    const bytes = await browser.storage.local.getBytesInUse(
+      entries.map((item) => queueKey(item.wire.envelope.id)),
+    )
+    const addedBytes = new TextEncoder().encode(key + JSON.stringify(entry)).length
+    if (!allowed()) return
+    if (entries.length >= QUEUE_CAP || bytes + addedBytes > 64 * 1024 * 1024) {
       await browser.storage.local.set({
         captureQueueError: 'Capture paused: queue full. This capture was not saved.',
       })
@@ -47,7 +57,7 @@ export function enqueueCapture(wire: ExtensionCaptureWire): Promise<void> {
       )
     }
     await browser.storage.local.set({
-      [queueKey(wire.envelope.id)]: { wire, queuedAt: Date.now(), attempts: 0 },
+      [key]: entry,
     })
     await browser.storage.local.remove('captureQueueError')
   })
@@ -57,29 +67,24 @@ export function enqueueCapture(wire: ExtensionCaptureWire): Promise<void> {
 
 let tail: Promise<FlushResult> | null = null
 
-/**
- * Send every queued capture to the host, oldest first. A `queued` ack
- * removes the entry; `invalid-payload` drops it (it can never succeed); any
- * hold (host missing, no graph, IO) stops the pass — the condition affects
- * every later entry too — and the next trigger retries.
- *
- * Passes never overlap, but a caller is never handed an already-running
- * pass either: its pass **starts after** every earlier request, so a save
- * that enqueued just before calling this is guaranteed a pass whose
- * snapshot includes it (an in-flight pass started earlier would miss it
- * and falsely report it queued). A pass over an already-empty queue is one
- * storage read, so the occasional chained extra pass costs nothing.
+/** Deliver in serialized passes. Only host-wide failures stop later captures.
+ * Explicit retries include parked graph/version errors, never invalid payloads.
  */
-export function flushQueue(): Promise<FlushResult> {
-  return scheduleQueuePass(runFlush)
+export function flushQueue(retryParked = false): Promise<FlushResult> {
+  return scheduleQueuePass(() => runFlush(retryParked))
 }
 
 /** Explicitly discard pending captures after any in-flight delivery settles. */
-export function discardQueuedCaptures(): Promise<FlushResult> {
+export function discardQueuedCaptures(id: string): Promise<FlushResult> {
   return scheduleQueuePass(async () => {
-    const entries = await readQueue()
-    await browser.storage.local.remove(entries.map((entry) => queueKey(entry.wire.envelope.id)))
-    return { sent: 0, failed: 0, rejectedIds: [], held: 0, holdReason: null }
+    await browser.storage.local.remove([queueKey(id), 'captureQueueError'])
+    return {
+      sent: 0,
+      failed: 0,
+      rejectedIds: [],
+      held: (await readQueue()).length,
+      holdReason: null,
+    }
   })
 }
 
@@ -95,17 +100,22 @@ function scheduleQueuePass(pass: () => Promise<FlushResult>): Promise<FlushResul
   return next
 }
 
-async function runFlush(): Promise<FlushResult> {
+async function runFlush(retryParked: boolean): Promise<FlushResult> {
   const snapshot = await readQueue()
   let sent = 0
   const rejectedIds: string[] = []
   let holdReason: FlushResult['holdReason'] = null
 
   for (const entry of snapshot) {
+    if (entry.parked && (!retryParked || entry.parked === 'invalid-payload')) {
+      holdReason ??= entry.parked
+      continue
+    }
     const id = entry.wire.envelope.id
     const outcome = await sendToHost(entry.wire)
     if (outcome.kind === 'queued') {
       await browser.storage.local.remove(queueKey(id))
+      await browser.storage.local.remove('captureQueueError')
       sent += 1
     } else if (outcome.kind === 'rejected' && entry.wire.envelope.kind !== 'x-bookmark') {
       console.error(`capture ${id} dropped — the host rejected it: ${outcome.message}`)
@@ -114,22 +124,24 @@ async function runFlush(): Promise<FlushResult> {
     } else {
       const reason = outcome.kind === 'rejected' ? 'invalid-payload' : outcome.reason
       console.warn(`captures held (${reason}): ${outcome.message}`)
+      const parked =
+        reason === 'graph-mismatch' ||
+        reason === 'unsupported-version' ||
+        reason === 'invalid-payload'
+          ? reason
+          : undefined
       await browser.storage.local.set({
-        [queueKey(id)]: { ...entry, attempts: entry.attempts + 1 },
+        [queueKey(id)]: { ...entry, attempts: entry.attempts + 1, ...(parked ? { parked } : {}) },
       })
       if (reason === 'graph-mismatch' || reason === 'unsupported-version') {
-        const stored = await browser.storage.local.get('bookmarkSettings')
-        const settings = stored['bookmarkSettings']
-        if (typeof settings === 'object' && settings !== null) {
-          await browser.storage.local.set({
-            bookmarkSettings: { ...settings, enabled: false },
-            bookmarkError:
-              'Automatic capture paused. Open the paired graph or update Reflect, then pair again.',
-          })
-        }
+        await writeBookmarkSettings({ ...(await readBookmarkSettings()), enabled: false })
+        await browser.storage.local.set({
+          bookmarkError:
+            'Automatic capture paused. Open the paired graph or update Reflect, then pair again.',
+        })
       }
       holdReason = reason
-      break
+      if (!parked) break
     }
   }
 

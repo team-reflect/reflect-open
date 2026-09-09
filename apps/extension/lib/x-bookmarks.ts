@@ -6,7 +6,7 @@ import {
   type BookmarkEnvelope,
 } from '@reflect/core/capture-envelope'
 import { enqueueCapture, flushQueue } from './flush'
-import { readBookmarkSettings } from './bookmark-settings'
+import { readBookmarkSettings, bookmarkCaptureGeneration } from './bookmark-settings'
 
 const requestSchema = z.object({ variables: z.object({ tweet_id: postIdSchema }) })
 const MAX_REQUEST_BYTES = 65536
@@ -66,23 +66,25 @@ export function bookmarkCaptureDate(date: Date): string {
 export async function saveBookmark(
   postId: string,
   evidence: BookmarkEnvelope['evidence'],
+  tabId: number,
   date = new Date(),
 ): Promise<void> {
+  const generation = bookmarkCaptureGeneration()
+  const allowed = (): boolean => generation === bookmarkCaptureGeneration()
+  if ((await browser.tabs.get(tabId)).incognito)
+    throw new Error('Bookmark capture is unavailable in incognito tabs.')
+  if (
+    evidence === 'request-intent' &&
+    !(await browser.permissions.contains({
+      permissions: ['webRequest'],
+      origins: ['https://x.com/*'],
+    }))
+  )
+    return
   const settings = await readBookmarkSettings()
   if (evidence === 'request-intent' && !settings.enabled) return
   if (!settings.targetGraphId) throw new Error('Pair Reflect before saving bookmarks.')
-  if (evidence === 'request-intent') {
-    const latest = await readBookmarkSettings()
-    if (
-      !latest.enabled ||
-      latest.targetGraphId !== settings.targetGraphId ||
-      !(await browser.permissions.contains({
-        permissions: ['webRequest'],
-        origins: ['https://x.com/*'],
-      }))
-    )
-      return
-  }
+  if (!allowed()) return
   const envelope = bookmarkEnvelopeSchema.parse({
     version: 2,
     kind: 'x-bookmark',
@@ -95,7 +97,7 @@ export async function saveBookmark(
     evidence,
     presentation: settings.presentation,
   })
-  await enqueueCapture({ envelope })
+  await enqueueCapture({ envelope }, allowed)
   await flushQueue()
 }
 
@@ -127,7 +129,7 @@ function onBookmarkRequest(
 ): undefined {
   const postId = parseCreateBookmark(details)
   if (postId === undefined) return
-  void saveBookmark(postId, 'request-intent', new Date(details.timeStamp)).catch(
+  void saveBookmark(postId, 'request-intent', details.tabId, new Date(details.timeStamp)).catch(
     recordBookmarkError,
   )
 }

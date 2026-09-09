@@ -88,7 +88,13 @@ pub fn spool(payload: &[u8], pointer_path: &Path) -> Result<(), HostError> {
     if pointer.target_graph_id.as_deref() != Some(bookmark.target_graph_id.as_str()) {
         return Err(HostError::GraphMismatch);
     }
-    let inbox = Path::new(&pointer.graph_root).join(".reflect/inbox");
+    let graph = Path::new(&pointer.graph_root);
+    let identity = std::fs::read_to_string(graph.join(".reflect/capture-id"))
+        .map_err(|_| HostError::GraphMismatch)?;
+    if identity != bookmark.target_graph_id {
+        return Err(HostError::GraphMismatch);
+    }
+    let inbox = graph.join(".reflect/inbox");
     std::fs::create_dir_all(&inbox).map_err(|error| HostError::Io(error.to_string()))?;
     let bytes = serde_json::to_vec(&bookmark).map_err(|error| HostError::Io(error.to_string()))?;
     atomic_write(&inbox, &format!("{}.json", bookmark.id), &bytes)
@@ -107,7 +113,27 @@ mod tests {
     fn shared_bookmark_boundary() {
         let values = fixtures();
         for value in values["accepted"].as_array().unwrap() {
-            assert!(Bookmark::parse(value.to_string().as_bytes()).is_ok());
+            let bookmark = Bookmark::parse(value.to_string().as_bytes()).unwrap();
+            let directory = tempfile::tempdir().unwrap();
+            let pointer = directory.path().join("pointer.json");
+            std::fs::create_dir_all(directory.path().join(".reflect")).unwrap();
+            std::fs::write(
+                directory.path().join(".reflect/capture-id"),
+                &bookmark.target_graph_id,
+            )
+            .unwrap();
+            std::fs::write(&pointer, serde_json::json!({"version":1,"graphRoot":directory.path(),"bookmarkVersion":2,"targetGraphId":bookmark.target_graph_id}).to_string()).unwrap();
+            spool(value.to_string().as_bytes(), &pointer).unwrap();
+            let actual: serde_json::Value = serde_json::from_slice(
+                &std::fs::read(
+                    directory
+                        .path()
+                        .join(format!(".reflect/inbox/{}.json", bookmark.id)),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            assert!(values["spooled"].as_array().unwrap().contains(&actual));
         }
         for value in values["rejected"].as_array().unwrap() {
             assert!(Bookmark::parse(value.to_string().as_bytes()).is_err());
@@ -134,6 +160,8 @@ mod tests {
         let mut data = serde_json::json!({"version":1,"graphRoot":directory.path(),"bookmarkVersion":2,"targetGraphId":"a".repeat(64)});
         std::fs::write(&pointer, data.to_string()).unwrap();
         assert_eq!(capabilities(&pointer).unwrap()["bookmarkVersion"], 2);
+        std::fs::create_dir_all(directory.path().join(".reflect")).unwrap();
+        std::fs::write(directory.path().join(".reflect/capture-id"), "a".repeat(64)).unwrap();
         let payload = fixtures()["accepted"][0].to_string();
         spool(payload.as_bytes(), &pointer).unwrap();
         spool(payload.as_bytes(), &pointer).unwrap();
@@ -142,6 +170,12 @@ mod tests {
                 .unwrap()
                 .count(),
             1
+        );
+        // The pointer can outlive a graph replaced at exactly the same path.
+        std::fs::write(directory.path().join(".reflect/capture-id"), "b".repeat(64)).unwrap();
+        assert_eq!(
+            spool(payload.as_bytes(), &pointer).unwrap_err(),
+            HostError::GraphMismatch
         );
         data["targetGraphId"] = "b".repeat(64).into();
         std::fs::write(&pointer, data.to_string()).unwrap();

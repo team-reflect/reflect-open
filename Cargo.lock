@@ -4881,6 +4881,7 @@ dependencies = [
  "dispatch2",
  "fastembed",
  "file-id",
+ "getrandom 0.4.3",
  "git2",
  "hf-hub 0.5.0",
  "image",

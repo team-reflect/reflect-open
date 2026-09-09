@@ -1,6 +1,9 @@
+import { browser } from 'wxt/browser'
+import { bookmarkWireSchema } from '@reflect/core/capture-envelope'
+import fixtures from '../../../packages/core/src/actions/bookmark-envelope.fixtures.json'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CaptureWireMessage } from '@reflect/core/capture-envelope'
-import { enqueueCapture, flushQueue, readQueue } from './flush'
+import { discardQueuedCaptures, enqueueCapture, flushQueue, readQueue } from './flush'
 import { sendToHost, type SendOutcome } from './native'
 
 /** In-memory `chrome.storage.local` faithful to get(null)/set/remove. */
@@ -10,6 +13,7 @@ vi.mock('wxt/browser', () => ({
   browser: {
     storage: {
       local: {
+        getBytesInUse: vi.fn(async () => 0),
         get: (keys: string | string[] | null) => {
           if (keys === null) {
             return Promise.resolve(Object.fromEntries(store))
@@ -148,4 +152,83 @@ describe('flushQueue', () => {
     expect(result.sent).toBe(1)
     expect(await readQueue()).toEqual([])
   })
+})
+
+const bookmark = bookmarkWireSchema.parse(fixtures.accepted[0])
+
+it.each(['graph-mismatch', 'unsupported-version', 'invalid-payload'] as const)(
+  'parks %s without blocking page captures, including after restart',
+  async (reason) => {
+    store.set('bookmarkSettings', {
+      enabled: true,
+      presentation: 'link',
+      targetGraphId: bookmark.envelope.targetGraphId,
+    })
+    await enqueueCapture(bookmark)
+    await enqueueCapture(wire(SECOND))
+    sendMock.mockResolvedValueOnce(
+      reason === 'invalid-payload'
+        ? { kind: 'rejected', message: reason }
+        : { kind: 'held', reason, message: reason },
+    )
+    expect((await flushQueue()).sent).toBe(1)
+    const [parked] = await readQueue()
+    expect(parked?.parked).toBe(reason)
+    if (reason !== 'invalid-payload')
+      expect(store.get('bookmarkSettings')).toMatchObject({ enabled: false })
+    // Persisted state is sufficient; a new worker needs no in-memory failure list.
+    await flushQueue()
+    expect(sendMock).toHaveBeenCalledTimes(2)
+    await flushQueue(true)
+    expect(sendMock).toHaveBeenCalledTimes(reason === 'invalid-payload' ? 2 : 3)
+  },
+)
+
+it('refuses the byte budget without removing accepted data', async () => {
+  await enqueueCapture(bookmark)
+  vi.mocked(browser.storage.local.getBytesInUse).mockResolvedValueOnce(64 * 1024 * 1024)
+  await expect(enqueueCapture(wire(SECOND))).rejects.toThrow('queue full')
+  expect(await readQueue()).toHaveLength(1)
+  await flushQueue()
+  expect(store.has('captureQueueError')).toBe(false)
+})
+
+it('surfaces storage failure and lets a subsequent admission proceed', async () => {
+  const write = vi
+    .spyOn(browser.storage.local, 'set')
+    .mockRejectedValueOnce(new Error('storage unavailable'))
+  await expect(enqueueCapture(bookmark)).rejects.toThrow('storage unavailable')
+  expect(await readQueue()).toEqual([])
+  await enqueueCapture(wire(SECOND))
+  expect(await readQueue()).toHaveLength(1)
+  write.mockRestore()
+})
+
+it('replays the same event after a lost ACK and discards only the selected entry', async () => {
+  await enqueueCapture(bookmark)
+  sendMock.mockResolvedValueOnce({ kind: 'held', reason: 'io', message: 'ACK lost' })
+  await flushQueue()
+  await flushQueue()
+  expect(sendMock.mock.calls.map(([message]) => message.envelope.id)).toEqual([
+    bookmark.envelope.id,
+    bookmark.envelope.id,
+  ])
+  await enqueueCapture(bookmark)
+  await enqueueCapture(wire(SECOND))
+  store.set('captureQueueError', 'full')
+  await discardQueuedCaptures(bookmark.envelope.id)
+  expect((await readQueue()).map((entry) => entry.wire.envelope.id)).toEqual([SECOND])
+  expect(store.has('captureQueueError')).toBe(false)
+})
+
+it('rechecks admission after asynchronous capacity reads', async () => {
+  const capacity = Promise.withResolvers<number>()
+  vi.mocked(browser.storage.local.getBytesInUse).mockReturnValueOnce(capacity.promise)
+  let allowed = true
+  const admission = enqueueCapture(bookmark, () => allowed)
+  await vi.waitFor(() => expect(browser.storage.local.getBytesInUse).toHaveBeenCalled())
+  allowed = false
+  capacity.resolve(0)
+  await admission
+  expect(await readQueue()).toEqual([])
 })

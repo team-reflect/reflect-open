@@ -1,3 +1,6 @@
+import { drainCaptureInbox } from './capture-drain'
+import { BookmarkCaptureError } from './bookmark-capture'
+import fixtures from './bookmark-envelope.fixtures.json'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   addSpool,
@@ -633,3 +636,23 @@ describe('drainCaptureInbox (text captures)', () => {
     expect([...files.keys()]).toEqual([DAILY])
   })
 })
+
+it.each([true, false])(
+  'isolates bookmark write failure (permanent=%s) from later page captures',
+  async (permanent) => {
+    const bookmark = fixtures.spooled[0]!
+    const name = `${bookmark.id}.json`
+    spool.set(name, { contents: JSON.stringify(bookmark), modifiedMs: -1 })
+    addSpool(envelope())
+    const writeBookmark = vi.fn(async () => {
+      throw permanent ? new BookmarkCaptureError('Invalid receipts') : new Error('Daily note busy')
+    })
+    const outcome = await drainCaptureInbox({ generation: 3, writeBookmark })
+    expect(outcome.drained).toBe(1)
+    expect(outcome.invalid).toBe(permanent ? 1 : 0)
+    expect(rejected.has(name)).toBe(permanent)
+    expect(spool.has(name)).toBe(!permanent)
+    expect(writeBookmark).toHaveBeenCalledTimes(1)
+    expect(outcome.stopped?.message).toContain(permanent ? 'inbox-rejected' : 'remains queued')
+  },
+)

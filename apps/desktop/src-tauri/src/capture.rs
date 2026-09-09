@@ -51,24 +51,44 @@ fn pointer_path() -> AppResult<PathBuf> {
     Ok(base.join("reflect-open").join("capture-pointer.json"))
 }
 
-fn bookmark_graph_id(root: &Path) -> String {
-    use sha2::{Digest, Sha256};
-    use std::fmt::Write;
-    let mut encoded = String::with_capacity(64);
-    for byte in Sha256::digest(root.to_string_lossy().as_bytes()) {
-        let _ = write!(encoded, "{byte:02x}");
+fn bookmark_graph_id(root: &Path) -> AppResult<String> {
+    let directory = root.join(".reflect");
+    fs::create_dir_all(&directory)?;
+    let path = directory.join("capture-id");
+    if !path.exists() {
+        let mut bytes = [0u8; 32];
+        getrandom::fill(&mut bytes).map_err(|error| AppError::io(error.to_string()))?;
+        let identity: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+        let mut temporary = tempfile::NamedTempFile::new_in(&directory)?;
+        temporary.write_all(identity.as_bytes())?;
+        temporary.as_file().sync_all()?;
+        if let Err(error) = temporary.persist_noclobber(&path) {
+            if error.error.kind() != std::io::ErrorKind::AlreadyExists {
+                return Err(error.error.into());
+            }
+        }
+        #[cfg(unix)]
+        fs::File::open(&directory)?.sync_all()?;
     }
-    encoded
+    let identity = fs::read_to_string(path)?;
+    if identity.len() != 64
+        || !identity
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(AppError::parse("Invalid graph capture identity"));
+    }
+    Ok(identity)
 }
 
-fn pointer_json(root: &Path) -> String {
-    serde_json::json!({
+fn pointer_json(root: &Path) -> AppResult<String> {
+    Ok(serde_json::json!({
         "version": 1,
-        "graphRoot": root.to_string_lossy(),
+        "graphRoot": root.to_str().ok_or_else(|| AppError::io("Graph path is not UTF-8"))?,
         "bookmarkVersion": 2,
-        "targetGraphId": bookmark_graph_id(root),
+        "targetGraphId": bookmark_graph_id(root)?,
     })
-    .to_string()
+    .to_string())
 }
 
 // Also used by `skill.rs` for the agent-skill files under `~/.agents/`.
@@ -174,7 +194,7 @@ pub fn capture_bookmark_check(
     state: State<GraphState>,
 ) -> AppResult<()> {
     let root = root_for_generation(&state, generation)?;
-    if bookmark_graph_id(&root) != target_graph_id {
+    if bookmark_graph_id(&root)? != target_graph_id {
         return Err(AppError::io("Bookmark belongs to another graph"));
     }
     Ok(())
@@ -188,7 +208,7 @@ pub fn capture_bookmark_check(
 pub fn capture_host_register(state: State<GraphState>) -> AppResult<()> {
     let root = current_root(&state)?;
     fs::create_dir_all(root.join(INBOX_DIR))?;
-    atomic_write_to(&pointer_path()?, &pointer_json(&root))?;
+    atomic_write_to(&pointer_path()?, &pointer_json(&root)?)?;
 
     #[cfg(target_os = "macos")]
     {
@@ -658,11 +678,24 @@ mod tests {
     }
 
     #[test]
+    fn graph_identity_survives_moves_but_not_replacement() {
+        let directory = tempfile::tempdir().unwrap();
+        let original = directory.path().join("original");
+        let moved = directory.path().join("moved");
+        let identity = bookmark_graph_id(&original).unwrap();
+        assert_eq!(bookmark_graph_id(&original).unwrap(), identity);
+        fs::rename(&original, &moved).unwrap();
+        assert_eq!(bookmark_graph_id(&moved).unwrap(), identity);
+        assert_ne!(bookmark_graph_id(&original).unwrap(), identity);
+    }
+
+    #[test]
     fn pointer_json_is_versioned() {
+        let directory = tempfile::tempdir().unwrap();
         let parsed: serde_json::Value =
-            serde_json::from_str(&pointer_json(Path::new("/graphs/personal"))).unwrap();
+            serde_json::from_str(&pointer_json(directory.path()).unwrap()).unwrap();
         assert_eq!(parsed["version"], 1);
-        assert_eq!(parsed["graphRoot"], "/graphs/personal");
+        assert_eq!(parsed["graphRoot"], directory.path().to_str().unwrap());
     }
 
     #[test]

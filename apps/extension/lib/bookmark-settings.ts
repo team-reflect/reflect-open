@@ -27,3 +27,20 @@ export async function getBookmarkCapability(): Promise<BookmarkCapability> {
     throw new Error('Update Reflect and open your target graph, then pair again.')
   return parsed.data
 }
+
+let generation = 0
+
+/** Invalidate work already awaiting permissions, tab lookup, or queue admission. */
+export function invalidateBookmarkCapture(): void {
+  generation += 1
+}
+
+export function bookmarkCaptureGeneration(): number {
+  return generation
+}
+
+/** Called only by the background, including permission revocation. */
+export async function writeBookmarkSettings(settings: BookmarkSettings): Promise<void> {
+  invalidateBookmarkCapture()
+  await browser.storage.local.set({ [BOOKMARK_SETTINGS_KEY]: settings })
+}

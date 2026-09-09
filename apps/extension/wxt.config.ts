@@ -31,7 +31,6 @@ export default defineConfig({
   zip: { name: 'reflect-capture' },
   manifest: {
     name: 'Reflect Capture',
-    incognito: 'not_allowed',
     description: 'Save the page you are reading into Reflect.',
     homepage_url: 'https://github.com/team-reflect/reflect-open',
     // Unpacked dev/CI loads pin the ID; the store rejects `key`, so drop it there.

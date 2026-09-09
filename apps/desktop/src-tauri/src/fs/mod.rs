@@ -448,7 +448,7 @@ fn write_note_revision(
 ) -> AppResult<Option<u64>> {
     let _guard = NOTE_WRITE_LOCK
         .lock()
-        .map_err(|_| AppError::io("note write lock poisoned"))?;
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     if checked {
         let current = match io::read_note_no_follow(root, target) {
             Ok(value) => Some(value),
@@ -475,7 +475,7 @@ pub fn note_create(
     let root = root_for_generation(&state, generation)?;
     let _guard = NOTE_WRITE_LOCK
         .lock()
-        .map_err(|_| AppError::io("note write lock poisoned"))?;
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let target = resolve(&root, &path)?;
     match atomic_create(&root, &target, &contents)? {
         AtomicCreateOutcome::Created(modified_ms) => {
@@ -1274,6 +1274,20 @@ mod move_tests {
 #[cfg(test)]
 mod note_revision_tests {
     use super::*;
+
+    #[test]
+    fn poisoned_ordering_lock_does_not_disable_note_writes() {
+        let _ = std::panic::catch_unwind(|| {
+            let _guard = NOTE_WRITE_LOCK
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            panic!("simulated writer panic");
+        });
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("note.md");
+        write_note_revision(directory.path(), &target, "saved", true, None).unwrap();
+        assert_eq!(fs::read_to_string(target).unwrap(), "saved");
+    }
 
     #[test]
     fn stale_revision_does_not_replace_newer_text() {

@@ -137,9 +137,10 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
           inFlightWrite = null
         }
       })
-      .catch((cause) => {
+      .catch(async (cause) => {
         console.error('failed to save note:', cause)
         error = errorMessage(cause)
+        await reconcileFromDisk()
         emit()
       })
   }

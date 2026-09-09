@@ -195,7 +195,18 @@ Private daily notes always receive plain links. Neither mode archives tweet text
 Accepted captures survive browser restarts. A full queue rejects new captures
 without deleting earlier ones; retry after delivery. Graph mismatch pauses
 automatic capture. Open the previously paired graph to deliver old captures,
-then pair again for new ones. Moving a graph changes its local pairing identity.
+then explicitly retry pending captures, or pair again for new ones. Pairing disables
+automatic capture. The graph stores its random identity in `.reflect/capture-id`;
+moving this file with the graph preserves pairing. Replacing the graph without
+this file requires pairing again. Include this file when backing up pairing state.
+
+Graph/version errors are parked until an explicit retry. Invalid bookmark payloads
+are parked until individually discarded. Export pending captures before discarding
+anything you need to recover. Parked bookmarks do not block ordinary captures.
+Malformed daily-note metadata gets one write attempt before its spool moves to
+`.reflect/inbox-rejected/`; Reflect reports how to repair and retry it. Temporary
+write conflicts remain queued, with one attempt per drain trigger.
+Incognito tabs still support ordinary page capture; bookmark saving is unavailable.
 Only a host `queued` acknowledgement removes a capture from the browser queue;
 it does not certify that the desktop has written the daily note.
 

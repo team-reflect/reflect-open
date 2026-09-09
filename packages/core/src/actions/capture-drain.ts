@@ -1,3 +1,4 @@
+import { BookmarkCaptureError } from './bookmark-capture'
 import type { BookmarkEnvelope } from './bookmark-envelope'
 import { errorMessage, isAppError, toAppError } from '../errors'
 import {
@@ -169,6 +170,7 @@ export async function drainCaptureInbox(
         first.modifiedMs - second.modifiedMs || first.path.localeCompare(second.path),
     )
 
+  let bookmarkStop: ReconcileStop | null = null
   let drained = 0
   let deduped = 0
   let invalid = 0
@@ -196,10 +198,24 @@ export async function drainCaptureInbox(
         continue
       }
       if (envelope.kind === 'x-bookmark') {
-        if (!input.writeBookmark) throw new Error('Bookmark writer is unavailable; update Reflect')
-        await input.writeBookmark(envelope)
-        await captureInboxRemove(name, input.generation)
-        drained += 1
+        try {
+          if (!input.writeBookmark)
+            throw new Error('Bookmark writer is unavailable; update Reflect')
+          await input.writeBookmark(envelope)
+          await captureInboxRemove(name, input.generation)
+          drained += 1
+        } catch (cause) {
+          if (stale()) return outcome({ reason: 'stale', message: 'The graph session ended' })
+          const permanent = cause instanceof BookmarkCaptureError
+          if (permanent) {
+            await captureInboxReject(name, input.generation)
+            invalid += 1
+          }
+          bookmarkStop ??= {
+            reason: toAppError(cause).kind,
+            message: `${errorMessage(cause)}. ${permanent ? `Repair the daily note, then move .reflect/inbox-rejected/${name} back to .reflect/inbox to retry.` : 'Bookmark remains queued for the next capture pass.'}`,
+          }
+        }
         continue
       }
       if (envelope.kind !== undefined) {
@@ -288,7 +304,7 @@ export async function drainCaptureInbox(
   } catch (cause) {
     return outcome({ reason: toAppError(cause).kind, message: errorMessage(cause) })
   }
-  return outcome(null)
+  return outcome(bookmarkStop)
 }
 
 function parseEnvelope(raw: string): InboxEnvelope | null {

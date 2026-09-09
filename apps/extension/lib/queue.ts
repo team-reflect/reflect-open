@@ -9,6 +9,7 @@ export const queuedCaptureSchema = z.object({
   queuedAt: z.number(),
   /** Send attempts so far — surfaced in the popup's pending count tooltip. */
   attempts: z.number(),
+  parked: z.enum(['graph-mismatch', 'unsupported-version', 'invalid-payload']).optional(),
 })
 
 export type QueuedCapture = z.infer<typeof queuedCaptureSchema>

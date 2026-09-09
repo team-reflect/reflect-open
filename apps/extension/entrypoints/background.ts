@@ -1,4 +1,10 @@
 import { z } from 'zod'
+import {
+  bookmarkSettingsSchema,
+  readBookmarkSettings,
+  writeBookmarkSettings,
+  invalidateBookmarkCapture,
+} from '@/lib/bookmark-settings'
 import { extensionCaptureWireSchema, postIdSchema } from '@reflect/core/capture-envelope'
 import { registerBookmarkObserver, saveBookmark, recordBookmarkError } from '@/lib/x-bookmarks'
 import { browser } from 'wxt/browser'
@@ -48,30 +54,36 @@ const enqueueRequestSchema = z.object({
   type: z.literal('enqueue'),
   wire: extensionCaptureWireSchema,
 })
-const bookmarkRequestSchema = z.object({ type: z.literal('save-bookmark'), postId: postIdSchema })
+const bookmarkRequestSchema = z.object({
+  type: z.literal('save-bookmark'),
+  postId: postIdSchema,
+  tabId: z.number().int().nonnegative(),
+})
+const settingsRequestSchema = z.object({
+  type: z.literal('bookmark-settings'),
+  settings: bookmarkSettingsSchema,
+})
+const discardRequestSchema = z.object({ type: z.literal('discard-capture'), id: z.guid() })
 
 export default defineBackground(() => {
   registerBookmarkObserver()
   browser.permissions.onAdded.addListener(registerBookmarkObserver)
   browser.permissions.onRemoved.addListener(() => {
-    void browser.storage.local
-      .get('bookmarkSettings')
-      .then(async (stored) => {
-        const settings = stored['bookmarkSettings']
-        if (typeof settings === 'object' && settings !== null)
-          await browser.storage.local.set({ bookmarkSettings: { ...settings, enabled: false } })
-      })
+    invalidateBookmarkCapture()
+    void readBookmarkSettings()
+      .then((settings) => writeBookmarkSettings({ ...settings, enabled: false }))
       .catch(recordBookmarkError)
   })
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     const enqueue = enqueueRequestSchema.safeParse(message)
     const bookmark = bookmarkRequestSchema.safeParse(message)
-    if (enqueue.success || bookmark.success) {
-      const task = enqueue.success
-        ? enqueueCapture(enqueue.data.wire)
-        : bookmark.success
-          ? saveBookmark(bookmark.data.postId, 'manual')
-          : Promise.resolve()
+    const settings = settingsRequestSchema.safeParse(message)
+    let task: Promise<void> | undefined
+    if (enqueue.success) task = enqueueCapture(enqueue.data.wire)
+    else if (bookmark.success)
+      task = saveBookmark(bookmark.data.postId, 'manual', bookmark.data.tabId)
+    else if (settings.success) task = writeBookmarkSettings(settings.data.settings)
+    if (task) {
       void task.then(
         () => sendResponse({ ok: true }),
         (cause: unknown) =>
@@ -82,14 +94,15 @@ export default defineBackground(() => {
       )
       return true
     }
-    if (z.object({ type: z.literal('discard-captures') }).safeParse(message).success) {
-      void discardQueuedCaptures().then(sendResponse, () =>
+    const discard = discardRequestSchema.safeParse(message)
+    if (discard.success) {
+      void discardQueuedCaptures(discard.data.id).then(sendResponse, () =>
         sendResponse({ error: 'Could not discard captures' }),
       )
       return true
     }
     if (isFlushRequest(message)) {
-      flushQueue().then(sendResponse, (cause: unknown) => {
+      flushQueue(true).then(sendResponse, (cause: unknown) => {
         console.error('capture flush failed:', cause)
         sendResponse({ sent: 0, failed: 0, rejectedIds: [], held: -1, holdReason: 'io' })
       })

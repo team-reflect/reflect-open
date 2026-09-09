@@ -12,20 +12,25 @@ const receiptSchema = z
   })
   .strict()
 
+/** A capture that needs manual recovery, not repeated background writes. */
+export class BookmarkCaptureError extends Error {}
+
 /** Append a post and its delivery receipt in the same daily-note revision. */
 export function appendBookmark(source: string, envelope: BookmarkEnvelope): string {
   const split = splitFrontmatter(source)
   if (/^---[ \t]*\r?\n/.test(source) && split.raw === null)
-    throw new Error('Unclosed daily note frontmatter')
+    throw new BookmarkCaptureError('Unclosed daily note frontmatter')
   const metadata = parseFrontmatter(split.raw)
-  if (metadata.warning) throw new Error('Invalid daily note frontmatter')
+  if (metadata.warning) throw new BookmarkCaptureError('Invalid daily note frontmatter')
   const stored = metadata.data['reflectBookmarkReceipts']
-  const receipts = receiptSchema.parse(
+  const result = receiptSchema.safeParse(
     stored === undefined ? { schemaVersion: 1, events: {} } : stored,
   )
+  if (!result.success) throw new BookmarkCaptureError('Invalid bookmark receipts in daily note')
+  const receipts = result.data
   if (envelope.id in receipts.events) {
     if (receipts.events[envelope.id] !== envelope.postId)
-      throw new Error('Bookmark receipt ID conflict')
+      throw new BookmarkCaptureError('Bookmark receipt ID conflict')
     return source
   }
   const parsed = parseNote({ path: '', source })
@@ -41,7 +46,10 @@ export function appendBookmark(source: string, envelope: BookmarkEnvelope): stri
     )
     const position = heading ? sectionEnd(headings, heading, source.length) : source.length
     const prefix = source.slice(0, position)
-    source = `${prefix}${prefix.endsWith('\n\n') || prefix === '' ? '' : prefix.endsWith('\n') ? '\n' : '\n\n'}${heading ? '' : '## X bookmarks\n\n'}${markdown}\n\n${source.slice(position)}`
+    let separator = ''
+    if (prefix && !prefix.endsWith('\n\n')) separator = prefix.endsWith('\n') ? '\n' : '\n\n'
+    const headingMarkdown = heading ? '' : '## X bookmarks\n\n'
+    source = `${prefix}${separator}${headingMarkdown}${markdown}\n\n${source.slice(position)}`
   }
   return upsertFrontmatter(source, {
     reflectBookmarkReceipts: {
