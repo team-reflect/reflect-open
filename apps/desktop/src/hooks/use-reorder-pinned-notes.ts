@@ -1,13 +1,12 @@
-import { useCallback } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { arrayMove } from '@dnd-kit/sortable'
-import type { PinnedNote } from '@reflect/core'
 import { reorderPinnedNotes } from '@/lib/note-pin'
-import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client'
-import { useGraph } from '@/providers/graph-provider'
 import { updatePinOrder } from '@/lib/notes/pin-order'
 import { invalidatePinnedNotesCache, updatePinnedNotesCache } from '@/lib/notes/pinned-notes-cache'
-import { isNotNullish } from '@ocavue/utils'
+import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client'
+import { useGraph } from '@/providers/graph-provider'
+import { arrayMove } from '@dnd-kit/sortable'
+import type { PinnedNote } from '@reflect/core'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
 
 interface ReorderPinnedNotesVariables {
   generation: number
@@ -58,7 +57,7 @@ export function useReorderPinnedNotes(
       // All notes that changed `note.pinnedOrder`
       const updated = renumbered.filter((a, index) => {
         const b = moved[index]
-        return (a && b && a.pinnedOrder !== b.pinnedOrder)
+        return a && b && a.pinnedOrder !== b.pinnedOrder
       })
 
       void queryClient.cancelQueries({ queryKey: queryKeys.index.pinnedNotes(graph.root) })

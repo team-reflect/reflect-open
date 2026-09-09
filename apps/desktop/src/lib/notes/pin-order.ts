@@ -32,10 +32,7 @@ export function getNextPinOrder(shelf: readonly PinnedNote[]): number {
  * the whole shelf when the moved note has no number to take. Returns a new
  * array, leaving the original untouched.
  */
-export function updatePinOrder(
-  shelf: readonly PinnedNote[],
-  movedPath: string,
-): PinnedNote[]   {
+export function updatePinOrder(shelf: readonly PinnedNote[], movedPath: string): PinnedNote[] {
   if (isSorted(shelf)) {
     return [...shelf]
   }
