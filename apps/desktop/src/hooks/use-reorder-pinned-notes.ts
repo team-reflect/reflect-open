@@ -52,7 +52,7 @@ export function useReorderPinnedNotes(
       const moved: PinnedNote[] = arrayMove([...pinned], activeIndex, overIndex)
 
       // Update `note.pinnedOrder` in the moved note.
-      const renumbered: PinnedNote[] | null = updatePinOrder(moved, activePath)
+      const renumbered: PinnedNote[] = updatePinOrder(moved, activePath)
 
       const next: PinnedNote[] = renumbered ?? moved
 

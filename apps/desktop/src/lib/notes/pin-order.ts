@@ -35,7 +35,7 @@ export function getNextPinOrder(shelf: readonly PinnedNote[]): number {
 export function updatePinOrder(
   shelf: readonly PinnedNote[],
   movedPath: string,
-): PinnedNote[] | null {
+): PinnedNote[]   {
   if (isSorted(shelf)) {
     return [...shelf]
   }
