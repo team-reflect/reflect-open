@@ -7,6 +7,7 @@ import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { updatePinOrder } from '@/lib/notes/pin-order'
 import { invalidatePinnedNotesCache, updatePinnedNotesCache } from '@/lib/notes/pinned-notes-cache'
+import { isNotNullish } from '@ocavue/utils'
 
 interface ReorderPinnedNotesVariables {
   generation: number
@@ -51,14 +52,18 @@ export function useReorderPinnedNotes(
       // Move the note in the array.
       const moved: PinnedNote[] = arrayMove([...pinned], activeIndex, overIndex)
 
-      // Update `note.pinnedOrder` in the moved note.
+      // Update `note.pinnedOrder` in the moved note to maintain the correct order.
       const renumbered: PinnedNote[] = updatePinOrder(moved, activePath)
 
-      const next: PinnedNote[] = renumbered ?? moved
+      // All notes that changed `note.pinnedOrder`
+      const updated = renumbered.filter((a, index) => {
+        const b = moved[index]
+        return (a && b && a.pinnedOrder !== b.pinnedOrder)
+      })
 
       void queryClient.cancelQueries({ queryKey: queryKeys.index.pinnedNotes(graph.root) })
-      updatePinnedNotesCache(queryClient, graph.root, () => next)
-      mutate({ generation: graph.generation, root: graph.root, notes: renumbered })
+      updatePinnedNotesCache(queryClient, graph.root, () => renumbered)
+      mutate({ generation: graph.generation, root: graph.root, notes: updated })
     },
     [graph, mutate, pinned, queryClient],
   )
