@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.2...v0.12.0-beta.3) (2026-09-09)
+
+
+### Bug Fixes
+
+* **mobile:** align the All and Tasks search bars ([#1254](https://github.com/team-reflect/reflect-open/issues/1254)) ([a52848d](https://github.com/team-reflect/reflect-open/commit/a52848d219c4ca5b719fc93a0e88a33043c99afd))
+* number pinned notes with gaps ([#1247](https://github.com/team-reflect/reflect-open/issues/1247)) ([d6aefc6](https://github.com/team-reflect/reflect-open/commit/d6aefc6f81df848d35eb59c59e9de25f19d9f83c))
+
 ## [0.12.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.1...v0.12.0-beta.2) (2026-09-09)
 
 
