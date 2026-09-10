@@ -6,10 +6,12 @@ import type {
   FormattedAudioMemoTranscript,
 } from '../ai/audio-memo-format'
 import {
+  AUDIO_MEMO_SIDECAR_CONTENTS,
   audioMemoFromPath,
   audioMemoIdentity,
   audioMemoPartFromPath,
   audioMemoPartPath,
+  audioMemoSidecarPath,
   captureAudioMemoPart,
   isSilentStop,
   reconcileAudioMemos,
@@ -162,6 +164,10 @@ describe('audioMemoFromPath', () => {
     expect(audioMemoPartPath(MEMO, 1000, false)).toBe(path)
   })
 
+  it('never parses a sidecar marker as a recording', () => {
+    expect(audioMemoFromPath(audioMemoSidecarPath(MEMO))).toBeNull()
+  })
+
   it('rejects everything that is not a well-formed memo recording', () => {
     expect(audioMemoFromPath('audio-memos/voice-note.mp3')).toBeNull()
     expect(audioMemoFromPath('audio-memos/audio-memo-2026-13-40-153022-845.webm')).toBeNull()
@@ -275,6 +281,7 @@ describe('reconcileAudioMemos', () => {
         'morning thoughts\n\n## [[Audio memos]]\n\n- [[audio-memo-2026-06-11-153022-845|Memo Transcript]]\n',
         3,
       ],
+      [audioMemoSidecarPath(MEMO), AUDIO_MEMO_SIDECAR_CONTENTS, 3],
     ])
     expect(ensureBacklinkTargetMock).toHaveBeenCalledWith('Audio memos', 3)
     expect(generateAudioMemoTitleMock).toHaveBeenCalledWith({
@@ -393,6 +400,16 @@ describe('reconcileAudioMemos', () => {
       expect.stringContaining('second transcript'),
       3,
     )
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      audioMemoSidecarPath(earlier),
+      AUDIO_MEMO_SIDECAR_CONTENTS,
+      3,
+    )
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      audioMemoSidecarPath(MEMO),
+      AUDIO_MEMO_SIDECAR_CONTENTS,
+      3,
+    )
     expect(ensureBacklinkTargetMock).toHaveBeenCalledTimes(1)
   })
 
@@ -498,7 +515,10 @@ describe('reconcileAudioMemos', () => {
     expect(outcome).toEqual({ pending: 0, transcribed: 0, rejected: 0, stopped: null })
     expect(onPending).toHaveBeenCalledWith(0)
     expect(transcribeMock).not.toHaveBeenCalled()
-    expect(writeNoteMock).not.toHaveBeenCalled()
+    // The fragile tombstone gets its durable marker healed in the same pass.
+    expect(writeNoteMock.mock.calls).toEqual([
+      [audioMemoSidecarPath(MEMO), AUDIO_MEMO_SIDECAR_CONTENTS, 3],
+    ])
   })
 
   it("a same-second sibling backlink is not this memo's tombstone", async () => {
@@ -518,6 +538,75 @@ describe('reconcileAudioMemos', () => {
       expect.stringContaining('memo transcript'),
       3,
     )
+  })
+
+  it('a sidecar marker tombstones a session without touching the daily note', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath), fileMeta(audioMemoSidecarPath(MEMO))])
+
+    const onPending = vi.fn()
+    const outcome = await reconcile({ onPending })
+
+    expect(outcome).toEqual({ pending: 0, transcribed: 0, rejected: 0, stopped: null })
+    expect(onPending).toHaveBeenCalledWith(0)
+    expect(transcribeMock).not.toHaveBeenCalled()
+    expect(writeNoteMock).not.toHaveBeenCalled()
+    expect(readNoteMock).not.toHaveBeenCalled()
+  })
+
+  it('a purged memo with a marker stays deleted', async () => {
+    // The resurrection report: note and daily backlink both purged, the
+    // recording still present. The marker alone must keep every device from
+    // regenerating (and re-billing) the transcription.
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath), fileMeta(audioMemoSidecarPath(MEMO))])
+    readNoteMock.mockResolvedValue('cleaned-up daily note\n')
+
+    const outcome = await reconcile()
+
+    expect(outcome).toEqual({ pending: 0, transcribed: 0, rejected: 0, stopped: null })
+    expect(transcribeMock).not.toHaveBeenCalled()
+    expect(writeNoteMock).not.toHaveBeenCalled()
+  })
+
+  it('heals the marker for a transcribed session that lacks one', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+    listFilesMock.mockResolvedValue([fileMeta(MEMO.notePath)])
+
+    const outcome = await reconcile()
+
+    expect(outcome).toEqual({ pending: 0, transcribed: 0, rejected: 0, stopped: null })
+    expect(transcribeMock).not.toHaveBeenCalled()
+    expect(writeNoteMock.mock.calls).toEqual([
+      [audioMemoSidecarPath(MEMO), AUDIO_MEMO_SIDECAR_CONTENTS, 3],
+    ])
+  })
+
+  it('a failed marker heal never blocks transcription of pending sessions', async () => {
+    const done = audioMemoIdentity(new Date(2026, 5, 10, 9, 0, 0, 0), 'audio/mp4')
+    listDirMock.mockResolvedValue([fileMeta(done.audioPath), fileMeta(MEMO.audioPath)])
+    listFilesMock.mockResolvedValue([fileMeta(done.notePath)])
+    writeNoteMock.mockImplementation(async (path) => {
+      if (path === audioMemoSidecarPath(done)) {
+        throw { kind: 'io', message: 'disk full' }
+      }
+    })
+
+    const outcome = await reconcile()
+
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(writeNoteMock).toHaveBeenCalledWith(MEMO.notePath, expect.any(String), 3)
+  })
+
+  it('a stale gate during the heal loop stops the pass', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+    listFilesMock.mockResolvedValue([fileMeta(MEMO.notePath)])
+
+    const outcome = await reconcile({ isStale: () => true })
+
+    expect(outcome.stopped).toEqual({
+      reason: 'stale',
+      message: 'the graph session ended mid-pass',
+    })
+    expect(writeNoteMock).not.toHaveBeenCalled()
   })
 
   it('an empty transcript writes a placeholder note — silence must not retry forever', async () => {
@@ -637,6 +726,11 @@ describe('reconcileAudioMemos', () => {
       expect.stringContaining(
         '- [[audio-memo-2026-06-11-153022-845|Audio memo 2026-06-11 15:30:22]]',
       ),
+      3,
+    )
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      audioMemoSidecarPath(MEMO),
+      AUDIO_MEMO_SIDECAR_CONTENTS,
       3,
     )
   })
