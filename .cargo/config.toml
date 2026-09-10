@@ -1,0 +1,3 @@
+[registry]
+# Requires cargo 1.100+ (stable on 2026-11-12); older cargo ignores this key.
+global-min-publish-age = "7 days"
