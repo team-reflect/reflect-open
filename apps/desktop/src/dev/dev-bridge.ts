@@ -66,8 +66,8 @@ const iapRestoreArgsSchema = z.object({ payload: iapPayloadSchema })
 
 // Fixed preview prices, independent of App Store Connect and browser locale.
 const iapProducts = [
-  { productId: IAP_PRODUCT_IDS.monthly, formattedPrice: '$4.99' },
-  { productId: IAP_PRODUCT_IDS.yearly, formattedPrice: '$49.99' },
+  { productId: IAP_PRODUCT_IDS.monthly, formattedPrice: '$9999.99' },
+  { productId: IAP_PRODUCT_IDS.yearly, formattedPrice: '$99999.99' },
 ]
 
 /**

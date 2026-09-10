@@ -21,11 +21,11 @@ vi.mock('@/mobile/use-active-subscription', () => ({
 }))
 
 const YEARLY_PRODUCT = {
-  formattedPrice: '$39.99',
+  formattedPrice: '$99999.99',
   productId: IAP_PRODUCT_IDS.yearly,
 } satisfies IapProduct
 const MONTHLY_PRODUCT = {
-  formattedPrice: '$4.99',
+  formattedPrice: '$9999.99',
   productId: IAP_PRODUCT_IDS.monthly,
 } satisfies IapProduct
 const PRODUCTS: IapProduct[] = [YEARLY_PRODUCT, MONTHLY_PRODUCT]
