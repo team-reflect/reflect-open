@@ -21,7 +21,11 @@ import {
   type AllNotesFilters,
 } from '@/mobile/search-filters/filter-state'
 import { NoteRowList } from '@/mobile/note-row-list'
-import { MobileSearchHeader, MobileSearchHeaderContent } from '@/mobile/search-header'
+import {
+  MobileSearchHeader,
+  MobileSearchHeaderContent,
+  MobileSearchHeaderScrollableContent,
+} from '@/mobile/search-header'
 import { SearchInput } from '@/mobile/search-input'
 import type { NoteRowModel } from '@/mobile/swipeable-note-row'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus'
@@ -164,7 +168,7 @@ export function MobileAllNotes({
             onValueChange={onQueryChange}
           />
         </MobileSearchHeaderContent>
-        <div className="pb-2">
+        <MobileSearchHeaderScrollableContent>
           {pending !== null ? (
             <TagSuggestions
               facets={matchingTagFacets(facets ?? [], pending.partial)}
@@ -179,7 +183,7 @@ export function MobileAllNotes({
               onClearRouteTag={() => navigate({ kind: 'allNotes', tag: null })}
             />
           )}
-        </div>
+        </MobileSearchHeaderScrollableContent>
       </MobileSearchHeader>
       {/* Undefined hits mean "still fetching" only while the query can run —
           with no bridge/graph it never will, and the empty state is honest. */}
@@ -216,7 +220,7 @@ function TagSuggestions({
     return <p className="pb-1 text-xs text-text-muted">No matching tags</p>
   }
   return (
-    <div className="flex gap-1.5 overflow-x-auto pb-1" role="listbox" aria-label="Matching tags">
+    <div className="flex gap-1.5 w-max pb-2" role="listbox" aria-label="Matching tags">
       {facets.map((facet) => (
         <button
           key={facet.tag}
