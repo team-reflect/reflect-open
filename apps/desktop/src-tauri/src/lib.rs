@@ -53,6 +53,9 @@ mod watcher;
 #[cfg(mobile)]
 #[path = "watcher_mobile.rs"]
 mod watcher;
+// PROBE: temporary instrumentation for the macOS 26 window-collapse bug.
+#[cfg(desktop)]
+mod window_probe;
 
 use tauri::{Emitter, Manager};
 
@@ -181,6 +184,9 @@ pub fn run() {
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // PROBE: must stay registered before window-state so the boot record
+        // captures the state file before the plugin's setup reads it.
+        .plugin(window_probe::init())
         .plugin(
             // Note windows are excluded from state tracking: they cascade
             // fresh from their opener, and their content-hashed labels would
@@ -189,7 +195,9 @@ pub fn run() {
                 .with_state_flags(windows::restorable_window_state_flags())
                 .with_filter(|label| !label.starts_with(windows::NOTE_WINDOW_PREFIX))
                 .build(),
-        );
+        )
+        // PROBE: log every window event with a paired tao + AppKit dump.
+        .on_window_event(window_probe::on_window_event);
 
     // Reveal the main window on `PageLoadEvent::Finished`, not on
     // `RunEvent::Ready`. Ready only guarantees plugin init + window-state
@@ -393,7 +401,11 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(move |app, event| match &event {
+        .run(move |app, event| {
+            // PROBE: run-loop milestones, including the exit-moment dump.
+            #[cfg(desktop)]
+            window_probe::on_run_event(app, &event);
+            match &event {
             // Ready no longer reveals the main window — the page-load hook
             // above does, once the webview has painted. It is still the first
             // point where the window and an app handle both exist, so arm the
@@ -504,5 +516,6 @@ pub fn run() {
                 }
             }
             _ => {}
+            }
         });
 }
