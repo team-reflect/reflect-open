@@ -534,22 +534,15 @@ pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
     Ok(String::from_utf8_lossy(&response.body).into_owned())
 }
 
-// ---- oEmbed fetch ---------------------------------------------------------------
+// ---- JSON fetch -----------------------------------------------------------------
 
-/// oEmbed answers are ~1 KB of JSON; anything past this cap is not an oEmbed
-/// answer, and a truncated one would be unparseable, so oversize is an error
-/// rather than a cut.
-const OEMBED_FETCH_MAX_BYTES: usize = 64 * 1024;
+/// JSON responses exceeding the byte cap are rejected rather than truncated.
+const CAPTURE_JSON_MAX_BYTES: usize = 64 * 1024;
 
-/// Fetch an oEmbed endpoint's JSON answer for the capture meta scrape. Which
-/// URLs are oEmbed endpoints is policy and lives in `@reflect/core`
-/// (`actions/oembed`), behind the same privacy gate as `capture_meta_fetch`;
-/// this side only bounds the transport, strictly tighter than the HTML
-/// fetch: https only, JSON only, a small byte cap, and no redirects (oEmbed
-/// endpoints answer directly, so a redirect is a failure).
+/// Fetch bounded HTTPS JSON without following redirects.
 #[tauri::command]
-pub async fn capture_oembed_fetch(url: String) -> AppResult<String> {
-    let response = fetch_capture_json(&url, OEMBED_FETCH_MAX_BYTES).await?;
+pub async fn capture_json_fetch(url: String) -> AppResult<String> {
+    let response = fetch_capture_json(&url, CAPTURE_JSON_MAX_BYTES).await?;
     String::from_utf8(response.body)
         .map_err(|err| AppError::parse(format!("{url} answered non-UTF-8: {err}")))
 }
@@ -573,7 +566,11 @@ mod tests {
         ));
         assert!(matches!(
             classify_fetch_status(url, StatusCode::NOT_FOUND),
-            Some(AppError::Io { .. })
+            Some(AppError::NotFound { .. })
+        ));
+        assert!(matches!(
+            classify_fetch_status(url, StatusCode::GONE),
+            Some(AppError::NotFound { .. })
         ));
         assert!(matches!(
             classify_fetch_status(url, StatusCode::FORBIDDEN),

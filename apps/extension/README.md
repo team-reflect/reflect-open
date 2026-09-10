@@ -25,6 +25,37 @@ cannot observe the desktop drain.
 
 ## Develop
 
+### Save new X bookmarks
+
+Upgrade the Reflect desktop app, then open **Settings** from the capture popup
+and enable **Save new X bookmarks to Reflect**. This optional permission observes
+new `CreateBookmark` requests on X/Twitter. It saves bookmark intent, including
+requests X later rejects, without reading cookies or request headers. Turning it
+off revokes those host permissions; captures already queued still finish.
+
+Each new capture UUID creates a separate note linked from its capture-day Daily.
+Replaying the same UUID only repairs its backlink and cleanup. The desktop saves
+the URL first, then appends available public text. Long posts may be previews;
+protected/unavailable posts may only have a link. There is no automatic like
+capture, historical import, media download, quote expansion or DOM extraction.
+Manual X captures keep annotations, selection and screenshots; supplied page text
+is saved directly without another text fetch. Private notes and private Daily
+notes block external enrichment, and edited notes stop automatic appends.
+
+The shared extension queue holds 50 captures and drops the oldest when full.
+New captures can evict earlier manual captures during a long offline period.
+An old native host can transport the unchanged v1 envelope, but an old desktop
+still applies its old link-capture behavior. Upgrade desktop before opting in.
+
+For browser acceptance, use an unpacked build and verify button/menu/shortcut
+bookmarks, cancellation, permission denial/revocation, and service worker wake
+after suspension. Only record the operation and post ID, never a full request.
+Then close Reflect, queue a bookmark, reopen it, and verify the note and Daily
+link. These live checks complement the request fixtures; they are not proven by
+offline tests.
+
+### Build and run
+
 ```bash
 pnpm --filter @reflect/extension dev     # wxt dev server (auto-reloads in Chrome)
 pnpm --filter @reflect/extension build   # production build → .output/chrome-mv3
@@ -61,8 +92,8 @@ allowlisted by) the native-messaging host. Check, in order:
    ("Open Reflect and pick a graph first") means the host ran but has no active
    graph to spool into.
 
-The capture is never lost while held — it stays queued and retries automatically
-once the host is reachable.
+Held captures retry automatically once the host is reachable, subject to the
+50-entry queue limit described above.
 
 ## The unpacked ID is pinned — and the store ID is not the same
 

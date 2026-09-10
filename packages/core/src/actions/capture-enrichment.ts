@@ -44,6 +44,8 @@ import {
 } from './capture-note'
 import type { PageMeta } from '../link-preview/metadata'
 import { scrapePageMeta } from './meta-scrape'
+import { enrichXCapture } from './x-capture'
+import { isXCapturePath, xCaptureFromSource, xCaptureMeta } from './x-capture-note'
 
 /**
  * Capture notes still awaiting enrichment, oldest first: well-formed capture
@@ -51,30 +53,34 @@ import { scrapePageMeta } from './meta-scrape'
  */
 export async function listPendingCaptures(generation: number): Promise<CaptureIdentity[]> {
   const files = await listFiles(generation)
-  const candidates = files
-    .map((file) => captureFromPath(file.path))
-    .filter((identity): identity is CaptureIdentity => identity !== null)
-    .sort((first, second) => first.base.localeCompare(second.base))
   const pending: CaptureIdentity[] = []
-  for (const identity of candidates) {
+  for (const file of files) {
+    const isX = isXCapturePath(file.path)
+    const legacy = captureFromPath(file.path)
+    if (!isX && legacy === null) continue
     let source: string
     try {
-      source = await readNote(identity.notePath, generation)
+      source = await readNote(file.path, generation)
     } catch (cause) {
-      if (isAppError(cause) && cause.kind === 'notFound') {
-        continue
-      }
+      if (isAppError(cause) && cause.kind === 'notFound') continue
       throw cause
     }
-    const meta = captureNoteMeta(parseFrontmatter(splitFrontmatter(source).raw).data)
-    if (meta?.captureStatus === 'pending') {
-      pending.push(identity)
-    }
+    const meta = isX
+      ? xCaptureMeta(source)
+      : captureNoteMeta(parseFrontmatter(splitFrontmatter(source).raw).data)
+    const identity = isX ? xCaptureFromSource(file.path, source) : legacy
+    if (identity && meta?.captureStatus === 'pending') pending.push(identity)
   }
+  pending.sort(
+    (first, second) =>
+      first.date.localeCompare(second.date) || first.base.localeCompare(second.base),
+  )
   return pending
 }
 
 export interface ReconcileCaptureEnrichmentInput {
+  /** Defer capture writes while an editor holds unsaved changes. */
+  isNoteDirty?: (path: string) => boolean
   /** The configured-providers state — decides the provider and keychain entry. */
   providers: AiProvidersState
   /** `GraphInfo.generation` — pins every read and write to the issuing graph. */
@@ -196,17 +202,22 @@ export async function reconcileCaptureEnrichment(
   const config = defaultAiProvider(input.providers)
   let apiKey: string | null = null
   let providerStop: ReconcileStop | null = null
-  if (config !== null) {
-    try {
-      apiKey = await aiApiKeyForConfig(config)
-    } catch (cause) {
-      const error = toAppError(cause)
-      providerStop = { reason: error.kind, message: error.message }
-    }
-    if (apiKey === null && providerStop === null) {
-      providerStop = {
-        reason: 'config',
-        message: `The API key for the configured ${config.provider} model is missing from the keychain.`,
+  let providerLoaded = false
+  async function loadProvider(): Promise<void> {
+    if (providerLoaded) return
+    providerLoaded = true
+    if (config !== null) {
+      try {
+        apiKey = await aiApiKeyForConfig(config)
+      } catch (cause) {
+        const error = toAppError(cause)
+        providerStop = { reason: error.kind, message: error.message }
+      }
+      if (apiKey === null && providerStop === null) {
+        providerStop = {
+          reason: 'config',
+          message: `The API key for the configured ${config.provider} model is missing from the keychain.`,
+        }
       }
     }
   }
@@ -266,6 +277,13 @@ export async function reconcileCaptureEnrichment(
       return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
     }
     try {
+      if (isXCapturePath(identity.notePath)) {
+        const result = await enrichXCapture(identity, input)
+        if (result === 'enriched') enriched += 1
+        if (result === 'skipped') skipped += 1
+        continue
+      }
+      await loadProvider()
       let snapshot = await currentCapture(identity)
       if (snapshot === null) {
         continue

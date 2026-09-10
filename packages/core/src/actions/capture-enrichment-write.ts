@@ -7,6 +7,12 @@ import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdo
 import type { AiProviderConfig } from '../settings/schema'
 import type { CaptureIdentity } from './capture-identity'
 import {
+  isXCapturePath,
+  xCaptureFrontmatter,
+  xCaptureMeta,
+  type XCaptureMeta,
+} from './x-capture-note'
+import {
   captureNoteMeta,
   notePrivate,
   noteSource,
@@ -31,6 +37,8 @@ export interface PendingCaptureSnapshot {
 }
 
 interface PersistCaptureEnrichmentInput {
+  expectedCapture?: Pick<XCaptureMeta, 'captureKind' | 'captureDay' | 'captureUrl'>
+  canWrite?: () => boolean
   identity: CaptureIdentity
   expectedHash: string
   body: string
@@ -62,8 +70,9 @@ export async function readPendingCaptureSnapshot(
     throw cause
   }
   const split = splitFrontmatter(source)
-  const frontmatter = parseFrontmatter(split.raw).data
-  const meta = captureNoteMeta(frontmatter)
+  const isX = isXCapturePath(identity.notePath)
+  const frontmatter = isX ? xCaptureFrontmatter(source) : parseFrontmatter(split.raw).data
+  const meta = isX ? xCaptureMeta(source) : captureNoteMeta(frontmatter)
   if (meta === null || meta.captureStatus !== 'pending') {
     return null
   }
@@ -166,6 +175,16 @@ export async function persistCaptureEnrichment(
   const captureHash = await hashContent(input.body)
   const snapshot = await readPendingCaptureSnapshot(input.identity, input.generation)
   const dailySource = await noteSource(dailyPath(input.identity.date), input.generation)
+  const expected = input.expectedCapture
+  if (
+    expected &&
+    (xCaptureFrontmatter(dailySource).private ||
+      snapshot?.meta.captureKind !== expected.captureKind ||
+      snapshot.meta.captureDay !== expected.captureDay ||
+      snapshot.meta.captureUrl !== expected.captureUrl ||
+      input.identity.date !== expected.captureDay)
+  )
+    return null
   if (
     snapshot === null ||
     snapshot.title !== input.fromTitle ||
@@ -177,6 +196,7 @@ export async function persistCaptureEnrichment(
   }
   const reassembled = snapshot.source.slice(0, snapshot.bodyOffset) + input.body
   const titleChanged = input.toTitle !== input.fromTitle
+  if (input.canWrite?.() === false) return null
   await writeNote(
     input.identity.notePath,
     upsertFrontmatter(reassembled, {

@@ -21,6 +21,8 @@ export { notePrivate } from '../privacy/checkers'
 export type CaptureStatus = 'pending' | 'done' | 'skipped'
 
 const captureNoteMetaSchema = z.object({
+  captureKind: z.literal('x-text').optional(),
+  captureDay: z.iso.date().optional(),
   captureUrl: z.string(),
   captureStatus: z.enum(['pending', 'done', 'skipped']),
   /** The metadata attempt completed, including a permanently unsuitable page. */

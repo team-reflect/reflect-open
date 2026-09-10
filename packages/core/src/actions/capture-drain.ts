@@ -22,6 +22,8 @@ import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter'
 import type { ReconcileStop } from './audio-memo'
 import { ensureBacklinkTarget } from './backlink-target'
+import { drainXCapture } from './x-capture'
+import { xPostId } from './x-post'
 import {
   captureFromPath,
   captureIdentity,
@@ -54,6 +56,8 @@ const SCREENSHOT_MAX_DIM = 1600
 const ORPHAN_SPOOL_MAX_AGE_MS = 60 * 60 * 1000
 
 export interface DrainCaptureInboxInput {
+  /** Defer capture writes while an editor holds unsaved changes. */
+  isNoteDirty?: (path: string) => boolean
   /** `GraphInfo.generation` — pins every read and write to the issuing graph. */
   generation: number
   /** Abort gate, checked between spool files (graph switch / unmount). */
@@ -196,6 +200,11 @@ export async function drainCaptureInbox(
         await drainTextCapture(envelope, input.generation)
         await captureInboxRemove(name, input.generation)
         drained += 1
+        continue
+      }
+      const postId = xPostId(envelope.url)
+      if (postId !== null) {
+        if ((await drainXCapture(envelope, name, postId, input)) === 'saved') drained += 1
         continue
       }
       const fresh = captureIdentity(new Date(envelope.capturedAt), envelope.id)
