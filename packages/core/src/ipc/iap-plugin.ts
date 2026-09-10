@@ -30,7 +30,9 @@ const iapProductSchema = z.object({
 })
 
 /**
- * One store product as the plugin reports it.
+ * One store product as the plugin reports it. `formattedPrice` is the
+ * store-localized display price (e.g., "$4.99"); it is nullish on plugin code
+ * paths that build the dictionary without loaded store metadata.
  */
 export type IapProduct = z.infer<typeof iapProductSchema>
 
