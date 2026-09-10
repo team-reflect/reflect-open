@@ -84,6 +84,12 @@ vi.mock('@/components/note-pane', () => ({
     )
   },
 }))
+vi.mock('@/providers/graph-provider', () => ({
+  useGraph: () => ({
+    graph: { root: '/g', name: 'g', generation: 1 },
+    indexing: false,
+  }),
+}))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
     settings: { dateFormat: 'mdy' },
