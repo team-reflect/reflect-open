@@ -5,5 +5,5 @@ export function MobileSearchHeader({ children }: { children: ReactNode }): React
 }
 
 export function MobileSearchHeaderContent({ children }: { children: ReactNode }): ReactElement {
-  return <div className="flex h-11 items-center gap-1">{children}</div>
+  return <div className="flex h-12 items-center gap-1">{children}</div>
 }
