@@ -83,6 +83,9 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         return null
       case 'plugin:mobile-haptics|impact_light':
         return null
+      case 'plugin:iap|get_product_status':
+        // Browser previews have no App Store purchases.
+        return { isOwned: false }
       case 'mobile_storage':
         // No iCloud in a plain browser — the dev harness exercises the
         // local-storage path (and, via `mobileOnboarded` above, skips
