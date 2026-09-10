@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.3...v0.12.0-beta.4) (2026-09-10)
+
+
+### Bug Fixes
+
+* show preferences shortcut in graph menu ([#1257](https://github.com/team-reflect/reflect-open/issues/1257)) ([49da07d](https://github.com/team-reflect/reflect-open/commit/49da07da284747b577b4e8b9540defc73e3607e3))
+* update mobile search header styles ([#1261](https://github.com/team-reflect/reflect-open/issues/1261)) ([fbc4862](https://github.com/team-reflect/reflect-open/commit/fbc48621192c6c6c21a1806ad7542bff0051a311))
+
 ## [0.12.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.2...v0.12.0-beta.3) (2026-09-09)
 
 
