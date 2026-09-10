@@ -18,7 +18,6 @@ import {
 import { useTaskActions } from '@/lib/tasks/use-task-actions'
 import { useToday } from '@/lib/use-today'
 import { hapticImpactLight } from '@/mobile/haptics'
-import { MobileSearchHeader, MobileSearchHeaderContent } from '@/mobile/search-header'
 import { SearchInput } from '@/mobile/search-input'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet'
 import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer'
@@ -143,40 +142,38 @@ export function MobileTasks(): ReactElement {
       className="flex h-full w-screen flex-col"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <MobileSearchHeader>
-        <MobileSearchHeaderContent>
-          <SearchInput
-            ref={searchInputRef}
-            placeholder="Search tasks…"
-            aria-label="Search tasks"
-            value={query}
-            onValueChange={setQuery}
-          />
-          {recentlyCompleted.length > 0 ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-10 shrink-0"
-              aria-label={`Archive ${recentlyCompleted.length} completed`}
-              onClick={archiveCompleted}
-            >
-              <Archive />
-            </Button>
-          ) : null}
+      <header className="flex shrink-0 items-center gap-1 border-b border-border px-4 pb-2 pt-1">
+        <SearchInput
+          ref={searchInputRef}
+          placeholder="Search tasks…"
+          aria-label="Search tasks"
+          value={query}
+          onValueChange={setQuery}
+        />
+        {recentlyCompleted.length > 0 ? (
           <Button
             variant="ghost"
             size="icon"
             className="size-10 shrink-0"
-            aria-label="Task filters"
-            onClick={() => {
-              hapticImpactLight()
-              setFiltersOpen(true)
-            }}
+            aria-label={`Archive ${recentlyCompleted.length} completed`}
+            onClick={archiveCompleted}
           >
-            <SlidersHorizontal />
+            <Archive />
           </Button>
-        </MobileSearchHeaderContent>
-      </MobileSearchHeader>
+        ) : null}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-10 shrink-0"
+          aria-label="Task filters"
+          onClick={() => {
+            hapticImpactLight()
+            setFiltersOpen(true)
+          }}
+        >
+          <SlidersHorizontal />
+        </Button>
+      </header>
       {isError ? (
         <p role="alert" className="px-4 py-6 text-sm text-text-muted">
           Couldn’t load tasks.
