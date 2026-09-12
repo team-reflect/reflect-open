@@ -1,6 +1,6 @@
 import {
   appendTaskToContext,
-  appendTaskLine,
+  appendTaskUnderHeading,
   editTaskLine,
   isAppError,
   parseNote,
@@ -28,7 +28,7 @@ export interface TaskMarkerOffsetChange {
   readonly marker: TaskMarker | null
 }
 
-export interface ContinuedTaskInContext {
+export interface InsertedTask {
   /** The newly inserted empty task's exact persisted marker identity. */
   readonly created: TaskMarker
   /** Relocations for pre-existing task markers shifted by the atomic write. */
@@ -177,7 +177,7 @@ export function continueTaskInContext(
   task: TaskRef,
   content: string | null,
   generation: number,
-): Promise<ContinuedTaskInContext> {
+): Promise<InsertedTask> {
   return serializeByPath(task.notePath, async () => {
     if (openSession(task.notePath) !== null) {
       throw new NoteBusyError('This note is open — add the task in the note itself.')
@@ -241,14 +241,14 @@ export function continueTaskInContext(
 }
 
 /**
- * Insert a new empty `+ [ ] ` task at the end of `notePath` (Plan 18's Return-to-
- * add) and return its marker offset, so the Tasks view can select the new row and
+ * Insert a new empty `+ [ ] ` task under Tasks and return its marker and the
+ * shifted identities of existing tasks, so the Tasks view can select the new row and
  * open its inline editor. A missing note — today's daily not yet created — starts
  * empty. Refuses an **open** note via {@link NoteBusyError}: appending through
  * disk would clobber its live buffer, and the Tasks view rarely targets one.
  * Serialized per path with the other task writes.
  */
-export function insertTask(notePath: string, generation: number): Promise<number> {
+export function insertTask(notePath: string, generation: number): Promise<InsertedTask> {
   return serializeByPath(notePath, async () => {
     if (openSession(notePath) !== null) {
       throw new NoteBusyError('This note is open — add the task in the note itself.')
@@ -263,8 +263,26 @@ export function insertTask(notePath: string, generation: number): Promise<number
         throw cause
       }
     }
-    const { source: next, markerOffset } = appendTaskLine(source)
-    await writeNote(notePath, next, generation)
-    return markerOffset
+    const inserted = appendTaskUnderHeading(source)
+    const delta = inserted.source.length - source.length
+    const offsetChanges = parseNote({ path: notePath, source }).tasks.map<TaskMarkerOffsetChange>(
+      (task) => ({
+        from: task.markerOffset,
+        fromRaw: task.raw,
+        marker: {
+          markerOffset:
+            task.markerOffset + (task.markerOffset >= inserted.insertionOffset ? delta : 0),
+          raw: task.raw,
+        },
+      }),
+    )
+    const created = parseNote({ path: notePath, source: inserted.source }).tasks.find(
+      (task) => task.markerOffset === inserted.markerOffset,
+    )
+    if (created === undefined) {
+      throw new Error(`task insertion failed at offset ${inserted.markerOffset}`)
+    }
+    await writeNote(notePath, inserted.source, generation)
+    return { created: { markerOffset: created.markerOffset, raw: created.raw }, offsetChanges }
   })
 }

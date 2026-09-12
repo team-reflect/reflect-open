@@ -13,10 +13,10 @@ import { dailyPath, notePath } from '../graph/paths'
 import { hashContent } from '../indexing/hash'
 import {
   appendListItem,
+  appendTaskUnderHeading,
   appendListItemUnderBacklinkedHeading,
   headingMatchesBacklinkedTitle,
   upgradeSectionHeadingBacklink,
-  type ListItemKind,
 } from '../markdown/edit'
 import { parseNote } from '../markdown/extract'
 import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks'
@@ -325,8 +325,15 @@ async function drainTextCapture(envelope: TextCaptureEnvelope, generation: numbe
   const dailySource = await noteSource(daily, generation)
   // `task` is Reflect's round `+` checkbox, the only marker the Tasks
   // projection reads; `checkbox` is the square `- [ ]`, an inert daily item.
-  const kind: ListItemKind = envelope.kind === 'append' ? 'bullet' : envelope.kind
-  await writeNote(daily, appendListItem(dailySource, envelope.text, kind), generation)
+  const next =
+    envelope.kind === 'task'
+      ? appendTaskUnderHeading(dailySource, envelope.text).source
+      : appendListItem(
+          dailySource,
+          envelope.text,
+          envelope.kind === 'append' ? 'bullet' : 'checkbox',
+        )
+  await writeNote(daily, next, generation)
 }
 
 async function sweepOrphanSpools(

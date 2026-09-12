@@ -524,7 +524,15 @@ describe('drainCaptureInbox (text captures)', () => {
 
     await drain()
 
-    expect(files.get(DAILY)).toBe('+ [ ] buy milk\n')
+    expect(files.get(DAILY)).toBe('## Tasks\n\n+ [ ] buy milk\n')
+  })
+
+  it('places task captures in the existing section without creating a backlink target', async () => {
+    files.set(DAILY, '## Tasks\n\n+ [ ] old\n\n## Later\n\nprose\n')
+    addTextSpool(textEnvelope({ kind: 'task', text: 'buy milk' }))
+    await drain()
+    expect(files.get(DAILY)).toBe('## Tasks\n\n+ [ ] old\n+ [ ] buy milk\n\n## Later\n\nprose\n')
+    expect([...files.keys()].filter((path) => path !== DAILY)).toEqual([])
   })
 
   it('appends a checkbox envelope as a square GFM checkbox', async () => {
