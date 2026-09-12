@@ -220,6 +220,29 @@ export const describeAssetsSchema = z.boolean().catch(true)
 export const transcriptionFormatSchema = z.boolean().catch(true)
 
 /**
+ * Maximum stored transcription hint. `whisper-1` (the OpenAI fallback model)
+ * reads only the last 224 prompt tokens, so a longer hint would be cut from
+ * the front.
+ */
+export const TRANSCRIPTION_PROMPT_MAX_LENGTH = 500
+
+/** Canonicalize the user's transcription hint before storing or sending it. */
+export function normalizeTranscriptionPrompt(value: string): string {
+  return value.trim().slice(0, TRANSCRIPTION_PROMPT_MAX_LENGTH)
+}
+
+/**
+ * Free-text context for audio-memo transcription (for example names the
+ * provider tends to misspell). Sent verbatim with every segment as the
+ * provider's prompt (OpenAI) or appended to the instruction (Gemini). Empty
+ * (the default) sends nothing.
+ */
+export const transcriptionPromptSchema = z
+  .string()
+  .catch('')
+  .transform(normalizeTranscriptionPrompt)
+
+/**
  * Whether the user has finished the mobile onboarding choice (Plan 19, step
  * 6): iCloud Drive or this device. Off by default — a fresh install shows
  * the onboarding screen before anything seeds a graph. Once set, later
@@ -520,6 +543,7 @@ export const settingsSchema = z.looseObject({
   semanticSearchEnabled: semanticSearchEnabledSchema,
   describeAssets: describeAssetsSchema,
   transcriptionFormat: transcriptionFormatSchema,
+  transcriptionPrompt: transcriptionPromptSchema,
   contactsEnabled: contactsEnabledSchema,
   mobileOnboarded: mobileOnboardedSchema,
   mobileStorage: mobileStorageKindSchema,

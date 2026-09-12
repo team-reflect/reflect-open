@@ -18,11 +18,11 @@ import {
 import { useTaskActions } from '@/lib/tasks/use-task-actions'
 import { useToday } from '@/lib/use-today'
 import { hapticImpactLight } from '@/mobile/haptics'
-import { MobileSearchHeader, MobileSearchHeaderContent } from '@/mobile/search-header'
 import { SearchInput } from '@/mobile/search-input'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet'
 import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer'
 import { MobileTaskGroup } from '@/mobile/task-group'
+import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
@@ -143,8 +143,8 @@ export function MobileTasks(): ReactElement {
       className="flex h-full w-screen flex-col"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <MobileSearchHeader>
-        <MobileSearchHeaderContent>
+      <MobileTopBar>
+        <MobileTopBarRow>
           <SearchInput
             ref={searchInputRef}
             placeholder="Search tasks…"
@@ -153,20 +153,15 @@ export function MobileTasks(): ReactElement {
             onValueChange={setQuery}
           />
           {recentlyCompleted.length > 0 ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-10 shrink-0"
+            <MobileTopBarIconButton
               aria-label={`Archive ${recentlyCompleted.length} completed`}
               onClick={archiveCompleted}
             >
               <Archive />
-            </Button>
+            </MobileTopBarIconButton>
           ) : null}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-10 shrink-0"
+          <MobileTopBarIconButton
+            edge="trailing"
             aria-label="Task filters"
             onClick={() => {
               hapticImpactLight()
@@ -174,9 +169,9 @@ export function MobileTasks(): ReactElement {
             }}
           >
             <SlidersHorizontal />
-          </Button>
-        </MobileSearchHeaderContent>
-      </MobileSearchHeader>
+          </MobileTopBarIconButton>
+        </MobileTopBarRow>
+      </MobileTopBar>
       {isError ? (
         <p role="alert" className="px-4 py-6 text-sm text-text-muted">
           Couldn’t load tasks.

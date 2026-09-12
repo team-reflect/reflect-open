@@ -53,6 +53,7 @@ const createTranscriptionReconciler = vi.hoisted(() =>
       generation: number
       getProviders: () => AiProvidersState
       getTranscriptionFormat: () => boolean
+      getTranscriptionPrompt: () => string
     }) => reconcilerControls.fake,
   ),
 )
@@ -134,6 +135,7 @@ const SETTINGS = vi.hoisted(() => ({
     aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
     defaultAiProviderId: 'cfg-openai',
     transcriptionFormat: true,
+    transcriptionPrompt: '',
   },
 }))
 
@@ -189,6 +191,7 @@ beforeEach(() => {
     aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
     defaultAiProviderId: 'cfg-openai',
     transcriptionFormat: true,
+    transcriptionPrompt: '',
   }
   captureAudioMemoPart.mockResolvedValue({ ok: true, memo: MEMO })
   reconcilerControls.fake.getTranscribing.mockReturnValue(false)
@@ -230,11 +233,17 @@ describe('AudioMemoProvider', () => {
     // Models are read lazily, so a key added mid-session reaches the next pass.
     expect(options?.getProviders().defaultProviderId).toBe('cfg-openai')
     expect(options?.getTranscriptionFormat()).toBe(true)
+    expect(options?.getTranscriptionPrompt()).toBe('')
     expect(reconcilerControls.fake.start).toHaveBeenCalledTimes(1)
 
-    SETTINGS.current = { ...SETTINGS.current, transcriptionFormat: false }
+    SETTINGS.current = {
+      ...SETTINGS.current,
+      transcriptionFormat: false,
+      transcriptionPrompt: 'Names: Ocavue',
+    }
     await rerender()
     expect(options?.getTranscriptionFormat()).toBe(false)
+    expect(options?.getTranscriptionPrompt()).toBe('Names: Ocavue')
     expect(createTranscriptionReconciler).toHaveBeenCalledTimes(1)
 
     await unmount()
@@ -262,6 +271,7 @@ describe('AudioMemoProvider', () => {
       ],
       defaultAiProviderId: 'claude',
       transcriptionFormat: true,
+      transcriptionPrompt: '',
     }
     const { rerender } = await renderHook(() => useAudioMemo(), { wrapper })
     expect(reconcilerControls.fake.schedule).not.toHaveBeenCalled()
@@ -270,6 +280,7 @@ describe('AudioMemoProvider', () => {
       aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
       defaultAiProviderId: 'cfg-openai',
       transcriptionFormat: true,
+      transcriptionPrompt: '',
     }
     await rerender()
 
@@ -669,6 +680,7 @@ describe('AudioMemoProvider', () => {
       ],
       defaultAiProviderId: 'claude',
       transcriptionFormat: true,
+      transcriptionPrompt: '',
     }
     const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 

@@ -11,6 +11,7 @@
 //! `@reflect/core` (`actions/capture-envelope.ts`) — that TS file is the
 //! source of truth.
 
+pub mod bookmark;
 pub mod envelope;
 pub mod protocol;
 pub mod spool;
@@ -27,6 +28,8 @@ use spool::{inbox_dir, spool_capture};
 pub enum HostError {
     /// No pointer file — the app has never opened a graph on this machine.
     NoGraph,
+    /// The desktop app that owns the pointed graph cannot read this envelope version yet.
+    UnsupportedVersion,
     /// The wire message failed validation.
     InvalidPayload(String),
     /// The spool write (or pointer read) failed.
@@ -37,6 +40,7 @@ impl HostError {
     fn code(&self) -> &'static str {
         match self {
             HostError::NoGraph => "no-graph",
+            HostError::UnsupportedVersion => "unsupported-version",
             HostError::InvalidPayload(_) => "invalid-payload",
             HostError::Io(_) => "io",
         }
@@ -44,6 +48,9 @@ impl HostError {
 
     fn message(&self) -> String {
         match self {
+            HostError::UnsupportedVersion => {
+                "Update and open Reflect before saving bookmarks.".into()
+            }
             HostError::NoGraph => "Open Reflect and pick a graph first.".to_string(),
             HostError::InvalidPayload(message) | HostError::Io(message) => message.clone(),
         }
@@ -67,6 +74,13 @@ fn ack_json(outcome: &Result<(), HostError>) -> Vec<u8> {
 
 /// Handle one wire message: validate, locate the inbox, spool.
 fn handle_message(payload: &[u8], pointer_path: &Path) -> Result<(), HostError> {
+    let value: serde_json::Value = serde_json::from_slice(payload)
+        .map_err(|_| HostError::InvalidPayload("Invalid capture JSON".into()))?;
+    match value["envelope"].get("kind") {
+        Some(kind) if kind == "x-bookmark" => return bookmark::spool(payload, pointer_path),
+        Some(_) => return Err(HostError::InvalidPayload("Unexpected capture kind".into())),
+        None => {}
+    }
     let capture = ValidatedCapture::parse(payload)?;
     let inbox = inbox_dir(pointer_path)?;
     spool_capture(&inbox, &capture)

@@ -1,9 +1,9 @@
 import { browser } from 'wxt/browser'
-import type { CaptureWireMessage } from '@reflect/core/capture-envelope'
+import type { ExtensionCaptureWire } from '@reflect/core/capture-envelope'
 import type { FlushResult } from './messages'
 import { sendToHost } from './native'
 import {
-  overCap,
+  QUEUE_CAP,
   queueKey,
   QUEUE_KEY_PREFIX,
   queuedCaptureSchema,
@@ -11,13 +11,7 @@ import {
   type QueuedCapture,
 } from './queue'
 
-/**
- * Queue persistence + the flush driver, shared by the background (which owns
- * retries) and the popup (which enqueues before asking for a flush). Every
- * capture lives under its own storage key, so the popup's enqueue and the
- * background's per-entry removals are independent atomic writes — no shared
- * snapshot is ever written back (see `lib/queue.ts`).
- */
+/** Background-owned queue admission and delivery; popup reads are read-only. */
 
 /** Every queued capture, oldest first. Unreadable entries are skipped. */
 export async function readQueue(): Promise<QueuedCapture[]> {
@@ -35,15 +29,28 @@ export async function readQueue(): Promise<QueuedCapture[]> {
   return sortQueue(entries)
 }
 
-/** Persist a capture — the durable step before any flush. Cap-enforced. */
-export async function enqueueCapture(wire: CaptureWireMessage): Promise<void> {
-  const entry: QueuedCapture = { wire, queuedAt: Date.now(), attempts: 0 }
-  await browser.storage.local.set({ [queueKey(wire.envelope.id)]: entry })
-  const dropped = overCap(await readQueue())
-  if (dropped.length > 0) {
-    console.warn(`capture queue at cap: dropping ${dropped.length} oldest capture(s)`)
-    await browser.storage.local.remove(dropped.map((old) => queueKey(old.wire.envelope.id)))
-  }
+let enqueueTail = Promise.resolve()
+
+/**
+ * Persist a capture, the durable step before any flush. Admission is
+ * serialized so a full queue refuses the newcomer instead of evicting an
+ * accepted capture.
+ */
+export function enqueueCapture(wire: ExtensionCaptureWire): Promise<void> {
+  const next = enqueueTail.then(async () => {
+    const entries = await readQueue()
+    if (entries.some((entry) => entry.wire.envelope.id === wire.envelope.id)) return
+    if (entries.length >= QUEUE_CAP) {
+      throw new Error(
+        'Capture queue full. Existing captures are kept; retry after they are delivered.',
+      )
+    }
+    await browser.storage.local.set({
+      [queueKey(wire.envelope.id)]: { wire, queuedAt: Date.now(), attempts: 0 },
+    })
+  })
+  enqueueTail = next.catch(() => {})
+  return next
 }
 
 let tail: Promise<FlushResult> | null = null
@@ -94,7 +101,8 @@ async function runFlush(): Promise<FlushResult> {
         [queueKey(id)]: { ...entry, attempts: entry.attempts + 1 },
       })
       holdReason = outcome.reason
-      break
+      // Only a bookmark waits on a desktop update; page captures behind it still go.
+      if (outcome.reason !== 'unsupported-version') break
     }
   }
 

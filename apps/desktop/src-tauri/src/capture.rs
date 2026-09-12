@@ -55,6 +55,7 @@ fn pointer_json(root: &Path) -> String {
     serde_json::json!({
         "version": 1,
         "graphRoot": root.to_string_lossy(),
+        "bookmarkVersion": 2,
     })
     .to_string()
 }
@@ -637,6 +638,7 @@ mod tests {
             serde_json::from_str(&pointer_json(Path::new("/graphs/personal"))).unwrap();
         assert_eq!(parsed["version"], 1);
         assert_eq!(parsed["graphRoot"], "/graphs/personal");
+        assert_eq!(parsed["bookmarkVersion"], 2);
     }
 
     #[test]

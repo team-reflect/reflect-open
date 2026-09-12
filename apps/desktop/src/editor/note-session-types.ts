@@ -51,7 +51,9 @@ export interface NoteSessionIo {
    * no generation is available — the session then tracks dirtiness but never
    * writes.
    */
-  write: ((path: string, contents: string) => Promise<void>) | null
+  write:
+    | ((path: string, contents: string, expectedContents?: string | null) => Promise<void>)
+    | null
 }
 
 /** Why {@link NoteSessionOptions.onContent} fired. */
@@ -232,6 +234,8 @@ export interface NoteSession {
    * A blank block is refused (`false`) — there is nothing to write.
    */
   commitBodyAppend: (block: string) => Promise<boolean>
+  /** Apply a synchronous full-source transform through the live save pipeline. */
+  commitSourceEdit: (transform: (source: string) => string) => Promise<boolean>
   /** Flush pending edits and detach: no further snapshots are emitted. */
   dispose: () => void
   /**

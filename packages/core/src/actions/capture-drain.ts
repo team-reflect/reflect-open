@@ -1,3 +1,4 @@
+import type { BookmarkEnvelope } from './bookmark-envelope'
 import { errorMessage, isAppError, toAppError } from '../errors'
 import {
   captureInboxList,
@@ -56,6 +57,8 @@ const ORPHAN_SPOOL_MAX_AGE_MS = 60 * 60 * 1000
 export interface DrainCaptureInboxInput {
   /** `GraphInfo.generation` — pins every read and write to the issuing graph. */
   generation: number
+  /** Appends a bookmark to the daily note at `path`, merging with a live editor when open. */
+  writeBookmark?: (envelope: BookmarkEnvelope, path: string) => Promise<void>
   /** Abort gate, checked between spool files (graph switch / unmount). */
   isStale?: () => boolean
   /** Clock for the orphan sweep; injectable for tests. */
@@ -166,6 +169,7 @@ export async function drainCaptureInbox(
         first.modifiedMs - second.modifiedMs || first.path.localeCompare(second.path),
     )
 
+  let bookmarkStop: ReconcileStop | null = null
   let drained = 0
   let deduped = 0
   let invalid = 0
@@ -192,7 +196,25 @@ export async function drainCaptureInbox(
         invalid += 1
         continue
       }
-      if ('kind' in envelope) {
+      if (envelope.kind === 'x-bookmark') {
+        try {
+          if (!input.writeBookmark) {
+            throw new Error('Bookmark writer is unavailable; update Reflect')
+          }
+          const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
+          await input.writeBookmark(envelope, daily)
+          await captureInboxRemove(name, input.generation)
+          drained += 1
+        } catch (cause) {
+          if (stale()) {
+            return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
+          }
+          // Keep the spool; the next pass retries after the editor settles.
+          bookmarkStop ??= { reason: toAppError(cause).kind, message: errorMessage(cause) }
+        }
+        continue
+      }
+      if (envelope.kind !== undefined) {
         await drainTextCapture(envelope, input.generation)
         await captureInboxRemove(name, input.generation)
         drained += 1
@@ -278,7 +300,7 @@ export async function drainCaptureInbox(
   } catch (cause) {
     return outcome({ reason: toAppError(cause).kind, message: errorMessage(cause) })
   }
-  return outcome(null)
+  return outcome(bookmarkStop)
 }
 
 function parseEnvelope(raw: string): InboxEnvelope | null {

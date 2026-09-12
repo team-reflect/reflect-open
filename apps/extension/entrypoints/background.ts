@@ -1,11 +1,14 @@
+import { z } from 'zod'
+import { extensionCaptureWireSchema } from '@reflect/core/capture-envelope'
 import { browser } from 'wxt/browser'
 import { defineBackground } from '#imports'
 import { SAVE_CURRENT_PAGE_COMMAND } from '@/lib/commands'
-import { flushQueue } from '@/lib/flush'
+import { enqueueCapture, flushQueue } from '@/lib/flush'
 import { isFlushRequest } from '@/lib/messages'
 import { readIncludePageTextPreference } from '@/lib/popup-preferences'
 import { saveCapture } from '@/lib/save-capture'
 import { snapshotTab } from '@/lib/snapshot-active-tab'
+import { registerBookmarkObserver } from '@/lib/x-bookmarks'
 import { tryExtractPageText } from './popup/extract-page-text'
 
 /**
@@ -41,8 +44,26 @@ async function saveTabWithDefaults(tab: Parameters<typeof snapshotTab>[0]): Prom
   }
 }
 
+const enqueueRequestSchema = z.object({
+  type: z.literal('enqueue'),
+  wire: extensionCaptureWireSchema,
+})
+
 export default defineBackground(() => {
+  registerBookmarkObserver()
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    const enqueue = enqueueRequestSchema.safeParse(message)
+    if (enqueue.success) {
+      void enqueueCapture(enqueue.data.wire).then(
+        () => sendResponse({ ok: true }),
+        (cause: unknown) =>
+          sendResponse({
+            ok: false,
+            message: cause instanceof Error ? cause.message : 'Capture failed',
+          }),
+      )
+      return true
+    }
     if (isFlushRequest(message)) {
       flushQueue().then(sendResponse, (cause: unknown) => {
         console.error('capture flush failed:', cause)

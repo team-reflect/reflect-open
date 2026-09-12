@@ -1,10 +1,6 @@
 import { z } from 'zod'
 
-/**
- * The popup ↔ background message contract. The popup persists the capture to
- * the queue itself, then sends `flush` — the queue (not the message) is the
- * source of truth, so a popup window closing mid-roundtrip loses nothing.
- */
+/** Popup requests are admitted and delivered by the background worker. */
 
 /** Ask the background to flush the queue now. */
 export interface FlushRequest {
@@ -24,9 +20,10 @@ export function isFlushRequest(message: unknown): message is FlushRequest {
  * Why queued captures are being held for retry. `no-host`: the native host
  * isn't registered (Reflect not installed, or never launched since install);
  * `no-graph`: Reflect has never opened a graph; `io`: the host failed to
- * spool — all retried on the next flush trigger.
+ * spool; `unsupported-version`: the desktop cannot read a bookmark envelope
+ * yet — all retried on the next flush trigger.
  */
-export const holdReasonSchema = z.enum(['no-host', 'no-graph', 'io'])
+export const holdReasonSchema = z.enum(['no-host', 'no-graph', 'io', 'unsupported-version'])
 export type HoldReason = z.infer<typeof holdReasonSchema>
 
 /** The flush outcome the popup renders. */

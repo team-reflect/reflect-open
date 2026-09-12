@@ -9,7 +9,6 @@ import {
   type FilteredSearchHit,
   type NoteTagFacet,
 } from '@reflect/core'
-import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 import { queryKeys } from '@/lib/query-client'
@@ -21,9 +20,14 @@ import {
   type AllNotesFilters,
 } from '@/mobile/search-filters/filter-state'
 import { NoteRowList } from '@/mobile/note-row-list'
-import { MobileSearchHeader, MobileSearchHeaderContent } from '@/mobile/search-header'
 import { SearchInput } from '@/mobile/search-input'
 import type { NoteRowModel } from '@/mobile/swipeable-note-row'
+import {
+  MobileTopBar,
+  MobileTopBarIconButton,
+  MobileTopBarRow,
+  MobileTopBarScrollableRow,
+} from '@/mobile/top-bar'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
@@ -143,18 +147,12 @@ export function MobileAllNotes({
       className="flex h-full w-screen flex-col"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <MobileSearchHeader>
-        <MobileSearchHeaderContent>
+      <MobileTopBar>
+        <MobileTopBarRow>
           {tag !== null && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="-ml-2 size-10 shrink-0"
-              aria-label="Back"
-              onClick={back}
-            >
+            <MobileTopBarIconButton edge="leading" aria-label="Back" onClick={back}>
               <ChevronLeft />
-            </Button>
+            </MobileTopBarIconButton>
           )}
           <SearchInput
             ref={searchInputRef}
@@ -163,8 +161,8 @@ export function MobileAllNotes({
             value={query}
             onValueChange={onQueryChange}
           />
-        </MobileSearchHeaderContent>
-        <div className="pb-2">
+        </MobileTopBarRow>
+        <MobileTopBarScrollableRow>
           {pending !== null ? (
             <TagSuggestions
               facets={matchingTagFacets(facets ?? [], pending.partial)}
@@ -179,8 +177,8 @@ export function MobileAllNotes({
               onClearRouteTag={() => navigate({ kind: 'allNotes', tag: null })}
             />
           )}
-        </div>
-      </MobileSearchHeader>
+        </MobileTopBarScrollableRow>
+      </MobileTopBar>
       {/* Undefined hits mean "still fetching" only while the query can run —
           with no bridge/graph it never will, and the empty state is honest. */}
       {enabled && hits === undefined ? (
@@ -216,7 +214,7 @@ function TagSuggestions({
     return <p className="pb-1 text-xs text-text-muted">No matching tags</p>
   }
   return (
-    <div className="flex gap-1.5 overflow-x-auto pb-1" role="listbox" aria-label="Matching tags">
+    <div className="flex gap-1.5 w-max pb-2" role="listbox" aria-label="Matching tags">
       {facets.map((facet) => (
         <button
           key={facet.tag}

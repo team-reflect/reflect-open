@@ -1,3 +1,6 @@
+import { browser } from 'wxt/browser'
+import { bookmarkWireSchema } from '@reflect/core/capture-envelope'
+import fixtures from '../../../packages/core/src/actions/bookmark-envelope.fixtures.json'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CaptureWireMessage } from '@reflect/core/capture-envelope'
 import { enqueueCapture, flushQueue, readQueue } from './flush'
@@ -148,4 +151,53 @@ describe('flushQueue', () => {
     expect(result.sent).toBe(1)
     expect(await readQueue()).toEqual([])
   })
+})
+
+const bookmark = bookmarkWireSchema.parse(fixtures.accepted[0])
+bookmark.envelope.id = FIRST
+
+it('holds a bookmark an old desktop cannot read without blocking page captures', async () => {
+  await enqueueCapture(bookmark)
+  await enqueueCapture(wire(SECOND))
+  sendMock.mockResolvedValueOnce({
+    kind: 'held',
+    reason: 'unsupported-version',
+    message: 'update Reflect',
+  })
+  const result = await flushQueue()
+  expect(result).toMatchObject({ sent: 1, held: 1, holdReason: 'unsupported-version' })
+  expect((await readQueue()).map((entry) => entry.wire.envelope.id)).toEqual([FIRST])
+  await flushQueue()
+  expect(await readQueue()).toEqual([])
+})
+
+it('refuses a full queue without removing accepted data', async () => {
+  for (let index = 100; index < 150; index++) {
+    await enqueueCapture(wire(`00000000-0000-4000-8000-${String(index).padStart(12, '0')}`))
+  }
+  await expect(enqueueCapture(bookmark)).rejects.toThrow('queue full')
+  expect(await readQueue()).toHaveLength(50)
+})
+
+it('surfaces storage failure and lets a subsequent admission proceed', async () => {
+  const write = vi
+    .spyOn(browser.storage.local, 'set')
+    .mockRejectedValueOnce(new Error('storage unavailable'))
+  await expect(enqueueCapture(bookmark)).rejects.toThrow('storage unavailable')
+  expect(await readQueue()).toEqual([])
+  await enqueueCapture(wire(SECOND))
+  expect(await readQueue()).toHaveLength(1)
+  write.mockRestore()
+})
+
+it('replays the same event after a lost ACK', async () => {
+  await enqueueCapture(bookmark)
+  sendMock.mockResolvedValueOnce({ kind: 'held', reason: 'io', message: 'ACK lost' })
+  await flushQueue()
+  await flushQueue()
+  expect(sendMock.mock.calls.map(([message]) => message.envelope.id)).toEqual([
+    bookmark.envelope.id,
+    bookmark.envelope.id,
+  ])
+  expect(await readQueue()).toEqual([])
 })

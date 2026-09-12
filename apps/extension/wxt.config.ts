@@ -36,7 +36,8 @@ export default defineConfig({
     // Unpacked dev/CI loads pin the ID; the store rejects `key`, so drop it there.
     ...(isStoreBuild ? {} : { key: PUBLIC_KEY }),
     // `activeTab` (granted by the action click / shortcut) covers the
-    // screenshot and the selection grab — no broad host permissions.
+    // screenshot and the selection grab; `webRequest` on x.com only observes
+    // bookmark requests.
     permissions: [
       'activeTab',
       'scripting',
@@ -44,7 +45,9 @@ export default defineConfig({
       'storage',
       'unlimitedStorage',
       'alarms',
+      'webRequest',
     ],
+    host_permissions: ['https://x.com/*'],
     commands: {
       [SAVE_CURRENT_PAGE_COMMAND]: {
         suggested_key: { default: 'Ctrl+Shift+K', mac: 'Command+Shift+K' },

@@ -152,14 +152,31 @@ export async function readNoteLocal(path: string, generation?: number): Promise<
  * `GraphInfo`) pins the write to the graph it was issued for — Rust rejects it
  * if the graph switched in between.
  *
+ * `expectedContents` rejects a stale source revision; null requires a missing
+ * file, while omission keeps an unconditional write.
+ *
  * The echo carries the file's on-disk mtime, which Rust returns from the
  * write: the index row it produces must compare equal to a later `listFiles`
  * mtime, or the reconcile's read-free skip never fires and the note is
  * re-read on every pass. `Date.now()` is a fallback for a platform that
  * can't report one.
  */
-export async function writeNote(path: string, contents: string, generation: number): Promise<void> {
-  const modifiedMs = await call('note_write', { path, contents, generation }, z.number().nullable())
+export async function writeNote(
+  path: string,
+  contents: string,
+  generation: number,
+  expectedContents?: string | null,
+): Promise<void> {
+  const modifiedMs = await call(
+    'note_write',
+    {
+      path,
+      contents,
+      generation,
+      ...(expectedContents === undefined ? {} : { checkContents: true, expectedContents }),
+    },
+    z.number().nullable(),
+  )
   echoLocalWrite({ path, kind: 'upsert', modifiedMs: modifiedMs ?? Date.now() })
 }
 

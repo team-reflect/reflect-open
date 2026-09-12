@@ -1,3 +1,5 @@
+import { z } from 'zod'
+import { BookmarkControls } from './bookmark-controls'
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react'
 import { browser } from 'wxt/browser'
 import { readQueue } from '@/lib/flush'
@@ -95,6 +97,12 @@ export function CapturePopup(): ReactElement {
           capturedAt: new Date(),
         },
         () => browser.runtime.sendMessage({ type: 'flush' }),
+        async (wire) => {
+          const response = z
+            .object({ ok: z.boolean(), message: z.string().optional() })
+            .parse(await browser.runtime.sendMessage({ type: 'enqueue', wire }))
+          if (!response.ok) throw new Error(response.message ?? 'Capture could not be queued')
+        },
       )
       if (outcome.fate === 'queued') {
         window.close()
@@ -130,70 +138,75 @@ export function CapturePopup(): ReactElement {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-3 p-3">
-      {page.screenshotDataUrl ? (
-        <img
-          src={page.screenshotDataUrl}
-          alt=""
-          className="h-32 w-full rounded-md border border-border object-cover object-top"
-        />
-      ) : null}
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-text">{page.title || host}</p>
-        <p className="truncate text-xs text-text-muted">{host}</p>
-      </div>
-      {page.selection ? (
-        <blockquote className="max-h-16 overflow-hidden border-l-2 border-border pl-2 text-xs text-text-secondary">
-          {page.selection}
-        </blockquote>
-      ) : null}
-      <input
-        type="text"
-        value={note}
-        onChange={(event) => setNote(event.target.value)}
-        placeholder="Add a note (optional)"
-        autoFocus
-        disabled={busy}
-        className="rounded-md border border-border bg-input-bg px-2 py-1.5 text-sm text-text outline-none placeholder:text-text-muted focus:ring-2 focus:ring-focus-ring"
-      />
-      <label className="flex items-center gap-2 text-xs text-text-secondary">
+    <>
+      <form onSubmit={onSubmit} className="flex flex-col gap-3 p-3">
+        {page.screenshotDataUrl ? (
+          <img
+            src={page.screenshotDataUrl}
+            alt=""
+            className="h-32 w-full rounded-md border border-border object-cover object-top"
+          />
+        ) : null}
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-text">{page.title || host}</p>
+          <p className="truncate text-xs text-text-muted">{host}</p>
+        </div>
+        {page.selection ? (
+          <blockquote className="max-h-16 overflow-hidden border-l-2 border-border pl-2 text-xs text-text-secondary">
+            {page.selection}
+          </blockquote>
+        ) : null}
         <input
-          type="checkbox"
-          checked={includePageText}
-          onChange={(event) => onIncludePageTextChange(event.target.checked)}
+          type="text"
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder="Add a note (optional)"
+          autoFocus
           disabled={busy}
-          className="size-3.5 rounded border-border text-accent focus:ring-focus-ring"
+          className="rounded-md border border-border bg-input-bg px-2 py-1.5 text-sm text-text outline-none placeholder:text-text-muted focus:ring-2 focus:ring-focus-ring"
         />
-        Capture page text
-      </label>
-      <button
-        type="submit"
-        disabled={busy}
-        className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-text-on-brand hover:bg-accent-hover disabled:opacity-60"
-      >
-        {save.phase === 'saving' ? 'Saving…' : 'Save to Reflect'}
-      </button>
-      {save.phase === 'held' ? (
-        <p className="text-xs text-text-muted">
-          {holdMessage(save.result)}{' '}
-          {save.result.holdReason === 'no-host' ? (
-            <a
-              href={RELEASES_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="text-accent underline"
-            >
-              Download Reflect
-            </a>
-          ) : null}
-        </p>
-      ) : null}
-      {save.phase === 'failed' ? <p className="text-xs text-destructive">{save.message}</p> : null}
-      {save.phase === 'idle' && heldCount > 0 ? (
-        <p className="text-xs text-text-muted">
-          {heldCount} earlier {heldCount === 1 ? 'capture' : 'captures'} waiting for Reflect.
-        </p>
-      ) : null}
-    </form>
+        <label className="flex items-center gap-2 text-xs text-text-secondary">
+          <input
+            type="checkbox"
+            checked={includePageText}
+            onChange={(event) => onIncludePageTextChange(event.target.checked)}
+            disabled={busy}
+            className="size-3.5 rounded border-border text-accent focus:ring-focus-ring"
+          />
+          Capture page text
+        </label>
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-text-on-brand hover:bg-accent-hover disabled:opacity-60"
+        >
+          {save.phase === 'saving' ? 'Saving…' : 'Save to Reflect'}
+        </button>
+        {save.phase === 'held' ? (
+          <p className="text-xs text-text-muted">
+            {holdMessage(save.result)}{' '}
+            {save.result.holdReason === 'no-host' ? (
+              <a
+                href={RELEASES_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent underline"
+              >
+                Download Reflect
+              </a>
+            ) : null}
+          </p>
+        ) : null}
+        {save.phase === 'failed' ? (
+          <p className="text-xs text-destructive">{save.message}</p>
+        ) : null}
+        {save.phase === 'idle' && heldCount > 0 ? (
+          <p className="text-xs text-text-muted">
+            {heldCount} earlier {heldCount === 1 ? 'capture' : 'captures'} waiting for Reflect.
+          </p>
+        ) : null}
+      </form>
+      <BookmarkControls />
+    </>
   )
 }

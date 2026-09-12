@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CaptureWireMessage } from '@reflect/core/capture-envelope'
-import {
-  overCap,
-  QUEUE_CAP,
-  queueKey,
-  queuedCaptureSchema,
-  sortQueue,
-  type QueuedCapture,
-} from './queue'
+import { queueKey, queuedCaptureSchema, sortQueue, type QueuedCapture } from './queue'
 
 function wire(id: string): CaptureWireMessage {
   return {
@@ -42,18 +35,6 @@ describe('sortQueue', () => {
   it('orders oldest first, tie-broken by id', () => {
     const sorted = sortQueue([queued(uuid(2), 9), queued(uuid(1), 3), queued(uuid(0), 3)])
     expect(sorted.map((entry) => entry.wire.envelope.id)).toEqual([uuid(0), uuid(1), uuid(2)])
-  })
-})
-
-describe('overCap', () => {
-  it('returns nothing at or under the cap', () => {
-    const full = Array.from({ length: QUEUE_CAP }, (_, index) => queued(uuid(index), index))
-    expect(overCap(full)).toEqual([])
-  })
-
-  it('returns the oldest entries past the cap', () => {
-    const entries = Array.from({ length: QUEUE_CAP + 2 }, (_, index) => queued(uuid(index), index))
-    expect(overCap(entries)).toEqual([entries[0], entries[1]])
   })
 })
 

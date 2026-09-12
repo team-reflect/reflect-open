@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { bookmarkEnvelopeSchema, bookmarkWireSchema } from './bookmark-envelope'
+export * from './bookmark-envelope'
 
 /**
  * The platform-agnostic capture envelope (Plan 11): the contract between
@@ -34,6 +36,7 @@ const BASE64_RE = /^(?:[A-Z0-9+/]{4})*(?:[A-Z0-9+/]{2}==|[A-Z0-9+/]{3}=)?$/i
 export const captureEnvelopeSchema = z.object({
   /** Envelope format version; bump on breaking changes. */
   version: z.literal(1),
+  kind: z.never().optional(),
   /**
    * Producer-generated UUID — names the spool files, dedups host retries.
    * `z.guid()`, not `z.uuid()`: the host's `is_uuid` (apps/native-host) accepts
@@ -85,6 +88,9 @@ export const captureWireMessageSchema = z.object({
 })
 
 export type CaptureWireMessage = z.infer<typeof captureWireMessageSchema>
+
+export const extensionCaptureWireSchema = z.union([bookmarkWireSchema, captureWireMessageSchema])
+export type ExtensionCaptureWire = z.infer<typeof extensionCaptureWireSchema>
 
 /**
  * Cap on a text capture's payload. A `reflect://` URL is a world-invokable
@@ -155,7 +161,11 @@ export type TextCaptureSource = z.infer<typeof textCaptureSourceSchema>
  * widens independently of shape. Text envelopes parse first so `kind` is
  * honored before the link shape gets a say.
  */
-export const inboxEnvelopeSchema = z.union([textCaptureEnvelopeSchema, captureEnvelopeSchema])
+export const inboxEnvelopeSchema = z.union([
+  bookmarkEnvelopeSchema,
+  textCaptureEnvelopeSchema,
+  captureEnvelopeSchema,
+])
 
 export type InboxEnvelope = z.infer<typeof inboxEnvelopeSchema>
 
@@ -173,7 +183,7 @@ export const captureAckSchema = z.discriminatedUnion('ok', [
      * `invalid-payload`: the wire message failed validation.
      * `io`: the spool write failed.
      */
-    code: z.enum(['no-graph', 'invalid-payload', 'io']),
+    code: z.enum(['no-graph', 'invalid-payload', 'io', 'unsupported-version']),
     message: z.string(),
   }),
 ])

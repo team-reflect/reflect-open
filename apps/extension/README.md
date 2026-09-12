@@ -165,6 +165,7 @@ Each is reviewed individually; every permission below is exercised by the code:
 | `storage` | Queue captures locally so a capture survives the app being closed and retries until it spools. |
 | `unlimitedStorage` | Queued captures embed a screenshot data URL, which can exceed the default storage quota while waiting for the app. |
 | `alarms` | A coarse retry timer so held captures flush once Reflect is installed/launched later. |
+| `webRequest` + `https://x.com/*` | Observe bookmark requests on x.com to save the post link to your daily note. |
 
 ### Data-handling disclosures (Privacy practices tab)
 

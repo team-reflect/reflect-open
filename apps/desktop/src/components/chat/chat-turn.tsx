@@ -18,11 +18,8 @@ interface ChatTurnProps {
  * shadcn chat primitives, followed by assistant text, tool markers, and
  * notices in the order the engine produced them.
  *
- * Text still streaming renders as plain text; once it settles it re-renders
- * through the same read-only markdown preview the palette uses (so
- * `[[citations]]` appear as the editor's wiki-link chips and click through
- * to the note). Live markdown would re-parse the whole message through a
- * ProseMirror editor on every delta — quadratic work the reader can feel.
+ * Assistant text uses the same lightweight, read-only markdown preview while
+ * streaming and after completion, including clickable `[[citation]]` chips.
  *
  * Wiki navigation passes a null generation deliberately: a clicked citation
  * that doesn't resolve must never *create* a note the model hallucinated.
@@ -33,7 +30,6 @@ interface ChatTurnProps {
  */
 export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
   const navigateWikiLink = useWikiLinkNavigation(null)
-  const lastIndex = turn.parts.length - 1
   const replyMarkdown = turn.status === 'done' ? assistantReplyMarkdown(turn) : null
 
   return (
@@ -59,14 +55,7 @@ export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
             </Marker>
           ) : null}
           {turn.parts.map((part, index) => (
-            <ChatAssistantPart
-              key={index}
-              index={index}
-              lastIndex={lastIndex}
-              part={part}
-              status={turn.status}
-              onWikiLinkClick={navigateWikiLink}
-            />
+            <ChatAssistantPart key={index} part={part} onWikiLinkClick={navigateWikiLink} />
           ))}
           {replyMarkdown !== null ? (
             <MessageFooter className="pointer-events-none -mt-1 opacity-0 transition-opacity duration-100 group-hover/assistant-response:pointer-events-auto group-hover/assistant-response:opacity-100 group-focus-within/assistant-response:pointer-events-auto group-focus-within/assistant-response:opacity-100">

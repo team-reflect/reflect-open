@@ -52,6 +52,7 @@ const createTranscriptionReconciler = vi.hoisted(() =>
       generation: number
       getProviders: () => AiProvidersState
       getTranscriptionFormat: () => boolean
+      getTranscriptionPrompt: () => string
     }) => reconcilerControls.fake,
   ),
 )
@@ -156,6 +157,7 @@ const SETTINGS = vi.hoisted(() => ({
     ],
     defaultAiProviderId: 'cfg-openai',
     transcriptionFormat: true,
+    transcriptionPrompt: '',
   },
 }))
 
@@ -214,6 +216,7 @@ beforeEach(() => {
     ],
     defaultAiProviderId: 'cfg-openai',
     transcriptionFormat: true,
+    transcriptionPrompt: '',
   }
   captureAudioMemoPart.mockResolvedValue({ ok: true, memo: MEMO })
   // `list_staged` (the orphan scan) and `dir_list` (the cancel sweep) are the
@@ -676,6 +679,7 @@ describe('MobileAudioMemoProvider', () => {
       ],
       defaultAiProviderId: 'claude',
       transcriptionFormat: true,
+      transcriptionPrompt: '',
     }
     const { result } = await renderHook(() => useMobileAudioMemo(), {
       wrapper,

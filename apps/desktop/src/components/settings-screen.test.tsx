@@ -177,6 +177,48 @@ describe('SettingsScreen', () => {
     await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
   })
 
+  it('reflects and persists the transcription helper text', async () => {
+    stored = { transcriptionPrompt: 'Ocavue' }
+    await renderScreen()
+    const textarea = page.getByRole('textbox', { name: 'Transcription helper text' })
+    await expect.element(textarea).toHaveValue('Ocavue')
+
+    await textarea.fill('  Names:\nOcavue  ')
+    await userEvent.tab()
+
+    await vi.waitFor(() =>
+      expect(saved.at(-1)).toMatchObject({ transcriptionPrompt: 'Names:\nOcavue' }),
+    )
+  })
+
+  it('clears the transcription helper text', async () => {
+    stored = { transcriptionPrompt: 'Ocavue' }
+    await renderScreen()
+    const section = page.getByRole('region', { name: 'Audio memos' })
+
+    await section.getByRole('button', { name: 'Clear' }).click()
+
+    await vi.waitFor(() => expect(saved.at(-1)).toMatchObject({ transcriptionPrompt: '' }))
+  })
+
+  it('warns when the transcription helper text is over the limit and truncates on save', async () => {
+    await renderScreen()
+    const textarea = page.getByRole('textbox', { name: 'Transcription helper text' })
+
+    await textarea.fill('x'.repeat(510))
+
+    await expect.element(textarea).toHaveAttribute('aria-invalid', 'true')
+    await expect
+      .element(page.getByRole('alert'))
+      .toHaveTextContent('10 characters over the 500-character limit')
+
+    await userEvent.tab()
+
+    await vi.waitFor(() =>
+      expect(saved.at(-1)).toMatchObject({ transcriptionPrompt: 'x'.repeat(500) }),
+    )
+  })
+
   it('confirms before forgetting the open graph from saved graphs', async () => {
     graph.current = { root: '/graphs/work', name: 'Work', generation: 1 }
     await renderScreen()
@@ -250,6 +292,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -302,6 +345,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -368,6 +412,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -441,6 +486,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -493,6 +539,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -538,6 +585,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -592,6 +640,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -643,6 +692,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -700,6 +750,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -763,6 +814,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -808,6 +860,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -882,6 +935,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -925,6 +979,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: true,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -990,6 +1045,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -1045,6 +1101,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: true,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -1094,6 +1151,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -1174,13 +1232,13 @@ describe('SettingsScreen', () => {
     )
   })
 
-  it('restores the default AI chat prompt', async () => {
+  it('clears the AI chat prompt', async () => {
     stored = { chatSystemPrompt: 'Always answer in haiku.' }
     await renderScreen()
     const section = page.getByRole('region', { name: 'AI chat' })
     await expect.element(section.getByRole('textbox')).toHaveValue('Always answer in haiku.')
 
-    await section.getByRole('button', { name: 'Use default' }).click()
+    await section.getByRole('button', { name: 'Clear' }).click()
 
     await vi.waitFor(() => expect(saved.at(-1)).toMatchObject({ chatSystemPrompt: '' }))
   })
@@ -1229,6 +1287,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -1290,6 +1349,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',
@@ -1342,6 +1402,7 @@ describe('SettingsScreen', () => {
           semanticSearchEnabled: false,
           describeAssets: true,
           transcriptionFormat: true,
+          transcriptionPrompt: '',
           contactsEnabled: false,
           mobileOnboarded: false,
           mobileStorage: 'local',

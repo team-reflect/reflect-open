@@ -20,13 +20,12 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { ChatProvider, useChatSession } from '@/providers/chat-provider'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { ChatScreen } from './chat-screen'
-import { isModEvent } from '@meowdown/core'
 
 /**
  * The chat view over a faked engine: the provider stack and screen are real,
  * `streamChat` is scripted. Covers the no-provider call-to-action, a full
  * grounded turn (user bubble → tool chip → cited answer), the model picker,
- * the plain-while-streaming text rendering, abort-on-unmount, New chat, and
+ * live markdown rendering, abort-on-unmount, New chat, and
  * photo attachments (drop → preview → image-only send).
  */
 
@@ -94,36 +93,6 @@ vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ indexGeneration: null, graph: null }),
 }))
 
-// jsdom can't host the ProseMirror contenteditable (same stub as the palette
-// tests); markdown rendering is the editor's concern, not this screen's.
-vi.mock('@/editor/markdown-preview', () => ({
-  MarkdownPreview: ({
-    content,
-    onWikiLinkClick,
-  }: {
-    content: string
-    onWikiLinkClick?: (options: { target: string; openInNewWindow: boolean }) => void
-  }) => {
-    const wikiTargets = Array.from(
-      content.matchAll(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g),
-      (match) => match[1]!,
-    )
-    return (
-      <div data-testid="markdown-preview">
-        {content}
-        {wikiTargets.map((target) => (
-          <button
-            key={target}
-            type="button"
-            onClick={(event) => onWikiLinkClick?.({ target, openInNewWindow: isModEvent(event) })}
-          >
-            Open {target}
-          </button>
-        ))}
-      </div>
-    )
-  },
-}))
 vi.mock('@/lib/provider-fetch', () => ({ providerFetch: vi.fn() }))
 
 const GRAPH: GraphInfo = { root: '/graphs/test', name: 'test-graph', generation: 1 }
@@ -252,10 +221,7 @@ describe('ChatScreen', () => {
 
     await expect.element(view.getByText('when does atlas ship?')).toBeInTheDocument()
     await expect.element(view.getByText(/Searched “atlas” · 1 note/)).toBeInTheDocument()
-    // The turn settled, so the answer renders as markdown (not plain text).
-    await expect
-      .element(view.getByTestId('markdown-preview'))
-      .toHaveTextContent('It ships in June.')
+    await expect.element(view.getByText('It ships in June.')).toBeInTheDocument()
     await view.getByRole('button', { name: 'Atlas', exact: true }).click()
     expect(probedRoute).toEqual({ kind: 'note', path: 'notes/atlas.md' })
 
@@ -365,7 +331,7 @@ describe('ChatScreen', () => {
     const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'what should I open?{Enter}')
-    await view.getByRole('button', { name: 'Open Atlas' }).click()
+    await view.getByTestId('wikilink').click()
 
     await vi.waitFor(() => expect(probedRoute).toEqual({ kind: 'note', path: 'notes/atlas.md' }))
   })
@@ -382,7 +348,7 @@ describe('ChatScreen', () => {
     const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'what should I open?{Enter}')
-    await view.getByRole('button', { name: 'Open Atlas' }).click({ modifiers: ['ControlOrMeta'] })
+    await view.getByTestId('wikilink').click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({
@@ -401,14 +367,14 @@ describe('ChatScreen', () => {
     await view.getByRole('combobox', { name: 'Model' }).click()
 
     await expect.element(page.getByText('OpenAI')).toBeInTheDocument()
-    const labels = page
-      .getByRole('option')
-      .elements()
-      .map((option) => option.textContent)
-    expect(labels).toEqual([
-      ...aiProvider('openai').models.map((model) => model.label),
-      MODEL.model,
-    ])
+    await expect
+      .poll(() =>
+        page
+          .getByRole('option')
+          .elements()
+          .map((option) => option.textContent),
+      )
+      .toEqual([...aiProvider('openai').models.map((model) => model.label), MODEL.model])
   })
 
   it('routes the turn to the picked catalog model', async () => {
@@ -569,23 +535,52 @@ describe('ChatScreen', () => {
       .toBeInTheDocument()
   })
 
-  it('renders streaming text as plain text until the turn settles', async () => {
+  it('renders markdown as chunks arrive and keeps it mounted when the turn settles', async () => {
     configureModel()
+    const nextChunk = Promise.withResolvers<void>()
+    const finish = Promise.withResolvers<void>()
+    const firstChunk = '# Streaming\n\n**markdown'
+    const secondChunk = '**\n\n- First item\n- Second item\n\n```ts\nconst answer = 42'
+    const finalChunk = '\n```\n\nSee [[Atlas]].'
     streamChat.mockImplementation(() =>
       (async function* (): AsyncGenerator<ChatStreamEvent> {
-        yield { type: 'text-delta', text: 'Streaming **markdown**' }
-        await new Promise<never>(() => {})
+        yield { type: 'text-delta', text: firstChunk }
+        await nextChunk.promise
+        yield { type: 'text-delta', text: secondChunk }
+        await finish.promise
+        yield { type: 'text-delta', text: finalChunk }
+        yield {
+          type: 'complete',
+          messages: [{ role: 'assistant', content: firstChunk + secondChunk + finalChunk }],
+        }
       })(),
     )
     const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hi{Enter}')
 
-    // Visible immediately as plain text — never re-parsed per delta.
-    await expect.element(view.getByText('Streaming **markdown**')).toBeInTheDocument()
-    expect(view.getByTestId('markdown-preview').query()).toBeNull()
-    // Nothing to copy until the reply is whole.
+    const heading = view.getByRole('heading', { name: 'Streaming', level: 1 })
+    await expect.element(heading).toBeInTheDocument()
+    const headingElement = heading.element()
+    await expect.element(view.getByText('**markdown', { exact: true })).toBeInTheDocument()
     expect(view.getByRole('button', { name: 'Copy reply' }).query()).toBeNull()
+
+    nextChunk.resolve()
+    const bold = view.getByRole('strong')
+    await expect.element(bold).toHaveTextContent('markdown')
+    const firstItem = view.getByText('First item', { exact: true })
+    await expect.element(firstItem).toBeInTheDocument()
+    expect(firstItem.element().closest('.prosemirror-flat-list')).not.toBeNull()
+    await expect.element(view.getByText('Second item', { exact: true })).toBeInTheDocument()
+    await expect.element(view.getByRole('code')).toHaveTextContent('const answer = 42')
+    expect(view.getByRole('button', { name: 'Copy reply' }).query()).toBeNull()
+
+    finish.resolve()
+    await expect.element(view.getByRole('button', { name: 'Copy reply' })).toBeInTheDocument()
+    await expect.element(view.getByTestId('wikilink')).toHaveTextContent('Atlas')
+    expect(heading.element()).toBe(headingElement)
+    expect(bold.element().tagName).toBe('STRONG')
+    await expect.element(view.getByRole('code')).toHaveTextContent('const answer = 42')
   })
 
   it('rejects a second send fired before the first one has rendered', async () => {
@@ -724,10 +719,10 @@ describe('ChatScreen', () => {
     const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hey{Enter}')
-    await expect.element(view.getByTestId('markdown-preview')).toHaveTextContent('Hello!')
+    await expect.element(view.getByText('Hello!', { exact: true })).toBeInTheDocument()
 
     await view.getByRole('button', { name: /new chat/i }).click()
-    expect(view.getByTestId('markdown-preview').query()).toBeNull()
+    expect(view.getByText('Hello!', { exact: true }).query()).toBeNull()
     expect(view.getByText('hey').query()).toBeNull()
   })
 })

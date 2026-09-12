@@ -18,6 +18,7 @@ function firstTask(source: string): TaskMarker {
 
 interface Harness {
   snapshots: NoteSessionSnapshot[]
+  expectedContents: (string | null | undefined)[]
   writes: Array<{ path: string; contents: string }>
   applied: string[]
   contents: Array<{ content: string; origin: string }>
@@ -39,6 +40,7 @@ function harness(options?: {
   reconcilePendingEditorInput?: () => void
 }): Harness {
   const snapshots: NoteSessionSnapshot[] = []
+  const expectedContents: (string | null | undefined)[] = []
   const writes: Array<{ path: string; contents: string }> = []
   const applied: string[] = []
   const contents: Array<{ content: string; origin: string }> = []
@@ -56,11 +58,14 @@ function harness(options?: {
       write:
         options?.write === false
           ? null
-          : async (path, contents) => {
+          : async (path, contents, expected) => {
+              expectedContents.push(expected)
               await options?.beforeWrite?.()
               if (writeFailure !== null) {
                 throw new Error(writeFailure)
               }
+              if (expected !== undefined && expected !== disk)
+                throw { kind: 'io', message: 'Note changed on disk; reload before retrying' }
               writes.push({ path, contents })
               disk = contents
             },
@@ -84,6 +89,7 @@ function harness(options?: {
   })
   return {
     snapshots,
+    expectedContents,
     writes,
     applied,
     contents,
@@ -1034,4 +1040,91 @@ describe('commitTaskToBullet', () => {
       TaskStaleError,
     )
   })
+})
+
+describe('commitSourceEdit', () => {
+  it('keeps dirty body text while committing metadata and a bookmark together', async () => {
+    const h = harness()
+    h.session.load()
+    await settled()
+    h.session.editorChanged('# My unsaved thought\n')
+    expect(
+      await h.session.commitSourceEdit(
+        (source) => `---\nreceipt: saved\n---\n${source}\n[X post](https://x.com/i/status/20)\n`,
+      ),
+    ).toBe(true)
+    expect(h.writes.at(-1)?.contents).toContain('# My unsaved thought')
+    expect(h.writes.at(-1)?.contents).toContain('receipt: saved')
+    expect(h.writes.at(-1)?.contents).toContain('https://x.com/i/status/20')
+  })
+})
+
+it.each([null, '# Hello\n'])(
+  'sends the last disk revision for checked writes: %s',
+  async (disk) => {
+    const h = harness({ disk, createIfMissing: true })
+    h.session.load()
+    await settled()
+    h.session.editorChanged('# First edit\n')
+    await h.session.flush()
+    h.session.editorChanged('# Second edit\n')
+    await h.session.flush()
+    expect(h.expectedContents).toEqual([disk, '# First edit\n'])
+    h.session.discard()
+  },
+)
+
+it('parks an external revision when a checked autosave fails', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const h = harness()
+  try {
+    h.session.load()
+    await settled()
+    h.session.editorChanged('# My unsaved text\n')
+    h.setDisk('# Capture wrote here\n')
+    await h.session.flush()
+    expect(h.snapshots.at(-1)?.conflict).toBe('# Capture wrote here\n')
+    expect(h.session.content()).toBe('# My unsaved text\n')
+    expect(h.writes).toEqual([])
+    await h.session.flush()
+    expect(h.expectedContents).toHaveLength(1)
+    h.session.keepMine()
+    await h.session.flush()
+    expect(h.expectedContents.at(-1)).toBe('# Capture wrote here\n')
+    expect(h.writes.at(-1)?.contents).toBe('# My unsaved text\n')
+  } finally {
+    h.session.discard()
+    log.mockRestore()
+  }
+})
+
+it('a rejected source edit preserves typing made while its write was pending', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const started = Promise.withResolvers<void>()
+  const finished = Promise.withResolvers<void>()
+  const h = harness({
+    beforeWrite: () => {
+      started.resolve()
+      return finished.promise
+    },
+  })
+  try {
+    h.session.load()
+    await settled()
+    h.failWrites('disk full')
+    const commit = h.session.commitSourceEdit(
+      (source) => `---\nreceipt: queued\n---\n${source}\nBookmark\n`,
+    )
+    const failure = expect(commit).rejects.toThrow('disk full')
+    await started.promise
+    h.session.editorChanged('# Typed during capture\n')
+    finished.resolve()
+    await failure
+    expect(h.session.content()).toBe('# Typed during capture\n')
+    expect(h.snapshots.at(-1)?.dirty).toBe(true)
+    expect(h.writes).toEqual([])
+  } finally {
+    h.session.discard()
+    log.mockRestore()
+  }
 })
