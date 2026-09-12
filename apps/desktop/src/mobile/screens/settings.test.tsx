@@ -257,7 +257,7 @@ describe('MobileSettings', () => {
     })
   })
 
-  it('restores the default prompt immediately from the mobile editor', async () => {
+  it('clears the prompt immediately from the mobile editor', async () => {
     const user = userEvent
     settingsState.current = {
       ...settingsState.current,

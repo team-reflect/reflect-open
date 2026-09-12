@@ -1232,7 +1232,7 @@ describe('SettingsScreen', () => {
     )
   })
 
-  it('restores the default AI chat prompt', async () => {
+  it('clears the AI chat prompt', async () => {
     stored = { chatSystemPrompt: 'Always answer in haiku.' }
     await renderScreen()
     const section = page.getByRole('region', { name: 'AI chat' })
