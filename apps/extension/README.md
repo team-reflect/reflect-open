@@ -26,14 +26,15 @@ cannot observe the desktop drain.
 ## Develop
 
 ```bash
-pnpm --filter @reflect/extension dev     # wxt dev server (auto-reloads in Chrome)
+pnpm --filter @reflect/extension dev     # wxt dev server (hot-reloads a loaded extension)
 pnpm --filter @reflect/extension build   # production build → .output/chrome-mv3
 pnpm --filter @reflect/extension test    # vitest over lib/
 ```
 
 Load a build via `chrome://extensions` → Developer mode → **Load unpacked**.
-Prefer `pnpm … dev` (`.output/chrome-mv3-dev`) for development — it auto-reloads
-and always keeps the pinned `key`. You can also load the `pnpm … build` output
+The dev server does not open Chrome for you: load `.output/chrome-mv3-dev` once,
+and it hot-reloads from then on. Prefer `pnpm … dev` for development, since it
+always keeps the pinned `key`. You can also load the `pnpm … build` output
 (`.output/chrome-mv3`), but **do not load the `pnpm zip` output**: the store
 artifact omits `key`, so it loads under a random ID the host won't allowlist.
 
