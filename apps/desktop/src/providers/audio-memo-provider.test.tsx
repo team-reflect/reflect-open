@@ -53,6 +53,7 @@ const createTranscriptionReconciler = vi.hoisted(() =>
       generation: number
       getProviders: () => AiProvidersState
       getTranscriptionFormat: () => boolean
+      getTranscriptionPrompt: () => string
     }) => reconcilerControls.fake,
   ),
 )
@@ -232,11 +233,17 @@ describe('AudioMemoProvider', () => {
     // Models are read lazily, so a key added mid-session reaches the next pass.
     expect(options?.getProviders().defaultProviderId).toBe('cfg-openai')
     expect(options?.getTranscriptionFormat()).toBe(true)
+    expect(options?.getTranscriptionPrompt()).toBe('')
     expect(reconcilerControls.fake.start).toHaveBeenCalledTimes(1)
 
-    SETTINGS.current = { ...SETTINGS.current, transcriptionFormat: false }
+    SETTINGS.current = {
+      ...SETTINGS.current,
+      transcriptionFormat: false,
+      transcriptionPrompt: 'Names: Ocavue',
+    }
     await rerender()
     expect(options?.getTranscriptionFormat()).toBe(false)
+    expect(options?.getTranscriptionPrompt()).toBe('Names: Ocavue')
     expect(createTranscriptionReconciler).toHaveBeenCalledTimes(1)
 
     await unmount()

@@ -45,6 +45,8 @@ export interface TranscriptionReconcilerOptions {
   getProviders: () => AiProvidersState
   /** Read lazily so a settings toggle applies to the next reconcile pass. */
   getTranscriptionFormat: () => boolean
+  /** Read lazily so a hint edit applies to the next reconcile pass. */
+  getTranscriptionPrompt: () => string
 }
 
 /** Build the reconciler for one graph session. `dispose()` is terminal. */
@@ -92,6 +94,7 @@ export function createTranscriptionReconciler(
       providers: options.getProviders(),
       generation: options.generation,
       formatTranscript: options.getTranscriptionFormat(),
+      transcriptionPrompt: options.getTranscriptionPrompt(),
       fetchFn: providerFetch,
       isStale,
       onPending: (count) => setTranscribing(count > 0),

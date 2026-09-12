@@ -52,6 +52,7 @@ const createTranscriptionReconciler = vi.hoisted(() =>
       generation: number
       getProviders: () => AiProvidersState
       getTranscriptionFormat: () => boolean
+      getTranscriptionPrompt: () => string
     }) => reconcilerControls.fake,
   ),
 )
