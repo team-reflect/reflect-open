@@ -18,6 +18,8 @@ interface TextSettingDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (value: string) => void
+  /** Whether a Use default button clears the value; on unless set to false. */
+  resettable?: boolean
 }
 
 /** The mobile editor for one free-text setting: Save persists, Use default clears. */
@@ -49,6 +51,7 @@ function TextSettingSheet({
   value,
   onSave,
   onClose,
+  resettable = true,
 }: Omit<TextSettingDrawerProps, 'open' | 'onOpenChange'> & { onClose: () => void }): ReactElement {
   const [draft, setDraft] = useState(value)
   const [dirty, setDirty] = useState(false)
@@ -82,17 +85,19 @@ function TextSettingSheet({
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={normalize(currentDraft) === ''}
-            onClick={() => {
-              onSave('')
-              onClose()
-            }}
-          >
-            Use default
-          </Button>
+          {resettable ? (
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={normalize(currentDraft) === ''}
+              onClick={() => {
+                onSave('')
+                onClose()
+              }}
+            >
+              Use default
+            </Button>
+          ) : null}
           <Button
             type="button"
             onClick={() => {

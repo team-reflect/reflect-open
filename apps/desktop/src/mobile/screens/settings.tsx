@@ -445,7 +445,7 @@ export function MobileSettings(): ReactElement {
         title="Transcription helper text"
         description="Context sent to your transcription provider with every audio memo, such as names it tends to misspell."
         ariaLabel="Transcription helper text"
-        placeholder="This transcription mentions the following names: Ocavue"
+        placeholder="This transcription mentions the following names:"
         maxLength={TRANSCRIPTION_PROMPT_MAX_LENGTH}
         rows={3}
         normalize={normalizeTranscriptionPrompt}
@@ -453,6 +453,7 @@ export function MobileSettings(): ReactElement {
         open={transcriptionPromptOpen}
         onOpenChange={setTranscriptionPromptOpen}
         onSave={(transcriptionPrompt) => updateSettings({ transcriptionPrompt })}
+        resettable={false}
       />
       <AiPromptDrawer
         prompt={editingPrompt}

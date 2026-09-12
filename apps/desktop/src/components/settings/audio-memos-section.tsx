@@ -22,11 +22,12 @@ export function AudioMemosSection(): ReactElement {
         description="Context sent to your transcription provider with every audio memo, such as names it tends to misspell."
         ariaLabel="Transcription helper text"
         value={settings.transcriptionPrompt}
-        placeholder="This transcription mentions the following names: Ocavue"
+        placeholder="This transcription mentions the following names:"
         maxLength={TRANSCRIPTION_PROMPT_MAX_LENGTH}
         rows={2}
         normalize={normalizeTranscriptionPrompt}
         onSave={(transcriptionPrompt) => updateSettings({ transcriptionPrompt })}
+        resettable={false}
       />
     </SettingsSection>
   )

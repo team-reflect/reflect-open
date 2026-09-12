@@ -191,14 +191,12 @@ describe('SettingsScreen', () => {
     )
   })
 
-  it('clears the transcription helper text with Use default', async () => {
+  it('offers no Use default button for the transcription helper text', async () => {
     stored = { transcriptionPrompt: 'Ocavue' }
     await renderScreen()
     const section = page.getByRole('region', { name: 'Audio memos' })
 
-    await section.getByRole('button', { name: 'Use default' }).click()
-
-    await vi.waitFor(() => expect(saved.at(-1)).toMatchObject({ transcriptionPrompt: '' }))
+    expect(section.getByRole('button', { name: 'Use default' }).query()).toBeNull()
   })
 
   it('warns when the transcription helper text is over the limit and truncates on save', async () => {
