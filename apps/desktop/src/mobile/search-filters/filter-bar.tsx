@@ -68,7 +68,7 @@ export function FilterBar({
 
   return (
     <>
-      <div className="flex gap-1.5 overflow-x-auto pb-1" role="toolbar" aria-label="Filters">
+      <div className="flex gap-1.5 w-max pb-2" role="toolbar" aria-label="Filters">
         {active && (
           <FilterChip onClick={reset}>
             <X className="-ml-1 size-3.5" />

@@ -12,7 +12,7 @@
     "test": "vitest run --config ../../vitest.config.ts --project core-browser --project core-node"
   },
   "dependencies": {
-    "@meowdown/markdown": "^0.68.2",
+    "@meowdown/markdown": "^0.68.3",
     "@reflect/db": "workspace:*",
     "@reflect/modules": "workspace:*",
     "@reflect/utils": "workspace:*",
