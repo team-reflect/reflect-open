@@ -100,4 +100,3 @@ export function MobileScreen({
       return <MobileDaily key="daily" date={today} />
   }
 }
-
