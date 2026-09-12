@@ -266,7 +266,7 @@ describe('MobileSettings', () => {
     await mount()
 
     await user.click(page.getByRole('button', { name: /System prompt.*Custom/ }))
-    await user.click(page.getByRole('button', { name: 'Use default' }))
+    await user.click(page.getByRole('button', { name: 'Clear' }))
 
     expect(updateSettings).toHaveBeenCalledWith({ chatSystemPrompt: '' })
     await expect

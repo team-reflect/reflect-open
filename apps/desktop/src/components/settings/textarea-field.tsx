@@ -15,10 +15,8 @@ interface SettingsTextareaFieldProps {
   rows: number
   /** Canonicalize a draft before it is saved or compared with the default. */
   normalize: (value: string) => string
-  /** Persist a normalized value (`''` restores the default). */
+  /** Persist a normalized value (`''` clears it). */
   onSave: (value: string) => void
-  /** Whether a Use default button clears the value; on unless set to false. */
-  resettable?: boolean
 }
 
 /**
@@ -35,7 +33,6 @@ export function SettingsTextareaField({
   rows,
   normalize,
   onSave,
-  resettable = true,
 }: SettingsTextareaFieldProps): ReactElement {
   const [draft, setDraft] = useState(value)
   const [dirty, setDirty] = useState(false)
@@ -59,7 +56,7 @@ export function SettingsTextareaField({
     onSave(normalized)
   }
 
-  const resetToDefault = () => {
+  const clear = () => {
     draftRef.current = ''
     dirtyRef.current = false
     setDraft('')
@@ -107,19 +104,17 @@ export function SettingsTextareaField({
           limit. The extra text is dropped when saved.
         </p>
       ) : null}
-      {resettable ? (
-        <div className="mt-2 flex justify-end">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={normalize(currentDraft) === ''}
-            onClick={resetToDefault}
-          >
-            Use default
-          </Button>
-        </div>
-      ) : null}
+      <div className="mt-2 flex justify-end">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={normalize(currentDraft) === ''}
+          onClick={clear}
+        >
+          Clear
+        </Button>
+      </div>
     </SettingsField>
   )
 }

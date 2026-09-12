@@ -453,7 +453,6 @@ export function MobileSettings(): ReactElement {
         open={transcriptionPromptOpen}
         onOpenChange={setTranscriptionPromptOpen}
         onSave={(transcriptionPrompt) => updateSettings({ transcriptionPrompt })}
-        resettable={false}
       />
       <AiPromptDrawer
         prompt={editingPrompt}

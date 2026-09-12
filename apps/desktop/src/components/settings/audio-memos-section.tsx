@@ -27,7 +27,6 @@ export function AudioMemosSection(): ReactElement {
         rows={2}
         normalize={normalizeTranscriptionPrompt}
         onSave={(transcriptionPrompt) => updateSettings({ transcriptionPrompt })}
-        resettable={false}
       />
     </SettingsSection>
   )

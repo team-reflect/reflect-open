@@ -191,12 +191,14 @@ describe('SettingsScreen', () => {
     )
   })
 
-  it('offers no Use default button for the transcription helper text', async () => {
+  it('clears the transcription helper text', async () => {
     stored = { transcriptionPrompt: 'Ocavue' }
     await renderScreen()
     const section = page.getByRole('region', { name: 'Audio memos' })
 
-    expect(section.getByRole('button', { name: 'Use default' }).query()).toBeNull()
+    await section.getByRole('button', { name: 'Clear' }).click()
+
+    await vi.waitFor(() => expect(saved.at(-1)).toMatchObject({ transcriptionPrompt: '' }))
   })
 
   it('warns when the transcription helper text is over the limit and truncates on save', async () => {
@@ -1236,7 +1238,7 @@ describe('SettingsScreen', () => {
     const section = page.getByRole('region', { name: 'AI chat' })
     await expect.element(section.getByRole('textbox')).toHaveValue('Always answer in haiku.')
 
-    await section.getByRole('button', { name: 'Use default' }).click()
+    await section.getByRole('button', { name: 'Clear' }).click()
 
     await vi.waitFor(() => expect(saved.at(-1)).toMatchObject({ chatSystemPrompt: '' }))
   })
