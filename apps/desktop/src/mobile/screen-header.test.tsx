@@ -16,16 +16,18 @@ describe('MobileScreenHeader', () => {
     if (header === null) {
       throw new Error('expected a header')
     }
-    expect(Array.from(header.classList)).toContain('grid')
-    expect(Array.from(header.classList)).toContain('h-11')
-    expect(Array.from(header.classList)).toContain('grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]')
-    expect(Array.from(header.classList)).toContain('items-center')
+    const bar = header.getBoundingClientRect()
+    const title = view.getByRole('heading', { name: 'Roadmap' }).element().getBoundingClientRect()
+    expect(title.left + title.width / 2).toBeCloseTo(bar.left + bar.width / 2, 1)
 
-    expect(Array.from(view.getByRole('button', { name: 'Back' }).element().classList)).toContain(
-      'justify-self-center',
+    const back = view.getByRole('button', { name: 'Back' }).element().getBoundingClientRect()
+    const more = view
+      .getByRole('button', { name: 'More actions' })
+      .element()
+      .getBoundingClientRect()
+    expect(back.left + back.width / 2 - bar.left).toBeCloseTo(
+      bar.right - (more.left + more.width / 2),
+      1,
     )
-    expect(
-      Array.from(view.getByRole('heading', { name: 'Roadmap' }).element().classList),
-    ).toContain('text-center')
   })
 })
