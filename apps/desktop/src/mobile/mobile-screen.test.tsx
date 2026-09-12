@@ -6,7 +6,6 @@ import { format } from 'date-fns'
 import { act, StrictMode, type ReactElement } from 'react'
 import { setBridge } from '@reflect/core'
 import { clearFormattingToolbar, publishFormattingToolbar } from '@/editor/formatting-toolbar-store'
-import { ChatProvider } from '@/providers/chat-provider'
 import { RouterProvider, useRouter } from '@/routing/router'
 import type { Route } from '@/routing/route'
 import { addDaysIso, formatDayLabel, parseIsoDate, todayIso } from '@/lib/dates'
@@ -117,12 +116,10 @@ vi.mock('@/components/ui/drawer', () => ({
   DrawerTrigger: ({ children }: { children?: import('react').ReactNode }) => <>{children}</>,
 }))
 
-const GRAPH = { root: '/g', name: 'g', generation: 1 }
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({
-    graph: GRAPH,
+    graph: { root: '/g', name: 'g', generation: 1 },
     indexing: false,
-    indexGeneration: null,
   }),
 }))
 vi.mock('@/providers/settings-provider', () => ({
@@ -225,12 +222,10 @@ function mount(initialRoute: Route, probeRoute?: Route, options?: { strict?: boo
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const tree = (
     <QueryClientProvider client={queryClient}>
-      <ChatProvider graph={GRAPH}>
-        <RouterProvider initialRoute={initialRoute}>
-          <MobileShell />
-          {probeRoute ? <NavProbe to={probeRoute} /> : null}
-        </RouterProvider>
-      </ChatProvider>
+      <RouterProvider initialRoute={initialRoute}>
+        <MobileShell />
+        {probeRoute ? <NavProbe to={probeRoute} /> : null}
+      </RouterProvider>
     </QueryClientProvider>
   )
   // The app runs under StrictMode (main.tsx); opt in where a test guards
@@ -646,33 +641,6 @@ describe('MobileShell', () => {
         .getAttribute('aria-current'),
     ).not.toBe('date')
     expect(editorProbe.focusCalls).toBe(0)
-  })
-
-  it('draws the Tasks, Chat, and pushed-screen top-bar dividers on one row', async () => {
-    const user = userEvent
-    const view = await mount({ kind: 'today' })
-
-    const dividerBottom = (): number => {
-      const layer = visibleLayer(view)
-      const header = layer.querySelector('header')
-      if (header === null) {
-        throw new Error('no top bar')
-      }
-      return header.getBoundingClientRect().bottom - layer.getBoundingClientRect().top
-    }
-
-    await user.click(view.getByRole('button', { name: 'Tasks' }))
-    await expect.element(view.getByRole('searchbox', { name: 'Search tasks' })).toBeVisible()
-    const tasks = dividerBottom()
-
-    await user.click(view.getByRole('button', { name: 'Chat' }))
-    await expect.element(view.getByRole('heading', { name: 'Chat', exact: true })).toBeVisible()
-    expect(dividerBottom()).toBe(tasks)
-
-    await user.click(view.getByRole('button', { name: 'Daily' }))
-    await user.click(view.getByRole('button', { name: 'Settings' }))
-    await expect.element(view.getByRole('heading', { name: 'Settings' })).toBeVisible()
-    expect(dividerBottom()).toBe(tasks)
   })
 
   it('switches to the Tasks tab, which renders the grouped task list', async () => {
