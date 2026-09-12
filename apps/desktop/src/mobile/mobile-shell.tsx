@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { Suspense, useEffect, useRef, useState, type ReactElement } from 'react'
+import { LoadingScreen } from '@/components/loading-screen'
 import { useDoubleTap } from '@/hooks/use-double-tap'
 import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar'
 import { MobileStack } from '@/mobile/mobile-stack'
@@ -101,12 +102,15 @@ export function MobileShell(): ReactElement {
       style={{ height: 'calc(100dvh - var(--keyboard-height, 0px))' }}
     >
       <div className="min-h-0 flex-1">
-        <MobileStack
-          allQuery={allQuery}
-          onAllQueryChange={setAllQuery}
-          allFilters={allFilters}
-          onAllFiltersChange={setAllFilters}
-        />
+        {/* A stable boundary lets route transitions retain the current screen while lazy code loads. */}
+        <Suspense fallback={<LoadingScreen />}>
+          <MobileStack
+            allQuery={allQuery}
+            onAllQueryChange={setAllQuery}
+            allFilters={allFilters}
+            onAllFiltersChange={setAllFilters}
+          />
+        </Suspense>
       </div>
       {/* V1 lets the keyboard cover the tab bar; with the root shrunk it
           would ride above the keyboard instead, so it hides while typing.
