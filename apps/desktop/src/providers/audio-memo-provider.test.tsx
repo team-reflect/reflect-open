@@ -134,6 +134,7 @@ const SETTINGS = vi.hoisted(() => ({
     aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
     defaultAiProviderId: 'cfg-openai',
     transcriptionFormat: true,
+    transcriptionPrompt: '',
   },
 }))
 
@@ -189,6 +190,7 @@ beforeEach(() => {
     aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
     defaultAiProviderId: 'cfg-openai',
     transcriptionFormat: true,
+    transcriptionPrompt: '',
   }
   captureAudioMemoPart.mockResolvedValue({ ok: true, memo: MEMO })
   reconcilerControls.fake.getTranscribing.mockReturnValue(false)
@@ -262,6 +264,7 @@ describe('AudioMemoProvider', () => {
       ],
       defaultAiProviderId: 'claude',
       transcriptionFormat: true,
+      transcriptionPrompt: '',
     }
     const { rerender } = await renderHook(() => useAudioMemo(), { wrapper })
     expect(reconcilerControls.fake.schedule).not.toHaveBeenCalled()
@@ -270,6 +273,7 @@ describe('AudioMemoProvider', () => {
       aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
       defaultAiProviderId: 'cfg-openai',
       transcriptionFormat: true,
+      transcriptionPrompt: '',
     }
     await rerender()
 
@@ -669,6 +673,7 @@ describe('AudioMemoProvider', () => {
       ],
       defaultAiProviderId: 'claude',
       transcriptionFormat: true,
+      transcriptionPrompt: '',
     }
     const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 

@@ -16,6 +16,7 @@ describe('settingsSchema', () => {
       semanticSearchEnabled: false,
       describeAssets: true,
       transcriptionFormat: true,
+      transcriptionPrompt: '',
       contactsEnabled: false,
       mobileOnboarded: false,
       mobileStorage: 'local',
@@ -46,6 +47,7 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.semanticSearchEnabled).toBe(false)
     expect(DEFAULT_SETTINGS.describeAssets).toBe(true)
     expect(DEFAULT_SETTINGS.transcriptionFormat).toBe(true)
+    expect(DEFAULT_SETTINGS.transcriptionPrompt).toBe('')
     expect(DEFAULT_SETTINGS.contactsEnabled).toBe(false)
     expect(DEFAULT_SETTINGS.mobileOnboarded).toBe(false)
     expect(DEFAULT_SETTINGS.mobileStorage).toBe('local')
@@ -113,6 +115,16 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ describeAssets: false }).describeAssets).toBe(false)
     expect(settingsSchema.parse({ transcriptionFormat: true }).transcriptionFormat).toBe(true)
     expect(settingsSchema.parse({ transcriptionFormat: false }).transcriptionFormat).toBe(false)
+    expect(settingsSchema.parse({ transcriptionPrompt: 'Ocavue' }).transcriptionPrompt).toBe('Ocavue')
+    expect(settingsSchema.parse({ transcriptionPrompt: '  Ocavue\n' }).transcriptionPrompt).toBe(
+      'Ocavue',
+    )
+    expect(
+      settingsSchema.parse({ transcriptionPrompt: 'Names:\nOcavue' }).transcriptionPrompt,
+    ).toBe('Names:\nOcavue')
+    expect(
+      settingsSchema.parse({ transcriptionPrompt: 'x'.repeat(600) }).transcriptionPrompt,
+    ).toHaveLength(500)
     expect(settingsSchema.parse({ contactsEnabled: true }).contactsEnabled).toBe(true)
     expect(settingsSchema.parse({ contactsEnabled: false }).contactsEnabled).toBe(false)
     expect(settingsSchema.parse({ allNotesFilterTags: ['meeting'] }).allNotesFilterTags).toEqual([
@@ -191,6 +203,8 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ describeAssets: 0 }).describeAssets).toBe(true)
     expect(settingsSchema.parse({ transcriptionFormat: 'yes' }).transcriptionFormat).toBe(true)
     expect(settingsSchema.parse({ transcriptionFormat: 0 }).transcriptionFormat).toBe(true)
+    expect(settingsSchema.parse({ transcriptionPrompt: 42 }).transcriptionPrompt).toBe('')
+    expect(settingsSchema.parse({ transcriptionPrompt: null }).transcriptionPrompt).toBe('')
     expect(settingsSchema.parse({ contactsEnabled: 'yes' }).contactsEnabled).toBe(false)
     expect(settingsSchema.parse({ contactsEnabled: 1 }).contactsEnabled).toBe(false)
     expect(settingsSchema.parse({ allNotesFilterTags: 'book' }).allNotesFilterTags).toEqual([
@@ -227,6 +241,7 @@ describe('settingsSchema', () => {
       semanticSearchEnabled: false,
       describeAssets: true,
       transcriptionFormat: true,
+      transcriptionPrompt: '',
       contactsEnabled: false,
       mobileOnboarded: false,
       mobileStorage: 'local',
