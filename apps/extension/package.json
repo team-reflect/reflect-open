@@ -15,14 +15,14 @@
     "@reflect/core": "workspace:*",
     "@reflect/design-system": "workspace:*",
     "defuddle": "^0.19.3",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.7",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@wxt-dev/module-react": "^1.2.2",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3",
