@@ -1,10 +1,8 @@
 import { z } from 'zod'
 
-/** Bound for a bookmark wire message, in UTF-8 bytes. */
-export const BOOKMARK_MAX_BYTES = 8192
 export const postIdSchema = z.string().regex(/^[1-9]\d{0,19}$/)
 
-/** URL-only bookmark capture, bound to a paired local graph. */
+/** URL-only X bookmark capture; the desktop derives the permalink from `postId`. */
 export const bookmarkEnvelopeSchema = z
   .object({
     version: z.literal(2),
@@ -13,29 +11,13 @@ export const bookmarkEnvelopeSchema = z
     source: z.literal('extension'),
     postId: postIdSchema,
     capturedAt: z.iso.datetime({ offset: true }),
-    captureDate: z.iso.date(),
-    targetGraphId: z.string().regex(/^[a-f0-9]{64}$/),
-    evidence: z.enum(['request-intent', 'manual']),
-    presentation: z.enum(['link', 'embed']),
   })
   .strict()
 export type BookmarkEnvelope = z.infer<typeof bookmarkEnvelopeSchema>
 
-export const bookmarkWireSchema = z
-  .object({ envelope: bookmarkEnvelopeSchema })
-  .strict()
-  .refine((value) => new TextEncoder().encode(JSON.stringify(value)).length <= BOOKMARK_MAX_BYTES)
+export const bookmarkWireSchema = z.object({ envelope: bookmarkEnvelopeSchema }).strict()
 
-/** Capability advertised by a desktop-installed, bookmark-aware host. */
-export const bookmarkCapabilitySchema = z.object({
-  ok: z.literal(true),
-  bookmarkVersion: z.literal(2),
-  targetGraphId: bookmarkEnvelopeSchema.shape.targetGraphId,
-  maxMessageBytes: z.literal(BOOKMARK_MAX_BYTES),
-})
-export type BookmarkCapability = z.infer<typeof bookmarkCapabilitySchema>
-
-/** Normalize supported X permalink spellings without trusting a page title. */
+/** Normalize supported X permalink spellings to a post ID. */
 export function getBookmarkPostId(value: string): string | undefined {
   try {
     const url = new URL(value)

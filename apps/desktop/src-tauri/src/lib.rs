@@ -365,7 +365,6 @@ pub fn run() {
             contacts::contacts_lookup_by_email,
             contacts::contacts_lookup_by_name,
             capture::capture_host_register,
-            capture::capture_bookmark_check,
             capture::capture_inbox_list,
             capture::capture_inbox_spool,
             capture::capture_inbox_read,

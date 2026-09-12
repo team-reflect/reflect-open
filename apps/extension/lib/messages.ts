@@ -20,16 +20,10 @@ export function isFlushRequest(message: unknown): message is FlushRequest {
  * Why queued captures are being held for retry. `no-host`: the native host
  * isn't registered (Reflect not installed, or never launched since install);
  * `no-graph`: Reflect has never opened a graph; `io`: the host failed to
- * spool — all retried on the next flush trigger.
+ * spool; `unsupported-version`: the desktop cannot read a bookmark envelope
+ * yet — all retried on the next flush trigger.
  */
-export const holdReasonSchema = z.enum([
-  'no-host',
-  'no-graph',
-  'io',
-  'unsupported-version',
-  'graph-mismatch',
-  'invalid-payload',
-])
+export const holdReasonSchema = z.enum(['no-host', 'no-graph', 'io', 'unsupported-version'])
 export type HoldReason = z.infer<typeof holdReasonSchema>
 
 /** The flush outcome the popup renders. */

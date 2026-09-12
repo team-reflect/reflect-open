@@ -25,10 +25,6 @@ const envelope: BookmarkEnvelope = {
   source: 'extension',
   postId: '20',
   capturedAt: '2026-09-09T04:00:00Z',
-  captureDate: '2026-09-09',
-  targetGraphId: 'a'.repeat(64),
-  evidence: 'manual',
-  presentation: 'link',
 }
 
 beforeEach(() => {
@@ -42,7 +38,8 @@ beforeEach(() => {
 
 it('replays after a crash between note commit and spool cleanup without duplicating', async () => {
   let source = 'My journal\n'
-  const writeBookmark = vi.fn(async (capture: BookmarkEnvelope) => {
+  const writeBookmark = vi.fn(async (capture: BookmarkEnvelope, path: string) => {
+    expect(path).toMatch(/^daily\/2026-09-0[89]\.md$/)
     source = appendBookmark(source, capture)
   })
   vi.mocked(captureInboxRemove).mockRejectedValueOnce({ kind: 'io', message: 'cleanup failed' })

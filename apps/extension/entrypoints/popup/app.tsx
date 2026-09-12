@@ -206,7 +206,7 @@ export function CapturePopup(): ReactElement {
           </p>
         ) : null}
       </form>
-      <BookmarkControls url={page.url} tabId={captured.tabId} />
+      <BookmarkControls />
     </>
   )
 }

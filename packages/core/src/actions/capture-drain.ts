@@ -1,4 +1,3 @@
-import { BookmarkCaptureError } from './bookmark-capture'
 import type { BookmarkEnvelope } from './bookmark-envelope'
 import { errorMessage, isAppError, toAppError } from '../errors'
 import {
@@ -58,8 +57,8 @@ const ORPHAN_SPOOL_MAX_AGE_MS = 60 * 60 * 1000
 export interface DrainCaptureInboxInput {
   /** `GraphInfo.generation` — pins every read and write to the issuing graph. */
   generation: number
-  /** Transactional bookmark writer supplied by the document host. */
-  writeBookmark?: (envelope: BookmarkEnvelope) => Promise<void>
+  /** Appends a bookmark to the daily note at `path`, merging with a live editor when open. */
+  writeBookmark?: (envelope: BookmarkEnvelope, path: string) => Promise<void>
   /** Abort gate, checked between spool files (graph switch / unmount). */
   isStale?: () => boolean
   /** Clock for the orphan sweep; injectable for tests. */
@@ -199,22 +198,19 @@ export async function drainCaptureInbox(
       }
       if (envelope.kind === 'x-bookmark') {
         try {
-          if (!input.writeBookmark)
+          if (!input.writeBookmark) {
             throw new Error('Bookmark writer is unavailable; update Reflect')
-          await input.writeBookmark(envelope)
+          }
+          const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
+          await input.writeBookmark(envelope, daily)
           await captureInboxRemove(name, input.generation)
           drained += 1
         } catch (cause) {
-          if (stale()) return outcome({ reason: 'stale', message: 'The graph session ended' })
-          const permanent = cause instanceof BookmarkCaptureError
-          if (permanent) {
-            await captureInboxReject(name, input.generation)
-            invalid += 1
+          if (stale()) {
+            return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
           }
-          bookmarkStop ??= {
-            reason: toAppError(cause).kind,
-            message: `${errorMessage(cause)}. ${permanent ? `Repair the daily note, then move .reflect/inbox-rejected/${name} back to .reflect/inbox to retry.` : 'Bookmark remains queued for the next capture pass.'}`,
-          }
+          // Keep the spool; the next pass retries after the editor settles.
+          bookmarkStop ??= { reason: toAppError(cause).kind, message: errorMessage(cause) }
         }
         continue
       }

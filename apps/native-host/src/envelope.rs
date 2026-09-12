@@ -144,11 +144,6 @@ impl ValidatedCapture {
     /// Parse and validate one wire payload. Every rejection is an
     /// `invalid-payload` ack with a reason the extension can surface.
     pub fn parse(payload: &[u8]) -> Result<Self, HostError> {
-        let value: serde_json::Value = serde_json::from_slice(payload)
-            .map_err(|_| HostError::InvalidPayload("Invalid capture JSON".into()))?;
-        if value["envelope"].get("kind").is_some() {
-            return Err(HostError::InvalidPayload("Unexpected capture kind".into()));
-        }
         let message: WireMessage = serde_json::from_slice(payload)
             .map_err(|error| HostError::InvalidPayload(format!("malformed message: {error}")))?;
         let mut envelope = message.envelope;

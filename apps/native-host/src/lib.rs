@@ -28,8 +28,8 @@ use spool::{inbox_dir, spool_capture};
 pub enum HostError {
     /// No pointer file — the app has never opened a graph on this machine.
     NoGraph,
+    /// The desktop app that owns the pointed graph cannot read this envelope version yet.
     UnsupportedVersion,
-    GraphMismatch,
     /// The wire message failed validation.
     InvalidPayload(String),
     /// The spool write (or pointer read) failed.
@@ -41,7 +41,6 @@ impl HostError {
         match self {
             HostError::NoGraph => "no-graph",
             HostError::UnsupportedVersion => "unsupported-version",
-            HostError::GraphMismatch => "graph-mismatch",
             HostError::InvalidPayload(_) => "invalid-payload",
             HostError::Io(_) => "io",
         }
@@ -52,7 +51,6 @@ impl HostError {
             HostError::UnsupportedVersion => {
                 "Update and open Reflect before saving bookmarks.".into()
             }
-            HostError::GraphMismatch => "Open the paired graph or pair again.".into(),
             HostError::NoGraph => "Open Reflect and pick a graph first.".to_string(),
             HostError::InvalidPayload(message) | HostError::Io(message) => message.clone(),
         }
@@ -78,8 +76,10 @@ fn ack_json(outcome: &Result<(), HostError>) -> Vec<u8> {
 fn handle_message(payload: &[u8], pointer_path: &Path) -> Result<(), HostError> {
     let value: serde_json::Value = serde_json::from_slice(payload)
         .map_err(|_| HostError::InvalidPayload("Invalid capture JSON".into()))?;
-    if value["envelope"]["kind"] == "x-bookmark" {
-        return bookmark::spool(payload, pointer_path);
+    match value["envelope"].get("kind") {
+        Some(kind) if kind == "x-bookmark" => return bookmark::spool(payload, pointer_path),
+        Some(_) => return Err(HostError::InvalidPayload("Unexpected capture kind".into())),
+        None => {}
     }
     let capture = ValidatedCapture::parse(payload)?;
     let inbox = inbox_dir(pointer_path)?;
@@ -95,18 +95,6 @@ pub fn run(
     pointer_path: &Path,
 ) -> std::io::Result<()> {
     while let Some(payload) = read_message(input)? {
-        if serde_json::from_slice::<serde_json::Value>(&payload)
-            .ok()
-            .as_ref()
-            == Some(&serde_json::json!({"type": "bookmark-capabilities"}))
-        {
-            let response = match bookmark::capabilities(pointer_path) {
-                Ok(value) => value.to_string().into_bytes(),
-                Err(error) => ack_json(&Err(error)),
-            };
-            write_message(output, &response)?;
-            continue;
-        }
         let outcome = handle_message(&payload, pointer_path);
         if let Err(error) = &outcome {
             eprintln!("reflect-capture-host: {error:?}");

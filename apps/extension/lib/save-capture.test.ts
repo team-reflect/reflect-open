@@ -10,7 +10,6 @@ vi.mock('wxt/browser', () => ({
   browser: {
     storage: {
       local: {
-        getBytesInUse: vi.fn(async () => 0),
         get: (keys: string | string[] | null) => {
           if (keys === null) {
             return Promise.resolve(Object.fromEntries(store))

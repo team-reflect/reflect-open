@@ -100,7 +100,7 @@ export function createCaptureController(options: CaptureControllerOptions): Capt
     const drained = await drainCaptureInbox({
       generation: options.generation,
       isStale,
-      writeBookmark: (envelope) => commitBookmark(envelope, options.generation),
+      writeBookmark: (envelope, path) => commitBookmark(envelope, path, options.generation),
     })
     surfaceStop('Saving link capture', drained.stopped)
     if (isStale()) {

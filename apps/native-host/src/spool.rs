@@ -22,7 +22,6 @@ pub(crate) struct Pointer {
     version: u32,
     pub graph_root: String,
     pub bookmark_version: Option<u32>,
-    pub target_graph_id: Option<String>,
 }
 
 /// Default pointer-file location, shared with the desktop app's conventions

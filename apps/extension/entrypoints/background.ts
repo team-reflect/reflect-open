@@ -1,25 +1,14 @@
 import { z } from 'zod'
-import {
-  bookmarkSettingsSchema,
-  readBookmarkSettings,
-  writeBookmarkSettings,
-  invalidateBookmarkCapture,
-} from '@/lib/bookmark-settings'
-import { extensionCaptureWireSchema, postIdSchema } from '@reflect/core/capture-envelope'
-import {
-  registerBookmarkObserver,
-  unregisterBookmarkObserver,
-  saveBookmark,
-  recordBookmarkError,
-} from '@/lib/x-bookmarks'
+import { extensionCaptureWireSchema } from '@reflect/core/capture-envelope'
 import { browser } from 'wxt/browser'
 import { defineBackground } from '#imports'
 import { SAVE_CURRENT_PAGE_COMMAND } from '@/lib/commands'
-import { discardQueuedCaptures, enqueueCapture, flushQueue } from '@/lib/flush'
+import { enqueueCapture, flushQueue } from '@/lib/flush'
 import { isFlushRequest } from '@/lib/messages'
 import { readIncludePageTextPreference } from '@/lib/popup-preferences'
 import { saveCapture } from '@/lib/save-capture'
 import { snapshotTab } from '@/lib/snapshot-active-tab'
+import { registerBookmarkObserver } from '@/lib/x-bookmarks'
 import { tryExtractPageText } from './popup/extract-page-text'
 
 /**
@@ -59,38 +48,13 @@ const enqueueRequestSchema = z.object({
   type: z.literal('enqueue'),
   wire: extensionCaptureWireSchema,
 })
-const bookmarkRequestSchema = z.object({
-  type: z.literal('save-bookmark'),
-  postId: postIdSchema,
-  tabId: z.number().int().nonnegative(),
-})
-const settingsRequestSchema = z.object({
-  type: z.literal('bookmark-settings'),
-  settings: bookmarkSettingsSchema,
-})
-const discardRequestSchema = z.object({ type: z.literal('discard-capture'), id: z.guid() })
 
 export default defineBackground(() => {
   registerBookmarkObserver()
-  browser.permissions.onAdded.addListener(registerBookmarkObserver)
-  browser.permissions.onRemoved.addListener(() => {
-    invalidateBookmarkCapture()
-    unregisterBookmarkObserver()
-    void readBookmarkSettings()
-      .then((settings) => writeBookmarkSettings({ ...settings, enabled: false }))
-      .catch(recordBookmarkError)
-  })
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     const enqueue = enqueueRequestSchema.safeParse(message)
-    const bookmark = bookmarkRequestSchema.safeParse(message)
-    const settings = settingsRequestSchema.safeParse(message)
-    let task: Promise<void> | undefined
-    if (enqueue.success) task = enqueueCapture(enqueue.data.wire)
-    else if (bookmark.success)
-      task = saveBookmark(bookmark.data.postId, 'manual', bookmark.data.tabId)
-    else if (settings.success) task = writeBookmarkSettings(settings.data.settings)
-    if (task) {
-      void task.then(
+    if (enqueue.success) {
+      void enqueueCapture(enqueue.data.wire).then(
         () => sendResponse({ ok: true }),
         (cause: unknown) =>
           sendResponse({
@@ -100,21 +64,11 @@ export default defineBackground(() => {
       )
       return true
     }
-    const discard = discardRequestSchema.safeParse(message)
-    if (discard.success) {
-      void discardQueuedCaptures(discard.data.id).then(sendResponse, () =>
-        sendResponse({ error: 'Could not discard captures' }),
-      )
-      return true
-    }
     if (isFlushRequest(message)) {
-      flushQueue(z.object({ retryParked: z.literal(true) }).safeParse(message).success).then(
-        sendResponse,
-        (cause: unknown) => {
-          console.error('capture flush failed:', cause)
-          sendResponse({ sent: 0, failed: 0, rejectedIds: [], held: -1, holdReason: 'io' })
-        },
-      )
+      flushQueue().then(sendResponse, (cause: unknown) => {
+        console.error('capture flush failed:', cause)
+        sendResponse({ sent: 0, failed: 0, rejectedIds: [], held: -1, holdReason: 'io' })
+      })
       return true // responding asynchronously
     }
     return false

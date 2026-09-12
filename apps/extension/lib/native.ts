@@ -52,8 +52,7 @@ export async function sendToHost(wire: ExtensionCaptureWire): Promise<SendOutcom
     case 'no-graph':
       return { kind: 'held', reason: 'no-graph', message: ack.data.message }
     case 'unsupported-version':
-    case 'graph-mismatch':
-      return { kind: 'held', reason: ack.data.code, message: ack.data.message }
+      return { kind: 'held', reason: 'unsupported-version', message: ack.data.message }
     case 'io':
       return { kind: 'held', reason: 'io', message: ack.data.message }
   }

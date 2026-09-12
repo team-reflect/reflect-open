@@ -42,7 +42,6 @@ reflect-index-schema = { path = "../../../crates/index-schema" }
 reflect-graph-paths = { workspace = true }
 tempfile = { workspace = true }
 sha2 = { workspace = true }
-getrandom = "0.4.3"
 dirs = "6.0.0"
 tauri-plugin-dialog = "2.7.3"
 base64 = "0.23.0"

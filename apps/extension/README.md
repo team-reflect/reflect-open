@@ -178,48 +178,19 @@ Each is reviewed individually; every permission below is exercised by the code:
   2. Data is **not** used or transferred for purposes unrelated to the single purpose.
   3. Data is **not** used or transferred to determine creditworthiness or for lending.
 
-## X bookmarks (experimental)
+## X bookmarks
 
-Pair the extension with the graph selected in an updated Reflect desktop app.
-On an X post permalink, **Save post link to daily note** saves just that post URL.
-The optional **Record new bookmark requests** setting requests access to x.com
-and observes new CreateBookmark requests in this Chrome profile, across its X
-accounts. A request is a save intent, not confirmation that X accepted it.
-Historical bookmarks and unbookmark deletions are not synchronized.
+Bookmarking a post on x.com queues that post's link, and Reflect appends
+`[X post <id>](https://x.com/i/status/<id>)` under `## X bookmarks` in the
+capture-day daily note. The extension observes `CreateBookmark` requests
+(hence the `webRequest` permission on `https://x.com/*`) and keeps only the
+post ID: no page text, screenshots, media, or account data. A request is a
+save intent; X rejecting it is not observed. Historical bookmarks and
+unbookmarking are not synchronized, incognito tabs are ignored, and the popup
+checkbox opts out.
 
-Bookmarks go directly into the capture-day daily note under `X bookmarks`. No
-per-post notes, screenshots, page text, AI enrichment, or media downloads are
-created. Links are the default; optional online tweet previews contact X.
-Private daily notes always receive plain links. Neither mode archives tweet text.
-
-Accepted captures survive browser restarts. A full queue rejects new captures
-without deleting earlier ones; retry after delivery. Graph mismatch pauses
-automatic capture. Open the previously paired graph to deliver old captures,
-then explicitly retry pending captures, or pair again for new ones. Pairing disables
-automatic capture. The graph stores its random identity in `.reflect/capture-id`;
-moving this file with the graph preserves pairing. Replacing the graph without
-this file requires pairing again. Include this file when backing up pairing state.
-
-Graph/version errors are parked until an explicit retry. Invalid bookmark payloads
-are parked until individually discarded. Export pending captures before discarding
-anything you need to recover. Parked bookmarks do not block ordinary captures.
-Malformed daily-note metadata gets one write attempt before its spool moves to
-`.reflect/inbox-rejected/`; Reflect reports how to repair and retry it. Temporary
-write conflicts remain queued, with one attempt per drain trigger.
-Incognito tabs still support ordinary page capture; bookmark saving is unavailable.
-Only a host `queued` acknowledgement removes a capture from the browser queue;
-it does not certify that the desktop has written the daily note.
-
-Before release, verify real X button/menu/keyboard coverage, optional permission
-revocation and worker suspension with DevTools closed, native messaging with both
-unpacked and store extension IDs, queue saturation, graph switching, and offline
-restart. Test a dirty daily note and a crash after writing it but before removing
-the inbox file. Keep automatic capture experimental until these checks pass.
-
-Two broader release limitations remain: checked note writes serialize Reflect's
-own writers, but cannot lock out an uncooperative external sync process between
-the comparison and rename. Also, changing an existing note to private does not
-currently suppress previously stored remote embeds in every editor/preview
-surface. The preview option must not ship until that renderer privacy gate is
-implemented and tested. These require filesystem coordination and renderer work
-beyond bookmark ingestion; passing capture tests alone does not close them.
+Links go to whichever graph the desktop app last opened, like every other
+capture. A desktop build that cannot read bookmark envelopes holds them in the
+browser queue (logged, not shown) until it is updated; page captures behind
+them still deliver. A post already linked in that day's note is not added
+again, so a replayed spool never duplicates an entry.

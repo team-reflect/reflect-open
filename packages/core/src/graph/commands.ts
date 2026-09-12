@@ -19,11 +19,6 @@ import {
   type WindowBootstrap,
 } from './schemas'
 
-/** Verify a bookmark's paired graph against the active native graph session. */
-export async function checkBookmarkGraph(targetGraphId: string, generation: number): Promise<void> {
-  await call('capture_bookmark_check', { targetGraphId, generation }, z.null())
-}
-
 /** Commands that return `()` from Rust serialize as `null` over IPC. */
 const voidSchema = z.null()
 

@@ -183,7 +183,7 @@ export const captureAckSchema = z.discriminatedUnion('ok', [
      * `invalid-payload`: the wire message failed validation.
      * `io`: the spool write failed.
      */
-    code: z.enum(['no-graph', 'invalid-payload', 'io', 'unsupported-version', 'graph-mismatch']),
+    code: z.enum(['no-graph', 'invalid-payload', 'io', 'unsupported-version']),
     message: z.string(),
   }),
 ])

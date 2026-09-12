@@ -1,7 +1,5 @@
 import {
-  checkBookmarkGraph,
   appendBookmark,
-  dailyPath,
   isAppError,
   readNote,
   writeNote,
@@ -9,13 +7,12 @@ import {
 } from '@reflect/core'
 import { openSession } from '@/editor/open-documents'
 
-/** Route bookmark edits through a live document or a checked filesystem write. */
+/** Route a bookmark through the live daily document, or a revision-checked file write. */
 export async function commitBookmark(
   envelope: BookmarkEnvelope,
+  path: string,
   generation: number,
 ): Promise<void> {
-  await checkBookmarkGraph(envelope.targetGraphId, generation)
-  const path = dailyPath(envelope.captureDate)
   const owner = openSession(path, generation)
   if (owner !== null) {
     if (!(await owner.commitSourceEdit((source) => appendBookmark(source, envelope)))) {

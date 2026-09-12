@@ -3,19 +3,16 @@ import { bookmarkWireSchema } from '@reflect/core/capture-envelope'
 import fixtures from '../../../packages/core/src/actions/bookmark-envelope.fixtures.json'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CaptureWireMessage } from '@reflect/core/capture-envelope'
-import { discardQueuedCaptures, enqueueCapture, flushQueue, readQueue } from './flush'
+import { enqueueCapture, flushQueue, readQueue } from './flush'
 import { sendToHost, type SendOutcome } from './native'
 
 /** In-memory `chrome.storage.local` faithful to get(null)/set/remove. */
 const store = new Map<string, unknown>()
-const { bytesMock } = vi.hoisted(() => ({ bytesMock: vi.fn(async () => 0) }))
 
 vi.mock('wxt/browser', () => ({
   browser: {
-    permissions: { remove: vi.fn(async () => true) },
     storage: {
       local: {
-        getBytesInUse: bytesMock,
         get: (keys: string | string[] | null) => {
           if (keys === null) {
             return Promise.resolve(Object.fromEntries(store))
@@ -159,41 +156,27 @@ describe('flushQueue', () => {
 const bookmark = bookmarkWireSchema.parse(fixtures.accepted[0])
 bookmark.envelope.id = FIRST
 
-it.each(['graph-mismatch', 'unsupported-version', 'invalid-payload'] as const)(
-  'parks %s without blocking page captures, including after restart',
-  async (reason) => {
-    store.set('bookmarkSettings', {
-      enabled: true,
-      presentation: 'link',
-      targetGraphId: bookmark.envelope.targetGraphId,
-    })
-    await enqueueCapture(bookmark)
-    await enqueueCapture(wire(SECOND))
-    sendMock.mockResolvedValueOnce(
-      reason === 'invalid-payload'
-        ? { kind: 'rejected', message: reason }
-        : { kind: 'held', reason, message: reason },
-    )
-    expect((await flushQueue()).sent).toBe(1)
-    const [parked] = await readQueue()
-    expect(parked?.parked).toBe(reason)
-    if (reason !== 'invalid-payload')
-      expect(store.get('bookmarkSettings')).toMatchObject({ enabled: false })
-    // Persisted state is sufficient; a new worker needs no in-memory failure list.
-    await flushQueue()
-    expect(sendMock).toHaveBeenCalledTimes(2)
-    await flushQueue(true)
-    expect(sendMock).toHaveBeenCalledTimes(reason === 'invalid-payload' ? 2 : 3)
-  },
-)
-
-it('refuses the byte budget without removing accepted data', async () => {
+it('holds a bookmark an old desktop cannot read without blocking page captures', async () => {
   await enqueueCapture(bookmark)
-  bytesMock.mockResolvedValueOnce(64 * 1024 * 1024)
-  await expect(enqueueCapture(wire(SECOND))).rejects.toThrow('queue full')
-  expect(await readQueue()).toHaveLength(1)
+  await enqueueCapture(wire(SECOND))
+  sendMock.mockResolvedValueOnce({
+    kind: 'held',
+    reason: 'unsupported-version',
+    message: 'update Reflect',
+  })
+  const result = await flushQueue()
+  expect(result).toMatchObject({ sent: 1, held: 1, holdReason: 'unsupported-version' })
+  expect((await readQueue()).map((entry) => entry.wire.envelope.id)).toEqual([FIRST])
   await flushQueue()
-  expect(store.has('captureQueueError')).toBe(false)
+  expect(await readQueue()).toEqual([])
+})
+
+it('refuses a full queue without removing accepted data', async () => {
+  for (let index = 100; index < 150; index++) {
+    await enqueueCapture(wire(`00000000-0000-4000-8000-${String(index).padStart(12, '0')}`))
+  }
+  await expect(enqueueCapture(bookmark)).rejects.toThrow('queue full')
+  expect(await readQueue()).toHaveLength(50)
 })
 
 it('surfaces storage failure and lets a subsequent admission proceed', async () => {
@@ -207,7 +190,7 @@ it('surfaces storage failure and lets a subsequent admission proceed', async () 
   write.mockRestore()
 })
 
-it('replays the same event after a lost ACK and discards only the selected entry', async () => {
+it('replays the same event after a lost ACK', async () => {
   await enqueueCapture(bookmark)
   sendMock.mockResolvedValueOnce({ kind: 'held', reason: 'io', message: 'ACK lost' })
   await flushQueue()
@@ -216,22 +199,5 @@ it('replays the same event after a lost ACK and discards only the selected entry
     bookmark.envelope.id,
     bookmark.envelope.id,
   ])
-  await enqueueCapture(bookmark)
-  await enqueueCapture(wire(SECOND))
-  store.set('captureQueueError', 'full')
-  await discardQueuedCaptures(bookmark.envelope.id)
-  expect((await readQueue()).map((entry) => entry.wire.envelope.id)).toEqual([SECOND])
-  expect(store.has('captureQueueError')).toBe(false)
-})
-
-it('rechecks admission after asynchronous capacity reads', async () => {
-  const capacity = Promise.withResolvers<number>()
-  bytesMock.mockReturnValueOnce(capacity.promise)
-  let allowed = true
-  const admission = enqueueCapture(bookmark, () => allowed)
-  await vi.waitFor(() => expect(browser.storage.local.getBytesInUse).toHaveBeenCalled())
-  allowed = false
-  capacity.resolve(0)
-  await admission
   expect(await readQueue()).toEqual([])
 })
