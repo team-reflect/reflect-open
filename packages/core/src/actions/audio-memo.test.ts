@@ -107,6 +107,7 @@ function reconcile(overrides: Partial<ReconcileAudioMemosInput> = {}) {
     providers: PROVIDERS,
     generation: 3,
     formatTranscript: false,
+    transcriptionPrompt: '',
     ...overrides,
   })
 }
@@ -287,6 +288,14 @@ describe('reconcileAudioMemos', () => {
       fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
     })
     expect(formatAudioMemoTranscriptMock).not.toHaveBeenCalled()
+  })
+
+  it('passes the transcription hint to every segment call', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+
+    await reconcile({ transcriptionPrompt: 'Names: Ocavue' })
+
+    expect(transcribeMock).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'Names: Ocavue' }))
   })
 
   it('formats and names a fresh transcript in one best-effort AI pass when enabled', async () => {
