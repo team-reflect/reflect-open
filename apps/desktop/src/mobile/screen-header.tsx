@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
 import { ChevronLeft } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar'
 
 interface MobileScreenHeaderProps {
   title: string
@@ -21,18 +21,16 @@ export function MobileScreenHeader({
   trailing,
 }: MobileScreenHeaderProps): ReactElement {
   return (
-    <header className="grid h-11 shrink-0 grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center border-b border-border px-1">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-10 justify-self-center"
-        aria-label="Back"
-        onClick={onBack}
-      >
-        <ChevronLeft />
-      </Button>
-      <h1 className="min-w-0 truncate text-center text-base font-semibold">{title}</h1>
-      <div className="flex size-10 items-center justify-center justify-self-center">{trailing}</div>
-    </header>
+    <MobileTopBar>
+      <MobileTopBarRow className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] gap-0 px-1">
+        <MobileTopBarIconButton className="justify-self-center" aria-label="Back" onClick={onBack}>
+          <ChevronLeft />
+        </MobileTopBarIconButton>
+        <h1 className="min-w-0 truncate text-center text-base font-semibold">{title}</h1>
+        <div className="flex size-10 items-center justify-center justify-self-center">
+          {trailing}
+        </div>
+      </MobileTopBarRow>
+    </MobileTopBar>
   )
 }
