@@ -115,7 +115,9 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ describeAssets: false }).describeAssets).toBe(false)
     expect(settingsSchema.parse({ transcriptionFormat: true }).transcriptionFormat).toBe(true)
     expect(settingsSchema.parse({ transcriptionFormat: false }).transcriptionFormat).toBe(false)
-    expect(settingsSchema.parse({ transcriptionPrompt: 'Ocavue' }).transcriptionPrompt).toBe('Ocavue')
+    expect(settingsSchema.parse({ transcriptionPrompt: 'Ocavue' }).transcriptionPrompt).toBe(
+      'Ocavue',
+    )
     expect(settingsSchema.parse({ transcriptionPrompt: '  Ocavue\n' }).transcriptionPrompt).toBe(
       'Ocavue',
     )

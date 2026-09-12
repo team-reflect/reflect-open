@@ -291,7 +291,9 @@ export function MobileSettings(): ReactElement {
             <SettingsNavRow
               label="Helper text"
               value={
-                normalizeTranscriptionPrompt(settings.transcriptionPrompt) === '' ? 'None' : 'Custom'
+                normalizeTranscriptionPrompt(settings.transcriptionPrompt) === ''
+                  ? 'None'
+                  : 'Custom'
               }
               onPress={() => setTranscriptionPromptOpen(true)}
             />

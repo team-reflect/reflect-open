@@ -120,7 +120,11 @@ describe('createTranscriptionReconciler', () => {
 
   it('reads the transcription hint lazily for every pass', async () => {
     let prompt = ''
-    const subject = create(PROVIDERS, () => true, () => prompt)
+    const subject = create(
+      PROVIDERS,
+      () => true,
+      () => prompt,
+    )
     subject.start()
     await flush()
     expect(reconcileAudioMemos).toHaveBeenLastCalledWith(

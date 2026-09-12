@@ -295,7 +295,9 @@ describe('reconcileAudioMemos', () => {
 
     await reconcile({ transcriptionPrompt: 'Names: Ocavue' })
 
-    expect(transcribeMock).toHaveBeenCalledWith(expect.objectContaining({ prompt: 'Names: Ocavue' }))
+    expect(transcribeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'Names: Ocavue' }),
+    )
   })
 
   it('formats and names a fresh transcript in one best-effort AI pass when enabled', async () => {
