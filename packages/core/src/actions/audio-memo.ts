@@ -443,6 +443,8 @@ export interface ReconcileAudioMemosInput {
   generation: number
   /** Whether a best-effort text-model pass formats each fresh transcript. */
   formatTranscript: boolean
+  /** User transcription hint, sent with every segment. */
+  transcriptionPrompt: string
   /** Host transport for the provider call (the Tauri HTTP plugin's fetch). */
   fetchFn?: typeof fetch
   /** Abort gate, checked between memos (graph switch / unmount). */
@@ -591,6 +593,7 @@ export async function reconcileAudioMemos(
         session,
         provider: config.provider,
         apiKey,
+        prompt: input.transcriptionPrompt,
         generation: input.generation,
         fetchFn: input.fetchFn,
         isStale: stale,

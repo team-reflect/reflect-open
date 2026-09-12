@@ -46,6 +46,8 @@ export interface TranscriptionRequest {
   audio: Blob
   /** The recording's MIME type, possibly with codec parameters. */
   mimeType: string
+  /** User transcription hint, if any. */
+  prompt?: string | undefined
   /**
    * Host transport — the desktop app passes the Tauri HTTP plugin's fetch
    * (CORS-free); `@reflect/core` itself stays platform-agnostic.
@@ -110,6 +112,9 @@ async function transcribeWithOpenAi(request: TranscriptionRequest): Promise<stri
     const form = new FormData()
     form.append('file', request.audio, uploadFilename(request.mimeType))
     form.append('model', model)
+    if (request.prompt) {
+      form.append('prompt', request.prompt)
+    }
     return send(
       fetchFn,
       'https://api.openai.com/v1/audio/transcriptions',
@@ -177,6 +182,9 @@ async function transcribeWithGemini(request: TranscriptionRequest): Promise<stri
   }
   const fetchFn = request.fetchFn ?? fetch
   const data = bytesToBase64(new Uint8Array(await request.audio.arrayBuffer()))
+  const instruction = request.prompt
+    ? `${GEMINI_INSTRUCTION}\n${request.prompt}`
+    : GEMINI_INSTRUCTION
   const attempt = (model: string): Promise<Response> =>
     send(
       fetchFn,
@@ -188,7 +196,7 @@ async function transcribeWithGemini(request: TranscriptionRequest): Promise<stri
           contents: [
             {
               parts: [
-                { text: GEMINI_INSTRUCTION },
+                { text: instruction },
                 { inline_data: { mime_type: baseMimeType(request.mimeType), data } },
               ],
             },

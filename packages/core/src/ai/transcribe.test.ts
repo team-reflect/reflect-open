@@ -63,6 +63,19 @@ describe('transcribeAudio (openai)', () => {
     expect(file.name).toBe('memo.m4a')
   })
 
+  it('sends the hint as the prompt field and omits it when empty', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, () => jsonResponse(200, { text: 'ok' }))
+
+    await transcribeAudio(request({ fetchFn, prompt: 'Names: Ocavue' }))
+    await transcribeAudio(request({ fetchFn, prompt: '' }))
+    await transcribeAudio(request({ fetchFn }))
+
+    expect((calls[0]!.body as FormData).get('prompt')).toBe('Names: Ocavue')
+    expect((calls[1]!.body as FormData).get('prompt')).toBeNull()
+    expect((calls[2]!.body as FormData).get('prompt')).toBeNull()
+  })
+
   it('names webm recordings .webm', async () => {
     const calls: RecordedCall[] = []
     const fetchFn = recordingFetch(calls, () => jsonResponse(200, { text: 'hi' }))
@@ -189,6 +202,22 @@ describe('transcribeAudio (google)', () => {
   function geminiResponse(text: string): Response {
     return jsonResponse(200, { candidates: [{ content: { parts: [{ text }] } }] })
   }
+
+  it('appends the hint to the instruction and leaves it out when empty', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, () => geminiResponse('ok'))
+
+    await transcribeAudio(request({ provider: 'google', fetchFn, prompt: 'Names: Ocavue' }))
+    await transcribeAudio(request({ provider: 'google', fetchFn }))
+
+    const text = (index: number) =>
+      (JSON.parse(String(calls[index]!.body)) as { contents: { parts: { text?: string }[] }[] })
+        .contents[0]!.parts[0]!.text
+    expect(text(0)).toBe(
+      'Transcribe this audio recording verbatim. Return only the transcribed text, with no commentary or formatting.\nNames: Ocavue',
+    )
+    expect(text(1)).not.toContain('Ocavue')
+  })
 
   it('posts inline base64 audio to the fixed transcription model', async () => {
     const calls: RecordedCall[] = []

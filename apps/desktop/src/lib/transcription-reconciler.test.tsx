@@ -53,11 +53,13 @@ let reconciler: TranscriptionReconciler | null = null
 function create(
   providers: AiProvidersState = PROVIDERS,
   getTranscriptionFormat: () => boolean = () => true,
+  getTranscriptionPrompt: () => string = () => '',
 ): TranscriptionReconciler {
   reconciler = createTranscriptionReconciler({
     generation: 3,
     getProviders: () => providers,
     getTranscriptionFormat,
+    getTranscriptionPrompt,
   })
   return reconciler
 }
@@ -113,6 +115,27 @@ describe('createTranscriptionReconciler', () => {
 
     expect(reconcileAudioMemos).toHaveBeenLastCalledWith(
       expect.objectContaining({ formatTranscript: false }),
+    )
+  })
+
+  it('reads the transcription hint lazily for every pass', async () => {
+    let prompt = ''
+    const subject = create(
+      PROVIDERS,
+      () => true,
+      () => prompt,
+    )
+    subject.start()
+    await flush()
+    expect(reconcileAudioMemos).toHaveBeenLastCalledWith(
+      expect.objectContaining({ transcriptionPrompt: '' }),
+    )
+
+    prompt = 'Names: Ocavue'
+    subject.schedule()
+    await flush()
+    expect(reconcileAudioMemos).toHaveBeenLastCalledWith(
+      expect.objectContaining({ transcriptionPrompt: 'Names: Ocavue' }),
     )
   })
 

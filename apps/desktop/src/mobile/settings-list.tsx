@@ -88,7 +88,7 @@ export function SettingsNavRow({
 }: SettingsNavRowProps): ReactElement {
   return (
     <button type="button" className={PRESSABLE_ROW_CLASS} onClick={onPress} disabled={disabled}>
-      <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
       {value !== undefined ? <span className="shrink-0 text-text-muted">{value}</span> : null}
       <ChevronRight aria-hidden className="size-4 shrink-0 text-text-muted" strokeWidth={1.75} />
     </button>

@@ -195,6 +195,45 @@ describe('MobileSettings', () => {
     })
   })
 
+  it('edits the transcription helper text', async () => {
+    const user = userEvent
+    await mount()
+
+    await user.click(page.getByRole('button', { name: /Helper text.*None/ }))
+    const textarea = page.getByRole('textbox', { name: 'Transcription helper text' })
+    await user.type(textarea, ' Names: Ocavue ')
+    await user.click(page.getByRole('button', { name: 'Save' }))
+
+    expect(updateSettings).toHaveBeenCalledWith({ transcriptionPrompt: 'Names: Ocavue' })
+  })
+
+  it('shows Custom once a transcription helper text is stored', async () => {
+    settingsState.current = { ...settingsState.current, transcriptionPrompt: 'Ocavue' }
+    await mount()
+
+    await expect
+      .element(page.getByRole('button', { name: /Helper text.*Custom/ }))
+      .toBeInTheDocument()
+  })
+
+  it('warns when the transcription helper text is over the limit', async () => {
+    const user = userEvent
+    await mount()
+
+    await user.click(page.getByRole('button', { name: /Helper text.*None/ }))
+    const textarea = page.getByRole('textbox', { name: 'Transcription helper text' })
+    await user.fill(textarea, 'x'.repeat(510))
+
+    await expect.element(textarea).toHaveAttribute('aria-invalid', 'true')
+    await expect
+      .element(page.getByRole('alert'))
+      .toHaveTextContent('10 characters over the 500-character limit')
+
+    await user.click(page.getByRole('button', { name: 'Save' }))
+
+    expect(updateSettings).toHaveBeenCalledWith({ transcriptionPrompt: 'x'.repeat(500) })
+  })
+
   it('tracks a prompt that hydrates while its editor is open', async () => {
     const user = userEvent
     const view = await mount()
@@ -218,7 +257,7 @@ describe('MobileSettings', () => {
     })
   })
 
-  it('restores the default prompt immediately from the mobile editor', async () => {
+  it('clears the prompt immediately from the mobile editor', async () => {
     const user = userEvent
     settingsState.current = {
       ...settingsState.current,
@@ -227,7 +266,7 @@ describe('MobileSettings', () => {
     await mount()
 
     await user.click(page.getByRole('button', { name: /System prompt.*Custom/ }))
-    await user.click(page.getByRole('button', { name: 'Use default' }))
+    await user.click(page.getByRole('button', { name: 'Clear' }))
 
     expect(updateSettings).toHaveBeenCalledWith({ chatSystemPrompt: '' })
     await expect
