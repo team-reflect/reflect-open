@@ -100,7 +100,6 @@ export function useNoteDocument(
       return
     }
     const { session, created } = binding.bind(path, {
-      generation: () => generationRef.current,
       // The auto-rename lifecycle (Plan 07b/17) is owned by the coordinator —
       // the tracker, the rewrite chain, alias placement, and the file move.
       coordinator: () =>

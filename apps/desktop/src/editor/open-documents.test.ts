@@ -236,15 +236,3 @@ describe('reloadOpenDocuments with live sessions', () => {
     }
   })
 })
-
-it('generation-bound lookup cannot select another graph at the same note path', () => {
-  const first = fakeSession('daily/2026-09-09.md', [])
-  const second = fakeSession(first.path, [])
-  const unregisterFirst = registerOpenDocument({ session: first, generation: () => 1 })
-  expect(openSession(first.path, 1)).toBe(first)
-  const unregisterSecond = registerOpenDocument({ session: second, generation: () => 2 })
-  expect(openSession(first.path, 1)).toBeNull()
-  expect(openSession(first.path, 2)).toBe(second)
-  unregisterFirst()
-  unregisterSecond()
-})

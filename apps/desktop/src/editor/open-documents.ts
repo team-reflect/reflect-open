@@ -19,8 +19,6 @@ import type { NoteSession } from './note-session'
 
 export interface OpenDocument {
   session: NoteSession
-  /** Current native graph generation used by this document writer. */
-  generation?: (() => number | null) | undefined
   /** Fire pending settle-time work (title renames) now. */
   settle?: () => void
   /** Resolves once fired settle-time work has landed. */
@@ -48,10 +46,8 @@ export function registerOpenDocument(document: OpenDocument): () => void {
 }
 
 /** The live session for `path`, if that note is open in some pane. */
-export function openSession(path: string, generation?: number): NoteSession | null {
-  const document = documents.get(path)
-  if (generation !== undefined && document?.generation?.() !== generation) return null
-  return document?.session ?? null
+export function openSession(path: string): NoteSession | null {
+  return documents.get(path)?.session ?? null
 }
 
 /**

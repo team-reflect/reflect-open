@@ -165,6 +165,7 @@ Each is reviewed individually; every permission below is exercised by the code:
 | `storage` | Queue captures locally so a capture survives the app being closed and retries until it spools. |
 | `unlimitedStorage` | Queued captures embed a screenshot data URL, which can exceed the default storage quota while waiting for the app. |
 | `alarms` | A coarse retry timer so held captures flush once Reflect is installed/launched later. |
+| `webRequest` + `https://x.com/*` | Observe bookmark requests on x.com to save the post link to your daily note. |
 
 ### Data-handling disclosures (Privacy practices tab)
 
@@ -177,20 +178,3 @@ Each is reviewed individually; every permission below is exercised by the code:
   1. Data is **not** sold to third parties.
   2. Data is **not** used or transferred for purposes unrelated to the single purpose.
   3. Data is **not** used or transferred to determine creditworthiness or for lending.
-
-## X bookmarks
-
-Bookmarking a post on x.com queues that post's link, and Reflect appends
-`![](https://x.com/i/status/<id>)` (rendered as a tweet card) under `## X bookmarks` in the
-capture-day daily note. The extension observes `CreateBookmark` requests
-(hence the `webRequest` permission on `https://x.com/*`) and keeps only the
-post ID: no page text, screenshots, media, or account data. A request is a
-save intent; X rejecting it is not observed. Historical bookmarks and
-unbookmarking are not synchronized, incognito tabs are ignored, and the popup
-checkbox opts out.
-
-Links go to whichever graph the desktop app last opened, like every other
-capture. A desktop build that cannot read bookmark envelopes holds them in the
-browser queue (logged, not shown) until it is updated; page captures behind
-them still deliver. A post already linked in that day's note is not added
-again, so a replayed spool never duplicates an entry.
