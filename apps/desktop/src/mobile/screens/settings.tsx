@@ -6,7 +6,10 @@ import {
   errorMessage,
   iapRestorePurchases,
   listNotes,
+  CHAT_SYSTEM_PROMPT_MAX_LENGTH,
+  TRANSCRIPTION_PROMPT_MAX_LENGTH,
   normalizeChatSystemPrompt,
+  normalizeTranscriptionPrompt,
   type AiPrompt,
   type AiProviderConfig,
   type EditorTextSize,
@@ -24,10 +27,10 @@ import { queryKeys } from '@/lib/query-client'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer'
 import { AiPromptDrawer } from '@/mobile/ai-prompt-drawer'
 import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer'
-import { ChatSystemPromptDrawer } from '@/mobile/chat-system-prompt-drawer'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
 import { MobileScreenHeader } from '@/mobile/screen-header'
+import { TextSettingDrawer } from '@/mobile/text-setting-drawer'
 import {
   SettingsActionRow,
   SettingsGroup,
@@ -114,6 +117,7 @@ export function MobileSettings(): ReactElement {
     useAiProviders()
   const [addProviderOpen, setAddProviderOpen] = useState(false)
   const [systemPromptOpen, setSystemPromptOpen] = useState(false)
+  const [transcriptionPromptOpen, setTranscriptionPromptOpen] = useState(false)
   const { prompts, addPrompt, updatePrompt, removePrompt } = useAiPrompts()
   // The edited prompt sticks around after close so the exit animation has
   // content; `promptOpen` alone drives visibility (the edit-sheet pattern).
@@ -275,7 +279,7 @@ export function MobileSettings(): ReactElement {
 
           <SettingsGroup
             header="Audio memos"
-            footer="Uses AI to add punctuation, paragraphs, and light Markdown."
+            footer="Uses AI to add punctuation, paragraphs, and light Markdown. Helper text is sent to your transcription provider with every memo."
             footerId={audioMemoDescriptionId}
           >
             <SettingsSwitchRow
@@ -283,6 +287,13 @@ export function MobileSettings(): ReactElement {
               checked={settings.transcriptionFormat}
               descriptionId={audioMemoDescriptionId}
               onCheckedChange={(transcriptionFormat) => updateSettings({ transcriptionFormat })}
+            />
+            <SettingsNavRow
+              label="Helper text"
+              value={
+                normalizeTranscriptionPrompt(settings.transcriptionPrompt) === '' ? 'None' : 'Custom'
+              }
+              onPress={() => setTranscriptionPromptOpen(true)}
             />
           </SettingsGroup>
 
@@ -415,11 +426,31 @@ export function MobileSettings(): ReactElement {
         onSetDefaultModel={setDefaultModel}
         onRemove={removeProvider}
       />
-      <ChatSystemPromptDrawer
+      <TextSettingDrawer
+        title="System prompt"
+        description="Additional instructions sent with every AI chat. Reflect’s note-search, citation, and privacy rules still apply."
+        ariaLabel="System prompt instructions"
+        placeholder="Be concise. Challenge my assumptions and ask clarifying questions."
+        maxLength={CHAT_SYSTEM_PROMPT_MAX_LENGTH}
+        rows={8}
+        normalize={normalizeChatSystemPrompt}
         value={settings.chatSystemPrompt}
         open={systemPromptOpen}
         onOpenChange={setSystemPromptOpen}
         onSave={(chatSystemPrompt) => updateSettings({ chatSystemPrompt })}
+      />
+      <TextSettingDrawer
+        title="Transcription helper text"
+        description="Context sent to your transcription provider with every audio memo, such as names it tends to misspell."
+        ariaLabel="Transcription helper text"
+        placeholder="This transcription mentions the following names: Ocavue"
+        maxLength={TRANSCRIPTION_PROMPT_MAX_LENGTH}
+        rows={3}
+        normalize={normalizeTranscriptionPrompt}
+        value={settings.transcriptionPrompt}
+        open={transcriptionPromptOpen}
+        onOpenChange={setTranscriptionPromptOpen}
+        onSave={(transcriptionPrompt) => updateSettings({ transcriptionPrompt })}
       />
       <AiPromptDrawer
         prompt={editingPrompt}
