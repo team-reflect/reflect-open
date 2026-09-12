@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.12.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.4...v0.12.0-beta.5) (2026-09-12)
+
+
+### Features
+
+* add transcription helper text for audio memos ([#1264](https://github.com/team-reflect/reflect-open/issues/1264)) ([d2d8cd5](https://github.com/team-reflect/reflect-open/commit/d2d8cd53e28880fa1a5500c0817d091afd7afe76))
+* save X bookmark links directly to daily notes ([#1253](https://github.com/team-reflect/reflect-open/issues/1253)) ([4cf833c](https://github.com/team-reflect/reflect-open/commit/4cf833cbbd88507d667ee4ba665df718e3c7677c))
+
+
+### Bug Fixes
+
+* render chat replies as markdown while streaming ([#1259](https://github.com/team-reflect/reflect-open/issues/1259)) ([1181f0e](https://github.com/team-reflect/reflect-open/commit/1181f0eb38c916d2c86d6184402bbb46d59393e9))
+* update meowdown to ^0.68.3 ([#1262](https://github.com/team-reflect/reflect-open/issues/1262)) ([27b45fe](https://github.com/team-reflect/reflect-open/commit/27b45fef4735bb7e80f3aa775f9a77bf3d03b2f3))
+* update meowdown to ^0.69.0 ([#1267](https://github.com/team-reflect/reflect-open/issues/1267)) ([c054879](https://github.com/team-reflect/reflect-open/commit/c05487918d7941c860fa1dcd3adb3faef4210282))
+
 ## [0.12.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.3...v0.12.0-beta.4) (2026-09-10)
 
 
