@@ -5,7 +5,7 @@ import { getBookmarkPostId, type BookmarkEnvelope } from './bookmark-envelope'
 const SECTION_TITLE = 'X bookmarks'
 
 /**
- * Append a bookmark link under the daily note's `## X bookmarks` section. A
+ * Append a bookmark embed under the daily note's `## X bookmarks` section. A
  * post already linked anywhere in the note is left alone, so a replayed spool
  * never adds a second entry.
  */
@@ -14,7 +14,7 @@ export function appendBookmark(source: string, envelope: BookmarkEnvelope): stri
   if (parsed.links.some((link) => getBookmarkPostId(link.href) === envelope.postId)) {
     return source
   }
-  const line = `[X post ${envelope.postId}](https://x.com/i/status/${envelope.postId})`
+  const line = `![](https://x.com/i/status/${envelope.postId})`
   const headings = topLevelHeadings(parsed.headings)
   const heading = headings.find(
     (candidate) => candidate.level === 2 && candidate.text === SECTION_TITLE,

@@ -181,7 +181,7 @@ Each is reviewed individually; every permission below is exercised by the code:
 ## X bookmarks
 
 Bookmarking a post on x.com queues that post's link, and Reflect appends
-`[X post <id>](https://x.com/i/status/<id>)` under `## X bookmarks` in the
+`![](https://x.com/i/status/<id>)` (rendered as a tweet card) under `## X bookmarks` in the
 capture-day daily note. The extension observes `CreateBookmark` requests
 (hence the `webRequest` permission on `https://x.com/*`) and keeps only the
 post ID: no page text, screenshots, media, or account data. A request is a

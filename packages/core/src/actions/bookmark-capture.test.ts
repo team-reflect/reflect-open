@@ -17,12 +17,12 @@ describe('appendBookmark', () => {
   it('keeps frontmatter and prose while adding the section', () => {
     const source = '---\nprivate: true\n---\nMy unfinished thought\n'
     expect(appendBookmark(source, capture)).toBe(
-      '---\nprivate: true\n---\nMy unfinished thought\n\n## X bookmarks\n\n[X post 20](https://x.com/i/status/20)\n',
+      '---\nprivate: true\n---\nMy unfinished thought\n\n## X bookmarks\n\n![](https://x.com/i/status/20)\n',
     )
   })
   it('replays without duplicating and respects a deleted entry', () => {
     const saved = appendBookmark('', capture)
-    expect(saved).toBe('## X bookmarks\n\n[X post 20](https://x.com/i/status/20)\n')
+    expect(saved).toBe('## X bookmarks\n\n![](https://x.com/i/status/20)\n')
     expect(appendBookmark(saved, capture)).toBe(saved)
     expect(appendBookmark(saved, { ...capture, id: '7c9e6679-7425-40de-944b-e07fc1f90ae8' })).toBe(
       saved,
@@ -44,10 +44,8 @@ describe('appendBookmark', () => {
       })
     }
     expect(parseNote({ path: '', source }).links).toHaveLength(10)
-    expect(source).toContain('My note\n\n[X post 1](https://x.com/i/status/1)\n')
-    expect(source.endsWith('[X post 10](https://x.com/i/status/10)\n\n## Later\nKeep this\n')).toBe(
-      true,
-    )
+    expect(source).toContain('My note\n\n![](https://x.com/i/status/1)\n')
+    expect(source.endsWith('![](https://x.com/i/status/10)\n\n## Later\nKeep this\n')).toBe(true)
   })
 })
 
