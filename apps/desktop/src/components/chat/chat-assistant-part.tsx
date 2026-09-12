@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useDeferredValue, type ReactElement } from 'react'
 import type { AssistantPart } from '@reflect/core'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Marker, MarkerContent } from '@/components/ui/marker'
@@ -18,17 +18,7 @@ interface ChatAssistantPartProps {
 export function ChatAssistantPart({ part, onWikiLinkClick }: ChatAssistantPartProps): ReactElement {
   switch (part.kind) {
     case 'text':
-      return (
-        <Bubble variant="ghost" className="max-w-full">
-          <BubbleContent className="max-w-full text-text">
-            <MarkdownPreview
-              content={part.text}
-              onWikiLinkClick={onWikiLinkClick}
-              className="reflect-chat-message text-sm"
-            />
-          </BubbleContent>
-        </Bubble>
-      )
+      return <ChatAssistantText text={part.text} onWikiLinkClick={onWikiLinkClick} />
     case 'tool':
       return <ChatToolChip part={part} />
     case 'notice':
@@ -43,4 +33,30 @@ export function ChatAssistantPart({ part, onWikiLinkClick }: ChatAssistantPartPr
         </Marker>
       )
   }
+}
+
+/**
+ * Streamed deltas can arrive faster than a long code block re-highlights, so
+ * the markdown renders from a deferred value: React drops the intermediate
+ * renders instead of queueing them.
+ */
+function ChatAssistantText({
+  text,
+  onWikiLinkClick,
+}: {
+  text: string
+  onWikiLinkClick: ChatAssistantPartProps['onWikiLinkClick']
+}): ReactElement {
+  const content = useDeferredValue(text)
+  return (
+    <Bubble variant="ghost" className="max-w-full">
+      <BubbleContent className="max-w-full text-text">
+        <MarkdownPreview
+          content={content}
+          onWikiLinkClick={onWikiLinkClick}
+          className="reflect-chat-message text-sm"
+        />
+      </BubbleContent>
+    </Bubble>
+  )
 }
