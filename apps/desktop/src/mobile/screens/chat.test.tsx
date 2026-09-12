@@ -57,12 +57,6 @@ vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ indexGeneration: null, graph: null }),
 }))
 
-// Keep settled markdown as plain text so this suite isolates the chat state.
-vi.mock('@/editor/markdown-preview', () => ({
-  MarkdownPreview: ({ content }: { content: string }) => (
-    <div data-testid="markdown-preview">{content}</div>
-  ),
-}))
 vi.mock('@/lib/provider-fetch', () => ({ providerFetch: vi.fn() }))
 
 // Keep sheet content inline so this suite isolates the chat flow.
