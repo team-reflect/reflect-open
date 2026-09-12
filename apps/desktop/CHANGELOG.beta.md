@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.5...v0.12.0-beta.6) (2026-09-12)
+
+
+### Bug Fixes
+
+* **mobile:** avoid loading flashes on first tab switch ([#1271](https://github.com/team-reflect/reflect-open/issues/1271)) ([0dfe0b1](https://github.com/team-reflect/reflect-open/commit/0dfe0b15899c033e801b883c5c782b464d6703f4))
+
 ## [0.12.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.4...v0.12.0-beta.5) (2026-09-12)
 
 
