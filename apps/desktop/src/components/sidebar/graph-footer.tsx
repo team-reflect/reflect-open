@@ -160,6 +160,9 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
           >
             <Settings aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">Preferences</span>
+            {SETTINGS_BINDING && (
+              <ShortcutKeys binding={SETTINGS_BINDING} className="text-[10px]" />
+            )}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setAppsOpen(true)} className={MENU_ITEM_CLASS}>
