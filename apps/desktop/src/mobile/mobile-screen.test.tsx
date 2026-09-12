@@ -131,6 +131,7 @@ vi.mock('@/providers/settings-provider', () => ({
       aiProviders: [],
       defaultAiProviderId: null,
       chatSystemPrompt: '',
+      transcriptionPrompt: '',
       aiPrompts: [],
     },
     updateSettings: async () => {},
