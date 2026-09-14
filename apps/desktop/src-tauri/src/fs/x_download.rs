@@ -87,8 +87,8 @@ async fn download_once(root: PathBuf, url: String, hash: String) -> Result<archi
         .map_err(network)?
         .error_for_status()
         .map_err(network)?;
-    // Headers can be absent or wrong. Sniffed bytes choose the format-specific limit.
-    let mut limit = archive::VIDEO_MAX_BYTES.max(archive::IMAGE_MAX_BYTES);
+    // Enforce the same limit with or without a trustworthy Content-Length.
+    let limit = archive::MEDIA_MAX_BYTES;
     if response.content_length().is_some_and(|bytes| bytes > limit) {
         return Err(AppError::parse("media-too-large"));
     }
@@ -100,10 +100,7 @@ async fn download_once(root: PathBuf, url: String, hash: String) -> Result<archi
         .tempfile_in(archive::temporary_directory(&root)?)?;
     let mut file = tokio::fs::File::from_std(temporary.reopen()?);
     let mut bytes = 0u64;
-    let mut prefix = Vec::new();
     while let Some(chunk) = response.chunk().await.map_err(network)? {
-        prefix.extend_from_slice(&chunk[..chunk.len().min(8192 - prefix.len())]);
-        limit = limit.min(archive::media_byte_limit(&prefix));
         bytes += chunk.len() as u64;
         if bytes > limit {
             return Err(AppError::parse("media-too-large"));
