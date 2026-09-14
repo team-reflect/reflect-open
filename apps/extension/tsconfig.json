@@ -10,7 +10,14 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["./lib/**/*", "./entrypoints/**/*", "./.wxt/wxt.d.ts", "./.wxt/types/*", "./*.ts"],
+  "include": [
+    "./lib/**/*",
+    "./entrypoints/**/*",
+    "./scripts/**/*",
+    "./.wxt/wxt.d.ts",
+    "./.wxt/types/*",
+    "./*.ts"
+  ],
   "references": [
     {
       "path": "../../packages/core/tsconfig.json"

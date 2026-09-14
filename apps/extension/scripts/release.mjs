@@ -14,7 +14,9 @@ const { version } = z
   .object({ version: versionSchema })
   .parse(JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')))
 const zip = resolve(root, '.output', `reflect-capture-${version}-chrome.zip`)
-const manifest = JSON.parse(execFileSync('unzip', ['-p', zip, 'manifest.json'], { encoding: 'utf8' }))
+const manifest = JSON.parse(
+  execFileSync('unzip', ['-p', zip, 'manifest.json'], { encoding: 'utf8' }),
+)
 z.object({
   manifest_version: z.literal(3),
   name: z.literal('Reflect Capture'),
@@ -62,7 +64,9 @@ async function submit() {
     })
     .parse(await store.getStatus())
   if (command === 'dry-run') {
-    report(`Chrome credentials verified. No upload or submission.\n\n${JSON.stringify(status, null, 2)}`)
+    report(
+      `Chrome credentials verified. No upload or submission.\n\n${JSON.stringify(status, null, 2)}`,
+    )
     return
   }
   if (status.takenDown || status.warned) {
