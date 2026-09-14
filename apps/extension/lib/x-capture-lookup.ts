@@ -1,7 +1,7 @@
 import { xPostSchema } from '@reflect/core/x-archive'
 import { X_CAPTURE_CHANNEL } from './x-capture'
 import { requestXTweet } from '@post-embed/exporter/x/bridge'
-import { type CaptureLookupResponse } from './x-capture-messages'
+import type { CaptureLookupResponse } from './x-capture-messages'
 
 /** Look up one observed snapshot without crossing into privileged browser APIs. */
 export async function lookupCapturedPost(
