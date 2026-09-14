@@ -39,8 +39,8 @@ always keeps the pinned `key`. You can also load the `pnpm … build` output
 artifact omits `key`, so it loads under a random ID the host won't allowlist.
 
 The options page opens from the toolbar icon's context menu (Options), from
-Details → Extension options on `chrome://extensions`, or from the popup's
-Settings link.
+Details → Extension options on `chrome://extensions`, or from the gear in the
+popup's header.
 
 For the native hop to work, run the desktop app once (it writes the host
 manifests for detected browsers and the active-graph pointer file), then
