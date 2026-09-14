@@ -2,6 +2,7 @@ import { isAppError } from '../errors'
 import { readNote } from '../graph/commands'
 import { assetReferenceMatches, assetReferencingNotePaths } from '../indexing/asset-refs'
 import { parseNote } from '../markdown/extract'
+import { getXArchiveOwners } from '../x-archive/commands'
 
 /**
  * The asset privacy verdict both asset-description consumers share: the
@@ -46,6 +47,8 @@ export async function classifyAssetFromNotes(
   if (candidates.length === 0) {
     return 'skip-unreferenced'
   }
+  const owners = assetPath.startsWith('assets/x/') ? await getXArchiveOwners(assetPath) : []
+  const references = [assetPath, ...owners]
   let publicRefs = 0
   for (const notePath of candidates) {
     let source: string
@@ -58,7 +61,9 @@ export async function classifyAssetFromNotes(
       return 'skip-private'
     }
     const parsed = parseNote({ path: notePath, source })
-    if (!parsed.assets.some((ref) => assetReferenceMatches(ref.path, assetPath))) {
+    if (
+      !parsed.assets.some((ref) => references.some((path) => assetReferenceMatches(ref.path, path)))
+    ) {
       continue
     }
     if (parsed.frontmatter.private) {
