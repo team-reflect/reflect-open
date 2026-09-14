@@ -127,6 +127,7 @@ export class XPostHost {
   start(): void {
     this.#active = true
     if (this.#timer) clearInterval(this.#timer)
+    // FIXME: WHY do we need to poll every 2 seconds? This is a hack to make sure that the x-posts are loaded in time for the first render. We should find a better and much simpler way to do this.
     this.#timer = setInterval(() => {
       this.#poll().catch(() => {})
     }, 2000)
