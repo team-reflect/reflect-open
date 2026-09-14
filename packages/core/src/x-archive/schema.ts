@@ -7,11 +7,20 @@ import type { ArchivedXPost } from './types'
 export const archiveResourceSchema = z.looseObject({
   url: z.string(),
   state: z.enum(['pending', 'stored', 'failed', 'unsupported']),
-  error: z.enum(['network', 'authentication', 'source-missing', 'storage',
-    'format', 'unsupported-hls', 'video-too-large']).optional(),
+  error: z
+    .enum([
+      'network',
+      'authentication',
+      'source-missing',
+      'storage',
+      'format',
+      'unsupported-hls',
+      'video-too-large',
+    ])
+    .optional(),
 })
 export function isValidUrl(source: string): boolean {
-  try { new URL(source); return true } catch { return false }
+  return URL.canParse(source)
 }
 
 const outerSchema = z.looseObject({
@@ -32,8 +41,10 @@ export function parseArchivedPost(input: unknown): ArchivedXPost {
   }
   for (const entry of [post.output, post.output.quote]) {
     for (const media of entry?.media ?? []) {
-      if (media.type !== 'photo' &&
-          (media.sources.length > 1 || media.sources.some((source) => source.type !== 'video/mp4'))) {
+      if (
+        media.type !== 'photo' &&
+        (media.sources.length > 1 || media.sources.some((source) => source.type !== 'video/mp4'))
+      ) {
         throw new Error('invalid-video-selection')
       }
     }
@@ -44,10 +55,12 @@ export function parseArchivedPost(input: unknown): ArchivedXPost {
       throw new Error('unregistered-media-url')
     }
   }
-  return { ...archive, data: post.output } as ArchivedXPost
+  return { ...archive, data: post.output }
 }
 export const archivedPostSchema = z.unknown().transform((value, context) => {
-  try { return parseArchivedPost(value) } catch {
+  try {
+    return parseArchivedPost(value)
+  } catch {
     context.addIssue({ code: 'custom', message: 'invalid-post' })
     return z.NEVER
   }
@@ -60,6 +73,12 @@ export const archiveJobSchema = z.object({
   lease: z.string().nullable(),
   leaseUntil: z.number(),
   offset: z.number().int().nonnegative(),
-  receipt: z.object({ name: z.string(), bytes: z.number(), mime: z.string(), sha256: z.string().optional() }).nullable(),
+  receipt: z
+    .object({
+      name: z.string(),
+      bytes: z.number(),
+      mime: z.string(),
+      sha256: z.string().optional(),
+    })
+    .nullable(),
 })
-

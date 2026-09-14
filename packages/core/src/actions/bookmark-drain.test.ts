@@ -1,3 +1,7 @@
+vi.mock('../x-archive', () => ({
+  saveArchivedPost: vi.fn(async () => {}),
+  markArchivedCaptureProcessed: vi.fn(async () => {}),
+}))
 import { beforeEach, expect, it, vi } from 'vitest'
 import { appendBookmark } from './bookmark-capture'
 import { drainCaptureInbox } from './capture-drain'
@@ -21,6 +25,15 @@ vi.mock('../graph/commands', () => ({
 const envelope: BookmarkEnvelope = {
   version: 2,
   kind: 'x-bookmark',
+  archive: {
+    kind: 'x-post',
+    id: '20',
+    revision: 'capture-one',
+    capturedAt: '2026-09-09T04:00:00Z',
+    textState: 'complete',
+    data: { id: '20', createdAt: '', author: { name: '', handle: '' }, body: [] },
+    resources: [],
+  },
   id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
   source: 'extension',
   postId: '20',

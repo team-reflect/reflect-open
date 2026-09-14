@@ -14,16 +14,16 @@
   },
   "dependencies": {
     "@meowdown/markdown": "^0.70.1",
+    "@post-embed/schema": "^0.3.0",
+    "@post-embed/types": "^0.3.0",
     "@reflect/db": "workspace:*",
     "@reflect/modules": "workspace:*",
     "@reflect/utils": "workspace:*",
     "kysely": "^0.28.17",
     "ulidx": "^2.4.1",
+    "valibot": "^1.5.0",
     "yaml": "^2.9.1",
-    "zod": "^4.6.4",
-    "@post-embed/types": "^0.3.0",
-    "@post-embed/schema": "^0.3.0",
-    "valibot": "^1.5.0"
+    "zod": "^4.6.4"
   },
   "devDependencies": {
     "@ai-sdk/provider": "^4.0.14",

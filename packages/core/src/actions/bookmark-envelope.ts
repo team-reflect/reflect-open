@@ -4,16 +4,15 @@ import { z } from 'zod'
 export const postIdSchema = z.string().regex(/^[1-9]\d{0,19}$/)
 
 /** URL-only X bookmark capture; the desktop derives the permalink from `postId`. */
-export const bookmarkEnvelopeSchema = z
-  .object({
-    archive: archivedPostSchema,
-    version: z.literal(2),
-    kind: z.literal('x-bookmark'),
-    id: z.guid(),
-    source: z.literal('extension'),
-    postId: postIdSchema,
-    capturedAt: z.iso.datetime({ offset: true }),
-  })
+export const bookmarkEnvelopeSchema = z.object({
+  archive: archivedPostSchema,
+  version: z.literal(2),
+  kind: z.literal('x-bookmark'),
+  id: z.guid(),
+  source: z.literal('extension'),
+  postId: postIdSchema,
+  capturedAt: z.iso.datetime({ offset: true }),
+})
 
 export type BookmarkEnvelope = z.infer<typeof bookmarkEnvelopeSchema>
 

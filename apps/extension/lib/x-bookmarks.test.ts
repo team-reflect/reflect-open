@@ -1,14 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { captureBookmarkRequest, parseCreateBookmark, type BookmarkRequest } from './x-bookmarks'
-import { enqueueCapture } from './flush'
+import { saveXPost } from './x-save'
 import { readBookmarkSettings } from './bookmark-settings'
 
 const { tabMock } = vi.hoisted(() => ({ tabMock: vi.fn(async () => ({ incognito: false })) }))
 vi.mock('wxt/browser', () => ({ browser: { tabs: { get: tabMock } } }))
-vi.mock('./flush', () => ({
-  enqueueCapture: vi.fn(async () => {}),
-  flushQueue: vi.fn(async () => {}),
-}))
+vi.mock('./x-save', () => ({ saveXPost: vi.fn(async () => {}) }))
 vi.mock('./bookmark-settings', () => ({
   readBookmarkSettings: vi.fn(async () => ({ enabled: true })),
 }))
@@ -62,19 +59,12 @@ describe('parseCreateBookmark', () => {
 describe('captureBookmarkRequest', () => {
   it('queues a v2 envelope stamped with the request time', async () => {
     await captureBookmarkRequest(request())
-    expect(enqueueCapture).toHaveBeenCalledWith({
-      envelope: expect.objectContaining({
-        version: 2,
-        kind: 'x-bookmark',
-        postId: '20',
-        capturedAt: '2026-09-09T04:00:00.000Z',
-      }),
-    })
+    expect(saveXPost).toHaveBeenCalledWith(1, '20', '2026-09-09T04:00:00.000Z')
   })
   it('ignores incognito tabs', async () => {
     tabMock.mockResolvedValueOnce({ incognito: true })
     await captureBookmarkRequest(request())
-    expect(enqueueCapture).not.toHaveBeenCalled()
+    expect(saveXPost).not.toHaveBeenCalled()
   })
   it('does not inspect request bodies after the user opts out', async () => {
     vi.mocked(readBookmarkSettings).mockResolvedValueOnce({ enabled: false })
@@ -83,6 +73,6 @@ describe('captureBookmarkRequest', () => {
     Object.defineProperty(details, 'requestBody', { get: body })
     await captureBookmarkRequest(details)
     expect(body).not.toHaveBeenCalled()
-    expect(enqueueCapture).not.toHaveBeenCalled()
+    expect(saveXPost).not.toHaveBeenCalled()
   })
 })

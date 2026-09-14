@@ -11,11 +11,10 @@
 //! `@reflect/core` (`actions/capture-envelope.ts`) — that TS file is the
 //! source of truth.
 
-pub mod bookmark;
-pub mod x_archive;
 pub mod envelope;
 pub mod protocol;
 pub mod spool;
+pub mod x_archive;
 
 use std::io::{Read, Write};
 use std::path::Path;
@@ -78,7 +77,7 @@ fn handle_message(payload: &[u8], pointer_path: &Path) -> Result<(), HostError> 
     let value: serde_json::Value = serde_json::from_slice(payload)
         .map_err(|_| HostError::InvalidPayload("Invalid capture JSON".into()))?;
     match value["envelope"].get("kind") {
-        Some(kind) if kind == "x-bookmark" => return bookmark::spool(payload, pointer_path),
+        Some(kind) if kind == "x-bookmark" => return Err(HostError::UnsupportedVersion),
         Some(_) => return Err(HostError::InvalidPayload("Unexpected capture kind".into())),
         None => {}
     }
@@ -97,7 +96,9 @@ pub fn run(
 ) -> std::io::Result<()> {
     while let Some(payload) = read_message(input)? {
         if serde_json::from_slice::<serde_json::Value>(&payload)
-            .ok().is_some_and(|value| value.get("op").is_some()) {
+            .ok()
+            .is_some_and(|value| value.get("op").is_some())
+        {
             let response = x_archive::handle(&payload, pointer_path);
             write_message(output, &serde_json::to_vec(&response)?)?;
             continue;

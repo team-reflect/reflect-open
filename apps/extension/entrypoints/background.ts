@@ -26,8 +26,11 @@ const RETRY_ALARM = 'capture-retry'
 const RETRY_PERIOD_MINUTES = 15
 
 async function saveTabWithDefaults(tab: Parameters<typeof snapshotTab>[0]): Promise<void> {
-  const postId = tab.url ? parseXPostId(tab.url) : undefined
-  if (postId && tab.id !== undefined) { await saveXPost(tab.id, postId); return }
+  const postId = tab?.url ? parseXPostId(tab.url) : undefined
+  if (postId && tab?.id !== undefined) {
+    await saveXPost(tab.id, postId)
+    return
+  }
   const captured = await snapshotTab(tab)
   if (captured.status !== 'ready') {
     return
@@ -56,20 +59,36 @@ const enqueueRequestSchema = z.object({
 
 export default defineBackground(() => {
   registerBookmarkObserver()
-  const flushArchive = () => { flushArchivedCaptures().catch(() => {}) }
+  const flushArchive = () => {
+    flushArchivedCaptures().catch(() => {})
+  }
   browser.alarms.create('x-archive-retry', { periodInMinutes: 1 }).catch(() => {})
-  browser.alarms.onAlarm.addListener((alarm) => { if (alarm.name === 'x-archive-retry') flushArchive() })
+  browser.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'x-archive-retry') flushArchive()
+  })
   browser.runtime.onStartup.addListener(flushArchive)
   flushArchive()
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (sender.id === browser.runtime.id && sender.tab == null &&
-        sender.url === browser.runtime.getURL('/popup.html')) {
-      const save = z.object({ type: z.literal('x-archive:save'), tabId: z.number().int().nonnegative(),
-        postId: z.string().regex(/^[1-9]\d{0,19}$/) }).safeParse(message)
+    if (
+      sender.id === browser.runtime.id &&
+      sender.tab == null &&
+      sender.url === browser.runtime.getURL('/popup.html')
+    ) {
+      const save = z
+        .object({
+          type: z.literal('x-archive:save'),
+          tabId: z.number().int().nonnegative(),
+          postId: z.string().regex(/^[1-9]\d{0,19}$/),
+        })
+        .safeParse(message)
       if (save.success) {
         saveXPost(save.data.tabId, save.data.postId).then(
           () => sendResponse({ ok: true }),
-          (error: unknown) => sendResponse({ ok: false, message: error instanceof Error ? error.message : 'capture-failed' }),
+          (error: unknown) =>
+            sendResponse({
+              ok: false,
+              message: error instanceof Error ? error.message : 'capture-failed',
+            }),
         )
         return true
       }

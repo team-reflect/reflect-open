@@ -7,13 +7,13 @@
 //! [`io`]) and deletes go to the OS trash. Parsing/indexing live in later plans.
 
 pub mod asset_protocol;
-pub mod x_archive;
-pub mod x_media_protocol;
 pub mod assets;
 mod import;
 mod import_assets;
 mod io;
 mod resolve;
+pub mod x_archive;
+pub mod x_media_protocol;
 
 use std::fs;
 use std::path::{Path, PathBuf};

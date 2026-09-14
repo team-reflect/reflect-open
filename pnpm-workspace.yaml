@@ -28,7 +28,7 @@ minimumReleaseAgeExclude:
 
 blockExoticSubdeps: false
 overrides:
-  '@post-embed/types': https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
-  '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@41f4b426c813fe66763e43a3b0af9ec297287a65
-  '@post-embed/exporter': https://pkg.pr.new/@post-embed/exporter@41f4b426c813fe66763e43a3b0af9ec297287a65
-  '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@41f4b426c813fe66763e43a3b0af9ec297287a65
+  '@post-embed/types': https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
+  '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@7bc1a3259420e2060f3183eec77557183abd7e66
+  '@post-embed/exporter': https://pkg.pr.new/@post-embed/exporter@7bc1a3259420e2060f3183eec77557183abd7e66
+  '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@7bc1a3259420e2060f3183eec77557183abd7e66

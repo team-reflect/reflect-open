@@ -30,8 +30,13 @@ export async function assetReferencingNotePaths(assetPath: string): Promise<stri
   const basename = assetPath.split('/').at(-1) ?? assetPath
   const rows = await db
     .selectFrom('assets')
-    .where((eb) => eb.or([eb('assetPath', '=', assetPath), eb('assetPath', '=', basename),
-      ...(owners.length ? [eb('assetPath', 'in', owners)] : [])]))
+    .where((eb) =>
+      eb.or([
+        eb('assetPath', '=', assetPath),
+        eb('assetPath', '=', basename),
+        ...(owners.length > 0 ? [eb('assetPath', 'in', owners)] : []),
+      ]),
+    )
     .select('notePath')
     .distinct()
     .execute()

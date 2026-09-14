@@ -1,8 +1,13 @@
 import { useEffect, useMemo } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { mapXPostMediaUrls, parseXPostId, type XPost, type XMediaUrlPolicy } from '@post-embed/types'
+import {
+  mapXPostMediaUrls,
+  parseXPostId,
+  type XPost,
+  type MediaUrlResolver,
+} from '@post-embed/types'
 import { resolveArchivedPost } from '@reflect/core/x-archive'
-import { useGraph } from '@/providers/graph-provider'
+import { useOptionalGraph } from '@/providers/graph-provider'
 
 export class XPostHost {
   readonly #generation: number | null
@@ -22,10 +27,10 @@ export class XPostHost {
     this.#generation = generation
   }
 
-  readonly xPostMediaUrlPolicy: XMediaUrlPolicy = (url) => {
+  readonly resolveXPostMediaUrl: MediaUrlResolver = (url) => {
     if (!this.#active) return
     for (const allowed of this.#allowedByPost.values()) if (allowed.has(url)) return url
-    return undefined
+    return
   }
 
   readonly resolveXPost = (url: string): XPost | undefined | Promise<XPost | undefined> => {
@@ -47,7 +52,7 @@ export class XPostHost {
     listeners.add(notify)
     return () => {
       listeners.delete(notify)
-      if (!listeners.size) this.#subscribers.delete(url)
+      if (listeners.size === 0) this.#subscribers.delete(url)
     }
   }
 
@@ -74,12 +79,17 @@ export class XPostHost {
       if (resource.state === 'unsupported') continue
       const identity = id + ':' + resource.hash
       const previousState = this.#resourceStates.get(identity)
-      if (resource.state === 'stored' && previousState !== undefined && previousState !== 'stored') {
+      if (
+        resource.state === 'stored' &&
+        previousState !== undefined &&
+        previousState !== 'stored'
+      ) {
         this.#retryTokens.set(identity, (this.#retryTokens.get(identity) ?? 0) + 1)
       }
       this.#resourceStates.set(identity, resource.state)
       let runtime = convertFileSrc(
-        this.#generation + '/x-media/' + id + '/' + resource.hash, 'reflect-asset',
+        this.#generation + '/x-media/' + id + '/' + resource.hash,
+        'reflect-asset',
       )
       const retry = this.#retryTokens.get(identity)
       if (retry) runtime += '?retry=' + retry
@@ -92,7 +102,7 @@ export class XPostHost {
     this.#fingerprints.set(url, fingerprint)
     this.#allowedByPost.set(url, allowed)
     this.#posts.set(url, data)
-    if (previous !== undefined && previous !== fingerprint) this.#notify(url)
+    if (previous !== fingerprint) this.#notify(url)
     return data
   }
 
@@ -101,18 +111,24 @@ export class XPostHost {
     this.#polling = true
     try {
       for (const url of this.#subscribers.keys()) {
-        try { await this.#load(url) } catch {
+        try {
+          await this.#load(url)
+        } catch {
           if (this.#posts.delete(url)) this.#notify(url)
           this.#allowedByPost.delete(url)
         }
       }
-    } finally { this.#polling = false }
+    } finally {
+      this.#polling = false
+    }
   }
 
   start(): void {
     this.#active = true
     if (this.#timer) clearInterval(this.#timer)
-    this.#timer = setInterval(() => { this.#poll().catch(() => {}) }, 2000)
+    this.#timer = setInterval(() => {
+      this.#poll().catch(() => {})
+    }, 2000)
   }
 
   stop(): void {
@@ -128,14 +144,16 @@ export class XPostHost {
 }
 
 export function useXPostResolver() {
-  const { graph } = useGraph()
+  const graph = useOptionalGraph()?.graph
   const generation = graph?.generation ?? null
   const host = useMemo(() => new XPostHost(generation), [generation])
-  useEffect(() => { host.start(); return () => host.stop() }, [host])
+  useEffect(() => {
+    host.start()
+    return () => host.stop()
+  }, [host])
   return {
     resolveXPost: host.resolveXPost,
     subscribeXPost: host.subscribeXPost,
-    xPostMediaUrlPolicy: host.xPostMediaUrlPolicy,
+    resolveXPostMediaUrl: host.resolveXPostMediaUrl,
   }
 }
-

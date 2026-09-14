@@ -15,4 +15,3 @@ export async function sendArchiveMessage(request: ArchiveRequest) {
   if (!response.ok) throw new Error(response.error)
   return response
 }
-

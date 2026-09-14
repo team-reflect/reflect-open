@@ -591,3 +591,8 @@ export function useGraph(): GraphContextValue {
   }
   return context
 }
+
+/** Read graph context for surfaces that can also render outside a graph. */
+export function useOptionalGraph(): GraphContextValue | null {
+  return use(GraphContext)
+}

@@ -7,7 +7,9 @@ use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 
 #[derive(Default, Serialize, Deserialize)]
-struct Bindings { roots: BTreeMap<String, PathBuf> }
+struct Bindings {
+    roots: BTreeMap<String, PathBuf>,
+}
 
 pub fn handle(payload: &[u8], pointer: &Path) -> Value {
     match process(payload, pointer) {
@@ -16,12 +18,19 @@ pub fn handle(payload: &[u8], pointer: &Path) -> Value {
     }
 }
 fn process(payload: &[u8], pointer: &Path) -> Result<Value> {
-    anyhow::ensure!(payload.len() <= reflect_x_archive::MESSAGE_MAX_BYTES, "payload-too-large");
+    anyhow::ensure!(
+        payload.len() <= reflect_x_archive::MESSAGE_MAX_BYTES,
+        "payload-too-large"
+    );
     let request: Value = serde_json::from_slice(payload)?;
     anyhow::ensure!(request["version"] == 2, "invalid-version");
     let directory = pointer.parent().context("missing-config")?;
     std::fs::create_dir_all(directory)?;
-    let lock = OpenOptions::new().create(true).read(true).write(true).truncate(false)
+    let lock = OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .truncate(false)
         .open(directory.join("x-bindings.lock"))?;
     lock.lock_exclusive()?;
     let path = directory.join("x-bindings.json");
@@ -33,32 +42,53 @@ fn process(payload: &[u8], pointer: &Path) -> Result<Value> {
     let bind = request["op"] == "work.bind";
     let capture = request["op"] == "capture.put";
     if bind {
-        let pointer = crate::spool::read_pointer(pointer).map_err(|_| anyhow::anyhow!("no-graph"))?;
+        let pointer =
+            crate::spool::read_pointer(pointer).map_err(|_| anyhow::anyhow!("no-graph"))?;
         let root = PathBuf::from(pointer.graph_root).canonicalize()?;
-        let existing = bindings.roots.iter().find(|(_, saved)| **saved == root).map(|(key, _)| key.clone());
+        let existing = bindings
+            .roots
+            .iter()
+            .find(|(_, saved)| **saved == root)
+            .map(|(key, _)| key.clone());
         let binding = existing.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
         bindings.roots.insert(binding.clone(), root);
-        reflect_x_archive::atomic_json(directory, "x-bindings.json", &serde_json::to_value(&bindings)?)?;
+        reflect_x_archive::atomic_json(
+            directory,
+            "x-bindings.json",
+            &serde_json::to_value(&bindings)?,
+        )?;
         return Ok(json!({"ok":true,"binding":binding,"data":null}));
     }
     let binding = if capture {
-        let id = request["envelope"]["id"].as_str().context("invalid-event")?;
+        let id = request["envelope"]["id"]
+            .as_str()
+            .context("invalid-event")?;
         uuid::Uuid::parse_str(id)?;
         id.to_string()
     } else {
-        request["binding"].as_str().context("missing-binding")?.to_string()
+        request["binding"]
+            .as_str()
+            .context("missing-binding")?
+            .to_string()
     };
     if capture && !bindings.roots.contains_key(&binding) {
-        let pointer = crate::spool::read_pointer(pointer)
-            .map_err(|_| anyhow::anyhow!("no-graph"))?;
+        let pointer =
+            crate::spool::read_pointer(pointer).map_err(|_| anyhow::anyhow!("no-graph"))?;
         let root = PathBuf::from(pointer.graph_root).canonicalize()?;
         bindings.roots.insert(binding.clone(), root);
-        reflect_x_archive::atomic_json(directory, "x-bindings.json", &serde_json::to_value(&bindings)?)?;
+        reflect_x_archive::atomic_json(
+            directory,
+            "x-bindings.json",
+            &serde_json::to_value(&bindings)?,
+        )?;
     }
-    let root = bindings.roots.get(&binding).context("unknown-binding")?.clone();
+    let root = bindings
+        .roots
+        .get(&binding)
+        .context("unknown-binding")?
+        .clone();
     FileExt::unlock(&lock)?;
     anyhow::ensure!(root.is_dir(), "graph-unavailable");
     let data = reflect_x_archive::dispatch(&root, &request)?;
     Ok(json!({"ok":true,"binding":binding,"data":data}))
 }
-

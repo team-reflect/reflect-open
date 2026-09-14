@@ -21,7 +21,6 @@ use crate::HostError;
 pub(crate) struct Pointer {
     version: u32,
     pub graph_root: String,
-    pub bookmark_version: Option<u32>,
 }
 
 /// Default pointer-file location, shared with the desktop app's conventions

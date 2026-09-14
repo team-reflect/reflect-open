@@ -3,12 +3,18 @@ export const VIDEO_MAX_BYTES = 10_000_000
 export const IMAGE_MAX_BYTES = 64 * 1024 * 1024
 export const CAPTURE_MESSAGE_MAX_BYTES = 512 * 1024
 export const ASSET_CHUNK_MAX_BYTES = 256 * 1024
-export type ResourceError = 'network' | 'authentication' | 'source-missing' | 'storage'
-  | 'format' | 'unsupported-hls' | 'video-too-large'
+export type ResourceError =
+  | 'network'
+  | 'authentication'
+  | 'source-missing'
+  | 'storage'
+  | 'format'
+  | 'unsupported-hls'
+  | 'video-too-large'
 export interface ArchiveResource {
   url: string
   state: 'pending' | 'stored' | 'failed' | 'unsupported'
-  error?: ResourceError
+  error?: ResourceError | undefined
 }
 export interface ArchivedXPost {
   kind: 'x-post'
@@ -19,7 +25,12 @@ export interface ArchivedXPost {
   data: XPost
   resources: ArchiveResource[]
 }
-export interface ArchiveReceipt { name: string; bytes: number; mime: string; sha256?: string }
+export interface ArchiveReceipt {
+  name: string
+  bytes: number
+  mime: string
+  sha256?: string | undefined
+}
 export interface ArchiveJob {
   id: string
   resource: ArchiveResource
@@ -35,7 +46,20 @@ export type ArchiveRequest =
   | { op: 'capture.put'; envelope: object }
   | { op: 'work.pull'; binding: string }
   | { op: 'asset.status'; binding: string; jobId: string }
-  | { op: 'asset.append'; binding: string; jobId: string; lease: string; offset: number; data: string }
-  | { op: 'asset.commit'; binding: string; jobId: string; lease: string; bytes: number; sha256: string }
+  | {
+      op: 'asset.append'
+      binding: string
+      jobId: string
+      lease: string
+      offset: number
+      data: string
+    }
+  | {
+      op: 'asset.commit'
+      binding: string
+      jobId: string
+      lease: string
+      bytes: number
+      sha256: string
+    }
   | { op: 'asset.abort'; binding: string; jobId: string; lease: string; reason: ResourceError }
-

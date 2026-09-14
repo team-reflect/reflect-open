@@ -480,7 +480,8 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
         const link = readLink(body, from, to, bodyOffset)
         if (link) {
           const postId = parseXPostId(link.href)
-          if (postId) assets.push({ path: 'assets/x/post-' + postId + '.json', from: link.from, to: link.to })
+          if (postId)
+            assets.push({ path: 'assets/x/post-' + postId + '.json', from: link.from, to: link.to })
           const candidates = attachmentReferenceCandidates(path, link.href)
           if (candidates.length > 0) {
             // One authored reference, several spellings of the same file: the

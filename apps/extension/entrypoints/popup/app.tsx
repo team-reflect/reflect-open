@@ -1,3 +1,4 @@
+import { permalinkPostId } from '@/lib/x-capture'
 import { z } from 'zod'
 import { BookmarkControls } from './bookmark-controls'
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react'
@@ -88,7 +89,11 @@ export function CapturePopup(): ReactElement {
       const postId = permalinkPostId(captured.page.url)
       if (postId) {
         const result = z.object({ ok: z.boolean(), message: z.string().optional() }).parse(
-          await browser.runtime.sendMessage({ type: 'x-archive:save', tabId: captured.tabId, postId }),
+          await browser.runtime.sendMessage({
+            type: 'x-archive:save',
+            tabId: captured.tabId,
+            postId,
+          }),
         )
         if (!result.ok) throw new Error(result.message ?? 'Capture failed')
         window.close()

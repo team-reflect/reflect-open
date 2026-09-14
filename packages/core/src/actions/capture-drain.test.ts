@@ -1,3 +1,7 @@
+vi.mock('../x-archive', () => ({
+  saveArchivedPost: vi.fn(async () => {}),
+  markArchivedCaptureProcessed: vi.fn(async () => {}),
+}))
 import { drainCaptureInbox } from './capture-drain'
 import fixtures from './bookmark-envelope.fixtures.json'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

@@ -6,10 +6,10 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@post-embed/types': https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
-  '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@41f4b426c813fe66763e43a3b0af9ec297287a65
-  '@post-embed/exporter': https://pkg.pr.new/@post-embed/exporter@41f4b426c813fe66763e43a3b0af9ec297287a65
-  '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@41f4b426c813fe66763e43a3b0af9ec297287a65
+  '@post-embed/types': https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
+  '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@7bc1a3259420e2060f3183eec77557183abd7e66
+  '@post-embed/exporter': https://pkg.pr.new/@post-embed/exporter@7bc1a3259420e2060f3183eec77557183abd7e66
+  '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@7bc1a3259420e2060f3183eec77557183abd7e66
 
 importers:
 
@@ -73,8 +73,8 @@ importers:
         specifier: ^1.8.0
         version: 1.8.0
       '@post-embed/types':
-        specifier: https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
-        version: https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
+        specifier: https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
+        version: https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
       '@reflect/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -233,14 +233,14 @@ importers:
   apps/extension:
     dependencies:
       '@post-embed/exporter':
-        specifier: https://pkg.pr.new/@post-embed/exporter@41f4b426c813fe66763e43a3b0af9ec297287a65
-        version: https://pkg.pr.new/@post-embed/exporter@41f4b426c813fe66763e43a3b0af9ec297287a65(typescript@6.0.3)
+        specifier: https://pkg.pr.new/@post-embed/exporter@7bc1a3259420e2060f3183eec77557183abd7e66
+        version: https://pkg.pr.new/@post-embed/exporter@7bc1a3259420e2060f3183eec77557183abd7e66(typescript@6.0.3)
       '@post-embed/schema':
-        specifier: https://pkg.pr.new/@post-embed/schema@41f4b426c813fe66763e43a3b0af9ec297287a65
-        version: https://pkg.pr.new/@post-embed/schema@41f4b426c813fe66763e43a3b0af9ec297287a65(typescript@6.0.3)
+        specifier: https://pkg.pr.new/@post-embed/schema@7bc1a3259420e2060f3183eec77557183abd7e66
+        version: https://pkg.pr.new/@post-embed/schema@7bc1a3259420e2060f3183eec77557183abd7e66(typescript@6.0.3)
       '@post-embed/types':
-        specifier: https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
-        version: https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
+        specifier: https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
+        version: https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
       '@reflect/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -299,11 +299,11 @@ importers:
         specifier: ^0.70.1
         version: 0.70.1
       '@post-embed/schema':
-        specifier: https://pkg.pr.new/@post-embed/schema@41f4b426c813fe66763e43a3b0af9ec297287a65
-        version: https://pkg.pr.new/@post-embed/schema@41f4b426c813fe66763e43a3b0af9ec297287a65(typescript@6.0.3)
+        specifier: https://pkg.pr.new/@post-embed/schema@7bc1a3259420e2060f3183eec77557183abd7e66
+        version: https://pkg.pr.new/@post-embed/schema@7bc1a3259420e2060f3183eec77557183abd7e66(typescript@6.0.3)
       '@post-embed/types':
-        specifier: https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
-        version: https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
+        specifier: https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
+        version: https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
       '@reflect/db':
         specifier: workspace:*
         version: link:../db
@@ -1470,20 +1470,20 @@ packages:
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
 
-  '@post-embed/elements@https://pkg.pr.new/@post-embed/elements@41f4b426c813fe66763e43a3b0af9ec297287a65':
-    resolution: {integrity: sha512-1MSrk553YifjUG9BE0NTrrrXTNWYFtTc00qc+YI+2rRj53uu/6JwNW6xVnIPEQX7YXiPmyEx9tkxgg4k2P575Q==, tarball: https://pkg.pr.new/@post-embed/elements@41f4b426c813fe66763e43a3b0af9ec297287a65}
+  '@post-embed/elements@https://pkg.pr.new/@post-embed/elements@7bc1a3259420e2060f3183eec77557183abd7e66':
+    resolution: {integrity: sha512-8gSViicZ6JOgsnZOns1Mx9XMdlKwFG8m0q2/GVdeXrNmQt9o2mYGTnxPWuOLDV8qiLY4njn/lCwvwaSolXkjJQ==, tarball: https://pkg.pr.new/@post-embed/elements@7bc1a3259420e2060f3183eec77557183abd7e66}
     version: 0.3.0
 
-  '@post-embed/exporter@https://pkg.pr.new/@post-embed/exporter@41f4b426c813fe66763e43a3b0af9ec297287a65':
-    resolution: {integrity: sha512-FtZamU/bqLjaUdmkhsBmwNtbZGrDQbkx5sfYsokMRjSnVqrfkixsbFqH9pD5B+4EG8YirkVVMVtNdTTlB4IFig==, tarball: https://pkg.pr.new/@post-embed/exporter@41f4b426c813fe66763e43a3b0af9ec297287a65}
+  '@post-embed/exporter@https://pkg.pr.new/@post-embed/exporter@7bc1a3259420e2060f3183eec77557183abd7e66':
+    resolution: {integrity: sha512-080hDg+cub87FhTfZfzVsbZ4gbIpTb9wXREPL3RRvLBiFI7Z0VbQNUb4cVjiF9Sui1uo9QyY2gyUY2PDj1TNUg==, tarball: https://pkg.pr.new/@post-embed/exporter@7bc1a3259420e2060f3183eec77557183abd7e66}
     version: 0.3.0
 
-  '@post-embed/schema@https://pkg.pr.new/@post-embed/schema@41f4b426c813fe66763e43a3b0af9ec297287a65':
-    resolution: {integrity: sha512-XGrb0ea1oBY00k5rbQg0rk8pUqqf4zdcspD6JGoqVWgMBEwIwQWP9NfEH+k5XHkfr5TMMh/RAU0UFnI69buuHA==, tarball: https://pkg.pr.new/@post-embed/schema@41f4b426c813fe66763e43a3b0af9ec297287a65}
+  '@post-embed/schema@https://pkg.pr.new/@post-embed/schema@7bc1a3259420e2060f3183eec77557183abd7e66':
+    resolution: {integrity: sha512-bpcU9bU6RGyYcoMq4g+UsxmRM4Kufcx/N/RXI7pXtzM4qDa+fli983Jj6xJC+dRMnSnRoCfULlplx5mVSrXKsQ==, tarball: https://pkg.pr.new/@post-embed/schema@7bc1a3259420e2060f3183eec77557183abd7e66}
     version: 0.3.0
 
-  '@post-embed/types@https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65':
-    resolution: {integrity: sha512-cg7m15lgbq7+FX0SQQ5yzlduMX9RsBZ9WlPKkB0yKFzS448dyrpFWWdtQOSsb1yekWAu+mAuLTofU4qlNYL61g==, tarball: https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65}
+  '@post-embed/types@https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66':
+    resolution: {integrity: sha512-YQu2XnYXzbmc2PSLYjvhDKE0m/toIAA5Y8PqsbtZIil4X3OGulJ44flS2A0+b+47Ih9R/HP5vBQJaYYeNfj1XQ==, tarball: https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66}
     version: 0.3.0
 
   '@prosekit/core@0.13.2':
@@ -6977,10 +6977,10 @@ snapshots:
       '@lezer/highlight': 1.2.3
       '@meowdown/markdown': 0.70.1
       '@ocavue/utils': 1.8.0
-      '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@41f4b426c813fe66763e43a3b0af9ec297287a65(typescript@6.0.3)
-      '@post-embed/exporter': https://pkg.pr.new/@post-embed/exporter@41f4b426c813fe66763e43a3b0af9ec297287a65(typescript@6.0.3)
-      '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@41f4b426c813fe66763e43a3b0af9ec297287a65(typescript@6.0.3)
-      '@post-embed/types': https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
+      '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@7bc1a3259420e2060f3183eec77557183abd7e66(typescript@6.0.3)
+      '@post-embed/exporter': https://pkg.pr.new/@post-embed/exporter@7bc1a3259420e2060f3183eec77557183abd7e66(typescript@6.0.3)
+      '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@7bc1a3259420e2060f3183eec77557183abd7e66(typescript@6.0.3)
+      '@post-embed/types': https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
       '@prosekit/core': 0.13.2(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)
       '@prosekit/extensions': 0.18.2(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)
       '@prosekit/pm': 0.1.19
@@ -7029,8 +7029,8 @@ snapshots:
       '@base-ui/react': 1.8.0(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.0)(react@19.3.0)
       '@meowdown/core': 0.70.1(@lezer/common@1.5.2)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(supports-color@7.2.0)(typescript@6.0.3)
       '@ocavue/utils': 1.8.0
-      '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@41f4b426c813fe66763e43a3b0af9ec297287a65(typescript@6.0.3)
-      '@post-embed/types': https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
+      '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@7bc1a3259420e2060f3183eec77557183abd7e66(typescript@6.0.3)
+      '@post-embed/types': https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
       '@prosekit/core': 0.13.2(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)
       '@prosekit/pm': 0.1.19
       '@prosekit/react': 0.8.2(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(react-dom@19.3.0)(react@19.3.0)
@@ -7261,20 +7261,20 @@ snapshots:
 
   '@polka/url@1.0.0-next.29': {}
 
-  '@post-embed/elements@https://pkg.pr.new/@post-embed/elements@41f4b426c813fe66763e43a3b0af9ec297287a65(typescript@6.0.3)':
+  '@post-embed/elements@https://pkg.pr.new/@post-embed/elements@7bc1a3259420e2060f3183eec77557183abd7e66(typescript@6.0.3)':
     dependencies:
       '@aria-ui/core': 0.2.1
-      '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@41f4b426c813fe66763e43a3b0af9ec297287a65(typescript@6.0.3)
-      '@post-embed/types': https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
+      '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@7bc1a3259420e2060f3183eec77557183abd7e66(typescript@6.0.3)
+      '@post-embed/types': https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
       crelt: 1.0.7
     transitivePeerDependencies:
       - typescript
 
-  '@post-embed/exporter@https://pkg.pr.new/@post-embed/exporter@41f4b426c813fe66763e43a3b0af9ec297287a65(typescript@6.0.3)':
+  '@post-embed/exporter@https://pkg.pr.new/@post-embed/exporter@7bc1a3259420e2060f3183eec77557183abd7e66(typescript@6.0.3)':
     dependencies:
       '@ocavue/utils': 1.8.0
-      '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@41f4b426c813fe66763e43a3b0af9ec297287a65(typescript@6.0.3)
-      '@post-embed/types': https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
+      '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@7bc1a3259420e2060f3183eec77557183abd7e66(typescript@6.0.3)
+      '@post-embed/types': https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
       birpc: 4.2.0
       entities: 8.1.0
       lru.min: 1.1.5
@@ -7282,15 +7282,15 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@post-embed/schema@https://pkg.pr.new/@post-embed/schema@41f4b426c813fe66763e43a3b0af9ec297287a65(typescript@6.0.3)':
+  '@post-embed/schema@https://pkg.pr.new/@post-embed/schema@7bc1a3259420e2060f3183eec77557183abd7e66(typescript@6.0.3)':
     dependencies:
-      '@post-embed/types': https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
+      '@post-embed/types': https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
       '@standard-schema/spec': 1.1.0
       valibot: 1.5.0(typescript@6.0.3)
     transitivePeerDependencies:
       - typescript
 
-  '@post-embed/types@https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65': {}
+  '@post-embed/types@https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66': {}
 
   '@prosekit/core@0.13.2(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)':
     dependencies:

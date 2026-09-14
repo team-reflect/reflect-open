@@ -2,8 +2,11 @@ import { archiveJobSchema } from '@reflect/core/x-archive'
 import { sendArchiveMessage } from './x-native'
 import { downloadJob, finishDownload } from './x-download'
 import {
-  getRecords, putRecord, removeDownload,
-  type CaptureRecord, type DownloadRecord,
+  getRecords,
+  putRecord,
+  removeDownload,
+  type CaptureRecord,
+  type DownloadRecord,
 } from './x-download-store'
 
 let running: Promise<void> | undefined
@@ -12,7 +15,9 @@ export async function enqueueArchivedCapture(envelope: { id: string }): Promise<
 }
 export function flushArchivedCaptures(): Promise<void> {
   if (running) return running
-  running = run().finally(() => { running = undefined })
+  running = run().finally(() => {
+    running = undefined
+  })
   return running
 }
 async function run() {
@@ -23,23 +28,35 @@ async function run() {
     if (current.binding) bindings.add(current.binding)
   } catch {}
   for (const capture of captures) {
-    if (capture.binding) { bindings.add(capture.binding); continue }
+    if (capture.binding) {
+      bindings.add(capture.binding)
+      continue
+    }
     try {
       const response = await sendArchiveMessage({ op: 'capture.put', envelope: capture.envelope })
       if (!response.binding) throw new Error('missing-binding')
       await putRecord('captures', { ...capture, binding: response.binding })
       bindings.add(response.binding)
     } catch (error) {
-      await putRecord('captures', { ...capture, error: error instanceof Error ? error.message : 'native-failed' })
+      await putRecord('captures', {
+        ...capture,
+        error: error instanceof Error ? error.message : 'native-failed',
+      })
     }
   }
   for (const record of await getRecords<DownloadRecord>('downloads')) {
     bindings.add(record.binding)
-    if (record.complete) { await finishDownload(record).catch(() => {}); continue }
+    if (record.complete) {
+      await finishDownload(record).catch(() => {})
+      continue
+    }
     if (record.job.lease) {
       await sendArchiveMessage({
-        op: 'asset.abort', binding: record.binding, jobId: record.job.id,
-        lease: record.job.lease, reason: 'network',
+        op: 'asset.abort',
+        binding: record.binding,
+        jobId: record.job.id,
+        lease: record.job.lease,
+        reason: 'network',
       }).catch(() => {})
     }
     await removeDownload(record.id)
@@ -54,4 +71,3 @@ async function run() {
     }
   }
 }
-
