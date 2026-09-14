@@ -1,5 +1,9 @@
 import { browser } from 'wxt/browser'
-import { captureAckSchema, captureCapabilitiesSchema, type ExtensionCaptureWire } from '@reflect/core/capture-envelope'
+import {
+  captureAckSchema,
+  captureCapabilitiesSchema,
+  type ExtensionCaptureWire,
+} from '@reflect/core/capture-envelope'
 import type { HoldReason } from './messages'
 
 /**
@@ -77,15 +81,24 @@ async function checkLikeCapability(): Promise<SendOutcome | null> {
   const capabilities = captureCapabilitiesSchema.safeParse(raw)
   if (capabilities.success && capabilities.data.xLikeVersion === 2) return null
   const ack = captureAckSchema.safeParse(raw)
-  if (capabilities.success || (ack.success && !ack.data.ok &&
-      (ack.data.code === 'invalid-payload' || ack.data.code === 'unsupported-version'))) {
+  if (
+    capabilities.success ||
+    (ack.success &&
+      !ack.data.ok &&
+      (ack.data.code === 'invalid-payload' || ack.data.code === 'unsupported-version'))
+  ) {
     return {
-      kind: 'held', reason: 'unsupported-version',
+      kind: 'held',
+      reason: 'unsupported-version',
       message: 'Update Reflect to save liked posts. Your captures are still queued.',
     }
   }
   if (ack.success && !ack.data.ok) {
-    return { kind: 'held', reason: ack.data.code === 'no-graph' ? 'no-graph' : 'io', message: ack.data.message }
+    return {
+      kind: 'held',
+      reason: ack.data.code === 'no-graph' ? 'no-graph' : 'io',
+      message: ack.data.message,
+    }
   }
   return { kind: 'held', reason: 'io', message: 'Unrecognized capture capability response.' }
 }

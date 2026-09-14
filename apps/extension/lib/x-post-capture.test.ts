@@ -1,11 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { captureXPostRequest, parseXPostId, registerXPostObserver, type XPostRequest } from './x-post-capture'
+import {
+  captureXPostRequest,
+  parseXPostId,
+  registerXPostObserver,
+  type XPostRequest,
+} from './x-post-capture'
 import { readLikeSettings } from './like-settings'
 import { saveXPost } from './x-save'
 import { readBookmarkSettings } from './bookmark-settings'
 
-const { tabMock, observe } = vi.hoisted(() => ({ tabMock: vi.fn(async () => ({ incognito: false })), observe: vi.fn() }))
-vi.mock('wxt/browser', () => ({ browser: { tabs: { get: tabMock }, webRequest: { onBeforeRequest: { addListener: observe } } } }))
+const { tabMock, observe } = vi.hoisted(() => ({
+  tabMock: vi.fn(async () => ({ incognito: false })),
+  observe: vi.fn(),
+}))
+vi.mock('wxt/browser', () => ({
+  browser: { tabs: { get: tabMock }, webRequest: { onBeforeRequest: { addListener: observe } } },
+}))
 vi.mock('./x-save', () => ({ saveXPost: vi.fn(async () => {}) }))
 vi.mock('./like-settings', () => ({ readLikeSettings: vi.fn(async () => ({ enabled: false })) }))
 vi.mock('./bookmark-settings', () => ({
@@ -64,7 +74,10 @@ describe('parseXPostId', () => {
 describe('captureXPostRequest', () => {
   it('queues a v2 envelope stamped with the request time', async () => {
     await captureXPostRequest(request())
-    expect(saveXPost).toHaveBeenCalledWith(1, '20', '2026-09-09T04:00:00.000Z', { kind: 'x-bookmark', shouldAdmit: expect.any(Function) })
+    expect(saveXPost).toHaveBeenCalledWith(1, '20', '2026-09-09T04:00:00.000Z', {
+      kind: 'x-bookmark',
+      shouldAdmit: expect.any(Function),
+    })
   })
   it('ignores incognito tabs', async () => {
     tabMock.mockResolvedValueOnce({ incognito: true })
@@ -85,10 +98,19 @@ describe('captureXPostRequest', () => {
 it('captures likes independently and ignores unlike requests', async () => {
   vi.mocked(readLikeSettings).mockResolvedValueOnce({ enabled: true })
   vi.mocked(readBookmarkSettings).mockResolvedValueOnce({ enabled: false })
-  await captureXPostRequest({ ...request(), url: 'https://x.com/i/api/graphql/newHash/FavoriteTweet' })
-  expect(saveXPost).toHaveBeenCalledWith(1, '20', '2026-09-09T04:00:00.000Z', { kind: 'x-like', shouldAdmit: expect.any(Function) })
+  await captureXPostRequest({
+    ...request(),
+    url: 'https://x.com/i/api/graphql/newHash/FavoriteTweet',
+  })
+  expect(saveXPost).toHaveBeenCalledWith(1, '20', '2026-09-09T04:00:00.000Z', {
+    kind: 'x-like',
+    shouldAdmit: expect.any(Function),
+  })
   vi.mocked(saveXPost).mockClear()
-  await captureXPostRequest({ ...request(), url: 'https://x.com/i/api/graphql/newHash/UnfavoriteTweet' })
+  await captureXPostRequest({
+    ...request(),
+    url: 'https://x.com/i/api/graphql/newHash/UnfavoriteTweet',
+  })
   expect(saveXPost).not.toHaveBeenCalled()
 })
 
@@ -108,10 +130,16 @@ it('ignores a tab that disappears before inspection', async () => {
   expect(saveXPost).not.toHaveBeenCalled()
 })
 
-
 it('registers both narrow operations synchronously at worker start', () => {
   registerXPostObserver()
-  expect(observe).toHaveBeenCalledWith(expect.any(Function), {
-    urls: ['https://x.com/i/api/graphql/*/CreateBookmark', 'https://x.com/i/api/graphql/*/FavoriteTweet'],
-  }, ['requestBody'])
+  expect(observe).toHaveBeenCalledWith(
+    expect.any(Function),
+    {
+      urls: [
+        'https://x.com/i/api/graphql/*/CreateBookmark',
+        'https://x.com/i/api/graphql/*/FavoriteTweet',
+      ],
+    },
+    ['requestBody'],
+  )
 })

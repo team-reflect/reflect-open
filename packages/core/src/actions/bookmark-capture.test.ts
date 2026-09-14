@@ -85,5 +85,7 @@ it('keeps one post at its first location across both actions', () => {
 it('adds likes before the next section without altering existing prose', () => {
   const source = '## X likes\n\nMy annotation\n\n## Later\nKeep me\n'
   const saved = appendXPost(source, { ...capture, kind: 'x-like' })
-  expect(saved).toBe('## X likes\n\nMy annotation\n\n![](https://x.com/i/status/20)\n\n## Later\nKeep me\n')
+  expect(saved).toBe(
+    '## X likes\n\nMy annotation\n\n![](https://x.com/i/status/20)\n\n## Later\nKeep me\n',
+  )
 })

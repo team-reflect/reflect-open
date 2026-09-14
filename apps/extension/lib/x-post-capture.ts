@@ -29,7 +29,9 @@ export function getXPostKind(details: XPostRequest): XPostKind | undefined {
   try {
     const url = new URL(details.url)
     if (url.origin !== 'https://x.com') return undefined
-    const operation = /^\/i\/api\/graphql\/[^/]+\/(CreateBookmark|FavoriteTweet)$/.exec(url.pathname)?.[1]
+    const operation = /^\/i\/api\/graphql\/[^/]+\/(CreateBookmark|FavoriteTweet)$/.exec(
+      url.pathname,
+    )?.[1]
     if (operation === 'CreateBookmark') return 'x-bookmark'
     if (operation === 'FavoriteTweet') return 'x-like'
     return undefined
@@ -92,10 +94,12 @@ export function registerXPostObserver(): void {
         })
       })
     },
-    { urls: [
-      'https://x.com/i/api/graphql/*/CreateBookmark',
-      'https://x.com/i/api/graphql/*/FavoriteTweet',
-    ] },
+    {
+      urls: [
+        'https://x.com/i/api/graphql/*/CreateBookmark',
+        'https://x.com/i/api/graphql/*/FavoriteTweet',
+      ],
+    },
     ['requestBody'],
   )
 }

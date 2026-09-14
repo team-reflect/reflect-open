@@ -13,8 +13,11 @@ import {
 } from '@/lib/popup-preferences'
 import { LIKE_SETTINGS_KEY, readLikeSettings, writeLikeSettings } from '@/lib/like-settings'
 import {
-  X_CAPTURE_ERROR_KEY, CAPTURE_DELIVERY_KEY, readXCaptureError,
-  readCaptureDelivery, dismissXCaptureError,
+  X_CAPTURE_ERROR_KEY,
+  CAPTURE_DELIVERY_KEY,
+  readXCaptureError,
+  readCaptureDelivery,
+  dismissXCaptureError,
 } from '@/lib/x-capture-status'
 import { SettingsSection, SettingsSwitchRow } from './settings-rows'
 import { useStoredSetting } from './use-stored-setting'
@@ -75,7 +78,9 @@ export function OptionsPage(): ReactElement {
     setSavingX(true)
     setSettingsError(null)
     try {
-      await (kind === 'like' ? writeLikeSettings({ enabled: next }) : writeBookmarkSettings({ enabled: next }))
+      await (kind === 'like'
+        ? writeLikeSettings({ enabled: next })
+        : writeBookmarkSettings({ enabled: next }))
     } catch {
       setSettingsError('Could not save the X setting. Please try again.')
     } finally {
@@ -92,7 +97,8 @@ export function OptionsPage(): ReactElement {
     }
   }
 
-  const showXAccessNotice = (bookmarks?.enabled === true || likes?.enabled === true) && xAccess === false
+  const showXAccessNotice =
+    (bookmarks?.enabled === true || likes?.enabled === true) && xAccess === false
 
   return (
     <main className="mx-auto max-w-md p-6">
@@ -123,13 +129,24 @@ export function OptionsPage(): ReactElement {
         <p className="px-4 py-3 text-xs text-text-muted">
           A like or bookmark request can be saved even if X later rejects it.
         </p>
-        {settingsError ? <p role="alert" className="px-4 py-3 text-xs">{settingsError}</p> : null}
+        {settingsError ? (
+          <p role="alert" className="px-4 py-3 text-xs">
+            {settingsError}
+          </p>
+        ) : null}
         {captureError ? (
           <div role="alert" className="px-4 py-3 text-xs">
             <p>{captureError}</p>
-            <button type="button" onClick={() => void dismissXCaptureError().catch(() => {
-              setSettingsError('Could not dismiss the capture error. Please try again.')
-            })}>Dismiss</button>
+            <button
+              type="button"
+              onClick={() =>
+                void dismissXCaptureError().catch(() => {
+                  setSettingsError('Could not dismiss the capture error. Please try again.')
+                })
+              }
+            >
+              Dismiss
+            </button>
           </div>
         ) : null}
         {delivery && delivery.held > 0 ? (

@@ -1,10 +1,4 @@
-import {
-  appendXPost,
-  isAppError,
-  readNote,
-  writeNote,
-  type XPostEnvelope,
-} from '@reflect/core'
+import { appendXPost, isAppError, readNote, writeNote, type XPostEnvelope } from '@reflect/core'
 import { openSession } from '@/editor/open-documents'
 
 /** Route an X post through the live daily document, or a revision-checked file write. */

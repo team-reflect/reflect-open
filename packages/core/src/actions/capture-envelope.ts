@@ -89,7 +89,11 @@ export const captureWireMessageSchema = z.object({
 
 export type CaptureWireMessage = z.infer<typeof captureWireMessageSchema>
 
-export const extensionCaptureWireSchema = z.union([bookmarkWireSchema, likeWireSchema, captureWireMessageSchema])
+export const extensionCaptureWireSchema = z.union([
+  bookmarkWireSchema,
+  likeWireSchema,
+  captureWireMessageSchema,
+])
 export type ExtensionCaptureWire = z.infer<typeof extensionCaptureWireSchema>
 
 /**

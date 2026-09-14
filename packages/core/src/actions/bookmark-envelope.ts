@@ -36,8 +36,10 @@ export type XPostEnvelope = z.infer<typeof xPostEnvelopeSchema>
 export type XPostKind = XPostEnvelope['kind']
 
 /** The current native host and graph reader's supported like format. */
-export const captureCapabilitiesSchema = z.object({
-  ok: z.literal(true),
-  status: z.literal('capabilities'),
-  xLikeVersion: z.literal(2).nullable(),
-}).strict()
+export const captureCapabilitiesSchema = z
+  .object({
+    ok: z.literal(true),
+    status: z.literal('capabilities'),
+    xLikeVersion: z.literal(2).nullable(),
+  })
+  .strict()
