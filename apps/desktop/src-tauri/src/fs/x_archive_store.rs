@@ -181,7 +181,6 @@ pub fn resource_url(root: &Path, post_id: &str, hash: &str) -> Result<String> {
 }
 
 #[cfg(test)]
-
 mod tests {
     use super::*;
     use serde_json::json;
