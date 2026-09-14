@@ -23,6 +23,9 @@ crate-type = ["staticlib", "rlib"]
 tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
+reflect-x-archive = { path = "../../../crates/x-archive" }
+anyhow = "1"
+
 # `devtools` compiles the web inspector into release builds too (it is otherwise
 # debug-only), so a shipped app stays debuggable — see `src/devtools.rs`.
 tauri = { workspace = true, features = ["devtools"] }
@@ -32,7 +35,7 @@ tauri-plugin-opener = "2.5.5"
 percent-encoding = "2.3.2"
 # `time` backs the bounded wait in `windows::close_note_windows` (tauri
 # already runs on tokio; this only makes the sleep primitive addressable).
-tokio = { version = "1.53.1", features = ["time"] }
+tokio = { version = "1.53.1", features = ["time", "sync"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 # `hooks` adds the authorizer API used to lock the read-only `db_query` bridge

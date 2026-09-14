@@ -9,6 +9,11 @@ name = "reflect-capture-host"
 path = "src/main.rs"
 
 [dependencies]
+reflect-x-archive = { path = "../../crates/x-archive" }
+anyhow = "1"
+fs2 = "0.4"
+uuid = { version = "1", features = ["v4", "serde"] }
+
 serde = { workspace = true }
 serde_json = { workspace = true }
 base64 = "0.23.1"

@@ -17,7 +17,11 @@
     "defuddle": "^0.19.3",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "zod": "^4.6.4"
+    "zod": "^4.6.4",
+    "@post-embed/types": "^0.3.0",
+    "@post-embed/schema": "^0.3.0",
+    "@post-embed/exporter": "^0.3.0",
+    "valibot": "^1.5.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

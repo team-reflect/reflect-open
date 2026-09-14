@@ -1,3 +1,4 @@
+import { getXArchiveOwners } from '../x-archive/commands'
 import { db } from './db'
 
 /**
@@ -25,10 +26,12 @@ export function assetReferenceMatches(reference: string, assetPath: string): boo
  * candidate's live markdown.
  */
 export async function assetReferencingNotePaths(assetPath: string): Promise<string[]> {
+  const owners = assetPath.startsWith('assets/x/') ? await getXArchiveOwners(assetPath) : []
   const basename = assetPath.split('/').at(-1) ?? assetPath
   const rows = await db
     .selectFrom('assets')
-    .where((eb) => eb.or([eb('assetPath', '=', assetPath), eb('assetPath', '=', basename)]))
+    .where((eb) => eb.or([eb('assetPath', '=', assetPath), eb('assetPath', '=', basename),
+      ...(owners.length ? [eb('assetPath', 'in', owners)] : [])]))
     .select('notePath')
     .distinct()
     .execute()

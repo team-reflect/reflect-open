@@ -46,6 +46,10 @@ pub(crate) fn handle<R: Runtime>(
     let request_path = percent_encoding::percent_decode(&request.uri().path().as_bytes()[1..])
         .decode_utf8_lossy()
         .into_owned();
+    if request_path.split('/').nth(1) == Some("x-media") {
+        super::x_media_protocol::handle(app, request, request_path, responder);
+        return;
+    }
     let preview_raster_only = requests_preview_raster(request.uri().query());
     let method_allowed = request.method() == tauri::http::Method::GET;
     tauri::async_runtime::spawn_blocking(move || {

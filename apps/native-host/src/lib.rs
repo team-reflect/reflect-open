@@ -12,6 +12,7 @@
 //! source of truth.
 
 pub mod bookmark;
+pub mod x_archive;
 pub mod envelope;
 pub mod protocol;
 pub mod spool;
@@ -95,6 +96,12 @@ pub fn run(
     pointer_path: &Path,
 ) -> std::io::Result<()> {
     while let Some(payload) = read_message(input)? {
+        if serde_json::from_slice::<serde_json::Value>(&payload)
+            .ok().is_some_and(|value| value.get("op").is_some()) {
+            let response = x_archive::handle(&payload, pointer_path);
+            write_message(output, &serde_json::to_vec(&response)?)?;
+            continue;
+        }
         let outcome = handle_message(&payload, pointer_path);
         if let Err(error) = &outcome {
             eprintln!("reflect-capture-host: {error:?}");

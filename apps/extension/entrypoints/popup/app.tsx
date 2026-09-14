@@ -85,6 +85,15 @@ export function CapturePopup(): ReactElement {
     }
     setSave({ phase: 'saving' })
     try {
+      const postId = permalinkPostId(captured.page.url)
+      if (postId) {
+        const result = z.object({ ok: z.boolean(), message: z.string().optional() }).parse(
+          await browser.runtime.sendMessage({ type: 'x-archive:save', tabId: captured.tabId, postId }),
+        )
+        if (!result.ok) throw new Error(result.message ?? 'Capture failed')
+        window.close()
+        return
+      }
       const contentText = includePageText
         ? await tryExtractPageText(captured.tabId, captured.page.url)
         : undefined

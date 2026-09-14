@@ -1,3 +1,4 @@
+import { archivedPostSchema } from '../x-archive/schema'
 import { z } from 'zod'
 
 export const postIdSchema = z.string().regex(/^[1-9]\d{0,19}$/)
@@ -5,6 +6,7 @@ export const postIdSchema = z.string().regex(/^[1-9]\d{0,19}$/)
 /** URL-only X bookmark capture; the desktop derives the permalink from `postId`. */
 export const bookmarkEnvelopeSchema = z
   .object({
+    archive: archivedPostSchema,
     version: z.literal(2),
     kind: z.literal('x-bookmark'),
     id: z.guid(),
@@ -12,7 +14,7 @@ export const bookmarkEnvelopeSchema = z
     postId: postIdSchema,
     capturedAt: z.iso.datetime({ offset: true }),
   })
-  .strict()
+
 export type BookmarkEnvelope = z.infer<typeof bookmarkEnvelopeSchema>
 
 export const bookmarkWireSchema = z.object({ envelope: bookmarkEnvelopeSchema }).strict()

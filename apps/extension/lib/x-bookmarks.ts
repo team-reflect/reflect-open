@@ -1,7 +1,7 @@
+import { saveXPost } from './x-save'
 import { z } from 'zod'
 import { browser } from 'wxt/browser'
-import { bookmarkEnvelopeSchema, postIdSchema } from '@reflect/core/capture-envelope'
-import { enqueueCapture, flushQueue } from './flush'
+import { postIdSchema } from '@reflect/core/capture-envelope'
 import { readBookmarkSettings } from './bookmark-settings'
 
 const requestSchema = z.object({ variables: z.object({ tweet_id: postIdSchema }) })
@@ -61,16 +61,7 @@ export async function captureBookmarkRequest(details: BookmarkRequest): Promise<
   const postId = parseCreateBookmark(details)
   if (postId === undefined) return
   if ((await browser.tabs.get(details.tabId)).incognito) return
-  const envelope = bookmarkEnvelopeSchema.parse({
-    version: 2,
-    kind: 'x-bookmark',
-    id: crypto.randomUUID(),
-    source: 'extension',
-    postId,
-    capturedAt: new Date(details.timeStamp).toISOString(),
-  })
-  await enqueueCapture({ envelope })
-  await flushQueue()
+  await saveXPost(details.tabId, postId, new Date(details.timeStamp).toISOString())
 }
 
 /** Must run synchronously at worker start so Chrome can wake the worker for requests. */

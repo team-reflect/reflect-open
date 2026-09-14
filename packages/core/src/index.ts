@@ -13,3 +13,5 @@ export * from './exports/platform'
 export * from './exports/ai-actions'
 export * from './exports/link-preview'
 export * from './exports/sync-markdown-indexing'
+
+export * from './x-archive'

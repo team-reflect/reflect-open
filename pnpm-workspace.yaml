@@ -25,3 +25,10 @@ minimumReleaseAgeExclude:
   - '@prosemirror-adapter/*'
   - prosemirror-flat-list
   - prosemirror-view
+
+blockExoticSubdeps: false
+overrides:
+  '@post-embed/types': https://pkg.pr.new/@post-embed/types@41f4b426c813fe66763e43a3b0af9ec297287a65
+  '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@41f4b426c813fe66763e43a3b0af9ec297287a65
+  '@post-embed/exporter': https://pkg.pr.new/@post-embed/exporter@41f4b426c813fe66763e43a3b0af9ec297287a65
+  '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@41f4b426c813fe66763e43a3b0af9ec297287a65
