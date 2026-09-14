@@ -5,11 +5,8 @@ export const BOOKMARK_SETTINGS_KEY = 'bookmarkSettings'
 const bookmarkSettingsSchema = z.object({ enabled: z.boolean() })
 export type BookmarkSettings = z.infer<typeof bookmarkSettingsSchema>
 
-/** What observing bookmark requests needs; Chrome lets the user withhold it under Site access. */
-export const X_BOOKMARK_ACCESS = {
-  permissions: ['webRequest' as const],
-  origins: ['https://x.com/*'],
-}
+/** The host the bookmark observer needs; Chrome lets the user withhold it under Site access. */
+export const X_BOOKMARK_ACCESS = { origins: ['https://x.com/*'] }
 
 /** Capture is on by default; the options page opts out. */
 export async function readBookmarkSettings(): Promise<BookmarkSettings> {
