@@ -11,6 +11,11 @@ import {
   readIncludePageTextPreference,
   writeIncludePageTextPreference,
 } from '@/lib/popup-preferences'
+import { LIKE_SETTINGS_KEY, readLikeSettings, writeLikeSettings } from '@/lib/like-settings'
+import {
+  X_CAPTURE_ERROR_KEY, CAPTURE_DELIVERY_KEY, readXCaptureError,
+  readCaptureDelivery, dismissXCaptureError,
+} from '@/lib/x-capture-status'
 import { SettingsSection, SettingsSwitchRow } from './settings-rows'
 import { useStoredSetting } from './use-stored-setting'
 
@@ -52,6 +57,11 @@ function useXAccess(): [granted: boolean | null, request: () => Promise<boolean>
 export function OptionsPage(): ReactElement {
   const includePageText = useStoredSetting(INCLUDE_PAGE_TEXT_KEY, readIncludePageTextPreference)
   const bookmarks = useStoredSetting(BOOKMARK_SETTINGS_KEY, readBookmarkSettings)
+  const likes = useStoredSetting(LIKE_SETTINGS_KEY, readLikeSettings)
+  const captureError = useStoredSetting(X_CAPTURE_ERROR_KEY, readXCaptureError)
+  const delivery = useStoredSetting(CAPTURE_DELIVERY_KEY, readCaptureDelivery)
+  const [settingsError, setSettingsError] = useState<string | null>(null)
+  const [savingX, setSavingX] = useState(false)
   const [xAccess, requestXAccess] = useXAccess()
   const [xAccessRefused, setXAccessRefused] = useState(false)
 
@@ -61,10 +71,16 @@ export function OptionsPage(): ReactElement {
     })
   }
 
-  function onBookmarksChange(next: boolean): void {
-    void writeBookmarkSettings({ enabled: next }).catch((cause: unknown) => {
-      console.error('could not save bookmark settings:', cause)
-    })
+  async function saveXSetting(kind: 'bookmark' | 'like', next: boolean): Promise<void> {
+    setSavingX(true)
+    setSettingsError(null)
+    try {
+      await (kind === 'like' ? writeLikeSettings({ enabled: next }) : writeBookmarkSettings({ enabled: next }))
+    } catch {
+      setSettingsError('Could not save the X setting. Please try again.')
+    } finally {
+      setSavingX(false)
+    }
   }
 
   async function onAllowXAccess(): Promise<void> {
@@ -76,7 +92,7 @@ export function OptionsPage(): ReactElement {
     }
   }
 
-  const showXAccessNotice = bookmarks?.enabled === true && xAccess === false
+  const showXAccessNotice = (bookmarks?.enabled === true || likes?.enabled === true) && xAccess === false
 
   return (
     <main className="mx-auto max-w-md p-6">
@@ -94,13 +110,39 @@ export function OptionsPage(): ReactElement {
           legend="Save new X bookmarks to my daily note"
           description="Bookmarking a post on x.com adds its link under “X bookmarks” in that day’s note."
           checked={bookmarks?.enabled ?? true}
-          disabled={bookmarks === null}
-          onCheckedChange={onBookmarksChange}
+          disabled={bookmarks === null || savingX}
+          onCheckedChange={(next) => void saveXSetting('bookmark', next)}
         />
+        <SettingsSwitchRow
+          legend="Save new X likes to my daily note"
+          description="Saves new like actions on x.com in this browser under X likes. Existing likes are not imported. Unliking a post will not remove it from Reflect."
+          checked={likes?.enabled ?? false}
+          disabled={likes === null || savingX}
+          onCheckedChange={(next) => void saveXSetting('like', next)}
+        />
+        <p className="px-4 py-3 text-xs text-text-muted">
+          A like or bookmark request can be saved even if X later rejects it.
+        </p>
+        {settingsError ? <p role="alert" className="px-4 py-3 text-xs">{settingsError}</p> : null}
+        {captureError ? (
+          <div role="alert" className="px-4 py-3 text-xs">
+            <p>{captureError}</p>
+            <button type="button" onClick={() => void dismissXCaptureError().catch(() => {
+              setSettingsError('Could not dismiss the capture error. Please try again.')
+            })}>Dismiss</button>
+          </div>
+        ) : null}
+        {delivery && delivery.held > 0 ? (
+          <p role="status" className="px-4 py-3 text-xs">
+            {delivery.holdReason === 'unsupported-version'
+              ? 'Update Reflect to save X posts. Your captures are still queued.'
+              : 'Captures are waiting for Reflect. Open Reflect and check your graph; accepted captures remain queued.'}
+          </p>
+        ) : null}
         {showXAccessNotice ? (
           <div className="flex items-center justify-between gap-4 px-4 py-3 text-xs text-text-muted">
             <span>
-              Reflect Capture can’t see x.com right now, so bookmarks aren’t being saved.
+              Reflect Capture can’t see x.com right now, so enabled X captures are not being saved.
               {xAccessRefused ? ` ${SITE_ACCESS_FALLBACK}` : null}
             </span>
             <button

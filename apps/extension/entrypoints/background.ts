@@ -10,7 +10,7 @@ import { isFlushRequest } from '@/lib/messages'
 import { readIncludePageTextPreference } from '@/lib/popup-preferences'
 import { saveCapture } from '@/lib/save-capture'
 import { snapshotTab } from '@/lib/snapshot-active-tab'
-import { registerBookmarkObserver } from '@/lib/x-bookmarks'
+import { registerXPostObserver } from '@/lib/x-post-capture'
 import { tryExtractPageText } from './popup/extract-page-text'
 
 /**
@@ -57,7 +57,7 @@ const enqueueRequestSchema = z.object({
 })
 
 export default defineBackground(() => {
-  registerBookmarkObserver()
+  registerXPostObserver()
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.id === browser.runtime.id) {
       const save = z

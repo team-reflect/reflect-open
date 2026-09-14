@@ -10,7 +10,7 @@ import {
   type AiProvidersState,
   type ReconcileStop,
 } from '@reflect/core'
-import { commitBookmark } from '@/lib/bookmark-capture'
+import { commitXPost } from '@/lib/bookmark-capture'
 import { createBackgroundReconciler } from '@/lib/background-reconciler'
 import { startOperation } from '@/lib/operations'
 import { providerFetch } from '@/lib/provider-fetch'
@@ -100,7 +100,7 @@ export function createCaptureController(options: CaptureControllerOptions): Capt
     const drained = await drainCaptureInbox({
       generation: options.generation,
       isStale,
-      writeBookmark: (envelope, path) => commitBookmark(envelope, path, options.generation),
+      writeXPost: (envelope, path) => commitXPost(envelope, path, options.generation),
     })
     surfaceStop('Saving link capture', drained.stopped)
     if (isStale()) {

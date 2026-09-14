@@ -43,7 +43,7 @@ export default defineConfig({
     ...(isStoreBuild ? {} : { key: PUBLIC_KEY }),
     // `activeTab` (granted by the action click / shortcut) covers the
     // screenshot and the selection grab; `webRequest` on x.com only observes
-    // bookmark requests.
+    // bookmark and like requests.
     permissions: [
       'activeTab',
       'scripting',

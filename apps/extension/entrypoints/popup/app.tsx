@@ -30,6 +30,8 @@ const RELEASES_URL = 'https://github.com/team-reflect/reflect-open/releases/late
 
 function holdMessage(result: FlushResult): string {
   switch (result.holdReason) {
+    case 'unsupported-version':
+      return 'Update Reflect to save X posts. Your captures are still queued.'
     case 'no-host':
       return 'Install Reflect to finish saving — the capture is kept and retries automatically.'
     case 'no-graph':
