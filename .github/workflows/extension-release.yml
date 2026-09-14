@@ -1,0 +1,183 @@
+name: Extension release
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      commit:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing extension-vX.Y.Z release tag
+        type: string
+        required: true
+      dry_run:
+        description: Verify credentials without uploading or submitting to Chrome
+        type: boolean
+        default: true
+
+concurrency:
+  group: chrome-extension-ccabifmooehighoonjeiololjfofkhkd
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    if: github.repository == 'team-reflect/reflect-open' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: write
+    outputs:
+      commit: ${{ steps.release.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit || inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify release source
+        id: release
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$TAG" =~ ^extension-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          version="$(jq -r .version apps/extension/package.json)"
+          [ "$TAG" = "extension-v${version}" ]
+          commit="$(git rev-parse HEAD)"
+          [ "$(git rev-parse "$TAG^{commit}")" = "$commit" ]
+          git merge-base --is-ancestor "$commit" origin/master
+          gh release view "$TAG" > /dev/null
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for CI on the release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ steps.release.outputs.commit }}
+        run: |
+          for attempt in {1..90}; do
+            result="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&event=push&branch=master&per_page=1" --jq '.workflow_runs[0] | [.status, .conclusion] | @tsv')"
+            if [[ "$result" == completed$'\t'success ]]; then
+              exit 0
+            fi
+            if [[ "$result" == completed* ]]; then
+              echo "::error::CI did not succeed for $COMMIT: $result"
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "::error::Timed out waiting for CI on $COMMIT. Retry after CI succeeds."
+          exit 1
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Install Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore the release package on retries
+        id: restore
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count="$(gh release view "$TAG" --json assets --jq '.assets | length')"
+          if [ "$count" -gt 0 ]; then
+            gh release download "$TAG" --dir apps/extension/.output
+            echo "restored=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and verify the store package
+        if: steps.restore.outputs.restored != 'true'
+        run: |
+          pnpm --filter @reflect/extension zip
+          git rev-parse HEAD > apps/extension/.output/source.txt
+          cd apps/extension/.output
+          sha256sum reflect-capture-*-chrome.zip source.txt > SHA256SUMS
+
+      - name: Verify package provenance
+        env:
+          COMMIT: ${{ steps.release.outputs.commit }}
+        run: |
+          cd apps/extension/.output
+          sha256sum --check SHA256SUMS
+          [ "$(cat source.txt)" = "$COMMIT" ]
+          cd ..
+          node scripts/release.mjs verify
+
+      - name: Archive package before store submission
+        if: steps.restore.outputs.restored != 'true'
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$TAG" apps/extension/.output/reflect-capture-*-chrome.zip \
+            apps/extension/.output/source.txt apps/extension/.output/SHA256SUMS
+
+  submit:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.package.outputs.commit }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Install Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download and verify the archived package
+        env:
+          TAG: ${{ inputs.tag }}
+          COMMIT: ${{ needs.package.outputs.commit }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$TAG" --dir apps/extension/.output
+          cd apps/extension/.output
+          sha256sum --check SHA256SUMS
+          [ "$(cat source.txt)" = "$COMMIT" ]
+
+      - name: Submit to Chrome
+        working-directory: apps/extension
+        env:
+          CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+          CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
+          CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
+          MODE: ${{ inputs.dry_run && 'dry-run' || 'submit' }}
+        run: node scripts/release.mjs "$MODE"
+
+      - name: Publish the extension release assets
+        if: ${{ !inputs.dry_run }}
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "$TAG" --draft=false --latest=false
+          echo 'GitHub assets are published. See the Chrome submission summary for store availability.' >> "$GITHUB_STEP_SUMMARY"

@@ -66,12 +66,13 @@ disk at call time), and it is covered by tests.
   (`<graph>/.reflect/inbox/`) and the app drains it on next launch. **No Reflect-hosted
   server, no third party, and no other destination is ever contacted** — the extension
   stores no keys and makes no AI or network calls of its own.
-- **What:** only the page you explicitly capture (toolbar button or ⌘⇧K) — its URL,
+- **What:** the page you explicitly capture (toolbar button or ⌘⇧K): its URL,
   title, your current text selection, a screenshot of the visible tab, and, only when
-  you tick "Capture page text", the page's extracted text. Nothing is read in the
-  background; the extension requests no broad host permissions and acts on the active
-  tab only at the moment you trigger it.
-- **When:** when you capture. If the desktop app isn't reachable yet, the capture is
+  you tick "Capture page text", the page's extracted text. When you bookmark a post
+  on X, the background worker observes the bookmark request on x.com and saves the
+  post identifier/link locally. X bookmark capture is enabled by default and can be
+  disabled in the extension popup. Unrelated browsing content is not captured.
+- **When:** when you capture a page or bookmark on X with bookmark capture enabled. If the desktop app isn't reachable yet, the capture is
   held in the browser's local extension storage and retried automatically until it
   spools — it is never sent anywhere else in the meantime.
 - Once a capture lands in your graph, the desktop app's rules above apply unchanged:

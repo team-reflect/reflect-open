@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/v17.6.0/schemas/config.json",
+  "include-component-in-tag": true,
+  "bump-minor-pre-major": true,
+  "draft": true,
+  "force-tag-creation": true,
+  "always-update": true,
+  "bootstrap-sha": "a27822e92a42ea0dc89ed4ab2ea3814249fd7773",
+  "label": "autorelease: pending-extension",
+  "release-label": "autorelease: tagged-extension",
+  "pull-request-title-pattern": "chore(extension): release ${version}",
+  "packages": {
+    "apps/extension": {
+      "release-type": "node",
+      "package-name": "@reflect/extension",
+      "component": "extension",
+      "changelog-path": "CHANGELOG.md"
+    }
+  }
+}

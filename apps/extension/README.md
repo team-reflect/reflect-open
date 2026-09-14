@@ -97,22 +97,64 @@ openssl rsa -in key.pem -pubout -outform DER | shasum -a 256 \
 
 ## Releasing updates to the Chrome Web Store
 
-`pnpm --filter @reflect/extension zip` produces a key-stripped,
-signed-on-upload package whose manifest declares only the permissions the code
-uses (see the justifications below). Upload updates to the existing
-[Reflect Capture listing](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd)
-in the [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
+release-please maintains a separate `chore(extension): release <version>` PR on
+`master`. Merge it to create an `extension-v<version>` tag and run the
+[Extension release workflow](../../.github/workflows/extension-release.yml).
+The workflow waits for CI on that commit, builds and validates the store ZIP,
+archives it with its source SHA and checksums, and submits it to the existing
+[Reflect Capture listing](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd).
+Chrome publishes the update after review approval. GitHub release assets becoming
+available does not mean Chrome review has finished.
 
-### Build & upload
+The extension version and changelog are independent of desktop beta/stable
+releases. Let release-please update `package.json` and `CHANGELOG.md`. Extension
+`feat`/`fix` changes must touch `apps/extension`; shared dependency changes that
+need an extension release should include an extension-local change describing
+the affected behavior. A `chore` commit alone does not trigger a release.
 
-1. `pnpm --filter @reflect/extension check` (typecheck + lint) and
-   `pnpm --filter @reflect/extension test` — both must be green.
-2. `pnpm --filter @reflect/extension zip` → upload
-   `.output/reflect-capture-<version>-chrome.zip`. This artifact omits the manifest
-   `key` (the store rejects it); a plain `wxt build` keeps it for unpacked loads.
-3. Keep `chrome-extension://ccabifmooehighoonjeiololjfofkhkd/` in
-   `EXTENSION_ORIGINS` in `apps/desktop/src-tauri/src/capture.rs`; the
-   native-messaging host manifests rewrite themselves on each desktop launch.
+### Configuration
+
+The workflow reads repository Actions secrets `CHROME_PUBLISHER_ID`,
+`CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL`, and `CHROME_SERVICE_ACCOUNT_PRIVATE_KEY`.
+The service account must be linked to the existing publisher in the Chrome Web
+Store dashboard. See [Google's setup instructions](https://developer.chrome.com/docs/webstore/service-accounts).
+Use the v2 API service account credentials, not the deprecated v1 OAuth tokens.
+
+### Retries and manual recovery
+
+Run **Extension release** from `master`, enter an existing `extension-v<version>`
+tag, and leave **dry_run** enabled to verify credentials without a Chrome upload.
+Disable it to retry submission. Retries restore the archived ZIP and verify its
+checksum and source commit instead of rebuilding it. A partial GitHub asset upload
+fails verification; remove the incomplete assets from that draft release before
+retrying the packaging job.
+
+An already published or pending version is reported without uploading it again.
+Another pending review is never cancelled automatically. Inspect the
+[Developer Dashboard](https://chrome.google.com/webstore/devconsole) before
+replacing a submission, retrying an uncertain upload, or addressing a rejection.
+The pinned publisher fails when Google processes an upload asynchronously;
+wait for processing and submit the existing uploaded package in the dashboard.
+Do not repeatedly rerun the upload while it is processing. If a revision is
+staged, publish it from the dashboard. A published regression needs a new,
+higher extension version containing the fix.
+
+Before merging a Release PR, update listing/privacy declarations for changed
+permissions or capture behavior and check compatibility with the oldest supported
+installed desktop host. Test the store-installed extension on macOS, including
+queued captures while the app is closed. Preserve both extension IDs in
+`EXTENSION_ORIGINS`; a store ZIP omits `key` and is unsuitable for unpacked
+native-messaging tests. Use a normal `pnpm --filter @reflect/extension build`
+for those tests.
+
+### Manual packaging fallback
+
+Run `pnpm check` at the repository root and
+`pnpm --filter @reflect/extension test`, then
+`pnpm --filter @reflect/extension zip`. The ZIP script checks the actual manifest
+for the expected version, MV3, and absence of the dev key. Upload
+`apps/extension/.output/reflect-capture-<version>-chrome.zip` to the existing
+listing only after checking its current published and submitted versions.
 
 ### Listing copy
 
@@ -131,6 +173,10 @@ in the [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
 > A capture includes the page's URL and title, your current text selection, and a
 > screenshot of the visible tab. Optionally, tick "Capture page text" to include the
 > page's readable text as well.
+>
+> Bookmarking a post on X also saves its link to Reflect. This is enabled by
+> default and can be disabled in the popup. The extension observes bookmark
+> requests on x.com to identify the post you chose to save.
 >
 > Captures are handed to the **installed Reflect desktop app** over a local connection
 > on your own machine — there is no Reflect account and no Reflect server in the path.
@@ -171,8 +217,9 @@ Each is reviewed individually; every permission below is exercised by the code:
 ### Data-handling disclosures (Privacy practices tab)
 
 - **Data collected:** *Website content* (the captured page's URL, title, selection,
-  screenshot, and — only when opted in — page text). Collected **only on an explicit
-  user action**, never in the background.
+  screenshot, and optional page text), plus the post identifier/link when you
+  bookmark on X with bookmark capture enabled. The background worker observes
+  X bookmark requests; it does not capture unrelated browsing content.
 - **Where it goes:** to the user's own machine (the local Reflect desktop app). It is
   **not** sent to Reflect or any third party.
 - The three required certifications are all true and can be affirmed:

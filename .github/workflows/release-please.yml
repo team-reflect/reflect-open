@@ -14,6 +14,7 @@ on:
     branches: [master]
 
 permissions:
+  actions: read
   contents: write
   pull-requests: write
 
@@ -25,8 +26,8 @@ jobs:
   release-please:
     name: Maintain the Release PRs
     runs-on: ubuntu-latest
-    # The package lives at the repo root ("."), so each pass emits its outputs
-    # without a path prefix. The channels never release from the same push:
+    # The desktop package lives at the repo root ("."), so its outputs have
+    # no path prefix. The channels never release from the same push:
     # a push merges at most one Release PR, and the two passes only create
     # releases for merged PRs on their own head branch (the component in the
     # branch name tells them apart).
@@ -37,6 +38,9 @@ jobs:
       beta_created: ${{ steps.beta.outputs.releases_created }}
       beta_tag: ${{ steps.beta.outputs.tag_name }}
       beta_commit: ${{ steps.beta.outputs.sha }}
+      extension_created: ${{ steps.extension.outputs['apps/extension--release_created'] }}
+      extension_tag: ${{ steps.extension.outputs['apps/extension--tag_name'] }}
+      extension_commit: ${{ steps.extension.outputs['apps/extension--sha'] }}
     steps:
       # Stable runs first because a stable promotion advances
       # manifest.beta.json. Creating the stable tag before the beta pass gives
@@ -59,6 +63,23 @@ jobs:
           target-branch: master
           config-file: .github/release-please/config.beta.json
           manifest-file: .github/release-please/manifest.beta.json
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: extension
+        with:
+          target-branch: master
+          config-file: .github/release-please/config.extension.json
+          manifest-file: .github/release-please/manifest.extension.json
+
+  publish-extension:
+    name: Submit the Chrome extension
+    needs: release-please
+    if: needs.release-please.outputs.extension_created == 'true'
+    uses: ./.github/workflows/extension-release.yml
+    with:
+      tag: ${{ needs.release-please.outputs.extension_tag }}
+      commit: ${{ needs.release-please.outputs.extension_commit }}
+    secrets: inherit
 
   # Merging a Release PR makes its channel's pass above create a draft release
   # and output its tag. Chain straight into the build/sign/publish pipeline
