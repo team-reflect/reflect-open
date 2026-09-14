@@ -1,3 +1,4 @@
+export const X_CAPTURE_CHANNEL = 'reflect-x-capture'
 import { xPostSchema } from '@reflect/core/x-archive'
 import { postIdSchema } from '@reflect/core/capture-envelope'
 import { z } from 'zod'

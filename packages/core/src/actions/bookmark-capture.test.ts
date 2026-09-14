@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { appendBookmark } from './bookmark-capture'
-import { getBookmarkPostId, type BookmarkEnvelope } from './bookmark-envelope'
+import type { BookmarkEnvelope } from './bookmark-envelope'
 import { inboxEnvelopeSchema } from './capture-envelope'
 import { parseNote } from '../markdown/extract'
 
@@ -69,10 +69,4 @@ it('never falls back to the v1 link parser for an unknown kind or version', () =
       title: 'fallback',
     }).success,
   ).toBe(false)
-})
-
-it('accepts canonical IDs and rejects misleading permalink hosts', () => {
-  expect(getBookmarkPostId('https://x.com/i/status/20')).toBe('20')
-  expect(getBookmarkPostId('https://x.com.evil.test/i/status/20')).toBeUndefined()
-  expect(getBookmarkPostId('https://x.com/home')).toBeUndefined()
 })

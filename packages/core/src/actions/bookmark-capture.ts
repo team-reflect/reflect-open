@@ -1,6 +1,7 @@
+import { parseXPostId } from '@post-embed/schema'
 import { parseNote } from '../markdown/extract'
 import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks'
-import { getBookmarkPostId, type BookmarkEnvelope } from './bookmark-envelope'
+import type { BookmarkEnvelope } from './bookmark-envelope'
 
 const SECTION_TITLE = 'X bookmarks'
 
@@ -11,7 +12,7 @@ const SECTION_TITLE = 'X bookmarks'
  */
 export function appendBookmark(source: string, envelope: BookmarkEnvelope): string {
   const parsed = parseNote({ path: '', source })
-  if (parsed.links.some((link) => getBookmarkPostId(link.href) === envelope.data.id)) {
+  if (parsed.links.some((link) => parseXPostId(link.href) === envelope.data.id)) {
     return source
   }
   const line = `![](https://x.com/i/status/${envelope.data.id})`

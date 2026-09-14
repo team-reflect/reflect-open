@@ -1,7 +1,7 @@
 import { observeXTweets } from '@post-embed/exporter/x'
 import { exposeXTweets } from '@post-embed/exporter/x/bridge'
 import { defineContentScript } from '#imports'
-import { X_CAPTURE_CHANNEL } from '@/lib/x-capture'
+import { X_CAPTURE_CHANNEL } from '@/lib/x-capture-messages'
 
 declare global {
   interface Window {

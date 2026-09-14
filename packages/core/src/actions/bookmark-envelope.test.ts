@@ -2,8 +2,7 @@ import { expect, it } from 'vitest'
 import { bookmarkEnvelopeFixtures as fixtures } from './bookmark-envelope.fixtures'
 import { inboxEnvelopeSchema } from './capture-envelope'
 import { bookmarkWireSchema } from './bookmark-envelope'
-// FIXME: 'parity' in the file name referred to the deleted Rust fixture test; rename to
-// `bookmark-envelope.test.ts`.
+
 it('validates X capture envelopes for wire and inbox', () => {
   for (const value of fixtures.accepted)
     expect(bookmarkWireSchema.safeParse(value).success).toBe(true)
