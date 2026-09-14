@@ -178,6 +178,7 @@ jobs:
           CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
           CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
           MODE: ${{ inputs.dry_run && 'dry-run' || 'submit' }}
+          # FIXME: just use the standard wxt command. do not write all own scripts.
         run: node scripts/release.mjs "$MODE"
 
       - name: Publish the extension release assets
