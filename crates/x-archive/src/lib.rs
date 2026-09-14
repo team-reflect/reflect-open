@@ -6,6 +6,11 @@ use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
+// FIXME: the native host depends on this whole crate (and transitively on `infer`, `sha2`,
+// `tempfile`, `url`) for the five-line `valid_id` only. Inline that digit check in the native host
+// and fold this crate into `apps/desktop/src-tauri/src/fs/` as a module, the only real user. Also:
+// `MESSAGE_MAX_BYTES` now caps post JSON reads, not messages (rename), and `Receipt` derives
+// `Serialize` but is never serialized.
 pub const VIDEO_MAX_BYTES: u64 = 10_000_000;
 pub const IMAGE_MAX_BYTES: u64 = 64 * 1024 * 1024;
 pub const MESSAGE_MAX_BYTES: usize = 64 * 1024 * 1024;

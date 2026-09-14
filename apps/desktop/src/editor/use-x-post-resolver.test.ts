@@ -35,6 +35,11 @@ function archivedPost(): NonNullable<Awaited<ReturnType<typeof resolveArchivedPo
   }
 }
 
+// FIXME: all three tests here exercise the subscription and go away with it (see the FIXME at the
+// top of use-x-post-resolver.ts), together with the
+// `subscribeFileChanges`/`subscribeReconcileRequests` mocks added to backlinks-panel.test.tsx and
+// incoming-backlinks.test.tsx. What is left to test is `resolve`: rewrites media URLs to
+// reflect-asset URLs, returns undefined for a missing archive, and ignores non-X URLs.
 it('notifies a missing card when its archive first arrives', async () => {
   setBridge({ invoke: async () => null, listen: async () => () => {} })
   const resolve = vi.mocked(resolveArchivedPost)

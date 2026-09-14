@@ -161,6 +161,13 @@ export class XPostResolverHost {
   }
 }
 
+// FIXME: this creates one host per component instance: NoteEditor, MarkdownPreview and *every*
+// BacklinkSnippet each get their own `#posts` cache, their own in-flight map and (today) their own
+// pair of file-change listeners, so the same post is resolved and its downloads re-triggered once
+// per snippet. Create one host per graph instead (a value on the graph context, or a module-level
+// `Map<generation, host>`), and have this hook only look it up. Also `#load` caches a missing
+// archive as `undefined` for the host's whole lifetime; once the subscription is gone, do not cache
+// negative results, so a later render can pick up an archive that arrived in the meantime.
 export function useXPostResolver() {
   const graph = useGraph({ optional: true })?.graph
   const generation = graph?.generation ?? null

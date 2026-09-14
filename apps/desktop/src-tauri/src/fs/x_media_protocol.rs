@@ -10,6 +10,9 @@ fn error(status: StatusCode) -> Response<Cow<'static, [u8]>> {
     let mut builder = Response::builder()
         .status(status)
         .header("Cache-Control", "no-store");
+    // FIXME: dead branch, nothing returns 503 any more. The trailing `root_for_generation` re-check
+    // after the file read is also unnecessary: the bytes were read from a path validated under that
+    // root, delivering them after a graph switch is harmless.
     if status == StatusCode::SERVICE_UNAVAILABLE {
         builder = builder.header("Retry-After", "2");
     }
