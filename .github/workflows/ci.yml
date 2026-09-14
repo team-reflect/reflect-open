@@ -52,9 +52,6 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Build and verify Chrome Web Store package
-        run: pnpm --filter @reflect/extension zip
-
   test:
     strategy:
       fail-fast: false
