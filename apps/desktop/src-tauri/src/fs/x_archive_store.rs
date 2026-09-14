@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 pub const VIDEO_MAX_BYTES: u64 = 30 * 1024 * 1024;
 pub const IMAGE_MAX_BYTES: u64 = 20 * 1024 * 1024;
 pub const POST_JSON_MAX_BYTES: usize = 1024 * 1024;
-pub const MEDIA_EXTENSIONS: &[&str] = &["jpg", "png", "webp", "gif", "mp4"];
+pub const MEDIA_EXTENSIONS: &[&str] = &["jpg", "png", "webp", "gif", "mp4"];// FIXME: please do some search about tweet, for example is there any public archive etc. let's find out whether there are other extensions that we should support . id not  other extensions , use comments to explain why we don't support them and provide a link or some links as evidence.
 
 #[derive(Clone, Debug)]
 pub struct Receipt {
