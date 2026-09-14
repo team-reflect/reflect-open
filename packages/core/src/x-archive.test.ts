@@ -1,6 +1,6 @@
 import type { XPost } from '@post-embed/types'
 import { expect, it } from 'vitest'
-import { createArchivedPost } from './x-archive'
+import { createArchivedPost, xPostSchema } from './x-archive'
 
 it('archives the highest bitrate MP4 in the post and quote without mutating capture data', () => {
   const video = {
@@ -59,4 +59,15 @@ it('preserves photos and video posters while omitting HLS-only playback sources'
     photo,
     { ...video, sources: [] },
   ])
+})
+
+it('validates captured posts through the synchronous Standard Schema contract', () => {
+  const post = {
+    id: '123',
+    createdAt: '2026-09-14T00:00:00Z',
+    author: { name: 'Author', handle: 'author' },
+    body: [{ type: 'text', text: 'Saved text' }],
+  }
+  expect(xPostSchema.parse(post)).toEqual(post)
+  expect(xPostSchema.safeParse({ ...post, body: 42 }).success).toBe(false)
 })

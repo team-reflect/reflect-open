@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { safeParse } from 'valibot'
 import { XPostSchema } from '@post-embed/schema'
 import type { XPost, XPostBase } from '@post-embed/types'
 import { call } from './ipc/invoke'
@@ -12,16 +11,9 @@ export interface ArchivedXPost {
 
 /** One adapter shared by captured messages and archive files. */
 export const xPostSchema = z.unknown().transform((value, context) => {
-  // FIXME: I do not want to add "valibot" as a explicit dependency to reflect-open repo. Try to just use XPostSchema as a standard schema. Is there a good way so that I can integrate a standard schema into zod. Also notice that you can use runtime to ensuree that XPostSchema is a "sync" standard schema.
-  // Answer: yes, without valibot. Standard Schema exposes `XPostSchema['~standard'].validate(value)`,
-  // which returns `{ value }` or `{ issues }` synchronously for a valibot schema without async
-  // actions (post-embed's element already relies on this: `assumeNotPromise(XPostSchema['~standard'].validate(data))`).
-  // So: `const result = XPostSchema['~standard'].validate(value)`; if `result instanceof Promise` throw
-  // (guards the sync assumption at runtime); if `result.issues` add the zod issue, else return
-  // `result.value`. Then delete the `valibot` import and the `valibot` entry in packages/core/package.json.
-  // Zod 4 has no built-in adapter that accepts a foreign Standard Schema inline, so this transform stays.
-  const result = safeParse(XPostSchema, value)
-  if (result.success) return result.output
+  const result = XPostSchema['~standard'].validate(value)
+  if (result instanceof Promise) throw new Error('XPostSchema must validate synchronously')
+  if (!result.issues) return result.value
   context.addIssue({ code: 'custom', message: 'invalid-post' })
   return z.NEVER
 })
