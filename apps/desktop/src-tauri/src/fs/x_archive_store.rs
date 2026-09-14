@@ -7,7 +7,7 @@ use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-// FIXME: let's make it simpler by merge VIDEO_MAX_BYTES and IMAGE_MAX_BYTES into a single constant MEDIA_MAX_BYTES which is 20 * 1024 * 1024;
+// FIXME: let's make it simpler by merge VIDEO_MAX_BYTES and IMAGE_MAX_BYTES into a single constant MEDIA_MAX_BYTES which is 20 * 1024 * 1024; also some API/functions in this file can be simplified or removed if we don't need to distinguish between video and image anymore.
 pub const VIDEO_MAX_BYTES: u64 = 30 * 1024 * 1024;
 pub const IMAGE_MAX_BYTES: u64 = 20 * 1024 * 1024;
 pub const POST_JSON_MAX_BYTES: usize = 1024 * 1024;
