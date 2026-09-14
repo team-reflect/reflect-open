@@ -1,7 +1,7 @@
 use super::x_archive_store as archive;
 use crate::error::{AppError, AppResult as Result};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
