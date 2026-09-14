@@ -59,6 +59,11 @@ export interface EmbeddingChunks {
   text: string;
 }
 
+export interface EmbeddingState {
+  fingerprint: string;
+  notePath: string;
+}
+
 export interface IndexMeta {
   key: string;
   value: string;
@@ -109,9 +114,15 @@ export interface Notes {
   pathKey: Generated<string>;
   pinnedOrder: number | null;
   preview: Generated<string>;
+  projectionPath: Generated<string>;
   title: string;
   titleKey: string;
   updatedAt: Generated<number>;
+}
+
+export interface NoteSearch {
+  notePath: string;
+  rowid: Generated<number | null>;
 }
 
 export interface SearchFts {
@@ -143,12 +154,14 @@ export interface DB {
   chatConversations: ChatConversations;
   chatMessages: ChatMessages;
   embeddingChunks: EmbeddingChunks;
+  embeddingState: EmbeddingState;
   indexMeta: IndexMeta;
   links: Links;
   noteClaims: NoteClaims;
   noteEmails: NoteEmails;
   noteKeys: NoteKeys;
   notes: Notes;
+  noteSearch: NoteSearch;
   searchFts: SearchFts;
   tags: Tags;
   tasks: Tasks;

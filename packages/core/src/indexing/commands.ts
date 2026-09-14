@@ -43,9 +43,9 @@ export async function removeFromIndex(path: string, generation: number): Promise
 /**
  * Move a note's index rows **only** — the id-based reconcile half of Plan 17:
  * the file already lives at `to` (an external rename observed after the fact,
- * paired to its old row by frontmatter id). Embeddings ride along, so a
- * healed rename never re-embeds. Gated on the **index** generation like every
- * other reconcile-path write.
+ * paired to its old row by frontmatter id). Vectors ride along while the
+ * caller refreshes path-dependent references at the destination. Gated on the
+ * **index** generation like every other reconcile-path write.
  */
 export async function moveIndexedRows(from: string, to: string, generation: number): Promise<void> {
   await call('index_move', { from, to, generation, toAddress: movedNoteAddress(to) }, voidSchema)
@@ -69,7 +69,7 @@ function movedNoteAddress(path: string) {
  * Move a note file **and** its index rows in one Rust transaction (Plan 17):
  * pinned state, conflict flags, and embedding vectors survive the rename, and
  * the watcher's delete+create echo is benign by construction (the remove
- * finds no rows; the upsert re-applies identical rows). Unlike
+ * finds no rows; the upsert refreshes path-dependent references). Unlike
  * the other index commands, `generation` here is the **graph** generation
  * (the `note_write` gate) — a rename is user-initiated file mutation.
  */
@@ -94,6 +94,7 @@ const scanCandidateSchema = z.object({
   modifiedMs: z.number(),
   storedMtime: z.number().nullable(),
   storedHash: z.string().nullable(),
+  needsProjection: z.boolean(),
 })
 
 const scanOrphanSchema = z.object({
