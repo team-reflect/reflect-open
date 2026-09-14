@@ -1,6 +1,7 @@
+import { emitFileChanges, setBridge } from '@reflect/core'
 import { afterEach, expect, it, vi } from 'vitest'
 import { resolveArchivedPost } from '@reflect/core/x-archive'
-import { XPostHost } from './use-x-post-resolver'
+import { XPostResolverHost } from './use-x-post-resolver'
 
 vi.mock('@reflect/core/x-archive', () => ({ resolveArchivedPost: vi.fn() }))
 vi.mock('@tauri-apps/api/core', () => ({
@@ -9,56 +10,119 @@ vi.mock('@tauri-apps/api/core', () => ({
 vi.mock('@/providers/graph-provider', () => ({ useGraph: () => null }))
 
 afterEach(() => {
-  vi.useRealTimers()
+  setBridge(null)
   vi.resetAllMocks()
 })
 
+function archivedPost(
+  state: 'pending' | 'stored' = 'pending',
+): NonNullable<Awaited<ReturnType<typeof resolveArchivedPost>>> {
+  return {
+    archive: {
+      kind: 'x-post',
+      id: '123',
+      revision: 'one',
+      capturedAt: '2026-09-14T00:00:00Z',
+      textState: 'complete',
+      data: {
+        id: '123',
+        createdAt: '2026-09-14T00:00:00Z',
+        author: { name: 'Jack', handle: 'jack', avatar: 'https://example.com/avatar.png' },
+        body: [{ type: 'text', text: 'Saved tweet' }],
+      },
+      resources: [{ url: 'https://example.com/avatar.png', state }],
+    },
+    resources: [
+      {
+        url: 'https://example.com/avatar.png',
+        hash: 'a'.repeat(64),
+        state,
+        error: null,
+        bytes: null,
+      },
+    ],
+  }
+}
+
 it('notifies a missing card when its archive first arrives and rewrites media URLs', async () => {
-  vi.useFakeTimers()
+  setBridge({ invoke: async () => null, listen: async () => () => {} })
   const resolve = vi.mocked(resolveArchivedPost)
   resolve.mockResolvedValueOnce(null)
-  const host = new XPostHost(7)
+  const host = new XPostResolverHost(7)
   const url = 'https://x.com/jack/status/123'
   const notify = vi.fn()
+  await host.start()
   const unsubscribe = host.subscribeXPost(url, notify)
-  host.start()
   try {
     expect(await host.resolveXPost(url)).toBeUndefined()
     expect(notify).not.toHaveBeenCalled()
-    resolve.mockResolvedValue({
-      archive: {
-        kind: 'x-post',
-        id: '123',
-        revision: 'one',
-        capturedAt: '2026-09-14T00:00:00Z',
-        textState: 'complete',
-        data: {
-          id: '123',
-          createdAt: '2026-09-14T00:00:00Z',
-          author: { name: 'Jack', handle: 'jack', avatar: 'https://example.com/avatar.png' },
-          body: [{ type: 'text', text: 'Saved tweet' }],
-        },
-        resources: [{ url: 'https://example.com/avatar.png', state: 'pending' }],
-      },
-      resources: [
-        {
-          url: 'https://example.com/avatar.png',
-          hash: 'a'.repeat(64),
-          state: 'pending',
-          error: null,
-          bytes: null,
-        },
-      ],
-    })
-    await vi.advanceTimersByTimeAsync(2000)
-    expect(notify).toHaveBeenCalledOnce()
+    resolve.mockResolvedValue(archivedPost())
+    emitFileChanges([{ path: 'assets/x/post-123.json', kind: 'upsert' }])
+    await vi.waitFor(() => expect(notify).toHaveBeenCalledOnce())
     const post = await host.resolveXPost(url)
     expect(post?.author.avatar).toBe(`reflect-asset://7/x-media/123/${'a'.repeat(64)}`)
     expect(host.resolveXPostMediaUrl(post!.author.avatar!)).toBe(post?.author.avatar)
-    await vi.advanceTimersByTimeAsync(2000)
+    const calls = resolve.mock.calls.length
+    emitFileChanges([{ path: 'unrelated.md', kind: 'upsert' }])
+    expect(resolve).toHaveBeenCalledTimes(calls)
     expect(notify).toHaveBeenCalledOnce()
     unsubscribe()
   } finally {
     host.stop()
+  }
+})
+
+it('refreshes media after the file arrives and stops listening on teardown', async () => {
+  setBridge({ invoke: async () => null, listen: async () => () => {} })
+  const resolve = vi.mocked(resolveArchivedPost).mockResolvedValue(archivedPost())
+  const host = new XPostResolverHost(7)
+  const url = 'https://x.com/jack/status/123'
+  await host.start()
+  host.subscribeXPost(url, vi.fn())
+  try {
+    await host.resolveXPost(url)
+    resolve.mockResolvedValue(archivedPost('stored'))
+    emitFileChanges([{ path: `assets/x/url_sha256_${'a'.repeat(64)}.png`, kind: 'upsert' }])
+    await vi.waitFor(async () => {
+      const post = await host.resolveXPost(url)
+      expect(post?.author.avatar).toBe(`reflect-asset://7/x-media/123/${'a'.repeat(64)}?retry=1`)
+    })
+  } finally {
+    host.stop()
+  }
+  const calls = resolve.mock.calls.length
+  emitFileChanges([{ path: 'assets/x/post-123.json', kind: 'remove' }])
+  expect(resolve).toHaveBeenCalledTimes(calls)
+})
+
+it('rechecks after listener setup so an archive arriving during setup is not missed', async () => {
+  let ready!: () => void
+  const waiting = new Promise<void>((resolve) => {
+    ready = resolve
+  })
+  setBridge({
+    invoke: async () => null,
+    listen: async () => {
+      await waiting
+      return () => {}
+    },
+  })
+  const resolve = vi.mocked(resolveArchivedPost).mockResolvedValueOnce(null)
+  const host = new XPostResolverHost(7)
+  const url = 'https://x.com/jack/status/123'
+  const notify = vi.fn()
+  const started = host.start()
+  host.subscribeXPost(url, notify)
+  try {
+    expect(await host.resolveXPost(url)).toBeUndefined()
+    resolve.mockResolvedValue(archivedPost())
+    ready()
+    await started
+    expect(notify).toHaveBeenCalledOnce()
+    expect((await host.resolveXPost(url))?.id).toBe('123')
+  } finally {
+    ready()
+    host.stop()
+    await started
   }
 })

@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react'
+import { hasBridge, subscribeFileChanges, subscribeReconcileRequests } from '@reflect/core'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import {
   mapXPostMediaUrls,
@@ -9,8 +10,7 @@ import {
 import { resolveArchivedPost } from '@reflect/core/x-archive'
 import { useGraph } from '@/providers/graph-provider'
 
-// FIXME: rename XPostHost to XPostResolverHost
-export class XPostHost {
+export class XPostResolverHost {
   readonly #generation: number | null
   readonly #subscribers = new Map<string, Set<() => void>>()
   readonly #fingerprints = new Map<string, string>()
@@ -21,8 +21,9 @@ export class XPostHost {
   readonly #retryTokens = new Map<string, number>()
   #active = true
   #epoch = 0
-  #polling = false
-  #timer: ReturnType<typeof setInterval> | undefined
+  #refreshing = false
+  #refreshQueued = false
+  readonly #unlisten: Array<() => void> = []
 
   constructor(generation: number | null) {
     this.#generation = generation
@@ -107,38 +108,68 @@ export class XPostHost {
     return data
   }
 
-  async #poll(): Promise<void> {
-    if (this.#polling || !this.#active) return
-    this.#polling = true
+  async #refresh(): Promise<void> {
+    if (!this.#active) return
+    this.#refreshQueued = true
+    if (this.#refreshing) return
+    this.#refreshing = true
     try {
-      for (const url of this.#subscribers.keys()) {
-        try {
-          await this.#load(url)
-        } catch {
-          if (this.#posts.delete(url)) this.#notify(url)
-          this.#allowedByPost.delete(url)
+      do {
+        this.#refreshQueued = false
+        for (const url of this.#posts.keys()) {
+          if (!this.#subscribers.has(url)) {
+            this.#posts.delete(url)
+            this.#allowedByPost.delete(url)
+            this.#fingerprints.delete(url)
+          }
         }
-      }
+        for (const url of this.#subscribers.keys()) {
+          try {
+            // Finish an initial read before re-reading the changed file.
+            await this.#inflight.get(url)?.catch(() => {})
+            if (!this.#active) return
+            await this.#load(url)
+          } catch {
+            const hadPost = this.#posts.delete(url)
+            this.#allowedByPost.delete(url)
+            this.#fingerprints.delete(url)
+            if (hadPost) this.#notify(url)
+          }
+        }
+      } while (this.#refreshQueued && this.#active)
     } finally {
-      this.#polling = false
+      this.#refreshing = false
     }
   }
 
-  start(): void {
+  async start(): Promise<void> {
     this.#active = true
-    if (this.#timer) clearInterval(this.#timer)
-    // FIXME: WHY do we need to poll every 2 seconds? This is a hack to make sure that the x-posts are loaded in time for the first render. We should find a better and much simpler way to do this.
-    this.#timer = setInterval(() => {
-      this.#poll().catch(() => {})
-    }, 2000)
+    if (this.#generation === null || !hasBridge()) return
+    const epoch = this.#epoch
+    const active = () => this.#active && this.#epoch === epoch
+    const keep = (unlisten: () => void) => {
+      if (active()) this.#unlisten.push(unlisten)
+      else unlisten()
+    }
+    const refresh = () => {
+      if (active()) void this.#refresh()
+    }
+    await Promise.all([
+      subscribeFileChanges((changes) => {
+        if (changes.some((change) => change.path.startsWith('assets/x/'))) refresh()
+      }).then(keep),
+      subscribeReconcileRequests(refresh).then(keep),
+    ])
+    // Close the gap between the first read and installing the listeners.
+    if (active()) await this.#refresh()
   }
 
   stop(): void {
     this.#active = false
     this.#epoch++
-    if (this.#timer) clearInterval(this.#timer)
-    this.#timer = undefined
+    for (const unlisten of this.#unlisten.splice(0)) unlisten()
     this.#posts.clear()
+    this.#fingerprints.clear()
     this.#allowedByPost.clear()
     this.#inflight.clear()
     for (const url of this.#subscribers.keys()) this.#notify(url)
@@ -148,9 +179,11 @@ export class XPostHost {
 export function useXPostResolver() {
   const graph = useGraph({ optional: true })?.graph
   const generation = graph?.generation ?? null
-  const host = useMemo(() => new XPostHost(generation), [generation])
+  const host = useMemo(() => new XPostResolverHost(generation), [generation])
   useEffect(() => {
-    host.start()
+    void host.start().catch((error: unknown) => {
+      console.error('X archive subscription failed:', error)
+    })
     return () => host.stop()
   }, [host])
   return {
