@@ -23,7 +23,7 @@ it('hides ignored options for X posts and enables saving without page-text prefe
   const html = renderToStaticMarkup(createElement(CapturePopup))
   expect(html).not.toContain('Add a note (optional)')
   expect(html).not.toContain('Capture page text')
-  expect(html).not.toContain('disabled')
+  expect(html).not.toContain('disabled=')
   expect(html).toContain('Save to Reflect')
 })
 
