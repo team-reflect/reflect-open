@@ -41,6 +41,30 @@ fn network(error: reqwest::Error) -> AppError {
     }
 }
 
+// Bound network transfers across every graph/post, while retaining per-URL sharing.
+const MAX_CONCURRENT_DOWNLOADS: usize = 4;
+static DOWNLOAD_SLOTS: tokio::sync::Semaphore =
+    tokio::sync::Semaphore::const_new(MAX_CONCURRENT_DOWNLOADS);
+
+fn client() -> Result<reqwest::Client> {
+    static CLIENT: OnceLock<Result<reqwest::Client>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            reqwest::Client::builder()
+                .timeout(Duration::from_secs(180))
+                .redirect(reqwest::redirect::Policy::custom(|attempt| {
+                    if attempt.previous().len() >= 5 || !allowed(attempt.url()) {
+                        attempt.error("unsupported-media-redirect")
+                    } else {
+                        attempt.follow()
+                    }
+                }))
+                .build()
+                .map_err(network)
+        })
+        .clone()
+}
+
 fn allowed(url: &reqwest::Url) -> bool {
     url.scheme() == "https"
         && url.username().is_empty()
@@ -69,17 +93,11 @@ async fn download_once(root: PathBuf, url: String, hash: String) -> Result<archi
     if !allowed(&remote) {
         return Err(AppError::parse("unsupported-media-url"));
     }
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(180))
-        .redirect(reqwest::redirect::Policy::custom(|attempt| {
-            if attempt.previous().len() >= 5 || !allowed(attempt.url()) {
-                attempt.error("unsupported-media-redirect")
-            } else {
-                attempt.follow()
-            }
-        }))
-        .build()
-        .map_err(network)?;
+    let _slot = DOWNLOAD_SLOTS
+        .acquire()
+        .await
+        .expect("download semaphore stays open");
+    let client = client()?;
     let mut response = client
         .get(remote)
         .send()
@@ -212,5 +230,40 @@ mod tests {
         assert_eq!(receipt.name, name);
         assert_eq!(receipt.mime, "image/png");
         assert_eq!(std::fs::read_dir(directory).unwrap().count(), 1);
+    }
+    #[test]
+    fn queued_download_waits_for_capacity_but_offline_cache_does_not() {
+        tauri::async_runtime::block_on(async {
+            let root = tempfile::tempdir().unwrap();
+            let permits = DOWNLOAD_SLOTS
+                .acquire_many(MAX_CONCURRENT_DOWNLOADS as u32)
+                .await
+                .unwrap();
+            let pending = download(
+                root.path().to_owned(),
+                "https://pbs.twimg.com/waits-for-capacity.png".into(),
+            );
+            assert!(tokio::time::timeout(Duration::from_millis(50), pending)
+                .await
+                .is_err());
+            let url = "https://pbs.twimg.com/cached.png";
+            let hash = archive::hash_url(url).unwrap();
+            let directory = root.path().join("assets/x");
+            std::fs::create_dir_all(&directory).unwrap();
+            std::fs::write(
+                directory.join(format!("url_sha256_{hash}.png")),
+                b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR",
+            )
+            .unwrap();
+            let receipt = tokio::time::timeout(
+                Duration::from_secs(2),
+                download(root.path().to_owned(), url.into()),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+            assert_eq!(receipt.mime, "image/png");
+            drop(permits);
+        });
     }
 }
