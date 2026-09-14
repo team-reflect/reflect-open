@@ -4,6 +4,7 @@
   "include-component-in-tag": false,
   "bump-minor-pre-major": true,
   "draft": true,
+  "draft-pull-request": true,
   "force-tag-creation": true,
   "always-update": true,
   "label": "autorelease: pending-stable",

@@ -7,6 +7,7 @@
   "prerelease": true,
   "prerelease-type": "beta",
   "draft": true,
+  "draft-pull-request": true,
   "force-tag-creation": true,
   "always-update": true,
   "label": "autorelease: pending-beta",

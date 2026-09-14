@@ -3,10 +3,6 @@ name: Release Browser Extension
 on:
   workflow_call:
     inputs:
-      tag:
-        description: The extension-v<version> tag created by release-please
-        type: string
-        required: true
       commit:
         description: Immutable commit targeted by the release tag
         type: string
@@ -17,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
@@ -32,18 +28,8 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Build the store package
         run: pnpm --filter @reflect/extension zip
-
-      - name: Archive the store package
-        env:
-          TAG: ${{ inputs.tag }}
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" apps/extension/.output/reflect-capture-*-chrome.zip --clobber
-        # FIXME: we do not need to create github release maually in github action. so remove your "gh release upload" and "gh release edit". We can just use release-please for all the process.
 
       - name: Submit to Chrome
         working-directory: apps/extension
@@ -55,9 +41,3 @@ jobs:
           CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
           CHROME_PUBLISH_TYPE: DEFAULT_PUBLISH
         run: pnpm exec wxt submit --chrome-zip .output/reflect-capture-*-chrome.zip
-
-      - name: Publish the extension release assets
-        env:
-          TAG: ${{ inputs.tag }}
-          GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$TAG" --draft=false --latest=false

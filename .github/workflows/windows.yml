@@ -53,9 +53,6 @@ jobs:
         with:
           cache-on-failure: true
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       # No secrets on purpose: without SENTRY_AUTH_TOKEN the Sentry vite
       # plugin skips source-map upload, and without VITE_SENTRY_DSN the
       # experimental build carries no telemetry.

@@ -27,9 +27,6 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Verify generated DB types are current
         run: |
           pnpm --filter @reflect/db db:codegen
@@ -65,9 +62,6 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Install Playwright
         run: pnpm --filter @reflect/desktop exec playwright install ${{ matrix.config.browser }}

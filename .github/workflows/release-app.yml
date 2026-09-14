@@ -156,9 +156,6 @@ jobs:
           # A failed notarization still compiled everything; keep the cache.
           cache-on-failure: true
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       # The release script takes APPLE_API_KEY_PATH (a .p8 file on disk), so
       # materialize the key content outside the workspace.
       - name: Stage the App Store Connect API key

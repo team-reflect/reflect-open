@@ -97,14 +97,15 @@ openssl rsa -in key.pem -pubout -outform DER | shasum -a 256 \
 
 ## Releasing updates to the Chrome Web Store
 
-release-please maintains a separate `chore(extension): release <version>` PR on
-`master`. Merge it to create an `extension-v<version>` tag and run the
+release-please maintains a separate draft `chore(extension): release <version>` PR
+on `master`. Mark it ready and merge it to publish the GitHub release with an
+`extension-v<version>` tag and run the
 [Release Browser Extension workflow](../../.github/workflows/release-browser-extension.yml).
-The workflow builds the store ZIP from that commit, attaches it to the GitHub
-release, and uses `wxt submit` to submit it to the existing
+The workflow builds the store ZIP from that commit and uses `wxt submit` to
+submit it to the existing
 [Reflect Capture listing](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd).
-Chrome publishes the update after review approval. GitHub release assets becoming
-available does not mean Chrome review has finished.
+Chrome publishes the update after review approval. The GitHub release is published
+before Chrome submission and does not indicate that store review has finished.
 
 The extension version and changelog are independent of desktop beta/stable
 releases. Let release-please update `package.json` and `CHANGELOG.md`. Extension
@@ -125,7 +126,7 @@ Use the v2 API service account credentials, not the deprecated v1 OAuth tokens.
 The workflow runs only through release-please. For a failed run, inspect the
 [Developer Dashboard](https://chrome.google.com/webstore/devconsole) first, then
 rerun the failed job in GitHub Actions if a fresh upload is appropriate. Each rerun
-builds a new ZIP from the release commit and replaces the attached GitHub asset.
+builds a new ZIP from the release commit.
 
 `wxt submit` does not cancel pending reviews by default or skip already submitted
 versions. If the version is pending or published, finish recovery in the dashboard

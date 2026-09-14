@@ -1,5 +1,5 @@
 name: Set up Node.js and pnpm
-description: Installs pnpm and Node.js 22 with the pnpm dependency cache.
+description: Installs Node.js 22, pnpm, and workspace dependencies with a frozen lockfile.
 
 runs:
   using: composite
@@ -12,4 +12,7 @@ runs:
       with:
         node-version: 22
         cache: pnpm
-# FIXME: also put `pnpm install --frozen-lockfile` here so that we do not need to repeat it in every workflow that uses this action
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile

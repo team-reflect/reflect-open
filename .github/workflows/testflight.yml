@@ -91,9 +91,6 @@ jobs:
         with:
           cache-on-failure: true
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Resolve build number
         id: build_number
         run: |

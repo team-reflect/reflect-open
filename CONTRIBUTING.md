@@ -44,16 +44,6 @@ commit message and, for `feat`/`fix`, the user-facing changelog entry.
   ships in the next release, it just gets no changelog line.
 - GitHub's Revert button writes `Revert "…"`; retitle it to `revert: …`.
 
-<!--remove this section FIXME -->
-## Chrome extension releases
-
-Use `feat(extension):` or `fix(extension):` for extension behavior changes.
-release-please tracks `apps/extension` independently and maintains its own Release
-PR, version, and changelog. Merging that PR submits the extension for Chrome review.
-If a shared dependency change needs to ship independently, include an
-extension-local change documenting its effect so it reaches the extension Release
-PR. See the [extension release guide](apps/extension/README.md#releasing-updates-to-the-chrome-web-store).
-
 ## Where code goes
 
 - **Business logic → `packages/core`.** No file/DB/AI logic in React
