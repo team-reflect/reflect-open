@@ -12,7 +12,7 @@ export interface ArchivedXPost {
 
 /** One adapter shared by captured messages and archive files. */
 export const xPostSchema = z.unknown().transform((value, context) => {
-  // FIXME: I do not want to add "valibot" as a explicit dependency to reflect-open repo. Try to just use XPostSchema as a standard schema. Is there a good way so that I can integrate a standard schema into zod. Also notice that you can use runtime to ensuree that XPostSchema is a "sync" standard schema.
+  FIXME: I do not want to add "valibot" as a explicit dependency to reflect-open repo. Try to just use XPostSchema as a standard schema. Is there a good way so that I can integrate a standard schema into zod. Also notice that you can use runtime to ensuree that XPostSchema is a "sync" standard schema.
   const result = safeParse(XPostSchema, value)
   if (result.success) return result.output
   context.addIssue({ code: 'custom', message: 'invalid-post' })

@@ -5,6 +5,12 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use tauri::{Emitter, Manager, State};
 
+// FIXME(rust): every failure, including validation ones (`invalid-post-id`, `unknown-resource`,
+// `invalid-path`), is flattened into `AppError::io(error.to_string())`. The crate already has
+// `AppError::traversal`, `AppError::parse` and `AppError::not_found`, and `anyhow` was added to
+// this crate only so the store module can `bail!` with strings. Return `AppResult` from the store
+// functions directly with the right variant (they are in-crate, nothing needs `anyhow`), and drop
+// the `anyhow` dependency.
 async fn blocking<T: Send + 'static>(
     root: PathBuf,
     action: impl FnOnce(PathBuf) -> anyhow::Result<T> + Send + 'static,
@@ -31,6 +37,9 @@ fn download_media<R: tauri::Runtime>(
                         let _ = app.emit("index:changed", json!([{ "path": format!("assets/x/{}", receipt.name), "kind": "upsert" }]));
                     }
                 }
+                // FIXME(rust): the crate logs through `tracing` (`tracing::warn!` in
+                // asset_protocol.rs and a dozen other sites); `eprintln!` bypasses the log
+                // subscriber and file sink. Use `tracing::warn!`.
                 Err(error) => eprintln!("X media download failed: {error}"),
             }
         });
@@ -87,6 +96,10 @@ pub async fn x_archive_resolve<R: tauri::Runtime>(
 }
 
 #[tauri::command]
+// FIXME(logic): uses `current_root` while every other archive command and the classification that
+// calls this (`classifyAsset(assetPath, generation)`) are generation-pinned; a graph switch
+// mid-classification answers from the new graph. Take `generation` and use `root_for_generation`
+// like the rest.
 pub async fn x_archive_owners(
     state: State<'_, GraphState>,
     asset_path: String,

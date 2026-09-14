@@ -5,6 +5,10 @@ use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 pub const VIDEO_MAX_BYTES: u64 = 10_000_000;
+// FIXME: 64 MiB is far above anything pbs.twimg.com serves (`name=orig` images are a few MB), and
+// `x_media_protocol` buffers the whole requested range in memory (`vec![0; count]`), so this is
+// also the per-request RAM ceiling. Likewise `POST_JSON_MAX_BYTES` guards a JSON that is a few KB.
+// Pick limits that reflect the data: ~20 MiB for images, ~1 MiB for post JSON.
 pub const IMAGE_MAX_BYTES: u64 = 64 * 1024 * 1024;
 pub const POST_JSON_MAX_BYTES: usize = 64 * 1024 * 1024;
 pub const MEDIA_EXTENSIONS: &[&str] = &["jpg", "png", "webp", "gif", "mp4"];
@@ -43,6 +47,13 @@ pub fn get_candidate_names(hash: &str) -> Result<Vec<String>> {
         .map(|ext| format!("url_sha256_{hash}.{ext}"))
         .collect())
 }
+// FIXME(security): this is a second path-traversal guard next to the app's existing one in
+// `fs/resolve.rs` (`ensure_relative` + `resolve`, which the normal reflect-asset route and every
+// note command use). Two guards with different rules (this one stats every component for a symlink;
+// `resolve` canonicalizes the deepest existing ancestor against the canonicalized root) mean two
+// places to audit and two places to get wrong. Every caller here passes a fixed prefix plus a
+// validated id/hash, so `resolve::resolve(root, relative)` is a drop-in replacement; delete this
+// function.
 pub fn safe_path(root: &Path, relative: &str) -> Result<PathBuf> {
     ensure!(root.is_absolute() && root.is_dir(), "invalid-root");
     let mut path = root.to_path_buf();
@@ -124,6 +135,10 @@ pub fn find_cache(root: &Path, hash: &str) -> Result<Option<Receipt>> {
         let Ok((extension, mime, bytes)) = sniff(&path) else {
             continue;
         };
+        // FIXME(logic): a candidate whose extension disagrees with its sniffed bytes is skipped but
+        // left on disk forever, and the re-download writes a second file next to it. Either delete
+        // the mismatched candidate here or accept it under the sniffed mime (the name is only a
+        // cache key).
         if !name.ends_with(&format!(".{extension}")) {
             continue;
         }
@@ -143,6 +158,13 @@ pub fn read_post(root: &Path, post_id: &str) -> Result<Option<Value>> {
 }
 
 /// Derive resource URLs from the canonical post data, including a quoted post.
+// FIXME(rust): the store reads the post through untyped `serde_json::Value` indexing
+// (`post["data"]["quote"]`, `media["type"] == "photo"`, `source["type"] == "video/mp4"`). The Rust
+// side only needs a handful of fields; a `#[derive(Deserialize)]` view with `#[serde(default)]`
+// (`data.id`, `author.avatar`, `media[].{type,url,poster,sources[].{type,url}}`, `quote`) replaces
+// this manual walk, the `is_object` check in `read_post` and the `data.id` extraction in
+// `x_archive_write`, and makes a schema drift a deserialization error instead of silently empty URL
+// lists.
 pub fn media_urls(post: &Value) -> Vec<String> {
     let mut urls = std::collections::BTreeSet::new();
     for entry in [&post["data"], &post["data"]["quote"]] {

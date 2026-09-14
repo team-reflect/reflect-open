@@ -7,6 +7,11 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 
 // Share downloads by graph and exact URL, including across different posts.
+// FIXME(rust): the Weak-map plus `retain` scan on every call is O(live entries) per download and
+// exists only to evict finished locks. Entries are bounded by distinct media URLs seen in one
+// session; a plain `Mutex<HashMap<PathBuf, Arc<tokio::sync::Mutex<()>>>>` without eviction is
+// simpler, or evict the entry when the download completes. Fold this into the shared-outcome change
+// suggested at `lock.lock().await` below.
 fn download_lock(root: &Path, hash: &str) -> Arc<tokio::sync::Mutex<()>> {
     type Locks = Mutex<HashMap<PathBuf, Weak<tokio::sync::Mutex<()>>>>;
     static LOCKS: OnceLock<Locks> = OnceLock::new();
@@ -36,6 +41,13 @@ fn allowed(url: &reqwest::Url) -> bool {
 pub async fn download(root: PathBuf, url: String) -> Result<archive::Receipt> {
     let hash = archive::hash_url(&url)?;
     let lock = download_lock(&root, &hash);
+    // FIXME(logic): waiters queue serially behind this mutex and each one retries the download
+    // after the previous attempt failed (`find_cache` is still empty). Twenty cards sharing one
+    // avatar on a flaky network serialize twenty attempts of up to 180s each, and every
+    // reflect-asset request for that avatar stays pending meanwhile. Share the outcome with the
+    // waiters instead: keep a per-hash `tokio::sync::OnceCell<Result<Receipt>>`-style entry (or
+    // record a short-lived failure) so one failure answers all of them and a retry only happens on
+    // the next resolve.
     let _guard = lock.lock().await;
     let cache_root = root.clone();
     let cache_hash = hash.clone();
@@ -75,6 +87,15 @@ pub async fn download(root: PathBuf, url: String) -> Result<archive::Receipt> {
     let directory = archive::safe_path(&root, "assets/x")?;
     tokio::fs::create_dir_all(&directory).await?;
     archive::safe_path(&root, "assets/x")?;
+    // FIXME(logic): this `.part-*` temp file (and the `.tmp*` file `atomic_json` creates) lives
+    // inside `assets/x/`, i.e. inside the synced graph. The graph `.gitignore` defaults only cover
+    // `/.reflect/`, `.DS_Store` and editor swap files, and `git/commit.rs` stages with
+    // `add_all("*")`, so an auto-commit that races a download commits a half-written file, iCloud
+    // uploads it, and a crash mid-download leaves it behind forever (nothing sweeps `assets/x`).
+    // Write temps under `.reflect/x-archive/` (gitignored, invisible to the watcher, same
+    // filesystem so `persist` is still an atomic rename into `assets/x`), or add `.part-*`/`.tmp*`
+    // to the gitignore defaults and sweep stale temps at startup. The duplicated `safe_path(&root,
+    // "assets/x")` call above goes with it.
     let temporary = tempfile::Builder::new()
         .prefix(".part-")
         .tempfile_in(&directory)?;
