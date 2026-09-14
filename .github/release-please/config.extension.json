@@ -5,7 +5,7 @@
   "draft": true,
   "force-tag-creation": true,
   "always-update": true,
-  "bootstrap-sha": "a27822e92a42ea0dc89ed4ab2ea3814249fd7773",
+  "bootstrap-sha": "11ffb9d8f627a6f42d04a4aefa83c1cb92908c79",
   "label": "autorelease: pending-extension",
   "release-label": "autorelease: tagged-extension",
   "pull-request-title-pattern": "chore(extension): release ${version}",
