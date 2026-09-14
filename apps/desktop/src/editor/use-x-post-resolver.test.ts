@@ -6,7 +6,7 @@ vi.mock('@reflect/core/x-archive', () => ({ resolveArchivedPost: vi.fn() }))
 vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path: string) => `reflect-asset://${path}`,
 }))
-vi.mock('@/providers/graph-provider', () => ({ useOptionalGraph: () => null }))
+vi.mock('@/providers/graph-provider', () => ({ useGraph: () => null }))
 
 afterEach(() => {
   vi.useRealTimers()
@@ -34,6 +34,7 @@ it('notifies a missing card when its archive first arrives and rewrites media UR
         textState: 'complete',
         data: {
           id: '123',
+          createdAt: '2026-09-14T00:00:00Z',
           author: { name: 'Jack', handle: 'jack', avatar: 'https://example.com/avatar.png' },
           body: [{ type: 'text', text: 'Saved tweet' }],
         },

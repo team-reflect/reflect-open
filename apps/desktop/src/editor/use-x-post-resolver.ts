@@ -7,7 +7,7 @@ import {
   type MediaUrlResolver,
 } from '@post-embed/types'
 import { resolveArchivedPost } from '@reflect/core/x-archive'
-import { useOptionalGraph } from '@/providers/graph-provider'
+import { useGraph } from '@/providers/graph-provider'
 
 export class XPostHost {
   readonly #generation: number | null
@@ -144,7 +144,7 @@ export class XPostHost {
 }
 
 export function useXPostResolver() {
-  const graph = useOptionalGraph()?.graph
+  const graph = useGraph({ optional: true })?.graph
   const generation = graph?.generation ?? null
   const host = useMemo(() => new XPostHost(generation), [generation])
   useEffect(() => {

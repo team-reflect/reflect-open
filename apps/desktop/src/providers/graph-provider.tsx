@@ -584,15 +584,12 @@ export function GraphProvider({
 }
 
 /** Access the active graph + open/choose actions. Use within a GraphProvider. */
-export function useGraph(): GraphContextValue {
+export function useGraph(options: { optional: true }): GraphContextValue | null
+export function useGraph(): GraphContextValue
+export function useGraph(options?: { optional: true }): GraphContextValue | null {
   const context = use(GraphContext)
-  if (!context) {
+  if (!context && !options?.optional) {
     throw new Error('useGraph must be used within a GraphProvider')
   }
   return context
-}
-
-/** Read graph context for surfaces that can also render outside a graph. */
-export function useOptionalGraph(): GraphContextValue | null {
-  return use(GraphContext)
 }
