@@ -12,3 +12,4 @@ runs:
       with:
         node-version: 22
         cache: pnpm
+# FIXME: also put `pnpm install --frozen-lockfile` here so that we do not need to repeat it in every workflow that uses this action
