@@ -51,7 +51,35 @@ const enqueueRequestSchema = z.object({
 
 export default defineBackground(() => {
   registerBookmarkObserver()
-  browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (
+      import.meta.env.DEV &&
+      sender.id === browser.runtime.id &&
+      sender.tab == null &&
+      sender.url === browser.runtime.getURL('/popup.html')
+    ) {
+      const request = z
+        .object({
+          type: z.literal('x-capture:probe'),
+          tabId: z.number().int().nonnegative(),
+          postId: z.string().regex(/^[1-9]\d{0,19}$/),
+        })
+        .safeParse(message)
+      if (request.success) {
+        void import('@/lib/x-capture-probe')
+          .then(async ({ runCaptureProbe }) => {
+            const report = await runCaptureProbe(request.data.tabId, request.data.postId)
+            sendResponse({ ok: true, report })
+          })
+          .catch((error: unknown) =>
+            sendResponse({
+              ok: false,
+              reason: error instanceof Error ? error.message : 'probe-failed',
+            }),
+          )
+        return true
+      }
+    }
     const enqueue = enqueueRequestSchema.safeParse(message)
     if (enqueue.success) {
       void enqueueCapture(enqueue.data.wire).then(

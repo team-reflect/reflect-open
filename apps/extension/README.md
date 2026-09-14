@@ -42,6 +42,68 @@ For the native hop to work, run the desktop app once (it writes the host
 manifests for detected browsers and the active-graph pointer file), then
 restart Chrome so it re-reads the manifests.
 
+### X capture diagnostics (development only)
+
+Open an X post permalink in the same Chrome profile in which you can read it.
+After loading or reloading the dev extension, refresh the X tab so its
+`document_start` observer sees the page's responses. Expand long posts, open the
+Reflect popup, and use **X capture probe (development)**. The post ID is prefilled
+from the permalink. Keep the popup open until the probe finishes.
+
+The probe reuses `@post-embed/exporter/x` in the MAIN world, with a 200-entry
+in-memory cache, raw payload retention disabled, and broadcasts disabled. An
+ISOLATED content script queries one ID over the exporter bridge. The worker
+validates the returned snapshot and target URL again before reading media.
+Public and protected posts use the same path; there is no public proxy fallback.
+
+The popup shows main/quoted text, truncation flags, per-resource read outcomes,
+video format counts, byte signatures, and a document token. It reads avatars,
+photos, posters, and the highest-bitrate MP4 for each video or GIF. HLS-only
+videos are reported as unsupported, retaining their text and poster diagnostics.
+A missing source, HTTP failure, and unsupported HLS are separate outcomes.
+
+This is a probe, not an archive operation. Media streams are consumed and
+discarded, retaining at most a 32-byte prefix per resource. The diagnostic budget
+is 64 MiB and 120 seconds per resource. A budget failure does not mean the source
+cannot be archived. Closing the popup loses its report; reopening it does not
+resume a probe. The worker rejects a second probe for a tab while its first is
+still running. No probe snapshot is queued or sent to the native host.
+
+Only development builds register these content scripts and add media permissions
+for `pbs.twimg.com` and `video.twimg.com`. Production/store builds exclude the
+scripts, diagnostic UI, worker handler, and these extra permissions. The worker
+accepts probe requests only from the extension popup, rejects incognito and
+non-permalink tabs, checks every media URL against the allowlist, and rejects
+redirects. `credentials: include` uses Chrome's normal cookie rules; it does not
+guarantee that every resource will be accessible.
+
+To build the diagnostic variant without running a server:
+
+```bash
+pnpm --filter @reflect/extension exec wxt build --mode development
+```
+
+Load `.output/chrome-mv3-dev` from `chrome://extensions`. Synthetic unit fixtures
+cover public/protected wrapper parity, post IDs, navigation during lookup,
+untrusted media origins, stream budgets, and partial failures. CI builds both
+production and development variants. Real authenticated X verification remains
+manual, because synthetic tests cannot establish cookie/CDN behavior:
+
+| Scenario | Required result |
+| --- | --- |
+| Public/protected short text, expanded long text | Correct body; truncated source visibly flagged |
+| Main and quoted photos, MP4, GIF | Actual nonzero bytes for each selected supported resource |
+| HLS-only / absent source | `hls-only` / `no-source`, with separate format counts |
+| Old tab without observer | Refresh/reopen retry instruction |
+| SPA navigation or tab close during lookup | Failure instead of a different post's snapshot |
+| Extension reload, then page refresh | One current listener/observer, no duplicated results |
+| bfcache back/forward navigation | Restored document can still answer a probe |
+
+Record only aggregate counts, outcome categories, and whether the worker reader
+worked. Do not commit real protected text, media URLs, screenshots, or cookies.
+A passing synthetic test/build does not complete the authenticated acceptance
+matrix. This change does not yet establish that matrix's results.
+
 ### Troubleshooting: "Install Reflect to finish saving…" while Reflect is installed
 
 That message is the `no-host` state — Chrome could not reach (or was not

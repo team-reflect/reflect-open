@@ -1,6 +1,15 @@
 import { z } from 'zod'
 import { BookmarkControls } from './bookmark-controls'
-import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react'
+import { permalinkPostId } from '@/lib/x-capture'
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactElement,
+} from 'react'
 import { browser } from 'wxt/browser'
 import { readQueue } from '@/lib/flush'
 import type { FlushResult } from '@/lib/messages'
@@ -24,6 +33,10 @@ type SaveState =
   | { phase: 'saving' }
   | { phase: 'held'; result: FlushResult }
   | { phase: 'failed'; message: string }
+
+const XCaptureProbe = import.meta.env.DEV
+  ? lazy(() => import('./x-capture-probe').then((module) => ({ default: module.XCaptureProbe })))
+  : () => null
 
 const RELEASES_URL = 'https://github.com/team-reflect/reflect-open/releases/latest'
 
@@ -207,6 +220,11 @@ export function CapturePopup(): ReactElement {
         ) : null}
       </form>
       <BookmarkControls />
+      {import.meta.env.DEV && permalinkPostId(page.url) ? (
+        <Suspense fallback={null}>
+          <XCaptureProbe initialPostId={permalinkPostId(page.url) ?? ''} />
+        </Suspense>
+      ) : null}
     </>
   )
 }

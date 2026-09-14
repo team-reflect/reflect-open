@@ -29,7 +29,7 @@ export default defineConfig({
   vite: () => ({ plugins: [tailwindcss()] }),
   // A stable, human-readable store artifact: `reflect-capture-<version>-chrome.zip`.
   zip: { name: 'reflect-capture' },
-  manifest: {
+  manifest: ({ mode }) => ({
     name: 'Reflect Capture',
     description: 'Save the page you are reading into Reflect.',
     homepage_url: 'https://github.com/team-reflect/reflect-open',
@@ -47,12 +47,15 @@ export default defineConfig({
       'alarms',
       'webRequest',
     ],
-    host_permissions: ['https://x.com/*'],
+    host_permissions: [
+      'https://x.com/*',
+      ...(mode === 'development' ? ['https://pbs.twimg.com/*', 'https://video.twimg.com/*'] : []),
+    ],
     commands: {
       [SAVE_CURRENT_PAGE_COMMAND]: {
         suggested_key: { default: 'Ctrl+Shift+K', mac: 'Command+Shift+K' },
         description: 'Save the current page to Reflect',
       },
     },
-  },
+  }),
 })

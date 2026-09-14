@@ -223,6 +223,15 @@ importers:
 
   apps/extension:
     dependencies:
+      '@post-embed/exporter':
+        specifier: ^0.3.0
+        version: 0.3.0(typescript@6.0.3)
+      '@post-embed/schema':
+        specifier: ^0.3.0
+        version: 0.3.0(typescript@6.0.3)
+      '@post-embed/types':
+        specifier: ^0.3.0
+        version: 0.3.0
       '@reflect/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -238,6 +247,9 @@ importers:
       react-dom:
         specifier: ^19.3.0
         version: 19.3.0(react@19.3.0)
+      valibot:
+        specifier: ^1.5.0
+        version: 1.5.0(typescript@6.0.3)
       zod:
         specifier: ^4.6.4
         version: 4.6.4
