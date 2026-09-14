@@ -50,23 +50,18 @@ function useXAccess(): [granted: boolean | null, request: () => Promise<boolean>
 }
 
 export function OptionsPage(): ReactElement {
-  const [includePageText, setIncludePageText] = useStoredSetting(
-    INCLUDE_PAGE_TEXT_KEY,
-    readIncludePageTextPreference,
-  )
-  const [bookmarks, setBookmarks] = useStoredSetting(BOOKMARK_SETTINGS_KEY, readBookmarkSettings)
+  const includePageText = useStoredSetting(INCLUDE_PAGE_TEXT_KEY, readIncludePageTextPreference)
+  const bookmarks = useStoredSetting(BOOKMARK_SETTINGS_KEY, readBookmarkSettings)
   const [xAccess, requestXAccess] = useXAccess()
   const [xAccessRefused, setXAccessRefused] = useState(false)
 
   function onIncludePageTextChange(next: boolean): void {
-    setIncludePageText(next)
     void writeIncludePageTextPreference(next).catch((cause: unknown) => {
       console.error('could not save the page text preference:', cause)
     })
   }
 
   function onBookmarksChange(next: boolean): void {
-    setBookmarks({ enabled: next })
     void writeBookmarkSettings({ enabled: next }).catch((cause: unknown) => {
       console.error('could not save bookmark settings:', cause)
     })

@@ -1,16 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { browser } from 'wxt/browser'
 
 /**
  * A `chrome.storage.local` value behind one settings control: read once,
- * re-read whenever `key` changes in storage (another extension page may
- * write it while this one is open), `null` until the first read lands.
- * `read` must be a stable function reference (a module export).
+ * re-read whenever `key` changes in storage (this page's own writes included,
+ * and another extension page's), `null` until the first read lands. `read`
+ * must be a stable function reference (a module export).
  */
-export function useStoredSetting<T>(
-  key: string,
-  read: () => Promise<T>,
-): [value: T | null, setValue: (next: T) => void] {
+export function useStoredSetting<T>(key: string, read: () => Promise<T>): T | null {
   const [value, setValue] = useState<T | null>(null)
 
   useEffect(() => {
@@ -36,5 +33,5 @@ export function useStoredSetting<T>(
     }
   }, [key, read])
 
-  return [value, useCallback((next: T) => setValue(next), [])]
+  return value
 }
