@@ -202,7 +202,7 @@ a new cycle is tagged without a number (`v0.6.0-beta`, then `-beta.1`, `-beta.2`
 
 For this exceptional recovery path, merge a PR that sets `version` in
 `apps/desktop/package.json`, then run
-**Actions → Release → Run workflow** on that branch. The workflow derives the tag from
+**Actions → Release App → Run workflow** on that branch. The workflow derives the tag from
 the version, and publish creates the release (and its tag) itself via
 `gh release create`. Afterwards, sync that channel's manifest file with a follow-up PR
 so release-please continues from the right version.
@@ -335,7 +335,7 @@ downstream beta-sync job then downloads the canonical DMGs and manifest from tha
 tagged release before refreshing `updater-beta`. The workflow normally runs via
 `workflow_call` from
 `.github/workflows/release-please.yml` when a Release PR merges. The manual fallback is
-**Actions → Release → Run workflow** (tick *draft* to review the release before
+**Actions → Release App → Run workflow** (tick *draft* to review the release before
 publishing) on a branch whose `apps/desktop/package.json` version was already bumped by
 a merged PR; in that mode publish creates the release (and its tag) itself, with
 GitHub-generated notes.
