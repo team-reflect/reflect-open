@@ -1,3 +1,4 @@
+import { saveArchivedPost } from '../x-archive'
 vi.mock('../x-archive', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../x-archive')>()),
   saveArchivedPost: vi.fn(async () => {}),
@@ -62,4 +63,29 @@ it('keeps the spool when the document is busy or the bookmark writer is unavaila
   expect((await drainCaptureInbox({ generation: 1 })).drained).toBe(0)
   expect(captureInboxRemove).not.toHaveBeenCalled()
   expect(writeNote).not.toHaveBeenCalled()
+})
+
+it('saves the archive before writing Markdown and removes the spool last', async () => {
+  const steps: string[] = []
+  vi.mocked(saveArchivedPost).mockImplementation(async (generation, archive) => {
+    expect(generation).toBe(1)
+    expect(archive.data).toMatchObject(envelope.data)
+    steps.push('archive')
+  })
+  const writeBookmark = vi.fn(async () => {
+    steps.push('markdown')
+  })
+  vi.mocked(captureInboxRemove).mockImplementation(async () => {
+    steps.push('remove')
+  })
+  expect((await drainCaptureInbox({ generation: 1, writeBookmark })).drained).toBe(1)
+  expect(steps).toEqual(['archive', 'markdown', 'remove'])
+})
+
+it('retains the inbox and never inserts Markdown when archive persistence fails', async () => {
+  vi.mocked(saveArchivedPost).mockRejectedValue({ kind: 'io', message: 'disk full' })
+  const writeBookmark = vi.fn(async () => {})
+  expect((await drainCaptureInbox({ generation: 1, writeBookmark })).drained).toBe(0)
+  expect(writeBookmark).not.toHaveBeenCalled()
+  expect(captureInboxRemove).not.toHaveBeenCalled()
 })
