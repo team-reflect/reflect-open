@@ -13,7 +13,6 @@
   "include": [
     "./lib/**/*",
     "./entrypoints/**/*",
-    "./scripts/**/*",
     "./.wxt/wxt.d.ts",
     "./.wxt/types/*",
     "./*.ts"

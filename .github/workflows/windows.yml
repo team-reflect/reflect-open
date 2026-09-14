@@ -11,6 +11,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/windows.yml
+      - .github/actions/setup-node/action.yml
       - apps/desktop/scripts/release-windows.mjs
   # Called by release-please.yml so every release also produces a Windows
   # build for testing.
@@ -40,14 +41,7 @@ jobs:
           ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-
-      - name: Install Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: pnpm
+      - uses: ./.github/actions/setup-node
 
       # The default toolchain's host triple is x86_64-pc-windows-msvc, which
       # is exactly the build target — no extra rustup target needed.

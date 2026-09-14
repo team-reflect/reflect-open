@@ -1,6 +1,4 @@
-name: Release
-
-# rename this workflow to "Release App" and release-app.yml FIXME
+name: Release App
 
 on:
   # The normal path: called by release-please.yml right after it creates the
@@ -28,7 +26,7 @@ on:
 # Never run two releases at once, and never cancel one mid-notarization —
 # queue instead. A cancelled run can leave a half-published release behind.
 concurrency:
-  group: release # FIXME: rename "release" to "release-app"
+  group: release-app
   cancel-in-progress: false
 
 # Publish uploads assets into the release-please draft release and undrafts
@@ -129,14 +127,7 @@ jobs:
             exit 1
           fi
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-
-      - name: Install Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: pnpm
+      - uses: ./.github/actions/setup-node
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable

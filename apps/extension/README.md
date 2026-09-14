@@ -99,9 +99,9 @@ openssl rsa -in key.pem -pubout -outform DER | shasum -a 256 \
 
 release-please maintains a separate `chore(extension): release <version>` PR on
 `master`. Merge it to create an `extension-v<version>` tag and run the
-[Extension release workflow](../../.github/workflows/extension-release.yml).
-The workflow waits for CI on that commit, builds and validates the store ZIP,
-archives it with its source SHA and checksums, and submits it to the existing
+[Release Browser Extension workflow](../../.github/workflows/release-browser-extension.yml).
+The workflow builds the store ZIP from that commit, attaches it to the GitHub
+release, and uses `wxt submit` to submit it to the existing
 [Reflect Capture listing](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd).
 Chrome publishes the update after review approval. GitHub release assets becoming
 available does not mean Chrome review has finished.
@@ -122,22 +122,16 @@ Use the v2 API service account credentials, not the deprecated v1 OAuth tokens.
 
 ### Retries and manual recovery
 
-Run **Extension release** from `master`, enter an existing `extension-v<version>`
-tag, and leave **dry_run** enabled to verify credentials without a Chrome upload.
-Disable it to retry submission. Retries restore the archived ZIP and verify its
-checksum and source commit instead of rebuilding it. A partial GitHub asset upload
-fails verification; remove the incomplete assets from that draft release before
-retrying the packaging job.
+The workflow runs only through release-please. For a failed run, inspect the
+[Developer Dashboard](https://chrome.google.com/webstore/devconsole) first, then
+rerun the failed job in GitHub Actions if a fresh upload is appropriate. Each rerun
+builds a new ZIP from the release commit and replaces the attached GitHub asset.
 
-An already published or pending version is reported without uploading it again.
-Another pending review is never cancelled automatically. Inspect the
-[Developer Dashboard](https://chrome.google.com/webstore/devconsole) before
-replacing a submission, retrying an uncertain upload, or addressing a rejection.
-The pinned publisher fails when Google processes an upload asynchronously;
-wait for processing and submit the existing uploaded package in the dashboard.
-Do not repeatedly rerun the upload while it is processing. If a revision is
-staged, publish it from the dashboard. A published regression needs a new,
-higher extension version containing the fix.
+`wxt submit` does not cancel pending reviews by default or skip already submitted
+versions. If the version is pending or published, finish recovery in the dashboard
+instead of uploading again. The pinned publisher also fails when Google processes
+an upload asynchronously; wait for processing and submit the uploaded package in
+the dashboard. A published regression needs a higher version containing the fix.
 
 Before merging a Release PR, update listing/privacy declarations for changed
 permissions or capture behavior and check compatibility with the oldest supported
@@ -151,8 +145,7 @@ for those tests.
 
 Run `pnpm check` at the repository root and
 `pnpm --filter @reflect/extension test`, then
-`pnpm --filter @reflect/extension zip`. The ZIP script checks the actual manifest
-for the expected version, MV3, and absence of the dev key. Upload
+`pnpm --filter @reflect/extension zip`. The store build omits the dev key. Upload
 `apps/extension/.output/reflect-capture-<version>-chrome.zip` to the existing
 listing only after checking its current published and submitted versions.
 

@@ -60,7 +60,7 @@ test('each channel chains its release into delivery', () => {
     expect(workflow).toContain(`tag: \${{ needs.release-please.outputs.${channel}_tag }}`)
     expect(workflow).toContain(`commit: \${{ needs.release-please.outputs.${channel}_commit }}`)
   }
-  expect(workflow).toContain('uses: ./.github/workflows/release.yml')
+  expect(workflow).toContain('uses: ./.github/workflows/release-app.yml')
   expect(workflow).toContain('uses: ./.github/workflows/testflight.yml')
   expect(workflow).toContain('uses: ./.github/workflows/windows.yml')
 })

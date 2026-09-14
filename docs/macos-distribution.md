@@ -285,7 +285,7 @@ The base `tauri.conf.json` is the stable flavor and uses the shipped gradient ic
 artwork recolored via `magick -modulate` (beta `104,100,120`, dev `92,100,231`; see
 `src-tauri/icons/README.md`). `release:macos` picks the flavor from the version
 (prerelease → beta, else stable), so a release always matches the updater feed compiled
-into it; `release.yml` needs no flavor knowledge.
+into it; `release-app.yml` needs no flavor knowledge.
 
 Each overlay pins its own updater feed so the flavor is self-consistent regardless of the
 base config's channel: beta → `updater-beta`, dev → a deliberately non-existent
@@ -319,7 +319,7 @@ Stable installs are unaffected (same identifier and the shipped icon).
 
 ## Releasing from CI
 
-`.github/workflows/release.yml` first runs the publish preflights, then builds two
+`.github/workflows/release-app.yml` first runs the publish preflights, then builds two
 signed/notarized macOS artifacts in parallel:
 
 - Apple Silicon: `macos-26`, `--target=aarch64-apple-darwin`
