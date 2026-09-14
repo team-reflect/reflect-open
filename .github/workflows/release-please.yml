@@ -76,7 +76,10 @@ jobs:
     uses: ./.github/workflows/release-browser-extension.yml
     with:
       commit: ${{ needs.release-please.outputs.extension_commit }}
-    secrets: inherit
+    secrets:
+      CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+      CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
+      CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
 
   # Merging a Release PR makes its channel's pass above create a draft release
   # and output its tag. Chain straight into the build/sign/publish pipeline

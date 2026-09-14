@@ -7,6 +7,13 @@ on:
         description: Immutable commit targeted by the release tag
         type: string
         required: true
+    secrets:
+      CHROME_PUBLISHER_ID:
+        required: true
+      CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL:
+        required: true
+      CHROME_SERVICE_ACCOUNT_PRIVATE_KEY:
+        required: true
 
 concurrency:
   group: release-browser-extension
