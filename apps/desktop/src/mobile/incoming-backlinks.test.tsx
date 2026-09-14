@@ -21,6 +21,8 @@ const { getBacklinksWithContext, getBacklinksPage } = vi.hoisted(() => {
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
+  subscribeFileChanges: async () => () => {},
+  subscribeReconcileRequests: async () => () => {},
   getBacklinksWithContext: getBacklinksPage,
 }))
 vi.mock('@/providers/graph-provider', () => ({
