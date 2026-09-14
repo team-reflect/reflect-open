@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getXArchiveOwners } from '../x-archive/commands'
+import { getXArchiveOwners } from '../x-archive'
 import { classifyAssetFromNotes } from './asset-privacy'
 
-vi.mock('../x-archive/commands', () => ({ getXArchiveOwners: vi.fn() }))
+vi.mock('../x-archive', () => ({ getXArchiveOwners: vi.fn() }))
 
 const asset = `assets/x/url_sha256_${'a'.repeat(64)}.png`
 
@@ -74,4 +74,16 @@ describe('classifyAssetFromNotes: vault-wide references', () => {
       ),
     ).resolves.toBe('skip-private')
   })
+})
+
+it('reuses supplied ownership during live private-note validation', async () => {
+  expect(
+    await classifyAssetFromNotes(
+      asset,
+      ['private.md'],
+      async () => '---\nprivate: true\n---\n![](https://x.com/jack/status/123)',
+      ['assets/x/post-123.json'],
+    ),
+  ).toBe('skip-private')
+  expect(getXArchiveOwners).not.toHaveBeenCalled()
 })

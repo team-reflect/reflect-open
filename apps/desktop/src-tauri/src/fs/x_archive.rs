@@ -1,16 +1,9 @@
+use super::x_archive_store as archive;
 use super::GraphState;
 use crate::error::{AppError, AppResult};
-use reflect_x_archive as archive;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use tauri::{Emitter, Manager, State};
-
-// Serialize archive replacement with the app's Git checkout/merge.
-// FIXME: `merge_remote` does not take `NOTE_WRITE_LOCK` for note writes, so serializing only
-// archive writes with the Git merge (this lock plus the change in git/mod.rs) is inconsistent:
-// either checkout-during-write is a real problem, and then notes need the same treatment in a
-// separate change, or it is not, and this lock should go. Drop it here.
-pub(crate) static ARCHIVE_WRITE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 async fn blocking<T: Send + 'static>(
     root: PathBuf,
@@ -45,19 +38,6 @@ fn download_media<R: tauri::Runtime>(
 }
 
 #[tauri::command]
-pub async fn x_archive_read(
-    state: State<'_, GraphState>,
-    generation: u64,
-    post_id: String,
-) -> AppResult<Option<Value>> {
-    blocking(
-        super::root_for_generation(&state, generation)?,
-        move |root| archive::read_post(&root, &post_id),
-    )
-    .await
-}
-
-#[tauri::command]
 pub async fn x_archive_write<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     generation: u64,
@@ -70,29 +50,6 @@ pub async fn x_archive_write<R: tauri::Runtime>(
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("invalid-post"))?;
         anyhow::ensure!(archive::valid_id(id), "invalid-post-id");
-        let _guard = ARCHIVE_WRITE_LOCK
-            .lock()
-            .map_err(|_| anyhow::anyhow!("archive-lock"))?;
-        if let Some(previous) = archive::read_post(&root, id)? {
-            // FIXME: the 'keep the previous capture if it is newer or if the new one is truncated'
-            // rules (and the `chrono` parse they need) guard against two captures of the same tweet
-            // being drained out of order, which the sequential inbox drain makes rare and harmless.
-            // Last write wins is enough: delete the rules, the closure and the `chrono` dependency
-            // line in Cargo.toml.
-            let timestamp =
-                |post: &Value| -> anyhow::Result<chrono::DateTime<chrono::FixedOffset>> {
-                    Ok(chrono::DateTime::parse_from_rfc3339(
-                        post["capturedAt"]
-                            .as_str()
-                            .ok_or_else(|| anyhow::anyhow!("invalid-captured-at"))?,
-                    )?)
-                };
-            if timestamp(&previous)? > timestamp(&saved)?
-                || (previous["data"]["truncated"] != true && saved["data"]["truncated"] == true)
-            {
-                return Ok(previous);
-            }
-        }
         archive::atomic_json(&root, &format!("assets/x/post-{id}.json"), &saved)?;
         Ok(saved)
     })
@@ -130,9 +87,6 @@ pub async fn x_archive_resolve<R: tauri::Runtime>(
 }
 
 #[tauri::command]
-// FIXME: one privacy classification calls this twice (from `assetReferencingNotePaths` and again
-// from `classifyAssetFromNotes`), and each call reads and hashes every post JSON in assets/x.
-// Compute the owners once and pass them through.
 pub async fn x_archive_owners(
     state: State<'_, GraphState>,
     asset_path: String,

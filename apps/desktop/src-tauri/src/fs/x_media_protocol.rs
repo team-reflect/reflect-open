@@ -1,5 +1,5 @@
+use super::x_archive_store as archive;
 use super::GraphState;
-use reflect_x_archive as archive;
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -7,15 +7,9 @@ use tauri::http::{Request, Response, StatusCode};
 use tauri::{AppHandle, Manager, Runtime, UriSchemeResponder};
 
 fn error(status: StatusCode) -> Response<Cow<'static, [u8]>> {
-    let mut builder = Response::builder()
+    let builder = Response::builder()
         .status(status)
         .header("Cache-Control", "no-store");
-    // FIXME: dead branch, nothing returns 503 any more. The trailing `root_for_generation` re-check
-    // after the file read is also unnecessary: the bytes were read from a path validated under that
-    // root, delivering them after a graph switch is harmless.
-    if status == StatusCode::SERVICE_UNAVAILABLE {
-        builder = builder.header("Retry-After", "2");
-    }
     builder
         .body(Cow::Borrowed(&[] as &[u8]))
         .expect("valid response")
@@ -109,10 +103,6 @@ async fn serve<R: Runtime>(
     })
     .await
     .unwrap_or_else(|error| Err(error.into()));
-    // Do not deliver a response from the previous graph after a graph switch.
-    if super::root_for_generation(&app.state::<GraphState>(), generation).is_err() {
-        return error(StatusCode::FORBIDDEN);
-    }
     let Ok(bytes) = body else {
         return error(StatusCode::INTERNAL_SERVER_ERROR);
     };

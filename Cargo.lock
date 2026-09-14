@@ -4810,11 +4810,9 @@ version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
  "dirs",
- "reflect-x-archive",
  "serde",
  "serde_json",
  "tempfile",
- "uuid",
 ]
 
 [[package]]
@@ -4861,7 +4859,6 @@ dependencies = [
  "anyhow",
  "base64 0.23.1",
  "block2",
- "chrono",
  "core-foundation 0.10.1",
  "dirs",
  "dispatch2",
@@ -4871,6 +4868,7 @@ dependencies = [
  "hf-hub 0.5.0",
  "http-range-header",
  "image",
+ "infer",
  "keyring",
  "notify",
  "notify-debouncer-full",
@@ -4885,7 +4883,6 @@ dependencies = [
  "percent-encoding",
  "reflect-graph-paths",
  "reflect-index-schema",
- "reflect-x-archive",
  "reqwest 0.12.28",
  "rusqlite",
  "serde",
@@ -4914,19 +4911,6 @@ dependencies = [
  "walkdir",
  "xattr",
  "zip 8.6.0",
-]
-
-[[package]]
-name = "reflect-x-archive"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "infer",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
- "url",
 ]
 
 [[package]]

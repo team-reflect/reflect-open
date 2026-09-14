@@ -7,7 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./capture-envelope": "./src/actions/capture-envelope.ts",
-    "./x-archive": "./src/x-archive/index.ts"
+    "./x-archive": "./src/x-archive.ts"
   },
   "scripts": {
     "test": "vitest run --config ../../vitest.config.ts --project core-browser --project core-node"

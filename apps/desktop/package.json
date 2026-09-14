@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    /* FIXME: there are some review comments in https://github.com/ocavue/post-embed/pull/45. address them (accept or reject) */
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

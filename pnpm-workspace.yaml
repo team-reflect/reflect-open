@@ -29,10 +29,10 @@ minimumReleaseAgeExclude:
 # Development snapshots for the coordinated archive changes; replace with releases when publishing.
 blockExoticSubdeps: false
 overrides:
-  '@post-embed/types': https://pkg.pr.new/@post-embed/types@1f587bcdd6acd69bd876504a34a28e647603e206
-  '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@1f587bcdd6acd69bd876504a34a28e647603e206
-  '@post-embed/exporter': https://pkg.pr.new/@post-embed/exporter@1f587bcdd6acd69bd876504a34a28e647603e206
-  '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@1f587bcdd6acd69bd876504a34a28e647603e206
+  '@post-embed/types': https://pkg.pr.new/@post-embed/types@500e4abb2ab7844355cca53a97fa16369dfef947
+  '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@500e4abb2ab7844355cca53a97fa16369dfef947
+  '@post-embed/exporter': https://pkg.pr.new/@post-embed/exporter@500e4abb2ab7844355cca53a97fa16369dfef947
+  '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@500e4abb2ab7844355cca53a97fa16369dfef947
   '@meowdown/core': https://pkg.pr.new/@meowdown/core@3657540e519e47fc2cf37ad40753a80e1e45b720
   '@meowdown/react': https://pkg.pr.new/@meowdown/react@3657540e519e47fc2cf37ad40753a80e1e45b720
   '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@3657540e519e47fc2cf37ad40753a80e1e45b720

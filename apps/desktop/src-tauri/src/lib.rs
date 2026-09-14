@@ -281,7 +281,6 @@ pub fn run() {
         .manage(windows::WindowInit::default())
         .manage(embed::EmbedState::default())
         .invoke_handler(tauri::generate_handler![
-            fs::x_archive::x_archive_read,
             fs::x_archive::x_archive_write,
             fs::x_archive::x_archive_resolve,
             fs::x_archive::x_archive_owners,

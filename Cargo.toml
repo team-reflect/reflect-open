@@ -9,7 +9,6 @@ members = [
   "apps/desktop/src-tauri",
   "apps/native-host",
   "crates/graph-paths",
-  "crates/x-archive",
   "crates/index-schema",
   "plugins/tauri-plugin-app-store",
   "plugins/tauri-plugin-keyboard",

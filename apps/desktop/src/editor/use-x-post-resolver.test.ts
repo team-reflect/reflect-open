@@ -1,7 +1,6 @@
-import { emitFileChanges, setBridge } from '@reflect/core'
 import { afterEach, expect, it, vi } from 'vitest'
 import { resolveArchivedPost } from '@reflect/core/x-archive'
-import { XPostResolverHost } from './use-x-post-resolver'
+import { getXPostResolverHost, XPostResolverHost } from './use-x-post-resolver'
 
 vi.mock('@reflect/core/x-archive', () => ({ resolveArchivedPost: vi.fn() }))
 vi.mock('@tauri-apps/api/core', () => ({
@@ -10,7 +9,6 @@ vi.mock('@tauri-apps/api/core', () => ({
 vi.mock('@/providers/graph-provider', () => ({ useGraph: () => null }))
 
 afterEach(() => {
-  setBridge(null)
   vi.resetAllMocks()
 })
 
@@ -35,83 +33,53 @@ function archivedPost(): NonNullable<Awaited<ReturnType<typeof resolveArchivedPo
   }
 }
 
-// FIXME: all three tests here exercise the subscription and go away with it (see the FIXME at the
-// top of use-x-post-resolver.ts), together with the
-// `subscribeFileChanges`/`subscribeReconcileRequests` mocks added to backlinks-panel.test.tsx and
-// incoming-backlinks.test.tsx. What is left to test is `resolve`: rewrites media URLs to
-// reflect-asset URLs, returns undefined for a missing archive, and ignores non-X URLs.
-it('notifies a missing card when its archive first arrives', async () => {
-  setBridge({ invoke: async () => null, listen: async () => () => {} })
-  const resolve = vi.mocked(resolveArchivedPost)
-  resolve.mockResolvedValueOnce(null)
+it('rewrites media URLs while retaining URLs without a local mapping', async () => {
+  const result = archivedPost()
+  result.archive.data.media = [
+    { type: 'photo', url: 'https://pbs.twimg.com/unmapped.png', width: 100, height: 100 },
+  ]
+  vi.mocked(resolveArchivedPost).mockResolvedValue(result)
   const host = new XPostResolverHost(7)
-  const url = 'https://x.com/jack/status/123'
-  const notify = vi.fn()
-  await host.start()
-  const unsubscribe = host.subscribe(url, notify)
-  try {
-    expect(await host.resolve(url)).toBeUndefined()
-    expect(notify).not.toHaveBeenCalled()
-    resolve.mockResolvedValue(archivedPost())
-    emitFileChanges([{ path: 'assets/x/post-123.json', kind: 'upsert' }])
-    await vi.waitFor(() => expect(notify).toHaveBeenCalledOnce())
-    expect((await host.resolve(url))?.id).toBe('123')
-    const calls = resolve.mock.calls.length
-    emitFileChanges([{ path: 'unrelated.md', kind: 'upsert' }])
-    expect(resolve).toHaveBeenCalledTimes(calls)
-    expect(notify).toHaveBeenCalledOnce()
-    unsubscribe()
-  } finally {
-    host.stop()
-  }
+  const post = await host.resolve('https://x.com/jack/status/123')
+  expect(post?.author.avatar).toBe(`reflect-asset://7/x-media/123/${'a'.repeat(64)}`)
+  expect(post?.media?.[0]).toEqual({
+    type: 'photo',
+    url: 'https://pbs.twimg.com/unmapped.png',
+    width: 100,
+    height: 100,
+  })
 })
 
-it('rewrites media URLs and does not refetch when only a media file arrives', async () => {
-  setBridge({ invoke: async () => null, listen: async () => () => {} })
-  const resolve = vi.mocked(resolveArchivedPost).mockResolvedValue(archivedPost())
-  const host = new XPostResolverHost(7)
-  const url = 'https://x.com/jack/status/123'
-  await host.start()
-  host.subscribe(url, vi.fn())
-  expect((await host.resolve(url))?.author.avatar).toBe(
-    `reflect-asset://7/x-media/123/${'a'.repeat(64)}`,
-  )
-  const calls = resolve.mock.calls.length
-  emitFileChanges([{ path: `assets/x/url_sha256_${'a'.repeat(64)}.png`, kind: 'upsert' }])
-  expect(resolve).toHaveBeenCalledTimes(calls)
-  host.stop()
-  emitFileChanges([{ path: 'assets/x/post-123.json', kind: 'remove' }])
-  expect(resolve).toHaveBeenCalledTimes(calls)
-})
-
-it('rechecks after listener setup so an archive arriving during setup is not missed', async () => {
-  let ready!: () => void
-  const waiting = new Promise<void>((resolve) => {
-    ready = resolve
-  })
-  setBridge({
-    invoke: async () => null,
-    listen: async () => {
-      await waiting
-      return () => {}
-    },
-  })
+it('does not cache missing or previously read archives', async () => {
   const resolve = vi.mocked(resolveArchivedPost).mockResolvedValueOnce(null)
   const host = new XPostResolverHost(7)
   const url = 'https://x.com/jack/status/123'
-  const notify = vi.fn()
-  const started = host.start()
-  host.subscribe(url, notify)
-  try {
-    expect(await host.resolve(url)).toBeUndefined()
-    resolve.mockResolvedValue(archivedPost())
-    ready()
-    await started
-    expect(notify).toHaveBeenCalledOnce()
-    expect((await host.resolve(url))?.id).toBe('123')
-  } finally {
-    ready()
-    host.stop()
-    await started
-  }
+  expect(await host.resolve(url)).toBeUndefined()
+  resolve.mockResolvedValueOnce(archivedPost())
+  expect((await host.resolve(url))?.id).toBe('123')
+  resolve.mockResolvedValueOnce(null)
+  expect(await host.resolve(url)).toBeUndefined()
+  expect(resolve).toHaveBeenCalledTimes(3)
+})
+
+it('ignores non-X URLs and a missing graph', async () => {
+  expect(await new XPostResolverHost(7).resolve('https://example.com')).toBeUndefined()
+  expect(await new XPostResolverHost(null).resolve('https://x.com/jack/status/123')).toBeUndefined()
+  expect(resolveArchivedPost).not.toHaveBeenCalled()
+})
+
+it('shares pending reads for different URLs of the same post', async () => {
+  vi.mocked(resolveArchivedPost).mockResolvedValue(archivedPost())
+  const host = new XPostResolverHost(7)
+  const first = host.resolve('https://x.com/jack/status/123')
+  const second = host.resolve('https://twitter.com/jack/status/123')
+  expect(first).toBe(second)
+  await first
+  expect(resolveArchivedPost).toHaveBeenCalledExactlyOnceWith(7, '123')
+})
+
+it('shares a host within a graph and isolates another graph', () => {
+  const graph = { root: '/graph', name: 'Graph', generation: 7 }
+  expect(getXPostResolverHost(graph)).toBe(getXPostResolverHost(graph))
+  expect(getXPostResolverHost({ ...graph, generation: 8 })).not.toBe(getXPostResolverHost(graph))
 })

@@ -1,4 +1,4 @@
-import { getXArchiveOwners } from '../x-archive/commands'
+import { getXArchiveOwners } from '../x-archive'
 import { db } from './db'
 
 /**
@@ -25,8 +25,11 @@ export function assetReferenceMatches(reference: string, assetPath: string): boo
  * embed stores; {@link assetReferenceMatches} re-applies the same rule to the
  * candidate's live markdown.
  */
-export async function assetReferencingNotePaths(assetPath: string): Promise<string[]> {
-  const owners = await getXArchiveOwners(assetPath)
+export async function assetReferencingNotePaths(
+  assetPath: string,
+  knownOwners?: readonly string[],
+): Promise<string[]> {
+  const owners = knownOwners ?? (await getXArchiveOwners(assetPath))
   const basename = assetPath.split('/').at(-1) ?? assetPath
   const rows = await db
     .selectFrom('assets')

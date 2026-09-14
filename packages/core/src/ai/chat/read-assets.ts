@@ -1,3 +1,4 @@
+import { getXArchiveOwners } from '../../x-archive'
 import { z } from 'zod'
 import { classifyAssetFromNotes } from '../../actions/asset-privacy'
 import { isAppError } from '../../errors'
@@ -67,7 +68,7 @@ export const readAssetsInput = z.object({
 /** The effects {@link buildReadOneAsset} needs, already defaulted by the caller. */
 export interface ReadAssetDeps {
   readNoteFn: (path: string) => Promise<string>
-  assetReferencingNotePathsFn: (assetPath: string) => Promise<string[]>
+  assetReferencingNotePathsFn: (assetPath: string, owners?: readonly string[]) => Promise<string[]>
 }
 
 /**
@@ -98,8 +99,9 @@ export function buildReadOneAsset(deps: ReadAssetDeps) {
       throw cause
     }
     const body = splitFrontmatter(source).body.trim()
-    const candidates = await deps.assetReferencingNotePathsFn(canonical)
-    const verdict = await classifyAssetFromNotes(canonical, candidates, deps.readNoteFn)
+    const owners = await getXArchiveOwners(canonical)
+    const candidates = await deps.assetReferencingNotePathsFn(canonical, owners)
+    const verdict = await classifyAssetFromNotes(canonical, candidates, deps.readNoteFn, owners)
     const truncated = body.length > MAX_ASSET_DESCRIPTION_CHARS
     try {
       const asset = cloudSafeAssetDescription({

@@ -53,7 +53,7 @@ export interface NoteToolDeps {
   readNoteFn?: (path: string) => Promise<string>
   listRecentNotesFn?: (options: RecentNotesOptions) => Promise<RecentNoteRow[]>
   listDailyNotesFn?: (range: DailyNotesRange) => Promise<DailyNoteRow[]>
-  assetReferencingNotePathsFn?: (assetPath: string) => Promise<string[]>
+  assetReferencingNotePathsFn?: (assetPath: string, owners?: readonly string[]) => Promise<string[]>
 }
 
 export interface BuildNoteToolsOptions extends NoteToolDeps {

@@ -23,9 +23,8 @@ crate-type = ["staticlib", "rlib"]
 tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
-chrono = { version = "0.4", default-features = false, features = ["std"] }
+infer = "0.19"
 http-range-header = "0.4"
-reflect-x-archive = { path = "../../../crates/x-archive" }
 anyhow = "1"
 
 # `devtools` compiles the web inspector into release builds too (it is otherwise

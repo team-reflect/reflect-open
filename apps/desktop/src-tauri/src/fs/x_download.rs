@@ -1,5 +1,5 @@
+use super::x_archive_store as archive;
 use anyhow::{ensure, Context, Result};
-use reflect_x_archive as archive;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
@@ -101,4 +101,62 @@ pub async fn download(root: PathBuf, url: String) -> Result<archive::Receipt> {
     })
     .await
     .context("download publish task")?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn restricts_downloads_to_anonymous_https_cdn_urls() {
+        for url in [
+            "https://pbs.twimg.com/a.png",
+            "https://video.twimg.com/a.mp4",
+        ] {
+            assert!(allowed(&reqwest::Url::parse(url).unwrap()));
+        }
+        for url in [
+            "http://pbs.twimg.com/a.png",
+            "https://pbs.twimg.com.evil.test/a.png",
+            "https://user:password@pbs.twimg.com/a.png",
+            "https://pbs.twimg.com:444/a.png",
+            "https://127.0.0.1/a.png",
+        ] {
+            assert!(!allowed(&reqwest::Url::parse(url).unwrap()));
+        }
+    }
+
+    #[test]
+    fn shares_download_locks_by_graph_and_url() {
+        let first = download_lock(Path::new("/graph-a"), "url-a");
+        assert!(Arc::ptr_eq(
+            &first,
+            &download_lock(Path::new("/graph-a"), "url-a")
+        ));
+        assert!(!Arc::ptr_eq(
+            &first,
+            &download_lock(Path::new("/graph-b"), "url-a")
+        ));
+        assert!(!Arc::ptr_eq(
+            &first,
+            &download_lock(Path::new("/graph-a"), "url-b")
+        ));
+    }
+
+    #[test]
+    fn returns_completed_media_offline_without_requesting_the_source() {
+        let root = tempfile::tempdir().unwrap();
+        // A non-CDN URL could never be downloaded, but an existing valid cache is usable.
+        let url = "https://offline.invalid/photo.png";
+        let hash = archive::hash_url(url).unwrap();
+        let directory = root.path().join("assets/x");
+        std::fs::create_dir_all(&directory).unwrap();
+        let name = format!("url_sha256_{hash}.png");
+        std::fs::write(directory.join(&name), b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR").unwrap();
+        let receipt =
+            tauri::async_runtime::block_on(download(root.path().to_owned(), url.into())).unwrap();
+        assert_eq!(receipt.name, name);
+        assert_eq!(receipt.mime, "image/png");
+        assert_eq!(std::fs::read_dir(directory).unwrap().count(), 1);
+    }
 }
