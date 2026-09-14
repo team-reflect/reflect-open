@@ -87,16 +87,8 @@ async fn download_once(root: PathBuf, url: String, hash: String) -> Result<archi
         .map_err(network)?
         .error_for_status()
         .map_err(network)?;
-    let mut limit = if response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|header| header.to_str().ok())
-        .is_some_and(|mime| mime.starts_with("video/mp4"))
-    {
-        archive::VIDEO_MAX_BYTES
-    } else {
-        archive::IMAGE_MAX_BYTES
-    };
+    // Headers can be absent or wrong. Sniffed bytes choose the format-specific limit.
+    let mut limit = archive::VIDEO_MAX_BYTES.max(archive::IMAGE_MAX_BYTES);
     if response.content_length().is_some_and(|bytes| bytes > limit) {
         return Err(AppError::parse("media-too-large"));
     }

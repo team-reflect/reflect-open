@@ -6,7 +6,8 @@ use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
-pub const VIDEO_MAX_BYTES: u64 = 10_000_000;
+
+pub const VIDEO_MAX_BYTES: u64 = 30 * 1024 * 1024;
 pub const IMAGE_MAX_BYTES: u64 = 20 * 1024 * 1024;
 pub const POST_JSON_MAX_BYTES: usize = 1024 * 1024;
 pub const MEDIA_EXTENSIONS: &[&str] = &["jpg", "png", "webp", "gif", "mp4"];
@@ -87,10 +88,10 @@ pub fn read_json(root: &Path, relative: &str) -> Result<Option<Value>> {
     ))
 }
 pub fn media_byte_limit(prefix: &[u8]) -> u64 {
-    if infer::get(prefix).is_some_and(|kind| kind.mime_type() == "video/mp4") {
-        VIDEO_MAX_BYTES
-    } else {
-        IMAGE_MAX_BYTES
+    match infer::get(prefix) {
+        Some(kind) if kind.mime_type() == "video/mp4" => VIDEO_MAX_BYTES,
+        Some(_) => IMAGE_MAX_BYTES,
+        None => VIDEO_MAX_BYTES.max(IMAGE_MAX_BYTES),
     }
 }
 
@@ -101,11 +102,14 @@ pub fn sniff(path: &Path) -> Result<(String, String, u64)> {
     if !metadata.is_file() || bytes == 0 {
         return Err(AppError::parse("invalid-file"));
     }
-    if bytes > IMAGE_MAX_BYTES {
+    if bytes > VIDEO_MAX_BYTES.max(IMAGE_MAX_BYTES) {
         return Err(AppError::parse("media-too-large"));
     }
     let mut prefix = vec![0; bytes.min(8192) as usize];
     file.read_exact(&mut prefix)?;
+    if bytes > media_byte_limit(&prefix) {
+        return Err(AppError::parse("media-too-large"));
+    }
     let kind = infer::get(&prefix).ok_or_else(|| AppError::parse("unsupported-format"))?;
     let extension = match kind.mime_type() {
         "image/jpeg" => "jpg",
@@ -390,5 +394,21 @@ mod tests {
             media_urls(&post).unwrap(),
             vec!["https://video.twimg.com/v.mp4"]
         );
+    }
+    #[test]
+    fn allows_thirty_mib_video_and_twenty_mib_images() {
+        for (prefix, limit) in [
+            (b"\0\0\0\x18ftypmp42".as_slice(), VIDEO_MAX_BYTES),
+            (b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".as_slice(), IMAGE_MAX_BYTES),
+        ] {
+            let file = tempfile::NamedTempFile::new().unwrap();
+            fs::write(file.path(), prefix).unwrap();
+            file.as_file().set_len(limit).unwrap();
+            assert_eq!(sniff(file.path()).unwrap().2, limit);
+            file.as_file().set_len(limit + 1).unwrap();
+            assert!(sniff(file.path()).is_err());
+        }
+        assert_eq!(media_byte_limit(b""), VIDEO_MAX_BYTES);
+        assert_eq!(media_byte_limit(b"\0\0"), VIDEO_MAX_BYTES);
     }
 }
