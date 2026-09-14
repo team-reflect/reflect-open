@@ -104,8 +104,8 @@ on `master`. Mark it ready and merge it to publish the GitHub release with an
 The workflow builds the store ZIP from that commit and uses `wxt submit` to
 submit it to the existing
 [Reflect Capture listing](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd).
-Chrome publishes the update after review approval. The GitHub release is published
-before Chrome submission and does not indicate that store review has finished.
+After review approval, publish the staged update in the dashboard. The GitHub
+release does not indicate store review has finished.
 
 The extension version and changelog are independent of desktop beta/stable
 releases. Let release-please update `package.json` and `CHANGELOG.md`. Extension
