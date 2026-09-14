@@ -10,7 +10,18 @@ use std::path::{Path, PathBuf};
 pub const VIDEO_MAX_BYTES: u64 = 30 * 1024 * 1024;
 pub const IMAGE_MAX_BYTES: u64 = 20 * 1024 * 1024;
 pub const POST_JSON_MAX_BYTES: usize = 1024 * 1024;
-pub const MEDIA_EXTENSIONS: &[&str] = &["jpg", "png", "webp", "gif", "mp4"];// FIXME: please do some search about tweet, for example is there any public archive etc. let's find out whether there are other extensions that we should support . id not  other extensions , use comments to explain why we don't support them and provide a link or some links as evidence.
+// Cache formats cover X's documented JPG/PNG/GIF/WEBP images and progressive MP4.
+// https://docs.x.com/x-api/media/quickstart/best-practices
+// X's delivered-media examples expose MP4 and HLS variants; HLS playlists/segments
+// are intentionally outside this single-file archive's scope.
+// https://docs.x.com/x-api/enterprise-gnip-2.0/fundamentals/data-dictionary
+// The upload API also accepts BMP/TIFF, MOV/WebM, subtitles, and 3D assets, but
+// upload acceptance does not establish that tweet CDN responses use those formats.
+// We do not add them without a delivered-media sample and rendering support.
+// https://docs.x.com/x-api/media/initialize-media-upload
+// These are canonical cache suffixes selected from bytes: JPEG (including URLs
+// ending in .jpeg) becomes .jpg; the source URL's extension is never a filter.
+pub const MEDIA_EXTENSIONS: &[&str] = &["jpg", "png", "webp", "gif", "mp4"];
 
 #[derive(Clone, Debug)]
 pub struct Receipt {
