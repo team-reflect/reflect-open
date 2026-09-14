@@ -3,6 +3,10 @@ name: Release Browser Extension
 on:
   workflow_call:
     inputs:
+      tag:
+        description: The release tag (extension-v<version>) created by release-please
+        type: string
+        required: true
       commit:
         description: Immutable commit targeted by the release tag
         type: string
@@ -19,8 +23,9 @@ concurrency:
   group: release-browser-extension
   cancel-in-progress: false
 
+# Uploads the zip into the release-please draft release and undrafts it.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   release:
@@ -35,8 +40,52 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      - name: Verify the release tag matches apps/extension/package.json
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          version="$(jq -r .version apps/extension/package.json)"
+          if [ "$TAG" != "extension-v${version}" ]; then
+            echo "::error::release tag ${TAG} but apps/extension/package.json says ${version}"
+            exit 1
+          fi
+          echo "EXTENSION_VERSION=${version}" >> "$GITHUB_ENV"
+
+      # Store package first, keyed package second, so .output/chrome-mv3 ends
+      # up keyed (the same state a local `pnpm build` leaves behind).
       - name: Build the store package
         run: pnpm --filter @reflect/extension zip
+
+      - name: Build the unpacked package
+        run: pnpm --filter @reflect/extension zip:unpacked
+
+      # The GitHub release is the fallback while store review runs (or fails),
+      # so it is filled and published before the store submission.
+      - name: Attach the unpacked package to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release upload "$TAG" --clobber \
+            "apps/extension/.output/reflect-capture-${EXTENSION_VERSION}-chrome-unpacked.zip"
+
+      - name: Append the install instructions and publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release view "$TAG" --json body --jq .body > release-notes.md
+          if ! grep -q '^## Install before it reaches' release-notes.md; then
+            printf '\n' >> release-notes.md
+            sed "s/__VERSION__/${EXTENSION_VERSION}/g" \
+              .github/release-notes/extension-install.md >> release-notes.md
+          fi
+          # --latest=false is load-bearing: releases/latest/download/latest.json
+          # is the stable desktop updater feed.
+          gh release edit "$TAG" \
+            --notes-file release-notes.md \
+            --draft=false \
+            --latest=false
 
       - name: Submit to Chrome
         working-directory: apps/extension
@@ -48,4 +97,4 @@ jobs:
           CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
           # DEFAULT_PUBLISH or STAGED_PUBLISH
           CHROME_PUBLISH_TYPE: STAGED_PUBLISH
-        run: pnpm exec wxt submit --chrome-zip .output/reflect-capture-*-chrome.zip
+        run: pnpm exec wxt submit --chrome-zip ".output/reflect-capture-${EXTENSION_VERSION}-chrome.zip"

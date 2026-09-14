@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/v17.6.0/schemas/config.json",
   "include-component-in-tag": true,
   "bump-minor-pre-major": true,
-  "draft": false,
+  "draft": true,
   "draft-pull-request": true,
   "force-tag-creation": true,
   "always-update": true,

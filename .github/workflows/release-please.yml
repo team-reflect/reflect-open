@@ -38,6 +38,7 @@ jobs:
       beta_tag: ${{ steps.beta.outputs.tag_name }}
       beta_commit: ${{ steps.beta.outputs.sha }}
       extension_created: ${{ steps.extension.outputs['apps/extension--release_created'] }}
+      extension_tag: ${{ steps.extension.outputs['apps/extension--tag_name'] }}
       extension_commit: ${{ steps.extension.outputs['apps/extension--sha'] }}
     steps:
       # Stable runs first because a stable promotion advances
@@ -75,6 +76,7 @@ jobs:
     if: needs.release-please.outputs.extension_created == 'true'
     uses: ./.github/workflows/release-browser-extension.yml
     with:
+      tag: ${{ needs.release-please.outputs.extension_tag }}
       commit: ${{ needs.release-please.outputs.extension_commit }}
     secrets:
       CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}

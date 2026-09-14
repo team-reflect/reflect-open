@@ -11,7 +11,10 @@ app is closed: the host spools into the graph's capture inbox
 [Plan 11](../../docs/plans/11-link-capture.md) is the design doc.
 
 Install the published extension from the
-[Chrome Web Store](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd).
+[Chrome Web Store](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd),
+or load the `-unpacked.zip` from the latest
+[`extension-v*` release](https://github.com/team-reflect/reflect-open/releases?q=extension-v)
+before store review finishes.
 
 ## Architecture in one breath
 

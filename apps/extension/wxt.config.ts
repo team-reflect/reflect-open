@@ -27,8 +27,14 @@ const isStoreBuild = process.env['WXT_STORE_BUILD'] === 'true'
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   vite: () => ({ plugins: [tailwindcss()] }),
-  // A stable, human-readable store artifact: `reflect-capture-<version>-chrome.zip`.
-  zip: { name: 'reflect-capture' },
+  // Store artifact: `reflect-capture-<version>-chrome.zip`. The keyed build is
+  // `reflect-capture-<version>-chrome-unpacked.zip` so the two never collide.
+  zip: {
+    name: 'reflect-capture',
+    ...(isStoreBuild
+      ? {}
+      : { artifactTemplate: '{{name}}-{{packageVersion}}-{{browser}}-unpacked{{modeSuffix}}.zip' }),
+  },
   manifest: {
     name: 'Reflect Capture',
     description: 'Save the page you are reading into Reflect.',
