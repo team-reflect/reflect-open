@@ -13,25 +13,27 @@ export async function saveXPost(
   if (tab.incognito || !tab.url || new URL(tab.url).origin !== 'https://x.com') {
     throw new Error('unsupported-tab')
   }
-  const response = captureLookupResponseSchema.parse(
-    await browser.tabs.sendMessage(tabId, { type: 'x-capture:lookup', postId }, { frameId: 0 }),
-  )
-  // FIXME(logic): a bookmark is now dropped whenever the page lookup fails ('not-observed' because
-  // the tweet was rendered before the content scripts were injected, e.g. any x.com tab that was
-  // open when the extension was installed or updated; bridge timeouts; 'page-changed'). The only
-  // trace is `console.error` in x-bookmarks.ts. The previous URL-only path never lost a bookmark.
-  // Decide explicitly: fall back to an envelope without `data` (the card then shows 'unavailable'
-  // but the daily-note line still lands), or surface the failure to the user. Silent loss is a
-  // regression.
-  if (!response.ok) throw new Error(response.reason)
-  if ((await browser.tabs.get(tabId)).url !== response.pageUrl) throw new Error('page-changed')
+  // Page scripts can miss already-rendered tweets after extension installation or updates.
+  // Preserve the URL even when authenticated post data cannot be captured.
+  let post
+  try {
+    const response = captureLookupResponseSchema.parse(
+      await browser.tabs.sendMessage(tabId, { type: 'x-capture:lookup', postId }, { frameId: 0 }),
+    )
+    const current = await browser.tabs.get(tabId)
+    if (response.ok && current.url === response.pageUrl && response.post.id === postId) {
+      post = response.post
+    }
+  } catch {
+    // A missing bridge or closed tab does not erase the original save intent.
+  }
   const envelope = bookmarkEnvelopeSchema.parse({
     version: 2,
     kind: 'x-bookmark',
     id: crypto.randomUUID(),
     source: 'extension',
     capturedAt,
-    data: response.post,
+    ...(post ? { data: post } : { postId }),
   })
   await enqueueCapture({ envelope })
   await flushQueue()

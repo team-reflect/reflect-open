@@ -89,3 +89,17 @@ it('retains the inbox and never inserts Markdown when archive persistence fails'
   expect(writeBookmark).not.toHaveBeenCalled()
   expect(captureInboxRemove).not.toHaveBeenCalled()
 })
+
+it('writes and deduplicates URL-only bookmarks without touching an archive', async () => {
+  const fallback = { ...envelope, data: undefined, postId: '20' }
+  vi.mocked(captureInboxRead).mockResolvedValue(JSON.stringify(fallback))
+  let source = ''
+  const writeBookmark = async (capture: BookmarkEnvelope) => {
+    source = appendBookmark(source, capture)
+  }
+  expect((await drainCaptureInbox({ generation: 1, writeBookmark })).drained).toBe(1)
+  expect((await drainCaptureInbox({ generation: 1, writeBookmark })).drained).toBe(1)
+  expect(source).toBe('## X bookmarks\n\n![](https://x.com/i/status/20)\n')
+  expect(saveArchivedPost).not.toHaveBeenCalled()
+  expect(captureInboxRemove).toHaveBeenCalledTimes(2)
+})

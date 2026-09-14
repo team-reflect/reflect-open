@@ -12,11 +12,15 @@ pub fn spool(envelope: &Value, pointer: &Path) -> Result<(), HostError> {
     if !crate::envelope::is_uuid(id) {
         return Err(invalid());
     }
+    let post_id = match envelope.get("data") {
+        Some(data) => data["id"].as_str(),
+        None => envelope["postId"].as_str(),
+    };
     if envelope["source"] != "extension"
         || !envelope["capturedAt"]
             .as_str()
             .is_some_and(crate::envelope::is_iso_datetime)
-        || !envelope["data"]["id"].as_str().is_some_and(|id| {
+        || !post_id.is_some_and(|id| {
             !id.is_empty()
                 && id.len() <= 20
                 && !id.starts_with('0')

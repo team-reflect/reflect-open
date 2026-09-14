@@ -4,15 +4,20 @@ import { z } from 'zod'
 
 export const postIdSchema = z.string().regex(X_POST_ID_PATTERN)
 
-/** X capture with one source of truth for its timestamp and post ID. */
-export const bookmarkEnvelopeSchema = z.object({
+/** Capture metadata shared by snapshots and URL-only fallbacks. */
+const bookmarkMetadataSchema = z.object({
   version: z.literal(2),
   kind: z.literal('x-bookmark'),
   id: z.guid(),
   source: z.literal('extension'),
   capturedAt: z.iso.datetime({ offset: true }),
-  data: xPostSchema,
 })
+
+/** A failed page lookup still preserves the bookmark, without inventing post data. */
+export const bookmarkEnvelopeSchema = z.union([
+  bookmarkMetadataSchema.extend({ data: xPostSchema }),
+  bookmarkMetadataSchema.extend({ postId: postIdSchema, data: z.never().optional() }),
+])
 
 export type BookmarkEnvelope = z.infer<typeof bookmarkEnvelopeSchema>
 

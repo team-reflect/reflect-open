@@ -202,10 +202,12 @@ export async function drainCaptureInbox(
           if (!input.writeBookmark) {
             throw new Error('Bookmark writer is unavailable; update Reflect')
           }
-          await saveArchivedPost(
-            input.generation,
-            createArchivedPost(envelope.data, envelope.capturedAt),
-          )
+          if (envelope.data) {
+            await saveArchivedPost(
+              input.generation,
+              createArchivedPost(envelope.data, envelope.capturedAt),
+            )
+          }
           const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
           await input.writeBookmark(envelope, daily)
           await captureInboxRemove(name, input.generation)

@@ -11,11 +11,12 @@ const SECTION_TITLE = 'X bookmarks'
  * never adds a second entry.
  */
 export function appendBookmark(source: string, envelope: BookmarkEnvelope): string {
+  const postId = envelope.data ? envelope.data.id : envelope.postId
   const parsed = parseNote({ path: '', source })
-  if (parsed.links.some((link) => parseXPostId(link.href) === envelope.data.id)) {
+  if (parsed.links.some((link) => parseXPostId(link.href) === postId)) {
     return source
   }
-  const line = `![](https://x.com/i/status/${envelope.data.id})`
+  const line = `![](https://x.com/i/status/${postId})`
   const headings = topLevelHeadings(parsed.headings)
   const heading = headings.find(
     (candidate) => candidate.level === 2 && candidate.text === SECTION_TITLE,

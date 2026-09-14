@@ -214,6 +214,42 @@ mod tests {
     }
 
     #[test]
+    fn spools_url_only_bookmark_when_page_lookup_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let graph = dir.path().join("graph");
+        std::fs::create_dir_all(&graph).unwrap();
+        let pointer = dir.path().join("capture-pointer.json");
+        std::fs::write(
+            &pointer,
+            serde_json::json!({"version": 1, "graphRoot": graph}).to_string(),
+        )
+        .unwrap();
+        let envelope = serde_json::json!({
+            "version": 2, "kind": "x-bookmark", "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "source": "extension", "capturedAt": "2026-09-14T00:00:00Z",
+            "postId": "123"
+        });
+        let mut output = Vec::new();
+        run(
+            &mut Cursor::new(framed(&wire(envelope.clone(), None))),
+            &mut output,
+            &pointer,
+        )
+        .unwrap();
+        assert_eq!(
+            read_ack(&output),
+            serde_json::json!({"ok":true,"status":"queued"})
+        );
+        let saved: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(graph.join(".reflect/inbox/7c9e6679-7425-40de-944b-e07fc1f90ae7.json"))
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(saved, envelope);
+        assert!(!graph.join("assets").exists());
+    }
+
+    #[test]
     fn missing_pointer_acks_no_graph() {
         let dir = tempfile::tempdir().unwrap();
         let pointer = dir.path().join("does-not-exist.json");
