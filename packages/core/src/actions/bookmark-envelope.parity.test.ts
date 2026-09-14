@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest'
-import fixtures from './bookmark-envelope.fixtures.json'
+import fixtures from './bookmark-envelope.fixtures'
 import { inboxEnvelopeSchema } from './capture-envelope'
 import { bookmarkWireSchema } from './bookmark-envelope'
-it('matches the native bookmark boundary fixtures', () => {
+it('validates X capture envelopes for wire and inbox', () => {
   for (const value of fixtures.accepted)
     expect(bookmarkWireSchema.safeParse(value).success).toBe(true)
   for (const value of fixtures.spooled) expect(inboxEnvelopeSchema.parse(value)).toEqual(value)

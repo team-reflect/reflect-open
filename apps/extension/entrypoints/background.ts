@@ -1,8 +1,7 @@
 import { saveXPost } from '@/lib/x-save'
-import { flushArchivedCaptures } from '@/lib/x-archive-queue'
-import { parseXPostId } from '@post-embed/types'
+import { parseXPostId } from '@post-embed/schema'
 import { z } from 'zod'
-import { extensionCaptureWireSchema } from '@reflect/core/capture-envelope'
+import { extensionCaptureWireSchema, postIdSchema } from '@reflect/core/capture-envelope'
 import { browser } from 'wxt/browser'
 import { defineBackground } from '#imports'
 import { SAVE_CURRENT_PAGE_COMMAND } from '@/lib/commands'
@@ -59,32 +58,13 @@ const enqueueRequestSchema = z.object({
 
 export default defineBackground(() => {
   registerBookmarkObserver()
-  const flushArchive = () => {
-    flushArchivedCaptures().catch(() => {})
-  }
-  // FIXME: a second alarm that wakes the worker every minute forever, next to the existing
-  // `RETRY_ALARM` (15 min) retry path. Hook `flushArchive` into the existing alarm/`flushQueue`
-  // instead (or delete it with the desktop-download FIXME in lib/x-download.ts).
-  browser.alarms.create('x-archive-retry', { periodInMinutes: 1 }).catch(() => {})
-  browser.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === 'x-archive-retry') flushArchive()
-  })
-  browser.runtime.onStartup.addListener(flushArchive)
-  flushArchive()
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (
-      sender.id === browser.runtime.id &&
-      sender.tab == null &&
-      // FIXME: the `enqueue` message right below has no sender check; runtime messages already come
-      // only from this extension's own pages, so `sender.id === browser.runtime.id` (if anything)
-      // is enough. Also reuse `postIdSchema` instead of the inline regex.
-      sender.url === browser.runtime.getURL('/popup.html')
-    ) {
+    if (sender.id === browser.runtime.id) {
       const save = z
         .object({
           type: z.literal('x-archive:save'),
           tabId: z.number().int().nonnegative(),
-          postId: z.string().regex(/^[1-9]\d{0,19}$/),
+          postId: postIdSchema,
         })
         .safeParse(message)
       if (save.success) {

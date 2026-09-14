@@ -7,18 +7,9 @@ import { parseNote } from '../markdown/extract'
 const capture: BookmarkEnvelope = {
   version: 2,
   kind: 'x-bookmark',
-  archive: {
-    kind: 'x-post',
-    id: '20',
-    revision: 'capture-one',
-    capturedAt: '2026-09-09T04:00:00Z',
-    textState: 'complete',
-    data: { id: '20', createdAt: '', author: { name: '', handle: '' }, body: [] },
-    resources: [],
-  },
+  data: { id: '20', createdAt: '', author: { name: '', handle: '' }, body: [] },
   id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
   source: 'extension',
-  postId: '20',
   capturedAt: '2026-09-09T04:00:00Z',
 }
 
@@ -49,7 +40,7 @@ describe('appendBookmark', () => {
       source = appendBookmark(source, {
         ...capture,
         id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
-        postId: String(index + 1),
+        data: { ...capture.data, id: String(index + 1) },
       })
     }
     expect(parseNote({ path: '', source }).links).toHaveLength(10)

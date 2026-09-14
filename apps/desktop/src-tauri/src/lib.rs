@@ -283,7 +283,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             fs::x_archive::x_archive_read,
             fs::x_archive::x_archive_write,
-            fs::x_archive::x_archive_processed,
             fs::x_archive::x_archive_resolve,
             fs::x_archive::x_archive_owners,
             app_version,

@@ -14,40 +14,28 @@ afterEach(() => {
   vi.resetAllMocks()
 })
 
-function archivedPost(
-  state: 'pending' | 'stored' = 'pending',
-): NonNullable<Awaited<ReturnType<typeof resolveArchivedPost>>> {
+function archivedPost(): NonNullable<Awaited<ReturnType<typeof resolveArchivedPost>>> {
   return {
     archive: {
       kind: 'x-post',
-      id: '123',
-      revision: 'one',
       capturedAt: '2026-09-14T00:00:00Z',
-      textState: 'complete',
       data: {
         id: '123',
         createdAt: '2026-09-14T00:00:00Z',
         author: { name: 'Jack', handle: 'jack', avatar: 'https://example.com/avatar.png' },
         body: [{ type: 'text', text: 'Saved tweet' }],
       },
-      resources: [{ url: 'https://example.com/avatar.png', state }],
     },
     resources: [
       {
         url: 'https://example.com/avatar.png',
         hash: 'a'.repeat(64),
-        state,
-        error: null,
-        bytes: null,
       },
     ],
   }
 }
 
-// FIXME: this pins the 2-second polling implementation (`advanceTimersByTimeAsync(2000)`) and
-// asserts six things in one test. Once notification is event-driven, test 'notify fires when the
-// archive changes' and 'media URLs are rewritten' separately, without fake timers.
-it('notifies a missing card when its archive first arrives and rewrites media URLs', async () => {
+it('notifies a missing card when its archive first arrives', async () => {
   setBridge({ invoke: async () => null, listen: async () => () => {} })
   const resolve = vi.mocked(resolveArchivedPost)
   resolve.mockResolvedValueOnce(null)
@@ -55,16 +43,14 @@ it('notifies a missing card when its archive first arrives and rewrites media UR
   const url = 'https://x.com/jack/status/123'
   const notify = vi.fn()
   await host.start()
-  const unsubscribe = host.subscribeXPost(url, notify)
+  const unsubscribe = host.subscribe(url, notify)
   try {
-    expect(await host.resolveXPost(url)).toBeUndefined()
+    expect(await host.resolve(url)).toBeUndefined()
     expect(notify).not.toHaveBeenCalled()
     resolve.mockResolvedValue(archivedPost())
     emitFileChanges([{ path: 'assets/x/post-123.json', kind: 'upsert' }])
     await vi.waitFor(() => expect(notify).toHaveBeenCalledOnce())
-    const post = await host.resolveXPost(url)
-    expect(post?.author.avatar).toBe(`reflect-asset://7/x-media/123/${'a'.repeat(64)}`)
-    expect(host.resolveXPostMediaUrl(post!.author.avatar!)).toBe(post?.author.avatar)
+    expect((await host.resolve(url))?.id).toBe('123')
     const calls = resolve.mock.calls.length
     emitFileChanges([{ path: 'unrelated.md', kind: 'upsert' }])
     expect(resolve).toHaveBeenCalledTimes(calls)
@@ -75,25 +61,20 @@ it('notifies a missing card when its archive first arrives and rewrites media UR
   }
 })
 
-it('refreshes media after the file arrives and stops listening on teardown', async () => {
+it('rewrites media URLs and does not refetch when only a media file arrives', async () => {
   setBridge({ invoke: async () => null, listen: async () => () => {} })
   const resolve = vi.mocked(resolveArchivedPost).mockResolvedValue(archivedPost())
   const host = new XPostResolverHost(7)
   const url = 'https://x.com/jack/status/123'
   await host.start()
-  host.subscribeXPost(url, vi.fn())
-  try {
-    await host.resolveXPost(url)
-    resolve.mockResolvedValue(archivedPost('stored'))
-    emitFileChanges([{ path: `assets/x/url_sha256_${'a'.repeat(64)}.png`, kind: 'upsert' }])
-    await vi.waitFor(async () => {
-      const post = await host.resolveXPost(url)
-      expect(post?.author.avatar).toBe(`reflect-asset://7/x-media/123/${'a'.repeat(64)}?retry=1`)
-    })
-  } finally {
-    host.stop()
-  }
+  host.subscribe(url, vi.fn())
+  expect((await host.resolve(url))?.author.avatar).toBe(
+    `reflect-asset://7/x-media/123/${'a'.repeat(64)}`,
+  )
   const calls = resolve.mock.calls.length
+  emitFileChanges([{ path: `assets/x/url_sha256_${'a'.repeat(64)}.png`, kind: 'upsert' }])
+  expect(resolve).toHaveBeenCalledTimes(calls)
+  host.stop()
   emitFileChanges([{ path: 'assets/x/post-123.json', kind: 'remove' }])
   expect(resolve).toHaveBeenCalledTimes(calls)
 })
@@ -115,14 +96,14 @@ it('rechecks after listener setup so an archive arriving during setup is not mis
   const url = 'https://x.com/jack/status/123'
   const notify = vi.fn()
   const started = host.start()
-  host.subscribeXPost(url, notify)
+  host.subscribe(url, notify)
   try {
-    expect(await host.resolveXPost(url)).toBeUndefined()
+    expect(await host.resolve(url)).toBeUndefined()
     resolve.mockResolvedValue(archivedPost())
     ready()
     await started
     expect(notify).toHaveBeenCalledOnce()
-    expect((await host.resolveXPost(url))?.id).toBe('123')
+    expect((await host.resolve(url))?.id).toBe('123')
   } finally {
     ready()
     host.stop()

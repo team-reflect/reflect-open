@@ -1,97 +1,74 @@
 use reflect_x_archive as archive;
 use serde_json::json;
-use sha2::{Digest, Sha256};
-
-fn capture(root: &std::path::Path, id: &str, url: &str) -> serde_json::Value {
-    let value = json!({"kind":"x-post","id":id,"revision":"one","data":{"id":id},
-        "resources":[{"url":url,"state":"pending"}]});
-    archive::put_capture(
-        root,
-        json!({"id":uuid::Uuid::new_v4().to_string(),
-        "postId":id,"archive":value}),
-    )
-    .unwrap();
-    assert!(archive::write_post(root, id, None, &value).unwrap());
-    value
-}
 
 #[test]
-fn shares_completed_url_across_posts_and_retries_commit() {
+fn shares_completed_urls_and_ignores_invalid_cache_candidates() {
     let root = tempfile::tempdir().unwrap();
     let url = "https://pbs.twimg.com/media/shared?name=orig&format=png";
-    capture(root.path(), "123", url);
-    capture(root.path(), "456", url);
-    let job = archive::pull(root.path()).unwrap().unwrap();
-    assert_eq!(job.post_ids.len(), 2);
-    assert!(archive::pull(root.path()).unwrap().is_none());
-    let bytes = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR";
-    let lease = job.lease.as_deref().unwrap();
+    let hash = archive::hash_url(url).unwrap();
+    let dir = root.path().join("assets/x");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join(format!("url_sha256_{hash}.jpg")), b"invalid").unwrap();
+    let name = format!("url_sha256_{hash}.png");
+    std::fs::write(dir.join(&name), b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR").unwrap();
     assert_eq!(
-        archive::append(root.path(), &job.id, lease, 0, bytes).unwrap(),
-        bytes.len() as u64
-    );
-    assert_eq!(
-        archive::append(root.path(), &job.id, lease, 0, bytes).unwrap(),
-        bytes.len() as u64
-    );
-    let checksum = format!("{:x}", Sha256::digest(bytes));
-    let receipt =
-        archive::commit(root.path(), &job.id, lease, bytes.len() as u64, &checksum).unwrap();
-    assert_eq!(
-        receipt.name,
-        format!("url_sha256_{}.png", archive::hash_url(url).unwrap())
-    );
-    assert_eq!(
-        archive::commit(root.path(), &job.id, lease, bytes.len() as u64, &checksum)
+        archive::find_cache(root.path(), &hash)
+            .unwrap()
             .unwrap()
             .name,
-        receipt.name
+        name
     );
-    assert!(archive::pull(root.path()).unwrap().is_none());
-    assert_eq!(
-        archive::ensure_resource(root.path(), "456", &archive::hash_url(url).unwrap())
-            .unwrap()
-            .state,
-        "stored"
-    );
+    for id in ["123", "456"] {
+        let post = json!({ "data": { "id": id, "author": { "avatar": url } } });
+        archive::atomic_json(root.path(), &format!("assets/x/post-{id}.json"), &post).unwrap();
+        assert_eq!(archive::resource_url(root.path(), id, &hash).unwrap(), url);
+    }
 }
 
 #[test]
-fn rejects_unowned_resources_and_conflicting_revisions() {
+fn rejects_unowned_resources_and_unsafe_paths() {
     let root = tempfile::tempdir().unwrap();
-    let post = capture(root.path(), "123", "https://example.com/image.png");
-    assert!(!archive::write_post(root.path(), "123", None, &post).unwrap());
+    let post = json!({"data":{"id":"123", "author":{"avatar":"https://pbs.twimg.com/a.png"}}});
+    archive::atomic_json(root.path(), "assets/x/post-123.json", &post).unwrap();
     assert!(
-        archive::ensure_resource(
+        archive::resource_url(
             root.path(),
             "123",
-            &archive::hash_url("https://example.com/other.png").unwrap()
+            &archive::hash_url("https://pbs.twimg.com/b.png").unwrap()
         )
         .is_err()
     );
+    assert!(archive::read_post(root.path(), "../123").is_err());
+    assert!(archive::safe_path(root.path(), "../outside").is_err());
     let file = std::fs::read_to_string(root.path().join("assets/x/post-123.json")).unwrap();
     assert_eq!(file, serde_json::to_string(&post).unwrap());
 }
 
 #[test]
-fn invalid_complete_media_stays_terminal_after_restart() {
-    let root = tempfile::tempdir().unwrap();
-    capture(root.path(), "123", "https://example.com/not-media");
-    let job = archive::pull(root.path()).unwrap().unwrap();
-    let bytes = b"not a media file";
-    let lease = job.lease.as_deref().unwrap();
-    archive::append(root.path(), &job.id, lease, 0, bytes).unwrap();
-    let checksum = format!("{:x}", Sha256::digest(bytes));
-    assert!(archive::commit(root.path(), &job.id, lease, bytes.len() as u64, &checksum).is_err());
+fn includes_quote_media_and_excludes_hls_sources() {
+    let post = json!({"data": {"quote": {"media": [{"type":"video", "poster":"https://pbs.twimg.com/p.jpg", "sources":[
+        {"type":"video/mp4", "url":"https://video.twimg.com/v.mp4"},
+        {"type":"application/x-mpegURL", "url":"https://video.twimg.com/v.m3u8"}
+    ]}]}}});
     assert_eq!(
-        archive::status(root.path(), &job.id).unwrap().state,
-        "unsupported"
+        archive::media_urls(&post),
+        vec![
+            "https://pbs.twimg.com/p.jpg",
+            "https://video.twimg.com/v.mp4"
+        ]
     );
-    assert!(archive::pull(root.path()).unwrap().is_none());
-    assert!(
-        !root
-            .path()
-            .join(format!(".reflect/x-archive/transfers/{}.part", job.id))
-            .exists()
+}
+
+#[test]
+fn detects_video_bounds_from_bytes_without_trusting_content_type() {
+    assert_eq!(
+        archive::media_byte_limit(b"\0\0\0\x18ftypmp42"),
+        archive::VIDEO_MAX_BYTES
     );
+    let file = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(file.path(), b"\0\0\0\x18ftypmp42").unwrap();
+    file.as_file()
+        .set_len(archive::VIDEO_MAX_BYTES + 1)
+        .unwrap();
+    assert!(archive::sniff(file.path()).is_err());
 }

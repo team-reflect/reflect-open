@@ -49,7 +49,7 @@ export function BacklinkSnippet({
   return (
     <div className="reflect-backlink-snippet select-text text-xs text-text">
       <MarkdownView
-        {...xPost}
+        xPostHost={xPost}
         className="reflect-editor"
         markdown={text}
         expandCollapsed

@@ -1,4 +1,4 @@
-import { permalinkPostId } from '@/lib/x-capture'
+import { parseXPostId } from '@post-embed/schema'
 import { z } from 'zod'
 import { BookmarkControls } from './bookmark-controls'
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react'
@@ -86,7 +86,7 @@ export function CapturePopup(): ReactElement {
     }
     setSave({ phase: 'saving' })
     try {
-      const postId = permalinkPostId(captured.page.url)
+      const postId = parseXPostId(captured.page.url)
       if (postId) {
         const result = z.object({ ok: z.boolean(), message: z.string().optional() }).parse(
           await browser.runtime.sendMessage({

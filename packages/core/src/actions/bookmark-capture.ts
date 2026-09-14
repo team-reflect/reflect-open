@@ -11,10 +11,10 @@ const SECTION_TITLE = 'X bookmarks'
  */
 export function appendBookmark(source: string, envelope: BookmarkEnvelope): string {
   const parsed = parseNote({ path: '', source })
-  if (parsed.links.some((link) => getBookmarkPostId(link.href) === envelope.postId)) {
+  if (parsed.links.some((link) => getBookmarkPostId(link.href) === envelope.data.id)) {
     return source
   }
-  const line = `![](https://x.com/i/status/${envelope.postId})`
+  const line = `![](https://x.com/i/status/${envelope.data.id})`
   const headings = topLevelHeadings(parsed.headings)
   const heading = headings.find(
     (candidate) => candidate.level === 2 && candidate.text === SECTION_TITLE,

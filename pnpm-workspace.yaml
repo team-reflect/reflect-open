@@ -26,14 +26,13 @@ minimumReleaseAgeExclude:
   - prosemirror-flat-list
   - prosemirror-view
 
-# FIXME: pkg.pr.new overrides are a local testing hack; remove before merging (`blockExoticSubdeps`
-# too).
+# Development snapshots for the coordinated archive changes; replace with releases when publishing.
 blockExoticSubdeps: false
 overrides:
-  '@post-embed/types': https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66
-  '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@7bc1a3259420e2060f3183eec77557183abd7e66
-  '@post-embed/exporter': https://pkg.pr.new/@post-embed/exporter@7bc1a3259420e2060f3183eec77557183abd7e66
-  '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@7bc1a3259420e2060f3183eec77557183abd7e66
-  '@meowdown/core': https://pkg.pr.new/@meowdown/core@9dd89d2b472816ffe6f855fa6bcd90e9716b7c94
-  '@meowdown/react': https://pkg.pr.new/@meowdown/react@9dd89d2b472816ffe6f855fa6bcd90e9716b7c94
-  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@9dd89d2b472816ffe6f855fa6bcd90e9716b7c94
+  '@post-embed/types': https://pkg.pr.new/@post-embed/types@1f587bcdd6acd69bd876504a34a28e647603e206
+  '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@1f587bcdd6acd69bd876504a34a28e647603e206
+  '@post-embed/exporter': https://pkg.pr.new/@post-embed/exporter@1f587bcdd6acd69bd876504a34a28e647603e206
+  '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@1f587bcdd6acd69bd876504a34a28e647603e206
+  '@meowdown/core': https://pkg.pr.new/@meowdown/core@3657540e519e47fc2cf37ad40753a80e1e45b720
+  '@meowdown/react': https://pkg.pr.new/@meowdown/react@3657540e519e47fc2cf37ad40753a80e1e45b720
+  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@3657540e519e47fc2cf37ad40753a80e1e45b720

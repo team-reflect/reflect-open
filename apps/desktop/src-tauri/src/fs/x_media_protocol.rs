@@ -3,23 +3,9 @@ use reflect_x_archive as archive;
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
-use std::sync::{Arc, OnceLock};
-use std::time::{Duration, Instant};
 use tauri::http::{Request, Response, StatusCode};
 use tauri::{AppHandle, Manager, Runtime, UriSchemeResponder};
-use tokio::sync::Semaphore;
 
-// FIXME: two semaphores (128 waiters, 2 readers) on top of `spawn_blocking`, which is already a
-// bounded pool; drop both. HEAD support is unused: WebKit and Chromium media loaders issue GET with
-// Range.
-fn waiters() -> &'static Arc<Semaphore> {
-    static VALUE: OnceLock<Arc<Semaphore>> = OnceLock::new();
-    VALUE.get_or_init(|| Arc::new(Semaphore::new(128)))
-}
-fn readers() -> &'static Arc<Semaphore> {
-    static VALUE: OnceLock<Arc<Semaphore>> = OnceLock::new();
-    VALUE.get_or_init(|| Arc::new(Semaphore::new(2)))
-}
 fn error(status: StatusCode) -> Response<Cow<'static, [u8]>> {
     let mut builder = Response::builder()
         .status(status)
@@ -31,45 +17,17 @@ fn error(status: StatusCode) -> Response<Cow<'static, [u8]>> {
         .body(Cow::Borrowed(&[] as &[u8]))
         .expect("valid response")
 }
-// FIXME: ~40 lines of hand-rolled Range parsing; the `http-range-header` crate (or
-// `headers::Range`) does this, including suffix ranges and 416 semantics.
 fn range(header: Option<&str>, length: u64) -> Result<Option<(u64, u64)>, ()> {
     let Some(header) = header else {
         return Ok(None);
     };
-    let Some(value) = header.strip_prefix("bytes=") else {
-        return Ok(None);
-    };
-    if value.contains(',') {
+    let ranges = http_range_header::parse_range_header(header)
+        .and_then(|parsed| parsed.validate(length))
+        .map_err(|_| ())?;
+    if ranges.len() != 1 {
         return Ok(None);
     }
-    let Some((left, right)) = value.split_once('-') else {
-        return Ok(None);
-    };
-    if left.is_empty() {
-        let Ok(suffix) = right.parse::<u64>() else {
-            return Ok(None);
-        };
-        if suffix == 0 || length == 0 {
-            return Err(());
-        }
-        return Ok(Some((length.saturating_sub(suffix), length - 1)));
-    }
-    let Ok(start) = left.parse::<u64>() else {
-        return Ok(None);
-    };
-    let end = if right.is_empty() {
-        length.saturating_sub(1)
-    } else {
-        match right.parse::<u64>() {
-            Ok(end) => end,
-            Err(_) => return Ok(None),
-        }
-    };
-    if start >= length || end < start {
-        return Err(());
-    }
-    Ok(Some((start, end.min(length - 1))))
+    Ok(Some((*ranges[0].start(), *ranges[0].end())))
 }
 pub fn handle<R: Runtime>(
     app: AppHandle<R>,
@@ -99,48 +57,23 @@ async fn serve<R: Runtime>(
     if !archive::valid_id(&post) || !archive::valid_hash(&hash) {
         return error(StatusCode::BAD_REQUEST);
     }
-    let head = request.method() == "HEAD";
-    if request.method() != "GET" && !head {
+    if request.method() != "GET" {
         return error(StatusCode::METHOD_NOT_ALLOWED);
     }
-    let Ok(_waiter) = waiters().clone().try_acquire_owned() else {
-        return error(StatusCode::SERVICE_UNAVAILABLE);
+    let Ok(root) = super::root_for_generation(&app.state::<GraphState>(), generation) else {
+        return error(StatusCode::FORBIDDEN);
     };
-    // FIXME: this loop keeps the request pending for up to 30s, calling `ensure_resource` every
-    // 500ms, and each call locks and rewrites `state.json` with fsync (see crates/x-archive
-    // `with_state`). For a post with several pending images that is several state rewrites per
-    // second. With desktop-driven downloads (extension lib/x-download.ts FIXME) there is nothing to
-    // wait for: answer 404 immediately and let the host notify the card when the file lands.
-    // `root_for_generation` is also re-checked three times per request (here, before the read,
-    // after the read); once is enough because the path is resolved under that root.
-    let deadline = Instant::now() + Duration::from_secs(30);
-    let receipt = loop {
-        let Ok(root) = super::root_for_generation(&app.state::<GraphState>(), generation) else {
-            return error(StatusCode::FORBIDDEN);
-        };
-        let post = post.clone();
-        let hash = hash.clone();
-        let job = tauri::async_runtime::spawn_blocking(move || {
-            archive::ensure_resource(&root, &post, &hash)
-        })
-        .await;
-        match job {
-            Ok(Ok(job)) if job.state == "stored" => {
-                if let Some(receipt) = job.receipt {
-                    break receipt;
-                }
-            }
-            Ok(Ok(job)) if job.state == "unsupported" || job.state == "failed" => {
-                return error(StatusCode::UNPROCESSABLE_ENTITY)
-            }
-            Ok(Err(_)) => return error(StatusCode::NOT_FOUND),
-            Err(_) => return error(StatusCode::INTERNAL_SERVER_ERROR),
-            _ => {}
-        }
-        if Instant::now() >= deadline {
-            return error(StatusCode::SERVICE_UNAVAILABLE);
-        }
-        tokio::time::sleep(Duration::from_millis(500)).await;
+    let lookup_root = root.clone();
+    let source = tauri::async_runtime::spawn_blocking(move || {
+        archive::resource_url(&lookup_root, &post, &hash)
+    })
+    .await;
+    let Ok(Ok(source)) = source else {
+        return error(StatusCode::NOT_FOUND);
+    };
+    // Keep this request pending until the shared download publishes a complete file.
+    let Ok(receipt) = super::x_download::download(root.clone(), source).await else {
+        return error(StatusCode::BAD_GATEWAY);
     };
     let selected = match range(
         request
@@ -161,35 +94,19 @@ async fn serve<R: Runtime>(
     };
     let (start, end) = selected.unwrap_or((0, receipt.bytes - 1));
     let count = end - start + 1;
-    let permit = match tokio::time::timeout(
-        deadline.saturating_duration_since(Instant::now()),
-        readers().clone().acquire_owned(),
-    )
-    .await
-    {
-        Ok(Ok(permit)) => permit,
-        _ => return error(StatusCode::SERVICE_UNAVAILABLE),
-    };
-    let Ok(root) = super::root_for_generation(&app.state::<GraphState>(), generation) else {
-        return error(StatusCode::FORBIDDEN);
-    };
     let name = receipt.name.clone();
-    let body = if head {
-        Ok(Vec::new())
-    } else {
-        tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<Vec<u8>> {
-            let _permit = permit;
-            let path = archive::safe_path(&root, &format!("assets/x/{name}"))?;
-            let mut file = File::open(path)?;
-            anyhow::ensure!(file.metadata()?.len() == receipt.bytes, "file-changed");
-            file.seek(SeekFrom::Start(start))?;
-            let mut bytes = vec![0; count as usize];
-            file.read_exact(&mut bytes)?;
-            Ok(bytes)
-        })
-        .await
-        .unwrap_or_else(|error| Err(error.into()))
-    };
+    let body = tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<Vec<u8>> {
+        let path = archive::safe_path(&root, &format!("assets/x/{name}"))?;
+        let mut file = File::open(path)?;
+        anyhow::ensure!(file.metadata()?.len() == receipt.bytes, "file-changed");
+        file.seek(SeekFrom::Start(start))?;
+        let mut bytes = vec![0; count as usize];
+        file.read_exact(&mut bytes)?;
+        Ok(bytes)
+    })
+    .await
+    .unwrap_or_else(|error| Err(error.into()));
+    // Do not deliver a response from the previous graph after a graph switch.
     if super::root_for_generation(&app.state::<GraphState>(), generation).is_err() {
         return error(StatusCode::FORBIDDEN);
     }
@@ -209,4 +126,16 @@ async fn serve<R: Runtime>(
         );
     }
     builder.body(Cow::Owned(bytes)).expect("valid response")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::range;
+    #[test]
+    fn supports_video_ranges_and_rejects_unsatisfiable_ranges() {
+        assert_eq!(range(Some("bytes=2-4"), 10), Ok(Some((2, 4))));
+        assert_eq!(range(Some("bytes=-3"), 10), Ok(Some((7, 9))));
+        assert_eq!(range(Some("bytes=7-"), 10), Ok(Some((7, 9))));
+        assert!(range(Some("bytes=10-"), 10).is_err());
+    }
 }

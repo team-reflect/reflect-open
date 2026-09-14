@@ -438,7 +438,7 @@ export function NoteEditor({
   return (
     <>
       <MeowdownEditor
-        {...xPost}
+        xPostHost={xPost}
         handleRef={innerRef}
         mode={markMode}
         initialMarkdown={initialContent}

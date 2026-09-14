@@ -5,7 +5,6 @@ import { capturedPostSchema, type CaptureLookupResponse } from './x-capture-mess
 /** Look up one observed snapshot without crossing into privileged browser APIs. */
 export async function lookupCapturedPost(
   postId: string,
-  documentToken: string,
   currentUrl: () => string,
 ): Promise<CaptureLookupResponse> {
   const pageUrl = currentUrl()
@@ -15,12 +14,11 @@ export async function lookupCapturedPost(
       waitMs: 3000,
       timeoutMs: 2000,
     })
-    if (currentUrl() !== pageUrl) return { ok: false, reason: 'page-changed' }
     if (!entry) return { ok: false, reason: 'not-observed' }
     const parsed = capturedPostSchema.safeParse(entry.post)
     if (!parsed.success) return { ok: false, reason: 'invalid-snapshot' }
     if (parsed.data.id !== postId) return { ok: false, reason: 'wrong-post' }
-    return { ok: true, pageUrl, documentToken, post: parsed.data }
+    return { ok: true, pageUrl, post: parsed.data }
   } catch {
     return { ok: false, reason: 'lookup-failed' }
   }

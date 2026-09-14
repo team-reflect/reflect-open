@@ -1780,16 +1780,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs2"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
-dependencies = [
- "libc",
- "winapi",
-]
-
-[[package]]
 name = "fsevent-sys"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2412,6 +2402,12 @@ dependencies = [
  "http-body",
  "pin-project-lite",
 ]
+
+[[package]]
+name = "http-range-header"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9171a2ea8a68358193d15dd5d70c1c10a2afc3e7e4c5bc92bc9f025cebd7359c"
 
 [[package]]
 name = "httparse"
@@ -4812,10 +4808,8 @@ dependencies = [
 name = "reflect-capture-host"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "base64 0.23.1",
  "dirs",
- "fs2",
  "reflect-x-archive",
  "serde",
  "serde_json",
@@ -4867,6 +4861,7 @@ dependencies = [
  "anyhow",
  "base64 0.23.1",
  "block2",
+ "chrono",
  "core-foundation 0.10.1",
  "dirs",
  "dispatch2",
@@ -4874,6 +4869,7 @@ dependencies = [
  "file-id",
  "git2",
  "hf-hub 0.5.0",
+ "http-range-header",
  "image",
  "keyring",
  "notify",
@@ -4925,15 +4921,12 @@ name = "reflect-x-archive"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
- "fs2",
  "infer",
  "serde",
  "serde_json",
  "sha2 0.10.9",
  "tempfile",
  "url",
- "uuid",
 ]
 
 [[package]]

@@ -47,7 +47,7 @@ export async function classifyAssetFromNotes(
   if (candidates.length === 0) {
     return 'skip-unreferenced'
   }
-  const owners = assetPath.startsWith('assets/x/') ? await getXArchiveOwners(assetPath) : []
+  const owners = await getXArchiveOwners(assetPath)
   const references = [assetPath, ...owners]
   let publicRefs = 0
   for (const notePath of candidates) {

@@ -77,10 +77,9 @@ fn handle_message(payload: &[u8], pointer_path: &Path) -> Result<(), HostError> 
     let value: serde_json::Value = serde_json::from_slice(payload)
         .map_err(|_| HostError::InvalidPayload("Invalid capture JSON".into()))?;
     match value["envelope"].get("kind") {
-        // FIXME: dead arm now that bookmarks arrive as `op: capture.put`; fold into `Some(_)`. In
-        // `run` the payload is also parsed twice (once to sniff `op`, again in
-        // `x_archive::process`).
-        Some(kind) if kind == "x-bookmark" => return Err(HostError::UnsupportedVersion),
+        Some(kind) if kind == "x-bookmark" => {
+            return x_archive::spool(&value["envelope"], pointer_path)
+        }
         Some(_) => return Err(HostError::InvalidPayload("Unexpected capture kind".into())),
         None => {}
     }
@@ -98,14 +97,6 @@ pub fn run(
     pointer_path: &Path,
 ) -> std::io::Result<()> {
     while let Some(payload) = read_message(input)? {
-        if serde_json::from_slice::<serde_json::Value>(&payload)
-            .ok()
-            .is_some_and(|value| value.get("op").is_some())
-        {
-            let response = x_archive::handle(&payload, pointer_path);
-            write_message(output, &serde_json::to_vec(&response)?)?;
-            continue;
-        }
         let outcome = handle_message(&payload, pointer_path);
         if let Err(error) = &outcome {
             eprintln!("reflect-capture-host: {error:?}");
@@ -183,6 +174,43 @@ mod tests {
                 .unwrap();
         assert_eq!(spooled["screenshotRef"], format!("{id}.jpg"));
         assert_eq!(spooled["url"], "https://example.com/article");
+    }
+
+    #[test]
+    fn spools_post_data_without_downloading_media() {
+        let dir = tempfile::tempdir().unwrap();
+        let graph = dir.path().join("graph");
+        std::fs::create_dir_all(&graph).unwrap();
+        let pointer = dir.path().join("capture-pointer.json");
+        std::fs::write(
+            &pointer,
+            serde_json::json!({"version": 1, "graphRoot": graph}).to_string(),
+        )
+        .unwrap();
+        let envelope = serde_json::json!({
+            "version": 2, "kind": "x-bookmark", "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "source": "extension", "capturedAt": "2026-09-14T00:00:00Z",
+            "data": { "id": "123", "body": [{"type":"text", "text":"Saved post"}],
+                "author": { "avatar": "https://pbs.twimg.com/avatar.png" } }
+        });
+        let mut output = Vec::new();
+        run(
+            &mut Cursor::new(framed(&wire(envelope.clone(), None))),
+            &mut output,
+            &pointer,
+        )
+        .unwrap();
+        assert_eq!(
+            read_ack(&output),
+            serde_json::json!({"ok":true,"status":"queued"})
+        );
+        let saved: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(graph.join(".reflect/inbox/7c9e6679-7425-40de-944b-e07fc1f90ae7.json"))
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(saved, envelope);
+        assert!(!graph.join("assets").exists());
     }
 
     #[test]

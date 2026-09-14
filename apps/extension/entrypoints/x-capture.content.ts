@@ -7,7 +7,6 @@ export default defineContentScript({
   matches: ['https://x.com/*'],
   runAt: 'document_start',
   main(ctx) {
-    const documentToken = crypto.randomUUID()
     const listener: Parameters<typeof browser.runtime.onMessage.addListener>[0] = (
       message,
       sender,
@@ -16,11 +15,9 @@ export default defineContentScript({
       if (ctx.isInvalid || sender.id !== browser.runtime.id || sender.tab != null) return false
       const request = captureLookupRequestSchema.safeParse(message)
       if (!request.success) return false
-      void lookupCapturedPost(request.data.postId, documentToken, () => location.href).then(
-        (response) => {
-          if (ctx.isValid) sendResponse(response)
-        },
-      )
+      void lookupCapturedPost(request.data.postId, () => location.href).then((response) => {
+        if (ctx.isValid) sendResponse(response)
+      })
       return true
     }
     browser.runtime.onMessage.addListener(listener)

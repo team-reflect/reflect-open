@@ -2,52 +2,96 @@ use super::GraphState;
 use crate::error::{AppError, AppResult};
 use reflect_x_archive as archive;
 use serde_json::{json, Value};
-use tauri::{Manager, State};
+use std::path::PathBuf;
+use tauri::{Emitter, Manager, State};
+
+// Serialize archive replacement with the app's Git checkout/merge.
+pub(crate) static ARCHIVE_WRITE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+async fn blocking<T: Send + 'static>(
+    root: PathBuf,
+    action: impl FnOnce(PathBuf) -> anyhow::Result<T> + Send + 'static,
+) -> AppResult<T> {
+    tauri::async_runtime::spawn_blocking(move || action(root))
+        .await
+        .map_err(|error| AppError::io(error.to_string()))?
+        .map_err(|error| AppError::io(error.to_string()))
+}
+
+fn download_media<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    root: PathBuf,
+    generation: u64,
+    post: &Value,
+) {
+    for url in archive::media_urls(post) {
+        let app = app.clone();
+        let root = root.clone();
+        tauri::async_runtime::spawn(async move {
+            match super::x_download::download(root, url).await {
+                Ok(receipt) => {
+                    if super::root_for_generation(&app.state::<GraphState>(), generation).is_ok() {
+                        let _ = app.emit("index:changed", json!([{ "path": format!("assets/x/{}", receipt.name), "kind": "upsert" }]));
+                    }
+                }
+                Err(error) => eprintln!("X media download failed: {error}"),
+            }
+        });
+    }
+}
 
 #[tauri::command]
-// FIXME: five commands with the same `spawn_blocking(...).await.map_err(...)?.map_err(...)`
-// boilerplate; one `blocking<T>(root, f)` helper.
 pub async fn x_archive_read(
     state: State<'_, GraphState>,
     generation: u64,
     post_id: String,
 ) -> AppResult<Option<Value>> {
-    let root = super::root_for_generation(&state, generation)?;
-    tauri::async_runtime::spawn_blocking(move || {
-        archive::read_post(&root, &post_id).map_err(|error| AppError::io(error.to_string()))
-    })
+    blocking(
+        super::root_for_generation(&state, generation)?,
+        move |root| archive::read_post(&root, &post_id),
+    )
     .await
-    .map_err(|error| AppError::io(error.to_string()))?
 }
+
 #[tauri::command]
-pub async fn x_archive_write(
-    state: State<'_, GraphState>,
+pub async fn x_archive_write<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     generation: u64,
-    post_id: String,
-    expected: Option<String>,
     value: Value,
-) -> AppResult<bool> {
-    let root = super::root_for_generation(&state, generation)?;
-    tauri::async_runtime::spawn_blocking(move || {
-        archive::write_post(&root, &post_id, expected.as_deref(), &value)
-            .map_err(|error| AppError::io(error.to_string()))
-    })
-    .await
-    .map_err(|error| AppError::io(error.to_string()))?
-}
-#[tauri::command]
-pub async fn x_archive_processed(
-    state: State<'_, GraphState>,
-    generation: u64,
-    event: String,
 ) -> AppResult<()> {
-    let root = super::root_for_generation(&state, generation)?;
-    tauri::async_runtime::spawn_blocking(move || {
-        archive::mark_processed(&root, &event).map_err(|error| AppError::io(error.to_string()))
+    let root = super::root_for_generation(&app.state::<GraphState>(), generation)?;
+    let saved = value;
+    let saved = blocking(root.clone(), move |root| {
+        let id = saved["data"]["id"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("invalid-post"))?;
+        anyhow::ensure!(archive::valid_id(id), "invalid-post-id");
+        let _guard = ARCHIVE_WRITE_LOCK
+            .lock()
+            .map_err(|_| anyhow::anyhow!("archive-lock"))?;
+        if let Some(previous) = archive::read_post(&root, id)? {
+            let timestamp =
+                |post: &Value| -> anyhow::Result<chrono::DateTime<chrono::FixedOffset>> {
+                    Ok(chrono::DateTime::parse_from_rfc3339(
+                        post["capturedAt"]
+                            .as_str()
+                            .ok_or_else(|| anyhow::anyhow!("invalid-captured-at"))?,
+                    )?)
+                };
+            if timestamp(&previous)? > timestamp(&saved)?
+                || (previous["data"]["truncated"] != true && saved["data"]["truncated"] == true)
+            {
+                return Ok(previous);
+            }
+        }
+        archive::atomic_json(&root, &format!("assets/x/post-{id}.json"), &saved)?;
+        Ok(saved)
     })
-    .await
-    .map_err(|error| AppError::io(error.to_string()))?
+    .await?;
+    download_media(app, root, generation, &saved);
+    Ok(())
 }
+
 #[tauri::command]
 pub async fn x_archive_resolve<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
@@ -55,34 +99,25 @@ pub async fn x_archive_resolve<R: tauri::Runtime>(
     post_id: String,
 ) -> AppResult<Option<Value>> {
     let root = super::root_for_generation(&app.state::<GraphState>(), generation)?;
-    let value = tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<Option<Value>> {
-        let Some(post) = archive::read_post(&root, &post_id)? else {
-            return Ok(None);
-        };
-        let mut resources = Vec::new();
-        for resource in post["resources"]
-            .as_array()
-            .ok_or_else(|| anyhow::anyhow!("invalid-resources"))?
-        {
-            let url = resource["url"]
-                .as_str()
-                .ok_or_else(|| anyhow::anyhow!("invalid-url"))?;
-            let hash = archive::hash_url(url)?;
-            // FIXME: a read-only resolve rewrites `state.json` (lock + serialize + fsync + dir
-            // fsync) once per resource, and `XPostHost` calls this every 2s per subscribed post.
-            // Resolving must not write. The trailing `root_for_generation` re-check after the
-            // blocking read below is redundant too.
-            let job = archive::ensure_resource(&root, &post_id, &hash)?;
-            resources.push(json!({"url":url,"hash":hash,"state":job.state,
-                "error":job.resource.error,"bytes":job.receipt.map(|receipt| receipt.bytes)}));
-        }
-        Ok(Some(json!({"archive":post,"resources":resources})))
+    let post = blocking(root.clone(), move |root| {
+        archive::read_post(&root, &post_id)
     })
-    .await
-    .map_err(|error| AppError::io(error.to_string()))?
-    .map_err(|error| AppError::io(error.to_string()))?;
-    super::root_for_generation(&app.state::<GraphState>(), generation)?;
-    Ok(value)
+    .await?;
+    let Some(post) = post else {
+        return Ok(None);
+    };
+    let resources: Vec<_> = archive::media_urls(&post)
+        .iter()
+        .filter_map(|url| {
+            archive::hash_url(url)
+                .ok()
+                .map(|hash| json!({"url": url, "hash": hash}))
+        })
+        .collect();
+    // Archives synced from another device also resume missing downloads when opened.
+    // Resolution has no durable job state and never rewrites the post JSON.
+    download_media(app, root, generation, &post);
+    Ok(Some(json!({"archive": post, "resources": resources})))
 }
 
 #[tauri::command]
@@ -90,8 +125,7 @@ pub async fn x_archive_owners(
     state: State<'_, GraphState>,
     asset_path: String,
 ) -> AppResult<Vec<String>> {
-    let root = super::current_root(&state)?;
-    tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<Vec<String>> {
+    blocking(super::current_root(&state)?, move |root| {
         if !asset_path.starts_with("assets/x/") {
             return Ok(vec![]);
         }
@@ -100,11 +134,8 @@ pub async fn x_archive_owners(
         if !directory.is_dir() {
             return Ok(owners);
         }
-        // FIXME: to find the owners of one media file this reads and parses every post JSON under
-        // assets/x and SHA-256s every URL in each of them. `state.json` jobs are keyed
-        // `url_sha256_<hash>` and already carry `post_ids`; look the job up by the file's stem
-        // instead. (The `assets/x/` prefix is checked here, in `asset-refs.ts` and in
-        // `asset-privacy.ts`: once is enough.)
+        // The synced JSON is authoritative. Device-local download state would miss
+        // owners captured on another device and break private-note classification.
         for entry in std::fs::read_dir(directory)? {
             let entry = entry?;
             let Some(name) = entry.file_name().to_str().map(str::to_string) else {
@@ -122,28 +153,20 @@ pub async fn x_archive_owners(
             let Some(post) = archive::read_post(&root, id)? else {
                 continue;
             };
-            let Some(resources) = post["resources"].as_array() else {
-                continue;
-            };
-            let owns = resources.iter().any(|resource| {
-                let Some(url) = resource["url"].as_str() else {
-                    return false;
-                };
-                let Ok(hash) = archive::hash_url(url) else {
-                    return false;
-                };
-                archive::get_candidate_names(&hash)
-                    .unwrap_or_default()
-                    .iter()
-                    .any(|name| format!("assets/x/{name}") == asset_path)
-            });
-            if owns {
+            if archive::media_urls(&post).iter().any(|url| {
+                archive::hash_url(url)
+                    .ok()
+                    .and_then(|hash| archive::get_candidate_names(&hash).ok())
+                    .is_some_and(|names| {
+                        names
+                            .iter()
+                            .any(|name| format!("assets/x/{name}") == asset_path)
+                    })
+            }) {
                 owners.push(format!("assets/x/{name}"));
             }
         }
         Ok(owners)
     })
     .await
-    .map_err(|error| AppError::io(error.to_string()))?
-    .map_err(|error| AppError::io(error.to_string()))
 }

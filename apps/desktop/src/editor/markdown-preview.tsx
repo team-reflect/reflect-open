@@ -74,7 +74,7 @@ export function MarkdownPreview({
 
   return (
     <MarkdownView
-      {...xPost}
+      xPostHost={xPost}
       markdown={content}
       markMode="hide"
       interactive={interactive}

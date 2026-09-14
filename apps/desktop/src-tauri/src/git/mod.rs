@@ -197,7 +197,13 @@ pub async fn git_merge_remote(
     state: State<'_, GraphState>,
 ) -> AppResult<MergeOutcome> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    let outcome = run_blocking(move || merge::merge_remote(&root)).await;
+    let outcome = run_blocking(move || {
+        let _archive_guard = crate::fs::x_archive::ARCHIVE_WRITE_LOCK
+            .lock()
+            .map_err(|_| crate::error::AppError::io("archive-lock"))?;
+        merge::merge_remote(&root)
+    })
+    .await;
     // Invalidate on both arms: a failed merge can still have moved the tree
     // partway through checkout, and a stale catalog would pin the old view.
     let root = crate::fs::root_for_generation(&state, generation)?;

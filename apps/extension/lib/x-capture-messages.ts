@@ -1,20 +1,9 @@
-import { XPostSchema } from '@post-embed/schema'
-import { safeParse } from 'valibot'
+import { xPostSchema } from '@reflect/core/x-archive'
+import { postIdSchema } from '@reflect/core/capture-envelope'
 import { z } from 'zod'
 
-// FIXME: duplicate of `postIdSchema` in `@reflect/core/capture-envelope`. And the
-// `postIdSchema.safeParse(parsed.output.id)` below is redundant: `XPostSchema` already enforces the
-// same regex on `id`.
-export const postIdSchema = z.string().regex(/^[1-9]\d{0,19}$/)
-
-export const capturedPostSchema = z.unknown().transform((input, context) => {
-  const parsed = safeParse(XPostSchema, input)
-  if (!parsed.success || !postIdSchema.safeParse(parsed.output.id).success) {
-    context.addIssue({ code: 'custom', message: 'invalid-snapshot' })
-    return z.NEVER
-  }
-  return parsed.output
-})
+export { postIdSchema }
+export const capturedPostSchema = xPostSchema
 
 export type CapturedPost = z.output<typeof capturedPostSchema>
 
@@ -28,7 +17,6 @@ export const captureLookupResponseSchema = z.discriminatedUnion('ok', [
   z.object({
     ok: z.literal(true),
     pageUrl: z.url(),
-    documentToken: z.uuid(),
     post: capturedPostSchema,
   }),
   failureSchema,

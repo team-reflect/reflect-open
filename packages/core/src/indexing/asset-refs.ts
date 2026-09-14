@@ -26,9 +26,7 @@ export function assetReferenceMatches(reference: string, assetPath: string): boo
  * candidate's live markdown.
  */
 export async function assetReferencingNotePaths(assetPath: string): Promise<string[]> {
-  // FIXME: same `assets/x/` gate as asset-privacy.ts and the Rust command; and see extract.ts for
-  // the two-hop ownership walk.
-  const owners = assetPath.startsWith('assets/x/') ? await getXArchiveOwners(assetPath) : []
+  const owners = await getXArchiveOwners(assetPath)
   const basename = assetPath.split('/').at(-1) ?? assetPath
   const rows = await db
     .selectFrom('assets')

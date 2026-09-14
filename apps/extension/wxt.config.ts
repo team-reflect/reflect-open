@@ -47,9 +47,7 @@ export default defineConfig({
       'alarms',
       'webRequest',
     ],
-    // FIXME: the twimg permissions are only needed if the extension downloads media; see
-    // lib/x-download.ts.
-    host_permissions: ['https://x.com/*', 'https://pbs.twimg.com/*', 'https://video.twimg.com/*'],
+    host_permissions: ['https://x.com/*'],
     commands: {
       [SAVE_CURRENT_PAGE_COMMAND]: {
         suggested_key: { default: 'Ctrl+Shift+K', mac: 'Command+Shift+K' },

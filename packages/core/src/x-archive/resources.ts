@@ -1,96 +1,26 @@
-import { getXPostMediaUrls, type XPost, type XPostBase } from '@post-embed/types'
-import { isValidUrl } from './schema'
-import type { ArchiveResource, ArchivedXPost } from './types'
+import type { XPost, XPostBase } from '@post-embed/types'
+import type { ArchivedXPost } from './types'
 
-export function createArchivedPost(
-  post: XPost,
-  capturedAt: string,
-  revision: string,
-): ArchivedXPost {
-  const resources = new Map<string, ArchiveResource>()
-  function add(resource: ArchiveResource) {
-    resources.set(resource.url, resource)
-  }
+/** Capture one progressive MP4 per video; HLS is not archived. */
+export function createArchivedPost(post: XPost, capturedAt: string): ArchivedXPost {
   function select(entry: XPostBase): XPostBase {
     return {
       ...entry,
-      ...(entry.media
-        ? {
-            media: entry.media.map((media) => {
-              if (media.unavailable) {
-                if (media.type === 'photo' && isValidUrl(media.url)) {
-                  add({ url: media.url, state: 'failed', error: 'source-missing' })
-                }
-                if (media.type !== 'photo') {
-                  for (const source of media.sources)
-                    if (isValidUrl(source.url)) {
-                      add({ url: source.url, state: 'failed', error: 'source-missing' })
-                    }
-                }
-                return media.type === 'photo' ? media : { ...media, sources: [] }
-              }
-              if (media.type === 'photo') return media
-              const mp4 = media.sources
-                .filter((source) => source.type === 'video/mp4' && isValidUrl(source.url))
-                .sort(
-                  (left, right) =>
-                    (right.bitrate ?? 0) - (left.bitrate ?? 0) || left.url.localeCompare(right.url),
-                )[0]
-              if (!mp4) {
-                for (const source of media.sources) {
-                  if (source.type === 'application/x-mpegURL' && isValidUrl(source.url)) {
-                    add({ url: source.url, state: 'unsupported', error: 'unsupported-hls' })
-                  }
-                }
-              }
-              return { ...media, sources: mp4 ? [mp4] : [] }
-            }),
-          }
-        : {}),
+      media: entry.media?.map((media) => {
+        if (media.type === 'photo') return media
+        const source = media.sources
+          .filter((source) => source.type === 'video/mp4')
+          .sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0) || a.url.localeCompare(b.url))[0]
+        return { ...media, sources: source ? [source] : [] }
+      }),
     }
-  }
-  const data = {
-    ...post,
-    ...select(post),
-    ...(post.quote ? { quote: select(post.quote) } : {}),
-  }
-  for (const url of getXPostMediaUrls(data)) {
-    if (!resources.has(url)) add({ url, state: 'pending' })
   }
   return {
     kind: 'x-post',
-    id: data.id,
-    revision,
     capturedAt,
-    textState: data.truncated ? 'partial' : 'complete',
-    data,
-    resources: [...resources.values()],
-  }
-}
-// FIXME: the branch preserving `state: 'stored'` from `previous.resources` is dead: nothing ever
-// writes `stored` into a post JSON (only `state.json` jobs move to stored, and `write_post` is only
-// called from `saveArchivedPost` with capture-time states). `textState: 'unknown'` is never
-// produced either. `parseArchivedPost` already requires `resources` to match
-// `getXPostMediaUrls(data)` 1:1, so the list is derivable; keep in the JSON only the capture-time
-// exceptions (`unsupported-hls`, `source-missing`) or nothing, and delete this merge.
-export function mergeArchivedPost(
-  previous: ArchivedXPost | undefined,
-  incoming: ArchivedXPost,
-): ArchivedXPost {
-  if (!previous) return incoming
-  if (previous.revision === incoming.revision) return previous
-  if (previous.capturedAt > incoming.capturedAt) return previous
-  if (previous.textState === 'complete' && incoming.textState !== 'complete') return previous
-  const saved = new Map(previous.resources.map((resource) => [resource.url, resource]))
-  return {
-    ...previous,
-    ...incoming,
-    resources: incoming.resources.map((resource) => {
-      const old = saved.get(resource.url)
-      if (old?.state !== 'stored') return resource
-      const clean = { ...old, ...resource, state: 'stored' as const }
-      delete clean.error
-      return clean
-    }),
+    data: {
+      ...select(post),
+      ...(post.quote ? { quote: select(post.quote) } : {}),
+    },
   }
 }
