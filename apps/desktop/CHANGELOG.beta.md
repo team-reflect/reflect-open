@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.6...v0.12.0-beta.7) (2026-09-14)
+
+
+### Bug Fixes
+
+* update post-embed and meowdown ([#1289](https://github.com/team-reflect/reflect-open/issues/1289)) ([5e7b4cc](https://github.com/team-reflect/reflect-open/commit/5e7b4ccf9422cfc2ddc523eeb72ec13550a4ae7b))
+
 ## [0.12.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.5...v0.12.0-beta.6) (2026-09-14)
 
 
