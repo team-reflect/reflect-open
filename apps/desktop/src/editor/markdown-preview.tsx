@@ -1,4 +1,4 @@
-import { useXPostResolver } from '@/editor/use-x-post-resolver'
+import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver'
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
 import { useOpenExternalLink } from '@/editor/open-external-link'
@@ -48,7 +48,7 @@ export function MarkdownPreview({
   // The resolver and click handler are read through refs so a changing prop
   // never gives MarkdownView a new callback identity (which would re-render its
   // whole tree).
-  const xPost = useXPostResolver()
+  const resolveXPost = useXPostResolver()
   const resolveRef = useRef(resolveImageUrl)
   const navigateRef = useRef(onWikiLinkClick)
   useEffect(() => {
@@ -74,7 +74,8 @@ export function MarkdownPreview({
 
   return (
     <MarkdownView
-      xPostHost={xPost}
+      resolveXPost={resolveXPost}
+      mediaUrlProtocols={X_MEDIA_URL_PROTOCOLS}
       markdown={content}
       markMode="hide"
       interactive={interactive}

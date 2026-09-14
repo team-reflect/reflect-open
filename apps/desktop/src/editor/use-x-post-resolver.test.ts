@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { resolveArchivedPost } from '@reflect/core/x-archive'
-import { getXPostResolverHost, XPostResolverHost } from './use-x-post-resolver'
+import { getXPostResolver, createXPostResolver } from './use-x-post-resolver'
 
 vi.mock('@reflect/core/x-archive', () => ({ resolveArchivedPost: vi.fn() }))
 vi.mock('@tauri-apps/api/core', () => ({
@@ -39,8 +39,8 @@ it('rewrites media URLs while retaining URLs without a local mapping', async () 
     { type: 'photo', url: 'https://pbs.twimg.com/unmapped.png', width: 100, height: 100 },
   ]
   vi.mocked(resolveArchivedPost).mockResolvedValue(result)
-  const host = new XPostResolverHost(7)
-  const post = await host.resolve('https://x.com/jack/status/123')
+  const resolveXPost = createXPostResolver(7)
+  const post = await resolveXPost('https://x.com/jack/status/123')
   expect(post?.author.avatar).toBe(`reflect-asset://7/x-media/123/${'a'.repeat(64)}`)
   expect(post?.media?.[0]).toEqual({
     type: 'photo',
@@ -52,34 +52,34 @@ it('rewrites media URLs while retaining URLs without a local mapping', async () 
 
 it('does not cache missing or previously read archives', async () => {
   const resolve = vi.mocked(resolveArchivedPost).mockResolvedValueOnce(null)
-  const host = new XPostResolverHost(7)
+  const resolveXPost = createXPostResolver(7)
   const url = 'https://x.com/jack/status/123'
-  expect(await host.resolve(url)).toBeUndefined()
+  expect(await resolveXPost(url)).toBeUndefined()
   resolve.mockResolvedValueOnce(archivedPost())
-  expect((await host.resolve(url))?.id).toBe('123')
+  expect((await resolveXPost(url))?.id).toBe('123')
   resolve.mockResolvedValueOnce(null)
-  expect(await host.resolve(url)).toBeUndefined()
+  expect(await resolveXPost(url)).toBeUndefined()
   expect(resolve).toHaveBeenCalledTimes(3)
 })
 
 it('ignores non-X URLs and a missing graph', async () => {
-  expect(await new XPostResolverHost(7).resolve('https://example.com')).toBeUndefined()
-  expect(await new XPostResolverHost(null).resolve('https://x.com/jack/status/123')).toBeUndefined()
+  expect(await createXPostResolver(7)('https://example.com')).toBeUndefined()
+  expect(await createXPostResolver(null)('https://x.com/jack/status/123')).toBeUndefined()
   expect(resolveArchivedPost).not.toHaveBeenCalled()
 })
 
 it('shares pending reads for different URLs of the same post', async () => {
   vi.mocked(resolveArchivedPost).mockResolvedValue(archivedPost())
-  const host = new XPostResolverHost(7)
-  const first = host.resolve('https://x.com/jack/status/123')
-  const second = host.resolve('https://twitter.com/jack/status/123')
+  const resolveXPost = createXPostResolver(7)
+  const first = resolveXPost('https://x.com/jack/status/123')
+  const second = resolveXPost('https://twitter.com/jack/status/123')
   expect(first).toBe(second)
   await first
   expect(resolveArchivedPost).toHaveBeenCalledExactlyOnceWith(7, '123')
 })
 
-it('shares a host within a graph and isolates another graph', () => {
+it('shares a resolver within a graph and isolates another graph', () => {
   const graph = { root: '/graph', name: 'Graph', generation: 7 }
-  expect(getXPostResolverHost(graph)).toBe(getXPostResolverHost(graph))
-  expect(getXPostResolverHost({ ...graph, generation: 8 })).not.toBe(getXPostResolverHost(graph))
+  expect(getXPostResolver(graph)).toBe(getXPostResolver(graph))
+  expect(getXPostResolver({ ...graph, generation: 8 })).not.toBe(getXPostResolver(graph))
 })

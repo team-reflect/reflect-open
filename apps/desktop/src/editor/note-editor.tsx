@@ -1,4 +1,4 @@
-import { useXPostResolver } from '@/editor/use-x-post-resolver'
+import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver'
 import {
   useCallback,
   useImperativeHandle,
@@ -263,7 +263,7 @@ export function NoteEditor({
   onSearchChange,
   handleRef,
 }: NoteEditorProps): ReactElement {
-  const xPost = useXPostResolver()
+  const resolveXPost = useXPostResolver()
   const innerRef = useRef<EditorHandle>(null)
   const followDeepLink = useFollowDeepLink()
 
@@ -438,7 +438,8 @@ export function NoteEditor({
   return (
     <>
       <MeowdownEditor
-        xPostHost={xPost}
+        resolveXPost={resolveXPost}
+        mediaUrlProtocols={X_MEDIA_URL_PROTOCOLS}
         handleRef={innerRef}
         mode={markMode}
         initialMarkdown={initialContent}

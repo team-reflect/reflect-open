@@ -26,13 +26,9 @@ minimumReleaseAgeExclude:
   - prosemirror-flat-list
   - prosemirror-view
 
-# Development snapshots for the coordinated archive changes; replace with releases when publishing.
+# Development snapshots for meowdown; replace with releases when publishing.
 blockExoticSubdeps: false
 overrides:
-  '@post-embed/types': https://pkg.pr.new/@post-embed/types@6d2125d2b99494dc02e98eaf0878f765e62bd2a2
-  '@post-embed/schema': https://pkg.pr.new/@post-embed/schema@6d2125d2b99494dc02e98eaf0878f765e62bd2a2
-  '@post-embed/exporter': https://pkg.pr.new/@post-embed/exporter@6d2125d2b99494dc02e98eaf0878f765e62bd2a2
-  '@post-embed/elements': https://pkg.pr.new/@post-embed/elements@6d2125d2b99494dc02e98eaf0878f765e62bd2a2
-  '@meowdown/core': https://pkg.pr.new/@meowdown/core@cab87b5e925dde80cce8edda8ecbb45bdca0d53c
-  '@meowdown/react': https://pkg.pr.new/@meowdown/react@cab87b5e925dde80cce8edda8ecbb45bdca0d53c
-  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@cab87b5e925dde80cce8edda8ecbb45bdca0d53c
+  '@meowdown/core': https://pkg.pr.new/@meowdown/core@40394531dba670677f8dff8231d6550fdcfa36c5
+  '@meowdown/react': https://pkg.pr.new/@meowdown/react@40394531dba670677f8dff8231d6550fdcfa36c5
+  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@40394531dba670677f8dff8231d6550fdcfa36c5
