@@ -41,6 +41,7 @@ function holdMessage(result: FlushResult): string {
 
 export function CapturePopup(): ReactElement {
   const captured = useCapturedPage()
+  const postId = captured.status === 'ready' ? parseXPostId(captured.page.url) : undefined
   const [note, setNote] = useState('')
   const [includePageText, setIncludePageText] = useState(false)
   const includePageTextTouched = useRef(false)
@@ -79,14 +80,13 @@ export function CapturePopup(): ReactElement {
     event.preventDefault()
     if (
       captured.status !== 'ready' ||
-      !includePageTextPreferenceLoaded ||
+      (!postId && !includePageTextPreferenceLoaded) ||
       save.phase === 'saving'
     ) {
       return
     }
     setSave({ phase: 'saving' })
     try {
-      const postId = parseXPostId(captured.page.url)
       if (postId) {
         const result = z.object({ ok: z.boolean(), message: z.string().optional() }).parse(
           await browser.runtime.sendMessage({
@@ -150,7 +150,7 @@ export function CapturePopup(): ReactElement {
 
   const { page } = captured
   const host = new URL(page.url).host
-  const busy = save.phase === 'saving' || !includePageTextPreferenceLoaded
+  const busy = save.phase === 'saving' || (!postId && !includePageTextPreferenceLoaded)
 
   function onIncludePageTextChange(checked: boolean): void {
     includePageTextTouched.current = true
@@ -181,25 +181,29 @@ export function CapturePopup(): ReactElement {
             {page.selection}
           </blockquote>
         ) : null}
-        <input
-          type="text"
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          placeholder="Add a note (optional)"
-          autoFocus
-          disabled={busy}
-          className="rounded-md border border-border bg-input-bg px-2 py-1.5 text-sm text-text outline-none placeholder:text-text-muted focus:ring-2 focus:ring-focus-ring"
-        />
-        <label className="flex items-center gap-2 text-xs text-text-secondary">
-          <input
-            type="checkbox"
-            checked={includePageText}
-            onChange={(event) => onIncludePageTextChange(event.target.checked)}
-            disabled={busy}
-            className="size-3.5 rounded border-border text-accent focus:ring-focus-ring"
-          />
-          Capture page text
-        </label>
+        {!postId ? (
+          <>
+            <input
+              type="text"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="Add a note (optional)"
+              autoFocus
+              disabled={busy}
+              className="rounded-md border border-border bg-input-bg px-2 py-1.5 text-sm text-text outline-none placeholder:text-text-muted focus:ring-2 focus:ring-focus-ring"
+            />
+            <label className="flex items-center gap-2 text-xs text-text-secondary">
+              <input
+                type="checkbox"
+                checked={includePageText}
+                onChange={(event) => onIncludePageTextChange(event.target.checked)}
+                disabled={busy}
+                className="size-3.5 rounded border-border text-accent focus:ring-focus-ring"
+              />
+              Capture page text
+            </label>
+          </>
+        ) : null}
         <button
           type="submit"
           disabled={busy}
