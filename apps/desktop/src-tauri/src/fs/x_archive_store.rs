@@ -178,7 +178,7 @@ enum MediaView {
     Photo { url: String },
     #[serde(rename = "video", alias = "gif")]
     Video {
-        poster: String,
+        poster: Option<String>,
         #[serde(default)]
         sources: Vec<SourceView>,
     },
@@ -218,7 +218,9 @@ pub fn media_urls(post: &Value) -> Result<Vec<String>> {
                     urls.insert(url.clone());
                 }
                 MediaView::Video { poster, sources } => {
-                    urls.insert(poster.clone());
+                    if let Some(poster) = poster {
+                        urls.insert(poster.clone());
+                    }
                     urls.extend(
                         sources
                             .iter()
@@ -380,5 +382,13 @@ mod tests {
             resource_url(root.path(), "123", &"a".repeat(64)),
             Err(AppError::NotFound { .. })
         ));
+    }
+    #[test]
+    fn video_without_optional_poster_still_has_a_downloadable_source() {
+        let post = json!({"data":{"id":"123","media":[{"type":"video","sources":[{"type":"video/mp4","url":"https://video.twimg.com/v.mp4"}]}]}});
+        assert_eq!(
+            media_urls(&post).unwrap(),
+            vec!["https://video.twimg.com/v.mp4"]
+        );
     }
 }

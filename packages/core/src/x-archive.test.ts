@@ -69,5 +69,5 @@ it('validates captured posts through the synchronous Standard Schema contract', 
     body: [{ type: 'text', text: 'Saved text' }],
   }
   expect(xPostSchema.parse(post)).toEqual(post)
-  expect(xPostSchema.safeParse({ ...post, body: 42 }).success).toBe(false)
+  expect(xPostSchema.safeParse({ ...post, id: 'invalid' }).success).toBe(false)
 })
