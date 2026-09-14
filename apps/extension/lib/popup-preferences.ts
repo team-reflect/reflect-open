@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { browser } from 'wxt/browser'
 
-const INCLUDE_PAGE_TEXT_KEY = 'preference:includePageText'
+export const INCLUDE_PAGE_TEXT_KEY = 'preference:includePageText'
 
 const popupPreferencesSchema = z.object({
   [INCLUDE_PAGE_TEXT_KEY]: z.boolean().optional(),

@@ -71,7 +71,7 @@ disk at call time), and it is covered by tests.
   you tick "Capture page text", the page's extracted text. When you bookmark a post
   on X, the background worker observes the bookmark request on x.com and saves the
   post identifier/link locally. X bookmark capture is enabled by default and can be
-  disabled in the extension popup. Unrelated browsing content is not captured.
+  turned off in the extension's options page. Unrelated browsing content is not captured.
 - **When:** when you capture a page or bookmark on X with bookmark capture enabled. If the desktop app isn't reachable yet, the capture is
   held in the browser's local extension storage and retried automatically until it
   spools — it is never sent anywhere else in the meantime.
