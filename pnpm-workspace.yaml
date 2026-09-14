@@ -26,11 +26,9 @@ minimumReleaseAgeExclude:
   - prosemirror-flat-list
   - prosemirror-view
 
-# Development snapshots for meowdown; replace with releases when publishing.
-blockExoticSubdeps: false
-overrides:
-  '@meowdown/core': https://pkg.pr.new/@meowdown/core@346867e5f1b5336c889e829b146a04fcc0c115c1
-  '@meowdown/react': https://pkg.pr.new/@meowdown/react@346867e5f1b5336c889e829b146a04fcc0c115c1
-  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@346867e5f1b5336c889e829b146a04fcc0c115c1
-
-FIXME: the latest version of meowdown is being published to npm. Update the overrides above by commenting them out and update package.json
+# Keep these commented examples for future pkg.pr.new testing; do not remove them.
+# blockExoticSubdeps: false
+# overrides:
+#   '@meowdown/core': https://pkg.pr.new/@meowdown/core@346867e5f1b5336c889e829b146a04fcc0c115c1
+#   '@meowdown/react': https://pkg.pr.new/@meowdown/react@346867e5f1b5336c889e829b146a04fcc0c115c1
+#   '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@346867e5f1b5336c889e829b146a04fcc0c115c1
