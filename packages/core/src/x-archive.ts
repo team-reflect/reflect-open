@@ -54,9 +54,9 @@ export const resolvedPostSchema = z.object({
 export function resolveArchivedPost(generation: number, postId: string) {
   return call('x_archive_resolve', { generation, postId }, resolvedPostSchema.nullable())
 }
-export function getXArchiveOwners(assetPath: string) {
+export function getXArchiveOwners(assetPath: string, generation?: number) {
   if (!assetPath.startsWith('assets/x/')) return Promise.resolve([] as string[])
-  return call('x_archive_owners', { assetPath }, z.array(z.string()))
+  return call('x_archive_owners', { assetPath, generation }, z.array(z.string()))
 }
 
 export async function saveArchivedPost(generation: number, incoming: ArchivedXPost): Promise<void> {

@@ -4856,7 +4856,6 @@ dependencies = [
 name = "reflect-open"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "base64 0.23.1",
  "block2",
  "core-foundation 0.10.1",

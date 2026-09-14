@@ -25,7 +25,6 @@ tauri-build = { version = "2.6.3", features = [] }
 [dependencies]
 infer = "0.19"
 http-range-header = "0.4"
-anyhow = "1"
 
 # `devtools` compiles the web inspector into release builds too (it is otherwise
 # debug-only), so a shipped app stays debuggable — see `src/devtools.rs`.

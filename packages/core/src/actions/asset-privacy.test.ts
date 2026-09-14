@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getXArchiveOwners } from '../x-archive'
-import { classifyAssetFromNotes } from './asset-privacy'
+import { classifyAsset, classifyAssetFromNotes } from './asset-privacy'
 
 vi.mock('../x-archive', () => ({ getXArchiveOwners: vi.fn() }))
 
@@ -86,4 +86,10 @@ it('reuses supplied ownership during live private-note validation', async () => 
     ),
   ).toBe('skip-private')
   expect(getXArchiveOwners).not.toHaveBeenCalled()
+})
+
+it('pins archive ownership to the classification graph generation', async () => {
+  vi.mocked(getXArchiveOwners).mockRejectedValue(new Error('stale graph'))
+  await expect(classifyAsset(asset, 42)).rejects.toThrow('stale graph')
+  expect(getXArchiveOwners).toHaveBeenCalledWith(asset, 42)
 })

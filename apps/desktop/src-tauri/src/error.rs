@@ -11,7 +11,7 @@ use serde::Serialize;
 // parity. `Unknown` is also the fail-loud answer from the mobile embedding
 // stand-in (semantic search is desktop-only).
 #[allow(dead_code)]
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum AppError {
     /// Filesystem / IO failure.

@@ -27,7 +27,7 @@ export type AssetVerdict = 'send' | 'skip-unreferenced' | 'skip-private'
  * Fails closed: an unreadable candidate blocks the asset.
  */
 export async function classifyAsset(assetPath: string, generation: number): Promise<AssetVerdict> {
-  const owners = await getXArchiveOwners(assetPath)
+  const owners = await getXArchiveOwners(assetPath, generation)
   const candidates = await assetReferencingNotePaths(assetPath, owners)
   return await classifyAssetFromNotes(
     assetPath,

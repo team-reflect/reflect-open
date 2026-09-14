@@ -1,32 +1,44 @@
 use super::x_archive_store as archive;
-use anyhow::{ensure, Context, Result};
+use crate::error::{AppError, AppResult as Result};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock, Weak};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 
-// Share downloads by graph and exact URL, including across different posts.
-// FIXME(rust): the Weak-map plus `retain` scan on every call is O(live entries) per download and
-// exists only to evict finished locks. Entries are bounded by distinct media URLs seen in one
-// session; a plain `Mutex<HashMap<PathBuf, Arc<tokio::sync::Mutex<()>>>>` without eviction is
-// simpler, or evict the entry when the download completes. Fold this into the shared-outcome change
-// suggested at `lock.lock().await` below.
-fn download_lock(root: &Path, hash: &str) -> Arc<tokio::sync::Mutex<()>> {
-    type Locks = Mutex<HashMap<PathBuf, Weak<tokio::sync::Mutex<()>>>>;
-    static LOCKS: OnceLock<Locks> = OnceLock::new();
-    let mut locks = LOCKS
-        .get_or_init(Default::default)
+type Download = tokio::sync::OnceCell<Result<archive::Receipt>>;
+type Downloads = Mutex<HashMap<PathBuf, Arc<Download>>>;
+fn downloads() -> &'static Downloads {
+    static DOWNLOADS: OnceLock<Downloads> = OnceLock::new();
+    DOWNLOADS.get_or_init(Default::default)
+}
+
+/// Concurrent callers share success and failure. A later request may retry.
+async fn shared_download(
+    key: PathBuf,
+    action: impl std::future::Future<Output = Result<archive::Receipt>>,
+) -> Result<archive::Receipt> {
+    let entry = downloads()
         .lock()
-        .expect("download locks");
-    locks.retain(|_, lock| lock.strong_count() > 0);
-    let entry = locks.entry(root.join(hash)).or_default();
-    if let Some(lock) = entry.upgrade() {
-        return lock;
+        .expect("downloads")
+        .entry(key.clone())
+        .or_default()
+        .clone();
+    let result = entry.get_or_init(|| action).await.clone();
+    let mut pending = downloads().lock().expect("downloads");
+    if pending
+        .get(&key)
+        .is_some_and(|current| Arc::ptr_eq(current, &entry))
+    {
+        pending.remove(&key);
     }
-    let lock = Arc::new(tokio::sync::Mutex::new(()));
-    *entry = Arc::downgrade(&lock);
-    lock
+    result
+}
+
+fn network(error: reqwest::Error) -> AppError {
+    AppError::Network {
+        message: error.to_string(),
+    }
 }
 
 fn allowed(url: &reqwest::Url) -> bool {
@@ -40,25 +52,23 @@ fn allowed(url: &reqwest::Url) -> bool {
 /// Start or join one download. Only the final validated file is visible in assets/x.
 pub async fn download(root: PathBuf, url: String) -> Result<archive::Receipt> {
     let hash = archive::hash_url(&url)?;
-    let lock = download_lock(&root, &hash);
-    // FIXME(logic): waiters queue serially behind this mutex and each one retries the download
-    // after the previous attempt failed (`find_cache` is still empty). Twenty cards sharing one
-    // avatar on a flaky network serialize twenty attempts of up to 180s each, and every
-    // reflect-asset request for that avatar stays pending meanwhile. Share the outcome with the
-    // waiters instead: keep a per-hash `tokio::sync::OnceCell<Result<Receipt>>`-style entry (or
-    // record a short-lived failure) so one failure answers all of them and a retry only happens on
-    // the next resolve.
-    let _guard = lock.lock().await;
+    shared_download(root.join(&hash), download_once(root, url, hash)).await
+}
+
+async fn download_once(root: PathBuf, url: String, hash: String) -> Result<archive::Receipt> {
     let cache_root = root.clone();
     let cache_hash = hash.clone();
     if let Some(receipt) =
         tauri::async_runtime::spawn_blocking(move || archive::find_cache(&cache_root, &cache_hash))
-            .await??
+            .await
+            .map_err(|error| AppError::io(error.to_string()))??
     {
         return Ok(receipt);
     }
-    let remote = reqwest::Url::parse(&url)?;
-    ensure!(allowed(&remote), "unsupported-media-url");
+    let remote = reqwest::Url::parse(&url).map_err(|error| AppError::parse(error.to_string()))?;
+    if !allowed(&remote) {
+        return Err(AppError::parse("unsupported-media-url"));
+    }
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(180))
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
@@ -68,8 +78,15 @@ pub async fn download(root: PathBuf, url: String) -> Result<archive::Receipt> {
                 attempt.follow()
             }
         }))
-        .build()?;
-    let mut response = client.get(remote).send().await?.error_for_status()?;
+        .build()
+        .map_err(network)?;
+    let mut response = client
+        .get(remote)
+        .send()
+        .await
+        .map_err(network)?
+        .error_for_status()
+        .map_err(network)?;
     let mut limit = if response
         .headers()
         .get(reqwest::header::CONTENT_TYPE)
@@ -80,33 +97,25 @@ pub async fn download(root: PathBuf, url: String) -> Result<archive::Receipt> {
     } else {
         archive::IMAGE_MAX_BYTES
     };
-    ensure!(
-        response.content_length().is_none_or(|bytes| bytes <= limit),
-        "media-too-large"
-    );
-    let directory = archive::safe_path(&root, "assets/x")?;
+    if response.content_length().is_some_and(|bytes| bytes > limit) {
+        return Err(AppError::parse("media-too-large"));
+    }
+    let directory = super::resolve::resolve(&root, "assets/x")?;
     tokio::fs::create_dir_all(&directory).await?;
-    archive::safe_path(&root, "assets/x")?;
-    // FIXME(logic): this `.part-*` temp file (and the `.tmp*` file `atomic_json` creates) lives
-    // inside `assets/x/`, i.e. inside the synced graph. The graph `.gitignore` defaults only cover
-    // `/.reflect/`, `.DS_Store` and editor swap files, and `git/commit.rs` stages with
-    // `add_all("*")`, so an auto-commit that races a download commits a half-written file, iCloud
-    // uploads it, and a crash mid-download leaves it behind forever (nothing sweeps `assets/x`).
-    // Write temps under `.reflect/x-archive/` (gitignored, invisible to the watcher, same
-    // filesystem so `persist` is still an atomic rename into `assets/x`), or add `.part-*`/`.tmp*`
-    // to the gitignore defaults and sweep stale temps at startup. The duplicated `safe_path(&root,
-    // "assets/x")` call above goes with it.
+
     let temporary = tempfile::Builder::new()
         .prefix(".part-")
-        .tempfile_in(&directory)?;
+        .tempfile_in(archive::temporary_directory(&root)?)?;
     let mut file = tokio::fs::File::from_std(temporary.reopen()?);
     let mut bytes = 0u64;
     let mut prefix = Vec::new();
-    while let Some(chunk) = response.chunk().await? {
+    while let Some(chunk) = response.chunk().await.map_err(network)? {
         prefix.extend_from_slice(&chunk[..chunk.len().min(8192 - prefix.len())]);
         limit = limit.min(archive::media_byte_limit(&prefix));
         bytes += chunk.len() as u64;
-        ensure!(bytes <= limit, "media-too-large");
+        if bytes > limit {
+            return Err(AppError::parse("media-too-large"));
+        }
         file.write_all(&chunk).await?;
     }
     file.sync_all().await?;
@@ -114,14 +123,14 @@ pub async fn download(root: PathBuf, url: String) -> Result<archive::Receipt> {
     tauri::async_runtime::spawn_blocking(move || {
         let (extension, mime, bytes) = archive::sniff(temporary.path())?;
         let name = format!("url_sha256_{hash}.{extension}");
-        let path = archive::safe_path(&root, &format!("assets/x/{name}"))?;
+        let path = super::resolve::resolve(&root, &format!("assets/x/{name}"))?;
         temporary.persist(path).map_err(|error| error.error)?;
         #[cfg(unix)]
         std::fs::File::open(directory)?.sync_all()?;
         Ok(archive::Receipt { name, mime, bytes })
     })
     .await
-    .context("download publish task")?
+    .map_err(|error| AppError::io(error.to_string()))?
 }
 
 #[cfg(test)]
@@ -148,20 +157,55 @@ mod tests {
     }
 
     #[test]
-    fn shares_download_locks_by_graph_and_url() {
-        let first = download_lock(Path::new("/graph-a"), "url-a");
-        assert!(Arc::ptr_eq(
-            &first,
-            &download_lock(Path::new("/graph-a"), "url-a")
-        ));
-        assert!(!Arc::ptr_eq(
-            &first,
-            &download_lock(Path::new("/graph-b"), "url-a")
-        ));
-        assert!(!Arc::ptr_eq(
-            &first,
-            &download_lock(Path::new("/graph-a"), "url-b")
-        ));
+    fn concurrent_callers_share_failure_and_later_calls_retry() {
+        tauri::async_runtime::block_on(async {
+            let key = tempfile::tempdir().unwrap();
+            let key = key.path().join("shared-failure");
+            let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let release = Arc::new(tokio::sync::Notify::new());
+            let mut tasks = Vec::new();
+            for _ in 0..20 {
+                let key = key.clone();
+                let calls = calls.clone();
+                let release = release.clone();
+                tasks.push(tauri::async_runtime::spawn(async move {
+                    shared_download(key, async {
+                        calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        release.notified().await;
+                        Err(AppError::Network {
+                            message: "offline".into(),
+                        })
+                    })
+                    .await
+                }));
+            }
+            // Wait until every caller owns the same pending entry before releasing it.
+            loop {
+                let ready = downloads()
+                    .lock()
+                    .unwrap()
+                    .get(&key)
+                    .is_some_and(|entry| Arc::strong_count(entry) == 21);
+                if ready {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+            release.notify_one();
+            for task in tasks {
+                assert!(matches!(task.await.unwrap(), Err(AppError::Network { .. })));
+            }
+            assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+            assert!(!downloads().lock().unwrap().contains_key(&key));
+            let _ = shared_download(key, async {
+                calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Err(AppError::Network {
+                    message: "retry".into(),
+                })
+            })
+            .await;
+            assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+        });
     }
 
     #[test]

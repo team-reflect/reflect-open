@@ -92,17 +92,19 @@ async fn serve<R: Runtime>(
     let (start, end) = selected.unwrap_or((0, receipt.bytes - 1));
     let count = end - start + 1;
     let name = receipt.name.clone();
-    let body = tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<Vec<u8>> {
-        let path = archive::safe_path(&root, &format!("assets/x/{name}"))?;
+    let body = tauri::async_runtime::spawn_blocking(move || -> crate::error::AppResult<Vec<u8>> {
+        let path = super::resolve::resolve(&root, &format!("assets/x/{name}"))?;
         let mut file = File::open(path)?;
-        anyhow::ensure!(file.metadata()?.len() == receipt.bytes, "file-changed");
+        if file.metadata()?.len() != receipt.bytes {
+            return Err(crate::error::AppError::io("file-changed"));
+        }
         file.seek(SeekFrom::Start(start))?;
         let mut bytes = vec![0; count as usize];
         file.read_exact(&mut bytes)?;
         Ok(bytes)
     })
     .await
-    .unwrap_or_else(|error| Err(error.into()));
+    .unwrap_or_else(|error| Err(crate::error::AppError::io(error.to_string())));
     let Ok(bytes) = body else {
         return error(StatusCode::INTERNAL_SERVER_ERROR);
     };
