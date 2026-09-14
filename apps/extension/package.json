@@ -15,6 +15,7 @@
     "@reflect/core": "workspace:*",
     "@reflect/design-system": "workspace:*",
     "defuddle": "^0.19.3",
+    "lucide-react": "^1.45.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.4"
