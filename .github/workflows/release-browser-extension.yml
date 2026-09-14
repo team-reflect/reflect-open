@@ -43,7 +43,7 @@ jobs:
           TAG: ${{ inputs.tag }}
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" apps/extension/.output/reflect-capture-*-chrome.zip --clobber
-        # FIXME: we do not need to create github release. so remove your "gh release upload" and "gh release edit"
+        # FIXME: we do not need to create github release maually in github action. so remove your "gh release upload" and "gh release edit". We can just use release-please for all the process.
 
       - name: Submit to Chrome
         working-directory: apps/extension

@@ -2,6 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/v17.6.0/schemas/config.json",
   "include-component-in-tag": true,
   "bump-minor-pre-major": true,
+  // FIXME: for browser extension, we need to set "draft" to false.
   "draft": true,
   "force-tag-creation": true,
   "always-update": true,
