@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import type { OpenTask } from '@reflect/core'
-import { continueTaskInContext, type ContinuedTaskInContext } from '@/lib/note-task'
+import { continueTaskInContext, type InsertedTask } from '@/lib/note-task'
 import { mutationKeys } from '@/lib/query-client'
 import { relocateRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { withEditedTask, withoutTasks } from '@/lib/tasks/task-cache'
@@ -58,7 +58,7 @@ export function useTaskContextInsert(): TaskContextInsert {
         return null
       }
       const { generation, root } = graph
-      const result: ContinuedTaskInContext = await mutation.mutateAsync({
+      const result: InsertedTask = await mutation.mutateAsync({
         task,
         content,
         generation,

@@ -258,7 +258,7 @@ beforeEach(async () => {
   deleteTask.mockReset()
   editTask.mockReset()
   insertTask.mockReset()
-  insertTask.mockResolvedValue(0)
+  insertTask.mockResolvedValue({ created: { markerOffset: 0, raw: '[ ] ' }, offsetChanges: [] })
   continueTaskInContext.mockReset()
   continueTaskInContext.mockResolvedValue({
     created: { markerOffset: 0, raw: '[ ] ' },

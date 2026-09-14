@@ -149,7 +149,19 @@ export function useTaskSheetFinalizer({
       }
     }
   })
-  useEffect(() => () => unmountFlushRef.current(), [])
+  const mountGenerationRef = useRef(0)
+  useEffect(() => {
+    const mountGeneration = ++mountGenerationRef.current
+    return () => {
+      // StrictMode immediately reconnects effects; that rehearsal must not
+      // delete the empty task whose sheet just opened.
+      queueMicrotask(() => {
+        if (mountGenerationRef.current === mountGeneration) {
+          unmountFlushRef.current()
+        }
+      })
+    }
+  }, [])
 
   return { draft, setDraft, resolve, handleOpenChange, closeHandled, closeNavigate }
 }

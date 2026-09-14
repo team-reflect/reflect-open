@@ -1,6 +1,13 @@
 import { useMutation } from '@tanstack/react-query'
 import type { OpenTask } from '@reflect/core'
-import { convertTaskToBullet, deleteTask, editTask, insertTask, toggleTask } from '@/lib/note-task'
+import {
+  convertTaskToBullet,
+  deleteTask,
+  editTask,
+  insertTask,
+  toggleTask,
+  type InsertedTask,
+} from '@/lib/note-task'
 import { mutationKeys } from '@/lib/query-client'
 import { editAndToggleError, isEditAndToggleError } from '@/lib/tasks/edit-and-toggle-error'
 import {
@@ -8,6 +15,7 @@ import {
   forgetRecentlyCompleted,
   hasRecentlyCompleted,
   markRecentlyCompleted,
+  relocateRecentlyCompleted,
 } from '@/lib/tasks/recently-completed'
 import { scheduledContent } from '@/lib/tasks/task-schedule-content'
 import {
@@ -442,13 +450,15 @@ export function useTaskActions(): TaskActions {
       if (graph?.generation === undefined) {
         return null
       }
-      let markerOffset: number
+      let result: InsertedTask
       try {
-        markerOffset = await insertMutation.mutateAsync(target)
+        result = await insertMutation.mutateAsync(target)
       } catch {
         return null // reconcile already surfaced the failure
       }
-      const created = insertedTaskRow(target, markerOffset)
+      cache.relocate(target.notePath, result.offsetChanges)
+      relocateRecentlyCompleted(root, target.notePath, result.offsetChanges)
+      const created = insertedTaskRow(target, result.created.markerOffset, [], result.created.raw)
       cache.addOpen(created)
       return created
     },
@@ -475,13 +485,15 @@ export function useTaskActions(): TaskActions {
       if (!(await persistTaskDraft(task, content))) {
         return null // the edit/delete rollback already surfaced the failure
       }
-      let markerOffset: number
+      let result: InsertedTask
       try {
-        markerOffset = await insertMutation.mutateAsync(target)
+        result = await insertMutation.mutateAsync(target)
       } catch {
         return null
       }
-      const created = insertedTaskRow(target, markerOffset)
+      cache.relocate(target.notePath, result.offsetChanges)
+      relocateRecentlyCompleted(root, target.notePath, result.offsetChanges)
+      const created = insertedTaskRow(target, result.created.markerOffset, [], result.created.raw)
       cache.addOpen(created)
       return created
     },

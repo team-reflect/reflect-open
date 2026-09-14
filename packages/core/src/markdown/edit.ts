@@ -1,12 +1,12 @@
 import type { SyntaxNode } from '@meowdown/markdown'
-import { appendListItemAtHeading, listItemBlock } from './append-list-item'
+import { appendListItemAtHeading, insertListItemAtHeading, listItemBlock } from './append-list-item'
 import { appendHeadingSection } from './append-section'
 import { parseNote } from './extract'
 import { splitFrontmatter } from './frontmatter'
 import { parseBody } from './grammar'
 import { topLevelHeadings } from './heading-blocks'
 import { foldKey } from './keys'
-import { lineEndingAt, offsetBeforeLineEnding } from './line-endings'
+import { documentLineEnding, lineEndingAt, offsetBeforeLineEnding } from './line-endings'
 import type { Heading, TaskMarker, WikiLink } from './model'
 import { normalizeWikiTarget } from './resolve'
 import { scanInlineWikiLinks } from './scan'
@@ -127,19 +127,51 @@ export function removeTaskLine(source: string, task: TaskMarker): string {
   return source.slice(0, lineStart) + source.slice(lineEnd)
 }
 
+/** Source and coordinates of an automatically inserted round task. */
+export interface TaskInsertion {
+  readonly source: string
+  /** Offset of the inserted task's opening bracket in the resulting source. */
+  readonly markerOffset: number
+  /** Splice boundary in the original source; later task markers shift by the length delta. */
+  readonly insertionOffset: number
+}
+
 /**
- * Append a new empty task — a `+ [ ] ` line — to the end of `source`, returning
- * the new source and the marker's offset (the `[`). The Tasks view's Return-to-add
- * (Plan 18) writes the empty line, then the inline editor on the new row fills it.
- * A single newline separates it from existing content (continuing a trailing
- * list, or interrupting a paragraph — a non-empty task item is allowed to); an
- * empty note just becomes the one task. The trailing space keeps it a valid GFM
- * checkbox and seats the caret.
+ * Insert a round task under a top-level Tasks H2, creating a plain heading when
+ * missing. Reuse a linked Tasks heading without rewriting it, preferring plain
+ * headings when both exist. Empty text keeps the trailing space GFM requires.
  */
-export function appendTaskLine(source: string): { source: string; markerOffset: number } {
-  const base = source.replace(/\s*$/, '')
-  const prefix = base.length > 0 ? `${base}\n+ ` : '+ '
-  return { source: `${prefix}[ ] \n`, markerOffset: prefix.length }
+export function appendTaskUnderHeading(source: string, text = ''): TaskInsertion {
+  const { headings, wikiLinks } = parseNote({ path: '', source })
+  const matches = topLevelHeadings(headings).filter(
+    (heading) =>
+      heading.level === 2 && headingMatchesBacklinkedTitle(source, heading, wikiLinks, 'Tasks'),
+  )
+  const target =
+    matches.find((heading) => linkedHeadingTarget(source, heading, wikiLinks) === null) ??
+    matches[0]
+  if (target !== undefined) {
+    const inserted = insertListItemAtHeading(source, target, text, 'task')
+    return {
+      source: inserted.source,
+      markerOffset: inserted.itemOffset + 2,
+      insertionOffset: inserted.insertionOffset,
+    }
+  }
+
+  const lineEnding = documentLineEnding(source)
+  const gap =
+    source.length === 0 || source.endsWith(lineEnding.repeat(2))
+      ? ''
+      : source.endsWith(lineEnding)
+        ? lineEnding
+        : lineEnding.repeat(2)
+  const prefix = `${source}${gap}## Tasks${lineEnding.repeat(2)}+ `
+  return {
+    source: `${prefix}[ ] ${text.trim()}${lineEnding}`,
+    markerOffset: prefix.length,
+    insertionOffset: source.length,
+  }
 }
 
 function taskNodeAt(body: string, markerOffset: number): SyntaxNode | null {

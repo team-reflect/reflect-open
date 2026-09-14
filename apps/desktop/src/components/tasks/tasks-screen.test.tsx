@@ -243,7 +243,7 @@ beforeEach(() => {
   deleteTask.mockReset()
   editTask.mockReset()
   insertTask.mockReset()
-  insertTask.mockResolvedValue(0)
+  insertTask.mockResolvedValue({ created: { markerOffset: 0, raw: '[ ] ' }, offsetChanges: [] })
   continueTaskInContext.mockReset()
   continueTaskInContext.mockResolvedValue({
     created: { markerOffset: 0, raw: '[ ] ' },
@@ -824,7 +824,7 @@ describe('TasksScreen', () => {
   })
 
   it('a note group’s "+ Add" button inserts into that note and opens the editor', async () => {
-    insertTask.mockResolvedValue(0)
+    insertTask.mockResolvedValue({ created: { markerOffset: 0, raw: '[ ] ' }, offsetChanges: [] })
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/proj.md',
@@ -841,6 +841,36 @@ describe('TasksScreen', () => {
     await waitFor(() => expect(insertTask).toHaveBeenCalledWith('notes/proj.md', 1))
     // The new row's editor opens, ready to type.
     await view.findByTestId('task-editor')
+    await view.unmount()
+  })
+
+  it('relocates later cached tasks before adding a row at their former offset', async () => {
+    const later = task({
+      notePath: 'notes/proj.md',
+      noteTitle: 'Project',
+      markerOffset: 20,
+      text: 'later',
+      raw: '[ ] later',
+    })
+    getOpenTasks.mockResolvedValue([later])
+    insertTask.mockResolvedValue({
+      created: { markerOffset: 20, raw: '[ ] ' },
+      offsetChanges: [
+        { from: 20, fromRaw: '[ ] later', marker: { markerOffset: 28, raw: '[ ] later' } },
+      ],
+    })
+    const view = await renderScreen()
+    await userEvent.click(await view.findByRole('button', { name: 'Add a task to Project' }))
+    await view.findByTestId('task-editor')
+    await userEvent.click(view.getByRole('button', { name: 'cancel-edit' }))
+    await userEvent.click(await view.findByRole('button', { name: 'later' }))
+    await userEvent.click(view.getByRole('button', { name: 'delete-edit' }))
+    await waitFor(() =>
+      expect(deleteTask).toHaveBeenCalledWith(
+        expect.objectContaining({ notePath: 'notes/proj.md', markerOffset: 28, raw: '[ ] later' }),
+        1,
+      ),
+    )
     await view.unmount()
   })
 
@@ -975,7 +1005,7 @@ describe('TasksScreen', () => {
 
   it('Enter in the editor saves the row and opens the next task (continuous entry)', async () => {
     editTask.mockResolvedValue(undefined)
-    insertTask.mockResolvedValue(7)
+    insertTask.mockResolvedValue({ created: { markerOffset: 7, raw: '[ ] ' }, offsetChanges: [] })
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1110,7 +1140,7 @@ describe('TasksScreen', () => {
 
   it('Enter on a cleared row deletes it instead of leaving a bare task (no ghost)', async () => {
     deleteTask.mockResolvedValue(undefined)
-    insertTask.mockResolvedValue(0)
+    insertTask.mockResolvedValue({ created: { markerOffset: 0, raw: '[ ] ' }, offsetChanges: [] })
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',

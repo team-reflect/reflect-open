@@ -206,22 +206,64 @@ describe('convertTaskToBullet', () => {
 })
 
 describe('insertTask', () => {
-  it('writes round task syntax to an empty note', async () => {
+  it('writes an empty task under Tasks with its persisted identity', async () => {
     openSession.mockReturnValue(null)
     readNote.mockResolvedValue('')
     writeNote.mockResolvedValue(undefined)
 
-    await expect(insertTask('notes/a.md', 7)).resolves.toBe(2)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '+ [ ] \n', 7)
+    await expect(insertTask('notes/a.md', 7)).resolves.toEqual({
+      created: { markerOffset: '## Tasks\n\n+ '.length, raw: '[ ] ' },
+      offsetChanges: [],
+    })
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '## Tasks\n\n+ [ ] \n', 7)
   })
 
-  it('appends round task syntax after existing content', async () => {
+  it('relocates duplicate open and completed task markers after the section insertion', async () => {
+    const source = '+ [ ] same\n\n## Tasks\n\n+ [ ] same\n\n## Later\n\n+ [ ] same\n+ [x] done\n'
     openSession.mockReturnValue(null)
-    readNote.mockResolvedValue('# Notes\n\nbody\n')
+    readNote.mockResolvedValue(source)
     writeNote.mockResolvedValue(undefined)
+    const result = await insertTask('notes/a.md', 7)
+    // The item joins the Tasks list before its existing blank line.
+    const next = source.replace('+ [ ] same\n\n## Later', '+ [ ] same\n+ [ ] \n\n## Later')
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', next, 7)
+    const finalTasks = parseNote({ path: 'notes/a.md', source: next }).tasks
+    expect(result.created).toEqual({ markerOffset: finalTasks[2]!.markerOffset, raw: '[ ] ' })
+    const originalTasks = parseNote({ path: 'notes/a.md', source }).tasks
+    expect(result.offsetChanges).toEqual(
+      originalTasks.map((task, index) => ({
+        from: task.markerOffset,
+        fromRaw: task.raw,
+        marker: {
+          markerOffset: finalTasks[index < 2 ? index : index + 1]!.markerOffset,
+          raw: task.raw,
+        },
+      })),
+    )
+  })
 
-    await expect(insertTask('notes/a.md', 7)).resolves.toBe('# Notes\n\nbody\n+ '.length)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '# Notes\n\nbody\n+ [ ] \n', 7)
+  it('returns the exact CRLF identity so the empty task can be edited immediately', async () => {
+    const source = '## Tasks\r\n\r\nprose\r\n'
+    openSession.mockReturnValue(null)
+    readNote.mockResolvedValue(source)
+    const result = await insertTask('notes/a.md', 7)
+    expect(result.created).toEqual({ markerOffset: '## Tasks\r\n\r\n+ '.length, raw: '[ ] \r' })
+    readNote.mockResolvedValue('## Tasks\r\n\r\n+ [ ] \r\n\r\nprose\r\n')
+    await expect(
+      editTask({ notePath: 'notes/a.md', ...result.created }, 'new', 7),
+    ).resolves.toBeUndefined()
+  })
+
+  it('creates a missing daily note and refuses an open note', async () => {
+    openSession.mockReturnValue(null)
+    readNote.mockRejectedValue({ kind: 'notFound', message: 'missing' })
+    await expect(insertTask('daily/2026-06-14.md', 7)).resolves.toMatchObject({
+      created: { raw: '[ ] ' },
+    })
+    openSession.mockReturnValue({})
+    writeNote.mockClear()
+    await expect(insertTask('daily/2026-06-14.md', 7)).rejects.toBeInstanceOf(NoteBusyError)
+    expect(writeNote).not.toHaveBeenCalled()
   })
 })
 
