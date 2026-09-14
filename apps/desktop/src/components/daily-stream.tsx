@@ -6,8 +6,10 @@ import type { NoteEditorHandle } from '@/editor/note-editor'
 import { formatDayLabel, todayIso } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { useSettings } from '@/providers/settings-provider'
+import { useGraph } from '@/providers/graph-provider'
 import { useToday } from '@/lib/use-today'
 import { createDayWindow, dateAtIndex, indexOfDate, neighborDate } from '@/lib/day-window'
+import { rememberDailyPaneHeight, savedDailyPaneHeight } from '@/lib/daily-note-heights'
 import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider'
 import { useRouter } from '@/routing/router'
 import { clamp } from '@ocavue/utils'
@@ -58,6 +60,41 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   const today = useToday()
   const targetDate = target.kind === 'today' ? today : target.date
   const { settings } = useSettings()
+  const { graph } = useGraph()
+  const graphRoot = graph?.root ?? null
+
+  // Mirrored like targetDate: the measuring ref callbacks below are cached per
+  // date for their whole life, so they read the root at cleanup time instead
+  // of capturing a possibly stale value.
+  const graphRootRef = useRef(graphRoot)
+  useLayoutEffect(() => {
+    graphRootRef.current = graphRoot
+  }, [graphRoot])
+
+  // One measuring ref callback per date, cached: an inline ref would be a new
+  // function every render, and React 19 re-runs cleanup + setup for a changed
+  // ref — a forced layout read per visible row per render. The cleanup runs
+  // just before the row's DOM leaves the document, capturing the height the
+  // remounted placeholder should reserve.
+  const [paneMeasureRefs] = useState(
+    () => new Map<string, (el: HTMLDivElement) => () => void>(),
+  )
+  const paneMeasureRef = useCallback(
+    (date: string) => {
+      let ref = paneMeasureRefs.get(date)
+      if (ref === undefined) {
+        ref = (el) => () => {
+          const root = graphRootRef.current
+          if (root !== null) {
+            rememberDailyPaneHeight(root, date, el.offsetHeight)
+          }
+        }
+        paneMeasureRefs.set(date, ref)
+      }
+      return ref
+    },
+    [paneMeasureRefs],
+  )
 
   // targetDate is read at arrival time, not reacted to. On the `today` route
   // it follows this component's live clock — the same value that paints the
@@ -256,6 +293,8 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
           const focusSelection =
             pendingFocus !== null && pendingFocus.date === date ? pendingFocus.selection : null
           const autoFocus = focusSelection !== null
+          const paneHeight =
+            graphRoot !== null ? savedDailyPaneHeight(graphRoot, date) : undefined
           return (
             <section
               key={date}
@@ -280,18 +319,21 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
               >
                 {formatDayLabel(date, settings.dateFormat)}
               </h2>
-              <NotePane
-                path={dailyPath(date)}
-                dailyDate={date}
-                registerHandle={registerHandle}
-                onExitBoundary={handleExitBoundary}
-                lazy
-                autoFocus={autoFocus}
-                autoFocusSelection={focusSelection ?? 'start'}
-                onAutoFocused={consumeFocus}
-                gutterClassName={CONTENT_GUTTER}
-                editorClassName={isPast ? 'min-h-[100px]' : 'min-h-[60vh]'}
-              />
+              <div ref={paneMeasureRef(date)}>
+                <NotePane
+                  path={dailyPath(date)}
+                  dailyDate={date}
+                  registerHandle={registerHandle}
+                  onExitBoundary={handleExitBoundary}
+                  lazy
+                  autoFocus={autoFocus}
+                  autoFocusSelection={focusSelection ?? 'start'}
+                  onAutoFocused={consumeFocus}
+                  gutterClassName={CONTENT_GUTTER}
+                  editorClassName={isPast ? 'min-h-[100px]' : 'min-h-[60vh]'}
+                  {...(paneHeight !== undefined ? { placeholderHeight: paneHeight } : {})}
+                />
+              </div>
             </section>
           )
         }}
