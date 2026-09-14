@@ -1,14 +1,19 @@
 name: Extension release
 
+# rename this workflow to "Release Browser Extension" and release-browser-extension.yml FIXME
+
 on:
   workflow_call:
     inputs:
       tag:
+        description: The release tag (v<version>) created by release-please
         type: string
         required: true
       commit:
+        description: Immutable commit targeted by the release tag
         type: string
         required: true
+  # remove "workflow_dispatch" trigger completely FIXME
   workflow_dispatch:
     inputs:
       tag:
@@ -21,7 +26,7 @@ on:
         default: true
 
 concurrency:
-  group: chrome-extension-ccabifmooehighoonjeiololjfofkhkd
+  group: chrome-extension-ccabifmooehighoonjeiololjfofkhkd # FIXME rename the group name to "release-browser-extension"
   cancel-in-progress: false
 
 permissions:

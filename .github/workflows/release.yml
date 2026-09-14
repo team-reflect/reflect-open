@@ -1,5 +1,7 @@
 name: Release
 
+# rename this workflow to "Release App" and release-app.yml FIXME
+
 on:
   # The normal path: called by release-please.yml right after it creates the
   # draft release for a merged Release PR.
@@ -26,7 +28,7 @@ on:
 # Never run two releases at once, and never cancel one mid-notarization —
 # queue instead. A cancelled run can leave a half-published release behind.
 concurrency:
-  group: release
+  group: release # FIXME: rename "release" to "release-app"
   cancel-in-progress: false
 
 # Publish uploads assets into the release-please draft release and undrafts
