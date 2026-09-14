@@ -49,7 +49,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify release source
+      - name: Verify release source  # FIXME: remove this step
         id: release
         env:
           TAG: ${{ inputs.tag }}
@@ -64,7 +64,7 @@ jobs:
           gh release view "$TAG" > /dev/null
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
 
-      - name: Wait for CI on the release commit
+      - name: Wait for CI on the release commit # FIXME: remove this step
         env:
           GH_TOKEN: ${{ github.token }}
           COMMIT: ${{ steps.release.outputs.commit }}
@@ -134,6 +134,7 @@ jobs:
           gh release upload "$TAG" apps/extension/.output/reflect-capture-*-chrome.zip \
             apps/extension/.output/source.txt apps/extension/.output/SHA256SUMS
 
+  # FIXME: just merge the package and submit jobs into one job, since they are sequential and share the same environment. do not use "gh release download" to restore the package, just use the output from the package job. make the code much simpler.
   submit:
     needs: package
     runs-on: ubuntu-latest
