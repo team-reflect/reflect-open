@@ -149,9 +149,6 @@ pub fn media_urls(post: &Value) -> Vec<String> {
             urls.insert(url.to_owned());
         }
         for media in entry["media"].as_array().into_iter().flatten() {
-            if media["unavailable"] == true {
-                continue;
-            }
             if media["type"] == "photo" {
                 if let Some(url) = media["url"].as_str() {
                     urls.insert(url.to_owned());

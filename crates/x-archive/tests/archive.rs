@@ -72,3 +72,12 @@ fn detects_video_bounds_from_bytes_without_trusting_content_type() {
         .unwrap();
     assert!(archive::sniff(file.path()).is_err());
 }
+
+#[test]
+fn retains_ownership_of_media_marked_unavailable() {
+    let post = json!({"data": {"media": [{"type":"photo", "unavailable":true, "url":"https://pbs.twimg.com/private.jpg"}]}});
+    assert_eq!(
+        archive::media_urls(&post),
+        vec!["https://pbs.twimg.com/private.jpg"]
+    );
+}
