@@ -11,6 +11,14 @@ use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
+// FIXME: with desktop-driven downloads (see apps/extension/lib/x-download.ts) this crate reduces to
+// `safe_path`, `atomic_json`, `read_json`, `hash_url`, `get_candidate_names`/`find_cache` and
+// `sniff`.
+// `Job`/`State`/`pull`/`status`/`append`/`commit`/`abort`/`leased`/`part_path`/`add_jobs`/`dispatch`
+// and `LEASE_MS`/`CHUNK_MAX_BYTES` are the cross-process transfer protocol and go away.
+// Independently: `state`/`error` are stringly typed (`"pending"`, `"stored"`, ... compared by `==`
+// in a dozen places, and the same list is duplicated as `ResourceError` in TS and in `abort()`);
+// use serde enums.
 pub const VIDEO_MAX_BYTES: u64 = 10_000_000;
 pub const IMAGE_MAX_BYTES: u64 = 64 * 1024 * 1024;
 pub const MESSAGE_MAX_BYTES: usize = 512 * 1024;
@@ -50,6 +58,12 @@ pub struct Receipt {
 #[derive(Default, Serialize, Deserialize)]
 pub struct State {
     pub jobs: BTreeMap<String, Job>,
+    // FIXME: stores every full envelope (post text and all URLs) forever, only to answer
+    // `contains_key`; keep a set of ids. `processed` (plus the `x_archive_processed` command and
+    // `markArchivedCaptureProcessed`) exists to make a replayed `capture.put` idempotent after the
+    // desktop drained the inbox file, but the extension only re-sends a capture whose first put
+    // threw before it got a binding, so that needs a crash between the host's inbox write and its
+    // reply. The old URL-only bookmark path accepted that window; drop the marker.
     pub captures: BTreeMap<String, Value>,
     pub processed: BTreeMap<String, bool>,
 }
@@ -130,6 +144,9 @@ pub fn read_json(root: &Path, relative: &str) -> Result<Option<Value>> {
     );
     Ok(Some(serde_json::from_reader(file)?))
 }
+// FIXME: always rewrites `state.json` (serialize, fsync file, fsync dir) even when `action` only
+// read it (`status`, `ensure_resource` on a stored job, every poll). Write only when the state
+// changed.
 fn with_state<T>(root: &Path, action: impl FnOnce(&mut State) -> Result<T>) -> Result<T> {
     directory(root, ".reflect/x-archive")?;
     let lock_path = safe_path(root, ".reflect/x-archive/lock")?;
@@ -263,6 +280,7 @@ pub fn put_capture(root: &Path, envelope: Value) -> Result<()> {
         state.captures.insert(id.clone(), envelope.clone());
         Ok(())
     })?;
+    // FIXME: two `with_state` calls back to back (two locks, two state rewrites); one call.
     // Repeated put re-creates an inbox only until a durable processed marker exists.
     with_state(root, |state| {
         if !state.processed.get(&id).copied().unwrap_or(false) {
@@ -485,6 +503,8 @@ pub fn commit(
             "invalid-checksum"
         );
         let path = part_path(root, id)?;
+        // FIXME: mapping `sniff` failures back to categories by matching on `error.to_string()`
+        // ("unsupported-format", "invalid-file", ...). Return a typed error from `sniff` instead.
         let (extension, mime, bytes) = match sniff(&path) {
             Ok(media) => media,
             Err(error) => {

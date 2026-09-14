@@ -39,6 +39,11 @@ fn process(payload: &[u8], pointer: &Path) -> Result<Value> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Bindings::default(),
         Err(error) => return Err(error.into()),
     };
+    // FIXME: `work.bind`, `x-bindings.json`, its lock file and a uuid per canonicalized graph root
+    // exist so a download started under one graph can finish after the pointer changes. The pointer
+    // already names the current graph, and the existing capture inbox simply waits until that graph
+    // is pointed again. Delete the binding layer; `capture.put` becomes the deleted
+    // `bookmark::spool` (write `.reflect/inbox/<id>.json`) with the archive attached.
     let bind = request["op"] == "work.bind";
     let capture = request["op"] == "capture.put";
     if bind {

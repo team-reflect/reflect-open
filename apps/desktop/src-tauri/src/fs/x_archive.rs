@@ -5,6 +5,8 @@ use serde_json::{json, Value};
 use tauri::{Manager, State};
 
 #[tauri::command]
+// FIXME: five commands with the same `spawn_blocking(...).await.map_err(...)?.map_err(...)`
+// boilerplate; one `blocking<T>(root, f)` helper.
 pub async fn x_archive_read(
     state: State<'_, GraphState>,
     generation: u64,
@@ -66,6 +68,10 @@ pub async fn x_archive_resolve<R: tauri::Runtime>(
                 .as_str()
                 .ok_or_else(|| anyhow::anyhow!("invalid-url"))?;
             let hash = archive::hash_url(url)?;
+            // FIXME: a read-only resolve rewrites `state.json` (lock + serialize + fsync + dir
+            // fsync) once per resource, and `XPostHost` calls this every 2s per subscribed post.
+            // Resolving must not write. The trailing `root_for_generation` re-check after the
+            // blocking read below is redundant too.
             let job = archive::ensure_resource(&root, &post_id, &hash)?;
             resources.push(json!({"url":url,"hash":hash,"state":job.state,
                 "error":job.resource.error,"bytes":job.receipt.map(|receipt| receipt.bytes)}));
@@ -94,6 +100,11 @@ pub async fn x_archive_owners(
         if !directory.is_dir() {
             return Ok(owners);
         }
+        // FIXME: to find the owners of one media file this reads and parses every post JSON under
+        // assets/x and SHA-256s every URL in each of them. `state.json` jobs are keyed
+        // `url_sha256_<hash>` and already carry `post_ids`; look the job up by the file's stem
+        // instead. (The `assets/x/` prefix is checked here, in `asset-refs.ts` and in
+        // `asset-privacy.ts`: once is enough.)
         for entry in std::fs::read_dir(directory)? {
             let entry = entry?;
             let Some(name) = entry.file_name().to_str().map(str::to_string) else {

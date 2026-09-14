@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { call } from '../ipc/invoke'
 import { archivedPostSchema } from './schema'
 
+// FIXME: `error` and `bytes` per resource are never read by the only consumer (`XPostHost`).
 export const resolvedPostSchema = z.object({
   archive: archivedPostSchema,
   resources: z.array(

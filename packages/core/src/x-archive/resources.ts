@@ -67,6 +67,12 @@ export function createArchivedPost(
     resources: [...resources.values()],
   }
 }
+// FIXME: the branch preserving `state: 'stored'` from `previous.resources` is dead: nothing ever
+// writes `stored` into a post JSON (only `state.json` jobs move to stored, and `write_post` is only
+// called from `saveArchivedPost` with capture-time states). `textState: 'unknown'` is never
+// produced either. `parseArchivedPost` already requires `resources` to match
+// `getXPostMediaUrls(data)` 1:1, so the list is derivable; keep in the JSON only the capture-time
+// exceptions (`unsupported-hls`, `source-missing`) or nothing, and delete this merge.
 export function mergeArchivedPost(
   previous: ArchivedXPost | undefined,
   incoming: ArchivedXPost,

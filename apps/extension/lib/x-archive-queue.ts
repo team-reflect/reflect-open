@@ -9,6 +9,8 @@ import {
   type DownloadRecord,
 } from './x-download-store'
 
+// FIXME: goes away with the x-download.ts FIXME (the desktop downloads). The `bindings` handling
+// here mirrors the native host's `work.bind` layer, see apps/native-host/src/x_archive.rs.
 let running: Promise<void> | undefined
 export async function enqueueArchivedCapture(envelope: { id: string }): Promise<void> {
   await putRecord('captures', { id: envelope.id, envelope })

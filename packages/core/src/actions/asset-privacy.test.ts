@@ -47,6 +47,8 @@ it('does not return a send verdict when archive ownership cannot be read', async
   ).rejects.toThrow('unreadable archive')
 })
 
+// FIXME: stray ' , ' left from an em-dash removal in an existing title that should have stayed
+// byte-identical; restore it.
 describe('classifyAssetFromNotes , vault-wide references', () => {
   it('blocks an asset a private note embeds by bare filename', async () => {
     // The index stored `photo.png`; the file is `Media/photo.png`.

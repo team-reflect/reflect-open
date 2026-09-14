@@ -18,6 +18,13 @@ export class XPostResolverHost {
   readonly #allowedByPost = new Map<string, Set<string>>()
   readonly #inflight = new Map<string, Promise<XPost | undefined>>()
   readonly #resourceStates = new Map<string, string>()
+  // FIXME: `#retryTokens` / `?retry=N` cache busting exists because the protocol handler may 503
+  // after 30s while the download continues and the browser then remembers the failed <img>. The
+  // response already carries `Cache-Control: no-store`, and with desktop-driven downloads plus an
+  // event (see extension lib/x-download.ts) the URL never needs to change. `#fingerprints`
+  // (JSON.stringify of the whole archive every 2s per subscribed post), `#epoch`, `#polling` and
+  // `#resourceStates` are all bookkeeping for the polling design and go with it.
+  // `x_archive_resolve` also returns `error` and `bytes` per resource that nothing here reads.
   readonly #retryTokens = new Map<string, number>()
   #active = true
   #epoch = 0
@@ -29,6 +36,11 @@ export class XPostResolverHost {
     this.#generation = generation
   }
 
+  // FIXME: `#allowedByPost` exists only so post-embed's `getSafeUrl` accepts `reflect-asset:` URLs.
+  // Every URL it allows was minted by this class from `generation/x-media/<id>/<hash>` and Rust
+  // validates ownership again on request, so the map guards nothing. A prefix check against
+  // `convertFileSrc(generation + '/x-media/', 'reflect-asset')`, or a protocol allowlist prop in
+  // post-embed, replaces it.
   readonly resolveXPostMediaUrl: MediaUrlResolver = (url) => {
     if (!this.#active) return
     for (const allowed of this.#allowedByPost.values()) if (allowed.has(url)) return url

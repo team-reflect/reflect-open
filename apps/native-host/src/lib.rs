@@ -77,6 +77,9 @@ fn handle_message(payload: &[u8], pointer_path: &Path) -> Result<(), HostError> 
     let value: serde_json::Value = serde_json::from_slice(payload)
         .map_err(|_| HostError::InvalidPayload("Invalid capture JSON".into()))?;
     match value["envelope"].get("kind") {
+        // FIXME: dead arm now that bookmarks arrive as `op: capture.put`; fold into `Some(_)`. In
+        // `run` the payload is also parsed twice (once to sniff `op`, again in
+        // `x_archive::process`).
         Some(kind) if kind == "x-bookmark" => return Err(HostError::UnsupportedVersion),
         Some(_) => return Err(HostError::InvalidPayload("Unexpected capture kind".into())),
         None => {}

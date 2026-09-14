@@ -62,6 +62,9 @@ export default defineBackground(() => {
   const flushArchive = () => {
     flushArchivedCaptures().catch(() => {})
   }
+  // FIXME: a second alarm that wakes the worker every minute forever, next to the existing
+  // `RETRY_ALARM` (15 min) retry path. Hook `flushArchive` into the existing alarm/`flushQueue`
+  // instead (or delete it with the desktop-download FIXME in lib/x-download.ts).
   browser.alarms.create('x-archive-retry', { periodInMinutes: 1 }).catch(() => {})
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === 'x-archive-retry') flushArchive()
@@ -72,6 +75,9 @@ export default defineBackground(() => {
     if (
       sender.id === browser.runtime.id &&
       sender.tab == null &&
+      // FIXME: the `enqueue` message right below has no sender check; runtime messages already come
+      // only from this extension's own pages, so `sender.id === browser.runtime.id` (if anything)
+      // is enough. Also reuse `postIdSchema` instead of the inline regex.
       sender.url === browser.runtime.getURL('/popup.html')
     ) {
       const save = z

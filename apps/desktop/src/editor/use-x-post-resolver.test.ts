@@ -44,6 +44,9 @@ function archivedPost(
   }
 }
 
+// FIXME: this pins the 2-second polling implementation (`advanceTimersByTimeAsync(2000)`) and
+// asserts six things in one test. Once notification is event-driven, test 'notify fires when the
+// archive changes' and 'media URLs are rewritten' separately, without fake timers.
 it('notifies a missing card when its archive first arrives and rewrites media URLs', async () => {
   setBridge({ invoke: async () => null, listen: async () => () => {} })
   const resolve = vi.mocked(resolveArchivedPost)

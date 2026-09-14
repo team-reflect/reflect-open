@@ -15,6 +15,9 @@ export interface CaptureRecord {
   error?: string
 }
 
+// FIXME: three object stores and ~100 lines of hand-rolled IndexedDB promise wrappers. If any
+// persistence survives the x-download.ts FIXME, `idb-keyval` (or WXT's `storage`) covers this in a
+// few lines.
 let opened: Promise<IDBDatabase> | undefined
 function database(): Promise<IDBDatabase> {
   if (opened) return opened

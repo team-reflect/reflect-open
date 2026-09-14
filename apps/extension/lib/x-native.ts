@@ -8,6 +8,8 @@ const responseSchema = z.discriminatedUnion('ok', [
 ])
 export async function sendArchiveMessage(request: ArchiveRequest) {
   const message = { version: 2, ...request }
+  // FIXME: self-imposed 512 KB limit; the host already accepts 64 MiB frames (protocol.rs). See
+  // x-download.ts.
   if (new TextEncoder().encode(JSON.stringify(message)).byteLength > CAPTURE_MESSAGE_MAX_BYTES) {
     throw new Error('payload-too-large')
   }

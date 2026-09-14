@@ -17,6 +17,19 @@ import {
   type DownloadRecord,
 } from './x-download-store'
 
+// FIXME: This entire extension-side download pipeline (this file, x-download-store.ts,
+// x-archive-queue.ts, x-native.ts, the `asset.append`/`commit`/`abort`/`status` lease+offset
+// protocol in crates/x-archive and apps/native-host/src/x_archive.rs,
+// `ArchiveJob`/`ArchiveRequest`/`archiveJobSchema` in core, the twimg host_permissions, roughly 900
+// lines) rests on the assumption that media must be fetched with the user's X cookies. It does not:
+// pbs.twimg.com and video.twimg.com serve photos, posters, avatars and MP4s to anonymous requests
+// (verified with plain `curl -I`: HTTP 200, Accept-Ranges: bytes). The desktop already has a
+// reqwest client and a remote asset downloader (`apps/desktop/src-tauri/src/fs/import_assets.rs`
+// `download_remote_assets`). Let the native host only spool the envelope into `.reflect/inbox`
+// (exactly what the deleted `bookmark.rs` did) and let the desktop download pending resources into
+// `.part` + rename after it writes the post JSON. That also deletes both polling loops (`XPostHost`
+// every 2s, `x_media_protocol.rs` every 500ms) because the desktop knows the moment a file lands
+// and can emit an event.
 function toBase64(bytes: Uint8Array): string {
   let text = ''
   for (let start = 0; start < bytes.length; start += 8192) {
@@ -95,6 +108,13 @@ export async function downloadJob(binding: string, job: ArchiveJob): Promise<voi
         failure = limit === VIDEO_MAX_BYTES ? 'video-too-large' : 'format'
         throw new Error(failure)
       }
+      // FIXME: even if the extension keeps downloading: `browser.runtime.sendNativeMessage` starts
+      // a new host process per message, so every 256 KB chunk spawns a process, locks and rewrites
+      // `state.json` (with fsync). Chrome allows extension-to-host messages up to 64 MiB
+      // (`apps/native-host/src/protocol.rs` already enforces that cap); the 512 KB
+      // `CAPTURE_MESSAGE_MAX_BYTES` is self-imposed. Send each file in one message (X images are a
+      // few MB, videos are capped at 10 MB): no offsets, leases, resumable appends or IndexedDB
+      // chunk store, and a failed download simply retries from scratch on the next alarm.
       for (let start = 0; start < part.value.byteLength; start += ASSET_CHUNK_MAX_BYTES) {
         const chunk = part.value.slice(start, start + ASSET_CHUNK_MAX_BYTES)
         const offset = record.bytes

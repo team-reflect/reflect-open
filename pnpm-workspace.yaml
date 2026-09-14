@@ -26,6 +26,8 @@ minimumReleaseAgeExclude:
   - prosemirror-flat-list
   - prosemirror-view
 
+# FIXME: pkg.pr.new overrides are a local testing hack; remove before merging (`blockExoticSubdeps`
+# too).
 blockExoticSubdeps: false
 overrides:
   '@post-embed/types': https://pkg.pr.new/@post-embed/types@7bc1a3259420e2060f3183eec77557183abd7e66

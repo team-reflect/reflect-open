@@ -2,6 +2,9 @@ import { XPostSchema } from '@post-embed/schema'
 import { safeParse } from 'valibot'
 import { z } from 'zod'
 
+// FIXME: duplicate of `postIdSchema` in `@reflect/core/capture-envelope`. And the
+// `postIdSchema.safeParse(parsed.output.id)` below is redundant: `XPostSchema` already enforces the
+// same regex on `id`.
 export const postIdSchema = z.string().regex(/^[1-9]\d{0,19}$/)
 
 export const capturedPostSchema = z.unknown().transform((input, context) => {

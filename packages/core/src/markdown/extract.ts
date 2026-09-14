@@ -481,6 +481,12 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
         if (link) {
           const postId = parseXPostId(link.href)
           if (postId)
+            // FIXME: every X permalink in every note now produces an asset row pointing at a
+            // `post-<id>.json` that may not exist (tweets that were never archived), purely so
+            // `assetReferencingNotePaths` can walk media file -> owner post JSON -> note. If
+            // ownership is answered from `state.json` job `post_ids` (see desktop x_archive.rs),
+            // the walk is media -> post id -> notes containing that permalink, which the existing
+            // link index already answers without phantom asset refs.
             assets.push({ path: 'assets/x/post-' + postId + '.json', from: link.from, to: link.to })
           const candidates = attachmentReferenceCandidates(path, link.href)
           if (candidates.length > 0) {

@@ -4,6 +4,10 @@ import { z } from 'zod'
 export const postIdSchema = z.string().regex(/^[1-9]\d{0,19}$/)
 
 /** URL-only X bookmark capture; the desktop derives the permalink from `postId`. */
+// FIXME: `bookmark-envelope.fixtures.json` now repeats the same 15-line `archive` object seven
+// times. The Rust test that consumed it as language-neutral JSON was deleted with `bookmark.rs`, so
+// build the cases in the TS test from one shared `archive` constant instead. Also see x-save.ts:
+// `postId`/`capturedAt`/`id` are duplicated inside `archive`.
 export const bookmarkEnvelopeSchema = z.object({
   archive: archivedPostSchema,
   version: z.literal(2),

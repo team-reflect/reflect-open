@@ -9,6 +9,9 @@ use tauri::http::{Request, Response, StatusCode};
 use tauri::{AppHandle, Manager, Runtime, UriSchemeResponder};
 use tokio::sync::Semaphore;
 
+// FIXME: two semaphores (128 waiters, 2 readers) on top of `spawn_blocking`, which is already a
+// bounded pool; drop both. HEAD support is unused: WebKit and Chromium media loaders issue GET with
+// Range.
 fn waiters() -> &'static Arc<Semaphore> {
     static VALUE: OnceLock<Arc<Semaphore>> = OnceLock::new();
     VALUE.get_or_init(|| Arc::new(Semaphore::new(128)))
@@ -28,6 +31,8 @@ fn error(status: StatusCode) -> Response<Cow<'static, [u8]>> {
         .body(Cow::Borrowed(&[] as &[u8]))
         .expect("valid response")
 }
+// FIXME: ~40 lines of hand-rolled Range parsing; the `http-range-header` crate (or
+// `headers::Range`) does this, including suffix ranges and 416 semantics.
 fn range(header: Option<&str>, length: u64) -> Result<Option<(u64, u64)>, ()> {
     let Some(header) = header else {
         return Ok(None);
@@ -101,6 +106,13 @@ async fn serve<R: Runtime>(
     let Ok(_waiter) = waiters().clone().try_acquire_owned() else {
         return error(StatusCode::SERVICE_UNAVAILABLE);
     };
+    // FIXME: this loop keeps the request pending for up to 30s, calling `ensure_resource` every
+    // 500ms, and each call locks and rewrites `state.json` with fsync (see crates/x-archive
+    // `with_state`). For a post with several pending images that is several state rewrites per
+    // second. With desktop-driven downloads (extension lib/x-download.ts FIXME) there is nothing to
+    // wait for: answer 404 immediately and let the host notify the card when the file lands.
+    // `root_for_generation` is also re-checked three times per request (here, before the read,
+    // after the read); once is enough because the path is resolved under that root.
     let deadline = Instant::now() + Duration::from_secs(30);
     let receipt = loop {
         let Ok(root) = super::root_for_generation(&app.state::<GraphState>(), generation) else {

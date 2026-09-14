@@ -45,6 +45,10 @@ export function parseArchivedPost(input: unknown): ArchivedXPost {
         media.type !== 'photo' &&
         (media.sources.length > 1 || media.sources.some((source) => source.type !== 'video/mp4'))
       ) {
+        // FIXME: `invalid-video-selection` and `unregistered-media-url` make the *reader* reject a
+        // post JSON that a newer producer wrote with two sources or one extra URL, contrary to the
+        // 'unknown fields are allowed' rule for this file. Selection is a producer concern
+        // (`createArchivedPost`); the reader should only validate `XPostSchema` and the id.
         throw new Error('invalid-video-selection')
       }
     }
@@ -57,6 +61,9 @@ export function parseArchivedPost(input: unknown): ArchivedXPost {
   }
   return { ...archive, data: post.output }
 }
+// FIXME: zod wrapping valibot via `z.unknown().transform` + try/catch, and the extension's
+// `capturedPostSchema` does the same dance again. One shared `zodFromValibot(schema)` helper, or
+// keep this file entirely in one library (core already depends on both).
 export const archivedPostSchema = z.unknown().transform((value, context) => {
   try {
     return parseArchivedPost(value)
@@ -65,6 +72,10 @@ export const archivedPostSchema = z.unknown().transform((value, context) => {
     return z.NEVER
   }
 })
+// FIXME: `archiveJobSchema`, and
+// `ArchiveJob`/`ArchiveReceipt`/`ArchiveRequest`/`CAPTURE_MESSAGE_MAX_BYTES`/`ASSET_CHUNK_MAX_BYTES`
+// in types.ts, describe the extension<->host transfer protocol; see
+// apps/extension/lib/x-download.ts.
 export const archiveJobSchema = z.object({
   id: z.string().regex(/^url_sha256_[a-f0-9]{64}$/),
   resource: archiveResourceSchema,
