@@ -147,6 +147,7 @@ jobs:
           ref: ${{ needs.package.outputs.commit }}
           persist-credentials: false
 
+      # FIXME: add a new .github/actions/setup-node/action.yml that installs Node and pnpm, and use it here instead of the two steps below. Update all CI workflows to use the new action for node.js and pnpm setup.
       - name: Install pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
