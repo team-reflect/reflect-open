@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.12.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.5...v0.12.0-beta.6) (2026-09-14)
+
+
+### Features
+
+* **extension:** move the X bookmark switch to an options page ([#1285](https://github.com/team-reflect/reflect-open/issues/1285)) ([f19b134](https://github.com/team-reflect/reflect-open/commit/f19b1341c6b6d15d5b08611eea8b9327eb7fb006))
+* save X posts and media for offline reading ([#1284](https://github.com/team-reflect/reflect-open/issues/1284)) ([b72a93c](https://github.com/team-reflect/reflect-open/commit/b72a93cb153ed00362f0efe9f811ee9147da1e43))
+
+
+### Bug Fixes
+
+* **mobile:** avoid loading flashes on first tab switch ([#1271](https://github.com/team-reflect/reflect-open/issues/1271)) ([0dfe0b1](https://github.com/team-reflect/reflect-open/commit/0dfe0b15899c033e801b883c5c782b464d6703f4))
+* update meowdown to ^0.70.0 ([#1273](https://github.com/team-reflect/reflect-open/issues/1273)) ([11ffb9d](https://github.com/team-reflect/reflect-open/commit/11ffb9d8f627a6f42d04a4aefa83c1cb92908c79))
+
 ## [0.12.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.4...v0.12.0-beta.5) (2026-09-12)
 
 
