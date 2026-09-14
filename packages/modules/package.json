@@ -12,11 +12,11 @@
     "./ai-sdk/openai-compatible": "./src/ai-sdk/openai-compatible.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.48",
-    "@ai-sdk/google": "^4.0.63",
-    "@ai-sdk/openai": "^4.0.57",
-    "@ai-sdk/openai-compatible": "^3.0.43",
-    "ai": "^7.0.93"
+    "@ai-sdk/anthropic": "^4.0.53",
+    "@ai-sdk/google": "^4.0.69",
+    "@ai-sdk/openai": "^4.0.66",
+    "@ai-sdk/openai-compatible": "^3.0.48",
+    "ai": "^7.0.99"
   },
   "devDependencies": {
     "@ocavue/tsconfig": "^0.7.1",

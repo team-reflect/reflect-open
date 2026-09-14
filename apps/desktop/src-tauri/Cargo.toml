@@ -32,7 +32,7 @@ tauri-plugin-opener = "2.5.5"
 percent-encoding = "2.3.2"
 # `time` backs the bounded wait in `windows::close_note_windows` (tauri
 # already runs on tokio; this only makes the sleep primitive addressable).
-tokio = { version = "1.52.3", features = ["time"] }
+tokio = { version = "1.53.1", features = ["time"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 # `hooks` adds the authorizer API used to lock the read-only `db_query` bridge
@@ -44,7 +44,7 @@ tempfile = { workspace = true }
 sha2 = { workspace = true }
 dirs = "6.0.0"
 tauri-plugin-dialog = "2.7.3"
-base64 = "0.23.0"
+base64 = "0.23.1"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 keyring = { version = "3.6.3", features = [
@@ -166,7 +166,7 @@ tauri-plugin-app-store = { path = "../../../plugins/tauri-plugin-app-store" }
 tauri-plugin-updater = "2.11.0"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-window-state = "2.4.1"
-trash = "5.2.6"
+trash = "5.2.8"
 notify = "8.2.0"
 notify-debouncer-full = "0.7.0"
 # The watcher's pruned file-ID cache (rename stitching without the full-tree
