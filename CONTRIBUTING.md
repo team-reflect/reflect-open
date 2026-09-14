@@ -44,6 +44,7 @@ commit message and, for `feat`/`fix`, the user-facing changelog entry.
   ships in the next release, it just gets no changelog line.
 - GitHub's Revert button writes `Revert "…"`; retitle it to `revert: …`.
 
+<!--remove this section FIXME -->
 ## Chrome extension releases
 
 Use `feat(extension):` or `fix(extension):` for extension behavior changes.
