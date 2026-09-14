@@ -58,11 +58,11 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.3.0)
       '@meowdown/core':
-        specifier: ^0.71.0
-        version: 0.71.0(@lezer/common@1.5.2)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(supports-color@7.2.0)(typescript@6.0.3)
+        specifier: ^0.71.1
+        version: 0.71.1(@lezer/common@1.5.2)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(supports-color@7.2.0)(typescript@6.0.3)
       '@meowdown/react':
-        specifier: ^0.71.0
-        version: 0.71.0(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(react-dom@19.3.0)(react@19.3.0)(supports-color@7.2.0)(typescript@6.0.3)
+        specifier: ^0.71.1
+        version: 0.71.1(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(react-dom@19.3.0)(react@19.3.0)(supports-color@7.2.0)(typescript@6.0.3)
       '@ocavue/utils':
         specifier: ^1.8.0
         version: 1.8.0
@@ -231,7 +231,7 @@ importers:
     dependencies:
       '@post-embed/exporter':
         specifier: ^0.4.0
-        version: 0.4.0(typescript@6.0.3)
+        version: 0.4.1(typescript@6.0.3)
       '@post-embed/schema':
         specifier: ^0.4.0
         version: 0.4.0(typescript@6.0.3)
@@ -290,8 +290,8 @@ importers:
   packages/core:
     dependencies:
       '@meowdown/markdown':
-        specifier: ^0.71.0
-        version: 0.71.0
+        specifier: ^0.71.1
+        version: 0.71.1
       '@post-embed/schema':
         specifier: ^0.4.0
         version: 0.4.0(typescript@6.0.3)
@@ -1152,14 +1152,14 @@ packages:
   '@marijn/find-cluster-break@1.0.3':
     resolution: {integrity: sha512-FY+MKLBoTsLNJF/eLWaOsXGdz6uh3Iu1axjPf6TUq92IYumcTcXWHoS747JARLkcdlJ/Waiaxc5wQfFO8jC6NA==}
 
-  '@meowdown/core@0.71.0':
-    resolution: {integrity: sha512-Cfcff1Apfr2hd1CIObtQWjj64zdnLOoxCqpmtf2cGelnceYZhDgoJSRjPHSKjXMOBJ4wNf5ODMVzjvJSlL1yDA==}
+  '@meowdown/core@0.71.1':
+    resolution: {integrity: sha512-eFQBTKVrW5mTFgwYvExLIOH45apWkzd/XdTyPDZiirjgt/gnI6v/mNzHyciMoot1Kj15j84nuXKcsYu/v5NbUA==}
 
-  '@meowdown/markdown@0.71.0':
-    resolution: {integrity: sha512-CTUoaOUeuta9FX+g5qMOvbQTdyQIzKGgkienzSug9od6WgLNkrtqUQYgOawghcA1M3fNbmEQ8A7/Q313Vubsiw==}
+  '@meowdown/markdown@0.71.1':
+    resolution: {integrity: sha512-WEmQU782lCAlzi9WEOVK/uPGT/EP9ktQLAGvl1S76n1ySu7KK7R8dBAGJ41Z7FlxJnNDxTqVf9XZOY8ZWBjUAQ==}
 
-  '@meowdown/react@0.71.0':
-    resolution: {integrity: sha512-V2ZTJprqOQV8/AOBAkU3uKvN0II+OkkLPwyLFDJXoVxe1heyvnR09zd/xHQMCeaKKd0e7sVeaULtzIL/D+9ANw==}
+  '@meowdown/react@0.71.1':
+    resolution: {integrity: sha512-HEI/Rle0m+rE6tW9kH8RPEdDD2SfBYW3NkWZBAdOZ7zcxoxX5ZCFENQn36QUjamxh4VJCzlMEU+bFKTMwzOqxA==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -1461,14 +1461,17 @@ packages:
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
 
-  '@post-embed/elements@0.4.0':
-    resolution: {integrity: sha512-ZjXhrFlLc1FGDBwRfiIn1wmbIkgHIbil23l9kerBaGpw/QCXfVhDmG72msdwiJ2q0IUdJiXq9PZbM4fp+VLygg==}
+  '@post-embed/elements@0.4.1':
+    resolution: {integrity: sha512-CUswOGLePn+ykNBmxyeSOk1IRLgYdjq5VOdcu92CMzicHTMlbqnztV57B1GfY9AFg2+E9TKfbmoH2I9ymlYCmA==}
 
-  '@post-embed/exporter@0.4.0':
-    resolution: {integrity: sha512-dvrzxBp1yxF+h8GCQ1iz8VTXzibqM0dFPqBxTqiMdTELLZc4BCCtfDbnC25MbFtt7ftlT5pxv6pynj+jglUPCw==}
+  '@post-embed/exporter@0.4.1':
+    resolution: {integrity: sha512-4c6Y2p0CnjgWkiMQQWtfFwbdQJInguJyZmzyb/2dps3ugJFr1b9IW/zcNJ2KIEZCQO/+ZA/kvADL/9ODEMuPlg==}
 
   '@post-embed/schema@0.4.0':
     resolution: {integrity: sha512-1nA5+D8iQWzROPZtuTMrdS6y/RjRd1xPpVIIVFK/Lodp6GhCCiFrlC2szd0Ebytm8mYNrEugCSMeN3x6bbuOqA==}
+
+  '@post-embed/schema@0.5.0':
+    resolution: {integrity: sha512-ErtsyXf6LEdu2E2IUmMGu5CcR1UpxTj94529isRVYqcp9YVUZvT81PRXCL/05t61YaR1imnJr/5e2CIGYXBvlg==}
 
   '@post-embed/types@0.4.0':
     resolution: {integrity: sha512-mOpgMA9i4Zvpnx08T/oaS9vKSdRFctIcT0lqZwVkiX+sJGwd8yeb5g5OURU+99maEVyWrtSGGj5BsXwlkRzNyw==}
@@ -6956,17 +6959,17 @@ snapshots:
 
   '@marijn/find-cluster-break@1.0.3': {}
 
-  '@meowdown/core@0.71.0(@lezer/common@1.5.2)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(supports-color@7.2.0)(typescript@6.0.3)':
+  '@meowdown/core@0.71.1(@lezer/common@1.5.2)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(supports-color@7.2.0)(typescript@6.0.3)':
     dependencies:
       '@codemirror/language': 6.12.4
       '@codemirror/language-data': 6.5.2
       '@floating-ui/dom': 1.8.0
       '@lezer/highlight': 1.2.3
-      '@meowdown/markdown': 0.71.0
+      '@meowdown/markdown': 0.71.1
       '@ocavue/utils': 1.8.0
-      '@post-embed/elements': 0.4.0(typescript@6.0.3)
-      '@post-embed/exporter': 0.4.0(typescript@6.0.3)
-      '@post-embed/schema': 0.4.0(typescript@6.0.3)
+      '@post-embed/elements': 0.4.1(typescript@6.0.3)
+      '@post-embed/exporter': 0.4.1(typescript@6.0.3)
+      '@post-embed/schema': 0.5.0(typescript@6.0.3)
       '@post-embed/types': 0.4.0
       '@prosekit/core': 0.13.2(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)
       '@prosekit/extensions': 0.18.2(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)
@@ -7006,17 +7009,17 @@ snapshots:
       - y-prosemirror
       - yjs
 
-  '@meowdown/markdown@0.71.0':
+  '@meowdown/markdown@0.71.1':
     dependencies:
       '@lezer/common': 1.5.2
       '@lezer/markdown': 1.7.2
 
-  '@meowdown/react@0.71.0(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(react-dom@19.3.0)(react@19.3.0)(supports-color@7.2.0)(typescript@6.0.3)':
+  '@meowdown/react@0.71.1(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(react-dom@19.3.0)(react@19.3.0)(supports-color@7.2.0)(typescript@6.0.3)':
     dependencies:
       '@base-ui/react': 1.8.0(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.0)(react@19.3.0)
-      '@meowdown/core': 0.71.0(@lezer/common@1.5.2)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(supports-color@7.2.0)(typescript@6.0.3)
+      '@meowdown/core': 0.71.1(@lezer/common@1.5.2)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(supports-color@7.2.0)(typescript@6.0.3)
       '@ocavue/utils': 1.8.0
-      '@post-embed/elements': 0.4.0(typescript@6.0.3)
+      '@post-embed/elements': 0.4.1(typescript@6.0.3)
       '@post-embed/types': 0.4.0
       '@prosekit/core': 0.13.2(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)
       '@prosekit/pm': 0.1.19
@@ -7248,19 +7251,19 @@ snapshots:
 
   '@polka/url@1.0.0-next.29': {}
 
-  '@post-embed/elements@0.4.0(typescript@6.0.3)':
+  '@post-embed/elements@0.4.1(typescript@6.0.3)':
     dependencies:
       '@aria-ui/core': 0.2.1
-      '@post-embed/schema': 0.4.0(typescript@6.0.3)
+      '@post-embed/schema': 0.5.0(typescript@6.0.3)
       '@post-embed/types': 0.4.0
       crelt: 1.0.7
     transitivePeerDependencies:
       - typescript
 
-  '@post-embed/exporter@0.4.0(typescript@6.0.3)':
+  '@post-embed/exporter@0.4.1(typescript@6.0.3)':
     dependencies:
       '@ocavue/utils': 1.8.0
-      '@post-embed/schema': 0.4.0(typescript@6.0.3)
+      '@post-embed/schema': 0.5.0(typescript@6.0.3)
       '@post-embed/types': 0.4.0
       birpc: 4.2.0
       entities: 8.1.0
@@ -7270,6 +7273,14 @@ snapshots:
       - typescript
 
   '@post-embed/schema@0.4.0(typescript@6.0.3)':
+    dependencies:
+      '@post-embed/types': 0.4.0
+      '@standard-schema/spec': 1.1.0
+      valibot: 1.5.0(typescript@6.0.3)
+    transitivePeerDependencies:
+      - typescript
+
+  '@post-embed/schema@0.5.0(typescript@6.0.3)':
     dependencies:
       '@post-embed/types': 0.4.0
       '@standard-schema/spec': 1.1.0
