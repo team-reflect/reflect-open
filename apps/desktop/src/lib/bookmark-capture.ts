@@ -1,22 +1,16 @@
-import {
-  appendBookmark,
-  isAppError,
-  readNote,
-  writeNote,
-  type BookmarkEnvelope,
-} from '@reflect/core'
+import { appendXPost, isAppError, readNote, writeNote, type XPostEnvelope } from '@reflect/core'
 import { openSession } from '@/editor/open-documents'
 
-/** Route a bookmark through the live daily document, or a revision-checked file write. */
-export async function commitBookmark(
-  envelope: BookmarkEnvelope,
+/** Route an X post through the live daily document, or a revision-checked file write. */
+export async function commitXPost(
+  envelope: XPostEnvelope,
   path: string,
   generation: number,
 ): Promise<void> {
   const owner = openSession(path)
   if (owner !== null) {
-    if (!(await owner.commitSourceEdit((source) => appendBookmark(source, envelope)))) {
-      throw new Error('Resolve or finish loading the daily note before saving bookmarks')
+    if (!(await owner.commitSourceEdit((source) => appendXPost(source, envelope)))) {
+      throw new Error('Resolve or finish loading the daily note before saving X posts')
     }
     return
   }
@@ -30,11 +24,11 @@ export async function commitBookmark(
   // A document may have opened while the filesystem read was pending.
   const opened = openSession(path)
   if (opened !== null) {
-    if (!(await opened.commitSourceEdit((current) => appendBookmark(current, envelope)))) {
-      throw new Error('The daily note is busy; bookmark remains queued')
+    if (!(await opened.commitSourceEdit((current) => appendXPost(current, envelope)))) {
+      throw new Error('The daily note is busy; X post remains queued')
     }
     return
   }
-  const next = appendBookmark(source ?? '', envelope)
+  const next = appendXPost(source ?? '', envelope)
   if (next !== source) await writeNote(path, next, generation, source)
 }

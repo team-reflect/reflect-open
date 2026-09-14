@@ -56,6 +56,7 @@ fn pointer_json(root: &Path) -> String {
         "version": 1,
         "graphRoot": root.to_string_lossy(),
         "bookmarkVersion": 2,
+        "xLikeVersion": 2,
     })
     .to_string()
 }
@@ -639,6 +640,7 @@ mod tests {
         assert_eq!(parsed["version"], 1);
         assert_eq!(parsed["graphRoot"], "/graphs/personal");
         assert_eq!(parsed["bookmarkVersion"], 2);
+        assert_eq!(parsed["xLikeVersion"], 2);
     }
 
     #[test]

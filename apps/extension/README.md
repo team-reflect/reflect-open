@@ -177,8 +177,13 @@ listing only after checking its current published and submitted versions.
 >
 > Bookmarking a post on X also saves its link to Reflect. This is enabled by
 > default and can be turned off in the extension's options (right-click the
-> toolbar icon and choose Options). The extension observes bookmark requests
-> on x.com to identify the post you chose to save.
+> toolbar icon and choose Options). You can independently enable "Save new X
+> likes to my daily note" there. Likes are off by default. New likes are saved
+> under "X likes"; bookmarking and liking the same post on one day saves it once.
+> Existing likes are not imported, and unliking does not remove saved content.
+> The extension records requests on x.com in this browser, even if X later
+> rejects the action. When available, captured post data follows the same
+> offline archive path for likes and bookmarks; otherwise the URL is kept.
 >
 > Captures are handed to the **installed Reflect desktop app** over a local connection
 > on your own machine — there is no Reflect account and no Reflect server in the path.
@@ -214,14 +219,16 @@ Each is reviewed individually; every permission below is exercised by the code:
 | `storage` | Queue captures locally so a capture survives the app being closed and retries until it spools. |
 | `unlimitedStorage` | Queued captures embed a screenshot data URL, which can exceed the default storage quota while waiting for the app. |
 | `alarms` | A coarse retry timer so held captures flush once Reflect is installed/launched later. |
-| `webRequest` + `https://x.com/*` | Observe bookmark requests on x.com to save the post link to your daily note. |
+| `webRequest` + `https://x.com/*` | Observe enabled bookmark and like requests on x.com to save the post to your daily note. |
 
 ### Data-handling disclosures (Privacy practices tab)
 
 - **Data collected:** *Website content* (the captured page's URL, title, selection,
-  screenshot, and optional page text), plus the post identifier/link when you
-  bookmark on X with bookmark capture enabled. The background worker observes
-  X bookmark requests; it does not capture unrelated browsing content.
+  screenshot, and optional page text), plus the post identifier and available
+  post snapshot when you bookmark or like on X with that capture setting enabled.
+  The background worker observes the selected actions on x.com; it does not
+  capture unrelated browsing content. Disabling a setting stops new captures;
+  already accepted captures continue delivery.
 - **Where it goes:** to the user's own machine (the local Reflect desktop app). It is
   **not** sent to Reflect or any third party.
 - The three required certifications are all true and can be affirmed:

@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser'
-import { bookmarkWireSchema } from '@reflect/core/capture-envelope'
+import { bookmarkWireSchema, likeWireSchema } from '@reflect/core/capture-envelope'
 import { bookmarkEnvelopeFixtures as fixtures } from '../../../packages/core/src/actions/bookmark-envelope.fixtures'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CaptureWireMessage } from '@reflect/core/capture-envelope'
@@ -199,5 +199,35 @@ it('replays the same event after a lost ACK', async () => {
     bookmark.envelope.id,
     bookmark.envelope.id,
   ])
+  expect(await readQueue()).toEqual([])
+})
+
+it('retains a held like and still delivers a supported page capture', async () => {
+  const like = likeWireSchema.parse({
+    envelope: {
+      version: 2,
+      kind: 'x-like',
+      id: FIRST,
+      postId: '20',
+      source: 'extension',
+      capturedAt: '2026-09-09T04:00:00Z',
+    },
+  })
+  await enqueueCapture(like)
+  await enqueueCapture(wire(SECOND))
+  sendMock.mockResolvedValueOnce({
+    kind: 'held',
+    reason: 'unsupported-version',
+    message: 'Update Reflect',
+  })
+  const result = await flushQueue()
+  expect(result).toMatchObject({ sent: 1, held: 1, failed: 0, holdReason: 'unsupported-version' })
+  expect((await readQueue()).map((entry) => entry.wire.envelope.id)).toEqual([FIRST])
+})
+
+it('checks automatic admission policy inside the serialized queue operation', async () => {
+  const policy = vi.fn(async () => false)
+  await enqueueCapture(wire(FIRST), policy)
+  expect(policy).toHaveBeenCalledTimes(1)
   expect(await readQueue()).toEqual([])
 })

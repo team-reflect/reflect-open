@@ -2,6 +2,7 @@ import { browser } from 'wxt/browser'
 import type { ExtensionCaptureWire } from '@reflect/core/capture-envelope'
 import type { FlushResult } from './messages'
 import { sendToHost } from './native'
+import { writeCaptureDelivery } from './x-capture-status'
 import {
   QUEUE_CAP,
   queueKey,
@@ -36,10 +37,14 @@ let enqueueTail = Promise.resolve()
  * serialized so a full queue refuses the newcomer instead of evicting an
  * accepted capture.
  */
-export function enqueueCapture(wire: ExtensionCaptureWire): Promise<void> {
+export function enqueueCapture(
+  wire: ExtensionCaptureWire,
+  shouldAdmit?: () => Promise<boolean>,
+): Promise<void> {
   const next = enqueueTail.then(async () => {
     const entries = await readQueue()
     if (entries.some((entry) => entry.wire.envelope.id === wire.envelope.id)) return
+    if (shouldAdmit && !(await shouldAdmit())) return
     if (entries.length >= QUEUE_CAP) {
       throw new Error(
         'Capture queue full. Existing captures are kept; retry after they are delivered.',
@@ -101,16 +106,22 @@ async function runFlush(): Promise<FlushResult> {
         [queueKey(id)]: { ...entry, attempts: entry.attempts + 1 },
       })
       holdReason = outcome.reason
-      // Only a bookmark waits on a desktop update; page captures behind it still go.
-      if (outcome.reason !== 'unsupported-version') break
+      // Keep supported captures moving past held X captures.
+      if (outcome.reason !== 'unsupported-version' && entry.wire.envelope.kind !== 'x-like') break
     }
   }
 
-  return {
+  const result: FlushResult = {
     sent,
     failed: rejectedIds.length,
     rejectedIds,
     held: (await readQueue()).length,
     holdReason,
   }
+  try {
+    await writeCaptureDelivery(result)
+  } catch (cause) {
+    console.error('could not persist capture delivery status:', cause)
+  }
+  return result
 }

@@ -4,8 +4,8 @@
  * durable raw capture notes, then enrichment patches those notes later and
  * retries freely.
  */
-export { appendBookmark } from './bookmark-capture'
-export type { BookmarkEnvelope } from './bookmark-envelope'
+export { appendXPost } from './bookmark-capture'
+export type { BookmarkEnvelope, XPostEnvelope } from './bookmark-envelope'
 export {
   captureFromPath,
   captureIdentity,

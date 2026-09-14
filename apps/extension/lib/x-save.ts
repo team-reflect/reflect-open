@@ -1,15 +1,21 @@
 import { browser } from 'wxt/browser'
-import { bookmarkEnvelopeSchema } from '@reflect/core/capture-envelope'
+import { xPostEnvelopeSchema, type XPostKind } from '@reflect/core/capture-envelope'
 import { captureLookupResponseSchema } from './x-capture-messages'
 import { enqueueCapture, flushQueue } from './flush'
+
+interface SaveXPostOptions {
+  kind?: XPostKind
+  shouldAdmit?: () => Promise<boolean>
+}
 
 export async function saveXPost(
   tabId: number,
   postId: string,
   capturedAt = new Date().toISOString(),
-) {
+  options: SaveXPostOptions = {},
+): Promise<void> {
   const tab = await browser.tabs.get(tabId)
-  // Bookmarks can be created from the home timeline, not only a post permalink.
+  // X save actions can originate from the home timeline.
   if (tab.incognito || !tab.url || new URL(tab.url).origin !== 'https://x.com') {
     throw new Error('unsupported-tab')
   }
@@ -27,14 +33,14 @@ export async function saveXPost(
   } catch {
     // A missing bridge or closed tab does not erase the original save intent.
   }
-  const envelope = bookmarkEnvelopeSchema.parse({
+  const envelope = xPostEnvelopeSchema.parse({
     version: 2,
-    kind: 'x-bookmark',
+    kind: options.kind ?? 'x-bookmark',
     id: crypto.randomUUID(),
     source: 'extension',
     capturedAt,
     ...(post ? { data: post } : { postId }),
   })
-  await enqueueCapture({ envelope })
+  await enqueueCapture({ envelope }, options.shouldAdmit)
   await flushQueue()
 }

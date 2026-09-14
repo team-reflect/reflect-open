@@ -68,11 +68,16 @@ disk at call time), and it is covered by tests.
   stores no keys and makes no AI or network calls of its own.
 - **What:** the page you explicitly capture (toolbar button or ⌘⇧K): its URL,
   title, your current text selection, a screenshot of the visible tab, and, only when
-  you tick "Capture page text", the page's extracted text. When you bookmark a post
-  on X, the background worker observes the bookmark request on x.com and saves the
-  post identifier/link locally. X bookmark capture is enabled by default and can be
-  turned off in the extension's options page. Unrelated browsing content is not captured.
-- **When:** when you capture a page or bookmark on X with bookmark capture enabled. If the desktop app isn't reachable yet, the capture is
+  you tick "Capture page text", the page's extracted text. When enabled, X bookmark
+  and like capture observe the corresponding request on x.com and save the post
+  identifier and available post snapshot locally. Bookmark capture defaults to on;
+  like capture defaults to off. Both settings are independent in the extension's
+  options page. Existing likes and actions in native X apps are not imported.
+  Unliking does not remove content from Reflect. A request can be saved even if
+  X later rejects it. Unrelated browsing content is not captured.
+- **When:** when you capture a page or perform an enabled bookmark or like action
+  on x.com in this browser. Disabling a setting stops new captures; accepted ones
+  remain queued. If the desktop app isn't reachable yet, the capture is
   held in the browser's local extension storage and retried automatically until it
   spools — it is never sent anywhere else in the meantime.
 - Once a capture lands in your graph, the desktop app's rules above apply unchanged:

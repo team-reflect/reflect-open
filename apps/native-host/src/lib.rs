@@ -49,7 +49,7 @@ impl HostError {
     fn message(&self) -> String {
         match self {
             HostError::UnsupportedVersion => {
-                "Update and open Reflect before saving bookmarks.".into()
+                "Update and open Reflect before saving X posts.".into()
             }
             HostError::NoGraph => "Open Reflect and pick a graph first.".to_string(),
             HostError::InvalidPayload(message) | HostError::Io(message) => message.clone(),
@@ -77,8 +77,13 @@ fn handle_message(payload: &[u8], pointer_path: &Path) -> Result<(), HostError> 
     let value: serde_json::Value = serde_json::from_slice(payload)
         .map_err(|_| HostError::InvalidPayload("Invalid capture JSON".into()))?;
     match value["envelope"].get("kind") {
-        Some(kind) if kind == "x-bookmark" => {
-            return x_archive::spool(&value["envelope"], pointer_path)
+        Some(kind) if kind == "x-bookmark" || kind == "x-like" => {
+            if kind == "x-like" && value.as_object().is_none_or(|fields| fields.len() != 1) {
+                return Err(HostError::InvalidPayload(
+                    "Unexpected like message fields".into(),
+                ));
+            }
+            return x_archive::spool(&value["envelope"], pointer_path);
         }
         Some(_) => return Err(HostError::InvalidPayload("Unexpected capture kind".into())),
         None => {}
@@ -86,6 +91,31 @@ fn handle_message(payload: &[u8], pointer_path: &Path) -> Result<(), HostError> 
     let capture = ValidatedCapture::parse(payload)?;
     let inbox = inbox_dir(pointer_path)?;
     spool_capture(&inbox, &capture)
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapabilityRequest {
+    #[serde(rename = "type")]
+    kind: String,
+}
+
+/// Read capabilities without writing a capture or creating an inbox.
+fn capability_reply(payload: &[u8], pointer_path: &Path) -> Option<Vec<u8>> {
+    let request: CapabilityRequest = serde_json::from_slice(payload).ok()?;
+    if request.kind != "capture-capabilities" {
+        return None;
+    }
+    Some(match spool::read_pointer(pointer_path) {
+        Ok(pointer) => serde_json::json!({
+            "ok": true,
+            "status": "capabilities",
+            "xLikeVersion": pointer.x_like_version.filter(|version| *version == 2),
+        })
+        .to_string()
+        .into_bytes(),
+        Err(error) => ack_json(&Err(error)),
+    })
 }
 
 /// The host's whole life: read length-prefixed messages until EOF, ack each.
@@ -97,6 +127,10 @@ pub fn run(
     pointer_path: &Path,
 ) -> std::io::Result<()> {
     while let Some(payload) = read_message(input)? {
+        if let Some(reply) = capability_reply(&payload, pointer_path) {
+            write_message(output, &reply)?;
+            continue;
+        }
         let outcome = handle_message(&payload, pointer_path);
         if let Err(error) = &outcome {
             eprintln!("reflect-capture-host: {error:?}");
@@ -276,5 +310,69 @@ mod tests {
         let ack = read_ack(&output);
         assert_eq!(ack["ok"], false);
         assert_eq!(ack["code"], "invalid-payload");
+    }
+    #[test]
+    fn capability_probe_is_read_only_and_checks_current_pointer() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("pointer.json");
+        let probe = br#"{"type":"capture-capabilities"}"#;
+        for version in [None, Some(2)] {
+            std::fs::write(
+                &path,
+                serde_json::json!({
+                    "version": 1, "graphRoot": directory.path(),
+                    "bookmarkVersion": 2, "xLikeVersion": version,
+                })
+                .to_string(),
+            )
+            .unwrap();
+            let mut output = Vec::new();
+            run(&mut Cursor::new(framed(probe)), &mut output, &path).unwrap();
+            let ack = read_ack(&output);
+            assert_eq!(ack["status"], "capabilities");
+            assert_eq!(ack["xLikeVersion"], serde_json::json!(version));
+            assert!(!directory.path().join(".reflect/inbox").exists());
+        }
+        std::fs::remove_file(&path).unwrap();
+        let mut output = Vec::new();
+        run(&mut Cursor::new(framed(probe)), &mut output, &path).unwrap();
+        assert_eq!(read_ack(&output)["code"], "no-graph");
+        assert!(
+            capability_reply(br#"{"type":"capture-capabilities","extra":true}"#, &path).is_none()
+        );
+    }
+
+    #[test]
+    fn wire_dispatch_spools_like_only_for_capable_reader() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("pointer.json");
+        let payload = wire(
+            serde_json::json!({
+                "version": 2, "kind": "x-like", "postId": "20",
+                "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+                "capturedAt": "2026-09-09T04:00:00Z", "source": "extension",
+            }),
+            None,
+        );
+        for supported in [false, true] {
+            std::fs::write(
+                &path,
+                serde_json::json!({
+                    "version": 1, "graphRoot": directory.path(), "bookmarkVersion": 2,
+                    "xLikeVersion": if supported { Some(2) } else { None },
+                })
+                .to_string(),
+            )
+            .unwrap();
+            let mut output = Vec::new();
+            run(&mut Cursor::new(framed(&payload)), &mut output, &path).unwrap();
+            let ack = read_ack(&output);
+            if supported {
+                assert_eq!(ack["status"], "queued");
+            } else {
+                assert_eq!(ack["code"], "unsupported-version");
+                assert!(!directory.path().join(".reflect/inbox").exists());
+            }
+        }
     }
 }
