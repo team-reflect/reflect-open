@@ -3,7 +3,15 @@ import { join } from 'node:path'
 import { expect, test } from 'vitest'
 
 const scriptsDirectory = import.meta.dirname
-const workflowPath = join(scriptsDirectory, '..', '..', '..', '.github', 'workflows', 'release-app.yml')
+const workflowPath = join(
+  scriptsDirectory,
+  '..',
+  '..',
+  '..',
+  '.github',
+  'workflows',
+  'release-app.yml',
+)
 const workflow = readFileSync(workflowPath, 'utf8')
 
 test('Apple Silicon releases pin the runner and isolate Xcode build caches', () => {
