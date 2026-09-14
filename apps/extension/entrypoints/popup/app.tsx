@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { BookmarkControls } from './bookmark-controls'
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react'
 import { browser } from 'wxt/browser'
 import { readQueue } from '@/lib/flush'
@@ -206,7 +205,15 @@ export function CapturePopup(): ReactElement {
           </p>
         ) : null}
       </form>
-      <BookmarkControls />
+      <div className="flex justify-end border-t border-border px-3 py-2">
+        <button
+          type="button"
+          onClick={() => void browser.runtime.openOptionsPage()}
+          className="text-xs text-text-muted underline-offset-2 hover:text-text hover:underline"
+        >
+          Settings
+        </button>
+      </div>
     </>
   )
 }

@@ -38,6 +38,10 @@ always keeps the pinned `key`. You can also load the `pnpm … build` output
 (`.output/chrome-mv3`), but **do not load the `pnpm zip` output**: the store
 artifact omits `key`, so it loads under a random ID the host won't allowlist.
 
+The options page opens from the toolbar icon's context menu (Options), from
+Details → Extension options on `chrome://extensions`, or from the popup's
+Settings link.
+
 For the native hop to work, run the desktop app once (it writes the host
 manifests for detected browsers and the active-graph pointer file), then
 restart Chrome so it re-reads the manifests.
@@ -169,8 +173,9 @@ listing only after checking its current published and submitted versions.
 > page's readable text as well.
 >
 > Bookmarking a post on X also saves its link to Reflect. This is enabled by
-> default and can be disabled in the popup. The extension observes bookmark
-> requests on x.com to identify the post you chose to save.
+> default and can be turned off in the extension's options (right-click the
+> toolbar icon and choose Options). The extension observes bookmark requests
+> on x.com to identify the post you chose to save.
 >
 > Captures are handed to the **installed Reflect desktop app** over a local connection
 > on your own machine — there is no Reflect account and no Reflect server in the path.

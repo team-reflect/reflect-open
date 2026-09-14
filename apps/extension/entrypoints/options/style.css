@@ -1,0 +1,8 @@
+@import '../../lib/theme.css';
+
+body {
+  margin: 0;
+  background: var(--surface-app);
+  color: var(--text);
+  font-family: var(--font-sans, system-ui, sans-serif);
+}
