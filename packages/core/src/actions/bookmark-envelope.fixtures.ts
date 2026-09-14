@@ -7,7 +7,7 @@ const envelope: BookmarkEnvelope = {
   capturedAt: '2026-09-09T04:00:00Z',
   data: { id: '20', createdAt: '', author: { name: '', handle: '' }, body: [] },
 }
-export default {
+export const bookmarkEnvelopeFixtures = {
   accepted: [{ envelope }, { envelope: { ...envelope, extra: 'ignore me' } }],
   spooled: [envelope],
   rejected: [

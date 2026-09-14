@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import fixtures from './bookmark-envelope.fixtures'
+import { bookmarkEnvelopeFixtures as fixtures } from './bookmark-envelope.fixtures'
 import { inboxEnvelopeSchema } from './capture-envelope'
 import { bookmarkWireSchema } from './bookmark-envelope'
 it('validates X capture envelopes for wire and inbox', () => {

@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser'
 import { bookmarkWireSchema } from '@reflect/core/capture-envelope'
-import fixtures from '../../../packages/core/src/actions/bookmark-envelope.fixtures'
+import { bookmarkEnvelopeFixtures as fixtures } from '../../../packages/core/src/actions/bookmark-envelope.fixtures'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CaptureWireMessage } from '@reflect/core/capture-envelope'
 import { enqueueCapture, flushQueue, readQueue } from './flush'
