@@ -6,6 +6,28 @@ import type { XPost } from '@post-embed/types'
 import { resolveArchivedPost } from '@reflect/core/x-archive'
 import { useGraph } from '@/providers/graph-provider'
 
+// FIXME: Delete the whole subscribe/revision mechanism across the three repos and simplify as far
+// as possible. Today it is the only thing `revision` on the card is for, and it is no longer needed
+// for media: `x_media_protocol.rs` keeps the reflect-asset request pending until
+// `x_download::download` publishes the file, and the `index:changed` events for finished media
+// (`assets/x/url_sha256_*`) are filtered out below anyway. What remains is 'the post JSON appears,
+// changes or disappears after the card rendered'. The normal save flow never hits that:
+// `capture-drain.ts` calls `saveArchivedPost` (writes `assets/x/post-<id>.json`) before
+// `writeBookmark` appends the Markdown line, so by the time a card is created its JSON already
+// exists. The only scenarios given up are: a hand-pasted X URL that is archived later, a
+// cross-device sync that delivers the Markdown before the JSON, and re-saving the same tweet with
+// updated text. In those cases the card keeps its old state until the note is reopened, which is
+// acceptable. Meanwhile the mechanism has a real cost: `#refresh` notifies every subscribed URL on
+// any `post-*.json` change and on every `index:reconcile` (watcher restart, wake from sleep,
+// iCloud), so every X card in the note is re-rendered and every playing video is paused. Remove
+// here: `#subscribers`, `subscribe`, `#notify`, `#refresh`, `#refreshing`/`#refreshQueued`, both
+// `subscribeFileChanges`/`subscribeReconcileRequests` listeners, `#unlisten`, `#epoch` and the
+// `start()` body that only exists to install them (leave `stop()` clearing the caches). Remove in
+// meowdown: `XPostHost.subscribe`, the `subscribe` call and `#unsubscribeXPost` in
+// `core/src/extensions/image.ts`, and the `useState`/`useEffect` revision pair in
+// `react/src/components/markdown-view.tsx`. Remove in post-embed: `XPostProps.revision`, the
+// `revision` prop declaration in `x-post.ts`, `FetchProps.revision` and the `props.revision.get()`
+// read in `fetch.ts`, plus the 'refreshes the same URL when its host revision changes' test.
 export class XPostResolverHost {
   readonly #generation: number | null
   readonly #subscribers = new Map<string, Set<() => void>>()
