@@ -9,6 +9,7 @@
   "label": "autorelease: pending-extension",
   "release-label": "autorelease: tagged-extension",
   "pull-request-title-pattern": "chore(extension): release ${version}",
+  // FIXME: enable "draft-pull-request" for all three release-please workflows
   "packages": {
     "apps/extension": {
       "release-type": "node",
