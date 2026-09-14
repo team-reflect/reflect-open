@@ -9,6 +9,7 @@ name = "reflect-capture-host"
 path = "src/main.rs"
 
 [dependencies]
+# FIXME: stray blank line left after removing the `reflect-x-archive` dependency; delete it.
 
 serde = { workspace = true }
 serde_json = { workspace = true }

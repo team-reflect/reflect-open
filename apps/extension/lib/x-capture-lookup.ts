@@ -4,6 +4,9 @@ import { requestXTweet } from '@post-embed/exporter/x/bridge'
 import type { CaptureLookupResponse } from './x-capture-messages'
 
 /** Look up one observed snapshot without crossing into privileged browser APIs. */
+// FIXME: single caller (`x-capture.content.ts`) and no test of its own; inline it there. Likewise
+// `x-capture.ts` holds one constant that belongs in x-capture-messages.ts, leaving one messages
+// module plus the two content scripts.
 export async function lookupCapturedPost(
   postId: string,
   currentUrl: () => string,

@@ -19,4 +19,7 @@ export type BookmarkEnvelope = z.infer<typeof bookmarkEnvelopeSchema>
 export const bookmarkWireSchema = z.object({ envelope: bookmarkEnvelopeSchema }).strict()
 
 /** Normalize supported X permalink spellings to a post ID. */
+// FIXME: an alias for `parseXPostId` with its own three assertions in bookmark-capture.test.ts that
+// re-test post-embed's function. Import `parseXPostId` directly in bookmark-capture.ts and delete
+// the alias and those assertions.
 export const getBookmarkPostId = parseXPostId

@@ -181,6 +181,8 @@ pub fn resource_url(root: &Path, post_id: &str, hash: &str) -> Result<String> {
 }
 
 #[cfg(test)]
+// FIXME: conventional `mod tests` with `use super::*`; the `archive` alias is a leftover from the
+// deleted crate's integration test.
 mod archive {
     use super as archive;
     use serde_json::json;
