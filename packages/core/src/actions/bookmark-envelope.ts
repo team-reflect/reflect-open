@@ -34,6 +34,7 @@ export const likeWireSchema = z.object({ envelope: likeEnvelopeSchema }).strict(
 export const xPostEnvelopeSchema = z.union([bookmarkEnvelopeSchema, likeEnvelopeSchema])
 export type XPostEnvelope = z.infer<typeof xPostEnvelopeSchema>
 export type XPostKind = XPostEnvelope['kind']
+export const xPostWireSchema = z.object({ envelope: xPostEnvelopeSchema }).strict()
 
 /** The current native host and graph reader's supported like format. */
 export const captureCapabilitiesSchema = z

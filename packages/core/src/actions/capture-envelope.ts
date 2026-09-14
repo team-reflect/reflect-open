@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { xPostEnvelopeSchema, bookmarkWireSchema, likeWireSchema } from './bookmark-envelope'
+import { xPostEnvelopeSchema, xPostWireSchema } from './bookmark-envelope'
 export * from './bookmark-envelope'
 
 /**
@@ -89,11 +89,7 @@ export const captureWireMessageSchema = z.object({
 
 export type CaptureWireMessage = z.infer<typeof captureWireMessageSchema>
 
-export const extensionCaptureWireSchema = z.union([
-  bookmarkWireSchema,
-  likeWireSchema,
-  captureWireMessageSchema,
-])
+export const extensionCaptureWireSchema = z.union([xPostWireSchema, captureWireMessageSchema])
 export type ExtensionCaptureWire = z.infer<typeof extensionCaptureWireSchema>
 
 /**

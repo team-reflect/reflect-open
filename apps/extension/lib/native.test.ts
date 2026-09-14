@@ -1,10 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-import { browser } from 'wxt/browser'
 import { likeWireSchema } from '@reflect/core/capture-envelope'
 import { sendToHost } from './native'
 
-vi.mock('wxt/browser', () => ({ browser: { runtime: { sendNativeMessage: vi.fn() } } }))
-const send = vi.mocked(browser.runtime.sendNativeMessage)
+const { send } = vi.hoisted(() => ({
+  send: vi.fn<(application: string, message: unknown) => Promise<unknown>>(),
+}))
+vi.mock('wxt/browser', () => ({ browser: { runtime: { sendNativeMessage: send } } }))
 const wire = likeWireSchema.parse({
   envelope: {
     version: 2,
