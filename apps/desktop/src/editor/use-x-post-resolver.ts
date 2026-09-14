@@ -9,6 +9,7 @@ import {
 import { resolveArchivedPost } from '@reflect/core/x-archive'
 import { useGraph } from '@/providers/graph-provider'
 
+// FIXME: rename XPostHost to XPostResolverHost
 export class XPostHost {
   readonly #generation: number | null
   readonly #subscribers = new Map<string, Set<() => void>>()
