@@ -127,6 +127,14 @@ export async function invalidateEntitlements(queryClient: QueryClient): Promise<
   await queryClient.invalidateQueries({ queryKey: queryKeys.iap.entitlements })
 }
 
+/** Refetch entitlements now and report the subscription they name. */
+export async function refetchActiveSubscription(
+  queryClient: QueryClient,
+): Promise<ActiveSubscription> {
+  await invalidateEntitlements(queryClient)
+  return queryClient.getQueryData<ActiveSubscription>(queryKeys.iap.entitlements) ?? null
+}
+
 /** The live or startup-seeded active subscription. */
 export function useActiveSubscription(): {
   value: ActiveSubscription

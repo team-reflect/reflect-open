@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
-import { IAP_PRODUCT_IDS, iapGetProducts, iapPurchase, iapRestorePurchases } from '@reflect/core'
+import { IAP_PRODUCT_IDS, iapGetProducts, iapPurchase, syncAppStore } from '@reflect/core'
 import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -9,7 +9,7 @@ import { openUrlSync } from '@/lib/open-url'
 import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
-import { useActiveSubscription } from '@/mobile/use-active-subscription'
+import { refetchActiveSubscription, useActiveSubscription } from '@/mobile/use-active-subscription'
 
 type PurchasePlan = 'monthly' | 'yearly'
 
@@ -23,6 +23,7 @@ const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
 
 export function PaywallScreen(): ReactElement {
   const subscription = useActiveSubscription()
+  const queryClient = useQueryClient()
   const [selectedPlan, setSelectedPlan] = useState<PurchasePlan>('yearly')
 
   const products = useQuery({
@@ -50,11 +51,9 @@ export function PaywallScreen(): ReactElement {
   const restoreMutation = useMutation({
     mutationKey: mutationKeys.iap.restore,
     scope: { id: mutationScopeIds.iapAction },
-    mutationFn: iapRestorePurchases,
-    onSuccess: (count) => {
-      if (count > 0) {
-        subscription.invalidate()
-      }
+    mutationFn: async () => {
+      await syncAppStore()
+      return await refetchActiveSubscription(queryClient)
     },
   })
   const actionPending = purchaseMutation.isPending || restoreMutation.isPending
@@ -63,7 +62,7 @@ export function PaywallScreen(): ReactElement {
     : null
   const restoreFeedback = restoreMutation.isError
     ? 'Restore failed. Check your connection and try again.'
-    : restoreMutation.data === 0
+    : restoreMutation.data === null
       ? 'No previous purchase found for this Apple account.'
       : null
 

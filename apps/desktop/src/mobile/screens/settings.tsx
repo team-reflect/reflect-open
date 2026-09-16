@@ -1,15 +1,15 @@
 import { useId, useState, type ReactElement } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   aiProvider,
   aiProviderRequiresApiKey,
   errorMessage,
-  iapRestorePurchases,
   listNotes,
   CHAT_SYSTEM_PROMPT_MAX_LENGTH,
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
   normalizeChatSystemPrompt,
   normalizeTranscriptionPrompt,
+  syncAppStore,
   type AiPrompt,
   type AiProviderConfig,
   type EditorTextSize,
@@ -40,7 +40,7 @@ import {
   SettingsValueRow,
   type SegmentedOption,
 } from '@/mobile/settings-list'
-import { useActiveSubscription } from '@/mobile/use-active-subscription'
+import { refetchActiveSubscription, useActiveSubscription } from '@/mobile/use-active-subscription'
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment'
 import { useMobileSyncStatus } from '@/mobile/use-sync-status'
 import { useGraph } from '@/providers/graph-provider'
@@ -82,6 +82,7 @@ export function MobileSettings(): ReactElement {
   const { graph, mobileStorageKind, platform } = useGraph()
   const isIos = platform === 'ios'
   const subscription = useActiveSubscription()
+  const queryClient = useQueryClient()
   const [, setPaywallRequested] = usePaywallRequested()
   const [restorePending, setRestorePending] = useState(false)
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
@@ -90,9 +91,9 @@ export function MobileSettings(): ReactElement {
     setRestorePending(true)
     setRestoreMessage(null)
     try {
-      const count = await iapRestorePurchases()
-      subscription.invalidate()
-      if (count === 0) {
+      await syncAppStore()
+      const found = await refetchActiveSubscription(queryClient)
+      if (found === null) {
         setRestoreMessage('No previous purchase found for this Apple account.')
       }
     } catch {

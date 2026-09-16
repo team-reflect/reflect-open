@@ -316,9 +316,8 @@ export {
   IAP_PRODUCT_IDS,
   iapGetProducts,
   iapPurchase,
-  iapRestorePurchases,
   iapIsOwned,
   subscribeIapPurchaseUpdated,
   type IapProduct,
 } from '../ipc/iap-plugin'
-export { getAppStoreEnvironment } from '../ipc/app-store-plugin'
+export { getAppStoreEnvironment, syncAppStore } from '../ipc/app-store-plugin'

@@ -62,7 +62,6 @@ const iapProductArgsSchema = z.object({
 const iapProductsArgsSchema = z.object({
   payload: iapPayloadSchema.extend({ productIds: z.array(z.string()) }),
 })
-const iapRestoreArgsSchema = z.object({ payload: iapPayloadSchema })
 
 // Fixed preview prices, independent of App Store Connect and browser locale.
 const iapProducts = [
@@ -106,6 +105,8 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         return null
       case 'plugin:app-store|get_environment':
         return { environment: 'Sandbox' }
+      case 'plugin:app-store|sync':
+        return null
       case 'plugin:iap|get_products': {
         const { payload } = iapProductsArgsSchema.parse(args)
         return {
@@ -123,10 +124,6 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         }
         ownedProductId = payload.productId
         return null
-      }
-      case 'plugin:iap|restore_purchases': {
-        iapRestoreArgsSchema.parse(args)
-        return { purchases: ownedProductId === null ? [] : [{ productId: ownedProductId }] }
       }
       case 'mobile_storage':
         // No iCloud in a plain browser — the dev harness exercises the

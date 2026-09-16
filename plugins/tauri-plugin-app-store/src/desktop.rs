@@ -19,4 +19,8 @@ impl<R: Runtime> AppStore<R> {
             environment: "Production".into(),
         })
     }
+
+    pub fn sync(&self) -> crate::Result<()> {
+        Ok(())
+    }
 }
