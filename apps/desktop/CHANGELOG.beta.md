@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.7...v0.12.0-beta.8) (2026-09-16)
+
+
+### Features
+
+* **mobile:** add in-app offer code redemption ([#1294](https://github.com/team-reflect/reflect-open/issues/1294)) ([26c8732](https://github.com/team-reflect/reflect-open/commit/26c87322fe9d0772cd2b86822008eff21f256465))
+
 ## [0.12.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.6...v0.12.0-beta.7) (2026-09-16)
 
 
