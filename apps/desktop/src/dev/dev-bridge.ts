@@ -106,6 +106,7 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       case 'plugin:app-store|get_environment':
         return { environment: 'Sandbox' }
       case 'plugin:app-store|sync':
+      case 'plugin:app-store|present_offer_code_redeem_sheet':
         return null
       case 'plugin:iap|get_products': {
         const { payload } = iapProductsArgsSchema.parse(args)

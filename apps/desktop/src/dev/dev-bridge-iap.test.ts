@@ -5,6 +5,7 @@ import {
   iapGetProducts,
   iapIsOwned,
   iapPurchase,
+  presentOfferCodeRedeemSheet,
   setBridge,
   syncAppStore,
 } from '@reflect/core'
@@ -37,6 +38,7 @@ describe('dev bridge App Store and IAP bindings', () => {
       await expect(iapIsOwned(product.productId)).resolves.toBe(false)
     }
     await expect(syncAppStore()).resolves.toBeUndefined()
+    await expect(presentOfferCodeRedeemSheet()).resolves.toBeUndefined()
     await expect(iapGetProducts([IAP_PRODUCT_IDS.monthly, 'unknown'])).resolves.toEqual([
       expect.objectContaining({ productId: IAP_PRODUCT_IDS.monthly }),
     ])

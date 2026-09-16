@@ -38,4 +38,11 @@ impl<R: Runtime> AppStore<R> {
     pub fn sync(&self) -> crate::Result<()> {
         self.0.run_mobile_plugin("sync", ()).map_err(Into::into)
     }
+
+    /// Show Apple's offer-code redemption sheet.
+    pub fn present_offer_code_redeem_sheet(&self) -> crate::Result<()> {
+        self.0
+            .run_mobile_plugin("presentOfferCodeRedeemSheet", ())
+            .map_err(Into::into)
+    }
 }

@@ -23,4 +23,8 @@ impl<R: Runtime> AppStore<R> {
     pub fn sync(&self) -> crate::Result<()> {
         Ok(())
     }
+
+    pub fn present_offer_code_redeem_sheet(&self) -> crate::Result<()> {
+        Ok(())
+    }
 }

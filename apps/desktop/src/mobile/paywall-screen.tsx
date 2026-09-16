@@ -1,7 +1,13 @@
 import { useState, type ReactElement } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
-import { IAP_PRODUCT_IDS, iapGetProducts, iapPurchase, syncAppStore } from '@reflect/core'
+import {
+  IAP_PRODUCT_IDS,
+  iapGetProducts,
+  iapPurchase,
+  presentOfferCodeRedeemSheet,
+  syncAppStore,
+} from '@reflect/core'
 import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -160,6 +166,14 @@ export function PaywallScreen(): ReactElement {
             onClick={() => openUrlSync(CLAIM_FREE_YEAR_URL)}
           >
             Already a Reflect member? Get your first year free
+          </button>
+          <button
+            type="button"
+            className="text-sm text-text-muted underline disabled:opacity-50"
+            disabled={actionPending}
+            onClick={() => void presentOfferCodeRedeemSheet().catch(() => {})}
+          >
+            Redeem a code
           </button>
           <button
             type="button"

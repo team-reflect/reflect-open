@@ -320,4 +320,8 @@ export {
   subscribeIapPurchaseUpdated,
   type IapProduct,
 } from '../ipc/iap-plugin'
-export { getAppStoreEnvironment, syncAppStore } from '../ipc/app-store-plugin'
+export {
+  getAppStoreEnvironment,
+  presentOfferCodeRedeemSheet,
+  syncAppStore,
+} from '../ipc/app-store-plugin'

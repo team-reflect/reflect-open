@@ -9,6 +9,7 @@ import {
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
   normalizeChatSystemPrompt,
   normalizeTranscriptionPrompt,
+  presentOfferCodeRedeemSheet,
   syncAppStore,
   type AiPrompt,
   type AiProviderConfig,
@@ -360,6 +361,12 @@ export function MobileSettings(): ReactElement {
                   }}
                 />
               )}
+              <SettingsActionRow
+                label="Redeem Code"
+                onPress={() => {
+                  void presentOfferCodeRedeemSheet().catch(() => {})
+                }}
+              />
               <SettingsActionRow
                 label="Restore Purchases"
                 pending={restorePending}

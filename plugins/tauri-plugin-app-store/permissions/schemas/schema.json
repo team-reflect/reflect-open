@@ -307,6 +307,18 @@
           "markdownDescription": "Denies the get_environment command without any pre-configured scope."
         },
         {
+          "description": "Enables the present_offer_code_redeem_sheet command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-present-offer-code-redeem-sheet",
+          "markdownDescription": "Enables the present_offer_code_redeem_sheet command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the present_offer_code_redeem_sheet command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-present-offer-code-redeem-sheet",
+          "markdownDescription": "Denies the present_offer_code_redeem_sheet command without any pre-configured scope."
+        },
+        {
           "description": "Enables the sync command without any pre-configured scope.",
           "type": "string",
           "const": "allow-sync",
@@ -319,10 +331,10 @@
           "markdownDescription": "Denies the sync command without any pre-configured scope."
         },
         {
-          "description": "Read which channel installed this build (App Store, TestFlight sandbox, or Xcode) and force a StoreKit sync\n#### This default permission set includes:\n\n- `allow-get-environment`\n- `allow-sync`",
+          "description": "Read which channel installed this build (App Store, TestFlight sandbox, or Xcode), force a StoreKit sync, and show the offer-code redemption sheet\n#### This default permission set includes:\n\n- `allow-get-environment`\n- `allow-sync`\n- `allow-present-offer-code-redeem-sheet`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Read which channel installed this build (App Store, TestFlight sandbox, or Xcode) and force a StoreKit sync\n#### This default permission set includes:\n\n- `allow-get-environment`\n- `allow-sync`"
+          "markdownDescription": "Read which channel installed this build (App Store, TestFlight sandbox, or Xcode), force a StoreKit sync, and show the offer-code redemption sheet\n#### This default permission set includes:\n\n- `allow-get-environment`\n- `allow-sync`\n- `allow-present-offer-code-redeem-sheet`"
         }
       ]
     }

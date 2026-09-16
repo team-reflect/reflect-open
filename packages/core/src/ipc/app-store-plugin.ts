@@ -39,3 +39,18 @@ const syncCommand = definePluginCommand<Record<string, never>, unknown>(
 export async function syncAppStore(): Promise<void> {
   await syncCommand({})
 }
+
+const presentOfferCodeRedeemSheetCommand = definePluginCommand<Record<string, never>, unknown>(
+  'app-store',
+  'present_offer_code_redeem_sheet',
+  ignoredResult,
+)
+
+/**
+ * Show Apple's in-app offer-code redemption sheet. A redeemed code arrives
+ * through the iap plugin's `purchaseUpdated` event, not through this call's
+ * result, which resolves as soon as the sheet is presented.
+ */
+export async function presentOfferCodeRedeemSheet(): Promise<void> {
+  await presentOfferCodeRedeemSheetCommand({})
+}

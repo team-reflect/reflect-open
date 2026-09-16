@@ -143,6 +143,19 @@ describe('PaywallScreen purchase mutation', () => {
   })
 })
 
+describe('PaywallScreen offer code', () => {
+  it('opens the in-app redemption sheet', async () => {
+    const view = await render(<PaywallScreen />, { wrapper })
+    await expect.element(view.getByRole('button', { name: 'Redeem a code' })).toBeVisible()
+
+    await view.getByRole('button', { name: 'Redeem a code' }).click()
+
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('plugin:app-store|present_offer_code_redeem_sheet', {}),
+    )
+  })
+})
+
 describe('PaywallScreen restore mutation', () => {
   it('syncs with the App Store and shows the no-purchase message when nothing is owned', async () => {
     const view = await render(<PaywallScreen />, { wrapper })

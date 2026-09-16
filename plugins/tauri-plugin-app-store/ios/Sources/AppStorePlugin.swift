@@ -1,6 +1,7 @@
 import Foundation
 import StoreKit
 import Tauri
+import UIKit
 
 /// The install-channel probe. StoreKit 2's `AppTransaction.environment` is
 /// the official signal: `Production` for the App Store, `Sandbox` for
@@ -49,6 +50,29 @@ class AppStorePlugin: Plugin {
       invoke.resolve()
     } catch {
       invoke.reject("AppStore.sync failed: \(error.localizedDescription)")
+    }
+  }
+
+  /// Shows Apple's offer-code redemption sheet inside the app. A redeemed
+  /// code lands as a transaction on `Transaction.updates`.
+  @MainActor
+  @objc public func presentOfferCodeRedeemSheet(_ invoke: Invoke) async throws {
+    guard #available(iOS 16.0, *) else {
+      invoke.reject("presentOfferCodeRedeemSheet needs iOS 16")
+      return
+    }
+    guard
+      let scene = UIApplication.shared.connectedScenes
+        .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+    else {
+      invoke.reject("no active window scene")
+      return
+    }
+    do {
+      try await AppStore.presentOfferCodeRedeemSheet(in: scene)
+      invoke.resolve()
+    } catch {
+      invoke.reject("presentOfferCodeRedeemSheet failed: \(error.localizedDescription)")
     }
   }
 }
