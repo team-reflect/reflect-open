@@ -216,9 +216,11 @@ describe('usePaywallGate', () => {
       expect(lookupCount).toBe(2)
 
       await hook.act(() => vi.advanceTimersByTimeAsync(15_000))
-      // The first deadline is retried once; the retry waits on the same
-      // still-pending native lookup, so no new StoreKit call is made.
+      // The first deadline is retried once after a zero-delay sleep; the
+      // retry waits on the same still-pending native lookup, so no new
+      // StoreKit call is made.
       expect(hook.result.current).toBe('hide')
+      await hook.act(() => vi.advanceTimersByTimeAsync(1))
       await hook.act(() => vi.advanceTimersByTimeAsync(15_000))
       // The observer hears about the timeout on TanStack's zero-delay notify
       // timer, which a fake clock schedules for the next tick.
