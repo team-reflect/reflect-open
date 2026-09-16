@@ -62,7 +62,16 @@ export function PaywallScreen(): ReactElement {
       return await refetchActiveSubscription(queryClient)
     },
   })
-  const actionPending = purchaseMutation.isPending || restoreMutation.isPending
+  const redeemMutation = useMutation({
+    mutationKey: mutationKeys.iap.redeem,
+    scope: { id: mutationScopeIds.iapAction },
+    mutationFn: presentOfferCodeRedeemSheet,
+    // A redeemed code normally arrives as a purchaseUpdated event; the
+    // refetch here covers a sheet that closed without emitting one.
+    onSuccess: subscription.invalidate,
+  })
+  const actionPending =
+    purchaseMutation.isPending || restoreMutation.isPending || redeemMutation.isPending
   const purchasingPlan = purchaseMutation.isPending
     ? (purchaseMutation.variables?.plan ?? null)
     : null
@@ -71,17 +80,28 @@ export function PaywallScreen(): ReactElement {
     : restoreMutation.data === null
       ? 'No previous purchase found for this Apple account.'
       : null
+  const redeemFeedback = redeemMutation.isError
+    ? 'Could not open the redemption sheet. Try again.'
+    : null
 
   const subscribe = () => {
     const product = selectedPlan === 'yearly' ? yearly : monthly
     if (product === null) return
     restoreMutation.reset()
+    redeemMutation.reset()
     purchaseMutation.mutate({ plan: selectedPlan, productId: product.productId })
   }
 
   const restore = () => {
     purchaseMutation.reset()
+    redeemMutation.reset()
     restoreMutation.mutate()
+  }
+
+  const redeem = () => {
+    purchaseMutation.reset()
+    restoreMutation.reset()
+    redeemMutation.mutate()
   }
 
   return (
@@ -171,10 +191,13 @@ export function PaywallScreen(): ReactElement {
             type="button"
             className="text-sm text-text-muted underline disabled:opacity-50"
             disabled={actionPending}
-            onClick={() => void presentOfferCodeRedeemSheet().catch(() => {})}
+            onClick={redeem}
           >
-            Redeem a code
+            {redeemMutation.isPending ? 'Opening…' : 'Redeem a code'}
           </button>
+          {redeemFeedback !== null ? (
+            <p className="text-center text-sm text-text-muted">{redeemFeedback}</p>
+          ) : null}
           <button
             type="button"
             className="text-sm text-text-muted underline disabled:opacity-50"

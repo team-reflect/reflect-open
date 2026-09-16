@@ -86,21 +86,37 @@ export function MobileSettings(): ReactElement {
   const queryClient = useQueryClient()
   const [, setPaywallRequested] = usePaywallRequested()
   const [restorePending, setRestorePending] = useState(false)
-  const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
+  const [redeemPending, setRedeemPending] = useState(false)
+  const [subscriptionMessage, setSubscriptionMessage] = useState<string | null>(null)
 
   const handleRestore = async (): Promise<void> => {
     setRestorePending(true)
-    setRestoreMessage(null)
+    setSubscriptionMessage(null)
     try {
       await syncAppStore()
       const found = await refetchActiveSubscription(queryClient)
       if (found === null) {
-        setRestoreMessage('No previous purchase found for this Apple account.')
+        setSubscriptionMessage('No previous purchase found for this Apple account.')
       }
     } catch {
-      setRestoreMessage('Restore failed. Check your connection and try again.')
+      setSubscriptionMessage('Restore failed. Check your connection and try again.')
     } finally {
       setRestorePending(false)
+    }
+  }
+
+  const handleRedeem = async (): Promise<void> => {
+    setRedeemPending(true)
+    setSubscriptionMessage(null)
+    try {
+      await presentOfferCodeRedeemSheet()
+      // A redeemed code normally arrives as a purchaseUpdated event; the
+      // refetch here covers a sheet that closed without emitting one.
+      subscription.invalidate()
+    } catch {
+      setSubscriptionMessage('Could not open the redemption sheet. Try again.')
+    } finally {
+      setRedeemPending(false)
     }
   }
   const { settings, updateSettings } = useSettings()
@@ -329,7 +345,7 @@ export function MobileSettings(): ReactElement {
           ) : null}
 
           {isIos ? (
-            <SettingsGroup header="Subscription" footer={restoreMessage}>
+            <SettingsGroup header="Subscription" footer={subscriptionMessage}>
               <SettingsValueRow
                 label="Plan"
                 value={
@@ -363,8 +379,9 @@ export function MobileSettings(): ReactElement {
               )}
               <SettingsActionRow
                 label="Redeem Code"
+                pending={redeemPending}
                 onPress={() => {
-                  void presentOfferCodeRedeemSheet().catch(() => {})
+                  void handleRedeem()
                 }}
               />
               <SettingsActionRow

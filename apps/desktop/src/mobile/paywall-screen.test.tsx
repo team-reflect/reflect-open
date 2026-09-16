@@ -35,6 +35,7 @@ const PRODUCTS: IapProduct[] = [YEARLY_PRODUCT, MONTHLY_PRODUCT]
 let getProducts: () => Promise<{ products: IapProduct[] }>
 let purchase: () => Promise<null>
 let sync: () => Promise<null>
+let redeem: () => Promise<null>
 let invoke = vi.fn<IpcBridge['invoke']>()
 let queryClient: QueryClient
 
@@ -46,6 +47,7 @@ beforeEach(() => {
   getProducts = async () => ({ products: PRODUCTS })
   purchase = async () => null
   sync = async () => null
+  redeem = async () => null
   queryClient = new QueryClient({
     defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
   })
@@ -57,6 +59,8 @@ beforeEach(() => {
         return await purchase()
       case 'plugin:app-store|sync':
         return await sync()
+      case 'plugin:app-store|present_offer_code_redeem_sheet':
+        return await redeem()
       default:
         return null
     }
@@ -144,15 +148,56 @@ describe('PaywallScreen purchase mutation', () => {
 })
 
 describe('PaywallScreen offer code', () => {
-  it('opens the in-app redemption sheet', async () => {
+  it('opens the in-app redemption sheet and refetches entitlements after it closes', async () => {
+    const pendingRedeem = deferred<null>()
+    redeem = () => pendingRedeem.promise
+    const view = await render(<PaywallScreen />, { wrapper })
+    const button = view.getByRole('button', { name: 'Redeem a code' })
+    await expect.element(button).toBeVisible()
+
+    await button.click()
+
+    await expect.element(view.getByRole('button', { name: 'Opening…' })).toBeDisabled()
+    await expect
+      .element(view.getByRole('button', { name: 'Start 7-day free trial' }))
+      .toBeDisabled()
+    await expect.element(view.getByRole('button', { name: 'Restore Purchases' })).toBeDisabled()
+    expect(invoke).toHaveBeenCalledWith('plugin:app-store|present_offer_code_redeem_sheet', {})
+    expect(mocks.invalidate).not.toHaveBeenCalled()
+
+    pendingRedeem.resolve(null)
+    await vi.waitFor(() => expect(mocks.invalidate).toHaveBeenCalledTimes(1))
+    await expect.element(view.getByRole('button', { name: 'Redeem a code' })).not.toBeDisabled()
+    expect(view.getByText(/Could not open the redemption sheet/).query()).toBeNull()
+  })
+
+  it('shows a retryable message when the sheet cannot be presented', async () => {
+    redeem = () => Promise.reject(new Error('no active window scene'))
     const view = await render(<PaywallScreen />, { wrapper })
     await expect.element(view.getByRole('button', { name: 'Redeem a code' })).toBeVisible()
 
     await view.getByRole('button', { name: 'Redeem a code' }).click()
 
-    await vi.waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('plugin:app-store|present_offer_code_redeem_sheet', {}),
-    )
+    await expect
+      .element(view.getByText('Could not open the redemption sheet. Try again.'))
+      .toBeVisible()
+    expect(mocks.invalidate).not.toHaveBeenCalled()
+    await expect.element(view.getByRole('button', { name: 'Redeem a code' })).not.toBeDisabled()
+  })
+
+  it('clears the redeem message when a restore starts', async () => {
+    redeem = () => Promise.reject(new Error('no active window scene'))
+    const view = await render(<PaywallScreen />, { wrapper })
+    await expect.element(view.getByRole('button', { name: 'Redeem a code' })).toBeVisible()
+    await view.getByRole('button', { name: 'Redeem a code' }).click()
+    await expect
+      .element(view.getByText('Could not open the redemption sheet. Try again.'))
+      .toBeVisible()
+
+    await view.getByRole('button', { name: 'Restore Purchases' }).click()
+
+    await vi.waitFor(() => expect(queryClient.isMutating()).toBe(0))
+    expect(view.getByText(/Could not open the redemption sheet/).query()).toBeNull()
   })
 })
 
