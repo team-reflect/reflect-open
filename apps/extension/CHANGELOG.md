@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/team-reflect/reflect-open/compare/extension-v0.2.0...extension-v0.2.1) (2026-09-16)
+
+
+### Bug Fixes
+
+* update post-embed and meowdown ([#1289](https://github.com/team-reflect/reflect-open/issues/1289)) ([5e7b4cc](https://github.com/team-reflect/reflect-open/commit/5e7b4ccf9422cfc2ddc523eeb72ec13550a4ae7b))
+
 ## [0.2.0](https://github.com/team-reflect/reflect-open/compare/extension-v0.1.3...extension-v0.2.0) (2026-09-14)
 
 
