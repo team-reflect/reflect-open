@@ -307,10 +307,22 @@
           "markdownDescription": "Denies the get_environment command without any pre-configured scope."
         },
         {
-          "description": "Read which channel installed this build (App Store, TestFlight sandbox, or Xcode)\n#### This default permission set includes:\n\n- `allow-get-environment`",
+          "description": "Enables the sync command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-sync",
+          "markdownDescription": "Enables the sync command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the sync command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-sync",
+          "markdownDescription": "Denies the sync command without any pre-configured scope."
+        },
+        {
+          "description": "Read which channel installed this build (App Store, TestFlight sandbox, or Xcode) and force a StoreKit sync\n#### This default permission set includes:\n\n- `allow-get-environment`\n- `allow-sync`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Read which channel installed this build (App Store, TestFlight sandbox, or Xcode)\n#### This default permission set includes:\n\n- `allow-get-environment`"
+          "markdownDescription": "Read which channel installed this build (App Store, TestFlight sandbox, or Xcode) and force a StoreKit sync\n#### This default permission set includes:\n\n- `allow-get-environment`\n- `allow-sync`"
         }
       ]
     }
