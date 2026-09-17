@@ -113,9 +113,6 @@ export function OptionsPage(): ReactElement {
           disabled={likes === null}
           onCheckedChange={(next) => void saveXSetting('like', next)}
         />
-        <p className="px-4 py-3 text-xs text-text-muted">
-          A like or bookmark request can be saved even if X later rejects it.
-        </p>
         {settingsError ? (
           <p role="alert" className="px-4 py-3 text-xs">
             {settingsError}
