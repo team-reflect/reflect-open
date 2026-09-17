@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/team-reflect/reflect-open/compare/extension-v0.2.1...extension-v0.3.0) (2026-09-17)
+
+
+### Features
+
+* save liked X posts to daily notes ([#1288](https://github.com/team-reflect/reflect-open/issues/1288)) ([0bcf272](https://github.com/team-reflect/reflect-open/commit/0bcf2724b9239b9e2a21df5e09116999fc12de00))
+
 ## [0.2.1](https://github.com/team-reflect/reflect-open/compare/extension-v0.2.0...extension-v0.2.1) (2026-09-16)
 
 
