@@ -50,30 +50,8 @@ export const resolvedPostSchema = z.object({
   archive: archivedPostSchema,
   resources: z.array(z.object({ url: z.string(), hash: z.string() })),
 })
-export type ResolvedArchivedPost = z.infer<typeof resolvedPostSchema>
-
-// Found archives only, so an archive captured or synced later resolves on the next read.
-const resolvedPosts = new Map<string, ResolvedArchivedPost>()
-
-function resolvedPostKey(generation: number, postId: string): string {
-  return generation + ':' + postId
-}
-
-export function peekArchivedPost(
-  generation: number,
-  postId: string,
-): ResolvedArchivedPost | undefined {
-  return resolvedPosts.get(resolvedPostKey(generation, postId))
-}
-
-export async function resolveArchivedPost(generation: number, postId: string) {
-  const resolved = await call(
-    'x_archive_resolve',
-    { generation, postId },
-    resolvedPostSchema.nullable(),
-  )
-  if (resolved) resolvedPosts.set(resolvedPostKey(generation, postId), resolved)
-  return resolved
+export function resolveArchivedPost(generation: number, postId: string) {
+  return call('x_archive_resolve', { generation, postId }, resolvedPostSchema.nullable())
 }
 export function getXArchiveOwners(assetPath: string, generation?: number) {
   if (!assetPath.startsWith('assets/x/')) return Promise.resolve([] as string[])
@@ -82,5 +60,4 @@ export function getXArchiveOwners(assetPath: string, generation?: number) {
 
 export async function saveArchivedPost(generation: number, incoming: ArchivedXPost): Promise<void> {
   await call('x_archive_write', { generation, value: incoming }, z.null())
-  resolvedPosts.delete(resolvedPostKey(generation, incoming.data.id))
 }

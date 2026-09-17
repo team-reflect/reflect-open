@@ -3,8 +3,9 @@ import { cleanup, render } from 'vitest-browser-react'
 import { page } from 'vitest/browser'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { setBridge } from '@reflect/core'
-import type { ResolvedArchivedPost } from '@reflect/core/x-archive'
+import type { resolveArchivedPost } from '@reflect/core/x-archive'
 import { PaletteProvider } from '@/components/command-palette/palette-provider'
+import { queryClient } from '@/lib/query-client'
 import { RouterProvider } from '@/routing/router'
 import '@/test-utils/locator'
 import { RouteContent } from './route-content'
@@ -40,8 +41,10 @@ vi.mock('@/providers/settings-provider', () => ({
   }),
 }))
 
+type ResolvedArchive = Awaited<ReturnType<typeof resolveArchivedPost>>
+
 let files: Record<string, string>
-const resolveArchive = vi.fn<(postId: string) => Promise<ResolvedArchivedPost | null>>()
+const resolveArchive = vi.fn<(postId: string) => Promise<ResolvedArchive>>()
 
 beforeEach(() => {
   files = {}
@@ -59,10 +62,11 @@ beforeEach(() => {
 afterEach(async () => {
   await cleanup()
   setBridge(null)
+  queryClient.clear()
   vi.resetAllMocks()
 })
 
-function archivedPost(id: string, text: string): ResolvedArchivedPost {
+function archivedPost(id: string, text: string): NonNullable<ResolvedArchive> {
   return {
     archive: {
       kind: 'x-post',
