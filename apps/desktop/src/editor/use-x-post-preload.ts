@@ -1,4 +1,4 @@
-import { collectPostEmbeds } from '@meowdown/core'
+import { collectImages, matchEmbed } from '@meowdown/markdown'
 import { sleep } from '@ocavue/utils'
 import { useEffect, useMemo, useState } from 'react'
 import { getXPostResolver, isXPostResolved } from '@/editor/use-x-post-resolver'
@@ -18,9 +18,7 @@ export function useXPostPreload(markdown: string | null): boolean {
     () =>
       markdown === null
         ? []
-        : collectPostEmbeds(markdown)
-            .filter((embed) => embed.kind === 'x-post')
-            .map((embed) => embed.url),
+        : collectImages(markdown).filter((url) => matchEmbed(url) === 'x-post'),
     [markdown],
   )
   const resolved = urls.every((url) => isXPostResolved(graph, url))

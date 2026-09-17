@@ -6,9 +6,9 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@meowdown/core': https://pkg.pr.new/@meowdown/core@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b
-  '@meowdown/react': https://pkg.pr.new/@meowdown/react@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b
-  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b
+  '@meowdown/core': https://pkg.pr.new/@meowdown/core@fb5b6d3bc2eff0150b6756a338336ac02685006c
+  '@meowdown/react': https://pkg.pr.new/@meowdown/react@fb5b6d3bc2eff0150b6756a338336ac02685006c
+  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@fb5b6d3bc2eff0150b6756a338336ac02685006c
 
 importers:
 
@@ -63,11 +63,14 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.3.0)
       '@meowdown/core':
-        specifier: https://pkg.pr.new/@meowdown/core@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b
-        version: https://pkg.pr.new/@meowdown/core@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b(@lezer/common@1.5.2)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(supports-color@7.2.0)(typescript@6.0.3)
+        specifier: https://pkg.pr.new/@meowdown/core@fb5b6d3bc2eff0150b6756a338336ac02685006c
+        version: https://pkg.pr.new/@meowdown/core@fb5b6d3bc2eff0150b6756a338336ac02685006c(@lezer/common@1.5.2)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(supports-color@7.2.0)(typescript@6.0.3)
+      '@meowdown/markdown':
+        specifier: https://pkg.pr.new/@meowdown/markdown@fb5b6d3bc2eff0150b6756a338336ac02685006c
+        version: https://pkg.pr.new/@meowdown/markdown@fb5b6d3bc2eff0150b6756a338336ac02685006c(typescript@6.0.3)
       '@meowdown/react':
-        specifier: https://pkg.pr.new/@meowdown/react@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b
-        version: https://pkg.pr.new/@meowdown/react@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(react-dom@19.3.0)(react@19.3.0)(supports-color@7.2.0)(typescript@6.0.3)
+        specifier: https://pkg.pr.new/@meowdown/react@fb5b6d3bc2eff0150b6756a338336ac02685006c
+        version: https://pkg.pr.new/@meowdown/react@fb5b6d3bc2eff0150b6756a338336ac02685006c(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(react-dom@19.3.0)(react@19.3.0)(supports-color@7.2.0)(typescript@6.0.3)
       '@ocavue/utils':
         specifier: ^1.8.0
         version: 1.8.0
@@ -295,8 +298,8 @@ importers:
   packages/core:
     dependencies:
       '@meowdown/markdown':
-        specifier: https://pkg.pr.new/@meowdown/markdown@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b
-        version: https://pkg.pr.new/@meowdown/markdown@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b
+        specifier: https://pkg.pr.new/@meowdown/markdown@fb5b6d3bc2eff0150b6756a338336ac02685006c
+        version: https://pkg.pr.new/@meowdown/markdown@fb5b6d3bc2eff0150b6756a338336ac02685006c(typescript@6.0.3)
       '@post-embed/schema':
         specifier: ^0.5.0
         version: 0.5.0(typescript@6.0.3)
@@ -1157,16 +1160,16 @@ packages:
   '@marijn/find-cluster-break@1.0.3':
     resolution: {integrity: sha512-FY+MKLBoTsLNJF/eLWaOsXGdz6uh3Iu1axjPf6TUq92IYumcTcXWHoS747JARLkcdlJ/Waiaxc5wQfFO8jC6NA==}
 
-  '@meowdown/core@https://pkg.pr.new/@meowdown/core@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b':
-    resolution: {integrity: sha512-M3emJvuF2pYcnU36OrkuzkXTXsZC4qyLyAYHWfircOkIe1SgN+IhxJDNW7XedFsfZfPzAUFIhjlQZlTYYvZBwA==, tarball: https://pkg.pr.new/@meowdown/core@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b}
+  '@meowdown/core@https://pkg.pr.new/@meowdown/core@fb5b6d3bc2eff0150b6756a338336ac02685006c':
+    resolution: {integrity: sha512-f43X+3MC30ULwqB6CTG4My6oy/bc+bjb528Bh2WvmL9bRcc9XDDNbfhyA7Qbpu64RTUbB00KUVesZPWdBUguqA==, tarball: https://pkg.pr.new/@meowdown/core@fb5b6d3bc2eff0150b6756a338336ac02685006c}
     version: 0.71.2
 
-  '@meowdown/markdown@https://pkg.pr.new/@meowdown/markdown@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b':
-    resolution: {integrity: sha512-53uQ105tyQiJP12jaByotLuxGPqRKc4Hukhls3sRdh3kIktl59WIAEPHYZl5lb9EMfdEB2spdSYpGAXBeQPBTg==, tarball: https://pkg.pr.new/@meowdown/markdown@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b}
+  '@meowdown/markdown@https://pkg.pr.new/@meowdown/markdown@fb5b6d3bc2eff0150b6756a338336ac02685006c':
+    resolution: {integrity: sha512-h/bRhg91hn5LJ8yzbpRZa+IQP8Ot+GFf/2OCmKLtDd4UjYVDWuCT1pdnzx+nNA0g8bAXOlwq27KXsFjsxar9jQ==, tarball: https://pkg.pr.new/@meowdown/markdown@fb5b6d3bc2eff0150b6756a338336ac02685006c}
     version: 0.71.2
 
-  '@meowdown/react@https://pkg.pr.new/@meowdown/react@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b':
-    resolution: {integrity: sha512-K0niep7xU9BhWc+IWkliPIMtBxwS7sGF3p7Ee20nwlqMoacacing0s6eFWTdkOzugCxgqk6oJIwg28peRIe25w==, tarball: https://pkg.pr.new/@meowdown/react@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b}
+  '@meowdown/react@https://pkg.pr.new/@meowdown/react@fb5b6d3bc2eff0150b6756a338336ac02685006c':
+    resolution: {integrity: sha512-JmXxTNgAs0rhRCBT8PnLFd7QnnqPedNHpaXbR3KpRNFLRb3GUs3qHBuL1nfFzs1RV3nQWlLSxp2AzAQLDYagZg==, tarball: https://pkg.pr.new/@meowdown/react@fb5b6d3bc2eff0150b6756a338336ac02685006c}
     version: 0.71.2
     peerDependencies:
       react: ^19.0.0
@@ -3947,8 +3950,8 @@ packages:
     resolution: {integrity: sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg==}
     hasBin: true
 
-  katex@0.18.5:
-    resolution: {integrity: sha512-1FU5H3RjGJVj6GT9fMjf2uMIXmPQp232aXS3UEeQzf0dxefHg/CKMvNB3DuOC46LFG/E5PNxrE8dOwB782FDGg==}
+  katex@0.18.7:
+    resolution: {integrity: sha512-h+UCwkZ+4Jz8WQ7MLGfj7UVFrRCizGb912fwF4luGdYsC5paYG1vx+jy+KRcC/XkpjGva/P7nAWuxNnPzRvzHw==}
     hasBin: true
 
   keyv@5.6.0:
@@ -6964,13 +6967,13 @@ snapshots:
 
   '@marijn/find-cluster-break@1.0.3': {}
 
-  '@meowdown/core@https://pkg.pr.new/@meowdown/core@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b(@lezer/common@1.5.2)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(supports-color@7.2.0)(typescript@6.0.3)':
+  '@meowdown/core@https://pkg.pr.new/@meowdown/core@fb5b6d3bc2eff0150b6756a338336ac02685006c(@lezer/common@1.5.2)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(supports-color@7.2.0)(typescript@6.0.3)':
     dependencies:
       '@codemirror/language': 6.12.4
       '@codemirror/language-data': 6.5.2
       '@floating-ui/dom': 1.8.0
       '@lezer/highlight': 1.2.3
-      '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b
+      '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@fb5b6d3bc2eff0150b6756a338336ac02685006c(typescript@6.0.3)
       '@ocavue/utils': 1.8.0
       '@post-embed/elements': 0.5.0(typescript@6.0.3)
       '@post-embed/exporter': 0.4.1(typescript@6.0.3)
@@ -6981,7 +6984,7 @@ snapshots:
       '@prosekit/pm': 0.1.19
       '@prosekit/web': 0.9.2(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)
       hast-util-to-mdast: 10.1.2
-      katex: 0.18.5
+      katex: 0.18.7
       lru.min: 1.1.5
       mdast-util-to-markdown: 2.1.2
       micromark-util-decode-string: 2.0.1
@@ -7014,15 +7017,19 @@ snapshots:
       - y-prosemirror
       - yjs
 
-  '@meowdown/markdown@https://pkg.pr.new/@meowdown/markdown@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b':
+  '@meowdown/markdown@https://pkg.pr.new/@meowdown/markdown@fb5b6d3bc2eff0150b6756a338336ac02685006c(typescript@6.0.3)':
     dependencies:
       '@lezer/common': 1.5.2
       '@lezer/markdown': 1.7.2
+      '@post-embed/schema': 0.5.0(typescript@6.0.3)
+    transitivePeerDependencies:
+      - typescript
 
-  '@meowdown/react@https://pkg.pr.new/@meowdown/react@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(react-dom@19.3.0)(react@19.3.0)(supports-color@7.2.0)(typescript@6.0.3)':
+  '@meowdown/react@https://pkg.pr.new/@meowdown/react@fb5b6d3bc2eff0150b6756a338336ac02685006c(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(react-dom@19.3.0)(react@19.3.0)(supports-color@7.2.0)(typescript@6.0.3)':
     dependencies:
       '@base-ui/react': 1.8.0(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.0)(react@19.3.0)
-      '@meowdown/core': https://pkg.pr.new/@meowdown/core@1a5c972f2bcbe13ac7d3a2589c0a1c9eb48d9a5b(@lezer/common@1.5.2)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(supports-color@7.2.0)(typescript@6.0.3)
+      '@meowdown/core': https://pkg.pr.new/@meowdown/core@fb5b6d3bc2eff0150b6756a338336ac02685006c(@lezer/common@1.5.2)(@shikijs/types@4.4.3)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(supports-color@7.2.0)(typescript@6.0.3)
+      '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@fb5b6d3bc2eff0150b6756a338336ac02685006c(typescript@6.0.3)
       '@ocavue/utils': 1.8.0
       '@post-embed/elements': 0.5.0(typescript@6.0.3)
       '@post-embed/types': 0.4.0
@@ -9843,7 +9850,7 @@ snapshots:
     dependencies:
       commander: 8.3.0
 
-  katex@0.18.5:
+  katex@0.18.7:
     dependencies:
       commander: 15.0.0
 
