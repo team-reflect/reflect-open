@@ -32,6 +32,7 @@ import { useMarkdownLinkNavigation } from '@/editor/use-markdown-link-navigation
 import { useLinkPreview } from '@/editor/use-link-preview'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { useWikiLinkHoverPreview } from '@/editor/use-wiki-link-hover-preview'
+import { useXPostPreload } from '@/editor/use-x-post-preload'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
@@ -256,7 +257,11 @@ export function NotePaneComponent({
     }
   }, [dailyDate, onExitBoundary])
 
-  if (document.status === 'loading') {
+  const editorContent =
+    document.status === 'ready' && !document.protected ? document.initialContent : null
+  const xPostsReady = useXPostPreload(editorContent)
+
+  if (document.status === 'loading' || (editorContent !== null && !xPostsReady)) {
     // `reflect-note-loading` keeps the hint invisible for the first beat:
     // local reads resolve in milliseconds, and the text flashing on every
     // daily-stream row reads as flicker while the stream anchors.

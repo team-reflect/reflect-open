@@ -6,7 +6,10 @@ import type {
   ReconcileCaptureEnrichmentInput,
   ReconcileCaptureEnrichmentOutcome,
 } from '@reflect/core'
+import type { XPost } from '@post-embed/types'
+import { createXPostResolver, xPostQueryOptions } from '@/editor/use-x-post-resolver'
 import { createCaptureController, type CaptureController } from './capture-controller'
+import { queryClient } from './query-client'
 
 const drainCaptureInbox = vi.hoisted(() =>
   vi.fn<(input: DrainCaptureInboxInput) => Promise<DrainCaptureInboxOutcome>>(),
@@ -70,6 +73,7 @@ beforeEach(() => {
 afterEach(() => {
   controller?.dispose()
   controller = null
+  queryClient.clear()
 })
 
 describe('createCaptureController (shared-inbox relay)', () => {
@@ -152,5 +156,58 @@ describe('createCaptureController (shared-inbox relay)', () => {
     await flush()
 
     expect(drainCaptureInbox).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('createCaptureController (X post archives)', () => {
+  const url = 'https://x.com/jack/status/123'
+  const post: XPost = {
+    id: '123',
+    createdAt: '2026-09-14T00:00:00Z',
+    author: { name: 'Jack', handle: 'jack' },
+    body: [{ type: 'text', text: 'Saved tweet' }],
+  }
+
+  function cachePost(): void {
+    queryClient.setQueryData(xPostQueryOptions(3, '123').queryKey, post)
+  }
+
+  it('re-reads cached X posts after a pass drains captures', async () => {
+    cachePost()
+    drainCaptureInbox.mockResolvedValue(drained({ pending: 1, drained: 1 }))
+    const resolveXPost = createXPostResolver(3)
+    expect(resolveXPost(url)).toBe(post)
+
+    create().start()
+    await flush()
+
+    const next = resolveXPost(url)
+    expect(next).toBeInstanceOf(Promise)
+    await Promise.resolve(next).catch(() => {})
+  })
+
+  it('re-reads cached X posts after a pass stops partway', async () => {
+    cachePost()
+    drainCaptureInbox.mockResolvedValue(
+      drained({ pending: 1, stopped: { reason: 'io', message: 'disk full' } }),
+    )
+    const resolveXPost = createXPostResolver(3)
+
+    create().start()
+    await flush()
+
+    const next = resolveXPost(url)
+    expect(next).toBeInstanceOf(Promise)
+    await Promise.resolve(next).catch(() => {})
+  })
+
+  it('keeps cached X posts after a pass with nothing to drain', async () => {
+    cachePost()
+    const resolveXPost = createXPostResolver(3)
+
+    create().start()
+    await flush()
+
+    expect(resolveXPost(url)).toBe(post)
   })
 })

@@ -14,6 +14,7 @@ import { commitXPost } from '@/lib/bookmark-capture'
 import { createBackgroundReconciler } from '@/lib/background-reconciler'
 import { startOperation } from '@/lib/operations'
 import { providerFetch } from '@/lib/provider-fetch'
+import { invalidateXPostQueries } from '@/lib/query-client'
 
 /**
  * The link-capture lifecycle for one graph session. Built on
@@ -102,6 +103,8 @@ export function createCaptureController(options: CaptureControllerOptions): Capt
       isStale,
       writeXPost: (envelope, path) => commitXPost(envelope, path, options.generation),
     })
+    // A bookmark pass may have written X post archives, even when it stopped partway.
+    if (drained.drained > 0 || drained.stopped !== null) invalidateXPostQueries()
     surfaceStop('Saving link capture', drained.stopped)
     if (isStale()) {
       return
