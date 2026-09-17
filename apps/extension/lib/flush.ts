@@ -2,7 +2,6 @@ import { browser } from 'wxt/browser'
 import type { ExtensionCaptureWire } from '@reflect/core/capture-envelope'
 import type { FlushResult } from './messages'
 import { sendToHost } from './native'
-import { writeCaptureDelivery } from './x-capture-status'
 import {
   QUEUE_CAP,
   queueKey,
@@ -111,17 +110,11 @@ async function runFlush(): Promise<FlushResult> {
     }
   }
 
-  const result: FlushResult = {
+  return {
     sent,
     failed: rejectedIds.length,
     rejectedIds,
     held: (await readQueue()).length,
     holdReason,
   }
-  try {
-    await writeCaptureDelivery(result)
-  } catch (cause) {
-    console.error('could not persist capture delivery status:', cause)
-  }
-  return result
 }

@@ -4,7 +4,6 @@ import { postIdSchema } from '@reflect/core/capture-envelope'
 import { saveXPost } from './x-save'
 import { readBookmarkSettings } from './bookmark-settings'
 import { readLikeSettings } from './like-settings'
-import { reportXCaptureError } from './x-capture-status'
 
 const requestSchema = z.object({ variables: z.object({ tweet_id: postIdSchema }) })
 const MAX_REQUEST_BYTES = 65536
@@ -89,9 +88,6 @@ export function registerXPostObserver(): void {
     (details) => {
       void captureXPostRequest(details).catch((cause: unknown) => {
         console.error('X capture failed:', cause)
-        void reportXCaptureError(cause).catch((error: unknown) => {
-          console.error('could not report X capture failure:', error)
-        })
       })
     },
     {

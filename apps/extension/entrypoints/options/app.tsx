@@ -12,13 +12,6 @@ import {
   writeIncludePageTextPreference,
 } from '@/lib/popup-preferences'
 import { LIKE_SETTINGS_KEY, readLikeSettings, writeLikeSettings } from '@/lib/like-settings'
-import {
-  X_CAPTURE_ERROR_KEY,
-  CAPTURE_DELIVERY_KEY,
-  readXCaptureError,
-  readCaptureDelivery,
-  dismissXCaptureError,
-} from '@/lib/x-capture-status'
 import { SettingsSection, SettingsSwitchRow } from './settings-rows'
 import { useStoredSetting } from './use-stored-setting'
 
@@ -61,8 +54,6 @@ export function OptionsPage(): ReactElement {
   const includePageText = useStoredSetting(INCLUDE_PAGE_TEXT_KEY, readIncludePageTextPreference)
   const bookmarks = useStoredSetting(BOOKMARK_SETTINGS_KEY, readBookmarkSettings)
   const likes = useStoredSetting(LIKE_SETTINGS_KEY, readLikeSettings)
-  const captureError = useStoredSetting(X_CAPTURE_ERROR_KEY, readXCaptureError)
-  const delivery = useStoredSetting(CAPTURE_DELIVERY_KEY, readCaptureDelivery)
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [savingX, setSavingX] = useState(false)
   const [xAccess, requestXAccess] = useXAccess()
@@ -132,28 +123,6 @@ export function OptionsPage(): ReactElement {
         {settingsError ? (
           <p role="alert" className="px-4 py-3 text-xs">
             {settingsError}
-          </p>
-        ) : null}
-        {captureError ? (
-          <div role="alert" className="px-4 py-3 text-xs">
-            <p>{captureError}</p>
-            <button
-              type="button"
-              onClick={() =>
-                void dismissXCaptureError().catch(() => {
-                  setSettingsError('Could not dismiss the capture error. Please try again.')
-                })
-              }
-            >
-              Dismiss
-            </button>
-          </div>
-        ) : null}
-        {delivery && delivery.held > 0 ? (
-          <p role="status" className="px-4 py-3 text-xs">
-            {delivery.holdReason === 'unsupported-version'
-              ? 'Update Reflect to save X posts. Your captures are still queued.'
-              : 'Captures are waiting for Reflect. Open Reflect and check your graph; accepted captures remain queued.'}
           </p>
         ) : null}
         {showXAccessNotice ? (
