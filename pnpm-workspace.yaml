@@ -35,6 +35,6 @@ minimumReleaseAgeExclude:
 
 blockExoticSubdeps: false
 overrides:
-  '@meowdown/core': https://pkg.pr.new/@meowdown/core@fb5b6d3bc2eff0150b6756a338336ac02685006c
-  '@meowdown/react': https://pkg.pr.new/@meowdown/react@fb5b6d3bc2eff0150b6756a338336ac02685006c
-  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@fb5b6d3bc2eff0150b6756a338336ac02685006c
+  '@meowdown/core': https://pkg.pr.new/@meowdown/core@7915ca1083dc26997cb85d8189f604e58d5a624c
+  '@meowdown/react': https://pkg.pr.new/@meowdown/react@7915ca1083dc26997cb85d8189f604e58d5a624c
+  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@7915ca1083dc26997cb85d8189f604e58d5a624c
