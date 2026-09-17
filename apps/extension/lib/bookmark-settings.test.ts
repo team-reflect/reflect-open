@@ -1,6 +1,6 @@
-import { readLikeSettings, writeLikeSettings } from './like-settings'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readBookmarkSettings, writeBookmarkSettings } from './bookmark-settings'
+import { readLikeSettings, writeLikeSettings } from './like-settings'
 
 const store = new Map<string, unknown>()
 
@@ -49,21 +49,23 @@ describe('writeBookmarkSettings', () => {
   })
 })
 
-it('defaults missing or malformed likes to off without altering bookmarks', async () => {
-  await expect(readLikeSettings()).resolves.toEqual({ enabled: false })
-  store.set('xLikeSettings', { enabled: 'yes' })
-  await expect(readLikeSettings()).resolves.toEqual({ enabled: false })
-  await expect(readBookmarkSettings()).resolves.toEqual({ enabled: true })
-})
+describe('like settings', () => {
+  it('defaults missing or malformed likes to off without altering bookmarks', async () => {
+    await expect(readLikeSettings()).resolves.toEqual({ enabled: false })
+    store.set('xLikeSettings', { enabled: 'yes' })
+    await expect(readLikeSettings()).resolves.toEqual({ enabled: false })
+    await expect(readBookmarkSettings()).resolves.toEqual({ enabled: true })
+  })
 
-it.each([
-  [false, false],
-  [false, true],
-  [true, false],
-  [true, true],
-])('persists independent bookmark=%s and like=%s settings', async (bookmarks, likes) => {
-  await writeBookmarkSettings({ enabled: bookmarks })
-  await writeLikeSettings({ enabled: likes })
-  expect(await readBookmarkSettings()).toEqual({ enabled: bookmarks })
-  expect(await readLikeSettings()).toEqual({ enabled: likes })
+  it.each([
+    [false, false],
+    [false, true],
+    [true, false],
+    [true, true],
+  ])('persists independent bookmark=%s and like=%s settings', async (bookmarks, likes) => {
+    await writeBookmarkSettings({ enabled: bookmarks })
+    await writeLikeSettings({ enabled: likes })
+    expect(await readBookmarkSettings()).toEqual({ enabled: bookmarks })
+    expect(await readLikeSettings()).toEqual({ enabled: likes })
+  })
 })

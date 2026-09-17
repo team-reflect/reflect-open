@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { browser } from 'wxt/browser'
-import { postIdSchema } from '@reflect/core/capture-envelope'
+import { postIdSchema, type XPostKind } from '@reflect/core/capture-envelope'
 import { saveXPost } from './x-save'
 import { readBookmarkSettings } from './bookmark-settings'
 import { readLikeSettings } from './like-settings'
@@ -18,8 +18,6 @@ export interface XPostRequest {
     | { raw?: { bytes?: ArrayBuffer | undefined; file?: string | undefined }[] | undefined }
     | undefined
 }
-
-type XPostKind = 'x-bookmark' | 'x-like'
 
 /** Match only supported X save operations before examining the body. */
 export function getXPostKind(details: XPostRequest): XPostKind | undefined {
@@ -39,9 +37,8 @@ export function getXPostKind(details: XPostRequest): XPostKind | undefined {
   }
 }
 
-/** Extract a bounded string post ID from a supported request. */
+/** Extract a bounded string post ID from a request body. */
 export function parseXPostId(details: XPostRequest): string | undefined {
-  if (getXPostKind(details) === undefined) return undefined
   const parts = details.requestBody?.raw
   if (!parts?.length || parts.some((part) => part.file !== undefined || part.bytes === undefined))
     return undefined

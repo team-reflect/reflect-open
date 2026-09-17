@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   captureXPostRequest,
+  getXPostKind,
   parseXPostId,
   registerXPostObserver,
   type XPostRequest,
@@ -39,15 +40,7 @@ function request(body = '{"variables":{"tweet_id":"20"}}'): XPostRequest {
   }
 }
 
-describe('parseXPostId', () => {
-  it('reads string IDs, including bodies split across upload chunks', () => {
-    const details = request()
-    const bytes = new TextEncoder().encode('{"variables":{"tweet_id":"1234567890123456789"}}')
-    details.requestBody = {
-      raw: [{ bytes: bytes.slice(0, 9).buffer }, { bytes: bytes.slice(9).buffer }],
-    }
-    expect(parseXPostId(details)).toBe('1234567890123456789')
-  })
+describe('getXPostKind', () => {
   it.each([
     { method: 'GET' },
     { url: 'https://x.com/i/api/graphql/hash/DeleteBookmark' },
@@ -57,7 +50,18 @@ describe('parseXPostId', () => {
     { tabId: -1 },
     { url: 'invalid' },
   ])('ignores unrelated requests: %j', (patch) => {
-    expect(parseXPostId({ ...request(), ...patch })).toBeUndefined()
+    expect(getXPostKind({ ...request(), ...patch })).toBeUndefined()
+  })
+})
+
+describe('parseXPostId', () => {
+  it('reads string IDs, including bodies split across upload chunks', () => {
+    const details = request()
+    const bytes = new TextEncoder().encode('{"variables":{"tweet_id":"1234567890123456789"}}')
+    details.requestBody = {
+      raw: [{ bytes: bytes.slice(0, 9).buffer }, { bytes: bytes.slice(9).buffer }],
+    }
+    expect(parseXPostId(details)).toBe('1234567890123456789')
   })
   it('rejects malformed, numeric, oversized, and invalid UTF-8 bodies', () => {
     for (const body of ['{', '{"variables":{"tweet_id":20}}', ' '.repeat(65537)])

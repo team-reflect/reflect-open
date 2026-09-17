@@ -55,7 +55,6 @@ export function OptionsPage(): ReactElement {
   const bookmarks = useStoredSetting(BOOKMARK_SETTINGS_KEY, readBookmarkSettings)
   const likes = useStoredSetting(LIKE_SETTINGS_KEY, readLikeSettings)
   const [settingsError, setSettingsError] = useState<string | null>(null)
-  const [savingX, setSavingX] = useState(false)
   const [xAccess, requestXAccess] = useXAccess()
   const [xAccessRefused, setXAccessRefused] = useState(false)
 
@@ -66,7 +65,6 @@ export function OptionsPage(): ReactElement {
   }
 
   async function saveXSetting(kind: 'bookmark' | 'like', next: boolean): Promise<void> {
-    setSavingX(true)
     setSettingsError(null)
     try {
       await (kind === 'like'
@@ -74,8 +72,6 @@ export function OptionsPage(): ReactElement {
         : writeBookmarkSettings({ enabled: next }))
     } catch {
       setSettingsError('Could not save the X setting. Please try again.')
-    } finally {
-      setSavingX(false)
     }
   }
 
@@ -107,14 +103,14 @@ export function OptionsPage(): ReactElement {
           legend="Save new X bookmarks to my daily note"
           description="Bookmarking a post on x.com adds its link under “X bookmarks” in that day’s note."
           checked={bookmarks?.enabled ?? true}
-          disabled={bookmarks === null || savingX}
+          disabled={bookmarks === null}
           onCheckedChange={(next) => void saveXSetting('bookmark', next)}
         />
         <SettingsSwitchRow
           legend="Save new X likes to my daily note"
           description="Saves new like actions on x.com in this browser under X likes. Existing likes are not imported. Unliking a post will not remove it from Reflect."
           checked={likes?.enabled ?? false}
-          disabled={likes === null || savingX}
+          disabled={likes === null}
           onCheckedChange={(next) => void saveXSetting('like', next)}
         />
         <p className="px-4 py-3 text-xs text-text-muted">
