@@ -78,11 +78,6 @@ fn handle_message(payload: &[u8], pointer_path: &Path) -> Result<(), HostError> 
         .map_err(|_| HostError::InvalidPayload("Invalid capture JSON".into()))?;
     match value["envelope"].get("kind") {
         Some(kind) if kind == "x-bookmark" || kind == "x-like" => {
-            if kind == "x-like" && value.as_object().is_none_or(|fields| fields.len() != 1) {
-                return Err(HostError::InvalidPayload(
-                    "Unexpected like message fields".into(),
-                ));
-            }
             return x_archive::spool(&value["envelope"], pointer_path);
         }
         Some(_) => return Err(HostError::InvalidPayload("Unexpected capture kind".into())),

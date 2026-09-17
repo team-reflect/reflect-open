@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { appendXPost } from './bookmark-capture'
-import type { BookmarkEnvelope } from './bookmark-envelope'
+import type { XPostEnvelope } from './bookmark-envelope'
 import { inboxEnvelopeSchema } from './capture-envelope'
 import { parseNote } from '../markdown/extract'
 
-const capture: BookmarkEnvelope = {
+const capture: XPostEnvelope = {
   version: 2,
   kind: 'x-bookmark',
   data: { id: '20', createdAt: '', author: { name: '', handle: '' }, body: [] },

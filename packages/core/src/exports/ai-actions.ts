@@ -175,7 +175,6 @@ export {
   captureNoteMeta,
   drainCaptureInbox,
   appendXPost,
-  type BookmarkEnvelope,
   type XPostEnvelope,
   isCaptureSpoolPath,
   listPendingCaptures,

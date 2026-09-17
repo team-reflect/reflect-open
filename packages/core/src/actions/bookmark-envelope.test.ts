@@ -1,12 +1,14 @@
 import { expect, it } from 'vitest'
-import { bookmarkEnvelopeFixtures as fixtures } from './bookmark-envelope.fixtures'
-import { inboxEnvelopeSchema } from './capture-envelope'
-import { bookmarkWireSchema } from './bookmark-envelope'
+import fixtures from './bookmark-envelope.fixtures.json'
+import { extensionCaptureWireSchema, inboxEnvelopeSchema } from './capture-envelope'
+import { xPostWireSchema } from './bookmark-envelope'
 
-it('validates X capture envelopes for wire and inbox', () => {
-  for (const value of fixtures.accepted)
-    expect(bookmarkWireSchema.safeParse(value).success).toBe(true)
+it('validates X post envelopes for wire and inbox', () => {
+  for (const value of fixtures.accepted) {
+    expect(xPostWireSchema.safeParse(value).success).toBe(true)
+    expect(extensionCaptureWireSchema.safeParse(value).success).toBe(true)
+  }
   for (const value of fixtures.spooled) expect(inboxEnvelopeSchema.parse(value)).toEqual(value)
   for (const value of fixtures.rejected)
-    expect(bookmarkWireSchema.safeParse(value).success).toBe(false)
+    expect(xPostWireSchema.safeParse(value).success).toBe(false)
 })

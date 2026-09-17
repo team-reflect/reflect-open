@@ -1,6 +1,9 @@
 import { browser } from 'wxt/browser'
-import { bookmarkWireSchema, likeWireSchema } from '@reflect/core/capture-envelope'
-import { bookmarkEnvelopeFixtures as fixtures } from '../../../packages/core/src/actions/bookmark-envelope.fixtures'
+import {
+  xPostWireSchema,
+  type ExtensionCaptureWire,
+  type XPostKind,
+} from '@reflect/core/capture-envelope'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CaptureWireMessage } from '@reflect/core/capture-envelope'
 import { enqueueCapture, flushQueue, readQueue } from './flush'
@@ -153,8 +156,20 @@ describe('flushQueue', () => {
   })
 })
 
-const bookmark = bookmarkWireSchema.parse(fixtures.accepted[0])
-bookmark.envelope.id = FIRST
+function xPost(kind: XPostKind, id: string): ExtensionCaptureWire {
+  return xPostWireSchema.parse({
+    envelope: {
+      version: 2,
+      kind,
+      id,
+      postId: '20',
+      source: 'extension',
+      capturedAt: '2026-09-09T04:00:00Z',
+    },
+  })
+}
+
+const bookmark = xPost('x-bookmark', FIRST)
 
 it('holds a bookmark an old desktop cannot read without blocking page captures', async () => {
   await enqueueCapture(bookmark)
@@ -203,16 +218,7 @@ it('replays the same event after a lost ACK', async () => {
 })
 
 it('retains a held like and still delivers a supported page capture', async () => {
-  const like = likeWireSchema.parse({
-    envelope: {
-      version: 2,
-      kind: 'x-like',
-      id: FIRST,
-      postId: '20',
-      source: 'extension',
-      capturedAt: '2026-09-09T04:00:00Z',
-    },
-  })
+  const like = xPost('x-like', FIRST)
   await enqueueCapture(like)
   await enqueueCapture(wire(SECOND))
   sendMock.mockResolvedValueOnce({

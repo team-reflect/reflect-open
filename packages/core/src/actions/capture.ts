@@ -5,7 +5,7 @@
  * retries freely.
  */
 export { appendXPost } from './bookmark-capture'
-export type { BookmarkEnvelope, XPostEnvelope } from './bookmark-envelope'
+export type { XPostEnvelope } from './bookmark-envelope'
 export {
   captureFromPath,
   captureIdentity,
