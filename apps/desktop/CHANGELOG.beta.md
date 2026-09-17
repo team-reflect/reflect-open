@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.12.0...v0.13.0-beta) (2026-09-17)
+
+
+### Features
+
+* preload X posts before mounting the note editor ([#1297](https://github.com/team-reflect/reflect-open/issues/1297)) ([2fdac9a](https://github.com/team-reflect/reflect-open/commit/2fdac9a87d9bfdb9c2e2da564f10caa28dc4594b))
+* save liked X posts to daily notes ([#1288](https://github.com/team-reflect/reflect-open/issues/1288)) ([0bcf272](https://github.com/team-reflect/reflect-open/commit/0bcf2724b9239b9e2a21df5e09116999fc12de00))
+
 ## [0.12.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.7...v0.12.0-beta.8) (2026-09-16)
 
 
