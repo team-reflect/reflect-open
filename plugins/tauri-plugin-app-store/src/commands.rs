@@ -9,3 +9,15 @@ use crate::Result;
 pub(crate) async fn get_environment<R: Runtime>(app: AppHandle<R>) -> Result<AppStoreEnvironment> {
     app.app_store().environment()
 }
+
+/// Force a StoreKit refetch from the App Store; see `AppStore::sync`.
+#[command]
+pub(crate) async fn sync<R: Runtime>(app: AppHandle<R>) -> Result<()> {
+    app.app_store().sync()
+}
+
+/// Show Apple's offer-code redemption sheet; see `AppStore::present_offer_code_redeem_sheet`.
+#[command]
+pub(crate) async fn present_offer_code_redeem_sheet<R: Runtime>(app: AppHandle<R>) -> Result<()> {
+    app.app_store().present_offer_code_redeem_sheet()
+}

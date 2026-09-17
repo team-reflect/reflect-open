@@ -234,6 +234,9 @@ export const mutationKeys = {
     get restore() {
       return [...this.all, 'restore'] as const
     },
+    get redeem() {
+      return [...this.all, 'redeem'] as const
+    },
   },
   settings: {
     all: ['settings'] as const,

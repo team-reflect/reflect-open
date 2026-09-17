@@ -1,15 +1,16 @@
 import { useId, useState, type ReactElement } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   aiProvider,
   aiProviderRequiresApiKey,
   errorMessage,
-  iapRestorePurchases,
   listNotes,
   CHAT_SYSTEM_PROMPT_MAX_LENGTH,
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
   normalizeChatSystemPrompt,
   normalizeTranscriptionPrompt,
+  presentOfferCodeRedeemSheet,
+  syncAppStore,
   type AiPrompt,
   type AiProviderConfig,
   type EditorTextSize,
@@ -40,7 +41,7 @@ import {
   SettingsValueRow,
   type SegmentedOption,
 } from '@/mobile/settings-list'
-import { useActiveSubscription } from '@/mobile/use-active-subscription'
+import { refetchActiveSubscription, useActiveSubscription } from '@/mobile/use-active-subscription'
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment'
 import { useMobileSyncStatus } from '@/mobile/use-sync-status'
 import { useGraph } from '@/providers/graph-provider'
@@ -82,23 +83,40 @@ export function MobileSettings(): ReactElement {
   const { graph, mobileStorageKind, platform } = useGraph()
   const isIos = platform === 'ios'
   const subscription = useActiveSubscription()
+  const queryClient = useQueryClient()
   const [, setPaywallRequested] = usePaywallRequested()
   const [restorePending, setRestorePending] = useState(false)
-  const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
+  const [redeemPending, setRedeemPending] = useState(false)
+  const [subscriptionMessage, setSubscriptionMessage] = useState<string | null>(null)
 
   const handleRestore = async (): Promise<void> => {
     setRestorePending(true)
-    setRestoreMessage(null)
+    setSubscriptionMessage(null)
     try {
-      const count = await iapRestorePurchases()
-      subscription.invalidate()
-      if (count === 0) {
-        setRestoreMessage('No previous purchase found for this Apple account.')
+      await syncAppStore()
+      const found = await refetchActiveSubscription(queryClient)
+      if (found === null) {
+        setSubscriptionMessage('No previous purchase found for this Apple account.')
       }
     } catch {
-      setRestoreMessage('Restore failed. Check your connection and try again.')
+      setSubscriptionMessage('Restore failed. Check your connection and try again.')
     } finally {
       setRestorePending(false)
+    }
+  }
+
+  const handleRedeem = async (): Promise<void> => {
+    setRedeemPending(true)
+    setSubscriptionMessage(null)
+    try {
+      await presentOfferCodeRedeemSheet()
+      // A redeemed code normally arrives as a purchaseUpdated event; the
+      // refetch here covers a sheet that closed without emitting one.
+      subscription.invalidate()
+    } catch {
+      setSubscriptionMessage('Could not open the redemption sheet. Try again.')
+    } finally {
+      setRedeemPending(false)
     }
   }
   const { settings, updateSettings } = useSettings()
@@ -327,7 +345,7 @@ export function MobileSettings(): ReactElement {
           ) : null}
 
           {isIos ? (
-            <SettingsGroup header="Subscription" footer={restoreMessage}>
+            <SettingsGroup header="Subscription" footer={subscriptionMessage}>
               <SettingsValueRow
                 label="Plan"
                 value={
@@ -359,6 +377,13 @@ export function MobileSettings(): ReactElement {
                   }}
                 />
               )}
+              <SettingsActionRow
+                label="Redeem Code"
+                pending={redeemPending}
+                onPress={() => {
+                  void handleRedeem()
+                }}
+              />
               <SettingsActionRow
                 label="Restore Purchases"
                 pending={restorePending}

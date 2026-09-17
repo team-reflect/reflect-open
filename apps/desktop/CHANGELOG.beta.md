@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.12.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.7...v0.12.0-beta.8) (2026-09-16)
+
+
+### Features
+
+* **mobile:** add in-app offer code redemption ([#1294](https://github.com/team-reflect/reflect-open/issues/1294)) ([26c8732](https://github.com/team-reflect/reflect-open/commit/26c87322fe9d0772cd2b86822008eff21f256465))
+
+## [0.12.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.6...v0.12.0-beta.7) (2026-09-16)
+
+
+### Bug Fixes
+
+* **mobile:** give StoreKit entitlement lookups 15 s and one retry ([#1293](https://github.com/team-reflect/reflect-open/issues/1293)) ([ae04441](https://github.com/team-reflect/reflect-open/commit/ae044410f720fd44a951c8499fc3e32c07b33fc9))
+* **mobile:** sync with the App Store before reading entitlements on restore ([#1292](https://github.com/team-reflect/reflect-open/issues/1292)) ([33db791](https://github.com/team-reflect/reflect-open/commit/33db791ab389f698fa4cb73c52e35d254f43e7e6))
+* update meowdown to ^0.71.2 ([#1275](https://github.com/team-reflect/reflect-open/issues/1275)) ([b00a870](https://github.com/team-reflect/reflect-open/commit/b00a8703a3260015ed6e733e343e4f72df0b63e4))
+* update post-embed and meowdown ([#1289](https://github.com/team-reflect/reflect-open/issues/1289)) ([5e7b4cc](https://github.com/team-reflect/reflect-open/commit/5e7b4ccf9422cfc2ddc523eeb72ec13550a4ae7b))
+
 ## [0.12.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.5...v0.12.0-beta.6) (2026-09-14)
 
 

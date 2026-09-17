@@ -1,3 +1,3 @@
 [default]
-description = "Read which channel installed this build (App Store, TestFlight sandbox, or Xcode)"
-permissions = ["allow-get-environment"]
+description = "Read which channel installed this build (App Store, TestFlight sandbox, or Xcode), force a StoreKit sync, and show the offer-code redemption sheet"
+permissions = ["allow-get-environment", "allow-sync", "allow-present-offer-code-redeem-sheet"]

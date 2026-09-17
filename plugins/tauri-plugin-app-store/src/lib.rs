@@ -35,7 +35,11 @@ impl<R: Runtime, T: Manager<R>> crate::AppStoreExt<R> for T {
 /// Initializes the plugin.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("app-store")
-        .invoke_handler(tauri::generate_handler![commands::get_environment])
+        .invoke_handler(tauri::generate_handler![
+            commands::get_environment,
+            commands::sync,
+            commands::present_offer_code_redeem_sheet
+        ])
         .setup(|app, api| {
             #[cfg(mobile)]
             let app_store = mobile::init(app, api)?;

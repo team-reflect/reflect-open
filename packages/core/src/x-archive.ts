@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { XPostSchema } from '@post-embed/schema'
+import { parseXPost } from '@post-embed/schema'
 import type { XPost, XPostBase } from '@post-embed/types'
 import { call } from './ipc/invoke'
 
@@ -11,8 +11,7 @@ export interface ArchivedXPost {
 
 /** One adapter shared by captured messages and archive files. */
 export const xPostSchema = z.unknown().transform((value, context) => {
-  const result = XPostSchema['~standard'].validate(value)
-  if (result instanceof Promise) throw new Error('XPostSchema must validate synchronously')
+  const result = parseXPost(value)
   if (!result.issues) return result.value
   context.addIssue({ code: 'custom', message: 'invalid-post' })
   return z.NEVER

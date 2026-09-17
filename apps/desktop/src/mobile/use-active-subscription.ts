@@ -15,7 +15,7 @@ const activeSubscriptionSeedSchema = z.object({
 })
 const ACTIVE_SUBSCRIPTION_STORAGE_KEY = 'reflect.iap.active-subscription'
 const ACTIVE_SUBSCRIPTION_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000
-const ENTITLEMENT_LOOKUP_TIMEOUT_MS = 5_000
+const ENTITLEMENT_LOOKUP_TIMEOUT_MS = 15_000
 
 type SubscriptionPlan = Exclude<ActiveSubscription, null>
 const pendingEntitlementLookups = new Map<string, Promise<boolean>>()
@@ -127,6 +127,14 @@ export async function invalidateEntitlements(queryClient: QueryClient): Promise<
   await queryClient.invalidateQueries({ queryKey: queryKeys.iap.entitlements })
 }
 
+/** Refetch entitlements now and report the subscription they name. */
+export async function refetchActiveSubscription(
+  queryClient: QueryClient,
+): Promise<ActiveSubscription> {
+  await invalidateEntitlements(queryClient)
+  return queryClient.getQueryData<ActiveSubscription>(queryKeys.iap.entitlements) ?? null
+}
+
 /** The live or startup-seeded active subscription. */
 export function useActiveSubscription(): {
   value: ActiveSubscription
@@ -144,7 +152,7 @@ export function useActiveSubscription(): {
     initialDataUpdatedAt: 0,
     staleTime: 60_000,
     refetchOnWindowFocus: 'always',
-    retry: false,
+    retry: 1,
     enabled,
   })
 

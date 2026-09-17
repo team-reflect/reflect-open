@@ -48,11 +48,6 @@ const purchaseCommand = definePluginCommand<
   unknown
 >('iap', 'purchase', ignoredResult)
 
-const restorePurchasesCommand = definePluginCommand<
-  { payload: { productType: 'subs' } },
-  { purchases: unknown[] }
->('iap', 'restore_purchases', z.object({ purchases: z.array(z.unknown()) }))
-
 const getProductStatusCommand = definePluginCommand<
   { payload: { productId: string; productType: 'subs' } },
   { isOwned: boolean }
@@ -80,17 +75,6 @@ export async function iapGetProducts(productIds: string[]): Promise<IapProduct[]
  */
 export async function iapPurchase(productId: string): Promise<void> {
   await purchaseCommand({ payload: { productId, productType: 'subs' } })
-}
-
-/**
- * Re-sync entitlements from the App Store account, returning how many were
- * found (restore_purchases:
- * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/guest-js/index.ts#L285
- * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/ios/Sources/IapPlugin.swift#L192).
- */
-export async function iapRestorePurchases(): Promise<number> {
-  const { purchases } = await restorePurchasesCommand({ payload: { productType: 'subs' } })
-  return purchases.length
 }
 
 /**

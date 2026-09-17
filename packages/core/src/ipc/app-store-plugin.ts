@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { definePluginCommand } from './plugin'
+import { definePluginCommand, ignoredResult } from './plugin'
 
 /**
  * Typed bindings for `plugins/tauri-plugin-app-store`, the install-channel
@@ -23,4 +23,34 @@ const getEnvironmentCommand = definePluginCommand<Record<string, never>, { envir
  */
 export async function getAppStoreEnvironment(): Promise<string> {
   return (await getEnvironmentCommand({})).environment
+}
+
+const syncCommand = definePluginCommand<Record<string, never>, unknown>(
+  'app-store',
+  'sync',
+  ignoredResult,
+)
+
+/**
+ * Force StoreKit to refetch transactions from the App Store
+ * (`AppStore.sync()`). Apple may show a sign-in prompt, so call it only from
+ * an explicit user action such as Restore Purchases.
+ */
+export async function syncAppStore(): Promise<void> {
+  await syncCommand({})
+}
+
+const presentOfferCodeRedeemSheetCommand = definePluginCommand<Record<string, never>, unknown>(
+  'app-store',
+  'present_offer_code_redeem_sheet',
+  ignoredResult,
+)
+
+/**
+ * Show Apple's in-app offer-code redemption sheet. A redeemed code arrives
+ * through the iap plugin's `purchaseUpdated` event, not through this call's
+ * result, which resolves as soon as the sheet is presented.
+ */
+export async function presentOfferCodeRedeemSheet(): Promise<void> {
+  await presentOfferCodeRedeemSheetCommand({})
 }

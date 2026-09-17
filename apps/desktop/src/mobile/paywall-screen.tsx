@@ -1,7 +1,13 @@
 import { useState, type ReactElement } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
-import { IAP_PRODUCT_IDS, iapGetProducts, iapPurchase, iapRestorePurchases } from '@reflect/core'
+import {
+  IAP_PRODUCT_IDS,
+  iapGetProducts,
+  iapPurchase,
+  presentOfferCodeRedeemSheet,
+  syncAppStore,
+} from '@reflect/core'
 import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -9,7 +15,7 @@ import { openUrlSync } from '@/lib/open-url'
 import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls'
-import { useActiveSubscription } from '@/mobile/use-active-subscription'
+import { refetchActiveSubscription, useActiveSubscription } from '@/mobile/use-active-subscription'
 
 type PurchasePlan = 'monthly' | 'yearly'
 
@@ -23,6 +29,7 @@ const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
 
 export function PaywallScreen(): ReactElement {
   const subscription = useActiveSubscription()
+  const queryClient = useQueryClient()
   const [selectedPlan, setSelectedPlan] = useState<PurchasePlan>('yearly')
 
   const products = useQuery({
@@ -50,33 +57,51 @@ export function PaywallScreen(): ReactElement {
   const restoreMutation = useMutation({
     mutationKey: mutationKeys.iap.restore,
     scope: { id: mutationScopeIds.iapAction },
-    mutationFn: iapRestorePurchases,
-    onSuccess: (count) => {
-      if (count > 0) {
-        subscription.invalidate()
-      }
+    mutationFn: async () => {
+      await syncAppStore()
+      return await refetchActiveSubscription(queryClient)
     },
   })
-  const actionPending = purchaseMutation.isPending || restoreMutation.isPending
+  const redeemMutation = useMutation({
+    mutationKey: mutationKeys.iap.redeem,
+    scope: { id: mutationScopeIds.iapAction },
+    mutationFn: presentOfferCodeRedeemSheet,
+    // A redeemed code normally arrives as a purchaseUpdated event; the
+    // refetch here covers a sheet that closed without emitting one.
+    onSuccess: subscription.invalidate,
+  })
+  const actionPending =
+    purchaseMutation.isPending || restoreMutation.isPending || redeemMutation.isPending
   const purchasingPlan = purchaseMutation.isPending
     ? (purchaseMutation.variables?.plan ?? null)
     : null
   const restoreFeedback = restoreMutation.isError
     ? 'Restore failed. Check your connection and try again.'
-    : restoreMutation.data === 0
+    : restoreMutation.data === null
       ? 'No previous purchase found for this Apple account.'
       : null
+  const redeemFeedback = redeemMutation.isError
+    ? 'Could not open the redemption sheet. Try again.'
+    : null
 
   const subscribe = () => {
     const product = selectedPlan === 'yearly' ? yearly : monthly
     if (product === null) return
     restoreMutation.reset()
+    redeemMutation.reset()
     purchaseMutation.mutate({ plan: selectedPlan, productId: product.productId })
   }
 
   const restore = () => {
     purchaseMutation.reset()
+    redeemMutation.reset()
     restoreMutation.mutate()
+  }
+
+  const redeem = () => {
+    purchaseMutation.reset()
+    restoreMutation.reset()
+    redeemMutation.mutate()
   }
 
   return (
@@ -162,6 +187,17 @@ export function PaywallScreen(): ReactElement {
           >
             Already a Reflect member? Get your first year free
           </button>
+          <button
+            type="button"
+            className="text-sm text-text-muted underline disabled:opacity-50"
+            disabled={actionPending}
+            onClick={redeem}
+          >
+            {redeemMutation.isPending ? 'Opening…' : 'Redeem a code'}
+          </button>
+          {redeemFeedback !== null ? (
+            <p className="text-center text-sm text-text-muted">{redeemFeedback}</p>
+          ) : null}
           <button
             type="button"
             className="text-sm text-text-muted underline disabled:opacity-50"

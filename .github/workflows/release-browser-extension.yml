@@ -103,5 +103,6 @@ jobs:
           CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
           CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
           # DEFAULT_PUBLISH or STAGED_PUBLISH
-          CHROME_PUBLISH_TYPE: STAGED_PUBLISH
+          CHROME_PUBLISH_TYPE: DEFAULT_PUBLISH
+          CHROME_CANCEL_PENDING: true
         run: pnpm exec wxt submit --chrome-zip ".output/reflect-capture-${EXTENSION_VERSION}-chrome.zip"
