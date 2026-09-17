@@ -197,7 +197,7 @@ export async function drainCaptureInbox(
         invalid += 1
         continue
       }
-      if (envelope.kind === 'x-bookmark' || envelope.kind === 'x-like') {
+      if (isXPost(envelope)) {
         try {
           if (!input.writeXPost) {
             throw new Error('X post writer is unavailable; update Reflect')
@@ -308,6 +308,10 @@ export async function drainCaptureInbox(
     return outcome({ reason: toAppError(cause).kind, message: errorMessage(cause) })
   }
   return outcome(xPostStop)
+}
+
+function isXPost(envelope: InboxEnvelope): envelope is XPostEnvelope {
+  return envelope.kind === 'x-bookmark' || envelope.kind === 'x-like'
 }
 
 function parseEnvelope(raw: string): InboxEnvelope | null {
