@@ -1,6 +1,17 @@
 import type { XPost } from '@post-embed/types'
-import { expect, it } from 'vitest'
-import { createArchivedPost, xPostSchema } from './x-archive'
+import { afterEach, expect, it, vi } from 'vitest'
+import { setBridge } from './ipc/bridge'
+import {
+  createArchivedPost,
+  peekArchivedPost,
+  resolveArchivedPost,
+  saveArchivedPost,
+  xPostSchema,
+} from './x-archive'
+
+afterEach(() => {
+  setBridge(null)
+})
 
 it('archives the highest bitrate MP4 in the post and quote without mutating capture data', () => {
   const video = {
@@ -70,4 +81,32 @@ it('validates captured posts through the synchronous Standard Schema contract', 
   }
   expect(xPostSchema.parse(post)).toEqual(post)
   expect(xPostSchema.safeParse({ ...post, id: 'invalid' }).success).toBe(false)
+})
+
+it('keeps a resolved archive until a capture rewrites it', async () => {
+  const post: XPost = {
+    id: '123',
+    createdAt: '2026-09-14T00:00:00Z',
+    author: { name: 'Author', handle: 'author' },
+    body: [{ type: 'text', text: 'Saved text' }],
+  }
+  const archived = createArchivedPost(post, '2026-09-14T00:00:00Z')
+  const invoke = vi.fn(async (command: string) =>
+    command === 'x_archive_resolve' ? { archive: archived, resources: [] } : null,
+  )
+  setBridge({ invoke, listen: async () => () => {} })
+
+  expect(peekArchivedPost(1, '123')).toBeUndefined()
+  const resolved = await resolveArchivedPost(1, '123')
+  expect(peekArchivedPost(1, '123')).toEqual(resolved)
+  expect(peekArchivedPost(2, '123')).toBeUndefined()
+
+  await saveArchivedPost(1, archived)
+  expect(peekArchivedPost(1, '123')).toBeUndefined()
+})
+
+it('does not keep a missing archive', async () => {
+  setBridge({ invoke: async () => null, listen: async () => () => {} })
+  expect(await resolveArchivedPost(3, '456')).toBeNull()
+  expect(peekArchivedPost(3, '456')).toBeUndefined()
 })
