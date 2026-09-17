@@ -106,8 +106,8 @@ async function runFlush(): Promise<FlushResult> {
         [queueKey(id)]: { ...entry, attempts: entry.attempts + 1 },
       })
       holdReason = outcome.reason
-      // Keep supported captures moving past held X captures.
-      if (outcome.reason !== 'unsupported-version' && entry.wire.envelope.kind !== 'x-like') break
+      // Only an X post waits on a desktop update; page captures behind it still go.
+      if (outcome.reason !== 'unsupported-version') break
     }
   }
 
