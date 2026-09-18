@@ -104,19 +104,6 @@ mod capability_tests {
     }
 }
 
-/// Which UI family this build serves. The frontend's root gate (Plan 19)
-/// switches between the desktop and mobile surface trees on this answer.
-#[tauri::command]
-fn app_platform() -> &'static str {
-    if cfg!(target_os = "ios") {
-        "ios"
-    } else if cfg!(target_os = "android") {
-        "android"
-    } else {
-        "desktop"
-    }
-}
-
 /// Route `tracing` output to stderr, honoring `RUST_LOG` (default `info`).
 fn init_tracing() {
     use tracing_subscriber::EnvFilter;
@@ -285,7 +272,6 @@ pub fn run() {
             fs::x_archive::x_archive_resolve,
             fs::x_archive::x_archive_owners,
             app_version,
-            app_platform,
             background_task::background_task_begin,
             background_task::background_task_end,
             icloud::storage::mobile_storage,

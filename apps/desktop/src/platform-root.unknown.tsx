@@ -44,7 +44,7 @@ const plateformRootPromise = (async () => {
   if (!hasBridge()) {
     const index = await createDevIndexDb()
     const files = createDevFileStore(seedGraphFiles())
-    const devBridge = createDevBridge({ platform: appPlatform, files, index })
+    const devBridge = createDevBridge({ files, index })
     setBridge(devBridge)
   }
 
