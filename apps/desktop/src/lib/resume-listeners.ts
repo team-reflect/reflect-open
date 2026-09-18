@@ -1,6 +1,6 @@
 import { throttle } from "@ocavue/utils"
 
-const RESUME_DEDUPE_MS = 1_500
+const RESUME_THROTTLE_MS = 1_500
 
 /**
  * Call `onResume` when the user comes back to this window or the network comes
@@ -8,7 +8,7 @@ const RESUME_DEDUPE_MS = 1_500
  */
 export function attachResumeListeners(onResume: () => void): () => void {
 let canceled = false
-  const resumeThrottle = throttle(onResume, 1500)
+  const resumeThrottle = throttle(onResume, RESUME_THROTTLE_MS)
 
   const handleResume = (): void => {
     if (canceled) {return }
