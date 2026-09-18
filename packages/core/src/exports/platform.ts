@@ -33,8 +33,6 @@ export {
 export { impactLight } from '../ipc/mobile-haptics-plugin'
 export {
   getAppVersion,
-  getAppPlatform,
-  isMobilePlatform,
   mobileStorage,
   mobileStorageLocal,
   icloudDownloadPending,
@@ -45,7 +43,6 @@ export {
   icloudConflictsScan,
   icloudWatchStart,
   icloudWatchStop,
-  type AppPlatform,
   type IcloudDownloadScope,
   type IcloudScanOptions,
   type IcloudSweepScope,
@@ -54,6 +51,7 @@ export {
   type MobileStorageInfo,
   type MobileStorageKind,
 } from '../ipc/commands'
+export { isMobilePlatform, type AppPlatform } from '../app/platform'
 export { confirmQuit, subscribeQuitRequested } from '../app/quit'
 export {
   beginBackgroundTask,

@@ -16,7 +16,6 @@ import { createDevIndexDb } from '@/dev/dev-index-db'
 async function installPreview(): Promise<void> {
   setBridge(
     createDevBridge({
-      platform: 'ios',
       files: createDevFileStore({}),
       index: await createDevIndexDb(),
     }),

@@ -1,10 +1,4 @@
-import {
-  IAP_PRODUCT_IDS,
-  indexedNoteSchema,
-  ReflectError,
-  type AppPlatform,
-  type IpcBridge,
-} from '@reflect/core'
+import { IAP_PRODUCT_IDS, indexedNoteSchema, ReflectError, type IpcBridge } from '@reflect/core'
 import { z } from 'zod'
 import type { DevFileStore } from '@/dev/dev-file-store'
 import type { DevIndexDb } from '@/dev/dev-index-db'
@@ -12,10 +6,8 @@ import type { DevIndexDb } from '@/dev/dev-index-db'
 /** The fixed fake graph root the dev bridge reports (mirrors `mobile_storage`). */
 export const DEV_GRAPH_ROOT = '/dev-graph'
 
-/** Everything the command router needs; assembled by `installDevBridge`. */
+/** Everything the command router needs. */
 export interface DevBridgeBackend {
-  /** The platform `app_platform` reports (the `?platform=` override value). */
-  platform: AppPlatform
   files: DevFileStore
   index: DevIndexDb
 }
@@ -82,7 +74,7 @@ const iapProducts = [
  * error naming the gap.
  */
 export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
-  const { platform, files, index } = backend
+  const { files, index } = backend
   const graphInfo = { root: DEV_GRAPH_ROOT, name: 'Dev Graph', generation: 1 }
   let settingsDocument: Record<string, unknown> = { mobileOnboarded: true }
   const assets = new Map<string, string>()
@@ -95,8 +87,6 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
     switch (command) {
       case 'app_version':
         return '0.0.0-dev'
-      case 'app_platform':
-        return platform
       case 'background_task_begin':
         // Browser previews are never suspended like an iOS process, so the
         // native finite-length assertion is honestly unavailable.

@@ -8,7 +8,8 @@
 
     /* Path aliases */
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@platform-root": ["./src/platform-root.unknown.tsx"]
     }
   },
   "references": [

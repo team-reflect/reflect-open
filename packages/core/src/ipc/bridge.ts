@@ -104,7 +104,7 @@ export function hasBinaryIpc(): boolean {
 export function getBridge(): IpcBridge {
   if (activeBridge === null) {
     throw new Error(
-      'No IPC bridge is installed. Call setBridge() at startup — the desktop app installs the Tauri bridge in main.tsx; tests install a fake.',
+      'No IPC bridge is installed. Call setBridge() at startup — the desktop app installs the Tauri bridge in boot.ts; tests install a fake.',
     )
   }
   return activeBridge
