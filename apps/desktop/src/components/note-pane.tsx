@@ -9,7 +9,6 @@ import {
 } from '@reflect/core'
 import { BacklinksPanel } from '@/components/backlinks-panel'
 import { ConflictNoteView } from '@/components/conflict-note-view'
-import { InlineAlert } from '@/components/inline-alert'
 import { NoteLoading } from '@/components/note-loading'
 import { NoteOpenError } from '@/components/note-open-error'
 import { NoteSaveAlerts } from '@/components/note-save-alerts'
@@ -309,14 +308,7 @@ export function NotePaneComponent({
   return (
     <div className={cn('relative', className)} aria-label={`Editing ${path}`}>
       <div className={gutterClassName}>
-        <NoteSaveAlerts document={document} />
-
-        {saveError !== null ? (
-          <InlineAlert tone="error" className="mb-4">
-            Couldn’t save the {saveError.kind === 'image' ? 'pasted image' : 'file'}:{' '}
-            {saveError.message}. It was not added to the note.
-          </InlineAlert>
-        ) : null}
+        <NoteSaveAlerts document={document} assetSaveError={saveError} />
 
         <SyncConflictNotice path={path} className="mb-4" />
 
