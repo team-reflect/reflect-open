@@ -1,5 +1,6 @@
 import { addPluginListener, invoke, isTauri } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { setBridge, type IpcBridge } from '@reflect/core'
 
 /**
@@ -13,7 +14,13 @@ export const tauriBridge: IpcBridge = {
   // base64); metadata travels in headers since a raw body has no args.
   invokeBinary: (command, body, headers) => invoke(command, body, { headers }),
   listen: async (event, handler) => {
-    const unlisten = await listen(event, (incoming) => handler(incoming.payload))
+    // Tauri's default `Any` target bypasses the `emit_to` filter, so an
+    // untargeted listener also receives events addressed to OTHER windows
+    // (`window:navigate` re-navigated every note window). Targeting this
+    // window's label still receives `app.emit` broadcasts, which run unfiltered.
+    const unlisten = await listen(event, (incoming) => handler(incoming.payload), {
+      target: getCurrentWebviewWindow().label,
+    })
     return () => {
       // Tauri types unlisten() as `() => void`, but at runtime it is async and
       // can reject: its injected cleanup script reads `listeners[eventId].handlerId`
