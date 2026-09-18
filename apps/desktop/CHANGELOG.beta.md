@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.13.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta...v0.13.0-beta.1) (2026-09-18)
+
+
+### Bug Fixes
+
+* keep open-in-new-window from navigating other note windows ([#1311](https://github.com/team-reflect/reflect-open/issues/1311)) ([d564d80](https://github.com/team-reflect/reflect-open/commit/d564d80f121885db16c13376bd78cf1de633e65a))
+* keep the blank line after frontmatter out of the note body ([#1303](https://github.com/team-reflect/reflect-open/issues/1303)) ([442bac0](https://github.com/team-reflect/reflect-open/commit/442bac09737b7863376fa3a75d7c610d66bea6cc))
+* **mobile:** keep incoming backlinks on screen below a short note ([#1312](https://github.com/team-reflect/reflect-open/issues/1312)) ([e0ea126](https://github.com/team-reflect/reflect-open/commit/e0ea126839ea53808412d75d1be8ecba3c6b36a6))
+* update meowdown ([#1298](https://github.com/team-reflect/reflect-open/issues/1298)) ([a585000](https://github.com/team-reflect/reflect-open/commit/a5850002797c647b100bc96562141dba29f6e1fd))
+
 ## [0.13.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.12.0...v0.13.0-beta) (2026-09-17)
 
 
