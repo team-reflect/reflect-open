@@ -8,14 +8,11 @@ const RESUME_THROTTLE_MS = 1_500
  */
 export function attachResumeListeners(onResume: () => void): () => void {
   let canceled = false
-  const resumeThrottle = throttle(onResume, RESUME_THROTTLE_MS)
-
-  const handleResume = (): void => {
-    if (canceled) {
-      return
+  const handleResume = throttle((): void => {
+    if (!canceled) {
+      onResume()
     }
-    resumeThrottle()
-  }
+  }, RESUME_THROTTLE_MS)
   const handleVisibilityChange = (): void => {
     if (document.visibilityState === 'visible') {
       handleResume()
