@@ -7,7 +7,6 @@ import { seedGraphFiles } from '@/dev/seed-graph'
 import { lazy, Suspense } from 'react'
 import { LoadingScreen } from '@/components/loading-screen'
 
-
 const appPlatform: AppPlatform = (() => {
   if (import.meta.env.DEV && typeof window !== 'undefined') {
     const query = new URLSearchParams(window.location.search).get('platform')
@@ -21,29 +20,30 @@ const appPlatform: AppPlatform = (() => {
       return 'desktop'
     }
     if (query) {
-      console.warn("[reflect-open] Unknown platform override in query string:", query)
+      console.warn('[reflect-open] Unknown platform override in query string:', query)
     }
   }
 
-
-  const env = import.meta.env.TAURI_ENV_PLATFORM || ""
+  const env = import.meta.env.TAURI_ENV_PLATFORM || ''
 
   switch (env) {
     case 'ios':
       return 'ios'
     case 'android':
-      return  'android'
+      return 'android'
     case 'windows':
     case 'linux':
     case 'darwin':
-      case "":
+    case '':
       return 'desktop'
     default:
-      console.warn("[reflect-open] Unknown platform in environment variable TAURI_ENV_PLATFORM:", env)
+      console.warn(
+        '[reflect-open] Unknown platform in environment variable TAURI_ENV_PLATFORM:',
+        env,
+      )
       return 'desktop'
   }
 })()
-
 
 const plateformRootPromise = (async () => {
   if (!hasBridge()) {
@@ -54,10 +54,10 @@ const plateformRootPromise = (async () => {
   }
 
   if (appPlatform === 'desktop') {
-    const { warmPlatformRoot, PlatformRoot} = await import('@/platform-root.desktop')
+    const { warmPlatformRoot, PlatformRoot } = await import('@/platform-root.desktop')
     return { PlatformRoot, warmPlatformRoot }
   } else {
-    const { warmPlatformRoot, PlatformRoot} = await import('@/platform-root.mobile')
+    const { warmPlatformRoot, PlatformRoot } = await import('@/platform-root.mobile')
     return { PlatformRoot, warmPlatformRoot }
   }
 })()
@@ -67,13 +67,12 @@ const PlatformRootLazy = lazy(async () => {
   return { default: PlatformRoot }
 })
 
-
-export   function warmPlatformRoot() {
+export function warmPlatformRoot() {
   plateformRootPromise.then(({ warmPlatformRoot }) => warmPlatformRoot())
 }
 
 export function PlatformRoot() {
-  <Suspense fallback={<LoadingScreen/>}>
-    <PlatformRootLazy/>
+  ;<Suspense fallback={<LoadingScreen />}>
+    <PlatformRootLazy />
   </Suspense>
 }

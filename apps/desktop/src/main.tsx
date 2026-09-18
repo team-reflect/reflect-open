@@ -23,7 +23,6 @@ installNativeMenu().catch((cause: unknown) => {
   console.error('failed to install the native menu', cause)
 })
 
-
 const rootElement = document.getElementById('root')
 if (!rootElement) {
   throw new Error('Root element #root was not found')
