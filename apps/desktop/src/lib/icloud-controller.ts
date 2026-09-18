@@ -15,6 +15,7 @@ import {
 } from '@reflect/core'
 import { dirtyOpenPaths } from '@/editor/open-documents'
 import { throttledInvalidateIndexQueries } from '@/lib/query-client'
+import { attachResumeListeners } from '@/lib/resume-listeners'
 
 /**
  * Whether a graph root lives under iCloud Drive: the app's container and the
@@ -47,11 +48,6 @@ const INGEST_SCAN_DEBOUNCE_MS = 5_000
  * signals and resumes are unaffected.
  */
 const INGEST_SCAN_MIN_SPACING_MS = 30_000
-/**
- * Resume-trigger dedupe: one transition can fire `focus` and
- * `visibilitychange` together (the backup controller's window, same value).
- */
-const RESUME_SCAN_DEDUPE_MS = 1_500
 
 export interface IcloudControllerOptions {
   graph: GraphInfo
@@ -434,34 +430,4 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
   }
 
   return { start, dispose }
-}
-
-/**
- * Wire the resume triggers (same shape as the backup controller's): `focus`
- * for a desktop refocus, visibility → visible for mobile resume and desktop
- * unminimize. One transition can fire both events, so `onResume` calls are
- * deduped within {@link RESUME_SCAN_DEDUPE_MS}. Returns the listeners'
- * disposers.
- */
-function attachResumeListeners(onResume: () => void): Array<() => void> {
-  let lastResumeAt = 0
-  const resume = (): void => {
-    const now = Date.now()
-    if (now - lastResumeAt < RESUME_SCAN_DEDUPE_MS) {
-      return
-    }
-    lastResumeAt = now
-    onResume()
-  }
-  const onVisibilityChange = (): void => {
-    if (document.visibilityState === 'visible') {
-      resume()
-    }
-  }
-  window.addEventListener('focus', resume)
-  document.addEventListener('visibilitychange', onVisibilityChange)
-  return [
-    () => window.removeEventListener('focus', resume),
-    () => document.removeEventListener('visibilitychange', onVisibilityChange),
-  ]
 }
