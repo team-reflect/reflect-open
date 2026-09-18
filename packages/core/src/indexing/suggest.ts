@@ -2,8 +2,9 @@
  * Pure ranking for `[[` autocomplete (Plan 07): merges title and alias matches
  * from the index into one ordered candidate list. The SQL layer (`queries.ts`)
  * only guarantees "contains the query somewhere"; the ordering policy — exact
- * before prefix before substring, titles before aliases, recent before stale —
- * lives here where it can be unit-tested without a database.
+ * before prefix before substring, much-linked before rarely linked, titles
+ * before aliases, recent before stale — lives here where it can be unit-tested
+ * without a database.
  */
 
 import { foldKey } from '../markdown/keys'
@@ -103,6 +104,8 @@ export interface TitleCandidate {
   titleKey: string
   dailyDate: string | null
   mtime: number
+  /** How many wiki links in the graph name a spelling this note claims. */
+  linkCount: number
 }
 
 /** One `aliases ⋈ notes` row (an alias match). */
@@ -111,20 +114,33 @@ export interface AliasCandidate extends TitleCandidate {
   aliasKey: string
 }
 
-/** Lower ranks first: exact (0) < prefix (1) < substring (2); 3 = recency fill. */
+/**
+ * Lower ranks first: exact (0) < prefix (2) < substring (3); 4 = empty query.
+ * Rank 1 is left for an exact alias hit.
+ */
 function matchRank(key: string, candidateKey: string): number {
   if (key === '') {
-    return 3
+    return 4
   }
   if (candidateKey === key) {
     return 0
   }
-  return candidateKey.startsWith(key) ? 1 : 2
+  return candidateKey.startsWith(key) ? 2 : 3
+}
+
+/**
+ * Link counts on a log scale: 0, 1, 2-3, 4-7, 8-15, and so on. Counts in one
+ * bucket are treated as equally used, so recency decides between them.
+ */
+function computeUsageBucket(linkCount: number): number {
+  return 32 - Math.clz32(linkCount)
 }
 
 interface Scored {
   suggestion: WikiSuggestion
-  score: number
+  rank: number
+  usage: number
+  isAlias: boolean
   mtime: number
 }
 
@@ -139,21 +155,24 @@ interface Scored {
  * deliberately exact, not fold-based: an authored alias differing only by
  * case is a real display preference and keeps its promised text.
  */
-function toScored(row: TitleCandidate, matchedAlias: string | null, score: number): Scored {
+function toScored(row: TitleCandidate, matchedAlias: string | null, rank: number): Scored {
   const target = row.dailyDate ?? wikiLinkTargetForTitle(row.title)
   const alias = matchedAlias === target ? null : matchedAlias
   return {
     suggestion: { target, path: row.path, title: row.title, alias, date: row.dailyDate },
-    score,
+    rank,
+    usage: computeUsageBucket(row.linkCount),
+    isAlias: matchedAlias !== null,
     mtime: row.mtime,
   }
 }
 
 /**
- * Merge and order candidates for `key` (the case-folded query). Alias hits
- * rank just behind the equivalent title hit, ties break on file recency, and a
- * note appears once — its best-scoring entry wins (so a note whose title *and*
- * alias both match shows as the plain title row).
+ * Merge and order candidates for `key` (the case-folded query): match rank
+ * first, then the more-linked note, then a title hit before an alias hit, then
+ * file recency. Usage ranks inside a match rank, never across one, so a fully
+ * typed title keeps the top slot. A note appears once, as its best entry (so a
+ * note whose title *and* alias both match shows as the plain title row).
  */
 export function rankWikiSuggestions(
   key: string,
@@ -162,14 +181,17 @@ export function rankWikiSuggestions(
   limit: number,
 ): WikiSuggestion[] {
   const scored: Scored[] = [
-    // ×2 leaves room for the alias penalty between match ranks.
-    ...titles.map((row) => toScored(row, null, matchRank(key, row.titleKey) * 2)),
-    ...aliases.map((row) => toScored(row, row.alias, matchRank(key, row.aliasKey) * 2 + 1)),
+    ...titles.map((row) => toScored(row, null, matchRank(key, row.titleKey))),
+    // An exact title is a stronger claim on the query than an exact alias,
+    // whatever their usage.
+    ...aliases.map((row) => toScored(row, row.alias, matchRank(key, row.aliasKey) || 1)),
   ]
 
   scored.sort(
     (a, b) =>
-      a.score - b.score ||
+      a.rank - b.rank ||
+      b.usage - a.usage ||
+      Number(a.isAlias) - Number(b.isAlias) ||
       b.mtime - a.mtime ||
       a.suggestion.title.localeCompare(b.suggestion.title),
   )

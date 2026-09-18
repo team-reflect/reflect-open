@@ -14,6 +14,22 @@ import {
   type WikiSuggestion,
 } from './suggest'
 
+/** How many ranked-in-SQL rows each candidate query hands to the in-memory ranker. */
+const WIKI_CANDIDATE_LIMIT = 200
+
+/**
+ * A note's usage signal: how many links in the graph name a spelling the note
+ * claims. Both joins stay inside covering indexes (`note_claims_note`,
+ * `links_target_key`), so counting never reads a `links` row.
+ */
+function selectLinkCount() {
+  return sql<number>`(
+    SELECT count(*) FROM note_claims
+    JOIN links ON links.target_key = note_claims.key
+    WHERE note_claims.note_path = notes.path
+  )`.as('linkCount')
+}
+
 /** One `#tag` autocomplete candidate: display casing + how many notes carry it. */
 export interface TagSuggestion {
   tag: string
@@ -116,7 +132,7 @@ export async function getWikiAddressForPath(path: string): Promise<WikiLinkSugge
   if (note === undefined) {
     return null
   }
-  const candidate = rankWikiSuggestions('', [note], [], 1)[0]
+  const candidate = rankWikiSuggestions('', [{ ...note, linkCount: 0 }], [], 1)[0]
   if (candidate === undefined) {
     return null
   }
@@ -131,13 +147,20 @@ async function queryWikiTargetCandidates(
   const normalized = normalizeWikiTarget(query)
   const key = normalized.key
 
+  // The pool is cut by usage before recency: a much-linked note stays in it
+  // however long ago its file was last edited. An exact hit is always kept.
   let titleQuery = db
     .selectFrom('notes')
     .where('kind', '!=', 'template')
-    .select(['path', 'title', 'titleKey', 'dailyDate', 'mtime'])
+    .select(['path', 'title', 'titleKey', 'dailyDate', 'mtime', selectLinkCount()])
+    .orderBy(sql`title_key = ${key}`, 'desc')
+    .orderBy(sql`link_count`, 'desc')
     .orderBy('mtime', 'desc')
-    .limit(50)
-  if (key !== '') {
+    .limit(WIKI_CANDIDATE_LIMIT)
+  if (key === '') {
+    // Days come from the date generator; the unqueried list is for notes.
+    titleQuery = titleQuery.where('dailyDate', 'is', null)
+  } else {
     titleQuery = titleQuery.where(sql<boolean>`title_key LIKE ${likeContains(key)} ESCAPE '\\'`)
   }
   const titles: TitleCandidate[] = await titleQuery.execute()
@@ -157,9 +180,12 @@ async function queryWikiTargetCandidates(
         'notes.mtime',
         'aliases.alias',
         'aliases.aliasKey',
+        selectLinkCount(),
       ])
+      .orderBy(sql`alias_key = ${key}`, 'desc')
+      .orderBy(sql`link_count`, 'desc')
       .orderBy('notes.mtime', 'desc')
-      .limit(50)
+      .limit(WIKI_CANDIDATE_LIMIT)
       .execute()
   }
 

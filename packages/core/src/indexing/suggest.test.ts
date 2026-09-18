@@ -19,6 +19,7 @@ function note(title: string, mtime = 0, extra?: Partial<TitleCandidate>): TitleC
     titleKey: title.toLowerCase(),
     dailyDate: null,
     mtime,
+    linkCount: 0,
     ...extra,
   }
 }
@@ -28,6 +29,47 @@ function alias(target: TitleCandidate, aliasText: string): AliasCandidate {
 }
 
 describe('rankWikiSuggestions', () => {
+  it('ranks the more-linked note first inside a match rank', () => {
+    const result = rankWikiSuggestions(
+      'project',
+      [note('Project Rare', 900), note('Project Used', 1, { linkCount: 12 })],
+      [],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['Project Used', 'Project Rare'])
+  })
+
+  it('keeps an exact match above a more-linked partial match', () => {
+    const result = rankWikiSuggestions(
+      'ada',
+      [note('Ada Lovelace Notes', 900, { linkCount: 99 }), note('Ada', 1)],
+      [],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['Ada', 'Ada Lovelace Notes'])
+  })
+
+  it('breaks ties inside a usage bucket on recency', () => {
+    const result = rankWikiSuggestions(
+      'project',
+      [note('Project Older', 1, { linkCount: 7 }), note('Project Newer', 900, { linkCount: 4 })],
+      [],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['Project Newer', 'Project Older'])
+  })
+
+  it('ranks a more-linked alias hit above an unlinked title hit', () => {
+    const john = note('John Smith', 1, { linkCount: 40 })
+    const result = rankWikiSuggestions(
+      'johnn',
+      [note('Johnnie Walker Tasting', 900)],
+      [alias(john, 'Johnny')],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['John Smith', 'Johnnie Walker Tasting'])
+  })
+
   it('orders exact before prefix before substring', () => {
     const result = rankWikiSuggestions(
       'meet',
