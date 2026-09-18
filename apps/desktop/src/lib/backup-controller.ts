@@ -367,10 +367,6 @@ export function createBackupController(options: BackupControllerOptions): Backup
         return
       }
 
-      // `online` is the `offline` state's recovery trigger. Resume triggers are
-      // deduped: each one would otherwise queue its own full engine cycle
-      // (single flight queues a *follow-up*, it doesn't drop the second call),
-      // doubling the network work of every resume.
       domDisposers.push(attachResumeListeners(() => void next.syncNow()))
 
       void next.syncNow() // launch pull: pick up other devices' changes

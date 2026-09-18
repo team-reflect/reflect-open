@@ -1,3 +1,5 @@
+import { throttle } from "@ocavue/utils"
+
 /**
  * A single foreground/resume transition fires several DOM events at once:
  * WKWebView emits both `visibilitychange` and `focus` on app resume, desktop
@@ -13,26 +15,25 @@ const RESUME_DEDUPE_MS = 1_500
  * Returns the disposer.
  */
 export function attachResumeListeners(onResume: () => void): () => void {
-  let lastResumeAt = 0
-  const resume = (): void => {
-    const now = Date.now()
-    if (now - lastResumeAt < RESUME_DEDUPE_MS) {
-      return
-    }
-    lastResumeAt = now
-    onResume()
+let canceled = false
+  const resumeThrottle = throttle(onResume, RESUME_DEDUPE_MS)
+
+  const handleResume = (): void => {
+    if (canceled) {return }
+    resumeThrottle()
   }
-  const onVisibilityChange = (): void => {
+  const handleVisibilityChange = (): void => {
     if (document.visibilityState === 'visible') {
-      resume()
+      handleResume()
     }
   }
-  window.addEventListener('focus', resume)
-  document.addEventListener('visibilitychange', onVisibilityChange)
-  window.addEventListener('online', onResume)
+  window.addEventListener('focus', handleResume)
+  window.addEventListener('online', handleResume)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
   return () => {
-    window.removeEventListener('focus', resume)
-    document.removeEventListener('visibilitychange', onVisibilityChange)
-    window.removeEventListener('online', onResume)
+    canceled = true
+    window.removeEventListener('focus', handleResume)
+    window.removeEventListener('online', handleResume)
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
   }
 }
