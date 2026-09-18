@@ -10,7 +10,9 @@ import {
 import { BacklinksPanel } from '@/components/backlinks-panel'
 import { ConflictNoteView } from '@/components/conflict-note-view'
 import { InlineAlert } from '@/components/inline-alert'
-import { NoteConflictBanner } from '@/components/note-conflict-banner'
+import { NoteLoading } from '@/components/note-loading'
+import { NoteOpenError } from '@/components/note-open-error'
+import { NoteSaveAlerts } from '@/components/note-save-alerts'
 import { ProtectedNoteView } from '@/components/protected-note-view'
 import { SuggestedContactCard } from '@/components/suggested-contact-card'
 import { SyncConflictNotice } from '@/components/sync-conflict-notice'
@@ -262,36 +264,16 @@ export function NotePaneComponent({
   const xPostsReady = useXPostPreload(editorContent)
 
   if (document.status === 'loading' || (editorContent !== null && !xPostsReady)) {
-    // `reflect-note-loading` keeps the hint invisible for the first beat:
-    // local reads resolve in milliseconds, and the text flashing on every
-    // daily-stream row reads as flicker while the stream anchors.
-    return (
-      <div
-        className={cn(
-          'reflect-note-loading px-1 py-2 text-sm text-text-muted',
-          gutterClassName,
-          editorClassName,
-          className,
-        )}
-      >
-        Loading note…
-      </div>
-    )
+    return <NoteLoading className={cn(gutterClassName, editorClassName, className)} />
   }
 
   if (document.status === 'error') {
     return (
-      <div
-        role="alert"
-        className={cn(
-          'px-1 py-2 text-sm text-red-500',
-          gutterClassName,
-          editorClassName,
-          className,
-        )}
-      >
-        Couldn’t open {path}: {document.error}
-      </div>
+      <NoteOpenError
+        path={path}
+        message={document.error}
+        className={cn(gutterClassName, editorClassName, className)}
+      />
     )
   }
 
@@ -327,22 +309,13 @@ export function NotePaneComponent({
   return (
     <div className={cn('relative', className)} aria-label={`Editing ${path}`}>
       <div className={gutterClassName}>
-        {document.error !== null ? (
-          <InlineAlert tone="error" className="mb-4">
-            Saving failed: {document.error}. Your edits are kept in the editor and the next
-            successful save will persist them.
-          </InlineAlert>
-        ) : null}
+        <NoteSaveAlerts document={document} />
 
         {saveError !== null ? (
           <InlineAlert tone="error" className="mb-4">
             Couldn’t save the {saveError.kind === 'image' ? 'pasted image' : 'file'}:{' '}
             {saveError.message}. It was not added to the note.
           </InlineAlert>
-        ) : null}
-
-        {document.conflict !== null ? (
-          <NoteConflictBanner onKeepMine={document.keepMine} onLoadTheirs={document.loadTheirs} />
         ) : null}
 
         <SyncConflictNotice path={path} className="mb-4" />
