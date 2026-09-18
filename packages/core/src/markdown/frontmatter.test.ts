@@ -150,6 +150,13 @@ describe('upsertFrontmatter', () => {
     expect(upsertFrontmatter('---\n---\n# T\n', { pinned: undefined })).toBe('# T\n')
   })
 
+  it('writes the block in the line ending of the document', () => {
+    expect(upsertFrontmatter('---\r\nid: x\r\n---\r\n\r\n# T\r\n', { pinned: true })).toBe(
+      '---\r\nid: x\r\npinned: true\r\n---\r\n\r\n# T\r\n',
+    )
+    expect(upsertFrontmatter('# T\r\n', { id: 'x' })).toBe('---\r\nid: x\r\n---\r\n\r\n# T\r\n')
+  })
+
   it('keeps a body that opens with a blank line when it creates a block', () => {
     const patched = upsertFrontmatter('\n# T\n', { id: 'x' })
     expect(splitFrontmatter(patched).body).toBe('\n# T\n')

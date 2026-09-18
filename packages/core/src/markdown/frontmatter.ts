@@ -1,4 +1,5 @@
 import { isMap, parse as parseYaml, parseDocument, type Document } from 'yaml'
+import { documentLineEnding } from './line-endings'
 import { frontmatterSchema, type Frontmatter } from './model'
 
 /**
@@ -88,8 +89,8 @@ export function parseFrontmatter(raw: string | null): ParsedFrontmatter {
  * exists (and the patch sets something), and removes the block entirely when
  * deleting its last key — a note whose only metadata was a toggled flag returns
  * to having no frontmatter at all, not an empty `---` husk. A written block
- * always ends with its blank separator line, so a body that opens with a blank
- * line keeps it.
+ * uses the document's line ending and always ends with its blank separator
+ * line, so a body that opens with a blank line keeps it.
  */
 export function upsertFrontmatter(source: string, patch: Record<string, unknown>): string {
   // An empty patch is a no-op — never re-serialize (which could disturb comments,
@@ -116,7 +117,8 @@ export function upsertFrontmatter(source: string, patch: Record<string, unknown>
   if (isEmptyDocument(doc)) {
     return body
   }
-  return `---\n${ensureTrailingNewline(String(doc))}---\n\n${body}`
+  const block = `---\n${ensureTrailingNewline(String(doc))}---\n\n`
+  return block.replaceAll(/\r?\n/g, documentLineEnding(source)) + body
 }
 
 /**
