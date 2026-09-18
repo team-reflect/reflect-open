@@ -9,10 +9,10 @@ import { isTauri } from '@tauri-apps/api/core'
 initializeExceptionTelemetry()
 
 // Install the Tauri bridge when running inside a Tauri webview. Plain-browser
-// dev (`pnpm dev` without the shell) installs nothing here — `PlatformRoot`
-// later installs the in-memory dev bridge instead (unless `?platform=none`
-// opts out), and features that need the real shell rather than just an
-// answering bridge gate on `isNativeShell()`.
+// dev (`pnpm dev` without the shell) installs nothing here — the platform
+// root later installs the in-memory dev bridge instead, and features that
+// need the real shell rather than just an answering bridge gate on
+// `isNativeShell()`.
 if (isTauri()) {
   setBridge(tauriBridge)
 }
