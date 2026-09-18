@@ -45,7 +45,7 @@ const appPlatform: AppPlatform = (() => {
 
 
 
-if (!hasBridge) {
+if (!hasBridge()) {
   const index = await createDevIndexDb()
   const files = createDevFileStore(seedGraphFiles())
   const devBridge = createDevBridge({ platform: appPlatform, files, index })
