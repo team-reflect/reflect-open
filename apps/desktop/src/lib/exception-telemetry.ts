@@ -239,21 +239,31 @@ export function createExceptionTelemetryOptions(dsn: string, release: string): B
   }
 }
 
-/**
- * Start production exception telemetry before app bootstrap and return the
- * React 19 root handlers which capture render and recovery failures.
- */
-export function initializeExceptionTelemetry(): RootOptions {
+function getDsn() {
   const dsn = parseExceptionTelemetryDsn(import.meta.env.VITE_SENTRY_DSN)
-  if (!import.meta.env.PROD || !dsn) {
-    return {}
-  }
+  return import.meta.env.PROD && dsn
+}
+
+/**
+ * Start production exception telemetry before app bootstrap.
+ */
+export function initializeExceptionTelemetry(): void {
+  const dsn = getDsn()
+  if (!dsn) return
 
   try {
     init(createExceptionTelemetryOptions(dsn, `reflect@${__REFLECT_VERSION__}`))
-  } catch {
-    return {}
+  } catch (error) {
+    console.error('[reflect-open] Failed to initialize exception telemetry', error)
   }
+}
+
+/**
+ * Return React 19 root handlers which capture render and recovery failures.
+ */
+export function getExceptionReactRootOptions(): RootOptions {
+  if (!getDsn()) return {}
+
   const adaptReactErrorHandler = (
     handler: ReturnType<typeof reactErrorHandler>,
   ): ((error: unknown, errorInfo: { componentStack?: string | undefined }) => void) => {
