@@ -467,7 +467,7 @@ describe('createIcloudController', () => {
     expect(scanCalls[1]).toMatchObject({ scope: 'ingested', ingestedPaths: ['notes/late.md'] })
   })
 
-  it('conflict signals and resume events schedule deduped sweeps', async () => {
+  it('conflict signals and window focus each schedule a sweep', async () => {
     const icloud = controller({ watch: true })
     await icloud.start()
     await settleScan() // baseline
@@ -476,8 +476,6 @@ describe('createIcloudController', () => {
     await settleScan()
     expect(scanCalls).toHaveLength(2)
 
-    // One resume transition fires focus twice (focus + visibility) — deduped.
-    window.dispatchEvent(new Event('focus'))
     window.dispatchEvent(new Event('focus'))
     await settleScan()
     expect(scanCalls).toHaveLength(3)

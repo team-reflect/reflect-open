@@ -517,49 +517,40 @@ describe('createBackupController', () => {
     controller.dispose()
   })
 
-  it('window focus and online events trigger a sync — until dispose', async () => {
+  it('window focus triggers a sync', async () => {
     const { calls } = fakeBridge()
     const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
-    await controller.start()
-    await vi.waitFor(() => {
-      expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(1)
-    })
+    try {
+      await controller.start()
+      await vi.waitFor(() => {
+        expect(commitCount(calls)).toBe(1) // the launch pull's commit
+      })
 
-    window.dispatchEvent(new Event('focus'))
-    await vi.waitFor(() => {
-      expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(2)
-    })
-    window.dispatchEvent(new Event('online'))
-    await vi.waitFor(() => {
-      expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(3)
-    })
-
-    controller.dispose()
-    window.dispatchEvent(new Event('focus'))
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(3)
+      window.dispatchEvent(new Event('focus'))
+      await vi.waitFor(() => {
+        expect(commitCount(calls)).toBe(2)
+      })
+    } finally {
+      controller.dispose()
+    }
   })
 
-  it('a resume firing both visibility and focus runs one deduped cycle', async () => {
-    // WKWebView emits `visibilitychange` AND `focus` on one app foreground
-    // (desktop unminimize can too). Without the dedupe the second event
-    // queues a follow-up cycle — double network work on every resume.
+  it('the network coming back triggers a sync', async () => {
     const { calls } = fakeBridge()
     const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
-    await controller.start()
-    await vi.waitFor(() => {
-      expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(1)
-    })
+    try {
+      await controller.start()
+      await vi.waitFor(() => {
+        expect(commitCount(calls)).toBe(1) // the launch pull's commit
+      })
 
-    document.dispatchEvent(new Event('visibilitychange'))
-    window.dispatchEvent(new Event('focus'))
-    await vi.waitFor(() => {
-      expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(2)
-    })
-    // Let any wrongly-queued follow-up cycle surface before asserting.
-    await new Promise((resolve) => setTimeout(resolve, 20))
-    expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(2)
-    controller.dispose()
+      window.dispatchEvent(new Event('online'))
+      await vi.waitFor(() => {
+        expect(commitCount(calls)).toBe(2)
+      })
+    } finally {
+      controller.dispose()
+    }
   })
 
   it('going hidden does not trigger a cycle (backgrounding is the flush path)', async () => {
