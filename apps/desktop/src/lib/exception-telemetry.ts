@@ -1,3 +1,4 @@
+import { once } from '@ocavue/utils'
 import {
   dedupeIntegration,
   globalHandlersIntegration,
@@ -239,10 +240,13 @@ export function createExceptionTelemetryOptions(dsn: string, release: string): B
   }
 }
 
-function getDsn() {
-  const dsn = parseExceptionTelemetryDsn(import.meta.env.VITE_SENTRY_DSN)
-  return import.meta.env.PROD && dsn
-}
+const getDsn = once(function getDsn(): string | null {
+  if (import.meta.env.PROD) {
+    return parseExceptionTelemetryDsn(import.meta.env.VITE_SENTRY_DSN)
+  } else {
+    return null
+  }
+})
 
 /**
  * Start production exception telemetry before app bootstrap.
