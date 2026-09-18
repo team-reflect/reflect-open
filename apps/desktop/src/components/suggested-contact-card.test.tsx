@@ -100,7 +100,7 @@ describe('SuggestedContactCard', () => {
 
     await vi.waitFor(() => expect(written.length).toBe(1))
     expect(written[0]?.contents).toBe(
-      '---\nignoredContacts:\n  - Ada Lovelace\n---\n# Ada Lovelace\n',
+      '---\nignoredContacts:\n  - Ada Lovelace\n---\n\n# Ada Lovelace\n',
     )
     await expectLocatorToHaveCount(page.getByText('Ada Lovelace'), 0)
   })

@@ -93,7 +93,7 @@ describe('createTemplate', () => {
     expect(availableTemplatePath).toHaveBeenCalledWith('daily-review')
     expect(writeNote).toHaveBeenCalledWith(
       'templates/daily-review.md',
-      '---\ntitle: Daily Review\n---\n',
+      '---\ntitle: Daily Review\n---\n\n',
       7,
     )
   })

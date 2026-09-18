@@ -148,7 +148,7 @@ describe('ignoreContactSuggestion', () => {
 
     expect(writeNote).toHaveBeenCalledWith(
       'notes/Ada Lovelace.md',
-      '---\nignoredContacts:\n  - Grace Hopper\n  - Ada Lovelace\n---\n# Ada Lovelace\n',
+      '---\nignoredContacts:\n  - Grace Hopper\n  - Ada Lovelace\n---\n\n# Ada Lovelace\n',
       3,
     )
   })

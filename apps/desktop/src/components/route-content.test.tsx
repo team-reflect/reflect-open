@@ -266,7 +266,7 @@ describe('RouteContent', () => {
 
     // The seed's header rides along: the file is born with its identity
     // (`id:` frontmatter, Plan 17) plus exactly what the user typed.
-    expect(files[NEW_NOTE_PATH]).toMatch(/^---\nid: [0-9a-z]{26}\n---\n# Manifesto\n$/)
+    expect(files[NEW_NOTE_PATH]).toMatch(/^---\nid: [0-9a-z]{26}\n---\n\n# Manifesto\n$/)
     await view.unmount()
   })
 

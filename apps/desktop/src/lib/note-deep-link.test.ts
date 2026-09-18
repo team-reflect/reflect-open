@@ -73,7 +73,7 @@ describe('deepLinkForNote', () => {
 
     const id = decodeURIComponent(url.replace('reflect://note/', ''))
     expect(id).toMatch(ULID_RE)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', `---\nid: ${id}\n---\n# A\n`, 3)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', `---\nid: ${id}\n---\n\n# A\n`, 3)
     // The index trails local writes by a watcher debounce; without this the
     // just-copied link answers "Note not found" until the reindex.
     expect(indexNote).toHaveBeenCalledWith('notes/a.md', { generation: 3 })

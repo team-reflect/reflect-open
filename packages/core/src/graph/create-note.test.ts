@@ -113,7 +113,7 @@ describe('createNoteWithTitle', () => {
     const args = write?.[1] as { path: string; contents: string; generation: number }
     expect(args.path).toBe(path)
     expect(args.generation).toBe(7)
-    expect(args.contents).toMatch(/^---\nid: [0-9a-z]{26}\n---\n# New Idea\n$/)
+    expect(args.contents).toMatch(/^---\nid: [0-9a-z]{26}\n---\n\n# New Idea\n$/)
   })
 
   it('drops a leading emoji from the filename slug but preserves it byte-exactly in the H1', async () => {
@@ -124,7 +124,7 @@ describe('createNoteWithTitle', () => {
     expect(path).toBe('notes/business-ideas.md')
     const write = invoke.mock.calls.find(([command]) => command === 'note_create')
     const args = write?.[1] as { contents: string }
-    expect(args.contents).toMatch(/^---\nid: [0-9a-z]{26}\n---\n# 🧠 Business ideas\n$/)
+    expect(args.contents).toMatch(/^---\nid: [0-9a-z]{26}\n---\n\n# 🧠 Business ideas\n$/)
   })
 
   it('suffixes the slug when the bare path is taken', async () => {
@@ -141,7 +141,7 @@ describe('createNoteWithTitle', () => {
     const write = invoke.mock.calls.find(([command]) => command === 'note_create')
     const args = write?.[1] as { contents: string }
     expect(args.contents).toMatch(
-      /^---\nid: [0-9a-z]{26}\n---\n# Ada Lovelace\n\n- Type: #person\n$/,
+      /^---\nid: [0-9a-z]{26}\n---\n\n# Ada Lovelace\n\n- Type: #person\n$/,
     )
   })
 })
@@ -448,7 +448,7 @@ describe('resolveOrCreateNoteWithTitle', () => {
     })
     const write = invoke.mock.calls.find(([command]) => command === 'note_create')
     expect(write?.[1]?.['contents']).toMatch(
-      /^---\nid: [0-9a-z]{26}\n---\n# Ada Lovelace\n\n- Type: #person\n$/,
+      /^---\nid: [0-9a-z]{26}\n---\n\n# Ada Lovelace\n\n- Type: #person\n$/,
     )
   })
 
@@ -502,7 +502,7 @@ describe('untitledNoteSeed', () => {
   it('is an empty H1 (the caret lands there) plus a fresh id, unique per call', () => {
     const first = untitledNoteSeed()
     const second = untitledNoteSeed()
-    expect(first).toMatch(/^---\nid: [0-9a-z]{26}\n---\n#\n$/)
+    expect(first).toMatch(/^---\nid: [0-9a-z]{26}\n---\n\n#\n$/)
     expect(second).not.toBe(first)
   })
 })

@@ -49,7 +49,7 @@ describe('toggleNotePrivate', () => {
   it('marks an unopened note private via read-patch-write on disk', async () => {
     readNote.mockResolvedValue('# A\n')
     await expect(toggleNotePrivate(input())).resolves.toBeUndefined()
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\nprivate: true\n---\n# A\n', 3)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\nprivate: true\n---\n\n# A\n', 3)
   })
 
   it('un-marks on disk by removing the key (back to no frontmatter)', async () => {
@@ -69,7 +69,7 @@ describe('toggleNotePrivate', () => {
   it('replaces an explicit `private: false` with `private: true` when toggling on', async () => {
     readNote.mockResolvedValue('---\nprivate: false\n---\n# A\n')
     await expect(toggleNotePrivate(input())).resolves.toBeUndefined()
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\nprivate: true\n---\n# A\n', 3)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\nprivate: true\n---\n\n# A\n', 3)
   })
 
   it('routes through the live session, which owns landing the patch', async () => {
@@ -93,7 +93,7 @@ describe('toggleNotePrivate', () => {
     openSession.mockReturnValue(session)
     readNote.mockResolvedValue('# A\n')
     await expect(toggleNotePrivate(input())).resolves.toBeUndefined()
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\nprivate: true\n---\n# A\n', 3)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\nprivate: true\n---\n\n# A\n', 3)
   })
 
   it('marks a not-yet-created note private by creating its file (the lazy contract)', async () => {
@@ -102,7 +102,7 @@ describe('toggleNotePrivate', () => {
     openSession.mockReturnValue(session)
     readNote.mockRejectedValue({ kind: 'notFound', message: 'no such note' })
     await expect(toggleNotePrivate(input('daily/2026-06-10.md'))).resolves.toBeUndefined()
-    expect(writeNote).toHaveBeenCalledWith('daily/2026-06-10.md', '---\nprivate: true\n---\n', 3)
+    expect(writeNote).toHaveBeenCalledWith('daily/2026-06-10.md', '---\nprivate: true\n---\n\n', 3)
   })
 
   it('reports non-notFound read failures through operations', async () => {

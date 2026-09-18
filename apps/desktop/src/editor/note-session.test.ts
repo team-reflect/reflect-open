@@ -244,7 +244,7 @@ describe('createNoteSession', () => {
 })
 
 describe('frontmatter ownership (Plan 07b)', () => {
-  const FM = '---\naliases:\n  - Old\n---\n'
+  const FM = '---\naliases:\n  - Old\n---\n\n'
 
   it('the editor sees only the body; classification gates on the body', async () => {
     // A joined round-trip would classify lossy (meowdown mangles ---) — the
@@ -304,7 +304,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
     await vi.runAllTimersAsync()
     h.session.updateFrontmatter({ pinned: true })
     await vi.runAllTimersAsync()
-    expect(h.writes.at(-1)?.contents).toBe('---\npinned: true\n---\n# Hello\n')
+    expect(h.writes.at(-1)?.contents).toBe('---\npinned: true\n---\n\n# Hello\n')
 
     h.session.updateFrontmatter({ pinned: false })
     await vi.runAllTimersAsync()
@@ -319,7 +319,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
     await vi.runAllTimersAsync()
     h.session.updateFrontmatter({ private: true })
     await vi.runAllTimersAsync()
-    expect(h.writes.at(-1)?.contents).toBe('---\nprivate: true\n---\n# Hello\n')
+    expect(h.writes.at(-1)?.contents).toBe('---\nprivate: true\n---\n\n# Hello\n')
 
     h.session.updateFrontmatter({ private: false })
     await vi.runAllTimersAsync()
@@ -339,7 +339,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
     // Next save preserves the adopted header.
     h.session.editorChanged('# Hello!\n')
     await vi.runAllTimersAsync()
-    expect(h.writes.at(-1)?.contents).toBe('---\naliases:\n  - Newer\n---\n# Hello!\n')
+    expect(h.writes.at(-1)?.contents).toBe('---\naliases:\n  - Newer\n---\n\n# Hello!\n')
   })
 
   it('a frontmatter patch under a parked conflict lands with "keep mine"', async () => {
@@ -384,7 +384,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
     expect(h.snapshots.at(-1)?.conflict).toBe('---\npinned: true\n---\n# Theirs\n')
 
     h.session.loadTheirs()
-    expect(h.session.content()).toBe('---\npinned: true\n---\n# Theirs\n')
+    expect(h.session.content()).toBe('---\npinned: true\n---\n\n# Theirs\n')
   })
 
   it('commitFrontmatter lands the patch immediately on a clean session', async () => {
@@ -393,7 +393,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
     await vi.runAllTimersAsync()
     await expect(h.session.commitFrontmatter({ pinned: true })).resolves.toBe(true)
     // Flushed, not riding the save debounce.
-    expect(h.writes.at(-1)?.contents).toBe('---\npinned: true\n---\n# Hello\n')
+    expect(h.writes.at(-1)?.contents).toBe('---\npinned: true\n---\n\n# Hello\n')
     expect(h.snapshots.at(-1)?.dirty).toBe(false)
   })
 
@@ -489,11 +489,11 @@ describe('frontmatter ownership (Plan 07b)', () => {
 
     await expect(h.session.commitFrontmatter({ pinned: true })).resolves.toBe(true)
     // The contested content was patched and written — the index sees it now…
-    expect(h.writes.at(-1)?.contents).toBe('---\npinned: true\n---\n# Theirs\n')
+    expect(h.writes.at(-1)?.contents).toBe('---\npinned: true\n---\n\n# Theirs\n')
     // …the park holds the patched bytes, so "load theirs" adopts the pin…
-    expect(h.snapshots.at(-1)?.conflict).toBe('---\npinned: true\n---\n# Theirs\n')
+    expect(h.snapshots.at(-1)?.conflict).toBe('---\npinned: true\n---\n\n# Theirs\n')
     h.session.loadTheirs()
-    expect(h.session.content()).toBe('---\npinned: true\n---\n# Theirs\n')
+    expect(h.session.content()).toBe('---\npinned: true\n---\n\n# Theirs\n')
   })
 
   it('commitFrontmatter under a conflict keeps the patch through "keep mine" too', async () => {
@@ -508,7 +508,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
     await h.session.commitFrontmatter({ pinned: true })
     h.session.keepMine()
     await vi.runAllTimersAsync()
-    expect(h.writes.at(-1)?.contents).toBe('---\npinned: true\n---\n# Mine\n')
+    expect(h.writes.at(-1)?.contents).toBe('---\npinned: true\n---\n\n# Mine\n')
   })
 
   it('onContent reports full joined content with the right origins', async () => {
@@ -814,7 +814,7 @@ describe('retarget (Plan 17)', () => {
   })
 
   it('keeps frontmatter ownership across a retarget', async () => {
-    const h = harness({ disk: '---\nid: 01abc\n---\n# Hello\n' })
+    const h = harness({ disk: '---\nid: 01abc\n---\n\n# Hello\n' })
     h.session.load()
     await vi.waitFor(() => expect(h.snapshots.at(-1)?.status).toBe('ready'))
 
@@ -824,7 +824,7 @@ describe('retarget (Plan 17)', () => {
     // The exact header bytes ride along to the new path.
     expect(h.writes.at(-1)).toEqual({
       path: 'notes/hello.md',
-      contents: '---\nid: 01abc\n---\n# Hello\n\nbody\n',
+      contents: '---\nid: 01abc\n---\n\n# Hello\n\nbody\n',
     })
   })
 })
@@ -849,13 +849,13 @@ describe('commitTaskToggle', () => {
   })
 
   it('toggles a clean note (frontmatter offset intact) and writes only the marker', async () => {
-    const source = '---\nid: 01abc\n---\n+ [ ] ship it\n'
+    const source = '---\nid: 01abc\n---\n\n+ [ ] ship it\n'
     const h = harness({ disk: source })
     h.session.load()
     await settled()
 
     expect(await h.session.commitTaskToggle(firstTask(source))).toBe(true)
-    expect(h.writes.at(-1)?.contents).toBe('---\nid: 01abc\n---\n+ [x] ship it\n')
+    expect(h.writes.at(-1)?.contents).toBe('---\nid: 01abc\n---\n\n+ [x] ship it\n')
   })
 
   it('refuses (returns false) a protected note rather than write', async () => {
@@ -1127,4 +1127,51 @@ it('a rejected source edit preserves typing made while its write was pending', a
     h.session.discard()
     log.mockRestore()
   }
+})
+
+describe('frontmatter separator line', () => {
+  it('keeps the separator line out of the editor body', async () => {
+    const { session, snapshots } = harness({ disk: '---\nid: x\n---\n\n# T\n' })
+    session.load()
+    await settled()
+
+    expect(snapshots.at(-1)?.initialContent).toBe('# T\n')
+  })
+
+  it('keeps a blank line added above the body across a reopen', async () => {
+    const first = harness({ disk: '---\nid: x\n---\n# T\n' })
+    first.session.load()
+    await settled()
+    first.session.editorChanged('\n# T\n')
+    await first.session.flush()
+
+    const saved = '---\nid: x\n---\n\n\n# T\n'
+    expect(first.writes.at(-1)?.contents).toBe(saved)
+
+    const second = harness({ disk: saved })
+    second.session.load()
+    await settled()
+    expect(second.snapshots.at(-1)?.initialContent).toBe('\n# T\n')
+  })
+
+  it('keeps a leading blank line through a source edit', async () => {
+    const { session, applied } = harness({ disk: '---\nid: x\n---\n# T\n' })
+    session.load()
+    await settled()
+    session.editorChanged('\n+ [ ] a\n')
+
+    await session.commitTaskToggle(firstTask(session.content()))
+
+    expect(applied.at(-1)).toBe('\n+ [x] a\n')
+  })
+
+  it('keeps the frontmatter when the file ends at the closing fence', async () => {
+    const { session, writes } = harness({ disk: '---\nid: x\n---' })
+    session.load()
+    await settled()
+    session.editorChanged('hello')
+    await session.flush()
+
+    expect(writes.at(-1)?.contents).toBe('---\nid: x\n---\n\nhello')
+  })
 })

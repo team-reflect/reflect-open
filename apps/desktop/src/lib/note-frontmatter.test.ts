@@ -65,7 +65,7 @@ describe('commitNoteFrontmatter', () => {
 
     await commitNoteFrontmatter('notes/a.md', { pinned: true }, 3)
 
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\npinned: true\n---\n# A\n', 3)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\npinned: true\n---\n\n# A\n', 3)
   })
 
   it('patches disk directly when no session is open', async () => {
@@ -73,11 +73,11 @@ describe('commitNoteFrontmatter', () => {
 
     await commitNoteFrontmatter('notes/a.md', { private: true }, 3)
 
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\nprivate: true\n---\n# A\n', 3)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\nprivate: true\n---\n\n# A\n', 3)
   })
 
   it('writes nothing when the patch changes nothing', async () => {
-    readNote.mockResolvedValue('---\npinned: true\n---\n# A\n')
+    readNote.mockResolvedValue('---\npinned: true\n---\n\n# A\n')
 
     await commitNoteFrontmatter('notes/a.md', { pinned: true }, 3)
 
