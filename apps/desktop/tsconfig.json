@@ -9,7 +9,7 @@
     /* Path aliases */
     "paths": {
       "@/*": ["./src/*"],
-      "@platform-root": ["./src/platform-root.tsx"]
+      "@platform-root": ["src/platform-root.unknown.tsx"]
     }
   },
   "references": [
