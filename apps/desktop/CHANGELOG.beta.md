@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta.1...v0.13.0-beta.2) (2026-09-18)
+
+
+### Bug Fixes
+
+* rank backlink suggestions by link count ([#1317](https://github.com/team-reflect/reflect-open/issues/1317)) ([6dc575f](https://github.com/team-reflect/reflect-open/commit/6dc575f23558a5d9160851c0b2c9cf4723b6f576))
+* rank word-start matches higher for autocomplete ([#1318](https://github.com/team-reflect/reflect-open/issues/1318)) ([0bc1969](https://github.com/team-reflect/reflect-open/commit/0bc1969b1b722919c047f6527e9d609fab83bcaf))
+
 ## [0.13.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta...v0.13.0-beta.1) (2026-09-18)
 
 
