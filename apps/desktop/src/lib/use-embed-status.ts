@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { embedStatus, subscribeEmbedStatus, type EmbedStatus } from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready'
 
-/**
+/**FIXME: remove all stale comments for ?platform=none
  * The embedding runtime's live status (Plan 09). Polls once on mount, then
  * tracks `embed:status` events. Without a bridge (`?platform=none`) semantic
  * features stay in `uninitialized` — i.e. invisible.
