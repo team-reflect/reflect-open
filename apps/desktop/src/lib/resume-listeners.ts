@@ -1,4 +1,4 @@
-import { throttle } from "@ocavue/utils"
+import { throttle } from '@ocavue/utils'
 
 const RESUME_THROTTLE_MS = 1_500
 
@@ -7,11 +7,13 @@ const RESUME_THROTTLE_MS = 1_500
  * back. Returns the disposer.
  */
 export function attachResumeListeners(onResume: () => void): () => void {
-let canceled = false
+  let canceled = false
   const resumeThrottle = throttle(onResume, RESUME_THROTTLE_MS)
 
   const handleResume = (): void => {
-    if (canceled) {return }
+    if (canceled) {
+      return
+    }
     resumeThrottle()
   }
   const handleVisibilityChange = (): void => {
