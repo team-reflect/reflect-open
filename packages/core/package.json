@@ -22,10 +22,10 @@
     "kysely": "^0.28.17",
     "ulidx": "^2.4.1",
     "yaml": "^2.9.1",
-    "zod": "^4.6.4"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@ai-sdk/provider": "^4.0.14",
+    "@ai-sdk/provider": "^4.0.17",
     "@ocavue/tsconfig": "^0.7.1",
     "@vitest/browser-playwright": "^4.1.11",
     "playwright": "^1.63.0",
