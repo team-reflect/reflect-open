@@ -70,6 +70,36 @@ describe('rankWikiSuggestions', () => {
     expect(result.map((s) => s.title)).toEqual(['John Smith', 'Johnnie Walker Tasting'])
   })
 
+  it('ranks a word-start match above a mid-word match', () => {
+    const result = rankWikiSuggestions(
+      'smith',
+      [note('Blacksmithing', 900), note('John Smith', 1)],
+      [],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['John Smith', 'Blacksmithing'])
+  })
+
+  it('treats a later word start like a title start', () => {
+    const result = rankWikiSuggestions(
+      'smith',
+      [note('Smithsonian Trip', 900), note('John Smith', 1, { linkCount: 40 })],
+      [],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['John Smith', 'Smithsonian Trip'])
+  })
+
+  it('finds a word start after punctuation', () => {
+    const result = rankWikiSuggestions(
+      'beta',
+      [note('Alphabeta', 900), note('Launch (Beta)', 1)],
+      [],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['Launch (Beta)', 'Alphabeta'])
+  })
+
   it('orders exact before prefix before substring', () => {
     const result = rankWikiSuggestions(
       'meet',

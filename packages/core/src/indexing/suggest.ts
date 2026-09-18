@@ -2,7 +2,7 @@
  * Pure ranking for `[[` autocomplete (Plan 07): merges title and alias matches
  * from the index into one ordered candidate list. The SQL layer (`queries.ts`)
  * only guarantees "contains the query somewhere"; the ordering policy — exact
- * before prefix before substring, much-linked before rarely linked, titles
+ * before word start before mid-word, much-linked before rarely linked, titles
  * before aliases, recent before stale — lives here where it can be unit-tested
  * without a database.
  */
@@ -114,9 +114,23 @@ export interface AliasCandidate extends TitleCandidate {
   aliasKey: string
 }
 
+const WORD_CHARACTER_AT_END = /[\p{L}\p{N}]$/u
+
+/** Whether `key` occurs in `candidateKey` at the start of a word. */
+function matchesWordStart(key: string, candidateKey: string): boolean {
+  let index = candidateKey.indexOf(key)
+  while (index !== -1) {
+    if (!WORD_CHARACTER_AT_END.test(candidateKey.slice(0, index))) {
+      return true
+    }
+    index = candidateKey.indexOf(key, index + 1)
+  }
+  return false
+}
+
 /**
- * Lower ranks first: exact (0) < prefix (2) < substring (3); 4 = empty query.
- * Rank 1 is left for an exact alias hit.
+ * Lower ranks first: exact (0) < word start (2) < mid-word (3); 4 = empty
+ * query. Rank 1 is left for an exact alias hit.
  */
 function matchRank(key: string, candidateKey: string): number {
   if (key === '') {
@@ -125,7 +139,7 @@ function matchRank(key: string, candidateKey: string): number {
   if (candidateKey === key) {
     return 0
   }
-  return candidateKey.startsWith(key) ? 2 : 3
+  return matchesWordStart(key, candidateKey) ? 2 : 3
 }
 
 /**
