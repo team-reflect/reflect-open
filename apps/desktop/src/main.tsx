@@ -31,8 +31,8 @@ if (!rootElement) {
 const reactRootOptions = getExceptionReactRootOptions()
 
 // Platform-neutral providers only — everything desktop- or mobile-specific
-// (update checks, drag region, graph bootstrap mode) lives inside the lazy
-// trees behind the PlatformRoot gate (Plan 19). // FIXME: FIX stale comment
+// (update checks, drag region, graph bootstrap mode) lives inside the
+// platform root (Plan 19).
 createRoot(rootElement, reactRootOptions).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

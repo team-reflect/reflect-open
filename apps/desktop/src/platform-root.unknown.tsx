@@ -32,7 +32,6 @@ if (!hasBridge()) {
   setBridge(devBridge)
 }
 
-// FIXME: fix typo
 const { PlatformRoot, warmPlatformRoot } = await (async () => {
   if (appPlatform === 'desktop') {
     const { warmPlatformRoot, PlatformRoot } = await import('@/platform-root.desktop')
