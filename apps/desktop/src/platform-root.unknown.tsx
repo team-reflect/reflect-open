@@ -10,14 +10,13 @@ import { LoadingScreen } from '@/components/loading-screen'
 const appPlatform: AppPlatform = (() => {
   if (import.meta.env.DEV && typeof window !== 'undefined') {
     const query = new URLSearchParams(window.location.search).get('platform')
-    if (query === 'ios') {
-      return 'ios'
-    }
-    if (query === 'android') {
-      return 'android'
-    }
-    if (query === 'desktop') {
-      return 'desktop'
+    switch (query) {
+      case 'ios':
+        return 'ios'
+      case 'android':
+        return 'android'
+      case 'desktop':
+        return 'desktop'
     }
     if (query) {
       console.warn('[reflect-open] Unknown platform override in query string:', query)
@@ -25,7 +24,6 @@ const appPlatform: AppPlatform = (() => {
   }
 
   const env = import.meta.env.TAURI_ENV_PLATFORM || ''
-
   switch (env) {
     case 'ios':
       return 'ios'
