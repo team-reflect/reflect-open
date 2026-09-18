@@ -320,17 +320,87 @@ fn focus_existing(
     true
 }
 
-/// Cascade step for the next note window: successive opens from one window
+/// Cascade step for the next secondary window: successive opens from one window
 /// must not stack at a single offset, covering each other exactly. Steps by
-/// the number of live note windows and wraps so a pile never marches
+/// the number of live secondary windows and wraps so a pile never marches
 /// off-screen.
 fn cascade_offset(app: &tauri::AppHandle) -> f64 {
     let open_note_windows = app
         .webview_windows()
         .keys()
-        .filter(|existing| existing.starts_with(NOTE_WINDOW_PREFIX))
+        .filter(|existing| existing.as_str() != MAIN_WINDOW_LABEL)
         .count();
     48.0 * ((open_note_windows % 10) + 1) as f64
+}
+
+/// Build a hidden secondary window that reveals itself once its page has
+/// loaded. `opener` supplies the theme background and the cascade origin.
+pub(crate) fn build_secondary_window(
+    app: &tauri::AppHandle,
+    label: &str,
+    opener: Option<&tauri::WebviewWindow>,
+) -> tauri::Result<tauri::WebviewWindow> {
+    let cascade = cascade_offset(app);
+
+    // Shared by the page-load hook below and the fallback armed after the
+    // build, so the window is revealed exactly once whichever gets there first.
+    let revealed = Arc::new(Once::new());
+
+    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::default())
+        .title("Reflect")
+        .inner_size(1000.0, 650.0)
+        // Paint the OS-preferred theme color at build time so the note window
+        // doesn't briefly flash white before its webview loads the frontend
+        // (mirrors the main window's `apply_theme_background`).
+        .background_color(opener.map_or(SURFACE_APP_LIGHT, theme_background_color))
+        // Build hidden and reveal on `PageLoadEvent::Finished` so the user
+        // never sees WKWebView's default white backing while HTML/CSS/JS are
+        // still loading. The main window is gated the same way, from the
+        // app-level `on_page_load` hook in `lib.rs`. The shared `Once` gates
+        // the reveal to the first Finished only: reloads (Cmd+R, dev HMR,
+        // webview crash recovery) otherwise re-run `set_focus`, stealing focus
+        // back to a note window the user has moved away from. It also settles
+        // the race with the fallback armed after the build, for the load that
+        // never finishes at all.
+        .visible(false)
+        .on_page_load({
+            let revealed = Arc::clone(&revealed);
+            move |note_window, payload| {
+                if !matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                    return;
+                }
+                revealed.call_once(|| reveal_note_window(&note_window));
+            }
+        })
+        // Match the main window: HTML5 drops must reach the webview (chat and
+        // editor file drops), so the native drag-drop handler stays off.
+        .disable_drag_drop_handler();
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder
+            .title_bar_style(tauri::TitleBarStyle::Overlay)
+            .hidden_title(true);
+    }
+    // Cascade from the opener. Best-effort: a position we can't read just
+    // means the OS default placement.
+    if let Some((Ok(position), Ok(scale))) =
+        opener.map(|opener| (opener.outer_position(), opener.scale_factor()))
+    {
+        let position = position.to_logical::<f64>(scale);
+        builder = builder.position(position.x + cascade, position.y + cascade);
+    }
+
+    let note_window = builder.build()?;
+
+    // A webview that never finishes loading would otherwise leave its window
+    // hidden forever. Mobile has no hidden-window failure to recover from (one
+    // fullscreen webview, revealed in `run`).
+    #[cfg(desktop)]
+    {
+        let note_window = note_window.clone();
+        arm_reveal_fallback(&revealed, label, move || reveal_note_window(&note_window));
+    }
+    Ok(note_window)
 }
 
 /// Open (or focus) a secondary window on a `reflect://` route link.
@@ -394,83 +464,16 @@ pub async fn open_note_window(
             WindowOpenPlan::Create(reserved_label) => break reserved_label,
         }
     };
-    let cascade = cascade_offset(&app);
-
-    // Shared by the page-load hook below and the fallback armed after the
-    // build, so the window is revealed exactly once whichever gets there first.
-    let revealed = Arc::new(Once::new());
-
-    let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::default())
-        .title("Reflect")
-        .inner_size(1000.0, 650.0)
-        // Paint the OS-preferred theme color at build time so the note window
-        // doesn't briefly flash white before its webview loads the frontend
-        // (mirrors the main window's `apply_theme_background`).
-        .background_color(theme_background_color(&window))
-        // Build hidden and reveal on `PageLoadEvent::Finished` so the user
-        // never sees WKWebView's default white backing while HTML/CSS/JS are
-        // still loading. The main window is gated the same way, from the
-        // app-level `on_page_load` hook in `lib.rs`. The shared `Once` gates
-        // the reveal to the first Finished only: reloads (Cmd+R, dev HMR,
-        // webview crash recovery) otherwise re-run `set_focus`, stealing focus
-        // back to a note window the user has moved away from. It also settles
-        // the race with the fallback armed after the build, for the load that
-        // never finishes at all.
-        .visible(false)
-        .on_page_load({
-            let revealed = Arc::clone(&revealed);
-            move |note_window, payload| {
-                if !matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
-                    return;
-                }
-                revealed.call_once(|| reveal_note_window(&note_window));
-            }
-        })
-        // Match the main window: HTML5 drops must reach the webview (chat and
-        // editor file drops), so the native drag-drop handler stays off.
-        .disable_drag_drop_handler();
-    #[cfg(target_os = "macos")]
-    {
-        builder = builder
-            .title_bar_style(tauri::TitleBarStyle::Overlay)
-            .hidden_title(true);
-    }
-    // Cascade from the invoking window. Best-effort: a position we can't
-    // read just means the OS default placement.
-    if let (Ok(position), Ok(scale)) = (window.outer_position(), window.scale_factor()) {
-        let position = position.to_logical::<f64>(scale);
-        builder = builder.position(position.x + cascade, position.y + cascade);
-    }
-
-    let note_window = match builder.build() {
-        Ok(note_window) => note_window,
-        Err(err) => {
-            // Be defensive if a window created outside this command claimed the
-            // reserved label: surface it and preserve its one-shot bootstrap.
-            if focus_existing(&app, &label, &deep_link, &invoking_label) {
-                return Ok(());
-            }
-            // Keep the pending bootstrap for a later serialized retry, which
-            // reuses this preferred reservation.
-            return Err(AppError::io(format!("failed to open note window: {err}")));
+    if let Err(err) = build_secondary_window(&app, &label, Some(&window)) {
+        // Be defensive if a window created outside this command claimed the
+        // reserved label: surface it and preserve its one-shot bootstrap.
+        if focus_existing(&app, &label, &deep_link, &invoking_label) {
+            return Ok(());
         }
-    };
-
-    // The registry now routes this target here, so a webview that never
-    // finishes loading would strand the note behind a permanently hidden
-    // window rather than merely failing to show one.
-    #[cfg(desktop)]
-    {
-        let note_label = note_window.label().to_owned();
-        arm_reveal_fallback(&revealed, &note_label, move || {
-            reveal_note_window(&note_window)
-        });
+        // Keep the pending bootstrap for a later serialized retry, which
+        // reuses this preferred reservation.
+        return Err(AppError::io(format!("failed to open note window: {err}")));
     }
-    // Mobile builds compile this command but have no hidden-window failure to
-    // recover from (one fullscreen webview, revealed in `run`).
-    #[cfg(not(desktop))]
-    let _ = note_window;
-
     Ok(())
 }
 
