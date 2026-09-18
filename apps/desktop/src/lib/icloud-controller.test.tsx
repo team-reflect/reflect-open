@@ -483,6 +483,17 @@ describe('createIcloudController', () => {
     expect(scanCalls).toHaveLength(3)
   })
 
+  it('the network coming back schedules a sweep', async () => {
+    const icloud = controller()
+    await icloud.start()
+    await settleScan() // baseline
+
+    window.dispatchEvent(new Event('online'))
+    await settleScan()
+
+    expect(scanCalls).toHaveLength(2)
+  })
+
   it('dirty open notes ride skipPaths so their conflicts defer', async () => {
     seams.dirtyOpenPaths.mockReturnValue(['daily/2026-07-04.md'])
     const icloud = controller()

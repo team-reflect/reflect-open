@@ -402,7 +402,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       console.error('iCloud change subscriptions failed to start:', err)
     }
     disposers.push(
-      ...attachResumeListeners(() => {
+      attachResumeListeners(() => {
         if (metadataWatch) {
           void restartWatch()
         }

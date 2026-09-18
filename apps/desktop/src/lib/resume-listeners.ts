@@ -6,12 +6,13 @@
 const RESUME_DEDUPE_MS = 1_500
 
 /**
- * Call `onResume` when the user comes back to this window: `focus` for a
- * desktop refocus, visibility → visible for mobile resume and desktop
- * unminimize (which doesn't reliably fire `focus`). Returns the listeners'
- * disposers.
+ * Call `onResume` when the user comes back to this window or the network comes
+ * back: `focus` for a desktop refocus, visibility → visible for mobile resume
+ * and desktop unminimize (which doesn't reliably fire `focus`), and `online`.
+ * `online` is never deduped: a resume just before it ran while still offline.
+ * Returns the disposer.
  */
-export function attachResumeListeners(onResume: () => void): Array<() => void> {
+export function attachResumeListeners(onResume: () => void): () => void {
   let lastResumeAt = 0
   const resume = (): void => {
     const now = Date.now()
@@ -28,8 +29,10 @@ export function attachResumeListeners(onResume: () => void): Array<() => void> {
   }
   window.addEventListener('focus', resume)
   document.addEventListener('visibilitychange', onVisibilityChange)
-  return [
-    () => window.removeEventListener('focus', resume),
-    () => document.removeEventListener('visibilitychange', onVisibilityChange),
-  ]
+  window.addEventListener('online', onResume)
+  return () => {
+    window.removeEventListener('focus', resume)
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+    window.removeEventListener('online', onResume)
+  }
 }
