@@ -4,6 +4,8 @@ import { createDevBridge } from '@/dev/dev-bridge'
 import { createDevFileStore } from '@/dev/dev-file-store'
 import { createDevIndexDb } from '@/dev/dev-index-db'
 import { seedGraphFiles } from '@/dev/seed-graph'
+import { lazy, Suspense } from 'react'
+import { LoadingScreen } from '@/components/loading-screen'
 
 
 const appPlatform: AppPlatform = (() => {
@@ -43,16 +45,35 @@ const appPlatform: AppPlatform = (() => {
 })()
 
 
+const plateformRootPromise = (async () => {
+  if (!hasBridge()) {
+    const index = await createDevIndexDb()
+    const files = createDevFileStore(seedGraphFiles())
+    const devBridge = createDevBridge({ platform: appPlatform, files, index })
+    setBridge(devBridge)
+  }
+
+  if (appPlatform === 'desktop') {
+    const { warmPlatformRoot, PlatformRoot} = await import('@/platform-root.desktop')
+    return { PlatformRoot, warmPlatformRoot }
+  } else {
+    const { warmPlatformRoot, PlatformRoot} = await import('@/platform-root.mobile')
+    return { PlatformRoot, warmPlatformRoot }
+  }
+})()
+
+const PlatformRootLazy = lazy(async () => {
+  const { PlatformRoot } = await plateformRootPromise
+  return { default: PlatformRoot }
+})
 
 
-if (!hasBridge()) {
-  const index = await createDevIndexDb()
-  const files = createDevFileStore(seedGraphFiles())
-  const devBridge = createDevBridge({ platform: appPlatform, files, index })
-  setBridge(devBridge)
+export   function warmPlatformRoot() {
+  plateformRootPromise.then(({ warmPlatformRoot }) => warmPlatformRoot())
 }
 
-
-const { warmPlatformRoot, PlatformRoot} = appPlatform === 'desktop' ? (await import('@/platform-root.desktop'))  : (await import('@/platform-root.mobile'))
-
-export { PlatformRoot, warmPlatformRoot }
+export function PlatformRoot() {
+  <Suspense fallback={<LoadingScreen/>}>
+    <PlatformRootLazy/>
+  </Suspense>
+}
