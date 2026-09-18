@@ -105,5 +105,4 @@ export default defineConfig({
   },
 })
 
-
 // FIXME: "My Update note in docs/plans/19-mobile.md still names src/platform-root.tsx, which you renamed." fix it
