@@ -27,6 +27,16 @@ To see simulator names:
 xcrun simctl list devices available
 ```
 
+On Xcode 27, install the llvm-tools component once:
+
+```bash
+rustup component add llvm-tools
+```
+
+`swift-rs` uses its `llvm-objcopy` to re-export the `@_cdecl` symbols that
+Xcode 27's SwiftPM internalizes in static products. Without it the Swift
+plugins build but the app fails to link with undefined symbols.
+
 The first run can be quiet for a while because Xcode is compiling the Rust
 crate, the Swift keyboard plugin, and native dependencies for
 `aarch64-apple-ios-sim`. A healthy launch eventually prints the Plan 19 probe
