@@ -30,6 +30,20 @@ describe('splitFrontmatter', () => {
     expect(split.raw).toBe('id: x')
     expect(split.body).toBe('body')
   })
+
+  it.each([
+    ['---\nid: x\n---\n# T\n', '# T\n'],
+    ['---\nid: x\n---\n\n# T\n', '# T\n'],
+    ['---\nid: x\n---\n\n\n# T\n', '\n# T\n'],
+    ['---\nid: x\n---\n  \n# T\n', '# T\n'],
+    ['---\r\nid: x\r\n---\r\n\r\n# T\r\n', '# T\r\n'],
+    ['---\n---\n\n# T\n', '# T\n'],
+    ['\n# T\n', '\n# T\n'],
+  ])('reads one blank line after the block as its separator: %j', (source, body) => {
+    const split = splitFrontmatter(source)
+    expect(split.body).toBe(body)
+    expect(source.slice(split.bodyOffset)).toBe(body)
+  })
 })
 
 describe('parseFrontmatter', () => {

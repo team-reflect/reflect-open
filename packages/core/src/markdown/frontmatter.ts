@@ -12,15 +12,19 @@ import { frontmatterSchema, type Frontmatter } from './model'
 export interface FrontmatterSplit {
   /** YAML text between the fences, or `null` when there's no frontmatter block. */
   raw: string | null
-  /** Everything after the closing fence (the markdown body). */
+  /** Everything after the block: its closing fence and the one blank line that may follow it. */
   body: string
   /** Character offset of `body` within the original source. */
   bodyOffset: number
 }
 
 const OPEN_FENCE = /^---[ \t]*\r?\n/
-/** A closing `---` line: at the block start (empty frontmatter) or after a newline. */
-const CLOSE_FENCE = /(?:^|\r?\n)---[ \t]*(?:\r?\n|$)/
+/**
+ * A closing `---` line, at the block start (empty frontmatter) or after a
+ * newline, plus the blank line separating the block from the body. That line
+ * belongs to the block: read as body it would be an empty first paragraph.
+ */
+const CLOSE_FENCE = /(?:^|\r?\n)---[ \t]*(?:\r?\n(?:[ \t]*\r?\n)?|$)/
 
 /** Carve a leading YAML frontmatter block off `source`, preserving offsets. */
 export function splitFrontmatter(source: string): FrontmatterSplit {
