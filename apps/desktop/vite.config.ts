@@ -9,6 +9,21 @@ import babel from '@rolldown/plugin-babel'
 
 const host: string | undefined = process.env.TAURI_DEV_HOST
 
+// The Tauri CLI sets TAURI_ENV_PLATFORM for `beforeDevCommand` and
+// `beforeBuildCommand`. Plain `vite` and `vite build` leave it unset and get
+// the root that asks the shell at run time.
+function platformRootFile(): string {
+  const target = process.env.TAURI_ENV_PLATFORM
+  if (!target) {
+    return './src/platform-root.tsx'
+  }
+  // `armv7-linux-androideabi` makes the Tauri CLI report `androideabi`.
+  if (target === 'ios' || target.startsWith('android')) {
+    return './src/platform-root.mobile.tsx'
+  }
+  return './src/platform-root.desktop.tsx'
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -41,6 +56,7 @@ export default defineConfig({
 
   resolve: {
     alias: {
+      '@platform-root': fileURLToPath(new URL(platformRootFile(), import.meta.url)),
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },

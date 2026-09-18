@@ -154,6 +154,12 @@ Onboarding routes through two paths and lands on Today:
 
 ### 4. Frontend: one bundle, runtime platform gate, mobile surface tree
 
+> **Update:** shell builds no longer ask at run time. `vite.config.ts` aliases
+> `@platform-root` from the Tauri CLI's `TAURI_ENV_PLATFORM`, so a desktop or
+> mobile build imports its surface tree statically and ships without the
+> other one. `src/platform-root.tsx` (the runtime gate below) remains for
+> plain `vite`, where the variable is unset: browser dev and tests.
+
 ```tsx
 // main.tsx — platform gate; each side stays a lazy chunk
 const MobileApp = lazy(() => import('@/mobile/mobile-app'))

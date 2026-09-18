@@ -14,10 +14,8 @@ const MobileRoot = lazy(async () => {
 
 // The platform IPC round-trip is a build-time constant (the Rust shell's
 // compile-time platform tag), so it is resolved once and memoized. It must be
-// created lazily — at module-evaluation time `installTauriBridge()` in
-// main.tsx has not run yet (imports evaluate before the importing module's
-// body), so a module-scope `hasBridge()` check is always false and would pin
-// every shell, including iOS, to the desktop tree.
+// created lazily: the in-browser dev bridge installs after this module
+// evaluates, so a module-scope `hasBridge()` check would miss it.
 let platformPromise: Promise<AppPlatform> | undefined
 
 function resolveAppPlatform(): Promise<AppPlatform> {
