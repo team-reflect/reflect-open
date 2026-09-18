@@ -11,32 +11,35 @@ afterEach(() => {
 })
 
 describe('attachResumeListeners', () => {
-  it('calls back right away when the window regains focus', () => {
+  it('calls back after the window regains focus', () => {
     const onResume = vi.fn()
     const dispose = attachResumeListeners(onResume)
 
     window.dispatchEvent(new Event('focus'))
+    vi.runAllTimers()
 
     expect(onResume).toHaveBeenCalledTimes(1)
     dispose()
   })
 
-  it('calls back right away when the document becomes visible', () => {
+  it('calls back after the document becomes visible', () => {
     vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
     const onResume = vi.fn()
     const dispose = attachResumeListeners(onResume)
 
     document.dispatchEvent(new Event('visibilitychange'))
+    vi.runAllTimers()
 
     expect(onResume).toHaveBeenCalledTimes(1)
     dispose()
   })
 
-  it('calls back right away when the network comes back', () => {
+  it('calls back after the network comes back', () => {
     const onResume = vi.fn()
     const dispose = attachResumeListeners(onResume)
 
     window.dispatchEvent(new Event('online'))
+    vi.runAllTimers()
 
     expect(onResume).toHaveBeenCalledTimes(1)
     dispose()
@@ -54,20 +57,20 @@ describe('attachResumeListeners', () => {
     dispose()
   })
 
-  it('answers a burst of events once now and once after the burst', () => {
+  it('answers a burst of events with one call, after the last of them', () => {
     vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
     const onResume = vi.fn()
     const dispose = attachResumeListeners(onResume)
 
     document.dispatchEvent(new Event('visibilitychange'))
     window.dispatchEvent(new Event('focus'))
+    // The network is back by the time the call runs, so it is never stuck
+    // with the result of a run that started offline.
     window.dispatchEvent(new Event('online'))
-    expect(onResume).toHaveBeenCalledTimes(1)
+    expect(onResume).not.toHaveBeenCalled()
 
-    // The network came back after the first call already ran offline, so the
-    // burst still ends with a call that sees it.
     vi.runAllTimers()
-    expect(onResume).toHaveBeenCalledTimes(2)
+    expect(onResume).toHaveBeenCalledTimes(1)
     dispose()
   })
 
@@ -75,14 +78,13 @@ describe('attachResumeListeners', () => {
     const onResume = vi.fn()
     const dispose = attachResumeListeners(onResume)
     window.dispatchEvent(new Event('focus'))
-    window.dispatchEvent(new Event('online'))
-    expect(onResume).toHaveBeenCalledTimes(1)
 
     dispose()
     vi.runAllTimers()
     window.dispatchEvent(new Event('focus'))
     window.dispatchEvent(new Event('online'))
+    vi.runAllTimers()
 
-    expect(onResume).toHaveBeenCalledTimes(1)
+    expect(onResume).not.toHaveBeenCalled()
   })
 })
