@@ -17,11 +17,11 @@
     "@post-embed/schema": "^0.5.0",
     "@reflect/core": "workspace:*",
     "@reflect/design-system": "workspace:*",
-    "defuddle": "^0.19.3",
-    "lucide-react": "^1.45.0",
+    "defuddle": "^0.19.4",
+    "lucide-react": "^1.47.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "zod": "^4.6.4"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
