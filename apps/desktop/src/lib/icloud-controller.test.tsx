@@ -130,11 +130,6 @@ function realEventLoopTurn(): Promise<void> {
   })
 }
 
-/** Let a just-dispatched resume event through the resume listeners' throttle. */
-async function settleResumeThrottle(): Promise<void> {
-  await vi.advanceTimersByTimeAsync(600)
-}
-
 async function settleScan(advanceMs = 1_100): Promise<void> {
   await vi.advanceTimersByTimeAsync(advanceMs)
   // The post-scan fan-out (emit → reindex → invalidate) continues past the
@@ -181,7 +176,6 @@ describe('createIcloudController', () => {
     await icloud.start()
     await settleScan()
     window.dispatchEvent(new Event('focus'))
-    await settleResumeThrottle()
     await settleScan()
     icloud.dispose()
     active = null
@@ -255,7 +249,6 @@ describe('createIcloudController', () => {
 
       visibility.mockReturnValue('visible')
       document.dispatchEvent(new Event('visibilitychange'))
-      await settleResumeThrottle()
       await settleScan()
 
       expect(scanCalls).toHaveLength(1)
@@ -278,7 +271,6 @@ describe('createIcloudController', () => {
     invoked.length = 0
 
     window.dispatchEvent(new Event('focus'))
-    await settleResumeThrottle()
     await settleScan()
 
     const commands = invoked.map(([command]) => command)
@@ -318,7 +310,6 @@ describe('createIcloudController', () => {
     expect(scanCalls[2]?.scope).toBe('candidates') // bulk-sync arrival sweeps stay cheap
 
     window.dispatchEvent(new Event('focus'))
-    await settleResumeThrottle()
     await settleScan()
     expect(scanCalls[3]?.scope).toBe('full') // resume re-checks everything
   })
@@ -342,7 +333,6 @@ describe('createIcloudController', () => {
     expect(listeners.has('icloud:watch-failed')).toBe(false)
 
     window.dispatchEvent(new Event('focus'))
-    await settleResumeThrottle()
     await settleScan()
     expect(scanCalls[2]?.scope).toBe('full') // resume re-checks everything
   })
@@ -454,7 +444,6 @@ describe('createIcloudController', () => {
     // full is sticky through the merge, whatever the arrival order.
     listeners.get('icloud:conflicts')?.(['notes/a.md'])
     window.dispatchEvent(new Event('focus'))
-    await settleResumeThrottle()
     releaseScan?.()
     await settleScan()
     expect(scanCalls).toHaveLength(2)
@@ -478,28 +467,12 @@ describe('createIcloudController', () => {
     expect(scanCalls[1]).toMatchObject({ scope: 'ingested', ingestedPaths: ['notes/late.md'] })
   })
 
-  it('conflict signals and window focus each schedule a sweep', async () => {
-    const icloud = controller({ watch: true })
-    await icloud.start()
-    await settleScan() // baseline
-
-    listeners.get('icloud:conflicts')?.(['notes/a.md'])
-    await settleScan()
-    expect(scanCalls).toHaveLength(2)
-
-    window.dispatchEvent(new Event('focus'))
-    await settleResumeThrottle()
-    await settleScan()
-    expect(scanCalls).toHaveLength(3)
-  })
-
   it('the network coming back schedules a sweep', async () => {
     const icloud = controller()
     await icloud.start()
     await settleScan() // baseline
 
     window.dispatchEvent(new Event('online'))
-    await settleResumeThrottle()
     await settleScan()
 
     expect(scanCalls).toHaveLength(2)

@@ -162,11 +162,6 @@ function fakeBridge(options: FakeOptions = {}) {
   }
 }
 
-/** Outlast the resume listeners' throttle, so a resume event has had its effect. */
-function settleResumeThrottle(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 600))
-}
-
 function commitCount(calls: string[]): number {
   return calls.filter((command) => command === 'git_commit_all').length
 }
@@ -287,7 +282,7 @@ describe('createBackupController', () => {
       expect(commitCount(calls)).toBe(1)
     })
     window.dispatchEvent(new Event('focus'))
-    await settleResumeThrottle()
+    await new Promise((resolve) => setTimeout(resolve, 0))
     expect(commitCount(calls)).toBe(1)
     expect(calls).not.toContain('git_fetch')
     expect(calls).not.toContain('git_push')
@@ -568,7 +563,7 @@ describe('createBackupController', () => {
     })
 
     document.dispatchEvent(new Event('visibilitychange'))
-    await settleResumeThrottle()
+    await new Promise((resolve) => setTimeout(resolve, 20))
     expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(1)
 
     visibility.mockRestore()
