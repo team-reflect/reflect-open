@@ -98,17 +98,27 @@ beforeEach(() => {
 
 type Navigate = (route: Route, options?: NavigateOptions) => void
 
-function NavigateProbe({ onReady }: { onReady: (navigate: Navigate) => void }): null {
-  const { navigate } = useRouter()
+interface RouterHandles {
+  navigate: Navigate
+  back: () => void
+}
+
+function NavigateProbe({ onReady }: { onReady: (handles: RouterHandles) => void }): null {
+  const { navigate, back } = useRouter()
   useEffect(() => {
-    onReady(navigate)
-  }, [navigate, onReady])
+    onReady({ navigate, back })
+  }, [navigate, back, onReady])
   return null
 }
 
 async function renderStream() {
-  let navigate: Navigate = () => {
-    throw new Error('navigate not ready')
+  let handles: RouterHandles = {
+    navigate: () => {
+      throw new Error('navigate not ready')
+    },
+    back: () => {
+      throw new Error('back not ready')
+    },
   }
   const view = await render(
     <div style={{ height: 800 }}>
@@ -116,7 +126,7 @@ async function renderStream() {
         <DailyStream target={{ kind: 'today' }} />
         <NavigateProbe
           onReady={(run) => {
-            navigate = run
+            handles = run
           }}
         />
       </RouterProvider>
@@ -125,7 +135,8 @@ async function renderStream() {
   const paneFor = (date: string) => page.locate(`[data-testid="pane-probe"][data-date="${date}"]`)
   return {
     view,
-    navigate: (route: Route, options?: NavigateOptions) => navigate(route, options),
+    navigate: (route: Route, options?: NavigateOptions) => handles.navigate(route, options),
+    back: () => handles.back(),
     anchored: (date: string) => expect.element(paneFor(date)).toBeInTheDocument(),
     paneFor,
   }
@@ -198,6 +209,33 @@ describe('DailyStream arrival focus', () => {
     const pane = paneFor(today)
     await expect.element(pane).toHaveAttribute('data-autofocus', 'true')
     await expect.element(pane).toHaveAttribute('data-selection', 'start')
+    await view.unmount()
+  })
+
+  it('a back-restored arrival un-renders a still-pending focus assignment', async () => {
+    const today = todayIso()
+    const { view, navigate, back, anchored, paneFor } = await renderStream()
+    await anchored(today)
+    await expect.element(paneFor(today)).toHaveAttribute('data-autofocus', 'true')
+
+    // Let virtua's anchor scroll and row measurement settle, then record the
+    // settled offset on this entry (the stream saves scroll per scroll event;
+    // fire one explicitly rather than racing the anchor scroll's async
+    // events). The second entry anchors to the same day, so from here on
+    // nothing scrolls and nothing re-renders the rows incidentally: the
+    // restored arrival's own re-render must be what clears the assignment.
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    fireEvent.scroll(page.locate('[data-testid="daily-stream"]'))
+
+    await act(() => navigate({ kind: 'daily', date: today }))
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    // The probe never consumed the arrival's focus, mirroring a day whose
+    // lazy editor has not mounted yet; a row that kept rendering `autoFocus`
+    // through the return would steal focus when that editor mounts.
+    await act(() => back())
+
+    await expect.element(paneFor(today)).toHaveAttribute('data-autofocus', 'false')
     await view.unmount()
   })
 })
