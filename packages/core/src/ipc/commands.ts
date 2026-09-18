@@ -24,6 +24,7 @@ export type AppPlatform = z.infer<typeof appPlatformSchema>
  * it is a build-time constant, so callers may cache it freely.
  */
 export async function getAppPlatform(): Promise<AppPlatform> {
+  // FIXME: delete getAppPlatform and app_platform, this is useless now
   return await call('app_platform', {}, appPlatformSchema)
 }
 

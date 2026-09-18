@@ -1,28 +1,32 @@
-import { fileURLToPath } from 'node:url'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
-import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
+import { fileURLToPath } from 'node:url'
+import { defineConfig } from 'vite'
 // The single version source; tauri.conf.json's `version` also points here.
-import pkg from './package.json'
-import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+import pkg from './package.json'
 
 const host: string | undefined = process.env.TAURI_DEV_HOST
 
-// The Tauri CLI sets TAURI_ENV_PLATFORM for `beforeDevCommand` and
-// `beforeBuildCommand`. Plain `vite` and `vite build` leave it unset and get
-// the root that asks the shell at run time.
-function platformRootFile(): string {
-  const target = process.env.TAURI_ENV_PLATFORM
-  if (!target) {
-    return './src/platform-root.tsx'
+const platform: 'mobile' | 'desktop' | '' = (() => {
+  const env = process.env.TAURI_ENV_PLATFORM
+  if (!env) {
+    return ''
   }
-  // `armv7-linux-androideabi` makes the Tauri CLI report `androideabi`.
-  if (target === 'ios' || target.startsWith('android')) {
-    return './src/platform-root.mobile.tsx'
+
+  switch (env) {
+    case 'ios':
+    case 'android':
+      return 'mobile'
+    case 'windows':
+    case 'darwin':
+    case 'linux':
+      return 'desktop'
   }
-  return './src/platform-root.desktop.tsx'
-}
+
+  throw new Error(`Unknown environment variable TAURI_ENV_PLATFORM: ${env}`)
+})()
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -56,7 +60,16 @@ export default defineConfig({
 
   resolve: {
     alias: {
-      '@platform-root': fileURLToPath(new URL(platformRootFile(), import.meta.url)),
+      '@platform-root': fileURLToPath(
+        new URL(
+          platform === 'mobile'
+            ? './src/platform-root.mobile.tsx'
+            : platform === 'desktop'
+              ? './src/platform-root.desktop.tsx'
+              : './src/platform-root.unknown.tsx',
+          import.meta.url,
+        ),
+      ),
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
