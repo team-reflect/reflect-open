@@ -45,7 +45,7 @@ describe('dev bridge index_reconcile_scan', () => {
   it('classifies candidates and orphans like the native scan', async () => {
     const files = createDevFileStore({ 'notes/settled.md': '# Settled' })
     const index = await createDevIndexDb()
-    const bridge = createDevBridge({ platform: 'ios', files, index })
+    const bridge = createDevBridge({ files, index })
 
     // The seeded file's row matches its listed mtime and has settled.
     const settledMtime = files.list()[0]!.modifiedMs
@@ -78,7 +78,6 @@ describe('dev bridge desktop boot surface', () => {
       'notes/two.md': '# Two',
     })
     const bridge = createDevBridge({
-      platform: 'desktop',
       files,
       index: await createDevIndexDb(),
     })
@@ -109,7 +108,6 @@ describe('dev bridge desktop boot surface', () => {
 describe('dev bridge background task parity', () => {
   it('reports native background assertions as unavailable and accepts cleanup', async () => {
     const bridge = createDevBridge({
-      platform: 'ios',
       files: createDevFileStore({}),
       index: await createDevIndexDb(),
     })
@@ -127,7 +125,6 @@ describe('dev bridge note_create parity', () => {
     try {
       const files = createDevFileStore({})
       const bridge = createDevBridge({
-        platform: 'ios',
         files,
         index: await createDevIndexDb(),
       })
@@ -152,7 +149,6 @@ describe('dev bridge note_create parity', () => {
     })
     const originalModifiedMs = files.list()[0]!.modifiedMs
     const bridge = createDevBridge({
-      platform: 'ios',
       files,
       index: await createDevIndexDb(),
     })
@@ -173,7 +169,6 @@ describe('dev bridge note_create parity', () => {
       'notes/existing.md': '# Existing\n',
     })
     const bridge = createDevBridge({
-      platform: 'ios',
       files,
       index: await createDevIndexDb(),
     })

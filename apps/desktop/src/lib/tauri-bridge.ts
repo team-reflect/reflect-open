@@ -1,7 +1,7 @@
-import { addPluginListener, invoke, isTauri } from '@tauri-apps/api/core'
+import { addPluginListener, invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { setBridge, type IpcBridge } from '@reflect/core'
+import type { IpcBridge } from '@reflect/core'
 
 /**
  * Adapts Tauri's IPC primitives to the `@reflect/core` bridge contract. This is
@@ -57,17 +57,4 @@ export const tauriBridge: IpcBridge = {
   listenPlugin: async (plugin, event, handler) => {
     await addPluginListener<unknown>(plugin, event, handler)
   },
-}
-
-/**
- * Install the Tauri bridge when running inside a Tauri webview. Plain-browser
- * dev (`pnpm dev` without the shell) installs nothing here — `PlatformRoot`
- * later installs the in-memory dev bridge instead (unless `?platform=none`
- * opts out), and features that need the real shell rather than just an
- * answering bridge gate on `isNativeShell()`.
- */
-export function installTauriBridge(): void {
-  if (isTauri()) {
-    setBridge(tauriBridge)
-  }
 }
