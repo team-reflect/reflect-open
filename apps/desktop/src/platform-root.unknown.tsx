@@ -72,7 +72,7 @@ export function warmPlatformRoot() {
 }
 
 export function PlatformRoot() {
-  ;<Suspense fallback={<LoadingScreen />}>
+  return <Suspense fallback={<LoadingScreen />}>
     <PlatformRootLazy />
   </Suspense>
 }
