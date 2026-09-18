@@ -4,8 +4,7 @@ import { createDevBridge } from '@/dev/dev-bridge'
 import { createDevFileStore } from '@/dev/dev-file-store'
 import { createDevIndexDb } from '@/dev/dev-index-db'
 import { seedGraphFiles } from '@/dev/seed-graph'
-import { lazy, Suspense } from 'react'
-import { LoadingScreen } from '@/components/loading-screen'
+import { parseEnvPlatform } from '@/lib/env'
 
 const appPlatform: AppPlatform = (() => {
   if (import.meta.env.DEV && typeof window !== 'undefined') {
@@ -23,31 +22,19 @@ const appPlatform: AppPlatform = (() => {
     }
   }
 
-  const env = import.meta.env.TAURI_ENV_PLATFORM || ''
-  switch (env) {
-    case 'ios':
-      return 'ios'
-    case 'android':
-      return 'android'
-    case 'windows':
-    case 'linux':
-    case 'darwin':
-    case '':
-      return 'desktop'
-    default:
-      console.warn('[reflect-open] Unknown environment variable TAURI_ENV_PLATFORM:', env)
-      return 'desktop'
-  }
+  return parseEnvPlatform()
 })()
 
+if (!hasBridge()) {
+  const index = await createDevIndexDb()
+  const files = createDevFileStore(seedGraphFiles())
+  const devBridge = createDevBridge({ files, index })
+  setBridge(devBridge)
+}
+
+
 // FIXME: fix typo
-const plateformRootPromise = (async () => {
-  if (!hasBridge()) {
-    const index = await createDevIndexDb()
-    const files = createDevFileStore(seedGraphFiles())
-    const devBridge = createDevBridge({ files, index })
-    setBridge(devBridge)
-  }
+const { PlatformRoot, warmPlatformRoot} = await (async () => {
 
   if (appPlatform === 'desktop') {
     const { warmPlatformRoot, PlatformRoot } = await import('@/platform-root.desktop')
@@ -58,19 +45,4 @@ const plateformRootPromise = (async () => {
   }
 })()
 
-const PlatformRootLazy = lazy(async () => {
-  const { PlatformRoot } = await plateformRootPromise
-  return { default: PlatformRoot }
-})
-
-export function warmPlatformRoot() {
-  plateformRootPromise.then(({ warmPlatformRoot }) => warmPlatformRoot())
-}
-
-export function PlatformRoot() {
-  return (
-    <Suspense fallback={<LoadingScreen />}>
-      <PlatformRootLazy />
-    </Suspense>
-  )
-}
+export { PlatformRoot, warmPlatformRoot}

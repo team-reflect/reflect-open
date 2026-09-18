@@ -1,12 +1,9 @@
-import type { ReactElement } from 'react'
-import type { AppPlatform } from '@reflect/core'
+import { parseEnvPlatform } from '@/lib/env'
 import { warmMobileStorage } from '@/lib/mobile-boot-warm'
 import { MobileRoot } from '@/mobile/mobile-root'
+import type { ReactElement } from 'react'
 
-// `armv7-linux-androideabi` makes the Tauri CLI report `androideabi`.
-const platform: AppPlatform = import.meta.env.TAURI_ENV_PLATFORM?.startsWith('android')
-  ? 'android'
-  : 'ios'
+const platform = parseEnvPlatform() === 'ios' ? 'ios' : 'android'
 
 /** Starts the slow iCloud-container resolve ahead of the first render. */
 export function warmPlatformRoot(): void {
