@@ -13,25 +13,6 @@ export async function getAppVersion(): Promise<string> {
   return await call('app_version', {}, appVersionSchema)
 }
 
-const appPlatformSchema = z.enum(['desktop', 'ios', 'android'])
-
-/** Which UI family the shell was built for (Plan 19's root gate). */
-export type AppPlatform = z.infer<typeof appPlatformSchema>
-
-/**
- * Returns the platform the Rust shell was compiled for. The frontend's root
- * gate switches between the desktop and mobile surface trees on this answer;
- * it is a build-time constant, so callers may cache it freely.
- */
-export async function getAppPlatform(): Promise<AppPlatform> {
-  return await call('app_platform', {}, appPlatformSchema)
-}
-
-/** Narrows {@link AppPlatform} to the mobile family. */
-export function isMobilePlatform(platform: AppPlatform): boolean {
-  return platform !== 'desktop'
-}
-
 const mobileStorageInfoSchema = z.object({
   localRoot: z.string(),
   /** The container's `Documents/` dir when iCloud is usable — new graphs are created inside it. */

@@ -108,7 +108,11 @@ export function DaySlide({
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       onScroll={handleScroll}
     >
-      <div ref={contentRef}>
+      {/* A column at least as tall as the slide, with the editor taking the
+          slack: the backlinks sit right below the note's own content, so a
+          short day keeps them on screen instead of pushing them past the
+          fold, while the reserved space stays click-to-focus. */}
+      <div ref={contentRef} className="flex min-h-full flex-col">
         {/* The date is the daily note's subject (V1 / desktop parity) —
             chrome above the editor, formatted per the user's setting,
             tinted on today. Shares the note body's gutter. */}
@@ -130,8 +134,11 @@ export function DaySlide({
           autoFocusSelection="end"
           onAutoFocused={handleAutoFocused}
           showBacklinks={false}
+          className="flex grow flex-col"
           gutterClassName={MOBILE_CONTENT_GUTTER}
-          editorClassName="min-h-[60dvh]"
+          // A floor for the day with no content and many backlinks, where the
+          // stretch leaves only a line of editor to tap.
+          editorClassName="grow min-h-24"
         />
         {/* The mobile section (touch chrome) replaces NotePane's built-in
             desktop panel; a daily-note backlink swipes the carousel to that

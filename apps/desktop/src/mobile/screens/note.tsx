@@ -45,22 +45,31 @@ export function MobileNote({ path }: { path: string }): ReactElement {
         // keyboard is down.
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <NotePane
-          path={path}
-          lazy
-          autoFocus={untitled}
-          showBacklinks={false}
-          // The daily surface gets its top inset from the date header; a
-          // plain note has no chrome between the header bar and the body,
-          // so the pane carries the vertical breathing room itself.
-          className="pt-4"
-          gutterClassName={MOBILE_CONTENT_GUTTER}
-          editorClassName="min-h-[60dvh]"
-        />
-        {/* The mobile section (touch chrome) replaces NotePane's built-in
-            desktop panel; a daily-note backlink opens the Daily surface at
-            that date rather than pushing another note screen. */}
-        <IncomingBacklinks path={path} className={cn(MOBILE_CONTENT_GUTTER, 'pb-4')} />
+        {/* A column at least as tall as the scroll area, with the editor
+            taking the slack: the backlinks sit right below the note's own
+            content, so a short note keeps them on screen instead of pushing
+            them past the fold, while the reserved space stays
+            click-to-focus. */}
+        <div className="flex min-h-full flex-col">
+          <NotePane
+            path={path}
+            lazy
+            autoFocus={untitled}
+            showBacklinks={false}
+            // The daily surface gets its top inset from the date header; a
+            // plain note has no chrome between the header bar and the body,
+            // so the pane carries the vertical breathing room itself.
+            className="flex grow flex-col pt-4"
+            gutterClassName={MOBILE_CONTENT_GUTTER}
+            // A floor for the note with no content and many backlinks, where
+            // the stretch leaves only a line of editor to tap.
+            editorClassName="grow min-h-24"
+          />
+          {/* The mobile section (touch chrome) replaces NotePane's built-in
+              desktop panel; a daily-note backlink opens the Daily surface at
+              that date rather than pushing another note screen. */}
+          <IncomingBacklinks path={path} className={cn(MOBILE_CONTENT_GUTTER, 'pb-4')} />
+        </div>
       </main>
     </div>
   )
