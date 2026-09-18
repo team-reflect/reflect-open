@@ -32,3 +32,5 @@ async function install(platform: AppPlatform): Promise<void> {
   Object.assign(window, { __reflectDev: { query: index.query, files } })
   console.info(`[dev-bridge] installed: platform=${platform}, in-memory graph + wasm SQLite index`)
 }
+
+// FIXME: delete this file, this file ise now useless.

@@ -24,7 +24,7 @@ export type AppPlatform = z.infer<typeof appPlatformSchema>
  * it is a build-time constant, so callers may cache it freely.
  */
 export async function getAppPlatform(): Promise<AppPlatform> {
-  // FIXME: delete getAppPlatform and app_platform, this is useless now
+  // FIXME: delete getAppPlatform and app_platform, this is useless now. Since we need to delete it, we do not need appPlatformSchema anymore. Also remove the AppPlatform type in this file. Move type AppPlatform to a better palce. type AppPlatform = 'desktop' | 'ios' | 'android'
   return await call('app_platform', {}, appPlatformSchema)
 }
 
