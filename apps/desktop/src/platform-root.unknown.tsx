@@ -37,7 +37,7 @@ const appPlatform: AppPlatform = (() => {
     case '':
       return 'desktop'
     default:
-      console.warn('[reflect-open] Unknown environment variable TAURI_ENV_PLATFORM:',env)
+      console.warn('[reflect-open] Unknown environment variable TAURI_ENV_PLATFORM:', env)
       return 'desktop'
   }
 })()
