@@ -40,6 +40,7 @@ const appPlatform: AppPlatform = (() => {
   }
 })()
 
+// FIXME: fix typo
 const plateformRootPromise = (async () => {
   if (!hasBridge()) {
     const index = await createDevIndexDb()

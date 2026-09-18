@@ -2,7 +2,7 @@ import { sentryVitePlugin } from '@sentry/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
-// The single version source; tauri.conf.json's `version` also points here.
+// The single version source; tauri.conf.json's `version` also points here. // FIXME: fix comment typo
 import babel from '@rolldown/plugin-babel'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import pkg from './package.json'
@@ -104,3 +104,6 @@ export default defineConfig({
     },
   },
 })
+
+
+// FIXME: "My Update note in docs/plans/19-mobile.md still names src/platform-root.tsx, which you renamed." fix it
