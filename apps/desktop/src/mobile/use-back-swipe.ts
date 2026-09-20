@@ -6,7 +6,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
-import { createPointerDrag, createVelocitySampler } from '@/lib/pointer-drag'
+import { PointerDrag, VelocitySampler } from '@/lib/pointer-drag'
 
 /** How far from the leading edge a touch may start and still arm the gesture. */
 const EDGE_WIDTH_PX = 32
@@ -89,8 +89,8 @@ export function useBackSwipe({
 }: BackSwipeOptions): BackSwipe {
   const stateRef = useRef<BackSwipeState>(IDLE)
   const [state, setState] = useState<BackSwipeState>(IDLE)
-  const [drag] = useState(createPointerDrag)
-  const [velocity] = useState(createVelocitySampler)
+  const [drag] = useState(() => new PointerDrag())
+  const [velocity] = useState(() => new VelocitySampler())
 
   // The scroll blocker lives only while a touch owns the gesture. React
   // registers touch listeners passively, so blocking the page's own vertical

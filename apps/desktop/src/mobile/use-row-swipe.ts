@@ -1,5 +1,5 @@
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { createPointerDrag, createVelocitySampler } from '@/lib/pointer-drag'
+import { PointerDrag, VelocitySampler } from '@/lib/pointer-drag'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion'
 
 /** Finger travel (px) before the gesture commits to horizontal swipe or vertical scroll. */
@@ -66,8 +66,8 @@ export function useRowSwipe({
   onBeginInteraction,
 }: RowSwipeOptions): RowSwipe {
   const reducedMotion = usePrefersReducedMotion()
-  const [drag] = useState(createPointerDrag)
-  const [velocity] = useState(createVelocitySampler)
+  const [drag] = useState(() => new PointerDrag())
+  const [velocity] = useState(() => new VelocitySampler())
   // Row translation at touch start (possibly mid-settle), then the live one
   // while dragging, already rubber-band constrained.
   const offsetRef = useRef({ start: 0, current: 0 })

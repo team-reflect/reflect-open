@@ -17,136 +17,119 @@ export interface DragPointerEvent {
 export type DragIntent = 'wait' | 'start' | 'abort'
 
 /** One primary touch, from touch start until it becomes a drag or ends. */
-export interface PointerDrag {
+export class PointerDrag {
+  private pointerId: number | undefined = undefined
+  private isDragging = false
+  private x = 0
+  private y = 0
+
   /** True from `arm` until the touch ends or aborts. */
-  readonly live: boolean
+  get live(): boolean {
+    return this.pointerId !== undefined
+  }
+
   /** True once an armed touch has started dragging. */
-  readonly dragging: boolean
-  readonly startX: number
-  readonly startY: number
+  get dragging(): boolean {
+    return this.isDragging
+  }
+
+  get startX(): number {
+    return this.x
+  }
+
+  get startY(): number {
+    return this.y
+  }
+
   /** Arm on a primary touch, replacing any live touch. Returns false for other pointers. */
-  arm: (event: DragPointerEvent) => boolean
+  arm(event: DragPointerEvent): boolean {
+    if (event.pointerType !== 'touch' || !event.isPrimary) {
+      return false
+    }
+    this.pointerId = event.pointerId
+    this.isDragging = false
+    this.x = event.clientX
+    this.y = event.clientY
+    return true
+  }
+
   /**
    * Advance the touch that owns this drag; events from other pointers return
    * undefined. While armed, `intent` decides from the travel whether to keep
    * waiting, start dragging (capturing the pointer), or abort.
    */
-  move: (
+  move(
     event: DragPointerEvent,
     intent: (travelX: number, travelY: number) => DragIntent,
-  ) => 'started' | 'moved' | 'aborted' | undefined
+  ): 'started' | 'moved' | 'aborted' | undefined {
+    if (this.pointerId !== event.pointerId) {
+      return
+    }
+    if (this.isDragging) {
+      return 'moved'
+    }
+    const decision = intent(event.clientX - this.x, event.clientY - this.y)
+    if (decision === 'wait') {
+      return
+    }
+    if (decision === 'abort') {
+      this.pointerId = undefined
+      return 'aborted'
+    }
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      // Synthetic events have no live pointer to capture.
+    }
+    this.isDragging = true
+    return 'started'
+  }
+
   /** End the touch that owns this drag, reporting whether it ever dragged. */
-  end: (event: DragPointerEvent) => 'tap' | 'drag' | undefined
-  cancel: () => void
-}
-
-export function createPointerDrag(): PointerDrag {
-  let pointerId: number | undefined
-  let dragging = false
-  let startX = 0
-  let startY = 0
-
-  return {
-    get live() {
-      return pointerId !== undefined
-    },
-    get dragging() {
-      return dragging
-    },
-    get startX() {
-      return startX
-    },
-    get startY() {
-      return startY
-    },
-    arm(event) {
-      if (event.pointerType !== 'touch' || !event.isPrimary) {
-        return false
-      }
-      pointerId = event.pointerId
-      dragging = false
-      startX = event.clientX
-      startY = event.clientY
-      return true
-    },
-    move(event, intent) {
-      if (pointerId !== event.pointerId) {
-        return
-      }
-      if (dragging) {
-        return 'moved'
-      }
-      const decision = intent(event.clientX - startX, event.clientY - startY)
-      if (decision === 'wait') {
-        return
-      }
-      if (decision === 'abort') {
-        pointerId = undefined
-        return 'aborted'
-      }
-      try {
-        event.currentTarget.setPointerCapture(event.pointerId)
-      } catch {
-        // Synthetic events have no live pointer to capture.
-      }
-      dragging = true
-      return 'started'
-    },
-    end(event) {
-      if (pointerId !== event.pointerId) {
-        return
-      }
-      const result = dragging ? 'drag' : 'tap'
-      pointerId = undefined
-      dragging = false
-      return result
-    },
-    cancel() {
-      pointerId = undefined
-      dragging = false
-    },
+  end(event: DragPointerEvent): 'tap' | 'drag' | undefined {
+    if (this.pointerId !== event.pointerId) {
+      return
+    }
+    const result = this.isDragging ? 'drag' : 'tap'
+    this.pointerId = undefined
+    this.isDragging = false
+    return result
   }
 }
 
 /** Velocity (units/ms) of one scalar, sampled over windows instead of per event. */
-export interface VelocitySampler {
-  readonly velocity: number
+export class VelocitySampler {
+  private current = 0
+  private sampleValue = 0
+  private sampleTime = 0
+
+  get velocity(): number {
+    return this.current
+  }
+
   /** True when the last sample is old enough that the finger has stalled. */
-  readonly stale: boolean
-  reset: (value: number) => void
+  get stale(): boolean {
+    return performance.now() - this.sampleTime > VELOCITY_STALE_MS
+  }
+
+  reset(value: number): void {
+    this.current = 0
+    this.sampleValue = value
+    this.sampleTime = performance.now()
+  }
+
   /**
    * Record `value`, refreshing the velocity once a full window has passed.
    * Returns the age (ms) of the sample this call was measured against.
    */
-  sample: (value: number) => number
-}
-
-export function createVelocitySampler(): VelocitySampler {
-  let velocity = 0
-  let sampleValue = 0
-  let sampleTime = 0
-
-  return {
-    get velocity() {
-      return velocity
-    },
-    get stale() {
-      return performance.now() - sampleTime > VELOCITY_STALE_MS
-    },
-    reset(value) {
-      velocity = 0
-      sampleValue = value
-      sampleTime = performance.now()
-    },
-    sample(value) {
-      const now = performance.now()
-      const elapsed = now - sampleTime
-      if (elapsed >= VELOCITY_WINDOW_MS) {
-        velocity = (value - sampleValue) / elapsed
-        sampleValue = value
-        sampleTime = now
-      }
-      return elapsed
-    },
+  sample(value: number): number {
+    const now = performance.now()
+    const elapsed = now - this.sampleTime
+    if (elapsed >= VELOCITY_WINDOW_MS) {
+      this.current = (value - this.sampleValue) / elapsed
+      this.sampleValue = value
+      this.sampleTime = now
+    }
+    return elapsed
   }
 }

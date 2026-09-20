@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { flushSync } from 'react-dom'
 import { clamp } from '@ocavue/utils'
-import { createPointerDrag, createVelocitySampler, VELOCITY_STALE_MS } from '@/lib/pointer-drag'
+import { PointerDrag, VelocitySampler, VELOCITY_STALE_MS } from '@/lib/pointer-drag'
 
 const DRAG_ACTIVATE_PX = 8
 const DISMISS_FRACTION = 0.18
@@ -192,8 +192,8 @@ export function useImageDismissDrag({
 }): ImageDismissDrag {
   const stateRef = useRef<DragState>(IDLE)
   const [state, setState] = useState<DragState>(IDLE)
-  const [drag] = useState(createPointerDrag)
-  const [velocity] = useState(createVelocitySampler)
+  const [drag] = useState(() => new PointerDrag())
+  const [velocity] = useState(() => new VelocitySampler())
   const suppressClickUntilRef = useRef(0)
 
   const commit = useCallback((next: DragState): void => {
