@@ -4,6 +4,7 @@ import {
   useImperativeHandle,
   useLayoutEffect,
   useRef,
+  useState,
   type ReactElement,
   type ReactNode,
   type Ref,
@@ -15,6 +16,7 @@ import type {
   FileClickHandler,
   FileInfoResolver,
   FileLinkResolver,
+  ImageClickHandler,
   LinkPreviewResolver,
   MarkMode,
   SearchStatus,
@@ -23,6 +25,7 @@ import type {
 } from '@meowdown/core'
 import {
   MeowdownEditor,
+  useLightbox,
   WikilinkHoverCard,
   type EditorHandle,
   type PendingReplacementResolveHandler,
@@ -33,15 +36,10 @@ import {
 } from '@meowdown/react'
 import { EditorInputTraits } from '@/editor/editor-input-traits'
 import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge'
-import {
-  IMAGE_LIGHTBOX_TRANSITION_NAME,
-  ImageLightbox,
-  type LightboxImage,
-} from '@/editor/image-lightbox'
+import { ImageLightbox } from '@/editor/image-lightbox'
 import { isOpenableExternalUrl } from '@/editor/open-external-link'
 import { resolveWikilink } from '@/editor/resolve-wikilink'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
-import { useLightboxTransition } from '@/editor/use-lightbox-transition'
 import { isDeepLinkUrl } from '@/lib/deep-links/parse'
 import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link'
 import { openUrlSync } from '@/lib/open-url'
@@ -293,11 +291,10 @@ export function NoteEditor({
     onExitBoundaryRef.current = onExitBoundary
   })
 
-  const {
-    item: lightboxImage,
-    open: openLightbox,
-    close: closeLightbox,
-  } = useLightboxTransition<HTMLImageElement, LightboxImage>()
+  const lightbox = useLightbox()
+  const openLightbox = lightbox.open
+  // Captured when the lightbox opens, so a later graph switch cannot retarget it.
+  const [openLightboxImage, setOpenLightboxImage] = useState<(() => void) | null>(null)
 
   useImperativeHandle(
     handleRef,
@@ -392,48 +389,30 @@ export function NoteEditor({
     (href) => resolveFileInfoRef.current?.(href),
     [],
   )
-  const handleImageClick = useCallback(
+  const handleImageClick: ImageClickHandler = useCallback(
     // Touch surfaces deliver the tap's `touchend` instead of a click —
     // meowdown cancels it so iOS WebKit can't focus the editor (and raise
     // the keyboard) under the opening lightbox.
-    ({
-      src,
-      alt,
-      event,
-    }: {
-      src: string
-      alt: string
-      event: MouseEvent | TouchEvent | KeyboardEvent
-    }) => {
+    ({ src, alt, element }) => {
       const displayUrl = resolveImageUrlRef.current?.(src) ?? null
       if (displayUrl === null) {
         return
       }
-      // The clicked target is the `<img>` or its meowdown image wrapper;
-      // the source element drives the View Transition zoom.
-      const sourceImage =
-        event.target instanceof HTMLElement
-          ? (event.target
-              .closest('.md-image-view-preview, .md-image-preview')
-              ?.querySelector('img') ?? null)
-          : null
-      openLightbox(sourceImage, {
-        src: displayUrl,
-        alt,
-        openPath: resolveAssetOpenPathRef.current?.(src) ?? null,
-        openImage: openAssetRef.current ?? null,
-        transitionName: IMAGE_LIGHTBOX_TRANSITION_NAME,
-      })
+      const openPath = resolveAssetOpenPathRef.current?.(src) ?? null
+      const openImage = openAssetRef.current ?? null
+      setOpenLightboxImage(() =>
+        openPath !== null && openImage !== null
+          ? () => {
+              void Promise.resolve(openImage(openPath)).catch((cause) => {
+                console.error('open image failed:', errorMessage(cause))
+              })
+            }
+          : null,
+      )
+      openLightbox({ type: 'image', src: displayUrl, alt }, element)
     },
     [openLightbox],
   )
-  const handleOpenLightboxImage = useCallback((image: LightboxImage) => {
-    if (image.openPath !== null && image.openImage !== null) {
-      void Promise.resolve(image.openImage(image.openPath)).catch((cause) => {
-        console.error('open image failed:', errorMessage(cause))
-      })
-    }
-  }, [])
 
   return (
     <>
@@ -494,11 +473,7 @@ export function NoteEditor({
         ) : null}
         {children}
       </MeowdownEditor>
-      <ImageLightbox
-        image={lightboxImage}
-        onClose={closeLightbox}
-        onOpenImage={handleOpenLightboxImage}
-      />
+      <ImageLightbox lightbox={lightbox} onOpenImage={openLightboxImage} />
     </>
   )
 }

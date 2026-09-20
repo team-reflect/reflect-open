@@ -570,24 +570,6 @@ html:root {
   cursor: zoom-in;
 }
 
-/* Editor image lightbox: zoom the clicked image into the full-window preview
-   and back via the View Transition API (an instant swap where unsupported).
-   The root snapshot is suppressed so only the image animates. */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 0s;
-}
-::view-transition-group(reflect-image-lightbox) {
-  animation-duration: 180ms;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-::view-transition-old(reflect-image-lightbox),
-::view-transition-new(reflect-image-lightbox) {
-  height: 100%;
-  object-fit: contain;
-  overflow: clip;
-}
-
 /* Read-only view for notes the editor can't faithfully round-trip yet. */
 .reflect-protected-note {
   font-family: var(--font-mono, monospace);

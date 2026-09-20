@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
-import { ImageLightbox, type LightboxImage } from './image-lightbox'
+import type { LightboxController } from '@meowdown/react'
+import { ImageLightbox } from './image-lightbox'
 import { setPlatformSurface } from '@/lib/platform-surface'
 
 // The Playwright context pins prefers-reduced-motion to reduce, so the
@@ -23,13 +24,12 @@ function installMatchMedia(reducedMotion: boolean): void {
   })
 }
 
-function makeImage(): LightboxImage {
+function makeLightbox(close: () => void): LightboxController {
   return {
-    src: 'asset://cat.png',
-    alt: 'Cat',
-    openPath: 'assets/cat.png',
-    openImage: vi.fn(async () => {}),
-    transitionName: 'reflect-image-lightbox-1',
+    item: { type: 'image', src: 'asset://cat.png', alt: 'Cat' },
+    open: vi.fn(),
+    close,
+    onExited: vi.fn(),
   }
 }
 
@@ -44,7 +44,7 @@ interface RenderedLightbox {
 async function renderMobileLightbox(): Promise<RenderedLightbox> {
   setPlatformSurface({ mobileApp: true })
   const onClose = vi.fn()
-  await render(<ImageLightbox image={makeImage()} onClose={onClose} onOpenImage={vi.fn()} />)
+  await render(<ImageLightbox lightbox={makeLightbox(onClose)} onOpenImage={vi.fn()} />)
 
   const dialog = page.getByRole('dialog', { name: 'Image preview' })
   await expect.element(dialog).toBeInTheDocument()
@@ -315,17 +315,16 @@ describe('ImageLightbox mobile drag-to-dismiss', () => {
 describe('ImageLightbox desktop surface', () => {
   it('ignores touch drags and closes on click without a drag backdrop', async () => {
     const onClose = vi.fn()
-    await render(<ImageLightbox image={makeImage()} onClose={onClose} onOpenImage={vi.fn()} />)
+    await render(<ImageLightbox lightbox={makeLightbox(onClose)} onOpenImage={vi.fn()} />)
 
     const dialogLocator = page.getByRole('dialog', { name: 'Image preview' })
     await expect.element(dialogLocator).toBeInTheDocument()
     const dialog = dialogLocator.element()
     expect(dialog.querySelector('.bg-black')).toBeNull()
-    expect(dialog.className).toContain('bg-black/80')
+    expect(getComputedStyle(dialog).backgroundColor).toBe('rgba(0, 0, 0, 0.8)')
 
     const preview = page.getByRole('button', { name: 'Close image preview' }).element()
     const image = preview.querySelector('img')
-    expect(image?.className).toContain('max-h-full max-w-full')
 
     touchDown(preview, 100, 100)
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 100, clientY: 200 })
