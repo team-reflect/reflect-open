@@ -1,3 +1,4 @@
+import { lightboxItemFromXPostMedia } from '@/editor/x-post-media-lightbox-item'
 import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver'
 import {
   useCallback,
@@ -22,6 +23,7 @@ import type {
   SearchStatus,
   StartPendingReplacementOptions,
   WikilinkHoverHit,
+  XPostMediaClickHandler,
 } from '@meowdown/core'
 import {
   MeowdownEditor,
@@ -36,7 +38,7 @@ import {
 } from '@meowdown/react'
 import { EditorInputTraits } from '@/editor/editor-input-traits'
 import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge'
-import { ImageLightbox } from '@/editor/image-lightbox'
+import { MediaLightbox } from '@/editor/media-lightbox'
 import { isOpenableExternalUrl } from '@/editor/open-external-link'
 import { resolveWikilink } from '@/editor/resolve-wikilink'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
@@ -414,6 +416,16 @@ export function NoteEditor({
     [openLightbox],
   )
 
+  const handleXPostMediaClick: XPostMediaClickHandler = useCallback(
+    (event) => {
+      // Without this the card opens the photo URL or plays the video in place.
+      event.preventDefault()
+      setOpenLightboxImage(null)
+      openLightbox(lightboxItemFromXPostMedia(event.detail.media), event.detail.element)
+    },
+    [openLightbox],
+  )
+
   return (
     <>
       <MeowdownEditor
@@ -448,6 +460,7 @@ export function NoteEditor({
         onLinkClick={handleLinkClick}
         {...(resolveLinkPreview !== undefined ? { resolveLinkPreview } : {})}
         onImageClick={handleImageClick}
+        onXPostMediaClick={handleXPostMediaClick}
         {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}
         {...(onTagSearch !== undefined ? { onTagSearch } : {})}
         {...(onSelectionMenuSearch !== undefined ? { onSelectionMenuSearch } : {})}
@@ -473,7 +486,7 @@ export function NoteEditor({
         ) : null}
         {children}
       </MeowdownEditor>
-      <ImageLightbox lightbox={lightbox} onOpenImage={openLightboxImage} />
+      <MediaLightbox lightbox={lightbox} onOpenImage={openLightboxImage} />
     </>
   )
 }

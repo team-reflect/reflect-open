@@ -9,6 +9,7 @@ import { expectLocatorToHaveCount } from '@/test-utils/expect'
 import { pasteFiles } from '@/test-utils/file-events'
 import '@/test-utils/locator'
 import { hover, unhover } from '@/test-utils/mouse'
+import type { XPost } from '@post-embed/types'
 import { NoteEditor, type NoteEditorHandle } from './note-editor'
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
@@ -23,6 +24,31 @@ const openDeepLinkInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>()
 vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
   openDeepLinkInNewWindow,
+}))
+
+// Media that loads without the network: the card hides a photo that fails.
+const X_PHOTO_URL =
+  "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='100'%20height='100'/%3E"
+const X_VIDEO_URL = 'data:video/mp4;base64,'
+
+vi.mock('@/editor/use-x-post-resolver', () => ({
+  X_MEDIA_URL_PROTOCOLS: ['data:'],
+  useXPostResolver: () => (): XPost => ({
+    id: '20',
+    createdAt: '2006-03-21T20:50:14.000Z',
+    lang: 'en',
+    author: { name: 'jack', handle: 'jack' },
+    body: [{ type: 'text', text: 'just setting up my twttr' }],
+    media: [
+      { type: 'photo', url: X_PHOTO_URL, alt: 'A square', width: 100, height: 100 },
+      {
+        type: 'video',
+        width: 100,
+        height: 100,
+        sources: [{ type: 'video/mp4', url: X_VIDEO_URL }],
+      },
+    ],
+  }),
 }))
 
 const pmRoot = page.locate('.ProseMirror')
@@ -330,6 +356,29 @@ describe('NoteEditor image lightbox', () => {
     firePointer(preview.element(), 'pointerup', { pointerId: 1, clientX: 184, clientY: 520 })
 
     await expectLocatorToHaveCount(page.getByRole('dialog'), 0, { timeout: 5_000 })
+  })
+
+  it('opens an X post photo without the local image opener', async () => {
+    await render(<NoteEditor initialContent="![](https://x.com/jack/status/20)" />)
+
+    await pmRoot.locate('[data-media] img').click()
+    const dialog = page.getByRole('dialog', { name: 'Image preview' })
+    await expect.element(dialog.getByAltText('A square')).toHaveAttribute('src', X_PHOTO_URL)
+    await expectLocatorToHaveCount(page.getByRole('button', { name: 'Open' }), 0)
+  })
+
+  it('plays an X post video in the lightbox instead of the card', async () => {
+    await render(<NoteEditor initialContent="![](https://x.com/jack/status/20)" />)
+
+    await pmRoot.getByRole('button', { name: 'Play video' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Video preview' })
+    await expect.element(dialog.locate('video source')).toHaveAttribute('src', X_VIDEO_URL)
+    await expectLocatorToHaveCount(pmRoot.locate('video'), 0)
+
+    await dialog.locate('video').click()
+    await expect.element(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await expectLocatorToHaveCount(page.getByRole('dialog'), 0)
   })
 
   it('uses the opener captured when the lightbox opens', async () => {
