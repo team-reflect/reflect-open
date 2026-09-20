@@ -1,50 +1,15 @@
-import { useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { createPointerDrag, createVelocitySampler } from '@/lib/pointer-drag'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion'
 
 /** Finger travel (px) before the gesture commits to horizontal swipe or vertical scroll. */
 const DIRECTION_THRESHOLD = 10
-/** Minimum spacing between velocity samples; the window smooths per-event jitter. */
-const VELOCITY_WINDOW_MS = 30
-/** A release this long after the last sample means the finger stalled, so momentum is discarded. */
-const VELOCITY_STALE_MS = 120
 /** How far ahead the release velocity is projected when choosing open vs closed. */
 const PROJECTED_MOMENTUM_MS = 100
 /** Duration of the settle transition that carries the row to its resting position. */
 const SETTLE_MS = 240
 /** iOS-feel settle curve: fast start, long decelerating tail. */
 const SETTLE_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
-
-/** Fields shared by both gesture phases. */
-interface GestureBase {
-  /** Pointer that owns this gesture; events from any other pointer are ignored. */
-  pointerId: number
-  /** Screen X where the touch started. */
-  startX: number
-  /** Screen Y where the touch started. */
-  startY: number
-  /** Row translation at touch start (possibly mid-settle). */
-  startOffset: number
-}
-
-/** Touch is down but the direction (swipe vs scroll) is still undecided. */
-interface ArmedGesture extends GestureBase {
-  phase: 'armed'
-}
-
-/** Horizontal intent won; the row tracks the finger 1:1. */
-interface DraggingGesture extends GestureBase {
-  phase: 'dragging'
-  /** Current row translation, already rubber-band constrained. */
-  offset: number
-  /** Latest sampled velocity in px/ms; negative when moving left. */
-  velocity: number
-  /** Row translation at the last velocity sample. */
-  sampleOffset: number
-  /** `performance.now()` timestamp of the last velocity sample. */
-  sampleTime: number
-}
-
-type RowGesture = ArmedGesture | DraggingGesture
 
 interface RowSwipeOptions {
   /** Total width of the actions underneath the row. */
@@ -101,7 +66,11 @@ export function useRowSwipe({
   onBeginInteraction,
 }: RowSwipeOptions): RowSwipe {
   const reducedMotion = usePrefersReducedMotion()
-  const gestureRef = useRef<RowGesture | null>(null)
+  const [drag] = useState(createPointerDrag)
+  const [velocity] = useState(createVelocitySampler)
+  // Row translation at touch start (possibly mid-settle), then the live one
+  // while dragging, already rubber-band constrained.
+  const offsetRef = useRef({ start: 0, current: 0 })
   const suppressClickRef = useRef(false)
   // Resting position: a revealed row sits shifted left of the actions, a closed row at zero.
   const restingOffset = revealed ? -actionWidth : 0
@@ -109,7 +78,7 @@ export function useRowSwipe({
   // A fresh callback every render, so React re-runs it each commit and the
   // resting presentation follows `revealed` without any hook state.
   const ref = (element: HTMLElement | null): void => {
-    if (element === null || gestureRef.current !== null) {
+    if (element === null || drag.live) {
       return
     }
     element.style.touchAction = 'pan-y'
@@ -117,113 +86,74 @@ export function useRowSwipe({
   }
 
   const onPointerDown = (event: ReactPointerEvent<HTMLElement>): void => {
-    if (event.pointerType !== 'touch' || !event.isPrimary) {
-      return
-    }
-    const currentGesture = gestureRef.current
-    if (currentGesture?.phase === 'dragging') {
-      return
-    }
     // An armed touch has no explicit pointer capture yet. If its release was
     // retargeted outside the row, let the next touch recover instead of
     // permanently rejecting every later swipe.
-    gestureRef.current = null
+    if (drag.dragging || !drag.arm(event)) {
+      return
+    }
     // Let the list close any other revealed row right away.
     onBeginInteraction()
     suppressClickRef.current = false
     // Read the live translation so a new touch grabs a mid-settle row where it visually is.
     const surface = event.currentTarget
     const startOffset = currentTranslateX(surface, restingOffset)
-    gestureRef.current = {
-      phase: 'armed',
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      startOffset,
-    }
+    offsetRef.current = { start: startOffset, current: startOffset }
     // Freeze an in-flight settle at its presentation value. A new touch can
     // redirect the row without waiting for the old transition to finish.
     presentDragging(surface, startOffset)
   }
 
   const onPointerMove = (event: ReactPointerEvent<HTMLElement>): void => {
-    const gesture = gestureRef.current
-    if (gesture === null || gesture.pointerId !== event.pointerId) {
-      return
-    }
-    const deltaX = event.clientX - gesture.startX
-    const deltaY = Math.abs(event.clientY - gesture.startY)
-    const horizontalDistance = Math.abs(deltaX)
-
-    if (gesture.phase === 'armed') {
+    const step = drag.move(event, (travelX, travelY) => {
+      const deltaY = Math.abs(travelY)
+      const horizontalDistance = Math.abs(travelX)
       if (deltaY >= DIRECTION_THRESHOLD && deltaY >= horizontalDistance) {
-        gestureRef.current = null
-        presentSettled(event.currentTarget, restingOffset, reducedMotion)
-        return
+        return 'abort'
       }
       if (horizontalDistance < DIRECTION_THRESHOLD || horizontalDistance <= deltaY) {
-        return
+        return 'wait'
       }
       // A closed row has nothing to reveal to its left when dragged right.
-      if (deltaX > 0 && gesture.startOffset >= 0) {
-        gestureRef.current = null
-        presentSettled(event.currentTarget, restingOffset, reducedMotion)
-        return
-      }
-      try {
-        event.currentTarget.setPointerCapture(event.pointerId)
-      } catch {
-        // Synthetic test events have no live pointer to capture.
-      }
+      return travelX > 0 && offsetRef.current.start >= 0 ? 'abort' : 'start'
+    })
+    if (step === undefined) {
+      return
+    }
+    if (step === 'aborted') {
+      presentSettled(event.currentTarget, restingOffset, reducedMotion)
+      return
+    }
+    const nextOffset = constrainOffset(
+      offsetRef.current.start + event.clientX - drag.startX,
+      actionWidth,
+    )
+    offsetRef.current.current = nextOffset
+    if (step === 'started') {
       // The eventual synthetic click belongs to this drag, not to the note.
       suppressClickRef.current = true
-      const nextOffset = constrainOffset(gesture.startOffset + deltaX, actionWidth)
-      const now = performance.now()
-      gestureRef.current = {
-        ...gesture,
-        phase: 'dragging',
-        offset: nextOffset,
-        velocity: 0,
-        sampleOffset: nextOffset,
-        sampleTime: now,
-      }
+      velocity.reset(nextOffset)
       presentDragging(event.currentTarget, nextOffset)
       return
     }
-
-    const nextOffset = constrainOffset(gesture.startOffset + deltaX, actionWidth)
-    const now = performance.now()
-    const elapsed = now - gesture.sampleTime
-    const nextGesture: DraggingGesture =
-      elapsed >= VELOCITY_WINDOW_MS
-        ? {
-            ...gesture,
-            offset: nextOffset,
-            velocity: (nextOffset - gesture.sampleOffset) / elapsed,
-            sampleOffset: nextOffset,
-            sampleTime: now,
-          }
-        : { ...gesture, offset: nextOffset }
-    gestureRef.current = nextGesture
+    velocity.sample(nextOffset)
     event.currentTarget.style.transform = `translate3d(${nextOffset}px, 0, 0)`
   }
 
   const release = (event: ReactPointerEvent<HTMLElement>, interrupted: boolean): void => {
-    const gesture = gestureRef.current
-    if (gesture === null || gesture.pointerId !== event.pointerId) {
+    const ended = drag.end(event)
+    if (ended === undefined) {
       return
     }
-    gestureRef.current = null
-    if (gesture.phase === 'armed') {
+    if (ended === 'tap') {
       // An armed release is a tap; the click goes through untouched.
       presentSettled(event.currentTarget, restingOffset, reducedMotion)
       return
     }
     let targetOffset = restingOffset
     if (!interrupted) {
-      const velocity =
-        performance.now() - gesture.sampleTime <= VELOCITY_STALE_MS ? gesture.velocity : 0
-      const projectedOffset = gesture.offset + velocity * PROJECTED_MOMENTUM_MS
+      const releaseVelocity = velocity.stale ? 0 : velocity.velocity
+      const projectedOffset = offsetRef.current.current + releaseVelocity * PROJECTED_MOMENTUM_MS
       if (projectedOffset < -actionWidth / 2) {
         targetOffset = -actionWidth
         onReveal()

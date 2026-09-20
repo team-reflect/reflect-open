@@ -9,13 +9,12 @@ import {
 } from 'react'
 import { flushSync } from 'react-dom'
 import { clamp } from '@ocavue/utils'
+import { createPointerDrag, createVelocitySampler, VELOCITY_STALE_MS } from '@/lib/pointer-drag'
 
 const DRAG_ACTIVATE_PX = 8
 const DISMISS_FRACTION = 0.18
 const DISMISS_VELOCITY_PX_PER_MS = 0.45
 const MIN_FLICK_DISTANCE_PX = 40
-const VELOCITY_WINDOW_MS = 30
-const VELOCITY_STALE_MS = 120
 const SNAP_BACK_MS = 300
 const DISMISS_MS = 260
 const DISMISS_MIN_MS = 140
@@ -32,19 +31,15 @@ const DISMISS_EASING = 'cubic-bezier(0.3, 0.7, 0.4, 1)'
 
 type DragState =
   | { phase: 'idle' }
-  | { phase: 'armed'; pointerId: number; startX: number; startY: number }
+  | { phase: 'armed' }
   | {
       phase: 'dragging'
-      pointerId: number
       originX: number
       originY: number
       width: number
       height: number
       deltaX: number
       deltaY: number
-      velocity: number
-      sampleDistance: number
-      sampleTime: number
     }
   | {
       phase: 'settling'
@@ -197,6 +192,8 @@ export function useImageDismissDrag({
 }): ImageDismissDrag {
   const stateRef = useRef<DragState>(IDLE)
   const [state, setState] = useState<DragState>(IDLE)
+  const [drag] = useState(createPointerDrag)
+  const [velocity] = useState(createVelocitySampler)
   const suppressClickUntilRef = useRef(0)
 
   const commit = useCallback((next: DragState): void => {
@@ -241,85 +238,51 @@ export function useImageDismissDrag({
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>): void => {
-      if (!enabled || event.pointerType !== 'touch' || !event.isPrimary) {
+      if (!enabled || stateRef.current.phase !== 'idle' || !drag.arm(event)) {
         return
       }
-      if (stateRef.current.phase !== 'idle') {
-        return
-      }
-      commit({
-        phase: 'armed',
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-      })
+      commit({ phase: 'armed' })
     },
-    [enabled, commit],
+    [enabled, commit, drag],
   )
 
   const onPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>): void => {
       const current = stateRef.current
-      if (
-        (current.phase !== 'armed' && current.phase !== 'dragging') ||
-        current.pointerId !== event.pointerId
-      ) {
+      if (current.phase !== 'armed' && current.phase !== 'dragging') {
         return
       }
+      const step = drag.move(event, (travelX, travelY) =>
+        dragDistance(travelX, travelY) < DRAG_ACTIVATE_PX ? 'wait' : 'start',
+      )
 
-      if (current.phase === 'armed') {
-        const travelX = event.clientX - current.startX
-        const travelY = event.clientY - current.startY
-        if (dragDistance(travelX, travelY) < DRAG_ACTIVATE_PX) {
-          return
-        }
-
-        try {
-          event.currentTarget.setPointerCapture?.(event.pointerId)
-        } catch {
-          // Synthetic tests do not have a live pointer to capture.
-        }
-
+      if (step === 'started') {
         const rect = event.currentTarget.getBoundingClientRect()
         const width = rect.width || window.innerWidth
         const height = rect.height || window.innerHeight
+        velocity.reset(0)
         // Rebase on the activation point so the image picks up from rest
         // instead of jumping by the activation distance.
         commit({
           phase: 'dragging',
-          pointerId: event.pointerId,
           originX: event.clientX,
           originY: event.clientY,
           width,
           height,
           deltaX: 0,
           deltaY: 0,
-          velocity: 0,
-          sampleDistance: 0,
-          sampleTime: performance.now(),
         })
         return
       }
 
-      const deltaX = event.clientX - current.originX
-      const deltaY = event.clientY - current.originY
-      const distance = dragDistance(deltaX, deltaY)
-      const now = performance.now()
-      const elapsed = now - current.sampleTime
-      if (elapsed < VELOCITY_WINDOW_MS) {
+      if (step === 'moved' && current.phase === 'dragging') {
+        const deltaX = event.clientX - current.originX
+        const deltaY = event.clientY - current.originY
+        velocity.sample(dragDistance(deltaX, deltaY))
         commit({ ...current, deltaX, deltaY })
-        return
       }
-      commit({
-        ...current,
-        deltaX,
-        deltaY,
-        velocity: (distance - current.sampleDistance) / elapsed,
-        sampleDistance: distance,
-        sampleTime: now,
-      })
     },
-    [commit],
+    [commit, drag, velocity],
   )
 
   const release = useCallback(
@@ -327,7 +290,7 @@ export function useImageDismissDrag({
       const current = stateRef.current
       if (
         (current.phase !== 'armed' && current.phase !== 'dragging') ||
-        current.pointerId !== event.pointerId
+        drag.end(event) === undefined
       ) {
         return
       }
@@ -339,12 +302,8 @@ export function useImageDismissDrag({
       const releaseDeltaX = event.clientX - current.originX
       const releaseDeltaY = event.clientY - current.originY
       const releaseDistance = dragDistance(releaseDeltaX, releaseDeltaY)
-      const now = performance.now()
-      const elapsed = now - current.sampleTime
-      const releaseVelocity =
-        elapsed >= VELOCITY_WINDOW_MS
-          ? (releaseDistance - current.sampleDistance) / elapsed
-          : current.velocity
+      const elapsed = velocity.sample(releaseDistance)
+      const releaseVelocity = velocity.velocity
       const flicked =
         releaseVelocity > DISMISS_VELOCITY_PX_PER_MS &&
         releaseDistance > MIN_FLICK_DISTANCE_PX &&
@@ -373,7 +332,7 @@ export function useImageDismissDrag({
           : SNAP_BACK_MS,
       })
     },
-    [commit, onClose, suppressUpcomingClick],
+    [commit, onClose, suppressUpcomingClick, drag, velocity],
   )
 
   const onPointerUp = useCallback(

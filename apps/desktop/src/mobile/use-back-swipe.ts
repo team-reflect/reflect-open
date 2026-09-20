@@ -6,6 +6,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
+import { createPointerDrag, createVelocitySampler } from '@/lib/pointer-drag'
 
 /** How far from the leading edge a touch may start and still arm the gesture. */
 const EDGE_WIDTH_PX = 32
@@ -19,13 +20,6 @@ const POP_FRACTION = 0.4
 const POP_VELOCITY_PX_PER_MS = 0.35
 /** ...as long as the finger actually travelled somewhere. */
 const MIN_FLICK_DX_PX = 24
-/**
- * Velocity is sampled over windows of at least this long — instantaneous
- * per-event velocity is far too jittery to gate a pop on.
- */
-const VELOCITY_WINDOW_MS = 30
-/** A velocity sample older than this at release means the finger stopped. */
-const VELOCITY_STALE_MS = 4 * VELOCITY_WINDOW_MS
 
 /** How long a released screen takes to settle on- or off-screen. */
 export const BACK_SWIPE_SETTLE_MS = 300
@@ -33,18 +27,9 @@ export const BACK_SWIPE_SETTLE_MS = 300
 export type BackSwipeState =
   | { phase: 'idle' }
   /** An edge touch that hasn't shown horizontal intent yet — nothing moves. */
-  | { phase: 'armed'; pointerId: number; startX: number; startY: number }
+  | { phase: 'armed' }
   /** The finger owns the screen: `deltaX` is how far it has dragged it. */
-  | {
-      phase: 'dragging'
-      pointerId: number
-      startX: number
-      width: number
-      deltaX: number
-      velocity: number
-      sampleDeltaX: number
-      sampleTime: number
-    }
+  | { phase: 'dragging'; width: number; deltaX: number }
   /** Released — the screen is animating off (`pop`) or back home (`cancel`). */
   | { phase: 'settling'; action: 'pop' | 'cancel'; width: number }
 
@@ -104,6 +89,8 @@ export function useBackSwipe({
 }: BackSwipeOptions): BackSwipe {
   const stateRef = useRef<BackSwipeState>(IDLE)
   const [state, setState] = useState<BackSwipeState>(IDLE)
+  const [drag] = useState(createPointerDrag)
+  const [velocity] = useState(createVelocitySampler)
 
   // The scroll blocker lives only while a touch owns the gesture. React
   // registers touch listeners passively, so blocking the page's own vertical
@@ -166,76 +153,48 @@ export function useBackSwipe({
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
-      if (!enabled || event.pointerType !== 'touch' || !event.isPrimary) {
-        return
-      }
-      if (stateRef.current.phase !== 'idle') {
+      if (!enabled || stateRef.current.phase !== 'idle') {
         return
       }
       const edgeX = event.clientX - event.currentTarget.getBoundingClientRect().left
-      if (edgeX > EDGE_WIDTH_PX) {
+      if (edgeX > EDGE_WIDTH_PX || !drag.arm(event)) {
         return
       }
-      commit({
-        phase: 'armed',
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-      })
+      commit({ phase: 'armed' })
     },
-    [enabled, commit],
+    [enabled, commit, drag],
   )
 
   const onPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
       const current = stateRef.current
-      const { clientX, clientY, pointerId } = event
-      if (current.phase === 'armed' && current.pointerId === pointerId) {
-        const deltaX = clientX - current.startX
-        const deltaY = Math.abs(clientY - current.startY)
-        if ((deltaY > DISARM_DY_PX && deltaY >= deltaX) || deltaX < -ACTIVATE_DX_PX) {
-          commit(IDLE)
-          return
-        }
-        if (deltaX >= ACTIVATE_DX_PX && deltaX > deltaY) {
-          try {
-            event.currentTarget.setPointerCapture?.(pointerId)
-          } catch {
-            // Synthetic events (tests) have no live pointer to capture.
-          }
-          const width = event.currentTarget.getBoundingClientRect().width || window.innerWidth
-          const clamped = Math.max(0, deltaX)
-          commit({
-            phase: 'dragging',
-            pointerId,
-            startX: current.startX,
-            width,
-            deltaX: clamped,
-            velocity: 0,
-            sampleDeltaX: clamped,
-            sampleTime: performance.now(),
-          })
-        }
+      if (current.phase !== 'armed' && current.phase !== 'dragging') {
         return
       }
-      if (current.phase === 'dragging' && current.pointerId === pointerId) {
-        const deltaX = Math.max(0, clientX - current.startX)
-        const now = performance.now()
-        const elapsed = now - current.sampleTime
-        if (elapsed < VELOCITY_WINDOW_MS) {
-          commit({ ...current, deltaX })
-          return
+      const step = drag.move(event, (travelX, travelY) => {
+        const deltaY = Math.abs(travelY)
+        if ((deltaY > DISARM_DY_PX && deltaY >= travelX) || travelX < -ACTIVATE_DX_PX) {
+          return 'abort'
         }
-        commit({
-          ...current,
-          deltaX,
-          velocity: (deltaX - current.sampleDeltaX) / elapsed,
-          sampleDeltaX: deltaX,
-          sampleTime: now,
-        })
+        return travelX >= ACTIVATE_DX_PX && travelX > deltaY ? 'start' : 'wait'
+      })
+      if (step === 'aborted') {
+        commit(IDLE)
+        return
+      }
+      const deltaX = Math.max(0, event.clientX - drag.startX)
+      if (step === 'started') {
+        const width = event.currentTarget.getBoundingClientRect().width || window.innerWidth
+        velocity.reset(deltaX)
+        commit({ phase: 'dragging', width, deltaX })
+        return
+      }
+      if (step === 'moved' && current.phase === 'dragging') {
+        velocity.sample(deltaX)
+        commit({ ...current, deltaX })
       }
     },
-    [commit],
+    [commit, drag, velocity],
   )
 
   const release = useCallback(
@@ -243,7 +202,7 @@ export function useBackSwipe({
       const current = stateRef.current
       if (
         (current.phase !== 'armed' && current.phase !== 'dragging') ||
-        current.pointerId !== event.pointerId
+        drag.end(event) === undefined
       ) {
         return
       }
@@ -254,9 +213,9 @@ export function useBackSwipe({
       // A flick only counts if the finger was still moving near release —
       // a stale sample means it stopped (holding emits no move events).
       const flicked =
-        current.velocity > POP_VELOCITY_PX_PER_MS &&
+        velocity.velocity > POP_VELOCITY_PX_PER_MS &&
         current.deltaX > MIN_FLICK_DX_PX &&
-        performance.now() - current.sampleTime <= VELOCITY_STALE_MS
+        !velocity.stale
       const pops = !interrupted && (current.deltaX > current.width * POP_FRACTION || flicked)
       if (reducedMotion) {
         commit(IDLE)
@@ -267,7 +226,7 @@ export function useBackSwipe({
       }
       commit({ phase: 'settling', action: pops ? 'pop' : 'cancel', width: current.width })
     },
-    [reducedMotion, onPop, commit],
+    [reducedMotion, onPop, commit, drag, velocity],
   )
 
   const onPointerUp = useCallback(
