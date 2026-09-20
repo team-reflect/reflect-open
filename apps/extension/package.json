@@ -13,8 +13,8 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
-    "@post-embed/exporter": "^0.4.1",
-    "@post-embed/schema": "^0.5.0",
+    "@post-embed/exporter": "^0.5.0",
+    "@post-embed/schema": "^0.5.2",
     "@reflect/core": "workspace:*",
     "@reflect/design-system": "workspace:*",
     "defuddle": "^0.19.3",

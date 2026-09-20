@@ -75,11 +75,11 @@ importers:
         specifier: ^1.8.0
         version: 1.8.0
       '@post-embed/schema':
-        specifier: ^0.5.0
-        version: 0.5.0(typescript@6.0.3)
+        specifier: ^0.5.2
+        version: 0.5.2(typescript@6.0.3)
       '@post-embed/types':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
       '@reflect/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -238,11 +238,11 @@ importers:
   apps/extension:
     dependencies:
       '@post-embed/exporter':
-        specifier: ^0.4.1
-        version: 0.4.1(typescript@6.0.3)
-      '@post-embed/schema':
         specifier: ^0.5.0
         version: 0.5.0(typescript@6.0.3)
+      '@post-embed/schema':
+        specifier: ^0.5.2
+        version: 0.5.2(typescript@6.0.3)
       '@reflect/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -301,11 +301,11 @@ importers:
         specifier: https://pkg.pr.new/@meowdown/markdown@53c64f4c71bb5ebfe34f3e3eb9f37dacc63a6284
         version: https://pkg.pr.new/@meowdown/markdown@53c64f4c71bb5ebfe34f3e3eb9f37dacc63a6284(typescript@6.0.3)
       '@post-embed/schema':
-        specifier: ^0.5.0
-        version: 0.5.0(typescript@6.0.3)
+        specifier: ^0.5.2
+        version: 0.5.2(typescript@6.0.3)
       '@post-embed/types':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
       '@reflect/db':
         specifier: workspace:*
         version: link:../db
@@ -1476,20 +1476,11 @@ packages:
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
 
-  '@post-embed/exporter@0.4.1':
-    resolution: {integrity: sha512-4c6Y2p0CnjgWkiMQQWtfFwbdQJInguJyZmzyb/2dps3ugJFr1b9IW/zcNJ2KIEZCQO/+ZA/kvADL/9ODEMuPlg==}
-
   '@post-embed/exporter@0.5.0':
     resolution: {integrity: sha512-3FPERb5BfyV1BQGhJtNA2hz+xWSHEnXHyVPC8vOkQ6Xz2gjxXng0bnZpNWpwKXfXGTLxC4dgyFtQ9Hi5QuBicg==}
 
-  '@post-embed/schema@0.5.0':
-    resolution: {integrity: sha512-ErtsyXf6LEdu2E2IUmMGu5CcR1UpxTj94529isRVYqcp9YVUZvT81PRXCL/05t61YaR1imnJr/5e2CIGYXBvlg==}
-
   '@post-embed/schema@0.5.2':
     resolution: {integrity: sha512-Q8vHpn9x+ajyqph6Iwcno3Mye7m/tesZb41HiakL2oxWbN57zBZJ2fXPGEQFF5b9A76Y1LdXx+6ZrlA0hZ08Dg==}
-
-  '@post-embed/types@0.4.0':
-    resolution: {integrity: sha512-mOpgMA9i4Zvpnx08T/oaS9vKSdRFctIcT0lqZwVkiX+sJGwd8yeb5g5OURU+99maEVyWrtSGGj5BsXwlkRzNyw==}
 
   '@post-embed/types@0.5.0':
     resolution: {integrity: sha512-q7SB/h99W/g7fdu0dZH1CiMARsJv7Yofy7xJ1LBFtn96UJzIgK9L+jpYbQ215yJ2O9BFSY34TpEqj9ZktGfkhw==}
@@ -7246,18 +7237,6 @@ snapshots:
 
   '@polka/url@1.0.0-next.29': {}
 
-  '@post-embed/exporter@0.4.1(typescript@6.0.3)':
-    dependencies:
-      '@ocavue/utils': 1.8.0
-      '@post-embed/schema': 0.5.0(typescript@6.0.3)
-      '@post-embed/types': 0.4.0
-      birpc: 4.2.0
-      entities: 8.1.0
-      lru.min: 1.1.5
-      valibot: 1.5.0(typescript@6.0.3)
-    transitivePeerDependencies:
-      - typescript
-
   '@post-embed/exporter@0.5.0(typescript@6.0.3)':
     dependencies:
       '@ocavue/utils': 1.8.0
@@ -7271,14 +7250,6 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@post-embed/schema@0.5.0(typescript@6.0.3)':
-    dependencies:
-      '@post-embed/types': 0.4.0
-      '@standard-schema/spec': 1.1.0
-      valibot: 1.5.0(typescript@6.0.3)
-    transitivePeerDependencies:
-      - typescript
-
   '@post-embed/schema@0.5.2(typescript@6.0.3)':
     dependencies:
       '@post-embed/types': 0.5.0
@@ -7286,8 +7257,6 @@ snapshots:
       valibot: 1.5.0(typescript@6.0.3)
     transitivePeerDependencies:
       - typescript
-
-  '@post-embed/types@0.4.0': {}
 
   '@post-embed/types@0.5.0': {}
 

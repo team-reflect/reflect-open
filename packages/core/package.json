@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@meowdown/markdown": "^0.72.0",
-    "@post-embed/schema": "^0.5.0",
-    "@post-embed/types": "^0.4.0",
+    "@post-embed/schema": "^0.5.2",
+    "@post-embed/types": "^0.5.0",
     "@reflect/db": "workspace:*",
     "@reflect/modules": "workspace:*",
     "@reflect/utils": "workspace:*",
