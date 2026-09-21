@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/team-reflect/reflect-open/compare/extension-v0.3.0...extension-v0.4.0) (2026-09-21)
+
+
+### Features
+
+* **desktop:** open X post photos and videos in the lightbox ([#1323](https://github.com/team-reflect/reflect-open/issues/1323)) ([b2dd673](https://github.com/team-reflect/reflect-open/commit/b2dd673da5571cfa2a9cc4057f7de73f89b0d153))
+
 ## [0.3.0](https://github.com/team-reflect/reflect-open/compare/extension-v0.2.1...extension-v0.3.0) (2026-09-17)
 
 
