@@ -46,24 +46,13 @@ pub(super) fn apply_chunks(
     note_path: &str,
     chunks: &[EmbeddedChunk],
 ) -> AppResult<()> {
-    // Chunks only exist for indexed notes. The embedding pipeline runs on its
-    // own queue, so a slow in-flight embed can land after index_remove
-    // deleted the note — without this guard it would reinsert vectors for a
-    // dead path (which surface as stale text if the path is later reused).
-    let note_exists: bool = conn
-        .prepare_cached("SELECT EXISTS(SELECT 1 FROM notes WHERE path = ?1)")?
-        .query_row(params![note_path], |row| row.get(0))?;
-    if !note_exists {
-        return remove_chunks(conn, note_path); // hygiene: drop any leftovers
-    }
-
     // Existing rows by content hash (a note rarely has duplicate-hash chunks;
     // if it does, rows pair up by position order — both forms are identical).
-    let mut existing: Vec<(i64, String)> = conn
+    let mut existing: Vec<(i64, String, String)> = conn
         .prepare_cached(
-            "SELECT id, content_hash FROM embedding_chunks WHERE note_path = ?1 ORDER BY pos_from",
+            "SELECT id, content_hash, model_id FROM embedding_chunks WHERE note_path = ?1 ORDER BY pos_from",
         )?
-        .query_map(params![note_path], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .query_map(params![note_path], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
         .collect::<Result<_, _>>()?;
 
     let mut kept: Vec<i64> = Vec::new();
@@ -72,14 +61,16 @@ pub(super) fn apply_chunks(
             None => {
                 let at = existing
                     .iter()
-                    .position(|(_, hash)| *hash == chunk.content_hash)
+                    .position(|(_, hash, model)| {
+                        *hash == chunk.content_hash && *model == chunk.model_id
+                    })
                     .ok_or_else(|| {
                         AppError::parse(format!(
                             "unchanged chunk has no stored row (hash {})",
                             chunk.content_hash
                         ))
                     })?;
-                let (id, _) = existing.remove(at);
+                let (id, _, _) = existing.remove(at);
                 conn.prepare_cached(
                     "UPDATE embedding_chunks
                      SET heading = ?2, pos_from = ?3, pos_to = ?4, model_id = ?5
@@ -120,7 +111,7 @@ pub(super) fn apply_chunks(
     }
 
     // Whatever wasn't kept is stale: drop vector + row.
-    for (id, _) in existing {
+    for (id, _, _) in existing {
         conn.prepare_cached("DELETE FROM embedding_vectors WHERE rowid = ?1")?
             .execute(params![id])?;
         conn.prepare_cached("DELETE FROM embedding_chunks WHERE id = ?1")?
@@ -137,6 +128,8 @@ pub(super) fn remove_chunks(conn: &Connection, note_path: &str) -> AppResult<()>
     )?
     .execute(params![note_path])?;
     conn.prepare_cached("DELETE FROM embedding_chunks WHERE note_path = ?1")?
+        .execute(params![note_path])?;
+    conn.prepare_cached("DELETE FROM embedding_state WHERE note_path = ?1")?
         .execute(params![note_path])?;
     Ok(())
 }

@@ -36,11 +36,12 @@ pub struct ScanCandidate {
     pub stored_mtime: Option<i64>,
     /// The stored row's content hash, or `None` when the path has no row.
     pub stored_hash: Option<String>,
+    /// The row moved since its path-dependent Markdown references were parsed.
+    pub needs_projection: bool,
 }
 
 /// A stored row whose file vanished from disk. Facts ride along because
-/// id-based move healing pairs orphans with arrivals and, on a heal, the
-/// moved row's hash decides whether the new path needs a re-index at all.
+/// id-based move healing pairs orphans with arrivals while retaining vectors.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanOrphan {
@@ -98,10 +99,14 @@ pub(super) fn scan_reconcile(
     files: &[FileMeta],
     now_ms: u64,
 ) -> AppResult<ReconcileScan> {
-    let mut stored: HashMap<String, (i64, String)> = HashMap::new();
-    let mut stmt = conn.prepare_cached("SELECT path, mtime, file_hash FROM notes")?;
+    let mut stored: HashMap<String, (i64, String, bool)> = HashMap::new();
+    let mut stmt =
+        conn.prepare_cached("SELECT path, mtime, file_hash, projection_path != path FROM notes")?;
     let rows = stmt.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, (row.get(1)?, row.get(2)?)))
+        Ok((
+            row.get::<_, String>(0)?,
+            (row.get(1)?, row.get(2)?, row.get(3)?),
+        ))
     })?;
     for row in rows {
         let (path, facts) = row?;
@@ -118,9 +123,11 @@ pub(super) fn scan_reconcile(
             // candidate. But when the index has no current row for it, the
             // content is *missing*, not merely offloaded: report it so the
             // caller can request exactly that download.
+            // A path-only projection repair can wait for local content. It
+            // must not hydrate a previously indexed note just to refresh refs.
             let current = stored
                 .get(&file.path)
-                .is_some_and(|(mtime, _)| *mtime == file.modified_ms as i64);
+                .is_some_and(|(mtime, _, _)| *mtime == file.modified_ms as i64);
             if !current {
                 stale_placeholders.push(file.path.clone());
             }
@@ -128,21 +135,26 @@ pub(super) fn scan_reconcile(
         }
         let facts = stored.get(&file.path);
         let settled = now_ms.saturating_sub(file.modified_ms) >= MTIME_TRUST_AGE_MS;
-        if settled && facts.is_some_and(|(mtime, _)| *mtime == file.modified_ms as i64) {
+        if settled
+            && facts.is_some_and(|(mtime, _, needs_projection)| {
+                *mtime == file.modified_ms as i64 && !needs_projection
+            })
+        {
             continue; // untouched since it was indexed
         }
         candidates.push(ScanCandidate {
             path: file.path.clone(),
             modified_ms: file.modified_ms,
-            stored_mtime: facts.map(|(mtime, _)| *mtime),
-            stored_hash: facts.map(|(_, hash)| hash.clone()),
+            stored_mtime: facts.map(|(mtime, _, _)| *mtime),
+            stored_hash: facts.map(|(_, hash, _)| hash.clone()),
+            needs_projection: facts.is_some_and(|(_, _, needs_projection)| *needs_projection),
         });
     }
 
     let mut orphans: Vec<ScanOrphan> = stored
         .into_iter()
         .filter(|(path, _)| !on_disk.contains(path.as_str()))
-        .map(|(path, (stored_mtime, stored_hash))| ScanOrphan {
+        .map(|(path, (stored_mtime, stored_hash, _))| ScanOrphan {
             path,
             stored_mtime,
             stored_hash,

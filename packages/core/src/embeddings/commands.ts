@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { localNoteReadSchema, type LocalNoteRead } from '../graph/commands'
 import { getBridge, type Unlisten } from '../ipc/bridge'
 import { call } from '../ipc/invoke'
 
@@ -26,6 +27,37 @@ export type EmbedStatus = z.infer<typeof embedStatusSchema>
 
 const voidSchema = z.null()
 const vectorsSchema = z.array(z.array(z.number()))
+const embedPendingSchema = z.array(z.object({ path: z.string(), fingerprint: z.string() }))
+const embedPreparedSchema = z
+  .object({ fingerprint: z.string(), fileHash: z.string(), assetPaths: z.array(z.string()) })
+  .nullable()
+
+/** Identity of the embedding projection requested for an index session. */
+export interface EmbedProjection {
+  generation: number
+  modelId: string
+  projectionVersion: number
+}
+
+/** Select only notes without a successful checkpoint for their current inputs. */
+export function embedPending(
+  options: EmbedProjection,
+): Promise<z.infer<typeof embedPendingSchema>> {
+  return call('embed_pending', { ...options }, embedPendingSchema)
+}
+
+/** Recheck one candidate before reading it; null means no local work remains. */
+export function embedPrepare(
+  path: string,
+  options: EmbedProjection,
+): Promise<z.infer<typeof embedPreparedSchema>> {
+  return call('embed_prepare', { path, ...options }, embedPreparedSchema)
+}
+
+/** Read local note/sidecar bytes from the pinned index root without hydrating iCloud files. */
+export function embedRead(path: string, generation: number): Promise<LocalNoteRead> {
+  return call('embed_read', { path, generation }, localNoteReadSchema)
+}
 
 export function embedStatus(): Promise<EmbedStatus> {
   return call('embed_status', {}, embedStatusSchema)
@@ -52,13 +84,14 @@ export interface EmbedChunkPayload {
   vector: number[] | null
 }
 
-/** Replace a note's chunk set (hash-diff applied in Rust; generation-pinned). */
+/** Replace chunks and checkpoint their inputs atomically, if the revision still matches. */
 export async function embedApply(
   path: string,
   chunks: EmbedChunkPayload[],
-  generation: number,
+  options: EmbedProjection & { fingerprint: string },
 ): Promise<void> {
-  await call('embed_apply', { path, chunks, generation }, voidSchema)
+  const { generation, ...projection } = options
+  await call('embed_apply', { request: { path, chunks, ...projection }, generation }, voidSchema)
 }
 
 /** Drop a deleted note's chunks + vectors (generation-pinned). */
