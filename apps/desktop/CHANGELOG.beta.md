@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.13.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta.2...v0.13.0-beta.3) (2026-09-21)
+
+
+### Features
+
+* **desktop:** open YouTube videos in the lightbox ([#1336](https://github.com/team-reflect/reflect-open/issues/1336)) ([cba57a9](https://github.com/team-reflect/reflect-open/commit/cba57a983d1f3e8c43a111c977f851707bf03814))
+
+
+### Bug Fixes
+
+* load a pasted X post that has no saved archive ([#1335](https://github.com/team-reflect/reflect-open/issues/1335)) ([8af56c4](https://github.com/team-reflect/reflect-open/commit/8af56c40e07db19471c46f40c2b33700c1d7f2a1))
+
 ## [0.13.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta.1...v0.13.0-beta.2) (2026-09-21)
 
 
