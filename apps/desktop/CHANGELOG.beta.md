@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta.3...v0.13.0-beta.4) (2026-09-21)
+
+
+### Bug Fixes
+
+* **desktop:** move the video lightbox close button to the right ([#1340](https://github.com/team-reflect/reflect-open/issues/1340)) ([cedca81](https://github.com/team-reflect/reflect-open/commit/cedca813a9d6a71d6bae9e194b2f18588fac0148))
+* load YouTube video cards through Rust ([#1339](https://github.com/team-reflect/reflect-open/issues/1339)) ([604b62a](https://github.com/team-reflect/reflect-open/commit/604b62a90cd33368b06dc5b4e10e760542dda931))
+
 ## [0.13.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta.2...v0.13.0-beta.3) (2026-09-21)
 
 
