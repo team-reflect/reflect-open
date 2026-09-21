@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { setBridge } from '@reflect/core'
-import type { resolveArchivedPost } from '@reflect/core/x-archive'
+import { fetchSyndicationPost, type resolveArchivedPost } from '@reflect/core/x-archive'
 import { invalidateXPostQueries, queryClient } from '@/lib/query-client'
 import { createXPostResolver, getXPostResolver } from './use-x-post-resolver'
 
@@ -8,14 +8,23 @@ vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path: string) => `reflect-asset://${path}`,
 }))
 vi.mock('@/providers/graph-provider', () => ({ useGraph: () => null }))
+vi.mock('@reflect/core/x-archive', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@reflect/core/x-archive')>()),
+  fetchSyndicationPost: vi.fn(),
+}))
+const fetchSyndication = vi.mocked(fetchSyndicationPost)
 
 type ResolvedArchive = Awaited<ReturnType<typeof resolveArchivedPost>>
 
 const resolveArchive = vi.fn<(args: Record<string, unknown>) => ResolvedArchive>()
+const writeArchive = vi.fn<(args: Record<string, unknown>) => null>()
 
 beforeEach(() => {
+  fetchSyndication.mockResolvedValue(null)
+  writeArchive.mockReturnValue(null)
   setBridge({
     invoke: async (command, args) => {
+      if (command === 'x_archive_write') return writeArchive(args)
       expect(command).toBe('x_archive_resolve')
       return resolveArchive(args)
     },
@@ -124,4 +133,47 @@ it('shares a resolver within a graph and isolates another graph', () => {
   const graph = { root: '/graph', name: 'Graph', generation: 7 }
   expect(getXPostResolver(graph)).toBe(getXPostResolver(graph))
   expect(getXPostResolver({ ...graph, generation: 8 })).not.toBe(getXPostResolver(graph))
+})
+
+it('fetches, saves, and renders a post that has no archive', async () => {
+  const saved = archivedPost()
+  resolveArchive.mockReturnValueOnce(null).mockReturnValueOnce(saved)
+  fetchSyndication.mockResolvedValueOnce(saved.archive.data)
+
+  const post = await createXPostResolver(1)(URL)
+
+  expect(post).toMatchObject({ id: '123' })
+  expect(fetchSyndication).toHaveBeenCalledWith('123')
+  expect(writeArchive).toHaveBeenCalledWith({
+    generation: 1,
+    value: expect.objectContaining({
+      kind: 'x-post',
+      data: expect.objectContaining({ id: '123' }),
+    }),
+  })
+})
+
+it('asks X once for a post that does not exist', async () => {
+  resolveArchive.mockReturnValue(null)
+  const resolve = createXPostResolver(1)
+  await expect(resolve(URL)).resolves.toBeUndefined()
+  await expect(resolve(URL)).resolves.toBeUndefined()
+  expect(fetchSyndication).toHaveBeenCalledTimes(1)
+  expect(resolveArchive).toHaveBeenCalledTimes(2)
+  expect(writeArchive).not.toHaveBeenCalled()
+})
+
+it('asks X again after a failed request', async () => {
+  resolveArchive.mockReturnValue(null)
+  fetchSyndication.mockRejectedValueOnce({ kind: 'network', message: 'offline' })
+  const resolve = createXPostResolver(1)
+  await expect(resolve(URL)).rejects.toMatchObject({ kind: 'network' })
+  await resolve(URL)
+  expect(fetchSyndication).toHaveBeenCalledTimes(2)
+})
+
+it('does not ask X for a post that has an archive', async () => {
+  resolveArchive.mockReturnValue(archivedPost())
+  await createXPostResolver(1)(URL)
+  expect(fetchSyndication).not.toHaveBeenCalled()
 })

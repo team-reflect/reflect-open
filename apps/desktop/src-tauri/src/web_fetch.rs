@@ -15,7 +15,7 @@ const FETCH_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_REDIRECTS: usize = 5;
 const MAX_CONCURRENT_DNS_LOOKUPS: usize = 8;
 const HTML_MAX_BYTES: usize = 2 * 1024 * 1024;
-const USER_AGENT: &str = concat!(
+pub(crate) const USER_AGENT: &str = concat!(
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ",
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
 );

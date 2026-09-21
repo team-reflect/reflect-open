@@ -16,6 +16,7 @@ pub mod x_archive;
 mod x_archive_store;
 mod x_download;
 pub mod x_media_protocol;
+pub mod x_syndication;
 
 use std::fs;
 use std::path::{Path, PathBuf};

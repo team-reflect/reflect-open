@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { fromSyndication } from '@post-embed/exporter/x/syndication'
 import { parseXPost } from '@post-embed/schema'
 import type { XPost, XPostBase } from '@post-embed/types'
 import { call } from './ipc/invoke.ts'
@@ -60,4 +61,16 @@ export function getXArchiveOwners(assetPath: string, generation?: number) {
 
 export async function saveArchivedPost(generation: number, incoming: ArchivedXPost): Promise<void> {
   await call('x_archive_write', { generation, value: incoming }, z.null())
+}
+
+const syndicationPostSchema = z.unknown().transform((value): XPost | null => {
+  if (value == null) return null
+  const result = fromSyndication(value)
+  return result.issues ? null : result.value
+})
+
+/** The post from X's syndication API, or `null` when X has no renderable public post with this id. */
+export async function fetchSyndicationPost(postId: string): Promise<XPost | null> {
+  const post = await call('x_syndication_fetch', { postId }, syndicationPostSchema)
+  return post?.id === postId ? post : null
 }

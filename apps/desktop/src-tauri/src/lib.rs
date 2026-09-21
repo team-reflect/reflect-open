@@ -271,6 +271,7 @@ pub fn run() {
             fs::x_archive::x_archive_write,
             fs::x_archive::x_archive_resolve,
             fs::x_archive::x_archive_owners,
+            fs::x_syndication::x_syndication_fetch,
             app_version,
             background_task::background_task_begin,
             background_task::background_task_end,

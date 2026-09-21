@@ -295,6 +295,9 @@ importers:
       '@meowdown/markdown':
         specifier: ^0.72.0
         version: 0.72.0(typescript@6.0.3)
+      '@post-embed/exporter':
+        specifier: ^0.5.0
+        version: 0.5.0(typescript@6.0.3)
       '@post-embed/schema':
         specifier: ^0.5.2
         version: 0.5.2(typescript@6.0.3)
