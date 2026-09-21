@@ -34,7 +34,12 @@ export function VideoLightboxContent({
         }
       }}
     >
-      <LightboxChromeButton side="left" size="icon-lg" aria-label="Close" onClick={onClose}>
+      <LightboxChromeButton
+        side={mobileSurface ? 'left' : 'right'}
+        size="icon-lg"
+        aria-label="Close"
+        onClick={onClose}
+      >
         <XIcon />
       </LightboxChromeButton>
       {item.type === 'video' ? <LightboxVideo item={item} /> : <LightboxFrame item={item} />}
