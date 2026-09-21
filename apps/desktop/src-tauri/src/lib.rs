@@ -142,12 +142,24 @@ pub fn run() {
     // desktop entries, and Windows dev builds (the installer writes the
     // registry keys in production; macOS reads CFBundleURLTypes). Best-effort
     // — a headless Linux box without xdg-mime must not fail the launch.
-    #[cfg(any(target_os = "linux", all(windows, debug_assertions)))]
+    //
+    // The main window is `create: false` in the config and built here, so it
+    // can carry a new-window handler. It starts hidden (`visible: false`);
+    // desktop reveals it from the page-load hook below after restoring
+    // geometry, but mobile has no window-state plugin, so show it here or the
+    // UI would never appear.
     let builder = builder.setup(|app| {
-        use tauri_plugin_deep_link::DeepLinkExt;
-        if let Err(err) = app.deep_link().register_all() {
-            tracing::warn!(error = %err, "deep-link scheme registration failed");
+        #[cfg(any(target_os = "linux", all(windows, debug_assertions)))]
+        {
+            use tauri_plugin_deep_link::DeepLinkExt;
+            if let Err(err) = app.deep_link().register_all() {
+                tracing::warn!(error = %err, "deep-link scheme registration failed");
+            }
         }
+        #[cfg(desktop)]
+        windows::build_main_window(app.handle())?;
+        #[cfg(mobile)]
+        windows::build_main_window(app.handle())?.show()?;
         Ok(())
     });
 
@@ -235,17 +247,6 @@ pub fn run() {
     // the channels apart, e.g. for the paywall gate.
     #[cfg(target_os = "ios")]
     let builder = builder.plugin(tauri_plugin_app_store::init());
-
-    // The main window starts hidden (`visible: false`); desktop reveals it
-    // from the page-load hook above after restoring geometry, but mobile has
-    // no window-state plugin, so show it here or the UI would never appear.
-    #[cfg(mobile)]
-    let builder = builder.setup(|app| {
-        if let Some(window) = app.get_webview_window(windows::MAIN_WINDOW_LABEL) {
-            window.show()?;
-        }
-        Ok(())
-    });
 
     builder
         // Serves note images (`assets/…`) to the webview. Registered as an

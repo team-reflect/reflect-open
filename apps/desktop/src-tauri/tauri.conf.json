@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "create": false,
         "title": "Reflect",
         "width": 1300,
         "height": 650,

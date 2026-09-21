@@ -5,6 +5,7 @@
   "app": {
     "windows": [
       {
+        "create": false,
         "title": "Reflect Dev",
         "width": 1300,
         "height": 650,

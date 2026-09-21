@@ -14,7 +14,9 @@ use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex, MutexGuard, Once};
 
 use serde::Serialize;
+use tauri::webview::{NewWindowFeatures, NewWindowResponse};
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_opener::OpenerExt;
 
 use crate::db::{self, IndexState};
 use crate::error::{AppError, AppResult};
@@ -202,21 +204,42 @@ pub(crate) fn reopen_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
         return;
     }
 
-    let Some(config) = app
+    match build_main_window(app) {
+        Ok(window) => surface_window(&window),
+        Err(err) => tracing::warn!(error = %err, "failed to recreate main window"),
+    }
+}
+
+/// Build the main window from its config entry, which is `create: false`.
+pub(crate) fn build_main_window<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> tauri::Result<tauri::WebviewWindow<R>> {
+    let config = app
         .config()
         .app
         .windows
         .iter()
         .find(|config| config.label == MAIN_WINDOW_LABEL)
         .cloned()
-    else {
-        tracing::warn!("cannot reopen main window because its config is missing");
-        return;
-    };
+        .ok_or(tauri::Error::WindowNotFound)?;
+    WebviewWindowBuilder::from_config(app, &config)?
+        .on_new_window(open_new_window_in_browser(app))
+        .build()
+}
 
-    match WebviewWindowBuilder::from_config(app, &config).and_then(|builder| builder.build()) {
-        Ok(window) => surface_window(&window),
-        Err(err) => tracing::warn!(error = %err, "failed to recreate main window"),
+/// A page asking for a new window (`window.open`, `target="_blank"`, also from
+/// inside a cross-origin iframe) gets its URL in the default browser instead.
+fn open_new_window_in_browser<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> impl Fn(tauri::Url, NewWindowFeatures) -> NewWindowResponse<R> + Send + 'static {
+    let app = app.clone();
+    move |url, _features| {
+        if matches!(url.scheme(), "http" | "https") {
+            if let Err(err) = app.opener().open_url(url.as_str(), None::<&str>) {
+                tracing::warn!(error = %err, "failed to open a new-window URL in the browser");
+            }
+        }
+        NewWindowResponse::Deny
     }
 }
 
@@ -374,7 +397,8 @@ pub(crate) fn build_secondary_window(
         })
         // Match the main window: HTML5 drops must reach the webview (chat and
         // editor file drops), so the native drag-drop handler stays off.
-        .disable_drag_drop_handler();
+        .disable_drag_drop_handler()
+        .on_new_window(open_new_window_in_browser(app));
     #[cfg(target_os = "macos")]
     {
         builder = builder
