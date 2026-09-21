@@ -189,6 +189,7 @@ export {
   captureSharedInboxRelay,
   promoteCaptureScreenshot,
 } from '../graph/commands.ts'
+export { fetchYouTubeVideo } from '../youtube-video.ts'
 export { createAsset, importAsset } from '../graph/assets.ts'
 export { assetFileName } from '../graph/asset-names.ts'
 export {
