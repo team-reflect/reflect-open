@@ -24,6 +24,7 @@ import type {
   StartPendingReplacementOptions,
   WikilinkHoverHit,
   XPostMediaClickHandler,
+  YouTubeVideoClickHandler,
 } from '@meowdown/core'
 import {
   MeowdownEditor,
@@ -426,6 +427,27 @@ export function NoteEditor({
     [openLightbox],
   )
 
+  const handleYouTubeVideoClick: YouTubeVideoClickHandler = useCallback(
+    (event) => {
+      // Without this the card plays the video in place.
+      event.preventDefault()
+      setOpenLightboxImage(null)
+      const { video, short, embedUrl, element } = event.detail
+      openLightbox(
+        {
+          type: 'frame',
+          src: embedUrl,
+          title: video.title || 'YouTube video',
+          poster: video.thumbnail_url,
+          width: short ? 9 : 16,
+          height: short ? 16 : 9,
+        },
+        element,
+      )
+    },
+    [openLightbox],
+  )
+
   return (
     <>
       <MeowdownEditor
@@ -461,6 +483,7 @@ export function NoteEditor({
         {...(resolveLinkPreview !== undefined ? { resolveLinkPreview } : {})}
         onImageClick={handleImageClick}
         onXPostMediaClick={handleXPostMediaClick}
+        onYouTubeVideoClick={handleYouTubeVideoClick}
         {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}
         {...(onTagSearch !== undefined ? { onTagSearch } : {})}
         {...(onSelectionMenuSearch !== undefined ? { onSelectionMenuSearch } : {})}

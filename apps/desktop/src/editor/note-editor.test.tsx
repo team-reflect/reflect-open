@@ -53,6 +53,25 @@ vi.mock('@/editor/use-x-post-resolver', () => ({
 
 const pmRoot = page.locate('.ProseMirror')
 
+// A saved snapshot, so the card renders without asking YouTube; it has no
+// thumbnail to load either.
+const YOUTUBE_NOTE = `![](https://www.youtube.com/watch?v=aqz-KE-bpKQ)<!-- ${JSON.stringify({
+  snapshot: {
+    kind: 'youtube-video',
+    data: {
+      url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
+      title: 'Big Buck Bunny',
+      author_name: 'Blender',
+      author_url: 'https://www.youtube.com/@Blender',
+      thumbnail_url: '',
+      thumbnail_width: 480,
+      thumbnail_height: 360,
+      width: 200,
+      height: 113,
+    },
+  },
+})} -->`
+
 const IMAGE_NOTE = 'A photo\n\n![Cat](assets/cat.png)'
 
 function renderEditor(
@@ -377,6 +396,23 @@ describe('NoteEditor image lightbox', () => {
 
     await dialog.locate('video').click()
     await expect.element(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await expectLocatorToHaveCount(page.getByRole('dialog'), 0)
+  })
+
+  it('plays a YouTube video in the lightbox instead of the card', async () => {
+    await render(<NoteEditor initialContent={YOUTUBE_NOTE} />)
+
+    await pmRoot.getByRole('button', { name: 'Play: Big Buck Bunny' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Video preview' })
+    await expect
+      .element(dialog.getByTitle('Big Buck Bunny'))
+      .toHaveAttribute(
+        'src',
+        'https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ?autoplay=1&playsinline=1',
+      )
+    await expectLocatorToHaveCount(pmRoot.locate('iframe'), 0)
+
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
     await expectLocatorToHaveCount(page.getByRole('dialog'), 0)
   })
