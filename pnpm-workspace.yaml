@@ -32,9 +32,3 @@ minimumReleaseAgeExclude:
 #   '@meowdown/core': https://pkg.pr.new/@meowdown/core@346867e5f1b5336c889e829b146a04fcc0c115c1
 #   '@meowdown/react': https://pkg.pr.new/@meowdown/react@346867e5f1b5336c889e829b146a04fcc0c115c1
 #   '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@346867e5f1b5336c889e829b146a04fcc0c115c1
-
-blockExoticSubdeps: false
-overrides:
-  '@meowdown/core': https://pkg.pr.new/@meowdown/core@53c64f4c71bb5ebfe34f3e3eb9f37dacc63a6284
-  '@meowdown/react': https://pkg.pr.new/@meowdown/react@53c64f4c71bb5ebfe34f3e3eb9f37dacc63a6284
-  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@53c64f4c71bb5ebfe34f3e3eb9f37dacc63a6284
