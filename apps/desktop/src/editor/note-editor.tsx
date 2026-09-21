@@ -1,5 +1,6 @@
 import { lightboxItemFromXPostMedia } from '@/editor/x-post-media-lightbox-item.ts'
 import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver.ts'
+import { resolveYouTubeVideo } from '@/editor/youtube-video-resolver.ts'
 import {
   useCallback,
   useImperativeHandle,
@@ -452,6 +453,7 @@ export function NoteEditor({
     <>
       <MeowdownEditor
         resolveXPost={resolveXPost}
+        resolveYouTubeVideo={resolveYouTubeVideo}
         mediaUrlProtocols={X_MEDIA_URL_PROTOCOLS}
         handleRef={innerRef}
         mode={markMode}

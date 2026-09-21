@@ -110,6 +110,11 @@ export const queryKeys = {
       return ['x-syndication', postId] as const
     },
   },
+  youTubeVideo: {
+    video(url: string) {
+      return ['youtube-video', url] as const
+    },
+  },
   chat: {
     all: ['chat'] as const,
     conversations(root: GraphRoot) {

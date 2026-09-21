@@ -1,4 +1,5 @@
 import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver.ts'
+import { resolveYouTubeVideo } from '@/editor/youtube-video-resolver.ts'
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
 import { useOpenExternalLink } from '@/editor/open-external-link.ts'
@@ -75,6 +76,7 @@ export function MarkdownPreview({
   return (
     <MarkdownView
       resolveXPost={resolveXPost}
+      resolveYouTubeVideo={resolveYouTubeVideo}
       mediaUrlProtocols={X_MEDIA_URL_PROTOCOLS}
       markdown={content}
       markMode="hide"

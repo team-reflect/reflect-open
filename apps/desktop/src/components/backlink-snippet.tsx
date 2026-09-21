@@ -1,4 +1,5 @@
 import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver.ts'
+import { resolveYouTubeVideo } from '@/editor/youtube-video-resolver.ts'
 import type { ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
 import type { WikilinkClickHandler } from '@meowdown/core'
@@ -50,6 +51,7 @@ export function BacklinkSnippet({
     <div className="reflect-backlink-snippet select-text text-xs text-text">
       <MarkdownView
         resolveXPost={resolveXPost}
+        resolveYouTubeVideo={resolveYouTubeVideo}
         mediaUrlProtocols={X_MEDIA_URL_PROTOCOLS}
         className="reflect-editor"
         markdown={text}
