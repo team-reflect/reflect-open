@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta.4...v0.13.0-beta.5) (2026-09-21)
+
+
+### Bug Fixes
+
+* **desktop:** open new-window requests in the browser ([#1342](https://github.com/team-reflect/reflect-open/issues/1342)) ([54446cd](https://github.com/team-reflect/reflect-open/commit/54446cd711aff306a01bf7e38cab34a554abce7d))
+
 ## [0.13.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta.3...v0.13.0-beta.4) (2026-09-21)
 
 
