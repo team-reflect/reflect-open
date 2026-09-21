@@ -62,7 +62,7 @@ it('rejects when the fetch fails', async () => {
   await expect(fetchYouTubeVideo(URL)).rejects.toMatchObject({ kind: 'io' })
 })
 
-it('rejects an answer that is not an oEmbed object', async () => {
-  bridgeAnswering('[]')
+it('rejects an answer that is not an object', async () => {
+  bridgeAnswering('null')
   await expect(fetchYouTubeVideo(URL)).rejects.toThrow('invalid oEmbed answer')
 })
