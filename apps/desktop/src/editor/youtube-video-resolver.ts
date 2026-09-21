@@ -22,7 +22,7 @@ async function loadYouTubeVideo(url: string) {
     return (await queryClient.query(youTubeVideoQueryOptions(url))) ?? undefined
   } catch (cause) {
     console.error('YouTube video fetch failed:', url, cause)
-    return undefined
+    return
   }
 }
 
