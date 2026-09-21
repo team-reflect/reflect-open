@@ -301,6 +301,9 @@ importers:
       '@meowdown/markdown':
         specifier: https://pkg.pr.new/@meowdown/markdown@03583b14927ad023ca1ce20d7eeeb1d254201d63
         version: https://pkg.pr.new/@meowdown/markdown@03583b14927ad023ca1ce20d7eeeb1d254201d63(typescript@6.0.3)
+      '@post-embed/exporter':
+        specifier: ^0.5.0
+        version: 0.5.0(typescript@6.0.3)
       '@post-embed/schema':
         specifier: ^0.5.2
         version: 0.5.2(typescript@6.0.3)

@@ -105,6 +105,11 @@ export const queryKeys = {
       return [...this.all, generation, postId] as const
     },
   },
+  xSyndication: {
+    post(postId: string) {
+      return ['x-syndication', postId] as const
+    },
+  },
   chat: {
     all: ['chat'] as const,
     conversations(root: GraphRoot) {

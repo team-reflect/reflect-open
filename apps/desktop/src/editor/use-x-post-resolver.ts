@@ -4,7 +4,12 @@ import { queryOptions } from '@tanstack/react-query'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { mapXPostMediaUrls, parseXPostId } from '@post-embed/schema'
 import type { XPost } from '@post-embed/types'
-import { resolveArchivedPost } from '@reflect/core/x-archive'
+import {
+  createArchivedPost,
+  fetchSyndicationPost,
+  resolveArchivedPost,
+  saveArchivedPost,
+} from '@reflect/core/x-archive'
 import { queryClient, queryKeys } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -13,8 +18,27 @@ export const X_MEDIA_URL_PROTOCOLS = ['reflect-asset:']
 // An archive no note shows is dropped this long after its last read.
 const X_POST_GC_TIME_MS = 30 * 60 * 1000
 
+function xSyndicationQueryOptions(id: string) {
+  return queryOptions({
+    queryKey: queryKeys.xSyndication.post(id),
+    queryFn: () => fetchSyndicationPost(id),
+    // X is asked once per post and app session; a failed request runs again.
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: false,
+  })
+}
+
+async function fetchAndArchiveXPost(generation: number, id: string) {
+  const post = await queryClient.query(xSyndicationQueryOptions(id))
+  if (!post) return null
+  await saveArchivedPost(generation, createArchivedPost(post, new Date().toISOString()))
+  return await resolveArchivedPost(generation, id)
+}
+
 async function loadArchivedXPost(generation: number, id: string): Promise<XPost | null> {
-  const result = await resolveArchivedPost(generation, id)
+  const result =
+    (await resolveArchivedPost(generation, id)) ?? (await fetchAndArchiveXPost(generation, id))
   if (!result) return null
   const local = new Map(
     result.resources.map((resource) => [

@@ -1,6 +1,14 @@
 import type { XPost } from '@post-embed/types'
-import { expect, it } from 'vitest'
-import { createArchivedPost, xPostSchema } from './x-archive.ts'
+import { afterEach, expect, it } from 'vitest'
+import { setBridge } from './ipc/bridge.ts'
+import { syndicationPost20 as tweet } from './testing/syndication-20.ts'
+import { createArchivedPost, fetchSyndicationPost, xPostSchema } from './x-archive.ts'
+
+afterEach(() => setBridge(null))
+
+function bridgeAnswering(answer: unknown) {
+  setBridge({ invoke: async () => answer, listen: async () => () => {} })
+}
 
 it('archives the highest bitrate MP4 in the post and quote without mutating capture data', () => {
   const video = {
@@ -70,4 +78,30 @@ it('validates captured posts through the synchronous Standard Schema contract', 
   }
   expect(xPostSchema.parse(post)).toEqual(post)
   expect(xPostSchema.safeParse({ ...post, id: 'invalid' }).success).toBe(false)
+})
+
+it('converts a syndication answer to a post', async () => {
+  bridgeAnswering(tweet)
+  await expect(fetchSyndicationPost('20')).resolves.toMatchObject({ id: '20' })
+})
+
+it.each([
+  ['a missing post', null],
+  ['an answer that is not a tweet', { id_str: '20' }],
+])('returns null for %s', async (_, answer) => {
+  bridgeAnswering(answer)
+  await expect(fetchSyndicationPost('20')).resolves.toBeNull()
+})
+
+it('returns null for a post with another id', async () => {
+  bridgeAnswering(tweet)
+  await expect(fetchSyndicationPost('21')).resolves.toBeNull()
+})
+
+it('rejects when the request fails', async () => {
+  setBridge({
+    invoke: async () => await Promise.reject({ kind: 'network', message: 'offline' }),
+    listen: async () => () => {},
+  })
+  await expect(fetchSyndicationPost('20')).rejects.toMatchObject({ kind: 'network' })
 })
