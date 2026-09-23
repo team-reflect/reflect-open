@@ -5,6 +5,7 @@ on:
     # master is the only long-lived branch.
     branches: [master]
   pull_request:
+  merge_group:
   workflow_dispatch:
 
 # Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
