@@ -44,6 +44,7 @@ jobs:
         run: pnpm build
 
   test:
+    if: github.event_name != 'merge_group'
     strategy:
       fail-fast: false
       matrix:
@@ -63,14 +64,11 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node
-        if: github.event_name != 'merge_group'
 
       - name: Install Playwright
-        if: github.event_name != 'merge_group'
         run: pnpm --filter @reflect/desktop exec playwright install ${{ matrix.config.browser }}
 
       - name: Test
-        if: github.event_name != 'merge_group'
         run: pnpm run test --shard ${{ matrix.shard }}
         env:
           REFLECT_TEST_BROWSER: ${{ matrix.config.browser }}
@@ -95,6 +93,7 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
   rust-test:
+    if: github.event_name != 'merge_group'
     name: test (Rust)
     runs-on: ubuntu-latest
     steps:
@@ -109,6 +108,7 @@ jobs:
         run: cargo test --workspace
 
   apple-rust:
+    if: github.event_name != 'merge_group'
     name: check Apple Rust bindings
     runs-on: macos-latest
     steps:
@@ -149,7 +149,7 @@ jobs:
 
     steps:
       - name: Verify that all jobs succeeded
-        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || (contains(needs.*.result, 'skipped') && github.event_name != 'merge_group') }}
         run: |
           echo 'Some jobs did not succeed: ${{ toJSON(needs) }}'
           exit 1
