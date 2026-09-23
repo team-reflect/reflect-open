@@ -54,7 +54,7 @@ jobs:
           - os: macos-latest
             browser: webkit
 
-    name: test-${{ matrix.config.browser }}-${{ matrix.shard }}
+    name: test-${{ matrix.config.browser }} ${{ matrix.shard }}
     runs-on: ${{ matrix.config.os }}
 
     steps:
