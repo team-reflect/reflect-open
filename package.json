@@ -40,7 +40,7 @@
     "simple-git-hooks": "^2.14.0",
     "turbo": "^2.10.12",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.1"
   },
   "simple-git-hooks": {
     "pre-commit": "./node_modules/.bin/nano-staged --allow-empty -u"
