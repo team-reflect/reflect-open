@@ -125,10 +125,10 @@ describe('AiProvidersSection', () => {
     await expect.element(page.getByText('OpenAI')).toBeInTheDocument()
     await expect
       .element(page.getByRole('combobox', { name: 'Default model for Anthropic' }))
-      .toHaveTextContent(/Claude Opus 4\.8/)
+      .toMatchTextContent(/Claude Opus 4\.8/)
     await expect
       .element(page.getByRole('combobox', { name: 'Default model for OpenAI' }))
-      .toHaveTextContent(/GPT-5\.5/)
+      .toMatchTextContent(/GPT-5\.5/)
     await expect.element(page.getByText(/wxyz1/)).toBeInTheDocument()
     await expect.element(page.getByText(/abcd2/)).toBeInTheDocument()
     await expect.element(page.getByText('Default', { exact: true })).toBeInTheDocument()
@@ -220,7 +220,7 @@ describe('AiProvidersSection', () => {
     await dialog.getByLabelText('API key').fill('sk-typo')
     await dialog.getByRole('button', { name: 'Add provider' }).click()
 
-    await expect.element(dialog.getByRole('alert')).toHaveTextContent(/rejected this API key/i)
+    await expect.element(dialog.getByRole('alert')).toMatchTextContent(/rejected this API key/i)
     expect(secrets.size).toBe(0)
     expect(saved).toEqual([])
   })
@@ -235,7 +235,7 @@ describe('AiProvidersSection', () => {
     await dialog.getByRole('button', { name: 'Add provider' }).click()
 
     // First submit downgrades to an explicit unverified save, not a block.
-    await expect.element(dialog.getByRole('alert')).toHaveTextContent(/reach OpenAI/)
+    await expect.element(dialog.getByRole('alert')).toMatchTextContent(/reach OpenAI/)
     expect(saved).toEqual([])
 
     await dialog.getByRole('button', { name: 'Save anyway' }).click()
@@ -253,7 +253,7 @@ describe('AiProvidersSection', () => {
     await dialog.getByLabelText('API key').fill('sk-test')
     await dialog.getByRole('button', { name: 'Add provider' }).click()
 
-    await expect.element(dialog.getByRole('alert')).toHaveTextContent(/^keychain locked$/)
+    await expect.element(dialog.getByRole('alert')).toMatchTextContent(/^keychain locked$/)
     await expect.element(page.getByRole('dialog')).toBeInTheDocument()
     expect(saved).toEqual([])
     expect(secrets.size).toBe(0)
@@ -270,7 +270,7 @@ describe('AiProvidersSection', () => {
 
     // A session-only entry would vanish on restart, stranding the key in the
     // keychain with no UI to delete it — so the key must never be stored.
-    await expect.element(dialog.getByRole('alert')).toHaveTextContent(/could not be loaded/i)
+    await expect.element(dialog.getByRole('alert')).toMatchTextContent(/could not be loaded/i)
     expect(secrets.size).toBe(0)
     expect(saved).toEqual([])
   })

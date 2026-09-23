@@ -125,7 +125,7 @@ describe('MobileSettings', () => {
     await mount()
 
     const graphRow = page.getByRole('button', { name: /Field Notes/ })
-    await expect.element(graphRow).toHaveTextContent('iCloud Drive')
+    await expect.element(graphRow).toMatchTextContent('iCloud Drive')
     await user.click(graphRow)
 
     expect(navigate).toHaveBeenCalledWith({ kind: 'graphs' })
@@ -227,7 +227,7 @@ describe('MobileSettings', () => {
     await expect.element(textarea).toHaveAttribute('aria-invalid', 'true')
     await expect
       .element(page.getByRole('alert'))
-      .toHaveTextContent('10 characters over the 500-character limit')
+      .toMatchTextContent('10 characters over the 500-character limit')
 
     await user.click(page.getByRole('button', { name: 'Save' }))
 

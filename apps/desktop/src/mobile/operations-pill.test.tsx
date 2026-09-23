@@ -52,8 +52,8 @@ describe('MobileOperationsPills', () => {
     act(() => handle.fail('The note is busy.'))
 
     const pill = page.getByRole('alert')
-    await expect.element(pill).toHaveTextContent('Completing task')
-    await expect.element(pill).toHaveTextContent('The note is busy.')
+    await expect.element(pill).toMatchTextContent('Completing task')
+    await expect.element(pill).toMatchTextContent('The note is busy.')
   })
 
   it('shows a warning as a status pill', async () => {
@@ -61,7 +61,7 @@ describe('MobileOperationsPills', () => {
     const handle = operate(() => startOperation('Importing notes'))
     act(() => handle.warn('2 files skipped.'))
 
-    await expect.element(page.getByRole('status')).toHaveTextContent('2 files skipped.')
+    await expect.element(page.getByRole('status')).toMatchTextContent('2 files skipped.')
   })
 
   it('dismisses a pill on tap', async () => {

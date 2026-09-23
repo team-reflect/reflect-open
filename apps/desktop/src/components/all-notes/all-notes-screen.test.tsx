@@ -385,8 +385,8 @@ describe('AllNotesScreen', () => {
     // `book` is pinned, so the combobox offers only `travel` (with its count).
     await view.getByRole('button', { name: 'Custom' }).click()
     const listbox = page.getByRole('listbox')
-    await expect.element(listbox).toHaveTextContent('#travel')
-    await expect.element(listbox).toHaveTextContent('2')
+    await expect.element(listbox).toMatchTextContent('#travel')
+    await expect.element(listbox).toMatchTextContent('2')
     expect(listbox.element().textContent).not.toContain('#book')
 
     await page.getByRole('option', { name: /#travel/ }).click()
@@ -635,7 +635,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
 
     // The confirm closes either way; the reason lands in the operations toast.
     await expectLocatorToHaveCount(page.getByText('Trash 1 note?'), 0)
-    await expect.element(view.getByTestId('operations')).toHaveTextContent('failed:disk on fire')
+    await expect.element(view.getByTestId('operations')).toMatchTextContent('failed:disk on fire')
     // The note that failed to trash is left in the list and stays selected, so
     // the bulk action is still available for an immediate retry (no re-select).
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()

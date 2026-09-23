@@ -73,7 +73,7 @@ describe('RecordingDrawer', () => {
     expect(memo.cancelRecording).not.toHaveBeenCalled()
     await expect
       .element(view.getByRole('button', { name: 'Confirm discard recording' }))
-      .toHaveTextContent('Tap again to discard')
+      .toMatchTextContent('Tap again to discard')
 
     await userEvent.click(view.getByRole('button', { name: 'Confirm discard recording' }))
 

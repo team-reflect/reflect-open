@@ -205,7 +205,7 @@ describe('RouteContent', () => {
 
     await expect.element(page.getByLabelText('Editing notes/exist.md')).toBeVisible()
     await expect.element(page.getByTestId('daily-stream')).not.toBeInTheDocument()
-    await expect.element(page.getByTestId('fake-editor')).toHaveTextContent('# Hello')
+    await expect.element(page.getByTestId('fake-editor')).toMatchTextContent('# Hello')
     expect(editorProbe.hoverRenderer).toBe(true)
 
     // The navigated-to note takes focus on mount.

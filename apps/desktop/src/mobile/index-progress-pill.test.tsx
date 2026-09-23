@@ -29,7 +29,7 @@ describe('IndexProgressPill', () => {
   it('appears once a pass has actually read enough files (a first index)', async () => {
     setIndexProgress({ done: 160, total: 7_000, worked: 160 })
     const view = await render(<IndexProgressPill />)
-    await expect.element(view.getByRole('status')).toHaveTextContent('160 of 7,000')
+    await expect.element(view.getByRole('status')).toMatchTextContent('160 of 7,000')
   })
 
   it('stays hidden below the work threshold — a routine sync of a few notes', async () => {

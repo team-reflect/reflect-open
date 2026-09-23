@@ -81,7 +81,7 @@ it('drops the validation error between opens', async () => {
   await renderDialog()
   await openDialog()
   await page.getByRole('button', { name: 'Create' }).click()
-  await expect.element(page.getByRole('alert')).toHaveTextContent('Enter a name.')
+  await expect.element(page.getByRole('alert')).toMatchTextContent('Enter a name.')
   await closeAndWaitForExit()
 
   await openDialog()

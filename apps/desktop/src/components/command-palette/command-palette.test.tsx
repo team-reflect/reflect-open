@@ -182,7 +182,7 @@ describe('CommandPalette', () => {
     expect(view.getByText('rust', { exact: true }).element().tagName).toBe('MARK')
 
     await userEvent.keyboard('{Enter}')
-    await expect.element(view.getByTestId('route')).toHaveTextContent('notes/rust.md')
+    await expect.element(view.getByTestId('route')).toMatchTextContent('notes/rust.md')
     expect(openRouteInNewWindow).not.toHaveBeenCalled()
     expect(view.getByTestId('palette-overlay').query()).toBeNull()
   })
@@ -225,7 +225,7 @@ describe('CommandPalette', () => {
     await result.click({ modifiers: ['ControlOrMeta'] })
 
     expect(view.getByTestId('palette-overlay').query()).toBeNull()
-    await expect.element(view.getByTestId('route')).toHaveTextContent('notes/rust.md')
+    await expect.element(view.getByTestId('route')).toMatchTextContent('notes/rust.md')
   })
 
   it('> filters to commands and Enter runs the selection', async () => {
@@ -267,7 +267,7 @@ describe('CommandPalette', () => {
     )
 
     await userEvent.keyboard('{Enter}')
-    await expect.element(view.getByTestId('route')).toHaveTextContent('2026-06-08')
+    await expect.element(view.getByTestId('route')).toMatchTextContent('2026-06-08')
   })
 
   it('stays lexical when the model is ready but semantic search is disabled', async () => {
@@ -315,10 +315,10 @@ describe('CommandPalette', () => {
 
     // cmdk highlights the top hit; its content renders in the preview pane.
     const preview = view.getByTestId('markdown-preview')
-    await expect.element(preview).toHaveTextContent('first body')
+    await expect.element(preview).toMatchTextContent('first body')
 
     await userEvent.keyboard('{ArrowDown}')
-    await expect.element(view.getByTestId('markdown-preview')).toHaveTextContent('second body')
+    await expect.element(view.getByTestId('markdown-preview')).toMatchTextContent('second body')
     expect(readNote).toHaveBeenCalledWith('notes/first.md')
     expect(readNote).toHaveBeenCalledWith('notes/second.md')
   })
@@ -331,7 +331,7 @@ describe('CommandPalette', () => {
     readNote.mockResolvedValue('---\npinned: true\n---\n# Pinned\n\nbody\n')
     const { view } = await renderPalette('pinned')
     const preview = view.getByTestId('markdown-preview')
-    await expect.element(preview).toHaveTextContent('body')
+    await expect.element(preview).toMatchTextContent('body')
     expect(preview.element().textContent).not.toContain('pinned: true')
   })
 
@@ -343,7 +343,7 @@ describe('CommandPalette', () => {
     readNote.mockRejectedValue({ kind: 'notFound', message: 'no such note' })
     const { view } = await renderPalette('2026-06-16')
     const preview = view.getByTestId('palette-preview')
-    await expect.element(preview).toHaveTextContent('Empty')
+    await expect.element(preview).toMatchTextContent('Empty')
     expect(preview.element().textContent).toContain('Tue, June 16th, 2026')
   })
 
@@ -383,7 +383,7 @@ describe('CommandPalette', () => {
     await expectLocatorToHaveCount(view.getByText('Tue, June 9th, 2026'), 2)
 
     await userEvent.keyboard('{Enter}')
-    await expect.element(view.getByTestId('route')).toHaveTextContent('2026-06-09')
+    await expect.element(view.getByTestId('route')).toMatchTextContent('2026-06-09')
   })
 
   it('shows a `//` note by its first segment and names the alias it matched through', async () => {
@@ -403,6 +403,6 @@ describe('CommandPalette', () => {
     expect(view.getByText('Tim MacCaw // Dad').query()).toBeNull()
 
     await userEvent.keyboard('{Enter}')
-    await expect.element(view.getByTestId('route')).toHaveTextContent('notes/tim-maccaw-dad.md')
+    await expect.element(view.getByTestId('route')).toMatchTextContent('notes/tim-maccaw-dad.md')
   })
 })

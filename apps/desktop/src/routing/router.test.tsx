@@ -251,18 +251,18 @@ describe('router', () => {
     }
 
     const view = await render(<Harness frozen={false} />)
-    await expect.element(view.getByTestId('frozen-probe')).toHaveTextContent('today:0')
+    await expect.element(view.getByTestId('frozen-probe')).toMatchTextContent('today:0')
 
     // Covered by a pushed note (the mobile stack hides it): navigations must
     // not reach it — the daily surface would read the arrivalSeq bump as a
     // re-arrival and re-anchor its scroll while hidden.
     await view.rerender(<Harness frozen={true} />)
     router!.navigate({ kind: 'note', path: 'notes/a.md' })
-    await expect.element(view.getByTestId('frozen-probe')).toHaveTextContent('today:0')
+    await expect.element(view.getByTestId('frozen-probe')).toMatchTextContent('today:0')
 
     // Surfacing again resumes the live value.
     await view.rerender(<Harness frozen={false} />)
-    await expect.element(view.getByTestId('frozen-probe')).toHaveTextContent('note:1')
+    await expect.element(view.getByTestId('frozen-probe')).toMatchTextContent('note:1')
   })
 
   it('exposes the route back() would land on (the mobile stack peeks it)', async () => {

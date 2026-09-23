@@ -146,8 +146,8 @@ describe('SimilarNotesSection', () => {
     ])
     const view = await renderSimilar('daily/2026-06-09.md')
     await userEvent.click(view.getByText('Gardening'))
-    await expect.element(view.getByTestId('route')).toHaveTextContent('"kind":"note"')
-    await expect.element(view.getByTestId('route')).toHaveTextContent('notes/gardening.md')
+    await expect.element(view.getByTestId('route')).toMatchTextContent('"kind":"note"')
+    await expect.element(view.getByTestId('route')).toMatchTextContent('notes/gardening.md')
     await view.unmount()
   })
 
@@ -172,7 +172,7 @@ describe('SimilarNotesSection', () => {
         path: 'notes/gardening.md',
       }),
     )
-    await expect.element(view.getByTestId('route')).toHaveTextContent('"kind":"today"')
+    await expect.element(view.getByTestId('route')).toMatchTextContent('"kind":"today"')
     await view.unmount()
   })
 })

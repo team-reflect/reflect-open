@@ -89,7 +89,7 @@ describe('DailyContextSidebar calendar header', () => {
   it('jumps to today from the calendar-icon button', async () => {
     const view = await renderSidebar('2026-06-09')
     await userEvent.click(page.getByRole('button', { name: 'Jump to today' }))
-    await expect.element(page.getByTestId('route')).toHaveTextContent('"kind":"today"')
+    await expect.element(page.getByTestId('route')).toMatchTextContent('"kind":"today"')
     await view.unmount()
   })
 })
@@ -104,7 +104,7 @@ describe('DailyContextSidebar calendar', () => {
     await expect.element(page.getByTestId('note-dot-2026-06-04')).not.toBeInTheDocument()
 
     await userEvent.click(page.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') }))
-    await expect.element(page.getByTestId('route')).toHaveTextContent('2026-06-18')
+    await expect.element(page.getByTestId('route')).toMatchTextContent('2026-06-18')
     await view.unmount()
   })
 
@@ -123,7 +123,7 @@ describe('DailyContextSidebar calendar', () => {
     expect(openRouteInNewWindow).toHaveBeenCalledTimes(1)
     await expect
       .element(page.getByTestId('route'))
-      .toHaveTextContent(JSON.stringify({ kind: 'today' }))
+      .toMatchTextContent(JSON.stringify({ kind: 'today' }))
     await view.unmount()
   })
 
@@ -158,7 +158,7 @@ describe('DailyContextSidebar calendar', () => {
 
     await expect
       .element(page.getByTestId('route'))
-      .toHaveTextContent(JSON.stringify({ kind: 'today' }))
+      .toMatchTextContent(JSON.stringify({ kind: 'today' }))
     await view.unmount()
   })
 
@@ -228,7 +228,7 @@ describe('DailyContextSidebar related notes', () => {
     // tests pin the same title).
     await expect.element(page.getByText('Similar notes')).toBeVisible()
     await userEvent.click(page.getByText('Rust'))
-    await expect.element(page.getByTestId('route')).toHaveTextContent('notes/rust.md')
+    await expect.element(page.getByTestId('route')).toMatchTextContent('notes/rust.md')
     await view.unmount()
   })
 })

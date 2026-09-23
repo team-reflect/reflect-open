@@ -59,7 +59,7 @@ describe('TemplatesSection note links', () => {
 
     await expect
       .element(page.getByTestId('route'))
-      .toHaveTextContent('note:templates/weekly-review.md')
+      .toMatchTextContent('note:templates/weekly-review.md')
     expect(openRouteInNewWindow).not.toHaveBeenCalled()
   })
 

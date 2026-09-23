@@ -70,10 +70,10 @@ afterEach(() => {
 describe('FormattingToolbarBridge', () => {
   it('publishes commands and capabilities when the editor gains focus', async () => {
     await setupEditor('- alpha\n- beta')
-    await expect.element(toolbarState).toHaveTextContent('no-toolbar')
+    await expect.element(toolbarState).toMatchTextContent('no-toolbar')
 
     await pmRoot.getByText('beta').click()
-    await expect.element(toolbarState).toHaveTextContent('has-toolbar')
+    await expect.element(toolbarState).toMatchTextContent('has-toolbar')
     expect(captured.toolbar?.capabilities).toEqual({
       canIndent: true,
       canDedent: true,
@@ -87,20 +87,20 @@ describe('FormattingToolbarBridge', () => {
     await setupEditor('alpha', false)
     await pmRoot.getByText('alpha').click()
     await expect.element(pmRoot).toHaveFocus()
-    await expect.element(toolbarState).toHaveTextContent('no-toolbar')
+    await expect.element(toolbarState).toMatchTextContent('no-toolbar')
   })
 
   it('publishes when the editor is focused programmatically (autoFocus arrivals)', async () => {
     const { handle } = await setupEditor('alpha')
     handle.focus()
-    await expect.element(toolbarState).toHaveTextContent('has-toolbar')
+    await expect.element(toolbarState).toMatchTextContent('has-toolbar')
   })
 
   it('recomputes capabilities as the caret moves, and clears on blur', async () => {
     await setupEditor('plain\n\n- alpha\n- beta')
 
     await pmRoot.getByText('plain').click()
-    await expect.element(toolbarState).toHaveTextContent('has-toolbar')
+    await expect.element(toolbarState).toMatchTextContent('has-toolbar')
     await vi.waitFor(() => {
       expect(captured.toolbar?.capabilities.canIndent).toBe(false)
     })
@@ -111,14 +111,14 @@ describe('FormattingToolbarBridge', () => {
     })
 
     captured.toolbar?.commands.dismissKeyboard()
-    await expect.element(toolbarState).toHaveTextContent('no-toolbar')
+    await expect.element(toolbarState).toMatchTextContent('no-toolbar')
   })
 
   it('turns the focused paragraph into a checkable bullet through the toolbar commands', async () => {
     const { handle } = await setupEditor('alpha')
 
     await pmRoot.getByText('alpha').click()
-    await expect.element(toolbarState).toHaveTextContent('has-toolbar')
+    await expect.element(toolbarState).toMatchTextContent('has-toolbar')
 
     captured.toolbar?.commands.cycleBulletOrderedList()
     await vi.waitFor(() => {
@@ -135,7 +135,7 @@ describe('FormattingToolbarBridge', () => {
     const { handle } = await setupEditor('- alpha\n- beta')
 
     await pmRoot.getByText('beta').click()
-    await expect.element(toolbarState).toHaveTextContent('has-toolbar')
+    await expect.element(toolbarState).toMatchTextContent('has-toolbar')
 
     captured.toolbar?.commands.indent()
     await vi.waitFor(() => {
@@ -157,7 +157,7 @@ describe('FormattingToolbarBridge', () => {
     const { handle } = await setupEditor('alpha')
 
     await pmRoot.getByText('alpha').click()
-    await expect.element(toolbarState).toHaveTextContent('has-toolbar')
+    await expect.element(toolbarState).toMatchTextContent('has-toolbar')
     handle.setSelection('end')
 
     captured.toolbar?.commands.insertTrigger('[[')
@@ -169,7 +169,7 @@ describe('FormattingToolbarBridge', () => {
     const { handle } = await setupEditor('alpha', true, saveFile)
 
     await pmRoot.getByText('alpha').click()
-    await expect.element(toolbarState).toHaveTextContent('has-toolbar')
+    await expect.element(toolbarState).toMatchTextContent('has-toolbar')
     expect(captured.toolbar?.capabilities.canAttachFiles).toBe(true)
     handle.setSelection('end')
 
@@ -192,7 +192,7 @@ describe('FormattingToolbarBridge', () => {
     const { handle } = await setupEditor('alpha', true, saveFile)
 
     await pmRoot.getByText('alpha').click()
-    await expect.element(toolbarState).toHaveTextContent('has-toolbar')
+    await expect.element(toolbarState).toMatchTextContent('has-toolbar')
 
     await captured.toolbar?.commands.attachFiles([
       new File(['png'], 'photo.png', { type: 'image/png' }),
@@ -206,9 +206,9 @@ describe('FormattingToolbarBridge', () => {
     const setup = await setupEditor('alpha')
 
     await pmRoot.getByText('alpha').click()
-    await expect.element(toolbarState).toHaveTextContent('has-toolbar')
+    await expect.element(toolbarState).toMatchTextContent('has-toolbar')
 
     await setup.rerender(false)
-    await expect.element(toolbarState).toHaveTextContent('no-toolbar')
+    await expect.element(toolbarState).toMatchTextContent('no-toolbar')
   })
 })

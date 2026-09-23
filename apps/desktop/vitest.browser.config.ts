@@ -21,6 +21,8 @@ export default defineDesktopProject({
     fileParallelism: false,
     browser: {
       enabled: true,
+      // Vitest 5 defaults locators.exact to true; keep v4 substring matching.
+      locators: { exact: false },
       viewport: { width: 900, height: 600 },
       provider: playwright({
         contextOptions: {

@@ -170,8 +170,8 @@ describe('BacklinkSnippet wiki-link chips', () => {
       </QueryClientProvider>,
     )
     const chips = view.getByTestId('wikilink')
-    await expect.element(chips.first()).toHaveTextContent(/^Dad$/)
-    await expect.element(chips.last()).toHaveTextContent(/^Tim MacCaw$/)
+    await expect.element(chips.first()).toMatchTextContent(/^Dad$/)
+    await expect.element(chips.last()).toMatchTextContent(/^Tim MacCaw$/)
     await chips.first().click()
     expect(onWikilinkClick).toHaveBeenCalledWith(
       expect.objectContaining({ target: 'Tim MacCaw // Dad' }),

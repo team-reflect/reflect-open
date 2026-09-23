@@ -547,7 +547,7 @@ describe('MobileShell', () => {
 
     await user.click(view.getByRole('button', { name: 'All' }))
     await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
-    await expect.element(view.getByText('No notes yet')).toHaveTextContent('No notes yet')
+    await expect.element(view.getByText('No notes yet')).toMatchTextContent('No notes yet')
 
     await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
     await waitFor(() =>
@@ -654,7 +654,7 @@ describe('MobileShell', () => {
     await user.click(view.getByRole('button', { name: 'Tasks' }))
     await expect.element(view.getByRole('searchbox', { name: 'Search tasks' })).toBeVisible()
     // The fake bridge's index is empty, so the tab lands on its empty state.
-    await expect.element(view.getByText('No tasks to show')).toHaveTextContent('No tasks to show')
+    await expect.element(view.getByText('No tasks to show')).toMatchTextContent('No tasks to show')
   })
 
   it('double-tapping Tasks selects the task search filter', async () => {

@@ -72,7 +72,7 @@ describe('SyncStatusPill', () => {
     sync.backup = connected({ state: 'syncing' })
     await mount()
 
-    await expect.element(page.getByRole('status')).toHaveTextContent('Syncing')
+    await expect.element(page.getByRole('status')).toMatchTextContent('Syncing')
   })
 
   it('claims nothing until the conflict count is known', async () => {
@@ -93,14 +93,14 @@ describe('SyncStatusPill', () => {
     vi.mocked(getConflictedNotes).mockRejectedValue(new Error('index unavailable'))
     await mount()
 
-    await expect.element(page.getByRole('status')).toHaveTextContent('Offline')
+    await expect.element(page.getByRole('status')).toMatchTextContent('Offline')
   })
 
   it('shows Needs review while conflicted notes exist', async () => {
     vi.mocked(getConflictedNotes).mockResolvedValue([{ path: 'notes/a.md', title: 'A' }])
     await mount()
 
-    await expect.element(page.getByRole('status')).toHaveTextContent('Needs review')
+    await expect.element(page.getByRole('status')).toMatchTextContent('Needs review')
   })
 
   it('yields to the software keyboard', async () => {

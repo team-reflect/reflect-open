@@ -210,7 +210,7 @@ describe('SettingsScreen', () => {
     await expect.element(textarea).toHaveAttribute('aria-invalid', 'true')
     await expect
       .element(page.getByRole('alert'))
-      .toHaveTextContent('10 characters over the 500-character limit')
+      .toMatchTextContent('10 characters over the 500-character limit')
 
     await userEvent.tab()
 
@@ -613,18 +613,18 @@ describe('SettingsScreen', () => {
     await renderScreen()
     const trigger = page.getByRole('combobox', { name: 'Date format' })
     // The options label themselves with today's date in each order.
-    await expect.element(trigger).toHaveTextContent(formatFullDate(new Date(), 'dmy'))
+    await expect.element(trigger).toMatchTextContent(formatFullDate(new Date(), 'dmy'))
   })
 
   it('selecting day-month-year persists the date format', async () => {
     await renderScreen()
     const trigger = page.getByRole('combobox', { name: 'Date format' })
-    await expect.element(trigger).toHaveTextContent(formatFullDate(new Date(), 'mdy'))
+    await expect.element(trigger).toMatchTextContent(formatFullDate(new Date(), 'mdy'))
 
     await trigger.click()
     await page.getByRole('option', { name: formatFullDate(new Date(), 'dmy') }).click()
 
-    await expect.element(trigger).toHaveTextContent(formatFullDate(new Date(), 'dmy'))
+    await expect.element(trigger).toMatchTextContent(formatFullDate(new Date(), 'dmy'))
     await vi.waitFor(() =>
       expect(saved).toEqual([
         {
@@ -671,12 +671,12 @@ describe('SettingsScreen', () => {
     await renderScreen()
     const trigger = page.getByRole('combobox', { name: 'Date format' })
     const isoLabel = formatFullDate(now, 'iso')
-    await expect.element(trigger).toHaveTextContent(formatFullDate(now, 'mdy'))
+    await expect.element(trigger).toMatchTextContent(formatFullDate(now, 'mdy'))
 
     await trigger.click()
     await page.getByRole('option', { name: isoLabel }).click()
 
-    await expect.element(trigger).toHaveTextContent(isoLabel)
+    await expect.element(trigger).toMatchTextContent(isoLabel)
     await vi.waitFor(() =>
       expect(saved).toEqual([
         {
@@ -729,12 +729,12 @@ describe('SettingsScreen', () => {
   it('selecting Sunday persists the week start day', async () => {
     await renderScreen()
     const trigger = page.getByRole('combobox', { name: 'Start week on' })
-    await expect.element(trigger).toHaveTextContent('Monday')
+    await expect.element(trigger).toMatchTextContent('Monday')
 
     await trigger.click()
     await page.getByRole('option', { name: 'Sunday' }).click()
 
-    await expect.element(trigger).toHaveTextContent('Sunday')
+    await expect.element(trigger).toMatchTextContent('Sunday')
     await vi.waitFor(() =>
       expect(saved).toEqual([
         {
@@ -779,7 +779,7 @@ describe('SettingsScreen', () => {
     await trigger.click()
     await page.getByRole('option', { name: 'Saturday' }).click()
 
-    await expect.element(trigger).toHaveTextContent('Saturday')
+    await expect.element(trigger).toMatchTextContent('Saturday')
     await vi.waitFor(() => expect(saved.at(-1)).toMatchObject({ weekStartDay: 'saturday' }))
   })
 
@@ -787,18 +787,18 @@ describe('SettingsScreen', () => {
     stored = { timeFormat: '24h' }
     await renderScreen()
     const trigger = page.getByRole('combobox', { name: 'Time format' })
-    await expect.element(trigger).toHaveTextContent('24-hour')
+    await expect.element(trigger).toMatchTextContent('24-hour')
   })
 
   it('selecting 24-hour persists the time format', async () => {
     await renderScreen()
     const trigger = page.getByRole('combobox', { name: 'Time format' })
-    await expect.element(trigger).toHaveTextContent('12-hour')
+    await expect.element(trigger).toMatchTextContent('12-hour')
 
     await trigger.click()
     await page.getByRole('option', { name: '24-hour' }).click()
 
-    await expect.element(trigger).toHaveTextContent('24-hour')
+    await expect.element(trigger).toMatchTextContent('24-hour')
     await vi.waitFor(() =>
       expect(saved).toEqual([
         {
@@ -890,7 +890,7 @@ describe('SettingsScreen', () => {
     await input.fill('my tag')
     await page.getByRole('button', { name: 'Add', exact: true }).click()
 
-    await expect.element(page.getByRole('alert')).toHaveTextContent(`"my tag" can't be a tag`)
+    await expect.element(page.getByRole('alert')).toMatchTextContent(`"my tag" can't be a tag`)
     // The draft stays put for fixing, and nothing reaches the store.
     await expect.element(input).toHaveValue('my tag')
     await vi.waitFor(() => expect(saved).toEqual([]))

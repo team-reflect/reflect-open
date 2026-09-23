@@ -567,20 +567,20 @@ describe('ChatScreen', () => {
 
     nextChunk.resolve()
     const bold = view.getByRole('strong')
-    await expect.element(bold).toHaveTextContent('markdown')
+    await expect.element(bold).toMatchTextContent('markdown')
     const firstItem = view.getByText('First item', { exact: true })
     await expect.element(firstItem).toBeInTheDocument()
     expect(firstItem.element().closest('.prosemirror-flat-list')).not.toBeNull()
     await expect.element(view.getByText('Second item', { exact: true })).toBeInTheDocument()
-    await expect.element(view.getByRole('code')).toHaveTextContent('const answer = 42')
+    await expect.element(view.getByRole('code')).toMatchTextContent('const answer = 42')
     expect(view.getByRole('button', { name: 'Copy reply' }).query()).toBeNull()
 
     finish.resolve()
     await expect.element(view.getByRole('button', { name: 'Copy reply' })).toBeInTheDocument()
-    await expect.element(view.getByTestId('wikilink')).toHaveTextContent('Atlas')
+    await expect.element(view.getByTestId('wikilink')).toMatchTextContent('Atlas')
     expect(heading.element()).toBe(headingElement)
     expect(bold.element().tagName).toBe('STRONG')
-    await expect.element(view.getByRole('code')).toHaveTextContent('const answer = 42')
+    await expect.element(view.getByRole('code')).toMatchTextContent('const answer = 42')
   })
 
   it('rejects a second send fired before the first one has rendered', async () => {

@@ -165,7 +165,7 @@ describe('SyncSection', () => {
     const section = page.getByRole('region', { name: 'Sync' })
     await section.getByRole('button', { name: /Conflicted note.*notes\/conflicted\.md/ }).click()
 
-    await expect.element(page.getByTestId('route')).toHaveTextContent('notes/conflicted.md')
+    await expect.element(page.getByTestId('route')).toMatchTextContent('notes/conflicted.md')
   })
 
   it('opens a ⌘-clicked conflicted note in a new window', async () => {

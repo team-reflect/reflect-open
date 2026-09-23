@@ -138,8 +138,8 @@ describe('NoteEditor wiki-link chips', () => {
       />,
     )
     const chips = pmRoot.getByTestId('wikilink')
-    await expect.element(chips.first()).toHaveTextContent(/^Dad$/)
-    await expect.element(chips.last()).toHaveTextContent(/^Tim MacCaw$/)
+    await expect.element(chips.first()).toMatchTextContent(/^Dad$/)
+    await expect.element(chips.last()).toMatchTextContent(/^Tim MacCaw$/)
     await chips.first().click()
     expect(onWikiLinkClick).toHaveBeenCalledWith({
       target: 'Tim MacCaw // Dad',
@@ -560,8 +560,8 @@ describe('NoteEditor file pills', () => {
     )
 
     const pill = pmRoot.getByTestId('file-pill')
-    await expect.element(pill).toHaveTextContent('report.pdf')
-    await expect.element(pmRoot.getByTestId('file-pill-size')).toHaveTextContent('1.4 MB')
+    await expect.element(pill).toMatchTextContent('report.pdf')
+    await expect.element(pmRoot.getByTestId('file-pill-size')).toMatchTextContent('1.4 MB')
   })
 
   it('leaves links as links when the host claims no file links', async () => {
@@ -607,7 +607,7 @@ describe('NoteEditor file paste', () => {
     const pasted = new File([new Uint8Array(4)], 'q3.pdf', { type: 'application/pdf' })
     pasteFiles(pmRoot.element(), [pasted])
 
-    await expect.element(pmRoot.getByTestId('file-pill')).toHaveTextContent('q3.pdf')
+    await expect.element(pmRoot.getByTestId('file-pill')).toMatchTextContent('q3.pdf')
     expect(saveFile).toHaveBeenCalledExactlyOnceWith(pasted)
     expect(handleRef.current?.getMarkdown()).toBe('[q3.pdf](assets/report.pdf)\n')
   })

@@ -49,13 +49,13 @@ function mountOn(date: string): ReturnType<typeof render> {
 describe('useWakeToToday', () => {
   it('navigates to today when the app foregrounds on a new date', async () => {
     const view = await mountOn('2026-06-10')
-    await expect.element(view.getByRole('status')).toHaveTextContent('daily:2026-06-10')
+    await expect.element(view.getByRole('status')).toMatchTextContent('daily:2026-06-10')
 
     setVisibility('hidden')
     vi.setSystemTime(new Date(2026, 5, 13, 8, 0, 0)) // overnight in the background
     setVisibility('visible')
 
-    await expect.element(view.getByRole('status')).toHaveTextContent('today')
+    await expect.element(view.getByRole('status')).toMatchTextContent('today')
   })
 
   it('stays put when the app foregrounds on the same date', async () => {
@@ -66,6 +66,6 @@ describe('useWakeToToday', () => {
     setVisibility('visible')
 
     await new Promise((resolve) => setTimeout(resolve, 50))
-    await expect.element(view.getByRole('status')).toHaveTextContent('daily:2026-06-10')
+    await expect.element(view.getByRole('status')).toMatchTextContent('daily:2026-06-10')
   })
 })

@@ -148,7 +148,7 @@ describe('NoteRowList', () => {
     await expect.element(match).toBeInTheDocument()
     await vi.waitFor(() => expect(match.element().tagName).toBe('MARK'))
     await expect.element(match).toHaveClass('bg-primary/15')
-    await expect.element(view.getByRole('button')).toHaveTextContent('Tim MacCaw')
+    await expect.element(view.getByRole('button')).toMatchTextContent('Tim MacCaw')
   })
 
   it('tracks a leftward touch and reveals pin and delete actions', async () => {

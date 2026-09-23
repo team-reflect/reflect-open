@@ -283,7 +283,7 @@ describe('Sidebar', () => {
     const { view } = await renderSidebar()
 
     const pinnedSection = view.getByRole('region', { name: /pinned notes/i })
-    await expect.element(pinnedSection).toHaveTextContent('Roadmap')
+    await expect.element(pinnedSection).toMatchTextContent('Roadmap')
     await expectLocatorToHaveCount(view.getByRole('button', { name: 'Roadmap' }), 1)
 
     const roadmap = pinnedSection.getByRole('button', { name: 'Roadmap' })
@@ -322,7 +322,7 @@ describe('Sidebar', () => {
     const { view } = await renderSidebar()
 
     const pinnedSection = view.getByRole('region', { name: /pinned notes/i })
-    await expect.element(pinnedSection).toHaveTextContent('Meeting with Ada')
+    await expect.element(pinnedSection).toMatchTextContent('Meeting with Ada')
     expect(pinnedSection.element().textContent).not.toContain('[[Ada Lovelace|Ada]]')
     await expect.element(view.getByRole('button', { name: 'Meeting with Ada' })).toBeInTheDocument()
   })
