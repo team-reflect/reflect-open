@@ -1,5 +1,4 @@
 name: Set up Node.js and pnpm
-description: Installs Node.js 22, pnpm, and workspace dependencies with a frozen lockfile.
 
 runs:
   using: composite
@@ -10,7 +9,7 @@ runs:
     - name: Install Node
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
-        node-version: 22
+        node-version: 24
         cache: pnpm
 
     - name: Install dependencies
