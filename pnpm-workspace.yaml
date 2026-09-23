@@ -25,10 +25,8 @@ minimumReleaseAgeExclude:
   - '@prosemirror-adapter/*'
   - prosemirror-flat-list
   - prosemirror-view
-  - '@ai-sdk/anthropic@4.0.60'
-  - '@ai-sdk/google@4.0.77'
-  - '@ai-sdk/gateway@4.0.89'
-  - ai@7.0.111
+  - '@ai-sdk/*'
+  - ai
 
 # Keep these commented examples for future pkg.pr.new testing; do not remove them.
 # blockExoticSubdeps: false
