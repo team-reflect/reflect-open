@@ -104,9 +104,9 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+  # check Apple Rust bindings
   apple-test:
     if: github.event_name != 'merge_group'
-    name: check Apple Rust bindings
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
