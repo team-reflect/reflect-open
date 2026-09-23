@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.13.0...v0.14.0-beta) (2026-09-23)
+
+
+### Features
+
+* add GPT-6 Sol and Luna to the AI model catalog ([#1345](https://github.com/team-reflect/reflect-open/issues/1345)) ([a202263](https://github.com/team-reflect/reflect-open/commit/a2022636ed809c7287dfd1c95600913f9f2d4731))
+
 ## [0.13.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta.4...v0.13.0-beta.5) (2026-09-21)
 
 
