@@ -105,7 +105,7 @@ jobs:
         run: cargo test --workspace
 
   # check Apple Rust bindings
-  apple-test:
+  apple-lint:
     if: github.event_name != 'merge_group'
     runs-on: macos-latest
     steps:
@@ -142,7 +142,7 @@ jobs:
     timeout-minutes: 10
 
     if: always()
-    needs: [node-lint, node-test, rust-lint, rust-test, apple-test]
+    needs: [node-lint, node-test, rust-lint, rust-test, apple-lint]
 
     steps:
       - name: Verify that all jobs succeeded
