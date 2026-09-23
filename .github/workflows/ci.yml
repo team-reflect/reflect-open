@@ -63,11 +63,14 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node
+        if: github.event_name != 'merge_group'
 
       - name: Install Playwright
+        if: github.event_name != 'merge_group'
         run: pnpm --filter @reflect/desktop exec playwright install ${{ matrix.config.browser }}
 
       - name: Test
+        if: github.event_name != 'merge_group'
         run: pnpm run test --shard ${{ matrix.shard }}
         env:
           REFLECT_TEST_BROWSER: ${{ matrix.config.browser }}
