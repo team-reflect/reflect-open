@@ -25,7 +25,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: reflect-asset: http://reflect-asset.localhost https://reflect-asset.localhost https:; media-src 'self' https: reflect-asset: http://reflect-asset.localhost https://reflect-asset.localhost; font-src 'self' data:; frame-src 'self' https://platform.twitter.com https://platform.x.com https://syndication.twitter.com https://www.youtube-nocookie.com https://www.youtube.com; connect-src 'self' ipc: http://ipc.localhost https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://openrouter.ai https://github.com https://api.github.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io"
+      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: reflect-asset: http://reflect-asset.localhost https://reflect-asset.localhost https:; media-src 'self' https: reflect-asset: http://reflect-asset.localhost https://reflect-asset.localhost; font-src 'self' data:; frame-src 'self' https://platform.twitter.com https://platform.x.com https://syndication.twitter.com https://www.youtube-nocookie.com https://www.youtube.com https://youtube-relay-reflect.vercel.app; connect-src 'self' ipc: http://ipc.localhost https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://openrouter.ai https://github.com https://api.github.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io"
     }
   },
   "plugins": {

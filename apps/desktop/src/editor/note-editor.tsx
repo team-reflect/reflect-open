@@ -51,6 +51,9 @@ import { cn } from '@/lib/utils.ts'
 
 type WikilinkHoverRenderer = (hit: WikilinkHoverHit) => ReactNode | Promise<ReactNode>
 
+// See apps/youtube-relay/README.md.
+const YOUTUBE_RELAY_URL = 'https://youtube-relay-reflect.vercel.app/'
+
 /**
  * Reflect's note editor: a thin wrapper over `@meowdown/react`'s
  * `<MeowdownEditor>`. meowdown owns the editing surface (wiki-link clicks,
@@ -433,11 +436,11 @@ export function NoteEditor({
       // Without this the card plays the video in place.
       event.preventDefault()
       setOpenLightboxImage(null)
-      const { video, short, embedUrl, element } = event.detail
+      const { video, short, videoId, element } = event.detail
       openLightbox(
         {
           type: 'frame',
-          src: embedUrl,
+          src: `${YOUTUBE_RELAY_URL}#v=${videoId}`,
           title: video.title || 'YouTube video',
           poster: video.thumbnail_url,
           width: short ? 9 : 16,

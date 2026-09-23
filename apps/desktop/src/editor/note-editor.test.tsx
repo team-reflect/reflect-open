@@ -407,10 +407,7 @@ describe('NoteEditor image lightbox', () => {
     const dialog = page.getByRole('dialog', { name: 'Video preview' })
     await expect
       .element(dialog.getByTitle('Big Buck Bunny'))
-      .toHaveAttribute(
-        'src',
-        'https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ?autoplay=1&playsinline=1',
-      )
+      .toHaveAttribute('src', 'https://youtube-relay-reflect.vercel.app/#v=aqz-KE-bpKQ')
     await expectLocatorToHaveCount(pmRoot.locate('iframe'), 0)
 
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
