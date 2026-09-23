@@ -23,7 +23,7 @@
   </head>
   <body>
     <script>
-      const videoId = new URLSearchParams(location.hash.slice(1)).get('v') ?? ''
+      const videoId = new URLSearchParams(location.hash.slice(1)).get('v') || ''
 
       if (/^[\w-]{11}$/.test(videoId)) {
         const frame = document.createElement('iframe')
