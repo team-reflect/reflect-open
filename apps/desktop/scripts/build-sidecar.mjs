@@ -10,7 +10,7 @@
 
 import { execFileSync, execSync } from 'node:child_process'
 import { copyFileSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 const platform = process.env.TAURI_ENV_PLATFORM ?? ''
 if (platform === 'ios' || platform === 'android') {
@@ -21,6 +21,7 @@ if (platform === 'ios' || platform === 'android') {
 const here = import.meta.dirname
 const repoRoot = join(here, '..', '..', '..')
 const binariesDir = join(here, '..', 'src-tauri', 'binaries')
+const cargoTargetDir = resolve(repoRoot, process.env.CARGO_TARGET_DIR ?? 'target')
 
 // Tauri exports TAURI_ENV_TARGET_TRIPLE to before-commands; outside of Tauri
 // (CI, manual runs) fall back to the host triple.
@@ -38,9 +39,8 @@ const SIDECARS = [
   { crate: 'reflect-capture-host', binary: 'reflect-capture-host' },
 ]
 
-// The explicit --target keeps the artifacts in target/<triple>/release/ — away
-// from target/release/, where tauri-build copies the de-suffixed sidecars —
-// and is what makes cross-compilation work.
+// The explicit --target keeps the artifacts under <cargo-target-dir>/<triple>/release/,
+// away from the app build's release directory, and makes cross-compilation work.
 const packageArgs = SIDECARS.flatMap(({ crate }) => ['-p', crate])
 execFileSync('cargo', ['build', '--release', ...packageArgs, '--target', triple], {
   cwd: repoRoot,
@@ -50,7 +50,7 @@ execFileSync('cargo', ['build', '--release', ...packageArgs, '--target', triple]
 const extension = triple.includes('windows') ? '.exe' : ''
 mkdirSync(binariesDir, { recursive: true })
 for (const { binary } of SIDECARS) {
-  const built = join(repoRoot, 'target', triple, 'release', `${binary}${extension}`)
+  const built = join(cargoTargetDir, triple, 'release', `${binary}${extension}`)
   const staged = join(binariesDir, `${binary}-${triple}${extension}`)
   copyFileSync(built, staged)
   console.log(`build-sidecar: staged ${staged}`)

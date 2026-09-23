@@ -92,7 +92,7 @@ See [docs/privacy.md](docs/privacy.md) for the full privacy model.
 Prerequisites:
 
 - A recent stable [Rust toolchain](https://rustup.rs)
-- Node.js with [pnpm](https://pnpm.io) 10
+- Node.js with [pnpm](https://pnpm.io) 11 (Corepack uses the version pinned in `package.json`)
 - Xcode Command Line Tools
 
 ```bash
