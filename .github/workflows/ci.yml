@@ -18,8 +18,7 @@ permissions:
   contents: read
 
 jobs:
-  node:
-    name: lint
+  node-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,7 +42,7 @@ jobs:
       - name: Build
         run: pnpm build
 
-  test:
+  node-test:
     if: github.event_name != 'merge_group'
     strategy:
       fail-fast: false
@@ -55,7 +54,7 @@ jobs:
           - os: macos-latest
             browser: webkit
 
-    name: test ${{ matrix.config.browser }} ${{ matrix.shard }}
+    name: test-${{ matrix.config.browser }}-${{ matrix.shard }}
     runs-on: ${{ matrix.config.os }}
 
     steps:
@@ -73,8 +72,7 @@ jobs:
         env:
           REFLECT_TEST_BROWSER: ${{ matrix.config.browser }}
 
-  rust:
-    name: fmt · clippy (Rust)
+  rust-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -94,7 +92,6 @@ jobs:
 
   rust-test:
     if: github.event_name != 'merge_group'
-    name: test (Rust)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -107,7 +104,7 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-  apple-rust:
+  apple-test:
     if: github.event_name != 'merge_group'
     name: check Apple Rust bindings
     runs-on: macos-latest
@@ -145,7 +142,7 @@ jobs:
     timeout-minutes: 10
 
     if: always()
-    needs: [node, test, rust, rust-test, apple-rust]
+    needs: [node-lint, node-test, rust-lint, rust-test, apple-test]
 
     steps:
       - name: Verify that all jobs succeeded
