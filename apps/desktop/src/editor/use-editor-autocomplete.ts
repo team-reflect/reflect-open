@@ -117,14 +117,23 @@ export function useEditorAutocomplete(): EditorAutocomplete {
       const blockedContactNames = contactResolutions.flatMap((resolution) =>
         resolution.kind === 'blocked' ? [resolution.contact.fullName] : [],
       )
-      return buildAutocompleteEntries(query, wikiLinks.suggestions, {
+      const entries = buildAutocompleteEntries(query, wikiLinks.suggestions, {
         offerCreate: true,
         contacts,
         blockedContactNames,
         requireSerializableWikiText: true,
         queryReadsAsDate: wikiLinks.queryReadsAsDate,
         claimedTargetKeys: wikiLinks.claimedTargetKeys,
-      }).map((entry) => {
+      })
+      // Distinct notes can share a title; their rows need the path to tell them apart.
+      const titleCounts = new Map<string, number>()
+      for (const entry of entries) {
+        if (entry.kind === 'suggestion' && entry.suggestion.date === null) {
+          const displayedTitle = displayNoteTitle(entry.suggestion.title)
+          titleCounts.set(displayedTitle, (titleCounts.get(displayedTitle) ?? 0) + 1)
+        }
+      }
+      return entries.map((entry) => {
         if (entry.kind === 'create') {
           return {
             target: entry.title,
@@ -191,7 +200,9 @@ export function useEditorAutocomplete(): EditorAutocomplete {
               ? path === null
                 ? `${date} · new`
                 : date
-              : undefined
+              : path !== null && (titleCounts.get(displayedTitle) ?? 0) > 1
+                ? path
+                : undefined
         return { target, label, ...(detail !== undefined ? { detail } : {}) }
       })
     },

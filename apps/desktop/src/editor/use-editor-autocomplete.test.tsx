@@ -176,6 +176,48 @@ describe('useEditorAutocomplete', () => {
     expect(items[1]).not.toHaveProperty('detail')
   })
 
+  it('details notes that share a title with their paths', async () => {
+    suggestWikiLinkTargets.mockResolvedValue({
+      suggestions: [
+        {
+          target: 'Event loop',
+          path: 'notes/event-loop.md',
+          title: 'Event loop',
+          alias: null,
+          date: null,
+          insertText: 'notes/event-loop',
+        },
+        {
+          target: 'Event loop',
+          path: 'notes/event-loop-2.md',
+          title: 'Event loop',
+          alias: null,
+          date: null,
+          insertText: 'notes/event-loop-2',
+        },
+        {
+          target: 'Event sourcing',
+          path: 'notes/event-sourcing.md',
+          title: 'Event sourcing',
+          alias: null,
+          date: null,
+          insertText: 'Event sourcing',
+        },
+      ],
+      claimedTargetKeys: [],
+      queryReadsAsDate: false,
+    })
+    const { result } = await renderHook(() => useEditorAutocomplete())
+
+    const items = await result.current.onWikilinkSearch('event')
+    expect(items.slice(0, 3)).toMatchObject([
+      { target: 'notes/event-loop', label: 'Event loop', detail: 'notes/event-loop.md' },
+      { target: 'notes/event-loop-2', label: 'Event loop', detail: 'notes/event-loop-2.md' },
+      { target: 'Event sourcing', label: 'Event sourcing' },
+    ])
+    expect(items[2]).not.toHaveProperty('detail')
+  })
+
   it('uses an existing email owner as the Contact row target', async () => {
     settingsState.contactsEnabled = true
     const contact = {
