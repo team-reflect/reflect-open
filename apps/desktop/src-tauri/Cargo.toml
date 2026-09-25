@@ -50,7 +50,7 @@ tauri-plugin-dialog = "2.7.3"
 base64 = "0.23.1"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-keyring = { version = "3.6.3", features = [
+keyring = { version = "4.2.0", features = [
   "apple-native",
   "windows-native",
   "sync-secret-service",
