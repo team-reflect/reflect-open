@@ -465,6 +465,92 @@ describe('NoteEditor image lightbox', () => {
   })
 })
 
+describe('NoteEditor attachment resolution', () => {
+  const embedImage = (src: string) => ({ kind: 'image' as const, src })
+
+  it('renders an Obsidian image embed and opens it through the asset opener', async () => {
+    const openAsset = vi.fn(async () => {})
+    await render(
+      <NoteEditor
+        initialContent="Budget ![[garden-budget.png]] here"
+        resolveWikiEmbed={({ target }) => embedImage(`/attachments/${target}`)}
+        resolveImageUrl={(src) => `asset://${src}`}
+        resolveAssetOpenPath={(src) => src.slice(1)}
+        openAsset={openAsset}
+      />,
+    )
+
+    const image = pmRoot.getByAltText('garden-budget.png')
+    await expect.element(image).toHaveAttribute('src', 'asset:///attachments/garden-budget.png')
+    await image.click()
+    await page.getByRole('button', { name: 'Open' }).click()
+    await vi.waitFor(() => {
+      expect(openAsset).toHaveBeenCalledWith('attachments/garden-budget.png')
+    })
+  })
+
+  it('leaves an embed the host declines as literal source', async () => {
+    const handleRef = createRef<NoteEditorHandle>()
+    await render(
+      <NoteEditor
+        initialContent="![[../outside.png]]"
+        resolveWikiEmbed={() => undefined}
+        resolveImageUrl={(src) => `asset://${src}`}
+        handleRef={handleRef}
+      />,
+    )
+
+    await expect.element(pmRoot).toHaveTextContent('![[../outside.png]]')
+    await expectLocatorToHaveCount(pmRoot.locate('img'), 0)
+  })
+
+  it('re-resolves rendered images in place when the image resolver changes', async () => {
+    const handleRef = createRef<NoteEditorHandle>()
+    const screen = await render(
+      <NoteEditor initialContent={IMAGE_NOTE} resolveImageUrl={() => null} handleRef={handleRef} />,
+    )
+    await expectLocatorToHaveCount(pmRoot.locate('img'), 0)
+
+    // The attachment catalog arrived: the host hands over a new resolver.
+    await screen.rerender(
+      <NoteEditor
+        initialContent={IMAGE_NOTE}
+        resolveImageUrl={(src) => `asset://${src}`}
+        handleRef={handleRef}
+      />,
+    )
+
+    await expect
+      .element(pmRoot.getByAltText('Cat'))
+      .toHaveAttribute('src', 'asset://assets/cat.png')
+    expect(handleRef.current?.getMarkdown()).toBe(`${IMAGE_NOTE}\n`)
+  })
+
+  it('re-resolves embeds when the embed resolver changes', async () => {
+    const note = 'Budget ![[garden-budget.png]] here'
+    const resolveImageUrl = (src: string): string => `asset://${src}`
+    const screen = await render(
+      <NoteEditor
+        initialContent={note}
+        resolveWikiEmbed={({ target }) => embedImage(`/${target}`)}
+        resolveImageUrl={resolveImageUrl}
+      />,
+    )
+    const image = pmRoot.getByAltText('garden-budget.png')
+    await expect.element(image).toHaveAttribute('src', 'asset:///garden-budget.png')
+
+    await screen.rerender(
+      <NoteEditor
+        initialContent={note}
+        resolveWikiEmbed={({ target }) => embedImage(`/attachments/${target}`)}
+        resolveImageUrl={resolveImageUrl}
+      />,
+    )
+
+    await expect.element(image).toHaveAttribute('src', 'asset:///attachments/garden-budget.png')
+  })
+})
+
 describe('NoteEditor link opening', () => {
   it('opens external links through the OS opener', async () => {
     await render(<NoteEditor initialContent="see [Docs](https://example.com) here" />)

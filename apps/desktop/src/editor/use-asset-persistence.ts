@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { convertFileSrc } from '@tauri-apps/api/core'
-import type { FileInfo, FileLinkPayload } from '@meowdown/core'
+import type { FileInfo, FileLinkResolver, WikiEmbedResolver } from '@meowdown/core'
 import {
   assetFileName,
   createAsset,
   errorMessage,
-  listDir,
   openAsset as openAssetCommand,
+  resolveAttachmentLink,
   revealAsset as revealAssetCommand,
-  type FileMeta,
 } from '@reflect/core'
+import { useNoteAttachments } from '@/editor/use-note-attachments.ts'
 import { formatBytes } from '@/lib/format-bytes.ts'
 import { startOperation } from '@/lib/operations.ts'
+import { loadAttachmentCatalog } from '@/providers/attachment-catalog-provider.tsx'
 
 /**
  * Above this size, a save gets a non-blocking status-line warning. Never a
@@ -31,36 +31,6 @@ const EXTENSION_BY_MIME: Record<string, string> = {
   'image/svg+xml': 'svg',
 }
 
-/**
- * True for a graph-relative `assets/…` path with no traversal segments. The
- * Rust shell already guards every *write* against traversal; this guards
- * *display and open* resolution so a crafted `assets/../…` reference in note
- * markdown is never handed to the asset protocol or the OS opener (defense
- * in depth).
- */
-function isSafeAssetSource(sourcePath: string): boolean {
-  if (!sourcePath.startsWith('assets/') || sourcePath.includes('\\')) {
-    return false
-  }
-  return sourcePath
-    .split('/')
-    .every((segment, index) =>
-      index === 0
-        ? segment === 'assets'
-        : segment.length > 0 && segment !== '.' && segment !== '..',
-    )
-}
-
-/**
- * Claims a `[label](url)` markdown link as a file attachment when its
- * destination is a safe graph-relative `assets/…` path, so meowdown renders
- * it as a file pill instead of a plain link. Pure by contract (meowdown
- * caches and diffs parse results), which a stateless path check satisfies.
- */
-export function resolveAssetFileLink({ href }: FileLinkPayload): boolean {
-  return isSafeAssetSource(href)
-}
-
 /** The failed save the pane reports on: which banner copy, and the cause. */
 export interface AssetSaveError {
   /** 'image' for `image/*` files, 'file' for everything else. */
@@ -69,10 +39,18 @@ export interface AssetSaveError {
 }
 
 export interface AssetPersistence {
-  /** Resolve an image source to a displayable URL (or null to skip). */
+  /** Resolve an image source in the note to a displayable URL (or null to skip). */
   resolveImageUrl: (src: string) => string | null
-  /** Vet a source as a graph-relative asset path for {@link openAsset} (null for remote/unsafe). */
+  /**
+   * Resolve an image source or link destination in the note to the
+   * graph-relative attachment {@link openAsset} opens (null for remote,
+   * note, and unsafe destinations).
+   */
   resolveAssetOpenPath: (src: string) => string | null
+  /** Classify the note's `![[embeds]]` (see `useNoteAttachments`). */
+  resolveWikiEmbed: WikiEmbedResolver
+  /** Claim the note's links to local attachments as file pills. */
+  resolveFileLink: FileLinkResolver
   /**
    * Open a vetted graph-relative asset path in the OS default application.
    * A refused file type degrades to revealing the file in the OS file
@@ -89,9 +67,8 @@ export interface AssetPersistence {
    */
   saveFile: (file: File) => Promise<string | null>
   /**
-   * Resolve the size a file pill shows for a claimed `assets/…` link
-   * (see {@link resolveAssetFileLink}); undefined for anything else or a
-   * file that no longer exists.
+   * Resolve the size a file pill shows for a claimed attachment link or
+   * embed; undefined for anything else or a file the catalog doesn't list.
    */
   resolveFileInfo: (href: string) => Promise<FileInfo | undefined>
   /** The most recent failed save; cleared by the next success. */
@@ -99,29 +76,31 @@ export interface AssetPersistence {
 }
 
 /**
- * Asset handling for one open graph: resolve `![…](…)` sources to displayable
- * URLs (remote URLs pass through; `assets/` paths map to `reflect-asset://`
- * URLs served off the UI thread by the Rust shell), open asset links in the
- * OS viewer, and persist pasted/dropped files by streaming them into the
- * graph's `assets/` folder — Rust resolves `-2`-style name collisions at
- * write time. A save over {@link LARGE_FILE_BYTES} gets a non-blocking
- * status-line warning after it lands. `generation` pins every save — and
- * every image URL — to the issuing graph session, so a save or image load
- * racing a graph switch is rejected loudly instead of landing in (or reading
- * from) the wrong graph; `path`, when given, scopes the error banner to the
- * note being edited (a pane is reused across note switches).
+ * Asset handling for the note at `path` in one open graph: resolve its images,
+ * embeds, and attachment links from the note's own folder
+ * ({@link useNoteAttachments}; local files become `reflect-asset://` URLs
+ * served off the UI thread by the Rust shell), open attachments in the OS
+ * viewer, and persist pasted/dropped files by streaming them into the graph's
+ * `assets/` folder — Rust resolves `-2`-style name collisions at write time.
+ * A save over {@link LARGE_FILE_BYTES} gets a non-blocking status-line warning
+ * after it lands. `generation` pins every save — and every image URL — to the
+ * issuing graph session, so a save or image load racing a graph switch is
+ * rejected loudly instead of landing in (or reading from) the wrong graph;
+ * `path` also scopes the error banner to the note being edited (a pane is
+ * reused across note switches).
  */
-export function useAssetPersistence(generation: number | null, path?: string): AssetPersistence {
+export function useAssetPersistence(generation: number | null, path: string): AssetPersistence {
   const [saveError, setSaveError] = useState<AssetSaveError | null>(null)
   // Stamps the note session a save was started for. The pane outlives the
   // note (and graph session) it shows, so a save that finishes after a
   // switch must not put its outcome on the *next* note's banner.
   const sessionEpoch = useRef(0)
-  // File-pill sizes by graph-relative asset path, seeded by every save (the
-  // size is already in hand) and backfilled by one shared `assets/` listing,
-  // so a note full of pills stats the directory once, not once per pill.
-  const sizeByAssetPath = useRef(new Map<string, number>())
-  const pendingAssetListing = useRef<Promise<FileMeta[]> | null>(null)
+  // File-pill sizes of this session's saves, by graph-relative asset path:
+  // the size is already in hand, while the attachment catalog only lists the
+  // file once the watcher reports it.
+  const savedSizes = useRef(new Map<string, number>())
+  const { resolveAttachmentPath, resolveImageUrl, resolveWikiEmbed, resolveFileLink } =
+    useNoteAttachments(generation, path)
 
   useEffect(() => {
     return () => {
@@ -132,36 +111,12 @@ export function useAssetPersistence(generation: number | null, path?: string): A
 
   useEffect(() => {
     return () => {
-      // Replace the map rather than clearing it: a listing or save still in
-      // flight for the old graph session writes into the orphaned instance,
-      // never into the next session's cache.
-      sizeByAssetPath.current = new Map()
-      pendingAssetListing.current = null
+      // Replace the map rather than clearing it: a save still in flight for
+      // the old graph session writes into the orphaned instance, never into
+      // the next session's cache.
+      savedSizes.current = new Map()
     }
   }, [generation])
-
-  const resolveImageUrl = useCallback(
-    (src: string): string | null => {
-      if (/^https?:\/\//.test(src)) {
-        return src
-      }
-      if (generation !== null && isSafeAssetSource(src)) {
-        return convertFileSrc(`${generation}/${src}`, 'reflect-asset')
-      }
-      return null
-    },
-    [generation],
-  )
-
-  const resolveAssetOpenPath = useCallback(
-    (src: string): string | null => {
-      if (generation !== null && isSafeAssetSource(src)) {
-        return src
-      }
-      return null
-    },
-    [generation],
-  )
 
   const openAsset = useCallback(
     async (assetPath: string): Promise<void> => {
@@ -202,7 +157,7 @@ export function useAssetPersistence(generation: number | null, path?: string): A
         : assetFileName(file.name)
       // Captured before the await: a save resolving after a graph switch
       // seeds the orphaned session's cache, not the next graph's.
-      const sizeCache = sizeByAssetPath.current
+      const sizeCache = savedSizes.current
       try {
         const saved = await createAsset(desiredName, file, generation)
         sizeCache.set(saved, file.size)
@@ -235,42 +190,47 @@ export function useAssetPersistence(generation: number | null, path?: string): A
 
   const resolveFileInfo = useCallback(
     async (href: string): Promise<FileInfo | undefined> => {
-      if (generation === null || !isSafeAssetSource(href)) {
+      if (generation === null) {
         return undefined
       }
-      // Captured before the await for the same session-scoping reason as in
-      // saveFile.
-      const cache = sizeByAssetPath.current
-      if (!cache.has(href)) {
-        pendingAssetListing.current ??= listDir('assets', generation).finally(() => {
-          pendingAssetListing.current = null
-        })
-        try {
-          const entries = await pendingAssetListing.current
-          for (const entry of entries) {
-            cache.set(entry.path, entry.size)
-          }
-        } catch {
-          // A failed listing degrades to a pill without a size, per the
-          // documented contract (undefined, never a rejection).
-          return undefined
-        }
+      const saved = savedSizes.current
+      try {
+        // Waits for the first listing, so a pill rendered before the catalog
+        // arrived still resolves the file (and size) it will display.
+        const catalog = await loadAttachmentCatalog(generation)
+        const assetPath = resolveAttachmentLink(path, href, catalog)
+        const size =
+          assetPath === null ? undefined : (saved.get(assetPath) ?? catalog.size(assetPath))
+        return size === undefined ? undefined : { size }
+      } catch {
+        // A failed listing degrades to a pill without a size, per the
+        // documented contract (undefined, never a rejection).
+        return undefined
       }
-      const size = cache.get(href)
-      return size === undefined ? undefined : { size }
     },
-    [generation],
+    [generation, path],
   )
 
   return useMemo<AssetPersistence>(
     () => ({
       resolveImageUrl,
-      resolveAssetOpenPath,
+      resolveAssetOpenPath: resolveAttachmentPath,
+      resolveWikiEmbed,
+      resolveFileLink,
       openAsset,
       saveFile,
       resolveFileInfo,
       saveError,
     }),
-    [resolveImageUrl, resolveAssetOpenPath, openAsset, saveFile, resolveFileInfo, saveError],
+    [
+      resolveImageUrl,
+      resolveAttachmentPath,
+      resolveWikiEmbed,
+      resolveFileLink,
+      openAsset,
+      saveFile,
+      resolveFileInfo,
+      saveError,
+    ],
   )
 }

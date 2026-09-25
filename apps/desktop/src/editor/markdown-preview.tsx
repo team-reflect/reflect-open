@@ -1,6 +1,7 @@
 import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver.ts'
 import { resolveYouTubeVideo } from '@/editor/youtube-video-resolver.ts'
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
+import type { WikiEmbedResolver } from '@meowdown/core'
 import { MarkdownView } from '@meowdown/react'
 import { useOpenExternalLink } from '@/editor/open-external-link.ts'
 import { resolveWikilink } from '@/editor/resolve-wikilink.ts'
@@ -20,8 +21,17 @@ import { cn } from '@/lib/utils.ts'
 interface MarkdownPreviewProps {
   /** The markdown body to render (callers strip frontmatter first). */
   content: string
-  /** Resolve `![…](…)` sources to displayable URLs; unresolved images are skipped. */
+  /**
+   * Resolve `![…](…)` sources to displayable URLs; unresolved images are
+   * skipped. Memoize it: a new identity re-renders the preview, which is how
+   * a newly loaded attachment catalog reaches its images.
+   */
   resolveImageUrl?: (src: string) => string | null
+  /**
+   * Classify Obsidian `![[target]]` embeds (images, file pills, note chips);
+   * omitted, embeds stay literal text. Memoize it like `resolveImageUrl`.
+   */
+  resolveWikiEmbed?: WikiEmbedResolver
   /**
    * Navigate a clicked `[[wiki link]]` target. Omitted, links render as
    * inert chips (the palette preview's behavior). `event` carries the
@@ -41,19 +51,19 @@ interface MarkdownPreviewProps {
 export function MarkdownPreview({
   content,
   resolveImageUrl,
+  resolveWikiEmbed,
   onWikiLinkClick,
   interactive = true,
   className,
 }: MarkdownPreviewProps): ReactElement {
   const openExternalLink = useOpenExternalLink()
-  // The resolver and click handler are read through refs so a changing prop
-  // never gives MarkdownView a new callback identity (which would re-render its
-  // whole tree).
+  // The click handler is read through a ref so a changing prop never gives
+  // MarkdownView a new callback identity (which would re-render its whole
+  // tree). The resolvers are memoized by their callers and pass through: a
+  // new identity is a changed answer the rendered images must pick up.
   const resolveXPost = useXPostResolver()
-  const resolveRef = useRef(resolveImageUrl)
   const navigateRef = useRef(onWikiLinkClick)
   useEffect(() => {
-    resolveRef.current = resolveImageUrl
     navigateRef.current = onWikiLinkClick
   })
 
@@ -63,9 +73,9 @@ export function MarkdownPreview({
   // navigation.
   const navigates = interactive && onWikiLinkClick != null
 
-  const resolveImageUrlStable = useCallback(
-    (src: string) => resolveRef.current?.(src) ?? undefined,
-    [],
+  const resolveImageUrlOrSkip = useCallback(
+    (src: string) => resolveImageUrl?.(src) ?? undefined,
+    [resolveImageUrl],
   )
   const onWikilinkClickStable = useCallback(
     (payload: { target: string; event: MouseEvent | KeyboardEvent; mod: boolean }) =>
@@ -82,7 +92,8 @@ export function MarkdownPreview({
       markMode="hide"
       interactive={interactive}
       resolveWikilink={resolveWikilink}
-      resolveImageUrl={resolveImageUrlStable}
+      resolveImageUrl={resolveImageUrlOrSkip}
+      {...(resolveWikiEmbed !== undefined ? { resolveWikiEmbed } : {})}
       {...(interactive ? { onLinkClick: openExternalLink } : {})}
       {...(navigates ? { onWikilinkClick: onWikilinkClickStable } : {})}
       className={cn('reflect-editor', className)}

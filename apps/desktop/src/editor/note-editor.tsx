@@ -3,6 +3,7 @@ import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-res
 import { resolveYouTubeVideo } from '@/editor/youtube-video-resolver.ts'
 import {
   useCallback,
+  useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
@@ -23,6 +24,7 @@ import type {
   MarkMode,
   SearchStatus,
   StartPendingReplacementOptions,
+  WikiEmbedResolver,
   WikilinkHoverHit,
   XPostMediaClickHandler,
   YouTubeVideoClickHandler,
@@ -141,8 +143,20 @@ interface NoteEditorProps {
    * has no hover to reveal the grip.
    */
   blockHandle?: boolean
-  /** Resolve an image `![…](…)` source to a displayable URL; unresolved images are skipped. */
+  /**
+   * Resolve an image `![…](…)` source to a displayable URL; unresolved images
+   * are skipped. Memoize it: a new identity means its answers changed (the
+   * note's folder, the graph session, the attachment catalog), and every
+   * rendered image re-resolves.
+   */
   resolveImageUrl?: (src: string) => string | null
+  /**
+   * Classify Obsidian `![[target]]` embeds as images, file pills, or note
+   * chips; `undefined` leaves the source literal. Memoize it like
+   * {@link NoteEditorProps.resolveImageUrl}: a new identity re-resolves every
+   * embed in the document.
+   */
+  resolveWikiEmbed?: WikiEmbedResolver
   /**
    * Vet a source (an image `src` or a link `href`) as a graph-relative asset
    * path for {@link openAsset}. Returns null for remote or unsafe sources.
@@ -244,6 +258,7 @@ export function NoteEditor({
   bulletAfterHeading = false,
   blockHandle = false,
   resolveImageUrl,
+  resolveWikiEmbed,
   resolveAssetOpenPath,
   openAsset,
   saveFile,
@@ -280,6 +295,7 @@ export function NoteEditor({
   const onNoteLinkClickRef = useRef(onNoteLinkClick)
   const onTagClickRef = useRef(onTagClick)
   const resolveImageUrlRef = useRef(resolveImageUrl)
+  const resolveWikiEmbedRef = useRef(resolveWikiEmbed)
   const resolveAssetOpenPathRef = useRef(resolveAssetOpenPath)
   const openAssetRef = useRef(openAsset)
   const saveFileRef = useRef(saveFile)
@@ -291,12 +307,42 @@ export function NoteEditor({
     onNoteLinkClickRef.current = onNoteLinkClick
     onTagClickRef.current = onTagClick
     resolveImageUrlRef.current = resolveImageUrl
+    resolveWikiEmbedRef.current = resolveWikiEmbed
     resolveAssetOpenPathRef.current = resolveAssetOpenPath
     openAssetRef.current = openAsset
     saveFileRef.current = saveFile
     resolveFileInfoRef.current = resolveFileInfo
     onExitBoundaryRef.current = onExitBoundary
   })
+
+  // meowdown resolves an image when it renders it and an embed when it parses
+  // it, through the stable wrappers below; a resolver whose answers changed
+  // must re-resolve what is already on screen. Compared against the
+  // identities the rendered document last used, so a mount (or StrictMode's
+  // remount) never refreshes.
+  const renderedResolvers = useRef({ resolveImageUrl, resolveWikiEmbed })
+  useEffect(() => {
+    const rendered = renderedResolvers.current
+    if (
+      rendered.resolveImageUrl === resolveImageUrl &&
+      rendered.resolveWikiEmbed === resolveWikiEmbed
+    ) {
+      return
+    }
+    renderedResolvers.current = { resolveImageUrl, resolveWikiEmbed }
+    const editor = innerRef.current
+    if (editor === null) {
+      return
+    }
+    // Only a document holding an embed has parse-time output to redo; the
+    // reparse re-resolves images too. Anything else re-resolves images in
+    // place, leaving the document (and a composition in progress) alone.
+    if (rendered.resolveWikiEmbed !== resolveWikiEmbed && editor.getMarkdown().includes('![[')) {
+      editor.refreshMarkdownRendering()
+    } else {
+      editor.refreshImages()
+    }
+  }, [resolveImageUrl, resolveWikiEmbed])
 
   const lightbox = useLightbox()
   const openLightbox = lightbox.open
@@ -348,6 +394,10 @@ export function NoteEditor({
     (src: string) => resolveImageUrlRef.current?.(src) ?? undefined,
     [],
   )
+  const handleResolveWikiEmbed: WikiEmbedResolver = useCallback(
+    (embed) => resolveWikiEmbedRef.current?.(embed),
+    [],
+  )
   const handleFilePaste = useCallback(
     async (file: File) => (await saveFileRef.current?.(file)) ?? undefined,
     [],
@@ -356,7 +406,7 @@ export function NoteEditor({
     // The event may also be the Mod-Enter key press that followed the link
     // (meowdown ≥0.33).
     ({ href, mod }: { href: string; event: MouseEvent | KeyboardEvent; mod: boolean }) => {
-      // A graph-relative `assets/…` href (an attachment link) opens through
+      // An attachment href (resolved from the note's folder) opens through
       // the generation-pinned asset command, never the URL opener — which
       // would receive a meaningless relative string.
       const assetPath = resolveAssetOpenPathRef.current?.(href) ?? null
@@ -386,7 +436,7 @@ export function NoteEditor({
     [followDeepLink],
   )
   // A file pill is a claimed link, so a click on it routes exactly like a
-  // link click: `assets/…` through the asset opener, anything else through
+  // link click: an attachment through the asset opener, anything else through
   // the deep-link/URL path.
   const handleFileClick: FileClickHandler = useCallback(
     ({ href, event, mod }) => handleLinkClick({ href, event, mod }),
@@ -496,6 +546,7 @@ export function NoteEditor({
         {...(onPendingReplacementResolve !== undefined ? { onPendingReplacementResolve } : {})}
         {...(onSlashMenuSearch !== undefined ? { onSlashMenuSearch } : {})}
         resolveImageUrl={handleResolveImageUrl}
+        resolveWikiEmbed={handleResolveWikiEmbed}
         resolveWikilink={resolveWikilink}
         onFilePaste={handleFilePaste}
         {...(resolveFileLink !== undefined ? { resolveFileLink } : {})}

@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { isAppError, readNote, splitFrontmatter } from '@reflect/core'
 import { MarkdownPreview } from '@/editor/markdown-preview.tsx'
-import { useAssetPersistence } from '@/editor/use-asset-persistence.ts'
+import { useNoteAttachments } from '@/editor/use-note-attachments.ts'
 import { formatDayLabel } from '@/lib/dates.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
@@ -37,7 +37,10 @@ async function readNoteForPreview(path: string): Promise<string | null> {
 export function NotePreview({ entry }: NotePreviewProps): ReactElement {
   const { graph } = useGraph()
   const { settings } = useSettings()
-  const { resolveImageUrl } = useAssetPersistence(graph?.generation ?? null)
+  const { resolveImageUrl, resolveWikiEmbed } = useNoteAttachments(
+    graph?.generation ?? null,
+    entry.path,
+  )
   const { data, isError } = useQuery({
     queryKey: queryKeys.index.notePreview(graph?.root, entry.path),
     queryFn: () => readNoteForPreview(entry.path),
@@ -54,7 +57,13 @@ export function NotePreview({ entry }: NotePreviewProps): ReactElement {
   } else if (body === null || body.trim() === '') {
     content = <p className="text-sm text-text-muted italic">Empty</p>
   } else {
-    content = <MarkdownPreview content={body} resolveImageUrl={resolveImageUrl} />
+    content = (
+      <MarkdownPreview
+        content={body}
+        resolveImageUrl={resolveImageUrl}
+        resolveWikiEmbed={resolveWikiEmbed}
+      />
+    )
   }
 
   return (

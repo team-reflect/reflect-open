@@ -1,12 +1,14 @@
 import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver.ts'
 import { resolveYouTubeVideo } from '@/editor/youtube-video-resolver.ts'
-import type { ReactElement } from 'react'
+import { useCallback, type ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
 import type { WikilinkClickHandler } from '@meowdown/core'
 import type { SnippetTask } from '@reflect/core'
 import { useOpenExternalLink } from '@/editor/open-external-link.ts'
 import { resolveWikilink } from '@/editor/resolve-wikilink.ts'
+import { useNoteAttachments } from '@/editor/use-note-attachments.ts'
 import { useSnippetTaskToggle } from '@/hooks/use-snippet-task-toggle.ts'
+import { useGraph } from '@/providers/graph-provider.tsx'
 
 interface BacklinkSnippetProps {
   /** The referencing block context's Markdown source (may span several lines). */
@@ -17,8 +19,6 @@ interface BacklinkSnippetProps {
   tasks: SnippetTask[]
   /** Navigate a clicked `[[wiki link]]` to its target. Pass a stable function. */
   onWikilinkClick: WikilinkClickHandler
-  /** Resolve `![…](…)` sources to displayable URLs. Pass a stable function. */
-  resolveImageUrl: (src: string) => string | undefined
 }
 
 /**
@@ -33,7 +33,8 @@ interface BacklinkSnippetProps {
  * Round `+ [ ]` task checkboxes are live — a click writes the
  * toggle through to the source note ({@link useSnippetTaskToggle}), old
  * Reflect's backlink-context behavior — while square GFM boxes stay read-only
- * (the `reflect-backlink-snippet` CSS keeps them inert-looking). The
+ * (the `reflect-backlink-snippet` CSS keeps them inert-looking). Images and
+ * `![[embeds]]` resolve from the source note's folder, as in its editor. The
  * `reflect-editor` class shares the editor's chip styling; the
  * `reflect-backlink-snippet` wrapper keeps it in the panel's compact line box.
  */
@@ -42,8 +43,13 @@ export function BacklinkSnippet({
   notePath,
   tasks,
   onWikilinkClick,
-  resolveImageUrl,
 }: BacklinkSnippetProps): ReactElement {
+  const generation = useGraph({ optional: true })?.graph?.generation ?? null
+  const { resolveImageUrl, resolveWikiEmbed } = useNoteAttachments(generation, notePath)
+  const resolveImageUrlOrSkip = useCallback(
+    (src: string) => resolveImageUrl(src) ?? undefined,
+    [resolveImageUrl],
+  )
   const resolveXPost = useXPostResolver()
   const onTaskClick = useSnippetTaskToggle(notePath, tasks)
   const openExternalLink = useOpenExternalLink()
@@ -60,7 +66,8 @@ export function BacklinkSnippet({
         onWikilinkClick={onWikilinkClick}
         onLinkClick={openExternalLink}
         {...(onTaskClick ? { onTaskClick } : {})}
-        resolveImageUrl={resolveImageUrl}
+        resolveImageUrl={resolveImageUrlOrSkip}
+        resolveWikiEmbed={resolveWikiEmbed}
       />
     </div>
   )

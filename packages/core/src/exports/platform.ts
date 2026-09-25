@@ -122,6 +122,14 @@ export {
   type GraphPathKind,
 } from '../graph/paths.ts'
 export {
+  createAttachmentCatalog,
+  isImageAttachmentPath,
+  resolveAttachmentLink,
+  resolveWikiEmbedTarget,
+  type AttachmentCatalog,
+  type WikiEmbedTarget,
+} from '../graph/attachment-resolution.ts'
+export {
   wikiNoteReference,
   markdownNoteReference,
   noteBasenameKey,

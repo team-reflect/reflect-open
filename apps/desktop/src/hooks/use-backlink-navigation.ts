@@ -1,6 +1,5 @@
 import { useCallback } from 'react'
 import type { WikilinkClickHandler } from '@meowdown/core'
-import { useAssetPersistence } from '@/editor/use-asset-persistence.ts'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import type { ModClickEvent } from '@/lib/windows/open-in-new-window.ts'
@@ -25,14 +24,12 @@ export interface BacklinkNavigation {
    * Stable, so it never rebuilds the snippet trees.
    */
   onWikilinkClick: WikilinkClickHandler
-  /** Resolve `![…](…)` sources inside a snippet to displayable URLs. Stable. */
-  resolveImageUrl: (src: string) => string | undefined
 }
 
 /**
  * Navigation for an incoming-backlinks surface, shared by the desktop panel
- * and the mobile section. Wiki links and images inside snippets resolve
- * through the same pipelines as the editor.
+ * and the mobile section. Wiki links inside snippets resolve through the same
+ * pipeline as the editor.
  */
 export function useBacklinkNavigation(): BacklinkNavigation {
   const { graph } = useGraph()
@@ -49,15 +46,10 @@ export function useBacklinkNavigation(): BacklinkNavigation {
   )
 
   const navigateWikiLink = useWikiLinkNavigation(graph?.generation ?? null)
-  const { resolveImageUrl } = useAssetPersistence(graph?.generation ?? null)
   const onWikilinkClick = useCallback<WikilinkClickHandler>(
     (payload) => navigateWikiLink({ target: payload.target, openInNewWindow: payload.mod }),
     [navigateWikiLink],
   )
-  const resolveImageUrlStable = useCallback(
-    (src: string) => resolveImageUrl(src) ?? undefined,
-    [resolveImageUrl],
-  )
 
-  return { openSource, onWikilinkClick, resolveImageUrl: resolveImageUrlStable }
+  return { openSource, onWikilinkClick }
 }

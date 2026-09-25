@@ -47,7 +47,6 @@ function renderSnippet(tasks: SnippetTask[] = anchors()) {
         notePath="notes/meeting.md"
         tasks={tasks}
         onWikilinkClick={() => {}}
-        resolveImageUrl={() => undefined}
       />
     </QueryClientProvider>,
   )
@@ -120,7 +119,6 @@ describe('BacklinkSnippet task checkboxes', () => {
           notePath="notes/meeting.md"
           tasks={[]}
           onWikilinkClick={() => {}}
-          resolveImageUrl={() => undefined}
         />
       </QueryClientProvider>,
     )
@@ -142,7 +140,6 @@ describe('BacklinkSnippet task checkboxes', () => {
           notePath="notes/meeting.md"
           tasks={squareOnly}
           onWikilinkClick={() => {}}
-          resolveImageUrl={() => undefined}
         />
       </QueryClientProvider>,
     )
@@ -165,7 +162,6 @@ describe('BacklinkSnippet wiki-link chips', () => {
           notePath="notes/meeting.md"
           tasks={[]}
           onWikilinkClick={onWikilinkClick}
-          resolveImageUrl={() => undefined}
         />
       </QueryClientProvider>,
     )

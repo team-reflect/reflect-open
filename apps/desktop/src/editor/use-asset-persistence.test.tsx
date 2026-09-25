@@ -9,9 +9,9 @@ vi.mock('@tauri-apps/api/core', () => ({
     `${protocol}://localhost/${encodeURIComponent(filePath)}`,
 }))
 import { resetOperations, useOperations, type Operation } from '@/lib/operations.ts'
+import { queryClient } from '@/lib/query-client.ts'
 import {
   LARGE_FILE_BYTES,
-  resolveAssetFileLink,
   useAssetPersistence,
   type AssetPersistence,
 } from './use-asset-persistence.ts'
@@ -64,6 +64,7 @@ afterEach(() => {
   persistence = null
   resetOperations()
   operations = []
+  queryClient.clear()
 })
 
 describe('useAssetPersistence saveFile', () => {
@@ -149,7 +150,7 @@ describe('useAssetPersistence resolveImageUrl', () => {
     )
   })
 
-  it('maps a safe assets/ path onto the generation-pinned reflect-asset URL', async () => {
+  it('maps an assets/ path onto the generation-pinned reflect-asset URL', async () => {
     installUploadBridge()
     await renderPersistence({ generation: 3 })
 
@@ -158,11 +159,24 @@ describe('useAssetPersistence resolveImageUrl', () => {
     )
   })
 
-  it('declines unsafe paths and missing sessions', async () => {
+  it("resolves a vault image from the note's own folder", async () => {
+    installUploadBridge()
+    await renderPersistence({ generation: 3, path: 'Projects/Garden redesign.md' })
+
+    expect(persistence!.resolveImageUrl('../attachments/garden-budget.png')).toBe(
+      `reflect-asset://localhost/${encodeURIComponent('3/attachments/garden-budget.png')}`,
+    )
+    expect(persistence!.resolveAssetOpenPath('../attachments/garden-budget.png')).toBe(
+      'attachments/garden-budget.png',
+    )
+  })
+
+  it('declines unsafe paths, notes, and missing sessions', async () => {
     installUploadBridge()
     await renderPersistence({ generation: 3 })
 
     expect(persistence!.resolveImageUrl('assets/../secrets.env')).toBeNull()
+    expect(persistence!.resolveImageUrl('../../outside.png')).toBeNull()
     expect(persistence!.resolveImageUrl('notes/other.md')).toBeNull()
 
     await renderPersistence({ generation: null })
@@ -174,25 +188,30 @@ function fileLink(href: string): { href: string; label: string; title: string } 
   return { href, label: 'label', title: '' }
 }
 
-describe('resolveAssetFileLink', () => {
-  it('claims safe graph-relative assets/ links only', () => {
-    expect(resolveAssetFileLink(fileLink('assets/q3-report.pdf'))).toBe(true)
-    expect(resolveAssetFileLink(fileLink('assets/sub/archive.zip'))).toBe(true)
+describe('useAssetPersistence resolveFileLink', () => {
+  it('claims links to local attachments, resolved from the note folder', async () => {
+    await renderPersistence({ generation: 3, path: 'Projects/Plan.md' })
+    const claims = persistence!.resolveFileLink
 
-    expect(resolveAssetFileLink(fileLink('https://example.com/q3.pdf'))).toBe(false)
-    expect(resolveAssetFileLink(fileLink('notes/other.md'))).toBe(false)
-    expect(resolveAssetFileLink(fileLink('assets/../secrets.env'))).toBe(false)
-    expect(resolveAssetFileLink(fileLink(String.raw`assets\evil.pdf`))).toBe(false)
-    expect(resolveAssetFileLink(fileLink('assets/'))).toBe(false)
+    expect(claims(fileLink('assets/q3-report.pdf'))).toBe(true)
+    expect(claims(fileLink('assets/sub/archive.zip'))).toBe(true)
+    expect(claims(fileLink('../attachments/report.pdf'))).toBe(true)
+
+    expect(claims(fileLink('https://example.com/q3.pdf'))).toBe(false)
+    expect(claims(fileLink('notes/other.md'))).toBe(false)
+    expect(claims(fileLink('assets/../secrets.env'))).toBe(false)
+    expect(claims(fileLink(String.raw`assets\evil.pdf`))).toBe(false)
+    expect(claims(fileLink('assets/'))).toBe(false)
+    expect(claims(fileLink('../../outside.pdf'))).toBe(false)
   })
 })
 
-/** A bridge whose upload commands succeed and whose `dir_list` serves `entries`. */
+/** A bridge whose upload commands succeed and whose `list_attachments` serves `entries`. */
 function installListingBridge(
   entries: Array<{ path: string; size: number }>,
 ): ReturnType<typeof vi.fn> {
   const invoke = vi.fn(async (command: string, args: Record<string, unknown>) =>
-    command === 'dir_list'
+    command === 'list_attachments'
       ? entries.map((entry) => ({ ...entry, modifiedMs: 0 }))
       : command === 'asset_upload_begin'
         ? 'upload-1'
@@ -205,7 +224,7 @@ function installListingBridge(
 }
 
 describe('useAssetPersistence resolveFileInfo', () => {
-  it('lists the assets directory once for a burst of pills', async () => {
+  it('lists the vault attachments once for a burst of pills', async () => {
     const invoke = installListingBridge([
       { path: 'assets/q3-report.pdf', size: 1234 },
       { path: 'assets/archive.zip', size: 5678 },
@@ -219,11 +238,23 @@ describe('useAssetPersistence resolveFileInfo', () => {
 
     expect(report).toEqual({ size: 1234 })
     expect(archive).toEqual({ size: 5678 })
-    expect(invoke.mock.calls.filter(([command]) => command === 'dir_list')).toHaveLength(1)
+    expect(invoke.mock.calls.filter(([command]) => command === 'list_attachments')).toHaveLength(1)
   })
 
-  it('serves a just-saved file from the save itself, without a listing', async () => {
-    const invoke = installListingBridge([])
+  it('sizes vault attachments outside assets/, including embed sources', async () => {
+    installListingBridge([{ path: 'attachments/report.pdf', size: 42 }])
+    await renderPersistence({ generation: 3, path: 'Projects/Plan.md' })
+
+    await expect(persistence!.resolveFileInfo('../attachments/report.pdf')).resolves.toEqual({
+      size: 42,
+    })
+    await expect(persistence!.resolveFileInfo('/attachments/report.pdf')).resolves.toEqual({
+      size: 42,
+    })
+  })
+
+  it('serves a just-saved file from the save itself', async () => {
+    installListingBridge([])
     const { act } = await renderPersistence({ generation: 3 })
 
     await act(async () => {
@@ -233,21 +264,19 @@ describe('useAssetPersistence resolveFileInfo', () => {
     await expect(persistence!.resolveFileInfo('assets/q3-report.pdf')).resolves.toEqual({
       size: 1234,
     })
-    expect(invoke.mock.calls.filter(([command]) => command === 'dir_list')).toHaveLength(0)
   })
 
-  it('declines remote or unsafe hrefs without touching the bridge', async () => {
-    const invoke = installListingBridge([])
+  it('declines remote or unsafe hrefs', async () => {
+    installListingBridge([{ path: 'secrets.env', size: 9 }])
     await renderPersistence({ generation: 3 })
 
     await expect(
       persistence!.resolveFileInfo('https://example.com/q3.pdf'),
     ).resolves.toBeUndefined()
     await expect(persistence!.resolveFileInfo('assets/../secrets.env')).resolves.toBeUndefined()
-    expect(invoke).not.toHaveBeenCalled()
   })
 
-  it('returns undefined for an asset missing from the listing', async () => {
+  it('returns undefined for an attachment missing from the listing', async () => {
     installListingBridge([{ path: 'assets/other.pdf', size: 9 }])
     await renderPersistence({ generation: 3 })
 
@@ -262,7 +291,7 @@ describe('useAssetPersistence resolveFileInfo', () => {
     expect(invoke).not.toHaveBeenCalled()
   })
 
-  it('degrades to no size when the assets listing fails', async () => {
+  it('degrades to no size when the listing fails', async () => {
     setBridge({
       invoke: async () => {
         throw { kind: 'io', message: 'bridge down' }
@@ -279,7 +308,7 @@ describe('useAssetPersistence resolveFileInfo', () => {
     let resolveListing: ((entries: unknown) => void) | null = null
     setBridge({
       invoke: (command: string) =>
-        command === 'dir_list'
+        command === 'list_attachments'
           ? new Promise((resolve) => {
               resolveListing = resolve
             })

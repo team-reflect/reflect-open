@@ -39,6 +39,32 @@ it is not an import and does not rearrange its files.
 - Backlinks, tags, daily-note dates, attachments, and readable filenames remain useful
   outside Reflect because they are encoded in the files themselves.
 
+## Attachments and Embeds in an Opened Vault
+
+An adopted vault keeps its images beside its notes, so attachment references resolve
+the way CommonMark and Obsidian read them (`packages/core/src/graph/attachment-resolution.ts`):
+
+- A Markdown destination (`![alt](../attachments/photo.png)`) resolves from the note's
+  own folder first, then from the vault root. Reflect's own `![](assets/…)` links are
+  vault-root relative, which is also the answer before the attachment catalog has
+  loaded, so Reflect-written images never wait on it. A bare filename that matches
+  neither reading is found by name anywhere in the vault (Obsidian's "shortest path").
+- An Obsidian embed, `![[photo.png]]`, is vault-root relative when it names a folder
+  and found by name when it does not. Images render inline and other attachments render
+  as file pills. Ties go to the file beside the note, then the shallowest one.
+- Links to local attachments render as file pills and open in the OS default app.
+- The resolver only ever returns a spelling the index records for that reference, so
+  the asset privacy gate always sees the note that displays a file. A bare name is
+  stored bare and matches every file with that name, so a name lookup is covered too.
+
+**Note embeds are not transcluded.** `![[Deep Work]]` renders as a link chip to the
+note, like `[[Deep Work]]`, and counts as a backlink. The Markdown is left as written,
+so Obsidian still transcludes it. Transclusion stays out of scope for three reasons.
+It would bring a second note's content into the editor, which needs editing and
+round-trip rules. It would put another surface in competition with the editor. And a
+public note that transcluded a private one would render private content where AI
+features act on the public note.
+
 ## Non-Goals
 
 - No Markdown ZIP export button.

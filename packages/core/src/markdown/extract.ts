@@ -186,8 +186,12 @@ function keepAttachments(candidates: readonly (string | null)[]): string[] {
   ]
 }
 
-/** Does this wiki-embed target name a supported attachment rather than a note? */
-function isAttachmentEmbedTarget(target: string): boolean {
+/**
+ * Does this wiki-embed target name a supported attachment rather than a note?
+ * The one classification the index and the editor share, so `![[x]]` can
+ * never be a file in one and a note link in the other.
+ */
+export function isAttachmentEmbedTarget(target: string): boolean {
   return target !== '' && isAttachmentPath(target.split('/').at(-1) ?? target)
 }
 
@@ -199,7 +203,7 @@ function isAttachmentEmbedTarget(target: string): boolean {
  * (traversal, hidden components) returns null — it must never reach the
  * asset projection.
  */
-function wikiEmbedAssetPath(target: string): string | null {
+export function wikiEmbedAssetPath(target: string): string | null {
   const path = resolveSegments([], target.replace(/^\//, ''))
   return path !== null && isAttachmentPath(path) ? path : null
 }
