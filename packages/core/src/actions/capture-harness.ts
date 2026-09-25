@@ -148,7 +148,10 @@ export function wireCaptureMocks(): void {
     if (contents === undefined) throw notFound()
     return contents
   })
-  writeNoteMock.mockImplementation(async (path, contents) => {
+  writeNoteMock.mockImplementation(async (path, contents, _generation, expected) => {
+    if (expected !== undefined && (files.get(path) ?? null) !== expected) {
+      throw { kind: 'io', message: 'Note changed on disk; reload before retrying' }
+    }
     files.set(path, contents)
   })
   listFilesMock.mockImplementation(async () =>

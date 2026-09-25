@@ -16,6 +16,7 @@ import {
   IDENTITY,
   inboxRemoveMock,
   promoteMock,
+  readNoteMock,
   rejected,
   scrapeMock,
   spool,
@@ -59,6 +60,75 @@ beforeEach(() => {
 })
 
 describe('drainCaptureInbox', () => {
+  it('keeps daily edits that arrive while preparing the capture', async () => {
+    files.set(DAILY, '+ [x] Existing task\n')
+    addSpool(envelope())
+    promoteMock.mockImplementationOnce(async () => {
+      files.set(DAILY, '+ [x] Existing task\n+ [ ] Added while capture was saving\n')
+    })
+    expect((await drain()).stopped).toBeNull()
+    expect(files.get(DAILY)).toContain('Added while capture was saving')
+    expect(files.get(DAILY)).toContain(`[[${IDENTITY.base}|An article]]`)
+  })
+
+  it('keeps a capture queued when the daily revision changes, then retries without losing either edit', async () => {
+    files.set(DAILY, '+ [x] Existing task\n')
+    addSpool(envelope())
+    const write = writeNoteMock.getMockImplementation()!
+    writeNoteMock.mockImplementation(async (path, content, generation, expected) => {
+      if (path === DAILY) {
+        files.set(DAILY, '+ [x] Existing task\n+ [ ] Arrived from another device\n')
+      }
+      await write(path, content, generation, expected)
+    })
+    const first = await drain()
+    expect(first.drained).toBe(0)
+    expect(first.stopped?.reason).toBe('io')
+    expect(files.get(DAILY)).toContain('Arrived from another device')
+    expect(spool.has(`${envelope().id}.json`)).toBe(true)
+
+    writeNoteMock.mockImplementation(write)
+    expect((await drain()).stopped).toBeNull()
+    expect(files.get(DAILY)).toContain('Arrived from another device')
+    expect(files.get(DAILY)?.match(new RegExp(IDENTITY.base, 'g'))).toHaveLength(1)
+    expect(spool.size).toBe(0)
+  })
+
+  it('adds a link to the host live document instead of its older disk snapshot', async () => {
+    files.set(DAILY, '+ [x] Existing task\n')
+    addSpool(envelope())
+    const editDaily = vi.fn(async (path: string, transform: (source: string) => string) => {
+      files.set(path, transform('+ [x] Existing task\n+ [ ] Unsaved typing\n'))
+    })
+    expect((await drain({ editDaily })).stopped).toBeNull()
+    expect(editDaily).toHaveBeenCalledOnce()
+    expect(files.get(DAILY)).toContain('Unsaved typing')
+    expect(files.get(DAILY)).toContain(`[[${IDENTITY.base}|An article]]`)
+    expect(writeNoteMock.mock.calls.some(([path]) => path === DAILY)).toBe(false)
+  })
+
+  it('does not replace a daily note created while a text capture was reading it', async () => {
+    const capture: TextCaptureEnvelope = {
+      version: 1,
+      id: envelope().id,
+      capturedAt: CAPTURED_AT.toISOString(),
+      source: 'ios-share',
+      kind: 'append',
+      text: 'Shared text',
+    }
+    spool.set(`${capture.id}.json`, { contents: JSON.stringify(capture), modifiedMs: 0 })
+    readNoteMock.mockImplementationOnce(async () => {
+      files.set(DAILY, '- [[existing-link]]\n')
+      throw { kind: 'notFound', message: 'missing at read time' }
+    })
+    expect((await drain()).stopped?.reason).toBe('io')
+    expect(files.get(DAILY)).toBe('- [[existing-link]]\n')
+    expect(spool.has(`${capture.id}.json`)).toBe(true)
+    expect((await drain()).stopped).toBeNull()
+    expect(files.get(DAILY)).toContain('[[existing-link]]')
+    expect(files.get(DAILY)).toContain('Shared text')
+  })
+
   it('writes the capture note, daily entry, and asset — then removes the spool', async () => {
     addSpool(envelope({ selection: 'quoted text', note: 'check later' }))
 

@@ -51,6 +51,11 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   let saveChain: Promise<void> = Promise.resolve()
   /** Settles when the current initial load has committed its state. */
   let loadPromise: Promise<void> = Promise.resolve()
+  /** A newer reload or write supersedes pending reads, even if they finish last. */
+  let reloadVersion = 0
+  let pendingReloads = 0
+  let dispatchedWriteVersion = 0
+  let savedWriteVersion = 0
   /**
    * Content of the write currently in flight (set when dispatched, before the
    * write resolves). The watcher event for our own save can arrive before the
@@ -124,15 +129,22 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
           return
         }
         const content = header + buffer
+        const writeVersion = ++dispatchedWriteVersion
+        reloadVersion += 1
         inFlightWrite = content
         try {
           await write(path, content, missing ? null : disk)
+          savedWriteVersion = writeVersion
+          reloadVersion += 1
           disk = content
           dirty = header + buffer !== content
           missing = false // the landed write created the file if it was missing
           error = null // a previous save failure is resolved by this success
           emit()
           onContent?.(content, 'saved')
+          if (pendingReloads > 0) {
+            void reconcileFromDisk()
+          }
         } finally {
           inFlightWrite = null
         }
@@ -241,17 +253,26 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
    * external-change path).
    */
   async function reconcileFromDisk(): Promise<void> {
+    const version = ++reloadVersion
+    pendingReloads += 1
     let content: string
     try {
       content = await io.read(path)
     } catch (cause) {
-      if (!disposed && isAppError(cause) && cause.kind === 'notFound') {
+      if (
+        !disposed &&
+        version === reloadVersion &&
+        isAppError(cause) &&
+        cause.kind === 'notFound'
+      ) {
         missing = true
         emit()
       }
       return // preserve the buffer if the file disappeared or cannot be read
+    } finally {
+      pendingReloads -= 1
     }
-    if (disposed) {
+    if (disposed || version !== reloadVersion) {
       return
     }
     if (content === disk || content === inFlightWrite) {
@@ -290,6 +311,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   }
 
   function load(): void {
+    reloadVersion += 1
     loading = true
     missedChange = false
     status = 'loading'
@@ -371,6 +393,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       return
     }
     const content = conflict
+    reloadVersion += 1
     conflict = null
     // Same re-gating as the clean-reload path: never load lossy content into a
     // live editor whose next save would drop what it can't model.
@@ -446,12 +469,20 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
    * can't diverge, then re-throws the failure.
    */
   async function commitBodyEdit(transform: (full: string) => string): Promise<boolean> {
-    if (io.write === null || disposed || isProtected || status !== 'ready' || conflict !== null) {
+    if (
+      io.write === null ||
+      disposed ||
+      deleting ||
+      isProtected ||
+      status !== 'ready' ||
+      conflict !== null
+    ) {
       return false
     }
     reconcilePendingEditorInput?.()
     const previousHeader = header
     const previousBuffer = buffer
+    const previousWriteVersion = dispatchedWriteVersion
     const doc = splitDoc(transform(header + buffer))
     header = doc.header
     buffer = doc.body
@@ -463,9 +494,10 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     emit()
     await flush()
     // `flush()` resolves even when the write failed (captured in `error`, not
-    // thrown). Revert and surface the failure: it persists, or nothing changes.
-    if (shouldPersist && error !== null) {
-      const message = error
+    // thrown), or a new conflict paused it before dispatch. Only a write started
+    // after this edit can confirm persistence; an earlier in-flight write cannot.
+    if (shouldPersist && (error !== null || savedWriteVersion <= previousWriteVersion)) {
+      const message = error ?? 'The note changed before the edit could be saved; retry'
       if (header === doc.header) header = previousHeader
       if (buffer === doc.body) {
         buffer = previousBuffer
@@ -542,6 +574,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       return path
     },
     retarget: (to: string) => {
+      reloadVersion += 1
       path = to
     },
     load,
