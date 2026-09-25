@@ -96,8 +96,10 @@ import { serializeWikiSuggestionAddress } from './suggest.ts'
  * 20 - `notes.has_content` records whether a note would render blank, and
  * `search_fts.body` now carries the raw Markdown body, so every note must
  * reproject.
+ * 21 - task breadcrumbs include the nearest meaningful Markdown heading,
+ * excluding the automatic Tasks section. Existing task rows must reproject.
  */
-export const PROJECTION_VERSION = 20
+export const PROJECTION_VERSION = 21
 
 /**
  * Precedence of the spellings a note answers to (`note_claims.tier`): the
@@ -182,7 +184,7 @@ export const indexedTaskSchema = z.object({
   markerOffset: z.number(),
   /** Display/search text of the task's marker line, markdown stripped. */
   text: z.string(),
-  /** Parent outline/list item text, top-down, displayed in the Tasks view. */
+  /** Nearest meaningful heading followed by parent list labels, top-down, displayed in the Tasks view. */
   breadcrumbs: taskBreadcrumbsSchema,
   /** The marker line verbatim — the surgical write-back's staleness guard. */
   raw: z.string(),

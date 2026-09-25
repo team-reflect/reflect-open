@@ -5,8 +5,8 @@ import { plainTextOfRange } from './plain-text.ts'
 /**
  * A task's breadcrumbs are the rendered labels of its ancestor `ListItem`
  * nodes, outermost first — the outline context the Tasks view shows above a
- * run of rows. Only list ancestry counts: headings and sibling items are not
- * context, and a parent task labels the subtasks nested beneath it. Each
+ * run of rows. The extractor prepends the nearest meaningful section heading;
+ * this helper supplies list ancestry, with parent tasks labeling subtasks. Each
  * label is the item's lead textblock (its first paragraph or task line)
  * rendered through the same plain-text pass as task text, so markdown
  * formatting is stripped consistently and wrapped lines stay one label.

@@ -1,4 +1,5 @@
 import { displayNoteTitle } from '../markdown/note-title.ts'
+import { isTasksLabel } from '../markdown/task-heading.ts'
 import type { OpenTask } from './queries.ts'
 
 /**
@@ -31,19 +32,11 @@ export interface TaskGroup {
   tasks: OpenTask[]
 }
 
-const PUNCTUATION_RE = /[\p{P}\p{S}]/gu
-
-function normalizedBreadcrumb(text: string): string {
-  return text.replaceAll(/\s+/g, '').replaceAll(PUNCTUATION_RE, '')
-}
-
-/** Trim breadcrumb labels and hide a lone generic Tasks/Todo parent. */
+/** Trim breadcrumb labels and omit the automatic Tasks section label. */
 export function visibleTaskBreadcrumbs(breadcrumbs: readonly string[]): string[] {
-  const visible = breadcrumbs.map((text) => text.trim()).filter((text) => text.length > 0)
-  if (visible.length !== 1) {
-    return visible
-  }
-  return /^(?:task|todo)s?$/i.test(normalizedBreadcrumb(visible[0]!)) ? [] : visible
+  return breadcrumbs
+    .map((text) => text.trim())
+    .filter((text) => text.length > 0 && !isTasksLabel(text))
 }
 
 /** One consecutive run of task rows sharing the same parent outline labels. */
@@ -58,7 +51,7 @@ function haveSameBreadcrumbs(left: readonly string[], right: readonly string[]):
   return left.length === right.length && left.every((part, index) => part === right[index])
 }
 
-/** Group consecutive task rows that share the same parent outline context. */
+/** Group consecutive task rows in one note that share the same visible context. */
 export function groupTaskContexts(tasks: readonly OpenTask[]): TaskContext[] {
   const contexts: {
     breadcrumbs: readonly string[]
@@ -68,12 +61,17 @@ export function groupTaskContexts(tasks: readonly OpenTask[]): TaskContext[] {
 
   for (const task of tasks) {
     const previous = contexts.at(-1)
-    if (previous !== undefined && haveSameBreadcrumbs(previous.breadcrumbs, task.breadcrumbs)) {
+    const visibleBreadcrumbs = visibleTaskBreadcrumbs(task.breadcrumbs)
+    if (
+      previous !== undefined &&
+      previous.tasks[0]?.notePath === task.notePath &&
+      haveSameBreadcrumbs(previous.visibleBreadcrumbs, visibleBreadcrumbs)
+    ) {
       previous.tasks.push(task)
     } else {
       contexts.push({
         breadcrumbs: task.breadcrumbs,
-        visibleBreadcrumbs: visibleTaskBreadcrumbs(task.breadcrumbs),
+        visibleBreadcrumbs,
         tasks: [task],
       })
     }

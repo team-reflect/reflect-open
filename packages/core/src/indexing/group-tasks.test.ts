@@ -35,14 +35,28 @@ describe('visibleTaskBreadcrumbs', () => {
     expect(visibleTaskBreadcrumbs(['', ' Project ', '  '])).toEqual(['Project'])
   })
 
-  it('hides common single task headings', () => {
-    for (const heading of ['Task', 'Tasks:', 'todo', 'TODOs', 'To Do', "To Do's: "]) {
+  it('hides only the exact Tasks label regardless of casing or surrounding spaces', () => {
+    for (const heading of ['Tasks', ' tasks ', 'TASKS', '\tTaSkS\t']) {
       expect(visibleTaskBreadcrumbs([heading])).toEqual([])
     }
   })
 
-  it('keeps multi-part breadcrumbs even when one part is common', () => {
-    expect(visibleTaskBreadcrumbs(['Tasks', 'Project'])).toEqual(['Tasks', 'Project'])
+  it('keeps other task-related labels meaningful', () => {
+    for (const heading of [
+      'Task',
+      'Tasks:',
+      'House tasks',
+      'todo',
+      'TODOs',
+      'To Do',
+      "To Do's: ",
+    ]) {
+      expect(visibleTaskBreadcrumbs([heading])).toEqual([heading.trim()])
+    }
+  })
+
+  it('omits Tasks from multi-part breadcrumbs while retaining the other labels', () => {
+    expect(visibleTaskBreadcrumbs(['Tasks', 'House chore', ' tasks '])).toEqual(['House chore'])
   })
 })
 
@@ -71,9 +85,37 @@ describe('groupTaskContexts', () => {
   it('labels each context with its visible breadcrumbs', () => {
     const contexts = groupTaskContexts([
       task({ markerOffset: 1, breadcrumbs: [' Project '] }),
-      task({ markerOffset: 2, breadcrumbs: ['Tasks:'] }),
+      task({ markerOffset: 2, breadcrumbs: ['Tasks'] }),
     ])
     expect(contexts.map((context) => context.visibleBreadcrumbs)).toEqual([['Project'], []])
+  })
+
+  it('groups equal visible contexts without rewriting stored breadcrumbs', () => {
+    const tasks = [
+      task({ markerOffset: 1, breadcrumbs: ['Tasks', 'House chore'] }),
+      task({ markerOffset: 2, breadcrumbs: [' House chore '] }),
+      task({ markerOffset: 3, breadcrumbs: ['Tasks'] }),
+      task({ markerOffset: 4, breadcrumbs: [] }),
+    ]
+    const contexts = groupTaskContexts(tasks)
+
+    expect(contexts.map((context) => context.visibleBreadcrumbs)).toEqual([['House chore'], []])
+    expect(contexts.map((context) => context.tasks)).toEqual([tasks.slice(0, 2), tasks.slice(2)])
+    expect(contexts[0]?.tasks[0]?.breadcrumbs).toEqual(['Tasks', 'House chore'])
+    expect(contexts[1]?.tasks[0]?.breadcrumbs).toEqual(['Tasks'])
+  })
+
+  it('keeps matching contexts in different notes separate', () => {
+    const tasks = [
+      task({ notePath: 'notes/a.md', breadcrumbs: ['House chore'] }),
+      task({ notePath: 'notes/b.md', breadcrumbs: ['House chore'] }),
+      task({ notePath: 'notes/b.md', markerOffset: 10, breadcrumbs: ['Tasks'] }),
+      task({ notePath: 'notes/c.md', breadcrumbs: [] }),
+    ]
+
+    expect(groupTaskContexts(tasks).map((context) => context.tasks)).toEqual(
+      tasks.map((entry) => [entry]),
+    )
   })
 
   it('returns no contexts for no tasks', () => {

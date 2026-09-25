@@ -1,5 +1,6 @@
 import { parseXPostId } from '@post-embed/schema'
-import type { SyntaxNode } from '@meowdown/markdown'
+import { headingContentSpan, linkedHeadingTarget } from './heading-blocks.ts'
+import type { SyntaxNode, Tree } from '@meowdown/markdown'
 import { dateFromDailyPath, isAttachmentPath, isDaily } from '../graph/paths.ts'
 import { parseFrontmatter, splitFrontmatter } from './frontmatter.ts'
 import { parseBody } from './grammar.ts'
@@ -9,6 +10,7 @@ import { headingLevelOf } from './node-types.ts'
 import { buildPlainText, plainTextOfRange, unescapeMarkdownText } from './plain-text.ts'
 import { normalizeWikiTarget } from './resolve.ts'
 import { taskBreadcrumbs } from './task-breadcrumbs.ts'
+import { isTasksLabel } from './task-heading.ts'
 import { parseTaskMarker } from './task-marker.ts'
 import { isWikiNodeName, wikiBracketStart } from './wiki-nodes.ts'
 import type {
@@ -300,13 +302,15 @@ function lineEndAfter(body: string, from: number): number {
  * line verbatim from the marker onward for the write-back guard.
  */
 function readTask(
-  body: string,
+  source: string,
   taskNode: SyntaxNode,
   bodyOffset: number,
   cuts: Span[],
   literalRanges: Span[],
   wikiLinks: WikiLink[],
+  headings: readonly Heading[],
 ): ParsedTask | null {
+  const body = source.slice(bodyOffset)
   const { from, to } = taskNode
   if (!hasRoundTaskListMarker(body, from)) {
     return null
@@ -317,9 +321,26 @@ function readTask(
   }
   const lineEnd = lineEndAfter(body, from)
   const markerOffset = from + bodyOffset
+  const heading = headings.findLast(
+    (candidate) => candidate.topLevel && candidate.from < markerOffset,
+  )
+  const headingLabel =
+    heading === undefined ||
+    isTasksLabel(linkedHeadingTarget(source, heading, wikiLinks) ?? heading.text)
+      ? ''
+      : plainTextOfRange(
+          body,
+          heading.from - bodyOffset,
+          heading.to - bodyOffset,
+          cuts,
+          literalRanges,
+        )
   return {
     text: plainTextOfRange(body, from, lineEnd, cuts, literalRanges),
-    breadcrumbs: taskBreadcrumbs(body, taskNode, cuts, literalRanges),
+    breadcrumbs: [
+      ...(headingLabel === '' || isTasksLabel(headingLabel) ? [] : [headingLabel]),
+      ...taskBreadcrumbs(body, taskNode, cuts, literalRanges),
+    ],
     raw: body.slice(from, lineEnd),
     checked: marker.checked,
     markerOffset,
@@ -406,6 +427,17 @@ function deriveTitle(frontmatter: Frontmatter, headings: Heading[], path: string
 
 /** Parse one note's full source into the stable {@link ParsedNote} contract. */
 export function parseNote(input: { path: string; source: string }): ParsedNote {
+  return parseNoteWithTree(input).note
+}
+
+interface ParsedNoteWithTree {
+  readonly note: ParsedNote
+  readonly tree: Tree
+  readonly bodyOffset: number
+}
+
+/** Parse a note once, retaining its body tree for structural source edits. */
+export function parseNoteWithTree(input: { path: string; source: string }): ParsedNoteWithTree {
   const { path, source } = input
   const { raw, body, bodyOffset } = splitFrontmatter(source)
   const { data: frontmatter, warning } = parseFrontmatter(raw)
@@ -468,6 +500,7 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
         headings.push({
           level: headingLevel,
           text,
+          content: headingContentSpan(node.node, bodyOffset),
           slug: slugify(text),
           topLevel,
           from: from + bodyOffset,
@@ -508,13 +541,13 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
 
   const tasks: ParsedTask[] = []
   for (const taskNode of taskNodes) {
-    const task = readTask(body, taskNode, bodyOffset, cuts, literalPlainText, wikiLinks)
+    const task = readTask(source, taskNode, bodyOffset, cuts, literalPlainText, wikiLinks, headings)
     if (task) {
       tasks.push(task)
     }
   }
 
-  return {
+  const note: ParsedNote = {
     path,
     id: stringField(frontmatter, 'id'),
     title: deriveTitle(frontmatter, headings, path),
@@ -528,4 +561,5 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
     tasks,
     displayText: buildPlainText(body, cuts, literalPlainText),
   }
+  return { note, tree, bodyOffset }
 }

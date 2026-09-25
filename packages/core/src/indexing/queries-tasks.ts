@@ -12,7 +12,7 @@ export interface OpenTask extends TaskMarker {
   checked: boolean
   /** Display text, markdown stripped. */
   text: string
-  /** Parent outline/list item text, top-down, displayed above the task row. */
+  /** Nearest meaningful heading followed by parent list labels, top-down, displayed above the task row. */
   breadcrumbs: readonly string[]
   noteTitle: string
   /** The task's explicit `[[YYYY-MM-DD]]` due date, or null. */

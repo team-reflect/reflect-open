@@ -255,6 +255,50 @@ describe('parseNote — tasks', () => {
     ])
   })
 
+  it('groups tasks under their nearest section heading and keeps list ancestry', () => {
+    const note = parse(
+      '# Home\n\n## House chore\n\n+ Kitchen\n  + [ ] wash dishes\n\n### Garden\n\n+ [ ] water plants\n\n## Work\n\n+ [ ] send update\n',
+    )
+    expect(note.tasks.map((task) => task.breadcrumbs)).toEqual([
+      ['House chore', 'Kitchen'],
+      ['Garden'],
+      ['Work'],
+    ])
+  })
+
+  it.each(['Tasks', 'tAsKs', '[[Tasks]]', '[[TASKS|To do]]', '**Tasks**'])(
+    'omits the %s heading without falling back to the note title',
+    (heading) => {
+      const note = parse(`# Home\n\n## ${heading}\n\n+ [ ] top\n+ Kitchen\n  + [ ] child\n`)
+      expect(note.tasks.map((task) => task.breadcrumbs)).toEqual([[], ['Kitchen']])
+    },
+  )
+
+  it.each(['Task', 'Todo', 'Tasks:'])('retains the distinct %s heading', (heading) => {
+    const note = parse(`## ${heading}\n\n+ [ ] first\n`)
+    expect(note.tasks[0]?.breadcrumbs).toEqual([heading])
+  })
+
+  it('keeps a Tasks subheading from borrowing its parent section label', () => {
+    const note = parse('## House chore\n\n+ [ ] first\n\n### Tasks\n\n+ [ ] second\n')
+    expect(note.tasks.map((task) => task.breadcrumbs)).toEqual([['House chore'], []])
+  })
+
+  it('ignores quoted and list-nested headings as section boundaries', () => {
+    const note = parse(
+      '## House chore\n\n> ## Tasks\n\n- ## Elsewhere\n\n+ [ ] first\n\n```\n## Tasks\n```\n\n+ [ ] second\n',
+    )
+    expect(note.tasks.map((task) => task.breadcrumbs)).toEqual([['House chore'], ['House chore']])
+  })
+
+  it('preserves task offsets under formatted headings with frontmatter and CRLF', () => {
+    const source = '---\r\nid: home\r\n---\r\n## **House chore**\r\n\r\n+ [ ] wash dishes\r\n'
+    const task = parse(source).tasks[0]!
+    expect(task.breadcrumbs).toEqual(['House chore'])
+    expect(task.markerOffset).toBe(source.indexOf('[ ]'))
+    expect(source.slice(task.markerOffset, task.markerOffset + task.raw.length)).toBe(task.raw)
+  })
+
   it('ignores checkboxes inside fenced code', () => {
     const note = parse('+ [ ] real\n\n```\n+ [ ] not a task\n```\n')
     expect(note.tasks).toEqual([
