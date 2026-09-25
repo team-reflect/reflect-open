@@ -22,7 +22,7 @@ packages:
   # NativeDiagnostics.swift.
   Sentry:
     url: https://github.com/getsentry/sentry-cocoa
-    exactVersion: 8.58.4
+    exactVersion: 9.29.0
 fileGroups: [../../src]
 configs:
   debug: debug
