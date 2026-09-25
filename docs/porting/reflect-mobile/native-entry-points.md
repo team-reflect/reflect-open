@@ -5,8 +5,9 @@ recording entry points are in: the lock-screen/home-screen widget (opens
 `reflect://record-audio`, forwarded by the Rust shell into the recording
 plugin's queue), Siri App Intents ("Start/Stop recording in Reflect",
 in-process `AppIntent`s in the app target posting NotificationCenter
-requests), the home-screen quick action (a shortcut-item handler the plugin
-adds to tao's app delegate), and the Live Activity with an iOS 17
+requests), the home-screen quick action (handled by the app target's scene
+delegate, `SceneDelegate.swift`, which posts the same start request as
+Siri), and the Live Activity with an iOS 17
 `LiveActivityIntent` stop button. The **native-action handshake** below is
 implemented in `plugins/tauri-plugin-recording` (persisted queue →
 `actions_ready` → deliver → confirm-after-2s), exactly as this doc

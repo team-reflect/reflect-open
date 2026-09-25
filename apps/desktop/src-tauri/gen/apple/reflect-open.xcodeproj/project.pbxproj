@@ -39,6 +39,7 @@
 		E413DBCB60FF081C8E58468A /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 088536D8F462855DCFDA7B06 /* WebKit.framework */; };
 		E7D75AA83CFA468E0EFBAB21 /* RecordAudioWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7AC6BF821D47F74D41DFAFE /* RecordAudioWidget.swift */; };
 		E9E7B6C59015E7301EE63308 /* libiconv.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 44C3B8C21F2D38187423AB2F /* libiconv.tbd */; };
+		EBC807526009F3618F2FAA80 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E7FA0170C3E9B118FC2DB72 /* SceneDelegate.swift */; };
 		ED7E82D99D937F44DF372E66 /* NativeDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6A04E7EA62A721AED66B3F2 /* NativeDiagnostics.swift */; };
 		F00F5EAED90E34102F9AE651 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A86D201016958E2276806466 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -127,6 +128,7 @@
 		73D6C2FDB2DD7919E24C4533 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		769DDD2643E0BA4942D2EF92 /* QuickNoteIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickNoteIntent.swift; sourceTree = "<group>"; };
 		772B62ED093A33BDCD1864D8 /* calendar.rs */ = {isa = PBXFileReference; path = calendar.rs; sourceTree = "<group>"; };
+		7E7FA0170C3E9B118FC2DB72 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		80E05926405BFDA2A3BC70BC /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 		88ED38A3B3D14839B5066255 /* embed.rs */ = {isa = PBXFileReference; path = embed.rs; sourceTree = "<group>"; };
 		89342C7501B47DBB934B2D27 /* ShareState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareState.swift; sourceTree = "<group>"; };
@@ -396,6 +398,7 @@
 				B6A04E7EA62A721AED66B3F2 /* NativeDiagnostics.swift */,
 				769DDD2643E0BA4942D2EF92 /* QuickNoteIntent.swift */,
 				D29B88183661F5C1C960E074 /* RecordingIntents.swift */,
+				7E7FA0170C3E9B118FC2DB72 /* SceneDelegate.swift */,
 				3613166A0FB6AFF3C3B2F85C /* StopRecordingLiveActivityIntent.swift */,
 				024093CF75026447063ECAFB /* bindings */,
 			);
@@ -679,6 +682,7 @@
 				ED7E82D99D937F44DF372E66 /* NativeDiagnostics.swift in Sources */,
 				45B561FF8FBC00C0809C6856 /* QuickNoteIntent.swift in Sources */,
 				6C55CBAB912EC5920CE314DA /* RecordingIntents.swift in Sources */,
+				EBC807526009F3618F2FAA80 /* SceneDelegate.swift in Sources */,
 				6C3751B3B175DFE411D97C0F /* StopRecordingLiveActivityIntent.swift in Sources */,
 				14BE6EF4AB511AC099410853 /* main.mm in Sources */,
 			);

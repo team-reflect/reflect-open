@@ -136,6 +136,18 @@ targets:
             UIApplicationShortcutItemIconType: UIApplicationShortcutIconTypeAudio
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
         UILaunchStoryboardName: LaunchScreen
+        # The UIScene lifecycle, which apps linked against the iOS 27 SDK
+        # must adopt or UIKit aborts them at launch. One scene only (iPad
+        # gets no multi-window), so tao 0.35 keeps running its app-delegate
+        # lifecycle; gen/apple/Sources/reflect-open/SceneDelegate.swift
+        # attaches tao's window to the scene and relays the scene's events to
+        # tao's app delegate.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default Configuration
+                UISceneDelegateClassName: ReflectSceneDelegate
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

@@ -22,6 +22,9 @@ const DEFAULT_EXPORT_METHOD = 'app-store-connect'
 const EXPORT_METHODS = new Set(['app-store-connect', 'release-testing', 'debugging', 'validation'])
 const IOS_BUNDLE_IDENTIFIER = 'app.reflect.ios'
 const NON_EXEMPT_ENCRYPTION_KEY = 'ITSAppUsesNonExemptEncryption'
+const SCENE_DELEGATE_KEY_PATH =
+  'UIApplicationSceneManifest.UISceneConfigurations.UIWindowSceneSessionRoleApplication.0.UISceneDelegateClassName'
+const SCENE_DELEGATE_CLASS = 'ReflectSceneDelegate'
 const KEYCHAIN_SERVICE = 'reflect-notary'
 const SHARE_EXTENSION_APP_GROUP = 'group.app.reflect'
 
@@ -456,6 +459,30 @@ function assertIpaExportCompliance(ipa) {
 }
 
 /**
+ * Apps linked against the iOS 27 SDK abort at launch unless they adopt the
+ * UIScene lifecycle, and nothing fails at build time: the IPA uploads and
+ * installs, then crashes on every iOS 27 device. The manifest lives in
+ * ios.project.yml, so verify the shipped Info.plist still names the delegate.
+ */
+function assertIpaSceneManifest(ipa) {
+  let delegateClass = null
+  try {
+    delegateClass = readIpaInfoPlistRawValue(ipa, SCENE_DELEGATE_KEY_PATH)
+  } catch {
+    // Reported below as missing.
+  }
+  if (delegateClass !== SCENE_DELEGATE_CLASS) {
+    fail(
+      `IPA Info.plist ${SCENE_DELEGATE_KEY_PATH} is ${delegateClass ?? 'missing'}, ` +
+        `expected ${SCENE_DELEGATE_CLASS}.\n` +
+        '  iOS 27 refuses to launch apps without a UIScene manifest; restore\n' +
+        '  UIApplicationSceneManifest in apps/desktop/src-tauri/ios.project.yml.',
+    )
+  }
+  log(`scene delegate: ${delegateClass}`)
+}
+
+/**
  * The share extension is useless without its App Group entitlement: the
  * container lookup returns nil and every share fails with "Couldn't save",
  * while the build itself installs and launches normally. The entitlement
@@ -498,6 +525,7 @@ function assertIpaAppexEntitlements(ipa) {
 function assertIpaAppStoreMetadata(ipa) {
   assertIpaBundleIdentifier(ipa)
   assertIpaExportCompliance(ipa)
+  assertIpaSceneManifest(ipa)
   assertIpaAppexEntitlements(ipa)
 }
 

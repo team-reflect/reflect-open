@@ -39,6 +39,26 @@ lines from `spike_mobile.rs`:
 [plan19-spike] PASS: libgit2 init+commit
 ```
 
+## Xcode 27
+
+Xcode 27's `xcrun devicectl list devices` also lists simulators, and the
+tauri-cli releases up to 2.11.5 (cargo-mobile2 0.22.4) take them for
+physical devices: `pnpm tauri:ios:dev "iPhone 17 Pro"` then builds for
+`aarch64-apple-ios`, points the app at your LAN address, and fails while
+archiving with `No Accounts` and provisioning-profile errors. cargo-mobile2
+0.22.5 fixes the detection, but no tauri-cli release ships it yet. Until one
+does, build the CLI from source at the `@tauri-apps/cli` version in
+`apps/desktop/package.json` (without `--locked`, Cargo resolves the fixed
+cargo-mobile2) and run the dev loop through it from `apps/desktop`:
+
+```bash
+cargo install tauri-cli --version 2.11.4
+```
+
+```bash
+cargo tauri ios dev --config src-tauri/tauri.ios.dev.conf.json "iPhone 17 Pro"
+```
+
 ## Link preview capture
 
 To verify URL-only share captures:

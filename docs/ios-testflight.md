@@ -195,6 +195,23 @@ workflow.
   or place `AuthKey_<KEY>.p8` in `~/.appstoreconnect/private_keys/`.
 - **Multiple providers**: if using the Apple ID fallback for upload-only
   commands, set `APPLE_PROVIDER_PUBLIC_ID`.
+- **The app crashes at launch on iOS 27** (`EXC_BREAKPOINT` in
+  `_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`): apps linked
+  against the iOS 27 SDK must adopt the UIScene lifecycle. The app declares
+  `UIApplicationSceneManifest` in `ios.project.yml` and bridges it onto Tauri's
+  app delegate in `gen/apple/Sources/reflect-open/SceneDelegate.swift`; the
+  release helper refuses IPAs whose Info.plist no longer names
+  `ReflectSceneDelegate`. Apple enforces the requirement only for apps built
+  with the iOS 27 SDK; the CI runner's default Xcode is still 26.6.
+- **`Undefined symbols … _retain_object`, `_release_object`,
+  `_string_from_bytes` on Xcode 27** (release builds only): Xcode 27's SwiftPM
+  keeps `@_cdecl` exports local in optimized static libraries. swift-rs 1.0.8
+  promotes the plugins' own exports back with rustup's `llvm-objcopy`
+  (`rustup component add llvm-tools`; without it every plugin symbol is
+  missing), but not its shared runtime shim
+  ([Brendonovich/swift-rs#81](https://github.com/Brendonovich/swift-rs/issues/81)).
+  Until a fixed swift-rs ships, build releases with Xcode 26.x, e.g.
+  `DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer pnpm release:ios …`.
 - **Export-compliance prompt appears again**: rebuild from an Xcode project that
   includes `ITSAppUsesNonExemptEncryption=false` in the iOS Info.plist. The
   release helper refuses to upload IPAs that are missing this key.

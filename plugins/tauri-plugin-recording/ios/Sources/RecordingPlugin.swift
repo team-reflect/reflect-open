@@ -142,16 +142,14 @@ class RecordingPlugin: Plugin {
     case remote
   }
 
-  /// The Siri/App-Intent bridge: intents compiled into the app target run in
-  /// this process but in a different module, so they talk to the plugin
-  /// through NotificationCenter. Names are duplicated in
+  /// The app-target bridge: the Siri intents and the scene delegate's quick
+  /// action run in this process but in a different module, so they talk to
+  /// the plugin through NotificationCenter. Names are duplicated in
   /// `gen/apple/Sources/reflect-open/` — keep them in sync.
   static let startRequestedNotification = Notification.Name(
     "app.reflect.recording.start-requested")
   static let stopRequestedNotification = Notification.Name(
     "app.reflect.recording.stop-requested")
-  /// The home-screen quick action's `UIApplicationShortcutItemType`.
-  static let recordShortcutType = "app.reflect.record-audio"
   /// The persisted native-action queue (the V1 handshake): an action fired
   /// from an OS entry point survives webview crashes and cold starts here
   /// until the webview confirms it ran.
@@ -167,9 +165,6 @@ class RecordingPlugin: Plugin {
   private static let reminderRequestId = "app.reflect.recording.reminder"
   /// `UNTimeIntervalNotificationTrigger` refuses anything under a minute.
   private static let minimumReminderSeconds: TimeInterval = 60
-
-  /// The delegate-hook target for OS callbacks that carry no plugin context.
-  private static weak var shared: RecordingPlugin?
 
   private var recorder: AVAudioRecorder?
   private var meterTimer: Timer?
@@ -237,8 +232,9 @@ class RecordingPlugin: Plugin {
       name: UIApplication.willEnterForegroundNotification,
       object: nil
     )
-    // OS entry points (Siri App Intents run in this process, in the app
-    // module) reach the plugin through NotificationCenter.
+    // OS entry points handled in the app module (Siri App Intents and the
+    // home-screen quick action, both in this process) reach the plugin
+    // through NotificationCenter.
     center.addObserver(
       self,
       selector: #selector(handleStartRequested),
@@ -251,8 +247,6 @@ class RecordingPlugin: Plugin {
       name: Self.stopRequestedNotification,
       object: nil
     )
-    Self.shared = self
-    Self.installShortcutHandler()
     // A crash mid-recording leaves its Live Activity counting on the lock
     // screen with nothing behind it (the orphan scan saves the audio, but
     // nobody ended the activity), and its reminder still firing every half
@@ -784,38 +778,6 @@ class RecordingPlugin: Plugin {
     // backgrounded or the webview dead; ingest follows the usual paths.
     guard let recorder = self.recorder, pendingStop == nil, pendingCancel == nil else { return }
     finalize(recorder, native: .remote)
-  }
-
-  /// The home-screen quick action arrives on the app delegate — a runtime
-  /// class tao registers without implementing
-  /// `application:performActionForShortcutItem:completionHandler:`. Add the
-  /// method to that class; if some future delegate already implements it,
-  /// leave theirs alone (the quick action degrades to just opening the app).
-  private static var didInstallShortcutHandler = false
-  private static func installShortcutHandler() {
-    guard
-      !didInstallShortcutHandler,
-      let delegate = UIApplication.shared.delegate,
-      let delegateClass = object_getClass(delegate)
-    else { return }
-    didInstallShortcutHandler = true
-    let selector = NSSelectorFromString(
-      "application:performActionForShortcutItem:completionHandler:")
-    guard class_getInstanceMethod(delegateClass, selector) == nil else { return }
-    let block:
-      @convention(block) (
-        AnyObject, UIApplication, UIApplicationShortcutItem, @escaping (Bool) -> Void
-      ) -> Void = { _, _, item, completion in
-        let handled = item.type == RecordingPlugin.recordShortcutType
-        if handled {
-          DispatchQueue.main.async {
-            RecordingPlugin.shared?.queueNativeAction("recordAudio")
-          }
-        }
-        completion(handled)
-      }
-    class_addMethod(
-      delegateClass, selector, imp_implementationWithBlock(block), "v@:@@@?")
   }
 
   // MARK: - Recording reminder
