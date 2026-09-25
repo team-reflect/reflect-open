@@ -5,6 +5,7 @@ import type {
   WikilinkItem,
   WikilinkSearchHandler,
 } from '@meowdown/react'
+import { Counter } from '@ocavue/utils'
 import {
   aliasHint,
   contactLinkSuggestions,
@@ -126,11 +127,10 @@ export function useEditorAutocomplete(): EditorAutocomplete {
         claimedTargetKeys: wikiLinks.claimedTargetKeys,
       })
       // Distinct notes can share a title; their rows need the path to tell them apart.
-      const titleCounts = new Map<string, number>()
+      const titleCounts = new Counter<string>()
       for (const entry of entries) {
         if (entry.kind === 'suggestion' && entry.suggestion.date === null) {
-          const displayedTitle = displayNoteTitle(entry.suggestion.title)
-          titleCounts.set(displayedTitle, (titleCounts.get(displayedTitle) ?? 0) + 1)
+          titleCounts.increment(displayNoteTitle(entry.suggestion.title))
         }
       }
       return entries.map((entry) => {
@@ -200,7 +200,7 @@ export function useEditorAutocomplete(): EditorAutocomplete {
               ? path === null
                 ? `${date} · new`
                 : date
-              : path !== null && (titleCounts.get(displayedTitle) ?? 0) > 1
+              : path !== null && titleCounts.get(displayedTitle) > 1
                 ? path
                 : undefined
         return { target, label, ...(detail !== undefined ? { detail } : {}) }
