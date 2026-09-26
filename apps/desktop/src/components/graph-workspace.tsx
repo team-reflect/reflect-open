@@ -5,8 +5,8 @@ import { NoteWindowContent } from '@/components/note-window-content.tsx'
 import { WorkspaceContent } from '@/components/workspace-content.tsx'
 import { getInitialWindowRoute } from '@/lib/windows/initial-window-route.ts'
 import { isMainWindow } from '@/lib/windows/window-role.ts'
+import { useAttachmentCatalogSync } from '@/lib/attachment-catalog.ts'
 import { AssetDescribeProvider } from '@/providers/asset-describe-provider.tsx'
-import { AttachmentCatalogProvider } from '@/providers/attachment-catalog-provider.tsx'
 import { AudioMemoProvider } from '@/providers/audio-memo-provider.tsx'
 import { FocusedDailyProvider } from '@/providers/focused-daily-provider.tsx'
 import { CaptureProvider } from '@/providers/capture-provider.tsx'
@@ -32,59 +32,56 @@ interface GraphWorkspaceProps {
  * fresh history.
  */
 export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
+  useAttachmentCatalogSync(graph.generation)
   // A note window's first route is its ⌘-clicked target (seeded by the boot
   // hook) — starting on the default today route would flash the daily note
   // until the deep link navigated.
   const initialRoute = isMainWindow() ? null : getInitialWindowRoute()
   return (
     <RouterProvider key={graph.root} {...(initialRoute !== null ? { initialRoute } : {})}>
-      {/* Outermost: editors and every preview surface (palette, backlinks,
-          hover cards) resolve images against the vault's attachments. */}
-      <AttachmentCatalogProvider graph={graph}>
-        <SyncProvider graph={graph}>
-          <PaletteProvider>
-            <ShortcutsProvider>
-              <NoteTemplatesProvider>
-                <SidebarProvider>
-                  {/* Above the sidebar: a recording must survive the sidebar (and its
-                      mic button) unmounting on collapse. */}
-                  <AudioMemoProvider graph={graph}>
-                    <CaptureProvider graph={graph}>
-                      {/* Inside the router (deep links navigate) and beside capture
-                          (deep-link writes spool into the same inbox drain). */}
-                      <DeepLinkProvider graph={graph}>
-                        <AssetDescribeProvider graph={graph}>
-                          <ChatProvider graph={graph}>
-                            {/* Tracks the focused day in the daily stream so the right
-                                sidebar describes it, not just the routed day. */}
-                            <FocusedDailyProvider>
-                              <NoteFindProvider>
-                                {/* A ⌘-clicked note window is chrome-free: the
-                                    routed view only, no sidebar/palette shell.
-                                    The V1 import lives above the routed views so
-                                    closing settings can't orphan a running
-                                    import; main window only — its dialog is the
-                                    import's single face. */}
-                                {isMainWindow() ? (
-                                  <V1ImportProvider graph={graph}>
-                                    <WorkspaceContent graph={graph} />
-                                  </V1ImportProvider>
-                                ) : (
-                                  <NoteWindowContent />
-                                )}
-                              </NoteFindProvider>
-                            </FocusedDailyProvider>
-                          </ChatProvider>
-                        </AssetDescribeProvider>
-                      </DeepLinkProvider>
-                    </CaptureProvider>
-                  </AudioMemoProvider>
-                </SidebarProvider>
-              </NoteTemplatesProvider>
-            </ShortcutsProvider>
-          </PaletteProvider>
-        </SyncProvider>
-      </AttachmentCatalogProvider>
+      <SyncProvider graph={graph}>
+        <PaletteProvider>
+          <ShortcutsProvider>
+            <NoteTemplatesProvider>
+              <SidebarProvider>
+                {/* Above the sidebar: a recording must survive the sidebar (and its
+                    mic button) unmounting on collapse. */}
+                <AudioMemoProvider graph={graph}>
+                  <CaptureProvider graph={graph}>
+                    {/* Inside the router (deep links navigate) and beside capture
+                        (deep-link writes spool into the same inbox drain). */}
+                    <DeepLinkProvider graph={graph}>
+                      <AssetDescribeProvider graph={graph}>
+                        <ChatProvider graph={graph}>
+                          {/* Tracks the focused day in the daily stream so the right
+                              sidebar describes it, not just the routed day. */}
+                          <FocusedDailyProvider>
+                            <NoteFindProvider>
+                              {/* A ⌘-clicked note window is chrome-free: the
+                                  routed view only, no sidebar/palette shell.
+                                  The V1 import lives above the routed views so
+                                  closing settings can't orphan a running
+                                  import; main window only — its dialog is the
+                                  import's single face. */}
+                              {isMainWindow() ? (
+                                <V1ImportProvider graph={graph}>
+                                  <WorkspaceContent graph={graph} />
+                                </V1ImportProvider>
+                              ) : (
+                                <NoteWindowContent />
+                              )}
+                            </NoteFindProvider>
+                          </FocusedDailyProvider>
+                        </ChatProvider>
+                      </AssetDescribeProvider>
+                    </DeepLinkProvider>
+                  </CaptureProvider>
+                </AudioMemoProvider>
+              </SidebarProvider>
+            </NoteTemplatesProvider>
+          </ShortcutsProvider>
+        </PaletteProvider>
+      </SyncProvider>
     </RouterProvider>
   )
 }

@@ -15,9 +15,9 @@ import {
 } from '@/mobile/use-keyboard.ts'
 import { usePaywallGate } from '@/mobile/use-paywall-gate.ts'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics.ts'
-import { AttachmentCatalogProvider } from '@/providers/attachment-catalog-provider.tsx'
 import { CaptureProvider } from '@/providers/capture-provider.tsx'
 import { ChatProvider } from '@/providers/chat-provider.tsx'
+import { useAttachmentCatalogSync } from '@/lib/attachment-catalog.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { SyncProvider } from '@/providers/sync-provider.tsx'
 import { RouterProvider } from '@/routing/router.tsx'
@@ -44,6 +44,7 @@ export function MobileApp(): ReactElement {
   // iCloud graphs have an out-of-process writer (the OS syncing files in):
   // nudge downloads + re-reconcile on resume. Inert for local/git graphs.
   useICloudRefresh()
+  useAttachmentCatalogSync(graph?.generation ?? null)
 
   // Flush-on-background (Plan 19, decision 6): iOS may suspend or kill the
   // process soon after backgrounding, so every hide lands dirty note buffers
@@ -66,34 +67,32 @@ export function MobileApp(): ReactElement {
     return (
       <AppErrorBoundary>
         <RouterProvider key={graph.root}>
-          <AttachmentCatalogProvider graph={graph}>
-            {/* Same engine, contracts, and triggers as desktop (Plan 12) — the
-                controller owns resume/edit/online; mobile adds only the
-                plain-language status pill (step 10). */}
-            <SyncProvider graph={graph}>
-              {/* Link capture (Plan 11, iOS share extension): relay the App
-                  Group inbox + drain on launch and on every resume. */}
-              <CaptureProvider graph={graph}>
-                {/* Same chat session engine as desktop (Plan 23): the
-                    conversation and composer draft live here so the Chat tab
-                    survives tab switches; semantic search is forced off on
-                    this surface inside the provider. */}
-                <ChatProvider graph={graph}>
-                  {/* Native recording over the shared capture pipeline — the
-                      mobile leg of desktop's audio memos. Mounted here so the
-                      queue, the reconciler, and the orphan scan survive tab
-                      switches. */}
-                  <MobileAudioMemoProvider graph={graph}>
-                    <MobileShell />
-                    <MobileStatusLayer />
-                    {/* Mounted beside the shell (not inside the daily screen)
-                        so a live recording's sheet survives tab switches. */}
-                    <RecordingDrawer />
-                  </MobileAudioMemoProvider>
-                </ChatProvider>
-              </CaptureProvider>
-            </SyncProvider>
-          </AttachmentCatalogProvider>
+          {/* Same engine, contracts, and triggers as desktop (Plan 12) — the
+              controller owns resume/edit/online; mobile adds only the
+              plain-language status pill (step 10). */}
+          <SyncProvider graph={graph}>
+            {/* Link capture (Plan 11, iOS share extension): relay the App
+                Group inbox + drain on launch and on every resume. */}
+            <CaptureProvider graph={graph}>
+              {/* Same chat session engine as desktop (Plan 23): the
+                  conversation and composer draft live here so the Chat tab
+                  survives tab switches; semantic search is forced off on
+                  this surface inside the provider. */}
+              <ChatProvider graph={graph}>
+                {/* Native recording over the shared capture pipeline — the
+                    mobile leg of desktop's audio memos. Mounted here so the
+                    queue, the reconciler, and the orphan scan survive tab
+                    switches. */}
+                <MobileAudioMemoProvider graph={graph}>
+                  <MobileShell />
+                  <MobileStatusLayer />
+                  {/* Mounted beside the shell (not inside the daily screen)
+                      so a live recording's sheet survives tab switches. */}
+                  <RecordingDrawer />
+                </MobileAudioMemoProvider>
+              </ChatProvider>
+            </CaptureProvider>
+          </SyncProvider>
         </RouterProvider>
       </AppErrorBoundary>
     )

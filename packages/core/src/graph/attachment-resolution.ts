@@ -88,14 +88,10 @@ export function resolveAttachmentLink(
       return existing
     }
     // Only an authored bare filename is Obsidian's shortest-path spelling
-    // (`./x`, `/x`, and `../x` each name one place), and only its slash-less
-    // candidate is matched by basename in the privacy gate.
-    const bare = isBareFilename(destination)
-      ? candidates.find((path) => !path.includes('/'))
-      : undefined
-    const named = bare === undefined ? null : closestNamed(catalog, sourcePath, bare)
-    if (named !== null) {
-      return named
+    // (`./x`, `/x`, and `../x` each name one place), and only a bare reference
+    // is matched by basename in the privacy gate.
+    if (isBareFilename(destination)) {
+      return closestNamed(catalog, sourcePath, filename(fallback)) ?? fallback
     }
   }
   return fallback

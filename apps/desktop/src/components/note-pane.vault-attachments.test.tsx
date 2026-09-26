@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render } from 'vitest-browser-react'
 import { page } from 'vitest/browser'
@@ -5,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { setBridge, type FileMeta } from '@reflect/core'
 import { PaletteProvider } from '@/components/command-palette/palette-provider.tsx'
 import { queryClient } from '@/lib/query-client.ts'
-import { AttachmentCatalogProvider } from '@/providers/attachment-catalog-provider.tsx'
+import { useAttachmentCatalogSync } from '@/lib/attachment-catalog.ts'
 import { RouterProvider } from '@/routing/router.tsx'
 import { deferred } from '@/test-utils/deferred.ts'
 import '@/test-utils/locator.ts'
@@ -76,14 +77,19 @@ function renderNote(path: string) {
   return render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider initialRoute={{ kind: 'note', path }}>
-        <AttachmentCatalogProvider graph={GRAPH}>
+        <CatalogSync>
           <PaletteProvider>
             <RouteContent />
           </PaletteProvider>
-        </AttachmentCatalogProvider>
+        </CatalogSync>
       </RouterProvider>
     </QueryClientProvider>,
   )
+}
+
+function CatalogSync({ children }: { children: ReactNode }): ReactNode {
+  useAttachmentCatalogSync(GRAPH.generation)
+  return children
 }
 
 const BUDGET_URL = 'reflect-asset://1/attachments/garden-budget.png'

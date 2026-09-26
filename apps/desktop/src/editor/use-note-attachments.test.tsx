@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import { setBridge, type GraphInfo } from '@reflect/core'
 import { queryClient } from '@/lib/query-client.ts'
-import { AttachmentCatalogProvider } from '@/providers/attachment-catalog-provider.tsx'
+import { useAttachmentCatalogSync } from '@/lib/attachment-catalog.ts'
+import { deferred } from '@/test-utils/deferred.ts'
 import { useNoteAttachments, type NoteAttachments } from './use-note-attachments.ts'
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -20,15 +21,18 @@ interface FakeVault {
   emit: (event: string, payload: unknown) => void
 }
 
-/** A bridge serving `list_attachments` from a mutable file list, with emittable events. */
-function installVault(paths: string[]): FakeVault {
+/**
+ * A bridge serving `list_attachments` from a mutable file list (after `gate`
+ * settles), with emittable events.
+ */
+function installVault(paths: string[], gate: Promise<void> = Promise.resolve()): FakeVault {
   let files = paths
   const handlers = new Map<string, Set<(payload: unknown) => void>>()
-  const invoke = vi.fn(async (command: string) =>
-    command === 'list_attachments'
-      ? files.map((path) => ({ path, size: path.length, modifiedMs: 0 }))
-      : null,
-  )
+  const invoke = vi.fn(async (command: string) => {
+    if (command !== 'list_attachments') return null
+    await gate
+    return files.map((path) => ({ path, size: path.length, modifiedMs: 0 }))
+  })
   setBridge({
     invoke,
     invokeBinary: async () => null,
@@ -52,10 +56,15 @@ function installVault(paths: string[]): FakeVault {
   }
 }
 
+function CatalogSync({ children }: { children: ReactNode }): ReactNode {
+  useAttachmentCatalogSync(GRAPH.generation)
+  return children
+}
+
 function wrapper({ children }: { children: ReactNode }): ReactNode {
   return (
     <QueryClientProvider client={queryClient}>
-      <AttachmentCatalogProvider graph={GRAPH}>{children}</AttachmentCatalogProvider>
+      <CatalogSync>{children}</CatalogSync>
     </QueryClientProvider>
   )
 }
@@ -96,12 +105,14 @@ describe('useNoteAttachments', () => {
   })
 
   it('waits for the catalog when it has not loaded yet', async () => {
-    installVault(['attachments/garden-budget.png'])
+    const listing = deferred<void>()
+    installVault(['attachments/garden-budget.png'], listing.promise)
     await renderAttachments('Home.md')
 
-    await expect(attachments?.resolveImageUrl('garden-budget.png')).resolves.toBe(
-      assetUrl('attachments/garden-budget.png'),
-    )
+    const url = attachments?.resolveImageUrl('garden-budget.png')
+    expect(url).toBeInstanceOf(Promise)
+    listing.resolve()
+    await expect(url).resolves.toBe(assetUrl('attachments/garden-budget.png'))
   })
 
   it('hands out embed sources that read back as the same file', async () => {
@@ -124,7 +135,7 @@ describe('useNoteAttachments', () => {
   })
 })
 
-describe('AttachmentCatalogProvider', () => {
+describe('useAttachmentCatalogSync', () => {
   it('re-lists when an attachment changes, not when only a note does', async () => {
     const vault = installVault([])
     await renderAttachments('Home.md')

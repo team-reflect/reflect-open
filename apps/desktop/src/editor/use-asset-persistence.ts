@@ -16,7 +16,7 @@ import {
 import { useNoteAttachments } from '@/editor/use-note-attachments.ts'
 import { formatBytes } from '@/lib/format-bytes.ts'
 import { startOperation } from '@/lib/operations.ts'
-import { loadAttachmentCatalog } from '@/providers/attachment-catalog-provider.tsx'
+import { loadAttachmentCatalog } from '@/lib/attachment-catalog.ts'
 
 /**
  * Above this size, a save gets a non-blocking status-line warning. Never a

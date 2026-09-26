@@ -6,10 +6,7 @@ import {
   resolveWikiEmbedTarget,
   type AttachmentCatalog,
 } from '@reflect/core'
-import {
-  loadAttachmentCatalog,
-  peekAttachmentCatalog,
-} from '@/providers/attachment-catalog-provider.tsx'
+import { loadAttachmentCatalog, peekAttachmentCatalog } from '@/lib/attachment-catalog.ts'
 
 /** How one note's images, `![[embeds]]`, and attachment links render. */
 export interface NoteAttachments {
