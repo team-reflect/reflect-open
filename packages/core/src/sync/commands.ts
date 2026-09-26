@@ -1,9 +1,10 @@
 import { z } from 'zod'
 import { call } from '../ipc/invoke.ts'
+import type { GitCredential } from './git-credentials.ts'
 
 /**
  * Typed bindings for the Rust git primitives (Plan 12). The Rust layer is
- * remote-agnostic — URLs and per-call tokens, nothing GitHub-specific (that
+ * remote-agnostic — URLs and per-call credentials, nothing GitHub-specific (that
  * lives in `./github`). Policy (cadence, retries, product states) is
  * `./engine`'s job; these are the verbs it composes.
  */
@@ -107,8 +108,12 @@ export async function gitDisconnect(generation: number): Promise<GitStatus> {
  * Clone a backup repository into an absolute `path` (restore on a fresh
  * machine — runs before any graph is open). Refuses non-empty destinations.
  */
-export async function gitClone(url: string, path: string, token: string | null): Promise<void> {
-  await call('git_clone', { url, path, token }, z.null())
+export async function gitClone(
+  url: string,
+  path: string,
+  credential: GitCredential | null,
+): Promise<void> {
+  await call('git_clone', { url, path, credential }, z.null())
 }
 
 /**
@@ -123,8 +128,11 @@ export async function gitCommitAll(
 }
 
 /** Fetch `origin`; returns ahead/behind for the current branch. */
-export async function gitFetch(token: string | null, generation: number): Promise<RemoteDelta> {
-  return await call('git_fetch', { token, generation }, remoteDeltaSchema)
+export async function gitFetch(
+  credential: GitCredential | null,
+  generation: number,
+): Promise<RemoteDelta> {
+  return await call('git_fetch', { credential, generation }, remoteDeltaSchema)
 }
 
 /**
@@ -137,6 +145,9 @@ export async function gitMergeRemote(generation: number): Promise<MergeOutcome> 
 }
 
 /** Push to `origin`; rejections come back as data, not thrown errors. */
-export async function gitPush(token: string | null, generation: number): Promise<PushOutcome> {
-  return await call('git_push', { token, generation }, pushOutcomeSchema)
+export async function gitPush(
+  credential: GitCredential | null,
+  generation: number,
+): Promise<PushOutcome> {
+  return await call('git_push', { credential, generation }, pushOutcomeSchema)
 }

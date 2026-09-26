@@ -1,3 +1,4 @@
+import { githubCredential } from './git-credentials.ts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge.ts'
 import { createSyncEngine, isSyncError, type SyncStatus } from './engine.ts'
@@ -65,7 +66,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 7,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -82,7 +83,7 @@ describe('createSyncEngine', () => {
 
     expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_push'])
     expect(calls[0]!.args['generation']).toBe(7)
-    expect(calls[1]!.args['token']).toBe('tok')
+    expect(calls[1]!.args['credential']).toEqual(githubCredential('tok'))
     expect(statuses.map((status) => status.state)).toEqual(['syncing', 'idle'])
     engine.stop()
   })
@@ -91,7 +92,7 @@ describe('createSyncEngine', () => {
     const calls = fakeGit(defaultResponses)
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => null,
+      getCredential: async () => null,
       idleMs: 100,
       maxWaitMs: 250,
     })
@@ -122,7 +123,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -156,7 +157,7 @@ describe('createSyncEngine', () => {
       const statuses: SyncStatus[] = []
       const engine = createSyncEngine({
         generation: 1,
-        getToken: async () => {
+        getCredential: async () => {
           throw new ReflectError(kind, 'refresh failed')
         },
         onStatus: (status) => {
@@ -181,7 +182,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -205,7 +206,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -233,7 +234,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -262,7 +263,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -287,7 +288,11 @@ describe('createSyncEngine', () => {
       }
       return defaultResponses(command)
     })
-    const engine = createSyncEngine({ generation: 1, getToken: async () => 'tok', idleMs: 10 })
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => githubCredential('tok'),
+      idleMs: 10,
+    })
 
     engine.noteChanged()
     await vi.advanceTimersByTimeAsync(10)
@@ -326,7 +331,7 @@ describe('createSyncEngine', () => {
     const batches: Array<Array<{ path: string }>> = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onRemoteChanges: (changes) => {
         batches.push(changes)
       },
@@ -357,7 +362,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -410,7 +415,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -463,7 +468,7 @@ describe('createSyncEngine', () => {
     let canStartCycle = true
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -518,7 +523,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -565,7 +570,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -603,7 +608,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -645,7 +650,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -662,7 +667,10 @@ describe('createSyncEngine', () => {
     const calls = fakeGit((command) =>
       command === 'git_commit_all' ? CLEAN_COMMIT : defaultResponses(command),
     )
-    const engine = createSyncEngine({ generation: 1, getToken: async () => 'tok' })
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => githubCredential('tok'),
+    })
 
     await engine.syncNow()
 
@@ -689,7 +697,7 @@ describe('createSyncEngine', () => {
     const skipped: Array<{ path: string }[]> = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onLargeFilesSkipped: (files) => {
         skipped.push(files)
       },
@@ -715,7 +723,7 @@ describe('createSyncEngine', () => {
     })
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       idleMs: 10,
     })
 
@@ -740,7 +748,11 @@ describe('createSyncEngine', () => {
     const calls = fakeGit((command) =>
       command === 'git_commit_all' ? CLEAN_COMMIT : defaultResponses(command),
     )
-    const engine = createSyncEngine({ generation: 1, getToken: async () => 'tok', idleMs: 10 })
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => githubCredential('tok'),
+      idleMs: 10,
+    })
 
     engine.noteChanged()
     await vi.runAllTimersAsync()
@@ -762,7 +774,10 @@ describe('createSyncEngine', () => {
       }
       return defaultResponses(command)
     })
-    const engine = createSyncEngine({ generation: 1, getToken: async () => 'tok' })
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => githubCredential('tok'),
+    })
 
     await engine.syncNow()
 
@@ -774,7 +789,7 @@ describe('createSyncEngine', () => {
     const calls = fakeGit(defaultResponses)
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       idleMs: 100,
     })
 
@@ -795,7 +810,7 @@ describe('createSyncEngine', () => {
     const calls = fakeGit(defaultResponses)
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => null,
+      getCredential: async () => null,
       localOnly: true,
       idleMs: 10,
     })
@@ -810,7 +825,11 @@ describe('createSyncEngine', () => {
 
   it('stop() cancels pending work', async () => {
     const calls = fakeGit(defaultResponses)
-    const engine = createSyncEngine({ generation: 1, getToken: async () => 'tok', idleMs: 10 })
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => githubCredential('tok'),
+      idleMs: 10,
+    })
 
     engine.noteChanged()
     engine.stop()
@@ -819,7 +838,7 @@ describe('createSyncEngine', () => {
     expect(calls).toHaveLength(0)
   })
 
-  it('passes a missing credential through as a null token (Rust owns the failure)', async () => {
+  it('passes a missing credential through as null (Rust owns the failure)', async () => {
     // The engine has no null-token special case on purpose: only the remote
     // knows whether it needs auth. A push refused for a missing credential
     // must still land on the reconnect affordance.
@@ -832,7 +851,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => null,
+      getCredential: async () => null,
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -843,7 +862,7 @@ describe('createSyncEngine', () => {
     await vi.runAllTimersAsync()
 
     const push = calls.find((call) => call.command === 'git_push')
-    expect(push?.args['token']).toBeNull()
+    expect(push?.args['credential']).toBeNull()
     expect(statuses.at(-1)).toMatchObject({ state: 'error', errorKind: 'auth' })
     engine.stop()
   })
@@ -853,7 +872,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -879,7 +898,10 @@ describe('createSyncEngine', () => {
       }
       return defaultResponses(command)
     })
-    const engine = createSyncEngine({ generation: 1, getToken: async () => 'tok' })
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => githubCredential('tok'),
+    })
 
     const first = engine.syncNow()
     const second = engine.syncNow()
@@ -927,7 +949,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -962,7 +984,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => githubCredential('tok'),
       onStatus: (status) => {
         statuses.push(status)
       },

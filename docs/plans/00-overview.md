@@ -81,6 +81,7 @@ before the editor, and the editor lands before search/AI.
 | 21 | [iCloud Drive sync](21-icloud-drive-sync.md) | **Shipped (2026-07-04).** iCloud Drive as the primary consumer sync path: graphs in the app's iCloud container, deterministic resolution ladder over per-device shadow bases (markers as the fallback), `.reflect/`/`.git/` sync-exclusion, iCloud-first onboarding on both platforms with multi-graph lists + the mobile switcher; git remotes stay the self-managed path. AI-assisted resolution deferred |
 | 22 | [Mobile GitHub connect](22-mobile-github-connect.md) | **Implemented; device pass pending.** The connect front door for local (non-iCloud) graphs on iOS: shared wizard hook, `ConnectGithubDrawer`, Settings entry point — no new sync mechanism |
 | 23 | [Mobile AI chat](23-mobile-ai-chat.md) | The Plan 10 chat on iOS as a fourth tab: same engine/store/privacy gate, mobile composer + history/model sheets, per-device BYOK provider settings, lexical-only `search_notes`; streaming-on-iOS spike gates the build |
+| 25 | [Per-host git credentials](25-per-host-git-credentials.md) | Generic git remotes from iOS: one keychain credential per host (host + port), HTTPS basic auth, a credential-conditional adoption gate — closes Plan 16's deferred per-host item, which V2's credential helpers cannot reach on iOS; mobile connect sheet |
 
 ## Milestone map
 

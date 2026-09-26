@@ -1,4 +1,5 @@
 import { isAppError } from '../errors.ts'
+import type { GitCredential } from './git-credentials.ts'
 import {
   gitCommitAll,
   gitFetch,
@@ -63,7 +64,7 @@ export interface SyncEngineOptions {
    */
   generation: number
   /** Resolves the remote credential; `null` = none connected (auth error). */
-  getToken: () => Promise<string | null>
+  getCredential: () => Promise<GitCredential | null>
   /**
    * Observes every product-state transition. Called synchronously; never
    * called again after `stop()`.
@@ -294,7 +295,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     mode: 'push' | 'full',
     remoteChanges: (changes: ChangedFile[]) => void,
   ): Promise<void> {
-    const token = options.localOnly === true ? null : await step(options.getToken())
+    const credential = options.localOnly === true ? null : await step(options.getCredential())
     const commit = await step(gitCommitAll('Update notes', options.generation))
     if (commit.skippedLargeFiles.length > 0) {
       options.onLargeFilesSkipped?.(commit.skippedLargeFiles)
@@ -312,7 +313,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       }
     } else {
       // Launch/focus: pick up other devices' changes even with nothing to push.
-      const delta = await step(gitFetch(token, options.generation))
+      const delta = await step(gitFetch(credential, options.generation))
       const merged = await merge(remoteChanges)
       const localOnly = commit.committed || delta.ahead > 0
       if (!localOnly && (merged.kind === 'upToDate' || merged.kind === 'fastForward')) {
@@ -320,7 +321,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       }
     }
     for (let attempt = 0; attempt < MAX_PUSH_ATTEMPTS; attempt++) {
-      const push = await step(gitPush(token, options.generation))
+      const push = await step(gitPush(credential, options.generation))
       if (push.pushed) {
         return
       }
@@ -329,7 +330,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       }
       // The normal two-device race: another device pushed first. Converge and
       // retry — a conflicted merge still commits (markers in the note).
-      await step(gitFetch(token, options.generation))
+      await step(gitFetch(credential, options.generation))
       await merge(remoteChanges)
     }
     throw new PushRejectedError(

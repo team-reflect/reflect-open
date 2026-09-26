@@ -29,6 +29,7 @@ import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer.tsx'
 import { AiPromptDrawer } from '@/mobile/ai-prompt-drawer.tsx'
 import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer.tsx'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer.tsx'
+import { ConnectHostDrawer } from '@/mobile/connect-host-drawer.tsx'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
 import { TextSettingDrawer } from '@/mobile/text-setting-drawer.tsx'
@@ -134,6 +135,7 @@ export function MobileSettings(): ReactElement {
   const status = useMobileSyncStatus()
   const [disconnecting, setDisconnecting] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)
+  const [connectHostOpen, setConnectHostOpen] = useState(false)
   const { providers, defaultProvider, addProvider, removeProvider, makeDefault, setDefaultModel } =
     useAiProviders()
   const [addProviderOpen, setAddProviderOpen] = useState(false)
@@ -334,7 +336,13 @@ export function MobileSettings(): ReactElement {
               ) : null}
               {status !== null ? <SettingsValueRow label="Status" value={status.label} /> : null}
               {canConnect ? (
-                <SettingsActionRow label="Connect GitHub" onPress={() => setConnectOpen(true)} />
+                <>
+                  <SettingsActionRow label="Connect GitHub" onPress={() => setConnectOpen(true)} />
+                  <SettingsActionRow
+                    label="Connect another host"
+                    onPress={() => setConnectHostOpen(true)}
+                  />
+                </>
               ) : null}
               {repo !== null ? (
                 <SettingsActionRow
@@ -442,6 +450,7 @@ export function MobileSettings(): ReactElement {
         </div>
       </main>
       <ConnectGithubDrawer open={connectOpen} onOpenChange={setConnectOpen} />
+      <ConnectHostDrawer open={connectHostOpen} onOpenChange={setConnectHostOpen} />
       <AddAiProviderDrawer
         open={addProviderOpen}
         onOpenChange={setAddProviderOpen}

@@ -57,6 +57,16 @@ export {
   type GithubRepo,
   type GithubUser,
 } from './github.ts'
+export {
+  remoteCredentialOrigin,
+  githubCredential,
+  isValidGitCredential,
+  gitCredentialSecretName,
+  loadGitCredential,
+  saveGitCredential,
+  deleteGitCredential,
+  type GitCredential,
+} from './git-credentials.ts'
 export { createGist, updateGist, deleteGist, type PublishedGist, type GistFile } from './gists.ts'
 export {
   createSyncEngine,
