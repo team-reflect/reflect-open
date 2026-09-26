@@ -1,15 +1,9 @@
 import { useCallback, type ReactNode } from 'react'
-import type { WikilinkHoverHit } from '@meowdown/core'
-import {
-  resolveExistingWikiTarget,
-  splitFrontmatter,
-  type AttachmentCatalog,
-  type DateFormat,
-} from '@reflect/core'
+import type { ImageUrlResolver, WikilinkHoverHit } from '@meowdown/core'
+import { resolveExistingWikiTarget, splitFrontmatter, type DateFormat } from '@reflect/core'
 import { WikiLinkHoverPreview } from '@/components/wiki-link-hover-preview.tsx'
 import { attachmentUrl, createNoteAttachments } from '@/editor/use-note-attachments.ts'
 import { readExistingNoteSource } from '@/lib/read-existing-note-source.ts'
-import { useAttachmentCatalog } from '@/providers/attachment-catalog-provider.tsx'
 
 interface WikiLinkHoverPreviewOptions {
   generation: number | null
@@ -31,12 +25,8 @@ function previewRasterUrl(url: string): string {
  * raster attachments only, resolved from that note's own folder. Remote
  * images and SVGs never load in a hover card.
  */
-function passiveImageResolver(
-  generation: number,
-  notePath: string,
-  catalog: AttachmentCatalog | null,
-): (source: string) => string | null {
-  const { resolveAttachmentPath } = createNoteAttachments(generation, notePath, catalog)
+function passiveImageResolver(generation: number, notePath: string): ImageUrlResolver {
+  const { resolveAttachmentPath } = createNoteAttachments(generation, notePath)
   return (source) => {
     const assetPath = resolveAttachmentPath(source)
     // SVG can contain external subresource references. The filename check
@@ -44,7 +34,7 @@ function passiveImageResolver(
     // enforce a sniffed raster MIME allowlist, so renamed SVG bytes cannot
     // bypass the passive card's no-network boundary.
     if (assetPath === null || isSvgAsset(assetPath)) {
-      return null
+      return undefined
     }
     return previewRasterUrl(attachmentUrl(generation, assetPath))
   }
@@ -57,17 +47,12 @@ function passiveImageResolver(
  * and failed targets resolve to `null`, which renders no card. Failures are
  * swallowed into `null` rather than rejected: transient read errors (an iCloud
  * eviction, a graph switch) are expected and should not log as errors.
- *
- * The body's images and `![[embeds]]` resolve from the target note's folder
- * against the attachment catalog, so a new catalog re-runs the resolution.
  */
 export function useWikiLinkHoverPreview({
   generation,
   graphKey,
   dateFormat,
 }: WikiLinkHoverPreviewOptions): (hit: WikilinkHoverHit) => Promise<ReactNode> {
-  const catalog = useAttachmentCatalog()
-
   return useCallback(
     async ({ target }: WikilinkHoverHit): Promise<ReactNode> => {
       if (generation === null || graphKey === null) {
@@ -84,16 +69,14 @@ export function useWikiLinkHoverPreview({
             path={resolution.path}
             markdown={splitFrontmatter(source).body}
             dateFormat={dateFormat}
-            resolveImageUrl={passiveImageResolver(generation, resolution.path, catalog)}
-            resolveWikiEmbed={
-              createNoteAttachments(generation, resolution.path, catalog).resolveWikiEmbed
-            }
+            resolveImageUrl={passiveImageResolver(generation, resolution.path)}
+            resolveWikiEmbed={createNoteAttachments(generation, resolution.path).resolveWikiEmbed}
           />
         )
       } catch {
         return null
       }
     },
-    [catalog, dateFormat, generation, graphKey],
+    [dateFormat, generation, graphKey],
   )
 }

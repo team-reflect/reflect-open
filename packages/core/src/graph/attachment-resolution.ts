@@ -103,37 +103,32 @@ export function resolveAttachmentLink(
 
 /**
  * What an Obsidian `![[target]]` embed shows: another note (rendered as a
- * link to it — Reflect does not transclude note content), or an attachment
- * rendered inline as an image or as a file pill.
+ * link to it, never transcluded), or an attachment as the Markdown destination
+ * {@link resolveAttachmentLink} reads it by.
  */
 export type WikiEmbedTarget =
   | { readonly kind: 'note' }
-  | { readonly kind: 'image' | 'file'; readonly path: string }
+  | { readonly kind: 'image' | 'file'; readonly source: string }
 
 /**
- * Classify an Obsidian `![[target]]` embed in `sourcePath`, or null when it
- * names an attachment at an unsafe path (traversal, hidden components). An
- * attachment target with a folder is vault-root relative; a bare filename is
- * found by name in the catalog and falls back to the vault root, like
- * {@link resolveAttachmentLink}.
+ * Classify an Obsidian `![[target]]` embed, or null when it names an
+ * attachment at an unsafe path (traversal, hidden components). A target with a
+ * folder is vault-root relative; a bare filename is found by name, so the
+ * spelling handed out needs no catalog.
  */
-export function resolveWikiEmbedTarget(
-  sourcePath: string,
-  target: string,
-  catalog: AttachmentCatalog | null,
-): WikiEmbedTarget | null {
+export function resolveWikiEmbedTarget(target: string): WikiEmbedTarget | null {
   if (!isAttachmentEmbedTarget(target)) {
     return { kind: 'note' }
   }
-  const authored = wikiEmbedAssetPath(target)
-  if (authored === null) {
+  const path = wikiEmbedAssetPath(target)
+  if (path === null) {
     return null
   }
-  const path =
-    authored.includes('/') || catalog === null
-      ? authored
-      : (closestNamed(catalog, sourcePath, authored) ?? authored)
-  return { kind: isImageAttachmentPath(path) ? 'image' : 'file', path }
+  const encoded = path.split('/').map(encodeURIComponent).join('/')
+  return {
+    kind: isImageAttachmentPath(path) ? 'image' : 'file',
+    source: path.includes('/') ? `/${encoded}` : encoded,
+  }
 }
 
 /**

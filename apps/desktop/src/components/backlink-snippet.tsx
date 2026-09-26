@@ -1,6 +1,6 @@
 import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver.ts'
 import { resolveYouTubeVideo } from '@/editor/youtube-video-resolver.ts'
-import { useCallback, type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
 import type { WikilinkClickHandler } from '@meowdown/core'
 import type { SnippetTask } from '@reflect/core'
@@ -46,10 +46,6 @@ export function BacklinkSnippet({
 }: BacklinkSnippetProps): ReactElement {
   const generation = useGraph({ optional: true })?.graph?.generation ?? null
   const { resolveImageUrl, resolveWikiEmbed } = useNoteAttachments(generation, notePath)
-  const resolveImageUrlOrSkip = useCallback(
-    (src: string) => resolveImageUrl(src) ?? undefined,
-    [resolveImageUrl],
-  )
   const resolveXPost = useXPostResolver()
   const onTaskClick = useSnippetTaskToggle(notePath, tasks)
   const openExternalLink = useOpenExternalLink()
@@ -66,7 +62,7 @@ export function BacklinkSnippet({
         onWikilinkClick={onWikilinkClick}
         onLinkClick={openExternalLink}
         {...(onTaskClick ? { onTaskClick } : {})}
-        resolveImageUrl={resolveImageUrlOrSkip}
+        resolveImageUrl={resolveImageUrl}
         resolveWikiEmbed={resolveWikiEmbed}
       />
     </div>

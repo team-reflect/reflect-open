@@ -154,7 +154,7 @@ describe('useAssetPersistence resolveImageUrl', () => {
     installUploadBridge()
     await renderPersistence({ generation: 3 })
 
-    expect(persistence!.resolveImageUrl('assets/cat.png')).toBe(
+    expect(await persistence!.resolveImageUrl('assets/cat.png')).toBe(
       `reflect-asset://localhost/${encodeURIComponent('3/assets/cat.png')}`,
     )
   })
@@ -163,7 +163,7 @@ describe('useAssetPersistence resolveImageUrl', () => {
     installUploadBridge()
     await renderPersistence({ generation: 3, path: 'Projects/Garden redesign.md' })
 
-    expect(persistence!.resolveImageUrl('../attachments/garden-budget.png')).toBe(
+    expect(await persistence!.resolveImageUrl('../attachments/garden-budget.png')).toBe(
       `reflect-asset://localhost/${encodeURIComponent('3/attachments/garden-budget.png')}`,
     )
     expect(persistence!.resolveAssetOpenPath('../attachments/garden-budget.png')).toBe(
@@ -175,12 +175,12 @@ describe('useAssetPersistence resolveImageUrl', () => {
     installUploadBridge()
     await renderPersistence({ generation: 3 })
 
-    expect(persistence!.resolveImageUrl('assets/../secrets.env')).toBeNull()
-    expect(persistence!.resolveImageUrl('../../outside.png')).toBeNull()
-    expect(persistence!.resolveImageUrl('notes/other.md')).toBeNull()
+    expect(await persistence!.resolveImageUrl('assets/../secrets.env')).toBeUndefined()
+    expect(await persistence!.resolveImageUrl('../../outside.png')).toBeUndefined()
+    expect(await persistence!.resolveImageUrl('notes/other.md')).toBeUndefined()
 
     await renderPersistence({ generation: null })
-    expect(persistence!.resolveImageUrl('assets/cat.png')).toBeNull()
+    expect(persistence!.resolveImageUrl('assets/cat.png')).toBeUndefined()
   })
 })
 

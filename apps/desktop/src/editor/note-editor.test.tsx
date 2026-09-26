@@ -80,7 +80,7 @@ function renderEditor(
   return render(
     <NoteEditor
       initialContent={IMAGE_NOTE}
-      resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
+      resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
       resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
       openAsset={openAsset}
     />,
@@ -425,7 +425,7 @@ describe('NoteEditor image lightbox', () => {
     await screen.rerender(
       <NoteEditor
         initialContent={IMAGE_NOTE}
-        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
+        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
         resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
         openAsset={secondOpenImage}
       />,
@@ -442,7 +442,7 @@ describe('NoteEditor image lightbox', () => {
     await render(
       <NoteEditor
         initialContent={IMAGE_NOTE}
-        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
+        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
         resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
       />,
     )
@@ -456,7 +456,7 @@ describe('NoteEditor image lightbox', () => {
     await render(
       <NoteEditor
         initialContent={'![Cat](assets/cat.png)\n\n![X](https://blocked.example/x.png)'}
-        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
+        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
       />,
     )
 
@@ -502,52 +502,6 @@ describe('NoteEditor attachment resolution', () => {
 
     await expect.element(pmRoot).toHaveTextContent('![[../outside.png]]')
     await expectLocatorToHaveCount(pmRoot.locate('img'), 0)
-  })
-
-  it('re-resolves rendered images in place when the image resolver changes', async () => {
-    const handleRef = createRef<NoteEditorHandle>()
-    const screen = await render(
-      <NoteEditor initialContent={IMAGE_NOTE} resolveImageUrl={() => null} handleRef={handleRef} />,
-    )
-    await expectLocatorToHaveCount(pmRoot.locate('img'), 0)
-
-    // The attachment catalog arrived: the host hands over a new resolver.
-    await screen.rerender(
-      <NoteEditor
-        initialContent={IMAGE_NOTE}
-        resolveImageUrl={(src) => `asset://${src}`}
-        handleRef={handleRef}
-      />,
-    )
-
-    await expect
-      .element(pmRoot.getByAltText('Cat'))
-      .toHaveAttribute('src', 'asset://assets/cat.png')
-    expect(handleRef.current?.getMarkdown()).toBe(`${IMAGE_NOTE}\n`)
-  })
-
-  it('re-resolves embeds when the embed resolver changes', async () => {
-    const note = 'Budget ![[garden-budget.png]] here'
-    const resolveImageUrl = (src: string): string => `asset://${src}`
-    const screen = await render(
-      <NoteEditor
-        initialContent={note}
-        resolveWikiEmbed={({ target }) => embedImage(`/${target}`)}
-        resolveImageUrl={resolveImageUrl}
-      />,
-    )
-    const image = pmRoot.getByAltText('garden-budget.png')
-    await expect.element(image).toHaveAttribute('src', 'asset:///garden-budget.png')
-
-    await screen.rerender(
-      <NoteEditor
-        initialContent={note}
-        resolveWikiEmbed={({ target }) => embedImage(`/attachments/${target}`)}
-        resolveImageUrl={resolveImageUrl}
-      />,
-    )
-
-    await expect.element(image).toHaveAttribute('src', 'asset:///attachments/garden-budget.png')
   })
 })
 

@@ -1,11 +1,4 @@
-import {
-  createContext,
-  use,
-  useCallback,
-  useEffect,
-  type ReactElement,
-  type ReactNode,
-} from 'react'
+import { useCallback, useEffect, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   createAttachmentCatalog,
@@ -20,13 +13,9 @@ import { invalidateAttachmentCatalog, queryClient } from '@/lib/query-client.ts'
 import { createAttachmentCatalogQueryOptions } from '@/lib/query-options.ts'
 import { useFileChanges } from '@/lib/use-file-changes.ts'
 
-const AttachmentCatalogContext = createContext<AttachmentCatalog | null>(null)
-
 type AttachmentListing = Parameters<typeof createAttachmentCatalog>[0]
 
-// One catalog per listing: structural sharing hands back the same listing
-// array while nothing changed, so the catalog (and every resolver built on
-// it) keeps its identity too.
+// One catalog per listing, so a lookup never re-indexes an unchanged listing.
 const catalogs = new WeakMap<AttachmentListing, AttachmentCatalog>()
 
 function catalogFor(listing: AttachmentListing): AttachmentCatalog {
@@ -38,11 +27,13 @@ function catalogFor(listing: AttachmentListing): AttachmentCatalog {
   return catalog
 }
 
-/**
- * The attachment catalog for a graph session, waiting for the first listing
- * when it has not arrived yet — for async consumers (file-pill sizes) that
- * would otherwise resolve against no catalog at all.
- */
+/** The attachment catalog for a graph session, or null while its first listing loads. */
+export function peekAttachmentCatalog(generation: number): AttachmentCatalog | null {
+  const listing = queryClient.getQueryData(createAttachmentCatalogQueryOptions(generation).queryKey)
+  return listing === undefined ? null : catalogFor(listing)
+}
+
+/** The attachment catalog for a graph session, waiting for the first listing. */
 export async function loadAttachmentCatalog(generation: number): Promise<AttachmentCatalog> {
   return catalogFor(await queryClient.fetchQuery(createAttachmentCatalogQueryOptions(generation)))
 }
@@ -53,22 +44,17 @@ interface AttachmentCatalogProviderProps {
 }
 
 /**
- * Holds the open graph's attachment catalog, which display-time resolution of
- * images, `![[embeds]]`, and attachment links reads (`useNoteAttachments`).
- * One listing per graph session, re-listed when the watcher reports an
+ * Keeps the open graph's attachment catalog loaded for {@link peekAttachmentCatalog}:
+ * one listing per graph session, re-listed when the watcher reports an
  * attachment appearing or disappearing, or a folder change only a re-listing
- * can explain. A single subscription serves every open editor and preview.
+ * can explain. The query subscription is what makes an invalidation refetch.
  */
 export function AttachmentCatalogProvider({
   graph,
   children,
-}: AttachmentCatalogProviderProps): ReactElement {
+}: AttachmentCatalogProviderProps): ReactNode {
   const bridgeReady = useBridgeReady()
-  const { data } = useQuery({
-    ...createAttachmentCatalogQueryOptions(graph.generation),
-    enabled: bridgeReady,
-  })
-  const catalog = data === undefined ? null : catalogFor(data)
+  useQuery({ ...createAttachmentCatalogQueryOptions(graph.generation), enabled: bridgeReady })
 
   useFileChanges(
     useCallback((changes: FileChange[]) => {
@@ -100,14 +86,5 @@ export function AttachmentCatalogProvider({
     }
   }, [bridgeReady])
 
-  return <AttachmentCatalogContext value={catalog}>{children}</AttachmentCatalogContext>
-}
-
-/**
- * The open graph's attachment catalog, or null while it first loads (and
- * outside an {@link AttachmentCatalogProvider}). Resolution degrades to each
- * reference's vault-root reading until it arrives.
- */
-export function useAttachmentCatalog(): AttachmentCatalog | null {
-  return use(AttachmentCatalogContext)
+  return children
 }

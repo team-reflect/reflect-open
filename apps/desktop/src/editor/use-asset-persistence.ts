@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { FileInfo, FileLinkResolver, WikiEmbedResolver } from '@meowdown/core'
+import type {
+  FileInfo,
+  FileLinkResolver,
+  ImageUrlResolver,
+  WikiEmbedResolver,
+} from '@meowdown/core'
 import {
   assetFileName,
   createAsset,
@@ -39,8 +44,8 @@ export interface AssetSaveError {
 }
 
 export interface AssetPersistence {
-  /** Resolve an image source in the note to a displayable URL (or null to skip). */
-  resolveImageUrl: (src: string) => string | null
+  /** Resolve an image source in the note to a displayable URL, possibly later. */
+  resolveImageUrl: ImageUrlResolver
   /**
    * Resolve an image source or link destination in the note to the
    * graph-relative attachment {@link openAsset} opens (null for remote,

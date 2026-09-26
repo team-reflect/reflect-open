@@ -84,50 +84,7 @@ afterEach(() => {
 })
 
 describe('useNoteAttachments', () => {
-  it('finds a bare embed by name once the catalog loads', async () => {
-    installVault(['attachments/garden-budget.png'])
-    await renderAttachments('Home.md')
-
-    await vi.waitFor(() => {
-      expect(attachments?.resolveWikiEmbed(embed('garden-budget.png'))).toEqual({
-        kind: 'image',
-        src: '/attachments/garden-budget.png',
-      })
-    })
-    expect(attachments?.resolveImageUrl('/attachments/garden-budget.png')).toBe(
-      assetUrl('attachments/garden-budget.png'),
-    )
-  })
-
-  it('hands out embed sources that read back as the same file', async () => {
-    installVault(['Media/my photo #1.png', 'Media/100%.pdf'])
-    await renderAttachments('Home.md')
-    await vi.waitFor(() => {
-      expect(attachments?.resolveWikiEmbed(embed('my photo #1.png'))).toEqual({
-        kind: 'image',
-        src: '/Media/my%20photo%20%231.png',
-      })
-    })
-
-    const image = attachments?.resolveWikiEmbed(embed('my photo #1.png'))
-    const file = attachments?.resolveWikiEmbed(embed('100%.pdf'))
-    expect(image?.kind === 'image' && attachments?.resolveAttachmentPath(image.src ?? '')).toBe(
-      'Media/my photo #1.png',
-    )
-    expect(file?.kind === 'file' && attachments?.resolveAttachmentPath(file.href ?? '')).toBe(
-      'Media/100%.pdf',
-    )
-  })
-
-  it('renders note embeds as note chips and leaves unsafe embeds literal', async () => {
-    installVault([])
-    await renderAttachments('Home.md')
-
-    expect(attachments?.resolveWikiEmbed(embed('Deep Work'))).toEqual({ kind: 'note' })
-    expect(attachments?.resolveWikiEmbed(embed('../outside.png'))).toBeUndefined()
-  })
-
-  it('prefers the file beside the note for an ambiguous relative image', async () => {
+  it('answers synchronously once the catalog is loaded, preferring the file beside the note', async () => {
     installVault(['Projects/attachments/plan.png', 'attachments/plan.png'])
     await renderAttachments('Projects/Plan.md')
 
@@ -137,16 +94,42 @@ describe('useNoteAttachments', () => {
       )
     })
   })
+
+  it('waits for the catalog when it has not loaded yet', async () => {
+    installVault(['attachments/garden-budget.png'])
+    await renderAttachments('Home.md')
+
+    await expect(attachments?.resolveImageUrl('garden-budget.png')).resolves.toBe(
+      assetUrl('attachments/garden-budget.png'),
+    )
+  })
+
+  it('hands out embed sources that read back as the same file', async () => {
+    installVault(['Media/my photo #1.png', 'Media/100%.pdf'])
+    await renderAttachments('Home.md')
+
+    const image = attachments?.resolveWikiEmbed(embed('Media/my photo #1.png'))
+    const file = attachments?.resolveWikiEmbed(embed('100%.pdf'))
+    expect(image).toEqual({ kind: 'image', src: '/Media/my%20photo%20%231.png' })
+    await vi.waitFor(() => {
+      expect(attachments?.resolveAttachmentPath('/Media/my%20photo%20%231.png')).toBe(
+        'Media/my photo #1.png',
+      )
+      expect(file?.kind === 'file' && attachments?.resolveAttachmentPath(file.href ?? '')).toBe(
+        'Media/100%.pdf',
+      )
+    })
+    expect(attachments?.resolveWikiEmbed(embed('Deep Work'))).toEqual({ kind: 'note' })
+    expect(attachments?.resolveWikiEmbed(embed('../outside.png'))).toBeUndefined()
+  })
 })
 
 describe('AttachmentCatalogProvider', () => {
   it('re-lists when an attachment changes, not when only a note does', async () => {
     const vault = installVault([])
     await renderAttachments('Home.md')
-    await vi.waitFor(() => expect(vault.listings()).toBe(1))
-    expect(attachments?.resolveWikiEmbed(embed('garden-budget.png'))).toEqual({
-      kind: 'image',
-      src: '/garden-budget.png',
+    await vi.waitFor(() => {
+      expect(attachments?.resolveImageUrl('garden-budget.png')).toBe(assetUrl('garden-budget.png'))
     })
 
     vault.emit('index:changed', [{ path: 'Home.md', kind: 'upsert', modifiedMs: 1 }])
@@ -158,10 +141,9 @@ describe('AttachmentCatalogProvider', () => {
       { path: 'attachments/garden-budget.png', kind: 'upsert', modifiedMs: 1 },
     ])
     await vi.waitFor(() => {
-      expect(attachments?.resolveWikiEmbed(embed('garden-budget.png'))).toEqual({
-        kind: 'image',
-        src: '/attachments/garden-budget.png',
-      })
+      expect(attachments?.resolveImageUrl('garden-budget.png')).toBe(
+        assetUrl('attachments/garden-budget.png'),
+      )
     })
     expect(vault.listings()).toBe(2)
   })
@@ -174,21 +156,5 @@ describe('AttachmentCatalogProvider', () => {
     vault.emit('index:reconcile', null)
 
     await vi.waitFor(() => expect(vault.listings()).toBe(2))
-  })
-
-  it('keeps resolver identities when a re-listing finds the same files', async () => {
-    const vault = installVault(['attachments/a.png'])
-    await renderAttachments('Home.md')
-    await vi.waitFor(() => expect(vault.listings()).toBe(1))
-    await vi.waitFor(() => {
-      expect(attachments?.resolveImageUrl('a.png')).toBe(assetUrl('attachments/a.png'))
-    })
-    const before = attachments
-
-    vault.emit('index:changed', [{ path: 'attachments/a.png', kind: 'upsert', modifiedMs: 2 }])
-    await vi.waitFor(() => expect(vault.listings()).toBe(2))
-    await new Promise((resolve) => setTimeout(resolve, 50))
-
-    expect(attachments).toBe(before)
   })
 })

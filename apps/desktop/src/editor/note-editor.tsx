@@ -3,7 +3,6 @@ import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-res
 import { resolveYouTubeVideo } from '@/editor/youtube-video-resolver.ts'
 import {
   useCallback,
-  useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
@@ -18,6 +17,7 @@ import type {
   ExitBoundaryHandler,
   FileClickHandler,
   FileInfoResolver,
+  ImageUrlResolver,
   FileLinkResolver,
   ImageClickHandler,
   LinkPreviewResolver,
@@ -144,17 +144,13 @@ interface NoteEditorProps {
    */
   blockHandle?: boolean
   /**
-   * Resolve an image `![…](…)` source to a displayable URL; unresolved images
-   * are skipped. Memoize it: a new identity means its answers changed (the
-   * note's folder, the graph session, the attachment catalog), and every
-   * rendered image re-resolves.
+   * Resolve an image `![…](…)` source to a displayable URL, possibly later;
+   * unresolved images are skipped.
    */
-  resolveImageUrl?: (src: string) => string | null
+  resolveImageUrl?: ImageUrlResolver
   /**
    * Classify Obsidian `![[target]]` embeds as images, file pills, or note
-   * chips; `undefined` leaves the source literal. Memoize it like
-   * {@link NoteEditorProps.resolveImageUrl}: a new identity re-resolves every
-   * embed in the document.
+   * chips; `undefined` leaves the source literal.
    */
   resolveWikiEmbed?: WikiEmbedResolver
   /**
@@ -315,35 +311,6 @@ export function NoteEditor({
     onExitBoundaryRef.current = onExitBoundary
   })
 
-  // meowdown resolves an image when it renders it and an embed when it parses
-  // it, through the stable wrappers below; a resolver whose answers changed
-  // must re-resolve what is already on screen. Compared against the
-  // identities the rendered document last used, so a mount (or StrictMode's
-  // remount) never refreshes.
-  const renderedResolvers = useRef({ resolveImageUrl, resolveWikiEmbed })
-  useEffect(() => {
-    const rendered = renderedResolvers.current
-    if (
-      rendered.resolveImageUrl === resolveImageUrl &&
-      rendered.resolveWikiEmbed === resolveWikiEmbed
-    ) {
-      return
-    }
-    renderedResolvers.current = { resolveImageUrl, resolveWikiEmbed }
-    const editor = innerRef.current
-    if (editor === null) {
-      return
-    }
-    // Only a document holding an embed has parse-time output to redo; the
-    // reparse re-resolves images too. Anything else re-resolves images in
-    // place, leaving the document (and a composition in progress) alone.
-    if (rendered.resolveWikiEmbed !== resolveWikiEmbed && editor.getMarkdown().includes('![[')) {
-      editor.refreshMarkdownRendering()
-    } else {
-      editor.refreshImages()
-    }
-  }, [resolveImageUrl, resolveWikiEmbed])
-
   const lightbox = useLightbox()
   const openLightbox = lightbox.open
   // Captured when the lightbox opens, so a later graph switch cannot retarget it.
@@ -390,8 +357,8 @@ export function NoteEditor({
     (payload: { tag: string }) => onTagClickRef.current?.(payload.tag),
     [],
   )
-  const handleResolveImageUrl = useCallback(
-    (src: string) => resolveImageUrlRef.current?.(src) ?? undefined,
+  const handleResolveImageUrl: ImageUrlResolver = useCallback(
+    (src) => resolveImageUrlRef.current?.(src),
     [],
   )
   const handleResolveWikiEmbed: WikiEmbedResolver = useCallback(
@@ -451,22 +418,23 @@ export function NoteEditor({
     // meowdown cancels it so iOS WebKit can't focus the editor (and raise
     // the keyboard) under the opening lightbox.
     ({ src, alt, element }) => {
-      const displayUrl = resolveImageUrlRef.current?.(src) ?? null
-      if (displayUrl === null) {
-        return
-      }
-      const openPath = resolveAssetOpenPathRef.current?.(src) ?? null
-      const openImage = openAssetRef.current ?? null
-      setOpenLightboxImage(() =>
-        openPath !== null && openImage !== null
-          ? () => {
-              void Promise.resolve(openImage(openPath)).catch((cause) => {
-                console.error('open image failed:', errorMessage(cause))
-              })
-            }
-          : null,
-      )
-      openLightbox({ type: 'image', src: displayUrl, alt }, element)
+      void Promise.resolve(resolveImageUrlRef.current?.(src)).then((displayUrl) => {
+        if (displayUrl === undefined) {
+          return
+        }
+        const openPath = resolveAssetOpenPathRef.current?.(src) ?? null
+        const openImage = openAssetRef.current ?? null
+        setOpenLightboxImage(() =>
+          openPath !== null && openImage !== null
+            ? () => {
+                void Promise.resolve(openImage(openPath)).catch((cause) => {
+                  console.error('open image failed:', errorMessage(cause))
+                })
+              }
+            : null,
+        )
+        openLightbox({ type: 'image', src: displayUrl, alt }, element)
+      })
     },
     [openLightbox],
   )

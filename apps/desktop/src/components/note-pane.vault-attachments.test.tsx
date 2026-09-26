@@ -123,18 +123,17 @@ it('renders Obsidian embeds and vault-root images in a root note', async () => {
   await view.unmount()
 })
 
-it('moves an embed onto its real folder once the attachment catalog arrives', async () => {
+it('renders an embed once the attachment catalog arrives', async () => {
   const listing = deferred<FileMeta[]>()
   listAttachments = () => listing.promise
   files['Home.md'] = 'Embed: ![[garden-budget.png]]\n'
   const view = await renderNote('Home.md')
 
-  // Before the catalog loads, a bare name reads as the vault root.
-  const image = page.getByAltText('garden-budget.png')
-  await expect.element(image).toHaveAttribute('src', 'reflect-asset://1/garden-budget.png')
+  await expect.element(page.getByText('Embed:')).toBeVisible()
+  expect(document.querySelectorAll('.ProseMirror img')).toHaveLength(0)
 
   listing.resolve(ATTACHMENTS)
 
-  await expect.element(image).toHaveAttribute('src', BUDGET_URL)
+  await expect.element(page.getByAltText('garden-budget.png')).toHaveAttribute('src', BUDGET_URL)
   await view.unmount()
 })

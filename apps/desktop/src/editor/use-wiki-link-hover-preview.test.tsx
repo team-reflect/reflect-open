@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
-import type { WikiEmbedResolver, WikilinkHoverHit } from '@meowdown/core'
+import type { ImageUrlResolver, WikiEmbedResolver, WikilinkHoverHit } from '@meowdown/core'
 import { useWikiLinkHoverPreview } from './use-wiki-link-hover-preview.tsx'
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -26,7 +26,7 @@ vi.mock('@/lib/read-existing-note-source.ts', () => ({
 interface MarkdownPreviewProps {
   content: string
   interactive: boolean
-  resolveImageUrl: (src: string) => string | null
+  resolveImageUrl: ImageUrlResolver
   resolveWikiEmbed: WikiEmbedResolver
 }
 
@@ -126,9 +126,9 @@ describe('useWikiLinkHoverPreview', () => {
     await render(<>{await renderBody(hoverHit('Alpha'))}</>)
 
     const props = mocks.markdownPreview.mock.calls.at(-1)?.[0] as MarkdownPreviewProps
-    expect(props.resolveImageUrl('https://example.com/cat.png')).toBeNull()
-    expect(props.resolveImageUrl('../../outside.png')).toBeNull()
-    expect(props.resolveImageUrl('assets/vector.svg')).toBeNull()
+    expect(props.resolveImageUrl('https://example.com/cat.png')).toBeUndefined()
+    expect(props.resolveImageUrl('../../outside.png')).toBeUndefined()
+    expect(props.resolveImageUrl('assets/vector.svg')).toBeUndefined()
     expect(props.resolveImageUrl('assets/cat.png')).toBe(
       'reflect-asset://7/assets/cat.png?reflect-preview=raster',
     )
@@ -149,7 +149,7 @@ describe('useWikiLinkHoverPreview', () => {
       'reflect-asset://7/attachments/garden-budget.png?reflect-preview=raster',
     )
     const embed = { target: 'garden-budget.png', display: '', width: null, height: null }
-    expect(props.resolveWikiEmbed(embed)).toEqual({ kind: 'image', src: '/garden-budget.png' })
+    expect(props.resolveWikiEmbed(embed)).toEqual({ kind: 'image', src: 'garden-budget.png' })
     expect(props.resolveWikiEmbed({ ...embed, target: 'Deep Work' })).toEqual({ kind: 'note' })
   })
 

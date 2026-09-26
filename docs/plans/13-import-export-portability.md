@@ -50,8 +50,11 @@ the way CommonMark and Obsidian read them (`packages/core/src/graph/attachment-r
   loaded, so Reflect-written images never wait on it. A bare filename that matches
   neither reading is found by name anywhere in the vault (Obsidian's "shortest path").
 - An Obsidian embed, `![[photo.png]]`, is vault-root relative when it names a folder
-  and found by name when it does not. Images render inline and other attachments render
-  as file pills. Ties go to the file beside the note, then the shallowest one.
+  and otherwise reads like a bare Markdown destination: beside the note, then the vault
+  root, then by name. Images render inline and other attachments render as file pills.
+  Name ties go to the file beside the note, then the shallowest one.
+- The editor asks for an image's URL once; when the catalog has not loaded yet, the
+  answer is a promise it waits for, so the first render already shows the right file.
 - Links to local attachments render as file pills and open in the OS default app.
 - The resolver only ever returns a spelling the index records for that reference, so
   the asset privacy gate always sees the note that displays a file. A bare name is

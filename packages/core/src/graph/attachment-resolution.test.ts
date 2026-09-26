@@ -119,49 +119,36 @@ describe('resolveAttachmentLink', () => {
 })
 
 describe('resolveWikiEmbedTarget', () => {
-  it('finds a bare image target by name, falling back to the vault root', () => {
-    expect(resolveWikiEmbedTarget('Home.md', 'garden-budget.png', vault)).toEqual({
+  it('hands out a bare target by name and a folder target from the vault root', () => {
+    expect(resolveWikiEmbedTarget('garden-budget.png')).toEqual({
       kind: 'image',
-      path: 'attachments/garden-budget.png',
+      source: 'garden-budget.png',
     })
-    expect(resolveWikiEmbedTarget('Home.md', 'garden-budget.png', null)).toEqual({
+    expect(resolveWikiEmbedTarget('attachments/garden-budget.png')).toEqual({
       kind: 'image',
-      path: 'garden-budget.png',
-    })
-    expect(resolveWikiEmbedTarget('Home.md', 'missing.png', vault)).toEqual({
-      kind: 'image',
-      path: 'missing.png',
+      source: '/attachments/garden-budget.png',
     })
   })
 
-  it('reads a target with a folder as vault-root relative, undecoded', () => {
-    expect(
-      resolveWikiEmbedTarget('Projects/Plan.md', 'attachments/garden-budget.png', vault),
-    ).toEqual({ kind: 'image', path: 'attachments/garden-budget.png' })
-    expect(resolveWikiEmbedTarget('Home.md', '/attachments/my%20photo.png', vault)).toEqual({
+  it('encodes the source so it reads back as the same file', () => {
+    expect(resolveWikiEmbedTarget('Media/my photo #1.png')).toEqual({
       kind: 'image',
-      path: 'attachments/my%20photo.png',
+      source: '/Media/my%20photo%20%231.png',
     })
+    expect(resolveAttachmentLink('Home.md', '/Media/my%20photo%20%231.png', null)).toBe(
+      'Media/my photo #1.png',
+    )
   })
 
-  it('renders non-image attachments as files', () => {
-    expect(resolveWikiEmbedTarget('Home.md', 'report.pdf', vault)).toEqual({
-      kind: 'file',
-      path: 'attachments/report.pdf',
-    })
-  })
-
-  it('classifies note targets as notes, however they are spelled', () => {
-    expect(resolveWikiEmbedTarget('Home.md', 'Deep Work', vault)).toEqual({ kind: 'note' })
-    expect(resolveWikiEmbedTarget('Home.md', 'Deep Work#Rules', vault)).toEqual({ kind: 'note' })
-    expect(resolveWikiEmbedTarget('Home.md', 'Projects/Garden redesign', vault)).toEqual({
-      kind: 'note',
-    })
+  it('renders non-image attachments as files and note targets as notes', () => {
+    expect(resolveWikiEmbedTarget('report.pdf')).toEqual({ kind: 'file', source: 'report.pdf' })
+    expect(resolveWikiEmbedTarget('Deep Work#Rules')).toEqual({ kind: 'note' })
+    expect(resolveWikiEmbedTarget('Projects/Garden redesign')).toEqual({ kind: 'note' })
   })
 
   it('returns null for attachments at unsafe paths', () => {
-    expect(resolveWikiEmbedTarget('Home.md', '../outside.png', vault)).toBeNull()
-    expect(resolveWikiEmbedTarget('Home.md', '.obsidian/icon.png', vault)).toBeNull()
+    expect(resolveWikiEmbedTarget('../outside.png')).toBeNull()
+    expect(resolveWikiEmbedTarget('.obsidian/icon.png')).toBeNull()
   })
 })
 
@@ -216,11 +203,13 @@ describe('agreement with the index privacy gate', () => {
   for (const [source, target] of embeds) {
     it(`indexes what ${source} displays for ![[${target}]]`, () => {
       for (const catalog of [vault, catalogOf(), null]) {
-        const embed = resolveWikiEmbedTarget(source, target, catalog)
+        const embed = resolveWikiEmbedTarget(target)
         expectIndexed(
           source,
           `![[${target}]]`,
-          embed?.kind === 'note' ? null : (embed?.path ?? null),
+          embed?.kind === 'note'
+            ? null
+            : resolveAttachmentLink(source, embed?.source ?? '', catalog),
         )
       }
     })
