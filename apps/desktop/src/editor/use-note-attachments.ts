@@ -68,7 +68,7 @@ export function createNoteAttachments(
         return src
       }
       if (generation === null) {
-        return undefined
+        return
       }
       const url = (catalog: AttachmentCatalog | null): string | undefined => {
         const path = resolvePath(src, catalog)

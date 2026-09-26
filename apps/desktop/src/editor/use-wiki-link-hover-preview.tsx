@@ -34,7 +34,7 @@ function passiveImageResolver(generation: number, notePath: string): ImageUrlRes
     // enforce a sniffed raster MIME allowlist, so renamed SVG bytes cannot
     // bypass the passive card's no-network boundary.
     if (assetPath === null || isSvgAsset(assetPath)) {
-      return undefined
+      return
     }
     return previewRasterUrl(attachmentUrl(generation, assetPath))
   }
