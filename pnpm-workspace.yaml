@@ -34,11 +34,3 @@ minimumReleaseAgeExclude:
 #   '@meowdown/core': https://pkg.pr.new/@meowdown/core@346867e5f1b5336c889e829b146a04fcc0c115c1
 #   '@meowdown/react': https://pkg.pr.new/@meowdown/react@346867e5f1b5336c889e829b146a04fcc0c115c1
 #   '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@346867e5f1b5336c889e829b146a04fcc0c115c1
-
-# Temporary: prosekit/meowdown#628 (async `resolveImageUrl`) until it ships on npm.
-blockExoticSubdeps: false
-overrides:
-  '@meowdown/core': https://pkg.pr.new/@meowdown/core@e29090f
-  '@meowdown/react': https://pkg.pr.new/@meowdown/react@e29090f
-  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@e29090f
-  '@meowdown/embed': https://pkg.pr.new/@meowdown/embed@e29090f
