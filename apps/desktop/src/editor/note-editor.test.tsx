@@ -80,7 +80,7 @@ function renderEditor(
   return render(
     <NoteEditor
       initialContent={IMAGE_NOTE}
-      resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
+      resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
       resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
       openAsset={openAsset}
     />,
@@ -425,7 +425,7 @@ describe('NoteEditor image lightbox', () => {
     await screen.rerender(
       <NoteEditor
         initialContent={IMAGE_NOTE}
-        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
+        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
         resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
         openAsset={secondOpenImage}
       />,
@@ -442,7 +442,7 @@ describe('NoteEditor image lightbox', () => {
     await render(
       <NoteEditor
         initialContent={IMAGE_NOTE}
-        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
+        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
         resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
       />,
     )
@@ -456,12 +456,52 @@ describe('NoteEditor image lightbox', () => {
     await render(
       <NoteEditor
         initialContent={'![Cat](assets/cat.png)\n\n![X](https://blocked.example/x.png)'}
-        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
+        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
       />,
     )
 
     await expect.element(pmRoot.getByAltText('Cat')).toBeInTheDocument()
     await expectLocatorToHaveCount(pmRoot.locate('img'), 1)
+  })
+})
+
+describe('NoteEditor attachment resolution', () => {
+  const embedImage = (src: string) => ({ kind: 'image' as const, src })
+
+  it('renders an Obsidian image embed and opens it through the asset opener', async () => {
+    const openAsset = vi.fn(async () => {})
+    await render(
+      <NoteEditor
+        initialContent="Budget ![[garden-budget.png]] here"
+        resolveWikiEmbed={({ target }) => embedImage(`/attachments/${target}`)}
+        resolveImageUrl={(src) => `asset://${src}`}
+        resolveAssetOpenPath={(src) => src.slice(1)}
+        openAsset={openAsset}
+      />,
+    )
+
+    const image = pmRoot.getByAltText('garden-budget.png')
+    await expect.element(image).toHaveAttribute('src', 'asset:///attachments/garden-budget.png')
+    await image.click()
+    await page.getByRole('button', { name: 'Open' }).click()
+    await vi.waitFor(() => {
+      expect(openAsset).toHaveBeenCalledWith('attachments/garden-budget.png')
+    })
+  })
+
+  it('leaves an embed the host declines as literal source', async () => {
+    const handleRef = createRef<NoteEditorHandle>()
+    await render(
+      <NoteEditor
+        initialContent="![[../outside.png]]"
+        resolveWikiEmbed={() => undefined}
+        resolveImageUrl={(src) => `asset://${src}`}
+        handleRef={handleRef}
+      />,
+    )
+
+    await expect.element(pmRoot).toHaveTextContent('![[../outside.png]]')
+    await expectLocatorToHaveCount(pmRoot.locate('img'), 0)
   })
 })
 

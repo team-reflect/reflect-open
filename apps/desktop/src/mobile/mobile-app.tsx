@@ -17,6 +17,7 @@ import { usePaywallGate } from '@/mobile/use-paywall-gate.ts'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics.ts'
 import { CaptureProvider } from '@/providers/capture-provider.tsx'
 import { ChatProvider } from '@/providers/chat-provider.tsx'
+import { useAttachmentCatalogSync } from '@/lib/attachment-catalog.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { SyncProvider } from '@/providers/sync-provider.tsx'
 import { RouterProvider } from '@/routing/router.tsx'
@@ -43,6 +44,7 @@ export function MobileApp(): ReactElement {
   // iCloud graphs have an out-of-process writer (the OS syncing files in):
   // nudge downloads + re-reconcile on resume. Inert for local/git graphs.
   useICloudRefresh()
+  useAttachmentCatalogSync(graph?.generation ?? null)
 
   // Flush-on-background (Plan 19, decision 6): iOS may suspend or kill the
   // process soon after backgrounding, so every hide lands dirty note buffers

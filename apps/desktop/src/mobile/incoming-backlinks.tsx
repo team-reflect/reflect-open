@@ -43,7 +43,7 @@ export function IncomingBacklinks({
     loadMore,
   } = useBacklinkSources(path)
   const [expanded, setExpanded] = useBacklinksExpanded()
-  const { openSource, onWikilinkClick, resolveImageUrl } = useBacklinkNavigation()
+  const { openSource, onWikilinkClick } = useBacklinkNavigation()
 
   if (isError) {
     return (
@@ -92,7 +92,6 @@ export function IncomingBacklinks({
             expanded={expanded}
             onOpen={openSource}
             onWikilinkClick={onWikilinkClick}
-            resolveImageUrl={resolveImageUrl}
           />
         ))}
         <BacklinkLoadMore

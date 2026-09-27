@@ -5,6 +5,7 @@ import { NoteWindowContent } from '@/components/note-window-content.tsx'
 import { WorkspaceContent } from '@/components/workspace-content.tsx'
 import { getInitialWindowRoute } from '@/lib/windows/initial-window-route.ts'
 import { isMainWindow } from '@/lib/windows/window-role.ts'
+import { useAttachmentCatalogSync } from '@/lib/attachment-catalog.ts'
 import { AssetDescribeProvider } from '@/providers/asset-describe-provider.tsx'
 import { AudioMemoProvider } from '@/providers/audio-memo-provider.tsx'
 import { FocusedDailyProvider } from '@/providers/focused-daily-provider.tsx'
@@ -31,6 +32,7 @@ interface GraphWorkspaceProps {
  * fresh history.
  */
 export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
+  useAttachmentCatalogSync(graph.generation)
   // A note window's first route is its ⌘-clicked target (seeded by the boot
   // hook) — starting on the default today route would flash the daily note
   // until the deep link navigated.

@@ -24,7 +24,7 @@ import {
 } from '@/editor/editor-handle-registry.ts'
 import { markModeFromSyntax } from '@/editor/mark-mode.ts'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor.tsx'
-import { resolveAssetFileLink, useAssetPersistence } from '@/editor/use-asset-persistence.ts'
+import { useAssetPersistence } from '@/editor/use-asset-persistence.ts'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete.ts'
 import { useNoteDocument } from '@/editor/use-note-document.ts'
 import { useTagNavigation } from '@/editor/use-tag-navigation.ts'
@@ -167,14 +167,20 @@ export function NotePaneComponent({
     // notes stay unseeded — the date is their identity.
     ...(needsSeed ? { missingSeed: seed.seed } : {}),
   })
-  const { resolveImageUrl, resolveAssetOpenPath, openAsset, saveFile, resolveFileInfo, saveError } =
-    useAssetPersistence(generation, path)
+  const {
+    resolveImageUrl,
+    resolveWikiEmbed,
+    resolveAssetOpenPath,
+    resolveFileLink,
+    openAsset,
+    saveFile,
+    resolveFileInfo,
+    saveError,
+  } = useAssetPersistence(generation, path)
   const renderWikilinkHoverCard = useWikiLinkHoverPreview({
     generation,
     graphKey: graph?.root ?? null,
     dateFormat: settings.dateFormat,
-    resolveImageUrl,
-    resolveAssetOpenPath,
   })
   const onWikiLinkClick = useWikiLinkNavigation(generation)
   const onNoteLinkClick = useMarkdownLinkNavigation(generation, path)
@@ -336,13 +342,14 @@ export function NotePaneComponent({
         // The grip drag-reorders blocks and the "+" inserts a paragraph below.
         blockHandle={true}
         resolveImageUrl={resolveImageUrl}
+        resolveWikiEmbed={resolveWikiEmbed}
         resolveAssetOpenPath={resolveAssetOpenPath}
         openAsset={openAsset}
         saveFile={saveFile}
-        // Claims `assets/…` links (what saveFile inserts for a dropped
-        // non-image file) so they render as file pills, sized by
-        // resolveFileInfo.
-        resolveFileLink={resolveAssetFileLink}
+        // Claims links to local attachments (what saveFile inserts for a
+        // dropped non-image file, or a vault's own attachment links) so they
+        // render as file pills, sized by resolveFileInfo.
+        resolveFileLink={resolveFileLink}
         resolveFileInfo={resolveFileInfo}
         onWikiLinkClick={onWikiLinkClick}
         onNoteLinkClick={onNoteLinkClick}

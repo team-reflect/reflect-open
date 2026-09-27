@@ -917,6 +917,30 @@ pub async fn list_files<R: tauri::Runtime>(
     generation: Option<u64>,
     app: tauri::AppHandle<R>,
 ) -> AppResult<Vec<FileMeta>> {
+    catalog_off_main(generation, app, |catalog| catalog.notes).await
+}
+
+/// List supported local attachments from the same cached catalog as
+/// [`list_files`], and off the main thread for the same reason: the editor
+/// asks for it as soon as a note opens, possibly before any walk has run.
+#[tauri::command]
+pub async fn list_attachments<R: tauri::Runtime>(
+    generation: Option<u64>,
+    app: tauri::AppHandle<R>,
+) -> AppResult<Vec<FileMeta>> {
+    catalog_off_main(generation, app, |catalog| catalog.attachments).await
+}
+
+/// Read one listing out of the cached catalog on the blocking pool.
+async fn catalog_off_main<R, F>(
+    generation: Option<u64>,
+    app: tauri::AppHandle<R>,
+    listing: F,
+) -> AppResult<Vec<FileMeta>>
+where
+    R: tauri::Runtime,
+    F: FnOnce(io::FileCatalog) -> Vec<FileMeta> + Send + 'static,
+{
     // Pin the graph session before the hop, like `note_read` and `db_query`:
     // an unpinned call resolved inside the closure could list a root swapped
     // in after the invoke (the rebuild path calls this without a
@@ -931,19 +955,9 @@ pub async fn list_files<R: tauri::Runtime>(
     };
     crate::blocking::run_blocking(move || {
         let state = app.state::<GraphState>();
-        Ok(file_catalog(&state, Some(generation))?.notes)
+        Ok(listing(file_catalog(&state, Some(generation))?))
     })
     .await
-}
-
-/// List supported local attachments from the same cached catalog as
-/// [`list_files`].
-#[tauri::command]
-pub fn list_attachments(
-    generation: Option<u64>,
-    state: State<GraphState>,
-) -> AppResult<Vec<FileMeta>> {
-    Ok(file_catalog(&state, generation)?.attachments)
 }
 
 /// Counts from the vault catalog. `skipped` is what the walk refused or

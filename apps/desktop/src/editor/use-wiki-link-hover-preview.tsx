@@ -1,15 +1,14 @@
 import { useCallback, type ReactNode } from 'react'
-import type { WikilinkHoverHit } from '@meowdown/core'
+import type { ImageUrlResolver, WikilinkHoverHit } from '@meowdown/core'
 import { resolveExistingWikiTarget, splitFrontmatter, type DateFormat } from '@reflect/core'
 import { WikiLinkHoverPreview } from '@/components/wiki-link-hover-preview.tsx'
+import { createNoteAttachments } from '@/editor/use-note-attachments.ts'
 import { readExistingNoteSource } from '@/lib/read-existing-note-source.ts'
 
 interface WikiLinkHoverPreviewOptions {
   generation: number | null
   graphKey: string | null
   dateFormat: DateFormat
-  resolveImageUrl: (src: string) => string | null
-  resolveAssetOpenPath: (src: string) => string | null
 }
 
 function isSvgAsset(path: string): boolean {
@@ -19,6 +18,27 @@ function isSvgAsset(path: string): boolean {
 function previewRasterUrl(url: string): string {
   const separator = url.includes('?') ? '&' : '?'
   return `${url}${separator}reflect-preview=raster`
+}
+
+/**
+ * The passive card's image resolver for the note at `notePath`: local
+ * raster attachments only, resolved from that note's own folder. Remote
+ * images and SVGs never load in a hover card.
+ */
+function passiveImageResolver(generation: number, notePath: string): ImageUrlResolver {
+  const { resolveAttachmentPath, resolveImageUrl } = createNoteAttachments(generation, notePath)
+  return async (source) => {
+    const assetPath = resolveAttachmentPath(source)
+    // SVG can contain external subresource references. The filename check
+    // avoids an unnecessary request; the query also makes the asset protocol
+    // enforce a sniffed raster MIME allowlist, so renamed SVG bytes cannot
+    // bypass the passive card's no-network boundary.
+    if (assetPath === null || isSvgAsset(assetPath)) {
+      return
+    }
+    const url = await resolveImageUrl(source)
+    return url === undefined ? undefined : previewRasterUrl(url)
+  }
 }
 
 /**
@@ -33,25 +53,7 @@ export function useWikiLinkHoverPreview({
   generation,
   graphKey,
   dateFormat,
-  resolveImageUrl,
-  resolveAssetOpenPath,
 }: WikiLinkHoverPreviewOptions): (hit: WikilinkHoverHit) => Promise<ReactNode> {
-  const resolvePreviewImageUrl = useCallback(
-    (source: string): string | null => {
-      const assetPath = resolveAssetOpenPath(source)
-      // SVG can contain external subresource references. The filename check
-      // avoids an unnecessary request; the query also makes the asset protocol
-      // enforce a sniffed raster MIME allowlist, so renamed SVG bytes cannot
-      // bypass the passive card's no-network boundary.
-      if (assetPath === null || isSvgAsset(assetPath)) {
-        return null
-      }
-      const url = resolveImageUrl(assetPath)
-      return url === null ? null : previewRasterUrl(url)
-    },
-    [resolveAssetOpenPath, resolveImageUrl],
-  )
-
   return useCallback(
     async ({ target }: WikilinkHoverHit): Promise<ReactNode> => {
       if (generation === null || graphKey === null) {
@@ -68,13 +70,14 @@ export function useWikiLinkHoverPreview({
             path={resolution.path}
             markdown={splitFrontmatter(source).body}
             dateFormat={dateFormat}
-            resolveImageUrl={resolvePreviewImageUrl}
+            resolveImageUrl={passiveImageResolver(generation, resolution.path)}
+            resolveWikiEmbed={createNoteAttachments(generation, resolution.path).resolveWikiEmbed}
           />
         )
       } catch {
         return null
       }
     },
-    [dateFormat, generation, graphKey, resolvePreviewImageUrl],
+    [dateFormat, generation, graphKey],
   )
 }

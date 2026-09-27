@@ -21,7 +21,6 @@ function mount(onOpen: OnOpen) {
       expanded={false}
       onOpen={onOpen}
       onWikilinkClick={() => {}}
-      resolveImageUrl={() => undefined}
     />,
   )
 }

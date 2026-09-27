@@ -1,6 +1,8 @@
 import { mutationOptions, queryOptions } from '@tanstack/react-query'
 import {
+  createAttachmentCatalog,
   dailyDatesInRange,
+  listAttachments,
   getConflictedNotes,
   getDuplicateNoteIds,
   listChatConversations,
@@ -39,6 +41,20 @@ export function createDailyDatesQueryOptions(root: string | undefined, start: st
   return queryOptions({
     queryKey: queryKeys.index.dailyDates(root, start, end),
     queryFn: () => dailyDatesInRange(start, end),
+  })
+}
+
+/**
+ * The vault's attachment listing for one graph session, reduced to what
+ * display resolution reads so structural sharing keeps the result identical
+ * (and every open editor unrefreshed) when only modification times change.
+ * Freshness is event-driven: `useAttachmentCatalogSync` invalidates it.
+ */
+export function createAttachmentCatalogQueryOptions(generation: number) {
+  return queryOptions({
+    queryKey: queryKeys.attachments.catalog(generation),
+    queryFn: async () => createAttachmentCatalog(await listAttachments(generation)),
+    staleTime: Infinity,
   })
 }
 

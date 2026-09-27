@@ -121,6 +121,12 @@ export const queryKeys = {
       return [...this.all, root, 'conversations'] as const
     },
   },
+  attachments: {
+    all: ['attachments'] as const,
+    catalog(generation: number) {
+      return [...this.all, generation] as const
+    },
+  },
   settings: {
     all: ['settings'] as const,
   },
@@ -368,6 +374,14 @@ export function dropIcloudStatusQuery(): void {
 /** Refetch chat-history queries; called after a turn save or a delete. */
 export function invalidateChatQueries(): void {
   void queryClient.invalidateQueries({ queryKey: queryKeys.chat.all })
+}
+
+/**
+ * Re-list the vault's attachments; called when the watcher reports an
+ * attachment file (or a folder) appearing, moving, or disappearing.
+ */
+export function invalidateAttachmentCatalog(): void {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.attachments.all })
 }
 
 /** Re-read archived X posts; called after a capture pass writes archive JSON. */

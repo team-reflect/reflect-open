@@ -19,8 +19,6 @@ interface IncomingBacklinkGroupProps {
   onOpen: (path: string) => void
   /** Navigate a clicked `[[wiki link]]` inside a snippet to its target. */
   onWikilinkClick: WikilinkClickHandler
-  /** Resolve `![…](…)` sources inside a snippet to displayable URLs. */
-  resolveImageUrl: (src: string) => string | undefined
 }
 
 /**
@@ -40,7 +38,6 @@ export function IncomingBacklinkGroup({
   expanded: expandedOverride,
   onOpen,
   onWikilinkClick,
-  resolveImageUrl,
 }: IncomingBacklinkGroupProps): ReactElement {
   const [expanded, setExpanded] = useState(expandedOverride)
 
@@ -92,7 +89,6 @@ export function IncomingBacklinkGroup({
               notePath={source.path}
               tasks={snippet.tasks}
               onWikilinkClick={onWikilinkClick}
-              resolveImageUrl={resolveImageUrl}
             />
           ))}
         </div>

@@ -1,8 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
-import type { WikilinkHoverHit } from '@meowdown/core'
+import type { ImageUrlResolver, WikiEmbedResolver, WikilinkHoverHit } from '@meowdown/core'
+import { setBridge, type FileMeta } from '@reflect/core'
+import { queryClient } from '@/lib/query-client.ts'
+import { deferred } from '@/test-utils/deferred.ts'
 import { useWikiLinkHoverPreview } from './use-wiki-link-hover-preview.tsx'
+
+vi.mock('@tauri-apps/api/core', () => ({
+  convertFileSrc: (filePath: string) => `reflect-asset://${filePath}`,
+}))
 
 const mocks = vi.hoisted(() => ({
   resolveExistingWikiTarget: vi.fn(),
@@ -22,7 +29,8 @@ vi.mock('@/lib/read-existing-note-source.ts', () => ({
 interface MarkdownPreviewProps {
   content: string
   interactive: boolean
-  resolveImageUrl: (src: string) => string | null
+  resolveImageUrl: ImageUrlResolver
+  resolveWikiEmbed: WikiEmbedResolver
 }
 
 vi.mock('@/editor/markdown-preview.tsx', () => ({
@@ -44,9 +52,6 @@ async function setupRenderer(
       generation: 7,
       graphKey: '/graph',
       dateFormat: 'mdy',
-      resolveImageUrl: (source) => `reflect-asset://${source}`,
-      resolveAssetOpenPath: (source) =>
-        source.startsWith('assets/') && !source.includes('..') ? source : null,
       ...overrides,
     }),
   )
@@ -55,9 +60,15 @@ async function setupRenderer(
 
 describe('useWikiLinkHoverPreview', () => {
   beforeEach(() => {
+    setBridge({ invoke: async () => [], listen: async () => () => {} })
     mocks.resolveExistingWikiTarget.mockReset()
     mocks.readExistingNoteSource.mockReset()
     mocks.markdownPreview.mockReset()
+  })
+
+  afterEach(() => {
+    setBridge(null)
+    queryClient.clear()
   })
 
   it('resolves null without touching the graph when no graph session is open', async () => {
@@ -124,12 +135,62 @@ describe('useWikiLinkHoverPreview', () => {
     await render(<>{await renderBody(hoverHit('Alpha'))}</>)
 
     const props = mocks.markdownPreview.mock.calls.at(-1)?.[0] as MarkdownPreviewProps
-    expect(props.resolveImageUrl('https://example.com/cat.png')).toBeNull()
-    expect(props.resolveImageUrl('assets/../secret.png')).toBeNull()
-    expect(props.resolveImageUrl('assets/vector.svg')).toBeNull()
-    expect(props.resolveImageUrl('assets/cat.png')).toBe(
-      'reflect-asset://assets/cat.png?reflect-preview=raster',
+    expect(await props.resolveImageUrl('https://example.com/cat.png')).toBeUndefined()
+    expect(await props.resolveImageUrl('../../outside.png')).toBeUndefined()
+    expect(await props.resolveImageUrl('assets/vector.svg')).toBeUndefined()
+    expect(await props.resolveImageUrl('assets/cat.png')).toBe(
+      'reflect-asset://7/assets/cat.png?reflect-preview=raster',
     )
+  })
+
+  it("resolves the target note's images and embeds from its own folder", async () => {
+    mocks.resolveExistingWikiTarget.mockResolvedValue({
+      kind: 'resolved',
+      path: 'Projects/Garden redesign.md',
+    })
+    mocks.readExistingNoteSource.mockResolvedValue('![[garden-budget.png]]')
+    const renderBody = await setupRenderer()
+
+    await render(<>{await renderBody(hoverHit('Garden redesign'))}</>)
+
+    const props = mocks.markdownPreview.mock.calls.at(-1)?.[0] as MarkdownPreviewProps
+    expect(await props.resolveImageUrl('../attachments/garden-budget.png')).toBe(
+      'reflect-asset://7/attachments/garden-budget.png?reflect-preview=raster',
+    )
+    const embed = { target: 'garden-budget.png', display: '', width: null, height: null }
+    expect(props.resolveWikiEmbed(embed)).toEqual({ kind: 'image', src: 'garden-budget.png' })
+    expect(props.resolveWikiEmbed({ ...embed, target: 'Deep Work' })).toEqual({ kind: 'note' })
+  })
+
+  it('waits for the catalog before resolving a bare image embed', async () => {
+    const listing = deferred<FileMeta[]>()
+    setBridge({ invoke: () => listing.promise, listen: async () => () => {} })
+    mocks.resolveExistingWikiTarget.mockResolvedValue({ kind: 'resolved', path: 'notes/alpha.md' })
+    mocks.readExistingNoteSource.mockResolvedValue('![[photo.png]]')
+    const renderBody = await setupRenderer()
+    await render(<>{await renderBody(hoverHit('Alpha'))}</>)
+
+    const props = mocks.markdownPreview.mock.calls.at(-1)?.[0] as MarkdownPreviewProps
+    const image = props.resolveWikiEmbed({
+      target: 'photo.png',
+      display: '',
+      width: null,
+      height: null,
+    })
+    expect(image?.kind).toBe('image')
+    if (image?.kind !== 'image' || image.src === undefined) {
+      throw new Error('Missing image source')
+    }
+    const url = props.resolveImageUrl(image.src)
+    let settled = false
+    void Promise.resolve(url).then(() => {
+      settled = true
+    })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    listing.resolve([{ path: 'Media/photo.png', size: 42, modifiedMs: 0 }])
+    await expect(url).resolves.toBe('reflect-asset://7/Media/photo.png?reflect-preview=raster')
   })
 
   it('shows a formatted subject and Empty note for an empty daily note', async () => {
