@@ -50,7 +50,7 @@ type AnthropicModelId = KnownId<Parameters<AnthropicProvider>[0]>
 type GoogleModelId = KnownId<Parameters<GoogleProvider>[0]>
 type OpenAIModelId = KnownId<Parameters<OpenAIProvider>[0]>
 
-// https://github.com/vercel/ai/blob/ai@7.0.93/packages/openai/src/responses/openai-responses-language-model-options.ts#L88
+// https://github.com/vercel/ai/blob/ai@7.0.117/packages/openai/src/responses/openai-responses-language-model-options.ts#L91
 const OPENAI_MODELS: NonEmptyArray<AiModelOption<OpenAIModelId>> = [
   { id: 'gpt-6-astra', label: 'GPT-6 Astra', contextWindow: 1_000_000 },
   { id: 'gpt-6-sol', label: 'GPT-6 Sol', contextWindow: 1_000_000 },
@@ -64,7 +64,7 @@ const OPENAI_MODELS: NonEmptyArray<AiModelOption<OpenAIModelId>> = [
   { id: 'gpt-5.4-nano', label: 'GPT-5.4 nano', contextWindow: 400_000 },
 ]
 
-// https://github.com/vercel/ai/blob/ai@7.0.93/packages/anthropic/src/anthropic-language-model-options.ts#L4
+// https://github.com/vercel/ai/blob/ai@7.0.117/packages/anthropic/src/anthropic-language-model-options.ts#L4
 const ANTHROPIC_MODELS: NonEmptyArray<AiModelOption<AnthropicModelId>> = [
   { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', contextWindow: 1_000_000 },
   { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', contextWindow: 1_000_000 },
@@ -76,7 +76,7 @@ const ANTHROPIC_MODELS: NonEmptyArray<AiModelOption<AnthropicModelId>> = [
   { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', contextWindow: 200_000 },
 ]
 
-// https://github.com/vercel/ai/blob/ai@7.0.93/packages/google/src/google-language-model-options.ts#L8
+// https://github.com/vercel/ai/blob/ai@7.0.117/packages/google/src/google-language-model-options.ts#L8
 const GOOGLE_MODELS: NonEmptyArray<AiModelOption<GoogleModelId>> = [
   { id: 'gemini-pro-latest', label: 'Gemini Pro Latest', contextWindow: 1_000_000 },
   { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', contextWindow: 1_000_000 },

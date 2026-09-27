@@ -328,7 +328,7 @@ importers:
     devDependencies:
       '@ai-sdk/provider':
         specifier: ^4.0.17
-        version: 4.0.17
+        version: 4.0.18
       '@ocavue/tsconfig':
         specifier: ^0.7.1
         version: 0.7.1
