@@ -17,7 +17,7 @@
     "@post-embed/schema": "^0.5.2",
     "@reflect/core": "workspace:*",
     "@reflect/design-system": "workspace:*",
-    "defuddle": "^0.19.3",
+    "defuddle": "^0.19.4",
     "lucide-react": "^1.45.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
