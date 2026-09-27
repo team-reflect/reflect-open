@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.14.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.14.0-beta.1...v0.14.0-beta.2) (2026-09-27)
+
+
+### Features
+
+* render images and Obsidian embeds ([#1370](https://github.com/team-reflect/reflect-open/issues/1370)) ([3c7b01f](https://github.com/team-reflect/reflect-open/commit/3c7b01faae0e03cc6742624c91c146df8a83da5f))
+* support Claude Opus 5.5 ([#1377](https://github.com/team-reflect/reflect-open/issues/1377)) ([f9371bf](https://github.com/team-reflect/reflect-open/commit/f9371bfaa9f3f38d0f545736f6b50a5e512c0d29))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.75.1 ([#1380](https://github.com/team-reflect/reflect-open/issues/1380)) ([63ab081](https://github.com/team-reflect/reflect-open/commit/63ab081be21439eeabfc0fd5258f1b5db60958ec))
+
 ## [0.14.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.14.0-beta...v0.14.0-beta.1) (2026-09-25)
 
 
