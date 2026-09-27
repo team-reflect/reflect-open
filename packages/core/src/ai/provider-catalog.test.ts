@@ -28,6 +28,7 @@ describe('AI_PROVIDERS', () => {
         id: 'anthropic',
         models: [
           'claude-fable-5-1',
+          'claude-opus-5-5',
           'claude-fable-5',
           'claude-opus-5',
           'claude-opus-4-8',
