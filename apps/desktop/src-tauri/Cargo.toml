@@ -211,7 +211,7 @@ tauri-plugin-recording = { path = "../../../plugins/tauri-plugin-recording" }
 windows-native-keyring-store = "1.1.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-dbus-secret-service-keyring-store = "1.0.1"
+dbus-secret-service-keyring-store = { version = "1.0.1", features = ["crypto-rust"] }
 
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }
