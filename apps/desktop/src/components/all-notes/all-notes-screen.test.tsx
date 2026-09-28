@@ -459,7 +459,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     ).toBe(trashButton.element())
 
     // ⌘-click a second row extends the selection.
-    await view.getByText('Dandelion chocolate.').click({ modifiers: ['Meta'] })
+    await view.getByText('Dandelion chocolate.').click({ modifiers: ['ControlOrMeta'] })
     await expect.element(view.getByRole('button', { name: /Trash \(2\)/ })).toBeInTheDocument()
     expect(openRouteInNewWindow).not.toHaveBeenCalled()
     await view.unmount()
@@ -535,7 +535,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
     await view.getByText('Shop your health goals.').click()
-    await view.getByText('Dandelion chocolate.').click({ modifiers: ['Meta'] })
+    await view.getByText('Dandelion chocolate.').click({ modifiers: ['ControlOrMeta'] })
     await view.getByRole('button', { name: /Trash \(2\)/ }).click()
 
     // Confirm, then the two notes go to the trash via `note_delete`.
@@ -672,7 +672,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
     await view.getByText('Shop your health goals.').click()
-    await view.getByText('Dandelion chocolate.').click({ modifiers: ['Meta'] })
+    await view.getByText('Dandelion chocolate.').click({ modifiers: ['ControlOrMeta'] })
     await view.getByRole('button', { name: /Trash \(2\)/ }).click()
     await expect.element(page.getByText('Trash 2 notes?')).toBeInTheDocument()
     await page.getByRole('button', { name: 'Trash', exact: true }).click()
