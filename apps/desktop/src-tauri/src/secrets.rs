@@ -13,7 +13,7 @@ use crate::error::{AppError, AppResult};
 const SERVICE: &str = "reflect-open";
 
 /// Install this platform's native keychain as the default store.
-pub fn init_store() -> keyring_core::Result<()> {
+fn init_store() -> keyring_core::Result<()> {
     #[cfg(target_os = "macos")]
     let store = apple_native_keyring_store::keychain::Store::new()?;
     #[cfg(target_os = "ios")]
@@ -26,8 +26,13 @@ pub fn init_store() -> keyring_core::Result<()> {
     Ok(())
 }
 
+/// Installs the native store on first use, and retries if an earlier attempt failed.
 fn entry(name: &str) -> AppResult<Entry> {
-    Entry::new(SERVICE, name).map_err(|err| AppError::io(err.to_string()))
+    let entry = match Entry::new(SERVICE, name) {
+        Err(Error::NoDefaultStore) => init_store().and_then(|()| Entry::new(SERVICE, name)),
+        other => other,
+    };
+    entry.map_err(|err| AppError::io(err.to_string()))
 }
 
 fn set_in(entry: &Entry, value: &str) -> AppResult<()> {
