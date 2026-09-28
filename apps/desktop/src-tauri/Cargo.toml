@@ -50,11 +50,7 @@ tauri-plugin-dialog = "2.8.0"
 base64 = "0.23.1"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-keyring = { version = "3.6.3", features = [
-  "apple-native",
-  "windows-native",
-  "sync-secret-service",
-] }
+keyring-core = "1.0.0"
 # Git backup/sync primitives (Plan 12) + SSH transport for generic remotes
 # (Plan 16 V1: agent auth only). Everything is vendored/static — libssh2 and
 # openssl must never link against homebrew dylibs the distributed app won't
@@ -85,6 +81,7 @@ zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2
 
 [target.'cfg(target_os = "macos")'.dependencies]
 xattr = "1.6.1"
+apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }
 # Apple Calendar read-only bridge (`src/calendar.rs`): EventKit through the
 # objc2 bindings, trimmed to the classes the modules touch. objc2-app-kit
 # backs EKCalendar's NSColor → hex conversion and the Edit menu's Paste and
@@ -158,6 +155,7 @@ objc2-ui-kit = { version = "0.3.2", default-features = false, features = [
 ] }
 tauri-plugin-iap = "0.9.1"
 tauri-plugin-app-store = { path = "../../../plugins/tauri-plugin-app-store" }
+apple-native-keyring-store = { version = "1.0.2", features = ["protected"] }
 
 # Desktop-only capabilities (Plan 19): auto-update (mobile updates go through
 # the app stores), window-state (no windows to restore on mobile), the file
@@ -208,6 +206,12 @@ ort = { version = "=2.0.0-rc.11", default-features = false, features = [
 tauri-plugin-keyboard = { path = "../../../plugins/tauri-plugin-keyboard" }
 tauri-plugin-mobile-haptics = { path = "../../../plugins/tauri-plugin-mobile-haptics" }
 tauri-plugin-recording = { path = "../../../plugins/tauri-plugin-recording" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-native-keyring-store = "1.1.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+dbus-secret-service-keyring-store = "1.0.1"
 
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }

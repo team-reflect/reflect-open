@@ -5,12 +5,26 @@
 //! capability); which names exist and what they hold is `@reflect/core`
 //! policy (see `ai/secrets.ts`).
 
-use keyring::Entry;
+use keyring_core::{Entry, Error};
 
 use crate::error::{AppError, AppResult};
 
 /// The keychain service every Reflect secret is filed under.
 const SERVICE: &str = "reflect-open";
+
+/// Install this platform's native keychain as the default store.
+pub fn init_store() -> keyring_core::Result<()> {
+    #[cfg(target_os = "macos")]
+    let store = apple_native_keyring_store::keychain::Store::new()?;
+    #[cfg(target_os = "ios")]
+    let store = apple_native_keyring_store::protected::Store::new()?;
+    #[cfg(target_os = "windows")]
+    let store = windows_native_keyring_store::Store::new()?;
+    #[cfg(target_os = "linux")]
+    let store = dbus_secret_service_keyring_store::Store::new()?;
+    keyring_core::set_default_store(store);
+    Ok(())
+}
 
 fn entry(name: &str) -> AppResult<Entry> {
     Entry::new(SERVICE, name).map_err(|err| AppError::io(err.to_string()))
@@ -26,7 +40,7 @@ fn set_in(entry: &Entry, value: &str) -> AppResult<()> {
 fn get_from(entry: &Entry) -> AppResult<Option<String>> {
     match entry.get_password() {
         Ok(value) => Ok(Some(value)),
-        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(Error::NoEntry) => Ok(None),
         Err(err) => Err(AppError::io(err.to_string())),
     }
 }
@@ -35,7 +49,7 @@ fn get_from(entry: &Entry) -> AppResult<Option<String>> {
 /// (retry-safe from the frontend).
 fn delete_from(entry: &Entry) -> AppResult<()> {
     match entry.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Ok(()) | Err(Error::NoEntry) => Ok(()),
         Err(err) => Err(AppError::io(err.to_string())),
     }
 }
@@ -74,41 +88,42 @@ pub async fn secret_delete(name: String) -> AppResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Once;
 
-    /// The mock keystore scopes state to one `Entry` (no shared backing store),
-    /// so the round trip is exercised on a single entry. What this asserts is
-    /// the error mapping the frontend relies on: a missing entry reads as
-    /// `None` (not an error) and delete is idempotent. The real cross-process
-    /// persistence is the OS keychain's contract, not ours.
-    #[test]
-    fn keychain_round_trip_on_one_entry() {
-        keyring::set_default_credential_builder(keyring::mock::default_credential_builder());
-        let entry = entry("ai-api-key:test").unwrap();
-
-        assert_eq!(get_from(&entry).unwrap(), None);
-
-        set_in(&entry, "sk-secret").unwrap();
-        assert_eq!(get_from(&entry).unwrap(), Some("sk-secret".into()));
-
-        set_in(&entry, "sk-rotated").unwrap();
-        assert_eq!(get_from(&entry).unwrap(), Some("sk-rotated".into()));
-
-        delete_from(&entry).unwrap();
-        assert_eq!(get_from(&entry).unwrap(), None);
-
-        // Idempotent: deleting again is fine.
-        delete_from(&entry).unwrap();
+    /// The default store is process-global, so install the mock once.
+    fn use_mock_store() {
+        static INSTALL: Once = Once::new();
+        INSTALL.call_once(|| {
+            keyring_core::set_default_store(keyring_core::mock::Store::new().unwrap());
+        });
     }
 
-    /// The commands hop to a blocking thread (a parked keychain prompt must
-    /// never stall the main loop); this exercises that plumbing end-to-end
-    /// against the mock store.
     #[test]
-    fn commands_resolve_through_the_blocking_hop() {
-        keyring::set_default_credential_builder(keyring::mock::default_credential_builder());
+    fn commands_round_trip_through_the_store() {
+        use_mock_store();
         tauri::async_runtime::block_on(async {
-            assert_eq!(secret_get("plumbing-test".into()).await.unwrap(), None);
-            secret_delete("plumbing-test".into()).await.unwrap();
+            let name = || "ai-api-key:round-trip".to_string();
+
+            assert_eq!(secret_get(name()).await.unwrap(), None);
+
+            secret_set(name(), "sk-secret".into()).await.unwrap();
+            assert_eq!(secret_get(name()).await.unwrap(), Some("sk-secret".into()));
+
+            secret_set(name(), "sk-rotated".into()).await.unwrap();
+            assert_eq!(secret_get(name()).await.unwrap(), Some("sk-rotated".into()));
+
+            secret_delete(name()).await.unwrap();
+            assert_eq!(secret_get(name()).await.unwrap(), None);
+            secret_delete(name()).await.unwrap();
         });
+    }
+
+    #[test]
+    fn store_failures_are_errors_not_missing_keys() {
+        use_mock_store();
+        let entry = entry("ai-api-key:failure").unwrap();
+        let mock: &keyring_core::mock::Cred = entry.as_any().downcast_ref().unwrap();
+        mock.set_error(Error::NoStorageAccess("locked".into()));
+        assert!(get_from(&entry).is_err());
     }
 }

@@ -115,6 +115,9 @@ fn init_tracing() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     init_tracing();
+    if let Err(err) = secrets::init_store() {
+        tracing::error!(error = %err, "keychain store unavailable");
+    }
     let builder = tauri::Builder::default();
 
     // Single-instance must be the first plugin so a second launch is caught
