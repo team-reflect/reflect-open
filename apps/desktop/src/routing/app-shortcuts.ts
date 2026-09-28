@@ -5,7 +5,7 @@ import { toggleNotePrivate } from '@/lib/note-private.ts'
 import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
 import { registerKeymap } from '@/editor/keymap.ts'
-import { APP_COMMANDS } from '@/lib/commands/app-commands.ts'
+import { APP_COMMANDS, GRAPH_SWITCH_COMMAND_IDS } from '@/lib/commands/app-commands.ts'
 import { runCommand } from '@/lib/commands/registry.ts'
 import { todayIso } from '@/lib/dates.ts'
 import { setMenuCommandDispatch } from '@/lib/native-menu/dispatch.ts'
@@ -44,7 +44,16 @@ export const APP_BINDINGS = registerKeymap(
 )
 
 const BINDING_TO_ID = new Map(BOUND_COMMANDS.map(({ binding, command }) => [binding, command.id]))
-const HISTORY_COMMAND_IDS = new Set(['history.back', 'history.forward'])
+
+// App chrome that outranks a focused editor: these dispatch in the capture
+// phase, before ProseMirror sees the keydown, so an editor binding on the same
+// chord can't swallow them (meowdown's `Mod-1`–`Mod-6` headings share ⌘1–⌘6
+// with graph switching on macOS).
+const EDITOR_OVERRIDE_COMMAND_IDS = new Set([
+  'history.back',
+  'history.forward',
+  ...GRAPH_SWITCH_COMMAND_IDS,
+])
 
 // AppKit owns this key equivalent on macOS. Keep it in the registry for
 // display, collision detection, and the plain-browser/non-macOS fallback, but
@@ -131,8 +140,8 @@ function modifierPrefixesFor(event: KeyboardEvent): string[] {
 }
 
 function idForKeyDown(event: KeyboardEvent): string | null {
-  if ((!event.metaKey && !event.ctrlKey) || event.repeat) {
-    return null // held keys must not spam navigations (e.g. a stack of new notes)
+  if (!event.metaKey && !event.ctrlKey) {
+    return null
   }
   for (const { key, shift: shifted } of bindingLookupsFor(event)) {
     const shift = shifted ? 'Shift-' : ''
@@ -328,17 +337,25 @@ export function useAppShortcuts(): CommandContext {
       return true
     }
 
-    function onHistoryKeyDownCapture(event: KeyboardEvent) {
-      if (getIsComposing()) {
+    function onEditorOverrideKeyDownCapture(event: KeyboardEvent) {
+      // Shifted chords stay editor-first: on layouts that type digits with
+      // Shift, ⌘⇧7–⌘⇧9 are meowdown's physical-digit list toggles too.
+      if (getIsComposing() || event.shiftKey) {
         return
       }
       const id = idForKeyDown(event)
-      if (id === null || isNativeMacosMenuCommand(id) || !HISTORY_COMMAND_IDS.has(id)) {
+      if (id === null || isNativeMacosMenuCommand(id) || !EDITOR_OVERRIDE_COMMAND_IDS.has(id)) {
+        return
+      }
+      if (event.repeat) {
+        // The chord still belongs to the app while held; letting repeats
+        // through would toggle a heading in the note being switched away from.
+        event.preventDefault()
         return
       }
       if (triggerCommand(id)) {
-        // History navigation is app chrome, so it wins even when the focused
-        // editor would otherwise consume the bracket chord while bubbling.
+        // Preventing the default here is what makes ProseMirror ignore the
+        // keydown when it arrives at the focused editor.
         event.preventDefault()
       }
     }
@@ -355,7 +372,8 @@ export function useAppShortcuts(): CommandContext {
         return
       }
       const id = idForKeyDown(event)
-      if (id === null || isNativeMacosMenuCommand(id)) {
+      // Held keys must not spam commands (e.g. a stack of new notes).
+      if (id === null || event.repeat || isNativeMacosMenuCommand(id)) {
         return
       }
       if (triggerCommand(id)) {
@@ -366,11 +384,11 @@ export function useAppShortcuts(): CommandContext {
     }
 
     setMenuCommandDispatch(triggerCommand)
-    window.addEventListener('keydown', onHistoryKeyDownCapture, { capture: true })
+    window.addEventListener('keydown', onEditorOverrideKeyDownCapture, { capture: true })
     window.addEventListener('keydown', onKeyDown)
     return () => {
       setMenuCommandDispatch(null)
-      window.removeEventListener('keydown', onHistoryKeyDownCapture, true)
+      window.removeEventListener('keydown', onEditorOverrideKeyDownCapture, true)
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [context, closeShortcuts])

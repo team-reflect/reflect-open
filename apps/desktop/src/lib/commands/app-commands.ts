@@ -51,6 +51,11 @@ const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from({ length: 9 }, (_, index)
   }
 })
 
+/** Ids of the ⌘1–⌘9 recent-graph commands (`graph.switch1`…`graph.switch9`). */
+export const GRAPH_SWITCH_COMMAND_IDS: readonly string[] = GRAPH_SWITCH_COMMANDS.map(
+  (command) => command.id,
+)
+
 const APP_COMMANDS: AppCommand[] = [
   ...GRAPH_SWITCH_COMMANDS,
   {

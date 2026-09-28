@@ -1212,7 +1212,7 @@ describe('SettingsScreen', () => {
     await expect.element(dialog.getByText('Toggle sidebar')).toBeInTheDocument()
     await expect.element(dialog.getByText('Go to today')).toBeInTheDocument()
     await expect.element(dialog.getByText('Bold')).toBeInTheDocument()
-    await expect.element(dialog.getByText('Heading 1')).toBeInTheDocument()
+    await expect.element(dialog.getByText('Insert a wikilink')).toBeInTheDocument()
     await expect.element(dialog.getByText('Open the AI menu on the selection')).toBeInTheDocument()
   })
 

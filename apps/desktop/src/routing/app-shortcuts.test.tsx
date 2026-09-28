@@ -431,6 +431,49 @@ describe('app shortcuts', () => {
     expect(openRecent).not.toHaveBeenCalled()
   })
 
+  it('⌘number switches graphs even when the focused editor binds the chord', async () => {
+    const { act } = await shortcutsHook()
+    // Stands in for ProseMirror, which skips keydowns an earlier listener
+    // already claimed; otherwise meowdown's ⌘1–⌘6 toggle headings.
+    const toggleHeading = vi.fn()
+    const editor = document.createElement('div')
+    document.body.append(editor)
+    editor.addEventListener('keydown', (event) => {
+      if (!event.defaultPrevented) {
+        toggleHeading()
+        event.preventDefault()
+      }
+    })
+
+    try {
+      await act(() => pressFrom(editor, '2', { code: 'Digit2' }))
+      expect(openRecent).toHaveBeenCalledWith('/work')
+
+      await act(() => pressFrom(editor, '1', { code: 'Digit1' })) // already open
+      await act(() => pressFrom(editor, '2', { code: 'Digit2', repeat: true }))
+      expect(openRecent).toHaveBeenCalledTimes(1)
+      expect(toggleHeading).not.toHaveBeenCalled()
+    } finally {
+      editor.remove()
+    }
+  })
+
+  it('leaves shifted digit chords to a focused editor that handles them', async () => {
+    const { act } = await shortcutsHook()
+    const editor = document.createElement('div')
+    document.body.append(editor)
+    editor.addEventListener('keydown', (event) => event.preventDefault())
+
+    try {
+      // On layouts that type digits with Shift this is also the shape of
+      // meowdown's ⌘⇧7–⌘⇧9 list toggles, so the editor keeps first refusal.
+      await act(() => pressFrom(editor, '2', { code: 'Digit2', shiftKey: true }))
+      expect(openRecent).not.toHaveBeenCalled()
+    } finally {
+      editor.remove()
+    }
+  })
+
   it('keeps graph switching on the Meta key, not Ctrl-number', async () => {
     const { act } = await shortcutsHook()
 
