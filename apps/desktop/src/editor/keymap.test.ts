@@ -18,9 +18,9 @@ describe('keymap registry', () => {
     expect(() => registerKeymap('app', { 'Shift-Mod-x': 'collides' })).toThrow(
       /already registered by the editor scope as "Mod-Shift-x"/,
     )
-    expect(() => registerKeymap('app', { 'Alt-Mod-F14': 'fine', 'Mod-Alt-F14': 'collides' })).toThrow(
-      /duplicate keybinding/,
-    )
+    expect(() =>
+      registerKeymap('app', { 'Alt-Mod-F14': 'fine', 'Mod-Alt-F14': 'collides' }),
+    ).toThrow(/duplicate keybinding/)
     expect(listRegisteredBindings().has('Alt-Mod-F14')).toBe(false)
   })
 
