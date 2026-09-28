@@ -452,14 +452,19 @@ html:root {
   margin: 0.4em 0;
 }
 
-/* The Tasks inline editor (TaskEditor) shares each row's single-line leading-6
-   box with the read-only TaskText, which renders the content in a marginless
-   span. The editor wraps it in a paragraph, so the `.reflect-editor p` block
+/* The Tasks inline editor (TaskEditor) shares each row's single-line box with
+   the read-only TaskText, which renders the content in a marginless span. The editor wraps it in a paragraph, so the `.reflect-editor p` block
    margin above would grow the row the moment it enters edit mode. Zero it (same
    0-1-1 specificity, later source order wins the tie) so focusing a task never
    shifts its height. */
 .reflect-task-editor p {
   margin: 0;
+}
+
+/* Same unitless line-height as `.reflect-task-preview` below. Unlayered, so it
+   wins over meowdown's `.ProseMirror` line-height. */
+.reflect-task-editor {
+  line-height: calc(24 / 14);
 }
 
 /* Unfocused task rows use the read-only markdown preview, but the row still owns
@@ -468,7 +473,10 @@ html:root {
 .reflect-task-preview {
   color: inherit;
   font-size: var(--text-sm, 0.875rem);
-  line-height: 1.5rem;
+  /* 24px at text-sm. Unitless, so the `font-size: 0` spans that hide link
+     syntax inherit a zero line-height; an absolute value would give each one a
+     24px line box that makes the row taller. */
+  line-height: calc(24 / 14);
 }
 .reflect-task-preview p,
 .reflect-task-preview h1,

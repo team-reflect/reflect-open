@@ -227,7 +227,7 @@ export function TaskEditor({
         onTagClick={onTagClick}
         onWikilinkSearch={onWikilinkSearch}
         onTagSearch={onTagSearch}
-        className="reflect-task-editor text-sm leading-6"
+        className="reflect-task-editor text-sm"
         handleRef={handleRef}
       >
         <TaskCommitKeymap apiRef={apiRef} onNavigate={onNavigate} />

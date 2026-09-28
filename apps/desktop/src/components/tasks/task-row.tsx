@@ -147,7 +147,7 @@ export function TaskRow({
           }
           toggle()
         }}
-        // h-6 matches the text/editor's leading-6 line so the circle centers on
+        // h-6 matches the text/editor's 24px line so the circle centers on
         // the first line (items-start keeps it there when a task wraps).
         className="flex h-6 shrink-0 items-center text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none disabled:cursor-default"
       >
