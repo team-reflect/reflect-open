@@ -1,4 +1,5 @@
 import { EDITOR_KEY_BINDINGS } from '@meowdown/core'
+import { isApplePlatform, normalizeBinding } from '@/lib/keybindings.ts'
 
 /**
  * The central keymap registry (Plan 05 step 9). Every shortcut the app binds —
@@ -12,9 +13,14 @@ import { EDITOR_KEY_BINDINGS } from '@meowdown/core'
 export type KeymapScope = 'editor' | 'app'
 
 const registeredBindings = new Map<string, KeymapScope>()
+/** Normalized binding → the binding as registered. */
+const registeredKeystrokes = new Map<string, string>()
 
 /**
- * Register `bindings` under `scope`, throwing on any already-taken key.
+ * Register `bindings` under `scope`, throwing on any already-taken keystroke.
+ * Bindings are compared after {@link normalizeBinding}, so `Mod-Alt-1` and
+ * `Alt-Mod-1` collide. `Meta` is rejected: it means ⌘ on Apple but the
+ * Windows/Super key elsewhere, so bindings spell the command key `Mod`.
  * All-or-nothing: validation happens before any key is committed, so a
  * colliding batch never leaves the registry partially mutated.
  */
@@ -22,15 +28,25 @@ export function registerKeymap<T>(
   scope: KeymapScope,
   bindings: Record<string, T>,
 ): Record<string, T> {
-  const keys = Object.keys(bindings)
-  for (const key of keys) {
-    const existing = registeredBindings.get(key)
-    if (existing) {
-      throw new Error(`duplicate keybinding "${key}": already registered by the ${existing} scope`)
+  const apple = isApplePlatform()
+  const claimed = new Map<string, string>()
+  for (const binding of Object.keys(bindings)) {
+    if (binding.split('-').slice(0, -1).includes('Meta')) {
+      throw new Error(`keybinding "${binding}" uses Meta; use Mod instead`)
     }
+    const keystroke = normalizeBinding(binding, apple)
+    const existing = registeredKeystrokes.get(keystroke) ?? claimed.get(keystroke)
+    if (existing !== undefined) {
+      const owner = registeredBindings.get(existing) ?? scope
+      throw new Error(
+        `duplicate keybinding "${binding}": already registered by the ${owner} scope as "${existing}"`,
+      )
+    }
+    claimed.set(keystroke, binding)
   }
-  for (const key of keys) {
-    registeredBindings.set(key, scope)
+  for (const [keystroke, binding] of claimed) {
+    registeredKeystrokes.set(keystroke, binding)
+    registeredBindings.set(binding, scope)
   }
   return bindings
 }

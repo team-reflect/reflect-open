@@ -6,6 +6,7 @@ import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
 import { registerKeymap } from '@/editor/keymap.ts'
 import { APP_COMMANDS } from '@/lib/commands/app-commands.ts'
+import { isApplePlatform, normalizeBinding } from '@/lib/keybindings.ts'
 import { runCommand } from '@/lib/commands/registry.ts'
 import { todayIso } from '@/lib/dates.ts'
 import { setMenuCommandDispatch } from '@/lib/native-menu/dispatch.ts'
@@ -43,7 +44,11 @@ export const APP_BINDINGS = registerKeymap(
   Object.fromEntries(BOUND_COMMANDS.map(({ binding, command }) => [binding, command.title])),
 )
 
-const BINDING_TO_ID = new Map(BOUND_COMMANDS.map(({ binding, command }) => [binding, command.id]))
+const IS_APPLE = isApplePlatform()
+
+const BINDING_TO_ID = new Map(
+  BOUND_COMMANDS.map(({ binding, command }) => [normalizeBinding(binding, IS_APPLE), command.id]),
+)
 const HISTORY_COMMAND_IDS = new Set(['history.back', 'history.forward'])
 
 // AppKit owns this key equivalent on macOS. Keep it in the registry for
@@ -121,30 +126,22 @@ function bindingLookupsFor(event: KeyboardEvent): BindingKeyLookup[] {
   return lookups
 }
 
-function modifierPrefixesFor(event: KeyboardEvent): string[] {
-  const alt = event.altKey ? 'Alt-' : ''
-  return [
-    event.metaKey ? `${alt}Meta-` : null,
-    event.ctrlKey ? `${alt}Ctrl-` : null,
-    `${alt}Mod-`,
-  ].filter((prefix): prefix is string => prefix !== null)
-}
-
 function idForKeyDown(event: KeyboardEvent): string | null {
   if ((!event.metaKey && !event.ctrlKey) || event.repeat) {
     return null // held keys must not spam navigations (e.g. a stack of new notes)
   }
-  for (const { key, shift: shifted } of bindingLookupsFor(event)) {
-    const shift = shifted ? 'Shift-' : ''
-    for (const prefix of modifierPrefixesFor(event)) {
-      // Alt participates in the lookup rather than being rejected, so
-      // `Alt-Mod-l` can bind while an alt chord still never fires a plain
-      // `Mod-` command.
-      const candidate = `${prefix}${shift}${key}`
-      const id = BINDING_TO_ID.get(candidate)
-      if (id !== undefined) {
-        return id
-      }
+  for (const { key, shift } of bindingLookupsFor(event)) {
+    // Every held modifier is part of the lookup, so `Mod-Alt-l` can bind while
+    // an alt chord still never fires a plain `Mod-` command.
+    const modifiers = [
+      event.ctrlKey ? 'Ctrl' : null,
+      event.metaKey ? 'Meta' : null,
+      event.altKey ? 'Alt' : null,
+      shift ? 'Shift' : null,
+    ].filter((modifier): modifier is string => modifier !== null)
+    const id = BINDING_TO_ID.get(normalizeBinding([...modifiers, key].join('-'), IS_APPLE))
+    if (id !== undefined) {
+      return id
     }
   }
   return null

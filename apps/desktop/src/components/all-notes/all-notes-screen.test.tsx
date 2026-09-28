@@ -564,7 +564,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
     await view.getByText('Shop your health goals.').click()
-    await userEvent.keyboard('{Meta>}{Backspace}{/Meta}')
+    await userEvent.keyboard('{ControlOrMeta>}{Backspace}{/ControlOrMeta}')
 
     await expect.element(page.getByText('Trash 1 note?')).toBeInTheDocument()
     await view.unmount()
@@ -581,7 +581,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await view.getByText('Daily travel notes.').click()
     expect(view.getByRole('button', { name: /Trash \(/ }).query()).toBeNull()
 
-    await userEvent.keyboard('{Meta>}{Backspace}{/Meta}')
+    await userEvent.keyboard('{ControlOrMeta>}{Backspace}{/ControlOrMeta}')
     expect(page.getByText('Trash 1 note?').query()).toBeNull()
     expect(mockInvoke.mock.calls.some(([command]) => command === 'note_delete')).toBe(false)
     await view.unmount()

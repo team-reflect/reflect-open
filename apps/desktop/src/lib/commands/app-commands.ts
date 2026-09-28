@@ -46,7 +46,7 @@ const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from({ length: 9 }, (_, index)
     id: `graph.switch${position}`,
     title: `Switch to graph ${position}`,
     keywords: ['graph', 'workspace', 'switch', 'recent'],
-    keybinding: `Meta-${position}`,
+    keybinding: `Mod-${position}`,
     run: (context) => context.switchGraph(index),
   }
 })

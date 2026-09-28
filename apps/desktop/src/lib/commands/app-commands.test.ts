@@ -126,9 +126,9 @@ describe('keybindingFor', () => {
     expect(keybindingFor('note.openInNewWindow')).toBe('Mod-Shift-o')
   })
 
-  it('graph switch commands use macOS command-number bindings', () => {
-    expect(keybindingFor('graph.switch1')).toBe('Meta-1')
-    expect(keybindingFor('graph.switch9')).toBe('Meta-9')
+  it('graph switch commands use command-number bindings', () => {
+    expect(keybindingFor('graph.switch1')).toBe('Mod-1')
+    expect(keybindingFor('graph.switch9')).toBe('Mod-9')
   })
 })
 

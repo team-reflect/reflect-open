@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, type KeyboardEvent, type ReactElement } from 'react'
 import { ChevronDownIcon, ChevronUpIcon, XIcon } from 'lucide-react'
-import { getIsComposing } from '@meowdown/core'
+import { getIsComposing, isModEvent } from '@meowdown/core'
 import { SearchIcon } from '@/components/icons/search-icon.tsx'
 import { useNoteFind } from '@/providers/note-find-provider.tsx'
 
@@ -50,7 +50,7 @@ export function NoteFindBar(): ReactElement | null {
     if (getIsComposing()) {
       return
     }
-    const mod = event.metaKey || event.ctrlKey
+    const mod = isModEvent(event)
     const key = event.key.toLowerCase()
     if (mod && key === 'f' && !event.altKey && !event.shiftKey) {
       event.preventDefault()

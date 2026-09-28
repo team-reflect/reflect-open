@@ -49,7 +49,7 @@ export function AllNotesTable({
         path,
         event.shiftKey
           ? { metaKey: false, ctrlKey: false, shiftKey: true }
-          : { metaKey: true, ctrlKey: false, shiftKey: false },
+          : { metaKey: true, ctrlKey: true, shiftKey: false },
       ),
     [clickSelect],
   )

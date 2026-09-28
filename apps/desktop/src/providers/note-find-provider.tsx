@@ -9,7 +9,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { getIsComposing, type SearchStatus } from '@meowdown/core'
+import { getIsComposing, isModEvent, type SearchStatus } from '@meowdown/core'
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry.ts'
 import {
   listenForFocusedNoteMenuCommands,
@@ -183,7 +183,7 @@ export function NoteFindProvider({ children }: { children: ReactNode }): ReactEl
 
     function onKeyDown(event: KeyboardEvent): void {
       if (event.defaultPrevented || event.altKey || event.repeat || getIsComposing()) return
-      if (!event.metaKey && !event.ctrlKey) return
+      if (!isModEvent(event)) return
       const key = event.key.toLowerCase()
       if (key === 'f' && !event.shiftKey) {
         if (openForPath(notePath)) event.preventDefault()

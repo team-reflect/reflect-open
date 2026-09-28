@@ -45,6 +45,33 @@ export function isApplePlatform(): boolean {
   return /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent)
 }
 
+const MODIFIER_ORDER = ['Mod', 'Ctrl', 'Meta', 'Alt', 'Shift']
+
+/**
+ * The canonical spelling of a binding, so bindings that mean the same
+ * keystroke compare equal as strings. `Mod` is ⌘ on Apple and Ctrl elsewhere,
+ * so the platform's command key is spelled `Mod`; modifiers take one fixed
+ * order and a letter key is lowercase. `Alt-Mod-L` becomes `Mod-Alt-l`, and on
+ * Apple a ⌘1 keydown (`Meta-1`) becomes `Mod-1`.
+ */
+export function normalizeBinding(binding: string, apple: boolean): string {
+  const separator = binding.lastIndexOf('-', binding.length - 2)
+  const key = binding.slice(separator + 1)
+  const modifiers = new Set(separator < 0 ? [] : binding.slice(0, separator).split('-'))
+  for (const modifier of modifiers) {
+    if (!MODIFIER_ORDER.includes(modifier)) {
+      throw new Error(`unknown modifier "${modifier}" in keybinding "${binding}"`)
+    }
+  }
+  if (modifiers.delete(apple ? 'Meta' : 'Ctrl')) {
+    modifiers.add('Mod')
+  }
+  return [
+    ...MODIFIER_ORDER.filter((modifier) => modifiers.has(modifier)),
+    key.length === 1 ? key.toLowerCase() : key,
+  ].join('-')
+}
+
 /** One plain-text label for tooltips and AT, e.g. `⌘D` on Apple, `Ctrl+D` elsewhere. */
 export function formatBindingLabel(binding: string): string {
   const apple = isApplePlatform()

@@ -1,6 +1,7 @@
 import { act } from 'react'
 import { renderHook } from 'vitest-browser-react'
 import { describe, expect, it } from 'vitest'
+import { MOD_KEY } from '@/test-utils/mod-key.ts'
 import { useListSelection } from './use-list-selection.ts'
 
 const KEYS = ['a', 'b', 'c', 'd']
@@ -13,9 +14,9 @@ describe('useListSelection', () => {
     act(() => result.current.clickSelect('b', noMods))
     expect([...result.current.selected]).toEqual(['b'])
 
-    act(() => result.current.clickSelect('d', { ...noMods, metaKey: true }))
+    act(() => result.current.clickSelect('d', { ...noMods, ...MOD_KEY }))
     expect([...result.current.selected].sort()).toEqual(['b', 'd'])
-    act(() => result.current.clickSelect('b', { ...noMods, metaKey: true }))
+    act(() => result.current.clickSelect('b', { ...noMods, ...MOD_KEY }))
     expect([...result.current.selected]).toEqual(['d'])
 
     // Shift extends from the anchor (the last ⌘-click left it at 'b').

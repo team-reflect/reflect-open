@@ -21,6 +21,10 @@ const findNextInNote = vi.hoisted(() => vi.fn())
 const findPreviousInNote = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/platform.ts', () => ({ isMacosDesktop: true, isNativeShell: () => false }))
+vi.mock('@/lib/keybindings.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/keybindings.ts')>()),
+  isApplePlatform: () => true,
+}))
 vi.mock('@/providers/note-find-provider.tsx', () => ({
   useNoteFindActions: () => ({
     openForPath: openNoteFindForPath,

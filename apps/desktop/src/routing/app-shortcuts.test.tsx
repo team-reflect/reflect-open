@@ -4,6 +4,7 @@ import {
   FocusedDailyProvider,
   useSetFocusedDailyDate,
 } from '@/providers/focused-daily-provider.tsx'
+import { isModEvent } from '@meowdown/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
@@ -14,6 +15,7 @@ import { registerAppCommands } from '@/lib/commands/app-commands.ts'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
 import { ShortcutsProvider, useShortcuts } from '@/providers/shortcuts-provider.tsx'
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
+import { MOD_KEY, NON_MOD_KEY } from '@/test-utils/mod-key.ts'
 import { useAppShortcuts } from './app-shortcuts.ts'
 import { RouterProvider, useRouter } from './router.tsx'
 
@@ -125,7 +127,7 @@ function shortcutsHook(client = new QueryClient()) {
 
 function press(key: string, options: KeyboardEventInit = {}) {
   window.dispatchEvent(
-    new KeyboardEvent('keydown', { key, metaKey: true, cancelable: true, ...options }),
+    new KeyboardEvent('keydown', { key, ...MOD_KEY, cancelable: true, ...options }),
   )
 }
 
@@ -133,7 +135,7 @@ function pressFrom(target: EventTarget, key: string, options: KeyboardEventInit 
   target.dispatchEvent(
     new KeyboardEvent('keydown', {
       key,
-      metaKey: true,
+      ...MOD_KEY,
       cancelable: true,
       bubbles: true,
       ...options,
@@ -228,8 +230,8 @@ describe('app shortcuts', () => {
       'Mod-k',
       'Mod-\\',
       'Alt-Mod-l',
-      'Meta-1',
-      'Meta-9',
+      'Mod-1',
+      'Mod-9',
     ]) {
       expect(bindings.get(key)).toBe('app')
     }
@@ -360,7 +362,7 @@ describe('app shortcuts', () => {
     editor.addEventListener('keydown', (event) => event.preventDefault())
     await act(() => {
       editor.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'k', metaKey: true, cancelable: true, bubbles: true }),
+        new KeyboardEvent('keydown', { key: 'k', ...MOD_KEY, cancelable: true, bubbles: true }),
       )
     })
     expect(result.current.palette.open).toBe(false)
@@ -415,7 +417,7 @@ describe('app shortcuts', () => {
     const editor = document.createElement('div')
     document.body.append(editor)
     editor.addEventListener('keydown', (event) => {
-      if (event.altKey && event.metaKey) {
+      if (event.altKey && isModEvent(event)) {
         toggleHeading()
         event.preventDefault()
       }
@@ -458,10 +460,10 @@ describe('app shortcuts', () => {
     expect(openRecent).not.toHaveBeenCalled()
   })
 
-  it('keeps graph switching on the Meta key, not Ctrl-number', async () => {
+  it('switches graphs only on the Mod key, not the other command key', async () => {
     const { act } = await shortcutsHook()
 
-    await act(() => press('2', { metaKey: false, ctrlKey: true }))
+    await act(() => press('2', NON_MOD_KEY))
 
     expect(openRecent).not.toHaveBeenCalled()
   })
@@ -469,13 +471,13 @@ describe('app shortcuts', () => {
   it('matches uppercase keys (caps lock) and ignores auto-repeat', async () => {
     const { result, act } = await shortcutsHook()
     await act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'N', metaKey: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'N', ...MOD_KEY }))
     })
     expect(result.current.router.route.kind).toBe('note') // caps lock still triggers
 
     const opened = result.current.router.route
     await act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', metaKey: true, repeat: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', ...MOD_KEY, repeat: true }))
     })
     expect(result.current.router.route).toEqual(opened) // held key doesn't spam notes
   })
@@ -508,7 +510,7 @@ describe('app shortcuts', () => {
   it('ignores chords with extra modifiers', async () => {
     const { result, act } = await shortcutsHook()
     await act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', metaKey: true, altKey: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', ...MOD_KEY, altKey: true }))
     })
     expect(result.current.router.route).toEqual({ kind: 'today' })
   })

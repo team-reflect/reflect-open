@@ -1,6 +1,7 @@
 import { act } from 'react'
 import { renderHook } from 'vitest-browser-react'
 import { describe, expect, it } from 'vitest'
+import { MOD_KEY } from '@/test-utils/mod-key.ts'
 import { useTaskSelection } from './use-task-selection.ts'
 
 const KEYS = ['a', 'b', 'c', 'd']
@@ -14,9 +15,9 @@ describe('useTaskSelection', () => {
     expect([...result.current.selected]).toEqual(['b'])
 
     // ⌘-click adds; a second ⌘-click on the same key removes it.
-    act(() => result.current.clickSelect('d', { ...noMods, metaKey: true }))
+    act(() => result.current.clickSelect('d', { ...noMods, ...MOD_KEY }))
     expect([...result.current.selected].sort()).toEqual(['b', 'd'])
-    act(() => result.current.clickSelect('b', { ...noMods, metaKey: true }))
+    act(() => result.current.clickSelect('b', { ...noMods, ...MOD_KEY }))
     expect([...result.current.selected]).toEqual(['d'])
 
     // Shift extends from the anchor (the last ⌘-click, 'b' removed → anchor 'b').
@@ -73,7 +74,7 @@ describe('useTaskSelection', () => {
     expect(result.current.activeKey()).toBe('b')
 
     // A ⌘-click across notes moves the pivot to the row just touched, not render order.
-    act(() => result.current.clickSelect('d', { ...noMods, metaKey: true }))
+    act(() => result.current.clickSelect('d', { ...noMods, ...MOD_KEY }))
     expect(result.current.activeKey()).toBe('d')
 
     // Arrow movement carries the pivot; clearing drops it.

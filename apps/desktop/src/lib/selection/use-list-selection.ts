@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
+import { isModEvent } from '@meowdown/core'
 
 /**
  * Multi-select over a flat, ordered list of string keys — the rows as they
@@ -92,7 +93,7 @@ export function useListSelection(orderedKeys: readonly string[]): ListSelection 
 
   const clickSelect = useCallback<ListSelection['clickSelect']>(
     (key, event) => {
-      if (event.metaKey || event.ctrlKey) {
+      if (isModEvent(event)) {
         setSelected((current) => {
           const next = new Set(current)
           if (next.has(key)) {

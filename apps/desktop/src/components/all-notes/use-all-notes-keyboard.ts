@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react'
+import { isModEvent } from '@meowdown/core'
 import type { ListSelection } from '@/lib/selection/use-list-selection.ts'
 
 export interface AllNotesKeyboardOptions {
@@ -71,7 +72,7 @@ export function useAllNotesKeyboard({
       if (target?.closest?.(OWNS_KEYS) != null) {
         return
       }
-      const mod = event.metaKey || event.ctrlKey
+      const mod = isModEvent(event)
       const scrollActiveIntoView = (): void => {
         const key = selection.activeKey()
         if (key !== null) {

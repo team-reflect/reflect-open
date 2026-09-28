@@ -7,11 +7,26 @@ describe('keymap registry', () => {
   })
 
   it('registers all-or-nothing: a colliding batch commits no keys', () => {
-    expect(() => registerKeymap('app', { 'Mod-zz-unique': 'fine', 'Mod-b': 'collides' })).toThrow(
+    expect(() => registerKeymap('app', { 'Mod-F13': 'fine', 'Mod-b': 'collides' })).toThrow(
       /duplicate keybinding/,
     )
-    expect(listRegisteredBindings().has('Mod-zz-unique')).toBe(false)
+    expect(listRegisteredBindings().has('Mod-F13')).toBe(false)
     expect(listRegisteredBindings().get('Mod-b')).toBe('editor') // untouched
+  })
+
+  it('compares bindings after normalizing them', () => {
+    expect(() => registerKeymap('app', { 'Shift-Mod-x': 'collides' })).toThrow(
+      /already registered by the editor scope as "Mod-Shift-x"/,
+    )
+    expect(() => registerKeymap('app', { 'Alt-Mod-F14': 'fine', 'Mod-Alt-F14': 'collides' })).toThrow(
+      /duplicate keybinding/,
+    )
+    expect(listRegisteredBindings().has('Alt-Mod-F14')).toBe(false)
+  })
+
+  it('rejects Meta: bindings spell the command key Mod', () => {
+    expect(() => registerKeymap('app', { 'Meta-F15': 'meta' })).toThrow(/uses Meta; use Mod/)
+    expect(listRegisteredBindings().has('Meta-F15')).toBe(false)
   })
 
   it('holds meowdown editor bindings editor-scope', () => {
