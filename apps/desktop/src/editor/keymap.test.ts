@@ -18,6 +18,6 @@ describe('keymap registry', () => {
     const bindings = listRegisteredBindings()
     expect(bindings.get('Mod-b')).toBe('editor')
     expect(bindings.get('Mod-i')).toBe('editor')
-    expect(bindings.get('Mod-1')).toBe('editor')
+    expect(bindings.get('Mod-Alt-1')).toBe('editor')
   })
 })

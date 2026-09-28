@@ -407,6 +407,33 @@ describe('app shortcuts', () => {
     expect(openRecent).toHaveBeenCalledTimes(1)
   })
 
+  it('⌘number switches graphs from a focused editor that leaves the chord alone', async () => {
+    const { act } = await shortcutsHook()
+    // Stands in for meowdown, whose heading toggles are ⌘⌥1–⌘⌥6: plain ⌘N is
+    // not an editor binding, so the keydown bubbles to the app untouched.
+    const toggleHeading = vi.fn()
+    const editor = document.createElement('div')
+    document.body.append(editor)
+    editor.addEventListener('keydown', (event) => {
+      if (event.altKey && event.metaKey) {
+        toggleHeading()
+        event.preventDefault()
+      }
+    })
+
+    try {
+      await act(() => pressFrom(editor, '2', { code: 'Digit2' }))
+      expect(openRecent).toHaveBeenCalledWith('/work')
+      expect(toggleHeading).not.toHaveBeenCalled()
+
+      await act(() => pressFrom(editor, '™', { code: 'Digit2', altKey: true }))
+      expect(openRecent).toHaveBeenCalledTimes(1) // ⌘⌥2 stays the editor's
+      expect(toggleHeading).toHaveBeenCalledTimes(1)
+    } finally {
+      editor.remove()
+    }
+  })
+
   it('matches graph number shortcuts by physical digit key on symbol-producing layouts', async () => {
     const { act } = await shortcutsHook()
 
