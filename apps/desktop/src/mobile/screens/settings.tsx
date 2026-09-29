@@ -28,7 +28,6 @@ import { queryKeys } from '@/lib/query-client.ts'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer.tsx'
 import { AiPromptDrawer } from '@/mobile/ai-prompt-drawer.tsx'
 import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer.tsx'
-import { ClassicSignInProgress } from '@/mobile/classic-sign-in-progress.tsx'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer.tsx'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
@@ -48,11 +47,9 @@ import {
 } from '@/mobile/use-active-subscription.ts'
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
 import {
-  CLASSIC_COPY,
   classicAccessMessage,
   formatClassicDate,
   useClassicAccess,
-  useClassicSignIn,
   useClassicSignOut,
 } from '@/mobile/use-classic-access.ts'
 import { useMobileSyncStatus } from '@/mobile/use-sync-status.ts'
@@ -96,7 +93,6 @@ export function MobileSettings(): ReactElement {
   const isIos = platform === 'ios'
   const subscription = useActiveSubscription()
   const classicAccess = useClassicAccess()
-  const classicSignIn = useClassicSignIn()
   const classicSignOut = useClassicSignOut()
   const queryClient = useQueryClient()
   const [, setPaywallRequested] = usePaywallRequested()
@@ -362,14 +358,7 @@ export function MobileSettings(): ReactElement {
           {isIos ? (
             <SettingsGroup
               header="Subscription"
-              footer={
-                subscriptionMessage ??
-                classicAccessMessage(classicAccess) ??
-                (classicAccess.value === null
-                  ? // FIXME i do not think this is usefull. delete it.
-                    'Verifying only checks your subscription. Nothing is synced with Reflect Classic.'
-                  : null)
-              }
+              footer={subscriptionMessage ?? classicAccessMessage(classicAccess)}
             >
               <SettingsValueRow
                 label="Plan"
@@ -407,11 +396,11 @@ export function MobileSettings(): ReactElement {
               {classicAccess.value !== null ? (
                 <>
                   <SettingsValueRow
-                    label={CLASSIC_COPY.verifiedAccountLabel}
+                    label="Verified Account"
                     value={classicAccess.value.email ?? 'Unknown'}
                   />
                   <SettingsActionRow
-                    label={CLASSIC_COPY.removeRow} // FIXME: do not use a variable "removeRow" for the copy, if only one place is using it. Apply thise rules to all other places.
+                    label="Remove Reflect Classic Verification"
                     tone="destructive"
                     pending={classicSignOut.isPending}
                     onPress={() => {
@@ -419,16 +408,7 @@ export function MobileSettings(): ReactElement {
                     }}
                   />
                 </>
-              ) : (
-                <SettingsActionRow
-                  label={CLASSIC_COPY.verifyRow} // FIXME: delete this because user can already go to "Manage Subscription" to visit this page
-                  pending={classicSignIn.mutation.isPending}
-                  onPress={() => {
-                    setSubscriptionMessage(null)
-                    classicSignIn.mutation.mutate(false)
-                  }}
-                />
-              )}
+              ) : null}
               <SettingsActionRow
                 label="Redeem Code"
                 pending={redeemPending}
@@ -544,7 +524,6 @@ export function MobileSettings(): ReactElement {
         }}
         onRemove={removePrompt}
       />
-      <ClassicSignInProgress signIn={classicSignIn} doneLabel="Done" />
     </div>
   )
 }

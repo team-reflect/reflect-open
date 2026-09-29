@@ -22,7 +22,6 @@ import {
 import { ClassicMemberDrawer } from '@/mobile/classic-member-drawer.tsx'
 import { ClassicSignInProgress } from '@/mobile/classic-sign-in-progress.tsx'
 import {
-  CLASSIC_COPY,
   classicAccessMessage,
   useClassicAccess,
   useClassicSignIn,
@@ -214,7 +213,9 @@ export function PaywallScreen(): ReactElement {
             disabled={actionPending}
             onClick={() => setClassicDrawerOpen(true)}
           >
-            {classicSignIn.mutation.isPending ? 'Signing in…' : CLASSIC_COPY.claimLink}
+            {classicSignIn.mutation.isPending
+              ? 'Signing in…'
+              : 'Already a Reflect member? Get your first year free'}
           </button>
           {classicMessage !== null ? (
             <p className="text-center text-sm text-text-muted">{classicMessage}</p>
@@ -265,7 +266,7 @@ export function PaywallScreen(): ReactElement {
           openUrlSync(CLAIM_FREE_YEAR_URL)
         }}
       />
-      <ClassicSignInProgress signIn={classicSignIn} doneLabel="Start writing" />
+      <ClassicSignInProgress signIn={classicSignIn} />
     </div>
   )
 }

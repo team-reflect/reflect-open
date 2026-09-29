@@ -14,22 +14,6 @@ import { providerFetch } from '@/lib/provider-fetch.ts'
 import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 
-/** User-facing copy. It must read as checking a subscription, never as syncing notes. */
-export const CLASSIC_COPY = {
-  claimLink: 'Already a Reflect member? Get your first year free',
-  sheetTitle: 'Reflect Classic member?',
-  signInOption: 'Sign in here', // FIXME: do not put strings into XXX_COPY if that string is only used once
-  signInBadge: 'Recommended',
-  signInDetail: 'Instant. Renews while you stay subscribed.',
-  webOption: 'Get an offer code on the web',
-  webDetail: 'Redeem it in the App Store. One year.',
-  hint: 'Signing in only checks your subscription. Nothing is synced with Reflect Classic.',
-  verifyRow: 'Verify Reflect Classic Subscription',
-  removeRow: 'Remove Reflect Classic Verification',
-  verifiedAccountLabel: 'Verified Account',
-  ended: 'Your Reflect Classic access to Reflect Open has ended.',
-} as const
-
 interface ClassicAccessState {
   access: ClassicAccess | null
   active: boolean
@@ -126,5 +110,7 @@ export function classicAccessMessage(classicAccess: {
   value: ClassicAccess | null
   active: boolean
 }): string | null {
-  return classicAccess.value !== null && !classicAccess.active ? CLASSIC_COPY.ended : null
+  return classicAccess.value !== null && !classicAccess.active
+    ? 'Your Reflect Classic access to Reflect Open has ended.'
+    : null
 }

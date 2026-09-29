@@ -87,13 +87,7 @@ function StepIcon({ state }: { state: StepState }): ReactElement {
  * sign-in sheet closes until the user acknowledges the result. Renders nothing
  * while idle, while the sheet is open, or after a cancelled sheet.
  */
-export function ClassicSignInProgress({
-  signIn,
-  doneLabel,
-}: {
-  signIn: ClassicSignIn
-  doneLabel: string
-}): ReactElement | null {
+export function ClassicSignInProgress({ signIn }: { signIn: ClassicSignIn }): ReactElement | null {
   const queryClient = useQueryClient()
   const screen = screenFor(signIn)
   if (screen === null) return null
@@ -142,7 +136,7 @@ export function ClassicSignInProgress({
         <div className="mt-auto flex flex-col items-center gap-4">
           {mutation.data?.kind === 'signed-in' ? (
             <Button className="h-12 w-full rounded-xl text-base" onClick={() => void done()}>
-              {doneLabel}
+              Start writing
             </Button>
           ) : null}
           {mutation.data?.kind === 'not-eligible' ? (

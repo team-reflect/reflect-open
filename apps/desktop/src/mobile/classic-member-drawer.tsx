@@ -1,7 +1,8 @@
 import type { ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
-import { CLASSIC_COPY } from '@/mobile/use-classic-access.ts'
+
+const TITLE = 'Reflect Classic member?'
 
 interface ClassicMemberDrawerProps {
   open: boolean
@@ -19,22 +20,24 @@ export function ClassicMemberDrawer({
 }: ClassicMemberDrawerProps): ReactElement {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent aria-label={CLASSIC_COPY.sheetTitle}>
-        <DrawerTitle>{CLASSIC_COPY.sheetTitle}</DrawerTitle>
+      <DrawerContent aria-label={TITLE}>
+        <DrawerTitle>{TITLE}</DrawerTitle>
         <DrawerBody className="gap-3 px-5">
           <Option
-            title={CLASSIC_COPY.signInOption}
-            badge={CLASSIC_COPY.signInBadge}
-            detail={CLASSIC_COPY.signInDetail}
+            title="Sign in here"
+            badge="Recommended"
+            detail="Instant. Renews while you stay subscribed."
             recommended
             onPress={onSignIn}
           />
           <Option
-            title={CLASSIC_COPY.webOption}
-            detail={CLASSIC_COPY.webDetail}
+            title="Get an offer code on the web"
+            detail="Redeem it in the App Store. One year."
             onPress={onWebClaim}
           />
-          <p className="text-center text-xs leading-5 text-text-muted">{CLASSIC_COPY.hint}</p>
+          <p className="text-center text-xs leading-5 text-text-muted">
+            Signing in only checks your subscription. Nothing is synced with Reflect Classic.
+          </p>
         </DrawerBody>
       </DrawerContent>
     </Drawer>
