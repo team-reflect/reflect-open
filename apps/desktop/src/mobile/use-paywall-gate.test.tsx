@@ -231,7 +231,7 @@ describe('usePaywallGate', () => {
       const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(() => {}))
       const { result } = await renderHook(() => usePaywallGate(), { wrapper })
       await vi.waitFor(() => expect(result.current).toBe('show'))
-      expect(fetch).toHaveBeenCalledWith('https://next.reflect.app/api/users/me', expect.anything())
+      expect(fetch).toHaveBeenCalledWith('https://reflect.app/api/users/me', expect.anything())
       fetch.mockRestore()
     })
 

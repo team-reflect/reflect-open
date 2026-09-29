@@ -323,7 +323,7 @@ describe('PaywallScreen Reflect Classic verification', () => {
   function afterSheet(result: () => Promise<ClassicSignInResult>) {
     return async (options: SignInOptions): Promise<ClassicSignInResult> => {
       const callback = await options.startWebAuth({
-        url: 'https://next.reflect.app/oauth',
+        url: 'https://reflect.app/oauth',
         callbackScheme: 'reflect',
         ephemeral: options.ephemeral,
       })
