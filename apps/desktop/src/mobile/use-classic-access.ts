@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   clearClassicAccess,
@@ -12,16 +13,19 @@ import { providerFetch } from '@/lib/provider-fetch.ts'
 import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 
-/** User-facing copy. It must read as verifying a subscription, never as syncing notes. */
+/** User-facing copy. It must read as checking a subscription, never as syncing notes. */
 export const CLASSIC_COPY = {
-  verifyButton: 'Verify Reflect Classic subscription',
+  claimLink: 'Already a Reflect member? Get your first year free',
+  sheetTitle: 'Reflect Classic member?',
+  signInOption: 'Sign in here',
+  signInBadge: 'Recommended',
+  signInDetail: 'Instant. Renews while you stay subscribed.',
+  webOption: 'Get an offer code on the web',
+  webDetail: 'Redeem it in the App Store. One year.',
+  hint: 'Signing in only checks your subscription. Nothing is synced with Reflect Classic.',
   verifyRow: 'Verify Reflect Classic Subscription',
   removeRow: 'Remove Reflect Classic Verification',
   verifiedAccountLabel: 'Verified Account',
-  hint: 'This only checks your subscription. Nothing is synced with Reflect Classic.',
-  differentAccount: 'Use a different Reflect Classic account',
-  failed: 'Could not verify your Reflect Classic subscription. Try again.',
-  notEligible: "This Reflect Classic account doesn't include Reflect Open.",
   ended: 'Your Reflect Classic access to Reflect Open has ended.',
 } as const
 
@@ -57,24 +61,36 @@ export function useClassicAccess(): {
   }
 }
 
-/** Verifies a Reflect Classic subscription; the argument asks for a private sign-in session. */
+/**
+ * Verifies a Reflect Classic subscription; the argument asks for a private
+ * sign-in session. `checking` is true once the sign-in sheet has closed and
+ * the subscription is being read.
+ */
 export function useClassicSignIn() {
-  const queryClient = useQueryClient()
-  return useMutation<ClassicSignInResult, Error, boolean>({
+  const [browserClosed, setBrowserClosed] = useState(false)
+  const mutation = useMutation<ClassicSignInResult, Error, boolean>({
     mutationKey: mutationKeys.classic.signIn,
     scope: { id: mutationScopeIds.iapAction },
-    mutationFn: (ephemeral) =>
-      signInWithClassic({ ephemeral, fetchFn: providerFetch, startWebAuth }),
+    mutationFn: (ephemeral) => {
+      setBrowserClosed(false)
+      return signInWithClassic({
+        ephemeral,
+        fetchFn: providerFetch,
+        startWebAuth: async (options) => {
+          const callback = await startWebAuth(options)
+          setBrowserClosed(true)
+          return callback
+        },
+      })
+    },
     onError: (error) => {
       console.error('Verifying the Reflect Classic subscription failed', error)
     },
-    onSuccess: async (result) => {
-      if (result.kind === 'signed-in') {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.classic.access })
-      }
-    },
   })
+  return { mutation, checking: mutation.isPending && browserClosed }
 }
+
+export type ClassicSignIn = ReturnType<typeof useClassicSignIn>
 
 /** Forgets this device's Reflect Classic verification. */
 export function useClassicSignOut() {
@@ -86,13 +102,10 @@ export function useClassicSignOut() {
   })
 }
 
-/** The status line to show next to the verify action, or `null` for none. */
-export function classicAccessMessage(
-  classicAccess: { value: ClassicAccess | null; active: boolean },
-  signIn: ReturnType<typeof useClassicSignIn>,
-): string | null {
-  if (signIn.isError) return CLASSIC_COPY.failed
-  if (signIn.data?.kind === 'not-eligible') return CLASSIC_COPY.notEligible
-  if (classicAccess.value !== null && !classicAccess.active) return CLASSIC_COPY.ended
-  return null
+/** The status line for a stored verification, or `null` for none. */
+export function classicAccessMessage(classicAccess: {
+  value: ClassicAccess | null
+  active: boolean
+}): string | null {
+  return classicAccess.value !== null && !classicAccess.active ? CLASSIC_COPY.ended : null
 }

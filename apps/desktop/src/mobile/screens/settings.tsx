@@ -28,6 +28,7 @@ import { queryKeys } from '@/lib/query-client.ts'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer.tsx'
 import { AiPromptDrawer } from '@/mobile/ai-prompt-drawer.tsx'
 import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer.tsx'
+import { ClassicSignInProgress } from '@/mobile/classic-sign-in-progress.tsx'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer.tsx'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
@@ -362,8 +363,10 @@ export function MobileSettings(): ReactElement {
               header="Subscription"
               footer={
                 subscriptionMessage ??
-                classicAccessMessage(classicAccess, classicSignIn) ??
-                (classicAccess.value === null ? CLASSIC_COPY.hint : null)
+                classicAccessMessage(classicAccess) ??
+                (classicAccess.value === null
+                  ? 'Verifying only checks your subscription. Nothing is synced with Reflect Classic.'
+                  : null)
               }
             >
               <SettingsValueRow
@@ -417,10 +420,10 @@ export function MobileSettings(): ReactElement {
               ) : (
                 <SettingsActionRow
                   label={CLASSIC_COPY.verifyRow}
-                  pending={classicSignIn.isPending}
+                  pending={classicSignIn.mutation.isPending}
                   onPress={() => {
                     setSubscriptionMessage(null)
-                    classicSignIn.mutate(classicSignIn.data?.kind === 'not-eligible')
+                    classicSignIn.mutation.mutate(false)
                   }}
                 />
               )}
@@ -539,6 +542,7 @@ export function MobileSettings(): ReactElement {
         }}
         onRemove={removePrompt}
       />
+      <ClassicSignInProgress signIn={classicSignIn} doneLabel="Done" />
     </div>
   )
 }
