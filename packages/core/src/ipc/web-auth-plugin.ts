@@ -16,11 +16,10 @@ export interface WebAuthOptions {
 }
 
 // iOS omits `url` on cancel and the desktop stub sends `null`; accept both.
-const startCommand = definePluginCommand<{ payload: WebAuthOptions }, { url?: string | null }>(
-  'web-auth',
-  'start',
-  z.object({ url: z.string().nullish() }),
-)
+const startCommand = definePluginCommand<
+  { payload: WebAuthOptions },
+  { url?: string | null | undefined }
+>('web-auth', 'start', z.object({ url: z.string().nullish() }))
 
 /**
  * Open `url` in the system web sign-in session and resolve the callback URL it
