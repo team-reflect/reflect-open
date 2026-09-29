@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.14.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.14.0-beta.2...v0.14.0-beta.3) (2026-09-29)
+
+
+### Features
+
+* **ios:** verify a Reflect Classic subscription to unlock the app ([#1395](https://github.com/team-reflect/reflect-open/issues/1395)) ([e66f8e0](https://github.com/team-reflect/reflect-open/commit/e66f8e07a1050cf8416d2931198a062da74931dc))
+
+
+### Bug Fixes
+
+* fix native menu item actions ([#1392](https://github.com/team-reflect/reflect-open/issues/1392)) ([fcbbb44](https://github.com/team-reflect/reflect-open/commit/fcbbb44535ca76d4b9a2a379a258d2344382f2f3))
+* make `Mod` mean ⌘ on Apple and Ctrl elsewhere ([#1385](https://github.com/team-reflect/reflect-open/issues/1385)) ([daf1fc1](https://github.com/team-reflect/reflect-open/commit/daf1fc1088115f02f771fd50a1064499fb8198de))
+* stop Tasks rows with links from growing taller than the editor ([#1384](https://github.com/team-reflect/reflect-open/issues/1384)) ([bf852a5](https://github.com/team-reflect/reflect-open/commit/bf852a5b2d35879638069ed8dfddea14ee2cb439))
+* switch graphs with ⌘1–⌘6 while a note is focused ([#1387](https://github.com/team-reflect/reflect-open/issues/1387)) ([e8254f0](https://github.com/team-reflect/reflect-open/commit/e8254f0a0c081d11a36d6e697c86a003ff4cabfa))
+
 ## [0.14.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.14.0-beta.1...v0.14.0-beta.2) (2026-09-27)
 
 
