@@ -366,8 +366,8 @@ export function MobileSettings(): ReactElement {
                 subscriptionMessage ??
                 classicAccessMessage(classicAccess) ??
                 (classicAccess.value === null
-                  // FIXME i do not think this is usefull. delete it.
-                  ? 'Verifying only checks your subscription. Nothing is synced with Reflect Classic.'
+                  ? // FIXME i do not think this is usefull. delete it.
+                    'Verifying only checks your subscription. Nothing is synced with Reflect Classic.'
                   : null)
               }
             >
