@@ -21,6 +21,7 @@
     "@reflect/modules": "workspace:*",
     "@reflect/utils": "workspace:*",
     "kysely": "^0.28.17",
+    "pkce-challenge": "^6.0.0",
     "ulidx": "^2.4.1",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"

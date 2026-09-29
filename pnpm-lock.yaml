@@ -316,6 +316,9 @@ importers:
       kysely:
         specifier: ^0.28.17
         version: 0.28.17
+      pkce-challenge:
+        specifier: ^6.0.0
+        version: 6.0.0
       ulidx:
         specifier: ^2.4.1
         version: 2.4.1
@@ -4676,6 +4679,10 @@ packages:
 
   pkce-challenge@5.0.1:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
+    engines: {node: '>=16.20.0'}
+
+  pkce-challenge@6.0.0:
+    resolution: {integrity: sha512-KrEAOa2aGlEyV+gN2jMXwSQhZ5gUR4WwivtPjSktYzh7srb70pYvVGV0uLfmoCx75fUQtqTairuoxayHLtvo9w==}
     engines: {node: '>=16.20.0'}
 
   pkg-types@1.3.1:
@@ -10678,6 +10685,8 @@ snapshots:
   picomatch@4.0.7: {}
 
   pkce-challenge@5.0.1: {}
+
+  pkce-challenge@6.0.0: {}
 
   pkg-types@1.3.1:
     dependencies:

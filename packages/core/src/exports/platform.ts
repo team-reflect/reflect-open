@@ -333,3 +333,16 @@ export {
   syncAppStore,
 } from '../ipc/app-store-plugin.ts'
 export { startWebAuth, type WebAuthOptions } from '../ipc/web-auth-plugin.ts'
+export {
+  CLASSIC_ACCESS_SECRET,
+  classicAccessUntil,
+  classicPaidThrough,
+  clearClassicAccess,
+  isClassicAccessActive,
+  loadClassicAccess,
+  signInWithClassic,
+  type ClassicAccess,
+  type ClassicInvoice,
+  type ClassicSignInResult,
+  type StartWebAuth,
+} from '../classic/classic-access.ts'
