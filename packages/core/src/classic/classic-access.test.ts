@@ -224,7 +224,7 @@ describe('signInWithClassic', () => {
 
     await expect(
       signInWithClassic({ ephemeral: true, fetchFn, startWebAuth: approve }),
-    ).resolves.toEqual({ kind: 'not-eligible' })
+    ).resolves.toEqual({ kind: 'not-eligible', email: 'a@example.com' })
     expect(keychain.size).toBe(0)
   })
 
@@ -306,6 +306,23 @@ describe('signInWithClassic', () => {
     ).rejects.toMatchObject({ kind: 'parse' })
     expect(warn).toHaveBeenCalledWith(
       'Reflect Classic returned an unexpected body (/api/users/me)',
+      expect.anything(),
+    )
+  })
+  it('reports and logs an invoice period end that is not a date as a parse failure', async () => {
+    fakeKeychain()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { fetchFn } = fakeFetch({
+      '/api/oauth/token': tokenRoute(),
+      '/api/users/me': meRoute(false),
+      '/api/users/me/invoices': invoicesRoute([invoice({ lines: [{ period_end: 'soon' }] })]),
+    })
+
+    await expect(
+      signInWithClassic({ ephemeral: false, fetchFn, startWebAuth: approve }),
+    ).rejects.toMatchObject({ kind: 'parse' })
+    expect(warn).toHaveBeenCalledWith(
+      'Reflect Classic returned an unexpected body (/api/users/me/invoices)',
       expect.anything(),
     )
   })

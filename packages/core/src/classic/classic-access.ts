@@ -34,7 +34,7 @@ export type ClassicAccess = z.infer<typeof classicAccessSchema>
 
 export type ClassicSignInResult =
   | { kind: 'cancelled' }
-  | { kind: 'not-eligible' }
+  | { kind: 'not-eligible'; email: string | null }
   | { kind: 'signed-in'; access: ClassicAccess }
 
 /** Opens the system web sign-in and resolves its callback URL, or `null` when cancelled. */
@@ -53,7 +53,7 @@ const invoiceSchema = z.object({
   status: z.string().nullable(),
   amount_paid: z.number(),
   amount_refunded: z.number(),
-  lines: z.array(z.object({ period_end: z.string() })),
+  lines: z.array(z.object({ period_end: z.iso.datetime() })),
 })
 export type ClassicInvoice = z.infer<typeof invoiceSchema>
 
@@ -222,7 +222,7 @@ export async function signInWithClassic(options: {
   const token = await exchangeCode(code, verifier, options.fetchFn)
   const now = Date.now()
   const { email, expiresAt } = await checkClassicAccount(options.fetchFn, token, now)
-  if (expiresAt === null) return { kind: 'not-eligible' }
+  if (expiresAt === null) return { kind: 'not-eligible', email }
 
   const access = { token, email, expiresAt, checkedAt: now }
   await saveAccess(access)
