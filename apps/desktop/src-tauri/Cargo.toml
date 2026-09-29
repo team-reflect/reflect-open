@@ -155,6 +155,7 @@ objc2-ui-kit = { version = "0.3.2", default-features = false, features = [
 ] }
 tauri-plugin-iap = "0.9.1"
 tauri-plugin-app-store = { path = "../../../plugins/tauri-plugin-app-store" }
+tauri-plugin-web-auth = { path = "../../../plugins/tauri-plugin-web-auth" }
 apple-native-keyring-store = { version = "1.0.2", features = ["protected"] }
 
 # Desktop-only capabilities (Plan 19): auto-update (mobile updates go through

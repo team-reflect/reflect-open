@@ -14,6 +14,7 @@ members = [
   "plugins/tauri-plugin-keyboard",
   "plugins/tauri-plugin-mobile-haptics",
   "plugins/tauri-plugin-recording",
+  "plugins/tauri-plugin-web-auth",
 ]
 
 [workspace.dependencies]

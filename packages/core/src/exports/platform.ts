@@ -332,3 +332,4 @@ export {
   presentOfferCodeRedeemSheet,
   syncAppStore,
 } from '../ipc/app-store-plugin.ts'
+export { startWebAuth, type WebAuthOptions } from '../ipc/web-auth-plugin.ts'

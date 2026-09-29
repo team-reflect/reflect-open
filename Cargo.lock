@@ -5029,6 +5029,7 @@ dependencies = [
  "tauri-plugin-recording",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "tauri-plugin-web-auth",
  "tauri-plugin-window-state",
  "tempfile",
  "tokio",
@@ -6506,6 +6507,16 @@ dependencies = [
  "url",
  "windows-sys 0.60.2",
  "zip 4.6.1",
+]
+
+[[package]]
+name = "tauri-plugin-web-auth"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

@@ -248,6 +248,10 @@ pub fn run() {
     #[cfg(target_os = "ios")]
     let builder = builder.plugin(tauri_plugin_app_store::init());
 
+    // OAuth-style sign-in in an in-app browser sheet (ASWebAuthenticationSession).
+    #[cfg(target_os = "ios")]
+    let builder = builder.plugin(tauri_plugin_web_auth::init());
+
     builder
         // Serves note images (`assets/…`) to the webview. Registered as an
         // *asynchronous* protocol on purpose: WebKit delivers custom-scheme
