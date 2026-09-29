@@ -1,5 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core'
-import { Menu, type MenuItemOptions } from '@tauri-apps/api/menu'
+import { Menu, MenuItem } from '@tauri-apps/api/menu'
 
 export interface NativeContextMenuItem {
   /** Visible native menu item label. */
@@ -22,10 +22,9 @@ export async function openNativeContextMenu(options: NativeContextMenuOptions): 
     return
   }
 
-  const menuItems: MenuItemOptions[] = options.items.map((item) => ({
-    text: item.text,
-    action: item.action,
-  }))
-  const menu = await Menu.new({ items: menuItems })
+  const items = await Promise.all(
+    options.items.map((item) => MenuItem.new({ text: item.text, action: item.action })),
+  )
+  const menu = await Menu.new({ items })
   await menu.popup()
 }

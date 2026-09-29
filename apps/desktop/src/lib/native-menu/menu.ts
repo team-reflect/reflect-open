@@ -1,6 +1,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import {
   Menu,
+  MenuItem,
   Submenu,
   type MenuItemOptions,
   type PredefinedMenuItemOptions,
@@ -156,9 +157,10 @@ function menuItemOptions(commandId: string, text?: string): MenuItemOptions {
   }
 }
 
-function entryOptions(entry: AppMenuEntry): MenuItemOptions | PredefinedMenuItemOptions {
+// Inline item options lose their click handler once the submenu is built.
+async function menuEntry(entry: AppMenuEntry): Promise<MenuItem | PredefinedMenuItemOptions> {
   return entry.kind === 'command'
-    ? menuItemOptions(entry.commandId, entry.text)
+    ? await MenuItem.new(menuItemOptions(entry.commandId, entry.text))
     : { item: entry.item, ...(entry.text !== undefined ? { text: entry.text } : {}) }
 }
 
@@ -198,11 +200,12 @@ export async function installNativeMenu(): Promise<void> {
   }
   const layouts = appMenuLayout()
   const submenus = await Promise.all(
-    layouts.map((layout) =>
-      Submenu.new({
-        text: layout.text,
-        items: layout.entries.map(entryOptions),
-      }),
+    layouts.map(
+      async (layout) =>
+        await Submenu.new({
+          text: layout.text,
+          items: await Promise.all(layout.entries.map(menuEntry)),
+        }),
     ),
   )
   const menu = await Menu.new({ items: submenus })

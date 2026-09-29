@@ -22,13 +22,16 @@ const menuNew = vi.hoisted(() =>
 )
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri }))
-vi.mock('@tauri-apps/api/menu', () => ({ Menu: { new: menuNew } }))
+const menuItemNew = vi.hoisted(() => vi.fn(async (options: NativeMenuItemForTest) => options))
+
+vi.mock('@tauri-apps/api/menu', () => ({ Menu: { new: menuNew }, MenuItem: { new: menuItemNew } }))
 
 const { openNativeContextMenu } = await import('./context-menu.ts')
 
 beforeEach(() => {
   isTauri.mockReset().mockReturnValue(true)
   popup.mockClear()
+  menuItemNew.mockClear()
   menuNew.mockResolvedValue({ popup })
 })
 
@@ -63,6 +66,7 @@ describe('openNativeContextMenu', () => {
         }),
       ],
     })
+    expect(menuItemNew).toHaveBeenCalledWith({ text: 'Unpin Note', action: onSelect })
     expect(popup).toHaveBeenCalled()
     const item = firstMenuItem()
     item.action?.()

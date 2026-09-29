@@ -31,6 +31,7 @@ const submenuNew = vi.hoisted(() =>
   })),
 )
 const menuNew = vi.hoisted(() => vi.fn(async () => ({ setAsAppMenu })))
+const menuItemNew = vi.hoisted(() => vi.fn(async (options: MenuItemOptionsForTest) => options))
 const emitTo = vi.hoisted(() => vi.fn(async () => {}))
 const listen = vi.hoisted(() =>
   vi.fn(async (_event: string, _handler: MenuEventHandlerForTest) => () => {}),
@@ -45,6 +46,7 @@ vi.mock('@tauri-apps/api/webviewWindow', () => ({
 }))
 vi.mock('@tauri-apps/api/menu', () => ({
   Menu: { new: menuNew },
+  MenuItem: { new: menuItemNew },
   Submenu: { new: submenuNew },
 }))
 vi.mock('@/lib/windows/window-role.ts', () => ({ isMainWindow }))
@@ -60,6 +62,7 @@ beforeEach(() => {
   isMainWindow.mockReset().mockReturnValue(true)
   submenuNew.mockClear()
   menuNew.mockClear()
+  menuItemNew.mockClear()
   setAsAppMenu.mockClear()
   setAsWindowsMenuForNSApp.mockClear()
   setAsHelpMenuForNSApp.mockClear()
@@ -158,6 +161,7 @@ describe('installNativeMenu', () => {
       text: 'Toggle sidebar',
       accelerator: 'CmdOrCtrl+\\',
     })
+    expect(menuItemNew).toHaveBeenCalledWith(sidebarToggle)
     expect(sidebarToggle?.action).toBeTypeOf('function')
     sidebarToggle?.action?.('sidebar.toggle')
     expect(dispatch).toHaveBeenCalledWith('sidebar.toggle')
