@@ -180,6 +180,9 @@ export const queryKeys = {
     get access() {
       return [...this.all, 'access'] as const
     },
+    get recheck() {
+      return [...this.all, 'recheck'] as const
+    },
   },
   iap: {
     all: ['iap'] as const,

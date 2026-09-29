@@ -5,7 +5,7 @@ import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { queryKeys } from '@/lib/query-client.ts'
-import type { ClassicSignIn } from '@/mobile/use-classic-access.ts'
+import { formatClassicDate, type ClassicSignIn } from '@/mobile/use-classic-access.ts'
 
 type StepState = 'done' | 'active' | 'pending' | 'failed'
 
@@ -21,10 +21,6 @@ interface Screen {
 
 function signedInLabel(email: string | null): string {
   return email === null ? 'Signed in to Reflect Classic' : `Signed in as ${email}`
-}
-
-function formatDate(epochMs: number): string {
-  return new Date(epochMs).toLocaleDateString(undefined, { dateStyle: 'medium' })
 }
 
 function screenFor(signIn: ClassicSignIn): Screen | null {
@@ -57,7 +53,7 @@ function screenFor(signIn: ClassicSignIn): Screen | null {
       steps: [
         { state: 'done', label: signedInLabel(result.access.email) },
         { state: 'done', label: 'Reflect Classic subscription found' },
-        { state: 'done', label: `Free until ${formatDate(result.access.expiresAt)}` },
+        { state: 'done', label: `Free until ${formatClassicDate(result.access.expiresAt)}` },
       ],
     }
   }

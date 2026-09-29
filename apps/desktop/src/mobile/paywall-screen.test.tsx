@@ -363,9 +363,16 @@ describe('PaywallScreen Reflect Classic verification', () => {
   it('signs in through the shared browser session and stays quiet when cancelled', async () => {
     webAuthCallback = null
     mocks.signInWithClassic.mockImplementation(afterSheet(async () => signedIn(null)))
+    let progressShown = false
+    const observer = new MutationObserver(() => {
+      progressShown ||= progressScreen() !== null
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
     await openSignIn()
 
     await vi.waitFor(() => expect(queryClient.isMutating()).toBe(0))
+    observer.disconnect()
+    expect(progressShown).toBe(false)
     expect(mocks.signInWithClassic).toHaveBeenCalledWith(
       expect.objectContaining({ ephemeral: false }),
     )

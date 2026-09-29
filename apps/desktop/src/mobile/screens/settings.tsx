@@ -50,6 +50,7 @@ import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
 import {
   CLASSIC_COPY,
   classicAccessMessage,
+  formatClassicDate,
   useClassicAccess,
   useClassicSignIn,
   useClassicSignOut,
@@ -377,7 +378,7 @@ export function MobileSettings(): ReactElement {
                     : subscription.value === 'yearly'
                       ? 'Yearly'
                       : classicAccess.active && classicAccess.value !== null
-                        ? `Reflect Classic, until ${formatDate(classicAccess.value.expiresAt)}`
+                        ? `Reflect Classic, until ${formatClassicDate(classicAccess.value.expiresAt)}`
                         : subscription.isLoading || classicAccess.isLoading
                           ? 'Checking…'
                           : 'Not subscribed'
@@ -545,8 +546,4 @@ export function MobileSettings(): ReactElement {
       <ClassicSignInProgress signIn={classicSignIn} doneLabel="Done" />
     </div>
   )
-}
-
-function formatDate(epochMs: number): string {
-  return new Date(epochMs).toLocaleDateString(undefined, { dateStyle: 'medium' })
 }

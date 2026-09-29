@@ -4,6 +4,7 @@ import {
   clearClassicAccess,
   isClassicAccessActive,
   loadClassicAccess,
+  readClassicAccess,
   signInWithClassic,
   startWebAuth,
   type ClassicAccess,
@@ -39,20 +40,34 @@ function withActive(access: ClassicAccess | null): ClassicAccessState {
   return { access, active: access !== null && isClassicAccessActive(access, Date.now()) }
 }
 
-/** This device's Reflect Classic access, from the keychain and rechecked at most daily. */
+/**
+ * This device's Reflect Classic access as stored in the keychain. Loading
+ * covers only the keychain read; the daily recheck with Reflect Classic runs
+ * in the background and writes its answer back.
+ */
 export function useClassicAccess(): {
   value: ClassicAccess | null
   active: boolean
   isLoading: boolean
 } {
   const { platform } = useGraph()
+  const queryClient = useQueryClient()
   const query = useQuery({
     queryKey: queryKeys.classic.access,
-    queryFn: () => loadClassicAccess(providerFetch),
-    staleTime: 60 * 60 * 1000,
-    refetchOnWindowFocus: true,
+    queryFn: readClassicAccess,
     enabled: platform === 'ios',
     select: withActive,
+  })
+  useQuery({
+    queryKey: queryKeys.classic.recheck,
+    queryFn: async () => {
+      const access = await loadClassicAccess(providerFetch)
+      queryClient.setQueryData(queryKeys.classic.access, access)
+      return access
+    },
+    staleTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: true,
+    enabled: platform === 'ios' && query.data?.access?.token != null,
   })
   return {
     value: query.data?.access ?? null,
@@ -78,7 +93,7 @@ export function useClassicSignIn() {
         fetchFn: providerFetch,
         startWebAuth: async (options) => {
           const callback = await startWebAuth(options)
-          setBrowserClosed(true)
+          if (callback !== null) setBrowserClosed(true)
           return callback
         },
       })
@@ -100,6 +115,10 @@ export function useClassicSignOut() {
     mutationFn: clearClassicAccess,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.classic.access }),
   })
+}
+
+export function formatClassicDate(epochMs: number): string {
+  return new Date(epochMs).toLocaleDateString(undefined, { dateStyle: 'medium' })
 }
 
 /** The status line for a stored verification, or `null` for none. */

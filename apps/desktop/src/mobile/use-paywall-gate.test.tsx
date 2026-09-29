@@ -218,6 +218,43 @@ describe('usePaywallGate', () => {
       await vi.waitFor(() => expect(result.current).toBe('show'))
     })
 
+    it('decides from the keychain without waiting for the daily recheck', async () => {
+      classicAccess = () =>
+        Promise.resolve(
+          JSON.stringify({
+            token: 'token',
+            email: 'a@example.com',
+            expiresAt: Date.now() - 60_000,
+            checkedAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
+          }),
+        )
+      const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(() => {}))
+      const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+      await vi.waitFor(() => expect(result.current).toBe('show'))
+      expect(fetch).toHaveBeenCalledWith('https://reflect.app/api/users/me', expect.anything())
+      fetch.mockRestore()
+    })
+
+    it('lifts the paywall when the daily recheck finds a paying account', async () => {
+      classicAccess = () =>
+        Promise.resolve(
+          JSON.stringify({
+            token: 'token',
+            email: 'a@example.com',
+            expiresAt: Date.now() - 60_000,
+            checkedAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
+          }),
+        )
+      const fetch = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(async () =>
+          Response.json({ email: 'a@example.com', subscription: { paid: true } }),
+        )
+      const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+      await vi.waitFor(() => expect(result.current).toBe('hide'))
+      fetch.mockRestore()
+    })
+
     it('keeps the app visible while the keychain is still being read', async () => {
       classicAccess = never
       const { result } = await renderHook(() => usePaywallGate(), { wrapper })
