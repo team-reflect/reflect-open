@@ -18,7 +18,7 @@ import { useGraph } from '@/providers/graph-provider.tsx'
 export const CLASSIC_COPY = {
   claimLink: 'Already a Reflect member? Get your first year free',
   sheetTitle: 'Reflect Classic member?',
-  signInOption: 'Sign in here',
+  signInOption: 'Sign in here', // FIXME: do not put strings into XXX_COPY if that string is only used once
   signInBadge: 'Recommended',
   signInDetail: 'Instant. Renews while you stay subscribed.',
   webOption: 'Get an offer code on the web',

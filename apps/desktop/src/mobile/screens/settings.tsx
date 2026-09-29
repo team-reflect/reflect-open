@@ -366,6 +366,7 @@ export function MobileSettings(): ReactElement {
                 subscriptionMessage ??
                 classicAccessMessage(classicAccess) ??
                 (classicAccess.value === null
+                  // FIXME i do not think this is usefull. delete it.
                   ? 'Verifying only checks your subscription. Nothing is synced with Reflect Classic.'
                   : null)
               }
@@ -410,7 +411,7 @@ export function MobileSettings(): ReactElement {
                     value={classicAccess.value.email ?? 'Unknown'}
                   />
                   <SettingsActionRow
-                    label={CLASSIC_COPY.removeRow}
+                    label={CLASSIC_COPY.removeRow} // FIXME: do not use a variable "removeRow" for the copy, if only one place is using it. Apply thise rules to all other places.
                     tone="destructive"
                     pending={classicSignOut.isPending}
                     onPress={() => {
@@ -420,7 +421,7 @@ export function MobileSettings(): ReactElement {
                 </>
               ) : (
                 <SettingsActionRow
-                  label={CLASSIC_COPY.verifyRow}
+                  label={CLASSIC_COPY.verifyRow} // FIXME: delete this because user can already go to "Manage Subscription" to visit this page
                   pending={classicSignIn.mutation.isPending}
                   onPress={() => {
                     setSubscriptionMessage(null)
