@@ -1,7 +1,6 @@
 import { verifyChallenge } from 'pkce-challenge'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge.ts'
-import type { FetchFn } from '../sync/github-api.ts'
 import {
   CLASSIC_ACCESS_SECRET,
   classicAccessUntil,
@@ -61,9 +60,9 @@ function jsonResponse(body: unknown, status = 200): Response {
 type Route = (init: RequestInit | undefined) => Response | Promise<Response>
 
 /** A fetch fake that answers by URL path and records the paths it was asked for. */
-function fakeFetch(routes: Record<string, Route>): { fetchFn: FetchFn; paths: string[] } {
+function fakeFetch(routes: Record<string, Route>): { fetchFn: typeof fetch; paths: string[] } {
   const paths: string[] = []
-  const fetchFn: FetchFn = async (input, init) => {
+  const fetchFn: typeof fetch = async (input, init) => {
     const path = new URL(input instanceof Request ? input.url : String(input)).pathname
     paths.push(path)
     const route = routes[path]

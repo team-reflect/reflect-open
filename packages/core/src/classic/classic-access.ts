@@ -2,7 +2,6 @@ import pkceChallenge from 'pkce-challenge'
 import { z } from 'zod'
 import { ReflectError } from '../errors.ts'
 import { deleteSecret, getSecret, setSecret } from '../secrets/keychain.ts'
-import { JSON_HEADERS, type FetchFn } from '../sync/github-api.ts'
 
 /**
  * Reflect Open access granted by a Reflect Classic subscription: sign in with
@@ -94,7 +93,7 @@ export function classicAccessUntil(
   return paidThrough === null ? null : paidThrough + ACCESS_AFTER_PAYMENT_MS
 }
 
-async function send(fetchFn: FetchFn, path: string, init: RequestInit): Promise<Response> {
+async function send(fetchFn: typeof fetch, path: string, init: RequestInit): Promise<Response> {
   try {
     return await fetchFn(`${CLASSIC_ORIGIN}${path}`, init)
   } catch (error) {
@@ -102,10 +101,14 @@ async function send(fetchFn: FetchFn, path: string, init: RequestInit): Promise<
   }
 }
 
-async function exchangeCode(code: string, verifier: string, fetchFn: FetchFn): Promise<string> {
+async function exchangeCode(
+  code: string,
+  verifier: string,
+  fetchFn: typeof fetch,
+): Promise<string> {
   const response = await send(fetchFn, '/api/oauth/token', {
     method: 'POST',
-    headers: JSON_HEADERS,
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ client_id: CLASSIC_OAUTH_CLIENT_ID, code, code_verifier: verifier }),
   })
   const body = tokenSchema.safeParse(await response.json().catch(() => null))
@@ -116,7 +119,7 @@ async function exchangeCode(code: string, verifier: string, fetchFn: FetchFn): P
 }
 
 async function getWithToken<T>(
-  fetchFn: FetchFn,
+  fetchFn: typeof fetch,
   token: string,
   path: string,
   schema: z.ZodType<T>,
@@ -136,7 +139,7 @@ async function getWithToken<T>(
 
 /** Reads the account and works out until when it unlocks Reflect Open. */
 async function checkClassicAccount(
-  fetchFn: FetchFn,
+  fetchFn: typeof fetch,
   token: string,
   now: number,
 ): Promise<{ email: string | null; expiresAt: number | null }> {
@@ -165,7 +168,7 @@ async function readAccess(): Promise<ClassicAccess | null> {
 /** Sign in to Reflect Classic and store the access it grants on this device. */
 export async function signInWithClassic(options: {
   ephemeral: boolean
-  fetchFn: FetchFn
+  fetchFn: typeof fetch
   startWebAuth: StartWebAuth
 }): Promise<ClassicSignInResult> {
   const { code_verifier: verifier, code_challenge: challenge } = await pkceChallenge()
@@ -204,7 +207,7 @@ export async function signInWithClassic(options: {
  * successful check is more than a day old. A failed recheck keeps the stored
  * answer, so being offline never locks the app early.
  */
-export async function loadClassicAccess(fetchFn: FetchFn): Promise<ClassicAccess | null> {
+export async function loadClassicAccess(fetchFn: typeof fetch): Promise<ClassicAccess | null> {
   const stored = await readAccess()
   if (stored === null || stored.token === null) return stored
   if (Date.now() - stored.checkedAt < RECHECK_INTERVAL_MS) return stored
