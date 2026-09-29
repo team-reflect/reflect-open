@@ -179,7 +179,7 @@ describe('signInWithClassic', () => {
     expect(startWebAuth).toHaveBeenCalledWith(
       expect.objectContaining({ callbackScheme: 'reflect', ephemeral: false }),
     )
-    expect(authorizeUrl.origin + authorizeUrl.pathname).toBe('https://reflect.app/oauth')
+    expect(authorizeUrl.origin + authorizeUrl.pathname).toBe('https://next.reflect.app/oauth')
     expect(authorizeUrl.searchParams.get('client_id')).toBe('reflect-open')
     expect(authorizeUrl.searchParams.get('redirect_uri')).toBe('reflect://oauth/callback')
     expect(authorizeUrl.searchParams.get('code_challenge_method')).toBe('S256')

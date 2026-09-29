@@ -9,7 +9,7 @@ import { deleteSecret, getSecret, setSecret } from '../secrets/keychain.ts'
  * and keep the resulting expiry, plus the token to recheck it, in the keychain.
  */
 
-const CLASSIC_ORIGIN = 'https://reflect.app'
+const CLASSIC_ORIGIN = 'https://next.reflect.app'
 const CLASSIC_OAUTH_CLIENT_ID = 'reflect-open'
 const CALLBACK_SCHEME = 'reflect'
 const REDIRECT_URI = `${CALLBACK_SCHEME}://oauth/callback`
