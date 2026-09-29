@@ -19,6 +19,12 @@ import {
   refetchActiveSubscription,
   useActiveSubscription,
 } from '@/mobile/use-active-subscription.ts'
+import {
+  CLASSIC_COPY,
+  classicAccessMessage,
+  useClassicAccess,
+  useClassicSignIn,
+} from '@/mobile/use-classic-access.ts'
 
 type PurchasePlan = 'monthly' | 'yearly'
 
@@ -73,8 +79,15 @@ export function PaywallScreen(): ReactElement {
     // refetch here covers a sheet that closed without emitting one.
     onSuccess: subscription.invalidate,
   })
+  const classicAccess = useClassicAccess()
+  const classicSignIn = useClassicSignIn()
+  const classicMessage = classicAccessMessage(classicAccess, classicSignIn)
+  const verifyDifferentAccount = classicSignIn.data?.kind === 'not-eligible'
   const actionPending =
-    purchaseMutation.isPending || restoreMutation.isPending || redeemMutation.isPending
+    purchaseMutation.isPending ||
+    restoreMutation.isPending ||
+    redeemMutation.isPending ||
+    classicSignIn.isPending
   const purchasingPlan = purchaseMutation.isPending
     ? (purchaseMutation.variables?.plan ?? null)
     : null
@@ -92,19 +105,29 @@ export function PaywallScreen(): ReactElement {
     if (product === null) return
     restoreMutation.reset()
     redeemMutation.reset()
+    classicSignIn.reset()
     purchaseMutation.mutate({ plan: selectedPlan, productId: product.productId })
   }
 
   const restore = () => {
     purchaseMutation.reset()
     redeemMutation.reset()
+    classicSignIn.reset()
     restoreMutation.mutate()
   }
 
   const redeem = () => {
     purchaseMutation.reset()
     restoreMutation.reset()
+    classicSignIn.reset()
     redeemMutation.mutate()
+  }
+
+  const verifyClassic = () => {
+    purchaseMutation.reset()
+    restoreMutation.reset()
+    redeemMutation.reset()
+    classicSignIn.mutate(verifyDifferentAccount)
   }
 
   return (
@@ -180,6 +203,22 @@ export function PaywallScreen(): ReactElement {
             </div>
           </div>
         ) : null}
+
+        <div className="flex flex-col gap-2">
+          <Button
+            variant="outline"
+            className="h-12 rounded-xl text-base"
+            disabled={actionPending}
+            onClick={verifyClassic}
+          >
+            {classicSignIn.isPending ? <Spinner className="size-4" /> : null}
+            {verifyDifferentAccount ? CLASSIC_COPY.differentAccount : CLASSIC_COPY.verifyButton}
+          </Button>
+          <p className="text-center text-xs leading-5 text-text-muted">{CLASSIC_COPY.hint}</p>
+          {classicMessage !== null ? (
+            <p className="text-center text-sm text-text-muted">{classicMessage}</p>
+          ) : null}
+        </div>
 
         <div className="flex flex-col items-center gap-4">
           <button

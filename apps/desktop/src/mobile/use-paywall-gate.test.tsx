@@ -2,7 +2,7 @@ import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
-import { setBridge, type AppPlatform } from '@reflect/core'
+import { CLASSIC_ACCESS_SECRET, setBridge, type AppPlatform } from '@reflect/core'
 import { usePaywallRequested } from '@/hooks/use-paywall-requested.ts'
 import { resetLocalStorageStores } from '@/lib/local-storage.ts'
 import { queryKeys } from '@/lib/query-client.ts'
@@ -28,6 +28,8 @@ vi.mock('@/hooks/use-bridge-ready.ts', () => ({ useBridgeReady: () => bridgeStat
 let environment: () => Promise<string>
 /** What StoreKit says about each product id. */
 let owned: (productId: string) => Promise<boolean>
+/** What the keychain holds for the Reflect Classic access record. */
+let classicAccess: () => Promise<string | null>
 /** The persisted settings document. */
 let stored: Record<string, unknown>
 /** The native purchase event callback registered by the entitlement hook. */
@@ -80,6 +82,8 @@ function installFakeBridge(): void {
           return stored
         case 'settings_save':
           return null
+        case 'secret_get':
+          return args['name'] === CLASSIC_ACCESS_SECRET ? await classicAccess() : null
         case 'plugin:app-store|get_environment':
           return { environment: await environment() }
         case 'plugin:iap|get_product_status': {
@@ -116,6 +120,7 @@ beforeEach(() => {
   bridgeState.ready = true
   environment = () => Promise.resolve('Production')
   owned = () => Promise.resolve(false)
+  classicAccess = () => Promise.resolve(null)
   stored = {}
   emitPurchaseUpdated = null
   localStorage.clear()
@@ -188,6 +193,36 @@ describe('usePaywallGate', () => {
       result.current.requested[1](true)
     })
     await vi.waitFor(() => expect(result.current.gate).toBe('show'))
+  })
+
+  describe('Reflect Classic access', () => {
+    function classicRecord(expiresAt: number): string {
+      return JSON.stringify({
+        token: 'token',
+        email: 'a@example.com',
+        expiresAt,
+        checkedAt: Date.now(),
+      })
+    }
+
+    it('lets a verified Reflect Classic subscriber through without StoreKit', async () => {
+      classicAccess = () => Promise.resolve(classicRecord(Date.now() + 60_000))
+      owned = never
+      const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+      await vi.waitFor(() => expect(result.current).toBe('hide'))
+    })
+
+    it('shows the paywall once the Reflect Classic access has ended', async () => {
+      classicAccess = () => Promise.resolve(classicRecord(Date.now() - 60_000))
+      const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+      await vi.waitFor(() => expect(result.current).toBe('show'))
+    })
+
+    it('keeps the app visible while the keychain is still being read', async () => {
+      classicAccess = never
+      const { result } = await renderHook(() => usePaywallGate(), { wrapper })
+      await vi.waitFor(() => expect(result.current).toBe('hide'))
+    })
   })
 
   it('lets a subscriber through in every channel', async () => {

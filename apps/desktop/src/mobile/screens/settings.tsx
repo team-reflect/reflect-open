@@ -46,6 +46,13 @@ import {
   useActiveSubscription,
 } from '@/mobile/use-active-subscription.ts'
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
+import {
+  CLASSIC_COPY,
+  classicAccessMessage,
+  useClassicAccess,
+  useClassicSignIn,
+  useClassicSignOut,
+} from '@/mobile/use-classic-access.ts'
 import { useMobileSyncStatus } from '@/mobile/use-sync-status.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useSettings } from '@/providers/settings-provider.tsx'
@@ -86,6 +93,9 @@ export function MobileSettings(): ReactElement {
   const { graph, mobileStorageKind, platform } = useGraph()
   const isIos = platform === 'ios'
   const subscription = useActiveSubscription()
+  const classicAccess = useClassicAccess()
+  const classicSignIn = useClassicSignIn()
+  const classicSignOut = useClassicSignOut()
   const queryClient = useQueryClient()
   const [, setPaywallRequested] = usePaywallRequested()
   const [restorePending, setRestorePending] = useState(false)
@@ -348,7 +358,14 @@ export function MobileSettings(): ReactElement {
           ) : null}
 
           {isIos ? (
-            <SettingsGroup header="Subscription" footer={subscriptionMessage}>
+            <SettingsGroup
+              header="Subscription"
+              footer={
+                subscriptionMessage ??
+                classicAccessMessage(classicAccess, classicSignIn) ??
+                (classicAccess.value === null ? CLASSIC_COPY.hint : null)
+              }
+            >
               <SettingsValueRow
                 label="Plan"
                 value={
@@ -356,12 +373,14 @@ export function MobileSettings(): ReactElement {
                     ? 'Monthly'
                     : subscription.value === 'yearly'
                       ? 'Yearly'
-                      : subscription.isLoading
-                        ? 'Checking…'
-                        : 'Not subscribed'
+                      : classicAccess.active && classicAccess.value !== null
+                        ? `Reflect Classic, until ${formatDate(classicAccess.value.expiresAt)}`
+                        : subscription.isLoading || classicAccess.isLoading
+                          ? 'Checking…'
+                          : 'Not subscribed'
                 }
               />
-              {subscription.value === null ? (
+              {subscription.value === null && !classicAccess.active ? (
                 // The request flips usePaywallGate to 'show', so the gate in
                 // mobile-app.tsx replaces the app with the paywall immediately.
                 // It is what makes that work outside the App Store, where the
@@ -372,11 +391,36 @@ export function MobileSettings(): ReactElement {
                     setPaywallRequested(true)
                   }}
                 />
-              ) : (
+              ) : subscription.value !== null ? (
                 <SettingsActionRow
                   label="Manage Subscription"
                   onPress={() => {
                     openUrlSync('https://apps.apple.com/account/subscriptions')
+                  }}
+                />
+              ) : null}
+              {classicAccess.value !== null ? (
+                <>
+                  <SettingsValueRow
+                    label={CLASSIC_COPY.verifiedAccountLabel}
+                    value={classicAccess.value.email ?? 'Unknown'}
+                  />
+                  <SettingsActionRow
+                    label={CLASSIC_COPY.removeRow}
+                    tone="destructive"
+                    pending={classicSignOut.isPending}
+                    onPress={() => {
+                      classicSignOut.mutate()
+                    }}
+                  />
+                </>
+              ) : (
+                <SettingsActionRow
+                  label={CLASSIC_COPY.verifyRow}
+                  pending={classicSignIn.isPending}
+                  onPress={() => {
+                    setSubscriptionMessage(null)
+                    classicSignIn.mutate(classicSignIn.data?.kind === 'not-eligible')
                   }}
                 />
               )}
@@ -497,4 +541,8 @@ export function MobileSettings(): ReactElement {
       />
     </div>
   )
+}
+
+function formatDate(epochMs: number): string {
+  return new Date(epochMs).toLocaleDateString(undefined, { dateStyle: 'medium' })
 }

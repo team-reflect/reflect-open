@@ -4,6 +4,7 @@ import {
   useAppStoreEnvironment,
   type AppStoreEnvironment,
 } from '@/mobile/use-app-store-environment.ts'
+import { useClassicAccess } from '@/mobile/use-classic-access.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 
 /** Paywall visibility: `show` replaces the app; `hide` leaves the app visible. */
@@ -16,13 +17,14 @@ export type PaywallGate = 'show' | 'hide'
 export function usePaywallGate(): PaywallGate {
   const { platform } = useGraph()
   const subscription = useActiveSubscription()
+  const classicAccess = useClassicAccess()
   const environment = useAppStoreEnvironment()
   const [paywallRequested] = usePaywallRequested()
 
   if (platform !== 'ios') {
     return 'hide'
   }
-  if (subscription.value !== null) {
+  if (subscription.value !== null || classicAccess.active) {
     return 'hide'
   }
   // Ahead of the pending checks on purpose: a build that already knows it is
@@ -30,7 +32,7 @@ export function usePaywallGate(): PaywallGate {
   if (!isAppStoreInstall(environment.value) && !paywallRequested) {
     return 'hide'
   }
-  return subscription.isLoading ? 'hide' : 'show'
+  return subscription.isLoading || classicAccess.isLoading ? 'hide' : 'show'
 }
 
 /**

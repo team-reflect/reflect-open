@@ -175,6 +175,12 @@ export const queryKeys = {
       return [...this.all, 'environment'] as const
     },
   },
+  classic: {
+    all: ['classic'] as const,
+    get access() {
+      return [...this.all, 'access'] as const
+    },
+  },
   iap: {
     all: ['iap'] as const,
     get products() {
@@ -246,6 +252,15 @@ export const mutationKeys = {
     all: ['agent-skill'] as const,
     write(root: GraphRoot) {
       return [...this.all, root, 'write'] as const
+    },
+  },
+  classic: {
+    all: ['classic'] as const,
+    get signIn() {
+      return [...this.all, 'sign-in'] as const
+    },
+    get signOut() {
+      return [...this.all, 'sign-out'] as const
     },
   },
   iap: {
