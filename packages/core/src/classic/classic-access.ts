@@ -101,6 +101,40 @@ async function send(fetchFn: typeof fetch, path: string, init: RequestInit): Pro
   }
 }
 
+/**
+ * Validates a Reflect Classic response. A non-2xx status throws `failure`; a
+ * body that is not JSON or does not match `schema` throws `parse`. Each case
+ * logs its own warning.
+ */
+async function readResponse<T>(
+  response: Response,
+  path: string,
+  schema: z.ZodType<T>,
+  failure: 'auth' | 'network',
+): Promise<T> {
+  if (!response.ok) {
+    console.warn(`Reflect Classic answered ${response.status} (${path})`)
+    throw new ReflectError(failure, `Reflect Classic answered ${response.status} (${path})`)
+  }
+  let json: unknown
+  try {
+    json = await response.json()
+  } catch (error) {
+    console.warn(`Reflect Classic returned a body that is not JSON (${path})`, error)
+    throw new ReflectError('parse', `Reflect Classic returned a body that is not JSON (${path})`, {
+      cause: error,
+    })
+  }
+  const body = schema.safeParse(json)
+  if (!body.success) {
+    console.warn(`Reflect Classic returned an unexpected body (${path})`, body.error)
+    throw new ReflectError('parse', `Reflect Classic returned an unexpected body (${path})`, {
+      cause: body.error,
+    })
+  }
+  return body.data
+}
+
 async function exchangeCode(
   code: string,
   verifier: string,
@@ -111,11 +145,8 @@ async function exchangeCode(
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ client_id: CLASSIC_OAUTH_CLIENT_ID, code, code_verifier: verifier }),
   })
-  const body = tokenSchema.safeParse(await response.json().catch(() => null))
-  if (!response.ok || !body.success) {
-    throw new ReflectError('auth', `Reflect Classic rejected the sign-in (${response.status})`)
-  }
-  return body.data.access_token
+  const body = await readResponse(response, '/api/oauth/token', tokenSchema, 'auth')
+  return body.access_token
 }
 
 async function getWithToken<T>(
@@ -130,11 +161,7 @@ async function getWithToken<T>(
   if (response.status === 401) {
     throw new ReflectError('auth', `Reflect Classic rejected the stored token (${path})`)
   }
-  const body = schema.safeParse(await response.json().catch(() => null))
-  if (!response.ok || !body.success) {
-    throw new ReflectError('network', `Reflect Classic answered ${response.status} (${path})`)
-  }
-  return body.data
+  return await readResponse(response, path, schema, 'network')
 }
 
 /** Reads the account and works out until when it unlocks Reflect Open. */

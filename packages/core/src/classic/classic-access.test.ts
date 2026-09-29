@@ -249,8 +249,9 @@ describe('signInWithClassic', () => {
     expect(paths).toEqual([])
   })
 
-  it('rejects a code that Reflect Classic does not accept', async () => {
+  it('rejects and logs a code that Reflect Classic does not accept', async () => {
     fakeKeychain()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { fetchFn } = fakeFetch({
       '/api/oauth/token': () => jsonResponse({ error: { type: 'error' } }, 400),
     })
@@ -258,6 +259,55 @@ describe('signInWithClassic', () => {
     await expect(
       signInWithClassic({ ephemeral: false, fetchFn, startWebAuth: approve }),
     ).rejects.toMatchObject({ kind: 'auth' })
+    expect(warn).toHaveBeenCalledWith('Reflect Classic answered 400 (/api/oauth/token)')
+  })
+
+  it('reports and logs an error status as a network failure', async () => {
+    fakeKeychain()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { fetchFn } = fakeFetch({
+      '/api/oauth/token': tokenRoute(),
+      '/api/users/me': () => jsonResponse({ error: { type: 'error' } }, 500),
+    })
+
+    await expect(
+      signInWithClassic({ ephemeral: false, fetchFn, startWebAuth: approve }),
+    ).rejects.toMatchObject({ kind: 'network' })
+    expect(warn).toHaveBeenCalledWith('Reflect Classic answered 500 (/api/users/me)')
+  })
+
+  it('reports and logs a body that is not JSON as a parse failure', async () => {
+    fakeKeychain()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { fetchFn } = fakeFetch({
+      '/api/oauth/token': tokenRoute(),
+      '/api/users/me': () => new Response('<html>oops</html>', { status: 200 }),
+    })
+
+    await expect(
+      signInWithClassic({ ephemeral: false, fetchFn, startWebAuth: approve }),
+    ).rejects.toMatchObject({ kind: 'parse' })
+    expect(warn).toHaveBeenCalledWith(
+      'Reflect Classic returned a body that is not JSON (/api/users/me)',
+      expect.any(SyntaxError),
+    )
+  })
+
+  it('reports and logs a body with an unexpected shape as a parse failure', async () => {
+    fakeKeychain()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { fetchFn } = fakeFetch({
+      '/api/oauth/token': tokenRoute(),
+      '/api/users/me': () => jsonResponse({ email: 'a@example.com' }),
+    })
+
+    await expect(
+      signInWithClassic({ ephemeral: false, fetchFn, startWebAuth: approve }),
+    ).rejects.toMatchObject({ kind: 'parse' })
+    expect(warn).toHaveBeenCalledWith(
+      'Reflect Classic returned an unexpected body (/api/users/me)',
+      expect.anything(),
+    )
   })
 })
 
