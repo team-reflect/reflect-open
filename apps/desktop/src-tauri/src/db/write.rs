@@ -116,19 +116,16 @@ pub(super) struct IndexedEmail {
     pub(super) email_key: String,
 }
 
-/// One GFM checkbox (Plan 18). `marker_offset` is the `[`'s character offset in
-/// the file (UTF-16 units) and, with `note_path`, the row's primary key.
+/// One round task, addressed by child indexes in its note body AST.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct IndexedTask {
-    pub(super) marker_offset: i64,
+    pub(super) ast_path: Vec<u64>,
+    /// Raw first-paragraph Markdown from the note, without `[ ]` or `[x]`.
     pub(super) text: String,
-    /// Parent outline/list item text, top-down, displayed in the Tasks view.
-    #[serde(default)]
+    /// Ancestor list-item labels, outermost first, for task grouping and context.
     pub(super) breadcrumbs: Vec<String>,
-    pub(super) raw: String,
     pub(super) checked: bool,
-    /// Explicit due date (first `[[YYYY-MM-DD]]` in the item), or None.
     pub(super) due_date: Option<String>,
 }
 
@@ -223,7 +220,7 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
     }
     {
         let mut stmt = conn.prepare_cached(
-            "INSERT INTO tasks(note_path, marker_offset, text, breadcrumbs, raw, checked, due_date) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO tasks(note_path, ast_path, text, checked, due_date, breadcrumbs) VALUES(?1, ?2, ?3, ?4, ?5, ?6)",
         )?;
         for task in &note.tasks {
             let breadcrumbs = serde_json::to_string(&task.breadcrumbs).map_err(|err| {
@@ -231,12 +228,13 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
             })?;
             stmt.execute(params![
                 note.path,
-                task.marker_offset,
+                serde_json::to_string(&task.ast_path).map_err(|err| {
+                    crate::error::AppError::io(format!("serialize task path: {err}"))
+                })?,
                 task.text,
-                breadcrumbs,
-                task.raw,
                 i64::from(task.checked),
-                task.due_date
+                task.due_date,
+                breadcrumbs
             ])?;
         }
     }

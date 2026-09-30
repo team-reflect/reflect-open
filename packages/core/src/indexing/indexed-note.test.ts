@@ -8,8 +8,8 @@ import {
 } from './indexed-note.ts'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that rebuilds has_content and the FTS body', () => {
-    expect(PROJECTION_VERSION).toBe(20)
+  it('carries the projection version that rebuilds task AST paths', () => {
+    expect(PROJECTION_VERSION).toBe(23)
   })
 
   it('flattens a parsed note into the index payload', () => {
@@ -277,18 +277,16 @@ describe('buildIndexedNote', () => {
     })
     expect(indexed.tasks).toEqual([
       {
-        markerOffset: source.indexOf('[ ]'),
-        text: 'buy milk',
+        astPath: [1],
         breadcrumbs: [],
-        raw: '[ ] buy milk',
+        text: 'buy milk',
         checked: false,
         dueDate: null,
       },
       {
-        markerOffset: source.indexOf('[x] call'),
-        text: 'call mum',
+        astPath: [5],
         breadcrumbs: [],
-        raw: '[x] call mum',
+        text: 'call mum',
         checked: true,
         dueDate: null,
       },

@@ -1,28 +1,14 @@
-import { dailyPath, taskDateBucket, type OpenTask } from '@reflect/core'
-import type { InsertTaskTarget } from '@/lib/tasks/task-insert-target.ts'
-import { sameTask, taskKey } from '@/lib/tasks/task-identity.ts'
+import {
+  dailyPath,
+  taskDateBucket,
+  type Task,
+  type TaskGroup,
+  type TaskStore,
+  type TaskTarget,
+} from '@reflect/core'
 
-/**
- * Shared Tasks-view navigation helpers (Plan 18, V1 parity). The keyboard
- * handler and the inline editor both move the selection between rows, add tasks,
- * and keep the active row on screen, so the small bits of logic they have in
- * common live here — one definition, no drift between the editing and
- * not-editing paths.
- */
-
-/** The note context a new task inherits when added next to `task` (V1: same note/group). */
-export function insertTargetForTask(task: OpenTask): InsertTaskTarget {
-  return {
-    notePath: task.notePath,
-    noteTitle: task.noteTitle,
-    dailyDate: task.dailyDate,
-    isPinned: task.isPinned,
-    pinnedOrder: task.pinnedOrder,
-  }
-}
-
-/** Today's daily note as an insert target — V1's "add to Today" / Current bucket. */
-export function todaysDailyTarget(today: string): InsertTaskTarget {
+/** Today's daily note as a target: V1's "add to Today" and the Current bucket. */
+export function todaysDailyTarget(today: string): TaskTarget {
   return {
     notePath: dailyPath(today),
     noteTitle: today,
@@ -32,42 +18,63 @@ export function todaysDailyTarget(today: string): InsertTaskTarget {
   }
 }
 
+function noteTarget(task: Task): TaskTarget {
+  return {
+    notePath: task.notePath,
+    noteTitle: task.noteTitle,
+    dailyDate: task.dailyDate,
+    isPinned: task.isPinned,
+    pinnedOrder: task.pinnedOrder,
+  }
+}
+
 /**
- * Where a task added next to `task` lands, by V1's **group-based** rule
- * (`insertIntoGroup`): a Current task adds to today's daily, an undated (note)
- * task adds to its own note, and Overdue/Upcoming refuse — those buckets
- * aggregate tasks across many notes, so "add here" has no single home (`null`).
+ * Where a group's "+ Add" adds a task (V1): Current adds to today's daily, a
+ * note group to that note. The aggregate Overdue and Upcoming buckets span
+ * many notes and show no add button.
  */
-export function insertTargetForBucket(task: OpenTask, today: string): InsertTaskTarget | null {
+export function addTargetForGroup(group: TaskGroup, today: string): TaskTarget | null {
+  if (group.kind === 'current') return todaysDailyTarget(today)
+  const first = group.tasks[0]
+  return group.kind === 'note' && first !== undefined ? noteTarget(first) : null
+}
+
+/**
+ * Return or Enter on `task` (V1 continuous entry): save its draft, then add
+ * the next task and return it to select. A task with breadcrumb context is
+ * continued inside that context, right below it; otherwise V1's bucket rule
+ * decides, and the aggregate buckets return null. Without a task, add to
+ * today's daily.
+ */
+export function continueFrom(store: TaskStore, task: Task | undefined, today: string): Task | null {
+  if (task === undefined) return store.create(todaysDailyTarget(today))
+  const saved = store.commitDraft(task)
+  if (saved && saved.breadcrumbs.length > 0 && saved.text.trim() !== '') {
+    return store.create({ ...noteTarget(saved), breadcrumbs: saved.breadcrumbs }, saved)
+  }
   switch (taskDateBucket(task, today)) {
     case 'current':
-      return todaysDailyTarget(today)
+      return store.create(todaysDailyTarget(today))
     case 'note':
-      return insertTargetForTask(task)
+      return store.create(noteTarget(task))
     default:
-      return null // overdue / upcoming — no single note to add into
+      return null
   }
 }
 
 /**
  * The key to select after deleting `task` (V1's `selectPreviousTask`): the row
- * just above it, or — when it was the first — the row just below (which becomes
- * the new first). `null` when it was the only row, so the caller clears.
+ * just above it, or, when it was the first, the row just below. Null when it
+ * was the only row.
  */
-export function previousTaskKey(ordered: readonly OpenTask[], task: OpenTask): string | null {
-  const index = ordered.findIndex((row) => sameTask(row, task))
-  if (index === -1) {
-    return null
-  }
+export function previousTaskKey(ordered: readonly Task[], task: Task): string | null {
+  const index = ordered.findIndex((row) => row.key === task.key)
+  if (index === -1) return null
   const previous = ordered[index === 0 ? 1 : index - 1]
-  return previous ? taskKey(previous) : null
+  return previous ? previous.key : null
 }
 
-/**
- * Bring the row carrying `key` into view (V1 scrolls the selection on every
- * keyboard move). `block: 'nearest'` mirrors V1 — no jump when it's already
- * visible. A no-op when the row isn't mounted or `root` is gone.
- */
+/** Bring the row carrying `key` into view without jumping when it is already visible. */
 export function scrollTaskIntoView(root: HTMLElement | null, key: string): void {
   const selector = `[data-task-key="${key.replaceAll('"', String.raw`\"`)}"]`
   root?.querySelector(selector)?.scrollIntoView({ block: 'nearest' })

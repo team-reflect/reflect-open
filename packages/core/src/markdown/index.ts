@@ -16,7 +16,6 @@ export {
   type MarkdownLink,
   type Heading,
   type AssetRef,
-  type TaskMarker,
   type ParsedNote,
 } from './model.ts'
 export {
@@ -40,20 +39,12 @@ export {
   appendBlock,
   appendListItem,
   type ListItemKind,
-  appendTaskLine,
-  appendTaskToContext,
   wikiLinkSafe,
-  editTaskLine,
-  removeTaskLine,
   setTaskDueDate,
   clearTaskDueDate,
-  taskLineToBullet,
-  toggleTaskMarker,
-  TaskStaleError,
 } from './edit.ts'
 export { retitleWikiLinks, type WikiLinkRetitleOptions } from './retitle.ts'
 export { displayNoteTitle, wikiLinkTargetForTitle } from './note-title.ts'
-export { parseTaskMarker } from './task-marker.ts'
 export {
   conflictMarkerBlockCount,
   conflictMarkerLabels,
@@ -82,3 +73,14 @@ export {
   type WikiLookup,
   type AsyncWikiLookup,
 } from './resolve.ts'
+
+export {
+  taskPathSchema,
+  decodeTaskPath,
+  encodeTaskPath,
+  compareTaskPaths,
+  type TaskAddress,
+} from './task-path.ts'
+export { inlineMarkdownToDisplayText } from './plain-text.ts'
+export { editTaskDocument, type NewTask, type TaskOp } from './task-mutation.ts'
+export { projectTasks } from './task-projection.ts'

@@ -7,31 +7,21 @@ import {
   useState,
   type ReactElement,
 } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Archive, CalendarClock, List, Search } from 'lucide-react'
-import type { OpenTask, TaskGroup } from '@reflect/core'
+import type { TaskGroup, TaskTarget } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
-import { useBridgeReady } from '@/hooks/use-bridge-ready.ts'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
-import { useRecentlyCompleted } from '@/lib/tasks/recently-completed.ts'
-import { sameTask, taskKey } from '@/lib/tasks/task-identity.ts'
-import type { InsertTaskTarget } from '@/lib/tasks/task-insert-target.ts'
+import { useTaskList } from '@/lib/tasks/use-task-list.ts'
 import { scrollTaskIntoView } from '@/lib/tasks/task-navigation.ts'
-import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
-import { useTaskRowHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
+import { useTaskCommands } from '@/lib/tasks/use-task-commands.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
 import { composeVisibleTaskGroups } from '@/lib/tasks/task-visibility.ts'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
-import { useTaskSelection } from '@/lib/tasks/use-task-selection.ts'
-import {
-  createCompletedTasksQueryOptions,
-  createOpenTasksQueryOptions,
-} from '@/lib/tasks/tasks-query.ts'
+import { useListSelection } from '@/lib/selection/use-list-selection.ts'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useToday } from '@/lib/use-today.ts'
 import type { ModClickEvent } from '@/lib/windows/open-in-new-window.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@/routing/route.ts'
 import { TaskFiltersMenu } from './task-filters-menu.tsx'
 import { TaskGroupSection } from './task-group-section.tsx'
@@ -67,12 +57,11 @@ function focusedSelectedKey(
  * selection opens the inline editor.
  *
  * Completing a task keeps it showing (struck) in place — V1's middle state — via
- * the session-scoped {@link useRecentlyCompleted} set, until "Archive" (⌘⇧↵)
+ * the task store, until "Archive" (⌘⇧↵)
  * hides this run's completed tasks. They stay `[x]` on disk and remain under the
  * "show archived" filter, which reveals the whole completed history.
  */
 export function TasksScreen(): ReactElement {
-  const { graph } = useGraph()
   const navigateNoteLink = useNoteLinkNavigation()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()
@@ -81,61 +70,34 @@ export function TasksScreen(): ReactElement {
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
-  const bridgeReady = useBridgeReady()
-  const enabled = bridgeReady && graph !== null
-
-  const { data: open, isError: openFailed } = useQuery({
-    ...createOpenTasksQueryOptions(graph?.root),
-    enabled,
-  })
-  const { data: completed, isError: completedFailed } = useQuery({
-    ...createCompletedTasksQueryOptions(graph?.root),
-    enabled: enabled && filters.archived,
-  })
-
-  // Either read failing surfaces the alert — a failed completed read must not
-  // leave `ready` stuck (and the list blank) just because its data never arrived.
-  // The completed error only counts while archived is on: TanStack keeps the last
-  // error on the disabled query, so turning archived off must clear it.
-  const isError = openFailed || (filters.archived && completedFailed)
-  // When archived is on, the list merges open + completed, so the empty state
-  // must wait for both — else a graph with only completed tasks flashes "No
-  // tasks to show." while the completed query is still loading.
-  const ready = open !== undefined && (!filters.archived || completed !== undefined)
+  const { store, tasks, ready, isError, recentCount } = useTaskList(filters.archived)
   const { onScroll } = useScrollRestoration(scrollElement, ready)
-
-  // This session's completed tasks, still showing struck until archived —
-  // reconciled against the open read so a task reopened at its source note
-  // sheds its struck shadow instead of masking the live row.
-  const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null, open)
 
   const needle = query.trim().toLowerCase()
   const groups = useMemo(
-    () => composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
-    [open, completed, recentlyCompleted, filters, needle, today],
+    () => composeVisibleTaskGroups({ tasks, filters, needle, today }),
+    [tasks, filters, needle, today],
   )
 
   // The flat, render-order list of tasks the selection and its shortcuts act on.
   const orderedTasks = useMemo(() => groups.flatMap((group) => group.tasks), [groups])
-  const orderedKeys = useMemo(() => orderedTasks.map(taskKey), [orderedTasks])
+  const orderedKeys = useMemo(() => orderedTasks.map((task) => task.key), [orderedTasks])
   const tasksByKey = useMemo(
-    () => new Map(orderedTasks.map((task) => [taskKey(task), task])),
+    () => new Map(orderedTasks.map((task) => [task.key, task])),
     [orderedTasks],
   )
-  const selection = useTaskSelection(orderedKeys)
+  const selection = useListSelection(orderedKeys)
   // Close the schedule popover when the selection it acts on goes away (e.g. a
   // reindex prunes the selected row): the toolbar trigger and the calendar unmount
   // together, so a lingering `scheduleOpen` would remount it open on re-select.
   if (scheduleOpen && selection.selectedCount === 0) {
     setScheduleOpen(false)
   }
-  const actions = useTaskActions()
   const scrollToKey = useCallback((key: string | null) => {
     if (key !== null) {
       scrollTaskIntoView(rootRef.current, key)
     }
   }, [])
-  const editHandlers = useTaskRowHandlers({ selection, actions, orderedTasks, today, scrollToKey })
   const selectedTaskKeys = selection.selected
   const activeTaskKey = selection.activeKey
   // Selection opens the focused task's inline editor, often after an async insert
@@ -144,70 +106,22 @@ export function TasksScreen(): ReactElement {
   useLayoutEffect(() => {
     scrollToKey(focusedSelectedKey(selectedTaskKeys, activeTaskKey))
   }, [activeTaskKey, orderedKeys, scrollToKey, selectedTaskKeys])
-  // The group headers' "+ Add" (V1): drop any search filter so the new row is
-  // visible, write it, then select it so its editor opens focused.
+  const commands = useTaskCommands({
+    store,
+    selection,
+    tasksByKey,
+    orderedTasks,
+    today,
+    scrollToKey,
+  })
+  // The group headers' "+ Add" (V1): drop any search filter so the new row is visible.
   const onAdd = useCallback(
-    (target: InsertTaskTarget) => {
+    (target: TaskTarget) => {
       setQuery('')
-      void actions.insert(target).then((created) => {
-        if (created !== null) {
-          const key = taskKey(created)
-          selection.clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
-          scrollToKey(key)
-        }
-      })
+      commands.add(target)
     },
-    [actions, selection, scrollToKey],
+    [commands],
   )
-  // The tasks behind the current selection's keys, in selection order — what the
-  // toolbar actions (schedule, convert) act on. A row whose key no longer
-  // resolves (pruned by a reindex) is dropped rather than acted on.
-  const selectedTasks = useCallback(
-    (): OpenTask[] =>
-      [...selection.selected]
-        .map((key) => tasksByKey.get(key))
-        .filter((task): task is OpenTask => task !== undefined),
-    [selection, tasksByKey],
-  )
-  const onSelectionCheckboxToggle = useCallback(
-    (task: OpenTask) => {
-      const tasks = selectedTasks()
-      if (tasks.length <= 1 || !tasks.some((selectedTask) => sameTask(selectedTask, task))) {
-        actions.checkboxToggle(task)
-        return
-      }
-      if (task.checked) {
-        actions.toggle(tasks.filter((selectedTask) => selectedTask.checked))
-      } else {
-        actions.complete(tasks)
-      }
-    },
-    [actions, selectedTasks],
-  )
-  // Schedule the current selection (the calendar / ⌘⇧S), then deselect (V1).
-  const onSchedule = useCallback(
-    (isoDate: string | null) => {
-      actions.schedule(selectedTasks(), isoDate)
-      selection.clear()
-    },
-    [actions, selection, selectedTasks],
-  )
-  // Convert the current selection to plain bullets (the toolbar / ⌘⇧K): the rows
-  // leave the Tasks view, so deselect after, like scheduling. When a single row is
-  // being inline-edited it holds a flush-then-convert trigger here — route through
-  // it so the unsaved draft is saved first, never written stale by the convert
-  // landing ahead of the editor's commit (the keyboard ⌘⇧K hits the editor's own
-  // keymap; this covers the toolbar button and an unfocused sole selection).
-  const convertControllerRef = useRef<(() => void) | null>(null)
-  const onConvertToBullet = useCallback(() => {
-    const convertEditing = convertControllerRef.current
-    if (convertEditing !== null) {
-      convertEditing()
-    } else {
-      actions.convertToBullet(selectedTasks())
-      selection.clear()
-    }
-  }, [actions, selection, selectedTasks])
   const openNote = useCallback(
     (path: string, event?: ModClickEvent) =>
       navigateNoteLink({
@@ -218,17 +132,12 @@ export function TasksScreen(): ReactElement {
   )
   useTaskKeyboard({
     selection,
-    actions,
-    tasksByKey,
-    orderedTasks,
+    commands,
     query,
     setQuery,
-    today,
     rootRef,
-    scrollToKey,
     onToggleFilters: () => setFiltersOpen((open) => !open),
     onToggleSchedule: () => setScheduleOpen((open) => !open),
-    onConvertToBullet,
   })
 
   // Move focus into the Tasks surface on mount so the shortcuts work the moment
@@ -264,7 +173,7 @@ export function TasksScreen(): ReactElement {
             open={scheduleOpen}
             onOpenChange={setScheduleOpen}
             today={today}
-            onSchedule={onSchedule}
+            onSchedule={commands.schedule}
           >
             <Button
               type="button"
@@ -283,7 +192,7 @@ export function TasksScreen(): ReactElement {
             type="button"
             variant="ghost"
             aria-label={`Convert to bullet ${selection.selectedCount}`}
-            onClick={onConvertToBullet}
+            onClick={commands.convert}
             title="Drop the checkbox, keeping the line as a plain bullet — leaves the Tasks list"
             className="window-drag-control text-xs text-text-muted"
           >
@@ -292,17 +201,17 @@ export function TasksScreen(): ReactElement {
             <TaskToolbarCountBadge count={selection.selectedCount} />
           </Button>
         ) : null}
-        {recentlyCompleted.length > 0 ? (
+        {recentCount > 0 ? (
           <Button
             type="button"
             variant="ghost"
-            aria-label={`Archive ${recentlyCompleted.length}`}
-            onClick={actions.archive}
+            aria-label={`Archive ${recentCount}`}
+            onClick={commands.archive}
             className="window-drag-control text-xs text-text-muted"
           >
             <Archive aria-hidden className="size-3.5" />
             Archive
-            <TaskToolbarCountBadge count={recentlyCompleted.length} />
+            <TaskToolbarCountBadge count={recentCount} />
           </Button>
         ) : null}
         <TaskFiltersMenu
@@ -328,12 +237,9 @@ export function TasksScreen(): ReactElement {
                 key={group.kind === 'note' ? `note:${group.notePath}` : group.kind}
                 group={group}
                 selection={selection}
-                editHandlers={editHandlers}
-                taskActionPending={actions.isPending}
-                onSelectionCheckboxToggle={onSelectionCheckboxToggle}
+                commands={commands}
                 today={today}
                 onAdd={onAdd}
-                convertControllerRef={convertControllerRef}
                 onOpen={openNote}
               />
             ))}

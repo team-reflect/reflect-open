@@ -61,6 +61,7 @@ vi.mock('@/editor/note-editor.tsx', async () => {
           setSelection: (position: 'start' | 'end') => {
             editorProbe.selectionCalls.push(position)
           },
+          isAtTextblockBoundary: () => true,
           getSelectedText: () => '',
           openSelectionMenu: () => {},
           startPendingReplacement: () => false,

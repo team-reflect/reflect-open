@@ -1,16 +1,12 @@
+import { LEZER_NODE_IDS, parseInline, type InlineElement } from '@meowdown/markdown'
 import type { Span } from './model.ts'
 
 /**
- * Plain-text rendering (Plan 03): turn a slice of markdown body into the text a
- * reader sees — emphasis/marker syntax dropped, wiki brackets/pipes flattened,
- * backslash escapes resolved, code spans kept literal. A display projection
- * and only that: it feeds the UI slots that render a plain string rather than
- * Markdown (the All Notes row preview, task rows and their breadcrumbs).
- *
- * The walk in `extract.ts` supplies two span sets in body coordinates: `cuts`
- * (syntax ranges to drop — `*emphasis*` marks, the `[ ]` TaskMarker, URLs) and
- * `literalRanges` (code regions whose backslashes stay verbatim). This module is
- * pure string surgery over those spans; it does no parsing of its own.
+ * Plain-text rendering (Plan 03): the text a reader sees once emphasis and
+ * marker syntax are dropped, wiki brackets and pipes are flattened, backslash
+ * escapes are resolved, and code spans are kept literal. It feeds the UI slots
+ * that render a plain string rather than Markdown (the All Notes row preview,
+ * task rows and their breadcrumbs).
  */
 
 // Inner of a wiki link, for plain-text rendering.
@@ -29,73 +25,98 @@ function renderMarkdownText(text: string): string {
     .replaceAll(MARKDOWN_ESCAPE_RE, '$1')
 }
 
-function appendPlainTextChunk(
-  body: string,
-  from: number,
-  to: number,
-  literalRanges: Span[],
-): string {
+/** Render `[from, to)`, keeping the literal (code) ranges verbatim. */
+function renderChunk(body: string, from: number, to: number, literalRanges: Span[]): string {
   let kept = ''
   let cursor = from
-  for (const literalRange of literalRanges) {
-    if (literalRange.to <= cursor) {
-      continue
-    }
-    if (literalRange.from >= to) {
-      break
-    }
-
-    const literalFrom = Math.max(cursor, literalRange.from)
-    const literalTo = Math.min(to, literalRange.to)
-    if (cursor < literalFrom) {
-      kept += renderMarkdownText(body.slice(cursor, literalFrom))
-    }
+  for (const literal of literalRanges) {
+    if (literal.to <= cursor) continue
+    if (literal.from >= to) break
+    const literalFrom = Math.max(cursor, literal.from)
+    const literalTo = Math.min(to, literal.to)
+    if (cursor < literalFrom) kept += renderMarkdownText(body.slice(cursor, literalFrom))
     kept += body.slice(literalFrom, literalTo)
     cursor = literalTo
   }
-  if (cursor < to) {
-    kept += renderMarkdownText(body.slice(cursor, to))
-  }
+  if (cursor < to) kept += renderMarkdownText(body.slice(cursor, to))
   return kept
 }
 
 /**
- * Plain text of `[start, end)` minus the cut (syntax) ranges, with wiki
- * brackets/pipes flattened. Shared by the whole-body plain text and per-task
- * text so a task renders exactly as the note's body does (emphasis marks and
- * the `[ ]` TaskMarker dropped, code kept literal).
+ * Body text minus the cut (syntax) ranges, with wiki brackets/pipes flattened.
+ * `cuts` are the syntax spans to drop (emphasis marks, task markers, URLs) and
+ * `literalRanges` the code regions whose backslashes stay verbatim, both in
+ * body coordinates.
  */
-export function plainTextOfRange(
-  body: string,
-  start: number,
-  end: number,
-  cuts: Span[],
-  literalRanges: Span[],
-): string {
-  const sorted = [...cuts].sort((a, b) => a.from - b.from)
-  const sortedLiteralRanges = [...literalRanges].sort((a, b) => a.from - b.from)
+export function buildPlainText(body: string, cuts: Span[], literalRanges: Span[]): string {
+  const sortedCuts = [...cuts].sort((a, b) => a.from - b.from)
+  const sortedLiterals = [...literalRanges].sort((a, b) => a.from - b.from)
   let kept = ''
-  let pos = start
-  for (const cut of sorted) {
-    if (cut.to <= start) {
-      continue
-    }
-    if (cut.from >= end) {
-      break
-    }
-    const cutFrom = Math.max(start, cut.from)
-    if (cutFrom > pos) {
-      kept += appendPlainTextChunk(body, pos, cutFrom, sortedLiteralRanges)
-    }
-    pos = Math.max(pos, Math.min(end, cut.to))
+  let pos = 0
+  for (const cut of sortedCuts) {
+    if (cut.to <= 0) continue
+    if (cut.from >= body.length) break
+    const cutFrom = Math.max(0, cut.from)
+    if (cutFrom > pos) kept += renderChunk(body, pos, cutFrom, sortedLiterals)
+    pos = Math.max(pos, Math.min(body.length, cut.to))
   }
-  if (pos < end) {
-    kept += appendPlainTextChunk(body, pos, end, sortedLiteralRanges)
-  }
+  if (pos < body.length) kept += renderChunk(body, pos, body.length, sortedLiterals)
   return kept.replaceAll(/\s+/g, ' ').trim()
 }
 
-/** Body text minus the cut (syntax) ranges, with wiki brackets/pipes flattened. */
-export function buildPlainText(body: string, cuts: Span[], literalRanges: Span[]): string {
-  return plainTextOfRange(body, 0, body.length, cuts, literalRanges)
+// Syntax-only nodes that render as nothing.
+const INLINE_MARKS = new Set<number>([
+  LEZER_NODE_IDS.EmphasisMark,
+  LEZER_NODE_IDS.LinkMark,
+  LEZER_NODE_IDS.StrikethroughMark,
+  LEZER_NODE_IDS.CodeMark,
+  LEZER_NODE_IDS.HighlightMark,
+  LEZER_NODE_IDS.InlineMathMark,
+  LEZER_NODE_IDS.WikilinkMark,
+  LEZER_NODE_IDS.WikiEmbedMark,
+])
+// Parts of a link that are not its label.
+const LINK_INTERNALS = new Set<number>([
+  LEZER_NODE_IDS.URL,
+  LEZER_NODE_IDS.LinkTitle,
+  LEZER_NODE_IDS.LinkLabel,
+])
+
+/** Render inline Markdown as a compact display string. */
+export function inlineMarkdownToDisplayText(markdown: string): string {
+  function render(
+    nodes: readonly InlineElement[],
+    from: number,
+    to: number,
+    literal = false,
+    link = false,
+  ): string {
+    let result = ''
+    let cursor = from
+    const text = (value: string) => (literal ? value : unescapeMarkdownText(value))
+    for (const node of nodes) {
+      result += text(markdown.slice(cursor, node.from))
+      if (node.type === LEZER_NODE_IDS.Wikilink || node.type === LEZER_NODE_IDS.WikiEmbed) {
+        const open = node.type === LEZER_NODE_IDS.WikiEmbed ? 3 : 2
+        const inner = markdown.slice(node.from + open, node.to - 2)
+        result += unescapeMarkdownText(
+          inner.includes('|') ? inner.slice(inner.indexOf('|') + 1) : inner,
+        )
+      } else if (!INLINE_MARKS.has(node.type) && !(link && LINK_INTERNALS.has(node.type))) {
+        result +=
+          node.children.length > 0
+            ? render(
+                node.children,
+                node.from,
+                node.to,
+                literal || node.type === LEZER_NODE_IDS.InlineCode,
+                node.type === LEZER_NODE_IDS.Link || node.type === LEZER_NODE_IDS.Image,
+              )
+            : text(markdown.slice(node.from, node.to))
+      }
+      cursor = node.to
+    }
+    return result + text(markdown.slice(cursor, to))
+  }
+  return render(parseInline(markdown), 0, markdown.length).replaceAll(/\s+/g, ' ').trim()
 }

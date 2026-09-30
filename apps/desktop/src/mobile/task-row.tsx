@@ -1,11 +1,10 @@
 import type { ReactElement } from 'react'
 import { ArrowRight, Circle, CircleCheck, Trash2 } from 'lucide-react'
-import type { OpenTask } from '@reflect/core'
+import type { Task } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
 import { TaskText } from '@/components/tasks/task-text.tsx'
 import { formatShortDate } from '@/lib/dates.ts'
-import { taskKey } from '@/lib/tasks/task-identity.ts'
-import { useTaskCheckboxToggle } from '@/lib/tasks/use-task-checkbox-toggle.ts'
+import { useTaskStore } from '@/lib/tasks/task-store.ts'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
@@ -16,11 +15,11 @@ import { useSettings } from '@/providers/settings-provider.tsx'
 const ACTION_WIDTH = SWIPE_ACTION_WIDTH * 2
 
 interface MobileTaskRowProps {
-  task: OpenTask
+  task: Task
   /** Show the source-note date — date buckets aggregate tasks from many notes. */
   showSource: boolean
   /** Open the quick-edit sheet for this task (V1 mobile: tap edits in place). */
-  onEdit: (task: OpenTask) => void
+  onEdit: (task: Task) => void
   revealed: boolean
   onReveal: () => void
   onClose: () => void
@@ -33,7 +32,7 @@ interface MobileTaskRowProps {
 
 /**
  * One task row on the mobile Tasks tab (V1 mobile design over Plan 18 data): a
- * round checkbox that toggles the task through the same guarded write-back as
+ * round checkbox that toggles the task through the task store, as on
  * desktop — with a light haptic, V1's check feedback — and the task content
  * rendered as markdown. A completed (struck) row stays visible until archived.
  * Tapping the row body gives the same light confirmation and opens the
@@ -53,8 +52,8 @@ export function MobileTaskRow({
   onDelete,
 }: MobileTaskRowProps): ReactElement {
   const { settings } = useSettings()
-  const { toggle, isPending } = useTaskCheckboxToggle(task)
-  const label = task.text || 'Empty task'
+  const store = useTaskStore()
+  const label = task.displayText || 'Empty task'
   const edit = (): void => onEdit(task)
   const swipe = useRowSwipe({
     actionWidth: ACTION_WIDTH,
@@ -65,7 +64,7 @@ export function MobileTaskRow({
   })
 
   return (
-    <li data-task-key={taskKey(task)} className="relative overflow-hidden border-b border-border">
+    <li data-task-key={task.key} className="relative overflow-hidden border-b border-border">
       <div
         className="absolute inset-y-0 right-0 flex"
         style={{ width: ACTION_WIDTH }}
@@ -120,10 +119,9 @@ export function MobileTaskRow({
         <button
           type="button"
           aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
-          disabled={isPending}
           onClick={() => {
             hapticImpactLight()
-            toggle()
+            store?.update(task, { checked: !task.checked })
           }}
           // A generous touch target around the small glyph; self-stretch keeps
           // the circle vertically centered in the row as task text wraps.

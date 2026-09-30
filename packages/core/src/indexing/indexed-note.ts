@@ -1,3 +1,4 @@
+import { taskPathSchema } from '../markdown/task-path.ts'
 import { z } from 'zod'
 import {
   markdownNoteReference,
@@ -96,8 +97,9 @@ import { serializeWikiSuggestionAddress } from './suggest.ts'
  * 20 - `notes.has_content` records whether a note would render blank, and
  * `search_fts.body` now carries the raw Markdown body, so every note must
  * reproject.
+ * 23 - AST task addresses and raw first-paragraph Markdown in the six-column projection.
  */
-export const PROJECTION_VERSION = 20
+export const PROJECTION_VERSION = 23
 
 /**
  * Precedence of the spellings a note answers to (`note_claims.tier`): the
@@ -178,14 +180,10 @@ export function decodeTaskBreadcrumbs(column: string): readonly string[] {
 }
 
 export const indexedTaskSchema = z.object({
-  /** Character offset of the marker's `[` in the file (UTF-16 units) — the row PK with `path`. */
-  markerOffset: z.number(),
-  /** Display/search text of the task's marker line, markdown stripped. */
   text: z.string(),
+  astPath: taskPathSchema,
   /** Parent outline/list item text, top-down, displayed in the Tasks view. */
   breadcrumbs: taskBreadcrumbsSchema,
-  /** The marker line verbatim — the surgical write-back's staleness guard. */
-  raw: z.string(),
   checked: z.boolean(),
   /** Explicit due date (first `[[YYYY-MM-DD]]` in the item), or null — drives Overdue. */
   dueDate: z.string().nullable(),
@@ -399,10 +397,9 @@ export function buildIndexedNote(
     // projection stores each path once.
     assets: [...new Set(parsed.assets.map((asset) => asset.path))],
     tasks: parsed.tasks.map((task) => ({
-      markerOffset: task.markerOffset,
+      astPath: task.astPath,
       text: task.text,
       breadcrumbs: task.breadcrumbs,
-      raw: task.raw,
       checked: task.checked,
       dueDate: task.dueDate,
     })),

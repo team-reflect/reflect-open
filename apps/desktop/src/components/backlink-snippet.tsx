@@ -1,13 +1,13 @@
 import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver.ts'
 import { resolveYouTubeVideo } from '@/editor/youtube-video-resolver.ts'
-import type { ReactElement } from 'react'
+import { useCallback, type ReactElement } from 'react'
+import { taskStore } from '@/lib/tasks/task-store.ts'
 import { MarkdownView } from '@meowdown/react'
 import type { WikilinkClickHandler } from '@meowdown/core'
-import type { SnippetTask } from '@reflect/core'
+import { indexedTaskKey, type SnippetTask } from '@reflect/core'
 import { useOpenExternalLink } from '@/editor/open-external-link.ts'
 import { resolveWikilink } from '@/editor/resolve-wikilink.ts'
 import { useNoteAttachments } from '@/editor/use-note-attachments.ts'
-import { useSnippetTaskToggle } from '@/hooks/use-snippet-task-toggle.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 
 interface BacklinkSnippetProps {
@@ -30,10 +30,7 @@ interface BacklinkSnippetProps {
  * renders unclamped: truncating would cut the nested structure the context
  * exists to show. The source's fold state must not hide it either:
  * `expandCollapsed` renders `+` collapsed items expanded at every depth.
- * Round `+ [ ]` task checkboxes are live — a click writes the
- * toggle through to the source note ({@link useSnippetTaskToggle}), old
- * Reflect's backlink-context behavior — while square GFM boxes stay read-only
- * (the `reflect-backlink-snippet` CSS keeps them inert-looking). Images and
+ * Addressed round checkboxes are editable. Images and
  * `![[embeds]]` resolve from the source note's folder, as in its editor. The
  * `reflect-editor` class shares the editor's chip styling; the
  * `reflect-backlink-snippet` wrapper keeps it in the panel's compact line box.
@@ -41,13 +38,36 @@ interface BacklinkSnippetProps {
 export function BacklinkSnippet({
   text,
   notePath,
-  tasks,
   onWikilinkClick,
+  tasks,
 }: BacklinkSnippetProps): ReactElement {
-  const generation = useGraph({ optional: true })?.graph?.generation ?? null
+  const graph = useGraph({ optional: true })?.graph
+  const generation = graph?.generation ?? null
+  const handleTaskClick = useCallback(
+    ({ index }: { index: number }) => {
+      const task = tasks[index]
+      if (!task?.address || !task.round || !graph) return
+      const store = taskStore(graph.root, graph.generation)
+      const row = store.current({
+        ...task.address,
+        key: indexedTaskKey(task.address.notePath, task.address.astPath),
+        text: task.text,
+        displayText: task.text,
+        checked: task.checked,
+        dueDate: null,
+        breadcrumbs: [],
+        noteTitle: notePath,
+        dailyDate: null,
+        isPinned: false,
+        pinnedOrder: null,
+        updatedAt: 0,
+      })
+      store.update(row, { checked: !row.checked })
+    },
+    [tasks, graph, notePath],
+  )
   const { resolveImageUrl, resolveWikiEmbed } = useNoteAttachments(generation, notePath)
   const resolveXPost = useXPostResolver()
-  const onTaskClick = useSnippetTaskToggle(notePath, tasks)
   const openExternalLink = useOpenExternalLink()
   return (
     <div className="reflect-backlink-snippet select-text text-xs text-text">
@@ -57,11 +77,11 @@ export function BacklinkSnippet({
         mediaUrlProtocols={X_MEDIA_URL_PROTOCOLS}
         className="reflect-editor"
         markdown={text}
+        onTaskClick={handleTaskClick}
         expandCollapsed
         resolveWikilink={resolveWikilink}
         onWikilinkClick={onWikilinkClick}
         onLinkClick={openExternalLink}
-        {...(onTaskClick ? { onTaskClick } : {})}
         resolveImageUrl={resolveImageUrl}
         resolveWikiEmbed={resolveWikiEmbed}
       />

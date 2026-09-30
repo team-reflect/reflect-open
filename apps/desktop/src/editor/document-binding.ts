@@ -42,6 +42,7 @@ import type { RenameCoordinator } from './rename-coordinator.ts'
  */
 
 export interface BindFactories {
+  generation?: () => number | null
   /** Build the session; receives the coordinator its `onContent` feeds. */
   session: (coordinator: RenameCoordinator | null) => NoteSession
   coordinator: () => RenameCoordinator | null
@@ -121,6 +122,7 @@ export function createDocumentBinding(): DocumentBinding {
       // quit-time flush, settle-time rename work, and reopened-note lookups.
       unregister = registerOpenDocument({
         session: bound,
+        ...(create.generation ? { generation: create.generation } : {}),
         ...(owner ? { settle: () => owner.settle(), settled: () => owner.settled() } : {}),
       })
       return { session: bound, coordinator: owner, created: adopted === null }

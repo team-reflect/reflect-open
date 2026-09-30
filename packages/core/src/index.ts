@@ -13,3 +13,11 @@ export * from './exports/platform.ts'
 export * from './exports/ai-actions.ts'
 export * from './exports/link-preview.ts'
 export * from './exports/sync-markdown-indexing.ts'
+export {
+  TaskStore,
+  indexedTaskKey,
+  type Task,
+  type TaskPatch,
+  type TaskStoreIO,
+  type TaskTarget,
+} from './tasks/task-store.ts'

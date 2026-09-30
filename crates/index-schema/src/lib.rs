@@ -23,7 +23,7 @@ pub const INDEX_FILE: &str = "index.sqlite";
 /// `user_version` after every migration has run. Read-only consumers compare
 /// this against `PRAGMA user_version` to detect an index written by a newer
 /// (or older) app than they were built for.
-pub const LATEST_SCHEMA_VERSION: usize = 22;
+pub const LATEST_SCHEMA_VERSION: usize = 23;
 
 /// The `index_meta` key holding the TS-owned projection version (the rows'
 /// derivation version, distinct from the schema version above).
@@ -67,6 +67,7 @@ mod schema {
             )),
             M::up(include_str!("../migrations/0021_note_has_content.sql")),
             M::up(include_str!("../migrations/0022_drop_note_text.sql")),
+            M::up(include_str!("../migrations/0023_task_paragraph.sql")),
         ])
     });
 
@@ -212,6 +213,91 @@ mod schema {
         #[test]
         fn migrations_are_valid() {
             validate().unwrap();
+        }
+
+        #[test]
+        fn task_ast_upgrade_rebuilds_master_without_losing_chat() {
+            for version in [22] {
+                let mut conn = open_in_memory().unwrap();
+                migrate_to(&mut conn, version).unwrap();
+                conn.execute_batch(
+                    "INSERT INTO notes(path, title, title_key, file_hash) VALUES('a.md', 'A', 'a', 'h');
+                     INSERT INTO tasks(note_path, marker_offset, text, raw, checked) VALUES('a.md', 2, 'old', '[ ] old', 0);
+                     INSERT INTO index_meta(key, value) VALUES('projection_version', '21');
+                     INSERT INTO chat_conversations(id, title, created_ms, updated_ms) VALUES('chat', 'Keep', 1, 1);
+                     INSERT INTO chat_messages(id, conversation_id, seq, user_text, attachments, parts, response_messages, created_ms)
+                     VALUES('message', 'chat', 0, 'Keep this', '[]', '[]', '[]', 1);",
+                ).unwrap();
+
+                migrate(&mut conn).unwrap();
+                let columns: Vec<String> = conn
+                    .prepare("PRAGMA table_info(tasks)")
+                    .unwrap()
+                    .query_map([], |row| row.get(1))
+                    .unwrap()
+                    .map(Result::unwrap)
+                    .collect();
+                assert_eq!(
+                    columns,
+                    [
+                        "note_path",
+                        "ast_path",
+                        "text",
+                        "checked",
+                        "due_date",
+                        "breadcrumbs"
+                    ]
+                );
+                for (table, count) in [
+                    ("tasks", 0),
+                    ("notes", 1),
+                    ("chat_conversations", 1),
+                    ("chat_messages", 1),
+                ] {
+                    let actual: i64 = conn
+                        .query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
+                            row.get(0)
+                        })
+                        .unwrap();
+                    assert_eq!(actual, count);
+                }
+                let stamps: i64 = conn
+                    .query_row(
+                        "SELECT count(*) FROM index_meta WHERE key = 'projection_version'",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .unwrap();
+                assert_eq!(stamps, 0);
+            }
+        }
+
+        #[test]
+        fn failed_task_ast_upgrade_rolls_back_and_can_retry() {
+            let mut conn = open_in_memory().unwrap();
+            migrate_to(&mut conn, 22).unwrap();
+            conn.execute_batch(
+                "INSERT INTO notes(path, title, title_key, file_hash) VALUES('a.md', 'A', 'a', 'h');
+                 INSERT INTO tasks(note_path, marker_offset, text, raw, checked) VALUES('a.md', 2, 'old', '[ ] old', 0);
+                 DROP INDEX tasks_completed_by_note;
+                 CREATE INDEX tasks_completed_by_note ON notes(file_hash);",
+            ).unwrap();
+            assert!(migrate(&mut conn).is_err());
+            let version: i64 = conn
+                .query_row("PRAGMA user_version", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(version, 22);
+            let offset: i64 = conn
+                .query_row("SELECT marker_offset FROM tasks", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(offset, 2);
+            conn.execute_batch("DROP INDEX tasks_completed_by_note;")
+                .unwrap();
+            migrate(&mut conn).unwrap();
+            let count: i64 = conn
+                .query_row("SELECT count(*) FROM tasks", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(count, 0);
         }
 
         #[test]

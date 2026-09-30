@@ -1,8 +1,0 @@
-import { clearTaskDueDate, setTaskDueDate, type OpenTask } from '@reflect/core'
-import { taskContent } from '@/lib/tasks/task-content.ts'
-
-/** Return the task content after setting or clearing its scheduled date link. */
-export function scheduledContent(task: OpenTask, isoDate: string | null): string {
-  const content = taskContent(task.raw)
-  return isoDate === null ? clearTaskDueDate(content) : setTaskDueDate(content, isoDate)
-}

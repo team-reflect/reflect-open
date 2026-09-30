@@ -646,8 +646,7 @@ describe('getOpenTasks', () => {
     mockInvoke.mockResolvedValue([
       {
         note_path: 'notes/project.md',
-        marker_offset: 12,
-        raw: '[ ] ship it',
+        ast_path: '[2,1]',
         text: 'ship it',
         breadcrumbs: '["StartupToolbox","Reflections"]',
         checked: 0,
@@ -662,10 +661,11 @@ describe('getOpenTasks', () => {
 
     await expect(getOpenTasks()).resolves.toEqual([
       {
+        key: 'notes/project.md#[2,1]',
         notePath: 'notes/project.md',
-        markerOffset: 12,
-        raw: '[ ] ship it',
+        astPath: [2, 1],
         text: 'ship it',
+        displayText: 'ship it',
         breadcrumbs: ['StartupToolbox', 'Reflections'],
         checked: false,
         dueDate: null,

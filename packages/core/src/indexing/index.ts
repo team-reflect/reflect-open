@@ -23,7 +23,11 @@ export {
 } from './file-changes.ts'
 export { setLocalWriteEcho, subscribeOwnWrites } from './local-write-echo.ts'
 export { subscribeIcloudConflicts, subscribeIcloudWatchFailed } from './icloud-conflicts.ts'
-export { subscribeIndexApplied, type IndexAppliedListener } from './index-applied.ts'
+export {
+  emitIndexApplied,
+  subscribeIndexApplied,
+  type IndexAppliedListener,
+} from './index-applied.ts'
 export { INDEX_WRITTEN_EVENT, subscribeIndexWritten } from './index-written.ts'
 export { NOTE_MOVED_EVENT, subscribeNoteMoved } from './note-moved.ts'
 export {
@@ -91,7 +95,6 @@ export {
   type DailyNotesRange,
   type DuplicateIdGroup,
   type NoteRow,
-  type OpenTask,
   type PinnedNote,
   type TagSuggestion,
   type WikiLinkSuggestionResult,

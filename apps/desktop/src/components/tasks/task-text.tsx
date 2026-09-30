@@ -1,19 +1,17 @@
 import type { ReactElement } from 'react'
-import type { OpenTask } from '@reflect/core'
-import { MarkdownPreview } from '@/editor/markdown-preview.tsx'
-import { taskContent } from '@/lib/tasks/task-content.ts'
+import { MarkdownInlineView } from '@meowdown/react'
+import type { Task } from '@reflect/core'
+import { resolveWikilink } from '@/editor/resolve-wikilink.ts'
 
-/**
- * Render a task's content (its source line minus the checkbox marker) through
- * Reflect's read-only markdown preview. The focused row swaps this for the
- * inline editor; unfocused rows should look like rendered markdown, not raw
- * source text.
- */
-export function TaskText({ task }: { task: OpenTask }): ReactElement {
+/** Render the first paragraph as inline Markdown. */
+export function TaskText({ task }: { task: Task }): ReactElement {
   return (
-    <MarkdownPreview
-      content={taskContent(task.raw)}
-      className="reflect-task-preview pointer-events-none text-sm"
+    <MarkdownInlineView
+      markdown={task.text}
+      resolveWikilink={resolveWikilink}
+      markMode="hide"
+      interactive={false}
+      className="reflect-editor reflect-task-preview pointer-events-none text-sm"
     />
   )
 }

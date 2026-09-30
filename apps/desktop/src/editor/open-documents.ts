@@ -19,10 +19,21 @@ import type { NoteSession } from './note-session.ts'
 
 export interface OpenDocument {
   session: NoteSession
+  generation?: () => number | null
   /** Fire pending settle-time work (title renames) now. */
   settle?: () => void
   /** Resolves once fired settle-time work has landed. */
   settled?: () => Promise<void>
+}
+
+const pendingWriters = new Set<() => Promise<void>>()
+
+/** Register background writes that must settle before shutdown. */
+export function registerPendingWriter(flush: () => Promise<void>): () => void {
+  pendingWriters.add(flush)
+  return () => {
+    pendingWriters.delete(flush)
+  }
 }
 
 const documents = new Map<string, OpenDocument>()
@@ -46,8 +57,11 @@ export function registerOpenDocument(document: OpenDocument): () => void {
 }
 
 /** The live session for `path`, if that note is open in some pane. */
-export function openSession(path: string): NoteSession | null {
-  return documents.get(path)?.session ?? null
+export function openSession(path: string, generation?: number): NoteSession | null {
+  const document = documents.get(path)
+  return document && (generation === undefined || document.generation?.() === generation)
+    ? document.session
+    : null
 }
 
 /**
@@ -102,6 +116,7 @@ export function retargetOpenDocument(from: string, to: string, session: NoteSess
  * absorbed, never re-thrown.
  */
 export async function flushOpenDocuments(): Promise<void> {
+  await Promise.allSettled([...pendingWriters].map((flush) => flush()))
   await Promise.allSettled(
     [...documents.values()].map(async (document) => {
       await document.session.flush()

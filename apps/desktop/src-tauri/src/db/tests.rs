@@ -135,11 +135,10 @@ fn moved_address(to: &str) -> MovedNoteAddress {
     }
 }
 
-fn task(marker_offset: i64, text: &str, checked: bool) -> IndexedTask {
+fn task(child_index: u64, text: &str, checked: bool) -> IndexedTask {
     IndexedTask {
-        marker_offset,
+        ast_path: vec![child_index],
         text: text.to_string(),
-        raw: format!("[{}] {text}", if checked { "x" } else { " " }),
         breadcrumbs: vec![],
         checked,
         due_date: None,
@@ -893,12 +892,12 @@ fn apply_note_inserts_tasks_and_replace_clears_them() {
 
     let rows = run_query(
         &conn,
-        "SELECT marker_offset, text, breadcrumbs, checked, due_date FROM tasks WHERE note_path = 'notes/a.md' ORDER BY marker_offset",
+        "SELECT ast_path, text, breadcrumbs, checked, due_date FROM tasks WHERE note_path = 'notes/a.md' ORDER BY checked",
         &[],
     )
     .unwrap();
     assert_eq!(rows.len(), 2);
-    assert_eq!(rows[0]["marker_offset"], Value::from(4));
+    assert_eq!(rows[0]["ast_path"], Value::from("[4]"));
     assert_eq!(rows[0]["text"], Value::from("buy milk"));
     assert_eq!(rows[0]["breadcrumbs"], Value::from("[]"));
     assert_eq!(rows[0]["checked"], Value::from(0));
@@ -954,7 +953,7 @@ fn open_tasks_read_includes_private_notes_and_excludes_completed() {
         &conn,
         "SELECT tasks.note_path, tasks.text, notes.title AS note_title, notes.daily_date \
          FROM tasks INNER JOIN notes ON notes.path = tasks.note_path \
-         WHERE tasks.checked = 0 ORDER BY tasks.note_path, tasks.marker_offset",
+         WHERE tasks.checked = 0 ORDER BY tasks.note_path",
         &[],
     )
     .unwrap();

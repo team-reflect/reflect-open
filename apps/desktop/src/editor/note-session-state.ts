@@ -1,14 +1,9 @@
 import {
   appendBlock,
   detectConflictMarkers,
-  editTaskLine,
   errorMessage,
   isAppError,
-  removeTaskLine,
-  taskLineToBullet,
-  toggleTaskMarker,
   upsertFrontmatter,
-  type TaskMarker,
 } from '@reflect/core'
 import { splitDoc } from './note-session-doc.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
@@ -440,13 +435,22 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
    * refreshes promptly. Returns false when the session can't safely take a body
    * edit (no write channel, disposed, protected/read-only, still loading, or a
    * parked conflict) so the caller refuses rather than clobber the buffer via disk.
-   * `transform` runs before any mutation, so a `TaskStaleError` (the marker can't
-   * be located) propagates with nothing changed. And the write is all-or-nothing:
+   * `transform` runs before any mutation; a thrown error leaves the buffer unchanged.
    * a failed flush reverts the in-memory edit so the editor and the Tasks list
    * can't diverge, then re-throws the failure.
    */
-  async function commitBodyEdit(transform: (full: string) => string): Promise<boolean> {
-    if (io.write === null || disposed || isProtected || status !== 'ready' || conflict !== null) {
+  async function commitBodyEdit(
+    transform: (full: string) => string,
+    onApplied?: (source: string) => void,
+  ): Promise<boolean> {
+    if (
+      io.write === null ||
+      disposed ||
+      deleting ||
+      isProtected ||
+      status !== 'ready' ||
+      conflict !== null
+    ) {
       return false
     }
     reconcilePendingEditorInput?.()
@@ -456,6 +460,11 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     header = doc.header
     buffer = doc.body
     applyToEditor(doc.body) // the open editor shows the edited line
+    // `applyToEditor` dispatches synchronously, and the editor's change handler
+    // may normalize `buffer` on the way, so the revert below compares against
+    // what was actually applied rather than `doc.body`.
+    const appliedBuffer = buffer
+    const appliedSource = header + buffer
     dirty = header + buffer !== disk
     // A no-op edit (transform changed nothing) writes nothing, so a *prior*
     // surfaced save error must not be mistaken for this edit's failure.
@@ -464,10 +473,10 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     await flush()
     // `flush()` resolves even when the write failed (captured in `error`, not
     // thrown). Revert and surface the failure: it persists, or nothing changes.
-    if (shouldPersist && error !== null) {
-      const message = error
+    if (shouldPersist && (error !== null || conflict !== null)) {
+      const message = error ?? 'The note changed on disk. Resolve its conflict before retrying.'
       if (header === doc.header) header = previousHeader
-      if (buffer === doc.body) {
+      if (buffer === appliedBuffer) {
         buffer = previousBuffer
         applyToEditor(previousBuffer)
       }
@@ -476,23 +485,8 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       emit()
       throw new Error(message)
     }
+    onApplied?.(appliedSource)
     return true
-  }
-
-  function commitTaskToggle(task: TaskMarker): Promise<boolean> {
-    return commitBodyEdit((full) => toggleTaskMarker(full, task).source)
-  }
-
-  function commitTaskEdit(task: TaskMarker, content: string): Promise<boolean> {
-    return commitBodyEdit((full) => editTaskLine(full, task, content))
-  }
-
-  function commitTaskRemove(task: TaskMarker): Promise<boolean> {
-    return commitBodyEdit((full) => removeTaskLine(full, task))
-  }
-
-  function commitTaskToBullet(task: TaskMarker): Promise<boolean> {
-    return commitBodyEdit((full) => taskLineToBullet(full, task))
   }
 
   function commitBodyAppend(block: string): Promise<boolean> {
@@ -558,10 +552,6 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     cancelDelete,
     updateFrontmatter,
     commitFrontmatter,
-    commitTaskToggle,
-    commitTaskEdit,
-    commitTaskRemove,
-    commitTaskToBullet,
     commitBodyAppend,
     commitSourceEdit: commitBodyEdit,
     dispose,

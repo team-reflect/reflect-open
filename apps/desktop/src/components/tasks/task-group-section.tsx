@@ -1,11 +1,10 @@
-import { Fragment, type MutableRefObject, type ReactElement } from 'react'
+import { Fragment, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
-import { groupTaskContexts, type OpenTask, type TaskGroup } from '@reflect/core'
-import { addTargetForGroup, taskGroupHeaderStyle } from '@/lib/tasks/task-group-presentation.tsx'
-import type { InsertTaskTarget } from '@/lib/tasks/task-insert-target.ts'
-import { taskKey } from '@/lib/tasks/task-identity.ts'
-import type { TaskSelection } from '@/lib/tasks/use-task-selection.ts'
-import type { TaskRowEditHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
+import { groupTaskContexts, type TaskGroup, type TaskTarget } from '@reflect/core'
+import { taskGroupHeaderStyle } from '@/lib/tasks/task-group-presentation.tsx'
+import { addTargetForGroup } from '@/lib/tasks/task-navigation.ts'
+import type { ListSelection } from '@/lib/selection/use-list-selection.ts'
+import type { TaskCommands } from '@/lib/tasks/use-task-commands.ts'
 import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/lib/windows/open-in-new-window.ts'
 import { TaskBreadcrumbs } from './task-breadcrumbs.tsx'
@@ -13,19 +12,13 @@ import { TaskRow } from './task-row.tsx'
 
 interface TaskGroupSectionProps {
   group: TaskGroup
-  selection: TaskSelection
-  /** The inline-editor callbacks for a row, built once by the screen. */
-  editHandlers: (task: OpenTask) => TaskRowEditHandlers
-  /** Whether a Tasks-view write is already in flight. */
-  taskActionPending: boolean
-  /** Complete/reopen the selected rows using the clicked task's next checkbox state. */
-  onSelectionCheckboxToggle: (task: OpenTask) => void
+  selection: ListSelection
+  /** The view's task commands, shared by every row. */
+  commands: TaskCommands
   /** Today's ISO date — the Current group's "+ Add" targets today's daily. */
   today: string
   /** Add a task to this group and open its editor (the header's "+ Add", V1). */
-  onAdd: (target: InsertTaskTarget) => void
-  /** Holds the editing row's flush-then-convert trigger for the toolbar button. */
-  convertControllerRef: MutableRefObject<(() => void) | null>
+  onAdd: (target: TaskTarget) => void
   onOpen: (notePath: string, event?: ModClickEvent) => void
 }
 
@@ -38,12 +31,9 @@ interface TaskGroupSectionProps {
 export function TaskGroupSection({
   group,
   selection,
-  editHandlers,
-  taskActionPending,
-  onSelectionCheckboxToggle,
+  commands,
   today,
   onAdd,
-  convertControllerRef,
   onOpen,
 }: TaskGroupSectionProps): ReactElement {
   const showSource = group.kind !== 'note'
@@ -88,13 +78,13 @@ export function TaskGroupSection({
           contexts.map((context) => {
             const firstTask = context.tasks[0]!
             return (
-              <Fragment key={taskKey(firstTask)}>
+              <Fragment key={firstTask.key}>
                 <TaskBreadcrumbs
                   breadcrumbs={context.visibleBreadcrumbs}
-                  onSelect={() => selection.select(context.tasks.map(taskKey))}
+                  onSelect={() => selection.select(context.tasks.map((task) => task.key))}
                 />
                 {context.tasks.map((task) => {
-                  const key = taskKey(task)
+                  const key = task.key
                   const selected = selection.isSelected(key)
                   return (
                     <TaskRow
@@ -103,12 +93,8 @@ export function TaskGroupSection({
                       showSource={showSource}
                       selected={selected}
                       editing={selection.isSoleSelected(key)}
-                      taskActionPending={taskActionPending}
-                      togglesSelection={selected && selection.selectedCount > 1}
                       onSelect={(event) => selection.clickSelect(key, event)}
-                      onSelectionCheckboxToggle={() => onSelectionCheckboxToggle(task)}
-                      {...editHandlers(task)}
-                      convertControllerRef={convertControllerRef}
+                      commands={commands}
                       onOpen={onOpen}
                     />
                   )

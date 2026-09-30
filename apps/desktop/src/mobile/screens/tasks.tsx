@@ -1,21 +1,12 @@
 import { useDeferredValue, useMemo, useRef, useState, type ReactElement } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Archive, CircleCheck, Plus, SlidersHorizontal } from 'lucide-react'
-import type { OpenTask } from '@reflect/core'
+import type { Task, TaskTarget } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
-import { useBridgeReady } from '@/hooks/use-bridge-ready.ts'
-import { useRecentlyCompleted } from '@/lib/tasks/recently-completed.ts'
-import { taskKey } from '@/lib/tasks/task-identity.ts'
+import { useTaskList } from '@/lib/tasks/use-task-list.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
-import type { InsertTaskTarget } from '@/lib/tasks/task-insert-target.ts'
 import { todaysDailyTarget } from '@/lib/tasks/task-navigation.ts'
 import { composeVisibleTaskGroups } from '@/lib/tasks/task-visibility.ts'
-import {
-  createCompletedTasksQueryOptions,
-  createOpenTasksQueryOptions,
-} from '@/lib/tasks/tasks-query.ts'
-import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { SearchInput } from '@/mobile/search-input.tsx'
@@ -24,7 +15,6 @@ import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer.tsx'
 import { MobileTaskGroup } from '@/mobile/task-group.tsx'
 import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@/routing/route.ts'
 import { useRouter } from '@/routing/router.tsx'
 
@@ -33,7 +23,6 @@ import { useRouter } from '@/routing/router.tsx'
  * open task across the graph in desktop's exact groups — Current / Overdue /
  * Upcoming, then per-note — via the same queries, grouping
  * ({@link composeVisibleTaskGroups}) and optimistic mutations
- * ({@link useTaskActions}) the desktop view uses; this screen adds only the
  * touch surface. Task taps, toggles, adds, filters, scheduling, and archival
  * get light haptics; tapping a row opens the quick-edit sheet (edit / schedule /
  * complete / convert / open note) instead of desktop's multi-select; the filter
@@ -44,7 +33,6 @@ import { useRouter } from '@/routing/router.tsx'
  * completed tasks.
  */
 export function MobileTasks(): ReactElement {
-  const { graph } = useGraph()
   const { navigate, arrivalSeq, arrivalFocusEditor } = useRouter()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()
@@ -55,13 +43,11 @@ export function MobileTasks(): ReactElement {
   const [revealedTaskKey, setRevealedTaskKey] = useState<string | null>(null)
   // The sheet's task sticks around after close so the exit animation has
   // content; `sheetOpen` alone drives visibility.
-  const [editingTask, setEditingTask] = useState<OpenTask | null>(null)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   // Whether the current sheet visit should open with the editor focused
   // (keyboard up) — set per visit: true for "+"-added tasks, false for row taps.
   const [autoFocusEditor, setAutoFocusEditor] = useState(false)
-  const bridgeReady = useBridgeReady()
-  const enabled = bridgeReady && graph !== null
 
   // The Tasks-tab double-tap lands in the tab's capture surface: its live
   // search filter, selected so a replacement query can start immediately.
@@ -72,19 +58,7 @@ export function MobileTasks(): ReactElement {
     selectText: true,
   })
 
-  const { data: open, isError: openFailed } = useQuery({
-    ...createOpenTasksQueryOptions(graph?.root),
-    enabled,
-  })
-  const { data: completed, isError: completedFailed } = useQuery({
-    ...createCompletedTasksQueryOptions(graph?.root),
-    enabled: enabled && filters.archived,
-  })
-  const isError = openFailed || (filters.archived && completedFailed)
-  const ready = open !== undefined && (!filters.archived || completed !== undefined)
-
-  const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null, open)
-  const actions = useTaskActions()
+  const { store, enabled, tasks, ready, isError, recentCount } = useTaskList(filters.archived)
 
   // Defer the needle like the All tab defers its query: fast typing coalesces
   // while the input stays live. A cleared query applies immediately — the "+"
@@ -93,25 +67,20 @@ export function MobileTasks(): ReactElement {
   const deferredQuery = useDeferredValue(query)
   const needle = (query === '' ? '' : deferredQuery).trim().toLowerCase()
   const groups = useMemo(
-    () => composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
-    [open, completed, recentlyCompleted, filters, needle, today],
+    () => composeVisibleTaskGroups({ tasks, filters, needle, today }),
+    [tasks, filters, needle, today],
   )
 
-  // The sheet edits the task's *live* row, not the snapshot taken when it
-  // opened: a mutation or reindex can rewrite the row (raw, checked) while
-  // `editingTask` is set, and acting on the stale copy could flip a marker the
-  // wrong way or trip the write-back guard needlessly. Fall back to the
-  // snapshot when the row left the lists — the raw-match guard then refuses
-  // any write that no longer applies.
+  // The sheet edits the task's live row: the store or a reindex can rewrite it
+  // while the sheet is open. A row that left the list was deleted or converted,
+  // so the sheet closes with it.
   const liveEditingTask = useMemo(() => {
-    if (editingTask === null) {
-      return null
-    }
-    const key = taskKey(editingTask)
-    return groups.flatMap((group) => group.tasks).find((row) => taskKey(row) === key) ?? editingTask
+    if (editingTask === null) return null
+    return groups.flatMap((group) => group.tasks).find((row) => row.key === editingTask.key) ?? null
   }, [groups, editingTask])
+  if (sheetOpen && editingTask !== null && liveEditingTask === null) setSheetOpen(false)
 
-  const editTask = (task: OpenTask, options?: { autoFocus?: boolean; haptic?: boolean }): void => {
+  const editTask = (task: Task, options?: { autoFocus?: boolean; haptic?: boolean }): void => {
     if (options?.haptic !== false) {
       hapticImpactLight()
     }
@@ -123,19 +92,18 @@ export function MobileTasks(): ReactElement {
   // The group headers' "+" (V1): drop any search filter so the new row is
   // visible, write it, then open its quick-edit sheet with the editor focused
   // so typing starts immediately.
-  const onAdd = (target: InsertTaskTarget): void => {
+  const onAdd = (target: TaskTarget): void => {
     hapticImpactLight()
     setQuery('')
-    void actions.insert(target).then((created) => {
-      if (created !== null) {
-        editTask(created, { autoFocus: true, haptic: false })
-      }
-    })
+    const created = store?.create(target)
+    if (created) {
+      editTask(created, { autoFocus: true, haptic: false })
+    }
   }
 
   const archiveCompleted = (): void => {
     hapticImpactLight()
-    actions.archive()
+    store?.archive()
   }
 
   return (
@@ -152,9 +120,9 @@ export function MobileTasks(): ReactElement {
             value={query}
             onValueChange={setQuery}
           />
-          {recentlyCompleted.length > 0 ? (
+          {recentCount > 0 ? (
             <MobileTopBarIconButton
-              aria-label={`Archive ${recentlyCompleted.length} completed`}
+              aria-label={`Archive ${recentCount} completed`}
               onClick={archiveCompleted}
             >
               <Archive />
@@ -206,7 +174,7 @@ export function MobileTasks(): ReactElement {
               onAdd={onAdd}
               onEdit={editTask}
               onOpen={(path) => navigate(routeForPath(path))}
-              onDelete={(task) => actions.remove([task])}
+              onDelete={(task) => store?.update(task, { gone: 'removed' })}
               revealedTaskKey={revealedTaskKey}
               setRevealedTaskKey={setRevealedTaskKey}
             />
@@ -226,12 +194,11 @@ export function MobileTasks(): ReactElement {
       </Button>
       {liveEditingTask !== null ? (
         <MobileTaskEditSheet
-          key={taskKey(liveEditingTask)}
+          key={liveEditingTask.key}
           task={liveEditingTask}
           open={sheetOpen}
           onOpenChange={setSheetOpen}
           today={today}
-          actions={actions}
           onOpenNote={(path) => navigate(routeForPath(path))}
           autoFocusEditor={autoFocusEditor}
         />

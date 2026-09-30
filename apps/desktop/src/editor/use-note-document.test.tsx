@@ -40,6 +40,7 @@ function fakeEditor(): NoteEditorHandle & { applied: string[] } {
     insertMarkdown: () => {},
     focus: () => {},
     setSelection: () => {},
+    isAtTextblockBoundary: () => true,
     getSelectedText: () => '',
     openSelectionMenu: () => {},
     startPendingReplacement: () => false,

@@ -388,11 +388,8 @@ export function blockContextAt(
 }
 
 /**
- * {@link blockContextAt} plus each snippet line's whole-file origin, for
- * mapping an interaction inside the rendered snippet (a task checkbox click)
- * back to the exact source offset it came from. Origins are as of this read;
- * a later edit can drift them, which the task toggle's staleness guard
- * ({@link toggleTaskMarker}) turns into a refusal rather than a wrong write.
+ * Snippet lines and their source origins at the time of this read.
+ * These coordinates describe the source mapping, not a task mutation address.
  */
 export function blockContextLinesAt(
   source: string | BlockContextSource,

@@ -61,10 +61,9 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
     assets: [],
     tasks: [
       {
-        markerOffset: 40,
         text: 'Do the thing',
+        astPath: [40],
         breadcrumbs: ['Project'],
-        raw: '- [ ] Do the thing',
         checked: false,
         dueDate: null,
       },

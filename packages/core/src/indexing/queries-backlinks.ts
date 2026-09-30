@@ -205,10 +205,13 @@ export async function getBacklinksWithContext(
   // One read *and one parse* per distinct source: a well-linked source
   // contributes many rows, and context extraction walks the parsed body.
   const sources = new Map<string, BlockContextSource | null>()
+  const taskSources = new Map<string, { content: string }>()
   await Promise.all(
     pageSources.map(async ({ sourcePath }) => {
       try {
-        sources.set(sourcePath, prepareBlockContext(await readNote(sourcePath)))
+        const content = await readNote(sourcePath)
+        sources.set(sourcePath, prepareBlockContext(content))
+        taskSources.set(sourcePath, { content })
       } catch {
         sources.set(sourcePath, null)
       }
@@ -231,12 +234,22 @@ export async function getBacklinksWithContext(
         }
         seenSnippets.add(snippet)
       }
+      const taskSource = taskSources.get(pageSource.sourcePath)
       results.push({
         sourcePath: pageSource.sourcePath,
         sourceTitle: pageSource.sourceTitle,
         snippet,
         posFrom,
-        tasks: extractSnippetTasks(snippet, context.lineOrigins, context.lineSourceTexts),
+        tasks: extractSnippetTasks(
+          snippet,
+          taskSource
+            ? {
+                ...taskSource,
+                notePath: pageSource.sourcePath,
+                lineOrigins: context.lineOrigins,
+              }
+            : undefined,
+        ),
       })
     }
   }

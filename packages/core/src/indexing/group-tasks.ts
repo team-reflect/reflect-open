@@ -1,5 +1,6 @@
+import { compareTaskPaths } from '../markdown/task-path.ts'
 import { displayNoteTitle } from '../markdown/note-title.ts'
-import type { OpenTask } from './queries.ts'
+import type { Task } from '../tasks/task-store.ts'
 
 /**
  * Grouping for the Tasks view (Plan 18), faithful to V1's `task-view.ts`: open
@@ -28,7 +29,7 @@ export interface TaskGroup {
   label: string
   /** The note a `note` group's header opens; null for the date buckets. */
   notePath: string | null
-  tasks: OpenTask[]
+  tasks: Task[]
 }
 
 const PUNCTUATION_RE = /[\p{P}\p{S}]/gu
@@ -51,7 +52,7 @@ export interface TaskContext {
   readonly breadcrumbs: readonly string[]
   /** What the UI labels this context ({@link visibleTaskBreadcrumbs}); empty → unlabeled. */
   readonly visibleBreadcrumbs: readonly string[]
-  readonly tasks: readonly OpenTask[]
+  readonly tasks: readonly Task[]
 }
 
 function haveSameBreadcrumbs(left: readonly string[], right: readonly string[]): boolean {
@@ -59,11 +60,11 @@ function haveSameBreadcrumbs(left: readonly string[], right: readonly string[]):
 }
 
 /** Group consecutive task rows that share the same parent outline context. */
-export function groupTaskContexts(tasks: readonly OpenTask[]): TaskContext[] {
+export function groupTaskContexts(tasks: readonly Task[]): TaskContext[] {
   const contexts: {
     breadcrumbs: readonly string[]
     visibleBreadcrumbs: readonly string[]
-    tasks: OpenTask[]
+    tasks: Task[]
   }[] = []
 
   for (const task of tasks) {
@@ -83,7 +84,7 @@ export function groupTaskContexts(tasks: readonly OpenTask[]): TaskContext[] {
 }
 
 /** The date a task is bucketed by: its explicit due date, else its note's date. */
-function effectiveDate(task: OpenTask): string | null {
+function effectiveDate(task: Task): string | null {
   return task.dueDate ?? task.dailyDate
 }
 
@@ -93,7 +94,7 @@ function effectiveDate(task: OpenTask): string | null {
  * joins) can place one task without rebuilding every group. `today` is an ISO
  * `YYYY-MM-DD`. `'note'` means undated (grouped under its source note).
  */
-export function taskDateBucket(task: OpenTask, today: string): TaskGroupKind {
+export function taskDateBucket(task: Task, today: string): TaskGroupKind {
   const date = effectiveDate(task)
   if (date === null) {
     return 'note'
@@ -108,7 +109,7 @@ export function taskDateBucket(task: OpenTask, today: string): TaskGroupKind {
 }
 
 /** Within a date bucket: earliest effective date first, then document order. */
-function compareDated(left: OpenTask, right: OpenTask): number {
+function compareDated(left: Task, right: Task): number {
   // Every task in a date bucket has an effective date; ISO `YYYY-MM-DD` sorts
   // chronologically. (The `?? ''` only satisfies the type — it never fires here.)
   const leftDate = effectiveDate(left) ?? ''
@@ -119,7 +120,7 @@ function compareDated(left: OpenTask, right: OpenTask): number {
   if (left.notePath !== right.notePath) {
     return left.notePath < right.notePath ? -1 : 1
   }
-  return left.markerOffset - right.markerOffset
+  return compareTaskPaths(left.astPath, right.astPath)
 }
 
 /**
@@ -130,8 +131,8 @@ function compareDated(left: OpenTask, right: OpenTask): number {
  * encodes in SQL ({@link getPinnedNotes}), so the two can't drift.
  */
 function comparePinPrecedence(
-  left: Pick<OpenTask, 'isPinned' | 'pinnedOrder'>,
-  right: Pick<OpenTask, 'isPinned' | 'pinnedOrder'>,
+  left: Pick<Task, 'isPinned' | 'pinnedOrder'>,
+  right: Pick<Task, 'isPinned' | 'pinnedOrder'>,
 ): number {
   if (left.isPinned !== right.isPinned) {
     return left.isPinned ? -1 : 1 // pinned before unpinned
@@ -175,30 +176,28 @@ function compareNoteGroups(left: TaskGroup, right: TaskGroup): number {
  * Current → Overdue → Upcoming → per-note. Pure and self-sorting, so it does not
  * depend on the order the index read returns.
  */
-export function groupTasks(tasks: readonly OpenTask[], today: string): TaskGroup[] {
-  const current: OpenTask[] = []
-  const overdue: OpenTask[] = []
-  const upcoming: OpenTask[] = []
-  const byNote = new Map<string, OpenTask[]>()
+export function groupTasks(tasks: readonly Task[], today: string): TaskGroup[] {
+  const current: Task[] = []
+  const overdue: Task[] = []
+  const upcoming: Task[] = []
+  const byNote = new Map<string, Task[]>()
 
   for (const task of tasks) {
-    const date = effectiveDate(task)
-    if (date === null) {
-      // No due date and no daily date — V1's "unscheduled": grouped by note.
-      const group = byNote.get(task.notePath)
-      if (group === undefined) {
-        byNote.set(task.notePath, [task])
-      } else {
-        group.push(task)
+    switch (taskDateBucket(task, today)) {
+      case 'current':
+        current.push(task)
+        break
+      case 'overdue':
+        overdue.push(task)
+        break
+      case 'upcoming':
+        upcoming.push(task)
+        break
+      case 'note': {
+        const group = byNote.get(task.notePath)
+        if (group === undefined) byNote.set(task.notePath, [task])
+        else group.push(task)
       }
-    } else if (task.dueDate !== null && task.dueDate < today) {
-      // Overdue keys off the explicit due date ALONE (V1's asymmetry): a bare
-      // task in a past daily note is not overdue — it lands in Current below.
-      overdue.push(task)
-    } else if (date > today) {
-      upcoming.push(task)
-    } else {
-      current.push(task)
     }
   }
 
@@ -234,7 +233,7 @@ export function groupTasks(tasks: readonly OpenTask[], today: string): TaskGroup
       // A `byNote` entry only exists once a task has been pushed into it.
       label: displayNoteTitle(noteTasks[0]!.noteTitle),
       notePath: noteTasks[0]!.notePath,
-      tasks: noteTasks.sort((left, right) => left.markerOffset - right.markerOffset),
+      tasks: noteTasks.sort((left, right) => compareTaskPaths(left.astPath, right.astPath)),
     }))
     .sort(compareNoteGroups)
 

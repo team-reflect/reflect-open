@@ -33,6 +33,7 @@ function fakeEditor(): NoteEditorHandle & { inserted: string[] } {
     },
     focus: () => {},
     setSelection: () => {},
+    isAtTextblockBoundary: () => true,
     getSelectedText: () => '',
     openSelectionMenu: () => {},
     startPendingReplacement: () => false,

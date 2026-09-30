@@ -663,3 +663,19 @@ describe('NoteEditor file paste', () => {
     expect(handleRef.current?.getMarkdown()).toBe('\n')
   })
 })
+
+describe('task paragraph editing', () => {
+  it('keeps block prefixes literal and Shift-Enter inside the first paragraph', async () => {
+    const handle = createRef<NoteEditorHandle>()
+    const view = await render(
+      <NoteEditor singleParagraph initialContent="# literal" handleRef={handle} />,
+    )
+    handle.current?.focus()
+    handle.current?.setSelection('end')
+    await userEvent.keyboard('{Shift>}{Enter}{/Shift}next')
+    await vi.waitFor(() => expect(handle.current?.getMarkdown()).toBe('# literal\nnext'))
+    expect(view.container.querySelectorAll('.ProseMirror > p')).toHaveLength(1)
+    expect(view.container.querySelector('.ProseMirror > h1')).toBeNull()
+    await view.unmount()
+  })
+})

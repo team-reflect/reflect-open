@@ -63,6 +63,7 @@ vi.mock('@/components/note-pane.tsx', () => ({
         setSelection: (position: 'start' | 'end') => {
           focusLog.calls.push(`setSelection:${dailyDate}:${position}`)
         },
+        isAtTextblockBoundary: () => true,
         getSelectedText: () => '',
         openSelectionMenu: () => {},
         startPendingReplacement: () => false,

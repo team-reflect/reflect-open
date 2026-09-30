@@ -6,7 +6,14 @@ import type { SnippetTask } from '@reflect/core'
 import { BacklinkSnippet } from './backlink-snippet.tsx'
 
 const toggleTask = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/note-task.ts', () => ({ toggleTask }))
+vi.mock('@/lib/tasks/task-store.ts', () => ({
+  taskStore: () => ({
+    current: (row: import('@reflect/core').Task) => row,
+    update: (row: import('@reflect/core').Task) => {
+      toggleTask({ notePath: row.notePath, astPath: row.astPath, checked: row.checked }, 7)
+    },
+  }),
+}))
 
 const operationFail = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/operations.ts', () => ({
@@ -32,9 +39,9 @@ const SNIPPET = [
 
 function anchors(): SnippetTask[] {
   return [
-    { markerOffset: 124, raw: '[ ] prep agenda', checked: false, round: true, text: 'prep agenda' },
-    { markerOffset: 144, raw: '[x] square box', checked: true, round: false, text: 'square box' },
-    { markerOffset: 164, raw: '[x] send invite', checked: true, round: true, text: 'send invite' },
+    { checked: false, round: true, text: 'prep agenda' },
+    { checked: true, round: false, text: 'square box' },
+    { checked: true, round: true, text: 'send invite' },
   ]
 }
 
@@ -59,50 +66,24 @@ beforeEach(() => {
 })
 
 describe('BacklinkSnippet task checkboxes', () => {
-  it('writes a round-task click through to the source note', async () => {
+  it('does not write checkboxes without an exact source address', async () => {
     const view = await renderSnippet()
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
     expect(boxes).toHaveLength(3)
-    await userEvent.click(boxes[0]!)
-    await vi.waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
-    expect(toggleTask).toHaveBeenCalledWith(
-      { notePath: 'notes/meeting.md', markerOffset: 124, raw: '[ ] prep agenda' },
-      7,
-    )
-    await view.unmount()
-  })
-
-  it('toggles a checked round task by its own anchor', async () => {
-    const view = await renderSnippet()
-    const boxes = view.container.querySelectorAll('input[type="checkbox"]')
-    await userEvent.click(boxes[2]!)
-    await vi.waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
-    expect(toggleTask).toHaveBeenCalledWith(
-      { notePath: 'notes/meeting.md', markerOffset: 164, raw: '[x] send invite' },
-      7,
-    )
-    await view.unmount()
-  })
-
-  it('leaves a square GFM checkbox read-only', async () => {
-    const view = await renderSnippet()
-    const boxes = view.container.querySelectorAll('input[type="checkbox"]')
-    expect((boxes[1] as HTMLInputElement).checked).toBe(true)
-    await userEvent.click(boxes[1]!, { force: true })
+    for (const box of boxes) await userEvent.click(box, { force: true })
     expect(toggleTask).not.toHaveBeenCalled()
-    expect(operationFail).not.toHaveBeenCalled()
     await view.unmount()
   })
 
-  it('refuses instead of toggling when the anchors disagree with the rendered task', async () => {
-    // Simulate anchor drift: the anchor for index 0 claims a different state.
-    const drifted = anchors()
-    drifted[0] = { ...drifted[0]!, checked: true }
-    const view = await renderSnippet(drifted)
+  it('toggles only the addressed round checkbox at the rendered index', async () => {
+    const tasks = anchors()
+    tasks[2]!.address = { notePath: 'notes/meeting.md', astPath: [0, 3] }
+    const view = await renderSnippet(tasks)
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
-    await userEvent.click(boxes[0]!)
-    expect(toggleTask).not.toHaveBeenCalled()
-    await vi.waitFor(() => expect(operationFail).toHaveBeenCalled())
+    await userEvent.click(boxes[2]!, { force: true })
+    await vi.waitFor(() =>
+      expect(toggleTask).toHaveBeenCalledWith({ ...tasks[2]!.address, checked: true }, 7),
+    )
     await view.unmount()
   })
 
@@ -128,9 +109,7 @@ describe('BacklinkSnippet task checkboxes', () => {
   })
 
   it('renders checkboxes inert when the snippet has no round tasks', async () => {
-    const squareOnly: SnippetTask[] = [
-      { markerOffset: 144, raw: '[x] square box', checked: true, round: false, text: 'square box' },
-    ]
+    const squareOnly: SnippetTask[] = [{ checked: true, round: false, text: 'square box' }]
     const view = await render(
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}

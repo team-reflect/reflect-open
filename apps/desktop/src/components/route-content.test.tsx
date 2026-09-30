@@ -57,6 +57,7 @@ vi.mock('@/editor/note-editor.tsx', async () => {
             editorProbe.focusCalls.push('focus')
           },
           setSelection: () => {},
+          isAtTextblockBoundary: () => true,
           getSelectedText: () => '',
           openSelectionMenu: () => {},
           startPendingReplacement: () => false,
