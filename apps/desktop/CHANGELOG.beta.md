@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.15.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.14.0...v0.15.0-beta) (2026-10-01)
+
+
+### Features
+
+* support Claude Sonnet 5.5 and GPT-6.1 Sol ([#1403](https://github.com/team-reflect/reflect-open/issues/1403)) ([7e2e43d](https://github.com/team-reflect/reflect-open/commit/7e2e43d2e9659a0b9578185d4e54b1372d729677))
+
+
+### Bug Fixes
+
+* update meowdown ([#1383](https://github.com/team-reflect/reflect-open/issues/1383)) ([c828508](https://github.com/team-reflect/reflect-open/commit/c8285084d56880ee320e483ace62d419be559ba8))
+
 ## [0.14.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.14.0-beta.2...v0.14.0-beta.3) (2026-09-29)
 
 
