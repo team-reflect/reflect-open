@@ -94,7 +94,7 @@ markers in markdown, AI task extraction (later, over this projection), CLI
 ```ts
 // markdown/task-ast.ts: the projection (the historical sketch keyed tasks by a
 // character offset plus the raw line; tasks are now addressed in the block AST):
-interface ProjectedTask {
+interface ParsedTask {
   astPath: number[]     // child indexes from the body's AST root, e.g. [2, 1]
   markdown: string      // the item's first paragraph, marker excluded
   breadcrumbs: string[] // ancestor items' first paragraphs, outermost first

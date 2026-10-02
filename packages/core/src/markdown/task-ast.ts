@@ -100,7 +100,7 @@ export function getTaskDueDate(markdown: string): string | null {
   return null
 }
 
-export interface ProjectedTask {
+export interface ParsedTask {
   astPath: MarkdownAstPath
   /** The task's first paragraph, marker excluded. */
   markdown: string
@@ -111,11 +111,11 @@ export interface ProjectedTask {
 }
 
 /** The round tasks of a note body, in document order. */
-export function projectTasks(body: string): ProjectedTask[] {
-  return getRoundTasks(parseMarkdownAst(body)).map(toProjectedTask)
+export function projectTasks(body: string): ParsedTask[] {
+  return getRoundTasks(parseMarkdownAst(body)).map(toParsedTask)
 }
 
-function toProjectedTask(entry: TaskEntry): ProjectedTask {
+function toParsedTask(entry: TaskEntry): ParsedTask {
   return { ...toTaskSnapshot(entry), dueDate: getTaskDueDate(entry.markdown) }
 }
 

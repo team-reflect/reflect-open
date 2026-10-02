@@ -86,7 +86,7 @@ export {
   projectTasks,
   TaskStaleError,
   type InsertPosition,
-  type ProjectedTask,
+  type ParsedTask,
   type TaskEdit,
   type TaskEditInsert,
   type TaskEditItem,
