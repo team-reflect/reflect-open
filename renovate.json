@@ -11,9 +11,15 @@
       "enabled": false
     },
     {
-      "description": "Updated by .github/workflows/update-meowdown.yml instead.",
       "matchPackageNames": ["@meowdown/*"],
-      "enabled": false
+      "groupName": "meowdown",
+      "groupSlug": "meowdown",
+      "minimumReleaseAge": "0 days",
+      "prPriority": 100,
+      "dependencyDashboardApproval": false,
+      "draftPR": false,
+      "semanticCommitType": "fix",
+      "semanticCommitScope": null
     }
   ]
 }
