@@ -6,6 +6,7 @@ import {
   editTask,
   insertTask,
   toggleTask,
+  type InsertedTask,
 } from '@/lib/note-task.ts'
 import { mutationKeys } from '@/lib/query-client.ts'
 import { editAndToggleError, isEditAndToggleError } from '@/lib/tasks/edit-and-toggle-error.ts'
@@ -14,6 +15,7 @@ import {
   forgetRecentlyCompleted,
   hasRecentlyCompleted,
   markRecentlyCompleted,
+  relocateRecentlyCompleted,
 } from '@/lib/tasks/recently-completed.ts'
 import { scheduledContent } from '@/lib/tasks/task-schedule-content.ts'
 import {
@@ -448,13 +450,15 @@ export function useTaskActions(): TaskActions {
       if (graph?.generation === undefined) {
         return null
       }
-      let markerOffset: number
+      let result: InsertedTask
       try {
-        markerOffset = await insertMutation.mutateAsync(target)
+        result = await insertMutation.mutateAsync(target)
       } catch {
         return null // reconcile already surfaced the failure
       }
-      const created = insertedTaskRow(target, markerOffset)
+      cache.relocate(target.notePath, result.offsetChanges)
+      relocateRecentlyCompleted(root, target.notePath, result.offsetChanges)
+      const created = insertedTaskRow(target, result.created.markerOffset, [], result.created.raw)
       cache.addOpen(created)
       return created
     },
@@ -481,13 +485,15 @@ export function useTaskActions(): TaskActions {
       if (!(await persistTaskDraft(task, content))) {
         return null // the edit/delete rollback already surfaced the failure
       }
-      let markerOffset: number
+      let result: InsertedTask
       try {
-        markerOffset = await insertMutation.mutateAsync(target)
+        result = await insertMutation.mutateAsync(target)
       } catch {
         return null
       }
-      const created = insertedTaskRow(target, markerOffset)
+      cache.relocate(target.notePath, result.offsetChanges)
+      relocateRecentlyCompleted(root, target.notePath, result.offsetChanges)
+      const created = insertedTaskRow(target, result.created.markerOffset, [], result.created.raw)
       cache.addOpen(created)
       return created
     },

@@ -8,8 +8,8 @@ import {
 } from './indexed-note.ts'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that rebuilds has_content and the FTS body', () => {
-    expect(PROJECTION_VERSION).toBe(20)
+  it('carries the projection version that rebuilds heading-aware task breadcrumbs', () => {
+    expect(PROJECTION_VERSION).toBe(21)
   })
 
   it('flattens a parsed note into the index payload', () => {
@@ -279,7 +279,7 @@ describe('buildIndexedNote', () => {
       {
         markerOffset: source.indexOf('[ ]'),
         text: 'buy milk',
-        breadcrumbs: [],
+        breadcrumbs: ['Todo'],
         raw: '[ ] buy milk',
         checked: false,
         dueDate: null,
@@ -287,12 +287,23 @@ describe('buildIndexedNote', () => {
       {
         markerOffset: source.indexOf('[x] call'),
         text: 'call mum',
-        breadcrumbs: [],
+        breadcrumbs: ['Todo'],
         raw: '[x] call mum',
         checked: true,
         dueDate: null,
       },
     ])
+  })
+
+  it('projects meaningful headings and omits the automatic Tasks heading', () => {
+    const source =
+      '## Tasks\n\n+ [ ] buy milk\n\n## House chore\n\n+ Kitchen\n  + [ ] wash dishes\n'
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/n.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+    expect(indexed.tasks.map((task) => task.breadcrumbs)).toEqual([[], ['House chore', 'Kitchen']])
   })
 
   it('maps an explicit task due date from a [[YYYY-MM-DD]] link', () => {

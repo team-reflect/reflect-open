@@ -1,18 +1,25 @@
-import type { SyntaxNode } from '@meowdown/markdown'
-import { appendListItemAtHeading, listItemBlock } from './append-list-item.ts'
+import type { SyntaxNode, Tree } from '@meowdown/markdown'
+import {
+  appendListItemAtHeading,
+  insertListItemAtHeading,
+  listItemBlock,
+} from './append-list-item.ts'
 import { appendHeadingSection } from './append-section.ts'
-import { parseNote } from './extract.ts'
-import { splitFrontmatter } from './frontmatter.ts'
-import { parseBody } from './grammar.ts'
-import { topLevelHeadings } from './heading-blocks.ts'
-import { foldKey } from './keys.ts'
-import { lineEndingAt, offsetBeforeLineEnding } from './line-endings.ts'
-import type { Heading, TaskMarker, WikiLink } from './model.ts'
+import { parseNote, parseNoteWithTree } from './extract.ts'
+import {
+  headingMatchesBacklinkedTitle,
+  linkedHeadingTarget,
+  topLevelHeadings,
+} from './heading-blocks.ts'
+import { documentLineEnding, lineEndingAt, offsetBeforeLineEnding } from './line-endings.ts'
+import { isBulletList } from './node-types.ts'
+import type { Heading, ParsedTask, TaskMarker, WikiLink } from './model.ts'
 import { normalizeWikiTarget } from './resolve.ts'
 import { scanInlineWikiLinks } from './scan.ts'
 import { parseTaskMarker } from './task-marker.ts'
 
 export { appendBlock } from './append-section.ts'
+export { headingMatchesBacklinkedTitle } from './heading-blocks.ts'
 export { appendListItem, type ListItemKind } from './append-list-item.ts'
 
 /**
@@ -44,12 +51,20 @@ export class TaskStaleError extends Error {
  * Throws {@link TaskStaleError} when `raw` matches no task, or more than one.
  */
 function locateTaskMarker(source: string, markerOffset: number, raw: string): number {
-  // Re-extract: the recorded offset is trusted only when it still holds a real
-  // parsed task with this line — a byte match alone isn't enough, since an edit
-  // above could have turned the line into (say) code without changing its bytes.
   const tasks = parseNote({ path: '', source }).tasks
-  if (tasks.some((task) => task.markerOffset === markerOffset && task.raw === raw)) {
-    return markerOffset
+  return locateParsedTask(tasks, markerOffset, raw).markerOffset
+}
+
+function locateParsedTask(
+  tasks: readonly ParsedTask[],
+  markerOffset: number,
+  raw: string,
+): ParsedTask {
+  // Trust an offset only when it still holds a parsed task; matching bytes may
+  // now belong to a code block after an edit above the line.
+  const exact = tasks.find((task) => task.markerOffset === markerOffset && task.raw === raw)
+  if (exact !== undefined) {
+    return exact
   }
   const matches = tasks.filter((task) => task.raw === raw)
   if (matches.length === 0) {
@@ -58,7 +73,7 @@ function locateTaskMarker(source: string, markerOffset: number, raw: string): nu
   if (matches.length > 1) {
     throw new TaskStaleError(`task line is ambiguous: ${JSON.stringify(raw)}`)
   }
-  return matches[0]!.markerOffset
+  return matches[0]!
 }
 
 /**
@@ -127,23 +142,55 @@ export function removeTaskLine(source: string, task: TaskMarker): string {
   return source.slice(0, lineStart) + source.slice(lineEnd)
 }
 
-/**
- * Append a new empty task — a `+ [ ] ` line — to the end of `source`, returning
- * the new source and the marker's offset (the `[`). The Tasks view's Return-to-add
- * (Plan 18) writes the empty line, then the inline editor on the new row fills it.
- * A single newline separates it from existing content (continuing a trailing
- * list, or interrupting a paragraph — a non-empty task item is allowed to); an
- * empty note just becomes the one task. The trailing space keeps it a valid GFM
- * checkbox and seats the caret.
- */
-export function appendTaskLine(source: string): { source: string; markerOffset: number } {
-  const base = source.replace(/\s*$/, '')
-  const prefix = base.length > 0 ? `${base}\n+ ` : '+ '
-  return { source: `${prefix}[ ] \n`, markerOffset: prefix.length }
+/** Source and coordinates of an automatically inserted round task. */
+export interface TaskInsertion {
+  readonly source: string
+  /** Offset of the inserted task's opening bracket in the resulting source. */
+  readonly markerOffset: number
+  /** Splice boundary in the original source; later task markers shift by the length delta. */
+  readonly insertionOffset: number
 }
 
-function taskNodeAt(body: string, markerOffset: number): SyntaxNode | null {
-  let node: SyntaxNode | null = parseBody(body).resolve(markerOffset, 1)
+/**
+ * Insert a round task under a top-level Tasks H2, creating a plain heading when
+ * missing. Reuse a linked Tasks heading without rewriting it, preferring plain
+ * headings when both exist. Empty text keeps the trailing space GFM requires.
+ */
+export function appendTaskUnderHeading(source: string, text = ''): TaskInsertion {
+  const { headings, wikiLinks } = parseNote({ path: '', source })
+  const matches = topLevelHeadings(headings).filter(
+    (heading) =>
+      heading.level === 2 && headingMatchesBacklinkedTitle(source, heading, wikiLinks, 'Tasks'),
+  )
+  const target =
+    matches.find((heading) => linkedHeadingTarget(source, heading, wikiLinks) === null) ??
+    matches[0]
+  if (target !== undefined) {
+    const inserted = insertListItemAtHeading(source, target, text, 'task')
+    return {
+      source: inserted.source,
+      markerOffset: inserted.itemOffset + 2,
+      insertionOffset: inserted.insertionOffset,
+    }
+  }
+
+  const lineEnding = documentLineEnding(source)
+  const gap =
+    source.length === 0 || source.endsWith(lineEnding.repeat(2))
+      ? ''
+      : source.endsWith(lineEnding)
+        ? lineEnding
+        : lineEnding.repeat(2)
+  const prefix = `${source}${gap}## Tasks${lineEnding.repeat(2)}+ `
+  return {
+    source: `${prefix}[ ] ${text.trim()}${lineEnding}`,
+    markerOffset: prefix.length,
+    insertionOffset: source.length,
+  }
+}
+
+function taskNodeAt(tree: Tree, markerOffset: number): SyntaxNode | null {
+  let node: SyntaxNode | null = tree.resolve(markerOffset, 1)
   while (node !== null && node.name !== 'Task') {
     node = node.parent
   }
@@ -163,10 +210,28 @@ function nearestParentListItem(taskNode: SyntaxNode): SyntaxNode | null {
   return null
 }
 
+function taskContextNode(tree: Tree, task: ParsedTask, bodyOffset: number): SyntaxNode | null {
+  const taskNode = taskNodeAt(tree, task.markerOffset - bodyOffset)
+  if (taskNode === null) {
+    return null
+  }
+  const parentItem = nearestParentListItem(taskNode)
+  if (parentItem !== null) {
+    return parentItem
+  }
+  const ownList = taskNode.parent?.parent
+  if (ownList == null || !isBulletList(ownList) || !ownList.parent?.type.isTop) {
+    return null
+  }
+  // At the document root, only a meaningful heading can supply breadcrumbs.
+  return task.breadcrumbs.length > 0 ? ownList : null
+}
+
 /**
- * Add an empty task to the end of `task`'s nearest parent-list context. The new
+ * Add an empty task to its nearest parent list item, or continue its top-level
+ * list when a meaningful heading supplies the context. The new
  * line reuses the task's exact indentation and round-list prefix, so parsing it
- * yields the same ancestor breadcrumbs. The indexed marker is relocated through
+ * yields the same heading and ancestor breadcrumbs. The indexed marker is relocated through
  * the normal stale guard first; a task that no longer has a parent context is
  * refused rather than silently appended at the note root.
  */
@@ -179,12 +244,12 @@ export function appendTaskToContext(
   anchorOffset: number
   insertionOffset: number
 } {
-  const locatedOffset = locateTaskMarker(source, task.markerOffset, task.raw)
-  const { body, bodyOffset } = splitFrontmatter(source)
-  const taskNode = taskNodeAt(body, locatedOffset - bodyOffset)
-  const contextItem = taskNode === null ? null : nearestParentListItem(taskNode)
+  const { note, tree, bodyOffset } = parseNoteWithTree({ path: '', source })
+  const parsedTask = locateParsedTask(note.tasks, task.markerOffset, task.raw)
+  const locatedOffset = parsedTask.markerOffset
+  const contextItem = taskContextNode(tree, parsedTask, bodyOffset)
   if (contextItem === null) {
-    throw new TaskStaleError('task no longer has a parent list context')
+    throw new TaskStaleError('task no longer has a heading or parent list context')
   }
 
   // Lezer's CRLF ranges end between `\r` and `\n`; splice before the pair so
@@ -299,46 +364,6 @@ export function appendListItemUnderHeading(
     return appendHeadingSection(source, heading, listItemBlock(content))
   }
   return appendListItemAtHeading(source, target, content)
-}
-
-/** The target when a heading consists entirely of one parsed wiki link. */
-function linkedHeadingTarget(
-  source: string,
-  heading: Heading,
-  wikiLinks: readonly WikiLink[],
-): string | null {
-  const raw = source.slice(heading.from, heading.to)
-  const firstLine = raw.slice(0, !raw.includes('\n') ? raw.length : raw.indexOf('\n'))
-  const content = firstLine
-    .replace(/^[ \t]{0,3}#{1,6}[ \t]+/, '')
-    .replace(/[ \t]+#+[ \t]*$/, '')
-    .trim()
-  const match = /^\[\[\s*([^\]|\r\n]+?)\s*(?:\|[^\]\r\n]*)?\]\]$/.exec(content)
-  const textTarget = match?.[1]?.trim()
-  if (textTarget === undefined || textTarget === '') {
-    return null
-  }
-  const parsedLink = wikiLinks.find(
-    (link) =>
-      link.from >= heading.from &&
-      link.to <= heading.to &&
-      foldKey(link.target) === foldKey(textTarget),
-  )
-  return parsedLink?.target ?? null
-}
-
-/**
- * Whether `heading` names `title` either as a linked heading (`## [[Links]]`)
- * or as the legacy plain form (`## Links`). A linked heading's target, rather
- * than its display alias, identifies the section.
- */
-export function headingMatchesBacklinkedTitle(
-  source: string,
-  heading: Heading,
-  wikiLinks: readonly WikiLink[],
-  title: string,
-): boolean {
-  return foldKey(linkedHeadingTarget(source, heading, wikiLinks) ?? heading.text) === foldKey(title)
 }
 
 function matchingBacklinkedHeading(

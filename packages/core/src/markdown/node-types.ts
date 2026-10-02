@@ -35,6 +35,11 @@ export function headingLevelOf(node: TypedNode): number | null {
   return HEADING_LEVEL_BY_ID.get(node.type.id) ?? null
 }
 
+/** Is this an opening/closing ATX marker or a setext heading underline? */
+export function isHeaderMark(node: TypedNode): boolean {
+  return node.type.id === LEZER_NODE_IDS.HeaderMark
+}
+
 /** Is this an unordered (`-`/`+`/`*`) list? */
 export function isBulletList(node: TypedNode): boolean {
   return node.type.id === LEZER_NODE_IDS.BulletList

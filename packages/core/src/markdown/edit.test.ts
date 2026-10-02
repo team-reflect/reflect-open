@@ -4,7 +4,7 @@ import {
   appendBlock,
   appendListItemUnderBacklinkedHeading,
   appendListItemUnderHeading,
-  appendTaskLine,
+  appendTaskUnderHeading,
   appendTaskToContext,
   clearTaskDueDate,
   editTaskLine,
@@ -325,34 +325,117 @@ describe('editTaskLine', () => {
   })
 })
 
-describe('appendTaskLine', () => {
-  it('starts the note with a single empty task', () => {
-    const { source, markerOffset } = appendTaskLine('')
-    expect(source).toBe('+ [ ] \n')
-    const task = parseNote({ path: 'n.md', source }).tasks[0]!
-    expect(task.markerOffset).toBe(markerOffset)
-    expect(task.text).toBe('')
-    expect(task.checked).toBe(false)
+describe('appendTaskUnderHeading', () => {
+  it.each([
+    ['', '## Tasks\n\n+ [ ] \n'],
+    ['intro\n', 'intro\n\n## Tasks\n\n+ [ ] \n'],
+    ['## Tasks\n\n+ [ ] old\n', '## Tasks\n\n+ [ ] old\n+ [ ] \n'],
+    ['## tasks\n\nprose\n', '## tasks\n\n+ [ ] \n\nprose\n'],
+    ['## [[TASKS|To do]]\n', '## [[TASKS|To do]]\n\n+ [ ] \n'],
+    ['## Tasks\n\n- [ ] checkbox\n', '## Tasks\n\n+ [ ] \n\n- [ ] checkbox\n'],
+    ['## Tasks\n\n* bullet\n', '## Tasks\n\n+ [ ] \n\n* bullet\n'],
+    ['## Tasks\n\n1. ordered\n', '## Tasks\n\n+ [ ] \n\n1. ordered\n'],
+    [
+      '## Tasks\n\n- bullet\n\n+ [ ] old\n\nprose\n\n## Later\n\n+ [ ] later\n',
+      '## Tasks\n\n- bullet\n\n+ [ ] old\n+ [ ] \n\nprose\n\n## Later\n\n+ [ ] later\n',
+    ],
+    [
+      '## Tasks\n\nintro\n\n### Child\n\n+ [ ] nested\n',
+      '## Tasks\n\n+ [ ] \n\nintro\n\n### Child\n\n+ [ ] nested\n',
+    ],
+    ['## Tasks\n\n+ Project\n  + [ ] nested\n', '## Tasks\n\n+ Project\n  + [ ] nested\n+ [ ] \n'],
+    [
+      '## [[Tasks]]\n\n+ [ ] linked\n\n## Tasks\n\n+ [ ] plain\n',
+      '## [[Tasks]]\n\n+ [ ] linked\n\n## Tasks\n\n+ [ ] plain\n+ [ ] \n',
+    ],
+  ])(
+    'inserts an empty task into %j with exact marker and relocation offsets',
+    (original, expected) => {
+      const inserted = appendTaskUnderHeading(original)
+      expect(inserted.source).toBe(expected)
+      const tasks = parseNote({ path: 'n.md', source: inserted.source }).tasks
+      expect(tasks.find((task) => task.markerOffset === inserted.markerOffset)).toMatchObject({
+        raw: '[ ] ',
+        text: '',
+        checked: false,
+        breadcrumbs: [],
+      })
+      const delta = inserted.source.length - original.length
+      for (const task of parseNote({ path: 'n.md', source: original }).tasks) {
+        const offset =
+          task.markerOffset + (task.markerOffset >= inserted.insertionOffset ? delta : 0)
+        expect(tasks.find((candidate) => candidate.markerOffset === offset)).toMatchObject({
+          raw: task.raw,
+          text: task.text,
+          breadcrumbs: task.breadcrumbs,
+        })
+      }
+    },
+  )
+
+  it.each([
+    '# Tasks',
+    '### Tasks',
+    '> ## Tasks',
+    '- ## Tasks',
+    String.raw`## \[[Tasks]]`,
+    '```\n## Tasks\n```',
+  ])('does not reuse %s', (heading) => {
+    const source = `${heading}\n\nexisting\n`
+    expect(appendTaskUnderHeading(source, 'new').source).toBe(`${source}\n## Tasks\n\n+ [ ] new\n`)
   })
 
-  it('continues an existing task list and reports the new marker offset', () => {
-    const { source, markerOffset } = appendTaskLine('+ [ ] buy milk\n')
-    expect(source).toBe('+ [ ] buy milk\n+ [ ] \n')
-    const tasks = parseNote({ path: 'n.md', source }).tasks
-    expect(tasks).toHaveLength(2)
-    expect(tasks[1]!.markerOffset).toBe(markerOffset)
-    expect(tasks[1]!.text).toBe('')
+  it('preserves frontmatter and CRLF, and reuses the section across captures', () => {
+    const source = '---\r\nprivate: true\r\n---\r\n\r\n## Tasks\r\n\r\nprose\r\n'
+    const first = appendTaskUnderHeading(source, 'buy milk')
+    const second = appendTaskUnderHeading(first.source, 'call mum')
+    expect(second.source).toBe(
+      '---\r\nprivate: true\r\n---\r\n\r\n## Tasks\r\n\r\n+ [ ] buy milk\r\n+ [ ] call mum\r\n\r\nprose\r\n',
+    )
+    expect(parseNote({ path: 'n.md', source: second.source }).tasks[1]?.markerOffset).toBe(
+      second.markerOffset,
+    )
   })
 
-  it('appends after prose, with the marker locatable by the parser', () => {
-    const { source, markerOffset } = appendTaskLine('# Notes\n\nsome intro')
-    const tasks = parseNote({ path: 'n.md', source }).tasks
-    expect(tasks).toHaveLength(1)
-    expect(tasks[0]!.markerOffset).toBe(markerOffset)
+  it('preserves a trailing empty task when creating a new section', () => {
+    const original = '+ [ ] \n\n\n'
+    const inserted = appendTaskUnderHeading(original)
+    expect(inserted.source.startsWith(original)).toBe(true)
+    expect(parseNote({ path: 'n.md', source: inserted.source }).tasks).toHaveLength(2)
   })
 })
 
 describe('appendTaskToContext', () => {
+  it('relocates a unique anchor after content is inserted above it', () => {
+    const source = '## House chore\n\n+ [ ] first\n'
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[0]!
+    const shifted = `Intro.\n\n${source}`
+    const inserted = appendTaskToContext(shifted, task)
+    expect(inserted.source).toBe(`${shifted}+ [ ] \n`)
+    expect(inserted.anchorOffset).toBe(shifted.indexOf('[ ]'))
+  })
+
+  it('refuses an ambiguous anchor when its recorded position is stale', () => {
+    const source = '## House chore\n\n+ [ ] first\n'
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[0]!
+    const shifted = `Intro.\n\n${source}+ [ ] first\n`
+    expect(() => appendTaskToContext(shifted, task)).toThrow('task line is ambiguous')
+  })
+
+  it('uses the exact recorded anchor when another task has the same text', () => {
+    const source = '## Kitchen\n\n+ [ ] tidy\n\n## Garden\n\n+ [ ] tidy\n'
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[1]!
+    expect(appendTaskToContext(source, task).source).toBe(`${source}+ [ ] \n`)
+  })
+
+  it('refuses an anchor whose unchanged marker now belongs to a code block', () => {
+    const source = '## House chore\n\n+ [ ] first\n'
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[0]!
+    const fenced = source.replace('## House chore', '```           ') + '```\n'
+    expect(fenced.slice(task.markerOffset, task.markerOffset + task.raw.length)).toBe(task.raw)
+    expect(() => appendTaskToContext(fenced, task)).toThrow('task line no longer in note')
+  })
+
   it('adds a sibling at the end of a nested task context', () => {
     const source = [
       '+ StartupToolbox',
@@ -407,6 +490,52 @@ describe('appendTaskToContext', () => {
     const source = '+ [ ] top-level\n'
     const task = parseNote({ path: 'notes/n.md', source }).tasks[0]!
     expect(() => appendTaskToContext(source, task)).toThrow(TaskStaleError)
+  })
+
+  it('continues a heading group within its list before prose and subheadings', () => {
+    const source =
+      '## House chore\n\n+ [ ] first\n  + [ ] nested\n+ [ ] peer\n\nprose\n\n### Garden\n\n+ [ ] later\n'
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[0]!
+    const inserted = appendTaskToContext(source, task)
+    expect(inserted.source).toBe(
+      '## House chore\n\n+ [ ] first\n  + [ ] nested\n+ [ ] peer\n+ [ ] \n\nprose\n\n### Garden\n\n+ [ ] later\n',
+    )
+    const created = parseNote({ path: 'notes/n.md', source: inserted.source }).tasks.find(
+      (candidate) => candidate.markerOffset === inserted.markerOffset,
+    )
+    expect(created?.breadcrumbs).toEqual(['House chore'])
+  })
+
+  it('retains parent-list continuation within a heading group', () => {
+    const source = '## House chore\n\n+ Kitchen\n  + [ ] first\n+ Garden\n  + [ ] later\n'
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[0]!
+    const inserted = appendTaskToContext(source, task)
+    expect(inserted.source).toBe(
+      '## House chore\n\n+ Kitchen\n  + [ ] first\n  + [ ] \n+ Garden\n  + [ ] later\n',
+    )
+    const created = parseNote({ path: 'notes/n.md', source: inserted.source }).tasks.find(
+      (candidate) => candidate.markerOffset === inserted.markerOffset,
+    )
+    expect(created?.breadcrumbs).toEqual(['House chore', 'Kitchen'])
+  })
+
+  it.each(['Tasks', '[[Tasks|To do]]'])(
+    'does not treat the generic %s heading as explicit continuation context',
+    (heading) => {
+      const source = `# Home\n\n## ${heading}\n\n+ [ ] first\n`
+      const task = parseNote({ path: 'notes/n.md', source }).tasks[0]!
+      expect(() => appendTaskToContext(source, task)).toThrow(TaskStaleError)
+    },
+  )
+
+  it('continues heading tasks with frontmatter and CRLF', () => {
+    const source = '---\r\nid: home\r\n---\r\n## House chore\r\n\r\n+ [ ] first\r\n'
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[0]!
+    const inserted = appendTaskToContext(source, task)
+    expect(inserted.source).toBe(`${source}+ [ ] \r\n`)
+    const created = parseNote({ path: 'notes/n.md', source: inserted.source }).tasks[1]!
+    expect(created.markerOffset).toBe(inserted.markerOffset)
+    expect(created.breadcrumbs).toEqual(['House chore'])
   })
 
   it('preserves CRLF line endings around the inserted task', () => {
