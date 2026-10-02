@@ -223,6 +223,31 @@ describe('insertTask', () => {
     await expect(insertTask('notes/a.md', 7)).resolves.toBe('# Notes\n\nbody\n+ '.length)
     expect(writeNote).toHaveBeenCalledWith('notes/a.md', '# Notes\n\nbody\n+ [ ] \n', 7)
   })
+
+  it('appends through the live session when the note is open — never disk', async () => {
+    // The session applies the transform to its live document (unsaved edits
+    // included), so the offset is measured against that source, not disk.
+    let written = ''
+    const commitSourceEdit = vi.fn((transform: (source: string) => string) => {
+      written = transform('# Today\n\nunsaved line\n')
+      return Promise.resolve(true)
+    })
+    openSession.mockReturnValue({ commitSourceEdit })
+
+    await expect(insertTask('daily/2026-06-14.md', 7)).resolves.toBe(
+      '# Today\n\nunsaved line\n+ '.length,
+    )
+    expect(written).toBe('# Today\n\nunsaved line\n+ [ ] \n')
+    expect(readNote).not.toHaveBeenCalled()
+    expect(writeNote).not.toHaveBeenCalled()
+  })
+
+  it('throws NoteBusyError when the session declines, never clobbering via disk', async () => {
+    openSession.mockReturnValue({ commitSourceEdit: vi.fn().mockResolvedValue(false) })
+
+    await expect(insertTask('daily/2026-06-14.md', 7)).rejects.toBeInstanceOf(NoteBusyError)
+    expect(writeNote).not.toHaveBeenCalled()
+  })
 })
 
 describe('continueTaskInContext', () => {

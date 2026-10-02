@@ -1,4 +1,4 @@
-import { act } from 'react'
+import { act, StrictMode } from 'react'
 import { renderHook } from 'vitest-browser-react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenTask } from '@reflect/core'
@@ -208,6 +208,20 @@ describe('useTaskSheetFinalizer', () => {
 
     expect(edit).toHaveBeenCalledTimes(1)
     expect(edit.mock.calls[0]?.[1]).toBe('alpha edited')
+  })
+
+  it("survives StrictMode's remount probe without deleting a just-added empty task", async () => {
+    // The "+"-add path mounts the sheet already open on an empty task; the
+    // dev-time unmount/remount probe must not read as the sheet going away.
+    const empty = task({ text: '', raw: '[ ] ' })
+    const { unmount } = await renderHook(() => useTaskSheetFinalizer(deps({ task: empty })), {
+      wrapper: StrictMode,
+    })
+    await Promise.resolve()
+    expect(remove).not.toHaveBeenCalled()
+
+    await unmount()
+    await vi.waitFor(() => expect(remove).toHaveBeenCalledTimes(1))
   })
 
   it('does not flush on unmount when the sheet is closed', async () => {

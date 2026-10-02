@@ -1,13 +1,17 @@
 import { useState, type ReactElement } from 'react'
 import { untitledNotePath } from '@reflect/core'
-import { Plus, Square } from 'lucide-react'
+import { CircleCheck, Plus, Square } from 'lucide-react'
 import { MicIcon } from '@/components/icons/mic-icon.tsx'
 import { PencilIcon } from '@/components/icons/pencil-icon.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { taskKey } from '@/lib/tasks/task-identity.ts'
 import { cn } from '@/lib/utils.ts'
 import { useMobileAudioMemo } from '@/mobile/audio-memo-provider.tsx'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
+import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet.tsx'
+import { useNewTaskSheet } from '@/mobile/use-new-task-sheet.ts'
+import { routeForPath } from '@/routing/route.ts'
 import { useRouter } from '@/routing/router.tsx'
 
 const ACTIONS_ID = 'daily-capture-actions'
@@ -18,13 +22,16 @@ const ACTION_BUTTON_MOTION =
 
 /**
  * The Daily screen's compact capture speed dial. The persistent `+` expands
- * into new-note and audio-memo actions along one anchored vertical path. The
- * action wrappers remain mounted so a rapid second tap reverses from their
- * live on-screen transforms instead of restarting or jumping.
+ * into new-note, new-task, and audio-memo actions along one anchored vertical
+ * path. The action wrappers remain mounted so a rapid second tap reverses from
+ * their live on-screen transforms instead of restarting or jumping. New task
+ * opens the Tasks tab's quick-edit sheet over the Daily screen, on a fresh task
+ * in today's note.
  */
 export function DailyCaptureMenu(): ReactElement {
   const [expanded, setExpanded] = useState(false)
   const memo = useMobileAudioMemo()
+  const newTask = useNewTaskSheet()
   const { navigate } = useRouter()
   const recording = memo.phase === 'recording' || memo.phase === 'requesting'
   const audioLabel =
@@ -46,6 +53,11 @@ export function DailyCaptureMenu(): ReactElement {
   const createNote = (): void => {
     close()
     navigate({ kind: 'note', path: untitledNotePath() })
+  }
+
+  const createTask = (): void => {
+    close()
+    newTask.start()
   }
 
   const toggleAudioMemo = (): void => {
@@ -86,7 +98,7 @@ export function DailyCaptureMenu(): ReactElement {
             ACTION_MOTION,
             expanded
               ? 'pointer-events-auto z-[1] -translate-y-[3.75rem] scale-100 opacity-100 duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
-              : 'pointer-events-none z-[1] translate-y-0 scale-50 opacity-0 delay-[25ms] duration-200 ease-[cubic-bezier(0.64,0,0.78,0)]',
+              : 'pointer-events-none z-[1] translate-y-0 scale-50 opacity-0 delay-[50ms] duration-200 ease-[cubic-bezier(0.64,0,0.78,0)]',
           )}
         >
           <Button
@@ -101,13 +113,34 @@ export function DailyCaptureMenu(): ReactElement {
           </Button>
         </div>
 
+        <div
+          data-slot="new-task-action"
+          className={cn(
+            ACTION_MOTION,
+            expanded
+              ? 'pointer-events-auto -translate-y-[7.5rem] scale-100 opacity-100 delay-[35ms] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
+              : 'pointer-events-none translate-y-0 scale-50 opacity-0 delay-[25ms] duration-200 ease-[cubic-bezier(0.64,0,0.78,0)]',
+          )}
+        >
+          <Button
+            size="icon"
+            variant="secondary"
+            aria-label="New task"
+            tabIndex={expanded ? 0 : -1}
+            className={cn('size-12 rounded-full shadow-lg', ACTION_BUTTON_MOTION)}
+            onClick={createTask}
+          >
+            <CircleCheck aria-hidden className="size-5" />
+          </Button>
+        </div>
+
         {memo.available ? (
           <div
             data-slot="audio-memo-action"
             className={cn(
               ACTION_MOTION,
               expanded
-                ? 'pointer-events-auto -translate-y-[7.5rem] scale-100 opacity-100 delay-[35ms] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
+                ? 'pointer-events-auto -translate-y-[11.25rem] scale-100 opacity-100 delay-[70ms] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
                 : 'pointer-events-none translate-y-0 scale-50 opacity-0 duration-200 ease-[cubic-bezier(0.64,0,0.78,0)]',
             )}
           >
@@ -130,6 +163,19 @@ export function DailyCaptureMenu(): ReactElement {
           </div>
         ) : null}
       </div>
+
+      {newTask.task !== null ? (
+        <MobileTaskEditSheet
+          key={taskKey(newTask.task)}
+          task={newTask.task}
+          open={newTask.open}
+          onOpenChange={newTask.setOpen}
+          today={newTask.today}
+          actions={newTask.actions}
+          onOpenNote={(path) => navigate(routeForPath(path))}
+          autoFocusEditor
+        />
+      ) : null}
     </div>
   )
 }

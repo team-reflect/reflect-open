@@ -244,14 +244,28 @@ export function continueTaskInContext(
  * Insert a new empty `+ [ ] ` task at the end of `notePath` (Plan 18's Return-to-
  * add) and return its marker offset, so the Tasks view can select the new row and
  * open its inline editor. A missing note — today's daily not yet created — starts
- * empty. Refuses an **open** note via {@link NoteBusyError}: appending through
- * disk would clobber its live buffer, and the Tasks view rarely targets one.
- * Serialized per path with the other task writes.
+ * empty. Routes like {@link applyTaskChange}: an **open** note (the Daily screen's
+ * "New task" adds to today's note while it's on screen) appends through its live session so
+ * unsaved edits survive, and a session that can't take the edit surfaces as
+ * {@link NoteBusyError} rather than a clobbering disk write. Serialized per path
+ * with the other task writes.
  */
 export function insertTask(notePath: string, generation: number): Promise<number> {
   return serializeByPath(notePath, async () => {
-    if (openSession(notePath) !== null) {
-      throw new NoteBusyError('This note is open — add the task in the note itself.')
+    const owner = openSession(notePath)
+    if (owner !== null) {
+      // The session hands the transform its live document, so the offset is
+      // computed against exactly the source it writes.
+      let markerOffset = 0
+      const applied = await owner.commitSourceEdit((source) => {
+        const appended = appendTaskLine(source)
+        markerOffset = appended.markerOffset
+        return appended.source
+      })
+      if (!applied) {
+        throw new NoteBusyError('This note can’t be updated right now — try again in a moment.')
+      }
+      return markerOffset
     }
     let source: string
     try {

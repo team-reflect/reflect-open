@@ -149,7 +149,22 @@ export function useTaskSheetFinalizer({
       }
     }
   })
-  useEffect(() => () => unmountFlushRef.current(), [])
+  // The flush waits a microtask and runs only if the sheet stayed unmounted:
+  // StrictMode's dev-time unmount/remount probe runs this cleanup on a sheet
+  // that is still showing, and flushing there would delete a just-added,
+  // still-empty "+" task out from under it.
+  const mountedRef = useRef(false)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      queueMicrotask(() => {
+        if (!mountedRef.current) {
+          unmountFlushRef.current()
+        }
+      })
+    }
+  }, [])
 
   return { draft, setDraft, resolve, handleOpenChange, closeHandled, closeNavigate }
 }

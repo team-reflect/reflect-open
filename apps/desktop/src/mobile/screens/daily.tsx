@@ -13,7 +13,7 @@ import { useRouter } from '@/routing/router.tsx'
  * stay in lockstep through `date` — tapping a strip day or swiping the
  * carousel both navigate a daily route, which flows back as `date` (though
  * mid-swipe the strip briefly leads, following the gesture's target day). A
- * floating `+` expands into new-note and audio-memo capture actions.
+ * floating `+` expands into new-note, new-task, and audio-memo capture actions.
  *
  * Mounted once for the daily surface (a stable key in `MobileScreen`), so a
  * day change scrolls the carousel rather than remounting it.
