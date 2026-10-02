@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.15.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta...v0.15.0-beta.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* open the highlighted palette note in a new window with ⌘Enter ([#1420](https://github.com/team-reflect/reflect-open/issues/1420)) ([9355096](https://github.com/team-reflect/reflect-open/commit/935509666cab06d138a94235d6b52ad8ee490824))
+* open the selected All Notes row in a new window with ⌘Return ([#1421](https://github.com/team-reflect/reflect-open/issues/1421)) ([c1e1b2d](https://github.com/team-reflect/reflect-open/commit/c1e1b2d791ce83b6c25e5cf49ea3bf357c4820d9))
+* update meowdown ([#1415](https://github.com/team-reflect/reflect-open/issues/1415)) ([b8bb394](https://github.com/team-reflect/reflect-open/commit/b8bb394b3cd7682fb2a6d797f9ca1d661a44f524))
+
 ## [0.15.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.14.0...v0.15.0-beta) (2026-10-01)
 
 
