@@ -1,13 +1,14 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { isModEvent } from '@meowdown/core'
 import type { ListSelection } from '@/lib/selection/use-list-selection.ts'
+import type { ModClickEvent } from '@/lib/windows/open-in-new-window.ts'
 
 export interface AllNotesKeyboardOptions {
   selection: ListSelection
   /** The note paths in render order — the selection's keys resolve against these. */
   orderedPaths: readonly string[]
-  /** Open a note in the editor (Enter / ⌘Enter on the selection). */
-  onOpen: (path: string) => void
+  /** Open a note (Enter in place, ⌘Enter in a new window). */
+  onOpen: (path: string, event?: ModClickEvent) => void
   /** Ask to trash the selection (⌘⌫) — the screen opens its confirm dialog. */
   onRequestTrash: () => void
   /** The All Notes surface; shortcuts back off when focus is outside it. */
@@ -27,9 +28,9 @@ const OWNS_KEYS = '[role="menu"], [role="dialog"], [role="listbox"], input, text
  * with a smaller map: there's no inline editor and no add/complete here.
  *
  * The map: ↑/↓ move a single selection (Shift to extend the range), ⌘A select
- * all, Return / ⌘Return open the first selected note, ⌘⌫ trash the selection
- * (the screen confirms first — plain ⌫/Delete is deliberately *not* bound, so a
- * stray keypress can't bulk-trash), Esc clear.
+ * all, Return opens the first selected note (⌘Return in a new window), ⌘⌫
+ * trash the selection (the screen confirms first — plain ⌫/Delete is
+ * deliberately *not* bound, so a stray keypress can't bulk-trash), Esc clear.
  *
  * Scoping: the listener is on `document`, but backs off when focus sits outside
  * the surface (the sidebar or another panel keeps its own keys — only `body`/no
@@ -107,11 +108,11 @@ export function useAllNotesKeyboard({
         if (target?.closest?.('button, a, [role="button"], [role="link"]') != null) {
           return
         }
-        // V1: Return / ⌘Return open the first selected note (render order).
+        // Return opens the first selected note (render order).
         const firstSelected = orderedPaths.find((path) => selection.isSelected(path))
         if (firstSelected !== undefined) {
           event.preventDefault()
-          onOpen(firstSelected)
+          onOpen(firstSelected, event)
         }
       } else if (mod && event.key === 'Backspace') {
         if (selection.selectedCount > 0) {

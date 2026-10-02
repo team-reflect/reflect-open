@@ -518,6 +518,26 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await view.unmount()
   })
 
+  it('opens the selected note in a new window with Mod+Return', async () => {
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
+
+    await userEvent.keyboard('{ArrowDown}')
+    await expect.element(view.getByRole('button', { name: /Trash \(1\)/ })).toBeInTheDocument()
+
+    await userEvent.keyboard('{ControlOrMeta>}{Enter}{/ControlOrMeta}')
+
+    await vi.waitFor(() =>
+      expect(openRouteInNewWindow).toHaveBeenCalledWith({
+        kind: 'note',
+        path: 'notes/health.md',
+      }),
+    )
+    expect(openRouteInNewWindow).toHaveBeenCalledTimes(1)
+    expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: null })
+    await view.unmount()
+  })
+
   it('clears the selection on Escape', async () => {
     const view = await renderScreen()
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
