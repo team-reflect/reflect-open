@@ -1,0 +1,47 @@
+name: Update meowdown
+
+on:
+  repository_dispatch:
+    types: [meowdown-released]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-meowdown
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.repository == 'team-reflect/reflect-open'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-node
+
+      # npm may serve stale versions right after a release, so retry.
+      - name: Update @meowdown/*
+        run: |
+          for i in $(seq 1 10); do
+            pnpm up -r --latest '@meowdown/*'
+            pnpm dedupe
+            if ! git diff --quiet; then exit 0; fi
+            sleep 30
+          done
+
+      - name: Open a PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C chore/update-meowdown
+          git commit -am 'fix: update meowdown'
+          git push --force origin chore/update-meowdown
+          # Fails when the PR already exists. The push above has updated it.
+          gh pr create --head chore/update-meowdown --title 'fix: update meowdown' --body 'Update `@meowdown/*` to the latest versions.' || true
