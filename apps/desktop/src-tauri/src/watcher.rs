@@ -23,7 +23,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use file_id::{get_file_id, FileId};
-use notify::{RecommendedWatcher, RecursiveMode};
+use notify::event::{AccessKind, AccessMode};
+use notify::{EventKind, RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{new_debouncer_opt, DebounceEventResult, Debouncer, FileIdCache};
 use reflect_graph_paths::{
     classify, evicted_logical_path, eviction_placeholder, has_pruned_component, is_pruned_dir_name,
@@ -287,6 +288,14 @@ fn lock_watcher<'a>(
 /// Start (or restart) watching the active graph; emits `index:changed`
 /// batches and `index:reconcile` signals.
 ///
+/// Whether an event only records that something was read. Linux inotify
+/// reports opens and read-only closes; FSEvents does not. Treating them as
+/// changes loops: the reconcile walk opens every directory, and each opened
+/// directory flips `reconcile` again. A close after writing still counts.
+fn is_read_access(kind: &EventKind) -> bool {
+    matches!(kind, EventKind::Access(access) if *access != AccessKind::Close(AccessMode::Write))
+}
+
 /// The graph lock is held from reading the root until the new debouncer is
 /// installed, so a concurrent `graph_open` can't swap the root mid-install and
 /// leave a watcher bound to the previous graph emitting events attributed to
@@ -321,6 +330,7 @@ pub fn watch_start(
             let rescan_demanded = events.iter().any(|event| event.need_rescan());
             let paths: Vec<PathBuf> = events
                 .iter()
+                .filter(|event| !is_read_access(&event.kind))
                 .flat_map(|event| event.paths.clone())
                 .collect();
             let mut effects = collect_changes(&paths, &handler_root);
@@ -752,5 +762,57 @@ mod tests {
             "the removed subtree must be fully evicted"
         );
         assert!(cache.paths.contains_key(&root.join("top.md")));
+    }
+
+    #[test]
+    fn read_access_is_not_a_change() {
+        use notify::event::{CreateKind, ModifyKind};
+        assert!(is_read_access(&EventKind::Access(AccessKind::Open(
+            AccessMode::Any
+        ))));
+        assert!(is_read_access(&EventKind::Access(AccessKind::Close(
+            AccessMode::Read
+        ))));
+        assert!(is_read_access(&EventKind::Access(AccessKind::Read)));
+        assert!(!is_read_access(&EventKind::Access(AccessKind::Close(
+            AccessMode::Write
+        ))));
+        assert!(!is_read_access(&EventKind::Create(CreateKind::Folder)));
+        assert!(!is_read_access(&EventKind::Modify(ModifyKind::Any)));
+    }
+
+    /// The loop on Linux: listing the graph must not produce events that
+    /// survive the read-access filter.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn listing_the_graph_produces_no_change_events() {
+        use notify::Watcher;
+
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("notes/sub")).unwrap();
+        std::fs::write(root.join("notes/a.md"), "# a").unwrap();
+
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let mut watcher = notify::recommended_watcher(sender).unwrap();
+        watcher.watch(root, RecursiveMode::Recursive).unwrap();
+
+        for entry in WalkDir::new(root) {
+            let entry = entry.unwrap();
+            if entry.file_type().is_file() {
+                std::fs::read_to_string(entry.path()).unwrap();
+            }
+        }
+
+        let mut read_events = 0;
+        while let Ok(event) = receiver.recv_timeout(Duration::from_millis(300)) {
+            let event = event.unwrap();
+            assert!(
+                is_read_access(&event.kind),
+                "a read-only walk produced a change event: {event:?}"
+            );
+            read_events += 1;
+        }
+        assert!(read_events > 0, "inotify should report the walk's opens");
     }
 }
