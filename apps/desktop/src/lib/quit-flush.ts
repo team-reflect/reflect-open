@@ -15,7 +15,7 @@ import { isMainWindow } from '@/lib/windows/window-role.ts'
  * - **Window close** (red button, ⌘W): registering a JS `onCloseRequested`
  *   listener defers the close until the handler returns, so the flush is
  *   awaited before the window is destroyed. On macOS the main window stays
- *   alive and is hidden after flushing, preserving normal last-window close
+ *   alive and is hidden before flushing, preserving normal last-window close
  *   behavior without terminating the app; secondary windows still close.
  * - **App quit** (⌘Q): never reaches close-requested — the Rust shell defers
  *   `ExitRequested` once and emits `app:quit-requested`; we flush, then
@@ -45,14 +45,19 @@ export function installQuitFlush(): () => void {
     currentWindow.onCloseRequested(async (event) => {
       const shouldHide = isMacosDesktop && isMainWindow()
       if (shouldHide) {
-        // Prevent synchronously: waiting until after the flush lets AppKit
+        // Prevent synchronously: waiting until after an await lets AppKit
         // destroy the last window (and Tauri then terminates the process).
         event.preventDefault()
       }
-      await Promise.allSettled([flushOpenDocuments(), flushSettings()])
-      await flushBackup()
-      if (shouldHide) {
-        await currentWindow.hide()
+      try {
+        if (shouldHide) {
+          // The hidden main window stays alive while persistence finishes.
+          await currentWindow.hide()
+        }
+      } finally {
+        // A failed hide must not skip persistence either.
+        await Promise.allSettled([flushOpenDocuments(), flushSettings()])
+        await flushBackup()
       }
     }),
   )

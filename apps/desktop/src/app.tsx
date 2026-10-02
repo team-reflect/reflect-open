@@ -13,8 +13,8 @@ import { useGraph } from '@/providers/graph-provider.tsx'
 export function App(): ReactElement {
   const { status, graph, error } = useGraph()
 
-  // Quit-time persistence: flush dirty note buffers before the webview dies
-  // (secondary-window close, ⌘Q, reload) or the macOS main window hides.
+  // Quit-time persistence: flush dirty note buffers when exiting, awaiting
+  // persistence before destruction but hiding the macOS main window first.
   // Unmount effects don't run on those paths. installQuitFlush returns its
   // teardown, which the effect returns as cleanup.
   useEffect(() => {
