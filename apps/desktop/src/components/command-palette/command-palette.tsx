@@ -10,7 +10,6 @@ import { runCommand } from '@/lib/commands/registry.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { formatDayLabel } from '@/lib/dates.ts'
 import { cn } from '@/lib/utils.ts'
-import type { ModClickEvent } from '@/lib/windows/open-in-new-window.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { routeForPath } from '@/routing/route.ts'
 import { COMMAND_ICONS, FALLBACK_COMMAND_ICON } from './command-icons.ts'
@@ -51,9 +50,10 @@ const Snippet = memo(function Snippet({ snippet }: { snippet: string }): ReactEl
   )
 })
 
-interface PendingNoteClick {
-  path: string
-  event: ModClickEvent
+interface PendingNoteOpen {
+  /** The clicked note, or `null` for a key press on the highlighted item. */
+  path: string | null
+  openInNewWindow: boolean
 }
 
 export function CommandPalette({ context }: CommandPaletteProps): ReactElement | null {
@@ -62,9 +62,9 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
   const { sections, resultsSettled, searchFailed } = usePaletteResults(open, query)
   const navigateNoteLink = useNoteLinkNavigation()
   // cmdk's `onSelect` exposes only the selected value, not its originating
-  // click. Capture the modifiers before cmdk's own click handler, then consume
-  // them exactly once from `onSelect`; keyboard Enter has no captured click.
-  const pendingNoteClickRef = useRef<PendingNoteClick | null>(null)
+  // click or key press. Capture the modifiers before cmdk's own handler, then
+  // consume them exactly once from `onSelect`.
+  const pendingNoteOpenRef = useRef<PendingNoteOpen | null>(null)
   // cmdk's highlighted item, mirrored so the preview pane can follow it. Reset
   // on close so a reopened palette highlights its first result, not the last
   // session's pick.
@@ -112,11 +112,14 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
   }
 
   const openNote = (entry: NoteEntry): void => {
-    const pendingClick = pendingNoteClickRef.current
-    pendingNoteClickRef.current = null
+    const pending = pendingNoteOpenRef.current
+    pendingNoteOpenRef.current = null
     navigateNoteLink({
       target: routeForPath(entry.path),
-      openInNewWindow: pendingClick?.path === entry.path && isModEvent(pendingClick.event),
+      openInNewWindow:
+        pending !== null &&
+        pending.openInNewWindow &&
+        (pending.path === null || pending.path === entry.path),
     })
     closePalette()
   }
@@ -159,10 +162,11 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
               }
               return
             }
-            // cmdk dispatches its custom select event after this handler. Drop
-            // any abandoned pointer intent so Enter can never inherit it.
+            // cmdk dispatches its custom select event after this handler.
+            // Overwrite any abandoned pointer intent so Enter can never
+            // inherit it.
             if (event.key === 'Enter') {
-              pendingNoteClickRef.current = null
+              pendingNoteOpenRef.current = { path: null, openInNewWindow: isModEvent(event) }
             }
             if (event.key === 'Escape') {
               event.preventDefault()
@@ -202,9 +206,9 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                         key={entry.path}
                         value={entry.path}
                         onClickCapture={(event) => {
-                          pendingNoteClickRef.current = {
+                          pendingNoteOpenRef.current = {
                             path: entry.path,
-                            event: { metaKey: event.metaKey, ctrlKey: event.ctrlKey },
+                            openInNewWindow: isModEvent(event),
                           }
                         }}
                         onSelect={() => openNote(entry)}
@@ -251,7 +255,7 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                         key={command.id}
                         value={`command:${command.id}`}
                         onSelect={() => {
-                          pendingNoteClickRef.current = null
+                          pendingNoteOpenRef.current = null
                           closePalette()
                           void runCommand(command.id, context)
                         }}
@@ -301,6 +305,11 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
             <span className="flex items-center gap-1.5">
               <Kbd>↩</Kbd> Open
             </span>
+            {splitLayout ? (
+              <span className="flex items-center gap-1.5">
+                <ShortcutKeys binding="Mod-Enter" /> Open in new window
+              </span>
+            ) : null}
             <span className="flex items-center gap-1.5">
               <Kbd>esc</Kbd> Close
             </span>

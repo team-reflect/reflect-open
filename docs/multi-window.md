@@ -58,7 +58,8 @@ and an ordinary routed note both open through the same mechanism described
 below. The command is also exposed in the native Window menu.
 
 1. A mod-click (the platform's mod key: Cmd on Apple, Ctrl elsewhere), or a
-   Mod+Enter press on a selected link unit, asks for a new window. Each UI
+   Mod+Enter press on a selected link unit or on the highlighted note in the
+   command palette, asks for a new window. Each UI
    boundary turns its own gesture into the explicit `openInNewWindow` flag
    the navigation chain carries, and one definition backs them all:
    meowdown's `isModEvent` reads plain DOM row clicks, and the editor's own

@@ -228,6 +228,40 @@ describe('CommandPalette', () => {
     await expect.element(view.getByTestId('route')).toMatchTextContent('notes/rust.md')
   })
 
+  it('Mod+Enter opens the highlighted note in one note window', async () => {
+    suggestWikiTargets.mockResolvedValue([])
+    searchWithFilters.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust Notes', snippet: null, dailyDate: null },
+    ])
+    const { view } = await renderPalette('rust')
+    await expect.element(view.getByText('Rust Notes')).toBeInTheDocument()
+
+    await userEvent.keyboard('{ControlOrMeta>}{Enter}{/ControlOrMeta}')
+
+    expect(view.getByTestId('palette-overlay').query()).toBeNull()
+    expect(openRouteInNewWindow).toHaveBeenCalledTimes(1)
+    expect(openRouteInNewWindow).toHaveBeenCalledWith({
+      kind: 'note',
+      path: 'notes/rust.md',
+    })
+    expect(view.getByTestId('route').element().textContent).toBe(JSON.stringify({ kind: 'today' }))
+  })
+
+  it('falls back in-window after a declined Mod+Enter', async () => {
+    suggestWikiTargets.mockResolvedValue([])
+    searchWithFilters.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust Notes', snippet: null, dailyDate: null },
+    ])
+    openRouteInNewWindow.mockResolvedValue(false)
+    const { view } = await renderPalette('rust')
+    await expect.element(view.getByText('Rust Notes')).toBeInTheDocument()
+
+    await userEvent.keyboard('{ControlOrMeta>}{Enter}{/ControlOrMeta}')
+
+    expect(view.getByTestId('palette-overlay').query()).toBeNull()
+    await expect.element(view.getByTestId('route')).toMatchTextContent('notes/rust.md')
+  })
+
   it('> filters to commands and Enter runs the selection', async () => {
     suggestWikiTargets.mockResolvedValue([])
     searchWithFilters.mockResolvedValue([])
