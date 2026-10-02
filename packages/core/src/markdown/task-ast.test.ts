@@ -1,5 +1,5 @@
 import { parseMarkdownAst } from '@meowdown/markdown'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { splitFrontmatter } from './frontmatter.ts'
 import {
   applyTaskEdits,
@@ -14,6 +14,10 @@ import {
   type TaskSnapshot,
 } from './task-ast.ts'
 import { isSameTaskPath } from './task-path.ts'
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 /** The locator of the `index`th task in `source`, as the index would store it. */
 function locate(source: string, index = 0): TaskLocator {
@@ -174,12 +178,20 @@ describe('applyTaskEdits: toggle', () => {
     )
   })
 
-  it('refuses a task that is gone or ambiguous', () => {
+  it('takes the first of several identical tasks when the path is stale, and says so', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const source = '+ [ ] same\n+ [ ] same\n'
+    const stale = { ...locate(source, 1), astPath: [7] }
+    expect(applyTaskEdits(source, [{ kind: 'toggle', task: stale }]).source).toBe(
+      '+ [x] same\n+ [ ] same\n',
+    )
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('taking the first of 2'))
+  })
+
+  it('refuses a task that is gone', () => {
     const source = '+ [ ] dup\n+ [ ] dup\n'
     const gone = { ...locate(source), markdown: 'zzz' }
     expect(() => applyTaskEdits(source, [{ kind: 'toggle', task: gone }])).toThrow(TaskStaleError)
-    const ambiguous = { ...locate(source), astPath: [7] }
-    expect(() => applyTaskEdits(source, [{ kind: 'toggle', task: ambiguous }])).toThrow(/ambiguous/)
   })
 
   it('never reaches a checkbox inside a code block', () => {
@@ -489,14 +501,20 @@ describe('findTaskMove', () => {
     })
   })
 
-  it('returns undefined for a locator that names no task or several', () => {
+  it('returns undefined for a locator that names no task', () => {
     expect(findTaskMove(moved, { astPath: [1], markdown: 'c', checked: false })).toBeUndefined()
+  })
+
+  it('prefers the path match over identical content, else takes the first and warns', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const twins = '+ [ ] same\n+ [ ] same\n'
     const result = applyTaskEdits(twins, [{ kind: 'toggle', task: locate(twins, 1) }])
-    expect(findTaskMove(result.moved, { astPath: [5], markdown: 'same', checked: false })).toBe(
-      undefined,
-    )
     expect(findTaskMove(result.moved, locate(twins, 1))?.to).toMatchObject({ checked: true })
+    expect(warn).not.toHaveBeenCalled()
+    expect(
+      findTaskMove(result.moved, { astPath: [5], markdown: 'same', checked: false })?.from,
+    ).toMatchObject({ astPath: [0] })
+    expect(warn).toHaveBeenCalledOnce()
   })
 })
 

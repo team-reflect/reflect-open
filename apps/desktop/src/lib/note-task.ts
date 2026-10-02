@@ -67,7 +67,6 @@ function serializeByPath<T>(path: string, op: () => Promise<T>): Promise<T> {
 
 interface WriteTaskEditsOptions {
   /** Treat a missing note as empty: the first task creates it (today's daily). */
-  // FIXME: should we rename "createIfMissing" to "createNoteIfMissing"?
   readonly createIfMissing?: boolean
 }
 
@@ -91,7 +90,7 @@ async function readSource(notePath: string, createIfMissing: boolean): Promise<s
  * persist now (loading, protected/read-only, or a parked conflict), surfaced as
  * {@link NoteBusyError}. When the note is **not** open, disk is the source of
  * truth. Every locator in `edits` describes the note as the index last saw it;
- * a stale or ambiguous one surfaces as `TaskStaleError` from the core edit
+ * one whose task is gone surfaces as `TaskStaleError` from the core edit
  * rather than a silent wrong write. The result reports where every task of
  * the note ended up, so callers can re-address cached rows before the reindex.
  */

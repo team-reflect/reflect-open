@@ -18,10 +18,7 @@ import { normalizeWikiTarget } from './resolve.ts'
 import { scanInlineWikiLinks } from './scan.ts'
 import { isSameTaskPath } from './task-path.ts'
 
-/**
- * The task a caller addressed is not in the note anymore, or not uniquely:
- * the write is refused rather than applied to the wrong item.
- */
+/** The task a caller addressed is not in the note anymore: the write is refused. */
 export class TaskStaleError extends Error {
   constructor(message: string) {
     super(message)
@@ -176,14 +173,12 @@ export interface TaskEditResult {
 
 /**
  * Where a write left the task a locator names, or undefined when the locator
- * names none or several. Resolved like the edit itself, so a locator from a
- * stale index follows its task by content instead of claiming whatever task
- * now sits at its path.
+ * names none. Resolved like the edit itself, so a locator from a stale index
+ * follows its task by content instead of claiming whatever task now sits at
+ * its path.
  */
 export function findTaskMove(moves: readonly TaskMove[], task: TaskLocator): TaskMove | undefined {
-  const matches = matchTaskLocator(moves, (move) => move.from, task)
-  // FIXME: if we have more than one match, we just pick the first one and print a wanring.
-  return matches.length === 1 ? matches[0] : undefined
+  return resolveTaskLocator(moves, (move) => move.from, task)
 }
 
 /** A slot for a new item: right after a block, or at the end of a container. */
@@ -271,34 +266,38 @@ function hasSameContent(entry: TaskLocator, locator: TaskLocator): boolean {
 }
 
 /**
- * The entries a locator names: the one at its path while its content still
- * matches, else every entry with that content (the task moved, or is gone).
+ * The entry a locator names: the one at its path while its content still
+ * matches, else the first entry with that content (the task moved). Several
+ * entries with that content are identical lines, so the first is taken and
+ * the guess is logged.
  */
-function matchTaskLocator<T>(
+function resolveTaskLocator<T>(
   entries: readonly T[],
   locatorOf: (entry: T) => TaskLocator,
   locator: TaskLocator,
-): T[] {
+): T | undefined {
   const atPath = entries.find((entry) => {
     const candidate = locatorOf(entry)
     return isSameTaskPath(candidate.astPath, locator.astPath) && hasSameContent(candidate, locator)
   })
   if (atPath !== undefined) {
-    return [atPath]
+    return atPath
   }
-  return entries.filter((entry) => hasSameContent(locatorOf(entry), locator))
+  const byContent = entries.filter((entry) => hasSameContent(locatorOf(entry), locator))
+  if (byContent.length > 1) {
+    console.warn(
+      `task is ambiguous, taking the first of ${byContent.length}: ${JSON.stringify(locator.markdown)}`,
+    )
+  }
+  return byContent[0]
 }
 
 function locateTask(before: readonly TaskEntry[], locator: TaskLocator): TaskEntry {
-  const matches = matchTaskLocator(before, (entry) => entry, locator)
-  const [match] = matches
-  if (matches.length === 1 && match !== undefined) {
-    return match
-  } // FIXME: if we have more than one match, we just pick the first one and print a wanring.
-  const text = JSON.stringify(locator.markdown)
-  throw new TaskStaleError(
-    matches.length === 0 ? `task is no longer in the note: ${text}` : `task is ambiguous: ${text}`,
-  )
+  const match = resolveTaskLocator(before, (entry) => entry, locator)
+  if (match === undefined) {
+    throw new TaskStaleError(`task is no longer in the note: ${JSON.stringify(locator.markdown)}`)
+  }
+  return match
 }
 
 function resolveInsertPosition(
