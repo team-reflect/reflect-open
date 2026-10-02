@@ -442,8 +442,8 @@ function assertTasksSurvive(body: string, expected: readonly TaskEntry[]): void 
   const actual = getRoundTasks(parseMarkdownAst(body))
   const survives =
     actual.length === expected.length &&
-    actual.every((entry, position) => {
-      const wanted = expected[position]
+    actual.every((entry, i) => {
+      const wanted = expected[i]
       return (
         wanted !== undefined &&
         isSameTaskPath(entry.astPath, wanted.astPath) &&

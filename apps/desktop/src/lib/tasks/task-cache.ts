@@ -32,7 +32,7 @@ export function withoutTasks(
 }
 
 function isSameLabels(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && left.every((label, position) => label === right[position])
+  return left.length === right.length && left.every((label, i) => label === right[i])
 }
 
 /** The row as the write left its task; the row itself when nothing differs. */
