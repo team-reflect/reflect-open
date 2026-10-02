@@ -44,9 +44,9 @@ jobs:
         run: |
           if git diff --quiet; then exit 0; fi
           # Skip the push when the PR branch already has the same files.
-          git fetch origin chore/update-meowdown && git diff --quiet FETCH_HEAD && exit 0
-          git switch -C chore/update-meowdown
+          git fetch origin chore-update-meowdown && git diff --quiet FETCH_HEAD && exit 0
+          git switch -C chore-update-meowdown
           git commit -am 'fix: update meowdown'
-          git push --force origin chore/update-meowdown
+          git push --force origin chore-update-meowdown
           # Fails when the PR already exists. The push above has updated it.
-          gh pr create --head chore/update-meowdown --title 'fix: update meowdown' --body 'Update `@meowdown/*` to the latest versions.' || true
+          gh pr create --head chore-update-meowdown --title 'fix: update meowdown' --body 'Update `@meowdown/*` to the latest versions.' || true
