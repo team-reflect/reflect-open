@@ -88,8 +88,7 @@ Step-by-step walkthroughs for the most common kinds of change:
 - [Editor architecture](docs/contributing/editor-architecture.md) — the
   session/adapter split, the save loop, and where new editor code goes.
 - [Upgrading dependencies](docs/contributing/upgrading-dependencies.md) —
-  age gates, manifests vs locks, Node+Rust local checks, draft dep PRs
-  (especially Tauri).
+  age gates, manifests, local checks, draft PRs.
 
 ## "Plan NN" in comments?
 
