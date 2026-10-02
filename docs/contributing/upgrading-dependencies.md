@@ -10,12 +10,13 @@ routine updates; follow this when doing the bump yourself.
    prereleases unless explicitly allowed.
 2. **Edit source manifests** (`package.json`, `Cargo.toml`), then regenerate
    locks (`pnpm-lock.yaml`, `Cargo.lock`). No lock-only bumps.
-3. **Never change `pnpm-workspace.yaml`.**
-4. **Draft PR** — create a draft GitHub PR.
-5. **Title:** `chore(deps): update XXXX`.
-6. **Local Node *and* Rust build+lint must pass** before opening/pushing as
+3. **Run `pnpm dedupe`** after npm bumps and commit any lockfile changes.
+4. **Never change `pnpm-workspace.yaml`.**
+5. **Draft PR** — create a draft GitHub PR.
+6. **Title:** `chore(deps): update XXXX`.
+7. **Local Node *and* Rust build+lint must pass** before opening/pushing as
    ready; then CI `all-green` must pass.
-7. Branch from latest `origin/master`.
+8. Branch from latest `origin/master`.
 
 ## Tauri alignment
 
@@ -27,7 +28,7 @@ Keep majors aligned; path plugins under `plugins/` pick up workspace pins.
 ## Local checks
 
 ```bash
-pnpm install && pnpm typecheck && pnpm lint && pnpm build
+pnpm install && pnpm dedupe && pnpm typecheck && pnpm lint && pnpm build
 
 node apps/desktop/scripts/build-sidecar.mjs
 cargo fmt --all -- --check
