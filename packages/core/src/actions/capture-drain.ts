@@ -24,6 +24,7 @@ import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks.ts'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter.ts'
 import type { ReconcileStop } from './audio-memo.ts'
 import { ensureBacklinkTarget } from './backlink-target.ts'
+import { editCaptureDaily, type CaptureDailyEditor } from './capture-daily.ts'
 import {
   captureFromPath,
   captureIdentity,
@@ -56,6 +57,8 @@ const SCREENSHOT_MAX_DIM = 1600
 const ORPHAN_SPOOL_MAX_AGE_MS = 60 * 60 * 1000
 
 export interface DrainCaptureInboxInput {
+  /** Save daily edits through the host's live document when it is open. */
+  editDaily?: CaptureDailyEditor | undefined
   /** `GraphInfo.generation` — pins every read and write to the issuing graph. */
   generation: number
   /** Appends an X post to the daily note at `path`, merging with a live editor when open. */
@@ -222,7 +225,7 @@ export async function drainCaptureInbox(
         continue
       }
       if (envelope.kind !== undefined) {
-        await drainTextCapture(envelope, input.generation)
+        await drainTextCapture(envelope, input.generation, input.editDaily)
         await captureInboxRemove(name, input.generation)
         drained += 1
         continue
@@ -271,24 +274,36 @@ export async function drainCaptureInbox(
         input.generation,
       )
       const freshTitle = displayTitle(envelope)
-      let updatedDaily = dailySource
-      if (existing !== null) {
-        // The refresh reset the note's H1 to the fresh tab title; keep the
-        // daily's link text in step.
-        updatedDaily = retitleDailyEntry(updatedDaily, identity.base, existing.title, freshTitle)
-      }
-      updatedDaily = upgradeSectionHeadingBacklink(updatedDaily, linksNoteTitle, [LINKS_NOTE_TITLE])
-      if (!updatedDaily.includes(`[[${identity.base}`)) {
-        updatedDaily = appendListItemUnderBacklinkedHeading(
-          updatedDaily,
-          linksNoteTitle,
-          `[[${identity.base}|${freshTitle}]]`,
-          [LINKS_NOTE_TITLE],
-        )
-      }
-      if (updatedDaily !== dailySource) {
-        await writeNote(daily, updatedDaily, input.generation)
-      }
+      await editCaptureDaily(
+        daily,
+        input.generation,
+        (source) => {
+          let updatedDaily = source
+          if (existing !== null) {
+            // The refresh reset the note's H1 to the fresh tab title; keep the
+            // daily's link text in step.
+            updatedDaily = retitleDailyEntry(
+              updatedDaily,
+              identity.base,
+              existing.title,
+              freshTitle,
+            )
+          }
+          updatedDaily = upgradeSectionHeadingBacklink(updatedDaily, linksNoteTitle, [
+            LINKS_NOTE_TITLE,
+          ])
+          if (!updatedDaily.includes(`[[${identity.base}`)) {
+            updatedDaily = appendListItemUnderBacklinkedHeading(
+              updatedDaily,
+              linksNoteTitle,
+              `[[${identity.base}|${freshTitle}]]`,
+              [LINKS_NOTE_TITLE],
+            )
+          }
+          return updatedDaily
+        },
+        input.editDaily,
+      )
       await captureInboxRemove(name, input.generation)
       if (envelope.screenshotRef) {
         await captureInboxRemove(envelope.screenshotRef, input.generation)
@@ -331,13 +346,21 @@ function parseEnvelope(raw: string): InboxEnvelope | null {
  * duplication risk left is a crash between this write and the spool removal,
  * which re-appends one line once on retry.
  */
-async function drainTextCapture(envelope: TextCaptureEnvelope, generation: number): Promise<void> {
+async function drainTextCapture(
+  envelope: TextCaptureEnvelope,
+  generation: number,
+  editor?: CaptureDailyEditor,
+): Promise<void> {
   const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
-  const dailySource = await noteSource(daily, generation)
   // `task` is Reflect's round `+` checkbox, the only marker the Tasks
   // projection reads; `checkbox` is the square `- [ ]`, an inert daily item.
   const kind: ListItemKind = envelope.kind === 'append' ? 'bullet' : envelope.kind
-  await writeNote(daily, appendListItem(dailySource, envelope.text, kind), generation)
+  await editCaptureDaily(
+    daily,
+    generation,
+    (source) => appendListItem(source, envelope.text, kind),
+    editor,
+  )
 }
 
 async function sweepOrphanSpools(

@@ -6,6 +6,7 @@ import { parseNote } from '../markdown/extract.ts'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
 import type { AiProviderConfig } from '../settings/schema.ts'
 import type { CaptureIdentity } from './capture-identity.ts'
+import { editCaptureDaily, type CaptureDailyEditor } from './capture-daily.ts'
 import {
   captureNoteMeta,
   notePrivate,
@@ -31,6 +32,7 @@ export interface PendingCaptureSnapshot {
 }
 
 interface PersistCaptureEnrichmentInput {
+  editDaily?: CaptureDailyEditor | undefined
   identity: CaptureIdentity
   expectedHash: string
   body: string
@@ -100,6 +102,7 @@ export function hasCaptureWriteTransaction(meta: CaptureNoteMeta): boolean {
 export async function finishCaptureWrite(
   identity: CaptureIdentity,
   generation: number,
+  editDaily?: CaptureDailyEditor,
 ): Promise<Exclude<CaptureStatus, 'skipped'> | null> {
   let snapshot = await readPendingCaptureSnapshot(identity, generation)
   if (snapshot === null) {
@@ -119,15 +122,20 @@ export async function finishCaptureWrite(
   ) {
     return null
   }
-  const retitled = retitleDailyEntry(
-    dailySource,
-    identity.base,
-    transaction.fromTitle,
-    snapshot.title,
+  const title = snapshot.title
+  let dailyPrivate = false
+  await editCaptureDaily(
+    dailyNotePath,
+    generation,
+    (source) => {
+      dailyPrivate = notePrivate(source)
+      return dailyPrivate
+        ? source
+        : retitleDailyEntry(source, identity.base, transaction.fromTitle, title)
+    },
+    editDaily,
   )
-  if (retitled !== dailySource) {
-    await writeNote(dailyNotePath, retitled, generation)
-  }
+  if (dailyPrivate) return null
 
   snapshot = await readPendingCaptureSnapshot(identity, generation)
   dailySource = await noteSource(dailyNotePath, generation)
@@ -151,6 +159,7 @@ export async function finishCaptureWrite(
       captureFinalizeStatus: undefined,
     }),
     generation,
+    snapshot.source,
   )
   return transaction.status
 }
@@ -190,8 +199,12 @@ export async function persistCaptureEnrichment(
       captureFinalizeStatus: titleChanged ? input.status : undefined,
     }),
     input.generation,
+    snapshot.source,
   )
-  if (titleChanged && (await finishCaptureWrite(input.identity, input.generation)) === null) {
+  if (
+    titleChanged &&
+    (await finishCaptureWrite(input.identity, input.generation, input.editDaily)) === null
+  ) {
     return null
   }
   return captureHash
