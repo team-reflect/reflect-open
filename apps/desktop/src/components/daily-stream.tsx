@@ -89,6 +89,13 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   const consumeFocus = useCallback(() => {
     focusPending.current = null
   }, [])
+  // Rows read `focusPending` during render, but the anchor effect below fills
+  // it *after* the arrival's render pass, so the rendered focus props are one
+  // arrival behind until the rows render again. The anchor scroll usually
+  // forces that, but an arrival that lands where the stream already sits (a
+  // re-navigation while anchored on today) scrolls nothing, so the effect
+  // bumps this state to guarantee a pre-paint re-read of the slot.
+  const [, republishFocusPending] = useState(0)
 
   // Report the day the user is editing to the context sidebar: the route stays
   // on the day navigated to, but focus moves freely between stream rows, and the
@@ -194,15 +201,22 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
       focusPending.current = null
       pendingFocusRef.current = null
       virtualizerRef.current?.scrollTo(restored)
-      return
+    } else {
+      const target = targetDateRef.current
+      pendingFocusRef.current = null
+      focusPending.current = {
+        date: target,
+        selection: arrivalFocusEditorRef.current ? 'end' : 'start',
+      }
+      virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
     }
-    const target = targetDateRef.current
-    pendingFocusRef.current = null
-    focusPending.current = {
-      date: target,
-      selection: arrivalFocusEditorRef.current ? 'end' : 'start',
-    }
-    virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
+    // One bounded pre-paint render per arrival, not a cascade: the bumped
+    // render changes none of this effect's dependencies. The restored branch
+    // needs it too: a row still rendering an earlier arrival's `autoFocus`
+    // would otherwise keep it past the cancellation above and steal focus
+    // when its lazy editor mounts.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    republishFocusPending((seq) => seq + 1)
   }, [arrivalSeq, entryId, dayWindow, savedScroll])
 
   const onScrollOffset = useCallback((offset: number) => {
