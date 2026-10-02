@@ -49,4 +49,4 @@ jobs:
           git commit -am 'fix: update meowdown'
           git push --force origin chore-update-meowdown
           # Fails when the PR already exists. The push above has updated it.
-          gh pr create --head chore-update-meowdown --title 'fix: update meowdown' --body 'Update `@meowdown/*` to the latest versions.' || true
+          gh pr create --head chore-update-meowdown --title 'fix: update meowdown' --body '' || true
