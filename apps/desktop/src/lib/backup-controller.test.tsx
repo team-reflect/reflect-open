@@ -27,6 +27,7 @@ afterEach(() => {
 const GRAPH: GraphInfo = { root: '/g', name: 'G', generation: 3 }
 
 const AUTH = JSON.stringify({ kind: 'pat', token: 'ghp_abc' })
+const HOST_CREDENTIAL = { username: 'alex', secret: 'pat' }
 const CLEAN_COMMIT = { committed: false, sha: null, ahead: 0, skippedLargeFiles: [] }
 const UP_TO_DATE = { kind: 'upToDate', conflictedPaths: [], changedFiles: [] }
 
@@ -39,6 +40,8 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 interface FakeOptions {
   auth?: string | null
+  /** Per-host keychain entries by secret name (`git-credential:<origin>`); others read as absent. */
+  hostSecrets?: Record<string, string>
   /** Hold the direct index write until `releaseIndexApply()` (the convergence barrier). */
   gateIndexApply?: boolean
   /** Make every direct index write throw (the projection-failure path). */
@@ -48,6 +51,14 @@ interface FakeOptions {
   /** Make the watcher subscription throw (the unusable-watcher path). */
   failListen?: boolean
   failStatus?: boolean
+  /**
+   * Hold the first `git_fetch` open, reporting one commit ahead so the cycle
+   * would push next; `git_setup` releases it — the window where origin moves
+   * under a running cycle.
+   */
+  gateFetch?: boolean
+  /** Make `git_setup` throw (a remote that could not be pointed at). */
+  failSetup?: boolean
   /** Make the keychain read throw (locked keychain, stale ACL after re-signing). */
   failSecretGet?: boolean
   /** Scripted `git_merge_remote` outcome (defaults to up-to-date). */
@@ -67,6 +78,7 @@ function fakeBridge(options: FakeOptions = {}) {
   const calls: string[] = []
   const invocations: Array<{ command: string; args: Record<string, unknown> }> = []
   let auth = options.auth === undefined ? AUTH : options.auth
+  const hostSecrets = new Map(Object.entries(options.hostSecrets ?? {}))
   const status = {
     initialized: options.initialized ?? true,
     branch: 'main',
@@ -80,6 +92,8 @@ function fakeBridge(options: FakeOptions = {}) {
   }
   let releaseListen: (() => void) | null = null
   let releaseIndexApply: (() => void) | null = null
+  let releaseFetch: (() => void) | null = null
+  let fetchGated = options.gateFetch === true
   let indexApplyCount = 0
   const mergeOutcomes = [...(options.mergeOutcomes ?? [])]
   const pushOutcomes = [...(options.pushOutcomes ?? [])]
@@ -94,20 +108,44 @@ function fakeBridge(options: FakeOptions = {}) {
           }
           return status
         case 'git_setup':
+          if (options.failSetup === true) {
+            throw { kind: 'io', message: 'could not configure the remote' }
+          }
+          if (releaseFetch !== null) {
+            releaseFetch()
+            // Let the running cycle take its next steps while origin moves.
+            await new Promise((resolve) => setTimeout(resolve, 50))
+          }
           status.initialized = true
           status.remoteUrl = typeof args['remoteUrl'] === 'string' ? args['remoteUrl'] : null
           return status
-        case 'secret_get':
+        case 'secret_get': {
           if (options.failSecretGet === true) {
             throw { kind: 'io', message: 'keychain unavailable' }
           }
-          return auth
+          const name = args['name'] as string
+          return name.startsWith('git-credential:') ? (hostSecrets.get(name) ?? null) : auth
+        }
+        case 'secret_set': {
+          const name = args['name'] as string
+          if (name.startsWith('git-credential:')) {
+            hostSecrets.set(name, args['value'] as string)
+          }
+          return null
+        }
         case 'secret_delete':
           auth = null
           return null
         case 'git_commit_all':
           return CLEAN_COMMIT
         case 'git_fetch':
+          if (fetchGated) {
+            fetchGated = false
+            await new Promise<void>((resolve) => {
+              releaseFetch = resolve
+            })
+            return { ahead: 1, behind: 0 }
+          }
           return { ahead: 0, behind: 0 }
         case 'git_merge_remote':
           return mergeOutcomes.shift() ?? options.mergeOutcome ?? UP_TO_DATE
@@ -234,7 +272,7 @@ describe('createBackupController', () => {
       repo: null,
     })
     const fetch = invocations.find(({ command }) => command === 'git_fetch')
-    expect(fetch?.args).toMatchObject({ token: null })
+    expect(fetch?.args).toMatchObject({ credential: null })
     controller.dispose()
   })
 
@@ -250,7 +288,7 @@ describe('createBackupController', () => {
 
     for (const { command, args } of invocations) {
       if (command === 'git_fetch' || command === 'git_push') {
-        expect(args).toMatchObject({ token: null })
+        expect(args).toMatchObject({ credential: null })
       }
     }
     controller.dispose()
@@ -286,6 +324,68 @@ describe('createBackupController', () => {
     expect(commitCount(calls)).toBe(1)
     expect(calls).not.toContain('git_fetch')
     expect(calls).not.toContain('git_push')
+    controller.dispose()
+  })
+
+  it('adopts a credentialed HTTPS remote and presents its credential', async () => {
+    const { calls, invocations } = fakeBridge({
+      auth: null,
+      remoteUrl: 'https://git.example.com/alex/notes.git',
+      hostSecrets: { 'git-credential:https://git.example.com': JSON.stringify(HOST_CREDENTIAL) },
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_fetch')
+    })
+
+    const fetch = invocations.find(({ command }) => command === 'git_fetch')
+    expect(fetch?.args).toMatchObject({ credential: HOST_CREDENTIAL })
+    controller.dispose()
+  })
+
+  it('keeps an https credential away from the http form of the same host', async () => {
+    const { calls } = fakeBridge({
+      auth: null,
+      remoteUrl: 'http://git.example.com/alex/notes.git',
+      hostSecrets: { 'git-credential:https://git.example.com': JSON.stringify(HOST_CREDENTIAL) },
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+
+    expect(controller.getState()).toMatchObject({
+      phase: 'connected',
+      status: { state: 'error', errorKind: 'rejected' },
+    })
+    expect(calls).not.toContain('git_fetch')
+    controller.dispose()
+  })
+
+  it('resolves the credential against the current origin, not the one adopted', async () => {
+    // Rust talks to whatever origin is now; a remote re-pointed mid-session
+    // (here https → http) must not inherit the old origin's credential.
+    const { calls, invocations, status } = fakeBridge({
+      auth: null,
+      remoteUrl: 'https://git.example.com/alex/notes.git',
+      hostSecrets: { 'git-credential:https://git.example.com': JSON.stringify(HOST_CREDENTIAL) },
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_fetch')
+    })
+    const before = invocations.length
+
+    status.remoteUrl = 'http://git.example.com/alex/notes.git'
+    await controller.backUpNow()
+
+    const network = invocations
+      .slice(before)
+      .filter(({ command }) => command === 'git_fetch' || command === 'git_push')
+    expect(network.length).toBeGreaterThan(0)
+    for (const { args } of network) {
+      expect(args).toMatchObject({ credential: null })
+    }
     controller.dispose()
   })
 
@@ -411,6 +511,131 @@ describe('createBackupController', () => {
     } finally {
       setPlatformSurface({ mobileApp: false })
     }
+  })
+
+  it('disconnectGraph keeps the host credential for other graphs on that host', async () => {
+    const { calls } = fakeBridge({
+      auth: null,
+      remoteUrl: 'https://git.example.com/alex/notes.git',
+      hostSecrets: { 'git-credential:https://git.example.com': JSON.stringify(HOST_CREDENTIAL) },
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+
+    await controller.disconnectGraph()
+
+    expect(calls).toContain('git_disconnect')
+    expect(calls).not.toContain('secret_delete')
+    controller.dispose()
+  })
+
+  it('connectHostRemote refuses a github.com URL without storing anything', async () => {
+    const { calls } = fakeBridge({ auth: null, remoteUrl: null })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+
+    for (const url of [
+      'https://github.com/alex/notes.git',
+      'https://GitHub.com/alex/notes.git',
+      'https://github.com:443/alex/notes.git',
+    ]) {
+      await expect(controller.connectHostRemote(url, HOST_CREDENTIAL)).rejects.toThrow(
+        'GitHub sign-in',
+      )
+    }
+    expect(calls).not.toContain('secret_set')
+    expect(calls).not.toContain('git_setup')
+    controller.dispose()
+  })
+
+  it('connectHostRemote rejects an empty token before moving origin', async () => {
+    const { calls } = fakeBridge({ auth: null, remoteUrl: null })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+
+    await expect(
+      controller.connectHostRemote('https://git.example.com/alex/notes.git', {
+        username: 'alex',
+        secret: '',
+      }),
+    ).rejects.toThrow('both required')
+    expect(calls).not.toContain('git_setup')
+    controller.dispose()
+  })
+
+  it('connectHostRemote sets up the remote before storing the credential start() reads', async () => {
+    const { calls, invocations } = fakeBridge({ auth: null, remoteUrl: null })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+
+    await controller.connectHostRemote('https://git.example.com/alex/notes.git', HOST_CREDENTIAL)
+
+    // A setup that fails must leave nothing stored…
+    expect(calls.indexOf('git_setup')).toBeLessThan(calls.indexOf('secret_set'))
+    // …and the credential must exist by the time start() adopts the remote.
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_fetch')
+    })
+    const fetch = invocations.find(({ command }) => command === 'git_fetch')
+    expect(fetch?.args).toMatchObject({ credential: HOST_CREDENTIAL })
+    controller.dispose()
+  })
+
+  it('stops a running cycle before moving origin, so its credential never reaches the new host', async () => {
+    const { calls, invocations } = fakeBridge({ gateFetch: true })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_fetch')
+    })
+
+    await controller.connectHostRemote('https://git.example.com/alex/notes.git', HOST_CREDENTIAL)
+
+    const moved = invocations.findIndex(({ command }) => command === 'git_setup')
+    const githubAfterMove = invocations
+      .slice(moved)
+      .filter(({ command }) => command === 'git_fetch' || command === 'git_push')
+      .filter(
+        ({ args }) =>
+          (args['credential'] as { username?: string } | null)?.username === 'x-access-token',
+      )
+    expect(githubAfterMove).toEqual([])
+    controller.dispose()
+  })
+
+  it('brings the old engine back when pointing at the new remote fails', async () => {
+    const { calls } = fakeBridge({ failSetup: true })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_fetch')
+    })
+
+    await expect(
+      controller.connectHostRemote('https://git.example.com/alex/notes.git', HOST_CREDENTIAL),
+    ).rejects.toThrow()
+
+    expect(controller.getState()).toMatchObject({
+      phase: 'connected',
+      remoteUrl: 'https://github.com/alex/notes.git',
+    })
+    expect(calls).not.toContain('secret_set')
+    const fetches = calls.filter((command) => command === 'git_fetch').length
+    await controller.backUpNow()
+    expect(calls.filter((command) => command === 'git_fetch').length).toBeGreaterThan(fetches)
+    controller.dispose()
+  })
+
+  it('connectHostRemote rejects a URL that takes no credential before moving origin', async () => {
+    const { calls } = fakeBridge({ auth: null, remoteUrl: null })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+
+    await expect(
+      controller.connectHostRemote('git@git.example.com:alex/notes.git', HOST_CREDENTIAL),
+    ).rejects.toThrow('not an http(s) remote')
+    expect(calls).not.toContain('git_setup')
+    controller.dispose()
   })
 
   it('disconnectGraph drops the remote and lands on disconnected', async () => {

@@ -14,13 +14,19 @@ import {
   gitStatus,
   isCaptureSpoolPath,
   isNotePath,
+  saveGitCredential,
+  githubCredential,
+  isValidGitCredential,
+  loadGitCredential,
   loadGithubAuth,
   parseGithubRemote,
+  remoteCredentialOrigin,
   ReflectError,
   subscribeFileChanges,
   type ChangedFile,
   type GithubRepoRef,
   type GraphInfo,
+  type GitCredential,
   type SyncEngine,
   type SyncStatus,
   type Unlisten,
@@ -105,8 +111,18 @@ export interface BackupController {
     options?: { allowPublic?: boolean },
   ): Promise<ConnectExistingResult>
   /**
+   * Connect a non-GitHub host over HTTP(S): store the credential for the
+   * remote's origin, point `origin` at it, and restart. A github.com URL is
+   * refused — it belongs to the managed sign-in. The credential is per host,
+   * so this replaces the one any other graph on that host uses. The local branch is
+   * left as-is — there is no host API to ask for a default branch, so an
+   * existing repo on a differently-named branch must be matched by the user.
+   */
+  connectHostRemote(remoteUrl: string, credential: GitCredential): Promise<void>
+  /**
    * Stop backing **this graph** up (drops its remote; history and the
-   * machine-level GitHub credential stay — other graphs keep syncing).
+   * machine-level credentials — GitHub sign-in and per-host entries — stay,
+   * so other graphs on the same host keep syncing).
    */
   disconnectGraph(): Promise<void>
   /** Sign this machine out of GitHub — every connected graph stops syncing. */
@@ -262,7 +278,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
       const next = createSyncEngine({
         generation,
         localOnly: true,
-        getToken: async () => null,
+        getCredential: async () => null,
         onStatus: (engineStatus) => {
           // No UI surfaces local history, so a failing commit loop (disk full,
           // corrupted repo) must at least leave a trace for diagnosis.
@@ -320,12 +336,27 @@ export function createBackupController(options: BackupControllerOptions): Backup
         await startLocalHistory(status.initialized)
         return
       }
-      if (repo === null && /^https?:\/\//i.test(remoteUrl)) {
-        // Plan 16 V1 speaks SSH (and paths) to generic hosts, not HTTPS.
-        // Fail at adoption, not at the first push: a *public* HTTPS remote
-        // would pull anonymously and only 401 on push — the other device's
-        // edits arriving while this one's silently never leave. The engine
-        // never starts; `rejected` = acting (not retrying) is the fix.
+      // Adoption only asks *whether* a credential exists; the engine resolves
+      // it fresh each cycle below, so re-entering one takes effect without a
+      // restart.
+      const hasGitCredential =
+        repo === null &&
+        (await loadGitCredential(remoteUrl).catch((error: unknown) => {
+          // Same degradation as the GitHub read above: an unreadable keychain
+          // lands on the needs-a-credential state, not the engine-less catch.
+          console.error('reading the git host credential failed:', errorMessage(error))
+          return null
+        })) !== null
+      if (disposed) {
+        return
+      }
+      if (repo === null && !hasGitCredential && remoteCredentialOrigin(remoteUrl) !== null) {
+        // An HTTPS host we hold no credential for. Fail at adoption, not at
+        // the first push: a *public* HTTPS remote would pull anonymously and
+        // only 401 on push — the other device's edits arriving while this
+        // one's silently never leave. The engine never starts; `rejected` =
+        // acting (not retrying) is the fix. With a credential stored we
+        // adopt, and a bad one surfaces as an ordinary auth error instead.
         setState({
           phase: 'connected',
           remoteUrl,
@@ -334,7 +365,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
             state: 'error',
             errorKind: 'rejected',
             message:
-              'HTTPS isn’t supported for this host yet — switch the remote to its SSH form: git remote set-url origin git@<host>:<owner>/<repo>.git',
+              'This host needs a username and access token, or switch the remote to its SSH form: git remote set-url origin git@<host>:<owner>/<repo>.git',
           },
         })
         await startLocalHistory(status.initialized)
@@ -349,9 +380,23 @@ export function createBackupController(options: BackupControllerOptions): Backup
         // The background flusher's protected local commit bypasses this
         // engine deliberately.
         canStartCycle: () => !isMobileSurface() || document.visibilityState !== 'hidden',
-        // The managed token is for github.com only — a generic host must
-        // never receive it. Rust resolves generic credentials locally.
-        getToken: repo === null ? async () => null : () => getGithubToken(providerFetch),
+        // Resolved against the *current* origin each cycle, not the URL
+        // captured above: Rust fetches and pushes whatever origin is now, so
+        // a remote re-pointed mid-session — github.com to another host, or
+        // https to http — must not inherit the credential of the old one.
+        getCredential: async () => {
+          const current = (await gitStatus(generation)).remoteUrl
+          if (current === null) {
+            return null
+          }
+          if (parseGithubRemote(current) !== null) {
+            // A null token is "signed out" — the engine turns that into the
+            // same auth state it always did, not a silent no-auth push.
+            const token = await getGithubToken(providerFetch)
+            return token === null ? null : githubCredential(token)
+          }
+          return await loadGitCredential(current)
+        },
         onStatus: (engineStatus) => {
           setState({ phase: 'connected', remoteUrl, repo, status: engineStatus })
         },
@@ -389,9 +434,25 @@ export function createBackupController(options: BackupControllerOptions): Backup
     return token
   }
 
-  async function connectRemote(remoteUrl: string, branch: string): Promise<void> {
-    await gitSetup(remoteUrl, branch, generation)
-    await start()
+  /**
+   * Point `origin` at `remoteUrl` and restart. The engine stops first: a cycle
+   * resolves its credential once, so one still running when `origin` moves
+   * would send its next command — with the old remote's credential — to the
+   * new host. start() runs whatever happens, so a failed setup brings the old
+   * engine back instead of leaving backup silently stopped.
+   */
+  async function connectRemote(
+    remoteUrl: string,
+    branch: string | null,
+    afterSetup?: () => Promise<void>,
+  ): Promise<void> {
+    teardown()
+    try {
+      await gitSetup(remoteUrl, branch, generation)
+      await afterSetup?.()
+    } finally {
+      await start()
+    }
   }
 
   return {
@@ -431,6 +492,30 @@ export function createBackupController(options: BackupControllerOptions): Backup
       // the local branch must match or sync would fork a parallel branch.
       await connectRemote(githubRemoteUrl(ref), repo.defaultBranch)
       return 'connected'
+    },
+    connectHostRemote: async (remoteUrl, credential) => {
+      // Every input is checked before origin moves, so a bad one leaves the
+      // graph exactly as it was.
+      const origin = remoteCredentialOrigin(remoteUrl)
+      if (origin === null) {
+        throw new ReflectError('parse', `not an http(s) remote: ${remoteUrl}`)
+      }
+      if (new URL(origin).hostname === 'github.com') {
+        // By host, not by URL text, so no spelling slips past. start() routes
+        // github.com to the managed sign-in, so a token stored for it here
+        // would never be read.
+        throw new ReflectError(
+          'parse',
+          'github.com remotes use the GitHub sign-in — connect GitHub instead',
+        )
+      }
+      if (!isValidGitCredential(credential)) {
+        throw new ReflectError('parse', 'a username and access token are both required')
+      }
+      // Remote first, so a failed setup stores nothing; credential before
+      // start(), which is what reads it. The entry is per host, shared by
+      // every graph on it — saving replaces the one they use.
+      await connectRemote(remoteUrl, null, () => saveGitCredential(remoteUrl, credential))
     },
     disconnectGraph: async () => {
       await gitDisconnect(generation)
