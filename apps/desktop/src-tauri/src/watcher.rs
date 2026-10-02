@@ -108,6 +108,13 @@ impl FileIdCache for PrunedFileIdMap {
     }
 
     fn add_path(&mut self, path: &Path, recursive_mode: RecursiveMode) {
+        // Check before walking: walkdir opens a directory before
+        // `filter_entry` can reject it. The debouncer calls this for every
+        // event on an uncached path, and hidden paths are never cached, so on
+        // Linux (inotify reports opens) that open would call this again.
+        if !cache_keeps(&self.root, path) {
+            return;
+        }
         let depth = if recursive_mode == RecursiveMode::Recursive {
             usize::MAX
         } else {
@@ -814,5 +821,49 @@ mod tests {
             read_events += 1;
         }
         assert!(read_events > 0, "inotify should report the walk's opens");
+    }
+
+    /// The debouncer calls `add_path` for any event on an uncached path, and
+    /// hidden paths are never cached. If `add_path` opened such a path, the
+    /// open would raise another event for the same path, forever.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn opening_a_hidden_folder_does_not_feed_itself() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_path_buf();
+        std::fs::create_dir_all(root.join(".git/objects/aa")).unwrap();
+        std::fs::create_dir_all(root.join("notes")).unwrap();
+
+        let mut debouncer = new_debouncer_opt::<_, RecommendedWatcher, PrunedFileIdMap>(
+            Duration::from_millis(100),
+            None,
+            |_: DebounceEventResult| {},
+            PrunedFileIdMap::new(root.clone()),
+            notify::Config::default(),
+        )
+        .unwrap();
+        debouncer.watch(&root, RecursiveMode::Recursive).unwrap();
+
+        // A second, plain watcher counts the raw opens. The debouncer merges
+        // repeated events on one path, so its own output cannot show a loop.
+        use notify::Watcher;
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let mut probe = notify::recommended_watcher(sender).unwrap();
+        probe
+            .watch(&root.join(".git/objects"), RecursiveMode::NonRecursive)
+            .unwrap();
+
+        std::fs::read_dir(root.join(".git/objects"))
+            .unwrap()
+            .for_each(drop);
+
+        std::thread::sleep(Duration::from_millis(1000));
+        let opens = receiver
+            .try_iter()
+            .filter(|event| {
+                matches!(event, Ok(event) if matches!(event.kind, EventKind::Access(AccessKind::Open(_))))
+            })
+            .count();
+        assert!(opens < 20, "one open fed {opens} more opens");
     }
 }
