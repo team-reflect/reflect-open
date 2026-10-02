@@ -20,7 +20,7 @@ name = "reflect_open_lib"
 crate-type = ["staticlib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.7.0", features = [] }
+tauri-build = { version = "2.7.1", features = [] }
 
 [dependencies]
 infer = "0.19"
@@ -29,7 +29,7 @@ http-range-header = "0.4"
 # `devtools` compiles the web inspector into release builds too (it is otherwise
 # debug-only), so a shipped app stays debuggable — see `src/devtools.rs`.
 tauri = { workspace = true, features = ["devtools"] }
-tauri-plugin-opener = "2.6.0"
+tauri-plugin-opener = "2.7.0"
 # Decodes `reflect-asset://` request paths (`fs/asset_protocol.rs`); the same
 # crate tauri itself uses for its protocol URLs.
 percent-encoding = "2.3.2"
@@ -46,7 +46,7 @@ reflect-graph-paths = { workspace = true }
 tempfile = { workspace = true }
 sha2 = { workspace = true }
 dirs = "7.0.0"
-tauri-plugin-dialog = "2.8.0"
+tauri-plugin-dialog = "2.8.1"
 base64 = "0.23.1"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
@@ -165,7 +165,7 @@ apple-native-keyring-store = { version = "1.0.2", features = ["protected"] }
 # semantic search is desktop-only in the first mobile wave), and OS-trash
 # deletes (mobile moves into the graph-local `.reflect/trash/` instead).
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2.13.0"
+tauri-plugin-updater = "2.13.1"
 tauri-plugin-process = "2.4.0"
 tauri-plugin-window-state = "2.5.0"
 trash = "5.2.8"
@@ -178,8 +178,8 @@ walkdir = "2.5.0"
 # Direct dependency on fastembed's own downloader, used to pre-fetch the
 # embedding model with byte-level progress (fastembed downloads silently).
 hf-hub = { version = "0.5.0", default-features = false, features = ["ureq", "native-tls"] }
-tauri-plugin-deep-link = "2.5.0"
-tauri-plugin-single-instance = { version = "2.5.0", features = ["deep-link"] }
+tauri-plugin-deep-link = "2.6.1"
+tauri-plugin-single-instance = { version = "2.5.2", features = ["deep-link"] }
 
 [target.'cfg(all(not(any(target_os = "android", target_os = "ios")), not(all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
 fastembed = "5.13.0"
