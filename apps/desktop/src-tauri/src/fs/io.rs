@@ -13,7 +13,9 @@ use std::os::raw::c_int;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
-use reflect_graph_paths::{evicted_logical_path, eviction_placeholder, is_dataless};
+use reflect_graph_paths::{
+    evicted_logical_path, eviction_placeholder, is_dataless, normalize_line_endings,
+};
 
 use crate::error::{AppError, AppResult};
 use crate::graph_gitignore;
@@ -151,7 +153,8 @@ const O_NOFOLLOW_ANY: i32 = 0x2000_0000;
 /// row. The root is canonicalized first (a vault may legitimately live
 /// *behind* a symlink — `/var`, a linked `~/Dropbox`); `O_NOFOLLOW_ANY` then
 /// polices only the components below it. Off Apple targets it falls back to
-/// a plain read (the lexical resolve guard still applies).
+/// a plain read (the lexical resolve guard still applies). The returned text
+/// uses `\n` line endings.
 pub(super) fn read_note_no_follow(root: &Path, abs: &Path) -> std::io::Result<String> {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
@@ -167,12 +170,12 @@ pub(super) fn read_note_no_follow(root: &Path, abs: &Path) -> std::io::Result<St
             .open(path)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
-        Ok(contents)
+        Ok(normalize_line_endings(contents))
     }
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     {
         let _ = root;
-        fs::read_to_string(abs)
+        fs::read_to_string(abs).map(normalize_line_endings)
     }
 }
 
@@ -548,6 +551,16 @@ fn file_meta_from(entry: reflect_graph_paths::FileEntry) -> FileMeta {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn note_reads_use_lf_line_endings() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("note.md"), "# a\r\n\r\nb\rc\r\n").unwrap();
+        assert_eq!(
+            read_note_no_follow(dir.path(), &dir.path().join("note.md")).unwrap(),
+            "# a\n\nb\nc\n"
+        );
+    }
 
     #[cfg(target_os = "macos")]
     #[test]

@@ -31,4 +31,5 @@ jobs. When adding a fixture, add the file (or scalar input), regenerate, and
 commit both.
 
 `.gitattributes` disables line-ending conversion: the fixture bytes are the
-contract (`crlf.md` deliberately carries `\r\n`).
+contract (`crlf.md` deliberately carries `\r\n`). Both sides read a note with
+`\n` line endings, so `crlf.md` pins that conversion.

@@ -11,7 +11,7 @@ use rusqlite::{params, Connection};
 
 use crate::error::CliError;
 use crate::keys::fold_key;
-use crate::note_file::{checked_note_path, parse_note_meta, walk_notes};
+use crate::note_file::{checked_note_path, parse_note_meta, read_note_text, walk_notes};
 use crate::paths::{daily_path, parse_calendar_date};
 
 /// What a `<note>` argument resolved to.
@@ -113,7 +113,7 @@ fn scan_lookup(root: &Path, key: &str) -> Result<Vec<String>, CliError> {
         if note.rel_path.starts_with("templates/") {
             continue; // templates never resolve by title/alias
         }
-        let Ok(content) = std::fs::read_to_string(root.join(&note.rel_path)) else {
+        let Ok(content) = read_note_text(&root.join(&note.rel_path)) else {
             // An unreadable or evicted note hides itself, not the whole lookup.
             continue;
         };

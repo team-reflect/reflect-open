@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag};
-use reflect_graph_paths::eviction_placeholder;
+use reflect_graph_paths::{eviction_placeholder, normalize_line_endings};
 
 use crate::error::CliError;
 use crate::frontmatter::{parse_frontmatter, split_frontmatter, Frontmatter};
@@ -317,11 +317,16 @@ pub fn parse_note_meta(rel_path: &str, source: &str) -> NoteMeta {
     }
 }
 
+/// Read a note's text with `\n` line endings, the form the desktop indexes.
+pub fn read_note_text(path: &Path) -> std::io::Result<String> {
+    fs::read_to_string(path).map(normalize_line_endings)
+}
+
 /// Read a note and enforce the privacy contract: a `private: true` note is
 /// refused (exit 3), based on the file's own frontmatter — never an index row.
 pub fn read_note(root: &Path, rel_path: &str) -> Result<Note, CliError> {
     let absolute = checked_note_path(root, rel_path)?;
-    let content = fs::read_to_string(&absolute)
+    let content = read_note_text(&absolute)
         .map_err(|err| CliError::Runtime(format!("could not read {rel_path}: {err}")))?;
     let meta = parse_note_meta(rel_path, &content);
     if meta.private {
@@ -334,7 +339,7 @@ pub fn read_note(root: &Path, rel_path: &str) -> Result<Note, CliError> {
 /// A missing file has nothing to protect.
 pub fn ensure_not_private(root: &Path, rel_path: &str) -> Result<(), CliError> {
     let absolute = checked_note_path(root, rel_path)?;
-    let content = match fs::read_to_string(&absolute) {
+    let content = match read_note_text(&absolute) {
         Ok(content) => content,
         Err(_) if eviction_placeholder(&absolute).is_some_and(|path| path.is_file()) => {
             return Err(CliError::Runtime(format!(

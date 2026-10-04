@@ -19,7 +19,7 @@ use reflect_index_schema::{INDEX_FILE, LATEST_SCHEMA_VERSION, REFLECT_DIR};
 
 use crate::error::CliError;
 use crate::hash::hash_content;
-use crate::note_file::walk_notes;
+use crate::note_file::{read_note_text, walk_notes};
 
 /// A successfully-opened read-only index.
 pub struct OpenIndex {
@@ -120,7 +120,7 @@ pub fn detect_staleness(conn: &Connection, root: &Path) -> Result<Staleness, Cli
                     continue;
                 }
                 if note.mtime_ms as i64 != mtime {
-                    let changed = match std::fs::read_to_string(root.join(&note.rel_path)) {
+                    let changed = match read_note_text(&root.join(&note.rel_path)) {
                         Ok(content) => hash_content(&content) != file_hash,
                         Err(_) => true,
                     };

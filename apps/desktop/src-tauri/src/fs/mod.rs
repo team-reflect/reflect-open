@@ -422,6 +422,9 @@ static NOTE_WRITE_LOCK: Mutex<()> = Mutex::new(());
 /// platform can't provide one) so the caller's index echo can stamp the row
 /// with the value a later `list_files` will report — a `Date.now()` stamp
 /// never matches and costs a re-read on every reconcile.
+///
+/// `expected_contents` is compared with the note as [`note_read`] returns it,
+/// with `\n` line endings. `contents` is written as given.
 #[tauri::command]
 pub fn note_write(
     path: String,
@@ -1306,6 +1309,23 @@ mod note_revision_tests {
         let target = directory.path().join("note.md");
         write_note_revision(directory.path(), &target, "saved", true, None).unwrap();
         assert_eq!(fs::read_to_string(target).unwrap(), "saved");
+    }
+
+    #[test]
+    fn expected_revision_is_compared_with_lf_line_endings() {
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("note.md");
+        fs::write(&target, "a\r\nb\r\n").unwrap();
+        assert!(write_note_revision(
+            directory.path(),
+            &target,
+            "a\nb!\n",
+            true,
+            Some("a\r\nb\r\n")
+        )
+        .is_err());
+        write_note_revision(directory.path(), &target, "a\nb!\n", true, Some("a\nb\n")).unwrap();
+        assert_eq!(fs::read_to_string(target).unwrap(), "a\nb!\n");
     }
 
     #[test]

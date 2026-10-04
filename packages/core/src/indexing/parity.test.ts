@@ -73,7 +73,7 @@ function walkCorpusNotes(): string[] {
 async function deriveExpectations(): Promise<ExpectedParity> {
   const notes: Record<string, ExpectedNote> = {}
   for (const relPath of walkCorpusNotes()) {
-    const source = readFileSync(join(corpusDir, relPath), 'utf8')
+    const source = readFileSync(join(corpusDir, relPath), 'utf8').replaceAll(/\r\n?/g, '\n')
     const indexed = buildIndexedNote(parseNote({ path: relPath, source }), {
       fileHash: await hashContent(source),
       mtime: 0,

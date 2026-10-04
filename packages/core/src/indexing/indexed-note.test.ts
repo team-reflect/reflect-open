@@ -8,8 +8,8 @@ import {
 } from './indexed-note.ts'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that rebuilds tasks by AST path', () => {
-    expect(PROJECTION_VERSION).toBe(21)
+  it('carries the projection version that reprojects notes stored with CRLF', () => {
+    expect(PROJECTION_VERSION).toBe(22)
   })
 
   it('flattens a parsed note into the index payload', () => {

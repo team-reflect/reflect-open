@@ -6,7 +6,6 @@
 //! `--print` emits the URL on stdout without launching anything — the
 //! scriptable half, and how the integration tests exercise this command.
 
-use std::fs;
 use std::path::Path;
 use std::process::Command;
 
@@ -14,7 +13,7 @@ use crate::commands::open_index_for_resolution;
 use crate::commands::output::{print_json, OpenJson};
 use crate::error::CliError;
 use crate::graph::Graph;
-use crate::note_file::{ensure_not_private, parse_note_meta};
+use crate::note_file::{ensure_not_private, parse_note_meta, read_note_text};
 use crate::paths::{date_from_daily_path, parse_calendar_date};
 use crate::resolve::{resolve_note, ResolvedNote};
 
@@ -62,7 +61,7 @@ fn deep_link_url(root: &Path, resolved: &ResolvedNote) -> String {
     match resolved {
         ResolvedNote::Daily { date, .. } => format!("reflect://daily/{date}"),
         ResolvedNote::File { rel_path } => {
-            let id = fs::read_to_string(root.join(rel_path))
+            let id = read_note_text(&root.join(rel_path))
                 .ok()
                 .and_then(|content| parse_note_meta(rel_path, &content).id)
                 .filter(|id| !id.trim().is_empty());

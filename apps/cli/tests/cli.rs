@@ -43,7 +43,8 @@ impl Fixture {
     fn build_index(&self) {
         let conn = reflect_index_schema::open_index_at(self.root()).unwrap();
         for note in reflect_cli::note_file::walk_notes(self.root()) {
-            let content = fs::read_to_string(self.root().join(&note.rel_path)).unwrap();
+            let content =
+                reflect_cli::note_file::read_note_text(&self.root().join(&note.rel_path)).unwrap();
             let meta = parse_note_meta(&note.rel_path, &content);
             let daily_date = reflect_cli::paths::date_from_daily_path(&note.rel_path);
             let kind = if daily_date.is_some() {

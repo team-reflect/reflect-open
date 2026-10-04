@@ -215,13 +215,22 @@ fn wire_components(path: &str) -> Option<Vec<&str>> {
         .then_some(components)
 }
 
+/// Note text uses `\n` line endings in memory: `\r\n` and a lone `\r` both
+/// become `\n`.
+pub fn normalize_line_endings(text: String) -> String {
+    if !text.contains('\r') {
+        return text;
+    }
+    text.replace("\r\n", "\n").replace('\r', "\n")
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
     use super::{
-        classify, evicted_logical_path, eviction_placeholder, is_safe_visible, wire_path,
-        GraphPathKind,
+        classify, evicted_logical_path, eviction_placeholder, is_safe_visible,
+        normalize_line_endings, wire_path, GraphPathKind,
     };
     use serde::Deserialize;
 
@@ -315,5 +324,13 @@ mod tests {
         assert_eq!(icloud_placeholder_target("a.md.icloud"), None);
         assert_eq!(icloud_placeholder_target(".a.md"), None);
         assert_eq!(icloud_placeholder_target(".icloud"), None);
+    }
+
+    #[test]
+    fn line_endings_normalize_to_lf() {
+        assert_eq!(normalize_line_endings("a\nb\n".to_string()), "a\nb\n");
+        assert_eq!(normalize_line_endings("a\r\nb\r\n".to_string()), "a\nb\n");
+        assert_eq!(normalize_line_endings("a\rb".to_string()), "a\nb");
+        assert_eq!(normalize_line_endings("a\r\r\nb".to_string()), "a\n\nb");
     }
 }
