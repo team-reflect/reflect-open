@@ -177,8 +177,7 @@ decision) before any real Swift work is invested.
      brackets = checkbox, `+` with brackets = task.
    - No trailing `BulletList`, or marker rules refuse the join → fall
      back to `appendBlock` with the canonical form (`- text` /
-     `- [ ] text` / `+ [ ] text`). Line endings via the existing
-     `lineEndingAt`/`documentLineEnding` helpers (CRLF-safe).
+     `- [ ] text` / `+ [ ] text`).
 3. **`packages/core/src/actions/capture-drain.ts`** — `drainTextCapture`
    switches from `appendBlock` to `appendListItem` for **all three kinds**
    and all sources, and **drops the same-line dedup scan** (decided
@@ -198,7 +197,7 @@ decision) before any real Swift work is invested.
      falls back as its own `+ [ ]` block; nested tail (two-space and
      four-space markers) appends at the outer level with the outer marker;
      indented code-block tail falls back; ordered-list tail falls back;
-     fence tail falls back; trailing blank lines; CRLF documents;
+     fence tail falls back; trailing blank lines;
      frontmatter-only note.
    - `capture-drain.test.ts`: two `append` envelopes on one day yield one
      two-item list; the *same* envelope content twice yields two bullets

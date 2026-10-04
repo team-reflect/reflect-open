@@ -373,22 +373,6 @@ describe('continueTaskInContext', () => {
     )
   })
 
-  it('keeps CRLF line endings', async () => {
-    const source = '+ Group\r\n  + [ ] first\r\n'
-    openSession.mockReturnValue(null)
-    readNote.mockResolvedValue(source)
-    writeNote.mockResolvedValue(undefined)
-
-    const result = await continueTaskInContext(ref(source), 'edited', 7)
-
-    expect(writeNote).toHaveBeenCalledWith(
-      'notes/a.md',
-      '+ Group\r\n  + [ ] edited\r\n  + [ ] \r\n',
-      7,
-    )
-    expect(result.created).toMatchObject({ astPath: [0, 2], markdown: '', breadcrumbs: ['Group'] })
-  })
-
   it('refuses a root-level task, which has no context to continue', async () => {
     const source = '+ [ ] alone\n'
     openSession.mockReturnValue(null)

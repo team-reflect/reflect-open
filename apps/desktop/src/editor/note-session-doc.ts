@@ -1,4 +1,4 @@
-import { documentLineEnding, splitFrontmatter } from '@reflect/core'
+import { splitFrontmatter } from '@reflect/core'
 
 /**
  * The frontmatter block (may be empty) and the body that follows it. The block
@@ -10,6 +10,5 @@ export function splitDoc(content: string): { header: string; body: string } {
   if (raw === null) {
     return { header: '', body }
   }
-  const lineEnding = documentLineEnding(content)
-  return { header: content.slice(0, bodyOffset).trimEnd() + lineEnding + lineEnding, body }
+  return { header: content.slice(0, bodyOffset).trimEnd() + '\n\n', body }
 }

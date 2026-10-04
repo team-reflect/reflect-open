@@ -24,10 +24,6 @@ describe('detectRawConflictMarkers', () => {
     expect(detectRawConflictMarkers(CONFLICTED)).toBe(true)
   })
 
-  it('detects markers with CRLF line endings', () => {
-    expect(detectRawConflictMarkers(CONFLICTED.replaceAll('\n', '\r\n'))).toBe(true)
-  })
-
   it('requires the full sequence in order', () => {
     expect(detectRawConflictMarkers('plain note body')).toBe(false)
     expect(detectRawConflictMarkers('<<<<<<< this device\nno separator or end')).toBe(false)
@@ -89,11 +85,6 @@ describe('resolveConflictMarkers', () => {
       'outro',
     ].join('\n')
     expect(resolveConflictMarkers(twoBlocks, 'theirs')).toBe('intro\nb1\nmiddle  \nb2\noutro')
-  })
-
-  it('handles CRLF sources', () => {
-    const resolved = resolveConflictMarkers(CONFLICTED.replaceAll('\n', '\r\n'), 'ours')
-    expect(resolved).toBe('# Shared\r\n\r\nedited on a\r\n')
   })
 
   it('tolerates an unterminated block without throwing or dropping text', () => {
@@ -237,9 +228,5 @@ describe('detectConflictMarkers', () => {
     // conflict (git always writes markers at column 0), and the raw detector
     // ignores it too; the round trip may normalize it, which is fine.
     expect(detectConflictMarkers('> <<<<<<< a\n> x\n> =======\n> y\n> >>>>>>> b\n')).toBe(false)
-  })
-
-  it('handles CRLF line endings', () => {
-    expect(detectConflictMarkers(CONFLICTED.replaceAll('\n', '\r\n'))).toBe(true)
   })
 })

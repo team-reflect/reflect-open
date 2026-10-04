@@ -25,18 +25,11 @@ describe('splitFrontmatter', () => {
     expect(splitFrontmatter(source)).toEqual({ raw: null, body: source, bodyOffset: 0 })
   })
 
-  it('handles CRLF line endings', () => {
-    const split = splitFrontmatter('---\r\nid: x\r\n---\r\nbody')
-    expect(split.raw).toBe('id: x')
-    expect(split.body).toBe('body')
-  })
-
   it.each([
     ['---\nid: x\n---\n# T\n', '# T\n'],
     ['---\nid: x\n---\n\n# T\n', '# T\n'],
     ['---\nid: x\n---\n\n\n# T\n', '\n# T\n'],
     ['---\nid: x\n---\n  \n# T\n', '# T\n'],
-    ['---\r\nid: x\r\n---\r\n\r\n# T\r\n', '# T\r\n'],
     ['---\n---\n\n# T\n', '# T\n'],
     ['\n# T\n', '\n# T\n'],
   ])('reads one blank line after the block as its separator: %j', (source, body) => {
@@ -148,13 +141,6 @@ describe('upsertFrontmatter', () => {
 
   it('deletes a missing key from an empty block without throwing', () => {
     expect(upsertFrontmatter('---\n---\n# T\n', { pinned: undefined })).toBe('# T\n')
-  })
-
-  it('writes the block in the line ending of the document', () => {
-    expect(upsertFrontmatter('---\r\nid: x\r\n---\r\n\r\n# T\r\n', { pinned: true })).toBe(
-      '---\r\nid: x\r\npinned: true\r\n---\r\n\r\n# T\r\n',
-    )
-    expect(upsertFrontmatter('# T\r\n', { id: 'x' })).toBe('---\r\nid: x\r\n---\r\n\r\n# T\r\n')
   })
 
   it('keeps a body that opens with a blank line when it creates a block', () => {

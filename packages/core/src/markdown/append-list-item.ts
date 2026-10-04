@@ -2,7 +2,6 @@ import type { SyntaxNode } from '@meowdown/markdown'
 import { appendBlock } from './append-section.ts'
 import { splitFrontmatter } from './frontmatter.ts'
 import { parseBody } from './grammar.ts'
-import { lineEndingAt, offsetBeforeLineEnding } from './line-endings.ts'
 import type { Heading } from './model.ts'
 import { headingLevelOf, isBulletList, isListItem, isListMark } from './node-types.ts'
 
@@ -70,27 +69,21 @@ export function appendListItemAtHeading(source: string, target: Heading, content
 
   const list = sectionList(heading)
   const following = list === null ? heading.nextSibling : list.nextSibling
-  const anchor = offsetBeforeLineEnding(source, bodyOffset + (list?.to ?? heading.to))
+  const anchor = bodyOffset + (list?.to ?? heading.to)
   const tail = bodyOffset + (following?.from ?? body.length)
-  const lineEnding = lineEndingAt(source, anchor)
   const item = `${list === null ? DEFAULT_LIST_MARK : listMark(source, bodyOffset, list)} ${content.trim()}`
 
   if (list !== null) {
     const suffix = source.slice(anchor)
-    return source.slice(0, anchor) + lineEnding + item + (suffix || lineEnding)
+    return source.slice(0, anchor) + '\n' + item + (suffix || '\n')
   }
 
   // Starting the list: reuse the gap that already followed the heading so the
   // blank lines the author left (meowdown renders each as an empty paragraph)
   // end up below the new item instead of being collapsed away.
   const existingGap = source.slice(anchor, tail)
-  const suffix =
-    following === null
-      ? lineEnding
-      : existingGap.includes(lineEnding.repeat(2))
-        ? existingGap
-        : lineEnding.repeat(2)
-  return source.slice(0, anchor) + lineEnding.repeat(2) + item + suffix + source.slice(tail)
+  const suffix = following === null ? '\n' : existingGap.includes('\n\n') ? existingGap : '\n\n'
+  return source.slice(0, anchor) + '\n\n' + item + suffix + source.slice(tail)
 }
 
 /** The same item, as the whole body of a section that does not exist yet. */
@@ -150,8 +143,7 @@ export function appendListItem(source: string, text: string, kind: ListItemKind)
   if (tail === null || mark === null) {
     return appendBlock(source, `${ownMark(kind)} ${payload}`)
   }
-  const anchor = offsetBeforeLineEnding(source, bodyOffset + tail.to)
-  const lineEnding = lineEndingAt(source, anchor)
+  const anchor = bodyOffset + tail.to
   const suffix = source.slice(anchor)
-  return `${source.slice(0, anchor)}${lineEnding}${mark} ${payload}${suffix || lineEnding}`
+  return `${source.slice(0, anchor)}\n${mark} ${payload}${suffix || '\n'}`
 }

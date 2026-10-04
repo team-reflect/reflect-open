@@ -1,5 +1,4 @@
 import { isMap, parse as parseYaml, parseDocument, type Document } from 'yaml'
-import { documentLineEnding } from './line-endings.ts'
 import { frontmatterSchema, type Frontmatter } from './model.ts'
 
 /**
@@ -19,13 +18,13 @@ export interface FrontmatterSplit {
   bodyOffset: number
 }
 
-const OPEN_FENCE = /^---[ \t]*\r?\n/
+const OPEN_FENCE = /^---[ \t]*\n/
 /**
  * A closing `---` line, at the block start (empty frontmatter) or after a
  * newline, plus the blank line separating the block from the body. That line
  * belongs to the block: read as body it would be an empty first paragraph.
  */
-const CLOSE_FENCE = /(?:^|\r?\n)---[ \t]*(?:\r?\n(?:[ \t]*\r?\n)?|$)/
+const CLOSE_FENCE = /(?:^|\n)---[ \t]*(?:\n(?:[ \t]*\n)?|$)/
 
 /** Carve a leading YAML frontmatter block off `source`, preserving offsets. */
 export function splitFrontmatter(source: string): FrontmatterSplit {
@@ -89,8 +88,8 @@ export function parseFrontmatter(raw: string | null): ParsedFrontmatter {
  * exists (and the patch sets something), and removes the block entirely when
  * deleting its last key — a note whose only metadata was a toggled flag returns
  * to having no frontmatter at all, not an empty `---` husk. A written block
- * uses the document's line ending and always ends with its blank separator
- * line, so a body that opens with a blank line keeps it.
+ * always ends with its blank separator line, so a body that opens with a blank
+ * line keeps it.
  */
 export function upsertFrontmatter(source: string, patch: Record<string, unknown>): string {
   // An empty patch is a no-op — never re-serialize (which could disturb comments,
@@ -117,8 +116,7 @@ export function upsertFrontmatter(source: string, patch: Record<string, unknown>
   if (isEmptyDocument(doc)) {
     return body
   }
-  const block = `---\n${ensureTrailingNewline(String(doc))}---\n\n`
-  return block.replaceAll(/\r?\n/g, documentLineEnding(source)) + body
+  return `---\n${ensureTrailingNewline(String(doc))}---\n\n${body}`
 }
 
 /**

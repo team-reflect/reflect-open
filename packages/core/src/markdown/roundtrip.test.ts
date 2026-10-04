@@ -14,7 +14,6 @@ const CORPUS = {
     '# Notes\n\nSee [[Some Page|alias]] and ![img](assets/a.png) and [ext](https://x.com).\n',
   gfm: '## Tasks\n\n- [ ] todo\n- [x] done\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n~~strike~~\n',
   brokenFrontmatter: '---\nfoo: [unclosed\n---\n# Still Readable\n\n[[Linked]]\n',
-  crlf: '# Title\r\n\r\nA [[Wiki]] link.\r\n',
   noFrontmatter: 'just text with a #tag and a [[Link]]\n',
   emptyFrontmatter: '---\n---\n# Body\n',
 }
@@ -53,10 +52,5 @@ describe('edits are non-destructive', () => {
     for (const source of Object.values(CORPUS)) {
       expect(retitleWikiLinks(source, retitle('nonexistent', 'Whatever'))).toBe(source)
     }
-  })
-
-  it('preserves CRLF line endings outside the edited span', () => {
-    const renamed = retitleWikiLinks(CORPUS.crlf, retitle('wiki', 'Renamed'))
-    expect(renamed).toBe('# Title\r\n\r\nA [[Renamed]] link.\r\n')
   })
 })

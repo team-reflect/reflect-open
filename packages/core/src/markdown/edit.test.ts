@@ -101,13 +101,6 @@ describe('appendListItemUnderBacklinkedHeading', () => {
     )
   })
 
-  it('preserves CRLF while inserting before prose', () => {
-    const source = '## Links\r\n\r\n- [[Old]]\r\n\r\nScratchpad.\r\n'
-    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
-      '## [[Links]]\r\n\r\n- [[Old]]\r\n- [[New]]\r\n\r\nScratchpad.\r\n',
-    )
-  })
-
   it('preserves a nested matching heading and creates a top-level section', () => {
     const source = '> ## [[Links]]\n> - [[Quoted]]\n\nOutside the quote.\n'
     expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
@@ -126,13 +119,6 @@ describe('appendListItemUnderBacklinkedHeading', () => {
     const source = '## [[Links]]\n\nReading list for today:\n\n- [[Old]]\n'
     expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
       '## [[Links]]\n\nReading list for today:\n\n- [[Old]]\n- [[New]]\n',
-    )
-  })
-
-  it('uses CRLF when creating a missing section', () => {
-    const source = 'Morning notes.\r\n'
-    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
-      'Morning notes.\r\n\r\n## [[Links]]\r\n\r\n- [[New]]\r\n',
     )
   })
 })
@@ -159,10 +145,6 @@ describe('appendBlock', () => {
 
   it('trims the block itself', () => {
     expect(appendBlock('alpha', '  new text \n')).toBe('alpha\n\nnew text\n')
-  })
-
-  it('preserves CRLF when appending a block', () => {
-    expect(appendBlock('alpha\r\n', 'new text')).toBe('alpha\r\n\r\nnew text\r\n')
   })
 })
 

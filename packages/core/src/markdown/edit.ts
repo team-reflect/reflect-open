@@ -3,7 +3,6 @@ import { appendHeadingSection } from './append-section.ts'
 import { parseNote } from './extract.ts'
 import { topLevelHeadings } from './heading-blocks.ts'
 import { foldKey } from './keys.ts'
-import { offsetBeforeLineEnding } from './line-endings.ts'
 import type { Heading, WikiLink } from './model.ts'
 import { normalizeWikiTarget } from './resolve.ts'
 import { scanInlineWikiLinks } from './scan.ts'
@@ -165,13 +164,10 @@ export function upgradeSectionHeadingBacklink(
   if (target === undefined || linkedHeadingTarget(source, target, wikiLinks) !== null) {
     return source
   }
-  // Lezer ends a CRLF heading between the `\r` and the `\n`, so rewriting up to
-  // `target.to` would drop the `\r` and leave that one line LF-terminated.
-  const headingEnd = offsetBeforeLineEnding(source, target.to)
   return (
     source.slice(0, target.from) +
     `${'#'.repeat(target.level)} [[${safeTitle}]]` +
-    source.slice(headingEnd)
+    source.slice(target.to)
   )
 }
 

@@ -13,7 +13,6 @@ import {
 } from '@meowdown/markdown'
 import { DefaultMap } from '@ocavue/utils'
 import { splitFrontmatter } from './frontmatter.ts'
-import { documentLineEnding } from './line-endings.ts'
 import { normalizeWikiTarget } from './resolve.ts'
 import { scanInlineWikiLinks } from './scan.ts'
 import { isSameTaskPath } from './task-path.ts'
@@ -234,8 +233,7 @@ export function applyTaskEdits(source: string, edits: readonly TaskEdit[]): Task
     return snapshot
   })
 
-  const serializedBody = document.children.length === 0 ? '' : serializeMarkdownAst(document)
-  const nextBody = restoreLineEnding(serializedBody, source)
+  const nextBody = document.children.length === 0 ? '' : serializeMarkdownAst(document)
   assertTasksSurvive(nextBody, after)
   return {
     source: source.slice(0, bodyOffset) + nextBody,
@@ -406,7 +404,7 @@ function requireAttached(document: MarkdownDocument, target: MarkdownBlock): Att
 }
 
 function requireParagraphMarkdown(markdown: string): string {
-  const trimmed = markdown.replaceAll(/\r\n?/g, '\n').trim()
+  const trimmed = markdown.trim()
   if (/\n[ \t]*\n/.test(trimmed)) {
     throw new TaskStaleError(`task content must be one paragraph: ${JSON.stringify(markdown)}`)
   }
@@ -431,10 +429,6 @@ function createTaskItem(markdown: string): MarkdownListItem {
     collapsed: false,
     children: [{ type: 'paragraph', value: markdown }],
   }
-}
-
-function restoreLineEnding(body: string, source: string): string {
-  return documentLineEnding(source) === '\r\n' ? body.replaceAll('\n', '\r\n') : body
 }
 
 /** The written bytes must read back with the same tasks at the same paths. */

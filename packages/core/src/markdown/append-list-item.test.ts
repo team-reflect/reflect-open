@@ -90,10 +90,6 @@ describe('appendListItem', () => {
     expect(appendListItem('- a\n\n\n', 'b', 'bullet')).toBe('- a\n- b\n\n\n')
   })
 
-  it('keeps CRLF line endings when joining', () => {
-    expect(appendListItem('- a\r\n', 'b', 'bullet')).toBe('- a\r\n- b\r\n')
-  })
-
   it('joins the trailing list of a note with frontmatter', () => {
     const source = '---\nfoo: 1\n---\n\n- a\n'
     expect(appendListItem(source, 'b', 'bullet')).toBe('---\nfoo: 1\n---\n\n- a\n- b\n')

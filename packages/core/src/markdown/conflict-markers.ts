@@ -29,28 +29,27 @@ export type ConflictResolution = 'ours' | 'theirs' | 'both'
 export function resolveConflictMarkers(source: string, keep: ConflictResolution): string {
   const out: string[] = []
   let section: 'text' | 'ours' | 'theirs' = 'text'
-  for (const rawLine of source.split('\n')) {
-    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+  for (const line of source.split('\n')) {
     switch (section) {
       case 'text':
         if (line.startsWith('<<<<<<< ')) {
           section = 'ours'
         } else {
-          out.push(rawLine)
+          out.push(line)
         }
         break
       case 'ours':
         if (line === '=======') {
           section = 'theirs'
         } else if (keep !== 'theirs') {
-          out.push(rawLine)
+          out.push(line)
         }
         break
       case 'theirs':
         if (line.startsWith('>>>>>>> ')) {
           section = 'text'
         } else if (keep !== 'ours') {
-          out.push(rawLine)
+          out.push(line)
         }
         break
     }
@@ -81,8 +80,7 @@ export interface ConflictMarkerLabels {
 export function conflictMarkerLabels(source: string): ConflictMarkerLabels | null {
   let ours: string | null = null
   let sawSeparator = false
-  for (const rawLine of source.split('\n')) {
-    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+  for (const line of source.split('\n')) {
     if (ours === null) {
       if (line.startsWith('<<<<<<< ')) {
         ours = line.slice('<<<<<<< '.length).trim()
@@ -142,26 +140,25 @@ export function parseConflictMarkers(source: string): ConflictSegment[] {
     }
   }
 
-  for (const rawLine of source.split('\n')) {
-    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+  for (const line of source.split('\n')) {
     switch (section) {
       case 'text':
         if (line.startsWith('<<<<<<< ')) {
           section = 'ours'
           oursLabel = line.slice('<<<<<<< '.length).trim()
-          pending = [rawLine]
+          pending = [line]
           ours = []
           theirs = []
         } else {
-          text.push(rawLine)
+          text.push(line)
         }
         break
       case 'ours':
-        pending.push(rawLine)
+        pending.push(line)
         if (line === '=======') {
           section = 'theirs'
         } else {
-          ours.push(rawLine)
+          ours.push(line)
         }
         break
       case 'theirs':
@@ -178,8 +175,8 @@ export function parseConflictMarkers(source: string): ConflictSegment[] {
           section = 'text'
           pending = []
         } else {
-          pending.push(rawLine)
-          theirs.push(rawLine)
+          pending.push(line)
+          theirs.push(line)
         }
         break
     }
@@ -200,8 +197,7 @@ export function parseConflictMarkers(source: string): ConflictSegment[] {
 export function conflictMarkerBlockCount(source: string): number {
   let count = 0
   let stage: 'start' | 'separator' | 'end' = 'start'
-  for (const rawLine of source.split('\n')) {
-    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+  for (const line of source.split('\n')) {
     switch (stage) {
       case 'start':
         if (line.startsWith('<<<<<<< ')) {
@@ -232,8 +228,7 @@ export function conflictMarkerBlockCount(source: string): number {
  */
 export function detectRawConflictMarkers(source: string): boolean {
   let stage: 'start' | 'separator' | 'end' = 'start'
-  for (const rawLine of source.split('\n')) {
-    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+  for (const line of source.split('\n')) {
     switch (stage) {
       case 'start':
         if (line.startsWith('<<<<<<< ')) {
@@ -296,13 +291,12 @@ export function detectConflictMarkers(source: string): boolean {
   const ranges = codeBlockRanges(body)
   let stage: 'start' | 'separator' | 'end' = 'start'
   let offset = 0
-  for (const rawLine of source.split('\n')) {
+  for (const line of source.split('\n')) {
     const startInBody = offset - bodyOffset
-    offset += rawLine.length + 1
+    offset += line.length + 1
     if (startInBody >= 0 && ranges.some(([from, to]) => startInBody >= from && startInBody < to)) {
       continue
     }
-    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
     switch (stage) {
       case 'start':
         if (line.startsWith('<<<<<<< ')) {

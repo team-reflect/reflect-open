@@ -572,15 +572,6 @@ describe('drainCaptureInbox (text captures)', () => {
     expect(files.get(DAILY)).toBe('Wrote some prose.\n\n- call the bank\n')
   })
 
-  it('joins a CRLF daily with CRLF line endings', async () => {
-    files.set(DAILY, '- morning standup\r\n')
-    addTextSpool(textEnvelope())
-
-    await drain()
-
-    expect(files.get(DAILY)).toBe('- morning standup\r\n- call the bank\r\n')
-  })
-
   it('appends a duplicate line — identical text twice is two entries', async () => {
     files.set(DAILY, '- call the bank\n')
     addTextSpool(textEnvelope())

@@ -58,7 +58,6 @@ export {
 } from './conflict-markers.ts'
 export { canonicalEmail, canonicalEmails, extractEmailFields, foldEmail } from './email-fields.ts'
 export { foldFallbackTitleKey, foldKey, foldTag } from './keys.ts'
-export { documentLineEnding } from './line-endings.ts'
 export { gistBodyHash, gistFilename } from './gist.ts'
 export { slugForTitle } from './slug.ts'
 export { subjectAliases } from './subject-aliases.ts'

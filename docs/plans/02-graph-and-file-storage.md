@@ -78,8 +78,9 @@ private: true      # optional; hard-blocks cloud AI/capture for this note
    from the frontend as an absolute escape (path-traversal guard).
 
 2. **Atomic writes.** Write to a temp file in the same dir + `fsync` + rename, so an
-   interrupted save never corrupts a note. Preserve trailing-newline / line-ending style
-   on rewrite where practical (reduces sync churn in Plan 12).
+   interrupted save never corrupts a note. Notes are read with `\n` line endings and
+   written with `\n` line endings; preserve the trailing-newline style on rewrite where
+   practical (reduces sync churn in Plan 12).
 
 3. **Graph selection UX.** First-run picker (Tauri dialog) to choose/create a graph;
    persist recent graphs in local app state (not in `.reflect/` of any one graph — use

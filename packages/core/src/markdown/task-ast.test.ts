@@ -211,11 +211,7 @@ describe('applyTaskEdits: toggle', () => {
     )
   })
 
-  it('preserves CRLF line endings and the frontmatter bytes', () => {
-    const crlf = '# T\r\n\r\n+ [ ] a\r\n'
-    expect(applyTaskEdits(crlf, [{ kind: 'toggle', task: locate(crlf) }]).source).toBe(
-      '# T\r\n\r\n+ [x] a\r\n',
-    )
+  it('preserves the frontmatter bytes', () => {
     const fronted = '---\nid: x\n---\n+ [ ] a\n'
     expect(applyTaskEdits(fronted, [{ kind: 'toggle', task: locate(fronted) }]).source).toBe(
       '---\nid: x\n---\n+ [x] a\n',

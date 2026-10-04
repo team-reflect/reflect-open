@@ -98,7 +98,6 @@ export {
   type ConflictSide,
   parseBody,
   displayNoteTitle,
-  documentLineEnding,
   wikiLinkTargetForTitle,
   scanInlineWikiLinks,
   scanInlineImages,

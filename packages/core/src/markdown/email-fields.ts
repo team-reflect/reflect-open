@@ -92,7 +92,7 @@ export function extractEmailFields(body: string): string[] {
   const emails: string[] = []
   let legacyParentIndent: number | null = null
 
-  for (const line of body.split(/\r?\n/)) {
+  for (const line of body.split('\n')) {
     const field = line.match(EMAIL_FIELD_PATTERN)
     if (field !== null) {
       const inlineValue = field[2] ?? ''
