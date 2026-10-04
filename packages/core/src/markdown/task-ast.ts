@@ -1,4 +1,5 @@
 import {
+  isMarkdownAstEqual,
   parseMarkdownAst,
   resolveMarkdownAstPath,
   serializeMarkdownAst,
@@ -252,7 +253,7 @@ function assertSerializable(document: MarkdownDocument): void {
     return
   }
   const reparsed = parseMarkdownAst(serializeMarkdownAst(document))
-  if (JSON.stringify(reparsed) !== JSON.stringify(document)) {
+  if (!isMarkdownAstEqual(reparsed, document)) {
     throw new NoteNotSerializableError(
       'This note cannot be rewritten faithfully. Edit the task in the note itself.',
     )
