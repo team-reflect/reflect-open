@@ -75,10 +75,7 @@ fn unescape_markdown_text(text: &str) -> String {
 /// headings lose the leading hashes and any trailing closing hashes; both
 /// resolve backslash escapes like the TS extractor.
 fn clean_heading_text(raw: &str) -> String {
-    let raw = raw
-        .strip_suffix('\n')
-        .map(|text| text.strip_suffix('\r').unwrap_or(text))
-        .unwrap_or(raw);
+    let raw = raw.strip_suffix('\n').unwrap_or(raw);
     if let Some(newline_at) = raw.find('\n') {
         return unescape_markdown_text(raw[..newline_at].trim());
     }

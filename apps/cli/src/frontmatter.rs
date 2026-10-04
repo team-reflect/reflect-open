@@ -37,7 +37,6 @@ fn fence_line_len(text: &str) -> Option<usize> {
     match bytes.get(index) {
         None => Some(3 + index),
         Some(b'\n') => Some(3 + index + 1),
-        Some(b'\r') if bytes.get(index + 1) == Some(&b'\n') => Some(3 + index + 2),
         _ => None,
     }
 }
@@ -63,18 +62,13 @@ pub fn split_frontmatter(source: &str) -> FrontmatterSplit<'_> {
         };
     }
     // Otherwise the closing fence starts right after a newline. The raw block
-    // excludes that newline (and a preceding `\r`), matching the TS regex.
+    // excludes that newline, matching the TS regex.
     let mut search_from = 0;
     while let Some(newline_at) = rest[search_from..].find('\n').map(|at| search_from + at) {
         let line_start = newline_at + 1;
         if let Some(close_len) = fence_line_len(&rest[line_start..]) {
-            let raw_end = if newline_at > 0 && rest.as_bytes()[newline_at - 1] == b'\r' {
-                newline_at - 1
-            } else {
-                newline_at
-            };
             return FrontmatterSplit {
-                raw: Some(&rest[..raw_end]),
+                raw: Some(&rest[..newline_at]),
                 body: &rest[line_start + close_len..],
             };
         }
@@ -194,13 +188,6 @@ mod tests {
         let empty = split_frontmatter("---\n---\nbody");
         assert_eq!(empty.raw, Some(""));
         assert_eq!(empty.body, "body");
-    }
-
-    #[test]
-    fn windows_line_endings_split_cleanly() {
-        let split = split_frontmatter("---\r\ntitle: Foo\r\n---\r\nbody");
-        assert_eq!(split.raw, Some("title: Foo"));
-        assert_eq!(split.body, "body");
     }
 
     /// Parity with `coercePrivate` (`model.ts`): explicit truthy values only.
