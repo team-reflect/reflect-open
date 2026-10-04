@@ -99,10 +99,8 @@ import { serializeWikiSuggestionAddress } from './suggest.ts'
  * reproject.
  * 21 - tasks are keyed by AST path (`tasks.ast_path`) and store Markdown instead
  * of plain text, so every note's tasks must reproject.
- * 22 - note text is read with `\n` line endings, so the offsets and
- * `notes.file_hash` of notes stored with `\r\n` must reproject.
  */
-export const PROJECTION_VERSION = 22
+export const PROJECTION_VERSION = 21
 
 /**
  * Precedence of the spellings a note answers to (`note_claims.tier`): the
