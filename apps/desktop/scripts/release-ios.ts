@@ -19,13 +19,12 @@ const BUNDLE_IDENTIFIER = 'app.reflect.ios'
 const APP_GROUP = 'group.app.reflect'
 const SENTRY_DSN_PATTERN =
   /^https:\/\/[0-9a-f]{32}@o463484\.ingest\.us\.sentry\.io\/4511705649971200$/
-const buildDir = join(TAURI_SRC_DIR, 'gen', 'apple', 'build')
-const archive = join(buildDir, 'reflect-open_iOS.xcarchive')
+const BUILD_DIR = join(TAURI_SRC_DIR, 'gen', 'apple', 'build')
+const ARCHIVE_PATH = join(BUILD_DIR, 'reflect-open_iOS.xcarchive')
 
-// FIXME: rename these top-level constants. use APP_BINARY_PATH instead of appBinary. use BUILD_DIR instead of buildDir
-const appBinary = join(archive, 'Products', 'Applications', 'Reflect.app', 'Reflect')
-const dsymBinary = join(
-  archive,
+const APP_BINARY_PATH = join(ARCHIVE_PATH, 'Products', 'Applications', 'Reflect.app', 'Reflect')
+const DSYM_BINARY_PATH = join(
+  ARCHIVE_PATH,
   'dSYMs',
   'Reflect.app.dSYM',
   'Contents',
@@ -67,10 +66,10 @@ function assertSentryDsn(): void {
 }
 
 function findNewestIpa(): string {
-  const ipas = globSync('**/*.ipa', { cwd: buildDir }).map((path) => join(buildDir, path))
+  const ipas = globSync('**/*.ipa', { cwd: BUILD_DIR }).map((path) => join(BUILD_DIR, path))
   const newest = ipas.toSorted((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)[0]
   if (!newest) {
-    throw new Error(`no .ipa under ${buildDir}`)
+    throw new Error(`no .ipa under ${BUILD_DIR}`)
   }
   return newest
 }
@@ -131,12 +130,12 @@ async function readUuids(binary: string): Promise<string> {
 
 /** A crash report can only be symbolicated with the dSYM of the exact shipped executable. */
 async function assertArchiveSymbols(): Promise<void> {
-  const uuids = await readUuids(appBinary)
-  if (!uuids || uuids !== (await readUuids(dsymBinary))) {
+  const uuids = await readUuids(APP_BINARY_PATH)
+  if (!uuids || uuids !== (await readUuids(DSYM_BINARY_PATH))) {
     throw new Error('the archive executable and its dSYM do not have the same UUIDs')
   }
   // The archive strips the executable's symbol table, so look in the dSYM.
-  const symbols = await exec('xcrun', ['nm', '-gUj', dsymBinary], { throwOnError: true })
+  const symbols = await exec('xcrun', ['nm', '-gUj', DSYM_BINARY_PATH], { throwOnError: true })
   if (!symbols.stdout.includes('_reflect_start_native_diagnostics')) {
     throw new Error('the app binary does not contain the native diagnostics entry point')
   }
@@ -147,7 +146,7 @@ async function uploadDebugFiles(): Promise<void> {
     return log('SENTRY_AUTH_TOKEN is not set, skipping dSYM upload')
   }
   const project = ['--org', 'reflect-64', '--project', 'reflect-open']
-  const upload = ['--type', 'dsym', '--no-sources', '--wait-for', '60', archive]
+  const upload = ['--type', 'dsym', '--no-sources', '--wait-for', '60', ARCHIVE_PATH]
   const sentryCli = join(APP_DIR, 'node_modules', '.bin', 'sentry-cli')
   await exec(sentryCli, ['debug-files', 'upload', ...project, ...upload], {
     throwOnError: true,

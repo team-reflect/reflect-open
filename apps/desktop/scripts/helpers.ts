@@ -96,6 +96,15 @@ export function readTauriConfig(platform: 'macos' | 'windows', flavor: Flavor): 
   return TauriConfigSchema.parse(config)
 }
 
+/**
+ * The Rust target triple of this machine, for example `aarch64-apple-darwin`,
+ * `x86_64-apple-darwin`, `x86_64-pc-windows-msvc`, or `x86_64-unknown-linux-gnu`.
+ */
+export async function getHostTriple(): Promise<string> {
+  const { stdout } = await exec('rustc', ['--print', 'host-tuple'], { throwOnError: true })
+  return stdout.trim()
+}
+
 const CargoMetadataSchema = z.object({ target_directory: z.string() })
 
 /** The Cargo target directory of the workspace. */

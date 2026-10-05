@@ -4,7 +4,7 @@
 import { copyFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { exec } from 'tinyexec'
-import { log, ROOT_DIR, TAURI_SRC_DIR } from './helpers.ts'
+import { getHostTriple, log, ROOT_DIR, TAURI_SRC_DIR } from './helpers.ts'
 
 const SIDECARS = [
   { crate: 'reflect-cli', binary: 'reflect' },
@@ -12,22 +12,14 @@ const SIDECARS = [
 ]
 const INHERIT = { throwOnError: true, nodeOptions: { cwd: ROOT_DIR, stdio: 'inherit' } } as const
 
-/** Tauri exports the target triple to its before-commands. Elsewhere, use the host triple. */
-async function resolveTriple(): Promise<string> {
-  if (process.env.TAURI_ENV_TARGET_TRIPLE) {
-    return process.env.TAURI_ENV_TARGET_TRIPLE
-  }
-  const host = await exec('rustc', ['--print', 'host-tuple'], { throwOnError: true })
-  return host.stdout.trim()
-}
-
 async function main(): Promise<void> {
   const platform = process.env.TAURI_ENV_PLATFORM
   if (platform === 'ios' || platform === 'android') {
     return
   }
 
-  const triple = await resolveTriple()
+  // Tauri exports the target triple to its before-commands.
+  const triple = process.env.TAURI_ENV_TARGET_TRIPLE ?? (await getHostTriple())
   // The explicit --target keeps the artifacts out of target/release/, where
   // tauri-build copies the de-suffixed sidecars.
   const packages = SIDECARS.flatMap((sidecar) => ['-p', sidecar.crate])
