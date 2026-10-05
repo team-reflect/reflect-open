@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { x } from 'tinyexec'
 import { z } from 'zod'
 
+// FIXME: rename to APP_DIR, ROOT_DIR, TAURI_SRC_DIR
 export const appDir = join(import.meta.dirname, '..')
 export const repoRoot = join(appDir, '..', '..')
 export const tauriDir = join(appDir, 'src-tauri')
