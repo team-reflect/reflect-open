@@ -222,7 +222,8 @@ versioned because each manifest points at an immutable release payload.
 macOS build has to succeed. It runs `pnpm release:manifest --tag=<tag>`
 (`apps/desktop/scripts/release-manifest.ts`), which downloads the `.sig` files from the
 release, writes `latest.json` with one entry per platform (`darwin-aarch64`,
-`darwin-x86_64`, and `windows-x86_64` when a Windows signature exists), and uploads it.
+`darwin-x86_64`, plus `windows-x86_64` and `windows-aarch64` when their signatures
+exist), and uploads it.
 The workflow then appends the Mac download guide to the release notes, sets the
 pre-release and latest flags, and undrafts the release as its last step on the tagged
 release. Nothing is visible to users, and `releases/latest` does not move, until then.

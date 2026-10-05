@@ -131,17 +131,20 @@ jobs:
       commit: ${{ needs.release-please.outputs.beta_commit }}
     secrets: inherit
 
-  # The experimental Windows build rides every release too, but stays off the
-  # GitHub release: publish-windows.yml only uploads a workflow artifact. An
+  # The experimental Windows build rides every release too: x64 and arm64
+  # installers plus their updater signatures go into the draft release. An
   # independent job — a Windows failure never blocks the macOS release or
-  # the TestFlight upload. No secrets: the build is unsigned by design.
+  # the TestFlight upload. The installers are not code-signed; the secrets
+  # are only for the updater signature.
   publish-windows-stable:
     name: Build the Windows installer (stable)
     needs: release-please
     if: needs.release-please.outputs.stable_created == 'true'
     uses: ./.github/workflows/publish-windows.yml
     with:
+      tag: ${{ needs.release-please.outputs.stable_tag }}
       commit: ${{ needs.release-please.outputs.stable_commit }}
+    secrets: inherit
 
   publish-windows-beta:
     name: Build the Windows installer (beta)
@@ -149,7 +152,9 @@ jobs:
     if: needs.release-please.outputs.beta_created == 'true'
     uses: ./.github/workflows/publish-windows.yml
     with:
+      tag: ${{ needs.release-please.outputs.beta_tag }}
       commit: ${{ needs.release-please.outputs.beta_commit }}
+    secrets: inherit
 
   # The builds only fill the draft release. Publishing waits for macOS and
   # Windows to finish, but only macOS has to succeed: a Windows failure never

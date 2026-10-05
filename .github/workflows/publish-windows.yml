@@ -1,10 +1,11 @@
 name: Windows
 
-# Experimental: builds an unsigned Windows x64 NSIS installer. The installer
-# is kept as a workflow artifact only — it is never uploaded to a GitHub
-# release. See docs/windows-builds.md.
+# Experimental: builds Windows x64 and arm64 NSIS installers that are not
+# code-signed. A release build also uploads them, with their updater
+# signatures, into the draft release. See docs/windows-builds.md.
 
 on:
+  # Builds the installers as workflow artifacts only.
   workflow_dispatch:
   # Validate changes to the Windows build itself before merging; regular PRs
   # never trigger this.
@@ -15,23 +16,40 @@ on:
       - .github/actions/setup-rust/action.yml
       - apps/desktop/scripts/release-windows.ts
       - apps/desktop/scripts/helpers.ts
-  # Called by release.yml so every release also produces a Windows
-  # build for testing.
+  # Called by release.yml so every release also produces a Windows build.
   workflow_call:
     inputs:
+      tag:
+        description: The release tag (v<version>) created by release-please
+        required: true
+        type: string
       commit:
         description: Immutable commit targeted by the release tag.
         required: true
         type: string
 
+# A release build uploads its assets into the draft release.
+# publish-finalize.yml writes latest.json and publishes the release afterwards.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   windows:
-    name: Build Windows x64 (unsigned)
-    runs-on: windows-latest
+    name: Build Windows ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each runner's host triple is the build target, so no extra rustup
+        # target and no cross-compilation.
+        include:
+          - name: x64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: arm64
+            runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
     steps:
       # The runner image enables OS-level long paths but not git's own
       # support; deep pnpm paths can fail checkout without it.
@@ -45,24 +63,41 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      # The default toolchain's host triple is x86_64-pc-windows-msvc, which
-      # is exactly the build target — no extra rustup target needed.
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: ${{ matrix.target }}
 
-      # No secrets on purpose: without SENTRY_AUTH_TOKEN the Sentry vite
-      # plugin skips source-map upload, and without VITE_SENTRY_DSN the
-      # experimental build carries no telemetry.
+      # The updater key signs the installer for the in-app updater (minisign);
+      # it is not a code-signing certificate. Without the key (a PR from a
+      # fork) the build writes no signature. No Sentry secrets on purpose:
+      # without SENTRY_AUTH_TOKEN the Sentry vite plugin skips source-map
+      # upload, and without VITE_SENTRY_DSN the experimental build carries no
+      # telemetry.
       - name: Build Windows installer
         shell: bash
-        run: pnpm release:windows --artifact-dir="$RUNNER_TEMP/windows-artifacts"
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm release:windows --target=${{ matrix.target }} --artifact-dir="$RUNNER_TEMP/windows-artifacts"
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: reflect-windows-x64
+          name: reflect-windows-${{ matrix.name }}
           path: ${{ runner.temp }}/windows-artifacts/*
           if-no-files-found: error
           # The NSIS installer is already lzma-compressed; zipping it again
           # wastes minutes for nothing.
           compression-level: 0
           retention-days: 90
+
+      # Uploads clobber, so a failed run can be retried.
+      - name: Upload the assets to the draft release
+        if: inputs.tag != ''
+        shell: bash
+        working-directory: ${{ runner.temp }}/windows-artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" ./* --clobber
