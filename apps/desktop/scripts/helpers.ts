@@ -154,6 +154,8 @@ const TauriConfigSchema = z.object({
   }),
 })
 
+// FIXME: add a new PackageJsonSchema that reads the `package.json` and extracts the `version`. do not inline zod in `readAppVersion`
+
 export type TauriConfig = z.infer<typeof TauriConfigSchema>
 
 /** Resolves the config the way `tauri build` does: base, then platform file, then flavor overlay. */
