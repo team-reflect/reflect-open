@@ -47,6 +47,7 @@ jobs:
       # The default toolchain's host triple is x86_64-pc-windows-msvc, which
       # is exactly the build target — no extra rustup target needed.
       - name: Install Rust toolchain
+        # FIXME: I see many "dtolnay/rust-toolchain" calls. Just use our setup-rust action instead
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
 
       - name: Cache cargo build
