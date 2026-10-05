@@ -1,9 +1,9 @@
 // Builds a signed, notarized macOS app and DMG. See docs/macos-distribution.md.
 //
-//   pnpm release:macos [build]        Build, sign, notarize, then verify
-//   pnpm release:macos verify         Re-run the checks on existing bundles
-//   pnpm release:macos setup          Store the notarization Apple ID in the keychain
-//   pnpm release:macos setup-updater  Generate the updater signing keypair
+//   pnpm release:macos [build]        Build, sign, notarize, then verify // FIXME: we do not need `build` anymore. Do not handle positional args "build" anymore.
+//   pnpm release:macos verify         Re-run the checks on existing bundles // FIXME: delete `verify`.
+//   pnpm release:macos setup          Store the notarization Apple ID in the keychain // FIXME: delete `setup`. Ensure all docs are updated
+//   pnpm release:macos setup-updater  Generate the updater signing keypair // FIXME: delete `setup-updater`
 //
 //   --flavor=<stable|beta|dev>   Default: from the version
 //   --target=<triple>            Default: the host triple
