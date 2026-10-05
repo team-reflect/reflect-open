@@ -30,7 +30,7 @@ export interface RunOptions {
 }
 
 /** Runs a command and returns its trimmed stdout. Throws with the captured output on failure. */
-export async function run(
+export async function run( // FIXME: we do not need `run` and `exec` wrappers. Just import `exec` from `tinyexec` directly and use it. Pass throwOnError: true
   command: string,
   args: readonly string[],
   options: RunOptions = {},
