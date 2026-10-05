@@ -56,7 +56,7 @@ jobs:
       # single version source; tauri.conf.json points at it). When called from
       # release.yml, the tag it created must match the checked-out
       # commit's version, or the assets would publish under the wrong name.
-      - name: Verify the release tag matches apps/desktop/package.json
+      - name: Verify the release tag matches apps/desktop/package.json # FIXME: move the "Verify the release tag matches apps/desktop/package.json" step into the "Build · sign · notarize" job. Remove the "preflight" job
         env:
           INPUT_TAG: ${{ inputs.tag }}
         run: |
@@ -67,7 +67,7 @@ jobs:
             exit 1
           fi
 
-      - name: Verify release can publish
+      - name: Verify release can publish # FIXME: remove the "Verify release can publish" step
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -93,7 +93,7 @@ jobs:
           fi
 
   macos:
-    name: Build · sign · notarize (${{ matrix.name }})
+    name: Build · sign · notarize (${{ matrix.name }}) # FIX: remove the "name: xxx" line
     needs: preflight
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
