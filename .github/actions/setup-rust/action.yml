@@ -70,4 +70,4 @@ runs:
     # build script runs (clippy/test compile it), so stage the CLI first.
     - name: Stage the reflect CLI sidecar
       shell: bash
-      run: node apps/desktop/scripts/build-sidecar.mjs
+      run: node apps/desktop/scripts/build-sidecar.ts

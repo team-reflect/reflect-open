@@ -12,7 +12,8 @@ on:
     paths:
       - .github/workflows/windows.yml
       - .github/actions/setup-node/action.yml
-      - apps/desktop/scripts/release-windows.mjs
+      - apps/desktop/scripts/release-windows.ts
+      - apps/desktop/scripts/helpers.ts
   # Called by release-please.yml so every release also produces a Windows
   # build for testing.
   workflow_call:

@@ -70,7 +70,27 @@ jobs:
       - name: Verify release can publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node apps/desktop/scripts/release-macos.mjs preflight
+        run: |
+          tag="v$(jq -r .version apps/desktop/package.json)"
+          commit="$(git rev-parse HEAD)"
+
+          # `gh release create` reuses an existing tag and ignores --target, so
+          # a tag at another commit would publish this build under old code.
+          # The peeled "^{}" line sorts last and wins for annotated tags.
+          tagged="$(git ls-remote --tags origin "$tag" "$tag^{}" | tail -n 1 | cut -f 1)"
+          if [ -n "$tagged" ] && [ "$tagged" != "$commit" ]; then
+            echo "::error::tag ${tag} points at ${tagged}, but this run builds ${commit}"
+            exit 1
+          fi
+
+          # release-please creates an asset-less draft, which publish fills.
+          # A published release that carries artifacts has already shipped.
+          shipped="$(gh release view "$tag" --json isDraft,assets \
+            --jq 'select(.isDraft | not) | .assets[].name | select(endswith(".dmg") or . == "latest.json")' || true)"
+          if [ -n "$shipped" ]; then
+            echo "::error::release ${tag} already has published artifacts"
+            exit 1
+          fi
 
   macos:
     name: Build · sign · notarize (${{ matrix.name }})
@@ -157,17 +177,6 @@ jobs:
           # A failed notarization still compiled everything; keep the cache.
           cache-on-failure: true
 
-      # The release script takes APPLE_API_KEY_PATH (a .p8 file on disk), so
-      # materialize the key content outside the workspace.
-      - name: Stage the App Store Connect API key
-        env:
-          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
-        run: |
-          if [ -n "$APPLE_API_KEY_CONTENT" ]; then
-            printf '%s\n' "$APPLE_API_KEY_CONTENT" > "$RUNNER_TEMP/apple-api-key.p8"
-            echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/apple-api-key.p8" >> "$GITHUB_ENV"
-          fi
-
       # Tauri signs the .app; the script then repairs sidecar signatures,
       # notarizes + staples the app and DMG, signs the updater archive, and
       # runs the Gatekeeper checks.
@@ -178,6 +187,7 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -199,61 +209,186 @@ jobs:
     needs: macos
     runs-on: ubuntu-latest
     outputs:
-      prerelease: ${{ steps.channel.outputs.prerelease }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+      tag: ${{ steps.release.outputs.tag }}
+      asset: ${{ steps.release.outputs.asset }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ARTIFACTS: ${{ runner.temp }}/release-artifacts
+      NOTES: ${{ runner.temp }}/release-notes.md
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.commit || github.sha }}
-          # Full history so the HEAD-is-on-an-origin-branch check passes on the
-          # release commit, and credentials stay for gh/git release preflights.
-          persist-credentials: true
-          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Determine release channel
-        id: channel
+      # A prerelease version is the beta flavor. Asset names use the flavor's
+      # product name with spaces as dots, which is how GitHub stores them.
+      - name: Resolve release
+        id: release
         run: |
           version="$(jq -r .version apps/desktop/package.json)"
+          config=tauri.conf.json
+          prerelease=false
           if [[ "$version" == *-* ]]; then
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            config=tauri.beta.conf.json
+            prerelease=true
           fi
+          product="$(jq -r .productName "apps/desktop/src-tauri/$config")"
+          {
+            echo "version=$version"
+            echo "tag=v$version"
+            echo "prerelease=$prerelease"
+            echo "product=$product"
+            echo "asset=${product// /.}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Download release artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: macos-release-*
-          path: ${{ runner.temp }}/release-artifacts
+          path: ${{ env.ARTIFACTS }}
           merge-multiple: true
 
-      - name: Publish GitHub release
+      # Installed apps find a new version through this file: stable apps read
+      # it from releases/latest, beta apps from the updater-beta release.
+      - name: Write the updater manifest
+        working-directory: ${{ env.ARTIFACTS }}
         env:
-          GH_TOKEN: ${{ github.token }}
-          # Pass the boolean flag through an env variable so the shell never
-          # interpolates ${{ }} expressions directly into the run command.
-          DRAFT_FLAG: ${{ inputs.draft && '--draft' || '' }}
+          VERSION: ${{ steps.release.outputs.version }}
+          TAG: ${{ steps.release.outputs.tag }}
+          ASSET: ${{ steps.release.outputs.asset }}
         run: |
-          args=(publish --defer-beta-feed --from-artifacts="$RUNNER_TEMP/release-artifacts")
-          if [ -n "$DRAFT_FLAG" ]; then
-            args+=("$DRAFT_FLAG")
-          fi
-          node apps/desktop/scripts/release-macos.mjs "${args[@]}"
+          arm="${ASSET}_${VERSION}_aarch64.app.tar.gz"
+          intel="${ASSET}_${VERSION}_x86_64.app.tar.gz"
+          jq -n \
+            --arg version "$VERSION" \
+            --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg base "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG" \
+            --arg arm "$arm" \
+            --arg intel "$intel" \
+            --rawfile armSignature "$arm.sig" \
+            --rawfile intelSignature "$intel.sig" \
+            '{
+              version: $version,
+              pub_date: $date,
+              platforms: {
+                "darwin-aarch64": { signature: ($armSignature | rtrimstr("\n")), url: "\($base)/\($arm)" },
+                "darwin-x86_64": { signature: ($intelSignature | rtrimstr("\n")), url: "\($base)/\($intel)" }
+              }
+            }' > latest.json
 
+      # Keep the changelog release-please wrote. Without a release (the manual
+      # fallback), ask GitHub for generated notes.
+      - name: Write the release notes
+        id: notes
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          ASSET: ${{ steps.release.outputs.asset }}
+        run: |
+          if gh release view "$TAG" --json body --jq .body > "$NOTES"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+              -f tag_name="$TAG" -f target_commitish="$(git rev-parse HEAD)" --jq .body > "$NOTES"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          if ! grep -qF '## Which Mac download should I choose?' "$NOTES"; then
+            cat >> "$NOTES" <<EOF
+
+          ## Which Mac download should I choose?
+
+          - **Apple Silicon (M-series Macs):** download \`${ASSET}_aarch64.dmg\`.
+          - **Intel Macs:** download \`${ASSET}_x86_64.dmg\`.
+
+          To check your Mac, open **Apple menu -> About This Mac**. If it shows **Chip** with M1, M2, M3, M4, or newer, choose Apple Silicon. If it shows **Processor** with Intel, choose Intel.
+          EOF
+          fi
+
+      # Upload first and undraft last, so the release stays invisible (and
+      # releases/latest unmoved) until every asset is in place. Uploads
+      # clobber, so a failed run can be retried.
+      - name: Publish GitHub release
+        working-directory: ${{ env.ARTIFACTS }}
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          TAG: ${{ steps.release.outputs.tag }}
+          PRODUCT: ${{ steps.release.outputs.product }}
+          ASSET: ${{ steps.release.outputs.asset }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
+          EXISTS: ${{ steps.notes.outputs.exists }}
+          DRAFT: ${{ inputs.draft }}
+        run: |
+          assets=(latest.json)
+          for arch in aarch64 x86_64; do
+            archive="${ASSET}_${VERSION}_${arch}.app.tar.gz"
+            assets+=("${ASSET}_${arch}.dmg" "$archive" "$archive.sig")
+          done
+
+          flags=(--title "$PRODUCT $VERSION" --notes-file "$NOTES")
+          if [ "$PRERELEASE" = true ]; then
+            flags+=(--prerelease --latest=false)
+          else
+            flags+=(--prerelease=false --latest)
+          fi
+
+          if [ "$EXISTS" = true ]; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+            if [ "$DRAFT" != true ]; then
+              flags+=(--draft=false)
+            fi
+            gh release edit "$TAG" "${flags[@]}"
+          else
+            if [ "$DRAFT" = true ]; then
+              flags+=(--draft)
+            fi
+            gh release create "$TAG" "${assets[@]}" --target "$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)" "${flags[@]}"
+          fi
+
+  # Beta apps and the README download links read from the moving updater-beta
+  # release. This is a separate job so that a failed upload can be retried
+  # without rebuilding or touching the immutable tagged release.
   sync-beta-feed:
     name: Sync beta downloads and updater feed
     needs: publish
     if: needs.publish.outputs.prerelease == 'true'
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.publish.outputs.tag }}
+      ASSET: ${{ needs.publish.outputs.asset }}
+      COMMIT: ${{ inputs.commit || github.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ inputs.commit || github.sha }}
-          persist-credentials: true
-          fetch-depth: 0
-
-      # This is separate from publish so a transient moving-asset failure can
-      # be retried without rebuilding or touching the immutable tagged release.
       - name: Sync beta downloads and updater feed
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node apps/desktop/scripts/release-macos.mjs sync-beta-feed
+        run: |
+          if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = true ]; then
+            echo "release $TAG is still a draft; updater-beta stays unchanged"
+            exit 0
+          fi
+
+          # A retry of an older release must not roll the channel back.
+          newest="$(gh api --paginate "repos/$GH_REPO/releases" \
+            --jq '.[] | select(.prerelease and (.draft | not)) | .tag_name' |
+            jq -Rrn '[inputs | select(test("^v\\d+\\.\\d+\\.\\d+-beta(\\.\\d+)?$"))]
+              | max_by(ltrimstr("v") | [scan("\\d+") | tonumber] | if length == 3 then . + [0] else . end)')"
+          if [ "$newest" != "$TAG" ]; then
+            echo "$newest is already published; skipping older $TAG"
+            exit 0
+          fi
+
+          dmgs=("${ASSET}_aarch64.dmg" "${ASSET}_x86_64.dmg")
+          gh release download "$TAG" --dir . --pattern "${dmgs[0]}" --pattern "${dmgs[1]}" --pattern latest.json
+
+          if gh release view updater-beta > /dev/null; then
+            # DMGs first, so a failed upload leaves the working manifest untouched.
+            gh release upload updater-beta "${dmgs[@]}" --clobber
+            gh release upload updater-beta latest.json --clobber
+          else
+            gh release create updater-beta "${dmgs[@]}" latest.json \
+              --title 'Latest Reflect Beta downloads' \
+              --target "$COMMIT" \
+              --prerelease \
+              --latest=false \
+              --notes 'Moving downloads and updater feed for the latest Reflect Beta release. Choose a DMG for a fresh install; installed beta apps use latest.json.'
+          fi

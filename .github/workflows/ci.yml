@@ -125,7 +125,7 @@ jobs:
           cache-on-failure: true
 
       - name: Stage desktop sidecars
-        run: node apps/desktop/scripts/build-sidecar.mjs
+        run: node apps/desktop/scripts/build-sidecar.ts
 
       - name: Check desktop library
         run: cargo check -p reflect-open --lib
