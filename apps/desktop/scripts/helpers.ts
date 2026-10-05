@@ -24,7 +24,8 @@ export interface RunOptions {
 }
 
 /** Runs a command and returns its trimmed stdout. Throws with the captured output on failure. */
-export async function run( // FIXME: we do not need `run` and `exec` wrappers. Just import `exec` from `tinyexec` directly and use it. Pass throwOnError: true
+export async function run(
+  // FIXME: we do not need `run` and `exec` wrappers. Just import `exec` from `tinyexec` directly and use it. Pass throwOnError: true
   command: string,
   args: readonly string[],
   options: RunOptions = {},
@@ -75,7 +76,8 @@ export async function withTempDir<Result>(
 }
 
 /** Runs a script entry point. A thrown error becomes a one-line message and exit code 1. */
-export async function runMain(main: () => Promise<void>): Promise<void> { // FIXME: do not use `runMain`. Just call `main()` directly. we do not need to warp error in a one-line message.
+export async function runMain(main: () => Promise<void>): Promise<void> {
+  // FIXME: do not use `runMain`. Just call `main()` directly. we do not need to warp error in a one-line message.
   try {
     await main()
   } catch (error) {
