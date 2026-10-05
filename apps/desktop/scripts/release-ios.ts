@@ -264,6 +264,12 @@ async function runCommand(command: string, options: Options, tempDir: string): P
 }
 
 async function main(): Promise<void> {
+  // FIXME:
+  // For better reaablity, alwyas use {} in the apps/desktop/scripts/*.ts
+  // good: if (xxx) { throw new Error() }
+  // bad: if (xxx) throw new Error()
+  // good: if (xxx) { return await yyy() }
+  // bad: if (xxx) return await yyy()
   if (process.platform !== 'darwin') throw new Error('iOS releases only run on macOS')
   const { command, options } = parseOptions()
   await withTempDir((tempDir) => runCommand(command, options, tempDir))
