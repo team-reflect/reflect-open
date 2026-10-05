@@ -73,4 +73,5 @@ runs:
     # build script runs (clippy/test compile it), so stage the CLI first.
     - name: Stage the reflect CLI sidecar
       shell: bash
+      #  // FIXME: setup-rust should not contains the sidecar build step. sidecar build step is too specific to the desktop app. For the same reason, setup-rust should not contain ./.github/actions/setup-node
       run: node apps/desktop/scripts/build-sidecar.ts
