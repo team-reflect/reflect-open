@@ -1,5 +1,7 @@
 name: Release PR
 
+# FIXME rename this file from release-please.yml to release-pr.yml
+
 # Stable and beta Release PRs share master but use separate lifecycle labels
 # and head branches. A merged PR in one channel therefore cannot block the
 # other channel from refreshing its open PR. Beta versions use a prerelease
@@ -71,10 +73,11 @@ jobs:
           config-file: .github/release-please/config.extension.json
           manifest-file: .github/release-please/manifest.extension.json
 
-  publish-extension:
+  publish-extension: # FIXME: rename publish-extension to publish-browser-extension
     name: Submit the Chrome extension
     needs: release-please
     if: needs.release-please.outputs.extension_created == 'true'
+    # FIXME: rename release-browser-extension.yml  to publish-browser-extension.yml
     uses: ./.github/workflows/release-browser-extension.yml
     with:
       tag: ${{ needs.release-please.outputs.extension_tag }}
@@ -88,17 +91,17 @@ jobs:
   # and output its tag. Chain straight into the build/sign/publish pipeline
   # with the tag resolved to its immutable commit once; the called workflows
   # check out that SHA rather than resolving the tag name again.
-  publish-release-stable:
+  publish-release-stable: # FIXME: rename publish-release-stable to publish-macos-stable
     name: Build and publish the stable release
     needs: release-please
     if: needs.release-please.outputs.stable_created == 'true'
-    uses: ./.github/workflows/release-app.yml
+    uses: ./.github/workflows/release-app.yml # FIXME: rename release-app.yml to publish-macos.yml
     with:
       tag: ${{ needs.release-please.outputs.stable_tag }}
       commit: ${{ needs.release-please.outputs.stable_commit }}
     secrets: inherit
 
-  publish-release-beta:
+  publish-release-beta: # FIXME: rename publish-release-beta to publish-macos-beta
     name: Build and publish the beta release
     needs: release-please
     if: needs.release-please.outputs.beta_created == 'true'
@@ -116,7 +119,7 @@ jobs:
     name: Upload the stable release to TestFlight
     needs: release-please
     if: needs.release-please.outputs.stable_created == 'true'
-    uses: ./.github/workflows/testflight.yml
+    uses: ./.github/workflows/testflight.yml # FIXME: rename testflight.yml to publish-testflight.yml
     with:
       commit: ${{ needs.release-please.outputs.stable_commit }}
     secrets: inherit
@@ -134,7 +137,7 @@ jobs:
   # GitHub release: windows.yml only uploads a workflow artifact. An
   # independent job — a Windows failure never blocks the macOS release or
   # the TestFlight upload. No secrets: the build is unsigned by design.
-  build-windows-stable:
+  build-windows-stable: # FIXME: rename build-windows-stable to publish-windows-stable
     name: Build the Windows installer (stable)
     needs: release-please
     if: needs.release-please.outputs.stable_created == 'true'
@@ -142,10 +145,10 @@ jobs:
     with:
       commit: ${{ needs.release-please.outputs.stable_commit }}
 
-  build-windows-beta:
+  build-windows-beta: # FIXME: rename build-windows-beta to publish-windows-beta
     name: Build the Windows installer (beta)
     needs: release-please
     if: needs.release-please.outputs.beta_created == 'true'
-    uses: ./.github/workflows/windows.yml
+    uses: ./.github/workflows/windows.yml # FIXME: rename windows.yml to publish-windows.yml
     with:
       commit: ${{ needs.release-please.outputs.beta_commit }}
