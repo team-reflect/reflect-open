@@ -16,8 +16,7 @@ project:
   default; WebKit on demand (see below). Test files run sequentially
   (`fileParallelism: false`) because real keyboard focus is a per-page global.
 - **`apps/desktop/vitest.node.config.ts` (`node`)**:
-  `src/**/*.test.ts` plus `scripts/**/*.test.mjs`, executed in a plain node
-  environment.
+  `src/**/*.test.ts`, executed in a plain node environment.
 - **`packages/core/vitest.browser.config.ts` (`core-browser`)**:
   `src/**/*.test.tsx`. Only `meta-scrape` lives here: `parsePageMeta` uses
   the host's `DOMParser`, and in production that host is always a browser
