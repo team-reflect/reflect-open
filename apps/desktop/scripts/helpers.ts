@@ -116,7 +116,7 @@ export function readTauriConfig(platform: 'macos' | 'windows', flavor: Flavor): 
 
 const CargoMetadataSchema = z.object({ target_directory: z.string() })
 
-/** The Cargo target directory of the workspace. */
+/** The Cargo target directory of the workspace. */ // FIXME: function name should starts with a verb, e.g. `getCargoTargetDir`. Apply this rule to all functions in this scripts/ dir.
 export async function cargoTargetDir(): Promise<string> {
   const { stdout } = await exec('cargo', ['metadata', '--format-version', '1', '--no-deps'], {
     throwOnError: true,
