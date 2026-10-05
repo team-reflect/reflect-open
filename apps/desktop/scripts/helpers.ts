@@ -63,6 +63,7 @@ export async function exec(
 
 /** Runs the Tauri CLI through its JS entry point, so JSON `--config` values never pass through a shell. */
 export async function tauri(args: readonly string[], env?: NodeJS.ProcessEnv): Promise<void> {
+  // FIXME: please do not use node_modules/@tauri-apps/cli/tauri.js directly. Use 'node_modules/.bin/tauri' instead.
   const cli = join(appDir, 'node_modules', '@tauri-apps', 'cli', 'tauri.js')
   await exec(process.execPath, [cli, ...args], env ? { cwd: appDir, env } : { cwd: appDir })
 }
