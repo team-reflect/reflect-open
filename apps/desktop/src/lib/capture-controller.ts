@@ -11,6 +11,7 @@ import {
   type ReconcileStop,
 } from '@reflect/core'
 import { commitXPost } from '@/lib/bookmark-capture.ts'
+import { commitCaptureDaily } from '@/lib/capture-daily.ts'
 import { createBackgroundReconciler } from '@/lib/background-reconciler.ts'
 import { startOperation } from '@/lib/operations.ts'
 import { providerFetch } from '@/lib/provider-fetch.ts'
@@ -102,20 +103,24 @@ export function createCaptureController(options: CaptureControllerOptions): Capt
       generation: options.generation,
       isStale,
       writeXPost: (envelope, path) => commitXPost(envelope, path, options.generation),
+      editDaily: (path, transform) =>
+        commitCaptureDaily(path, options.generation, transform, isStale),
     })
     // A bookmark pass may have written X post archives, even when it stopped partway.
     if (drained.drained > 0 || drained.stopped !== null) invalidateXPostQueries()
-    surfaceStop('Saving link capture', drained.stopped)
     if (isStale()) {
       return
     }
+    surfaceStop('Saving link capture', drained.stopped)
     const enriched = await reconcileCaptureEnrichment({
       providers: options.getProviders(),
       generation: options.generation,
       fetchFn: providerFetch,
       isStale,
+      editDaily: (path, transform) =>
+        commitCaptureDaily(path, options.generation, transform, isStale),
     })
-    surfaceStop('Enriching link capture', enriched.stopped)
+    if (!isStale()) surfaceStop('Enriching link capture', enriched.stopped)
   }
 
   const loop = createBackgroundReconciler({ pass: reconcile })

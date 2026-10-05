@@ -180,6 +180,7 @@ export {
   listPendingCaptures,
   reconcileCaptureEnrichment,
   type CaptureIdentity,
+  type CaptureDailyEditor,
   type CaptureNoteMeta,
   type CaptureStatus,
   type DrainCaptureInboxInput,

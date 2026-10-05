@@ -5,6 +5,7 @@
  * retries freely.
  */
 export { appendXPost } from './bookmark-capture.ts'
+export type { CaptureDailyEditor } from './capture-daily.ts'
 export type { XPostEnvelope } from './bookmark-envelope.ts'
 export {
   captureFromPath,

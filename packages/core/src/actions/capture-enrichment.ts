@@ -20,6 +20,7 @@ import { hashContent } from '../indexing/hash.ts'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
 import type { AiProviderConfig } from '../settings/schema.ts'
 import type { ReconcileStop } from './audio-memo.ts'
+import type { CaptureDailyEditor } from './capture-daily.ts'
 import {
   finishCaptureWrite,
   hasCaptureWriteTransaction,
@@ -75,6 +76,8 @@ export async function listPendingCaptures(generation: number): Promise<CaptureId
 }
 
 export interface ReconcileCaptureEnrichmentInput {
+  /** Save daily retitles through the host's live document when it is open. */
+  editDaily?: CaptureDailyEditor | undefined
   /** The configured-providers state — decides the provider and keychain entry. */
   providers: AiProvidersState
   /** `GraphInfo.generation` — pins every read and write to the issuing graph. */
@@ -231,6 +234,7 @@ export async function reconcileCaptureEnrichment(
         captureFinalizeStatus: undefined,
       }),
       input.generation,
+      source,
     )
     skipped += 1
   }
@@ -271,7 +275,7 @@ export async function reconcileCaptureEnrichment(
         continue
       }
       if (hasCaptureWriteTransaction(snapshot.meta)) {
-        const finalized = await finishCaptureWrite(identity, input.generation)
+        const finalized = await finishCaptureWrite(identity, input.generation, input.editDaily)
         if (finalized === null) {
           await skipPending(identity)
           continue
@@ -292,6 +296,7 @@ export async function reconcileCaptureEnrichment(
           continue
         }
         const captureHash = await persistCaptureEnrichment({
+          editDaily: input.editDaily,
           identity,
           expectedHash: snapshot.meta.captureHash,
           body: snapshot.body,
@@ -394,6 +399,7 @@ export async function reconcileCaptureEnrichment(
         // configured between passes still run AI on this capture. Only after
         // the retitle fully lands does the second persist stamp `done`.
         const captureHash = await persistCaptureEnrichment({
+          editDaily: input.editDaily,
           identity,
           expectedHash: snapshot.meta.captureHash,
           body: metadataBody,
@@ -410,6 +416,7 @@ export async function reconcileCaptureEnrichment(
         }
         if (titleChanged) {
           const finalizedHash = await persistCaptureEnrichment({
+            editDaily: input.editDaily,
             identity,
             expectedHash: captureHash,
             body: metadataBody,
@@ -431,6 +438,7 @@ export async function reconcileCaptureEnrichment(
       let metadataHash = snapshot.meta.captureHash
       if (!metadataComplete) {
         const persistedHash = await persistCaptureEnrichment({
+          editDaily: input.editDaily,
           identity,
           expectedHash: snapshot.meta.captureHash,
           body: metadataBody,
@@ -496,6 +504,7 @@ export async function reconcileCaptureEnrichment(
         newBody = withTitle(newBody, aiTitle)
       }
       const captureHash = await persistCaptureEnrichment({
+        editDaily: input.editDaily,
         identity,
         expectedHash: metadataHash,
         body: newBody,

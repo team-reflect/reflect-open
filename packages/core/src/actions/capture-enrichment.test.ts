@@ -65,6 +65,47 @@ describe('reconcileCaptureEnrichment', () => {
     writeNoteMock.mockClear()
   }
 
+  it('does not overwrite another capture arriving between a daily retitle read and write', async () => {
+    await drainOne()
+    describeMock.mockResolvedValue({ title: 'A Cleaned Up Article', description: 'Description' })
+    const write = writeNoteMock.getMockImplementation()!
+    writeNoteMock.mockImplementation(async (path, content, generation, expected) => {
+      if (path === DAILY) files.set(DAILY, `${files.get(DAILY)}- [[another-capture|New link]]\n`)
+      await write(path, content, generation, expected)
+    })
+    expect((await reconcile()).stopped?.reason).toBe('io')
+    expect(files.get(DAILY)).toContain('another-capture')
+    expect(files.get(IDENTITY.notePath)).toContain('captureStatus: pending')
+    writeNoteMock.mockImplementation(write)
+    expect((await reconcile()).stopped).toBeNull()
+    expect(files.get(DAILY)).toContain('another-capture')
+    expect(files.get(DAILY)).toContain('|A Cleaned Up Article]]')
+  })
+
+  it('retitles the live daily source while preserving unsaved typing', async () => {
+    await drainOne()
+    describeMock.mockResolvedValue({ title: 'A Cleaned Up Article', description: 'Description' })
+    const editDaily = vi.fn(async (path: string, transform: (source: string) => string) => {
+      files.set(path, transform(`${files.get(path)}+ [ ] Unsaved thought\n`))
+    })
+    expect((await reconcile({ editDaily })).stopped).toBeNull()
+    expect(editDaily).toHaveBeenCalledOnce()
+    expect(files.get(DAILY)).toContain('Unsaved thought')
+    expect(files.get(DAILY)).toContain('|A Cleaned Up Article]]')
+  })
+
+  it('preserves a capture note edited after the enrichment checkpoint read', async () => {
+    await drainOne()
+    const write = writeNoteMock.getMockImplementation()!
+    writeNoteMock.mockImplementation(async (path, content, generation, expected) => {
+      if (path === IDENTITY.notePath) files.set(path, `${files.get(path)}\nMy annotation\n`)
+      await write(path, content, generation, expected)
+    })
+    expect((await reconcile()).stopped?.reason).toBe('io')
+    expect(files.get(IDENTITY.notePath)).toContain('My annotation')
+    expect(files.get(IDENTITY.notePath)).not.toContain('An AI description')
+  })
+
   it('attaches an Apple link preview to a URL-only capture', async () => {
     addSpool(envelope({ source: 'ios-share', title: '' }), { screenshot: false })
     expect((await drain()).stopped).toBeNull()
