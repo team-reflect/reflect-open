@@ -4,13 +4,12 @@ How to build Reflect's Tauri iOS target and upload it to TestFlight.
 
 ```bash
 pnpm release:ios preflight
-pnpm release:ios build --build-number="$(date -u +%Y%m%d%H%M)"
 pnpm release:ios testflight --wait
 ```
 
 The helper lives at `apps/desktop/scripts/release-ios.ts` and is exposed as
-`pnpm release:ios` from the repo root. `pnpm release:testflight` is a shorthand
-for `pnpm release:ios testflight`.
+`pnpm release:ios` from the repo root. It has the two commands that the TestFlight
+workflow runs.
 
 ## What You Need
 
@@ -28,12 +27,9 @@ for `pnpm release:ios testflight`.
    grows non-exempt cryptography, update the Info.plist value and the App Store
    Connect encryption answers before uploading.
 
-2. **Signing access for `app.reflect.ios`.** For local builds, signing into Xcode
-   with a team account that can provision `app.reflect.ios` is enough for
-   `pnpm release:ios build`. For CI, use an App Store Connect API key with
-   permission to manage signing and upload builds. When the API key is present,
-   the release helper exposes it to Tauri/xcodebuild through environment
-   variables and uses it directly for altool upload:
+2. **An App Store Connect API key** with permission to manage signing and upload
+   builds. The release helper exposes it to Tauri/xcodebuild through environment
+   variables and uses it for the altool upload:
 
    ```bash
    export APPLE_API_KEY=ABC123DEFG
@@ -45,20 +41,7 @@ for `pnpm release:ios testflight`.
    a temporary file outside the workspace. `APPLE_API_KEY_CONTENT` may be the raw
    `.p8` file contents or base64-wrapped text.
 
-3. **Upload credentials.** `pnpm release:ios testflight`, `upload`, and
-   `validate` call `xcrun altool`, which still needs explicit authentication
-   even when Xcode is signed in. Prefer the App Store Connect API key above.
-   Upload-only commands can also use:
-
-   ```bash
-   export APPLE_ID=release@example.com
-   export APPLE_PASSWORD=xxxx-xxxx-xxxx-xxxx
-   ```
-
-   `APPLE_PASSWORD` must be an app-specific password, not the Apple ID's normal
-   password. The helper passes it to altool through `@env:APPLE_PASSWORD`.
-
-4. **Sentry exception telemetry credentials.** Set the public `VITE_SENTRY_DSN` and the
+3. **Sentry exception telemetry credentials.** Set the public `VITE_SENTRY_DSN` and the
    private, build-only `SENTRY_AUTH_TOKEN` for local TestFlight builds. Configure them in
    GitHub as the repository secrets `SENTRY_DSN` and `SENTRY_AUTH_TOKEN`; the TestFlight
    workflow requires both before building. The DSN initializes the WebView SDK; the iOS
@@ -66,7 +49,7 @@ for `pnpm release:ios testflight`.
    be allowed to upload JavaScript source maps and native debug files to the
    `reflect-open` project; it must never use the `VITE_` prefix or enter the app bundle.
 
-5. **A monotonically increasing build number.** TestFlight rejects duplicate
+4. **A monotonically increasing build number.** TestFlight rejects duplicate
    `CFBundleVersion` values for the same marketing version. The GitHub Action
    always generates a UTC timestamp in `YYYYMMDDHHmm` format. Local `preflight`
    and `testflight` commands generate the same timestamp when `--build-number`
@@ -75,7 +58,7 @@ for `pnpm release:ios testflight`.
    builds: a lower `CFBundleVersion` can upload successfully while TestFlight
    still appears to show the previous timestamp build as the latest.
 
-6. **Xcode on macOS.** The workflow and local script use `xcodebuild`, Tauri's
+5. **Xcode on macOS.** The workflow and local script use `xcodebuild`, Tauri's
    iOS build command, and `xcrun altool`.
 
 ## Commands
@@ -84,42 +67,27 @@ for `pnpm release:ios testflight`.
 pnpm release:ios preflight
 ```
 
-Checks Xcode/altool, the build number, signing auth, and upload auth before
-spending time on the native archive. It also verifies that App Store Connect has
-a separate app record for `app.reflect.ios`.
-
-```bash
-pnpm release:ios build --build-number="$(date -u +%Y%m%d%H%M)"
-```
-
-Runs `pnpm tauri ios build --export-method app-store-connect --ci`, using the
-signed-in Xcode account locally or the App Store Connect API key environment
-when the key is configured. The build number is merged into the Tauri config as
-`bundle.iOS.bundleVersion`. The IPA lands under
-`apps/desktop/src-tauri/gen/apple/build/`. Release builds retain Rust line
-tables so Xcode can produce a dSYM that symbolicates native frames. The helper
-requires the current archive's main dSYM, verifies its UUID against the archived
-executable, and asserts the native diagnostics entry point is linked into the
-executable. When `SENTRY_AUTH_TOKEN` is set it uploads only that archive's
-native symbols — without source bundles — before returning. A `VITE_SENTRY_DSN`
-that is not the production project is a release error.
+Checks Xcode, the build number, and the API key before spending time on the native
+archive. It also verifies that App Store Connect has a separate app record for
+`app.reflect.ios`.
 
 ```bash
 pnpm release:ios testflight --wait
 ```
 
-Builds the IPA, uploads it with `xcrun altool --upload-package`, and optionally
-waits for App Store Connect processing to finish. If `--build-number` and
-`BUILD_NUMBER` are both omitted, the helper generates a UTC timestamp build
-number before archiving.
-
-```bash
-pnpm release:ios upload --ipa=apps/desktop/src-tauri/gen/apple/build/arm64/Reflect.ipa --wait
-pnpm release:ios validate --ipa=apps/desktop/src-tauri/gen/apple/build/arm64/Reflect.ipa
-```
-
-Uploads or validates an existing IPA. These commands support `APPLE_ID` +
-`APPLE_PASSWORD` (app-specific password) as a fallback to the API key.
+Runs `tauri ios build --export-method app-store-connect --ci` with the App Store
+Connect API key. The build number is merged into the Tauri config as
+`bundle.iOS.bundleVersion`; if `--build-number` and `BUILD_NUMBER` are both omitted,
+the helper generates a UTC timestamp. The IPA lands under
+`apps/desktop/src-tauri/gen/apple/build/`. Release builds retain Rust line
+tables so Xcode can produce a dSYM that symbolicates native frames. The helper
+requires the current archive's main dSYM, verifies its UUID against the archived
+executable, and asserts the native diagnostics entry point is linked into the
+executable. When `SENTRY_AUTH_TOKEN` is set it uploads only that archive's
+native symbols, without source bundles. A `VITE_SENTRY_DSN` that is not the
+production project is a release error. The helper then uploads the IPA with
+`xcrun altool --upload-package` and optionally waits for App Store Connect
+processing to finish.
 
 Pass `--export-method=release-testing` if App Store Connect or Xcode starts
 requiring the TestFlight-specific export method. The default remains

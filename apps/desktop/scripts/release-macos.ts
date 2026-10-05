@@ -22,18 +22,18 @@ import { parseArgs } from 'node:util'
 import { exec } from 'tinyexec'
 import { z } from 'zod'
 import {
-  cargoTargetDir,
-  flavorConfigArgs,
-  flavorOfVersion,
+  getCargoTargetDir,
+  getFlavorConfigArgs,
+  resolveFlavor,
   isFlavor,
   log,
   readAppVersion,
   readTauriConfig,
   resolveApiKey,
   resolveAppleId,
-  tauri,
+  runTauri,
   TAURI_SRC_DIR,
-  withTempDir,
+  runWithTempDir,
   type Flavor,
 } from './helpers.ts'
 
@@ -73,12 +73,16 @@ interface Signer {
 
 async function resolveBundle(flavor: Flavor, target: string): Promise<Bundle> {
   const arch = ARCHS[target]
-  if (!arch) throw new Error(`unsupported target "${target}"`)
+  if (!arch) {
+    throw new Error(`unsupported target "${target}"`)
+  }
   const config = readTauriConfig('macos', flavor)
   const { entitlements, files } = config.bundle.macOS ?? {}
-  if (!entitlements) throw new Error(`flavor "${flavor}" has no bundle.macOS.entitlements`)
+  if (!entitlements) {
+    throw new Error(`flavor "${flavor}" has no bundle.macOS.entitlements`)
+  }
   const version = readAppVersion()
-  const bundleDir = join(await cargoTargetDir(), target, 'release', 'bundle')
+  const bundleDir = join(await getCargoTargetDir(), target, 'release', 'bundle')
   const app = join(bundleDir, 'macos', `${config.productName}.app`)
   return {
     target,
@@ -98,12 +102,16 @@ async function resolveBundle(flavor: Flavor, target: string): Promise<Bundle> {
 }
 
 async function findSigningIdentity(): Promise<string> {
-  if (process.env.APPLE_SIGNING_IDENTITY) return process.env.APPLE_SIGNING_IDENTITY
+  if (process.env.APPLE_SIGNING_IDENTITY) {
+    return process.env.APPLE_SIGNING_IDENTITY
+  }
   const { stdout } = await exec('security', ['find-identity', '-v', '-p', 'codesigning'], {
     throwOnError: true,
   })
   const identity = /"(Developer ID Application: [^"]+)"/.exec(stdout)?.[1]
-  if (!identity) throw new Error('no "Developer ID Application" certificate in the keychain')
+  if (!identity) {
+    throw new Error('no "Developer ID Application" certificate in the keychain')
+  }
   return identity
 }
 
@@ -127,7 +135,7 @@ async function stageIntelOnnxRuntime(): Promise<string> {
   const resourceDir = join(TAURI_SRC_DIR, 'resources', 'onnxruntime')
   const staged = ONNX_RUNTIME_FILES.map((file) => join(resourceDir, basename(file)))
   if (!staged.every((path) => existsSync(path))) {
-    await withTempDir(async (tempDir) => {
+    await runWithTempDir(async (tempDir) => {
       const archive = join(tempDir, `${ONNX_RUNTIME}.tgz`)
       const url = `https://github.com/microsoft/onnxruntime/releases/download/v1.23.2/${ONNX_RUNTIME}.tgz`
       await exec('curl', ['-fL', '--retry', '3', '-o', archive, url], INHERIT)
@@ -147,14 +155,16 @@ async function stageIntelOnnxRuntime(): Promise<string> {
 }
 
 async function buildApp(flavor: Flavor, target: string, identity: string): Promise<void> {
-  const args = ['build', '--target', target, '--bundles', 'app', ...flavorConfigArgs(flavor)]
-  if (target === INTEL_TARGET) args.push('--config', await stageIntelOnnxRuntime())
+  const args = ['build', '--target', target, '--bundles', 'app', ...getFlavorConfigArgs(flavor)]
+  if (target === INTEL_TARGET) {
+    args.push('--config', await stageIntelOnnxRuntime())
+  }
   // Tauri notarizes whenever these are set, but notarization must wait until
   // the sidecars are re-signed.
   for (const name of ['APPLE_ID', 'APPLE_PASSWORD', 'APPLE_API_KEY', 'APPLE_API_ISSUER']) {
     delete process.env[name]
   }
-  await tauri(args, { APPLE_SIGNING_IDENTITY: identity })
+  await runTauri(args, { APPLE_SIGNING_IDENTITY: identity })
 }
 
 /**
@@ -162,12 +172,14 @@ async function buildApp(flavor: Flavor, target: string, identity: string): Promi
  * that run after Tauri has removed its own. Without the variable, the login
  * keychain is used.
  */
-async function withSigningKeychain(
+async function runWithSigningKeychain(
   tempDir: string,
   action: (keychain: string | null) => Promise<void>,
 ): Promise<void> {
   const { APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD } = process.env
-  if (!APPLE_CERTIFICATE || !APPLE_CERTIFICATE_PASSWORD) return await action(null)
+  if (!APPLE_CERTIFICATE || !APPLE_CERTIFICATE_PASSWORD) {
+    return await action(null)
+  }
 
   const certificate = join(tempDir, 'certificate.p12')
   const keychain = join(tempDir, 'signing.keychain-db')
@@ -204,7 +216,9 @@ async function withSigningKeychain(
     ],
   ]
   try {
-    for (const step of steps) await exec('security', step, { throwOnError: true })
+    for (const step of steps) {
+      await exec('security', step, { throwOnError: true })
+    }
     await action(keychain)
   } finally {
     await exec('security', ['list-keychains', '-d', 'user', '-s', ...previous])
@@ -212,7 +226,7 @@ async function withSigningKeychain(
   }
 }
 
-async function codesign(signer: Signer, args: readonly string[]): Promise<void> {
+async function runCodesign(signer: Signer, args: readonly string[]): Promise<void> {
   const keychain = signer.keychain ? ['--keychain', signer.keychain] : []
   const base = ['--force', '--sign', signer.identity, '--timestamp']
   await exec('codesign', [...base, ...keychain, ...args], INHERIT)
@@ -250,7 +264,9 @@ async function readProfileIdentity(bundle: Bundle): Promise<Record<string, strin
 
 /** The entitlements file for the app: the configured one plus the profile identity. */
 async function prepareEntitlements(bundle: Bundle, tempDir: string): Promise<string> {
-  if (!bundle.hasProfile) return bundle.entitlements
+  if (!bundle.hasProfile) {
+    return bundle.entitlements
+  }
   const merged = {
     ...(await readPlist(readFileSync(bundle.entitlements, 'utf8'))),
     ...(await readProfileIdentity(bundle)),
@@ -268,10 +284,10 @@ async function prepareEntitlements(bundle: Bundle, tempDir: string): Promise<str
  */
 async function resignApp(bundle: Bundle, signer: Signer, tempDir: string): Promise<void> {
   for (const sidecar of bundle.sidecars) {
-    await codesign(signer, ['--options', 'runtime', sidecar])
+    await runCodesign(signer, ['--options', 'runtime', sidecar])
   }
   const entitlements = await prepareEntitlements(bundle, tempDir)
-  await codesign(signer, ['--options', 'runtime', '--entitlements', entitlements, bundle.app])
+  await runCodesign(signer, ['--options', 'runtime', '--entitlements', entitlements, bundle.app])
 }
 
 async function notarize(path: string, notaryArgs: readonly string[]): Promise<void> {
@@ -281,7 +297,9 @@ async function notarize(path: string, notaryArgs: readonly string[]): Promise<vo
   const verdict = z
     .object({ id: z.string(), status: z.string() })
     .safeParse(stdout.startsWith('{') ? JSON.parse(stdout) : null).data
-  if (verdict?.status === 'Accepted') return
+  if (verdict?.status === 'Accepted') {
+    return
+  }
   const report = verdict
     ? await exec('xcrun', ['notarytool', 'log', verdict.id, ...notaryArgs])
     : null
@@ -306,7 +324,7 @@ async function createUpdaterArchive(bundle: Bundle): Promise<void> {
   await exec('tar', tarArgs, INHERIT)
   // An unset password makes the signer prompt.
   const password = process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? ''
-  await tauri(['signer', 'sign', bundle.updaterArchive], {
+  await runTauri(['signer', 'sign', bundle.updaterArchive], {
     TAURI_SIGNING_PRIVATE_KEY_PASSWORD: password,
   })
 }
@@ -332,7 +350,7 @@ async function createDmg(bundle: Bundle, signer: Signer, tempDir: string): Promi
   mkdirSync(dirname(bundle.dmg), { recursive: true })
   const convertArgs = ['-format', 'UDZO', '-imagekey', 'zlib-level=9', '-ov', '-o', bundle.dmg]
   await exec('hdiutil', ['convert', writableDmg, ...convertArgs], INHERIT)
-  await codesign(signer, [bundle.dmg])
+  await runCodesign(signer, [bundle.dmg])
 }
 
 async function expectOutput(
@@ -350,17 +368,23 @@ async function expectOutput(
 }
 
 async function verifyProfileIdentity(bundle: Bundle): Promise<void> {
-  if (!bundle.hasProfile) return
+  if (!bundle.hasProfile) {
+    return
+  }
   const display = ['--display', '--entitlements', '-', '--xml', bundle.app]
   const signed = await readPlist((await exec('codesign', display, { throwOnError: true })).stdout)
   for (const [key, value] of Object.entries(await readProfileIdentity(bundle))) {
-    if (signed[key] !== value) throw new Error(`the signed app lost the "${key}" entitlement`)
+    if (signed[key] !== value) {
+      throw new Error(`the signed app lost the "${key}" entitlement`)
+    }
   }
 }
 
 /** A sidecar with a bad signature passes `codesign --verify` and dies at launch, so launch them. */
 async function verifySidecarsLaunch(bundle: Bundle): Promise<void> {
-  if (bundle.target !== INTEL_TARGET && process.arch !== 'arm64') return
+  if (bundle.target !== INTEL_TARGET && process.arch !== 'arm64') {
+    return
+  }
   for (const sidecar of bundle.sidecars) {
     await expectOutput(sidecar, basename(sidecar) === 'reflect' ? ['--version'] : [], [])
   }
@@ -374,7 +398,9 @@ async function verify(bundle: Bundle, notarized: boolean): Promise<void> {
   )
   await verifyProfileIdentity(bundle)
   await verifySidecarsLaunch(bundle)
-  if (!notarized) return
+  if (!notarized) {
+    return
+  }
   const accepted = ['accepted', 'source=Notarized Developer ID']
   await expectOutput('spctl', ['--assess', '--type', 'execute', '-v', bundle.app], accepted)
   const openContext = ['--type', 'open', '--context', 'context:primary-signature']
@@ -412,16 +438,22 @@ async function build({
   const hasUpdaterKey = Boolean(
     process.env.TAURI_SIGNING_PRIVATE_KEY || process.env.TAURI_SIGNING_PRIVATE_KEY_PATH,
   )
-  if (artifactDir && !hasUpdaterKey) throw new Error('TAURI_SIGNING_PRIVATE_KEY is not set')
+  if (artifactDir && !hasUpdaterKey) {
+    throw new Error('TAURI_SIGNING_PRIVATE_KEY is not set')
+  }
 
-  await withTempDir(async (tempDir) => {
+  await runWithTempDir(async (tempDir) => {
     const notaryArgs = shouldNotarize ? resolveNotaryArgs(identity, tempDir) : null
     await buildApp(flavor, target, identity)
-    await withSigningKeychain(tempDir, async (keychain) => {
+    await runWithSigningKeychain(tempDir, async (keychain) => {
       const signer = { identity, keychain }
       await resignApp(bundle, signer, tempDir)
-      if (notaryArgs) await notarizeApp(bundle, notaryArgs, tempDir)
-      if (hasUpdaterKey) await createUpdaterArchive(bundle)
+      if (notaryArgs) {
+        await notarizeApp(bundle, notaryArgs, tempDir)
+      }
+      if (hasUpdaterKey) {
+        await createUpdaterArchive(bundle)
+      }
       await createDmg(bundle, signer, tempDir)
     })
     if (notaryArgs) {
@@ -430,7 +462,9 @@ async function build({
     }
   })
   await verify(bundle, shouldNotarize)
-  if (artifactDir) exportArtifacts(bundle, artifactDir)
+  if (artifactDir) {
+    exportArtifacts(bundle, artifactDir)
+  }
   log(`done: ${bundle.dmg}`)
 }
 
@@ -443,8 +477,10 @@ async function main(): Promise<void> {
       'no-notarize': { type: 'boolean', default: false },
     },
   })
-  const flavor = values.flavor ?? flavorOfVersion(readAppVersion())
-  if (!isFlavor(flavor)) throw new Error(`unknown flavor "${flavor}"`)
+  const flavor = values.flavor ?? resolveFlavor(readAppVersion())
+  if (!isFlavor(flavor)) {
+    throw new Error(`unknown flavor "${flavor}"`)
+  }
   const host = await exec('rustc', ['--print', 'host-tuple'], { throwOnError: true })
   await build({
     flavor,

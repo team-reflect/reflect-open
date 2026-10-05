@@ -219,8 +219,7 @@ normalize generated project and plist files.
 Use `pnpm release:ios` for TestFlight work; do not hand-roll `tauri ios build`
 and `altool` unless debugging the helper itself. Start with
 `pnpm release:ios preflight --build-number=<number>`, then run
-`pnpm release:ios testflight --build-number=<number> --wait` or upload an
-existing IPA with `pnpm release:ios upload --ipa=<path> --wait`.
+`pnpm release:ios testflight --build-number=<number> --wait`.
 
 The iOS bundle identifier is `app.reflect.ios`, intentionally separate from the
 old Capacitor TestFlight app (`app.reflect.ReflectMobile`). The release helper

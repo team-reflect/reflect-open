@@ -1,43 +1,46 @@
 // Builds the sidecar binaries and stages them where tauri-build expects them:
 // src-tauri/binaries/<name>-<target-triple>[.exe].
-//
-// The Rust CI jobs run this file without `pnpm install`, so it must not import
-// npm packages.
 
-import { execFileSync } from 'node:child_process'// FIXME: use `exec` from `tinyexec`
 import { copyFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { exec } from 'tinyexec'
+import { log, ROOT_DIR, TAURI_SRC_DIR } from './helpers.ts'
 
 const SIDECARS = [
   { crate: 'reflect-cli', binary: 'reflect' },
   { crate: 'reflect-capture-host', binary: 'reflect-capture-host' },
 ]
-const repoRoot = join(import.meta.dirname, '..', '..', '..')
-const binariesDir = join(import.meta.dirname, '..', 'src-tauri', 'binaries') // FIXME: use helpers.ts etc. Do Not Repeat Yourself.
+const INHERIT = { throwOnError: true, nodeOptions: { cwd: ROOT_DIR, stdio: 'inherit' } } as const
 
-function main(): void {
+/** Tauri exports the target triple to its before-commands. Elsewhere, use the host triple. */
+async function resolveTriple(): Promise<string> {
+  if (process.env.TAURI_ENV_TARGET_TRIPLE) {
+    return process.env.TAURI_ENV_TARGET_TRIPLE
+  }
+  const host = await exec('rustc', ['--print', 'host-tuple'], { throwOnError: true })
+  return host.stdout.trim()
+}
+
+async function main(): Promise<void> {
   const platform = process.env.TAURI_ENV_PLATFORM
-  if (platform === 'ios' || platform === 'android') return
+  if (platform === 'ios' || platform === 'android') {
+    return
+  }
 
-  // Tauri exports the target triple to its before-commands.
-  const triple =
-    process.env.TAURI_ENV_TARGET_TRIPLE ??
-    execFileSync('rustc', ['--print', 'host-tuple'], { encoding: 'utf8' }).trim()
+  const triple = await resolveTriple()
   // The explicit --target keeps the artifacts out of target/release/, where
   // tauri-build copies the de-suffixed sidecars.
   const packages = SIDECARS.flatMap((sidecar) => ['-p', sidecar.crate])
-  execFileSync('cargo', ['build', '--release', ...packages, '--target', triple], {
-    cwd: repoRoot,
-    stdio: 'inherit',
-  })
+  await exec('cargo', ['build', '--release', ...packages, '--target', triple], INHERIT)
 
   const extension = triple.includes('windows') ? '.exe' : ''
+  const binariesDir = join(TAURI_SRC_DIR, 'binaries')
   mkdirSync(binariesDir, { recursive: true })
   for (const { binary } of SIDECARS) {
     const staged = join(binariesDir, `${binary}-${triple}${extension}`)
-    copyFileSync(join(repoRoot, 'target', triple, 'release', `${binary}${extension}`), staged)
-    console.log(`build-sidecar: staged ${staged}`)
+    copyFileSync(join(ROOT_DIR, 'target', triple, 'release', `${binary}${extension}`), staged)
+    log(`staged ${staged}`)
   }
 }
 
-main()
+await main()

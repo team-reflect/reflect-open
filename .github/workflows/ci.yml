@@ -124,6 +124,9 @@ jobs:
         with:
           cache-on-failure: true
 
+      # The sidecar script imports npm packages.
+      - uses: ./.github/actions/setup-node
+
       - name: Stage desktop sidecars
         run: node apps/desktop/scripts/build-sidecar.ts
 

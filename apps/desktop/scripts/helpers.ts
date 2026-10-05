@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { apply as applyMergePatch } from 'tiny-merge-patch'
 import { exec } from 'tinyexec'
 import { z } from 'zod'
 
@@ -8,15 +9,12 @@ export const APP_DIR = join(import.meta.dirname, '..')
 export const ROOT_DIR = join(APP_DIR, '..', '..')
 export const TAURI_SRC_DIR = join(APP_DIR, 'src-tauri')
 
-const STABLE_UPDATER_ENDPOINT =
-  'https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json'
-
 export function log(message: string): void {
   console.log(`[release] ${message}`)
 }
 
 /** Runs the Tauri CLI with inherited stdio. `env` is added to the current environment. */
-export async function tauri(args: readonly string[], env?: NodeJS.ProcessEnv): Promise<void> {
+export async function runTauri(args: readonly string[], env?: NodeJS.ProcessEnv): Promise<void> {
   await exec(join(APP_DIR, 'node_modules', '.bin', 'tauri'), args, {
     throwOnError: true,
     nodeOptions: { cwd: APP_DIR, env, stdio: 'inherit' },
@@ -24,7 +22,7 @@ export async function tauri(args: readonly string[], env?: NodeJS.ProcessEnv): P
 }
 
 /** Calls `action` with a temporary directory and removes the directory afterwards. */
-export async function withTempDir<Result>(
+export async function runWithTempDir<Result>(
   action: (dir: string) => Promise<Result>,
 ): Promise<Result> {
   const dir = mkdtempSync(join(tmpdir(), 'reflect-release-'))
@@ -60,32 +58,14 @@ export function isFlavor(value: string): value is Flavor {
 }
 
 /** A prerelease version builds the beta flavor, so a build always matches its updater feed. */
-export function flavorOfVersion(version: string): Flavor {
+export function resolveFlavor(version: string): Flavor {
   return version.includes('-') ? 'beta' : 'stable'
 }
 
-/**
- * The `--config` arguments that select a flavor. The base config commits the
- * beta updater endpoint, so the stable flavor pins the stable feed here.
- */
-export function flavorConfigArgs(flavor: Flavor): string[] {
+/** The `--config` arguments that select a flavor. The base config is the stable flavor. */
+export function getFlavorConfigArgs(flavor: Flavor): string[] {
   const overlay = FLAVOR_OVERLAYS[flavor]
-  if (overlay) return ['--config', join('src-tauri', overlay)]
-  // FIXME: just fix tauri*conf*.json to point to the correct feed directly, then remove this hack.
-  const endpoints = { plugins: { updater: { endpoints: [STABLE_UPDATER_ENDPOINT] } } }
-  return ['--config', JSON.stringify(endpoints)]
-}
-
-/** Applies an RFC 7396 JSON Merge Patch, the algorithm Tauri uses for `--config`. */// FIXME: use a lib "tiny-merge-patch" instead of this homegrown version.
-function mergePatch(target: unknown, patch: unknown): unknown {
-  if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) return patch
-  const merged: Record<string, unknown> =
-    target !== null && typeof target === 'object' && !Array.isArray(target) ? { ...target } : {}
-  for (const [key, value] of Object.entries(patch)) {
-    if (value === null) delete merged[key]
-    else merged[key] = mergePatch(merged[key], value)
-  }
-  return merged
+  return overlay ? ['--config', join('src-tauri', overlay)] : []
 }
 
 const TauriConfigSchema = z.object({
@@ -109,15 +89,17 @@ export function readTauriConfig(platform: 'macos' | 'windows', flavor: Flavor): 
   const files = ['tauri.conf.json', `tauri.${platform}.conf.json`, FLAVOR_OVERLAYS[flavor]]
   let config: unknown = {}
   for (const file of files) {
-    if (file) config = mergePatch(config, readJson(join(TAURI_SRC_DIR, file)))
+    if (file) {
+      config = applyMergePatch(config, readJson(join(TAURI_SRC_DIR, file)))
+    }
   }
   return TauriConfigSchema.parse(config)
 }
 
 const CargoMetadataSchema = z.object({ target_directory: z.string() })
 
-/** The Cargo target directory of the workspace. */ // FIXME: function name should starts with a verb, e.g. `getCargoTargetDir`. Apply this rule to all functions in this scripts/ dir.
-export async function cargoTargetDir(): Promise<string> {
+/** The Cargo target directory of the workspace. */
+export async function getCargoTargetDir(): Promise<string> {
   const { stdout } = await exec('cargo', ['metadata', '--format-version', '1', '--no-deps'], {
     throwOnError: true,
     nodeOptions: { cwd: ROOT_DIR },
@@ -138,7 +120,9 @@ export interface ApiKey {
  */
 export function resolveApiKey(tempDir: string): ApiKey | null {
   const { APPLE_API_KEY, APPLE_API_ISSUER, APPLE_API_KEY_CONTENT, APPLE_API_KEY_PATH } = process.env
-  if (!APPLE_API_KEY || !APPLE_API_ISSUER) return null
+  if (!APPLE_API_KEY || !APPLE_API_ISSUER) {
+    return null
+  }
   if (!APPLE_API_KEY_CONTENT) {
     return { keyId: APPLE_API_KEY, issuer: APPLE_API_ISSUER, keyPath: APPLE_API_KEY_PATH ?? null }
   }

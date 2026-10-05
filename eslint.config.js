@@ -18,6 +18,12 @@ export default defineESLintConfig(
     ignores: ['./design-system/', '**/.wxt/', '**/.output/'],
   },
   {
+    files: ['apps/desktop/scripts/**/*.ts'],
+    rules: {
+      curly: ['error', 'all'],
+    },
+  },
+  {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.mjs'],
     // Disable some rules temporarily
     linterOptions: {

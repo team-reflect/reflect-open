@@ -253,9 +253,8 @@ retries repair partial uploads, while a retry for an older release becomes a no-
 rather than rolling the channel back.
 
 The channel is picked by the version string alone: a `-beta.N` prerelease publishes to
-the beta feed, a plain version to the stable feed. The beta and dev flavor overlays pin
-their own feeds, and `release-macos.ts` pins the stable feed into stable builds at
-build time, so releases are branch-independent.
+the beta feed, a plain version to the stable feed. The base `tauri.conf.json` points at
+the stable feed, and the beta and dev flavor overlays pin their own feeds.
 
 Cutting a beta means merging the beta Release PR; a stable release means merging the
 stable Release PR (see [Cutting a release](#cutting-a-release-release-prs) above).
@@ -278,11 +277,9 @@ artwork recolored via `magick -modulate` (beta `104,100,120`, dev `92,100,231`; 
 (prerelease → beta, else stable), so a release always matches the updater feed compiled
 into it; `release-app.yml` needs no flavor knowledge.
 
-Each overlay pins its own updater feed so the flavor is self-consistent regardless of the
-base config's channel: beta → `updater-beta`, dev → a deliberately non-existent
-`updater-dev-noop` feed so dev builds never find an update (in `tauri dev` the updater is
-off anyway). The stable feed is pinned into stable builds at build time by
-`release-macos.ts` (the committed base config points at the beta feed).
+Each flavor config names its own updater feed: the base config → `releases/latest`,
+beta → `updater-beta`, dev → a deliberately non-existent `updater-dev-noop` feed so dev
+builds never find an update (in `tauri dev` the updater is off anyway).
 
 Distinct identifiers give each flavor its own webview storage and embeddings cache.
 Settings, recent graphs and keychain secrets are currently **shared** across flavors (the

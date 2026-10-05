@@ -59,7 +59,7 @@ jobs:
       # experimental build carries no telemetry.
       - name: Build Windows installer
         shell: bash
-        run: pnpm release:windows build --artifact-dir="$RUNNER_TEMP/windows-artifacts"
+        run: pnpm release:windows --artifact-dir="$RUNNER_TEMP/windows-artifacts"
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

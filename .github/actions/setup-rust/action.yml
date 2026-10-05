@@ -66,6 +66,9 @@ runs:
       shell: bash
       run: mkdir -p ~/.cache/ort.pyke.io
 
+    # The sidecar script imports npm packages.
+    - uses: ./.github/actions/setup-node
+
     # tauri-build requires the sidecar to exist before the desktop crate's
     # build script runs (clippy/test compile it), so stage the CLI first.
     - name: Stage the reflect CLI sidecar
