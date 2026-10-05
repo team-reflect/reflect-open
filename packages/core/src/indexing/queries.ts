@@ -8,6 +8,7 @@ import {
 } from '../markdown/index.ts'
 import { db } from './db.ts'
 import { inClauseChunks } from './query-utils.ts'
+import { isNotNullish } from '@ocavue/utils'
 export {
   getBacklinks,
   getBacklinksWithContext,
@@ -163,7 +164,10 @@ export async function getDuplicateNoteIds(): Promise<DuplicateIdGroup[]> {
     .having(sql<number>`count(*)`, '>', 1)
     .execute()
   // Sorted before chunking so group order stays deterministic across chunks.
-  const ids = duplicated.flatMap((row) => (row.id === null ? [] : [row.id])).sort()
+  const ids = duplicated
+    .map((row) => row.id)
+    .filter(isNotNullish)
+    .sort()
   const groups = new Map<string, string[]>()
   for (const chunk of inClauseChunks(ids)) {
     const rows = await db
@@ -199,7 +203,7 @@ export async function dailyDatesInRange(start: string, end: string): Promise<str
     .select('dailyDate')
     .orderBy('dailyDate')
     .execute()
-  return rows.flatMap((row) => (row.dailyDate === null ? [] : [row.dailyDate]))
+  return rows.map((row) => row.dailyDate).filter(isNotNullish)
 }
 
 /** One daily-note row of a date-ranged listing (the AI chat's daily tool). */
@@ -240,11 +244,13 @@ export async function listDailyNotes(range: DailyNotesRange): Promise<DailyNoteR
     .orderBy('dailyDate', 'desc')
     .limit(range.limit)
     .execute()
-  return rows.flatMap((row) =>
-    row.dailyDate === null
-      ? []
-      : [{ ...row, dailyDate: row.dailyDate, isPrivate: row.isPrivate !== 0 }],
-  )
+  return rows
+    .flatMap((row) => {
+      return row.dailyDate === null
+        ? null
+        : { ...row, dailyDate: row.dailyDate, isPrivate: row.isPrivate !== 0 }
+    })
+    .filter(isNotNullish)
 }
 
 /** Graph-relative paths of every note carrying `tag` (case-insensitive), ordered by path. */

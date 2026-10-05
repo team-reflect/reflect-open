@@ -5,7 +5,7 @@ import type {
   WikilinkItem,
   WikilinkSearchHandler,
 } from '@meowdown/react'
-import { Counter } from '@ocavue/utils'
+import { Counter, isNotNullish } from '@ocavue/utils'
 import {
   aliasHint,
   contactLinkSuggestions,
@@ -104,20 +104,20 @@ export function useEditorAutocomplete(): EditorAutocomplete {
               })
           : Promise.resolve([]),
       ])
-      const contacts = contactResolutions.flatMap((resolution) =>
-        resolution.kind === 'blocked'
-          ? []
-          : [
-              {
+      const contacts = contactResolutions
+        .map((resolution) =>
+          resolution.kind === 'blocked'
+            ? null
+            : {
                 contact: resolution.contact,
                 target: resolution.insertText,
                 ownerPath: resolution.kind === 'existing' ? resolution.path : null,
               },
-            ],
-      )
-      const blockedContactNames = contactResolutions.flatMap((resolution) =>
-        resolution.kind === 'blocked' ? [resolution.contact.fullName] : [],
-      )
+        )
+        .filter(isNotNullish)
+      const blockedContactNames = contactResolutions
+        .map((resolution) => (resolution.kind === 'blocked' ? resolution.contact.fullName : null))
+        .filter(isNotNullish)
       const entries = buildAutocompleteEntries(query, wikiLinks.suggestions, {
         offerCreate: true,
         contacts,

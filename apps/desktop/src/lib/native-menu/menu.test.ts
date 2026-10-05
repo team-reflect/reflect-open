@@ -1,3 +1,4 @@
+import { isNotNullish } from '@ocavue/utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 interface MenuItemOptionsForTest {
@@ -81,7 +82,9 @@ afterEach(() => {
 
 function referencedCommandIds(): string[] {
   return appMenuLayout().flatMap((submenu) =>
-    submenu.entries.flatMap((entry) => (entry.kind === 'command' ? [entry.commandId] : [])),
+    submenu.entries
+      .map((entry) => (entry.kind === 'command' ? entry.commandId : null))
+      .filter(isNotNullish),
   )
 }
 

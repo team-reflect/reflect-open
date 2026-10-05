@@ -1,3 +1,4 @@
+import { isNotNullish } from '@ocavue/utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge.ts'
 import {
@@ -297,11 +298,13 @@ describe('getBacklinksWithContext', () => {
   }
 
   function dbQueries(): Array<{ sql: string; params: unknown[] }> {
-    return mockInvoke.mock.calls.flatMap(([command, args]) =>
-      command === 'db_query'
-        ? [{ sql: String(args['sql']), params: args['params'] as unknown[] }]
-        : [],
-    )
+    return mockInvoke.mock.calls
+      .map(([command, args]) =>
+        command === 'db_query'
+          ? { sql: String(args['sql']), params: args['params'] as unknown[] }
+          : null,
+      )
+      .filter(isNotNullish)
   }
 
   it('pages complete sources in deterministic recency order and reads only included sources', async () => {

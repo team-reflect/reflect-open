@@ -1,3 +1,4 @@
+import { isNotNullish } from '@ocavue/utils'
 import { generateText, streamText } from '@reflect/modules/ai'
 import { describe, expect, it } from 'vitest'
 import type { AiProviderConfig } from '../settings/schema.ts'
@@ -53,7 +54,8 @@ describe('createDemoModel', () => {
       events.push(event)
     }
     const text = events
-      .flatMap((event) => (event.type === 'text-delta' ? [event.text] : []))
+      .map((event) => (event.type === 'text-delta' ? event.text : null))
+      .filter(isNotNullish)
       .join('')
     expect(text).toBe(DEMO_REPLY_TEXT)
     expect(events.at(-1)?.type).toBe('complete')

@@ -1,3 +1,4 @@
+import { isNotNullish } from '@ocavue/utils'
 import { useEffect, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toggleNotePinned } from '@/lib/note-pin.ts'
@@ -34,9 +35,9 @@ import { useRouter } from './router.tsx'
  * keymap registry, the shared collision ledger with editor-scope keys.
  */
 
-const BOUND_COMMANDS = APP_COMMANDS.flatMap((command) =>
-  command.keybinding ? [{ binding: command.keybinding, command }] : [],
-)
+const BOUND_COMMANDS = APP_COMMANDS.map((command) =>
+  command.keybinding ? { binding: command.keybinding, command } : null,
+).filter(isNotNullish)
 
 /** Registered once at module scope; values are display descriptions. */
 export const APP_BINDINGS = registerKeymap(

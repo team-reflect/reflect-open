@@ -47,7 +47,7 @@ export function useSnippetTaskToggle(
 ): TaskClickHandler | undefined {
   const { graph } = useGraph()
 
-  const mutation = useMutation({
+  const { mutate, isPending } = useMutation({
     mutationKey: mutationKeys.tasks.snippetToggle(graph?.root),
     mutationFn: ({ notePath: path, locator, generation }: SnippetToggleInput) =>
       toggleTask({ notePath: path, ...locator }, generation),
@@ -55,7 +55,6 @@ export function useSnippetTaskToggle(
       startOperation(checked ? 'Reopening task' : 'Completing task').fail(errorMessage(cause))
     },
   })
-  const { mutate, isPending } = mutation
 
   const generation = graph?.generation
   const handler = useCallback<TaskClickHandler>(
