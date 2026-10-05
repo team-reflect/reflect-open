@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.2...v0.15.0-beta.3) (2026-10-05)
+
+
+### Bug Fixes
+
+* **ios:** mention iPad in the paywall copy ([#1436](https://github.com/team-reflect/reflect-open/issues/1436)) ([3bb44e6](https://github.com/team-reflect/reflect-open/commit/3bb44e6ec34b59653f9c803d21a0781c835d98bf))
+
 ## [0.15.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.1...v0.15.0-beta.2) (2026-10-05)
 
 
