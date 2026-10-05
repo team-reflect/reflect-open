@@ -20,7 +20,7 @@ on:
         required: true
 
 concurrency:
-  group: release-browser-extension
+  group: publish-browser-extension
   cancel-in-progress: false
 
 # Uploads the zip into the release-please draft release and undrafts it.

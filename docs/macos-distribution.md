@@ -9,7 +9,7 @@ pnpm release:macos                 # signed + notarized build for this Mac's arc
 
 The helper lives at `apps/desktop/scripts/release-macos.ts` and is exposed as
 `pnpm release:macos` from the repo root. It only builds. Publishing to GitHub Releases
-happens in `.github/workflows/release-app.yml`.
+happens in `.github/workflows/publish-macos.yml`.
 
 ## What you need
 
@@ -95,7 +95,7 @@ pnpm release:macos --artifact-dir=<dir>  # also copy the release assets to <dir>
 ```
 
 CI runs `--target=<triple> --artifact-dir=<dir>` once per architecture. The publish job
-of `release-app.yml` then downloads both artifact sets and publishes them with `gh`. A
+of `publish-macos.yml` then downloads both artifact sets and publishes them with `gh`. A
 separate `sync-beta-feed` job refreshes the moving beta downloads after the tagged
 release is published, so that final step can be retried without rebuilding or
 republishing.
@@ -106,7 +106,7 @@ The version lives in one place: `version` in `apps/desktop/package.json`.
 `tauri.conf.json` points its `version` at that file, the crate version in
 `src-tauri/Cargo.toml` is frozen at `0.0.0`, and `Cargo.lock` never changes for a
 release. release-please maintains the version: on every push to `master`,
-`.github/workflows/release-please.yml` runs two release-please passes (one per
+`.github/workflows/release.yml` runs two release-please passes (one per
 channel) that keep two **Release PRs** open side by side:
 
 - The **beta** Release PR (`chore: release X.Y.Z-beta.N`) bumps
@@ -207,7 +207,7 @@ so release-please continues from the right version.
 
 ## Publishing to GitHub Releases
 
-The publish job of `release-app.yml` takes the artifacts of both macOS targets
+The publish job of `publish-macos.yml` takes the artifacts of both macOS targets
 (`aarch64-apple-darwin` for Apple Silicon and `x86_64-apple-darwin` for Intel) and
 publishes the release tagged `v<version>` (the `version` in
 `apps/desktop/package.json`): normally by filling and undrafting the draft release that
@@ -277,7 +277,7 @@ The base `tauri.conf.json` is the stable flavor and uses the shipped gradient ic
 artwork recolored via `magick -modulate` (beta `104,100,120`, dev `92,100,231`; see
 `src-tauri/icons/README.md`). `release:macos` picks the flavor from the version
 (prerelease → beta, else stable), so a release always matches the updater feed compiled
-into it; `release-app.yml` needs no flavor knowledge.
+into it; `publish-macos.yml` needs no flavor knowledge.
 
 Each flavor config names its own updater feed: the base config → `releases/latest`,
 beta → `updater-beta`, dev → a deliberately non-existent `updater-dev-noop` feed so dev
@@ -309,7 +309,7 @@ Stable installs are unaffected (same identifier and the shipped icon).
 
 ## Releasing from CI
 
-`.github/workflows/release-app.yml` first runs the publish preflights, then builds two
+`.github/workflows/publish-macos.yml` first runs the publish preflights, then builds two
 signed/notarized macOS artifacts in parallel:
 
 - Apple Silicon: `macos-26`, `--target=aarch64-apple-darwin`
@@ -324,7 +324,7 @@ Apple Silicon to `Reflect_aarch64.dmg` and Intel to `Reflect_x86_64.dmg` (with
 downstream beta-sync job then downloads the canonical DMGs and manifest from that
 tagged release before refreshing `updater-beta`. The workflow normally runs via
 `workflow_call` from
-`.github/workflows/release-please.yml` when a Release PR merges. The manual fallback is
+`.github/workflows/release.yml` when a Release PR merges. The manual fallback is
 **Actions → Release App → Run workflow** (tick *draft* to review the release before
 publishing) on a branch whose `apps/desktop/package.json` version was already bumped by
 a merged PR; in that mode publish creates the release (and its tag) itself, with

@@ -10,11 +10,12 @@ on:
   # never trigger this.
   pull_request:
     paths:
-      - .github/workflows/windows.yml
+      - .github/workflows/publish-windows.yml
       - .github/actions/setup-node/action.yml
+      - .github/actions/setup-rust/action.yml
       - apps/desktop/scripts/release-windows.ts
       - apps/desktop/scripts/helpers.ts
-  # Called by release-please.yml so every release also produces a Windows
+  # Called by release.yml so every release also produces a Windows
   # build for testing.
   workflow_call:
     inputs:
@@ -46,14 +47,7 @@ jobs:
 
       # The default toolchain's host triple is x86_64-pc-windows-msvc, which
       # is exactly the build target — no extra rustup target needed.
-      - name: Install Rust toolchain
-        # FIXME: I see many "dtolnay/rust-toolchain" calls. Just use our setup-rust action instead
-        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
-
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          cache-on-failure: true
+      - uses: ./.github/actions/setup-rust
 
       # No secrets on purpose: without SENTRY_AUTH_TOKEN the Sentry vite
       # plugin skips source-map upload, and without VITE_SENTRY_DSN the

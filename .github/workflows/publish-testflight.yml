@@ -16,7 +16,7 @@ on:
         required: true
         type: boolean
         default: true
-  # Called by release-please.yml so every published release also ships to
+  # Called by release.yml so every published release also ships to
   # TestFlight. workflow_call has no choice type; release-ios.mjs validates
   # the export method.
   workflow_call:
@@ -38,10 +38,10 @@ on:
 
 # TestFlight uploads should be serialized so build numbers and App Store
 # Connect processing don't race each other. This also holds when the workflow
-# is called from release-please.yml; keep the group name hardcoded, since a
+# is called from release.yml; keep the group name hardcoded, since a
 # `github.workflow` group would resolve to the caller's name there.
 concurrency:
-  group: testflight
+  group: publish-testflight
   cancel-in-progress: false
 
 permissions:
@@ -82,15 +82,9 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+      - uses: ./.github/actions/setup-rust
         with:
           targets: aarch64-apple-ios
-
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          cache-on-failure: true
 
       - name: Resolve build number
         id: build_number

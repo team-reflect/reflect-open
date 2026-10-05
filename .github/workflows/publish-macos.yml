@@ -1,7 +1,7 @@
 name: Release App
 
 on:
-  # The normal path: called by release-please.yml right after it creates the
+  # The normal path: called by release.yml right after it creates the
   # draft release for a merged Release PR.
   workflow_call:
     inputs:
@@ -26,7 +26,7 @@ on:
 # Never run two releases at once, and never cancel one mid-notarization —
 # queue instead. A cancelled run can leave a half-published release behind.
 concurrency:
-  group: release-app
+  group: publish-macos
   cancel-in-progress: false
 
 # Publish uploads assets into the release-please draft release and undrafts
@@ -54,7 +54,7 @@ jobs:
 
       # The release is tagged v<version> from apps/desktop/package.json (the
       # single version source; tauri.conf.json points at it). When called from
-      # release-please.yml, the tag it created must match the checked-out
+      # release.yml, the tag it created must match the checked-out
       # commit's version, or the assets would publish under the wrong name.
       - name: Verify the release tag matches apps/desktop/package.json
         env:
@@ -150,11 +150,7 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
-        with:
-          targets: ${{ matrix.target }}
-
+      # rust-cache keys on CC and RUST_* variables, so set them before the cache is restored.
       - name: Scope the Rust cache to Xcode
         run: |
           set -euo pipefail
@@ -170,12 +166,10 @@ jobs:
           echo "CC=$clang" >> "$GITHUB_ENV"
           echo "RUST_CACHE_XCODE=$compiler_hash" >> "$GITHUB_ENV"
 
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: ./.github/actions/setup-rust
         with:
-          key: ${{ matrix.runner }}-${{ matrix.target }}
-          # A failed notarization still compiled everything; keep the cache.
-          cache-on-failure: true
+          targets: ${{ matrix.target }}
+          cache-key: ${{ matrix.runner }}-${{ matrix.target }}
 
       # Tauri signs the .app; the script then repairs sidecar signatures,
       # notarizes + staples the app and DMG, signs the updater archive, and

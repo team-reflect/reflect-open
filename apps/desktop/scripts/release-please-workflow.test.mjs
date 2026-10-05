@@ -4,7 +4,7 @@ import { expect, test } from 'vitest'
 
 const scriptsDirectory = import.meta.dirname
 const repoRoot = join(scriptsDirectory, '..', '..', '..')
-const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'release-please.yml'), 'utf8')
+const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'release.yml'), 'utf8')
 const stableConfig = JSON.parse(
   readFileSync(join(repoRoot, '.github', 'release-please', 'config.stable.json'), 'utf8'),
 )
@@ -60,12 +60,12 @@ test('each channel chains its release into delivery', () => {
     expect(workflow).toContain(`tag: \${{ needs.release-please.outputs.${channel}_tag }}`)
     expect(workflow).toContain(`commit: \${{ needs.release-please.outputs.${channel}_commit }}`)
   }
-  expect(workflow).toContain('uses: ./.github/workflows/release-app.yml')
-  expect(workflow).toContain('uses: ./.github/workflows/testflight.yml')
-  expect(workflow).toContain('uses: ./.github/workflows/windows.yml')
+  expect(workflow).toContain('uses: ./.github/workflows/publish-macos.yml')
+  expect(workflow).toContain('uses: ./.github/workflows/publish-testflight.yml')
+  expect(workflow).toContain('uses: ./.github/workflows/publish-windows.yml')
 })
 
 test('release runs queue instead of cancelling', () => {
-  expect(workflow).toContain('group: release-please')
+  expect(workflow).toContain('group: release')
   expect(workflow).toContain('cancel-in-progress: false')
 })

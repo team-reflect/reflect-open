@@ -107,7 +107,7 @@ openssl rsa -in key.pem -pubout -outform DER | shasum -a 256 \
 release-please maintains a separate draft `chore(extension): release <version>` PR
 on `master`. Mark it ready and merge it to publish the GitHub release with an
 `extension-v<version>` tag and run the
-[Release Browser Extension workflow](../../.github/workflows/release-browser-extension.yml).
+[Release Browser Extension workflow](../../.github/workflows/publish-browser-extension.yml).
 The workflow builds the store ZIP from that commit and uses `wxt submit` to
 submit it to the existing
 [Reflect Capture listing](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd).

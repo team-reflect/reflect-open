@@ -10,7 +10,7 @@ const workflowPath = join(
   '..',
   '.github',
   'workflows',
-  'release-app.yml',
+  'publish-macos.yml',
 )
 const workflow = readFileSync(workflowPath, 'utf8')
 
@@ -21,7 +21,7 @@ test('Apple Silicon releases pin the runner and isolate Xcode build caches', () 
   expect(appleSiliconMatrix).toContain('runner: macos-26')
 
   const cacheScopeStart = workflow.indexOf('- name: Scope the Rust cache to Xcode')
-  const cargoCacheStart = workflow.indexOf('- name: Cache cargo build')
+  const cargoCacheStart = workflow.indexOf('- uses: ./.github/actions/setup-rust')
   expect(cacheScopeStart).toBeGreaterThan(-1)
   expect(cargoCacheStart).toBeGreaterThan(cacheScopeStart)
 

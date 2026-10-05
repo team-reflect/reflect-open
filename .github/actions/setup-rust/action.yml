@@ -1,9 +1,17 @@
-name: Set up the Rust workspace
-description: Installs the Tauri system dependencies, the Rust toolchain, the cargo and ONNX Runtime caches, and stages the CLI sidecar. Linux runners only.
+name: Set up Rust
+description: Installs the Rust toolchain and the cargo build cache. On Linux it also installs the Tauri system dependencies and caches the ONNX Runtime binaries.
 
 inputs:
   components:
     description: Comma-separated rustup components to install alongside the toolchain.
+    required: false
+    default: ''
+  targets:
+    description: Comma-separated rustup targets to install alongside the host target.
+    required: false
+    default: ''
+  cache-key:
+    description: An extra key for the cargo build cache, for jobs that must not share one.
     required: false
     default: ''
 
@@ -12,6 +20,7 @@ runs:
   steps:
     # Tauri v2 build dependencies (the crate links the WebView + GTK stack).
     - name: Install Tauri system dependencies
+      if: runner.os == 'Linux'
       shell: bash
       run: |
         PACKAGES="\
@@ -38,12 +47,14 @@ runs:
       uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
       with:
         components: ${{ inputs.components }}
+        targets: ${{ inputs.targets }}
 
     - name: Cache cargo build
       uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       with:
-        # A failed clippy/test run still compiled the dependency tree; save it
-        # so the next push doesn't pay the cold-build cost again.
+        key: ${{ inputs.cache-key }}
+        # A failed run still compiled the dependency tree; save it so the next
+        # run doesn't pay the cold-build cost again.
         cache-on-failure: true
 
     # ort-sys (fastembed → ort) downloads prebuilt ONNX Runtime binaries at
@@ -53,6 +64,7 @@ runs:
     # Entries are content-addressed (dfbin/<target>/<hash>), so restoring a
     # stale cache after an ort upgrade is safe — it just downloads anew.
     - name: Cache ONNX Runtime binaries
+      if: runner.os == 'Linux'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ort.pyke.io
@@ -63,15 +75,6 @@ runs:
     # Without this, actions/cache warns at save time on builds that never
     # trigger the ort download (the path wouldn't exist).
     - name: Ensure ort cache dir exists
+      if: runner.os == 'Linux'
       shell: bash
       run: mkdir -p ~/.cache/ort.pyke.io
-
-    # The sidecar script imports npm packages.
-    - uses: ./.github/actions/setup-node
-
-    # tauri-build requires the sidecar to exist before the desktop crate's
-    # build script runs (clippy/test compile it), so stage the CLI first.
-    - name: Stage the reflect CLI sidecar
-      shell: bash
-      #  // FIXME: setup-rust should not contains the sidecar build step. sidecar build step is too specific to the desktop app. For the same reason, setup-rust should not contain ./.github/actions/setup-node
-      run: node apps/desktop/scripts/build-sidecar.ts

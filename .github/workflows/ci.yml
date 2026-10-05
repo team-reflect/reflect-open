@@ -80,10 +80,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up the Rust workspace
-        uses: ./.github/actions/setup-rust
+      - uses: ./.github/actions/setup-rust
         with:
           components: rustfmt, clippy
+
+      # The sidecar script imports npm packages.
+      - uses: ./.github/actions/setup-node
+
+      # tauri-build requires the sidecars before the desktop crate compiles.
+      - name: Stage desktop sidecars
+        run: node apps/desktop/scripts/build-sidecar.ts
 
       - name: Format check
         run: cargo fmt --all -- --check
@@ -99,8 +105,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up the Rust workspace
-        uses: ./.github/actions/setup-rust
+      - uses: ./.github/actions/setup-rust
+
+      # The sidecar script imports npm packages.
+      - uses: ./.github/actions/setup-node
+
+      # tauri-build requires the sidecars before the desktop crate compiles.
+      - name: Stage desktop sidecars
+        run: node apps/desktop/scripts/build-sidecar.ts
 
       - name: Test
         run: cargo test --workspace
@@ -114,19 +126,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+      - uses: ./.github/actions/setup-rust
         with:
           targets: aarch64-apple-ios
-
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          cache-on-failure: true
 
       # The sidecar script imports npm packages.
       - uses: ./.github/actions/setup-node
 
+      # tauri-build requires the sidecars before the desktop crate compiles.
       - name: Stage desktop sidecars
         run: node apps/desktop/scripts/build-sidecar.ts
 
