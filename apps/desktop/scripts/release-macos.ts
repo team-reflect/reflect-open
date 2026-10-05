@@ -481,6 +481,7 @@ async function main(): Promise<void> {
   if (!isFlavor(flavor)) {
     throw new Error(`unknown flavor "${flavor}"`)
   }
+  // FIXME: you have two `rustc --print host-tuple` make it a function and reuse it and use comment to explain some expected outputs
   const host = await exec('rustc', ['--print', 'host-tuple'], { throwOnError: true })
   await build({
     flavor,
