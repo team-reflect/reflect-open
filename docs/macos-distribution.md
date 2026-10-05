@@ -4,14 +4,12 @@ How to produce a signed, notarized macOS build of Reflect for distribution outsi
 Mac App Store.
 
 ```bash
-pnpm release:macos setup           # once: store notarization credentials in the keychain
-pnpm release:macos setup-updater   # once: generate the auto-update signing keypair
 pnpm release:macos                 # signed + notarized build for this Mac's architecture
-pnpm release:macos publish         # build Apple Silicon + Intel, then publish both DMGs
 ```
 
-The helper lives at `apps/desktop/scripts/release-macos.mjs` and is exposed as
-`pnpm release:macos` from the repo root.
+The helper lives at `apps/desktop/scripts/release-macos.ts` and is exposed as
+`pnpm release:macos` from the repo root. It only builds. Publishing to GitHub Releases
+happens in `.github/workflows/release-app.yml`.
 
 ## What you need
 
@@ -25,21 +23,23 @@ The helper lives at `apps/desktop/scripts/release-macos.mjs` and is exposed as
    security find-identity -v -p codesigning
    ```
 
-2. **An Apple ID on the team with an app-specific password** for notarization. Create the
-   password at [account.apple.com](https://account.apple.com) → Sign-In and Security →
-   App-Specific Passwords, then run `pnpm release:macos setup`. The setup command stores
-   it in your login keychain (item `reflect-notary`) — the password never touches shell
-   history or the repo.
+2. **Notarization credentials** in the environment. Either an App Store Connect API key
+   (`APPLE_API_KEY`, `APPLE_API_ISSUER`, and `APPLE_API_KEY_PATH` or
+   `APPLE_API_KEY_CONTENT`), or an Apple ID on the team with an app-specific password
+   (`APPLE_ID`, `APPLE_PASSWORD`). Create the password at
+   [account.apple.com](https://account.apple.com) → Sign-In and Security →
+   App-Specific Passwords. The script does not read credentials from the keychain.
 
 3. **Xcode Command Line Tools** (`xcode-select --install`) for `notarytool` and `stapler`.
 
-4. **The updater signing key** (for `publish`). Auto-update payloads are verified against
-   the minisign public key committed in `tauri.conf.json` (`plugins.updater.pubkey`) —
-   distinct from Apple signing. `pnpm release:macos setup-updater` generates the keypair,
-   stores the private key in your login keychain (item `reflect-updater`), and prints the
-   public key to commit. **Losing the private key strands every installed app** (they
-   reject anything not signed with it), so back it up; rotating it only reaches users via
-   a release signed with the old key that ships the new pubkey.
+4. **The updater signing key** (for `--artifact-dir`). Auto-update payloads are verified
+   against the minisign public key committed in `tauri.conf.json`
+   (`plugins.updater.pubkey`), which is distinct from Apple signing. Export the private
+   key as `TAURI_SIGNING_PRIVATE_KEY`. Without it, a local build skips the updater
+   archive. **Losing the private key strands every installed app** (they reject
+   anything not signed with it), so keep the backup safe. To rotate it, generate a new
+   pair with `pnpm tauri signer generate`; the new key only reaches users through a
+   release signed with the old key that ships the new pubkey.
 
 5. **Sentry exception telemetry credentials.** Set the public `VITE_SENTRY_DSN` and the
    private, build-only `SENTRY_AUTH_TOKEN` for local release builds. Configure them in
@@ -85,22 +85,18 @@ Bundles land under `target/<target-triple>/release/bundle/`, for example
 ## Commands and flags
 
 ```bash
-pnpm release:macos                 # build + notarize + verify (default)
-pnpm release:macos --target=x86_64-apple-darwin  # build + notarize + verify for Intel
-pnpm release:macos setup           # store Apple ID + app-specific password in the keychain
-pnpm release:macos verify          # re-run all checks on already-built bundles
-pnpm release:macos publish         # build + notarize + verify, then create a GitHub release
-pnpm release:macos sync-beta-feed  # retry moving beta downloads/feed from the tagged release
-pnpm release:macos publish --draft # same, but leave the release as a draft for review
+pnpm release:macos                 # build + notarize + verify
+pnpm release:macos --target=x86_64-apple-darwin  # the same for Intel
+pnpm release:macos --flavor=beta   # build a specific flavor: stable | beta | dev
 pnpm release:macos --no-notarize   # signed-only build (runs locally; Gatekeeper rejects it elsewhere)
+pnpm release:macos --artifact-dir=<dir>  # also copy the release assets to <dir>
 ```
 
-CI uses `build --target=<triple> --artifact-dir=<dir>` for each architecture, then
-`publish --defer-beta-feed --from-artifacts=<dir>` after downloading both artifact
-sets. A separate `sync-beta-feed` job refreshes moving beta downloads after the tagged
+CI runs `--target=<triple> --artifact-dir=<dir>` once per architecture. The publish job
+of `release-app.yml` then downloads both artifact sets and publishes them with `gh`. A
+separate `sync-beta-feed` job refreshes the moving beta downloads after the tagged
 release is published, so that final step can be retried without rebuilding or
-republishing. Local `publish` runs the same sync before returning unless explicitly
-deferred.
+republishing.
 
 ## Cutting a release (Release PRs)
 
@@ -209,11 +205,11 @@ so release-please continues from the right version.
 
 ## Publishing to GitHub Releases
 
-`pnpm release:macos publish` runs the full build above for both supported macOS targets
-(`aarch64-apple-darwin` for Apple Silicon and `x86_64-apple-darwin` for Intel), then
+The publish job of `release-app.yml` takes the artifacts of both macOS targets
+(`aarch64-apple-darwin` for Apple Silicon and `x86_64-apple-darwin` for Intel) and
 publishes the release tagged `v<version>` (the `version` in
 `apps/desktop/package.json`): normally by filling and undrafting the draft release that
-release-please created when the Release PR merged, or — when no release exists — by
+release-please created when the Release PR merged, or, when no release exists, by
 creating one itself. The release carries two notarized DMGs, two
 updater archives (one per architecture, each with its `.sig`), and a single
 `latest.json` manifest with both `darwin-aarch64` and `darwin-x86_64` platform entries.
@@ -223,25 +219,20 @@ for stable) because the release tag already identifies the version. That keeps
 versioned because each manifest points at an immutable release payload.
 Stable installs poll `releases/latest/download/latest.json`; beta installs poll
 `releases/download/updater-beta/latest.json`, a moving feed release that points at the
-newest published beta. Publish requires the updater key and always attaches the
-manifest — a release without it would stop existing installs from seeing any future
-updates. Beyond the signing
-requirements, it needs the [GitHub CLI](https://cli.github.com) authenticated with
-`gh auth login`.
+newest published beta. The build requires the updater key whenever it exports
+artifacts, and publish always attaches the manifest: a release without it would stop
+existing installs from seeing any future updates.
 
-All preflight checks run before the build, so a doomed publish fails in seconds rather
+The preflight job runs before the builds, so a doomed publish fails in seconds rather
 than after notarization:
 
-- the working tree is clean and `HEAD` is on an `origin` branch — the release tag is
-  created at that exact commit;
-- the `v<version>` release, when it already exists, is the asset-less draft created by
-  release-please and targets `HEAD` (publish fills and undrafts it); a release that
-  already carries artifacts, or a stray `v<version>` tag pointing at another commit,
-  fails the preflight. Publishing again means bumping `version` in
-  `apps/desktop/package.json` (via a Release PR) first.
+- a `v<version>` tag that already exists must point at the commit being built;
+- a `v<version>` release that is already published and carries artifacts fails the
+  preflight. Publishing again means bumping `version` in `apps/desktop/package.json`
+  (via a Release PR) first.
 
-Pass `--draft` to create the release without publishing it, then review and publish it
-from the GitHub UI.
+Tick *draft* on a manual run to leave the release as a draft, then review and publish
+it from the GitHub UI.
 
 ## Beta releases
 
@@ -263,7 +254,7 @@ rather than rolling the channel back.
 
 The channel is picked by the version string alone: a `-beta.N` prerelease publishes to
 the beta feed, a plain version to the stable feed. The beta and dev flavor overlays pin
-their own feeds, and `release-macos.mjs` pins the stable feed into stable builds at
+their own feeds, and `release-macos.ts` pins the stable feed into stable builds at
 build time, so releases are branch-independent.
 
 Cutting a beta means merging the beta Release PR; a stable release means merging the
@@ -291,7 +282,7 @@ Each overlay pins its own updater feed so the flavor is self-consistent regardle
 base config's channel: beta → `updater-beta`, dev → a deliberately non-existent
 `updater-dev-noop` feed so dev builds never find an update (in `tauri dev` the updater is
 off anyway). The stable feed is pinned into stable builds at build time by
-`release-macos.mjs` (the committed base config points at the beta feed).
+`release-macos.ts` (the committed base config points at the beta feed).
 
 Distinct identifiers give each flavor its own webview storage and embeddings cache.
 Settings, recent graphs and keychain secrets are currently **shared** across flavors (the
@@ -308,7 +299,7 @@ pnpm release:macos --flavor=beta --no-notarize   # signed-only beta, for local c
 ```
 
 Because GitHub rewrites spaces in uploaded asset names to dots, the updater manifest URL
-for "Reflect Beta" is sanitized to `Reflect.Beta.app.tar.gz` in `writeUpdaterManifest`.
+for "Reflect Beta" uses `Reflect.Beta`. The build script exports the assets under the dotted name.
 Do not "fix" the space back, or beta auto-update 404s.
 
 **Beta tester migration (one-time):** before flavors, beta builds were a plain "Reflect"
@@ -340,9 +331,8 @@ publishing) on a branch whose `apps/desktop/package.json` version was already bu
 a merged PR; in that mode publish creates the release (and its tag) itself, with
 GitHub-generated notes.
 
-The script reads all signing material from environment variables, which take
-precedence over the keychain (exporting them works for local releases too); the
-workflow wires them from repository Actions secrets of the same names. Create these
+The script reads all signing material from environment variables (exporting them
+works for local releases too); the workflow wires them from repository Actions secrets of the same names. Create these
 under **Settings → Secrets and variables → Actions**:
 
 | Secret | Value |
@@ -352,8 +342,8 @@ under **Settings → Secrets and variables → Actions**:
 | `APPLE_CERTIFICATE_PASSWORD` | The password set on that `.p12` export |
 | `APPLE_API_KEY` | App Store Connect API key ID, for notarization (preferred in CI — not tied to a personal Apple ID) |
 | `APPLE_API_ISSUER` | The API key's issuer UUID |
-| `APPLE_API_KEY_CONTENT` | The `.p8` key file's content; the workflow stages it on disk and sets `APPLE_API_KEY_PATH`, the variable the script reads |
-| `TAURI_SIGNING_PRIVATE_KEY` | The updater private key: `security find-generic-password -s reflect-updater -w \| base64 --decode` |
+| `APPLE_API_KEY_CONTENT` | The `.p8` key file's content, raw or base64; the script writes it to a temporary file |
+| `TAURI_SIGNING_PRIVATE_KEY` | The updater private key |
 
 Notes:
 

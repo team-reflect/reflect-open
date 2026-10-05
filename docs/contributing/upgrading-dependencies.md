@@ -30,7 +30,7 @@ Keep majors aligned; path plugins under `plugins/` pick up workspace pins.
 ```bash
 pnpm install && pnpm dedupe && pnpm typecheck && pnpm lint && pnpm build
 
-node apps/desktop/scripts/build-sidecar.mjs
+node apps/desktop/scripts/build-sidecar.ts
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo build --workspace

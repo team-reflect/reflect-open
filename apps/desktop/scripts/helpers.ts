@@ -1,66 +1,26 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { x } from 'tinyexec'
+import { exec } from 'tinyexec'
 import { z } from 'zod'
 
-// FIXME: rename to APP_DIR, ROOT_DIR, TAURI_SRC_DIR
-export const appDir = join(import.meta.dirname, '..')
-export const repoRoot = join(appDir, '..', '..')
-export const tauriDir = join(appDir, 'src-tauri')
+export const APP_DIR = join(import.meta.dirname, '..')
+export const ROOT_DIR = join(APP_DIR, '..', '..')
+export const TAURI_SRC_DIR = join(APP_DIR, 'src-tauri')
 
 const STABLE_UPDATER_ENDPOINT =
   'https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json'
-const NOTARY_KEYCHAIN_SERVICE = 'reflect-notary'
 
 export function log(message: string): void {
   console.log(`[release] ${message}`)
 }
 
-export interface RunOptions {
-  cwd?: string
-  env?: NodeJS.ProcessEnv
-  stdin?: string
-}
-
-/** Runs a command and returns its trimmed stdout. Throws with the captured output on failure. */
-export async function run(
-  // FIXME: we do not need `run` and `exec` wrappers. Just import `exec` from `tinyexec` directly and use it. Pass throwOnError: true
-  command: string,
-  args: readonly string[],
-  options: RunOptions = {},
-): Promise<string> {
-  const output = await x(command, args, {
-    nodeOptions: {
-      cwd: options.cwd,
-      env: options.env,
-      stdio: [options.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
-    },
-    ...(options.stdin === undefined ? {} : { stdin: options.stdin }),
-  })
-  if (output.exitCode !== 0) {
-    throw new Error(`${command} ${args[0] ?? ''} failed\n${output.stdout}${output.stderr}`.trim())
-  }
-  return output.stdout.trim()
-}
-
-/** Runs a command with inherited stdio. Throws when it exits with a non-zero status. */
-export async function exec(
-  command: string,
-  args: readonly string[],
-  options: Omit<RunOptions, 'stdin'> = {},
-): Promise<void> {
-  const output = await x(command, args, {
-    nodeOptions: { cwd: options.cwd, env: options.env, stdio: 'inherit' },
-  })
-  if (output.exitCode !== 0) throw new Error(`${command} ${args[0] ?? ''} failed`)
-}
-
-/** Runs the Tauri CLI through its JS entry point, so JSON `--config` values never pass through a shell. */
+/** Runs the Tauri CLI with inherited stdio. `env` is added to the current environment. */
 export async function tauri(args: readonly string[], env?: NodeJS.ProcessEnv): Promise<void> {
-  // FIXME: please do not use node_modules/@tauri-apps/cli/tauri.js directly. Use 'node_modules/.bin/tauri' instead.
-  const cli = join(appDir, 'node_modules', '@tauri-apps', 'cli', 'tauri.js')
-  await exec(process.execPath, [cli, ...args], env ? { cwd: appDir, env } : { cwd: appDir })
+  await exec(join(APP_DIR, 'node_modules', '.bin', 'tauri'), args, {
+    throwOnError: true,
+    nodeOptions: { cwd: APP_DIR, env, stdio: 'inherit' },
+  })
 }
 
 /** Calls `action` with a temporary directory and removes the directory afterwards. */
@@ -75,25 +35,15 @@ export async function withTempDir<Result>(
   }
 }
 
-/** Runs a script entry point. A thrown error becomes a one-line message and exit code 1. */
-export async function runMain(main: () => Promise<void>): Promise<void> {
-  // FIXME: do not use `runMain`. Just call `main()` directly. we do not need to warp error in a one-line message.
-  try {
-    await main()
-  } catch (error) {
-    console.error(`[release] error: ${error instanceof Error ? error.message : String(error)}`)
-    process.exitCode = 1
-  }
-}
-
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8'))
 }
 
+const PackageJsonSchema = z.object({ version: z.string().min(1) })
+
 /** The app version from `apps/desktop/package.json`, the single version source. */
 export function readAppVersion(): string {
-  return z.object({ version: z.string().min(1) }).parse(readJson(join(appDir, 'package.json')))
-    .version
+  return PackageJsonSchema.parse(readJson(join(APP_DIR, 'package.json'))).version
 }
 
 export type Flavor = 'stable' | 'beta' | 'dev'
@@ -151,8 +101,6 @@ const TauriConfigSchema = z.object({
   }),
 })
 
-// FIXME: add a new PackageJsonSchema that reads the `package.json` and extracts the `version`. do not inline zod in `readAppVersion`
-
 export type TauriConfig = z.infer<typeof TauriConfigSchema>
 
 /** Resolves the config the way `tauri build` does: base, then platform file, then flavor overlay. */
@@ -160,23 +108,20 @@ export function readTauriConfig(platform: 'macos' | 'windows', flavor: Flavor): 
   const files = ['tauri.conf.json', `tauri.${platform}.conf.json`, FLAVOR_OVERLAYS[flavor]]
   let config: unknown = {}
   for (const file of files) {
-    if (file) config = mergePatch(config, readJson(join(tauriDir, file)))
+    if (file) config = mergePatch(config, readJson(join(TAURI_SRC_DIR, file)))
   }
   return TauriConfigSchema.parse(config)
 }
 
+const CargoMetadataSchema = z.object({ target_directory: z.string() })
+
 /** The Cargo target directory of the workspace. */
 export async function cargoTargetDir(): Promise<string> {
-  const metadata = await run('cargo', ['metadata', '--format-version', '1', '--no-deps'], {
-    cwd: repoRoot,
+  const { stdout } = await exec('cargo', ['metadata', '--format-version', '1', '--no-deps'], {
+    throwOnError: true,
+    nodeOptions: { cwd: ROOT_DIR },
   })
-  return z.object({ target_directory: z.string() }).parse(JSON.parse(metadata)).target_directory
-}
-
-/** Reads a generic password from the keychain, or null when the item does not exist. */
-export async function keychainPassword(service: string): Promise<string | null> {
-  const output = await x('security', ['find-generic-password', '-s', service, '-w'])
-  return output.exitCode === 0 ? output.stdout.trim() : null
+  return CargoMetadataSchema.parse(JSON.parse(stdout)).target_directory
 }
 
 export interface ApiKey {
@@ -209,25 +154,8 @@ export interface AppleId {
   readonly password: string
 }
 
-/** The Apple ID and app-specific password from the environment or the `reflect-notary` keychain item. */
-export async function resolveAppleId(): Promise<AppleId | null> {
+/** The Apple ID and app-specific password from `APPLE_ID` and `APPLE_PASSWORD`. */
+export function resolveAppleId(): AppleId | null {
   const { APPLE_ID, APPLE_PASSWORD } = process.env
-  if (APPLE_ID && APPLE_PASSWORD) return { account: APPLE_ID, password: APPLE_PASSWORD }
-  const item = await x('security', ['find-generic-password', '-s', NOTARY_KEYCHAIN_SERVICE])
-  const account = /"acct"<blob>="([^"]+)"/.exec(item.stdout)?.[1]
-  const password = await keychainPassword(NOTARY_KEYCHAIN_SERVICE)
-  return account && password ? { account, password } : null
-}
-
-/** Stores the notarization Apple ID in the keychain. `security` prompts for the password itself. */
-export async function storeAppleId(account: string): Promise<void> {
-  await exec('security', [
-    'add-generic-password',
-    '-U',
-    '-s',
-    NOTARY_KEYCHAIN_SERVICE,
-    '-a',
-    account,
-    '-w',
-  ])
+  return APPLE_ID && APPLE_PASSWORD ? { account: APPLE_ID, password: APPLE_PASSWORD } : null
 }

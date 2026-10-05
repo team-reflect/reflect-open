@@ -8,7 +8,7 @@ pnpm release:ios build --build-number="$(date -u +%Y%m%d%H%M)"
 pnpm release:ios testflight --wait
 ```
 
-The helper lives at `apps/desktop/scripts/release-ios.mjs` and is exposed as
+The helper lives at `apps/desktop/scripts/release-ios.ts` and is exposed as
 `pnpm release:ios` from the repo root. `pnpm release:testflight` is a shorthand
 for `pnpm release:ios testflight`.
 
@@ -56,9 +56,7 @@ for `pnpm release:ios testflight`.
    ```
 
    `APPLE_PASSWORD` must be an app-specific password, not the Apple ID's normal
-   password. Locally, the helper also reuses the `reflect-notary` keychain item
-   created by `pnpm release:macos setup`, passing the stored password to altool
-   through `@env:APPLE_PASSWORD`.
+   password. The helper passes it to altool through `@env:APPLE_PASSWORD`.
 
 4. **Sentry exception telemetry credentials.** Set the public `VITE_SENTRY_DSN` and the
    private, build-only `SENTRY_AUTH_TOKEN` for local TestFlight builds. Configure them in
@@ -121,8 +119,7 @@ pnpm release:ios validate --ipa=apps/desktop/src-tauri/gen/apple/build/arm64/Ref
 ```
 
 Uploads or validates an existing IPA. These commands support `APPLE_ID` +
-`APPLE_PASSWORD` (app-specific password), or the local `reflect-notary`
-keychain item, as a fallback to the API key.
+`APPLE_PASSWORD` (app-specific password) as a fallback to the API key.
 
 Pass `--export-method=release-testing` if App Store Connect or Xcode starts
 requiring the TestFlight-specific export method. The default remains

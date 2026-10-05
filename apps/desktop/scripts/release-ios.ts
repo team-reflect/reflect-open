@@ -14,26 +14,25 @@
 import { existsSync, globSync, readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
+import { exec } from 'tinyexec'
 import { z } from 'zod'
 import {
-  appDir,
-  exec,
+  APP_DIR,
   log,
-  repoRoot,
   resolveApiKey,
   resolveAppleId,
-  run,
-  runMain,
+  ROOT_DIR,
   tauri,
-  tauriDir,
+  TAURI_SRC_DIR,
   withTempDir,
 } from './helpers.ts'
 
+const INHERIT = { throwOnError: true, nodeOptions: { stdio: 'inherit' } } as const
 const BUNDLE_IDENTIFIER = 'app.reflect.ios'
 const APP_GROUP = 'group.app.reflect'
 const SENTRY_DSN_PATTERN =
   /^https:\/\/[0-9a-f]{32}@o463484\.ingest\.us\.sentry\.io\/4511705649971200$/
-const buildDir = join(tauriDir, 'gen', 'apple', 'build')
+const buildDir = join(TAURI_SRC_DIR, 'gen', 'apple', 'build')
 const archive = join(buildDir, 'reflect-open_iOS.xcarchive')
 const appBinary = join(archive, 'Products', 'Applications', 'Reflect.app', 'Reflect')
 const dsymBinary = join(
@@ -59,14 +58,14 @@ interface Options {
 }
 
 /** Credentials for altool: the App Store Connect API key, else an Apple ID. */
-async function resolveCredentials(tempDir: string): Promise<Credentials> {
+function resolveCredentials(tempDir: string): Credentials {
   const apiKey = resolveApiKey(tempDir)
   if (apiKey) {
     const keyFile = apiKey.keyPath ? ['--p8-file-path', apiKey.keyPath] : []
     const altoolArgs = ['--api-key', apiKey.keyId, '--api-issuer', apiKey.issuer, ...keyFile]
     return { altoolArgs, env: apiKey.keyPath ? { APPLE_API_KEY_PATH: apiKey.keyPath } : {} }
   }
-  const appleId = await resolveAppleId()
+  const appleId = resolveAppleId()
   if (!appleId)
     throw new Error('no App Store Connect credentials: set APPLE_API_KEY and APPLE_API_ISSUER')
   return {
@@ -91,7 +90,8 @@ function findNewestIpa(): string {
 }
 
 async function readInfoValue(app: string, key: string): Promise<string> {
-  return await run('plutil', ['-extract', key, 'raw', '-o', '-', join(app, 'Info.plist')])
+  const args = ['-extract', key, 'raw', '-o', '-', join(app, 'Info.plist')]
+  return (await exec('plutil', args, { throwOnError: true })).stdout.trim()
 }
 
 /**
@@ -103,12 +103,8 @@ async function assertAppexEntitlements(app: string): Promise<void> {
   const appexes = existsSync(plugInsDir) ? readdirSync(plugInsDir) : []
   if (appexes.length === 0) throw new Error('the IPA contains no app extension')
   for (const appex of appexes) {
-    const entitlements = await run('codesign', [
-      '-d',
-      '--entitlements',
-      ':-',
-      join(plugInsDir, appex),
-    ])
+    const display = ['-d', '--entitlements', ':-', join(plugInsDir, appex)]
+    const entitlements = (await exec('codesign', display, { throwOnError: true })).stdout
     if (!entitlements.includes(APP_GROUP)) {
       throw new Error(`${appex} is signed without the ${APP_GROUP} App Group entitlement`)
     }
@@ -117,7 +113,7 @@ async function assertAppexEntitlements(app: string): Promise<void> {
 
 async function assertIpa(ipa: string): Promise<void> {
   await withTempDir(async (tempDir) => {
-    await run('unzip', ['-q', ipa, 'Payload/*', '-d', tempDir])
+    await exec('unzip', ['-q', ipa, 'Payload/*', '-d', tempDir], { throwOnError: true })
     const payloadDir = join(tempDir, 'Payload')
     const appName = readdirSync(payloadDir).find((name) => name.endsWith('.app'))
     if (!appName) throw new Error('the IPA contains no app')
@@ -135,7 +131,8 @@ async function assertIpa(ipa: string): Promise<void> {
 }
 
 async function readUuids(binary: string): Promise<string> {
-  const output = await run('xcrun', ['dwarfdump', '--uuid', binary])
+  const output = (await exec('xcrun', ['dwarfdump', '--uuid', binary], { throwOnError: true }))
+    .stdout
   return [...output.matchAll(/^UUID: ([0-9A-F-]{36})/gim)]
     .map((match) => match[1])
     .toSorted()
@@ -149,8 +146,8 @@ async function assertArchiveSymbols(): Promise<void> {
     throw new Error('the archive executable and its dSYM do not have the same UUIDs')
   }
   // The archive strips the executable's symbol table, so look in the dSYM.
-  const symbols = await run('xcrun', ['nm', '-gUj', dsymBinary])
-  if (!symbols.includes('_reflect_start_native_diagnostics')) {
+  const symbols = await exec('xcrun', ['nm', '-gUj', dsymBinary], { throwOnError: true })
+  if (!symbols.stdout.includes('_reflect_start_native_diagnostics')) {
     throw new Error('the app binary does not contain the native diagnostics entry point')
   }
 }
@@ -160,8 +157,11 @@ async function uploadDebugFiles(): Promise<void> {
     return log('SENTRY_AUTH_TOKEN is not set, skipping dSYM upload')
   const project = ['--org', 'reflect-64', '--project', 'reflect-open']
   const upload = ['--type', 'dsym', '--no-sources', '--wait-for', '60', archive]
-  const sentryCli = join(appDir, 'node_modules', '.bin', 'sentry-cli')
-  await exec(sentryCli, ['debug-files', 'upload', ...project, ...upload], { cwd: appDir })
+  const sentryCli = join(APP_DIR, 'node_modules', '.bin', 'sentry-cli')
+  await exec(sentryCli, ['debug-files', 'upload', ...project, ...upload], {
+    throwOnError: true,
+    nodeOptions: { cwd: APP_DIR, stdio: 'inherit' },
+  })
 }
 
 async function build({ buildNumber, exportMethod }: Options, tempDir: string): Promise<string> {
@@ -184,7 +184,10 @@ async function build({ buildNumber, exportMethod }: Options, tempDir: string): P
 
 async function altool(args: readonly string[], credentials: Credentials): Promise<void> {
   const allArgs = ['altool', ...args, ...credentials.altoolArgs, '--output-format', 'json']
-  await exec('xcrun', allArgs, { env: credentials.env })
+  await exec('xcrun', allArgs, {
+    throwOnError: true,
+    nodeOptions: { env: credentials.env, stdio: 'inherit' },
+  })
 }
 
 async function upload(ipa: string, wait: boolean, credentials: Credentials): Promise<void> {
@@ -194,11 +197,14 @@ async function upload(ipa: string, wait: boolean, credentials: Credentials): Pro
 
 async function preflight(tempDir: string): Promise<void> {
   assertSentryDsn()
-  const credentials = await resolveCredentials(tempDir)
-  log((await run('xcodebuild', ['-version'])).replaceAll('\n', ' / '))
+  const credentials = resolveCredentials(tempDir)
+  await exec('xcodebuild', ['-version'], INHERIT)
   const listArgs = ['altool', '--list-apps', '--filter-bundle-id', BUNDLE_IDENTIFIER]
   const allArgs = [...listArgs, ...credentials.altoolArgs, '--output-format', 'json']
-  const output = await run('xcrun', allArgs, { env: credentials.env })
+  const { stdout: output } = await exec('xcrun', allArgs, {
+    throwOnError: true,
+    nodeOptions: { env: credentials.env },
+  })
   const apps = z
     .array(z.unknown())
     .parse(JSON.parse(output.slice(output.indexOf('['), output.lastIndexOf(']') + 1)))
@@ -237,7 +243,7 @@ function parseOptions(): { command: string; options: Options } {
 
 function resolveIpa(path: string | undefined): string {
   if (!path) return findNewestIpa()
-  return existsSync(path) ? resolve(path) : resolve(repoRoot, path)
+  return existsSync(path) ? resolve(path) : resolve(ROOT_DIR, path)
 }
 
 async function runCommand(command: string, options: Options, tempDir: string): Promise<void> {
@@ -247,7 +253,7 @@ async function runCommand(command: string, options: Options, tempDir: string): P
   }
   if (command === 'preflight') return await preflight(tempDir)
   // Resolved before the build, so missing credentials fail in seconds.
-  const credentials = await resolveCredentials(tempDir)
+  const credentials = resolveCredentials(tempDir)
   switch (command) {
     case 'testflight':
       return await upload(await build(options, tempDir), options.wait, credentials)
@@ -275,4 +281,4 @@ async function main(): Promise<void> {
   await withTempDir((tempDir) => runCommand(command, options, tempDir))
 }
 
-await runMain(main) // FIXME: just call main directly
+await main()

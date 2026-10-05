@@ -11,7 +11,6 @@ import {
   flavorOfVersion,
   log,
   readAppVersion,
-  runMain,
   tauri,
 } from './helpers.ts'
 
@@ -41,4 +40,4 @@ async function main(): Promise<void> {
   copyFileSync(join(bundleDir, installer), join(artifactDir, installer))
 }
 
-await runMain(main) //FIXME: just call main directly
+await main()

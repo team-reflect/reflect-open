@@ -1,9 +1,6 @@
 // Builds a signed, notarized macOS app and DMG. See docs/macos-distribution.md.
 //
-//   pnpm release:macos [build]        Build, sign, notarize, then verify // FIXME: we do not need `build` anymore. Do not handle positional args "build" anymore.
-//   pnpm release:macos verify         Re-run the checks on existing bundles // FIXME: delete `verify`.
-//   pnpm release:macos setup          Store the notarization Apple ID in the keychain // FIXME: delete `setup`. Ensure all docs are updated
-//   pnpm release:macos setup-updater  Generate the updater signing keypair // FIXME: delete `setup-updater`
+//   pnpm release:macos [flags]
 //
 //   --flavor=<stable|beta|dev>   Default: from the version
 //   --target=<triple>            Default: the host triple
@@ -21,27 +18,21 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
-import { createInterface } from 'node:readline/promises'
 import { parseArgs } from 'node:util'
-import { x } from 'tinyexec'
+import { exec } from 'tinyexec'
 import { z } from 'zod'
 import {
   cargoTargetDir,
-  exec,
   flavorConfigArgs,
   flavorOfVersion,
   isFlavor,
-  keychainPassword,
   log,
   readAppVersion,
   readTauriConfig,
   resolveApiKey,
   resolveAppleId,
-  run,
-  runMain,
-  storeAppleId,
   tauri,
-  tauriDir,
+  TAURI_SRC_DIR,
   withTempDir,
   type Flavor,
 } from './helpers.ts'
@@ -51,7 +42,6 @@ const ARCHS: Record<string, string> = {
   'aarch64-apple-darwin': 'aarch64',
   [INTEL_TARGET]: 'x86_64',
 }
-const UPDATER_KEYCHAIN_SERVICE = 'reflect-updater'
 const ONNX_RUNTIME = 'onnxruntime-osx-x86_64-1.23.2'
 const ONNX_RUNTIME_FILES = ['lib/libonnxruntime.dylib', 'LICENSE', 'ThirdPartyNotices.txt']
 const PROFILE_IDENTITY_KEYS = [
@@ -59,6 +49,7 @@ const PROFILE_IDENTITY_KEYS = [
   'com.apple.developer.team-identifier',
 ]
 const PlistSchema = z.record(z.string(), z.unknown())
+const INHERIT = { throwOnError: true, nodeOptions: { stdio: 'inherit' } } as const
 
 interface Bundle {
   readonly target: string
@@ -95,7 +86,7 @@ async function resolveBundle(flavor: Flavor, target: string): Promise<Bundle> {
     identifier: config.identifier,
     assetName: config.productName.replaceAll(' ', '.'),
     version,
-    entitlements: join(tauriDir, entitlements),
+    entitlements: join(TAURI_SRC_DIR, entitlements),
     hasProfile: files?.['embedded.provisionprofile'] !== undefined,
     app,
     sidecars: config.bundle.externalBin.map((path) =>
@@ -108,51 +99,39 @@ async function resolveBundle(flavor: Flavor, target: string): Promise<Bundle> {
 
 async function findSigningIdentity(): Promise<string> {
   if (process.env.APPLE_SIGNING_IDENTITY) return process.env.APPLE_SIGNING_IDENTITY
-  const identities = await run('security', ['find-identity', '-v', '-p', 'codesigning'])
-  const identity = /"(Developer ID Application: [^"]+)"/.exec(identities)?.[1]
+  const { stdout } = await exec('security', ['find-identity', '-v', '-p', 'codesigning'], {
+    throwOnError: true,
+  })
+  const identity = /"(Developer ID Application: [^"]+)"/.exec(stdout)?.[1]
   if (!identity) throw new Error('no "Developer ID Application" certificate in the keychain')
   return identity
 }
 
-async function resolveNotaryArgs(identity: string, tempDir: string): Promise<string[]> {
+function resolveNotaryArgs(identity: string, tempDir: string): string[] {
   const apiKey = resolveApiKey(tempDir)
   if (apiKey?.keyPath) {
     return ['--key', apiKey.keyPath, '--key-id', apiKey.keyId, '--issuer', apiKey.issuer]
   }
-  const appleId = await resolveAppleId()
+  const appleId = resolveAppleId()
   const teamId = process.env.APPLE_TEAM_ID ?? /\(([0-9A-Z]{10})\)$/.exec(identity)?.[1]
   if (!appleId || !teamId) {
     throw new Error(
-      'no notarization credentials: run `pnpm release:macos setup` or pass --no-notarize',
+      'no notarization credentials: set APPLE_API_KEY or APPLE_ID, or pass --no-notarize',
     )
   }
   return ['--apple-id', appleId.account, '--password', appleId.password, '--team-id', teamId]
 }
 
-/** The environment for `tauri signer sign`, or null when no updater key is available. */
-async function resolveUpdaterKeyEnv(): Promise<NodeJS.ProcessEnv | null> {
-  const password = process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? ''
-  if (process.env.TAURI_SIGNING_PRIVATE_KEY || process.env.TAURI_SIGNING_PRIVATE_KEY_PATH) {
-    return { TAURI_SIGNING_PRIVATE_KEY_PASSWORD: password }
-  }
-  const stored = await keychainPassword(UPDATER_KEYCHAIN_SERVICE)
-  if (!stored) return null
-  return {
-    TAURI_SIGNING_PRIVATE_KEY: Buffer.from(stored, 'base64').toString('utf8'),
-    TAURI_SIGNING_PRIVATE_KEY_PASSWORD: password,
-  }
-}
-
 /** Upstream ONNX Runtime 1.24 dropped macOS x86_64, so Intel builds bundle the 1.23 dylib. */
 async function stageIntelOnnxRuntime(): Promise<string> {
-  const resourceDir = join(tauriDir, 'resources', 'onnxruntime')
+  const resourceDir = join(TAURI_SRC_DIR, 'resources', 'onnxruntime')
   const staged = ONNX_RUNTIME_FILES.map((file) => join(resourceDir, basename(file)))
   if (!staged.every((path) => existsSync(path))) {
     await withTempDir(async (tempDir) => {
       const archive = join(tempDir, `${ONNX_RUNTIME}.tgz`)
       const url = `https://github.com/microsoft/onnxruntime/releases/download/v1.23.2/${ONNX_RUNTIME}.tgz`
-      await exec('curl', ['-fL', '--retry', '3', '-o', archive, url])
-      await exec('tar', ['-xzf', archive, '-C', tempDir])
+      await exec('curl', ['-fL', '--retry', '3', '-o', archive, url], INHERIT)
+      await exec('tar', ['-xzf', archive, '-C', tempDir], INHERIT)
       mkdirSync(resourceDir, { recursive: true })
       for (const file of ONNX_RUNTIME_FILES) {
         copyFileSync(join(tempDir, ONNX_RUNTIME, file), join(resourceDir, basename(file)))
@@ -193,36 +172,50 @@ async function withSigningKeychain(
   const certificate = join(tempDir, 'certificate.p12')
   const keychain = join(tempDir, 'signing.keychain-db')
   const password = randomBytes(24).toString('hex')
-  const searchList = await run('security', ['list-keychains', '-d', 'user'])
-  const previous = [...searchList.matchAll(/"([^"]+)"/g)].flatMap((match) => match[1] ?? [])
+  const searchList = await exec('security', ['list-keychains', '-d', 'user'], {
+    throwOnError: true,
+  })
+  const previous = [...searchList.stdout.matchAll(/"([^"]+)"/g)].flatMap((match) => match[1] ?? [])
   writeFileSync(certificate, Buffer.from(APPLE_CERTIFICATE, 'base64'), { mode: 0o600 })
-  try {
-    await run('security', ['create-keychain', '-p', password, keychain])
+  const steps = [
+    ['create-keychain', '-p', password, keychain],
     // Notarization can outlast the default five-minute auto-lock.
-    await run('security', ['set-keychain-settings', '-lut', '21600', keychain])
-    await run('security', ['unlock-keychain', '-p', password, keychain])
-    await run('security', ['list-keychains', '-d', 'user', '-s', keychain, ...previous])
-    const importArgs = ['-P', APPLE_CERTIFICATE_PASSWORD, '-T', '/usr/bin/codesign']
-    await run('security', ['import', certificate, '-k', keychain, ...importArgs])
-    const partitions = ['-S', 'apple-tool:,apple:,codesign:', '-s', '-k', password]
-    await run('security', ['set-key-partition-list', ...partitions, keychain])
+    ['set-keychain-settings', '-lut', '21600', keychain],
+    ['unlock-keychain', '-p', password, keychain],
+    ['list-keychains', '-d', 'user', '-s', keychain, ...previous],
+    [
+      'import',
+      certificate,
+      '-k',
+      keychain,
+      '-P',
+      APPLE_CERTIFICATE_PASSWORD,
+      '-T',
+      '/usr/bin/codesign',
+    ],
+    [
+      'set-key-partition-list',
+      '-S',
+      'apple-tool:,apple:,codesign:',
+      '-s',
+      '-k',
+      password,
+      keychain,
+    ],
+  ]
+  try {
+    for (const step of steps) await exec('security', step, { throwOnError: true })
     await action(keychain)
   } finally {
-    await x('security', ['list-keychains', '-d', 'user', '-s', ...previous])
-    await x('security', ['delete-keychain', keychain])
+    await exec('security', ['list-keychains', '-d', 'user', '-s', ...previous])
+    await exec('security', ['delete-keychain', keychain])
   }
 }
 
 async function codesign(signer: Signer, args: readonly string[]): Promise<void> {
   const keychain = signer.keychain ? ['--keychain', signer.keychain] : []
-  await exec('codesign', [
-    '--force',
-    '--sign',
-    signer.identity,
-    '--timestamp',
-    ...keychain,
-    ...args,
-  ])
+  const base = ['--force', '--sign', signer.identity, '--timestamp']
+  await exec('codesign', [...base, ...keychain, ...args], INHERIT)
 }
 
 /** Converts plist text to JSON with `plutil`. `args` selects the conversion. */
@@ -230,8 +223,11 @@ async function readPlist(
   plist: string,
   args = ['-convert', 'json'],
 ): Promise<Record<string, unknown>> {
-  const json = await run('plutil', [...args, '-o', '-', '-'], { stdin: plist })
-  return PlistSchema.parse(JSON.parse(json))
+  const { stdout } = await exec('plutil', [...args, '-o', '-', '-'], {
+    throwOnError: true,
+    stdin: plist,
+  })
+  return PlistSchema.parse(JSON.parse(stdout))
 }
 
 /**
@@ -240,8 +236,8 @@ async function readPlist(
  */
 async function readProfileIdentity(bundle: Bundle): Promise<Record<string, string>> {
   const profilePath = join(bundle.app, 'Contents', 'embedded.provisionprofile')
-  const profile = await run('security', ['cms', '-D', '-i', profilePath])
-  const entitlements = await readPlist(profile, ['-extract', 'Entitlements', 'json'])
+  const profile = await exec('security', ['cms', '-D', '-i', profilePath], { throwOnError: true })
+  const entitlements = await readPlist(profile.stdout, ['-extract', 'Entitlements', 'json'])
   const identity = z
     .record(z.string(), z.string())
     .parse(Object.fromEntries(PROFILE_IDENTITY_KEYS.map((key) => [key, entitlements[key]])))
@@ -261,7 +257,7 @@ async function prepareEntitlements(bundle: Bundle, tempDir: string): Promise<str
   }
   const path = join(tempDir, 'Entitlements.plist')
   writeFileSync(path, JSON.stringify(merged))
-  await run('plutil', ['-convert', 'xml1', path])
+  await exec('plutil', ['-convert', 'xml1', path], { throwOnError: true })
   return path
 }
 
@@ -281,15 +277,15 @@ async function resignApp(bundle: Bundle, signer: Signer, tempDir: string): Promi
 async function notarize(path: string, notaryArgs: readonly string[]): Promise<void> {
   log(`notarizing ${basename(path)}`)
   const submit = ['notarytool', 'submit', path, ...notaryArgs, '--wait', '--output-format', 'json']
-  const { stdout, stderr } = await x('xcrun', submit)
+  const { stdout, stderr } = await exec('xcrun', submit)
   const verdict = z
     .object({ id: z.string(), status: z.string() })
     .safeParse(stdout.startsWith('{') ? JSON.parse(stdout) : null).data
   if (verdict?.status === 'Accepted') return
-  const detail = verdict
-    ? await run('xcrun', ['notarytool', 'log', verdict.id, ...notaryArgs])
-    : `${stdout}${stderr}`
-  throw new Error(`notarization of ${basename(path)} failed\n${detail}`)
+  const report = verdict
+    ? await exec('xcrun', ['notarytool', 'log', verdict.id, ...notaryArgs])
+    : null
+  throw new Error(`notarization of ${basename(path)} failed\n${report?.stdout ?? stdout + stderr}`)
 }
 
 async function notarizeApp(
@@ -298,17 +294,21 @@ async function notarizeApp(
   tempDir: string,
 ): Promise<void> {
   const zip = join(tempDir, `${basename(bundle.app)}.zip`)
-  await exec('ditto', ['-c', '-k', '--keepParent', bundle.app, zip])
+  await exec('ditto', ['-c', '-k', '--keepParent', bundle.app, zip], INHERIT)
   await notarize(zip, notaryArgs)
-  await exec('xcrun', ['stapler', 'staple', bundle.app])
+  await exec('xcrun', ['stapler', 'staple', bundle.app], INHERIT)
 }
 
 /** The updater payload must come from the re-signed app, so Tauri cannot create it. */
-async function createUpdaterArchive(bundle: Bundle, keyEnv: NodeJS.ProcessEnv): Promise<void> {
+async function createUpdaterArchive(bundle: Bundle): Promise<void> {
   rmSync(`${bundle.updaterArchive}.sig`, { force: true })
   const tarArgs = ['-czf', bundle.updaterArchive, '-C', dirname(bundle.app), basename(bundle.app)]
-  await exec('tar', tarArgs)
-  await tauri(['signer', 'sign', bundle.updaterArchive], keyEnv)
+  await exec('tar', tarArgs, INHERIT)
+  // An unset password makes the signer prompt.
+  const password = process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? ''
+  await tauri(['signer', 'sign', bundle.updaterArchive], {
+    TAURI_SIGNING_PRIVATE_KEY_PASSWORD: password,
+  })
 }
 
 /**
@@ -320,17 +320,18 @@ async function createDmg(bundle: Bundle, signer: Signer, tempDir: string): Promi
   const stagingDir = join(tempDir, 'dmg')
   const writableDmg = join(tempDir, 'writable.dmg')
   mkdirSync(stagingDir)
-  await exec('ditto', [bundle.app, join(stagingDir, basename(bundle.app))])
+  await exec('ditto', [bundle.app, join(stagingDir, basename(bundle.app))], INHERIT)
   symlinkSync('/Applications', join(stagingDir, 'Applications'))
 
-  const usedKb = Number((await run('du', ['-sk', stagingDir])).split('\t')[0])
+  const usage = await exec('du', ['-sk', stagingDir], { throwOnError: true })
+  const usedKb = Number(usage.stdout.split('\t')[0])
   const sizeMb = Math.ceil(usedKb / 1024) * 2 + 32
   const volumeName = basename(bundle.app, '.app')
   const createArgs = ['-volname', volumeName, '-srcfolder', stagingDir, '-format', 'UDRW']
-  await exec('hdiutil', ['create', ...createArgs, '-size', `${sizeMb}m`, writableDmg])
+  await exec('hdiutil', ['create', ...createArgs, '-size', `${sizeMb}m`, writableDmg], INHERIT)
   mkdirSync(dirname(bundle.dmg), { recursive: true })
   const convertArgs = ['-format', 'UDZO', '-imagekey', 'zlib-level=9', '-ov', '-o', bundle.dmg]
-  await exec('hdiutil', ['convert', writableDmg, ...convertArgs])
+  await exec('hdiutil', ['convert', writableDmg, ...convertArgs], INHERIT)
   await codesign(signer, [bundle.dmg])
 }
 
@@ -339,7 +340,7 @@ async function expectOutput(
   args: readonly string[],
   expected: readonly string[],
 ): Promise<void> {
-  const { exitCode, stdout, stderr } = await x(command, args, {
+  const { exitCode, stdout, stderr } = await exec(command, args, {
     nodeOptions: { stdio: ['ignore', 'pipe', 'pipe'] },
   })
   const output = `${stdout}${stderr}`
@@ -350,8 +351,8 @@ async function expectOutput(
 
 async function verifyProfileIdentity(bundle: Bundle): Promise<void> {
   if (!bundle.hasProfile) return
-  const xml = await run('codesign', ['--display', '--entitlements', '-', '--xml', bundle.app])
-  const signed = await readPlist(xml)
+  const display = ['--display', '--entitlements', '-', '--xml', bundle.app]
+  const signed = await readPlist((await exec('codesign', display, { throwOnError: true })).stdout)
   for (const [key, value] of Object.entries(await readProfileIdentity(bundle))) {
     if (signed[key] !== value) throw new Error(`the signed app lost the "${key}" entitlement`)
   }
@@ -408,23 +409,24 @@ async function build({
 }: BuildOptions): Promise<void> {
   const bundle = await resolveBundle(flavor, target)
   const identity = await findSigningIdentity()
-  const updaterKeyEnv = await resolveUpdaterKeyEnv()
-  if (artifactDir && !updaterKeyEnv)
-    throw new Error('no updater signing key: run `pnpm release:macos setup-updater`')
+  const hasUpdaterKey = Boolean(
+    process.env.TAURI_SIGNING_PRIVATE_KEY || process.env.TAURI_SIGNING_PRIVATE_KEY_PATH,
+  )
+  if (artifactDir && !hasUpdaterKey) throw new Error('TAURI_SIGNING_PRIVATE_KEY is not set')
 
   await withTempDir(async (tempDir) => {
-    const notaryArgs = shouldNotarize ? await resolveNotaryArgs(identity, tempDir) : null
+    const notaryArgs = shouldNotarize ? resolveNotaryArgs(identity, tempDir) : null
     await buildApp(flavor, target, identity)
     await withSigningKeychain(tempDir, async (keychain) => {
       const signer = { identity, keychain }
       await resignApp(bundle, signer, tempDir)
       if (notaryArgs) await notarizeApp(bundle, notaryArgs, tempDir)
-      if (updaterKeyEnv) await createUpdaterArchive(bundle, updaterKeyEnv)
+      if (hasUpdaterKey) await createUpdaterArchive(bundle)
       await createDmg(bundle, signer, tempDir)
     })
     if (notaryArgs) {
       await notarize(bundle.dmg, notaryArgs)
-      await exec('xcrun', ['stapler', 'staple', bundle.dmg])
+      await exec('xcrun', ['stapler', 'staple', bundle.dmg], INHERIT)
     }
   })
   await verify(bundle, shouldNotarize)
@@ -432,36 +434,8 @@ async function build({
   log(`done: ${bundle.dmg}`)
 }
 
-async function setup(): Promise<void> {
-  const readline = createInterface({ input: process.stdin, output: process.stdout })
-  const account = (await readline.question('Apple ID email: ')).trim()
-  readline.close()
-  console.log('Paste the app-specific password (https://account.apple.com) when prompted:')
-  await storeAppleId(account)
-}
-
-/**
- * Installed apps verify every update against the committed public key, so a
- * new key only reaches them through a release signed with the old one.
- */
-async function setupUpdater(): Promise<void> {
-  if (await keychainPassword(UPDATER_KEYCHAIN_SERVICE)) {
-    throw new Error(`keychain item "${UPDATER_KEYCHAIN_SERVICE}" already exists`)
-  }
-  await withTempDir(async (tempDir) => {
-    const keyPath = join(tempDir, 'updater.key')
-    await tauri(['signer', 'generate', '--write-keys', keyPath, '--password', '', '--ci'])
-    const privateKey = readFileSync(keyPath).toString('base64')
-    const item = ['-U', '-s', UPDATER_KEYCHAIN_SERVICE, '-a', 'updater', '-w', privateKey]
-    await run('security', ['add-generic-password', ...item])
-    log('public key for plugins.updater.pubkey in tauri.conf.json:')
-    console.log(readFileSync(`${keyPath}.pub`, 'utf8').trim())
-  })
-}
-
 async function main(): Promise<void> {
-  const { values, positionals } = parseArgs({
-    allowPositionals: true,
+  const { values } = parseArgs({
     options: {
       flavor: { type: 'string' },
       target: { type: 'string' },
@@ -469,17 +443,15 @@ async function main(): Promise<void> {
       'no-notarize': { type: 'boolean', default: false },
     },
   })
-  const command = positionals[0] ?? 'build'
-  if (command === 'setup') return await setup()
-  if (command === 'setup-updater') return await setupUpdater()
-
   const flavor = values.flavor ?? flavorOfVersion(readAppVersion())
   if (!isFlavor(flavor)) throw new Error(`unknown flavor "${flavor}"`)
-  const target = values.target ?? (await run('rustc', ['--print', 'host-tuple']))
-  const notarize = !values['no-notarize']
-  if (command === 'verify') return await verify(await resolveBundle(flavor, target), notarize)
-  if (command !== 'build') throw new Error(`unknown command "${command}"`)
-  await build({ flavor, target, notarize, artifactDir: values['artifact-dir'] })
+  const host = await exec('rustc', ['--print', 'host-tuple'], { throwOnError: true })
+  await build({
+    flavor,
+    target: values.target ?? host.stdout.trim(),
+    notarize: !values['no-notarize'],
+    artifactDir: values['artifact-dir'],
+  })
 }
 
-await runMain(main) // FIXME: just call main directly
+await main()

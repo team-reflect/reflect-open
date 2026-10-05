@@ -184,7 +184,7 @@ app can refresh its own installs without ever overwriting a hand-edited one
   `expected.json` from the real core pipeline, the Rust tests assert against
   it, so neither side can change without the other following in the same PR.
   Don't grow the surface.
-- The sidecar is staged by `apps/desktop/scripts/build-sidecar.mjs` into
+- The sidecar is staged by `apps/desktop/scripts/build-sidecar.ts` into
   `apps/desktop/src-tauri/binaries/` (gitignored), which Tauri's
   `bundle.externalBin` (desktop platform overlay configs) picks up. tauri-build
   requires that file to exist before the desktop crate compiles — `pnpm tauri

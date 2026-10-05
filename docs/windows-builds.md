@@ -9,7 +9,7 @@ listed on any GitHub release: the only way to get it is from GitHub Actions.
 2. Open the newest successful run (releases trigger one automatically; anyone
    with write access can also start one with **Run workflow**).
 3. Download the `reflect-windows-x64` artifact and unzip it. It contains the
-   NSIS installer (`*-setup.exe`) plus a `windows-x64.json` metadata file.
+   NSIS installer (`*-setup.exe`).
 
 Artifacts expire after 90 days.
 

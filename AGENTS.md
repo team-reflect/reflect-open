@@ -141,7 +141,7 @@ reflect-open/
 │   │   │   ├── icons/                   # App icons for desktop/mobile bundles
 │   │   │   ├── gen/                     # Generated schemas + platform projects (no hand-edits)
 │   │   │   └── ios.project.yml          # iOS XcodeGen template
-│   │   ├── scripts/        # build-sidecar.mjs (stages the reflect CLI for bundling)
+│   │   ├── scripts/        # build-sidecar.ts (stages the sidecars), release-*.ts
 │   │   ├── dist/           # Vite build output (frontendDist in tauri.conf.json)
 │   │   └── public/         # Static assets served by Vite
 │   ├── cli/                # `reflect` — self-contained Rust read/discovery CLI (see docs/cli.md)
@@ -196,7 +196,6 @@ pnpm tauri:dev        # `pnpm tauri dev` with the dev overlay → the "Reflect D
 pnpm build            # turbo build pipeline → apps/desktop/dist/
 pnpm tauri build      # Native app bundle, incl. the reflect CLI sidecar
 pnpm release:macos    # Signed + notarized macOS build for distribution (docs/macos-distribution.md)
-pnpm release:macos publish  # The above, then fill and undraft the release-please draft release
 pnpm tauri:ios:dev "iPhone 17 Pro"  # Run the Tauri iOS target in the simulator (docs/contributing/mobile-simulator.md)
 pnpm release:ios preflight --build-number=123  # Check iOS/TestFlight signing, App Store Connect app record, and upload auth
 pnpm release:ios testflight --build-number=123 --wait  # Build and upload the iOS app to TestFlight
@@ -226,8 +225,8 @@ existing IPA with `pnpm release:ios upload --ipa=<path> --wait`.
 The iOS bundle identifier is `app.reflect.ios`, intentionally separate from the
 old Capacitor TestFlight app (`app.reflect.ReflectMobile`). The release helper
 verifies the IPA bundle identifier and `ITSAppUsesNonExemptEncryption=false`
-before upload. See `docs/ios-testflight.md` for App Store Connect setup, local
-keychain fallback (`reflect-notary`), API key CI secrets, and troubleshooting.
+before upload. See `docs/ios-testflight.md` for App Store Connect setup, API key
+CI secrets, and troubleshooting.
 
 # Code Conventions
 
