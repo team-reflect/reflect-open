@@ -4,7 +4,7 @@
 //   pnpm release:ios preflight    Check the tools, credentials, and app record
 //   pnpm release:ios testflight   Build, then upload
 //   pnpm release:ios upload       Upload an existing IPA
-//   pnpm release:ios validate     Validate an existing IPA
+//   pnpm release:ios validate     Validate an existing IPA // FIXME: remove any scripts that do not use in GitHub Actions. Apply this rule to all scripts in apps/desktop/scripts/*.ts, not only release-ios.ts
 //
 //   --build-number=<digits>   Default: BUILD_NUMBER, else a UTC timestamp
 //   --export-method=<name>    Default: app-store-connect
