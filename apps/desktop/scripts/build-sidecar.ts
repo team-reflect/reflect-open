@@ -4,13 +4,12 @@
 import { copyFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { exec } from 'tinyexec'
-import { getHostTriple, log, ROOT_DIR, TAURI_SRC_DIR } from './helpers.ts'
+import { getHostTriple, INHERIT, log, TARGET_DIR, TAURI_SRC_DIR } from './helpers.ts'
 
 const SIDECARS = [
   { crate: 'reflect-cli', binary: 'reflect' },
   { crate: 'reflect-capture-host', binary: 'reflect-capture-host' },
 ]
-const INHERIT = { throwOnError: true, nodeOptions: { cwd: ROOT_DIR, stdio: 'inherit' } } as const
 
 async function main(): Promise<void> {
   const platform = process.env.TAURI_ENV_PLATFORM
@@ -30,7 +29,7 @@ async function main(): Promise<void> {
   mkdirSync(binariesDir, { recursive: true })
   for (const { binary } of SIDECARS) {
     const staged = join(binariesDir, `${binary}-${triple}${extension}`)
-    copyFileSync(join(ROOT_DIR, 'target', triple, 'release', `${binary}${extension}`), staged)
+    copyFileSync(join(TARGET_DIR, triple, 'release', `${binary}${extension}`), staged)
     log(`staged ${staged}`)
   }
 }

@@ -5,14 +5,7 @@
 import { copyFileSync, mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import {
-  getCargoTargetDir,
-  getFlavorConfigArgs,
-  resolveFlavor,
-  log,
-  readAppVersion,
-  runTauri,
-} from './helpers.ts'
+import { getFlavorConfigArgs, log, runTauri, TARGET_DIR } from './helpers.ts'
 
 const TARGET = 'x86_64-pc-windows-msvc'
 
@@ -20,12 +13,10 @@ async function main(): Promise<void> {
   const { values } = parseArgs({
     options: { 'artifact-dir': { type: 'string' } },
   })
-  const flavor = resolveFlavor(readAppVersion())
-
   // NSIS only: WiX rejects prerelease versions such as 0.11.0-beta.
-  await runTauri(['build', '--target', TARGET, '--bundles', 'nsis', ...getFlavorConfigArgs(flavor)])
+  await runTauri(['build', '--target', TARGET, '--bundles', 'nsis', ...getFlavorConfigArgs()])
 
-  const bundleDir = join(await getCargoTargetDir(), TARGET, 'release', 'bundle', 'nsis')
+  const bundleDir = join(TARGET_DIR, TARGET, 'release', 'bundle', 'nsis')
   const installers = readdirSync(bundleDir).filter((name) => name.endsWith('-setup.exe'))
   const [installer] = installers
   if (!installer || installers.length > 1) {

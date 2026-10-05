@@ -3,24 +3,32 @@
 //   pnpm release:ios preflight    Check the tools, credentials, and app record
 //   pnpm release:ios testflight   Build, check, then upload
 //
-//   --build-number=<digits>   Default: BUILD_NUMBER, else a UTC timestamp
+//   --build-number=<digits>   Required
 //   --export-method=<name>    Default: app-store-connect
 //   --wait                    Wait for App Store Connect processing
 
-import { existsSync, globSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { exec } from 'tinyexec'
 import { z } from 'zod'
-import { APP_DIR, log, resolveApiKey, runTauri, TAURI_SRC_DIR, runWithTempDir } from './helpers.ts'
+import {
+  APP_DIR,
+  INHERIT,
+  log,
+  resolveApiKey,
+  runTauri,
+  runWithTempDir,
+  TAURI_SRC_DIR,
+} from './helpers.ts'
 
-const INHERIT = { throwOnError: true, nodeOptions: { stdio: 'inherit' } } as const
 const BUNDLE_IDENTIFIER = 'app.reflect.ios'
 const APP_GROUP = 'group.app.reflect'
 const SENTRY_DSN_PATTERN =
   /^https:\/\/[0-9a-f]{32}@o463484\.ingest\.us\.sentry\.io\/4511705649971200$/
 const BUILD_DIR = join(TAURI_SRC_DIR, 'gen', 'apple', 'build')
 const ARCHIVE_PATH = join(BUILD_DIR, 'reflect-open_iOS.xcarchive')
+const IPA_PATH = join(BUILD_DIR, 'arm64', 'Reflect.ipa')
 
 const APP_BINARY_PATH = join(ARCHIVE_PATH, 'Products', 'Applications', 'Reflect.app', 'Reflect')
 const DSYM_BINARY_PATH = join(
@@ -41,19 +49,18 @@ interface Credentials {
 interface Options {
   readonly buildNumber: string
   readonly exportMethod: string
-  readonly wait: boolean
 }
 
 /** The App Store Connect API key, as altool arguments and as the environment Tauri reads. */
 function resolveCredentials(tempDir: string): Credentials {
   const apiKey = resolveApiKey(tempDir)
   if (!apiKey) {
-    throw new Error('APPLE_API_KEY and APPLE_API_ISSUER are not set')
+    throw new Error('the App Store Connect API key is not set')
   }
-  const keyFile = apiKey.keyPath ? ['--p8-file-path', apiKey.keyPath] : []
+  const { keyId, issuer, keyPath } = apiKey
   return {
-    altoolArgs: ['--api-key', apiKey.keyId, '--api-issuer', apiKey.issuer, ...keyFile],
-    env: apiKey.keyPath ? { APPLE_API_KEY_PATH: apiKey.keyPath } : {},
+    altoolArgs: ['--api-key', keyId, '--api-issuer', issuer, '--p8-file-path', keyPath],
+    env: { APPLE_API_KEY_PATH: keyPath },
   }
 }
 
@@ -63,15 +70,6 @@ function assertSentryDsn(): void {
   if (dsn && !SENTRY_DSN_PATTERN.test(dsn)) {
     throw new Error('VITE_SENTRY_DSN is not the production Reflect Sentry project')
   }
-}
-
-function findNewestIpa(): string {
-  const ipas = globSync('**/*.ipa', { cwd: BUILD_DIR }).map((path) => join(BUILD_DIR, path))
-  const newest = ipas.toSorted((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)[0]
-  if (!newest) {
-    throw new Error(`no .ipa under ${BUILD_DIR}`)
-  }
-  return newest
 }
 
 async function readInfoValue(app: string, key: string): Promise<string> {
@@ -98,9 +96,9 @@ async function assertAppexEntitlements(app: string): Promise<void> {
   }
 }
 
-async function assertIpa(ipa: string): Promise<void> {
+async function assertIpa(): Promise<void> {
   await runWithTempDir(async (tempDir) => {
-    await exec('unzip', ['-q', ipa, 'Payload/*', '-d', tempDir], { throwOnError: true })
+    await exec('unzip', ['-q', IPA_PATH, 'Payload/*', '-d', tempDir], { throwOnError: true })
     const payloadDir = join(tempDir, 'Payload')
     const appName = readdirSync(payloadDir).find((name) => name.endsWith('.app'))
     if (!appName) {
@@ -142,35 +140,26 @@ async function assertArchiveSymbols(): Promise<void> {
 }
 
 async function uploadDebugFiles(): Promise<void> {
-  if (!process.env.SENTRY_AUTH_TOKEN) {
-    return log('SENTRY_AUTH_TOKEN is not set, skipping dSYM upload')
-  }
   const project = ['--org', 'reflect-64', '--project', 'reflect-open']
   const upload = ['--type', 'dsym', '--no-sources', '--wait-for', '60', ARCHIVE_PATH]
   const sentryCli = join(APP_DIR, 'node_modules', '.bin', 'sentry-cli')
-  await exec(sentryCli, ['debug-files', 'upload', ...project, ...upload], {
-    throwOnError: true,
-    nodeOptions: { cwd: APP_DIR, stdio: 'inherit' },
-  })
+  await exec(sentryCli, ['debug-files', 'upload', ...project, ...upload], INHERIT)
 }
 
 async function build(
   { buildNumber, exportMethod }: Options,
   credentials: Credentials,
-): Promise<string> {
+): Promise<void> {
   const config = JSON.stringify({ bundle: { iOS: { bundleVersion: buildNumber } } })
   await runTauri(['ios', 'build', '--export-method', exportMethod, '--ci', '--config', config], {
     // Without line tables the dSYM cannot symbolicate Rust frames.
-    CARGO_PROFILE_RELEASE_DEBUG: process.env.CARGO_PROFILE_RELEASE_DEBUG ?? 'line-tables-only',
-    CI: 'true',
+    CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only',
     ...credentials.env,
   })
-  const ipa = findNewestIpa()
-  await assertIpa(ipa)
+  await assertIpa()
   await assertArchiveSymbols()
   await uploadDebugFiles()
-  log(`built ${ipa} (build ${buildNumber})`)
-  return ipa
+  log(`built ${IPA_PATH} (build ${buildNumber})`)
 }
 
 async function runAltool(args: readonly string[], credentials: Credentials): Promise<void> {
@@ -179,11 +168,6 @@ async function runAltool(args: readonly string[], credentials: Credentials): Pro
     throwOnError: true,
     nodeOptions: { env: credentials.env, stdio: 'inherit' },
   })
-}
-
-async function uploadIpa(ipa: string, wait: boolean, credentials: Credentials): Promise<void> {
-  const waitArgs = wait ? ['--wait'] : []
-  await runAltool(['--upload-package', ipa, '--show-progress', ...waitArgs], credentials)
 }
 
 /** Fails in seconds on problems that would otherwise surface after the long build. */
@@ -204,48 +188,33 @@ async function runPreflight(credentials: Credentials): Promise<void> {
   }
 }
 
-function createTimestampBuildNumber(): string {
-  return new Date().toISOString().replaceAll(/\D/g, '').slice(0, 12)
-}
-
-function parseOptions(): { command: string | undefined; options: Options } {
+async function main(): Promise<void> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
     options: {
-      'build-number': { type: 'string' },
+      'build-number': { type: 'string', default: '' },
       'export-method': { type: 'string', default: 'app-store-connect' },
       wait: { type: 'boolean', default: false },
     },
   })
-  const buildNumber =
-    values['build-number'] ?? process.env.BUILD_NUMBER ?? createTimestampBuildNumber()
+  const [command] = positionals
+  const buildNumber = values['build-number']
   if (!/^\d+$/.test(buildNumber)) {
     throw new Error(`invalid build number "${buildNumber}"`)
   }
-  const options = {
-    buildNumber,
-    exportMethod: values['export-method'],
-    wait: values.wait,
-  }
-  return { command: positionals[0], options }
-}
-
-async function main(): Promise<void> {
-  if (process.platform !== 'darwin') {
-    throw new Error('iOS releases only run on macOS')
-  }
-  const { command, options } = parseOptions()
-  if (command !== 'preflight' && command !== 'testflight') {
-    throw new Error(`unknown command "${command}"`)
-  }
   assertSentryDsn()
+
   await runWithTempDir(async (tempDir) => {
     const credentials = resolveCredentials(tempDir)
     if (command === 'preflight') {
       return await runPreflight(credentials)
     }
-    const ipa = await build(options, credentials)
-    await uploadIpa(ipa, options.wait, credentials)
+    if (command !== 'testflight') {
+      throw new Error(`unknown command "${command}"`)
+    }
+    await build({ buildNumber, exportMethod: values['export-method'] }, credentials)
+    const waitArgs = values.wait ? ['--wait'] : []
+    await runAltool(['--upload-package', IPA_PATH, '--show-progress', ...waitArgs], credentials)
   })
 }
 

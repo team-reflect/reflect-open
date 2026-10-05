@@ -3,8 +3,8 @@
 How to build Reflect's Tauri iOS target and upload it to TestFlight.
 
 ```bash
-pnpm release:ios preflight
-pnpm release:ios testflight --wait
+pnpm release:ios preflight --build-number=<digits>
+pnpm release:ios testflight --build-number=<digits> --wait
 ```
 
 The helper lives at `apps/desktop/scripts/release-ios.ts` and is exposed as
@@ -51,10 +51,8 @@ workflow runs.
 
 4. **A monotonically increasing build number.** TestFlight rejects duplicate
    `CFBundleVersion` values for the same marketing version. The GitHub Action
-   always generates a UTC timestamp in `YYYYMMDDHHmm` format. Local `preflight`
-   and `testflight` commands generate the same timestamp when `--build-number`
-   and `BUILD_NUMBER` are omitted. `--build-number=<number>` exists only as a
-   local debugging override. Do not use `github.run_number` for TestFlight
+   always generates a UTC timestamp in `YYYYMMDDHHmm` format and passes it as
+   `--build-number`, which the helper requires. Do not use `github.run_number` for TestFlight
    builds: a lower `CFBundleVersion` can upload successfully while TestFlight
    still appears to show the previous timestamp build as the latest.
 
@@ -64,7 +62,7 @@ workflow runs.
 ## Commands
 
 ```bash
-pnpm release:ios preflight
+pnpm release:ios preflight --build-number=<digits>
 ```
 
 Checks Xcode, the build number, and the API key before spending time on the native
@@ -72,14 +70,13 @@ archive. It also verifies that App Store Connect has a separate app record for
 `app.reflect.ios`.
 
 ```bash
-pnpm release:ios testflight --wait
+pnpm release:ios testflight --build-number=<digits> --wait
 ```
 
 Runs `tauri ios build --export-method app-store-connect --ci` with the App Store
 Connect API key. The build number is merged into the Tauri config as
-`bundle.iOS.bundleVersion`; if `--build-number` and `BUILD_NUMBER` are both omitted,
-the helper generates a UTC timestamp. The IPA lands under
-`apps/desktop/src-tauri/gen/apple/build/`. Release builds retain Rust line
+`bundle.iOS.bundleVersion`. The IPA lands at
+`apps/desktop/src-tauri/gen/apple/build/arm64/Reflect.ipa`. Release builds retain Rust line
 tables so Xcode can produce a dSYM that symbolicates native frames. The helper
 requires the current archive's main dSYM, verifies its UUID against the archived
 executable, and asserts the native diagnostics entry point is linked into the

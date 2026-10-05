@@ -23,6 +23,9 @@ happens in `.github/workflows/release-app.yml`.
    security find-identity -v -p codesigning
    ```
 
+   Export the full identity string as `APPLE_SIGNING_IDENTITY`. The script does not
+   search the keychain for it.
+
 2. **Notarization credentials** in the environment. Either an App Store Connect API key
    (`APPLE_API_KEY`, `APPLE_API_ISSUER`, and `APPLE_API_KEY_PATH` or
    `APPLE_API_KEY_CONTENT`), or an Apple ID on the team with an app-specific password
@@ -53,8 +56,8 @@ can still build unsigned bundles with plain `pnpm tauri build`.
 
 ## What `pnpm release:macos` does
 
-1. Auto-detects the Developer ID identity from the keychain and derives the team ID.
-2. Loads notarization credentials (keychain item, or environment variables — see
+1. Reads the Developer ID identity from `APPLE_SIGNING_IDENTITY`.
+2. Loads notarization credentials from environment variables (see
    [Releasing from CI](#releasing-from-ci) below).
 3. Runs `pnpm tauri build --target <target> --bundles app`, which stages the `reflect`
    CLI sidecar for that target and signs the app bundle. The release helper then
@@ -87,7 +90,6 @@ Bundles land under `target/<target-triple>/release/bundle/`, for example
 ```bash
 pnpm release:macos                 # build + notarize + verify
 pnpm release:macos --target=x86_64-apple-darwin  # the same for Intel
-pnpm release:macos --flavor=beta   # build a specific flavor: stable | beta | dev
 pnpm release:macos --no-notarize   # signed-only build (runs locally; Gatekeeper rejects it elsewhere)
 pnpm release:macos --artifact-dir=<dir>  # also copy the release assets to <dir>
 ```
@@ -292,7 +294,7 @@ Local builds:
 pnpm tauri:dev                                   # run Reflect Dev (green), isolated identifier
 pnpm tauri:build:dev                             # bundle Reflect Dev
 pnpm tauri:build:beta                            # bundle Reflect Beta locally (unsigned)
-pnpm release:macos --flavor=beta --no-notarize   # signed-only beta, for local checks
+pnpm release:macos --no-notarize                 # signed-only build of the version's flavor
 ```
 
 Because GitHub rewrites spaces in uploaded asset names to dots, the updater manifest URL
@@ -348,8 +350,7 @@ Notes:
   `APPLE_PASSWORD` (an app-specific password), plus `APPLE_TEAM_ID` if the signing
   identity doesn't end in `(TEAMID)`.
 - Leave `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` unset: the key has no password, GitHub
-  rejects empty-string secrets, and the workflow defaults it to empty. (Locally,
-  `TAURI_SIGNING_PRIVATE_KEY_PATH` also works in place of the key content.)
+  rejects empty-string secrets, and the workflow defaults it to empty.
 - No PAT is needed — the release is created with the workflow's own `GITHUB_TOKEN`.
 
 The workflow verifies the secrets before building, so a misconfigured runner fails in
@@ -359,8 +360,8 @@ on the runner keychain setup.
 
 ## Troubleshooting
 
-- **`no "Developer ID Application" certificate found`** — the cert isn't in your *login*
-  keychain, or it's the wrong type. An invalid/incomplete cert won't show up in
+- **`codesign` cannot find the identity**: the cert isn't in your *login* keychain, or
+  it's the wrong type. An invalid/incomplete cert won't show up in
   `security find-identity` at all.
 - **Notarization fails (`status: Invalid`)** — the script automatically prints the notary
   log, which lists each offending file. Common cause: a binary that wasn't signed with

@@ -2,10 +2,9 @@
 //
 //   pnpm release:macos [flags]
 //
-//   --flavor=<stable|beta|dev>   Default: from the version
-//   --target=<triple>            Default: the host triple
-//   --artifact-dir=<path>        Copy the release assets there after the build
-//   --no-notarize                Signed-only build
+//   --target=<triple>       Default: the host triple
+//   --artifact-dir=<path>   Copy the release assets there after the build
+//   --no-notarize           Signed-only build, for local runs without Apple credentials
 
 import { randomBytes } from 'node:crypto'
 import {
@@ -19,23 +18,21 @@ import {
 } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
+import { apply as applyMergePatch } from 'tiny-merge-patch'
 import { exec } from 'tinyexec'
 import { z } from 'zod'
 import {
-  getCargoTargetDir,
   getFlavorConfigArgs,
+  getFlavorOverlay,
   getHostTriple,
-  resolveFlavor,
-  isFlavor,
+  INHERIT,
   log,
   readAppVersion,
-  readTauriConfig,
   resolveApiKey,
-  resolveAppleId,
   runTauri,
-  TAURI_SRC_DIR,
   runWithTempDir,
-  type Flavor,
+  TARGET_DIR,
+  TAURI_SRC_DIR,
 } from './helpers.ts'
 
 const INTEL_TARGET = 'x86_64-apple-darwin'
@@ -50,7 +47,17 @@ const PROFILE_IDENTITY_KEYS = [
   'com.apple.developer.team-identifier',
 ]
 const PlistSchema = z.record(z.string(), z.unknown())
-const INHERIT = { throwOnError: true, nodeOptions: { stdio: 'inherit' } } as const
+const TauriConfigSchema = z.object({
+  productName: z.string(),
+  identifier: z.string(),
+  bundle: z.object({
+    externalBin: z.array(z.string()),
+    macOS: z.object({
+      entitlements: z.string(),
+      files: z.record(z.string(), z.string()).default({}),
+    }),
+  }),
+})
 
 interface Bundle {
   readonly target: string
@@ -72,63 +79,53 @@ interface Signer {
   readonly keychain: string | null
 }
 
-async function resolveBundle(flavor: Flavor, target: string): Promise<Bundle> {
+/** Resolves the config the way `tauri build` does: base, then platform file, then flavor overlay. */
+function readTauriConfig(): z.infer<typeof TauriConfigSchema> {
+  let config: unknown = {}
+  for (const file of ['tauri.conf.json', 'tauri.macos.conf.json', getFlavorOverlay()]) {
+    if (file) {
+      const patch: unknown = JSON.parse(readFileSync(join(TAURI_SRC_DIR, file), 'utf8'))
+      config = applyMergePatch(config, patch)
+    }
+  }
+  return TauriConfigSchema.parse(config)
+}
+
+function resolveBundle(target: string): Bundle {
   const arch = ARCHS[target]
   if (!arch) {
     throw new Error(`unsupported target "${target}"`)
   }
-  const config = readTauriConfig('macos', flavor)
-  const { entitlements, files } = config.bundle.macOS ?? {}
-  if (!entitlements) {
-    throw new Error(`flavor "${flavor}" has no bundle.macOS.entitlements`)
-  }
+  const { productName, identifier, bundle } = readTauriConfig()
   const version = readAppVersion()
-  const bundleDir = join(await getCargoTargetDir(), target, 'release', 'bundle')
-  const app = join(bundleDir, 'macos', `${config.productName}.app`)
+  const bundleDir = join(TARGET_DIR, target, 'release', 'bundle')
+  const app = join(bundleDir, 'macos', `${productName}.app`)
   return {
     target,
     arch,
-    identifier: config.identifier,
-    assetName: config.productName.replaceAll(' ', '.'),
+    identifier,
+    assetName: productName.replaceAll(' ', '.'),
     version,
-    entitlements: join(TAURI_SRC_DIR, entitlements),
-    hasProfile: files?.['embedded.provisionprofile'] !== undefined,
+    entitlements: join(TAURI_SRC_DIR, bundle.macOS.entitlements),
+    hasProfile: 'embedded.provisionprofile' in bundle.macOS.files,
     app,
-    sidecars: config.bundle.externalBin.map((path) =>
-      join(app, 'Contents', 'MacOS', basename(path)),
-    ),
-    dmg: join(bundleDir, 'dmg', `${config.productName}_${version}_${arch}.dmg`),
+    sidecars: bundle.externalBin.map((path) => join(app, 'Contents', 'MacOS', basename(path))),
+    dmg: join(bundleDir, 'dmg', `${productName}_${version}_${arch}.dmg`),
     updaterArchive: `${app}.tar.gz`,
   }
 }
 
-async function findSigningIdentity(): Promise<string> {
-  if (process.env.APPLE_SIGNING_IDENTITY) {
-    return process.env.APPLE_SIGNING_IDENTITY
-  }
-  const { stdout } = await exec('security', ['find-identity', '-v', '-p', 'codesigning'], {
-    throwOnError: true,
-  })
-  const identity = /"(Developer ID Application: [^"]+)"/.exec(stdout)?.[1]
-  if (!identity) {
-    throw new Error('no "Developer ID Application" certificate in the keychain')
-  }
-  return identity
-}
-
 function resolveNotaryArgs(identity: string, tempDir: string): string[] {
   const apiKey = resolveApiKey(tempDir)
-  if (apiKey?.keyPath) {
+  if (apiKey) {
     return ['--key', apiKey.keyPath, '--key-id', apiKey.keyId, '--issuer', apiKey.issuer]
   }
-  const appleId = resolveAppleId()
+  const { APPLE_ID, APPLE_PASSWORD } = process.env
   const teamId = process.env.APPLE_TEAM_ID ?? /\(([0-9A-Z]{10})\)$/.exec(identity)?.[1]
-  if (!appleId || !teamId) {
-    throw new Error(
-      'no notarization credentials: set APPLE_API_KEY or APPLE_ID, or pass --no-notarize',
-    )
+  if (!APPLE_ID || !APPLE_PASSWORD || !teamId) {
+    throw new Error('no notarization credentials: set APPLE_API_KEY or APPLE_ID')
   }
-  return ['--apple-id', appleId.account, '--password', appleId.password, '--team-id', teamId]
+  return ['--apple-id', APPLE_ID, '--password', APPLE_PASSWORD, '--team-id', teamId]
 }
 
 /** Upstream ONNX Runtime 1.24 dropped macOS x86_64, so Intel builds bundle the 1.23 dylib. */
@@ -155,8 +152,8 @@ async function stageIntelOnnxRuntime(): Promise<string> {
   return JSON.stringify({ bundle: { resources } })
 }
 
-async function buildApp(flavor: Flavor, target: string, identity: string): Promise<void> {
-  const args = ['build', '--target', target, '--bundles', 'app', ...getFlavorConfigArgs(flavor)]
+async function buildApp(target: string): Promise<void> {
+  const args = ['build', '--target', target, '--bundles', 'app', ...getFlavorConfigArgs()]
   if (target === INTEL_TARGET) {
     args.push('--config', await stageIntelOnnxRuntime())
   }
@@ -165,7 +162,7 @@ async function buildApp(flavor: Flavor, target: string, identity: string): Promi
   for (const name of ['APPLE_ID', 'APPLE_PASSWORD', 'APPLE_API_KEY', 'APPLE_API_ISSUER']) {
     delete process.env[name]
   }
-  await runTauri(args, { APPLE_SIGNING_IDENTITY: identity })
+  await runTauri(args)
 }
 
 /**
@@ -409,7 +406,6 @@ async function verify(bundle: Bundle, notarized: boolean): Promise<void> {
   for (const path of [bundle.app, bundle.dmg]) {
     await expectOutput('xcrun', ['stapler', 'validate', path], ['The validate action worked!'])
   }
-  log('verified')
 }
 
 /** Copies the release assets under the names they are published with. */
@@ -421,31 +417,28 @@ function exportArtifacts(bundle: Bundle, artifactDir: string): void {
   copyFileSync(`${bundle.updaterArchive}.sig`, join(artifactDir, `${archiveName}.sig`))
 }
 
-interface BuildOptions {
-  readonly flavor: Flavor
-  readonly target: string
-  readonly notarize: boolean
-  readonly artifactDir: string | undefined
-}
-
-async function build({
-  flavor,
-  target,
-  notarize: shouldNotarize,
-  artifactDir,
-}: BuildOptions): Promise<void> {
-  const bundle = await resolveBundle(flavor, target)
-  const identity = await findSigningIdentity()
-  const hasUpdaterKey = Boolean(
-    process.env.TAURI_SIGNING_PRIVATE_KEY || process.env.TAURI_SIGNING_PRIVATE_KEY_PATH,
-  )
+async function main(): Promise<void> {
+  const { values } = parseArgs({
+    options: {
+      target: { type: 'string' },
+      'artifact-dir': { type: 'string' },
+      'no-notarize': { type: 'boolean', default: false },
+    },
+  })
+  const artifactDir = values['artifact-dir']
+  const identity = process.env.APPLE_SIGNING_IDENTITY
+  if (!identity) {
+    throw new Error('APPLE_SIGNING_IDENTITY is not set')
+  }
+  const hasUpdaterKey = Boolean(process.env.TAURI_SIGNING_PRIVATE_KEY)
   if (artifactDir && !hasUpdaterKey) {
     throw new Error('TAURI_SIGNING_PRIVATE_KEY is not set')
   }
+  const bundle = resolveBundle(values.target ?? (await getHostTriple()))
 
   await runWithTempDir(async (tempDir) => {
-    const notaryArgs = shouldNotarize ? resolveNotaryArgs(identity, tempDir) : null
-    await buildApp(flavor, target, identity)
+    const notaryArgs = values['no-notarize'] ? null : resolveNotaryArgs(identity, tempDir)
+    await buildApp(bundle.target)
     await runWithSigningKeychain(tempDir, async (keychain) => {
       const signer = { identity, keychain }
       await resignApp(bundle, signer, tempDir)
@@ -461,33 +454,12 @@ async function build({
       await notarize(bundle.dmg, notaryArgs)
       await exec('xcrun', ['stapler', 'staple', bundle.dmg], INHERIT)
     }
+    await verify(bundle, notaryArgs !== null)
   })
-  await verify(bundle, shouldNotarize)
   if (artifactDir) {
     exportArtifacts(bundle, artifactDir)
   }
   log(`done: ${bundle.dmg}`)
-}
-
-async function main(): Promise<void> {
-  const { values } = parseArgs({
-    options: {
-      flavor: { type: 'string' },
-      target: { type: 'string' },
-      'artifact-dir': { type: 'string' },
-      'no-notarize': { type: 'boolean', default: false },
-    },
-  })
-  const flavor = values.flavor ?? resolveFlavor(readAppVersion())
-  if (!isFlavor(flavor)) {
-    throw new Error(`unknown flavor "${flavor}"`)
-  }
-  await build({
-    flavor,
-    target: values.target ?? (await getHostTriple()),
-    notarize: !values['no-notarize'],
-    artifactDir: values['artifact-dir'],
-  })
 }
 
 await main()
