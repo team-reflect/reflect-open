@@ -35,12 +35,12 @@
     "@types/node": "^24.0.0",
     "eslint": "^10.12.0",
     "nano-staged": "^1.0.2",
-    "oxfmt": "^0.70.0",
+    "oxfmt": "^0.71.0",
     "oxlint": "^1.82.0",
     "simple-git-hooks": "^2.14.0",
     "turbo": "^2.11.4",
     "typescript": "~6.0.3",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.3"
   },
   "simple-git-hooks": {
     "pre-commit": "./node_modules/.bin/nano-staged --allow-empty -u"
@@ -48,5 +48,5 @@
   "nano-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern"
   },
-  "packageManager": "pnpm@11.27.1"
+  "packageManager": "pnpm@11.28.4"
 }

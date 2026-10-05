@@ -28,12 +28,12 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@ai-sdk/provider": "^4.0.20",
+    "@ai-sdk/provider": "^4.0.21",
     "@ocavue/tsconfig": "^0.7.1",
-    "@vitest/browser-playwright": "^5.0.1",
+    "@vitest/browser-playwright": "^5.0.3",
     "playwright": "^1.63.0",
     "sqlite-vec": "^0.1.9",
     "typescript": "~6.0.3",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.3"
   }
 }
