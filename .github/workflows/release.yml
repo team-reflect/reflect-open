@@ -85,11 +85,12 @@ jobs:
       CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
 
   # Merging a Release PR makes its channel's pass above create a draft release
-  # and output its tag. Chain straight into the build/sign/publish pipeline
-  # with the tag resolved to its immutable commit once; the called workflows
-  # check out that SHA rather than resolving the tag name again.
+  # and output its tag. Chain straight into the builds with the tag resolved to
+  # its immutable commit once; the called workflows check out that SHA rather
+  # than resolving the tag name again. The builds upload into the draft, and
+  # the finalize jobs at the end publish it.
   publish-macos-stable:
-    name: Build and publish the stable release
+    name: Build the stable macOS release
     needs: release-please
     if: needs.release-please.outputs.stable_created == 'true'
     uses: ./.github/workflows/publish-macos.yml
@@ -99,7 +100,7 @@ jobs:
     secrets: inherit
 
   publish-macos-beta:
-    name: Build and publish the beta release
+    name: Build the beta macOS release
     needs: release-please
     if: needs.release-please.outputs.beta_created == 'true'
     uses: ./.github/workflows/publish-macos.yml

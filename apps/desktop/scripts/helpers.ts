@@ -5,7 +5,7 @@ import { exec } from 'tinyexec'
 import { z } from 'zod'
 
 export const APP_DIR = join(import.meta.dirname, '..')
-export const ROOT_DIR = join(APP_DIR, '..', '..')
+const ROOT_DIR = join(APP_DIR, '..', '..')
 export const TAURI_SRC_DIR = join(APP_DIR, 'src-tauri')
 export const TARGET_DIR = join(ROOT_DIR, 'target')
 

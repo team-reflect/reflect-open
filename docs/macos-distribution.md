@@ -234,20 +234,19 @@ from seeing any future updates, so a missing macOS signature fails the workflow.
 ## Beta releases
 
 Between stable releases, `version` in `apps/desktop/package.json` carries a
-prerelease suffix (e.g. `0.7.0-beta.3`), and `publish` turns that suffix into a
-GitHub **pre-release** automatically. `releases/latest` ignores pre-releases, so
+prerelease suffix (e.g. `0.7.0-beta.3`), and `publish-finalize.yml` turns that suffix
+into a GitHub **pre-release** automatically. `releases/latest` ignores pre-releases, so
 stable installs never see a beta.
 
-Beta builds use the dedicated `updater-beta` release instead. Every non-draft beta
-publish replaces its `latest.json`, `Reflect.Beta_aarch64.dmg`, and
-`Reflect.Beta_x86_64.dmg` assets with `--clobber`. The fixed DMG names give the README
-permanent fresh-install links, while the manifest still points installed apps at the
-immutable versioned updater archives. Draft beta releases do not update the moving
-assets. The DMGs are replaced before `latest.json`; if that downstream job fails, rerun
-only **Sync beta downloads and updater feed** to recover from the tagged release. The
-sync compares its source with the immutable published beta releases: same-version
-retries repair partial uploads, while a retry for an older release becomes a no-op
-rather than rolling the channel back.
+Beta builds use the dedicated `updater-beta` release instead. After it publishes a beta,
+`publish-finalize.yml` replaces the `latest.json`, `Reflect.Beta_aarch64.dmg`, and
+`Reflect.Beta_x86_64.dmg` assets of `updater-beta` with `--clobber`. The fixed DMG names
+give the README permanent fresh-install links, while the manifest still points installed
+apps at the immutable versioned updater archives. The DMGs are replaced before
+`latest.json`; if that step fails, run **Actions → Finalize release → Run workflow** with
+the tag to recover from the tagged release. The sync compares its source with the
+published beta releases: a same-version retry repairs partial uploads, while a retry for
+an older release becomes a no-op rather than rolling the channel back.
 
 The channel is picked by the version string alone: a `-beta.N` prerelease publishes to
 the beta feed, a plain version to the stable feed. The base `tauri.conf.json` points at
@@ -327,7 +326,7 @@ under **Settings → Secrets and variables → Actions**:
 | Secret | Value |
 | --- | --- |
 | `APPLE_SIGNING_IDENTITY` | Full identity string, e.g. `Developer ID Application: … (TEAMID)` — from `security find-identity -v -p codesigning` |
-| `APPLE_CERTIFICATE` | The Developer ID certificate + private key: export a `.p12` from Keychain Access, then `base64 -i certificate.p12`. Tauri imports it for the `.app`; the release helper imports it again into a temporary keychain for DMG signing |
+| `APPLE_CERTIFICATE` | The Developer ID certificate + private key: export a `.p12` from Keychain Access, then `base64 -i certificate.p12`. Tauri imports it for the `.app`; the release script imports it again into a temporary keychain for the re-signing and DMG signing |
 | `APPLE_CERTIFICATE_PASSWORD` | The password set on that `.p12` export |
 | `APPLE_API_KEY` | App Store Connect API key ID, for notarization (preferred in CI — not tied to a personal Apple ID) |
 | `APPLE_API_ISSUER` | The API key's issuer UUID |
@@ -341,7 +340,7 @@ Notes:
   identity doesn't end in `(TEAMID)`.
 - Leave `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` unset: the key has no password, GitHub
   rejects empty-string secrets, and the workflow defaults it to empty.
-- No PAT is needed — the release is created with the workflow's own `GITHUB_TOKEN`.
+- No PAT is needed — the release is published with the workflow's own `GITHUB_TOKEN`.
 
 The workflow verifies the secrets before building, so a misconfigured runner fails in
 seconds rather than after the build and notarization. See the

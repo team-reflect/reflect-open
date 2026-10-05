@@ -336,7 +336,7 @@ targets:
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     # The widget needs no capability of its own, but the release pipeline
-    # asserts every appex carries the App Group (release-ios.mjs), and the
+    # asserts every appex carries the App Group (release-ios.ts), and the
     # skip-codesign ad-hoc phase below must have entitlements to preserve —
     # exactly like ShareExtension (including the hand-maintained per-config
     # entitlement files; see the main target's comment).

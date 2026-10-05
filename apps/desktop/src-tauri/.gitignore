@@ -6,8 +6,8 @@
 # will have schema files for capabilities auto-completion
 /gen/schemas
 
-# Tauri sidecar staging (built by scripts/build-sidecar.mjs; never committed)
+# Tauri sidecar staging (built by scripts/build-sidecar.ts; never committed)
 /binaries
 
-# Release-only native runtime resources (downloaded by scripts/release-macos.mjs)
+# Release-only native runtime resources (downloaded by scripts/release-macos.ts)
 /resources/onnxruntime
