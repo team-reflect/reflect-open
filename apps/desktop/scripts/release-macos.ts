@@ -30,7 +30,6 @@ import {
   exec,
   flavorConfigArgs,
   flavorOfVersion,
-  hostTriple,
   isFlavor,
   keychainPassword,
   log,
@@ -40,7 +39,6 @@ import {
   resolveAppleId,
   run,
   runMain,
-  SIDECARS,
   storeAppleId,
   tauri,
   tauriDir,
@@ -72,6 +70,7 @@ interface Bundle {
   readonly entitlements: string
   readonly hasProfile: boolean
   readonly app: string
+  readonly sidecars: readonly string[]
   readonly dmg: string
   readonly updaterArchive: string
 }
@@ -99,6 +98,9 @@ async function resolveBundle(flavor: Flavor, target: string): Promise<Bundle> {
     entitlements: join(tauriDir, entitlements),
     hasProfile: files?.['embedded.provisionprofile'] !== undefined,
     app,
+    sidecars: config.bundle.externalBin.map((path) =>
+      join(app, 'Contents', 'MacOS', basename(path)),
+    ),
     dmg: join(bundleDir, 'dmg', `${config.productName}_${version}_${arch}.dmg`),
     updaterArchive: `${app}.tar.gz`,
   }
@@ -263,17 +265,13 @@ async function prepareEntitlements(bundle: Bundle, tempDir: string): Promise<str
   return path
 }
 
-function sidecarPaths(bundle: Bundle): string[] {
-  return SIDECARS.map((sidecar) => join(bundle.app, 'Contents', 'MacOS', sidecar.binary))
-}
-
 /**
  * Tauri signs the sidecars with the app's entitlements. The restricted iCloud
  * entitlements have no matching profile there, so the system kills them at
  * launch. Re-sign the sidecars without entitlements, then the app around them.
  */
 async function resignApp(bundle: Bundle, signer: Signer, tempDir: string): Promise<void> {
-  for (const sidecar of sidecarPaths(bundle)) {
+  for (const sidecar of bundle.sidecars) {
     await codesign(signer, ['--options', 'runtime', sidecar])
   }
   const entitlements = await prepareEntitlements(bundle, tempDir)
@@ -362,9 +360,9 @@ async function verifyProfileIdentity(bundle: Bundle): Promise<void> {
 /** A sidecar with a bad signature passes `codesign --verify` and dies at launch, so launch them. */
 async function verifySidecarsLaunch(bundle: Bundle): Promise<void> {
   if (bundle.target !== INTEL_TARGET && process.arch !== 'arm64') return
-  const [cli, captureHost] = sidecarPaths(bundle)
-  if (cli) await expectOutput(cli, ['--version'], ['reflect '])
-  if (captureHost) await expectOutput(captureHost, [], [])
+  for (const sidecar of bundle.sidecars) {
+    await expectOutput(sidecar, basename(sidecar) === 'reflect' ? ['--version'] : [], [])
+  }
 }
 
 async function verify(bundle: Bundle, notarized: boolean): Promise<void> {
@@ -477,7 +475,7 @@ async function main(): Promise<void> {
 
   const flavor = values.flavor ?? flavorOfVersion(readAppVersion())
   if (!isFlavor(flavor)) throw new Error(`unknown flavor "${flavor}"`)
-  const target = values.target ?? (await hostTriple())
+  const target = values.target ?? (await run('rustc', ['--print', 'host-tuple']))
   const notarize = !values['no-notarize']
   if (command === 'verify') return await verify(await resolveBundle(flavor, target), notarize)
   if (command !== 'build') throw new Error(`unknown command "${command}"`)

@@ -9,12 +9,6 @@ export const appDir = join(import.meta.dirname, '..')
 export const repoRoot = join(appDir, '..', '..')
 export const tauriDir = join(appDir, 'src-tauri')
 
-/** The sidecars listed as `externalBin` in the platform Tauri configs. */
-export const SIDECARS = [
-  { crate: 'reflect-cli', binary: 'reflect' },
-  { crate: 'reflect-capture-host', binary: 'reflect-capture-host' },
-] as const
-
 const STABLE_UPDATER_ENDPOINT =
   'https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json'
 const NOTARY_KEYCHAIN_SERVICE = 'reflect-notary'
@@ -145,6 +139,7 @@ const TauriConfigSchema = z.object({
   productName: z.string(),
   identifier: z.string(),
   bundle: z.object({
+    externalBin: z.array(z.string()).default([]),
     macOS: z
       .object({
         entitlements: z.string().optional(),
@@ -166,13 +161,6 @@ export function readTauriConfig(platform: 'macos' | 'windows', flavor: Flavor): 
     if (file) config = mergePatch(config, readJson(join(tauriDir, file)))
   }
   return TauriConfigSchema.parse(config)
-}
-
-/** The host target triple from rustc, which stays correct when Node runs under Rosetta. */
-export async function hostTriple(): Promise<string> {
-  const triple = /^host: (\S+)$/m.exec(await run('rustc', ['-vV']))?.[1]
-  if (!triple) throw new Error('could not read the host triple from `rustc -vV`')
-  return triple
 }
 
 /** The Cargo target directory of the workspace. */
