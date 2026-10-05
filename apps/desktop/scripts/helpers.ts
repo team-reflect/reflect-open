@@ -71,6 +71,7 @@ export function flavorOfVersion(version: string): Flavor {
 export function flavorConfigArgs(flavor: Flavor): string[] {
   const overlay = FLAVOR_OVERLAYS[flavor]
   if (overlay) return ['--config', join('src-tauri', overlay)]
+  // FIXME: just fix tauri*conf*.json to point to the correct feed directly, then remove this hack.
   const endpoints = { plugins: { updater: { endpoints: [STABLE_UPDATER_ENDPOINT] } } }
   return ['--config', JSON.stringify(endpoints)]
 }
