@@ -76,7 +76,7 @@ export function flavorConfigArgs(flavor: Flavor): string[] {
   return ['--config', JSON.stringify(endpoints)]
 }
 
-/** Applies an RFC 7396 JSON Merge Patch, the algorithm Tauri uses for `--config`. */
+/** Applies an RFC 7396 JSON Merge Patch, the algorithm Tauri uses for `--config`. */// FIXME: use a lib "tiny-merge-patch" instead of this homegrown version.
 function mergePatch(target: unknown, patch: unknown): unknown {
   if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) return patch
   const merged: Record<string, unknown> =
