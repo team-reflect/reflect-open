@@ -79,7 +79,7 @@ export async function withTempDir<Result>(
 }
 
 /** Runs a script entry point. A thrown error becomes a one-line message and exit code 1. */
-export async function runMain(main: () => Promise<void>): Promise<void> {
+export async function runMain(main: () => Promise<void>): Promise<void> { // FIXME: do not use `runMain`. Just call `main()` directly. we do not need to warp error in a one-line message.
   try {
     await main()
   } catch (error) {
