@@ -4,7 +4,7 @@
 // The Rust CI jobs run this file without `pnpm install`, so it must not import
 // npm packages.
 
-import { execFileSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'// FIXME: use `exec` from `tinyexec`
 import { copyFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
