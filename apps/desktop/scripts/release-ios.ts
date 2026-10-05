@@ -194,7 +194,7 @@ async function main(): Promise<void> {
     options: {
       'build-number': { type: 'string', default: '' },
       'export-method': { type: 'string', default: 'app-store-connect' },
-      wait: { type: 'boolean', default: false },
+      wait: { type: 'boolean', default: false }, // fixme: always enable wait
     },
   })
   const [command] = positionals
@@ -207,6 +207,7 @@ async function main(): Promise<void> {
   await runWithTempDir(async (tempDir) => {
     const credentials = resolveCredentials(tempDir)
     if (command === 'preflight') {
+      // FIXME: just remove the preflight command, it's not really useful and it duplicates the build step
       return await runPreflight(credentials)
     }
     if (command !== 'testflight') {

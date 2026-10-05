@@ -11,7 +11,8 @@ on:
         options:
           - app-store-connect
           - release-testing
-      wait_for_processing:
+
+      wait_for_processing: # FIXME: remove wait_for_processing input arg. always enable it
         description: Wait for App Store Connect processing before finishing.
         required: true
         type: boolean
@@ -30,7 +31,7 @@ on:
         required: false
         type: string
         default: app-store-connect
-      wait_for_processing:
+      wait_for_processing: # FIXME: remove wait_for_processing input arg. always enable it
         description: Wait for App Store Connect processing before finishing.
         required: false
         type: boolean
