@@ -11,6 +11,7 @@
     "postinstall": "node src-tauri/xcode-scripts/generate-xcode-env.mjs",
     "release:ios": "node scripts/release-ios.ts",
     "release:macos": "node scripts/release-macos.ts",
+    "release:manifest": "node scripts/release-manifest.ts",
     "release:windows": "node scripts/release-windows.ts",
     "test": "vitest run --config ../../vitest.config.ts --project browser --project node",
     "test:install": "playwright install chromium webkit",

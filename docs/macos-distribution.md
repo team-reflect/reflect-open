@@ -8,8 +8,8 @@ pnpm release:macos                 # signed + notarized build for this Mac's arc
 ```
 
 The helper lives at `apps/desktop/scripts/release-macos.ts` and is exposed as
-`pnpm release:macos` from the repo root. It only builds. Publishing to GitHub Releases
-happens in `.github/workflows/publish-macos.yml`.
+`pnpm release:macos` from the repo root. It only builds. `publish-macos.yml` uploads the
+assets into the draft release, and `publish-finalize.yml` publishes it.
 
 ## What you need
 
@@ -94,11 +94,10 @@ pnpm release:macos --no-notarize   # signed-only build (runs locally; Gatekeeper
 pnpm release:macos --artifact-dir=<dir>  # also copy the release assets to <dir>
 ```
 
-CI runs `--target=<triple> --artifact-dir=<dir>` once per architecture. The publish job
-of `publish-macos.yml` then downloads both artifact sets and publishes them with `gh`. A
-separate `sync-beta-feed` job refreshes the moving beta downloads after the tagged
-release is published, so that final step can be retried without rebuilding or
-republishing.
+CI runs `--target=<triple> --artifact-dir=<dir>` once per architecture and uploads the
+assets into the draft release. After the macOS and Windows builds finish,
+`publish-finalize.yml` writes `latest.json`, publishes the release, and refreshes the
+moving beta downloads. It can be run again by hand for one tag without rebuilding.
 
 ## Cutting a release (Release PRs)
 
@@ -199,42 +198,38 @@ a new cycle is tagged without a number (`v0.6.0-beta`, then `-beta.1`, `-beta.2`
 ### Manual fallback (no Release PR)
 
 For this exceptional recovery path, merge a PR that sets `version` in
-`apps/desktop/package.json`, then run
-**Actions → Release App → Run workflow** on that branch. The workflow derives the tag from
-the version, and publish creates the release (and its tag) itself via
-`gh release create`. Afterwards, sync that channel's manifest file with a follow-up PR
-so release-please continues from the right version.
+`apps/desktop/package.json` and create a draft release tagged `v<version>` at that
+commit. Run **Actions → Release App → Run workflow** on that commit to build and upload
+the assets, then **Actions → Finalize release → Run workflow** with the tag. Afterwards,
+sync that channel's manifest file with a follow-up PR so release-please continues from
+the right version.
 
 ## Publishing to GitHub Releases
 
-The publish job of `publish-macos.yml` takes the artifacts of both macOS targets
-(`aarch64-apple-darwin` for Apple Silicon and `x86_64-apple-darwin` for Intel) and
-publishes the release tagged `v<version>` (the `version` in
-`apps/desktop/package.json`): normally by filling and undrafting the draft release that
-release-please created when the Release PR merged, or, when no release exists, by
-creating one itself. The release carries two notarized DMGs, two
-updater archives (one per architecture, each with its `.sig`), and a single
-`latest.json` manifest with both `darwin-aarch64` and `darwin-x86_64` platform entries.
+Publishing has two parts.
+
+`publish-macos.yml` builds both macOS targets (`aarch64-apple-darwin` for Apple Silicon
+and `x86_64-apple-darwin` for Intel) and uploads their assets into the draft release
+tagged `v<version>` (the `version` in `apps/desktop/package.json`), which release-please
+created when the Release PR merged. The release carries two notarized DMGs and two
+updater archives (one per architecture, each with its `.sig`).
 Published DMGs use fixed names (`Reflect_aarch64.dmg` and `Reflect_x86_64.dmg`
 for stable) because the release tag already identifies the version. That keeps
 `releases/latest/download/<asset>` stable across releases. Updater archives remain
 versioned because each manifest points at an immutable release payload.
+
+`publish-finalize.yml` runs once the macOS and Windows builds have finished. Only the
+macOS build has to succeed. It runs `pnpm release:manifest --tag=<tag>`
+(`apps/desktop/scripts/release-manifest.ts`), which downloads the `.sig` files from the
+release, writes `latest.json` with one entry per platform (`darwin-aarch64`,
+`darwin-x86_64`, and `windows-x86_64` when a Windows signature exists), and uploads it.
+The workflow then appends the Mac download guide to the release notes, sets the
+pre-release and latest flags, and undrafts the release as its last step on the tagged
+release. Nothing is visible to users, and `releases/latest` does not move, until then.
 Stable installs poll `releases/latest/download/latest.json`; beta installs poll
 `releases/download/updater-beta/latest.json`, a moving feed release that points at the
-newest published beta. The build requires the updater key whenever it exports
-artifacts, and publish always attaches the manifest: a release without it would stop
-existing installs from seeing any future updates.
-
-The preflight job runs before the builds, so a doomed publish fails in seconds rather
-than after notarization:
-
-- a `v<version>` tag that already exists must point at the commit being built;
-- a `v<version>` release that is already published and carries artifacts fails the
-  preflight. Publishing again means bumping `version` in `apps/desktop/package.json`
-  (via a Release PR) first.
-
-Tick *draft* on a manual run to leave the release as a draft, then review and publish
-it from the GitHub UI.
+newest published beta. A release without the manifest would stop existing installs
+from seeing any future updates, so a missing macOS signature fails the workflow.
 
 ## Beta releases
 
@@ -309,26 +304,21 @@ Stable installs are unaffected (same identifier and the shipped icon).
 
 ## Releasing from CI
 
-`.github/workflows/publish-macos.yml` first runs the publish preflights, then builds two
-signed/notarized macOS artifacts in parallel:
+`.github/workflows/publish-macos.yml` builds two signed/notarized macOS artifacts in
+parallel:
 
 - Apple Silicon: `macos-26`, `--target=aarch64-apple-darwin`
 - Intel: `macos-26`, `--target=x86_64-apple-darwin`
 
 Each build job runs the same DMG notarization, Gatekeeper checks, and updater artifact
-signing as a local release, then uploads its artifacts to the workflow. A final publish
-job downloads both sets, writes the combined `latest.json`, and fills the release-please
-draft release: it keeps the changelog body, appends the Mac download chooser that maps
-Apple Silicon to `Reflect_aarch64.dmg` and Intel to `Reflect_x86_64.dmg` (with
-`Reflect.Beta` names for beta releases), and undrafts the release as its last step. The
-downstream beta-sync job then downloads the canonical DMGs and manifest from that
-tagged release before refreshing `updater-beta`. The workflow normally runs via
-`workflow_call` from
-`.github/workflows/release.yml` when a Release PR merges. The manual fallback is
-**Actions → Release App → Run workflow** (tick *draft* to review the release before
-publishing) on a branch whose `apps/desktop/package.json` version was already bumped by
-a merged PR; in that mode publish creates the release (and its tag) itself, with
-GitHub-generated notes.
+signing as a local release, then uploads its assets into the draft release.
+`.github/workflows/publish-finalize.yml` then writes the combined `latest.json`, keeps
+the changelog body, appends the Mac download chooser that maps Apple Silicon to
+`Reflect_aarch64.dmg` and Intel to `Reflect_x86_64.dmg` (with `Reflect.Beta` names for
+beta releases), and undrafts the release. For a beta it then copies the DMGs and the
+manifest from the tagged release to `updater-beta`. Both workflows normally run via
+`workflow_call` from `.github/workflows/release.yml` when a Release PR merges, and both
+can be started by hand to retry.
 
 The script reads all signing material from environment variables (exporting them
 works for local releases too); the workflow wires them from repository Actions secrets of the same names. Create these

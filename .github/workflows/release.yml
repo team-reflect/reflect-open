@@ -3,7 +3,7 @@ name: Release PR
 # Stable and beta Release PRs share master but use separate lifecycle labels
 # and head branches. A merged PR in one channel therefore cannot block the
 # other channel from refreshing its open PR. Beta versions use a prerelease
-# suffix (for example, X.Y.Z-beta or X.Y.Z-beta.N); publish-macos.yml derives the
+# suffix (for example, X.Y.Z-beta or X.Y.Z-beta.N); publish-finalize.yml derives the
 # prerelease/latest flags from that suffix.
 #
 # Everything runs on GITHUB_TOKEN. Tags created with that token do not trigger
@@ -149,3 +149,22 @@ jobs:
     uses: ./.github/workflows/publish-windows.yml
     with:
       commit: ${{ needs.release-please.outputs.beta_commit }}
+
+  # The builds only fill the draft release. Publishing waits for macOS and
+  # Windows to finish, but only macOS has to succeed: a Windows failure never
+  # blocks the release.
+  publish-finalize-stable:
+    name: Finalize the stable release
+    needs: [release-please, publish-macos-stable, publish-windows-stable]
+    if: ${{ !cancelled() && needs.publish-macos-stable.result == 'success' }}
+    uses: ./.github/workflows/publish-finalize.yml
+    with:
+      tag: ${{ needs.release-please.outputs.stable_tag }}
+
+  publish-finalize-beta:
+    name: Finalize the beta release
+    needs: [release-please, publish-macos-beta, publish-windows-beta]
+    if: ${{ !cancelled() && needs.publish-macos-beta.result == 'success' }}
+    uses: ./.github/workflows/publish-finalize.yml
+    with:
+      tag: ${{ needs.release-please.outputs.beta_tag }}

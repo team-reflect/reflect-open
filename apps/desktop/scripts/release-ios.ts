@@ -1,17 +1,14 @@
-// Builds the iOS app and uploads it to TestFlight. See docs/ios-testflight.md.
+// Builds the iOS app, checks it, and uploads it to TestFlight. See docs/ios-testflight.md.
 //
-//   pnpm release:ios preflight    Check the tools, credentials, and app record
-//   pnpm release:ios testflight   Build, check, then upload
+//   pnpm release:ios --build-number=<digits> [--export-method=<name>]
 //
 //   --build-number=<digits>   Required
 //   --export-method=<name>    Default: app-store-connect
-//   --wait                    Wait for App Store Connect processing
 
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { exec } from 'tinyexec'
-import { z } from 'zod'
 import {
   APP_DIR,
   INHERIT,
@@ -170,34 +167,13 @@ async function runAltool(args: readonly string[], credentials: Credentials): Pro
   })
 }
 
-/** Fails in seconds on problems that would otherwise surface after the long build. */
-async function runPreflight(credentials: Credentials): Promise<void> {
-  await exec('xcodebuild', ['-version'], INHERIT)
-  const listArgs = ['altool', '--list-apps', '--filter-bundle-id', BUNDLE_IDENTIFIER]
-  const allArgs = [...listArgs, ...credentials.altoolArgs, '--output-format', 'json']
-  const { stdout } = await exec('xcrun', allArgs, {
-    throwOnError: true,
-    nodeOptions: { env: credentials.env },
-  })
-  const json = stdout.slice(stdout.indexOf('['), stdout.lastIndexOf(']') + 1)
-  const apps = z.array(z.unknown()).parse(JSON.parse(json))
-  if (apps.length !== 1) {
-    throw new Error(
-      `expected one App Store Connect app for ${BUNDLE_IDENTIFIER}, found ${apps.length}`,
-    )
-  }
-}
-
 async function main(): Promise<void> {
-  const { values, positionals } = parseArgs({
-    allowPositionals: true,
+  const { values } = parseArgs({
     options: {
       'build-number': { type: 'string', default: '' },
       'export-method': { type: 'string', default: 'app-store-connect' },
-      wait: { type: 'boolean', default: false }, // fixme: always enable wait
     },
   })
-  const [command] = positionals
   const buildNumber = values['build-number']
   if (!/^\d+$/.test(buildNumber)) {
     throw new Error(`invalid build number "${buildNumber}"`)
@@ -206,16 +182,9 @@ async function main(): Promise<void> {
 
   await runWithTempDir(async (tempDir) => {
     const credentials = resolveCredentials(tempDir)
-    if (command === 'preflight') {
-      // FIXME: just remove the preflight command, it's not really useful and it duplicates the build step
-      return await runPreflight(credentials)
-    }
-    if (command !== 'testflight') {
-      throw new Error(`unknown command "${command}"`)
-    }
     await build({ buildNumber, exportMethod: values['export-method'] }, credentials)
-    const waitArgs = values.wait ? ['--wait'] : []
-    await runAltool(['--upload-package', IPA_PATH, '--show-progress', ...waitArgs], credentials)
+    // --wait blocks until App Store Connect has processed the build.
+    await runAltool(['--upload-package', IPA_PATH, '--show-progress', '--wait'], credentials)
   })
 }
 

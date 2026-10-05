@@ -3,13 +3,12 @@
 How to build Reflect's Tauri iOS target and upload it to TestFlight.
 
 ```bash
-pnpm release:ios preflight --build-number=<digits>
-pnpm release:ios testflight --build-number=<digits> --wait
+pnpm release:ios --build-number=<digits>
 ```
 
 The helper lives at `apps/desktop/scripts/release-ios.ts` and is exposed as
-`pnpm release:ios` from the repo root. It has the two commands that the TestFlight
-workflow runs.
+`pnpm release:ios` from the repo root. It does what the TestFlight workflow runs:
+build, check, upload.
 
 ## What You Need
 
@@ -62,15 +61,7 @@ workflow runs.
 ## Commands
 
 ```bash
-pnpm release:ios preflight --build-number=<digits>
-```
-
-Checks Xcode, the build number, and the API key before spending time on the native
-archive. It also verifies that App Store Connect has a separate app record for
-`app.reflect.ios`.
-
-```bash
-pnpm release:ios testflight --build-number=<digits> --wait
+pnpm release:ios --build-number=<digits>
 ```
 
 Runs `tauri ios build --export-method app-store-connect --ci` with the App Store
@@ -83,8 +74,8 @@ executable, and asserts the native diagnostics entry point is linked into the
 executable. When `SENTRY_AUTH_TOKEN` is set it uploads only that archive's
 native symbols, without source bundles. A `VITE_SENTRY_DSN` that is not the
 production project is a release error. The helper then uploads the IPA with
-`xcrun altool --upload-package` and optionally waits for App Store Connect
-processing to finish.
+`xcrun altool --upload-package --wait`, which returns after App Store Connect has
+processed the build.
 
 Pass `--export-method=release-testing` if App Store Connect or Xcode starts
 requiring the TestFlight-specific export method. The default remains
@@ -112,8 +103,7 @@ Configure these repository secrets:
 | `SENTRY_AUTH_TOKEN` | Build-only token allowed to upload releases, source maps, and debug files |
 
 The workflow does not accept a build-number input. Each run resolves one UTC
-timestamp build number, logs it, and passes the same value to both `preflight`
-and `testflight`. If you need a one-off custom value while debugging, run the
+timestamp build number, logs it, and passes it to the helper. If you need a one-off custom value while debugging, run the
 local package command with `--build-number=<number>` instead of changing the
 workflow.
 

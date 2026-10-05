@@ -149,8 +149,7 @@ pnpm tauri:ios:dev "iPhone 17 Pro"
 For TestFlight builds:
 
 ```bash
-pnpm release:ios preflight --build-number=123
-pnpm release:ios testflight --build-number=123 --wait
+pnpm release:ios --build-number=123
 ```
 
 ## Status

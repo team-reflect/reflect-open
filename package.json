@@ -20,6 +20,7 @@
     "tauri": "pnpm --filter @reflect/desktop tauri",
     "release:ios": "pnpm --filter @reflect/desktop release:ios",
     "release:macos": "pnpm --filter @reflect/desktop release:macos",
+    "release:manifest": "pnpm --filter @reflect/desktop release:manifest",
     "release:windows": "pnpm --filter @reflect/desktop release:windows",
     "tauri:dev": "pnpm --filter @reflect/desktop tauri:dev",
     "tauri:ios:dev": "pnpm --filter @reflect/desktop tauri:ios:dev",

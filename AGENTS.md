@@ -197,8 +197,7 @@ pnpm build            # turbo build pipeline → apps/desktop/dist/
 pnpm tauri build      # Native app bundle, incl. the reflect CLI sidecar
 pnpm release:macos    # Signed + notarized macOS build for distribution (docs/macos-distribution.md)
 pnpm tauri:ios:dev "iPhone 17 Pro"  # Run the Tauri iOS target in the simulator (docs/contributing/mobile-simulator.md)
-pnpm release:ios preflight --build-number=123  # Check iOS/TestFlight signing, App Store Connect app record, and upload auth
-pnpm release:ios testflight --build-number=123 --wait  # Build and upload the iOS app to TestFlight
+pnpm release:ios --build-number=123  # Build, check, and upload the iOS app to TestFlight
 ```
 
 **iOS simulator**
@@ -218,8 +217,7 @@ normalize generated project and plist files.
 
 Use `pnpm release:ios` for TestFlight work; do not hand-roll `tauri ios build`
 and `altool` unless debugging the helper itself. Start with
-`pnpm release:ios preflight --build-number=<number>`, then run
-`pnpm release:ios testflight --build-number=<number> --wait`.
+`pnpm release:ios --build-number=<number>`.
 
 The iOS bundle identifier is `app.reflect.ios`, intentionally separate from the
 old Capacitor TestFlight app (`app.reflect.ReflectMobile`). The release helper

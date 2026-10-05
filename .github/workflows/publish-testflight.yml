@@ -12,13 +12,8 @@ on:
           - app-store-connect
           - release-testing
 
-      wait_for_processing: # FIXME: remove wait_for_processing input arg. always enable it
-        description: Wait for App Store Connect processing before finishing.
-        required: true
-        type: boolean
-        default: true
   # Called by release.yml so every published release also ships to
-  # TestFlight. workflow_call has no choice type; release-ios.mjs validates
+  # TestFlight. workflow_call has no choice type; release-ios.ts passes
   # the export method.
   workflow_call:
     inputs:
@@ -31,11 +26,6 @@ on:
         required: false
         type: string
         default: app-store-connect
-      wait_for_processing: # FIXME: remove wait_for_processing input arg. always enable it
-        description: Wait for App Store Connect processing before finishing.
-        required: false
-        type: boolean
-        default: true
 
 # TestFlight uploads should be serialized so build numbers and App Store
 # Connect processing don't race each other. This also holds when the workflow
@@ -103,14 +93,7 @@ jobs:
           EXPORT_METHOD: ${{ inputs.export_method }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          WAIT_FLAG: ${{ inputs.wait_for_processing && '--wait' || '' }}
-        run: |
-          pnpm release:ios preflight --build-number="$BUILD_NUMBER"
-          args=(testflight --build-number="$BUILD_NUMBER" --export-method="$EXPORT_METHOD")
-          if [ -n "$WAIT_FLAG" ]; then
-            args+=("$WAIT_FLAG")
-          fi
-          pnpm release:ios "${args[@]}"
+        run: pnpm release:ios --build-number="$BUILD_NUMBER" --export-method="$EXPORT_METHOD"
 
       # Xcode Organizer symbolicates a TestFlight crash report from the local
       # archive, which a CI runner throws away. Keep it so an Apple `.ips` that
