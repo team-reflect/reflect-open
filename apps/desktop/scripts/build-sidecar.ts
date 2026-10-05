@@ -13,7 +13,7 @@ const SIDECARS = [
   { crate: 'reflect-capture-host', binary: 'reflect-capture-host' },
 ]
 const repoRoot = join(import.meta.dirname, '..', '..', '..')
-const binariesDir = join(import.meta.dirname, '..', 'src-tauri', 'binaries')
+const binariesDir = join(import.meta.dirname, '..', 'src-tauri', 'binaries') // FIXME: use helpers.ts etc. Do Not Repeat Yourself.
 
 function main(): void {
   const platform = process.env.TAURI_ENV_PLATFORM
