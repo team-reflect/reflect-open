@@ -34,7 +34,6 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ inputs.tag }}
-      NOTES: ${{ runner.temp }}/release-notes.md
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -77,9 +76,9 @@ jobs:
         env:
           ASSET: ${{ steps.release.outputs.asset }}
         run: |
-          gh release view "$TAG" --json body --jq .body > "$NOTES"
-          if ! grep -qF '## Which Mac download should I choose?' "$NOTES"; then
-            cat >> "$NOTES" <<EOF
+          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/release-notes.md"
+          if ! grep -qF '## Which Mac download should I choose?' "$RUNNER_TEMP/release-notes.md"; then
+            cat >> "$RUNNER_TEMP/release-notes.md" <<EOF
 
           ## Which Mac download should I choose?
 
@@ -96,7 +95,7 @@ jobs:
           PRODUCT: ${{ steps.release.outputs.product }}
           PRERELEASE: ${{ steps.release.outputs.prerelease }}
         run: |
-          flags=(--title "$PRODUCT $VERSION" --notes-file "$NOTES" --draft=false)
+          flags=(--title "$PRODUCT $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" --draft=false)
           if [ "$PRERELEASE" = true ]; then
             flags+=(--prerelease --latest=false)
           else
