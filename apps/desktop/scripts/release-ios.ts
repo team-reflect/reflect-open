@@ -21,6 +21,8 @@ const SENTRY_DSN_PATTERN =
   /^https:\/\/[0-9a-f]{32}@o463484\.ingest\.us\.sentry\.io\/4511705649971200$/
 const buildDir = join(TAURI_SRC_DIR, 'gen', 'apple', 'build')
 const archive = join(buildDir, 'reflect-open_iOS.xcarchive')
+
+// FIXME: rename these top-level constants. use APP_BINARY_PATH instead of appBinary. use BUILD_DIR instead of buildDir
 const appBinary = join(archive, 'Products', 'Applications', 'Reflect.app', 'Reflect')
 const dsymBinary = join(
   archive,
