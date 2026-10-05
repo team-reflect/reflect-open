@@ -49,6 +49,15 @@ runs:
         components: ${{ inputs.components }}
         targets: ${{ inputs.targets }}
 
+    # Build scripts (ort-sys, swift-rs) write the path of Xcode's clang runtime
+    # into their cached output, and cargo does not rerun them when Xcode
+    # changes. rust-cache hashes RUST_* variables into its key, so a new Xcode
+    # starts from a cold cache instead of failing at link time.
+    - name: Scope the cargo cache to Xcode
+      if: runner.os == 'macOS'
+      shell: bash
+      run: echo "RUST_CACHE_CLANG_DIR=$(xcrun clang --print-resource-dir)" >> "$GITHUB_ENV"
+
     - name: Cache cargo build
       uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       with:

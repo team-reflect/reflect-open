@@ -150,22 +150,6 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      # rust-cache keys on CC and RUST_* variables, so set them before the cache is restored.
-      - name: Scope the Rust cache to Xcode
-        run: |
-          set -euo pipefail
-
-          clang="$(xcrun --find clang)"
-          resource_dir="$("$clang" --print-resource-dir)"
-          runtime="$resource_dir/lib/darwin/libclang_rt.osx.a"
-          if [ ! -f "$runtime" ]; then
-            echo "::error::missing clang runtime at ${runtime}"
-            exit 1
-          fi
-          compiler_hash="$("$clang" --version | shasum -a 256 | cut -d ' ' -f 1)"
-          echo "CC=$clang" >> "$GITHUB_ENV"
-          echo "RUST_CACHE_XCODE=$compiler_hash" >> "$GITHUB_ENV"
-
       - uses: ./.github/actions/setup-rust
         with:
           targets: ${{ matrix.target }}

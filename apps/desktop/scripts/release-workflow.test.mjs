@@ -14,20 +14,24 @@ const workflowPath = join(
 )
 const workflow = readFileSync(workflowPath, 'utf8')
 
-test('Apple Silicon releases pin the runner and isolate Xcode build caches', () => {
+const setupRust = readFileSync(
+  join(scriptsDirectory, '..', '..', '..', '.github', 'actions', 'setup-rust', 'action.yml'),
+  'utf8',
+)
+
+test('Apple Silicon releases pin the runner', () => {
   const appleSiliconMatrix = workflow.match(
     /- name: Apple Silicon\n\s+runner: [^\n]+\n\s+target: aarch64-apple-darwin/,
   )?.[0]
   expect(appleSiliconMatrix).toContain('runner: macos-26')
+})
 
-  const cacheScopeStart = workflow.indexOf('- name: Scope the Rust cache to Xcode')
-  const cargoCacheStart = workflow.indexOf('- uses: ./.github/actions/setup-rust')
+test('the cargo cache is scoped to Xcode before it is restored', () => {
+  const cacheScopeStart = setupRust.indexOf('- name: Scope the cargo cache to Xcode')
+  const cargoCacheStart = setupRust.indexOf('- name: Cache cargo build')
   expect(cacheScopeStart).toBeGreaterThan(-1)
   expect(cargoCacheStart).toBeGreaterThan(cacheScopeStart)
-
-  const cacheScope = workflow.slice(cacheScopeStart, cargoCacheStart)
-  expect(cacheScope).toContain('xcrun --find clang')
-  expect(cacheScope).toContain('libclang_rt.osx.a')
-  expect(cacheScope).toContain('CC=$clang')
-  expect(cacheScope).toContain('RUST_CACHE_XCODE=$compiler_hash')
+  expect(setupRust.slice(cacheScopeStart, cargoCacheStart)).toContain(
+    'RUST_CACHE_CLANG_DIR=$(xcrun clang --print-resource-dir)',
+  )
 })
