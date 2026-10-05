@@ -41,4 +41,4 @@ async function main(): Promise<void> {
   copyFileSync(join(bundleDir, installer), join(artifactDir, installer))
 }
 
-await runMain(main)
+await runMain(main) //FIXME: just call main directly

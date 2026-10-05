@@ -484,4 +484,4 @@ async function main(): Promise<void> {
   await build({ flavor, target, notarize, artifactDir: values['artifact-dir'] })
 }
 
-await runMain(main)
+await runMain(main) // FIXME: just call main directly

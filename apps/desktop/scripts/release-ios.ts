@@ -269,4 +269,4 @@ async function main(): Promise<void> {
   await withTempDir((tempDir) => runCommand(command, options, tempDir))
 }
 
-await runMain(main)
+await runMain(main) // FIXME: just call main directly
