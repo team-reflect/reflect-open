@@ -64,7 +64,9 @@ The runtime directory is excluded by `.gitignore`, by an in-memory ignore
 rule, and (pending) by removing entries an older repository already
 tracked.
 
-- Test: `git::tests::commit_excludes_reflect_and_skips_when_clean`.
+- Test: `git::tests::commit_excludes_reflect_and_skips_when_clean` (untracked
+  `.reflect/` files only). Known gap: tracked-entry cleanup is pending its own
+  regression (`commit_removes_previously_tracked_reflect_files`).
 
 ## S7. Conflicts are committed and pushed, never left pending
 

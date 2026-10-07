@@ -48,6 +48,8 @@ interface FakeOptions {
   gateListen?: boolean
   /** Hold the first `git_merge_remote` until `releaseMerge()` (the mid-pull window). */
   gateMerge?: boolean
+  /** Hold the second `git_commit_all` until `releaseCommit()` (a flush still in flight). */
+  gateSecondCommit?: boolean
   /** Make the watcher subscription throw (the unusable-watcher path). */
   failListen?: boolean
   failStatus?: boolean
@@ -84,7 +86,9 @@ function fakeBridge(options: FakeOptions = {}) {
   let releaseListen: (() => void) | null = null
   let releaseIndexApply: (() => void) | null = null
   let releaseMerge: (() => void) | null = null
+  let releaseCommit: (() => void) | null = null
   let mergeCount = 0
+  let commitInvocations = 0
   let indexApplyCount = 0
   const mergeOutcomes = [...(options.mergeOutcomes ?? [])]
   const pushOutcomes = [...(options.pushOutcomes ?? [])]
@@ -111,6 +115,12 @@ function fakeBridge(options: FakeOptions = {}) {
           auth = null
           return null
         case 'git_commit_all':
+          commitInvocations += 1
+          if (options.gateSecondCommit === true && commitInvocations === 2) {
+            await new Promise<void>((resolve) => {
+              releaseCommit = resolve
+            })
+          }
           return CLEAN_COMMIT
         case 'git_fetch':
           return { ahead: 0, behind: 0 }
@@ -171,6 +181,7 @@ function fakeBridge(options: FakeOptions = {}) {
     releaseListen: () => releaseListen?.(),
     releaseIndexApply: () => releaseIndexApply?.(),
     releaseMerge: () => releaseMerge?.(),
+    releaseCommit: () => releaseCommit?.(),
   }
 }
 
@@ -535,7 +546,10 @@ describe('createBackupController', () => {
   // and its checkout and commit the stale tree (#1405). Red on purpose until
   // the flusher routes through the engine.
   it.fails('quit flush waits for an in-flight pull before committing', async () => {
-    const { calls, releaseMerge } = fakeBridge({ gateMerge: true })
+    const { calls, releaseMerge, releaseCommit } = fakeBridge({
+      gateMerge: true,
+      gateSecondCommit: true,
+    })
     const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
     await controller.start()
     try {
@@ -544,21 +558,28 @@ describe('createBackupController', () => {
       })
       expect(commitCount(calls)).toBe(1) // the launch cycle's own commit
 
-      const flushed = flushBackup()
+      let flushResolved = false
+      const flushed = flushBackup().then(() => {
+        flushResolved = true
+      })
       await Promise.resolve()
       // The pull is still between fetch and merge: no second commit may run yet.
       expect(commitCount(calls)).toBe(1)
 
       releaseMerge()
-      await flushed
       await vi.waitFor(() => {
         expect(commitCount(calls)).toBe(2)
       })
+      // The flush resolves with its commit, not before it.
+      expect(flushResolved).toBe(false)
+      releaseCommit()
+      await flushed
     } finally {
       // The expected failure above throws past the lines after it, so the
       // gate and the controller are released here, or the suspended merge
       // and the live listeners leak into the next test.
       releaseMerge()
+      releaseCommit()
       controller.dispose()
     }
   })
