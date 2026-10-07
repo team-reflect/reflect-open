@@ -31,6 +31,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use reflect_graph_paths::{to_slash, to_slash_lossy};
 use serde::Serialize;
 
 use crate::error::{AppError, AppResult};
@@ -688,7 +689,7 @@ fn read_zip_entries(path: &Path) -> AppResult<Vec<ImportEntry>> {
             continue;
         }
         if let Some(name) = file.enclosed_name() {
-            names.push(normalize_zip_path(&name.to_string_lossy()));
+            names.push(to_slash_lossy(&name));
         }
     }
 
@@ -704,7 +705,7 @@ fn read_zip_entries(path: &Path) -> AppResult<Vec<ImportEntry>> {
         let Some(name) = file.enclosed_name() else {
             continue;
         };
-        let name = normalize_zip_path(&name.to_string_lossy());
+        let name = to_slash_lossy(&name);
         let Some(relative) = sanitized_relative(&name, prefix.as_deref()) else {
             continue;
         };
@@ -714,10 +715,6 @@ fn read_zip_entries(path: &Path) -> AppResult<Vec<ImportEntry>> {
         entries.push(ImportEntry { relative, bytes });
     }
     Ok(entries)
-}
-
-fn normalize_zip_path(path: &str) -> String {
-    path.replace('\\', "/")
 }
 
 /// A single wrapping directory commonly added by zip tools:
@@ -747,7 +744,7 @@ fn sanitized_relative(raw: &str, prefix: Option<&str>) -> Option<String> {
     if raw.starts_with('/') || raw.contains('\0') {
         return None;
     }
-    let normalized = normalize_zip_path(raw);
+    let normalized = to_slash(raw);
     let mut parts = parts(&normalized);
     if parts.contains(&"..") {
         return None;
