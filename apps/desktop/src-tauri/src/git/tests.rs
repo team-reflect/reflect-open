@@ -1,94 +1,20 @@
-//! Integration tests for the git primitives, exercised against tempdir graphs
-//! and a local bare "remote" (libgit2's local transport — no network, no
-//! credentials, same code paths as HTTPS apart from auth).
-
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::panic::AssertUnwindSafe;
+use std::sync::mpsc;
+use std::thread;
 
 use git2::{Repository, RepositoryInitOptions};
-use tempfile::{tempdir, TempDir};
+use tempfile::tempdir;
 
 use super::commit::commit_all;
+use super::fault::{self, Fault, FaultPoint};
 use super::merge::{merge_remote, MergeKind};
 use super::remote::{fetch, push};
+use super::test_support::{
+    fixture, head_message, head_tree_paths, read, remote_tree_paths, scaffold_graph, second_device,
+    write, Fixture,
+};
 use super::{setup, status, MAX_FILE_BYTES};
-
-/// Scaffold a minimal graph layout (what `fs::bootstrap` produces).
-fn scaffold_graph(root: &Path) {
-    for dir in ["daily", "notes", "assets", ".reflect"] {
-        fs::create_dir_all(root.join(dir)).unwrap();
-    }
-    fs::write(
-        root.join(".gitignore"),
-        crate::graph_gitignore::default_contents(),
-    )
-    .unwrap();
-    fs::write(root.join(".reflect/index.sqlite"), "not a real db").unwrap();
-}
-
-fn write(root: &Path, rel: &str, contents: &str) {
-    let path = root.join(rel);
-    fs::create_dir_all(path.parent().unwrap()).unwrap();
-    fs::write(path, contents).unwrap();
-}
-
-fn read(root: &Path, rel: &str) -> String {
-    fs::read_to_string(root.join(rel)).unwrap()
-}
-
-fn head_message(root: &Path) -> String {
-    let repo = Repository::open(root).unwrap();
-    let commit = repo.head().unwrap().peel_to_commit().unwrap();
-    commit.message().unwrap().trim().to_string()
-}
-
-/// A bare remote + a primary graph connected to it.
-struct Fixture {
-    _dir: TempDir,
-    remote_url: String,
-    graph_a: PathBuf,
-}
-
-fn fixture() -> Fixture {
-    let dir = tempdir().unwrap();
-    let bare = dir.path().join("remote.git");
-    let mut opts = RepositoryInitOptions::new();
-    opts.bare(true).initial_head("main");
-    Repository::init_opts(&bare, &opts).unwrap();
-    let remote_url = bare.to_string_lossy().into_owned();
-
-    let graph_a = dir.path().join("graph-a");
-    scaffold_graph(&graph_a);
-    setup(&graph_a, Some(remote_url.clone()), None).unwrap();
-
-    Fixture {
-        _dir: dir,
-        remote_url,
-        graph_a,
-    }
-}
-
-/// Clone the remote into a second "device". `commit_all`/`merge_remote` only
-/// need a repo at the root, so the clone stands in for a second graph.
-fn second_device(fixture: &Fixture) -> PathBuf {
-    let root = fixture._dir.path().join("graph-b");
-    Repository::clone(&fixture.remote_url, &root).unwrap();
-    root
-}
-
-fn head_tree_paths(root: &Path) -> Vec<String> {
-    let repo = Repository::open(root).unwrap();
-    let tree = repo.head().unwrap().peel_to_tree().unwrap();
-    let mut paths = Vec::new();
-    tree.walk(git2::TreeWalkMode::PreOrder, |prefix, entry| {
-        if entry.kind() == Some(git2::ObjectType::Blob) {
-            paths.push(format!("{prefix}{}", entry.name().unwrap_or("")));
-        }
-        git2::TreeWalkResult::Ok
-    })
-    .unwrap();
-    paths
-}
 
 #[test]
 fn setup_initializes_main_and_origin() {
@@ -948,4 +874,171 @@ fn diverging_renames_keep_both_files_and_never_wedge() {
     assert!(read(root_a, "notes/title-a.md").contains("Title A"));
     assert!(read(root_a, "notes/title-b.md").contains("Title B"));
     assert!(push(root_a, None).unwrap().pushed);
+}
+
+// ---- Sync safety regressions (Phase 0 of the sync rework) -------------------
+//
+// These pin the data-loss paths in `docs/git-backup-safety.md`. The ignored
+// ones are red on purpose until the Phase 1 fixes land; run them with
+// `cargo test -p reflect-open git::tests -- --ignored`.
+
+/// The phone pushed a new note and linked it from the daily note; the Mac
+/// still has the old tree checked out and has fetched the phone's commit.
+fn pulled_note_fixture() -> Fixture {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "daily/2026-10-01.md", "# 2026-10-01\n\n- morning\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/from-phone.md", "# From phone\n");
+    write(
+        &root_b,
+        "daily/2026-10-01.md",
+        "# 2026-10-01\n\n- morning\n- [[From phone]]\n",
+    );
+    commit_all(&root_b, "phone", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    fetch(root_a, None).unwrap();
+    fixture
+}
+
+/// The next cycle after a failed pull (commit, fetch, merge, push) must keep
+/// the phone's note on disk, in HEAD, and on the remote. The failure mode
+/// this guards against is a commit of the stale working tree: the pulled
+/// note deleted, the daily note reverted, and both pushed (#1405).
+fn assert_next_cycle_keeps_pulled_notes(fixture: &Fixture) {
+    let root_a = &fixture.graph_a;
+    commit_all(root_a, "Update notes", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    merge_remote(root_a).unwrap();
+    assert!(push(root_a, None).unwrap().pushed);
+
+    assert!(
+        root_a.join("notes/from-phone.md").exists(),
+        "the pulled note was deleted from the working tree ({})",
+        head_message(root_a)
+    );
+    assert_eq!(read(root_a, "notes/from-phone.md"), "# From phone\n");
+    assert!(
+        read(root_a, "daily/2026-10-01.md").contains("[[From phone]]"),
+        "the daily note was reverted to its pre-pull content"
+    );
+    let local = head_tree_paths(root_a);
+    assert!(
+        local.contains(&"notes/from-phone.md".to_string()),
+        "{local:?}"
+    );
+    let remote = remote_tree_paths(fixture);
+    assert!(
+        remote.contains(&"notes/from-phone.md".to_string()),
+        "{remote:?}"
+    );
+}
+
+#[test]
+fn fast_forward_failure_before_the_ref_moves_converges_next_cycle() {
+    // A failure before anything happened must be a plain retry.
+    let fixture = pulled_note_fixture();
+    fault::arm(FaultPoint::BeforeFastForwardRefMove, Fault::Fail);
+    assert!(merge_remote(&fixture.graph_a).is_err());
+    assert_next_cycle_keeps_pulled_notes(&fixture);
+}
+
+#[test]
+#[ignore = "red until P1.1: fast-forward must check out before it moves the ref"]
+fn fast_forward_checkout_failure_never_reverts_pulled_notes() {
+    let fixture = pulled_note_fixture();
+    fault::arm(FaultPoint::BeforeFastForwardCheckout, Fault::Fail);
+    assert!(merge_remote(&fixture.graph_a).is_err());
+    assert_next_cycle_keeps_pulled_notes(&fixture);
+}
+
+#[test]
+#[ignore = "red until P1.1: fast-forward must not depend on HEAD.lock"]
+fn stale_head_lock_fast_forward_never_reverts_pulled_notes() {
+    // The field case behind #1405: a lock file left by a killed process. It
+    // stays in place for the whole test, as it did for the user, because
+    // nothing in the app removes it.
+    let fixture = pulled_note_fixture();
+    fs::write(fixture.graph_a.join(".git/HEAD.lock"), b"").unwrap();
+    let _ = merge_remote(&fixture.graph_a);
+    assert_next_cycle_keeps_pulled_notes(&fixture);
+}
+
+#[test]
+#[ignore = "red until P1.1 and P1.2: a concurrent commit must not see a moved ref over a stale tree"]
+fn commit_during_fast_forward_never_reverts_pulled_notes() {
+    // The quit-time flush commits outside the engine's queue, so it can land
+    // while a pull is between the ref move and the checkout.
+    let fixture = pulled_note_fixture();
+    let root_a = fixture.graph_a.clone();
+    let (entered_tx, entered_rx) = mpsc::channel::<()>();
+    let (resume_tx, resume_rx) = mpsc::channel::<()>();
+    let pull = thread::spawn({
+        let root = root_a.clone();
+        move || {
+            fault::arm(
+                FaultPoint::BeforeFastForwardCheckout,
+                Fault::hook(move || {
+                    entered_tx.send(()).unwrap();
+                    resume_rx.recv().unwrap();
+                }),
+            );
+            merge_remote(&root)
+        }
+    });
+    entered_rx.recv().unwrap();
+    commit_all(&root_a, "Update notes", MAX_FILE_BYTES).unwrap();
+    resume_tx.send(()).unwrap();
+    pull.join().unwrap().unwrap();
+
+    assert_next_cycle_keeps_pulled_notes(&fixture);
+}
+
+#[test]
+#[ignore = "red until P1.3: a merge interrupted before its commit must not wedge the repository"]
+fn merge_interrupted_before_commit_converges_next_cycle() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/a.md", "# A\n");
+    commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/b.md", "# B\n");
+    commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, "notes/a2.md", "# A2\n");
+    commit_all(root_a, "a2", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+
+    // The process dies after libgit2 entered merge state.
+    fault::arm(FaultPoint::AfterMergeBeforeCommit, Fault::Panic);
+    let crashed = std::panic::catch_unwind(AssertUnwindSafe(|| merge_remote(root_a)));
+    assert!(crashed.is_err(), "the injected crash must unwind");
+
+    // The next cycle needs no manual repair and loses nothing.
+    commit_all(root_a, "Update notes", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    merge_remote(root_a).unwrap();
+    assert!(push(root_a, None).unwrap().pushed);
+    let repo = Repository::open(root_a).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Clean);
+    for path in ["notes/a.md", "notes/a2.md", "notes/b.md"] {
+        assert!(
+            root_a.join(path).exists(),
+            "{path} missing from the working tree"
+        );
+    }
+    let remote = remote_tree_paths(&fixture);
+    for path in ["notes/a.md", "notes/a2.md", "notes/b.md"] {
+        assert!(
+            remote.contains(&path.to_string()),
+            "{path} missing from the remote: {remote:?}"
+        );
+    }
 }

@@ -128,8 +128,12 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
         let new_tree = repo.find_commit(remote_oid)?.tree()?;
         let mut changed_files = changed_between(&repo, old_tree.as_ref(), &new_tree)?;
         let refname = format!("refs/heads/{branch}");
+        #[cfg(test)]
+        super::fault::trip(super::fault::FaultPoint::BeforeFastForwardRefMove)?;
         repo.reference(&refname, remote_oid, true, "reflect sync: fast-forward")?;
         repo.set_head(&refname)?;
+        #[cfg(test)]
+        super::fault::trip(super::fault::FaultPoint::BeforeFastForwardCheckout)?;
         // Force is safe here: the pre-merge invariant is a committed working
         // tree, so there is nothing uncommitted to clobber.
         repo.checkout_head(Some(CheckoutBuilder::new().force()))?;
@@ -155,6 +159,8 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
     // behind would trip `ensure_clean_state` on every later cycle and wedge
     // sync until a manual repair — exactly what this design forbids. Clear it
     // on every path; the next cycle re-derives anything a failed attempt lost.
+    #[cfg(test)]
+    super::fault::trip(super::fault::FaultPoint::AfterMergeBeforeCommit)?;
     let result = complete_merge(&repo, root, remote_oid);
     if result.is_err() {
         let _ = repo.cleanup_state();
