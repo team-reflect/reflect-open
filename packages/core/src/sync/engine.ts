@@ -142,8 +142,8 @@ const MAX_PUSH_ATTEMPTS = 3
  * union of what was asked.
  */
 interface CycleRequest {
-  fetch: boolean
-  network: boolean
+  readonly fetch: boolean
+  readonly network: boolean
 }
 const COMMIT: CycleRequest = { fetch: false, network: false }
 const PUSH: CycleRequest = { fetch: false, network: true }
