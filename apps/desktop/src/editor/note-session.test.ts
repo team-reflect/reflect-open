@@ -462,6 +462,42 @@ describe('createNoteSession', () => {
     ])
   })
 
+  it('a merge that throws keeps the edits beside the note before adopting the external version', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { session, copies, applied, writes, snapshots, setDisk, setMerge } = harness({
+      merge: { kind: 'clean', content: 'never used\n' },
+    })
+    session.load()
+    await settled()
+    setMerge(null) // the merge command rejects (a dev harness without it, an IPC failure)
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    session.externalChanged()
+    await settled()
+
+    expect(consoleError).toHaveBeenCalledWith('three-way merge failed:', expect.any(Error))
+    expect(copies).toMatchObject([{ path: 'notes/a.md', contents: 'mine\n' }])
+    expect(applied).toEqual(['theirs\n'])
+    expect(writes).toEqual([])
+    expect(snapshots.at(-1)).toMatchObject({ dirty: false, error: null })
+    consoleError.mockRestore()
+  })
+
+  it('a stale autosave whose content is already on disk reconciles clean and clears the error', async () => {
+    // Another writer put exactly the buffer on disk before the checked save
+    // ran: the save is refused, the reconciliation adopts the matching
+    // content, and the failure it reported must not linger with nothing
+    // left to save.
+    const { session, snapshots, setDisk } = harness()
+    session.load()
+    await settled()
+    session.editorChanged('# Same on both\n')
+    setDisk('# Same on both\n')
+    await session.flush()
+    await settled()
+    expect(snapshots.at(-1)).toMatchObject({ dirty: false, error: null })
+  })
+
   it('without a merge capability the edits are kept beside the note too', async () => {
     const { session, copies, applied, setDisk } = harness()
     session.load()

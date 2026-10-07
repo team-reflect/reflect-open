@@ -211,6 +211,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     buffer = doc.body
     disk = content
     dirty = false
+    error = null // a reconciliation that lands clears the save failure that led here
     missing = false // external content means the file exists on disk now
     // Re-gate: the content may have introduced (or removed) syntax the editor
     // can't round-trip. When protection flips the pane remounts via
@@ -373,7 +374,6 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         return false
       }
       if (disposed || header + buffer === contents) {
-        error = null // a copy that failed earlier is made now
         return true
       }
     }
@@ -390,6 +390,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     disk = onDisk
     dirty = merged !== onDisk
     missing = false
+    error = null
     emit()
     applyToEditor(doc.body)
     if (dirty) {

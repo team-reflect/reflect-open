@@ -61,7 +61,8 @@ export interface NoteDocumentOptions {
 
 /**
  * Keep edits beside a note as `<note> (conflict).md` (then `(conflict 2)`,
- * …) when they could not be merged into an external change. Newer
+ * … up to the same bound as other claimed note paths) when they could not be
+ * merged into an external change. Newer
  * keystrokes during one reconciliation overwrite the copy it already made,
  * checked against what was written: a copy that moved meanwhile (another
  * window, another device) is left alone and a fresh sibling is made.
@@ -86,7 +87,7 @@ async function keepBesideNote(
   const slash = path.lastIndexOf('/')
   const dot = path.lastIndexOf('.')
   const [stem, ext] = dot > slash ? [path.slice(0, dot), path.slice(dot)] : [path, '']
-  for (let n = 1; n < 10; n += 1) {
+  for (let n = 1; n <= 1000; n += 1) {
     const copy = `${stem} (conflict${n === 1 ? '' : ` ${n}`})${ext}`
     const outcome = await createNoteIfAbsent(copy, contents, generation)
     if (outcome.kind === 'created') {
