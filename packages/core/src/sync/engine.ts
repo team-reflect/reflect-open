@@ -153,6 +153,14 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   let running: Promise<void> | null = null
   /** Follow-up requested while a cycle was in flight (strongest mode wins). */
   let rerunMode: 'push' | 'full' | null = null
+  /**
+   * Set by an auth failure, cleared by the next resume trigger (`syncNow`:
+   * launch, focus, online, manual) or by a cycle that gets through. While
+   * set, edit-triggered cycles still commit locally but skip the network:
+   * retrying per edit would repeat the same failure, and for a GitHub remote
+   * the same reconnect prompt, with nothing having changed in between.
+   */
+  let authFailed = false
 
   function emit(status: SyncStatus): void {
     if (signal.aborted) {
@@ -251,6 +259,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       return await running
     }
     running = (async () => {
+      const quiet = mode === 'push' && authFailed
       const remoteChangeTasks: Promise<void>[] = []
       // This cycle commits everything dirty so far — a pending debounce pass
       // (e.g. queued before a launch/focus/manual sync) would only duplicate it.
@@ -259,13 +268,18 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         timer = null
       }
       deadline = null
-      emit({ state: 'syncing' })
+      if (!quiet) {
+        emit({ state: 'syncing' })
+      }
       try {
-        await cycle(mode, (changes) => {
+        await cycle(mode, quiet, (changes) => {
           remoteChangeTasks.push(startRemoteChanges(changes))
         })
         await settleRemoteChanges(remoteChangeTasks)
-        emit({ state: 'idle' })
+        if (!quiet) {
+          authFailed = false
+          emit({ state: 'idle' })
+        }
       } catch (error) {
         if (error instanceof CycleSuppressedError) {
           // A merge can land and queue its changed files just before the owner
@@ -280,7 +294,9 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
             }
           }
         } else if (!signal.aborted) {
-          emit(statusForError(error))
+          const status = statusForError(error)
+          authFailed = status.state === 'error' && status.errorKind === 'auth'
+          emit(status)
         }
       } finally {
         running = null
@@ -296,15 +312,17 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   async function cycle(
     mode: 'push' | 'full',
+    quiet: boolean,
     remoteChanges: (changes: ChangedFile[]) => void,
   ): Promise<void> {
-    const credential = options.localOnly === true ? null : await step(options.getCredential())
+    const offline = options.localOnly === true || quiet
+    const credential = offline ? null : await step(options.getCredential())
     const commit = await step(gitCommitAll('Update notes', options.generation))
     if (commit.skippedLargeFiles.length > 0) {
       options.onLargeFilesSkipped?.(commit.skippedLargeFiles)
     }
-    if (options.localOnly === true) {
-      return // the commit is the whole cycle — the repo has no remote
+    if (offline) {
+      return // the commit is the whole cycle: no remote, or the sign-in is known bad
     }
     if (mode === 'push') {
       // The debounce path often fires for changes that are already committed
@@ -353,6 +371,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   }
 
   function syncNow(): Promise<void> {
+    authFailed = false // a resume trigger: the user may have fixed the sign-in
     return run('full')
   }
 

@@ -5,6 +5,7 @@ import {
   createSyncEngine,
   emitFileChanges,
   errorMessage,
+  getAuthenticatedUser,
   getGithubRepo,
   getGithubToken,
   githubCredential,
@@ -15,8 +16,11 @@ import {
   gitStatus,
   isCaptureSpoolPath,
   isNotePath,
+  isSyncError,
   loadGithubAuth,
+  loadHostCredential,
   parseGithubRemote,
+  remoteHost,
   ReflectError,
   subscribeFileChanges,
   type ChangedFile,
@@ -321,12 +325,23 @@ export function createBackupController(options: BackupControllerOptions): Backup
         await startLocalHistory(status.initialized)
         return
       }
-      if (repo === null && /^https?:\/\//i.test(remoteUrl)) {
-        // Plan 16 V1 speaks SSH (and paths) to generic hosts, not HTTPS.
-        // Fail at adoption, not at the first push: a *public* HTTPS remote
-        // would pull anonymously and only 401 on push — the other device's
-        // edits arriving while this one's silently never leave. The engine
-        // never starts; `rejected` = acting (not retrying) is the fix.
+      // A non-GitHub HTTPS host needs a stored sign-in (SSH and path remotes
+      // need none: the agent or the filesystem answers). Fail at adoption,
+      // not at the first push: a *public* HTTPS remote would pull anonymously
+      // and only 401 on push — the other device's edits arriving while this
+      // one's silently never leave. `rejected` = acting (not retrying) is
+      // the fix.
+      const host = repo === null ? remoteHost(remoteUrl) : null
+      // A keychain the app cannot read is "no sign-in" here, as for the
+      // GitHub read above: the graph must keep its local history either way.
+      const hostCredential =
+        host === null
+          ? null
+          : await loadHostCredential(host).catch((error: unknown) => {
+              console.error('reading the host sign-in failed:', errorMessage(error))
+              return null
+            })
+      if (host !== null && hostCredential === null) {
         setState({
           phase: 'connected',
           remoteUrl,
@@ -334,8 +349,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
           status: {
             state: 'error',
             errorKind: 'rejected',
-            message:
-              'HTTPS isn’t supported for this host yet — switch the remote to its SSH form: git remote set-url origin git@<host>:<owner>/<repo>.git',
+            message: `No sign-in is stored for ${host}. Add one in Settings → GitHub sync, or switch the remote to its SSH form: git remote set-url origin git@${host}:<owner>/<repo>.git`,
           },
         })
         await startLocalHistory(status.initialized)
@@ -350,17 +364,23 @@ export function createBackupController(options: BackupControllerOptions): Backup
         // The background flusher's protected local commit bypasses this
         // engine deliberately.
         canStartCycle: () => !isMobileSurface() || document.visibilityState !== 'hidden',
-        // The managed sign-in is for github.com only — a generic host must
-        // never receive it. Rust resolves generic credentials locally.
+        // The managed sign-in is for github.com only; another HTTPS host gets
+        // its own stored sign-in; SSH and path remotes get none and Rust
+        // resolves them locally.
         getCredential:
-          repo === null
-            ? async () => null
-            : async () => {
+          repo !== null
+            ? async () => {
                 const token = await getGithubToken(providerFetch)
                 return token === null ? null : githubCredential(token)
-              },
+              }
+            : host !== null
+              ? () => loadHostCredential(host)
+              : async () => null,
         onStatus: (engineStatus) => {
           setState({ phase: 'connected', remoteUrl, repo, status: engineStatus })
+          if (repo !== null && isForbidden(engineStatus)) {
+            void classifyForbidden(engineStatus, remoteUrl, repo)
+          }
         },
         onLargeFilesSkipped: (files) => {
           // Surface the guardrail loudly: these files are NOT in the backup.
@@ -385,6 +405,49 @@ export function createBackupController(options: BackupControllerOptions): Backup
         console.error('backup start failed:', errorMessage(error))
         setState({ phase: 'disconnected' })
       }
+    }
+  }
+
+  /**
+   * GitHub answers 403 both for a token without access to the repository
+   * and for rate limiting. libgit2 cannot tell either from a bad token, so
+   * the engine reports `auth` and the UI offers "reconnect GitHub", which
+   * fixes neither. Ask GitHub whether the token itself is good: when it is,
+   * the push was refused for another reason and the status names it.
+   */
+  async function classifyForbidden(
+    status: SyncStatus,
+    remoteUrl: string,
+    repo: GithubRepoRef,
+  ): Promise<void> {
+    let next: SyncStatus
+    try {
+      const token = await getGithubToken(providerFetch)
+      if (token === null) {
+        return
+      }
+      await getAuthenticatedUser(token, providerFetch)
+      next = {
+        state: 'error',
+        errorKind: 'rejected',
+        message: `GitHub refused the sync (403). Check that Reflect has access to ${repo.owner}/${repo.name}, or wait a few minutes if GitHub is rate limiting.`,
+      }
+    } catch (cause) {
+      // A rejected probe confirms the bad credential: `auth` stands. Anything
+      // else (GitHub throttling, a fetch that never reached it, an unparsable
+      // reply) says nothing about the credential, so it must not keep asking
+      // for a reconnect either.
+      if (cause instanceof ReflectError && cause.kind === 'auth') {
+        return
+      }
+      next = {
+        state: 'offline',
+        message: 'GitHub is rate limiting or unreachable; the backup will retry',
+      }
+    }
+    // Only replace the exact status this probe was asked about.
+    if (state.phase === 'connected' && state.status === status) {
+      setState({ phase: 'connected', remoteUrl, repo, status: next })
     }
   }
 
@@ -457,4 +520,9 @@ export function createBackupController(options: BackupControllerOptions): Backup
       listeners.clear()
     },
   }
+}
+
+/** An `auth` error that is really an HTTP 403 (libgit2 phrases it `status code: 403`). */
+function isForbidden(status: SyncStatus): boolean {
+  return isSyncError(status) && status.errorKind === 'auth' && status.message.includes('403')
 }
