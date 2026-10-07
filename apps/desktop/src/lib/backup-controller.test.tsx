@@ -538,22 +538,29 @@ describe('createBackupController', () => {
     const { calls, releaseMerge } = fakeBridge({ gateMerge: true })
     const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
     await controller.start()
-    await vi.waitFor(() => {
-      expect(calls).toContain('git_merge_remote')
-    })
-    expect(commitCount(calls)).toBe(1) // the launch cycle's own commit
+    try {
+      await vi.waitFor(() => {
+        expect(calls).toContain('git_merge_remote')
+      })
+      expect(commitCount(calls)).toBe(1) // the launch cycle's own commit
 
-    const flushed = flushBackup()
-    await Promise.resolve()
-    // The pull is still between fetch and merge: no second commit may run yet.
-    expect(commitCount(calls)).toBe(1)
+      const flushed = flushBackup()
+      await Promise.resolve()
+      // The pull is still between fetch and merge: no second commit may run yet.
+      expect(commitCount(calls)).toBe(1)
 
-    releaseMerge()
-    await flushed
-    await vi.waitFor(() => {
-      expect(commitCount(calls)).toBe(2)
-    })
-    controller.dispose()
+      releaseMerge()
+      await flushed
+      await vi.waitFor(() => {
+        expect(commitCount(calls)).toBe(2)
+      })
+    } finally {
+      // The expected failure above throws past the lines after it, so the
+      // gate and the controller are released here, or the suspended merge
+      // and the live listeners leak into the next test.
+      releaseMerge()
+      controller.dispose()
+    }
   })
 
   it('window focus triggers a sync', async () => {
