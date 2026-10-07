@@ -235,6 +235,8 @@ export {
   type TagSuggestion,
   type WikiLinkSuggestionResult,
   type FileChange,
+  type FileChangeHandler,
+  type FileChangeSource,
   type WikiSuggestion,
   type WikiLinkSuggestion,
   type GeneratedDate,

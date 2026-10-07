@@ -205,7 +205,7 @@ describe('createBackupController', () => {
 
     vi.useFakeTimers()
     try {
-      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }])
+      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }], 'external')
       await vi.advanceTimersByTimeAsync(30_000)
     } finally {
       vi.useRealTimers()
@@ -385,7 +385,7 @@ describe('createBackupController', () => {
 
     vi.useFakeTimers()
     try {
-      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }])
+      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }], 'external')
       await vi.advanceTimersByTimeAsync(30_000)
     } finally {
       vi.useRealTimers()
@@ -593,7 +593,7 @@ describe('createBackupController', () => {
 
       visibility.mockReturnValue('hidden')
       vi.useFakeTimers()
-      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }])
+      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }], 'external')
       window.dispatchEvent(new Event('online'))
       await vi.advanceTimersByTimeAsync(10_000)
 
@@ -628,7 +628,7 @@ describe('createBackupController', () => {
           expect(commitCount(calls)).toBe(1) // the launch pull's commit
         })
         vi.useFakeTimers()
-        emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }])
+        emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }], 'external')
         await vi.advanceTimersByTimeAsync(10_000)
         if (commitCount(calls) > 1) {
           return 10_000

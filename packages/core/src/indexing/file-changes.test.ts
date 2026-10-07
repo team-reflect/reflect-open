@@ -33,7 +33,7 @@ describe('subscribeFileChanges', () => {
       { path: 'notes/from-b.md', kind: 'upsert', modifiedMs: 123 },
       { path: 'notes/gone.md', kind: 'remove' },
     ]
-    emitFileChanges(changes)
+    emitFileChanges(changes, 'external')
 
     expect(received).toEqual([changes])
     unlisten()
@@ -47,7 +47,7 @@ describe('subscribeFileChanges', () => {
     })
     unlisten()
 
-    emitFileChanges([{ path: 'notes/a.md', kind: 'upsert' }])
+    emitFileChanges([{ path: 'notes/a.md', kind: 'upsert' }], 'external')
 
     expect(received).toEqual([])
   })
@@ -60,7 +60,7 @@ describe('subscribeFileChanges', () => {
     })
 
     emitFromBridge([{ path: 'notes/watched.md', kind: 'upsert' }])
-    emitFileChanges([{ path: 'notes/merged.md', kind: 'upsert' }])
+    emitFileChanges([{ path: 'notes/merged.md', kind: 'upsert' }], 'external')
 
     expect(received.map((batch) => batch[0]!.path)).toEqual(['notes/watched.md', 'notes/merged.md'])
     unlisten()

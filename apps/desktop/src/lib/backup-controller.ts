@@ -169,7 +169,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
     // the index and embeddings take markdown notes, the audio-memo
     // reconciler takes recordings) — and the index additionally gets a
     // direct apply (idempotent if a live watcher subscription double-applies).
-    emitFileChanges(changes)
+    emitFileChanges(changes, 'pull')
     const indexable = changes.filter((change) => isNotePath(change.path))
     if (indexGeneration !== null && indexable.length > 0) {
       const task = remoteIndexTail.then(async () => {
