@@ -175,7 +175,7 @@ jobs:
           cache-key: build-ios-mobile
 
       - name: Build
-        run: pnpm release:ios --build-number="$(date -u +%Y%m%d%H%M)" --no-sign
+        run: pnpm release:ios --build-number="1" --no-sign
 
   build-windows-desktop:
     needs: build-gate
