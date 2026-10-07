@@ -411,10 +411,11 @@ export function createBackupController(options: BackupControllerOptions): Backup
         message: `GitHub refused the sync (403). Check that Reflect has access to ${repo.owner}/${repo.name}, or wait a few minutes if GitHub is rate limiting.`,
       }
     } catch (cause) {
-      // A rejected probe confirms the bad credential: `auth` stands. A probe
-      // GitHub throttled, or that never reached it, says nothing about the
-      // credential, so it must not keep asking for a reconnect either.
-      if (!(cause instanceof ReflectError) || cause.kind !== 'network') {
+      // A rejected probe confirms the bad credential: `auth` stands. Anything
+      // else (GitHub throttling, a fetch that never reached it, an unparsable
+      // reply) says nothing about the credential, so it must not keep asking
+      // for a reconnect either.
+      if (cause instanceof ReflectError && cause.kind === 'auth') {
         return
       }
       next = {

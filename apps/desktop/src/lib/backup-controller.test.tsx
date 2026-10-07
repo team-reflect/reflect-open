@@ -563,6 +563,20 @@ describe('createBackupController', () => {
     controller.dispose()
   })
 
+  it('a 403 with a token probe that never reaches GitHub reports offline', async () => {
+    fakeBridge({ mergeOutcome: MERGED, pushError: FORBIDDEN })
+    httpFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(controller.getState()).toMatchObject({
+        phase: 'connected',
+        status: { state: 'offline' },
+      })
+    })
+    controller.dispose()
+  })
+
   it('a 403 with a rate-limited token probe reports offline, not a bad credential', async () => {
     fakeBridge({ mergeOutcome: MERGED, pushError: FORBIDDEN })
     httpFetch.mockResolvedValueOnce(jsonResponse({ message: 'API rate limit exceeded' }, 403))
