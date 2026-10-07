@@ -426,16 +426,29 @@ pub async fn note_read_local(
 static GRAPH_LOCKS: LazyLock<Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>> =
     LazyLock::new(Mutex::default);
 
+/// One lock per physical graph: a symlinked or differently spelled root must
+/// not get its own. A root that does not exist yet (a clone target) is keyed
+/// through its parent, which is where later opens of the finished clone
+/// canonicalize to.
+fn graph_lock_key(root: &Path) -> PathBuf {
+    if let Ok(key) = fs::canonicalize(root) {
+        return key;
+    }
+    match (root.parent(), root.file_name()) {
+        (Some(parent), Some(name)) => fs::canonicalize(parent)
+            .map(|parent| parent.join(name))
+            .unwrap_or_else(|_| root.to_path_buf()),
+        _ => root.to_path_buf(),
+    }
+}
+
 /// Run `f` while holding the graph lock for `root`. A lock poisoned by a
 /// panicking holder is taken anyway: the guarded code never leaves partial
 /// state behind that the next holder could misread. Graph-relative paths
 /// are resolved inside `f`, never before: a checkout that wins the lock may
 /// have replaced a parent directory meanwhile.
 pub(crate) fn with_graph_lock<T>(root: &Path, f: impl FnOnce() -> T) -> T {
-    // One lock per physical graph: a symlinked or differently spelled root
-    // must not get its own. A root that does not exist yet (a clone target)
-    // keeps its given path.
-    let key = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+    let key = graph_lock_key(root);
     let lock = {
         let mut locks = GRAPH_LOCKS.lock().unwrap_or_else(PoisonError::into_inner);
         let lock = Arc::clone(locks.entry(key).or_default());

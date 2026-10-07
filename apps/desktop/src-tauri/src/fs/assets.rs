@@ -125,18 +125,14 @@ pub(super) fn staging_dir(root: &Path) -> AppResult<std::path::PathBuf> {
     Ok(dir)
 }
 
-/// Resolved `assets/` directory for a commit/import destination, traversal-
-/// and generation-guarded.
-fn assets_dir_for(
-    state: &State<GraphState>,
-    generation: u64,
-    name: &str,
-) -> AppResult<std::path::PathBuf> {
+/// Resolved `assets/` directory for a commit/import destination,
+/// traversal-guarded. Call it under the graph lock: the check is only as
+/// good as the tree it saw.
+fn assets_dir_for(root: &Path, name: &str) -> AppResult<std::path::PathBuf> {
     ensure_asset_name(name)?;
-    let root = root_for_generation(state, generation)?;
     // Resolve the target through the shared guard even though `name` is
     // already vetted — defense in depth, and it canonicalizes symlink games.
-    resolve(&root, &format!("assets/{name}"))?;
+    resolve(root, &format!("assets/{name}"))?;
     let dir = root.join("assets");
     fs::create_dir_all(&dir)?;
     Ok(dir)
@@ -205,8 +201,10 @@ pub fn asset_upload_commit(
     // Pin the root before persisting: after the file lands, a failed root
     // lookup would otherwise skip invalidation and strand a stale catalog.
     let root = root_for_generation(&state, generation)?;
-    let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
+    // Destination validation and directory creation happen under the lock
+    // too: a checkout that wins it may have replaced `assets/` meanwhile.
     let final_name = super::with_graph_lock(&root, || {
+        let assets_dir = assets_dir_for(&root, &desired_name)?;
         persist_unique(upload.file, &assets_dir, &desired_name)
     })?;
     super::invalidate_file_catalog(&state, &root);
@@ -294,9 +292,10 @@ pub fn asset_import(
     let root = root_for_generation(&state, generation)?;
     let mut temp = tempfile::NamedTempFile::new_in(staging_dir(&root)?)?;
     std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
-    let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
-    let final_name =
-        super::with_graph_lock(&root, || persist_unique(temp, &assets_dir, &desired_name))?;
+    let final_name = super::with_graph_lock(&root, || {
+        let assets_dir = assets_dir_for(&root, &desired_name)?;
+        persist_unique(temp, &assets_dir, &desired_name)
+    })?;
     super::invalidate_file_catalog(&state, &root);
     Ok(format!("assets/{final_name}"))
 }
