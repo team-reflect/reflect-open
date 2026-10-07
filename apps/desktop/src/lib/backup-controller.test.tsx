@@ -312,6 +312,7 @@ describe('createBackupController', () => {
   })
 
   it('keeps local history when the host sign-in cannot be read', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { calls } = fakeBridge({
       auth: null,
       remoteUrl: 'https://gitlab.com/alex/notes.git',
@@ -327,10 +328,15 @@ describe('createBackupController', () => {
       expect(calls).toContain('git_commit_all')
     })
     expect(calls).not.toContain('git_fetch')
+    expect(consoleError).toHaveBeenCalledWith(
+      'reading the host sign-in failed:',
+      expect.any(String),
+    )
+    consoleError.mockRestore()
     controller.dispose()
   })
 
-
+  it('keeps the SSH suggestion when local history cannot start', async () => {
     // Local history is best effort: a watcher that won't come up must not cost
     // the user the one instruction they have for fixing the remote.
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
