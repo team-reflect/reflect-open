@@ -311,7 +311,26 @@ describe('createBackupController', () => {
     controller.dispose()
   })
 
-  it('keeps the SSH suggestion when local history cannot start', async () => {
+  it('keeps local history when the host sign-in cannot be read', async () => {
+    const { calls } = fakeBridge({
+      auth: null,
+      remoteUrl: 'https://gitlab.com/alex/notes.git',
+      failSecretGet: true,
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    expect(controller.getState()).toMatchObject({
+      phase: 'connected',
+      status: { state: 'error', errorKind: 'rejected' },
+    })
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_commit_all')
+    })
+    expect(calls).not.toContain('git_fetch')
+    controller.dispose()
+  })
+
+
     // Local history is best effort: a watcher that won't come up must not cost
     // the user the one instruction they have for fixing the remote.
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})

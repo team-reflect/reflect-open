@@ -330,7 +330,16 @@ export function createBackupController(options: BackupControllerOptions): Backup
       // one's silently never leave. `rejected` = acting (not retrying) is
       // the fix.
       const host = repo === null ? remoteHost(remoteUrl) : null
-      if (host !== null && (await loadHostCredential(host)) === null) {
+      // A keychain the app cannot read is "no sign-in" here, as for the
+      // GitHub read above: the graph must keep its local history either way.
+      const hostCredential =
+        host === null
+          ? null
+          : await loadHostCredential(host).catch((error: unknown) => {
+              console.error('reading the host sign-in failed:', errorMessage(error))
+              return null
+            })
+      if (host !== null && hostCredential === null) {
         setState({
           phase: 'connected',
           remoteUrl,
