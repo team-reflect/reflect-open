@@ -211,13 +211,22 @@ pub struct RemoteTip {
     pub tracking_oid: Option<String>,
 }
 
-/// Ask `origin` for its branch tip in one ref-advertisement round trip,
+/// Ask the remote for its branch tip in one ref-advertisement round trip,
 /// without downloading objects or touching the working tree. A tip that
 /// differs from the tracking ref means the remote moved since the last fetch.
-pub(super) fn remote_head(root: &Path, credential: Option<GitCredential>) -> AppResult<RemoteTip> {
+/// `url` probes another remote instead of `origin` (a host the user is about
+/// to connect: the credential is checked here, not at the first push).
+pub(super) fn remote_head(
+    root: &Path,
+    url: Option<&str>,
+    credential: Option<GitCredential>,
+) -> AppResult<RemoteTip> {
     let repo = open_existing(root)?;
     let branch = current_branch(&repo)?;
-    let mut remote = origin(&repo)?;
+    let mut remote = match url {
+        Some(url) => repo.remote_anonymous(url)?,
+        None => origin(&repo)?,
+    };
     let refname = format!("refs/heads/{branch}");
     remote.connect_auth(
         git2::Direction::Fetch,

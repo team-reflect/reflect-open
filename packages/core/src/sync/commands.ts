@@ -143,15 +143,18 @@ export const remoteTipSchema = z.object({
 export type RemoteTip = z.infer<typeof remoteTipSchema>
 
 /**
- * Where `origin`'s branch is right now, in one round trip and without a
+ * Where the remote's branch is right now, in one round trip and without a
  * fetch. `remoteOid !== trackingOid` means the remote moved since the last
  * fetch; `remoteOid === null` means the branch does not exist there yet.
+ * `url` probes that remote instead of `origin`: rejects when the host is
+ * unreachable or refuses the credential.
  */
 export async function gitRemoteHead(
   credential: GitCredential | null,
   generation: number,
+  url: string | null = null,
 ): Promise<RemoteTip> {
-  return await call('git_remote_head', { credential, generation }, remoteTipSchema)
+  return await call('git_remote_head', { url, credential, generation }, remoteTipSchema)
 }
 
 /** Fetch `origin`; returns ahead/behind for the current branch. */

@@ -1157,7 +1157,7 @@ fn remote_head_reports_the_remote_tip_without_fetching() {
     commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
     push(root_a, None).unwrap();
 
-    let tip = remote_head(root_a, None).unwrap();
+    let tip = remote_head(root_a, None, None).unwrap();
     assert!(tip.remote_oid.is_some());
     assert_eq!(
         tip.remote_oid, tip.tracking_oid,
@@ -1169,7 +1169,7 @@ fn remote_head_reports_the_remote_tip_without_fetching() {
     commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
     push(&root_b, None).unwrap();
 
-    let tip = remote_head(root_a, None).unwrap();
+    let tip = remote_head(root_a, None, None).unwrap();
     let b_head = Repository::open(&root_b)
         .unwrap()
         .head()
@@ -1185,6 +1185,13 @@ fn remote_head_reports_the_remote_tip_without_fetching() {
     );
 
     fetch(root_a, None).unwrap();
-    let tip = remote_head(root_a, None).unwrap();
+    let tip = remote_head(root_a, None, None).unwrap();
     assert_eq!(tip.remote_oid, tip.tracking_oid, "the fetch caught up");
+
+    // An explicit URL probes that remote instead of `origin`: the check a
+    // host connection runs before it saves anything.
+    let probed = remote_head(root_a, Some(&fixture.remote_url), None).unwrap();
+    assert_eq!(probed.remote_oid, tip.remote_oid);
+    let missing = fixture._dir.path().join("nowhere.git");
+    assert!(remote_head(root_a, missing.to_str(), None).is_err());
 }
