@@ -97,7 +97,7 @@ describe('open documents', () => {
     const unregisterBad = registerOpenDocument({ session: failing })
     const unregisterGood = registerOpenDocument({ session: fakeSession('notes/good.md', log) })
     try {
-      await expect(flushOpenDocuments()).resolves.toBeUndefined()
+      await expect(flushOpenDocuments()).resolves.toEqual(['notes/bad.md']) // reported, not thrown
       expect(log).toContain('flush:notes/good.md')
     } finally {
       unregisterBad()

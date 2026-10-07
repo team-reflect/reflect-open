@@ -296,7 +296,7 @@ describe('createNoteSession', () => {
     await settled()
 
     failArchive('disk full')
-    await session.flush()
+    await expect(session.flush()).rejects.toThrow('disk full') // exit paths ask before discarding
     expect(archived).toEqual([])
     expect(snapshots.at(-1)?.error).toBe('disk full')
     expect(session.content()).toBe('# Mine\n') // still owned by the session

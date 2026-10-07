@@ -179,8 +179,9 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
    * Keep a parked conflict's unsaved buffer recoverable (#1443). Saves are
    * paused while the conflict waits on the user, so this is the only copy
    * that survives teardown. The same buffer is archived once, however many
-   * flushes see it; a failed archive keeps the buffer in the session and the
-   * next flush retries.
+   * flushes see it. A failed archive keeps the buffer in the session, marks
+   * the session errored, and rejects the flush so an exit path can ask the
+   * user before the buffer is destroyed.
    */
   async function preserve(): Promise<void> {
     if (conflict === null || !dirty || io.archiveUnsaved === undefined) {
@@ -196,6 +197,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     } catch (cause) {
       error = errorMessage(cause)
       emit()
+      throw cause
     }
   }
 

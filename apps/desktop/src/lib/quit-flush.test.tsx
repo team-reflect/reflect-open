@@ -17,7 +17,8 @@ const core = vi.hoisted(() => ({
   quitRequested: null as (() => void) | null,
   unlisten: vi.fn(),
 }))
-const flushOpenDocuments = vi.hoisted(() => vi.fn(async () => {}))
+const flushOpenDocuments = vi.hoisted(() => vi.fn(async (): Promise<string[]> => []))
+const ask = vi.hoisted(() => vi.fn(async (_message: string) => true))
 const flushSettings = vi.hoisted(() => vi.fn(async () => {}))
 const flushBackup = vi.hoisted(() => vi.fn(async () => {}))
 
@@ -39,6 +40,7 @@ vi.mock('@reflect/core', () => ({
   },
 }))
 
+vi.mock('@tauri-apps/plugin-dialog', () => ({ ask }))
 vi.mock('@/editor/open-documents.ts', () => ({ flushOpenDocuments }))
 vi.mock('@/lib/backup-flush.ts', () => ({ flushBackup }))
 vi.mock('@/lib/settings-flush.ts', () => ({ flushSettings }))
@@ -84,6 +86,45 @@ describe('installQuitFlush', () => {
     expect(flushSettings).toHaveBeenCalledOnce()
     expect(flushBackup).toHaveBeenCalledOnce()
     expect(windowMock.hide).toHaveBeenCalledOnce()
+
+    dispose()
+  })
+
+  it('asks before quitting with edits that could not be archived, and stays on cancel', async () => {
+    flushOpenDocuments.mockResolvedValueOnce(['daily/2026-10-07.md'])
+    ask.mockResolvedValueOnce(false)
+    const dispose = installQuitFlush()
+    expect(core.quitRequested).not.toBeNull()
+    core.quitRequested?.()
+    await vi.waitFor(() => expect(ask).toHaveBeenCalledOnce())
+    expect(ask).toHaveBeenCalledWith(
+      expect.stringContaining('daily/2026-10-07.md'),
+      expect.anything(),
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(core.confirmQuit).not.toHaveBeenCalled()
+
+    dispose()
+  })
+
+  it('quits when the user accepts losing unarchived edits', async () => {
+    flushOpenDocuments.mockResolvedValueOnce(['daily/2026-10-07.md'])
+    ask.mockResolvedValueOnce(true)
+    const dispose = installQuitFlush()
+    core.quitRequested?.()
+    await vi.waitFor(() => expect(core.confirmQuit).toHaveBeenCalledOnce())
+
+    dispose()
+  })
+
+  it('keeps the main window open when hiding would discard unarchived edits', async () => {
+    flushOpenDocuments.mockResolvedValueOnce(['notes/a.md'])
+    ask.mockResolvedValueOnce(false)
+    const dispose = installQuitFlush()
+    const closeRequest = closeCurrentWindow()
+    await closeRequest.completed
+    expect(ask).toHaveBeenCalledOnce()
+    expect(windowMock.hide).not.toHaveBeenCalled()
 
     dispose()
   })

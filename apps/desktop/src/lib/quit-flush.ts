@@ -1,4 +1,5 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { ask } from '@tauri-apps/plugin-dialog'
 import { confirmQuit, subscribeQuitRequested } from '@reflect/core'
 import { flushOpenDocuments } from '@/editor/open-documents.ts'
 import { flushBackup } from '@/lib/backup-flush.ts'
@@ -21,12 +22,41 @@ import { isMainWindow } from '@/lib/windows/window-role.ts'
  *   `ExitRequested` once and emits `app:quit-requested`; we flush, then
  *   `confirmQuit()` exits for real (even if a flush failed: its error is
  *   already surfaced per-note, and refusing to quit would trap the user).
+ *   The one exception is an unsaved buffer that could not be archived: it
+ *   exists nowhere but in memory, so the user is asked before it goes.
  * - **Webview unload** (dev reloads): `beforeunload` can't await, but writes
  *   dispatched before teardown still reach the Rust process — a belt.
  *
  * Mobile's exit is backgrounding, not quitting — its leg of the same flush
  * sequence lives in `background-flush.ts` (Plan 19, decision 6).
  */
+/** Note buffers and settings land first, then the backup commit captures them. */
+async function flushEverything(): Promise<string[]> {
+  const [documents] = await Promise.all([flushOpenDocuments(), flushSettings().catch(() => {})])
+  await flushBackup()
+  return documents
+}
+
+/**
+ * Edits that could be neither saved (a parked conflict) nor archived (the
+ * archive write failed) exist only in memory. Ask before the exit destroys
+ * them; declining keeps the window, and the session, alive.
+ */
+async function mayDiscard(unpreserved: string[]): Promise<boolean> {
+  if (unpreserved.length === 0) {
+    return true
+  }
+  return await ask(
+    `Unsaved edits in ${unpreserved.join(', ')} could not be saved or archived. Quit anyway and lose them?`,
+    {
+      title: 'Unsaved edits',
+      kind: 'warning',
+      okLabel: 'Quit anyway',
+      cancelLabel: 'Keep editing',
+    },
+  )
+}
+
 export function installQuitFlush(): () => void {
   // No native shell (browser dev): nothing can quit-flush. getCurrentWindow
   // below is safe to reach only inside a Tauri webview.
@@ -49,9 +79,8 @@ export function installQuitFlush(): () => void {
         // destroy the last window (and Tauri then terminates the process).
         event.preventDefault()
       }
-      await Promise.allSettled([flushOpenDocuments(), flushSettings()])
-      await flushBackup()
-      if (shouldHide) {
+      const unpreserved = await flushEverything()
+      if (shouldHide && (await mayDiscard(unpreserved))) {
         await currentWindow.hide()
       }
     }),
@@ -59,11 +88,11 @@ export function installQuitFlush(): () => void {
 
   void subscriptions.add(
     subscribeQuitRequested(() => {
-      void Promise.allSettled([flushOpenDocuments(), flushSettings()])
-        .then(() => flushBackup())
-        .then(() => {
+      void flushEverything().then(async (unpreserved) => {
+        if (await mayDiscard(unpreserved)) {
           void confirmQuit()
-        })
+        }
+      })
     }),
   )
 

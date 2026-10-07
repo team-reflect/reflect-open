@@ -99,11 +99,13 @@ export function retargetOpenDocument(from: string, to: string, session: NoteSess
  * Flush every open buffer, fire each document's pending settle-time work, and
  * settle once all of it has landed. Failures are surfaced per-document by the
  * save pipeline already; teardown must proceed past them, so rejections are
- * absorbed, never re-thrown.
+ * absorbed, never re-thrown. The one rejection a flush does produce, an
+ * unsaved buffer that could not be archived either, comes back as its path.
  */
-export async function flushOpenDocuments(): Promise<void> {
-  await Promise.allSettled(
-    [...documents.values()].map(async (document) => {
+export async function flushOpenDocuments(): Promise<string[]> {
+  const open = [...documents.values()]
+  const results = await Promise.allSettled(
+    open.map(async (document) => {
       await document.session.flush()
       // Settle after the flush so the rename tracker has seen the final title;
       // settle() appends the rewrite synchronously, settled() awaits it.
@@ -111,4 +113,9 @@ export async function flushOpenDocuments(): Promise<void> {
       await document.settled?.()
     }),
   )
+  // A rejected flush is a parked buffer whose archive failed: the edits exist
+  // nowhere but in memory. Exit paths ask before destroying them.
+  return open
+    .filter((_, index) => results[index]?.status === 'rejected')
+    .map((document) => document.session.path)
 }
