@@ -7,6 +7,7 @@ import {
   type GraphInfo,
 } from '@reflect/core'
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
+import { flushBackup } from '@/lib/backup-flush.ts'
 import { setPlatformSurface } from '@/lib/platform-surface.ts'
 import { createBackupController, type BackupState } from './backup-controller.ts'
 
@@ -45,6 +46,8 @@ interface FakeOptions {
   failIndexApply?: boolean
   /** Hold the listen promise until `release()` (the teardown-race window). */
   gateListen?: boolean
+  /** Hold the first `git_merge_remote` until `releaseMerge()` (the mid-pull window). */
+  gateMerge?: boolean
   /** Make the watcher subscription throw (the unusable-watcher path). */
   failListen?: boolean
   failStatus?: boolean
@@ -80,6 +83,8 @@ function fakeBridge(options: FakeOptions = {}) {
   }
   let releaseListen: (() => void) | null = null
   let releaseIndexApply: (() => void) | null = null
+  let releaseMerge: (() => void) | null = null
+  let mergeCount = 0
   let indexApplyCount = 0
   const mergeOutcomes = [...(options.mergeOutcomes ?? [])]
   const pushOutcomes = [...(options.pushOutcomes ?? [])]
@@ -110,6 +115,12 @@ function fakeBridge(options: FakeOptions = {}) {
         case 'git_fetch':
           return { ahead: 0, behind: 0 }
         case 'git_merge_remote':
+          mergeCount += 1
+          if (options.gateMerge === true && mergeCount === 1) {
+            await new Promise<void>((resolve) => {
+              releaseMerge = resolve
+            })
+          }
           return mergeOutcomes.shift() ?? options.mergeOutcome ?? UP_TO_DATE
         case 'git_push':
           return (
@@ -159,6 +170,7 @@ function fakeBridge(options: FakeOptions = {}) {
     status,
     releaseListen: () => releaseListen?.(),
     releaseIndexApply: () => releaseIndexApply?.(),
+    releaseMerge: () => releaseMerge?.(),
   }
 }
 
@@ -514,6 +526,33 @@ describe('createBackupController', () => {
 
     expect(calls).toContain('secret_delete')
     expect(controller.getState()).toEqual({ phase: 'disconnected' })
+    controller.dispose()
+  })
+
+  // Safety invariant S4 (docs/git-backup-safety.md): the quit-time commit must
+  // queue behind an in-flight cycle. Today `flushBackup` calls
+  // `gitCommitAll` directly, so a commit can land between a pull's ref move
+  // and its checkout and commit the stale tree (#1405). Red on purpose until
+  // the flusher routes through the engine.
+  it.fails('quit flush waits for an in-flight pull before committing', async () => {
+    const { calls, releaseMerge } = fakeBridge({ gateMerge: true })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_merge_remote')
+    })
+    expect(commitCount(calls)).toBe(1) // the launch cycle's own commit
+
+    const flushed = flushBackup()
+    await Promise.resolve()
+    // The pull is still between fetch and merge: no second commit may run yet.
+    expect(commitCount(calls)).toBe(1)
+
+    releaseMerge()
+    await flushed
+    await vi.waitFor(() => {
+      expect(commitCount(calls)).toBe(2)
+    })
     controller.dispose()
   })
 
