@@ -25,6 +25,8 @@ vi.mock('@/lib/query-client.ts', () => ({
 interface ScanCall {
   skipPaths: string[]
   ingestedPaths: string[]
+  /** The arrivals as sent: each path with the mtime it arrived with. */
+  arrivals: Array<{ path: string; modifiedMs?: number }>
   recordBaseline: boolean
   scope: string
 }
@@ -60,9 +62,13 @@ beforeEach(() => {
       invoked.push([command, args ?? {}])
       switch (command) {
         case 'icloud_conflicts_scan': {
+          const arrivals =
+            (args?.['ingestedPaths'] as Array<{ path: string; modifiedMs?: number }> | undefined) ??
+            []
           scanCalls.push({
             skipPaths: (args?.['skipPaths'] as string[] | undefined) ?? [],
-            ingestedPaths: (args?.['ingestedPaths'] as string[] | undefined) ?? [],
+            ingestedPaths: arrivals.map((entry) => entry.path),
+            arrivals,
             recordBaseline: args?.['recordBaseline'] === true,
             scope: String(args?.['scope']),
           })
@@ -205,6 +211,9 @@ describe('createIcloudController', () => {
 
     expect(scanCalls).toHaveLength(2)
     expect(scanCalls[1]?.ingestedPaths).toEqual(['notes/external.md'])
+    // The arrival's mtime rides along: the sweep advances the base only while
+    // the file still carries it.
+    expect(scanCalls[1]?.arrivals).toEqual([{ path: 'notes/external.md', modifiedMs: 2 }])
     expect(scanCalls[1]?.recordBaseline).toBe(false)
   })
 

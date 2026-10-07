@@ -52,7 +52,6 @@ pub(crate) use self::io::file_occupied;
 pub(crate) use self::io::mark_dir_local_only;
 pub(crate) use self::io::modified_ms;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
-pub(crate) use self::own_writes::take_own_write_by_path;
 pub(crate) use self::own_writes::{record_own_write, take_own_write};
 /// The lexical traversal guard, shared with the conflict stores that mirror
 /// note paths under `.reflect/` (shadow bases, conflict archive).

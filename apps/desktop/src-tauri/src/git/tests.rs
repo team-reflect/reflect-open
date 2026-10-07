@@ -520,6 +520,12 @@ fn non_fast_forward_push_is_rejected_as_data() {
         merged.changed_files[0].modified_ms.is_some(),
         "upserts carry the written file's mtime: {merged:?}"
     );
+    // The pull's writes are this app's own: the watcher's echo of them must
+    // not read as an external arrival.
+    assert!(
+        crate::fs::take_own_write("notes/b.md", merged.changed_files[0].modified_ms),
+        "a pull registers what it wrote as an own write"
+    );
     assert!(push(root_a, None).unwrap().pushed);
 }
 

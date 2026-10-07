@@ -101,7 +101,8 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
   let disposed = false
   let baselinePending = true
   const disposers: Array<() => void> = []
-  let pendingIngest = new Set<string>()
+  /** External arrivals awaiting an ingest sweep: path → the mtime they arrived with. */
+  let pendingIngest = new Map<string, number | undefined>()
   let scanTimer: ReturnType<typeof setTimeout> | null = null
   let scanTimerDue = 0
   let scanRunning = false
@@ -199,8 +200,8 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       return
     }
     scanRunning = true
-    const ingested = [...pendingIngest]
-    pendingIngest = new Set()
+    const ingested = [...pendingIngest].map(([path, modifiedMs]) => ({ path, modifiedMs }))
+    pendingIngest = new Map()
     const recordBaseline = baselinePending
     baselinePending = false
     const scope = recordBaseline ? 'full' : nextScanScope
@@ -219,8 +220,8 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     } catch (err) {
       // A failed sweep leaves versions unresolved; the next signal retries.
       console.error('iCloud conflict sweep failed:', err)
-      for (const path of ingested) {
-        pendingIngest.add(path) // don't lose the base advances
+      for (const entry of ingested) {
+        pendingIngest.set(entry.path, entry.modifiedMs) // don't lose the base advances
       }
       if (recordBaseline) {
         baselinePending = true // the adoption baseline must survive a failed first sweep
@@ -318,9 +319,10 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     try {
       disposers.push(
         await subscribeFileChanges((changes, source) => {
-          // Only content observed on disk from elsewhere may advance a base:
-          // this device's saves, a pull, and the sweep's own rewrites all
-          // arrive with their provenance and are skipped here.
+          // Only content observed on disk from elsewhere may advance a base.
+          // This device's saves, a pull, and the sweep's own rewrites are
+          // registered as own writes in Rust, so both their in-process batch
+          // and their watcher echo arrive labeled and are skipped here.
           if (disposed || source !== 'external') {
             return
           }
@@ -328,7 +330,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
             if (change.kind !== 'upsert' || !isNotePath(change.path)) {
               continue
             }
-            pendingIngest.add(change.path)
+            pendingIngest.set(change.path, change.modifiedMs)
           }
           // Arrival-driven: the wide window plus the minimum spacing, so a
           // download burst folds into a handful of sweeps rather than one

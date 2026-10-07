@@ -1,9 +1,11 @@
 //! Which files this app itself wrote moments ago, by graph-relative path
-//! and the mtime the write produced. The desktop watcher consults it to
-//! report the echo of our own write as `index:own-write` instead of
-//! `index:changed`, so consumers that must tell this device's writes from
-//! everything else (the sync debounce, the iCloud shadow base) branch on
-//! provenance instead of guessing from timing or content.
+//! and the mtime the write produced: the write commands, the importer, the
+//! iCloud sweep, and a Git pull all register here. The desktop watcher and
+//! the iOS metadata query consult it to report the echo of our own write as
+//! `index:own-write` instead of `index:changed`, so consumers that must tell
+//! this device's writes from everything else (the sync debounce, the iCloud
+//! shadow base) branch on provenance instead of guessing from timing or
+//! content.
 //!
 //! Entries are consumed on match and expire after a few seconds either way:
 //! the watcher's debounce delivers an echo well within that, and a stale
@@ -57,33 +59,9 @@ pub(crate) fn take_own_write(rel: &str, modified_ms: Option<u64>) -> bool {
     with(|recent| recent.remove(&(to_slash(rel), ms)).is_some())
 }
 
-/// Whether `rel` was written by this app within the TTL, whatever mtime the
-/// observer reports. For the iCloud metadata query, whose change date for
-/// an item need not equal the filesystem mtime the write produced; the path
-/// is enough there because the query is the only observer on that platform.
-/// Consumes every entry for the path.
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-pub(crate) fn take_own_write_by_path(rel: &str) -> bool {
-    let rel = to_slash(rel);
-    with(|recent| {
-        let before = recent.len();
-        recent.retain(|(path, _), _| *path != rel);
-        recent.len() != before
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
-    #[test]
-    fn a_recorded_write_matches_by_path_alone_for_the_metadata_query() {
-        record_own_write("notes/q.md", Some(1));
-        assert!(!take_own_write_by_path("notes/other.md"));
-        assert!(take_own_write_by_path("notes/q.md"));
-        assert!(!take_own_write_by_path("notes/q.md"), "consumed on match");
-    }
 
     #[test]
     fn a_recorded_write_matches_once_by_path_and_mtime() {

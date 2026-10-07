@@ -95,11 +95,29 @@ pub enum SweepScope {
 
 /// The version-check candidate set for `scope` ([`run_sweep`]'s
 /// `conflict_candidates`): `None` checks every note.
-fn conflict_candidates(scope: SweepScope, ingested_paths: &[String]) -> Option<HashSet<String>> {
+/// An external change the frontend ingested, with the mtime it arrived with.
+/// The base advances only while the file still carries that mtime: a save or
+/// a pull that landed since is nobody's common ancestor yet.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IngestedPath {
+    pub path: String,
+    pub modified_ms: Option<u64>,
+}
+
+fn conflict_candidates(
+    scope: SweepScope,
+    ingested_paths: &[IngestedPath],
+) -> Option<HashSet<String>> {
     match scope {
         SweepScope::Full => None,
         SweepScope::Candidates => crate::icloud::watch::conflicted_paths(),
-        SweepScope::Ingested => Some(ingested_paths.iter().cloned().collect()),
+        SweepScope::Ingested => Some(
+            ingested_paths
+                .iter()
+                .map(|entry| entry.path.clone())
+                .collect(),
+        ),
     }
 }
 
@@ -115,7 +133,7 @@ fn conflict_candidates(scope: SweepScope, ingested_paths: &[String]) -> Option<H
 pub async fn icloud_conflicts_scan(
     generation: u64,
     skip_paths: Vec<String>,
-    ingested_paths: Vec<String>,
+    ingested_paths: Vec<IngestedPath>,
     record_baseline: bool,
     scope: SweepScope,
     state: State<'_, GraphState>,
@@ -165,7 +183,7 @@ pub async fn icloud_conflicts_scan(
 fn run_sweep(
     root: &Path,
     skip_paths: &[String],
-    ingested_paths: &[String],
+    ingested_paths: &[IngestedPath],
     record_baseline: bool,
     conflict_candidates: Option<HashSet<String>>,
 ) -> AppResult<SweepOutcome> {
@@ -173,16 +191,16 @@ fn run_sweep(
     let skip: BTreeSet<&str> = skip_paths.iter().map(String::as_str).collect();
     let mut outcome = SweepOutcome::default();
 
-    for rel in ingested_paths {
+    for entry in ingested_paths {
         // A dirty open session may still overwrite this file with content
         // derived from an *older* state — advancing the base to the external
         // revision now would make a later diff3 read that overwrite as "we
         // deleted the other device's lines" and drop them. Stale is the safe
         // direction; the base advances once the session settles.
-        if skip.contains(rel.as_str()) {
+        if skip.contains(entry.path.as_str()) {
             continue;
         }
-        advance_base_if_clean(root, rel, &shadow, false);
+        advance_base_if_clean(root, &entry.path, &shadow, false, entry.modified_ms);
     }
 
     let files = crate::fs::note_files(root);
@@ -197,7 +215,7 @@ fn run_sweep(
                 // Overwriting an existing base here would advance it past
                 // unsynced local edits — exactly what the advance rule forbids
                 // — so a baseline pass is safe to repeat on every start.
-                advance_base_if_clean(root, &file.path, &shadow, true);
+                advance_base_if_clean(root, &file.path, &shadow, true, None);
             }
         }
     }
@@ -291,8 +309,16 @@ fn run_sweep(
 /// marker writes echo back through the file watcher as ordinary external
 /// upserts, so the guard must live here, not in the caller), and
 /// non-UTF-8/missing files. `fill_only` restricts the write to notes without
-/// a base (the adoption case).
-fn advance_base_if_clean(root: &Path, rel: &str, shadow: &ShadowStore, fill_only: bool) {
+/// a base (the adoption case). `arrived_ms` is the mtime the ingest reported:
+/// the sweep runs seconds later, and a file written since (a save, a pull)
+/// is not what both sides derive from, so it is left for the next arrival.
+fn advance_base_if_clean(
+    root: &Path,
+    rel: &str,
+    shadow: &ShadowStore,
+    fill_only: bool,
+    arrived_ms: Option<u64>,
+) {
     // `ingested_paths` arrive over IPC — refuse traversal shapes before any
     // filesystem access, like every other IPC-supplied graph path. (The
     // shadow store would reject the *write*, but the read must not happen
@@ -304,6 +330,16 @@ fn advance_base_if_clean(root: &Path, rel: &str, shadow: &ShadowStore, fill_only
         return;
     }
     let abs = root.join(rel);
+    if let Some(arrived) = arrived_ms {
+        let current = abs
+            .metadata()
+            .ok()
+            .as_ref()
+            .and_then(crate::fs::modified_ms);
+        if current != Some(arrived) {
+            return; // written since it arrived: not yet a common ancestor
+        }
+    }
     if !unresolved_versions(&abs).none() {
         return;
     }
@@ -970,7 +1006,7 @@ mod tests {
         let root = graph();
         write(root.path(), "notes/a.md", "# a\n");
         // Record a base, then delete the note externally — an orphaned base.
-        run_sweep(root.path(), &[], &["notes/a.md".to_string()], false, None).unwrap();
+        run_sweep(root.path(), &[], &ingested(&["notes/a.md"]), false, None).unwrap();
         assert!(ShadowStore::new(root.path()).base("notes/a.md").is_some());
         fs::remove_file(root.path().join("notes/a.md")).unwrap();
 
@@ -986,10 +1022,15 @@ mod tests {
 
     #[test]
     fn ingested_scope_checks_exactly_the_arrivals_and_full_checks_everything() {
-        let arrivals = vec!["notes/a.md".to_string(), "daily/2026-07-04.md".to_string()];
+        let arrivals = ingested(&["notes/a.md", "daily/2026-07-04.md"]);
         assert_eq!(
             super::conflict_candidates(SweepScope::Ingested, &arrivals),
-            Some(arrivals.iter().cloned().collect::<HashSet<_>>())
+            Some(
+                arrivals
+                    .iter()
+                    .map(|entry| entry.path.clone())
+                    .collect::<HashSet<_>>()
+            )
         );
         assert_eq!(
             super::conflict_candidates(SweepScope::Full, &arrivals),
@@ -1029,7 +1070,7 @@ mod tests {
         run_sweep(
             root.path(),
             &["notes/open.md".to_string()],
-            &["notes/open.md".to_string()],
+            &ingested(&["notes/open.md"]),
             true, // even an adoption baseline must respect the dirty skip
             None,
         )
@@ -1048,7 +1089,7 @@ mod tests {
         run_sweep(
             root.path(),
             &[],
-            &["../evil.md".to_string(), "/etc/hosts".to_string()],
+            &ingested(&["../evil.md", "/etc/hosts"]),
             false,
             None,
         )
@@ -1070,9 +1111,66 @@ mod tests {
             "<<<<<<< Mac\nmine\n=======\ntheirs\n>>>>>>> iPhone\n",
         );
 
-        run_sweep(root.path(), &[], &["notes/a.md".to_string()], true, None).unwrap();
+        run_sweep(root.path(), &[], &ingested(&["notes/a.md"]), true, None).unwrap();
 
         assert_eq!(ShadowStore::new(root.path()).base("notes/a.md"), None);
+    }
+
+    /// Ingests without an arrival mtime: the base advances unconditionally.
+    fn ingested(paths: &[&str]) -> Vec<IngestedPath> {
+        paths
+            .iter()
+            .map(|path| IngestedPath {
+                path: path.to_string(),
+                modified_ms: None,
+            })
+            .collect()
+    }
+
+    fn mtime_ms(path: &Path) -> Option<u64> {
+        fs::metadata(path)
+            .ok()
+            .as_ref()
+            .and_then(crate::fs::modified_ms)
+    }
+
+    #[test]
+    fn an_ingest_written_since_it_arrived_does_not_advance_the_base() {
+        let root = graph();
+        let note = root.path().join("notes/a.md");
+        write(root.path(), "notes/a.md", "# arrived\n");
+        let arrived = mtime_ms(&note);
+        assert!(arrived.is_some());
+        // A local save landed between the arrival and the sweep.
+        write(root.path(), "notes/a.md", "# arrived, then edited here\n");
+        fs::File::options()
+            .write(true)
+            .open(&note)
+            .unwrap()
+            .set_modified(std::time::SystemTime::now() + std::time::Duration::from_secs(5))
+            .unwrap();
+        let stale = vec![IngestedPath {
+            path: "notes/a.md".to_string(),
+            modified_ms: arrived,
+        }];
+        run_sweep(root.path(), &[], &stale, false, None).unwrap();
+        let shadow = ShadowStore::new(root.path());
+        assert_eq!(
+            shadow.base("notes/a.md"),
+            None,
+            "the edit is not a common ancestor"
+        );
+
+        // The next arrival reports the file as it is now, and that advances.
+        let fresh = vec![IngestedPath {
+            path: "notes/a.md".to_string(),
+            modified_ms: mtime_ms(&note),
+        }];
+        run_sweep(root.path(), &[], &fresh, false, None).unwrap();
+        assert_eq!(
+            shadow.base("notes/a.md"),
+            Some("# arrived, then edited here\n".to_string())
+        );
     }
 
     #[test]
@@ -1086,7 +1184,7 @@ mod tests {
         assert_eq!(shadow.base("notes/a.md"), Some("# A\n".to_string()));
 
         write(root.path(), "notes/b.md", "# B updated externally\n");
-        run_sweep(root.path(), &[], &["notes/b.md".to_string()], false, None).unwrap();
+        run_sweep(root.path(), &[], &ingested(&["notes/b.md"]), false, None).unwrap();
         assert_eq!(
             shadow.base("notes/b.md"),
             Some("# B updated externally\n".to_string())

@@ -666,11 +666,12 @@ mod platform {
                 // The query also reports this device's own saves (and the
                 // sweep's rewrites) once iCloud notices them; those echoes
                 // must not read as external arrivals that advance a note's
-                // shadow base. The query's change date need not equal the
-                // write's mtime, so the match is by path within the TTL.
+                // shadow base. Same `(path, mtime)` match as the desktop
+                // watcher.
                 let (own, external): (Vec<_>, Vec<_>) =
                     round.changes.into_iter().partition(|change| {
-                        change.kind == "upsert" && crate::fs::take_own_write_by_path(&change.path)
+                        change.kind == "upsert"
+                            && crate::fs::take_own_write(&change.path, change.modified_ms)
                     });
                 if !external.is_empty() {
                     let _ = app.emit("index:changed", external);
@@ -842,10 +843,18 @@ mod platform {
                 continue; // placeholder (or eviction): bytes aren't local
             };
             if previous != Some(TrackedState::Local(mtime)) {
+                // The query's change date tracks the item, not the file:
+                // report the filesystem mtime, which is what a write
+                // produced and what the own-write registry matches on.
+                let modified_ms = std::fs::metadata(&item.abs)
+                    .ok()
+                    .as_ref()
+                    .and_then(crate::fs::modified_ms)
+                    .or(Some(mtime));
                 changes.push(FileChange {
                     path: item.rel.clone(),
                     kind: "upsert".to_string(),
-                    modified_ms: Some(mtime),
+                    modified_ms,
                 });
             }
         }
