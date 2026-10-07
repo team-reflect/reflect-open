@@ -36,16 +36,27 @@ pub(super) fn open_existing(root: &Path) -> AppResult<Repository> {
     Ok(Repository::open(root)?)
 }
 
-/// Refuse to operate on a repository mid-operation (a rebase/merge the user
-/// started with the git CLI). Guessing here could destroy their state.
+/// Refuse to operate on a repository mid-operation (a rebase, cherry-pick,
+/// or revert the user started with the git CLI): guessing there could
+/// destroy their state. A merge is the one state this app itself produces,
+/// between `repo.merge` and the merge commit; one left behind by a crash is
+/// cleared here (index back to `HEAD`, working tree untouched) so the next
+/// cycle re-derives it instead of refusing forever.
 pub(super) fn ensure_clean_state(repo: &Repository) -> AppResult<()> {
-    if repo.state() != git2::RepositoryState::Clean {
-        return Err(AppError::io(format!(
-            "the backup repository has a {:?} in progress; finish or abort it with git first",
-            repo.state()
-        )));
+    match repo.state() {
+        git2::RepositoryState::Clean => Ok(()),
+        git2::RepositoryState::Merge => {
+            tracing::warn!("clearing a merge an earlier run left unfinished");
+            let mut index = repo.index()?;
+            index.read_tree(&repo.head()?.peel_to_tree()?)?;
+            index.write()?;
+            repo.cleanup_state()?;
+            Ok(())
+        }
+        state => Err(AppError::io(format!(
+            "the backup repository has a {state:?} in progress; finish or abort it with git first"
+        ))),
     }
-    Ok(())
 }
 
 /// The branch HEAD points at. Works on an unborn HEAD (where `repo.head()`

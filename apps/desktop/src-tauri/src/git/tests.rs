@@ -1109,7 +1109,6 @@ fn commit_during_fast_forward_never_reverts_pulled_notes() {
 }
 
 #[test]
-#[ignore = "red until P1.3: a merge interrupted before its commit must not wedge the repository"]
 fn merge_interrupted_before_commit_converges_next_cycle() {
     let fixture = fixture();
     let root_a = &fixture.graph_a;
@@ -1147,4 +1146,16 @@ fn merge_interrupted_before_commit_converges_next_cycle() {
         assert_eq!(head_blob(root_a, rel), expected, "{rel} in HEAD");
         assert_eq!(remote_blob(&fixture, rel), expected, "{rel} on the remote");
     }
+}
+
+#[test]
+fn a_foreign_rebase_is_still_refused() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n");
+    commit_all(root, "a", MAX_FILE_BYTES).unwrap();
+    // The shape `git rebase` leaves while it is running.
+    fs::create_dir_all(root.join(".git/rebase-merge")).unwrap();
+    let err = commit_all(root, "again", MAX_FILE_BYTES).unwrap_err();
+    assert!(format!("{err:?}").contains("in progress"), "{err:?}");
 }

@@ -51,13 +51,14 @@ queue, never straight to `git_commit_all`.
 
 ## S5. The repository is never left in app-made merge state
 
-A pull that dies between `repo.merge()` and the merge commit must not leave
-`MERGE_HEAD` behind, because every later cycle refuses to run on a
-repository mid-merge. Foreign state (a rebase the user started with the
-git CLI) is still refused.
+A pull that dies between `repo.merge()` and the merge commit leaves
+`MERGE_HEAD` behind. The next command clears it (index back to `HEAD`,
+working tree kept) and carries on, so a crash never wedges the backup.
+Foreign state (a rebase the user started with the git CLI) is still
+refused.
 
-- Test: `git::tests::merge_interrupted_before_commit_converges_next_cycle`
-  (`#[ignore]`).
+- Test: `git::tests::merge_interrupted_before_commit_converges_next_cycle`,
+  `git::tests::a_foreign_rebase_is_still_refused`.
 
 ## S6. `.reflect/` never enters a commit
 
