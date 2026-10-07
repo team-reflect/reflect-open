@@ -143,9 +143,6 @@ jobs:
     if: needs.build-gate.outputs.run == 'true'
     runs-on: macos-26
     timeout-minutes: 120
-    env:
-      # See publish-macos.yml.
-      CARGO_HTTP_MULTIPLEXING: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -165,9 +162,6 @@ jobs:
     if: needs.build-gate.outputs.run == 'true'
     runs-on: macos-26
     timeout-minutes: 120
-    env:
-      # See publish-macos.yml.
-      CARGO_HTTP_MULTIPLEXING: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -189,10 +183,6 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 120
     steps:
-      # See publish-windows.yml.
-      - name: Enable git long paths
-        run: git config --system core.longpaths true
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false

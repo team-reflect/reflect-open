@@ -51,11 +51,6 @@ jobs:
             runner: windows-11-arm
             target: aarch64-pc-windows-msvc
     steps:
-      # The runner image enables OS-level long paths but not git's own
-      # support; deep pnpm paths can fail checkout without it.
-      - name: Enable git long paths
-        run: git config --system core.longpaths true
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.commit || github.sha }}
