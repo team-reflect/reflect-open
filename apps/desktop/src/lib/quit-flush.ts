@@ -1,6 +1,6 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { ask } from '@tauri-apps/plugin-dialog'
-import { confirmQuit, subscribeQuitRequested } from '@reflect/core'
+import { cancelQuit, confirmQuit, subscribeQuitRequested } from '@reflect/core'
 import { flushOpenDocuments } from '@/editor/open-documents.ts'
 import { flushBackup } from '@/lib/backup-flush.ts'
 import { isMacosDesktop, isNativeShell } from '@/lib/platform.ts'
@@ -13,11 +13,11 @@ import { isMainWindow } from '@/lib/windows/window-role.ts'
  * inside their save debounce — or with settings writes still in their queue.
  * Three exits, three hooks:
  *
- * - **Window close** (red button, ⌘W): registering a JS `onCloseRequested`
- *   listener defers the close until the handler returns, so the flush is
- *   awaited before the window is destroyed. On macOS the main window stays
- *   alive and is hidden after flushing, preserving normal last-window close
- *   behavior without terminating the app; secondary windows still close.
+ * - **Window close** (red button, ⌘W): the close is prevented up front and
+ *   the flush awaited; then the macOS main window hides (preserving normal
+ *   last-window close behavior without terminating the app) and any other
+ *   window is destroyed. Edits that could not be saved or archived stop
+ *   either step until the user agrees to lose them.
  * - **App quit** (⌘Q): never reaches close-requested — the Rust shell defers
  *   `ExitRequested` once and emits `app:quit-requested`; we flush, then
  *   `confirmQuit()` exits for real (even if a flush failed: its error is
@@ -73,15 +73,18 @@ export function installQuitFlush(): () => void {
   // git commit only — pushing on the way out could stall the quit).
   void subscriptions.add(
     currentWindow.onCloseRequested(async (event) => {
-      const shouldHide = isMacosDesktop && isMainWindow()
-      if (shouldHide) {
-        // Prevent synchronously: waiting until after the flush lets AppKit
-        // destroy the last window (and Tauri then terminates the process).
-        event.preventDefault()
-      }
+      // Prevent synchronously: waiting until after the flush lets AppKit
+      // destroy the last window (and Tauri then terminates the process), and
+      // the user may still decline to lose unpreserved edits.
+      event.preventDefault()
       const unpreserved = await flushEverything()
-      if (shouldHide && (await mayDiscard(unpreserved))) {
+      if (!(await mayDiscard(unpreserved))) {
+        return
+      }
+      if (isMacosDesktop && isMainWindow()) {
         await currentWindow.hide()
+      } else {
+        await currentWindow.destroy()
       }
     }),
   )
@@ -89,9 +92,10 @@ export function installQuitFlush(): () => void {
   void subscriptions.add(
     subscribeQuitRequested(() => {
       void flushEverything().then(async (unpreserved) => {
-        if (await mayDiscard(unpreserved)) {
-          void confirmQuit()
-        }
+        // The Rust side armed the handshake for every window; declining must
+        // disarm it, or new windows stay refused and a later confirmation
+        // from another window could still exit.
+        void ((await mayDiscard(unpreserved)) ? confirmQuit() : cancelQuit())
       })
     }),
   )

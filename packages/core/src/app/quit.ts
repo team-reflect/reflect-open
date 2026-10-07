@@ -27,3 +27,12 @@ export function subscribeQuitRequested(handler: () => void): Promise<Unlisten> {
 export function confirmQuit(): Promise<void> {
   return call('quit_confirm', {}, z.null()).then(() => undefined)
 }
+
+/**
+ * Call a deferred quit off: the flush could not preserve every edit and the
+ * user chose to keep editing. The Rust handshake is disarmed so no later
+ * confirmation exits the app and new windows can open again.
+ */
+export function cancelQuit(): Promise<void> {
+  return call('quit_cancel', {}, z.null()).then(() => undefined)
+}

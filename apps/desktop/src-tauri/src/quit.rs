@@ -46,6 +46,14 @@ impl QuitState {
         !self.lock().is_empty()
     }
 
+    /// Call the quit off: the user chose to keep editing after a flush could
+    /// not preserve everything. No window owes a confirmation any more, so a
+    /// late `quit_confirm` from another window settles nothing and window
+    /// creation is allowed again.
+    pub fn cancel(&self) {
+        self.lock().clear();
+    }
+
     /// Settle one window's obligation — its flush confirmed, or the window
     /// was destroyed and can no longer confirm. True when it was the last
     /// one owed; idempotent per label, so a confirm followed by a destroy
@@ -65,9 +73,25 @@ pub fn quit_confirm(window: tauri::WebviewWindow, app: AppHandle, state: State<'
     }
 }
 
+/// Cancel a deferred quit: the user chose to keep editing.
+#[tauri::command]
+pub fn quit_cancel(state: State<'_, QuitState>) {
+    state.cancel();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cancel_disarms_and_a_late_confirm_settles_nothing() {
+        let state = QuitState::default();
+        state.arm(["main".to_string(), "note-1".to_string()]);
+        assert!(state.armed());
+        state.cancel();
+        assert!(!state.armed());
+        assert!(!state.settle("main"), "nothing is owed after a cancel");
+    }
 
     #[test]
     fn arms_per_window_and_concludes_on_the_last_settle() {

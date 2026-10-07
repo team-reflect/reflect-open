@@ -13,20 +13,23 @@ type CloseRequestedHandler = (event: CloseRequestedEventForTest) => Promise<void
 const windowMock = vi.hoisted(() => ({
   closeRequested: null as CloseRequestedHandler | null,
   hide: vi.fn(async () => {}),
+  destroy: vi.fn(async () => {}),
   unlisten: vi.fn(),
 }))
 const core = vi.hoisted(() => ({
   confirmQuit: vi.fn(async () => {}),
+  cancelQuit: vi.fn(async () => {}),
   quitRequested: null as (() => void) | null,
   unlisten: vi.fn(),
 }))
-const flushOpenDocuments = vi.hoisted(() => vi.fn(async () => {}))
+const flushOpenDocuments = vi.hoisted(() => vi.fn(async (): Promise<string[]> => []))
 const flushSettings = vi.hoisted(() => vi.fn(async () => {}))
 const flushBackup = vi.hoisted(() => vi.fn(async () => {}))
 
 vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({
     hide: windowMock.hide,
+    destroy: windowMock.destroy,
     onCloseRequested: async (handler: CloseRequestedHandler) => {
       windowMock.closeRequested = handler
       return windowMock.unlisten
@@ -34,8 +37,10 @@ vi.mock('@tauri-apps/api/window', () => ({
   }),
 }))
 
+vi.mock('@tauri-apps/plugin-dialog', () => ({ ask: vi.fn(async () => true) }))
 vi.mock('@reflect/core', () => ({
   confirmQuit: core.confirmQuit,
+  cancelQuit: core.cancelQuit,
   subscribeQuitRequested: async (handler: () => void) => {
     core.quitRequested = handler
     return core.unlisten
@@ -62,16 +67,18 @@ afterEach(() => {
 })
 
 describe('installQuitFlush outside macOS', () => {
-  it('allows the main window to close normally', async () => {
+  it('flushes, then destroys the main window instead of hiding it', async () => {
     const dispose = installQuitFlush()
     const preventDefault = vi.fn()
     const closeRequested = windowMock.closeRequested
     expect(closeRequested).not.toBeNull()
     const completed = closeRequested?.({ preventDefault }) ?? Promise.resolve()
 
-    expect(preventDefault).not.toHaveBeenCalled()
+    expect(preventDefault).toHaveBeenCalledOnce()
     await completed
     expect(windowMock.hide).not.toHaveBeenCalled()
+    expect(windowMock.destroy).toHaveBeenCalledOnce()
+    expect(windowMock.destroy).toHaveBeenCalledOnce()
 
     dispose()
   })

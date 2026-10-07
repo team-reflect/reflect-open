@@ -382,6 +382,7 @@ pub fn run() {
             git::git_merge_remote,
             git::git_push,
             quit::quit_confirm,
+            quit::quit_cancel,
             windows::open_note_window,
             windows::window_bootstrap,
             windows::close_note_windows,

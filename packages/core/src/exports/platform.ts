@@ -52,7 +52,7 @@ export {
   type MobileStorageKind,
 } from '../ipc/commands.ts'
 export { isMobilePlatform, type AppPlatform } from '../app/platform.ts'
-export { confirmQuit, subscribeQuitRequested } from '../app/quit.ts'
+export { cancelQuit, confirmQuit, subscribeQuitRequested } from '../app/quit.ts'
 export {
   beginBackgroundTask,
   endBackgroundTask,
