@@ -663,7 +663,21 @@ mod platform {
                 crate::fs::invalidate_file_catalog(&state, root);
             }
             if is_update {
-                let _ = app.emit("index:changed", round.changes);
+                // The query also reports this device's own saves (and the
+                // sweep's rewrites) once iCloud notices them; those echoes
+                // must not read as external arrivals that advance a note's
+                // shadow base. The query's change date need not equal the
+                // write's mtime, so the match is by path within the TTL.
+                let (own, external): (Vec<_>, Vec<_>) =
+                    round.changes.into_iter().partition(|change| {
+                        change.kind == "upsert" && crate::fs::take_own_write_by_path(&change.path)
+                    });
+                if !external.is_empty() {
+                    let _ = app.emit("index:changed", external);
+                }
+                if !own.is_empty() {
+                    let _ = app.emit("index:own-write", own);
+                }
             }
         }
         if !is_update {

@@ -59,9 +59,31 @@ pub(crate) fn take_own_write(rel: &str, modified_ms: Option<u64>) -> bool {
     with(|recent| recent.remove(&(normalize(rel), ms)).is_some())
 }
 
+/// Whether `rel` was written by this app within the TTL, whatever mtime the
+/// observer reports. For the iCloud metadata query, whose change date for
+/// an item need not equal the filesystem mtime the write produced; the path
+/// is enough there because the query is the only observer on that platform.
+/// Consumes every entry for the path.
+pub(crate) fn take_own_write_by_path(rel: &str) -> bool {
+    let rel = normalize(rel);
+    with(|recent| {
+        let before = recent.len();
+        recent.retain(|(path, _), _| *path != rel);
+        recent.len() != before
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_recorded_write_matches_by_path_alone_for_the_metadata_query() {
+        record_own_write("notes/q.md", Some(1));
+        assert!(!take_own_write_by_path("notes/other.md"));
+        assert!(take_own_write_by_path("notes/q.md"));
+        assert!(!take_own_write_by_path("notes/q.md"), "consumed on match");
+    }
 
     #[test]
     fn a_recorded_write_matches_once_by_path_and_mtime() {
