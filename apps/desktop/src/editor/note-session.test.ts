@@ -351,6 +351,34 @@ describe('createNoteSession', () => {
     expect(snapshots.at(-1)).toMatchObject({ conflict: 'theirs, newer\n', protected: false })
   })
 
+  it('typing while the review write runs is not overwritten by the marked merge', async () => {
+    const marked = '<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
+    let target: ReturnType<typeof createNoteSession> | null = null
+    const { session, writes, snapshots, setDisk } = harness({
+      merge: { kind: 'conflicted', content: marked },
+      beforeWrite: async () => {
+        target?.editorChanged('mine, typed during review\n')
+      },
+    })
+    target = session
+    session.load()
+    await settled()
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    session.externalChanged()
+    await settled()
+
+    session.review()
+    await settled()
+    expect(writes).toEqual([{ path: 'notes/a.md', contents: marked }])
+    expect(session.content()).toBe('mine, typed during review\n') // the buffer survived
+    expect(snapshots.at(-1)).toMatchObject({
+      conflict: marked,
+      mergedPreview: null,
+      protected: false,
+    })
+  })
+
   it('a failed review write keeps the conflict and leaves the save chain usable', async () => {
     const marked = '<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
     const { session, writes, snapshots, setDisk, failWrites } = harness({

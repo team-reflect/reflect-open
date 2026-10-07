@@ -451,6 +451,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     // lands, and the chain settles either way.
     const marked = mergedPreview
     const onDisk = conflict
+    const ours = header + buffer
     const write = io.write
     saveChain = saveChain.then(async () => {
       try {
@@ -464,12 +465,23 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         await reconcileFromDisk()
         return
       }
-      if (!disposed) {
+      if (disposed) {
+        return
+      }
+      error = null
+      if (header + buffer === ours) {
         conflict = null
         mergedPreview = null
-        error = null
         adoptCleanContent(marked)
+        return
       }
+      // The editor stayed live while the write ran and the user kept typing.
+      // The marked merge is on disk now and no longer covers the buffer, so
+      // it is parked like any other external change: Keep mine overwrites
+      // it with the newer buffer, Load theirs opens it protected.
+      conflict = marked
+      mergedPreview = null
+      emit()
     })
   }
 
