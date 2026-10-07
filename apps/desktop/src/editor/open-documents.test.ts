@@ -20,6 +20,8 @@ function fakeSession(path: string, log: string[]): NoteSession {
       log.push(`flush:${path}`)
     },
     keepMine: () => {},
+    keepBoth: () => {},
+    review: () => {},
     isDirty: () => false,
     isUnpersisted: () => false,
     prepareDelete: async () => false,

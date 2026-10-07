@@ -32,6 +32,8 @@ function fakeSession(path: string) {
     externalChanged: () => {},
     flush,
     keepMine: () => {},
+    keepBoth: () => {},
+    review: () => {},
     isDirty: () => false,
     isUnpersisted: () => false,
     prepareDelete: async () => false,

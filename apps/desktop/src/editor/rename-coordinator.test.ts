@@ -112,6 +112,8 @@ function fakeSession(content: string): NoteSession & {
     externalChanged: () => {},
     flush: vi.fn(async () => {}),
     keepMine: () => {},
+    keepBoth: () => {},
+    review: () => {},
     isDirty: () => false,
     isUnpersisted: () => false,
     prepareDelete: async () => false,

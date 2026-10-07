@@ -1,5 +1,6 @@
 import { applyTaskEdits, projectTasks, TaskStaleError, type TaskLocator } from '@reflect/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { MergeTextOutcome } from '@reflect/core'
 import { createNoteSession, type NoteSessionSnapshot } from './note-session.ts'
 import type { RoundTripFidelity } from './roundtrip.ts'
 
@@ -31,6 +32,8 @@ interface Harness {
   setDisk: (contents: string | null) => void
   /** While set, writes reject with this message (the save-failure seam). */
   failWrites: (message: string | null) => void
+  /** Script the next three-way merge outcome (`null` = the merge throws). */
+  setMerge: (outcome: MergeTextOutcome | null) => void
   session: ReturnType<typeof createNoteSession>
 }
 
@@ -45,6 +48,8 @@ function harness(options?: {
   createIfMissing?: boolean
   missingSeed?: string
   reconcilePendingEditorInput?: () => void
+  /** Initial scripted merge outcome; `undefined` = no merge capability. */
+  merge?: MergeTextOutcome
 }): Harness {
   const snapshots: NoteSessionSnapshot[] = []
   const expectedContents: (string | null | undefined)[] = []
@@ -53,6 +58,7 @@ function harness(options?: {
   const contents: Array<{ content: string; origin: string }> = []
   let disk = options?.disk === undefined ? '# Hello\n' : options.disk
   let writeFailure: string | null = null
+  let mergeOutcome: MergeTextOutcome | null = options?.merge ?? null
   const session = createNoteSession({
     path: 'notes/a.md',
     io: {
@@ -76,6 +82,15 @@ function harness(options?: {
                 throw { kind: 'io', message: 'Note changed on disk; reload before retrying' }
               writes.push({ path, contents })
               disk = contents
+            },
+      mergeText:
+        options?.merge === undefined
+          ? undefined
+          : async () => {
+              if (mergeOutcome === null) {
+                throw new Error('no merge')
+              }
+              return mergeOutcome
             },
     },
     classify: options?.classify ?? (() => 'exact'),
@@ -106,6 +121,9 @@ function harness(options?: {
     },
     failWrites: (message) => {
       writeFailure = message
+    },
+    setMerge: (outcome) => {
+      mergeOutcome = outcome
     },
     session,
   }
@@ -211,6 +229,99 @@ describe('createNoteSession', () => {
     session.editorChanged('# Same edit\n')
     session.editorChanged('# Same edit\n')
     expect(snapshots.length).toBe(afterLoad + 1) // one dirty transition, not two
+  })
+
+  it('a clean three-way merge applies silently and keeps saving', async () => {
+    // The field report: a script appended to the daily note while the user
+    // folded a bullet. Nothing overlaps, so nothing to ask.
+    const merged = '# Hello\n\n+ mine\n- from the script\n'
+    const { session, writes, applied, snapshots, setDisk, expectedContents } = harness({
+      merge: { kind: 'clean', content: merged },
+    })
+    session.load()
+    await settled()
+    session.editorChanged('# Hello\n\n+ mine\n')
+    setDisk('# Hello\n\n- mine\n- from the script\n')
+    session.externalChanged()
+    await settled()
+
+    expect(snapshots.at(-1)?.conflict).toBeNull()
+    expect(applied).toEqual([merged])
+    expect(writes).toEqual([{ path: 'notes/a.md', contents: merged }])
+    // The write expects the external content: that is what is on disk now.
+    expect(expectedContents.at(-1)).toBe('# Hello\n\n- mine\n- from the script\n')
+  })
+
+  it('overlapping edits park with the marked merge as a preview', async () => {
+    const marked = '<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
+    const { session, writes, snapshots, setDisk } = harness({
+      merge: { kind: 'conflicted', content: marked },
+    })
+    session.load()
+    await settled()
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    session.externalChanged()
+    await settled()
+
+    expect(writes).toEqual([])
+    expect(snapshots.at(-1)).toMatchObject({ conflict: 'theirs\n', mergedPreview: marked })
+  })
+
+  it('keepBoth splices both sides into the buffer and saves over the external content', async () => {
+    const marked = '<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
+    const { session, writes, snapshots, setDisk, expectedContents } = harness({
+      merge: { kind: 'conflicted', content: marked },
+    })
+    session.load()
+    await settled()
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    session.externalChanged()
+    await settled()
+
+    session.keepBoth()
+    await settled()
+    expect(snapshots.at(-1)).toMatchObject({ conflict: null, mergedPreview: null })
+    expect(writes).toEqual([{ path: 'notes/a.md', contents: 'mine\ntheirs\n' }])
+    expect(expectedContents.at(-1)).toBe('theirs\n')
+  })
+
+  it('review writes the marked merge and opens it protected', async () => {
+    const marked = '<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
+    const { session, writes, snapshots, setDisk } = harness({
+      merge: { kind: 'conflicted', content: marked },
+    })
+    session.load()
+    await settled()
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    session.externalChanged()
+    await settled()
+
+    session.review()
+    await settled()
+    expect(writes).toEqual([{ path: 'notes/a.md', contents: marked }])
+    expect(snapshots.at(-1)).toMatchObject({
+      conflict: null,
+      protected: true,
+      dirty: false,
+      initialContent: marked,
+    })
+  })
+
+  it('an unmergeable change parks without a preview', async () => {
+    const { session, snapshots, setDisk } = harness({
+      merge: { kind: 'unmergeable', content: 'theirs\n' },
+    })
+    session.load()
+    await settled()
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    session.externalChanged()
+    await settled()
+
+    expect(snapshots.at(-1)).toMatchObject({ conflict: 'theirs\n', mergedPreview: null })
   })
 
   it('keepMine rewrites the file even when the conflict content equals the buffer', async () => {

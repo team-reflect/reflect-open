@@ -1,3 +1,4 @@
+import type { MergeTextOutcome } from '@reflect/core'
 import type { FrontmatterPatch } from './note-session-frontmatter.ts'
 import type { RoundTripFidelity } from './roundtrip.ts'
 
@@ -28,6 +29,13 @@ export interface NoteSessionSnapshot {
   missing: boolean
   /** External content waiting on the user's choice (set only when dirty). */
   conflict: string | null
+  /**
+   * With a parked `conflict`: the three-way merge of the buffer and the
+   * external content, carrying labeled markers where they overlap. `null`
+   * when no merge was possible (no merge capability, or a side already
+   * carried markers), in which case only Keep mine / Load theirs apply.
+   */
+  mergedPreview: string | null
   error: string | null
 }
 
@@ -39,6 +47,7 @@ export const INITIAL_NOTE_SNAPSHOT: NoteSessionSnapshot = {
   dirty: false,
   missing: false,
   conflict: null,
+  mergedPreview: null,
   error: null,
 }
 
@@ -53,6 +62,14 @@ export interface NoteSessionIo {
   write:
     | ((path: string, contents: string, expectedContents?: string | null) => Promise<void>)
     | null
+  /**
+   * Three-way merge of the buffer (`ours`) and external content (`theirs`)
+   * over the last content read from disk (`base`). Optional: without it an
+   * external change against a dirty buffer always parks.
+   */
+  mergeText?:
+    | ((path: string, base: string, ours: string, theirs: string) => Promise<MergeTextOutcome>)
+    | undefined
 }
 
 /** Why {@link NoteSessionOptions.onContent} fired. */
@@ -134,6 +151,14 @@ export interface NoteSession {
   keepMine: () => void
   /** Resolve a conflict by loading the external content (discards the buffer). */
   loadTheirs: () => void
+  /** Resolve a conflict by keeping both sides of every overlapping block (needs `mergedPreview`). */
+  keepBoth: () => void
+  /**
+   * Resolve a conflict by writing the marked merge to disk and opening it
+   * protected, where the conflict notice offers block-by-block choices
+   * (needs `mergedPreview`).
+   */
+  review: () => void
   /** The full current document (frontmatter + buffer), as a save would write it. */
   content: () => string
   /**

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { readNote, writeNote, type FileChange } from '@reflect/core'
+import { mergeText, readNote, writeNote, type FileChange } from '@reflect/core'
 import { useFileChanges } from '@/lib/use-file-changes.ts'
 import { createDocumentBinding, type DocumentBinding } from './document-binding.ts'
 import type { NoteEditorHandle } from './note-editor.tsx'
@@ -30,6 +30,10 @@ export interface NoteDocument extends NoteSessionSnapshot {
   keepMine: () => void
   /** Resolve a conflict by loading the external content (discards the buffer). */
   loadTheirs: () => void
+  /** Resolve a conflict by keeping both sides of every overlapping block. */
+  keepBoth: () => void
+  /** Resolve a conflict by opening the marked merge for block-by-block review. */
+  review: () => void
   /**
    * Stable identity of the underlying session: increments when a session is
    * *created*, not when a rename retargets one (Plan 17). Key the editor on
@@ -128,6 +132,7 @@ export function useNoteDocument(
                   return writeNote(forPath, contents, current, expectedContents)
                 }
               : null,
+            mergeText: canWrite ? mergeText : undefined,
           },
           classify: checkRoundTrip,
           onSnapshot: (next) => {
@@ -223,12 +228,22 @@ export function useNoteDocument(
     binding.session()?.loadTheirs()
   }, [binding])
 
+  const keepBoth = useCallback(() => {
+    binding.session()?.keepBoth()
+  }, [binding])
+
+  const review = useCallback(() => {
+    binding.session()?.review()
+  }, [binding])
+
   return {
     ...snapshot,
     onEditorChange,
     bindEditor,
     keepMine,
     loadTheirs,
+    keepBoth,
+    review,
     sessionEpoch: binding.epoch(),
   }
 }

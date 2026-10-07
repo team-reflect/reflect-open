@@ -66,6 +66,10 @@ beforeEach(() => {
       writes.push(contents)
       return null
     }
+    if (command === 'conflict_merge_text') {
+      // The hook tests exercise the park path; merging is the session's job.
+      return { kind: 'unmergeable', content: (args as { theirs: string }).theirs }
+    }
     return null
   })
 })

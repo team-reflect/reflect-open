@@ -30,7 +30,12 @@ export function NoteSaveAlerts({
         </InlineAlert>
       ) : null}
       {document.conflict !== null ? (
-        <NoteConflictBanner onKeepMine={document.keepMine} onLoadTheirs={document.loadTheirs} />
+        <NoteConflictBanner
+          onKeepMine={document.keepMine}
+          onLoadTheirs={document.loadTheirs}
+          onKeepBoth={document.mergedPreview === null ? undefined : document.keepBoth}
+          onReview={document.mergedPreview === null ? undefined : document.review}
+        />
       ) : null}
     </>
   )
