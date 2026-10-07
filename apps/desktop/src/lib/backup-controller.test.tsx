@@ -676,8 +676,8 @@ describe('createBackupController', () => {
       document.dispatchEvent(new Event('visibilitychange'))
       await vi.waitFor(() => {
         expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(1)
+        expect(calls.filter((command) => command === 'git_fetch')).toHaveLength(1)
       })
-      expect(calls.filter((command) => command === 'git_fetch')).toHaveLength(1)
 
       visibility.mockReturnValue('hidden')
       vi.useFakeTimers()

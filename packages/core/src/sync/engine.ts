@@ -349,14 +349,17 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       }
       return
     }
-    const credential = offline ? null : await step(options.getCredential())
+    // The commit comes first: it is the part of every cycle a flush is owed,
+    // and it must land even if the owner gates the network work that follows
+    // (the credential resolution is the first point a gate can interrupt).
     const commit = await step(gitCommitAll('Update notes', options.generation))
     if (commit.skippedLargeFiles.length > 0) {
       options.onLargeFilesSkipped?.(commit.skippedLargeFiles)
     }
     if (offline) {
-      return // the commit is the whole cycle: no remote, or a flush on the way out
+      return // the commit is the whole cycle: no remote
     }
+    const credential = await step(options.getCredential())
     if (mode === 'push') {
       // The debounce path often fires for changes that are already committed
       // and pushed (a pull's own writes re-enter via the watcher). Nothing

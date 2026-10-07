@@ -287,6 +287,51 @@ describe('createSyncEngine', () => {
     engine.stop()
   })
 
+  it('a queued flush commits before the follow-up resolves its credential', async () => {
+    // The follow-up starts visible, so it runs as a full sync; the app hides
+    // while the credential is being resolved. The commit has already landed.
+    const gate: { release: () => void } = { release: () => {} }
+    const calls = fakeGit((command) => {
+      if (command === 'git_merge_remote') {
+        return new Promise((resolve) => {
+          gate.release = () => resolve(MERGED)
+        })
+      }
+      return defaultResponses(command)
+    })
+    const credentialGate: { release: () => void } = { release: () => {} }
+    let credentials = 0
+    let canStartCycle = true
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => {
+        credentials += 1
+        if (credentials === 2) {
+          await new Promise<void>((resolve) => {
+            credentialGate.release = resolve
+          })
+        }
+        return CRED
+      },
+      canStartCycle: () => canStartCycle,
+    })
+    const first = engine.syncNow()
+    await vi.waitFor(() => expect(commandsOf(calls)).toContain('git_merge_remote'))
+    const second = engine.syncNow()
+    const flushed = engine.commitNow()
+    gate.release()
+    await first
+    // The follow-up is running: its commit landed before it asked for a credential.
+    await vi.waitFor(() => expect(credentials).toBe(2))
+    expect(commandsOf(calls).filter((command) => command === 'git_commit_all')).toHaveLength(2)
+    canStartCycle = false
+    credentialGate.release()
+    await flushed
+    await second
+    expect(commandsOf(calls).filter((command) => command === 'git_push')).toHaveLength(1) // the first sync only
+    engine.stop()
+  })
+
   it('commitNow runs even when the owner gates cycles (the hidden-app flush)', async () => {
     // iOS fires the background flush after the document is hidden, exactly
     // when canStartCycle says no to network cycles.
