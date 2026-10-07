@@ -82,8 +82,9 @@ requiring the TestFlight-specific export method. The default remains
 `app-store-connect`, matching Tauri's App Store Connect distribution docs and
 the upload flow.
 
-Pass `--no-upload` to build and check the IPA without the Sentry and TestFlight
-uploads. The `build-ios-mobile` CI job uses it to rehearse a release.
+Pass `--no-sign` to check that the app compiles and archives. It needs no
+credentials and uploads nothing, and the result cannot be installed. The
+`build-ios-mobile` CI job uses it.
 
 ## GitHub Action
 

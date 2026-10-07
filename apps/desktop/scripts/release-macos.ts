@@ -5,6 +5,7 @@
 //   --target=<triple>       Default: the host triple
 //   --artifact-dir=<path>   Copy the release assets there after the build
 //   --no-notarize           Signed-only build, for local runs without Apple credentials
+//   --no-sign               Unsigned app only, to check that it compiles and bundles
 
 import { randomBytes } from 'node:crypto'
 import {
@@ -423,9 +424,19 @@ async function main(): Promise<void> {
       target: { type: 'string' },
       'artifact-dir': { type: 'string' },
       'no-notarize': { type: 'boolean', default: false },
+      'no-sign': { type: 'boolean', default: false },
     },
   })
   const artifactDir = values['artifact-dir']
+  if (values['no-sign']) {
+    if (artifactDir) {
+      throw new Error('--no-sign makes no release assets, so it cannot be used with --artifact-dir')
+    }
+    const { target, app } = resolveBundle(values.target ?? (await getHostTriple()))
+    await buildApp(target)
+    log(`done (unsigned): ${app}`)
+    return
+  }
   const identity = process.env.APPLE_SIGNING_IDENTITY
   if (!identity) {
     throw new Error('APPLE_SIGNING_IDENTITY is not set')

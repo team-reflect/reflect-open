@@ -116,16 +116,31 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-  # The `build-*` jobs rehearse a release: they run the release scripts, but
-  # upload nothing. They run on a Release PR and on a manual run only, because
-  # each one is a full release build.
+  # The `build-*` jobs check that the release build of each platform still
+  # compiles and bundles. They run the release scripts without signing, so
+  # they need no secrets and upload nothing. Each one is a full release build,
+  # so they run on a Release PR and on a manual run only.
+  build-gate:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        env:
+          RUN: >-
+            ${{
+              github.repository == 'team-reflect/reflect-open' &&
+              (github.event_name == 'workflow_dispatch' ||
+                (github.event_name == 'pull_request' &&
+                  startsWith(github.head_ref, 'release-please') &&
+                  github.event.pull_request.head.repo.full_name == github.repository))
+            }}
+        run: echo "run=$RUN" >> "$GITHUB_OUTPUT"
+
   build-macos-desktop:
-    if: >-
-      github.repository == 'team-reflect/reflect-open' &&
-      (github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'pull_request' &&
-          startsWith(github.head_ref, 'release-please') &&
-          github.event.pull_request.head.repo.full_name == github.repository))
+    needs: build-gate
+    if: needs.build-gate.outputs.run == 'true'
     runs-on: macos-26
     timeout-minutes: 120
     env:
@@ -142,24 +157,12 @@ jobs:
         with:
           cache-key: build-macos-desktop
 
-      # Signs the app, but does not send it to Apple for notarization. Without
-      # SENTRY_AUTH_TOKEN the Sentry vite plugin skips the source-map upload.
-      - name: Build and sign
-        env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm release:macos --no-notarize --artifact-dir="$RUNNER_TEMP/release-artifacts"
+      - name: Build
+        run: pnpm release:macos --no-sign
 
   build-ios-mobile:
-    if: >-
-      github.repository == 'team-reflect/reflect-open' &&
-      (github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'pull_request' &&
-          startsWith(github.head_ref, 'release-please') &&
-          github.event.pull_request.head.repo.full_name == github.repository))
+    needs: build-gate
+    if: needs.build-gate.outputs.run == 'true'
     runs-on: macos-26
     timeout-minutes: 120
     env:
@@ -177,22 +180,12 @@ jobs:
           targets: aarch64-apple-ios
           cache-key: build-ios-mobile
 
-      # Xcode needs the App Store Connect key to sign the IPA. `--no-upload`
-      # skips the Sentry and TestFlight uploads.
-      - name: Build and sign
-        env:
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
-        run: pnpm release:ios --build-number="$(date -u +%Y%m%d%H%M)" --no-upload
+      - name: Build
+        run: pnpm release:ios --build-number="$(date -u +%Y%m%d%H%M)" --no-sign
 
   build-windows-desktop:
-    if: >-
-      github.repository == 'team-reflect/reflect-open' &&
-      (github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'pull_request' &&
-          startsWith(github.head_ref, 'release-please') &&
-          github.event.pull_request.head.repo.full_name == github.repository))
+    needs: build-gate
+    if: needs.build-gate.outputs.run == 'true'
     runs-on: windows-latest
     timeout-minutes: 120
     steps:
@@ -210,12 +203,10 @@ jobs:
         with:
           cache-key: build-windows-desktop
 
-      - name: Build installer
+      # Without the updater key, the script writes no updater signature.
+      - name: Build
         shell: bash
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm release:windows --artifact-dir="$RUNNER_TEMP/windows-artifacts"
+        run: pnpm release:windows
 
   # A single job for branch protection to require, instead of listing every
   # job (and every matrix entry) as a required status check. The `build-*`

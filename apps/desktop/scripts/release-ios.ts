@@ -4,7 +4,7 @@
 //
 //   --build-number=<digits>   Required
 //   --export-method=<name>    Default: app-store-connect
-//   --no-upload               Build and check only: no Sentry or TestFlight upload
+//   --no-sign                 Unsigned build without credentials: nothing is uploaded
 
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -47,7 +47,6 @@ interface Credentials {
 interface Options {
   readonly buildNumber: string
   readonly exportMethod: string
-  readonly upload: boolean
 }
 
 /** The App Store Connect API key, as altool arguments and as the environment Tauri reads. */
@@ -146,7 +145,7 @@ async function uploadDebugFiles(): Promise<void> {
 }
 
 async function build(
-  { buildNumber, exportMethod, upload }: Options,
+  { buildNumber, exportMethod }: Options,
   credentials: Credentials,
 ): Promise<void> {
   const config = JSON.stringify({ bundle: { iOS: { bundleVersion: buildNumber } } })
@@ -157,10 +156,18 @@ async function build(
   })
   await assertIpa()
   await assertArchiveSymbols()
-  if (upload) {
-    await uploadDebugFiles()
-  }
+  await uploadDebugFiles()
   log(`built ${IPA_PATH} (build ${buildNumber})`)
+}
+
+/** Checks that the app compiles and archives. The result cannot be installed. */
+async function buildUnsigned(buildNumber: string): Promise<void> {
+  const config = JSON.stringify({ bundle: { iOS: { bundleVersion: buildNumber } } })
+  await runTauri(['ios', 'build', '--no-sign', '--ci', '--config', config], {
+    CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only',
+  })
+  await assertArchiveSymbols()
+  log(`built an unsigned archive at ${ARCHIVE_PATH}`)
 }
 
 async function runAltool(args: readonly string[], credentials: Credentials): Promise<void> {
@@ -176,7 +183,7 @@ async function main(): Promise<void> {
     options: {
       'build-number': { type: 'string', default: '' },
       'export-method': { type: 'string', default: 'app-store-connect' },
-      'no-upload': { type: 'boolean', default: false },
+      'no-sign': { type: 'boolean', default: false },
     },
   })
   const buildNumber = values['build-number']
@@ -184,15 +191,16 @@ async function main(): Promise<void> {
     throw new Error(`invalid build number "${buildNumber}"`)
   }
   assertSentryDsn()
+  if (values['no-sign']) {
+    await buildUnsigned(buildNumber)
+    return
+  }
 
   await runWithTempDir(async (tempDir) => {
     const credentials = resolveCredentials(tempDir)
-    const upload = !values['no-upload']
-    await build({ buildNumber, exportMethod: values['export-method'], upload }, credentials)
-    if (upload) {
-      // --wait blocks until App Store Connect has processed the build.
-      await runAltool(['--upload-package', IPA_PATH, '--show-progress', '--wait'], credentials)
-    }
+    await build({ buildNumber, exportMethod: values['export-method'] }, credentials)
+    // --wait blocks until App Store Connect has processed the build.
+    await runAltool(['--upload-package', IPA_PATH, '--show-progress', '--wait'], credentials)
   })
 }
 

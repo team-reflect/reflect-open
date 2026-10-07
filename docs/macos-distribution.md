@@ -91,6 +91,7 @@ Bundles land under `target/<target-triple>/release/bundle/`, for example
 pnpm release:macos                 # build + notarize + verify
 pnpm release:macos --target=x86_64-apple-darwin  # the same for Intel
 pnpm release:macos --no-notarize   # signed-only build (runs locally; Gatekeeper rejects it elsewhere)
+pnpm release:macos --no-sign       # unsigned app only, to check that it compiles and bundles
 pnpm release:macos --artifact-dir=<dir>  # also copy the release assets to <dir>
 ```
 
@@ -132,9 +133,10 @@ not appear automatically on the bot-created Release PRs. Use the run-checks butt
 before merging one.
 
 On a Release PR, CI also runs the `build-macos-desktop`, `build-ios-mobile`, and
-`build-windows-desktop` jobs. They run the release scripts as a rehearsal: they build
-and sign, but they do not notarize and they upload nothing. A manual run of the CI
-workflow starts them on any branch.
+`build-windows-desktop` jobs. They run the release scripts without signing
+(`--no-sign`), to check that the release build of each platform compiles and bundles.
+They need no secrets and upload nothing. A manual run of the CI workflow starts them
+on any branch.
 
 ### Beta (the everyday release)
 
