@@ -11,6 +11,7 @@ import {
   githubCredential,
   githubRemoteUrl,
   gitDisconnect,
+  gitRemoteHead,
   gitSetup,
   gitStatus,
   isCaptureSpoolPath,
@@ -23,6 +24,7 @@ import {
   ReflectError,
   subscribeFileChanges,
   type ChangedFile,
+  type GitCredential,
   type GithubRepoRef,
   type GraphInfo,
   type SyncEngine,
@@ -35,7 +37,9 @@ import { startOperation } from '@/lib/operations.ts'
 import { isNativeShell } from '@/lib/platform.ts'
 import { isMobileSurface } from '@/lib/platform-surface.ts'
 import { providerFetch } from '@/lib/provider-fetch.ts'
+import { isICloudRoot } from '@/lib/icloud-controller.ts'
 import { throttledInvalidateIndexQueries } from '@/lib/query-client.ts'
+import { attachRemoteProbe } from '@/lib/remote-probe.ts'
 import { attachResumeListeners } from '@/lib/resume-listeners.ts'
 
 /**
@@ -83,8 +87,9 @@ export interface BackupControllerOptions {
  *
  * Owns: the connection probe, the sync engine, the watcher subscription that
  * feeds its debounce, the resume triggers (launch, window focus, visibility →
- * visible for mobile app resume, and back-online pulls), the quit-commit
- * hook, and the connect / disconnect / sign-out / back-up-now actions.
+ * visible for mobile app resume, and back-online pulls), the desktop remote
+ * probe timer, the quit-commit hook, and the connect / disconnect / sign-out
+ * / back-up-now actions.
  */
 export interface BackupController {
   /** Probe the graph and start the engine if fully connected. Idempotent. */
@@ -354,6 +359,18 @@ export function createBackupController(options: BackupControllerOptions): Backup
         await startLocalHistory(status.initialized)
         return
       }
+      // The managed sign-in is for github.com only; another HTTPS host gets
+      // its own stored sign-in; SSH and path remotes get none and Rust
+      // resolves them locally.
+      const getCredential: () => Promise<GitCredential | null> =
+        repo !== null
+          ? async () => {
+              const token = await getGithubToken(providerFetch)
+              return token === null ? null : githubCredential(token)
+            }
+          : host !== null
+            ? () => loadHostCredential(host)
+            : async () => null
       const next = createSyncEngine({
         generation,
         ...(isMobileSurface() ? { idleMs: MOBILE_IDLE_MS } : {}),
@@ -363,18 +380,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
         // The background flusher's protected local commit bypasses this
         // engine deliberately.
         canStartCycle: () => !isMobileSurface() || document.visibilityState !== 'hidden',
-        // The managed sign-in is for github.com only; another HTTPS host gets
-        // its own stored sign-in; SSH and path remotes get none and Rust
-        // resolves them locally.
-        getCredential:
-          repo !== null
-            ? async () => {
-                const token = await getGithubToken(providerFetch)
-                return token === null ? null : githubCredential(token)
-              }
-            : host !== null
-              ? () => loadHostCredential(host)
-              : async () => null,
+        getCredential,
         onStatus: (engineStatus) => {
           setState({ phase: 'connected', remoteUrl, repo, status: engineStatus })
           if (repo !== null && isForbidden(engineStatus)) {
@@ -394,6 +400,21 @@ export function createBackupController(options: BackupControllerOptions): Backup
       }
 
       domDisposers.push(attachResumeListeners(() => void next.syncNow()))
+      // A desktop window that stays in front still learns about the other
+      // device's push: a cheap tip probe on a timer, a full cycle only when
+      // the remote moved. Mobile has no idle network (resume covers it), and
+      // an iCloud-hosted graph pulls on the engine's own schedule.
+      if (!isMobileSurface() && !isICloudRoot(options.graph.root)) {
+        domDisposers.push(
+          attachRemoteProbe(
+            async () => {
+              const tip = await gitRemoteHead(await getCredential(), generation)
+              return tip.remoteOid !== tip.trackingOid
+            },
+            () => void next.syncNow(),
+          ),
+        )
+      }
 
       void next.syncNow() // launch pull: pick up other devices' changes
     } catch (error) {
