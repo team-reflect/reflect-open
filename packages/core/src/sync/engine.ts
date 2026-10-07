@@ -169,9 +169,16 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
    * The one follow-up requested while a cycle was in flight (strongest mode
    * wins). Its callers await `done`, which settles when the follow-up itself
    * finishes, not when the cycle they landed behind does: the quit flush
-   * must not report done before its own commit ran.
+   * must not report done before its own commit ran. `flush` remembers that
+   * a commit-only request joined: a network follow-up the owner gates in the
+   * meantime still owes that commit.
    */
-  let followUp: { mode: Mode; done: Promise<void>; settle: () => void } | null = null
+  let followUp: {
+    mode: Mode
+    flush: boolean
+    done: Promise<void>
+    settle: () => void
+  } | null = null
 
   function emit(status: SyncStatus): void {
     if (signal.aborted) {
@@ -274,9 +281,12 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         const done = new Promise<void>((resolve) => {
           settle = resolve
         })
-        followUp = { mode, done, settle }
-      } else if (MODES.indexOf(mode) > MODES.indexOf(followUp.mode)) {
-        followUp.mode = mode
+        followUp = { mode, flush: mode === 'commit', done, settle }
+      } else {
+        if (MODES.indexOf(mode) > MODES.indexOf(followUp.mode)) {
+          followUp.mode = mode
+        }
+        followUp.flush ||= mode === 'commit'
       }
       return await followUp.done
     }
@@ -318,7 +328,10 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
           const next = followUp
           followUp = null
           // A stopped engine runs nothing more, but its awaiters must not hang.
-          void (signal.aborted ? Promise.resolve() : run(next.mode)).finally(next.settle)
+          // A gated network follow-up still runs the commit a flush asked for.
+          const gated = options.canStartCycle?.() === false
+          const mode = gated && next.flush ? 'commit' : next.mode
+          void (signal.aborted ? Promise.resolve() : run(mode)).finally(next.settle)
         }
       }
     })()

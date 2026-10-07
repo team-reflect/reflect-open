@@ -248,6 +248,45 @@ describe('createSyncEngine', () => {
     engine.stop()
   })
 
+  it('a flush queued behind a sync still commits when the app hides meanwhile', async () => {
+    // Visible: a sync is mid-merge and another syncNow queues a full
+    // follow-up. The app goes to the background and the flush joins that
+    // follow-up. The gate must not swallow the commit the flush is owed.
+    const gate: { release: () => void } = { release: () => {} }
+    const calls = fakeGit((command) => {
+      if (command === 'git_merge_remote') {
+        return new Promise((resolve) => {
+          gate.release = () => resolve(MERGED)
+        })
+      }
+      return defaultResponses(command)
+    })
+    let canStartCycle = true
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => CRED,
+      canStartCycle: () => canStartCycle,
+    })
+    const first = engine.syncNow()
+    await vi.waitFor(() => expect(commandsOf(calls)).toContain('git_merge_remote'))
+    const second = engine.syncNow()
+    canStartCycle = false
+    const flushed = engine.commitNow()
+    gate.release()
+    await first
+    await flushed
+    await second
+    const commands = commandsOf(calls)
+    // The running sync stopped at the gate after its merge, and the queued
+    // full follow-up ran as the commit the flush was owed: no push, two commits.
+    expect(commands.filter((command) => command === 'git_push')).toHaveLength(0)
+    expect(commands.filter((command) => command === 'git_commit_all')).toHaveLength(2)
+    expect(commands.lastIndexOf('git_commit_all')).toBeGreaterThan(
+      commands.indexOf('git_merge_remote'),
+    )
+    engine.stop()
+  })
+
   it('commitNow runs even when the owner gates cycles (the hidden-app flush)', async () => {
     // iOS fires the background flush after the document is hidden, exactly
     // when canStartCycle says no to network cycles.
