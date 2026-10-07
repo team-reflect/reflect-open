@@ -37,6 +37,7 @@ use crate::error::{AppError, AppResult};
 
 use super::import_assets::{self, DownloadOutcome};
 use super::io::{atomic_write_bytes, file_occupied};
+use super::own_writes::record_own_write_at;
 use super::resolve::resolve;
 
 /// Summary returned to the settings UI after an import completes.
@@ -339,7 +340,8 @@ pub(super) fn finalize_import(
             EntryPlan::SkipIdentical => skipped_files += 1,
             EntryPlan::Write { relative, renamed } => {
                 let target = resolve(root, &relative)?;
-                atomic_write_bytes(root, &target, &entry.bytes)?;
+                let written = atomic_write_bytes(root, &target, &entry.bytes)?;
+                record_own_write_at(root, &target, written);
                 names.record(&target);
                 imported_files += 1;
                 if renamed {
@@ -382,7 +384,8 @@ pub(super) fn finalize_import(
             NotePlan::SkipIdentical => skipped_files += 1,
             NotePlan::Write { relative, renamed } => {
                 let target = resolve(root, &relative)?;
-                atomic_write_bytes(root, &target, &entry.bytes)?;
+                let written = atomic_write_bytes(root, &target, &entry.bytes)?;
+                record_own_write_at(root, &target, written);
                 names.record(&target);
                 imported_files += 1;
                 if renamed {
@@ -392,7 +395,8 @@ pub(super) fn finalize_import(
             }
             NotePlan::Merge { merged } => {
                 let target = resolve(root, &entry.relative)?;
-                atomic_write_bytes(root, &target, &merged)?;
+                let written = atomic_write_bytes(root, &target, &merged)?;
+                record_own_write_at(root, &target, written);
                 merged_files += 1;
                 changed_paths.push(entry.relative.clone());
             }

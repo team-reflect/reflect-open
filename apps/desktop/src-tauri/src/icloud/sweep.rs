@@ -520,11 +520,12 @@ fn apply_file_resolution(
 ) {
     let abs = root.join(rel);
     if resolution.changed {
-        if let Err(err) =
-            crate::fs::atomic_write_bytes(root, &abs, resolution.final_content.as_bytes())
-        {
-            tracing::warn!(path = rel, ?err, "failed to write conflict resolution");
-            return; // versions stay unresolved; next sweep retries
+        match crate::fs::atomic_write_bytes(root, &abs, resolution.final_content.as_bytes()) {
+            Ok(modified_ms) => crate::fs::record_own_write(rel, modified_ms),
+            Err(err) => {
+                tracing::warn!(path = rel, ?err, "failed to write conflict resolution");
+                return; // versions stay unresolved; next sweep retries
+            }
         }
     }
     if resolution.changed || resolution.marked {
@@ -687,8 +688,9 @@ fn fold_duplicate(
         Resolution::Marked { content } => (content, true),
     };
     if merged != canonical_content {
-        if crate::fs::atomic_write_bytes(root, &canonical_abs, merged.as_bytes()).is_err() {
-            return; // duplicate stays; next sweep retries
+        match crate::fs::atomic_write_bytes(root, &canonical_abs, merged.as_bytes()) {
+            Ok(modified_ms) => crate::fs::record_own_write(canonical_rel, modified_ms),
+            Err(_) => return, // duplicate stays; next sweep retries
         }
         outcome.changed.push(SweepChange {
             path: canonical_rel.to_string(),

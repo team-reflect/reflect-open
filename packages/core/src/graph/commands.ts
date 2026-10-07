@@ -107,8 +107,9 @@ export async function cancelReflectV1Import(): Promise<void> {
 /**
  * Mark files imported by {@link importReflectV1Zip} as this device's writes.
  * Call only after the UI confirms the imported graph is still the active graph:
- * these paths are graph-relative and the own-write channel is scoped to the
- * currently running iCloud controller.
+ * these paths are graph-relative and the file-change channel is scoped to the
+ * currently running iCloud controller. On desktop this is a no-op: the Rust
+ * importer records what it wrote and the watcher labels the echo itself.
  */
 export function markReflectV1ImportOwnWrites(summary: GraphImportSummary): void {
   const modifiedMs = Date.now()

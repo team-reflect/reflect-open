@@ -210,8 +210,9 @@ export function createBackupController(options: BackupControllerOptions): Backup
     // Spooled capture envelopes (`.reflect/inbox/`) are git-ignored and
     // drained within seconds — they must not tick the commit debounce. The
     // drain's own note writes arrive as ordinary changes right after.
-    const subscription = await subscribeFileChanges((changes) => {
-      if (changes.some((change) => !isCaptureSpoolPath(change.path))) {
+    const subscription = await subscribeFileChanges((changes, source) => {
+      // A pull's own writes are already committed; only edits need a cycle.
+      if (source !== 'pull' && changes.some((change) => !isCaptureSpoolPath(change.path))) {
         next.noteChanged()
       }
     })

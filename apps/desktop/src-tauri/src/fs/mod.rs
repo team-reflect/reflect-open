@@ -11,6 +11,7 @@ pub mod assets;
 mod import;
 mod import_assets;
 mod io;
+mod own_writes;
 mod resolve;
 pub mod x_archive;
 mod x_archive_store;
@@ -50,6 +51,7 @@ pub(crate) use self::io::file_occupied;
 /// backup repo must never ride a file-sync provider — Plan 21).
 pub(crate) use self::io::mark_dir_local_only;
 pub(crate) use self::io::modified_ms;
+pub(crate) use self::own_writes::{record_own_write, take_own_write};
 /// The lexical traversal guard, shared with the conflict stores that mirror
 /// note paths under `.reflect/` (shadow bases, conflict archive).
 pub(crate) use self::resolve::ensure_relative;
@@ -443,6 +445,7 @@ pub fn note_write(
         check_contents == Some(true),
         expected_contents.as_deref(),
     )?;
+    record_own_write(&path, modified_ms);
     invalidate_file_catalog(&state, &root);
     Ok(modified_ms)
 }
@@ -487,6 +490,7 @@ pub fn note_create(
     let target = resolve(&root, &path)?;
     match atomic_create(&root, &target, &contents)? {
         AtomicCreateOutcome::Created(modified_ms) => {
+            record_own_write(&path, modified_ms);
             invalidate_file_catalog(&state, &root);
             Ok(NoteCreateOutcome::Created { modified_ms })
         }
@@ -509,7 +513,8 @@ pub fn asset_write(
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(contents_base64.as_bytes())
         .map_err(|err| AppError::io(format!("invalid base64 asset payload: {err}")))?;
-    atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)?;
+    let modified_ms = atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)?;
+    record_own_write(&path, modified_ms);
     invalidate_file_catalog(&state, &root);
     Ok(())
 }

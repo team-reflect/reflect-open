@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { emitFileChanges, setBridge, writeNote } from '@reflect/core'
+import { emitFileChanges, setBridge } from '@reflect/core'
 import { createIcloudController, isICloudRoot } from './icloud-controller.ts'
 
 /**
@@ -191,10 +191,11 @@ describe('createIcloudController', () => {
     await icloud.start()
     await settleScan() // baseline out of the way
 
-    await writeNote('notes/own.md', '# mine\n', GRAPH.generation)
+    // The watcher reports our own save's echo with its provenance (Rust
+    // matches the path and mtime it just wrote); only `external` ingests.
+    emitFileChanges([{ path: 'notes/own.md', kind: 'upsert', modifiedMs: 1 }], 'own-write')
     emitFileChanges(
       [
-        { path: 'notes/own.md', kind: 'upsert', modifiedMs: 1 },
         { path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 },
         { path: 'notes/gone.md', kind: 'remove' },
       ],
@@ -229,13 +230,10 @@ describe('createIcloudController', () => {
     // …and neither the controller's own synchronous fan-out nor the file
     // watcher's later echo of the sweep's write may come back as an ingest —
     // only the genuinely external change does.
-    emitFileChanges(
-      [
-        { path: 'notes/merged.md', kind: 'upsert', modifiedMs: 6 }, // watcher echo
-        { path: 'notes/other.md', kind: 'upsert', modifiedMs: 9 },
-      ],
-      'external',
-    )
+    // (The sweep records what it wrote, so the watcher's echo of merged.md
+    // arrives as `own-write`, like any other write this device made.)
+    emitFileChanges([{ path: 'notes/merged.md', kind: 'upsert', modifiedMs: 6 }], 'own-write')
+    emitFileChanges([{ path: 'notes/other.md', kind: 'upsert', modifiedMs: 9 }], 'external')
     await settleScan(INGEST_SETTLE_MS) // arrival-driven: debounce + minimum spacing
     expect(scanCalls[1]?.ingestedPaths).toEqual(['notes/other.md'])
   })
