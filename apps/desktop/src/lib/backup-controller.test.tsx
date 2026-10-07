@@ -56,6 +56,8 @@ interface FakeOptions {
   mergeOutcomes?: unknown[]
   /** Per-call push outcomes for retry/convergence tests. */
   pushOutcomes?: unknown[]
+  /** Make every `git_push` throw this AppError (transport-level failures). */
+  pushError?: unknown
   /** The graph's origin (defaults to a GitHub HTTPS remote; null = none). */
   remoteUrl?: string | null
   /** Whether the graph already has a repository (defaults to true). */
@@ -112,6 +114,9 @@ function fakeBridge(options: FakeOptions = {}) {
         case 'git_merge_remote':
           return mergeOutcomes.shift() ?? options.mergeOutcome ?? UP_TO_DATE
         case 'git_push':
+          if (options.pushError !== undefined) {
+            throw options.pushError
+          }
           return (
             pushOutcomes.shift() ?? {
               pushed: true,
@@ -514,6 +519,47 @@ describe('createBackupController', () => {
 
     expect(calls).toContain('secret_delete')
     expect(controller.getState()).toEqual({ phase: 'disconnected' })
+    controller.dispose()
+  })
+
+  // libgit2 reports every 403 as an auth failure, but GitHub also answers
+  // 403 for a token without access to the repo and for rate limiting; the
+  // controller asks GitHub whether the token is good before blaming it.
+  const FORBIDDEN = { kind: 'auth', message: 'request failed with status code: 403' }
+  const MERGED = { kind: 'merged', conflictedPaths: [], changedFiles: [] }
+
+  it('a 403 with a valid token reports a refused sync, not a bad credential', async () => {
+    fakeBridge({ mergeOutcome: MERGED, pushError: FORBIDDEN })
+    httpFetch.mockResolvedValueOnce(jsonResponse({ login: 'alex' }))
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(controller.getState()).toMatchObject({
+        phase: 'connected',
+        status: { state: 'error', errorKind: 'rejected' },
+      })
+    })
+    const state = controller.getState()
+    expect(
+      state.phase === 'connected' && state.status.state === 'error' && state.status.message,
+    ).toContain('alex/notes')
+    controller.dispose()
+  })
+
+  it('a 403 with a rejected token stays an auth error', async () => {
+    fakeBridge({ mergeOutcome: MERGED, pushError: FORBIDDEN })
+    httpFetch.mockResolvedValueOnce(jsonResponse({ message: 'Bad credentials' }, 401))
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(httpFetch).toHaveBeenCalled()
+    })
+    await vi.waitFor(() => {
+      expect(controller.getState()).toMatchObject({
+        phase: 'connected',
+        status: { state: 'error', errorKind: 'auth' },
+      })
+    })
     controller.dispose()
   })
 
