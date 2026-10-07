@@ -21,6 +21,7 @@ setBridge({
 
 /** The fake on-disk file + a write log, behind the mocked IPC. */
 let disk: string
+let created: Array<{ path: string; contents: string }> = []
 let writes: string[]
 
 const MANAGED_ID = '01hv3xq7c2dm8k4t9w5e6r1n98'
@@ -54,6 +55,7 @@ function fakeEditor(): NoteEditorHandle & { applied: string[] } {
 beforeEach(() => {
   disk = '# Hello\n'
   writes = []
+  created = []
   emitChange = null
   mockInvoke.mockReset()
   mockInvoke.mockImplementation(async (command, args) => {
@@ -67,8 +69,13 @@ beforeEach(() => {
       return null
     }
     if (command === 'conflict_merge_text') {
-      // The hook tests exercise the park path; merging is the session's job.
+      // The hook tests exercise the copy-aside path; merging is the session's job.
       return { kind: 'unmergeable', content: (args as { theirs: string }).theirs }
+    }
+    if (command === 'note_create') {
+      const { path, contents } = args as { path: string; contents: string }
+      created.push({ path, contents })
+      return { kind: 'created', modifiedMs: null }
     }
     return null
   })
@@ -635,10 +642,9 @@ describe('useNoteDocument', () => {
       releaseRewrite()
       await paneA2.act(() => vi.runAllTimersAsync())
 
-      // The alias went through the live session — no conflict from our own
+      // The alias went through the live session — no merge against our own
       // background write, and the user's edit and the alias both persist
       // (carried to the slug path by the move).
-      expect(paneA2.result.current.conflict).toBeNull()
       expect(files['notes/new-title.md']).toContain('aliases:')
       expect(files['notes/new-title.md']).toContain('Old Title')
       expect(files['notes/new-title.md']).toContain('fresh edit')
@@ -682,7 +688,7 @@ describe('useNoteDocument', () => {
     await act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
     await act(async () => {})
     expect(editor.applied).toEqual([])
-    expect(result.current.conflict).toBeNull()
+    expect(result.current.dirty).toBe(false)
   })
 
   it('reloads a clean buffer on a real external change', async () => {
@@ -693,11 +699,10 @@ describe('useNoteDocument', () => {
     disk = '# Changed outside\n'
     await act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
     await vi.waitFor(() => expect(editor.applied).toEqual(['# Changed outside\n']))
-    expect(result.current.conflict).toBeNull()
     expect(result.current.dirty).toBe(false)
   })
 
-  it('parks an external change as a conflict when the buffer is dirty', async () => {
+  it('keeps unmergeable edits beside the note and loads the external version', async () => {
     const { result, act } = await readyHook()
     const editor = fakeEditor()
     await act(() => result.current.bindEditor(editor))
@@ -705,13 +710,9 @@ describe('useNoteDocument', () => {
     await act(() => result.current.onEditorChange('# My unsaved edit\n'))
     disk = '# Theirs\n'
     await act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
-    await vi.waitFor(() => expect(result.current.conflict).toBe('# Theirs\n'))
-    expect(editor.applied).toEqual([]) // never clobbered
-
-    // Load theirs: applies the external content and clears the conflict.
-    await act(() => result.current.loadTheirs())
-    expect(editor.applied).toEqual(['# Theirs\n'])
-    expect(result.current.conflict).toBeNull()
+    await vi.waitFor(() => expect(editor.applied).toEqual(['# Theirs\n']))
+    expect(created).toEqual([{ path: 'notes/a (conflict).md', contents: '# My unsaved edit\n' }])
+    expect(writes).toEqual([]) // the external version was never clobbered
     expect(result.current.dirty).toBe(false)
   })
 
@@ -817,34 +818,6 @@ describe('useNoteDocument', () => {
     }
   })
 
-  it('pauses saves while a conflict is parked (no clobbering theirs)', async () => {
-    vi.useFakeTimers()
-    try {
-      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1))
-      await hook.act(() => vi.advanceTimersByTimeAsync(0))
-
-      // An edit schedules a save, then an external change parks a conflict
-      // before the debounce fires.
-      await hook.act(() => hook.result.current.onEditorChange('# Mine\n'))
-      disk = '# Theirs\n'
-      await hook.act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
-      await hook.act(() => vi.advanceTimersByTimeAsync(0))
-      expect(hook.result.current.conflict).toBe('# Theirs\n')
-
-      // Neither the pending debounce nor an explicit flush may write now.
-      await hook.act(() => hook.result.current.onEditorChange('# Mine v2\n'))
-      await hook.act(() => vi.advanceTimersByTimeAsync(5000))
-      expect(writes).toEqual([])
-
-      // Resolution unblocks: keepMine rewrites with the buffer.
-      await hook.act(() => hook.result.current.keepMine())
-      await hook.act(() => vi.advanceTimersByTimeAsync(0))
-      expect(writes).toEqual(['# Mine v2\n'])
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
   it('treats a watcher event for an in-flight save as an echo, not a conflict', async () => {
     vi.useFakeTimers()
     try {
@@ -876,7 +849,8 @@ describe('useNoteDocument', () => {
       await hook.act(() => hook.result.current.onEditorChange('# Saved and more\n'))
       await hook.act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
       await hook.act(() => vi.advanceTimersByTimeAsync(0))
-      expect(hook.result.current.conflict).toBeNull() // echo, not a conflict
+      expect(created).toEqual([]) // echo: nothing to merge or keep aside
+      expect(hook.result.current.dirty).toBe(true)
 
       await hook.act(() => {
         resolveWrite?.()
@@ -1125,17 +1099,5 @@ describe('useNoteDocument', () => {
     } finally {
       vi.useRealTimers()
     }
-  })
-
-  it('keepMine rewrites the file with the buffer', async () => {
-    const { result, act } = await readyHook()
-    await act(() => result.current.onEditorChange('# My unsaved edit\n'))
-    disk = '# Theirs\n'
-    await act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
-    await vi.waitFor(() => expect(result.current.conflict).toBe('# Theirs\n'))
-
-    await act(() => result.current.keepMine())
-    await vi.waitFor(() => expect(writes).toContain('# My unsaved edit\n'))
-    expect(result.current.conflict).toBeNull()
   })
 })

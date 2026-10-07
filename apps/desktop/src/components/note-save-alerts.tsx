@@ -1,6 +1,5 @@
 import type { ReactElement } from 'react'
 import { InlineAlert } from '@/components/inline-alert.tsx'
-import { NoteConflictBanner } from '@/components/note-conflict-banner.tsx'
 import type { AssetSaveError } from '@/editor/use-asset-persistence.ts'
 import type { NoteDocument } from '@/editor/use-note-document.ts'
 
@@ -10,7 +9,7 @@ interface NoteSaveAlertsProps {
   assetSaveError?: AssetSaveError | null
 }
 
-/** What went wrong saving a ready document, and the external-change conflict prompt. */
+/** What went wrong saving a ready document. */
 export function NoteSaveAlerts({
   document,
   assetSaveError = null,
@@ -28,14 +27,6 @@ export function NoteSaveAlerts({
           Couldn’t save the {assetSaveError.kind === 'image' ? 'pasted image' : 'file'}:{' '}
           {assetSaveError.message}. It was not added to the note.
         </InlineAlert>
-      ) : null}
-      {document.conflict !== null ? (
-        <NoteConflictBanner
-          onKeepMine={document.keepMine}
-          onLoadTheirs={document.loadTheirs}
-          onKeepBoth={document.mergedPreview === null ? undefined : document.keepBoth}
-          onReview={document.mergedPreview === null ? undefined : document.review}
-        />
       ) : null}
     </>
   )

@@ -55,11 +55,6 @@ export interface RenameCoordinatorOptions {
   path: string
   /** Read the graph generation at rewrite time — never captured early. */
   generation: () => number | null
-  /**
-   * Gate: no rename fires while false (a parked conflict contests the very
-   * content the title came from; "keep mine" re-arms, "load theirs" cancels).
-   */
-  canFire: () => boolean
 }
 
 export interface RenameCoordinator {
@@ -73,7 +68,7 @@ export interface RenameCoordinator {
 }
 
 export function createRenameCoordinator(options: RenameCoordinatorOptions): RenameCoordinator {
-  const { generation, canFire } = options
+  const { generation } = options
   /** The note's current path — a landed move advances it (Plan 17). */
   let currentPath = options.path
   /** Serializes rewrites — a second settle waits for the first. */
@@ -230,7 +225,6 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
   const tracker = createTitleRenameTracker({
     path: options.path,
     onRename: runRename,
-    canFire,
   })
 
   return {

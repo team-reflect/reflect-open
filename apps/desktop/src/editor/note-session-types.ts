@@ -27,15 +27,6 @@ export interface NoteSessionSnapshot {
    * note exists only as this buffer until the first save lands.
    */
   missing: boolean
-  /** External content waiting on the user's choice (set only when dirty). */
-  conflict: string | null
-  /**
-   * With a parked `conflict`: the three-way merge of the buffer and the
-   * external content, carrying labeled markers where they overlap. `null`
-   * when no merge was possible (no merge capability, or a side already
-   * carried markers), in which case only Keep mine / Load theirs apply.
-   */
-  mergedPreview: string | null
   error: string | null
 }
 
@@ -46,8 +37,6 @@ export const INITIAL_NOTE_SNAPSHOT: NoteSessionSnapshot = {
   protected: false,
   dirty: false,
   missing: false,
-  conflict: null,
-  mergedPreview: null,
   error: null,
 }
 
@@ -64,12 +53,18 @@ export interface NoteSessionIo {
     | null
   /**
    * Three-way merge of the buffer (`ours`) and external content (`theirs`)
-   * over the last content read from disk (`base`). Optional: without it an
-   * external change against a dirty buffer always parks.
+   * over the last content read from disk (`base`).
    */
   mergeText?:
     | ((path: string, base: string, ours: string, theirs: string) => Promise<MergeTextOutcome>)
     | undefined
+  /**
+   * Keep `contents` as a sibling file of `path` (`<note> (conflict).md`) and
+   * return the copy's path: the fallback when edits cannot be merged into an
+   * external change (the file already carries markers, or no merge is
+   * available), so nothing typed is ever lost.
+   */
+  copyAside?: ((path: string, contents: string) => Promise<string>) | undefined
 }
 
 /** Why {@link NoteSessionOptions.onContent} fired. */
@@ -147,18 +142,6 @@ export interface NoteSession {
    * can't die before the bytes land.
    */
   flush: () => Promise<void>
-  /** Resolve a conflict by keeping the buffer (rewrites the file). */
-  keepMine: () => void
-  /** Resolve a conflict by loading the external content (discards the buffer). */
-  loadTheirs: () => void
-  /** Resolve a conflict by keeping both sides of every overlapping block (needs `mergedPreview`). */
-  keepBoth: () => void
-  /**
-   * Resolve a conflict by writing the marked merge to disk and opening it
-   * protected, where the conflict notice offers block-by-block choices
-   * (needs `mergedPreview`).
-   */
-  review: () => void
   /** The full current document (frontmatter + buffer), as a save would write it. */
   content: () => string
   /**
@@ -205,13 +188,9 @@ export interface NoteSession {
   updateFrontmatter: (patch: FrontmatterPatch) => boolean
   /**
    * {@link NoteSession.updateFrontmatter}, but the patch **lands on disk now**
-   * regardless of session state. Normally that's a flush; under a parked
-   * conflict — where saves are paused and a flush is a deliberate no-op — the
-   * contested content is patched and written through too, so the index sees
-   * the change immediately and *both* resolutions keep it ("keep mine" writes
-   * the patched header, "load theirs" adopts the patched park). Same gating
-   * and false-return as `updateFrontmatter`. For patches that should ride the
-   * resolution instead (the rename alias), use `updateFrontmatter`.
+   * (a flush) so the index sees the change immediately. Same gating and
+   * false-return as `updateFrontmatter`. For patches that can ride the next
+   * save instead (the rename alias), use `updateFrontmatter`.
    */
   commitFrontmatter: (patch: FrontmatterPatch) => Promise<boolean>
   /**
@@ -230,9 +209,9 @@ export interface NoteSession {
    * synchronously, so there is no read/write race with the editor. A session
    * still loading waits for the load, then applies the edit to the loaded
    * buffer. Returns false when the session can't take it (failed to load,
-   * protected, disposed, or a parked conflict) so the caller refuses rather
-   * than clobber the buffer; an
-   * error thrown by `transform` (a stale task locator) propagates untouched,
+   * protected, or disposed) so the caller refuses rather than clobber the
+   * buffer; an error thrown by `transform` (a stale task locator) propagates
+   * untouched,
    * and a failed flush reverts the in-memory edit before rethrowing.
    */
   commitSourceEdit: (transform: (source: string) => string) => Promise<boolean>

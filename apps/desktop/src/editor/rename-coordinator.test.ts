@@ -71,14 +71,10 @@ function managed(content: string): string {
   return upsertFrontmatter(content, { id: MANAGED_ID })
 }
 
-function makeCoordinator(overrides?: {
-  generation?: () => number | null
-  canFire?: () => boolean
-}) {
+function makeCoordinator(overrides?: { generation?: () => number | null }) {
   return createRenameCoordinator({
     path: PATH,
     generation: overrides?.generation ?? (() => 7),
-    canFire: overrides?.canFire ?? (() => true),
   })
 }
 
@@ -111,14 +107,10 @@ function fakeSession(content: string): NoteSession & {
     editorChanged: () => {},
     externalChanged: () => {},
     flush: vi.fn(async () => {}),
-    keepMine: () => {},
-    keepBoth: () => {},
-    review: () => {},
     isDirty: () => false,
     isUnpersisted: () => false,
     prepareDelete: async () => false,
     cancelDelete: () => {},
-    loadTheirs: () => {},
     commitFrontmatter: async () => true,
     content: () => content,
     liveContent: () => content,
@@ -305,22 +297,6 @@ describe('rename coordinator', () => {
     expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('rename dropped'))
   })
 
-  it('a blocked settle keeps the rename pending; the next settle fires it', async () => {
-    let armed = false
-    const coordinator = makeCoordinator({ canFire: () => armed })
-    io.readNote.mockResolvedValue(managed('# New Title\n'))
-    coordinator.content(managed('# Old Title\n'), 'load')
-    coordinator.content(managed('# New Title\n'), 'saved')
-    coordinator.settle() // conflict parked: must not fire
-    await coordinator.settled()
-    expect(io.rewriteLinksForTitleChange).not.toHaveBeenCalled()
-
-    armed = true // "keep mine" resolved the conflict
-    coordinator.settle()
-    await coordinator.settled()
-    expect(io.rewriteLinksForTitleChange).toHaveBeenCalledTimes(1)
-  })
-
   it('external content re-baselines: no rewrite for titles the user did not author', async () => {
     const coordinator = makeCoordinator()
     coordinator.content(managed('# Old Title\n'), 'load')
@@ -486,7 +462,6 @@ describe('rename coordinator', () => {
     const coordinator = createRenameCoordinator({
       path: 'Projects/subject.md',
       generation: () => 7,
-      canFire: () => true,
     })
     coordinator.content(managed('# Old Title\n'), 'load')
     coordinator.content(managed('# New Title\n'), 'saved')
@@ -512,7 +487,6 @@ describe('rename coordinator', () => {
     const coordinator = createRenameCoordinator({
       path: `notes/${base}.md`,
       generation: () => 7,
-      canFire: () => true,
     })
     coordinator.content(oldSource, 'load')
     coordinator.content(newSource, 'saved')

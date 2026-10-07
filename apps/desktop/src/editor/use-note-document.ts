@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { mergeText, readNote, writeNote, type FileChange } from '@reflect/core'
+import { createNoteIfAbsent, mergeText, readNote, writeNote, type FileChange } from '@reflect/core'
+import { startOperation } from '@/lib/operations.ts'
 import { useFileChanges } from '@/lib/use-file-changes.ts'
 import { createDocumentBinding, type DocumentBinding } from './document-binding.ts'
 import type { NoteEditorHandle } from './note-editor.tsx'
@@ -26,14 +27,6 @@ export interface NoteDocument extends NoteSessionSnapshot {
   onEditorChange: (markdown: string) => void
   /** Wire to the editor's imperative handle (reload/conflict application). */
   bindEditor: (handle: NoteEditorHandle | null) => void
-  /** Resolve a conflict by keeping the buffer (rewrites the file). */
-  keepMine: () => void
-  /** Resolve a conflict by loading the external content (discards the buffer). */
-  loadTheirs: () => void
-  /** Resolve a conflict by keeping both sides of every overlapping block. */
-  keepBoth: () => void
-  /** Resolve a conflict by opening the marked merge for block-by-block review. */
-  review: () => void
   /**
    * Stable identity of the underlying session: increments when a session is
    * *created*, not when a rename retargets one (Plan 17). Key the editor on
@@ -71,6 +64,35 @@ export interface NoteDocumentOptions {
  *   pins every write to that graph — Rust rejects a write whose generation is
  *   stale, so a flush racing a graph switch can't land in the new graph.
  */
+/**
+ * Keep `contents` as `<note> (conflict).md` next to `path` (then
+ * `(conflict 2)`, …): edits that could not be merged into an external change
+ * stay on disk where the user can find them.
+ */
+async function keepBesideNote(
+  path: string,
+  contents: string,
+  generation: number | null,
+): Promise<string> {
+  if (generation === null) {
+    throw new Error('no graph generation available for the conflict copy')
+  }
+  const slash = path.lastIndexOf('/')
+  const dot = path.lastIndexOf('.')
+  const [stem, ext] = dot > slash ? [path.slice(0, dot), path.slice(dot)] : [path, '']
+  for (let n = 1; n < 10; n += 1) {
+    const copy = `${stem} (conflict${n === 1 ? '' : ` ${n}`})${ext}`
+    const outcome = await createNoteIfAbsent(copy, contents, generation)
+    if (outcome.kind === 'created') {
+      startOperation('Edits kept beside the note').warn(
+        `${path} changed on disk in a way that could not be merged. Your version is at ${copy}.`,
+      )
+      return copy
+    }
+  }
+  throw new Error('no free name for the conflict copy')
+}
+
 export function useNoteDocument(
   path: string | null,
   generation: number | null,
@@ -81,8 +103,6 @@ export function useNoteDocument(
   const missingSeed = options?.missingSeed
   const [snapshot, setSnapshot] = useState<NoteSessionSnapshot>(INITIAL_NOTE_SNAPSHOT)
   const editorRef = useRef<NoteEditorHandle | null>(null)
-  /** Mirrors the snapshot's conflict for non-reactive checks (rename gating). */
-  const conflictRef = useRef<string | null>(null)
   /** The pane's lifecycle policy object — one per hook instance. */
   const [binding] = useState<DocumentBinding>(() => createDocumentBinding())
 
@@ -115,7 +135,6 @@ export function useNoteDocument(
           ? createRenameCoordinator({
               path,
               generation: () => generationRef.current,
-              canFire: () => conflictRef.current === null,
             })
           : null,
       session: (coordinator) =>
@@ -133,10 +152,12 @@ export function useNoteDocument(
                 }
               : null,
             mergeText: canWrite ? mergeText : undefined,
+            copyAside: canWrite
+              ? (forPath, contents) => keepBesideNote(forPath, contents, generationRef.current)
+              : undefined,
           },
           classify: checkRoundTrip,
           onSnapshot: (next) => {
-            conflictRef.current = next.conflict
             setSnapshot(next)
           },
           applyContent: (markdown) => editorRef.current?.setMarkdown(markdown),
@@ -220,30 +241,10 @@ export function useNoteDocument(
     editorRef.current = handle
   }, [])
 
-  const keepMine = useCallback(() => {
-    binding.session()?.keepMine()
-  }, [binding])
-
-  const loadTheirs = useCallback(() => {
-    binding.session()?.loadTheirs()
-  }, [binding])
-
-  const keepBoth = useCallback(() => {
-    binding.session()?.keepBoth()
-  }, [binding])
-
-  const review = useCallback(() => {
-    binding.session()?.review()
-  }, [binding])
-
   return {
     ...snapshot,
     onEditorChange,
     bindEditor,
-    keepMine,
-    loadTheirs,
-    keepBoth,
-    review,
     sessionEpoch: binding.epoch(),
   }
 }
