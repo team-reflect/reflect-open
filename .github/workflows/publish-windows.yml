@@ -48,7 +48,7 @@ jobs:
             runner: blacksmith-4vcpu-windows-2025
             target: x86_64-pc-windows-msvc
           - name: arm64
-            runner: blacksmith-4vcpu-windows-2025
+            runner: windows-11-arm
             target: aarch64-pc-windows-msvc
     steps:
       # The runner image enables OS-level long paths but not git's own
