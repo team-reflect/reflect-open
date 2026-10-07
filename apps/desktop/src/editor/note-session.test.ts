@@ -32,6 +32,8 @@ interface Harness {
   setDisk: (contents: string | null) => void
   /** While set, writes reject with this message (the save-failure seam). */
   failWrites: (message: string | null) => void
+  /** While set, archiveUnsaved rejects with this message. */
+  failArchive: (message: string | null) => void
   session: ReturnType<typeof createNoteSession>
 }
 
@@ -55,6 +57,7 @@ function harness(options?: {
   const contents: Array<{ content: string; origin: string }> = []
   let disk = options?.disk === undefined ? '# Hello\n' : options.disk
   let writeFailure: string | null = null
+  let archiveFailure: string | null = null
   const session = createNoteSession({
     path: 'notes/a.md',
     io: {
@@ -80,6 +83,9 @@ function harness(options?: {
               disk = contents
             },
       archiveUnsaved: async (path, contents) => {
+        if (archiveFailure !== null) {
+          throw new Error(archiveFailure)
+        }
         archived.push({ path, contents })
       },
     },
@@ -112,6 +118,9 @@ function harness(options?: {
     },
     failWrites: (message) => {
       writeFailure = message
+    },
+    failArchive: (message) => {
+      archiveFailure = message
     },
     session,
   }
@@ -236,6 +245,46 @@ describe('createNoteSession', () => {
     await settled()
 
     expect(writes).toEqual([]) // the conflict still blocks the write
+    expect(archived).toEqual([{ path: 'notes/a.md', contents: '# Mine\n' }])
+  })
+
+  it('flush archives a parked buffer once, without dispose (the quit path)', async () => {
+    // ⌘Q, window close, and iOS backgrounding await flush() on every open
+    // session but never dispose it; a blur-triggered flush can run many times.
+    const { session, archived, setDisk } = harness()
+    session.load()
+    await settled()
+    session.editorChanged('# Mine\n')
+    setDisk('# Theirs\n')
+    session.externalChanged()
+    await settled()
+
+    await session.flush()
+    await session.flush()
+    expect(archived).toEqual([{ path: 'notes/a.md', contents: '# Mine\n' }])
+
+    session.editorChanged('# Mine, more\n')
+    await session.flush()
+    expect(archived.map((entry) => entry.contents)).toEqual(['# Mine\n', '# Mine, more\n'])
+  })
+
+  it('a failed archive keeps the buffer and the next flush retries', async () => {
+    const { session, archived, snapshots, setDisk, failArchive } = harness()
+    session.load()
+    await settled()
+    session.editorChanged('# Mine\n')
+    setDisk('# Theirs\n')
+    session.externalChanged()
+    await settled()
+
+    failArchive('disk full')
+    await session.flush()
+    expect(archived).toEqual([])
+    expect(snapshots.at(-1)?.error).toBe('disk full')
+    expect(session.content()).toBe('# Mine\n') // still owned by the session
+
+    failArchive(null)
+    await session.flush()
     expect(archived).toEqual([{ path: 'notes/a.md', contents: '# Mine\n' }])
   })
 

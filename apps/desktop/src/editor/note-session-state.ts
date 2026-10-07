@@ -53,6 +53,8 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
    * conflict when the user kept typing during the save.
    */
   let inFlightWrite: string | null = null
+  /** The last buffer handed to `io.archiveUnsaved` — the same bytes are archived once. */
+  let archivedBuffer: string | null = null
   /** True while we push external content into the editor via `applyContent`. */
   let applyingContent = false
   /** True while the initial `load()` read is in flight. */
@@ -166,7 +168,34 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     save()
     // save() extended the chain synchronously (or left it settled when there
     // was nothing to do) — the chain as of now is exactly this flush's write.
-    return saveChain
+    // Under a parked conflict that write is a no-op, so the buffer is
+    // preserved instead; every exit path (navigation, quit, background) goes
+    // through here and waits for it.
+    return conflict === null ? saveChain : preserve()
+  }
+
+  /**
+   * Keep a parked conflict's unsaved buffer recoverable (#1443). Saves are
+   * paused while the conflict waits on the user, so this is the only copy
+   * that survives teardown. The same buffer is archived once, however many
+   * flushes see it; a failed archive keeps the buffer in the session and the
+   * next flush retries.
+   */
+  async function preserve(): Promise<void> {
+    if (!dirty || io.archiveUnsaved === undefined) {
+      return
+    }
+    const content = header + buffer
+    if (content === archivedBuffer) {
+      return
+    }
+    try {
+      await io.archiveUnsaved(path, content)
+      archivedBuffer = content
+    } catch (cause) {
+      error = errorMessage(cause)
+      emit()
+    }
   }
 
   function editorChanged(markdown: string): void {
@@ -506,14 +535,6 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     // reads the (now frozen) buffer, so pending edits persist to this
     // session's path even after the UI moves on.
     if (!discarded) {
-      if (conflict !== null && dirty && io.archiveUnsaved !== undefined) {
-        // A parked conflict pauses saves, so the flush below writes nothing
-        // and the buffer would die with the session. Keep it recoverable
-        // instead; the user chooses a side (or merges by hand) later.
-        void io.archiveUnsaved(path, header + buffer).catch((cause: unknown) => {
-          console.error('failed to archive unsaved edits:', cause)
-        })
-      }
       void flush()
     }
     disposed = true

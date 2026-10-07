@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { archiveUnsavedNote, readNote, writeNote, type FileChange } from '@reflect/core'
+import {
+  archiveUnsavedNote,
+  errorMessage,
+  readNote,
+  writeNote,
+  type FileChange,
+} from '@reflect/core'
 import { startOperation } from '@/lib/operations.ts'
 import { useFileChanges } from '@/lib/use-file-changes.ts'
 import { createDocumentBinding, type DocumentBinding } from './document-binding.ts'
@@ -135,10 +141,23 @@ export function useNoteDocument(
                   if (current === null) {
                     return
                   }
-                  const archived = await archiveUnsavedNote(forPath, contents, current)
-                  startOperation('Unsaved edits kept').warn(
-                    `${forPath} changed on disk while you were editing. Your version is at ${archived}.`,
-                  )
+                  try {
+                    const archived = await archiveUnsavedNote(forPath, contents, current)
+                    startOperation('Unsaved edits kept').warn(
+                      `${forPath} changed on disk while you were editing. Your version is at ${archived}.`,
+                    )
+                  } catch (cause) {
+                    // The buffer stays in the session (the next flush retries);
+                    // meanwhile the user can take it out by hand.
+                    startOperation('Unsaved edits could not be archived', {
+                      persistent: true,
+                      action: {
+                        label: 'Copy edits',
+                        run: () => navigator.clipboard.writeText(contents),
+                      },
+                    }).fail(`${forPath}: ${errorMessage(cause)}`)
+                    throw cause
+                  }
                 }
               : undefined,
           },
