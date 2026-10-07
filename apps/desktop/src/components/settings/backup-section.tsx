@@ -84,6 +84,9 @@ export function BackupSettingsField(): ReactElement {
       : null
   // A hand-wired non-GitHub remote (Plan 16) renders the section host-neutral.
   const genericRemote = backup.phase === 'connected' && backup.repo === null
+  // Gist publishing only needs the credential. A graph with no backup, or
+  // one backed up to a non-GitHub host, has no other way to store it.
+  const signInOnlyAvailable = !githubConnected && (backup.phase === 'disconnected' || genericRemote)
 
   function openGithubRepo(): void {
     if (backup.phase !== 'connected' || backup.repo === null) {
@@ -123,20 +126,10 @@ export function BackupSettingsField(): ReactElement {
 
           {backup.phase === 'disconnected' ? (
             <>
-              <div className="flex flex-wrap gap-2">
+              <div>
                 <Button size="sm" onClick={() => setConnectOpen(true)}>
                   Connect GitHub…
                 </Button>
-                {githubConnected ? null : (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    title="Store a GitHub sign-in without backing up this graph, for publishing notes as gists"
-                    onClick={() => setSignInOpen(true)}
-                  >
-                    Sign in only…
-                  </Button>
-                )}
               </div>
               {githubConnected ? (
                 <GithubSignOutRow
@@ -196,6 +189,19 @@ export function BackupSettingsField(): ReactElement {
                 />
               ) : null}
             </>
+          ) : null}
+
+          {signInOnlyAvailable ? (
+            <div>
+              <Button
+                size="sm"
+                variant="ghost"
+                title="Store a GitHub sign-in without backing up this graph, for publishing notes as gists"
+                onClick={() => setSignInOpen(true)}
+              >
+                Sign in only…
+              </Button>
+            </div>
           ) : null}
 
           {action.error !== null ? (
