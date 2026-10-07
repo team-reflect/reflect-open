@@ -14,13 +14,11 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use reflect_graph_paths::to_slash;
+
 const TTL: Duration = Duration::from_secs(5);
 
 static RECENT: Mutex<Option<HashMap<(String, u64), Instant>>> = Mutex::new(None);
-
-fn normalize(rel: &str) -> String {
-    rel.replace('\\', "/")
-}
 
 fn with<R>(f: impl FnOnce(&mut HashMap<(String, u64), Instant>) -> R) -> R {
     let mut guard = RECENT
@@ -37,7 +35,7 @@ fn with<R>(f: impl FnOnce(&mut HashMap<(String, u64), Instant>) -> R) -> R {
 pub(crate) fn record_own_write(rel: &str, modified_ms: Option<u64>) {
     if let Some(ms) = modified_ms {
         with(|recent| {
-            recent.insert((normalize(rel), ms), Instant::now());
+            recent.insert((to_slash(rel), ms), Instant::now());
         });
     }
 }
@@ -56,7 +54,7 @@ pub(crate) fn take_own_write(rel: &str, modified_ms: Option<u64>) -> bool {
     let Some(ms) = modified_ms else {
         return false;
     };
-    with(|recent| recent.remove(&(normalize(rel), ms)).is_some())
+    with(|recent| recent.remove(&(to_slash(rel), ms)).is_some())
 }
 
 /// Whether `rel` was written by this app within the TTL, whatever mtime the
@@ -66,7 +64,7 @@ pub(crate) fn take_own_write(rel: &str, modified_ms: Option<u64>) -> bool {
 /// Consumes every entry for the path.
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub(crate) fn take_own_write_by_path(rel: &str) -> bool {
-    let rel = normalize(rel);
+    let rel = to_slash(rel);
     with(|recent| {
         let before = recent.len();
         recent.retain(|(path, _), _| *path != rel);
