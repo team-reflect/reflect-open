@@ -234,7 +234,7 @@ describe('createBackupController', () => {
       repo: null,
     })
     const fetch = invocations.find(({ command }) => command === 'git_fetch')
-    expect(fetch?.args).toMatchObject({ token: null })
+    expect(fetch?.args).toMatchObject({ credential: null })
     controller.dispose()
   })
 
@@ -250,7 +250,7 @@ describe('createBackupController', () => {
 
     for (const { command, args } of invocations) {
       if (command === 'git_fetch' || command === 'git_push') {
-        expect(args).toMatchObject({ token: null })
+        expect(args).toMatchObject({ credential: null })
       }
     }
     controller.dispose()
