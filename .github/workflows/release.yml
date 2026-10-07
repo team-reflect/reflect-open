@@ -132,10 +132,9 @@ jobs:
     secrets: inherit
 
   # The experimental Windows build rides every release too: x64 and arm64
-  # installers plus their updater signatures go into the draft release. An
-  # independent job — a Windows failure never blocks the macOS release or
-  # the TestFlight upload. The installers are not code-signed; the secrets
-  # are only for the updater signature.
+  # installers plus their updater signatures go into the draft release. The
+  # installers are not code-signed; the secrets are only for the updater
+  # signature.
   publish-windows-stable:
     name: Build the Windows installer (stable)
     needs: release-please
@@ -156,13 +155,12 @@ jobs:
       commit: ${{ needs.release-please.outputs.beta_commit }}
     secrets: inherit
 
-  # The builds only fill the draft release. Publishing waits for macOS and
-  # Windows to finish, but only macOS has to succeed: a Windows failure never
-  # blocks the release.
+  # The builds only fill the draft release. Publishing waits for both macOS
+  # and Windows to succeed.
   publish-finalize-stable:
     name: Finalize the stable release
     needs: [release-please, publish-macos-stable, publish-windows-stable]
-    if: ${{ !cancelled() && needs.publish-macos-stable.result == 'success' }}
+    if: ${{ !cancelled() && needs.publish-macos-stable.result == 'success' && needs.publish-windows-stable.result == 'success' }}
     uses: ./.github/workflows/publish-finalize.yml
     with:
       tag: ${{ needs.release-please.outputs.stable_tag }}
@@ -170,7 +168,7 @@ jobs:
   publish-finalize-beta:
     name: Finalize the beta release
     needs: [release-please, publish-macos-beta, publish-windows-beta]
-    if: ${{ !cancelled() && needs.publish-macos-beta.result == 'success' }}
+    if: ${{ !cancelled() && needs.publish-macos-beta.result == 'success' && needs.publish-windows-beta.result == 'success' }}
     uses: ./.github/workflows/publish-finalize.yml
     with:
       tag: ${{ needs.release-please.outputs.beta_tag }}
