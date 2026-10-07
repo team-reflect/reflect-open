@@ -524,7 +524,7 @@ fn non_fast_forward_push_is_rejected_as_data() {
 }
 
 #[test]
-fn conflicting_edits_are_committed_with_labeled_markers() {
+fn conflicting_edits_are_merged_without_markers() {
     let fixture = fixture();
     let root_a = &fixture.graph_a;
     write(root_a, "notes/shared.md", "# Shared\n\noriginal line\n");
@@ -540,11 +540,8 @@ fn conflicting_edits_are_committed_with_labeled_markers() {
     commit_all(root_a, "a edit", MAX_FILE_BYTES).unwrap();
     fetch(root_a, None).unwrap();
     let merged = merge_remote(root_a).unwrap();
-    assert!(
-        matches!(merged.kind, MergeKind::MergedWithConflicts),
-        "{merged:?}"
-    );
-    assert_eq!(merged.conflicted_paths, vec!["notes/shared.md".to_string()]);
+    assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
+    assert!(merged.conflicted_paths.is_empty(), "{merged:?}");
     assert!(
         merged
             .changed_files
@@ -554,13 +551,17 @@ fn conflicting_edits_are_committed_with_labeled_markers() {
     );
 
     let content = read(root_a, "notes/shared.md");
-    assert!(content.contains("<<<<<<< this device"), "{content}");
+    assert!(!content.contains("<<<<<<<"), "{content}");
     assert!(content.contains("edited on a"), "{content}");
     assert!(content.contains("edited on b"), "{content}");
-    assert!(content.contains(">>>>>>> other device"), "{content}");
+    assert_eq!(
+        head_blob(root_a, "notes/shared.md"),
+        content,
+        "the merge is staged as written"
+    );
 
-    // The conflict is committed: the repo is never wedged mid-merge, and the
-    // push goes through so both devices converge on the same marked-up note.
+    // The merge is committed: the repo is never wedged mid-merge, and the
+    // push goes through so both devices converge on the same note.
     let repo = Repository::open(root_a).unwrap();
     assert_eq!(repo.state(), git2::RepositoryState::Clean);
     assert!(push(root_a, None).unwrap().pushed);
@@ -572,6 +573,122 @@ fn conflicting_edits_are_committed_with_labeled_markers() {
         "{converged:?}"
     );
     assert_eq!(read(&root_b, "notes/shared.md"), content);
+}
+
+#[test]
+fn daily_appends_on_two_devices_merge_by_union() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "daily/2026-07-04.md", "# 2026-07-04\n\n- seed\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(
+        &root_b,
+        "daily/2026-07-04.md",
+        "# 2026-07-04\n\n- seed\n- from b\n",
+    );
+    commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(
+        root_a,
+        "daily/2026-07-04.md",
+        "# 2026-07-04\n\n- seed\n- from a\n",
+    );
+    commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert!(merged.conflicted_paths.is_empty(), "{merged:?}");
+
+    let content = read(root_a, "daily/2026-07-04.md");
+    assert!(content.starts_with("# 2026-07-04\n\n- seed\n"), "{content}");
+    assert!(content.contains("- from a\n"), "{content}");
+    assert!(content.contains("- from b\n"), "{content}");
+    assert_eq!(content.matches("- seed").count(), 1, "{content}");
+}
+
+#[test]
+fn frontmatter_only_conflicts_merge_key_wise() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/a.md", "---\nid: abc\n---\n# Body\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(
+        &root_b,
+        "notes/a.md",
+        "---\nid: abc\ntags:\n  - b\n---\n# Body\n",
+    );
+    commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(
+        root_a,
+        "notes/a.md",
+        "---\nid: abc\nisPinned: true\n---\n# Body\n",
+    );
+    commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert!(merged.conflicted_paths.is_empty(), "{merged:?}");
+
+    let content = read(root_a, "notes/a.md");
+    assert!(content.contains("isPinned: true"), "{content}");
+    assert!(content.contains("- b"), "{content}");
+    assert_eq!(content.matches("# Body").count(), 1, "{content}");
+    assert!(!content.contains("<<<<<<<"), "{content}");
+}
+
+#[test]
+fn both_devices_merge_the_same_pair_to_the_same_bytes() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/shared.md", "# Shared\n\none\ntwo\nthree\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(
+        &root_b,
+        "notes/shared.md",
+        "# Shared\n\none\ntwo beta\nthree\n",
+    );
+    commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(
+        root_a,
+        "notes/shared.md",
+        "# Shared\n\none\ntwo alpha\nthree\n",
+    );
+    commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+
+    // Hand B the other side without a push (A has not pushed its merge):
+    // fetch A's branch straight into B's tracking ref, so each device now
+    // merges the same pair from the opposite side.
+    Repository::open(&root_b)
+        .unwrap()
+        .remote_anonymous(root_a.to_str().unwrap())
+        .unwrap()
+        .fetch(&["+refs/heads/main:refs/remotes/origin/main"], None, None)
+        .unwrap();
+
+    let on_a = merge_remote(root_a).unwrap();
+    let on_b = merge_remote(&root_b).unwrap();
+    assert!(on_a.conflicted_paths.is_empty(), "{on_a:?}");
+    assert!(on_b.conflicted_paths.is_empty(), "{on_b:?}");
+    let content = head_blob(root_a, "notes/shared.md");
+    assert_eq!(head_blob(&root_b, "notes/shared.md"), content);
+    assert!(
+        content.contains("alpha") && content.contains("beta"),
+        "{content}"
+    );
+    assert!(!content.contains("<<<<<<<"), "{content}");
 }
 
 #[test]
@@ -865,7 +982,7 @@ fn rename_on_one_device_merges_with_edit_on_the_other() {
 }
 
 #[test]
-fn same_title_created_on_two_devices_surfaces_as_a_review_conflict() {
+fn same_title_created_on_two_devices_merges_both_bodies() {
     // New with slug filenames: two offline devices can create the same path.
     // The merge must surface it through the existing marker flow, not wedge.
     let fixture = fixture();
@@ -892,17 +1009,14 @@ fn same_title_created_on_two_devices_surfaces_as_a_review_conflict() {
     fetch(root_a, None).unwrap();
     let merged = merge_remote(root_a).unwrap();
 
-    assert!(
-        matches!(merged.kind, MergeKind::MergedWithConflicts),
-        "{merged:?}"
-    );
-    assert_eq!(
-        merged.conflicted_paths,
-        vec!["notes/meeting.md".to_string()]
-    );
+    // No common ancestor: the ladder keeps both bodies under the one title.
+    assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
+    assert!(merged.conflicted_paths.is_empty(), "{merged:?}");
     let content = read(root_a, "notes/meeting.md");
     assert!(content.contains("notes from device a"), "{content}");
     assert!(content.contains("notes from device b"), "{content}");
+    assert_eq!(content.matches("# Meeting").count(), 1, "{content}");
+    assert!(!content.contains("<<<<<<<"), "{content}");
     let repo = Repository::open(root_a).unwrap();
     assert_eq!(repo.state(), git2::RepositoryState::Clean);
     assert!(push(root_a, None).unwrap().pushed);

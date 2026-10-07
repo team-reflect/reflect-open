@@ -1,23 +1,17 @@
-//! Pull-side merge: fast-forward when possible, otherwise merge — and when
-//! the merge conflicts, materialize the conflict **into the note** (standard
-//! Git markers with readable labels), commit the merge anyway, and let the
-//! user resolve by editing the file.
+//! Pull-side merge: fast-forward when possible, otherwise merge. A note both
+//! devices edited goes through the shared resolution ladder
+//! ([`crate::conflict::ladder`], the rules the iCloud sweep uses) and lands
+//! as merged text; the merge is committed with both parents either way, so
+//! the repository is never left mid-merge and the raw versions stay in
+//! history. Conflict markers are never written.
 //!
-//! The repository is never left mid-merge: committing the conflict keeps sync
-//! flowing for every other note, both devices converge on the same marked-up
-//! file, and the raw versions stay recoverable from history (the merge commit
-//! has both parents). The indexer (Plan 12 core) detects the markers and flags
-//! the note `Needs review`.
+//! Both devices converge: the ladder orders the sides by commit time (shared
+//! data), so the device that merges the mirror pair produces the same bytes.
 //!
-//! The markers are standard Git, with product labels instead of branch names:
-//!
-//! ```text
-//! <<<<<<< this device
-//! the local version
-//! =======
-//! the other device's version
-//! >>>>>>> other device
-//! ```
+//! What still needs a look is reported in `conflicted_paths`: a binary file
+//! both devices changed (the other device's copy lands alongside as
+//! `name (conflict).ext`) and a note one device edited while the other
+//! deleted it (the edit is restored).
 
 use std::fs;
 use std::path::Path;
@@ -27,12 +21,13 @@ use git2::{Index, IndexEntry, MergeOptions, Repository};
 use reflect_graph_paths::to_slash_lossy;
 use serde::Serialize;
 
+use crate::conflict::{self, ladder, Resolution};
 use crate::error::AppResult;
 
 use super::repo::{current_branch, ensure_clean_state, open_existing, signature};
 
-/// Conflict-marker labels. "this device" is the local side, "other device"
-/// the remote one — product language, not branch names.
+/// Side labels for diagnostics: "this device" is the local side, "other
+/// device" the remote one.
 const OUR_LABEL: &str = "this device";
 const THEIR_LABEL: &str = "other device";
 
@@ -69,9 +64,8 @@ pub struct ChangedFile {
 #[serde(rename_all = "camelCase")]
 pub struct MergeOutcome {
     pub kind: MergeKind,
-    /// Graph-relative paths that now carry conflict markers (or a binary
-    /// conflict copy). Informational — the indexer rediscovers them from
-    /// content.
+    /// Graph-relative paths the user may want to look at: a binary conflict
+    /// copy, or a note restored after an edit-vs-delete. Informational.
     pub conflicted_paths: Vec<String>,
     /// Every file this merge changed on disk. The sync layer reindexes these
     /// directly — pulls must not depend on the file watcher being up (on
@@ -161,11 +155,9 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
 
     let mut merge_opts = MergeOptions::new();
     let mut checkout = CheckoutBuilder::new();
-    checkout
-        .allow_conflicts(true)
-        .conflict_style_merge(true)
-        .our_label(OUR_LABEL)
-        .their_label(THEIR_LABEL);
+    // A file both sides changed is checked out as ours, never with markers;
+    // `resolve_conflicts` then writes its resolution over it.
+    checkout.allow_conflicts(true).use_ours(true);
     repo.merge(&[&annotated], Some(&mut merge_opts), Some(&mut checkout))?;
 
     // From here the repo carries MERGE_* state; a failure that leaves it
@@ -201,13 +193,14 @@ fn complete_merge(
 ) -> AppResult<(Vec<String>, Vec<ChangedFile>)> {
     #[cfg(test)]
     super::fault::trip(super::fault::FaultPoint::AfterMergeBeforeCommit)?;
+    let local_commit = repo.head()?.peel_to_commit()?;
+    let remote_commit = repo.find_commit(remote_oid)?;
     let mut index = repo.index()?;
-    let conflicted_paths = resolve_conflicts(repo, root, &mut index)?;
+    let stamps = (commit_ms(&local_commit), commit_ms(&remote_commit));
+    let conflicted_paths = resolve_conflicts(repo, root, &mut index, stamps)?;
     index.write()?;
 
     let tree = repo.find_tree(index.write_tree()?)?;
-    let local_commit = repo.head()?.peel_to_commit()?;
-    let remote_commit = repo.find_commit(remote_oid)?;
     // The working tree is final here (merge checkout + conflict resolution
     // wrote everything), so the stamped mtimes are the files' real ones.
     let mut changed_files = changed_between(repo, Some(&local_commit.tree()?), &tree)?;
@@ -216,7 +209,7 @@ fn complete_merge(
     let message = if conflicted_paths.is_empty() {
         "Merge changes from other devices"
     } else {
-        "Merge changes from other devices (conflicts to review)"
+        "Merge changes from other devices (files to review)"
     };
     repo.commit(
         Some("HEAD"),
@@ -261,6 +254,12 @@ fn changed_between(
     Ok(out)
 }
 
+/// A commit's time as the ladder's `modified_ms`: shared by every clone, so
+/// both devices order the sides the same way.
+fn commit_ms(commit: &git2::Commit) -> u64 {
+    commit.time().seconds().max(0) as u64 * 1000
+}
+
 /// Fill `modified_ms` for upserts from the (now final) working-tree files.
 fn stamp_modified_times(root: &Path, changes: &mut [ChangedFile]) {
     for change in changes {
@@ -279,13 +278,19 @@ fn stamp_modified_times(root: &Path, changes: &mut [ChangedFile]) {
 
 /// Turn every index conflict into committed working-tree content:
 ///
-/// - **text vs text** — the merge checkout already wrote labeled markers into
-///   the file; stage it as-is (the user resolves by editing the note);
+/// - **text vs text** — the ladder's merge over the common ancestor;
 /// - **edit vs delete** — keep the edited version, never silently delete;
 /// - **binary vs binary** — keep ours in place and the other device's copy
 ///   alongside (`name (conflict).ext`);
 /// - **deleted on both** — confirm the removal.
-fn resolve_conflicts(repo: &Repository, root: &Path, index: &mut Index) -> AppResult<Vec<String>> {
+///
+/// `stamps` are the (local, remote) commit times for the ladder's ordering.
+fn resolve_conflicts(
+    repo: &Repository,
+    root: &Path,
+    index: &mut Index,
+    stamps: (u64, u64),
+) -> AppResult<Vec<String>> {
     if !index.has_conflicts() {
         return Ok(Vec::new());
     }
@@ -309,7 +314,9 @@ fn resolve_conflicts(repo: &Repository, root: &Path, index: &mut Index) -> AppRe
     for conflict in conflicts {
         match (conflict.our, conflict.their) {
             (Some(our), Some(their)) => {
-                conflicted_paths.extend(resolve_both_edited(repo, root, index, our, their)?);
+                let resolved =
+                    resolve_both_edited(repo, root, index, conflict.ancestor, our, their, stamps)?;
+                conflicted_paths.extend(resolved);
             }
             (Some(edited), None) | (None, Some(edited)) => {
                 conflicted_paths.push(resolve_edit_vs_delete(repo, root, index, edited)?);
@@ -324,21 +331,28 @@ fn resolve_conflicts(repo: &Repository, root: &Path, index: &mut Index) -> AppRe
     Ok(conflicted_paths)
 }
 
-/// Both sides changed the file. Text: the merge checkout already wrote the
-/// labeled marker file, so staging the working copy clears the conflict
-/// entries. Binary: markers would corrupt the bytes — keep ours in place and
-/// write the other device's version alongside (`name (conflict).ext`).
+/// Both sides changed the file. Text: the ladder merges the two versions over
+/// their common ancestor and the result is written and staged; nothing is
+/// left to review (both originals are in the merge commit's parents). Binary:
+/// keep ours in place and write the other device's version alongside
+/// (`name (conflict).ext`).
 fn resolve_both_edited(
     repo: &Repository,
     root: &Path,
     index: &mut Index,
+    ancestor: Option<ConflictSide>,
     our: ConflictSide,
     their: ConflictSide,
+    stamps: (u64, u64),
 ) -> AppResult<Vec<String>> {
-    let binary = repo.find_blob(our.id)?.is_binary() || repo.find_blob(their.id)?.is_binary();
-    if !binary {
+    let our_blob = repo.find_blob(our.id)?;
+    let their_blob = repo.find_blob(their.id)?;
+    if let (Some(ours), Some(theirs)) = (text_of(&our_blob), text_of(&their_blob)) {
+        let base_blob = ancestor.map(|side| repo.find_blob(side.id)).transpose()?;
+        let merged = merge_text(base_blob.as_ref().and_then(text_of), ours, theirs, stamps)?;
+        write_file(root, &our.path, merged.as_bytes())?;
         index.add_path(Path::new(&our.path))?;
-        return Ok(vec![our.path]);
+        return Ok(Vec::new());
     }
     write_blob(repo, root, &our.path, our.id)?;
     let copy = conflict_copy_path(&their.path);
@@ -362,13 +376,51 @@ fn resolve_edit_vs_delete(
     Ok(edited.path)
 }
 
+/// The blob as text, `None` for binary or non-UTF-8 content.
+fn text_of<'a>(blob: &'a git2::Blob<'a>) -> Option<&'a str> {
+    if blob.is_binary() {
+        return None;
+    }
+    std::str::from_utf8(blob.content()).ok()
+}
+
+/// The shared ladder over the three versions. `ours` is the local side, with
+/// the local commit's time; the ladder itself orders the sides.
+fn merge_text(
+    base: Option<&str>,
+    ours: &str,
+    theirs: &str,
+    (our_ms, their_ms): (u64, u64),
+) -> AppResult<String> {
+    let side = |content: &str, label: &str, modified_ms| conflict::ConflictSide {
+        content: content.to_string(),
+        label: label.to_string(),
+        modified_ms,
+    };
+    let resolution = ladder::resolve(ladder::ConflictInput {
+        base,
+        sides: (
+            side(ours, OUR_LABEL, our_ms),
+            side(theirs, THEIR_LABEL, their_ms),
+        ),
+        merge_loop_detected: false,
+    })?;
+    Ok(match resolution {
+        Resolution::AlreadyResolved => ours.to_string(),
+        Resolution::Merged { content } | Resolution::Reconciled { content } => content,
+    })
+}
+
 fn write_blob(repo: &Repository, root: &Path, rel: &str, id: git2::Oid) -> AppResult<()> {
-    let blob = repo.find_blob(id)?;
+    write_file(root, rel, repo.find_blob(id)?.content())
+}
+
+fn write_file(root: &Path, rel: &str, bytes: &[u8]) -> AppResult<()> {
     let target = root.join(rel);
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::write(target, blob.content())?;
+    fs::write(target, bytes)?;
     Ok(())
 }
 
