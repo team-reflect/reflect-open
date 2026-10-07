@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::path::Path;
 
 use git2::{Index, IndexAddOption};
+use reflect_graph_paths::to_slash_lossy;
 use serde::Serialize;
 
 use crate::error::AppResult;
@@ -45,6 +46,8 @@ pub(super) fn commit_all(
     fallback_message: &str,
     max_file_bytes: u64,
 ) -> AppResult<CommitOutcome> {
+    #[cfg(test)]
+    super::fault::trip(super::fault::FaultPoint::BeforeCommit)?;
     let repo = open_existing(root)?;
     ensure_clean_state(&repo)?;
     // In-memory hard guarantee, independent of any on-disk ignore file: the
@@ -133,7 +136,7 @@ fn add_all_with_size_guard(
         if !meta.is_file() || meta.len() < max_file_bytes {
             return 0;
         }
-        let rel = path.to_string_lossy().replace('\\', "/");
+        let rel = to_slash_lossy(path);
         let mtime = meta
             .modified()
             .ok()

@@ -58,6 +58,6 @@ export function echoLocalWrite(change: FileChange): void {
     }
   }
   if (echoEnabled) {
-    emitFileChanges([change])
+    emitFileChanges([change], 'own-write')
   }
 }

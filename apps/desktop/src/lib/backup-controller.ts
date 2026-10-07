@@ -7,6 +7,7 @@ import {
   errorMessage,
   getGithubRepo,
   getGithubToken,
+  githubCredential,
   githubRemoteUrl,
   gitCommitAll,
   gitDisconnect,
@@ -15,7 +16,9 @@ import {
   isCaptureSpoolPath,
   isNotePath,
   loadGithubAuth,
+  loadHostCredential,
   parseGithubRemote,
+  remoteHost,
   ReflectError,
   subscribeFileChanges,
   type ChangedFile,
@@ -169,7 +172,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
     // the index and embeddings take markdown notes, the audio-memo
     // reconciler takes recordings) — and the index additionally gets a
     // direct apply (idempotent if a live watcher subscription double-applies).
-    emitFileChanges(changes)
+    emitFileChanges(changes, 'pull')
     const indexable = changes.filter((change) => isNotePath(change.path))
     if (indexGeneration !== null && indexable.length > 0) {
       const task = remoteIndexTail.then(async () => {
@@ -262,7 +265,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
       const next = createSyncEngine({
         generation,
         localOnly: true,
-        getToken: async () => null,
+        getCredential: async () => null,
         onStatus: (engineStatus) => {
           // No UI surfaces local history, so a failing commit loop (disk full,
           // corrupted repo) must at least leave a trace for diagnosis.
@@ -320,12 +323,23 @@ export function createBackupController(options: BackupControllerOptions): Backup
         await startLocalHistory(status.initialized)
         return
       }
-      if (repo === null && /^https?:\/\//i.test(remoteUrl)) {
-        // Plan 16 V1 speaks SSH (and paths) to generic hosts, not HTTPS.
-        // Fail at adoption, not at the first push: a *public* HTTPS remote
-        // would pull anonymously and only 401 on push — the other device's
-        // edits arriving while this one's silently never leave. The engine
-        // never starts; `rejected` = acting (not retrying) is the fix.
+      // A non-GitHub HTTPS host needs a stored sign-in (SSH and path remotes
+      // need none: the agent or the filesystem answers). Fail at adoption,
+      // not at the first push: a *public* HTTPS remote would pull anonymously
+      // and only 401 on push — the other device's edits arriving while this
+      // one's silently never leave. `rejected` = acting (not retrying) is
+      // the fix.
+      const host = repo === null ? remoteHost(remoteUrl) : null
+      // A keychain the app cannot read is "no sign-in" here, as for the
+      // GitHub read above: the graph must keep its local history either way.
+      const hostCredential =
+        host === null
+          ? null
+          : await loadHostCredential(host).catch((error: unknown) => {
+              console.error('reading the host sign-in failed:', errorMessage(error))
+              return null
+            })
+      if (host !== null && hostCredential === null) {
         setState({
           phase: 'connected',
           remoteUrl,
@@ -333,8 +347,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
           status: {
             state: 'error',
             errorKind: 'rejected',
-            message:
-              'HTTPS isn’t supported for this host yet — switch the remote to its SSH form: git remote set-url origin git@<host>:<owner>/<repo>.git',
+            message: `No sign-in is stored for ${host}. Add one in Settings → GitHub sync, or switch the remote to its SSH form: git remote set-url origin git@${host}:<owner>/<repo>.git`,
           },
         })
         await startLocalHistory(status.initialized)
@@ -349,9 +362,18 @@ export function createBackupController(options: BackupControllerOptions): Backup
         // The background flusher's protected local commit bypasses this
         // engine deliberately.
         canStartCycle: () => !isMobileSurface() || document.visibilityState !== 'hidden',
-        // The managed token is for github.com only — a generic host must
-        // never receive it. Rust resolves generic credentials locally.
-        getToken: repo === null ? async () => null : () => getGithubToken(providerFetch),
+        // The managed sign-in is for github.com only; another HTTPS host gets
+        // its own stored sign-in; SSH and path remotes get none and Rust
+        // resolves them locally.
+        getCredential:
+          repo !== null
+            ? async () => {
+                const token = await getGithubToken(providerFetch)
+                return token === null ? null : githubCredential(token)
+              }
+            : host !== null
+              ? () => loadHostCredential(host)
+              : async () => null,
         onStatus: (engineStatus) => {
           setState({ phase: 'connected', remoteUrl, repo, status: engineStatus })
         },

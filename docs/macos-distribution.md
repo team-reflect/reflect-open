@@ -199,7 +199,7 @@ a new cycle is tagged without a number (`v0.6.0-beta`, then `-beta.1`, `-beta.2`
 
 For this exceptional recovery path, merge a PR that sets `version` in
 `apps/desktop/package.json` and create a draft release tagged `v<version>` at that
-commit. Run **Actions → Release App → Run workflow** on that commit to build and upload
+commit. Run **Actions → Publish macOS → Run workflow** on that commit to build and upload
 the assets, then **Actions → Finalize release → Run workflow** with the tag. Afterwards,
 sync that channel's manifest file with a follow-up PR so release-please continues from
 the right version.

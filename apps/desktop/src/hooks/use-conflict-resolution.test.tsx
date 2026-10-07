@@ -59,9 +59,10 @@ describe('useConflictResolution', () => {
       generation: 7,
       content: resolved,
     })
-    expect(vi.mocked(emitFileChanges)).toHaveBeenCalledWith([
-      { path: 'notes/clash.md', kind: 'upsert' },
-    ])
+    expect(vi.mocked(emitFileChanges)).toHaveBeenCalledWith(
+      [{ path: 'notes/clash.md', kind: 'upsert' }],
+      'own-write',
+    )
     expect(vi.mocked(invalidateIndexQueries)).toHaveBeenCalled()
     expect(result.current.error).toBeNull()
     expect(result.current.busy).toBe(false)

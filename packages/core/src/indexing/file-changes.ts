@@ -25,8 +25,25 @@ const fileChangesSchema = z.array(fileChangeSchema)
 /** A single tracked change reported by the watcher. */
 export type FileChange = z.infer<typeof fileChangeSchema>
 
+/**
+ * Where a batch came from. Most consumers ignore it; the ones that must tell
+ * this device's own writes from everything else (the sync engine's dirty
+ * mark, the iCloud shadow base) branch on it instead of guessing from
+ * timing or content.
+ *
+ * - `external`: observed on disk by the Rust watcher or the iCloud metadata
+ *   query — another app, another device, or an echo of our own write.
+ * - `own-write`: a write this app just made (the mobile write echo, a
+ *   conflict resolution).
+ * - `pull`: files a Git pull wrote.
+ * - `icloud-sweep`: files the iCloud conflict sweep wrote.
+ */
+export type FileChangeSource = 'external' | 'own-write' | 'pull' | 'icloud-sweep'
+
+export type FileChangeHandler = (changes: FileChange[], source: FileChangeSource) => void
+
 /** Subscribers also reachable by {@link emitFileChanges} (sync-applied writes). */
-const localHandlers = new Set<(changes: FileChange[]) => void>()
+const localHandlers = new Set<FileChangeHandler>()
 
 /**
  * Subscribe to file-change batches: the watcher's {@link FILE_CHANGES_EVENT}
@@ -35,13 +52,13 @@ const localHandlers = new Set<(changes: FileChange[]) => void>()
  * subscription builds on it, and the editor (Plan 05) uses it for
  * external-change reconciliation of the open note.
  */
-export function subscribeFileChanges(handler: (changes: FileChange[]) => void): Promise<Unlisten> {
+export function subscribeFileChanges(handler: FileChangeHandler): Promise<Unlisten> {
   localHandlers.add(handler)
   return getBridge()
     .listen(FILE_CHANGES_EVENT, (payload) => {
       const parsed = fileChangesSchema.safeParse(payload)
       if (parsed.success) {
-        handler(parsed.data)
+        handler(parsed.data, 'external')
       } else {
         // A malformed payload means the Rust↔TS event contract drifted — loud
         // beats silently-stale indexes and editors.
@@ -78,13 +95,14 @@ export function subscribeReconcileRequests(handler: () => void): Promise<Unliste
 
 /**
  * Fan a locally produced batch (files a sync merge just wrote, Plan 12) to
- * every subscriber, exactly as if the watcher had reported it. Pull-applied
- * writes must reach open editors and the index even when the Rust watcher
- * isn't running yet — the launch pull can land before watch start, and an
- * unnotified open editor would overwrite the merged content on its next save.
+ * every subscriber, exactly as if the watcher had reported it, tagged with
+ * its {@link FileChangeSource}. Pull-applied writes must reach open editors
+ * and the index even when the Rust watcher isn't running yet — the launch
+ * pull can land before watch start, and an unnotified open editor would
+ * overwrite the merged content on its next save.
  */
-export function emitFileChanges(changes: FileChange[]): void {
+export function emitFileChanges(changes: FileChange[], source: FileChangeSource): void {
   for (const handler of localHandlers) {
-    handler(changes)
+    handler(changes, source)
   }
 }
