@@ -89,7 +89,7 @@ export interface NoteEditorHandle {
    * typing. Empty/whitespace-only markdown is a no-op.
    */
   insertMarkdown(this: void, markdown: string): void
-  focus(): void
+  focus(this: void): void
   /**
    * Move the caret to a document edge and scroll it into view. Used for
    * cross-note arrow navigation in the daily stream (jump to the end of the
@@ -109,9 +109,9 @@ export interface NoteEditorHandle {
   /** Clear the staged replacement without touching the document. */
   discardPendingReplacement(): void
   /** Select the next find match, wrapping at the document end. */
-  findNext(): void
+  findNext(this: void): void
   /** Select the previous find match, wrapping at the document start. */
-  findPrevious(): void
+  findPrevious(this: void): void
 }
 
 interface NoteEditorProps {
