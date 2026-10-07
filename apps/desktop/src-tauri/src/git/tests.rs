@@ -991,16 +991,21 @@ fn commit_during_fast_forward_never_reverts_pulled_notes() {
     // The competing commit runs on its own worker: once git commands are
     // serialized per graph it blocks until the pull finishes, so the pull
     // must be released without waiting for it.
-    let (commit_started_tx, commit_started_rx) = mpsc::channel::<()>();
+    let (commit_done_tx, commit_done_rx) = mpsc::channel::<()>();
     let commit = thread::spawn({
         let root = root_a.clone();
         move || {
-            commit_started_tx.send(()).unwrap();
-            commit_all(&root, "Update notes", MAX_FILE_BYTES)
+            let outcome = commit_all(&root, "Update notes", MAX_FILE_BYTES);
+            let _ = commit_done_tx.send(());
+            outcome
         }
     });
-    commit_started_rx.recv_timeout(WAIT).unwrap();
-    thread::sleep(Duration::from_millis(200)); // let the commit land in the window, or block
+    // Two outcomes are possible here, and both are the race under test: the
+    // commit completes inside the window (today: it sees the moved ref over
+    // the stale tree and commits the revert), or it blocks behind the graph
+    // lock until the pull finishes (once commands are serialized), in which
+    // case this wait times out and the pull is released below.
+    let _ = commit_done_rx.recv_timeout(Duration::from_secs(2));
     resume_tx.send(()).unwrap();
     pull.join().unwrap().unwrap();
     commit.join().unwrap().unwrap();
