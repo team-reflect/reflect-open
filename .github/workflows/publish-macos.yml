@@ -1,8 +1,7 @@
-name: Release App
+name: Publish macOS
 
 on:
-  # The normal path: called by release.yml right after release-please creates
-  # the draft release for a merged Release PR.
+  workflow_dispatch:
   workflow_call:
     inputs:
       tag:
@@ -13,18 +12,11 @@ on:
         description: Immutable commit targeted by the release tag
         type: string
         required: true
-  # Manual retry path: run on the release commit. The tag is derived from
-  # apps/desktop/package.json, and its draft release must already exist.
-  workflow_dispatch:
 
-# Never run two builds of a release at once, and never cancel one
-# mid-notarization — queue instead.
 concurrency:
   group: publish-macos
   cancel-in-progress: false
 
-# The build uploads its assets into the draft release. publish-finalize.yml
-# writes latest.json and publishes the release afterwards.
 permissions:
   contents: write
 
@@ -33,11 +25,6 @@ jobs:
     if: github.repository == 'team-reflect/reflect-open'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
-    env:
-      # Cargo registry fetches can intermittently fail on GitHub macOS runners
-      # with curl HTTP/2 framing errors. HTTP/1.1 is slower but steadier for
-      # release builds, where determinism matters more than a small fetch win.
-      CARGO_HTTP_MULTIPLEXING: false
     strategy:
       fail-fast: false
       matrix:

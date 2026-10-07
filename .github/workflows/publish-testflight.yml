@@ -1,4 +1,4 @@
-name: TestFlight
+name: Publish TestFlight
 
 on:
   workflow_dispatch:
@@ -11,10 +11,6 @@ on:
         options:
           - app-store-connect
           - release-testing
-
-  # Called by release.yml so every published release also ships to
-  # TestFlight. workflow_call has no choice type; release-ios.ts passes
-  # the export method.
   workflow_call:
     inputs:
       commit:
@@ -27,10 +23,6 @@ on:
         type: string
         default: app-store-connect
 
-# TestFlight uploads should be serialized so build numbers and App Store
-# Connect processing don't race each other. This also holds when the workflow
-# is called from release.yml; keep the group name hardcoded, since a
-# `github.workflow` group would resolve to the caller's name there.
 concurrency:
   group: publish-testflight
   cancel-in-progress: false
@@ -44,8 +36,6 @@ jobs:
     if: github.repository == 'team-reflect/reflect-open'
     runs-on: macos-26
     timeout-minutes: 120
-    env:
-      CARGO_HTTP_MULTIPLEXING: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

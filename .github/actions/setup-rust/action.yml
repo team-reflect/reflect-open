@@ -18,6 +18,12 @@ inputs:
 runs:
   using: composite
   steps:
+    # Cargo registry fetches can intermittently fail on GitHub runners with
+    # curl HTTP/2 framing errors. HTTP/1.1 is slower but steadier.
+    - name: Disable HTTP/2 multiplexing in cargo
+      shell: bash
+      run: echo "CARGO_HTTP_MULTIPLEXING=false" >> "$GITHUB_ENV"
+
     # Tauri v2 build dependencies (the crate links the WebView + GTK stack).
     - name: Install Tauri system dependencies
       if: runner.os == 'Linux'

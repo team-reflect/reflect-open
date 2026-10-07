@@ -1,0 +1,59 @@
+name: Build
+
+# Checks that the release build of each platform compiles and bundles. It uses
+# no secrets and uploads nothing.
+#
+# Only Release PRs change the desktop release-please manifests, so the paths
+# filter keeps this workflow off every other pull request.
+on:
+  pull_request:
+    paths:
+      - .github/release-please/manifest.stable.json
+      - .github/release-please/manifest.beta.json
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least-privilege default: the build only needs to read the repo.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos
+            os: macos-26
+            command: pnpm release:macos --no-sign
+          - name: ios
+            os: macos-26
+            target: aarch64-apple-ios
+            command: pnpm release:ios --build-number=1 --no-sign
+          - name: windows
+            os: windows-latest
+            command: pnpm release:windows
+
+    name: build-${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          targets: ${{ matrix.target }}
+          cache-key: build-${{ matrix.name }}
+
+      - name: Build
+        shell: bash
+        run: ${{ matrix.command }}

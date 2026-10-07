@@ -22,6 +22,7 @@ export {
   runDeviceFlow,
   refreshGithubAuth,
   getGithubToken,
+  githubCredential,
   getAuthenticatedUser,
   type DeviceFlowStart,
   type DevicePollResult,

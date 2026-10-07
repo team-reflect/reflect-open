@@ -3,6 +3,12 @@ name: Set up Node.js and pnpm
 runs:
   using: composite
   steps:
+    # The runner image enables OS-level long paths but not git's own support.
+    - name: Enable git long paths
+      if: runner.os == 'Windows'
+      shell: bash
+      run: git config --system core.longpaths true
+
     - name: Install pnpm
       uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 

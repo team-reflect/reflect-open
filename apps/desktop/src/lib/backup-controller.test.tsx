@@ -7,6 +7,7 @@ import {
   type GraphInfo,
 } from '@reflect/core'
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
+import { flushBackup } from '@/lib/backup-flush.ts'
 import { setPlatformSurface } from '@/lib/platform-surface.ts'
 import { createBackupController, type BackupState } from './backup-controller.ts'
 
@@ -45,11 +46,17 @@ interface FakeOptions {
   failIndexApply?: boolean
   /** Hold the listen promise until `release()` (the teardown-race window). */
   gateListen?: boolean
+  /** Hold the first `git_merge_remote` until `releaseMerge()` (the mid-pull window). */
+  gateMerge?: boolean
+  /** Hold the second `git_commit_all` until `releaseCommit()` (a flush still in flight). */
+  gateSecondCommit?: boolean
   /** Make the watcher subscription throw (the unusable-watcher path). */
   failListen?: boolean
   failStatus?: boolean
   /** Make the keychain read throw (locked keychain, stale ACL after re-signing). */
   failSecretGet?: boolean
+  /** A stored sign-in for a non-GitHub host (`git-host:<host>`), as JSON. */
+  hostSecret?: string | null
   /** Scripted `git_merge_remote` outcome (defaults to up-to-date). */
   mergeOutcome?: unknown
   /** Per-call merge outcomes for retry/convergence tests. */
@@ -82,6 +89,10 @@ function fakeBridge(options: FakeOptions = {}) {
   }
   let releaseListen: (() => void) | null = null
   let releaseIndexApply: (() => void) | null = null
+  let releaseMerge: (() => void) | null = null
+  let releaseCommit: (() => void) | null = null
+  let mergeCount = 0
+  let commitInvocations = 0
   let indexApplyCount = 0
   const mergeOutcomes = [...(options.mergeOutcomes ?? [])]
   const pushOutcomes = [...(options.pushOutcomes ?? [])]
@@ -103,15 +114,30 @@ function fakeBridge(options: FakeOptions = {}) {
           if (options.failSecretGet === true) {
             throw { kind: 'io', message: 'keychain unavailable' }
           }
+          if (String(args['name']).startsWith('git-host:')) {
+            return options.hostSecret ?? null
+          }
           return auth
         case 'secret_delete':
           auth = null
           return null
         case 'git_commit_all':
+          commitInvocations += 1
+          if (options.gateSecondCommit === true && commitInvocations === 2) {
+            await new Promise<void>((resolve) => {
+              releaseCommit = resolve
+            })
+          }
           return CLEAN_COMMIT
         case 'git_fetch':
           return { ahead: 0, behind: 0 }
         case 'git_merge_remote':
+          mergeCount += 1
+          if (options.gateMerge === true && mergeCount === 1) {
+            await new Promise<void>((resolve) => {
+              releaseMerge = resolve
+            })
+          }
           return mergeOutcomes.shift() ?? options.mergeOutcome ?? UP_TO_DATE
         case 'git_push':
           if (options.pushError !== undefined) {
@@ -164,6 +190,8 @@ function fakeBridge(options: FakeOptions = {}) {
     status,
     releaseListen: () => releaseListen?.(),
     releaseIndexApply: () => releaseIndexApply?.(),
+    releaseMerge: () => releaseMerge?.(),
+    releaseCommit: () => releaseCommit?.(),
   }
 }
 
@@ -210,7 +238,7 @@ describe('createBackupController', () => {
 
     vi.useFakeTimers()
     try {
-      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }])
+      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }], 'external')
       await vi.advanceTimersByTimeAsync(30_000)
     } finally {
       vi.useRealTimers()
@@ -239,7 +267,7 @@ describe('createBackupController', () => {
       repo: null,
     })
     const fetch = invocations.find(({ command }) => command === 'git_fetch')
-    expect(fetch?.args).toMatchObject({ token: null })
+    expect(fetch?.args).toMatchObject({ credential: null })
     controller.dispose()
   })
 
@@ -255,13 +283,13 @@ describe('createBackupController', () => {
 
     for (const { command, args } of invocations) {
       if (command === 'git_fetch' || command === 'git_push') {
-        expect(args).toMatchObject({ token: null })
+        expect(args).toMatchObject({ credential: null })
       }
     }
     controller.dispose()
   })
 
-  it('refuses a generic HTTPS remote at adoption with the SSH suggestion', async () => {
+  it('refuses a generic HTTPS remote without a stored sign-in', async () => {
     // A *public* generic HTTPS remote would pull anonymously and only fail
     // on push — edits arriving while the user's own never leave. The guard
     // surfaces the error before the engine ever starts.
@@ -291,6 +319,48 @@ describe('createBackupController', () => {
     expect(commitCount(calls)).toBe(1)
     expect(calls).not.toContain('git_fetch')
     expect(calls).not.toContain('git_push')
+    controller.dispose()
+  })
+
+  it('adopts a generic HTTPS remote with a stored host sign-in and sends it', async () => {
+    const { calls, invocations } = fakeBridge({
+      auth: null,
+      remoteUrl: 'https://gitlab.com/alex/notes.git',
+      hostSecret: JSON.stringify({ username: 'alex', secret: 'glpat-xyz' }),
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_fetch')
+    })
+    const fetch = invocations.find((call) => call.command === 'git_fetch')
+    expect(fetch?.args).toMatchObject({ credential: { username: 'alex', secret: 'glpat-xyz' } })
+    expect(controller.getState()).toMatchObject({ phase: 'connected', repo: null })
+    controller.dispose()
+  })
+
+  it('keeps local history when the host sign-in cannot be read', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { calls } = fakeBridge({
+      auth: null,
+      remoteUrl: 'https://gitlab.com/alex/notes.git',
+      failSecretGet: true,
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    expect(controller.getState()).toMatchObject({
+      phase: 'connected',
+      status: { state: 'error', errorKind: 'rejected' },
+    })
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_commit_all')
+    })
+    expect(calls).not.toContain('git_fetch')
+    expect(consoleError).toHaveBeenCalledWith(
+      'reading the host sign-in failed:',
+      expect.any(String),
+    )
+    consoleError.mockRestore()
     controller.dispose()
   })
 
@@ -390,7 +460,7 @@ describe('createBackupController', () => {
 
     vi.useFakeTimers()
     try {
-      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }])
+      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }], 'external')
       await vi.advanceTimersByTimeAsync(30_000)
     } finally {
       vi.useRealTimers()
@@ -591,6 +661,50 @@ describe('createBackupController', () => {
     controller.dispose()
   })
 
+  // Safety invariant S4 (docs/git-backup-safety.md): the quit-time commit must
+  // queue behind an in-flight cycle. Today `flushBackup` calls
+  // `gitCommitAll` directly, so a commit can land between a pull's ref move
+  // and its checkout and commit the stale tree (#1405). Red on purpose until
+  // the flusher routes through the engine.
+  it.fails('quit flush waits for an in-flight pull before committing', async () => {
+    const { calls, releaseMerge, releaseCommit } = fakeBridge({
+      gateMerge: true,
+      gateSecondCommit: true,
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    try {
+      await vi.waitFor(() => {
+        expect(calls).toContain('git_merge_remote')
+      })
+      expect(commitCount(calls)).toBe(1) // the launch cycle's own commit
+
+      let flushResolved = false
+      const flushed = flushBackup().then(() => {
+        flushResolved = true
+      })
+      await Promise.resolve()
+      // The pull is still between fetch and merge: no second commit may run yet.
+      expect(commitCount(calls)).toBe(1)
+
+      releaseMerge()
+      await vi.waitFor(() => {
+        expect(commitCount(calls)).toBe(2)
+      })
+      // The flush resolves with its commit, not before it.
+      expect(flushResolved).toBe(false)
+      releaseCommit()
+      await flushed
+    } finally {
+      // The expected failure above throws past the lines after it, so the
+      // gate and the controller are released here, or the suspended merge
+      // and the live listeners leak into the next test.
+      releaseMerge()
+      releaseCommit()
+      controller.dispose()
+    }
+  })
+
   it('window focus triggers a sync', async () => {
     const { calls } = fakeBridge()
     const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
@@ -667,7 +781,7 @@ describe('createBackupController', () => {
 
       visibility.mockReturnValue('hidden')
       vi.useFakeTimers()
-      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }])
+      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }], 'external')
       window.dispatchEvent(new Event('online'))
       await vi.advanceTimersByTimeAsync(10_000)
 
@@ -702,7 +816,7 @@ describe('createBackupController', () => {
           expect(commitCount(calls)).toBe(1) // the launch pull's commit
         })
         vi.useFakeTimers()
-        emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }])
+        emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }], 'external')
         await vi.advanceTimersByTimeAsync(10_000)
         if (commitCount(calls) > 1) {
           return 10_000

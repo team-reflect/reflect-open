@@ -1,4 +1,4 @@
-name: Release PR
+name: Release
 
 # Stable and beta Release PRs share master but use separate lifecycle labels
 # and head branches. A merged PR in one channel therefore cannot block the

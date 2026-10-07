@@ -19,6 +19,7 @@ export {
   pushOutcomeSchema,
   skippedFileSchema,
   changedFileSchema,
+  type GitCredential,
   type GitStatus,
   type CommitOutcome,
   type RemoteDelta,
@@ -42,6 +43,7 @@ export {
   runDeviceFlow,
   refreshGithubAuth,
   getGithubToken,
+  githubCredential,
   parseGithubRemote,
   githubRemoteUrl,
   newRepoUrl,
@@ -58,6 +60,12 @@ export {
   type GithubUser,
 } from './github.ts'
 export { createGist, updateGist, deleteGist, type PublishedGist, type GistFile } from './gists.ts'
+export {
+  clearHostCredential,
+  loadHostCredential,
+  remoteHost,
+  saveHostCredential,
+} from './host-credentials.ts'
 export {
   createSyncEngine,
   isSyncError,
