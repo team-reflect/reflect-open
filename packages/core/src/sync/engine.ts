@@ -94,7 +94,9 @@ export interface SyncEngineOptions {
    * Checked before a new cycle and again after every awaited command boundary.
    * Returning false at admission drops the trigger without issuing Git work;
    * returning false mid-cycle lets the already-issued command finish but
-   * suppresses every subsequent command. The lifecycle owner must replay a
+   * suppresses every subsequent command, except the push of what is already
+   * committed: that one command finishes the cycle's work rather than
+   * leaving it for the next foreground. The lifecycle owner must replay a
    * full cycle when work is allowed again.
    */
   canStartCycle?: () => boolean
@@ -207,7 +209,11 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
    * the engine stopped or the owner suppressed further cycles meanwhile. An
    * already-issued Git command cannot be recalled, but no later command starts.
    */
-  async function step<T>(promise: Promise<T>, onResult?: (result: T) => void): Promise<T> {
+  async function step<T>(
+    promise: Promise<T>,
+    onResult?: (result: T) => void,
+    gated = true,
+  ): Promise<T> {
     const result = await promise
     signal.throwIfAborted()
     onResult?.(result)
@@ -215,7 +221,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     // example, a file-change subscriber closing the graph). Preserve stop's
     // command boundary before the caller is allowed to issue later Git work.
     signal.throwIfAborted()
-    if (options.canStartCycle?.() === false) {
+    if (gated && options.canStartCycle?.() === false) {
       throw new CycleSuppressedError()
     }
     return result
@@ -378,17 +384,21 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       return
     }
     const offline = options.localOnly === true || quiet
+    // A push-only cycle sends what the commit wrote and nothing more, so a
+    // gate that closes during it (the app backgrounds) lets it finish; a
+    // cycle that will fetch and merge stops at the next boundary instead.
+    const gated = request.fetch
     // The commit comes first: it is the part of every cycle a flush is owed,
     // and it must land even if the owner gates the network work that follows
     // (the credential resolution is the first point a gate can interrupt).
-    const commit = await step(gitCommitAll('Update notes', options.generation))
+    const commit = await step(gitCommitAll('Update notes', options.generation), undefined, gated)
     if (commit.skippedLargeFiles.length > 0) {
       options.onLargeFilesSkipped?.(commit.skippedLargeFiles)
     }
     if (offline) {
       return // the commit is the whole cycle: no remote, or the sign-in is known bad
     }
-    const credential = await step(options.getCredential())
+    const credential = await step(options.getCredential(), undefined, gated)
     if (!request.fetch) {
       // The debounce path often fires for changes that are already committed
       // and pushed (a pull's own writes re-enter via the watcher). Nothing
@@ -407,7 +417,9 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       }
     }
     for (let attempt = 0; attempt < MAX_PUSH_ATTEMPTS; attempt++) {
-      const push = await step(gitPush(credential, options.generation))
+      // The push only sends what is committed; the fetch and merge a
+      // rejected push needs stay gated.
+      const push = await step(gitPush(credential, options.generation), undefined, false)
       if (push.pushed) {
         return
       }
