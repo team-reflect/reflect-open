@@ -9,7 +9,7 @@ permissions: {}
 jobs:
   conventional-title:
     name: Conventional PR title
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       # The repo squash-merges, so the PR title becomes the commit message and,
       # for feat/fix, the user-facing changelog entry. Breaking-change

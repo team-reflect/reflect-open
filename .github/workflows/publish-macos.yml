@@ -43,10 +43,10 @@ jobs:
       matrix:
         include:
           - name: Apple Silicon
-            runner: macos-26
+            runner: blacksmith-6vcpu-macos-26
             target: aarch64-apple-darwin
           - name: Intel
-            runner: macos-26
+            runner: blacksmith-6vcpu-macos-26
             target: x86_64-apple-darwin
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

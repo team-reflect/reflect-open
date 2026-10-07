@@ -25,7 +25,7 @@ jobs:
   release-please:
     name: Maintain the Release PRs
     if: github.repository == 'team-reflect/reflect-open'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     # The desktop package lives at the repo root ("."), so its outputs have
     # no path prefix. The channels never release from the same push:
     # a push merges at most one Release PR, and the two passes only create

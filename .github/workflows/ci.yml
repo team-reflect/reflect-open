@@ -51,7 +51,7 @@ jobs:
         config:
           - os: ubuntu-latest
             browser: chromium
-          - os: macos-latest
+          - os: blacksmith-6vcpu-macos-15
             browser: webkit
 
     name: test-${{ matrix.config.browser }} ${{ matrix.shard }}

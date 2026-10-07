@@ -45,10 +45,10 @@ jobs:
         # target and no cross-compilation.
         include:
           - name: x64
-            runner: windows-latest
+            runner: blacksmith-4vcpu-windows-2025
             target: x86_64-pc-windows-msvc
           - name: arm64
-            runner: windows-11-arm
+            runner: blacksmith-4vcpu-windows-2025
             target: aarch64-pc-windows-msvc
     steps:
       # The runner image enables OS-level long paths but not git's own
