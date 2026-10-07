@@ -406,7 +406,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
         onStatus: (engineStatus) => {
           setState({ phase: 'connected', remoteUrl, repo, role, status: engineStatus })
           if (repo !== null && isForbidden(engineStatus)) {
-            void classifyForbidden(engineStatus, remoteUrl, repo)
+            void classifyForbidden(engineStatus, repo)
           }
         },
         onLargeFilesSkipped: (files) => {
@@ -442,11 +442,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
    * fixes neither. Ask GitHub whether the token itself is good: when it is,
    * the push was refused for another reason and the status names it.
    */
-  async function classifyForbidden(
-    status: SyncStatus,
-    remoteUrl: string,
-    repo: GithubRepoRef,
-  ): Promise<void> {
+  async function classifyForbidden(status: SyncStatus, repo: GithubRepoRef): Promise<void> {
     let next: SyncStatus
     try {
       const token = await getGithubToken(providerFetch)
