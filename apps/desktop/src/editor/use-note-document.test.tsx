@@ -67,8 +67,20 @@ beforeEach(() => {
       return disk
     }
     if (command === 'note_write') {
-      const { path, contents } = args as { path: string; contents: string }
+      const { path, contents, expectedContents } = args as {
+        path: string
+        contents: string
+        expectedContents?: string
+      }
       if (path.includes(' (conflict')) {
+        const copy = created.find((entry) => entry.path === path)
+        if (
+          copy === undefined ||
+          (expectedContents !== undefined && expectedContents !== copy.contents)
+        ) {
+          throw { kind: 'io', message: 'Note changed on disk; reload before retrying' }
+        }
+        copy.contents = contents
         copyWrites.push({ path, contents })
         return null
       }
@@ -82,8 +94,12 @@ beforeEach(() => {
     }
     if (command === 'note_create') {
       const { path, contents } = args as { path: string; contents: string }
-      await createGate?.()
+      if (created.some((entry) => entry.path === path)) {
+        return { kind: 'collision' }
+      }
+      // The entry exists before the gated call resolves, like a file on disk.
       created.push({ path, contents })
+      await createGate?.()
       return { kind: 'created', modifiedMs: null }
     }
     return null
@@ -743,11 +759,58 @@ describe('useNoteDocument', () => {
     await act(() => releaseCreate?.())
 
     await vi.waitFor(() => expect(editor.applied).toEqual(['# Theirs\n']))
-    expect(created).toEqual([{ path: 'notes/a (conflict).md', contents: '# My unsaved edit\n' }])
+    expect(created.map((entry) => entry.path)).toEqual(['notes/a (conflict).md'])
     expect(copyWrites).toEqual([
       { path: 'notes/a (conflict).md', contents: '# My unsaved edit, and more\n' },
     ])
     expect(writes).toEqual([])
+  })
+
+  it('a later conflict in the same session gets its own sibling, and a copy that moved is left alone', async () => {
+    const { result, act } = await readyHook()
+    const editor = fakeEditor()
+    await act(() => result.current.bindEditor(editor))
+
+    await act(() => result.current.onEditorChange('# Version A\n'))
+    disk = '# Theirs\n'
+    await act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
+    await vi.waitFor(() => expect(editor.applied).toEqual(['# Theirs\n']))
+
+    await act(() => result.current.onEditorChange('# Version B\n'))
+    disk = '# Theirs, again\n'
+    await act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
+    await vi.waitFor(() => expect(editor.applied).toEqual(['# Theirs\n', '# Theirs, again\n']))
+    expect(created).toEqual([
+      { path: 'notes/a (conflict).md', contents: '# Version A\n' },
+      { path: 'notes/a (conflict 2).md', contents: '# Version B\n' },
+    ])
+
+    // Keystrokes during a copy retake it, but a copy another writer changed
+    // meanwhile is kept and the newer buffer goes to a fresh sibling.
+    let releaseCreate: (() => void) | null = null
+    createGate = () =>
+      new Promise<void>((resolve) => {
+        releaseCreate = resolve
+      })
+    await act(() => result.current.onEditorChange('# Version C\n'))
+    disk = '# Theirs, third\n'
+    await act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
+    await vi.waitFor(() => expect(releaseCreate).not.toBeNull())
+    await act(() => result.current.onEditorChange('# Version C, and more\n'))
+    created.find((entry) => entry.path === 'notes/a (conflict 3).md')!.contents =
+      '# edited elsewhere\n'
+    createGate = null
+    await act(() => releaseCreate?.())
+    await vi.waitFor(() =>
+      expect(created.at(-1)).toEqual({
+        path: 'notes/a (conflict 4).md',
+        contents: '# Version C, and more\n',
+      }),
+    )
+    expect(created.find((entry) => entry.path === 'notes/a (conflict 3).md')?.contents).toBe(
+      '# edited elsewhere\n',
+    )
+    expect(copyWrites).toEqual([])
   })
 
   it('opens a note the editor would corrupt in protected mode and never saves it', async () => {

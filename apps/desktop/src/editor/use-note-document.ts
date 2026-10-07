@@ -8,6 +8,7 @@ import { createRenameCoordinator } from './rename-coordinator.ts'
 import {
   createNoteSession,
   INITIAL_NOTE_SNAPSHOT,
+  type ConflictCopy,
   type NoteSessionSnapshot,
 } from './note-session.ts'
 import { checkRoundTrip } from './roundtrip.ts'
@@ -60,39 +61,42 @@ export interface NoteDocumentOptions {
 
 /**
  * Keep edits beside a note as `<note> (conflict).md` (then `(conflict 2)`,
- * …) when they could not be merged into an external change. One copier per
- * session: copying again while the user keeps typing overwrites the copy it
- * made, not a new file.
+ * …) when they could not be merged into an external change. Newer
+ * keystrokes during one reconciliation overwrite the copy it already made,
+ * checked against what was written: a copy that moved meanwhile (another
+ * window, another device) is left alone and a fresh sibling is made.
  */
-function conflictCopier(
-  generation: () => number | null,
-): (path: string, contents: string) => Promise<string> {
-  let copy: string | null = null
-  return async (path, contents) => {
-    const current = generation()
-    if (current === null) {
-      throw new Error('no graph generation available for the conflict copy')
+async function keepBesideNote(
+  path: string,
+  contents: string,
+  previous: ConflictCopy | null,
+  generation: number | null,
+): Promise<string> {
+  if (generation === null) {
+    throw new Error('no graph generation available for the conflict copy')
+  }
+  if (previous !== null) {
+    try {
+      await writeNote(previous.path, contents, generation, previous.contents)
+      return previous.path
+    } catch {
+      // The copy changed under us: keep it, and make a fresh one below.
     }
-    if (copy !== null) {
-      await writeNote(copy, contents, current)
+  }
+  const slash = path.lastIndexOf('/')
+  const dot = path.lastIndexOf('.')
+  const [stem, ext] = dot > slash ? [path.slice(0, dot), path.slice(dot)] : [path, '']
+  for (let n = 1; n < 10; n += 1) {
+    const copy = `${stem} (conflict${n === 1 ? '' : ` ${n}`})${ext}`
+    const outcome = await createNoteIfAbsent(copy, contents, generation)
+    if (outcome.kind === 'created') {
+      startOperation('Edits kept beside the note').warn(
+        `${path} changed on disk in a way that could not be merged. Your version is at ${copy}.`,
+      )
       return copy
     }
-    const slash = path.lastIndexOf('/')
-    const dot = path.lastIndexOf('.')
-    const [stem, ext] = dot > slash ? [path.slice(0, dot), path.slice(dot)] : [path, '']
-    for (let n = 1; n < 10; n += 1) {
-      const candidate = `${stem} (conflict${n === 1 ? '' : ` ${n}`})${ext}`
-      const outcome = await createNoteIfAbsent(candidate, contents, current)
-      if (outcome.kind === 'created') {
-        copy = candidate
-        startOperation('Edits kept beside the note').warn(
-          `${path} changed on disk in a way that could not be merged. Your version is at ${copy}.`,
-        )
-        return copy
-      }
-    }
-    throw new Error('no free name for the conflict copy')
   }
+  throw new Error('no free name for the conflict copy')
 }
 
 /**
@@ -160,7 +164,10 @@ export function useNoteDocument(
                 }
               : null,
             mergeText: canWrite ? mergeText : undefined,
-            copyAside: canWrite ? conflictCopier(() => generationRef.current) : undefined,
+            copyAside: canWrite
+              ? (forPath, contents, previous) =>
+                  keepBesideNote(forPath, contents, previous, generationRef.current)
+              : undefined,
           },
           classify: checkRoundTrip,
           onSnapshot: (next) => {

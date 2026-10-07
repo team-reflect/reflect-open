@@ -34,8 +34,8 @@ interface Harness {
   failWrites: (message: string | null) => void
   /** Script the next three-way merge outcome (`null` = the merge throws). */
   setMerge: (outcome: MergeTextOutcome | null) => void
-  /** Buffers kept beside the note when they could not be merged. */
-  copies: Array<{ path: string; contents: string }>
+  /** Buffers kept beside the note when they could not be merged (`previous` = the copy being retaken). */
+  copies: Array<{ path: string; contents: string; previous: string | null }>
   /** While set, conflict copies reject with this message. */
   failCopies: (message: string | null) => void
   session: ReturnType<typeof createNoteSession>
@@ -62,7 +62,7 @@ function harness(options?: {
   const writes: Array<{ path: string; contents: string }> = []
   const applied: string[] = []
   const contents: Array<{ content: string; origin: string }> = []
-  const copies: Array<{ path: string; contents: string }> = []
+  const copies: Array<{ path: string; contents: string; previous: string | null }> = []
   let disk = options?.disk === undefined ? '# Hello\n' : options.disk
   let writeFailure: string | null = null
   let copyFailure: string | null = null
@@ -100,13 +100,13 @@ function harness(options?: {
               }
               return mergeOutcome
             },
-      copyAside: async (path, contents) => {
+      copyAside: async (path, contents, previous) => {
         options?.beforeCopy?.()
         if (copyFailure !== null) {
           throw new Error(copyFailure)
         }
-        copies.push({ path, contents })
-        return `${path.slice(0, -3)} (conflict).md`
+        copies.push({ path, contents, previous: previous?.path ?? null })
+        return previous?.path ?? `${path.slice(0, -3)} (conflict${copies.length}).md`
       },
     },
     classify: options?.classify ?? (() => 'exact'),
@@ -337,7 +337,9 @@ describe('createNoteSession', () => {
     await settled()
 
     expect(writes).toEqual([{ path: 'notes/a.md', contents: marked }])
-    expect(copies).toEqual([{ path: 'notes/a.md', contents: 'mine, typed during the merge\n' }])
+    expect(copies).toMatchObject([
+      { path: 'notes/a.md', contents: 'mine, typed during the merge\n' },
+    ])
     expect(snapshots.at(-1)).toMatchObject({ protected: true, initialContent: marked })
   })
 
@@ -377,7 +379,7 @@ describe('createNoteSession', () => {
     await settled()
 
     expect(writes).toEqual([])
-    expect(copies).toEqual([{ path: 'notes/a.md', contents: 'mine\n' }])
+    expect(copies).toMatchObject([{ path: 'notes/a.md', contents: 'mine\n' }])
     expect(applied).toEqual(['theirs\n'])
     expect(snapshots.at(-1)).toMatchObject({ dirty: false, protected: false, error: null })
   })
@@ -405,7 +407,7 @@ describe('createNoteSession', () => {
     session.editorChanged('mine, more\n')
     await settled()
     expect(writes).toEqual([])
-    expect(copies).toEqual([{ path: 'notes/a.md', contents: 'mine, more\n' }])
+    expect(copies).toMatchObject([{ path: 'notes/a.md', contents: 'mine, more\n' }])
     expect(applied).toEqual(['theirs\n'])
     expect(snapshots.at(-1)).toMatchObject({ dirty: false, error: null })
   })
@@ -430,8 +432,34 @@ describe('createNoteSession', () => {
     session.externalChanged()
     await settled()
 
-    expect(copies.map((copy) => copy.contents)).toEqual(['mine\n', 'mine, typed during the copy\n'])
+    // The second round overwrites the copy the first made, not a new file.
+    expect(copies).toMatchObject([
+      { contents: 'mine\n', previous: null },
+      { contents: 'mine, typed during the copy\n', previous: 'notes/a (conflict1).md' },
+    ])
     expect(applied).toEqual(['theirs\n'])
+  })
+
+  it('a later conflict in the same session gets its own copy', async () => {
+    const { session, copies, setDisk } = harness({
+      merge: { kind: 'unmergeable', content: 'theirs\n' },
+    })
+    session.load()
+    await settled()
+    for (const [mine, theirs] of [
+      ['mine A\n', 'theirs\n'],
+      ['mine B\n', 'theirs, again\n'],
+    ] as const) {
+      session.editorChanged(mine)
+      setDisk(theirs)
+      session.externalChanged()
+      await settled()
+    }
+    // Neither reconciliation knows about the other's copy: version A survives.
+    expect(copies).toMatchObject([
+      { contents: 'mine A\n', previous: null },
+      { contents: 'mine B\n', previous: null },
+    ])
   })
 
   it('without a merge capability the edits are kept beside the note too', async () => {
@@ -443,7 +471,7 @@ describe('createNoteSession', () => {
     session.externalChanged()
     await settled()
 
-    expect(copies).toEqual([{ path: 'notes/a.md', contents: 'mine\n' }])
+    expect(copies).toMatchObject([{ path: 'notes/a.md', contents: 'mine\n' }])
     expect(applied).toEqual(['theirs\n'])
   })
 

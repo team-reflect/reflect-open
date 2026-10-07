@@ -9,6 +9,7 @@ import {
 import { splitDoc } from './note-session-doc.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
 import type {
+  ConflictCopy,
   NoteSession,
   NoteSessionIo,
   NoteSessionOptions,
@@ -361,10 +362,11 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     if (io.copyAside === undefined) {
       return true
     }
+    let copy: ConflictCopy | null = null // this reconciliation's copy only
     for (let round = 0; round < 3; round += 1) {
       const contents = header + buffer
       try {
-        await io.copyAside(path, contents)
+        copy = { path: await io.copyAside(path, contents, copy), contents }
       } catch (cause) {
         error = errorMessage(cause)
         emit()

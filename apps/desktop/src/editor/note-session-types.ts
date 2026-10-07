@@ -41,6 +41,12 @@ export const INITIAL_NOTE_SNAPSHOT: NoteSessionSnapshot = {
 }
 
 /** File access injected by the host (the hook binds `@reflect/core` commands). */
+/** A conflict copy as last written: its path and the contents it holds. */
+export interface ConflictCopy {
+  path: string
+  contents: string
+}
+
 export interface NoteSessionIo {
   read: (path: string) => Promise<string>
   /**
@@ -62,10 +68,14 @@ export interface NoteSessionIo {
    * Keep `contents` as a sibling file of `path` (`<note> (conflict).md`) and
    * return the copy's path: the fallback when edits cannot be merged into an
    * external change (the file already carries markers, or no merge is
-   * available), so nothing typed is ever lost. Called again with newer
-   * contents while the user keeps typing: the same copy is overwritten.
+   * available), so nothing typed is ever lost. `previous` is the copy this
+   * reconciliation already made (newer keystrokes arrived during it): it is
+   * overwritten only while it still holds what was written, else a fresh
+   * sibling is made. A later conflict passes `null` and gets its own copy.
    */
-  copyAside?: ((path: string, contents: string) => Promise<string>) | undefined
+  copyAside?:
+    | ((path: string, contents: string, previous: ConflictCopy | null) => Promise<string>)
+    | undefined
 }
 
 /** Why {@link NoteSessionOptions.onContent} fired. */
