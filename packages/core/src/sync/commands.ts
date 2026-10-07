@@ -136,6 +136,24 @@ export async function gitCommitAll(
   return await call('git_commit_all', { message: fallbackMessage, generation }, commitOutcomeSchema)
 }
 
+export const remoteTipSchema = z.object({
+  remoteOid: z.string().nullable(),
+  trackingOid: z.string().nullable(),
+})
+export type RemoteTip = z.infer<typeof remoteTipSchema>
+
+/**
+ * Where `origin`'s branch is right now, in one round trip and without a
+ * fetch. `remoteOid !== trackingOid` means the remote moved since the last
+ * fetch; `remoteOid === null` means the branch does not exist there yet.
+ */
+export async function gitRemoteHead(
+  credential: GitCredential | null,
+  generation: number,
+): Promise<RemoteTip> {
+  return await call('git_remote_head', { credential, generation }, remoteTipSchema)
+}
+
 /** Fetch `origin`; returns ahead/behind for the current branch. */
 export async function gitFetch(
   credential: GitCredential | null,

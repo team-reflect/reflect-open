@@ -3,6 +3,7 @@ export {
   gitSetup,
   gitCommitAll,
   gitFetch,
+  gitRemoteHead,
   gitMergeRemote,
   gitPush,
   isDeviceFlowConfigured,

@@ -198,6 +198,18 @@ pub async fn git_fetch(
     run_blocking(move || remote::fetch(&root, credential)).await
 }
 
+/// Where `origin`'s branch is right now, without a fetch: the probe behind
+/// periodic pulls. Nothing on disk changes, so no graph lock.
+#[tauri::command]
+pub async fn git_remote_head(
+    credential: Option<GitCredential>,
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<remote::RemoteTip> {
+    let root = crate::fs::root_for_generation(&state, generation)?;
+    run_blocking(move || remote::remote_head(&root, credential)).await
+}
+
 /// Merge the fetched remote branch; conflicts are committed into the notes as
 /// labeled markers (see [`merge`]). The repo is never left mid-merge.
 #[tauri::command]

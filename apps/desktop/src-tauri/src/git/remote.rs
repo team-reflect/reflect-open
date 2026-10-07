@@ -201,6 +201,45 @@ pub(super) fn clone(url: &str, target: &Path, credential: Option<GitCredential>)
 /// Push the current branch to `origin`. Rejections come back as data, not
 /// errors — the sync engine branches on them (non-fast-forward → pull/merge/
 /// retry; anything else → surface the remote's message).
+/// Where `origin` says its branch is, next to where the last fetch left it.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteTip {
+    /// The remote branch's commit, `None` while the branch is unborn there.
+    pub remote_oid: Option<String>,
+    /// `refs/remotes/origin/<branch>` as the last fetch left it.
+    pub tracking_oid: Option<String>,
+}
+
+/// Ask `origin` for its branch tip in one ref-advertisement round trip,
+/// without downloading objects or touching the working tree. A tip that
+/// differs from the tracking ref means the remote moved since the last fetch.
+pub(super) fn remote_head(root: &Path, credential: Option<GitCredential>) -> AppResult<RemoteTip> {
+    let repo = open_existing(root)?;
+    let branch = current_branch(&repo)?;
+    let mut remote = origin(&repo)?;
+    let refname = format!("refs/heads/{branch}");
+    remote.connect_auth(
+        git2::Direction::Fetch,
+        Some(callbacks_with_credentials(credential)),
+        None,
+    )?;
+    let remote_oid = remote
+        .list()?
+        .iter()
+        .find(|head| head.name() == refname)
+        .map(|head| head.oid().to_string());
+    remote.disconnect()?;
+    let tracking_oid = repo
+        .refname_to_id(&format!("refs/remotes/origin/{branch}"))
+        .ok()
+        .map(|oid| oid.to_string());
+    Ok(RemoteTip {
+        remote_oid,
+        tracking_oid,
+    })
+}
+
 pub(super) fn push(root: &Path, credential: Option<GitCredential>) -> AppResult<PushOutcome> {
     let repo = open_existing(root)?;
     let branch = current_branch(&repo)?;

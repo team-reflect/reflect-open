@@ -11,7 +11,7 @@ use tempfile::tempdir;
 use super::commit::commit_all;
 use super::fault::{self, Fault, FaultPoint};
 use super::merge::{merge_remote, MergeKind};
-use super::remote::{fetch, push};
+use super::remote::{fetch, push, remote_head};
 use super::test_support::{
     fixture, head_blob, head_message, head_tree_paths, read, remote_blob, scaffold_graph,
     second_device, write, Fixture,
@@ -1147,4 +1147,44 @@ fn merge_interrupted_before_commit_converges_next_cycle() {
         assert_eq!(head_blob(root_a, rel), expected, "{rel} in HEAD");
         assert_eq!(remote_blob(&fixture, rel), expected, "{rel} on the remote");
     }
+}
+
+#[test]
+fn remote_head_reports_the_remote_tip_without_fetching() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/a.md", "# A\n");
+    commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let tip = remote_head(root_a, None).unwrap();
+    assert!(tip.remote_oid.is_some());
+    assert_eq!(
+        tip.remote_oid, tip.tracking_oid,
+        "nothing moved since the push"
+    );
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/b.md", "# B\n");
+    commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    let tip = remote_head(root_a, None).unwrap();
+    let b_head = Repository::open(&root_b)
+        .unwrap()
+        .head()
+        .unwrap()
+        .target()
+        .unwrap()
+        .to_string();
+    assert_eq!(tip.remote_oid.as_deref(), Some(b_head.as_str()));
+    assert_ne!(tip.remote_oid, tip.tracking_oid, "the remote moved");
+    assert!(
+        !root_a.join("notes/b.md").exists(),
+        "the probe downloads nothing"
+    );
+
+    fetch(root_a, None).unwrap();
+    let tip = remote_head(root_a, None).unwrap();
+    assert_eq!(tip.remote_oid, tip.tracking_oid, "the fetch caught up");
 }
