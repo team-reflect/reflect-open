@@ -179,8 +179,6 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     done: Promise<void>
     settle: () => void
   } | null = null
-  /** Follow-up requested while a cycle was in flight (strongest mode wins). */
-  let rerunMode: 'push' | 'full' | null = null
   /**
    * Set by an auth failure, cleared by the next resume trigger (`syncNow`:
    * launch, focus, online, manual) or by a cycle that gets through. While
