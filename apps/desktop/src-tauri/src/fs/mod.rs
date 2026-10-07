@@ -298,12 +298,14 @@ pub async fn graph_import_reflect_v1_zip(
     // Writing is fast and local; throttle the events to ~100 per import so a
     // large graph doesn't flood the webview.
     let mut last_emitted = 0usize;
-    let summary = import::finalize_import(&root, prepared, downloads, |done, total| {
-        let step = (total / 100).max(1);
-        if done == total || done >= last_emitted + step {
-            last_emitted = done;
-            emit_import_progress(&app, "writing", done, total);
-        }
+    let summary = with_graph_lock(&root, || {
+        import::finalize_import(&root, prepared, downloads, |done, total| {
+            let step = (total / 100).max(1);
+            if done == total || done >= last_emitted + step {
+                last_emitted = done;
+                emit_import_progress(&app, "writing", done, total);
+            }
+        })
     })?;
     invalidate_file_catalog(&state, &root);
     Ok(summary)
@@ -426,15 +428,22 @@ static GRAPH_LOCKS: LazyLock<Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>> =
 
 /// Run `f` while holding the graph lock for `root`. A lock poisoned by a
 /// panicking holder is taken anyway: the guarded code never leaves partial
-/// state behind that the next holder could misread.
+/// state behind that the next holder could misread. Graph-relative paths
+/// are resolved inside `f`, never before: a checkout that wins the lock may
+/// have replaced a parent directory meanwhile.
 pub(crate) fn with_graph_lock<T>(root: &Path, f: impl FnOnce() -> T) -> T {
-    let lock = Arc::clone(
-        GRAPH_LOCKS
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .entry(root.to_path_buf())
-            .or_default(),
-    );
+    // One lock per physical graph: a symlinked or differently spelled root
+    // must not get its own. A root that does not exist yet (a clone target)
+    // keeps its given path.
+    let key = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+    let lock = {
+        let mut locks = GRAPH_LOCKS.lock().unwrap_or_else(PoisonError::into_inner);
+        let lock = Arc::clone(locks.entry(key).or_default());
+        // Entries nobody holds any more go: the registry stays bounded by the
+        // graphs in use, not by every path ever opened or cloned.
+        locks.retain(|_, entry| Arc::strong_count(entry) > 1);
+        lock
+    };
     let _guard = lock.lock().unwrap_or_else(PoisonError::into_inner);
     f()
 }
@@ -458,10 +467,9 @@ pub fn note_write(
     state: State<GraphState>,
 ) -> AppResult<Option<u64>> {
     let root = root_for_generation(&state, generation)?;
-    let target = resolve(&root, &path)?;
     let modified_ms = write_note_revision(
         &root,
-        &target,
+        &path,
         &contents,
         check_contents == Some(true),
         expected_contents.as_deref(),
@@ -472,12 +480,13 @@ pub fn note_write(
 
 pub(crate) fn write_note_revision(
     root: &Path,
-    target: &Path,
+    rel: &str,
     contents: &str,
     checked: bool,
     expected: Option<&str>,
 ) -> AppResult<Option<u64>> {
     with_graph_lock(root, || {
+        let target = &resolve(root, rel)?;
         if checked {
             let current = match io::read_note_no_follow(root, target) {
                 Ok(value) => Some(value),
@@ -503,8 +512,9 @@ pub fn note_create(
     state: State<GraphState>,
 ) -> AppResult<NoteCreateOutcome> {
     let root = root_for_generation(&state, generation)?;
-    let target = resolve(&root, &path)?;
-    match with_graph_lock(&root, || atomic_create(&root, &target, &contents))? {
+    match with_graph_lock(&root, || {
+        atomic_create(&root, &resolve(&root, &path)?, &contents)
+    })? {
         AtomicCreateOutcome::Created(modified_ms) => {
             invalidate_file_catalog(&state, &root);
             Ok(NoteCreateOutcome::Created { modified_ms })
@@ -528,8 +538,9 @@ pub fn asset_write(
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(contents_base64.as_bytes())
         .map_err(|err| AppError::io(format!("invalid base64 asset payload: {err}")))?;
-    let target = resolve(&root, &path)?;
-    with_graph_lock(&root, || atomic_write_bytes(&root, &target, &bytes))?;
+    with_graph_lock(&root, || {
+        atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)
+    })?;
     invalidate_file_catalog(&state, &root);
     Ok(())
 }
@@ -547,22 +558,24 @@ pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>
         )));
     }
     let root = root_for_generation(&state, generation)?;
-    let abs = resolve(&root, &path)?;
-    // An iCloud-evicted segment exists only as its `.name.icloud` stub —
-    // mirror `note_delete` so a cancelled session's evicted parts still
-    // delete (Plan 21).
-    let target = if abs.exists() {
-        abs
-    } else {
-        eviction_placeholder(&abs)
-            .filter(|stub| stub.exists())
-            .unwrap_or(abs)
-    };
-    match fs::remove_file(target) {
-        Ok(()) => Ok(()),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(err) => Err(err.into()),
-    }
+    with_graph_lock(&root, || {
+        let abs = resolve(&root, &path)?;
+        // An iCloud-evicted segment exists only as its `.name.icloud` stub —
+        // mirror `note_delete` so a cancelled session's evicted parts still
+        // delete (Plan 21).
+        let target = if abs.exists() {
+            abs
+        } else {
+            eviction_placeholder(&abs)
+                .filter(|stub| stub.exists())
+                .unwrap_or(abs)
+        };
+        match fs::remove_file(target) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(err.into()),
+        }
+    })
 }
 
 /// The per-segment transcript cache lives under `.reflect/transcripts/`:
@@ -775,23 +788,25 @@ pub fn note_exists(path: String, state: State<GraphState>) -> AppResult<bool> {
 /// reports failed. One rule, no adoption heuristics; the filename drifts
 /// until the next settled rename retries.
 pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()> {
-    let from_abs = resolve(root, from)?;
-    let to_abs = resolve(root, to)?;
-    // Occupied includes an evicted iCloud note (placeholder only on disk):
-    // renaming onto it would collide with the re-download (Plan 21).
-    if io::file_occupied(&to_abs) {
-        return Err(AppError::io(format!(
-            "cannot move note: {to} already exists on disk"
-        )));
-    }
-    if let Some(parent) = to_abs.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::rename(from_abs, to_abs)?;
-    // Carry the note's sync ancestor across the rename (Plan 21) — a missed
-    // move only degrades one future merge, never blocks the rename.
-    crate::conflict::shadow::ShadowStore::new(root).record_move(from, to);
-    Ok(())
+    with_graph_lock(root, || {
+        let from_abs = resolve(root, from)?;
+        let to_abs = resolve(root, to)?;
+        // Occupied includes an evicted iCloud note (placeholder only on disk):
+        // renaming onto it would collide with the re-download (Plan 21).
+        if io::file_occupied(&to_abs) {
+            return Err(AppError::io(format!(
+                "cannot move note: {to} already exists on disk"
+            )));
+        }
+        if let Some(parent) = to_abs.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::rename(from_abs, to_abs)?;
+        // Carry the note's sync ancestor across the rename (Plan 21) — a missed
+        // move only degrades one future merge, never blocks the rename.
+        crate::conflict::shadow::ShadowStore::new(root).record_move(from, to);
+        Ok(())
+    })
 }
 
 /// Send a note to the OS trash (recoverable), not a hard delete (pinned to
@@ -801,23 +816,26 @@ pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()>
 #[tauri::command]
 pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
     let root = root_for_generation(&state, generation)?;
-    let abs = resolve(&root, &path)?;
-    // An iCloud-evicted note exists only as its `.name.md.icloud` stub —
-    // trashing the logical path would fail and the note would be
-    // undeletable. Removing the stub deletes the iCloud item (Plan 21).
-    let target = if abs.exists() {
-        abs
-    } else {
-        eviction_placeholder(&abs)
-            .filter(|stub| stub.exists())
-            .unwrap_or(abs)
-    };
-    #[cfg(desktop)]
-    os_trash_delete(&target)?;
-    #[cfg(mobile)]
-    move_to_graph_trash(&root, &target)?;
-    // A deleted note's sync ancestor is meaningless — drop it (Plan 21).
-    crate::conflict::shadow::ShadowStore::new(&root).forget(&path);
+    with_graph_lock(&root, || {
+        let abs = resolve(&root, &path)?;
+        // An iCloud-evicted note exists only as its `.name.md.icloud` stub —
+        // trashing the logical path would fail and the note would be
+        // undeletable. Removing the stub deletes the iCloud item (Plan 21).
+        let target = if abs.exists() {
+            abs
+        } else {
+            eviction_placeholder(&abs)
+                .filter(|stub| stub.exists())
+                .unwrap_or(abs)
+        };
+        #[cfg(desktop)]
+        os_trash_delete(&target)?;
+        #[cfg(mobile)]
+        move_to_graph_trash(&root, &target)?;
+        // A deleted note's sync ancestor is meaningless — drop it (Plan 21).
+        crate::conflict::shadow::ShadowStore::new(&root).forget(&path);
+        Ok::<(), AppError>(())
+    })?;
     invalidate_file_catalog(&state, &root);
     Ok(())
 }
@@ -1324,7 +1342,7 @@ mod note_revision_tests {
             with_graph_lock(directory.path(), || panic!("simulated writer panic"))
         }));
         let target = directory.path().join("note.md");
-        write_note_revision(directory.path(), &target, "saved", true, None).unwrap();
+        write_note_revision(directory.path(), "note.md", "saved", true, None).unwrap();
         assert_eq!(fs::read_to_string(target).unwrap(), "saved");
     }
 
@@ -1335,13 +1353,13 @@ mod note_revision_tests {
         fs::write(&target, "a\r\nb\r\n").unwrap();
         assert!(write_note_revision(
             directory.path(),
-            &target,
+            "note.md",
             "a\nb!\n",
             true,
             Some("a\r\nb\r\n")
         )
         .is_err());
-        write_note_revision(directory.path(), &target, "a\nb!\n", true, Some("a\nb\n")).unwrap();
+        write_note_revision(directory.path(), "note.md", "a\nb!\n", true, Some("a\nb\n")).unwrap();
         assert_eq!(fs::read_to_string(target).unwrap(), "a\nb!\n");
     }
 
@@ -1352,7 +1370,7 @@ mod note_revision_tests {
         fs::write(&target, "user edited this").unwrap();
         assert!(write_note_revision(
             directory.path(),
-            &target,
+            "daily.md",
             "bookmark",
             true,
             Some("old text")
@@ -1361,7 +1379,7 @@ mod note_revision_tests {
         assert_eq!(fs::read_to_string(&target).unwrap(), "user edited this");
         write_note_revision(
             directory.path(),
-            &target,
+            "daily.md",
             "user edited this\nbookmark",
             true,
             Some("user edited this"),
@@ -1377,8 +1395,8 @@ mod note_revision_tests {
     fn missing_revision_never_clobbers_an_existing_daily() {
         let directory = tempfile::tempdir().unwrap();
         let target = directory.path().join("daily.md");
-        write_note_revision(directory.path(), &target, "first", true, None).unwrap();
-        assert!(write_note_revision(directory.path(), &target, "second", true, None).is_err());
+        write_note_revision(directory.path(), "daily.md", "first", true, None).unwrap();
+        assert!(write_note_revision(directory.path(), "daily.md", "second", true, None).is_err());
         assert_eq!(fs::read_to_string(&target).unwrap(), "first");
     }
 }

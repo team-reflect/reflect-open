@@ -1127,8 +1127,8 @@ fn note_write_waits_for_a_running_checkout() {
     let save = thread::spawn({
         let root = root_a.clone();
         move || {
-            let target = root.join("notes/typed.md");
-            let outcome = crate::fs::write_note_revision(&root, &target, "typed\n", false, None);
+            let outcome =
+                crate::fs::write_note_revision(&root, "notes/typed.md", "typed\n", false, None);
             let _ = written_tx.send(());
             outcome
         }

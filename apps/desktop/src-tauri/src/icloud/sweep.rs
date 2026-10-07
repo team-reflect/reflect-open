@@ -125,17 +125,13 @@ pub async fn icloud_conflicts_scan(
     let sweep_root = root.clone();
     let outcome = crate::blocking::run_blocking(move || {
         let candidates = conflict_candidates(scope, &ingested_paths);
-        // Sweep writes share the graph lock with saves and git commands: a
-        // marker write must not interleave with a checkout of the same note.
-        crate::fs::with_graph_lock(&sweep_root, || {
-            run_sweep(
-                &sweep_root,
-                &skip_paths,
-                &ingested_paths,
-                record_baseline,
-                candidates,
-            )
-        })
+        run_sweep(
+            &sweep_root,
+            &skip_paths,
+            &ingested_paths,
+            record_baseline,
+            candidates,
+        )
     })
     .await;
     if let Ok(outcome) = &outcome {
@@ -206,7 +202,13 @@ fn run_sweep(
         }
     }
 
-    fold_collision_duplicates(root, &files, &shadow, &skip, &mut outcome);
+    // Sweep writes share the graph lock with saves and git commands: a
+    // marker write or a fold must not interleave with a checkout of the same
+    // note. Discovery (the listing, the version scan) stays outside the
+    // lock; each note is resolved from a fresh read under it.
+    crate::fs::with_graph_lock(root, || {
+        fold_collision_duplicates(root, &files, &shadow, &skip, &mut outcome)
+    });
 
     for file in &files {
         if file.placeholder {
@@ -238,16 +240,18 @@ fn run_sweep(
         // not propagate bit-exactly. Mixed keys would let two devices order
         // the same content pair differently and emit different merged bytes.
         let current_ms = current_version_modified_ms(&abs).unwrap_or(file.modified_ms);
-        match resolve_file(root, &file.path, current_ms, scan.versions, &shadow) {
-            Ok(resolved) => {
-                apply_file_resolution(root, &file.path, resolved, &shadow, &mut outcome)
+        crate::fs::with_graph_lock(root, || {
+            match resolve_file(root, &file.path, current_ms, scan.versions, &shadow) {
+                Ok(resolved) => {
+                    apply_file_resolution(root, &file.path, resolved, &shadow, &mut outcome)
+                }
+                Err(err) => {
+                    // One bad note must not stop the sweep; versions stay
+                    // unresolved and the next sweep retries it.
+                    tracing::warn!(path = %file.path, ?err, "conflict resolution failed");
+                }
             }
-            Err(err) => {
-                // One bad note must not stop the sweep; versions stay
-                // unresolved and the next sweep retries it.
-                tracing::warn!(path = %file.path, ?err, "conflict resolution failed");
-            }
-        }
+        });
     }
 
     // External deletions never route through the store's `forget` — drop

@@ -206,7 +206,9 @@ pub fn asset_upload_commit(
     // lookup would otherwise skip invalidation and strand a stale catalog.
     let root = root_for_generation(&state, generation)?;
     let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
-    let final_name = persist_unique(upload.file, &assets_dir, &desired_name)?;
+    let final_name = super::with_graph_lock(&root, || {
+        persist_unique(upload.file, &assets_dir, &desired_name)
+    })?;
     super::invalidate_file_catalog(&state, &root);
     Ok(format!("assets/{final_name}"))
 }
@@ -258,8 +260,9 @@ pub fn asset_upload_commit_path(
         ));
     }
     let root = root_for_generation(&state, generation)?;
-    let target = resolve(&root, &path)?;
-    persist_exact(upload.file, &target)?;
+    super::with_graph_lock(&root, || {
+        persist_exact(upload.file, &resolve(&root, &path)?)
+    })?;
     super::invalidate_file_catalog(&state, &root);
     Ok(())
 }
@@ -292,7 +295,8 @@ pub fn asset_import(
     let mut temp = tempfile::NamedTempFile::new_in(staging_dir(&root)?)?;
     std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
     let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
-    let final_name = persist_unique(temp, &assets_dir, &desired_name)?;
+    let final_name =
+        super::with_graph_lock(&root, || persist_unique(temp, &assets_dir, &desired_name))?;
     super::invalidate_file_catalog(&state, &root);
     Ok(format!("assets/{final_name}"))
 }
@@ -337,8 +341,10 @@ pub fn audio_memo_import(
         )));
     }
     let root = root_for_generation(&state, generation)?;
-    let target = resolve(&root, &path)?;
-    import_exact(Path::new(&source_path), &staging_dir(&root)?, &target)?;
+    let staging = staging_dir(&root)?;
+    super::with_graph_lock(&root, || {
+        import_exact(Path::new(&source_path), &staging, &resolve(&root, &path)?)
+    })?;
     super::invalidate_file_catalog(&state, &root);
     Ok(())
 }
