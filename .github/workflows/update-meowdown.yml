@@ -1,3 +1,5 @@
+name: Update meowdown
+
 on:
   repository_dispatch:
     types: [meowdown-released]

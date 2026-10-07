@@ -1,3 +1,5 @@
+name: Publish TestFlight
+
 on:
   workflow_dispatch:
     inputs:

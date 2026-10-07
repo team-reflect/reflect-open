@@ -1,3 +1,5 @@
+name: Publish macOS
+
 on:
   workflow_dispatch:
   workflow_call:

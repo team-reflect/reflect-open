@@ -1,3 +1,5 @@
+name: Publish browser extension
+
 on:
   workflow_call:
     inputs:
