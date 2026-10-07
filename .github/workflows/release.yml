@@ -1,5 +1,3 @@
-name: Release PR
-
 # Stable and beta Release PRs share master but use separate lifecycle labels
 # and head branches. A merged PR in one channel therefore cannot block the
 # other channel from refreshing its open PR. Beta versions use a prerelease

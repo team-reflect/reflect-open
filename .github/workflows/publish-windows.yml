@@ -1,22 +1,5 @@
-name: Windows
-
-# Experimental: builds Windows x64 and arm64 NSIS installers that are not
-# code-signed. A release build also uploads them, with their updater
-# signatures, into the draft release. See docs/windows-builds.md.
-
 on:
-  # Builds the installers as workflow artifacts only.
   workflow_dispatch:
-  # Validate changes to the Windows build itself before merging; regular PRs
-  # never trigger this.
-  pull_request:
-    paths:
-      - .github/workflows/publish-windows.yml
-      - .github/actions/setup-node/action.yml
-      - .github/actions/setup-rust/action.yml
-      - apps/desktop/scripts/release-windows.ts
-      - apps/desktop/scripts/helpers.ts
-  # Called by release.yml so every release also produces a Windows build.
   workflow_call:
     inputs:
       tag:
@@ -28,8 +11,6 @@ on:
         required: true
         type: string
 
-# A release build uploads its assets into the draft release.
-# publish-finalize.yml writes latest.json and publishes the release afterwards.
 permissions:
   contents: write
 

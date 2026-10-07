@@ -1,5 +1,3 @@
-name: Release Browser Extension
-
 on:
   workflow_call:
     inputs:
