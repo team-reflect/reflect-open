@@ -181,6 +181,21 @@ export async function writeNote(
 }
 
 /**
+ * Archive an open note's unsaved buffer under `.reflect/conflict-archive/`.
+ * The note session calls this when it is torn down while an external change
+ * is parked against unsaved edits: saves are paused behind a parked
+ * conflict, so the buffer would otherwise die with the session. Returns the
+ * graph-relative archive path.
+ */
+export async function archiveUnsavedNote(
+  path: string,
+  contents: string,
+  generation: number,
+): Promise<string> {
+  return await call('note_archive_unsaved', { path, contents, generation }, z.string())
+}
+
+/**
  * Atomically create a note only if `path` is still unoccupied. A collision is
  * returned as data and never overwrites the winner, closing the race between a
  * caller's availability check and a concurrent sync checkout or creator.

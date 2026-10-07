@@ -170,6 +170,7 @@ export {
   readNoteLocal,
   type LocalNoteRead,
   writeNote,
+  archiveUnsavedNote,
   createNoteIfAbsent,
   writeAsset,
   readAsset,

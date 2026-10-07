@@ -352,6 +352,25 @@ pub async fn note_read(
     crate::blocking::run_blocking(move || Ok(io::read_note_no_follow(&root, &abs)?)).await
 }
 
+/// Archive an open note's unsaved buffer under `.reflect/conflict-archive/`
+/// (see [`crate::conflict::archive::archive_unsaved`]). The editor calls
+/// this when a session is torn down while an external change is parked
+/// against unsaved edits: the buffer must outlive the session. Returns the
+/// graph-relative archive path for the notice.
+#[tauri::command]
+pub async fn note_archive_unsaved(
+    path: String,
+    contents: String,
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<String> {
+    let root = root_for_generation(&state, generation)?;
+    crate::blocking::run_blocking(move || {
+        crate::conflict::archive::archive_unsaved(&root, &path, contents.as_bytes())
+    })
+    .await
+}
+
 /// How a [`note_read_local`] request found the note on disk.
 #[derive(Debug, Serialize)]
 #[serde(

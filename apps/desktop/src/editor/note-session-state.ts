@@ -506,6 +506,14 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     // reads the (now frozen) buffer, so pending edits persist to this
     // session's path even after the UI moves on.
     if (!discarded) {
+      if (conflict !== null && dirty && io.archiveUnsaved !== undefined) {
+        // A parked conflict pauses saves, so the flush below writes nothing
+        // and the buffer would die with the session. Keep it recoverable
+        // instead; the user chooses a side (or merges by hand) later.
+        void io.archiveUnsaved(path, header + buffer).catch((cause: unknown) => {
+          console.error('failed to archive unsaved edits:', cause)
+        })
+      }
       void flush()
     }
     disposed = true

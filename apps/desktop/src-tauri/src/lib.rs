@@ -299,6 +299,7 @@ pub fn run() {
             fs::note_read_local,
             fs::note_create,
             fs::note_write,
+            fs::note_archive_unsaved,
             fs::asset_write,
             fs::asset_read,
             fs::asset_read_binary,

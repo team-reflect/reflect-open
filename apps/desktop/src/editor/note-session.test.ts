@@ -25,6 +25,7 @@ interface Harness {
   snapshots: NoteSessionSnapshot[]
   expectedContents: (string | null | undefined)[]
   writes: Array<{ path: string; contents: string }>
+  archived: Array<{ path: string; contents: string }>
   applied: string[]
   contents: Array<{ content: string; origin: string }>
   /** `null` deletes the file: subsequent reads throw the notFound AppError. */
@@ -49,6 +50,7 @@ function harness(options?: {
   const snapshots: NoteSessionSnapshot[] = []
   const expectedContents: (string | null | undefined)[] = []
   const writes: Array<{ path: string; contents: string }> = []
+  const archived: Array<{ path: string; contents: string }> = []
   const applied: string[] = []
   const contents: Array<{ content: string; origin: string }> = []
   let disk = options?.disk === undefined ? '# Hello\n' : options.disk
@@ -77,6 +79,9 @@ function harness(options?: {
               writes.push({ path, contents })
               disk = contents
             },
+      archiveUnsaved: async (path, contents) => {
+        archived.push({ path, contents })
+      },
     },
     classify: options?.classify ?? (() => 'exact'),
     onSnapshot: (snapshot) => {
@@ -99,6 +104,7 @@ function harness(options?: {
     snapshots,
     expectedContents,
     writes,
+    archived,
     applied,
     contents,
     setDisk: (contents) => {
@@ -211,6 +217,39 @@ describe('createNoteSession', () => {
     session.editorChanged('# Same edit\n')
     session.editorChanged('# Same edit\n')
     expect(snapshots.length).toBe(afterLoad + 1) // one dirty transition, not two
+  })
+
+  it('dispose archives the buffer when a conflict is parked', async () => {
+    // #1443: a parked conflict pauses saves, so leaving the note would drop
+    // everything typed since the external change arrived.
+    const { session, writes, archived, snapshots, setDisk } = harness()
+    session.load()
+    await settled()
+
+    session.editorChanged('# Mine\n')
+    setDisk('# Theirs\n')
+    session.externalChanged()
+    await settled()
+    expect(snapshots.at(-1)?.conflict).toBe('# Theirs\n')
+
+    session.dispose()
+    await settled()
+
+    expect(writes).toEqual([]) // the conflict still blocks the write
+    expect(archived).toEqual([{ path: 'notes/a.md', contents: '# Mine\n' }])
+  })
+
+  it('dispose does not archive without a parked conflict', async () => {
+    const { session, writes, archived } = harness()
+    session.load()
+    await settled()
+
+    session.editorChanged('# Mine\n')
+    session.dispose()
+    await settled()
+
+    expect(writes).toEqual([{ path: 'notes/a.md', contents: '# Mine\n' }])
+    expect(archived).toEqual([])
   })
 
   it('keepMine rewrites the file even when the conflict content equals the buffer', async () => {

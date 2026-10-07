@@ -17,14 +17,15 @@ const MAX_PER_NOTE: usize = 20;
 /// Archived versions older than this are pruned regardless of count.
 const MAX_AGE_MS: u64 = 90 * 24 * 60 * 60 * 1000;
 
-/// Archive one version's full content before it is resolved away.
+/// Archive one version's full content before it is resolved away. Returns
+/// the archive file's path relative to the graph root.
 pub fn archive_version(
     root: &Path,
     rel: &str,
     device: Option<&str>,
     modified_ms: u64,
     bytes: &[u8],
-) -> AppResult<()> {
+) -> AppResult<String> {
     let dir = note_archive_dir(root, rel)
         .ok_or_else(|| AppError::io(format!("invalid archive path: {rel}")))?;
     fs::create_dir_all(&dir)?;
@@ -40,7 +41,24 @@ pub fn archive_version(
         target = dir.join(format!("{stem}-{attempt}.{ext}"));
     }
     crate::fs::atomic_write_bytes(root, &target, bytes)?;
-    Ok(())
+    let archived = target
+        .strip_prefix(root)
+        .map(|rel| rel.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|_| target.to_string_lossy().into_owned());
+    Ok(archived)
+}
+
+/// Archive an open note's unsaved buffer: the user typed into a note while
+/// an external change was parked against it, then closed the note before
+/// choosing a side. Saves are paused behind a parked conflict, so without
+/// this the buffer would die with the session (#1443). Stamped with the
+/// current time and the `unsaved` tag, next to the sync versions.
+pub fn archive_unsaved(root: &Path, rel: &str, bytes: &[u8]) -> AppResult<String> {
+    let now_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|dur| dur.as_millis() as u64)
+        .unwrap_or(0);
+    archive_version(root, rel, Some("unsaved"), now_ms, bytes)
 }
 
 /// Prune the archive: per note, keep the newest [`MAX_PER_NOTE`] versions and
@@ -156,6 +174,22 @@ mod tests {
             .path()
             .join(".reflect/conflict-archive/notes/b.md")
             .exists());
+    }
+
+    #[test]
+    fn archive_unsaved_keeps_the_buffer_under_the_unsaved_tag() {
+        let root = tempdir().unwrap();
+        fs::create_dir_all(root.path().join(".reflect")).unwrap();
+        let archived = archive_unsaved(root.path(), "daily/2026-10-07.md", b"# typed\n").unwrap();
+        assert!(
+            archived.starts_with(".reflect/conflict-archive/daily/2026-10-07.md/"),
+            "{archived}"
+        );
+        assert!(archived.ends_with("-unsaved.md"), "{archived}");
+        assert_eq!(
+            fs::read_to_string(root.path().join(&archived)).unwrap(),
+            "# typed\n"
+        );
     }
 
     #[test]

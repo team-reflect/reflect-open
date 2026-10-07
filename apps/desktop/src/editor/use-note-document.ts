@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { readNote, writeNote, type FileChange } from '@reflect/core'
+import { archiveUnsavedNote, readNote, writeNote, type FileChange } from '@reflect/core'
+import { startOperation } from '@/lib/operations.ts'
 import { useFileChanges } from '@/lib/use-file-changes.ts'
 import { createDocumentBinding, type DocumentBinding } from './document-binding.ts'
 import type { NoteEditorHandle } from './note-editor.tsx'
@@ -128,6 +129,18 @@ export function useNoteDocument(
                   return writeNote(forPath, contents, current, expectedContents)
                 }
               : null,
+            archiveUnsaved: canWrite
+              ? async (forPath, contents) => {
+                  const current = generationRef.current
+                  if (current === null) {
+                    return
+                  }
+                  const archived = await archiveUnsavedNote(forPath, contents, current)
+                  startOperation('Unsaved edits kept').warn(
+                    `${forPath} changed on disk while you were editing. Your version is at ${archived}.`,
+                  )
+                }
+              : undefined,
           },
           classify: checkRoundTrip,
           onSnapshot: (next) => {

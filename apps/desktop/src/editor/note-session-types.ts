@@ -53,6 +53,13 @@ export interface NoteSessionIo {
   write:
     | ((path: string, contents: string, expectedContents?: string | null) => Promise<void>)
     | null
+  /**
+   * Keep an unsaved buffer somewhere recoverable. Called by `dispose()` when
+   * an external change is still parked against unsaved edits: saves are
+   * paused in that state, so without this the buffer would be lost with the
+   * session. Optional — a host without a graph generation cannot archive.
+   */
+  archiveUnsaved?: ((path: string, contents: string) => Promise<void>) | undefined
 }
 
 /** Why {@link NoteSessionOptions.onContent} fired. */
