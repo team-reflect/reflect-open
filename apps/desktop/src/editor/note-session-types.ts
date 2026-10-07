@@ -62,7 +62,8 @@ export interface NoteSessionIo {
    * Keep `contents` as a sibling file of `path` (`<note> (conflict).md`) and
    * return the copy's path: the fallback when edits cannot be merged into an
    * external change (the file already carries markers, or no merge is
-   * available), so nothing typed is ever lost.
+   * available), so nothing typed is ever lost. Called again with newer
+   * contents while the user keeps typing: the same copy is overwritten.
    */
   copyAside?: ((path: string, contents: string) => Promise<string>) | undefined
 }

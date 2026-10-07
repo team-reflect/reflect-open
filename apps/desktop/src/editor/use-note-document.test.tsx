@@ -22,6 +22,8 @@ setBridge({
 /** The fake on-disk file + a write log, behind the mocked IPC. */
 let disk: string
 let created: Array<{ path: string; contents: string }> = []
+let copyWrites: Array<{ path: string; contents: string }> = []
+let createGate: (() => Promise<void>) | null = null
 let writes: string[]
 
 const MANAGED_ID = '01hv3xq7c2dm8k4t9w5e6r1n98'
@@ -56,6 +58,8 @@ beforeEach(() => {
   disk = '# Hello\n'
   writes = []
   created = []
+  copyWrites = []
+  createGate = null
   emitChange = null
   mockInvoke.mockReset()
   mockInvoke.mockImplementation(async (command, args) => {
@@ -63,7 +67,11 @@ beforeEach(() => {
       return disk
     }
     if (command === 'note_write') {
-      const contents = (args as { contents: string }).contents
+      const { path, contents } = args as { path: string; contents: string }
+      if (path.includes(' (conflict')) {
+        copyWrites.push({ path, contents })
+        return null
+      }
       disk = contents
       writes.push(contents)
       return null
@@ -74,6 +82,7 @@ beforeEach(() => {
     }
     if (command === 'note_create') {
       const { path, contents } = args as { path: string; contents: string }
+      await createGate?.()
       created.push({ path, contents })
       return { kind: 'created', modifiedMs: null }
     }
@@ -714,6 +723,31 @@ describe('useNoteDocument', () => {
     expect(created).toEqual([{ path: 'notes/a (conflict).md', contents: '# My unsaved edit\n' }])
     expect(writes).toEqual([]) // the external version was never clobbered
     expect(result.current.dirty).toBe(false)
+  })
+
+  it('keystrokes typed while the conflict copy is made overwrite the same copy', async () => {
+    const { result, act } = await readyHook()
+    const editor = fakeEditor()
+    await act(() => result.current.bindEditor(editor))
+    await act(() => result.current.onEditorChange('# My unsaved edit\n'))
+
+    let releaseCreate: (() => void) | null = null
+    createGate = () =>
+      new Promise<void>((resolve) => {
+        releaseCreate = resolve
+      })
+    disk = '# Theirs\n'
+    await act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
+    await vi.waitFor(() => expect(releaseCreate).not.toBeNull())
+    await act(() => result.current.onEditorChange('# My unsaved edit, and more\n'))
+    await act(() => releaseCreate?.())
+
+    await vi.waitFor(() => expect(editor.applied).toEqual(['# Theirs\n']))
+    expect(created).toEqual([{ path: 'notes/a (conflict).md', contents: '# My unsaved edit\n' }])
+    expect(copyWrites).toEqual([
+      { path: 'notes/a (conflict).md', contents: '# My unsaved edit, and more\n' },
+    ])
+    expect(writes).toEqual([])
   })
 
   it('opens a note the editor would corrupt in protected mode and never saves it', async () => {

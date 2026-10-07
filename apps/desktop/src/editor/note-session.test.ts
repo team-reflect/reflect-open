@@ -36,6 +36,8 @@ interface Harness {
   setMerge: (outcome: MergeTextOutcome | null) => void
   /** Buffers kept beside the note when they could not be merged. */
   copies: Array<{ path: string; contents: string }>
+  /** While set, conflict copies reject with this message. */
+  failCopies: (message: string | null) => void
   session: ReturnType<typeof createNoteSession>
 }
 
@@ -43,6 +45,8 @@ function harness(options?: {
   /** Runs before every read resolves (the slow-load seam). */
   beforeRead?: () => Promise<void>
   beforeWrite?: () => Promise<void>
+  /** Runs before every conflict copy resolves (the slow-copy seam). */
+  beforeCopy?: () => void
   write?: false
   classify?: (markdown: string) => RoundTripFidelity
   /** `null` simulates a missing file: reads throw the notFound AppError. */
@@ -61,6 +65,7 @@ function harness(options?: {
   const copies: Array<{ path: string; contents: string }> = []
   let disk = options?.disk === undefined ? '# Hello\n' : options.disk
   let writeFailure: string | null = null
+  let copyFailure: string | null = null
   let mergeOutcome: MergeTextOutcome | null = options?.merge ?? null
   const session = createNoteSession({
     path: 'notes/a.md',
@@ -96,6 +101,10 @@ function harness(options?: {
               return mergeOutcome
             },
       copyAside: async (path, contents) => {
+        options?.beforeCopy?.()
+        if (copyFailure !== null) {
+          throw new Error(copyFailure)
+        }
         copies.push({ path, contents })
         return `${path.slice(0, -3)} (conflict).md`
       },
@@ -128,6 +137,9 @@ function harness(options?: {
     },
     failWrites: (message) => {
       writeFailure = message
+    },
+    failCopies: (message) => {
+      copyFailure = message
     },
     setMerge: (outcome) => {
       mergeOutcome = outcome
@@ -368,6 +380,58 @@ describe('createNoteSession', () => {
     expect(copies).toEqual([{ path: 'notes/a.md', contents: 'mine\n' }])
     expect(applied).toEqual(['theirs\n'])
     expect(snapshots.at(-1)).toMatchObject({ dirty: false, protected: false, error: null })
+  })
+
+  it('a failed conflict copy keeps the dirty buffer, and the next save retries it', async () => {
+    const { session, writes, applied, copies, snapshots, setDisk, failCopies } = harness({
+      merge: { kind: 'unmergeable', content: 'theirs\n' },
+    })
+    session.load()
+    await settled()
+    failCopies('disk full')
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    session.externalChanged()
+    await settled()
+
+    // Nothing durable holds the edits yet, so nothing replaces them.
+    expect(copies).toEqual([])
+    expect(applied).toEqual([])
+    expect(session.content()).toBe('mine\n')
+    expect(snapshots.at(-1)).toMatchObject({ dirty: true, error: 'disk full' })
+
+    // The next save is refused as stale, reconciles, and copies again.
+    failCopies(null)
+    session.editorChanged('mine, more\n')
+    await settled()
+    expect(writes).toEqual([])
+    expect(copies).toEqual([{ path: 'notes/a.md', contents: 'mine, more\n' }])
+    expect(applied).toEqual(['theirs\n'])
+    expect(snapshots.at(-1)).toMatchObject({ dirty: false, error: null })
+  })
+
+  it('keystrokes typed while the conflict copy is made are copied too', async () => {
+    let target: ReturnType<typeof createNoteSession> | null = null
+    let typed = false
+    const { session, copies, applied, setDisk } = harness({
+      merge: { kind: 'unmergeable', content: 'theirs\n' },
+      beforeCopy: () => {
+        if (!typed) {
+          typed = true
+          target?.editorChanged('mine, typed during the copy\n')
+        }
+      },
+    })
+    target = session
+    session.load()
+    await settled()
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    session.externalChanged()
+    await settled()
+
+    expect(copies.map((copy) => copy.contents)).toEqual(['mine\n', 'mine, typed during the copy\n'])
+    expect(applied).toEqual(['theirs\n'])
   })
 
   it('without a merge capability the edits are kept beside the note too', async () => {

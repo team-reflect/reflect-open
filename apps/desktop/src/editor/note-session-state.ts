@@ -309,8 +309,9 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       await materialize(merged.content, ours, content, io.write)
       return
     }
-    await keepAside(header + buffer)
-    adoptCleanContent(content)
+    if (await keepAside()) {
+      adoptCleanContent(content)
+    }
   }
 
   /**
@@ -344,22 +345,39 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       return
     }
     error = null
-    if (header + buffer !== ours) {
-      await keepAside(header + buffer)
+    if (header + buffer === ours || (await keepAside())) {
+      adoptCleanContent(marked)
     }
-    adoptCleanContent(marked)
   }
 
-  async function keepAside(contents: string): Promise<void> {
+  /**
+   * Keep the buffer beside the note before external content replaces it.
+   * Keystrokes that land during the copy are copied again, so the copy holds
+   * what the user last saw. A copy that cannot be made keeps the dirty
+   * buffer with the error: its next save fails against the changed file and
+   * comes back here to retry.
+   */
+  async function keepAside(): Promise<boolean> {
     if (io.copyAside === undefined) {
-      return
+      return true
     }
-    try {
-      await io.copyAside(path, contents)
-    } catch (cause) {
-      error = errorMessage(cause)
-      emit()
+    for (let round = 0; round < 3; round += 1) {
+      const contents = header + buffer
+      try {
+        await io.copyAside(path, contents)
+      } catch (cause) {
+        error = errorMessage(cause)
+        emit()
+        return false
+      }
+      if (disposed || header + buffer === contents) {
+        error = null // a copy that failed earlier is made now
+        return true
+      }
     }
+    error = 'The note kept changing while its edits were being kept aside'
+    emit()
+    return false
   }
 
   /** Put `merged` in the editor as the dirty buffer over `onDisk`, and keep saving. */

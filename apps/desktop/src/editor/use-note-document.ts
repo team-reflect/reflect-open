@@ -59,40 +59,48 @@ export interface NoteDocumentOptions {
 }
 
 /**
+ * Keep edits beside a note as `<note> (conflict).md` (then `(conflict 2)`,
+ * …) when they could not be merged into an external change. One copier per
+ * session: copying again while the user keeps typing overwrites the copy it
+ * made, not a new file.
+ */
+function conflictCopier(
+  generation: () => number | null,
+): (path: string, contents: string) => Promise<string> {
+  let copy: string | null = null
+  return async (path, contents) => {
+    const current = generation()
+    if (current === null) {
+      throw new Error('no graph generation available for the conflict copy')
+    }
+    if (copy !== null) {
+      await writeNote(copy, contents, current)
+      return copy
+    }
+    const slash = path.lastIndexOf('/')
+    const dot = path.lastIndexOf('.')
+    const [stem, ext] = dot > slash ? [path.slice(0, dot), path.slice(dot)] : [path, '']
+    for (let n = 1; n < 10; n += 1) {
+      const candidate = `${stem} (conflict${n === 1 ? '' : ` ${n}`})${ext}`
+      const outcome = await createNoteIfAbsent(candidate, contents, current)
+      if (outcome.kind === 'created') {
+        copy = candidate
+        startOperation('Edits kept beside the note').warn(
+          `${path} changed on disk in a way that could not be merged. Your version is at ${copy}.`,
+        )
+        return copy
+      }
+    }
+    throw new Error('no free name for the conflict copy')
+  }
+}
+
+/**
  * @param path graph-relative path of the open note
  * @param generation the open graph's session generation (`GraphInfo.generation`);
  *   pins every write to that graph — Rust rejects a write whose generation is
  *   stale, so a flush racing a graph switch can't land in the new graph.
  */
-/**
- * Keep `contents` as `<note> (conflict).md` next to `path` (then
- * `(conflict 2)`, …): edits that could not be merged into an external change
- * stay on disk where the user can find them.
- */
-async function keepBesideNote(
-  path: string,
-  contents: string,
-  generation: number | null,
-): Promise<string> {
-  if (generation === null) {
-    throw new Error('no graph generation available for the conflict copy')
-  }
-  const slash = path.lastIndexOf('/')
-  const dot = path.lastIndexOf('.')
-  const [stem, ext] = dot > slash ? [path.slice(0, dot), path.slice(dot)] : [path, '']
-  for (let n = 1; n < 10; n += 1) {
-    const copy = `${stem} (conflict${n === 1 ? '' : ` ${n}`})${ext}`
-    const outcome = await createNoteIfAbsent(copy, contents, generation)
-    if (outcome.kind === 'created') {
-      startOperation('Edits kept beside the note').warn(
-        `${path} changed on disk in a way that could not be merged. Your version is at ${copy}.`,
-      )
-      return copy
-    }
-  }
-  throw new Error('no free name for the conflict copy')
-}
-
 export function useNoteDocument(
   path: string | null,
   generation: number | null,
@@ -152,9 +160,7 @@ export function useNoteDocument(
                 }
               : null,
             mergeText: canWrite ? mergeText : undefined,
-            copyAside: canWrite
-              ? (forPath, contents) => keepBesideNote(forPath, contents, generationRef.current)
-              : undefined,
+            copyAside: canWrite ? conflictCopier(() => generationRef.current) : undefined,
           },
           classify: checkRoundTrip,
           onSnapshot: (next) => {
