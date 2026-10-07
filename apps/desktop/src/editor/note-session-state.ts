@@ -310,7 +310,13 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       merged = null
     }
     if (merged?.kind === 'clean') {
-      adoptMerged(merged.content, content)
+      if (io.write !== null && classify(splitDoc(merged.content).body) === 'lossy') {
+        // Syntax the editor cannot round-trip: the exact merge goes to disk
+        // and the note opens protected, never into the live editor.
+        await materialize(merged.content, ours, content, io.write)
+      } else {
+        adoptMerged(merged.content, content)
+      }
       return
     }
     if (merged?.kind === 'conflicted' && io.write !== null) {
@@ -323,19 +329,20 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   }
 
   /**
-   * Write the marked merge over the external version it was made from (the
+   * Write a merge the live editor must not hold (markers, or syntax it
+   * cannot round-trip) over the external version it was made from (the
    * write expects that version, so a file that moved again is reconciled
-   * afresh instead of overwritten) and adopt it: markers open protected.
+   * afresh instead of overwritten) and adopt it: it opens protected.
    * Keystrokes that land during the write are kept beside the note.
    */
   async function materialize(
-    marked: string,
+    unsafe: string,
     ours: string,
     onDisk: string,
     write: NonNullable<NoteSessionIo['write']>,
   ): Promise<void> {
     try {
-      await write(path, marked, onDisk)
+      await write(path, unsafe, onDisk)
     } catch (cause) {
       if (disposed) {
         return
@@ -354,7 +361,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     }
     error = null
     if (header + buffer === ours || (await keepAside())) {
-      adoptCleanContent(marked)
+      adoptCleanContent(unsafe)
     }
   }
 

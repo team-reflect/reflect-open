@@ -277,6 +277,33 @@ describe('createNoteSession', () => {
     expect(expectedContents.at(-1)).toBe('# Hello\n\n- mine\n- from the script\n')
   })
 
+  it('a clean merge the editor cannot round-trip is written exactly and opens protected', async () => {
+    const merged = '+ [ ] mine\n+ [ ] theirs\n'
+    const { session, writes, applied, snapshots, setDisk, expectedContents } = harness({
+      merge: { kind: 'clean', content: merged },
+      classify: (markdown) => (markdown.includes('+ [ ]') ? 'lossy' : 'exact'),
+    })
+    session.load()
+    await settled()
+    session.editorChanged('mine\n')
+    const appliedBefore = applied.length
+    setDisk('theirs\n')
+    session.externalChanged()
+    await settled()
+
+    // The exact merge lands on disk; the live editor never sees it, so its
+    // normalized text can never be saved over the merge.
+    expect(writes).toEqual([{ path: 'notes/a.md', contents: merged }])
+    expect(expectedContents.at(-1)).toBe('theirs\n')
+    expect(applied).toHaveLength(appliedBefore)
+    expect(snapshots.at(-1)).toMatchObject({
+      protected: true,
+      dirty: false,
+      error: null,
+      initialContent: merged,
+    })
+  })
+
   it('overlapping edits are written into the file as markers and open protected', async () => {
     const marked = '<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
     const { session, writes, snapshots, copies, setDisk, expectedContents } = harness({
