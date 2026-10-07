@@ -176,6 +176,9 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
 
 ## Key decisions / contracts
 
+- **Safety invariants** (2026-10): [`docs/git-backup-safety.md`](../git-backup-safety.md)
+  lists the rules S1 to S8 that every sync change must keep, each with the
+  test that enforces it.
 - **libgit2 (`git2`) is the engine**; the Rust surface is remote-agnostic, GitHub
   specifics live only in `actions/sync/github.ts`.
 - **GitHub is the only supported remote in the UX**; file-sync providers (iCloud/

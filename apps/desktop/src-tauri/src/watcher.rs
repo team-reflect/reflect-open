@@ -27,7 +27,7 @@ use notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{new_debouncer_opt, DebounceEventResult, Debouncer, FileIdCache};
 use reflect_graph_paths::{
     classify, evicted_logical_path, eviction_placeholder, has_pruned_component, is_pruned_dir_name,
-    wire_path, GraphPathKind,
+    to_slash_lossy, wire_path, GraphPathKind,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -171,7 +171,7 @@ struct BatchEffects {
 /// unit-tested.
 fn tracked_relpath(path: &Path, root: &Path) -> Option<String> {
     let rel = path.strip_prefix(root).ok()?;
-    let rel_str = rel.to_string_lossy().replace('\\', "/");
+    let rel_str = to_slash_lossy(rel);
     if rel_str.starts_with(".reflect/inbox/") && rel_str.ends_with(".json") {
         return Some(rel_str);
     }

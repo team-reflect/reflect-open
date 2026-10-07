@@ -51,8 +51,10 @@ focus — sync never wedges.
   confirm `ssh -T git@<host>` works, refocus Reflect.
 - **Unknown host key** — connect once with `ssh <host>` so it lands in
   `~/.ssh/known_hosts`. Reflect never bypasses host-key verification.
-- **HTTPS remote** — refused at adoption with this same advice: switch it to
-  the SSH URL, `git remote set-url origin git@host:owner/repo.git`.
+- **HTTPS remote** — needs a sign-in stored for that host (a username and a
+  token, kept in the OS keychain); until one exists, adoption is refused
+  with that advice, or switch the remote to its SSH URL,
+  `git remote set-url origin git@host:owner/repo.git`.
 
 One more terminal-side fact: **"Stop backing up"** in Settings drops the
 graph's `origin` (history stays). For a hand-wired remote the way back is the
