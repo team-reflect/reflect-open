@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::path::Path;
 
 use git2::{Index, IndexAddOption, IndexEntry};
+use reflect_graph_paths::to_slash_lossy;
 use serde::Serialize;
 
 use crate::error::AppResult;
@@ -143,7 +144,7 @@ fn add_all_with_size_guard(
         if !meta.is_file() || meta.len() < max_file_bytes {
             return 0;
         }
-        let rel = path.to_string_lossy().replace('\\', "/");
+        let rel = to_slash_lossy(path);
         let mtime = meta
             .modified()
             .ok()

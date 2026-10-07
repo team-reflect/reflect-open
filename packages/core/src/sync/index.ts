@@ -61,6 +61,12 @@ export {
 } from './github.ts'
 export { createGist, updateGist, deleteGist, type PublishedGist, type GistFile } from './gists.ts'
 export {
+  clearHostCredential,
+  loadHostCredential,
+  remoteHost,
+  saveHostCredential,
+} from './host-credentials.ts'
+export {
   createSyncEngine,
   isSyncError,
   type SyncEngine,
