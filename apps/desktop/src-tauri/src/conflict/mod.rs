@@ -27,6 +27,15 @@ mod merge3;
 pub mod shadow;
 mod union;
 
+use serde::Serialize;
+
+use crate::error::AppResult;
+
+/// Marker labels for a merge between this device's buffer and content that
+/// arrived from elsewhere, when no device name is available.
+pub(crate) const THIS_DEVICE: &str = "this device";
+pub(crate) const OTHER_DEVICE: &str = "other device";
+
 /// One side of a two-way note conflict: full markdown plus the provenance
 /// that drives ordering and marker labels.
 #[derive(Debug, Clone)]
@@ -54,4 +63,138 @@ pub enum Resolution {
     /// Overlapping edits: `content` carries labeled conflict markers. Write
     /// it and let the indexer flag `has_conflict` → "Needs review".
     Marked { content: String },
+}
+
+/// What a buffer-level merge produced, for the editor.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeTextOutcome {
+    pub content: String,
+    /// False when `content` carries conflict markers.
+    pub clean: bool,
+}
+
+/// Command: merge an open note's unsaved buffer (`ours`) with content that
+/// arrived on disk (`theirs`) over the last content both derived from
+/// (`base`), through the same ladder Git pulls and iCloud sweeps use, so the
+/// editor resolves what they resolve: identical and whitespace-only
+/// differences, disjoint edits, key-wise frontmatter, and (by `path`) the
+/// daily-note append-union. Overlapping edits come back as labeled markers.
+#[tauri::command]
+pub fn conflict_merge_text(
+    path: String,
+    base: String,
+    ours: String,
+    theirs: String,
+) -> AppResult<MergeTextOutcome> {
+    let input = ladder::ConflictInput {
+        path: &path,
+        base: Some(&base),
+        // Fixed stamps keep "ours" the first side, so markers read
+        // `<<<<<<< this device` / `>>>>>>> other device` like a Git pull's.
+        sides: (
+            ConflictSide {
+                content: ours.clone(),
+                label: THIS_DEVICE.to_string(),
+                modified_ms: 0,
+            },
+            ConflictSide {
+                content: theirs,
+                label: OTHER_DEVICE.to_string(),
+                modified_ms: 1,
+            },
+        ),
+        creation_collision: false,
+        merge_loop_detected: false,
+    };
+    Ok(match ladder::resolve(input)? {
+        Resolution::AlreadyResolved => MergeTextOutcome {
+            content: ours,
+            clean: true,
+        },
+        Resolution::Merged { content } => MergeTextOutcome {
+            content,
+            clean: true,
+        },
+        Resolution::Marked { content } => MergeTextOutcome {
+            content,
+            clean: false,
+        },
+    })
+}
+
+#[cfg(test)]
+mod merge_text_tests {
+    use super::*;
+
+    fn merge(path: &str, base: &str, ours: &str, theirs: &str) -> MergeTextOutcome {
+        conflict_merge_text(
+            path.to_string(),
+            base.to_string(),
+            ours.to_string(),
+            theirs.to_string(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn disjoint_edits_merge_clean() {
+        let out = merge("notes/a.md", "a\nb\nc\n", "A\nb\nc\n", "a\nb\nC\n");
+        assert!(out.clean);
+        assert_eq!(out.content, "A\nb\nC\n");
+    }
+
+    #[test]
+    fn a_fold_and_an_external_append_merge_clean() {
+        // The user report: folding a bullet (`-` → `+`) while a script
+        // appended a line to the daily note.
+        let base = "# 2026-10-07\n\n- a\n  - a1\n";
+        let out = merge(
+            "daily/2026-10-07.md",
+            base,
+            "# 2026-10-07\n\n+ a\n  - a1\n",
+            "# 2026-10-07\n\n- a\n  - a1\n- from the script\n",
+        );
+        assert!(out.clean, "{}", out.content);
+        assert_eq!(
+            out.content,
+            "# 2026-10-07\n\n+ a\n  - a1\n- from the script\n"
+        );
+    }
+
+    #[test]
+    fn both_appending_to_a_daily_note_unions() {
+        let base = "# 2026-10-07\n\n- seed\n";
+        let out = merge(
+            "daily/2026-10-07.md",
+            base,
+            "# 2026-10-07\n\n- seed\n- mine\n",
+            "# 2026-10-07\n\n- seed\n- theirs\n",
+        );
+        assert!(out.clean, "{}", out.content);
+        assert!(out.content.contains("- mine\n") && out.content.contains("- theirs\n"));
+    }
+
+    #[test]
+    fn overlapping_edits_come_back_marked_with_device_labels() {
+        let out = merge("notes/a.md", "line\n", "mine\n", "theirs\n");
+        assert!(!out.clean);
+        assert!(
+            out.content.contains("<<<<<<< this device"),
+            "{}",
+            out.content
+        );
+        assert!(
+            out.content.contains(">>>>>>> other device"),
+            "{}",
+            out.content
+        );
+    }
+
+    #[test]
+    fn identical_content_is_clean() {
+        let out = merge("notes/a.md", "old\n", "same\n", "same\n");
+        assert!(out.clean);
+        assert_eq!(out.content, "same\n");
+    }
 }
