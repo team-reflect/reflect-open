@@ -111,6 +111,9 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
             changed_files: Vec::new(),
         });
     };
+    // The branch as analyzed: the fast-forward below moves the ref only if
+    // it is still here, so sample it before the analysis, not after.
+    let old_oid = repo.head().ok().and_then(|head| head.target());
     let annotated = repo.find_annotated_commit(remote_oid)?;
     let (analysis, _) = repo.merge_analysis(&[&annotated])?;
 
@@ -123,9 +126,10 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
     }
 
     if analysis.is_unborn() || analysis.is_fast_forward() {
-        // Capture the outgoing tree before anything moves (None on unborn).
-        let old_oid = repo.head().ok().and_then(|head| head.target());
-        let old_tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
+        // The outgoing tree, from the same snapshot (None on unborn).
+        let old_tree = old_oid
+            .and_then(|oid| repo.find_commit(oid).ok())
+            .and_then(|commit| commit.tree().ok());
         let new_tree = repo.find_commit(remote_oid)?.tree()?;
         let mut changed_files = changed_between(&repo, old_tree.as_ref(), &new_tree)?;
         // Files first, ref last: a failure in between leaves the branch where
