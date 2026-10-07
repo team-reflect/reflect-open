@@ -1,17 +1,21 @@
-import { useId, useState, type ReactElement, type ReactNode } from 'react'
+import { useId, useMemo, useState, type ReactElement, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { open } from '@tauri-apps/plugin-dialog'
 import { icloudStatus } from '@reflect/core'
-import { Cloud, Folder, FolderPlus } from 'lucide-react'
+import { Cloud, Download, Folder, FolderPlus } from 'lucide-react'
 import { getIsComposing } from '@meowdown/core'
 import { InlineAlert } from '@/components/inline-alert.tsx'
+import { GithubAuthStep } from '@/components/settings/github-auth-step.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useBridgeReady } from '@/hooks/use-bridge-ready.ts'
 import { useGraphColors } from '@/hooks/use-graph-colors.ts'
 import { cleanGraphName, graphNameFromRoot, isGraphNameTaken } from '@/lib/graph-names.ts'
 import { queryKeys } from '@/lib/query-client.ts'
+import { parseBackupSource, restoreBackup } from '@/lib/restore-backup.ts'
 import { graphColorCss } from '@/lib/graph-colors.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
@@ -75,6 +79,8 @@ export function GraphChooser(): ReactElement {
           </Button>
         </section>
       </div>
+
+      <RestoreCard openRecent={openRecent} />
 
       {error ? (
         <InlineAlert tone="error" className="mx-auto w-full max-w-sm text-center">
@@ -342,6 +348,79 @@ function IcloudCard({
           </Button>
         </div>
       )}
+    </section>
+  )
+}
+
+/**
+ * The new-machine path (Plan 12): clone the backup repository into a folder
+ * of the user's choice and open it. GitHub repositories need the GitHub
+ * sign-in, so the shared auth step appears until one is stored; another
+ * HTTPS host uses its stored sign-in, SSH the agent.
+ */
+function RestoreCard({
+  openRecent,
+}: {
+  openRecent: (root: string) => Promise<boolean>
+}): ReactElement {
+  const [repository, setRepository] = useState('')
+  const [githubAuthed, setGithubAuthed] = useState(false)
+  const action = useAsyncAction()
+  const repositoryId = useId()
+  const source = useMemo(() => parseBackupSource(repository), [repository])
+  const needsGithubSignIn = source?.github === true && !githubAuthed
+
+  async function restore(): Promise<void> {
+    if (source === null) {
+      return
+    }
+    const picked = await open({
+      directory: true,
+      multiple: false,
+      title: 'Choose where to restore',
+    })
+    if (typeof picked !== 'string') {
+      return
+    }
+    await action.run(async () => {
+      await openRecent(await restoreBackup(source, picked))
+    })
+  }
+
+  return (
+    <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-sm">
+      <CardHeader
+        icon={<Download aria-hidden className="size-4" strokeWidth={1.75} />}
+        title="Restore from a backup"
+      >
+        Already backing up to a Git repository? Download it into a new folder on this computer and
+        pick up where you left off.
+      </CardHeader>
+      <div className="space-y-1.5">
+        <label htmlFor={repositoryId} className="text-xs font-medium text-text-secondary">
+          Repository
+        </label>
+        <Input
+          id={repositoryId}
+          value={repository}
+          placeholder="owner/notes or https://…"
+          disabled={action.pending}
+          aria-invalid={repository.trim().length > 0 && source === null}
+          onChange={(event) => setRepository(event.target.value)}
+        />
+      </div>
+      {needsGithubSignIn ? <GithubAuthStep onAuthed={() => setGithubAuthed(true)} /> : null}
+      <Button
+        type="button"
+        variant="outline"
+        className="mt-auto w-full"
+        disabled={source === null || needsGithubSignIn || action.pending}
+        onClick={() => void restore()}
+      >
+        {action.pending ? <Spinner /> : <FolderPlus aria-hidden strokeWidth={1.75} />}
+        {action.pending ? 'Restoring…' : 'Choose where to restore…'}
+      </Button>
+      {action.error !== null ? <InlineAlert tone="error">{action.error}</InlineAlert> : null}
     </section>
   )
 }
