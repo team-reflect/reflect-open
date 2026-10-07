@@ -66,8 +66,8 @@ rule, and (pending) by removing entries an older repository already
 tracked.
 
 - Test: `git::tests::commit_excludes_reflect_and_skips_when_clean` (untracked
-  `.reflect/` files only). Known gap: tracked-entry cleanup is pending its own
-  regression (`commit_removes_previously_tracked_reflect_files`).
+  files), `git::tests::tracked_reflect_entries_are_dropped_from_the_next_commit`
+  (entries an adopted repository already tracked).
 
 ## S7. Conflicts are committed and pushed, never left pending
 

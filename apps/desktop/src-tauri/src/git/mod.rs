@@ -18,9 +18,13 @@
 
 mod commit;
 mod commit_message;
+#[cfg(test)]
+mod fault;
 mod merge;
 mod remote;
 mod repo;
+#[cfg(test)]
+mod test_support;
 #[cfg(test)]
 mod tests;
 

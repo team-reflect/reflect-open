@@ -24,6 +24,7 @@ use std::path::Path;
 
 use git2::build::CheckoutBuilder;
 use git2::{Index, IndexEntry, MergeOptions, Repository};
+use reflect_graph_paths::to_slash_lossy;
 use serde::Serialize;
 
 use crate::error::AppResult;
@@ -128,8 +129,12 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
         let new_tree = repo.find_commit(remote_oid)?.tree()?;
         let mut changed_files = changed_between(&repo, old_tree.as_ref(), &new_tree)?;
         let refname = format!("refs/heads/{branch}");
+        #[cfg(test)]
+        super::fault::trip(super::fault::FaultPoint::BeforeFastForwardRefMove)?;
         repo.reference(&refname, remote_oid, true, "reflect sync: fast-forward")?;
         repo.set_head(&refname)?;
+        #[cfg(test)]
+        super::fault::trip(super::fault::FaultPoint::BeforeFastForwardCheckout)?;
         // Force is safe here: the pre-merge invariant is a committed working
         // tree, so there is nothing uncommitted to clobber.
         repo.checkout_head(Some(CheckoutBuilder::new().force()))?;
@@ -182,6 +187,8 @@ fn complete_merge(
     root: &Path,
     remote_oid: git2::Oid,
 ) -> AppResult<(Vec<String>, Vec<ChangedFile>)> {
+    #[cfg(test)]
+    super::fault::trip(super::fault::FaultPoint::AfterMergeBeforeCommit)?;
     let mut index = repo.index()?;
     let conflicted_paths = resolve_conflicts(repo, root, &mut index)?;
     index.write()?;
@@ -229,7 +236,7 @@ fn changed_between(
         };
         if let Some(path) = file.path() {
             out.push(ChangedFile {
-                path: path.to_string_lossy().replace('\\', "/"),
+                path: to_slash_lossy(path),
                 kind: if removed {
                     ChangeKind::Remove
                 } else {

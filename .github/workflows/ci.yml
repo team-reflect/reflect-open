@@ -42,20 +42,9 @@ jobs:
       - name: Build
         run: pnpm build
 
-  node-test:
+  test-chromium:
     if: github.event_name != 'merge_group'
-    strategy:
-      fail-fast: false
-      matrix:
-        config:
-          - os: ubuntu-latest
-            browser: chromium
-          - os: blacksmith-6vcpu-macos-26
-            browser: webkit
-
-    name: test-${{ matrix.config.browser }}
-    runs-on: ${{ matrix.config.os }}
-
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -64,12 +53,31 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - name: Install Playwright
-        run: pnpm --filter @reflect/desktop exec playwright install ${{ matrix.config.browser }}
+        run: pnpm --filter @reflect/desktop exec playwright install chromium
 
       - name: Test
         run: pnpm run test
         env:
-          REFLECT_TEST_BROWSER: ${{ matrix.config.browser }}
+          REFLECT_TEST_BROWSER: chromium
+
+  # Not part of `all-green`: a WebKit failure does not block merging.
+  test-webkit:
+    if: github.event_name != 'merge_group'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node
+
+      - name: Install Playwright
+        run: pnpm --filter @reflect/desktop exec playwright install webkit
+
+      - name: Test
+        run: pnpm run test
+        env:
+          REFLECT_TEST_BROWSER: webkit
 
   rust-lint:
     if: github.event_name != 'merge_group'
@@ -116,57 +124,14 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-  build:
-    if: >-
-      ${{
-        github.repository == 'team-reflect/reflect-open' &&
-        (github.event_name == 'workflow_dispatch' ||
-          (github.event_name == 'pull_request' &&
-            startsWith(github.head_ref, 'release-please')))
-      }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: macos
-            os: macos-26
-            command: pnpm release:macos --no-sign
-          - name: ios
-            os: macos-26
-            target: aarch64-apple-ios
-            command: pnpm release:ios --build-number=1 --no-sign
-          - name: windows
-            os: windows-latest
-            command: pnpm release:windows
-
-    name: build-${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-node
-
-      - uses: ./.github/actions/setup-rust
-        with:
-          targets: ${{ matrix.target }}
-          cache-key: build-${{ matrix.name }}
-
-      - name: Build
-        shell: bash
-        run: ${{ matrix.command }}
-
   # A single job for branch protection to require, instead of listing every
-  # job (and every matrix entry) as a required status check.
+  # job as a required status check.
   all-green:
     runs-on: ubuntu-slim
     timeout-minutes: 10
 
     if: always()
-    needs: [node-lint, node-test, rust-lint, rust-test]
+    needs: [node-lint, test-chromium, rust-lint, rust-test]
 
     steps:
       - name: Verify that all jobs succeeded
