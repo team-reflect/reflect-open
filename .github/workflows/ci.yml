@@ -73,9 +73,7 @@ jobs:
 
   rust-lint:
     if: github.event_name != 'merge_group'
-    # The Apple checks below need a macOS runner. Pull requests skip them, so
-    # they stay on Linux.
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'macos-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -84,7 +82,6 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           components: rustfmt, clippy
-          targets: ${{ github.event_name != 'pull_request' && 'aarch64-apple-ios' || '' }}
 
       # The sidecar script imports npm packages.
       - uses: ./.github/actions/setup-node
@@ -98,18 +95,6 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
-
-      # Check the Apple Rust bindings. These two checks do not run on pull
-      # requests, to keep pull request CI short.
-      - name: Check desktop library
-        if: github.event_name != 'pull_request'
-        run: cargo check -p reflect-open --lib
-
-      # The TestFlight workflow is the only full iOS build, so type-check the
-      # iOS target here with the same feature set `tauri ios` builds with.
-      - name: Check iOS library
-        if: github.event_name != 'pull_request'
-        run: cargo check -p reflect-open --lib --target aarch64-apple-ios --no-default-features
 
   rust-test:
     if: github.event_name != 'merge_group'
@@ -131,8 +116,52 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+  # Check the Rust crate on the platforms that the other jobs do not compile
+  # for. It does not run on pull requests, to keep pull request CI short.
+  rust-build:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: mac-desktop
+            os: macos-latest
+          # The TestFlight workflow is the only full iOS build, so type-check
+          # the iOS target here with the same feature set `tauri ios` builds
+          # with.
+          - name: mac-mobile
+            os: macos-latest
+            target: aarch64-apple-ios
+            args: --target aarch64-apple-ios --no-default-features
+          - name: windows-desktop
+            os: windows-latest
+
+    name: build-${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          targets: ${{ matrix.config.target }}
+          cache-key: ${{ matrix.config.name }}
+
+      # The sidecar script imports npm packages.
+      - uses: ./.github/actions/setup-node
+
+      # tauri-build requires the sidecars before the desktop crate compiles.
+      - name: Stage desktop sidecars
+        run: node apps/desktop/scripts/build-sidecar.ts
+
+      - name: Check
+        run: cargo check -p reflect-open --lib ${{ matrix.config.args }}
+
   # A single job for branch protection to require, instead of listing every
-  # job (and every matrix entry) as a required status check.
+  # job (and every matrix entry) as a required status check. `rust-build` is
+  # not listed because it does not run on pull requests.
   all-green:
     runs-on: ubuntu-slim
     timeout-minutes: 10
