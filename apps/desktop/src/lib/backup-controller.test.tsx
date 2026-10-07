@@ -582,6 +582,29 @@ describe('createBackupController', () => {
     }
   })
 
+  it('the mobile background flush commits while the document is hidden', async () => {
+    setPlatformSurface({ mobileApp: true })
+    const visibility = vi.spyOn(document, 'visibilityState', 'get')
+    const { calls } = fakeBridge()
+    visibility.mockReturnValue('visible')
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    try {
+      await controller.start()
+      await vi.waitFor(() => {
+        expect(calls).toContain('git_merge_remote') // the launch cycle ran
+      })
+      const before = commitCount(calls)
+
+      visibility.mockReturnValue('hidden')
+      await flushBackup()
+      expect(commitCount(calls)).toBe(before + 1)
+    } finally {
+      controller.dispose()
+      visibility.mockRestore()
+      setPlatformSurface({ mobileApp: false })
+    }
+  })
+
   it('window focus triggers a sync', async () => {
     const { calls } = fakeBridge()
     const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })

@@ -248,6 +248,22 @@ describe('createSyncEngine', () => {
     engine.stop()
   })
 
+  it('commitNow runs even when the owner gates cycles (the hidden-app flush)', async () => {
+    // iOS fires the background flush after the document is hidden, exactly
+    // when canStartCycle says no to network cycles.
+    const calls = fakeGit(defaultResponses)
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => CRED,
+      canStartCycle: () => false,
+    })
+    await engine.commitNow()
+    expect(commandsOf(calls)).toEqual(['git_commit_all'])
+    await engine.syncNow()
+    expect(commandsOf(calls)).toEqual(['git_commit_all']) // still gated
+    engine.stop()
+  })
+
   it('surfaces a non-divergence rejection (e.g. push protection) as an error', async () => {
     fakeGit((command) => {
       if (command === 'git_push') {

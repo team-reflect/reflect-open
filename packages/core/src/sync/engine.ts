@@ -259,7 +259,10 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   }
 
   async function run(mode: Mode): Promise<void> {
-    if (signal.aborted || options.canStartCycle?.() === false) {
+    // A commit-only cycle is the background/quit flush: it must run while the
+    // document is hidden (that is when it fires), so only network cycles
+    // honor the owner's gate.
+    if (signal.aborted || (mode !== 'commit' && options.canStartCycle?.() === false)) {
       return
     }
     if (running !== null) {
@@ -324,6 +327,15 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   async function cycle(mode: Mode, remoteChanges: (changes: ChangedFile[]) => void): Promise<void> {
     const offline = options.localOnly === true || mode === 'commit'
+    if (mode === 'commit') {
+      // One command, no gate: the flush's commit must finish even hidden.
+      const flushed = await gitCommitAll('Update notes', options.generation)
+      signal.throwIfAborted()
+      if (flushed.skippedLargeFiles.length > 0) {
+        options.onLargeFilesSkipped?.(flushed.skippedLargeFiles)
+      }
+      return
+    }
     const credential = offline ? null : await step(options.getCredential())
     const commit = await step(gitCommitAll('Update notes', options.generation))
     if (commit.skippedLargeFiles.length > 0) {
