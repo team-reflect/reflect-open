@@ -268,6 +268,24 @@ describe('createNoteSession', () => {
     expect(archived.map((entry) => entry.contents)).toEqual(['# Mine\n', '# Mine, more\n'])
   })
 
+  it('a flush whose write lands stale parks the conflict and still archives', async () => {
+    // ⌘Q with a dirty buffer and no conflict yet: the external change is on
+    // disk but its watcher event has not arrived. The flush's write is
+    // rejected as stale, the catch parks the conflict, and the buffer must
+    // be archived before the flush resolves and the app quits.
+    const { session, writes, archived, snapshots, setDisk } = harness()
+    session.load()
+    await settled()
+    session.editorChanged('# Mine\n')
+    setDisk('# Theirs\n') // no externalChanged(): the watcher is behind
+
+    await session.flush()
+
+    expect(writes).toEqual([])
+    expect(snapshots.at(-1)?.conflict).toBe('# Theirs\n')
+    expect(archived).toEqual([{ path: 'notes/a.md', contents: '# Mine\n' }])
+  })
+
   it('a failed archive keeps the buffer and the next flush retries', async () => {
     const { session, archived, snapshots, setDisk, failArchive } = harness()
     session.load()

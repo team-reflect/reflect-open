@@ -168,10 +168,11 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     save()
     // save() extended the chain synchronously (or left it settled when there
     // was nothing to do) — the chain as of now is exactly this flush's write.
-    // Under a parked conflict that write is a no-op, so the buffer is
-    // preserved instead; every exit path (navigation, quit, background) goes
-    // through here and waits for it.
-    return conflict === null ? saveChain : preserve()
+    // Then preserve: under a parked conflict the write was a no-op, and a
+    // write that lands stale parks one on the way (its catch reconciles), so
+    // the check must run after the chain settles. Every exit path
+    // (navigation, quit, background) goes through here and waits for both.
+    return saveChain.then(preserve)
   }
 
   /**
@@ -182,7 +183,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
    * next flush retries.
    */
   async function preserve(): Promise<void> {
-    if (!dirty || io.archiveUnsaved === undefined) {
+    if (conflict === null || !dirty || io.archiveUnsaved === undefined) {
       return
     }
     const content = header + buffer
