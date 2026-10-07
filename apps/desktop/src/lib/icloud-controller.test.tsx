@@ -192,11 +192,14 @@ describe('createIcloudController', () => {
     await settleScan() // baseline out of the way
 
     await writeNote('notes/own.md', '# mine\n', GRAPH.generation)
-    emitFileChanges([
-      { path: 'notes/own.md', kind: 'upsert', modifiedMs: 1 },
-      { path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 },
-      { path: 'notes/gone.md', kind: 'remove' },
-    ])
+    emitFileChanges(
+      [
+        { path: 'notes/own.md', kind: 'upsert', modifiedMs: 1 },
+        { path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 },
+        { path: 'notes/gone.md', kind: 'remove' },
+      ],
+      'external',
+    )
     await settleScan(INGEST_SETTLE_MS) // arrival-driven: debounce + minimum spacing
 
     expect(scanCalls).toHaveLength(2)
@@ -226,10 +229,13 @@ describe('createIcloudController', () => {
     // …and neither the controller's own synchronous fan-out nor the file
     // watcher's later echo of the sweep's write may come back as an ingest —
     // only the genuinely external change does.
-    emitFileChanges([
-      { path: 'notes/merged.md', kind: 'upsert', modifiedMs: 6 }, // watcher echo
-      { path: 'notes/other.md', kind: 'upsert', modifiedMs: 9 },
-    ])
+    emitFileChanges(
+      [
+        { path: 'notes/merged.md', kind: 'upsert', modifiedMs: 6 }, // watcher echo
+        { path: 'notes/other.md', kind: 'upsert', modifiedMs: 9 },
+      ],
+      'external',
+    )
     await settleScan(INGEST_SETTLE_MS) // arrival-driven: debounce + minimum spacing
     expect(scanCalls[1]?.ingestedPaths).toEqual(['notes/other.md'])
   })
@@ -242,7 +248,7 @@ describe('createIcloudController', () => {
       await settleScan()
       expect(scanCalls).toHaveLength(0)
 
-      emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 5 }])
+      emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 5 }], 'external')
       listeners.get('icloud:conflicts')?.(['notes/conflicted.md'])
       await settleScan(INGEST_SETTLE_MS)
       expect(scanCalls).toHaveLength(0)
@@ -305,7 +311,7 @@ describe('createIcloudController', () => {
     await settleScan()
     expect(scanCalls[1]?.scope).toBe('candidates') // signal and set share a round
 
-    emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 }])
+    emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 }], 'external')
     await settleScan(INGEST_SETTLE_MS)
     expect(scanCalls[2]?.scope).toBe('candidates') // bulk-sync arrival sweeps stay cheap
 
@@ -324,7 +330,7 @@ describe('createIcloudController', () => {
     // themselves are the only notes a just-landed remote edit can have
     // conflicted, so the sweep checks exactly those — never the whole graph
     // per batch, and never the (unanswerable) candidates scope.
-    emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 }])
+    emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 }], 'external')
     await settleScan(INGEST_SETTLE_MS)
     expect(scanCalls[1]).toMatchObject({ scope: 'ingested', ingestedPaths: ['notes/external.md'] })
 
@@ -359,11 +365,11 @@ describe('createIcloudController', () => {
     await settleScan() // baseline (full) out of the way
 
     scanResults.push(new Error('container hiccup'))
-    emitFileChanges([{ path: 'notes/one.md', kind: 'upsert', modifiedMs: 1 }])
+    emitFileChanges([{ path: 'notes/one.md', kind: 'upsert', modifiedMs: 1 }], 'external')
     await settleScan(INGEST_SETTLE_MS)
     expect(scanCalls[1]?.scope).toBe('ingested')
 
-    emitFileChanges([{ path: 'notes/two.md', kind: 'upsert', modifiedMs: 2 }])
+    emitFileChanges([{ path: 'notes/two.md', kind: 'upsert', modifiedMs: 2 }], 'external')
     await settleScan(INGEST_SETTLE_MS)
     expect(scanCalls[2]).toMatchObject({
       scope: 'full',
@@ -376,10 +382,10 @@ describe('createIcloudController', () => {
     const icloud = controller()
     await icloud.start()
 
-    emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 }])
+    emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 }], 'external')
     await settleScan() // scan #1 (the sooner baseline timer wins): baseline + ingest — fails
 
-    emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 3 }])
+    emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 3 }], 'external')
     await settleScan(INGEST_SETTLE_MS) // scan #2 retries both, on the ingest window
 
     expect(scanCalls).toHaveLength(2)
@@ -396,13 +402,13 @@ describe('createIcloudController', () => {
     // A first-sync shape: batches keep arriving. The first arrival lands
     // just after the baseline sweep — the debounce alone would sweep again
     // at +5s, but the minimum spacing holds it back…
-    emitFileChanges([{ path: 'notes/one.md', kind: 'upsert', modifiedMs: 1 }])
+    emitFileChanges([{ path: 'notes/one.md', kind: 'upsert', modifiedMs: 1 }], 'external')
     await settleScan(5_100)
     expect(scanCalls).toHaveLength(1)
 
     // …so a later batch folds into the SAME deferred sweep, which fires once
     // the spacing from the baseline's end has elapsed, carrying both ingests.
-    emitFileChanges([{ path: 'notes/two.md', kind: 'upsert', modifiedMs: 2 }])
+    emitFileChanges([{ path: 'notes/two.md', kind: 'upsert', modifiedMs: 2 }], 'external')
     await settleScan(26_000)
     expect(scanCalls).toHaveLength(2)
     expect(scanCalls[1]?.ingestedPaths).toEqual(
@@ -457,7 +463,7 @@ describe('createIcloudController', () => {
     await settleScan() // the baseline sweep starts — and hangs
     expect(scanCalls).toHaveLength(1)
 
-    emitFileChanges([{ path: 'notes/late.md', kind: 'upsert', modifiedMs: 2 }])
+    emitFileChanges([{ path: 'notes/late.md', kind: 'upsert', modifiedMs: 2 }], 'external')
     releaseScan?.()
     await settleScan() // prompt window only — a long sweep must not chain
     expect(scanCalls).toHaveLength(1)

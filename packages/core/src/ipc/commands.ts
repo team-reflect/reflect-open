@@ -173,6 +173,34 @@ export type IcloudSweepOutcome = z.infer<typeof icloudSweepOutcomeSchema>
  */
 export type IcloudSweepScope = 'full' | 'candidates' | 'ingested'
 
+const mergeTextOutcomeSchema = z.object({
+  /**
+   * `clean`: `content` is the merge. `conflicted`: `content` carries labeled
+   * markers where the edits overlap. `unmergeable`: a side already carried
+   * markers (a pull wrote a conflicted note while the buffer was dirty);
+   * nothing was merged, `content` is `theirs`, and the caller keeps `ours`.
+   */
+  kind: z.enum(['clean', 'conflicted', 'unmergeable']),
+  content: z.string(),
+})
+export type MergeTextOutcome = z.infer<typeof mergeTextOutcomeSchema>
+
+/**
+ * Merge an open note's unsaved buffer (`ours`) with content that arrived on
+ * disk (`theirs`) over the last content both derived from (`base`), through
+ * the same resolution ladder Git pulls and iCloud sweeps use. `path` selects
+ * the daily-note append-union rule. Overlapping edits come back as labeled
+ * markers (`this device` / `other device`); see {@link MergeTextOutcome}.
+ */
+export async function mergeText(
+  path: string,
+  base: string,
+  ours: string,
+  theirs: string,
+): Promise<MergeTextOutcome> {
+  return await call('conflict_merge_text', { path, base, ours, theirs }, mergeTextOutcomeSchema)
+}
+
 /** Options for {@link icloudConflictsScan}. */
 export interface IcloudScanOptions {
   /** The open graph's generation — the scan is pinned to it. */

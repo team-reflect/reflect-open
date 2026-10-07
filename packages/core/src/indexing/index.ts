@@ -20,6 +20,8 @@ export {
   subscribeReconcileRequests,
   emitFileChanges,
   type FileChange,
+  type FileChangeHandler,
+  type FileChangeSource,
 } from './file-changes.ts'
 export { setLocalWriteEcho, subscribeOwnWrites } from './local-write-echo.ts'
 export { subscribeIcloudConflicts, subscribeIcloudWatchFailed } from './icloud-conflicts.ts'

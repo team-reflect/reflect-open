@@ -26,6 +26,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use reflect_graph_paths::to_slash_lossy;
+
 use crate::error::{AppError, AppResult};
 
 /// Content identity for merge-pair tracking, via the vendored libgit2
@@ -190,7 +192,7 @@ fn prune_orphan_dir(dir: &Path, store_root: &Path, keep: &std::collections::BTre
         let Ok(rel) = path.strip_prefix(store_root) else {
             continue;
         };
-        let rel = rel.to_string_lossy().replace('\\', "/");
+        let rel = to_slash_lossy(rel);
         let note = rel.strip_suffix(".pair").unwrap_or(&rel);
         if !keep.contains(note) {
             let _ = fs::remove_file(&path);

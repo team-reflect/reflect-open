@@ -117,6 +117,21 @@ pub fn wire_path(rel: &Path) -> Option<String> {
     (!out.is_empty()).then_some(out)
 }
 
+/// Replace every backslash in `text` with a forward slash.
+///
+/// For text that is already a string, such as a zip entry name. Unlike
+/// [`wire_path`], this validates nothing and never fails.
+pub fn to_slash(text: &str) -> String {
+    text.replace('\\', "/")
+}
+
+/// The forward-slashed form of a native path, for paths [`wire_path`] would
+/// reject: hidden components (`.reflect/`, `.gitignore`) and paths that are
+/// not graph-relative. Non-UTF-8 sequences become U+FFFD.
+pub fn to_slash_lossy(path: &Path) -> String {
+    to_slash(&path.to_string_lossy())
+}
+
 /// The logical file name represented by an iCloud eviction placeholder.
 pub fn icloud_placeholder_target(file_name: &str) -> Option<&str> {
     let name = file_name.strip_prefix('.')?.strip_suffix(".icloud")?;
@@ -230,7 +245,7 @@ mod tests {
 
     use super::{
         classify, evicted_logical_path, eviction_placeholder, is_safe_visible,
-        normalize_line_endings, wire_path, GraphPathKind,
+        normalize_line_endings, to_slash, to_slash_lossy, wire_path, GraphPathKind,
     };
     use serde::Deserialize;
 
@@ -284,6 +299,29 @@ mod tests {
             use std::os::unix::ffi::OsStrExt;
             let non_utf8 = Path::new(OsStr::from_bytes(b"caf\xC3.md"));
             assert_eq!(wire_path(non_utf8), None);
+        }
+    }
+
+    #[test]
+    fn to_slash_replaces_every_backslash() {
+        assert_eq!(to_slash("notes\\deep\\a.md"), "notes/deep/a.md");
+        assert_eq!(to_slash("notes/a.md"), "notes/a.md");
+        assert_eq!(to_slash(""), "");
+    }
+
+    #[test]
+    fn to_slash_lossy_keeps_what_wire_path_rejects() {
+        assert_eq!(
+            to_slash_lossy(Path::new(".reflect/inbox/a.json")),
+            ".reflect/inbox/a.json"
+        );
+        assert_eq!(to_slash_lossy(Path::new("a\\b.md")), "a/b.md");
+        #[cfg(unix)]
+        {
+            use std::ffi::OsStr;
+            use std::os::unix::ffi::OsStrExt;
+            let non_utf8 = Path::new(OsStr::from_bytes(b"caf\xC3.md"));
+            assert_eq!(to_slash_lossy(non_utf8), "caf\u{FFFD}.md");
         }
     }
 

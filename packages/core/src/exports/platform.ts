@@ -41,6 +41,8 @@ export {
   icloudStatus,
   icloudAdoptGraph,
   icloudConflictsScan,
+  mergeText,
+  type MergeTextOutcome,
   icloudWatchStart,
   icloudWatchStop,
   type IcloudDownloadScope,

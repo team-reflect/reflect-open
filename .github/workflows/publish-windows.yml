@@ -1,22 +1,7 @@
-name: Windows
-
-# Experimental: builds Windows x64 and arm64 NSIS installers that are not
-# code-signed. A release build also uploads them, with their updater
-# signatures, into the draft release. See docs/windows-builds.md.
+name: Publish Windows
 
 on:
-  # Builds the installers as workflow artifacts only.
   workflow_dispatch:
-  # Validate changes to the Windows build itself before merging; regular PRs
-  # never trigger this.
-  pull_request:
-    paths:
-      - .github/workflows/publish-windows.yml
-      - .github/actions/setup-node/action.yml
-      - .github/actions/setup-rust/action.yml
-      - apps/desktop/scripts/release-windows.ts
-      - apps/desktop/scripts/helpers.ts
-  # Called by release.yml so every release also produces a Windows build.
   workflow_call:
     inputs:
       tag:
@@ -28,8 +13,6 @@ on:
         required: true
         type: string
 
-# A release build uploads its assets into the draft release.
-# publish-finalize.yml writes latest.json and publishes the release afterwards.
 permissions:
   contents: write
 
@@ -51,11 +34,6 @@ jobs:
             runner: windows-11-arm
             target: aarch64-pc-windows-msvc
     steps:
-      # The runner image enables OS-level long paths but not git's own
-      # support; deep pnpm paths can fail checkout without it.
-      - name: Enable git long paths
-        run: git config --system core.longpaths true
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.commit || github.sha }}

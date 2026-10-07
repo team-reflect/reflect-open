@@ -265,7 +265,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     }
     applyingSweepResult = true
     try {
-      emitFileChanges(changes)
+      emitFileChanges(changes, 'icloud-sweep')
     } finally {
       applyingSweepResult = false
     }

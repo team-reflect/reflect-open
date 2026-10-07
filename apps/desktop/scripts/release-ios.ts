@@ -4,6 +4,7 @@
 //
 //   --build-number=<digits>   Required
 //   --export-method=<name>    Default: app-store-connect
+//   --no-sign                 Unsigned build without credentials: nothing is uploaded
 
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -159,6 +160,16 @@ async function build(
   log(`built ${IPA_PATH} (build ${buildNumber})`)
 }
 
+/** Checks that the app compiles and archives. The result cannot be installed. */
+async function buildUnsigned(buildNumber: string): Promise<void> {
+  const config = JSON.stringify({ bundle: { iOS: { bundleVersion: buildNumber } } })
+  await runTauri(['ios', 'build', '--no-sign', '--ci', '--config', config], {
+    CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only',
+  })
+  await assertArchiveSymbols()
+  log(`built an unsigned archive at ${ARCHIVE_PATH}`)
+}
+
 async function runAltool(args: readonly string[], credentials: Credentials): Promise<void> {
   const allArgs = ['altool', ...args, ...credentials.altoolArgs, '--output-format', 'json']
   await exec('xcrun', allArgs, {
@@ -172,6 +183,7 @@ async function main(): Promise<void> {
     options: {
       'build-number': { type: 'string', default: '' },
       'export-method': { type: 'string', default: 'app-store-connect' },
+      'no-sign': { type: 'boolean', default: false },
     },
   })
   const buildNumber = values['build-number']
@@ -179,6 +191,10 @@ async function main(): Promise<void> {
     throw new Error(`invalid build number "${buildNumber}"`)
   }
   assertSentryDsn()
+  if (values['no-sign']) {
+    await buildUnsigned(buildNumber)
+    return
+  }
 
   await runWithTempDir(async (tempDir) => {
     const credentials = resolveCredentials(tempDir)
