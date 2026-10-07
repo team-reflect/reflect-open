@@ -19,15 +19,19 @@ const sync = vi.hoisted(() => ({
   backUpNow: vi.fn(async () => {}),
 }))
 const github = vi.hoisted(() => ({ connected: false }))
+const graphs = vi.hoisted(() => ({
+  graph: null as { root: string; name: string; generation: number } | null,
+}))
 vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn(async () => {}) }))
 vi.mock('@/providers/sync-provider.tsx', () => ({ useSync: () => sync }))
-vi.mock('@/providers/graph-provider.tsx', () => ({ useGraph: () => ({ graph: null }) }))
+vi.mock('@/providers/graph-provider.tsx', () => ({ useGraph: () => graphs }))
 vi.mock('@/hooks/use-github-connected.ts', () => ({ useGithubConnected: () => github.connected }))
 
 afterEach(async () => {
   await cleanup()
   vi.clearAllMocks()
   github.connected = false
+  graphs.graph = null
 })
 
 async function renderSection(backup: BackupState): Promise<void> {
@@ -46,6 +50,31 @@ const AUTH_ERROR = {
 } as const
 
 describe('BackupSettingsField', () => {
+  it('explains the quiet window on an iCloud-hosted graph', async () => {
+    graphs.graph = {
+      root: '/Users/alex/Library/Mobile Documents/iCloud~app~reflect/Documents/G',
+      name: 'G',
+      generation: 1,
+    }
+    await renderSection({ phase: 'disconnected' })
+    await expect.element(page.getByText(/already syncs through iCloud Drive/)).toBeVisible()
+
+    await cleanup()
+    await renderSection({
+      phase: 'connected',
+      remoteUrl: 'https://github.com/alex/notes.git',
+      repo: { owner: 'alex', name: 'notes' },
+      status: { state: 'idle' },
+    })
+    await expect.element(page.getByText(/five minutes after iCloud/)).toBeVisible()
+  })
+
+  it('says nothing about iCloud on a folder graph', async () => {
+    graphs.graph = { root: '/Users/alex/Notes', name: 'Notes', generation: 1 }
+    await renderSection({ phase: 'disconnected' })
+    await expect.element(page.getByText(/iCloud Drive/)).not.toBeInTheDocument()
+  })
+
   it('renders a generic remote host-neutrally with the engine’s own auth message', async () => {
     await renderSection({
       phase: 'connected',

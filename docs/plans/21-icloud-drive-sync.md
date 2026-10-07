@@ -196,6 +196,10 @@ rename seam; a miss is again just a degraded merge.
   histories pushing one remote would non-FF forever). Enabling iCloud sync
   disconnects a configured Git remote (with an explanatory prompt); local
   checkpoint commits remain allowed and useful for recovery.
+  *2026-10 revision:* exclusivity is now a recommendation, not a rule. A
+  GitHub backup on an iCloud-hosted graph runs its network cycle only after
+  five quiet minutes, so the two engines never merge the same text; see
+  `docs/icloud-sync.md`.
 - **`.reflect/` exclusion goes cross-platform.** `mark_reflect_dir_local_only`
   widens from `cfg(target_os = "macos")` to Apple targets; the
   `ubiquitousItemIsExcludedFromSync` resource key exists on iOS. Verified inside
