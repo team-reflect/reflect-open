@@ -51,7 +51,8 @@ pub(crate) use self::io::file_occupied;
 /// backup repo must never ride a file-sync provider — Plan 21).
 pub(crate) use self::io::mark_dir_local_only;
 pub(crate) use self::io::modified_ms;
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+/// Own-write provenance, shared with the watchers and the sync writers (a
+/// pull's or sweep's write must not come back as an external change).
 pub(crate) use self::own_writes::{record_own_write, take_own_write};
 /// The lexical traversal guard, shared with the conflict stores that mirror
 /// note paths under `.reflect/` (shadow bases, conflict archive).
