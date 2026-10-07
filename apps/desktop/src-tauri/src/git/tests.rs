@@ -936,6 +936,17 @@ fn assert_next_cycle_keeps_pulled_notes(fixture: &Fixture) {
 }
 
 #[test]
+fn fast_forward_with_a_stale_head_lock_succeeds() {
+    // No `set_head` on the fast-forward path: a leftover lock file from a
+    // killed process must not fail every pull.
+    let fixture = pulled_note_fixture();
+    fs::write(fixture.graph_a.join(".git/HEAD.lock"), b"").unwrap();
+    let merged = merge_remote(&fixture.graph_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::FastForward), "{merged:?}");
+    assert_eq!(read(&fixture.graph_a, "notes/from-phone.md"), PHONE_NOTE);
+}
+
+#[test]
 fn fast_forward_failure_before_the_ref_moves_converges_next_cycle() {
     // A failure before anything happened must be a plain retry.
     let fixture = pulled_note_fixture();
@@ -945,7 +956,6 @@ fn fast_forward_failure_before_the_ref_moves_converges_next_cycle() {
 }
 
 #[test]
-#[ignore = "red until P1.1: fast-forward must check out before it moves the ref"]
 fn fast_forward_checkout_failure_never_reverts_pulled_notes() {
     let fixture = pulled_note_fixture();
     fault::arm(FaultPoint::BeforeFastForwardCheckout, Fault::Fail);
@@ -954,7 +964,6 @@ fn fast_forward_checkout_failure_never_reverts_pulled_notes() {
 }
 
 #[test]
-#[ignore = "red until P1.1: fast-forward must not depend on HEAD.lock"]
 fn stale_head_lock_fast_forward_never_reverts_pulled_notes() {
     // The field case behind #1405: a lock file left by a killed process. It
     // stays in place for the whole test, as it did for the user, because
@@ -966,7 +975,7 @@ fn stale_head_lock_fast_forward_never_reverts_pulled_notes() {
 }
 
 #[test]
-#[ignore = "red until P1.1 and P1.2: a concurrent commit must not see a moved ref over a stale tree"]
+#[ignore = "red until P1.2: a concurrent commit must wait for the running pull"]
 fn commit_during_fast_forward_never_reverts_pulled_notes() {
     // The quit-time flush commits outside the engine's queue, so it can land
     // while a pull is between the ref move and the checkout.

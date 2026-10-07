@@ -25,8 +25,8 @@ last. A failure in between leaves the ref where it was, so the next cycle
 retries the pull instead of committing the stale tree.
 
 - Test: `git::tests::fast_forward_checkout_failure_never_reverts_pulled_notes`,
-  `git::tests::stale_head_lock_fast_forward_never_reverts_pulled_notes`
-  (both `#[ignore]` until the fast-forward reorder lands).
+  `git::tests::stale_head_lock_fast_forward_never_reverts_pulled_notes`,
+  `git::tests::fast_forward_with_a_stale_head_lock_succeeds`.
 
 ## S3. After any failed git command, the next cycle loses nothing
 
