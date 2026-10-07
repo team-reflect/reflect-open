@@ -540,12 +540,10 @@ describe('createBackupController', () => {
     controller.dispose()
   })
 
-  // Safety invariant S4 (docs/git-backup-safety.md): the quit-time commit must
-  // queue behind an in-flight cycle. Today `flushBackup` calls
-  // `gitCommitAll` directly, so a commit can land between a pull's ref move
-  // and its checkout and commit the stale tree (#1405). Red on purpose until
-  // the flusher routes through the engine.
-  it.fails('quit flush waits for an in-flight pull before committing', async () => {
+  // Safety invariant S4 (docs/git-backup-safety.md): the quit-time commit
+  // queues behind an in-flight cycle, so it can never land between a pull's
+  // ref move and its checkout and commit the stale tree (#1405).
+  it('quit flush waits for an in-flight pull before committing', async () => {
     const { calls, releaseMerge, releaseCommit } = fakeBridge({
       gateMerge: true,
       gateSecondCommit: true,

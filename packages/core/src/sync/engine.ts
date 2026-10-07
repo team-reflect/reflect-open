@@ -112,6 +112,12 @@ export interface SyncEngine {
   /** Full cycle now — commit, pull/merge, push. For launch/focus/manual. */
   syncNow(): Promise<void>
   /**
+   * Commit now, nothing more: the quit-time and background flush. Joins the
+   * single-flight queue like every other cycle, so it can never run between
+   * a pull's steps; a network push on the way out could stall the exit.
+   */
+  commitNow(): Promise<void>
+  /**
    * Abort the engine: cancel timers, suppress further status emissions, and
    * unwind any in-flight cycle at its next step boundary.
    */
@@ -127,6 +133,14 @@ const DEFAULT_MAX_WAIT_MS = 5 * 60_000
  * straight rounds is pathological enough to surface.
  */
 const MAX_PUSH_ATTEMPTS = 3
+
+/**
+ * What a cycle does after its commit: `commit` stops there, `push` pushes if
+ * anything is pending, `full` fetches and merges first. Ordered weakest to
+ * strongest; a follow-up requested mid-cycle keeps the strongest.
+ */
+const MODES = ['commit', 'push', 'full'] as const
+type Mode = (typeof MODES)[number]
 
 /** A push the remote refused for a non-divergence reason (e.g. push protection). */
 class PushRejectedError extends Error {}
@@ -151,8 +165,13 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   /** Hard deadline (first unflushed edit + maxWaitMs); null = nothing pending. */
   let deadline: number | null = null
   let running: Promise<void> | null = null
-  /** Follow-up requested while a cycle was in flight (strongest mode wins). */
-  let rerunMode: 'push' | 'full' | null = null
+  /**
+   * The one follow-up requested while a cycle was in flight (strongest mode
+   * wins). Its callers await `done`, which settles when the follow-up itself
+   * finishes, not when the cycle they landed behind does: the quit flush
+   * must not report done before its own commit ran.
+   */
+  let followUp: { mode: Mode; done: Promise<void>; settle: () => void } | null = null
 
   function emit(status: SyncStatus): void {
     if (signal.aborted) {
@@ -239,7 +258,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     schedule(Math.max(0, Math.min(idleMs, deadline - now)))
   }
 
-  async function run(mode: 'push' | 'full'): Promise<void> {
+  async function run(mode: Mode): Promise<void> {
     if (signal.aborted || options.canStartCycle?.() === false) {
       return
     }
@@ -247,8 +266,16 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       // Queue one follow-up, keeping the strongest mode requested: a syncNow
       // landing mid-cycle must still get its fetch+merge, not be downgraded
       // to a push-only pass.
-      rerunMode = rerunMode === 'full' || mode === 'full' ? 'full' : 'push'
-      return await running
+      if (followUp === null) {
+        let settle = (): void => {}
+        const done = new Promise<void>((resolve) => {
+          settle = resolve
+        })
+        followUp = { mode, done, settle }
+      } else if (MODES.indexOf(mode) > MODES.indexOf(followUp.mode)) {
+        followUp.mode = mode
+      }
+      return await followUp.done
     }
     running = (async () => {
       const remoteChangeTasks: Promise<void>[] = []
@@ -284,27 +311,26 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         }
       } finally {
         running = null
-        if (rerunMode !== null && !signal.aborted) {
-          const next = rerunMode
-          rerunMode = null
-          void run(next)
+        if (followUp !== null) {
+          const next = followUp
+          followUp = null
+          // A stopped engine runs nothing more, but its awaiters must not hang.
+          void (signal.aborted ? Promise.resolve() : run(next.mode)).finally(next.settle)
         }
       }
     })()
     return await running
   }
 
-  async function cycle(
-    mode: 'push' | 'full',
-    remoteChanges: (changes: ChangedFile[]) => void,
-  ): Promise<void> {
-    const credential = options.localOnly === true ? null : await step(options.getCredential())
+  async function cycle(mode: Mode, remoteChanges: (changes: ChangedFile[]) => void): Promise<void> {
+    const offline = options.localOnly === true || mode === 'commit'
+    const credential = offline ? null : await step(options.getCredential())
     const commit = await step(gitCommitAll('Update notes', options.generation))
     if (commit.skippedLargeFiles.length > 0) {
       options.onLargeFilesSkipped?.(commit.skippedLargeFiles)
     }
-    if (options.localOnly === true) {
-      return // the commit is the whole cycle — the repo has no remote
+    if (offline) {
+      return // the commit is the whole cycle: no remote, or a flush on the way out
     }
     if (mode === 'push') {
       // The debounce path often fires for changes that are already committed
@@ -356,6 +382,10 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     return run('full')
   }
 
+  function commitNow(): Promise<void> {
+    return run('commit')
+  }
+
   function stop(): void {
     abort.abort()
     if (timer !== null) {
@@ -364,7 +394,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     }
   }
 
-  return { noteChanged, syncNow, stop }
+  return { noteChanged, syncNow, commitNow, stop }
 }
 
 function statusForError(error: unknown): SyncStatus {

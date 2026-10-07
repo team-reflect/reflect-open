@@ -220,6 +220,34 @@ describe('createSyncEngine', () => {
     engine.stop()
   })
 
+  it('commitNow joins the single-flight queue and never touches the network', async () => {
+    const gate: { release: () => void } = { release: () => {} }
+    const calls = fakeGit((command) => {
+      if (command === 'git_merge_remote') {
+        return new Promise((resolve) => {
+          gate.release = () => resolve(MERGED)
+        })
+      }
+      return defaultResponses(command)
+    })
+    const engine = createSyncEngine({ generation: 1, getCredential: async () => CRED })
+
+    const full = engine.syncNow()
+    await vi.waitFor(() => expect(commandsOf(calls)).toContain('git_merge_remote'))
+    const flushed = engine.commitNow()
+    await Promise.resolve()
+    // The pull is mid-merge: the flush commit waits instead of interleaving.
+    expect(commandsOf(calls).filter((command) => command === 'git_commit_all')).toHaveLength(1)
+
+    gate.release()
+    await full
+    await flushed
+    const commands = commandsOf(calls)
+    expect(commands.filter((command) => command === 'git_commit_all')).toHaveLength(2)
+    expect(commands.lastIndexOf('git_commit_all')).toBeGreaterThan(commands.indexOf('git_push'))
+    engine.stop()
+  })
+
   it('surfaces a non-divergence rejection (e.g. push protection) as an error', async () => {
     fakeGit((command) => {
       if (command === 'git_push') {

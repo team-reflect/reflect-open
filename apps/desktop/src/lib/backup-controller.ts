@@ -9,7 +9,6 @@ import {
   getGithubToken,
   githubCredential,
   githubRemoteUrl,
-  gitCommitAll,
   gitDisconnect,
   gitSetup,
   gitStatus,
@@ -222,10 +221,10 @@ export function createBackupController(options: BackupControllerOptions): Backup
       return false
     }
     unlisten = subscription
-    // Quit-time commit (local only — never a network push on the way out).
-    setBackupFlusher(async () => {
-      await gitCommitAll('Update notes', generation)
-    })
+    // Quit-time commit (local only — never a network push on the way out),
+    // queued behind any running cycle so it can never land between a pull's
+    // ref move and its checkout.
+    setBackupFlusher(() => next.commitNow())
     return true
   }
 
