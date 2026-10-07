@@ -116,33 +116,34 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-  # The `build-*` jobs check that the release build of each platform still
-  # compiles and bundles. They run the release scripts without signing, so
-  # they need no secrets and upload nothing. Each one is a full release build,
-  # so they run on a Release PR and on a manual run only.
-  build-gate:
-    runs-on: ubuntu-slim
-    timeout-minutes: 10
-    outputs:
-      run: ${{ steps.check.outputs.run }}
-    steps:
-      - id: check
-        env:
-          RUN: >-
-            ${{
-              github.repository == 'team-reflect/reflect-open' &&
-              (github.event_name == 'workflow_dispatch' ||
-                (github.event_name == 'pull_request' &&
-                  startsWith(github.head_ref, 'release-please') &&
-                  github.event.pull_request.head.repo.full_name == github.repository))
-            }}
-        run: echo "run=$RUN" >> "$GITHUB_OUTPUT"
-
-  build-macos-desktop:
+  build:
     needs: build-gate
-    if: needs.build-gate.outputs.run == 'true'
-    runs-on: macos-26
+    if: >-
+      ${{
+        github.repository == 'team-reflect/reflect-open' &&
+        (github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'pull_request' &&
+            startsWith(github.head_ref, 'release-please')))
+      }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos
+            os: macos-26
+            command: pnpm release:macos --no-sign
+          - name: ios
+            os: macos-26
+            target: aarch64-apple-ios
+            command: pnpm release:ios --build-number=1 --no-sign
+          - name: windows
+            os: windows-latest
+            command: pnpm release:windows
+
+    name: build-${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 120
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -152,50 +153,12 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache-key: build-macos-desktop
-
-      - name: Build
-        run: pnpm release:macos --no-sign
-
-  build-ios-mobile:
-    needs: build-gate
-    if: needs.build-gate.outputs.run == 'true'
-    runs-on: macos-26
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-node
-
-      - uses: ./.github/actions/setup-rust
-        with:
-          targets: aarch64-apple-ios
-          cache-key: build-ios-mobile
-
-      - name: Build
-        run: pnpm release:ios --build-number="1" --no-sign
-
-  build-windows-desktop:
-    needs: build-gate
-    if: needs.build-gate.outputs.run == 'true'
-    runs-on: windows-latest
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-node
-
-      - uses: ./.github/actions/setup-rust
-        with:
-          cache-key: build-windows-desktop
+          targets: ${{ matrix.target }}
+          cache-key: build-${{ matrix.name }}
 
       - name: Build
         shell: bash
-        run: pnpm release:windows
+        run: ${{ matrix.command }}
 
   # A single job for branch protection to require, instead of listing every
   # job (and every matrix entry) as a required status check.
