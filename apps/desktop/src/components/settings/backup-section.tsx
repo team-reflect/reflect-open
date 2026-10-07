@@ -23,7 +23,9 @@ import { useSync, type BackupState } from '@/providers/sync-provider.tsx'
 
 /** A short, plain-language line for each backup state — never Git jargon. */
 function statusLine(backup: Extract<BackupState, { phase: 'connected' }>): string {
-  if (backup.role === 'reader') {
+  // A reader still commits locally, and a failing commit (full disk, a
+  // locked index) must stay visible; only a healthy reader gets the label.
+  if (backup.role === 'reader' && backup.status.state !== 'error') {
     return 'Local history only; another device pushes the backup'
   }
   switch (backup.status.state) {

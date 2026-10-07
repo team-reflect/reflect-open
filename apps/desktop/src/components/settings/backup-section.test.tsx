@@ -264,6 +264,20 @@ describe('BackupSettingsField', () => {
     await vi.waitFor(() => expect(sync.setBackupWriter).toHaveBeenCalledWith(true))
   })
 
+  it('a reader still shows a failing local-history commit', async () => {
+    graphMock.root = '/Users/alex/Library/Mobile Documents/iCloud~app~reflect/Documents/G'
+    await renderSection({
+      phase: 'connected',
+      role: 'reader',
+      remoteUrl: 'https://github.com/alex/notes.git',
+      repo: { owner: 'alex', name: 'notes' },
+      status: { state: 'error', errorKind: 'other', message: 'disk full' },
+    })
+
+    await expect.element(page.getByText(/Backup failed: disk full/)).toBeVisible()
+    await expect.element(page.getByText(/another device pushes the backup/)).not.toBeInTheDocument()
+  })
+
   it('shows no backup-writer switch outside iCloud', async () => {
     await renderSection({
       phase: 'connected',
