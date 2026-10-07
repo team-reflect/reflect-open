@@ -1,7 +1,3 @@
-import { useEffect, type ReactElement } from 'react'
-import { render } from 'vitest-browser-react'
-import { page, userEvent } from 'vitest/browser'
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   registerNoteEditorHandle,
   unregisterNoteEditorHandle,
@@ -15,6 +11,10 @@ import {
   useNoteSearchReport,
 } from '@/providers/note-find-provider.tsx'
 import { RouterProvider } from '@/routing/router.tsx'
+import { useEffect, type ReactElement } from 'react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { render } from 'vitest-browser-react'
+import { page, userEvent } from 'vitest/browser'
 import { NoteFindBar } from './note-find-bar.tsx'
 
 vi.mock('@/lib/windows/window-role.ts', () => ({ isMainWindow: () => true }))

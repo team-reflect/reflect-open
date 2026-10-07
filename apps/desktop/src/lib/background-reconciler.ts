@@ -34,7 +34,7 @@ export interface BackgroundReconcilerOptions {
 
 export interface BackgroundReconciler {
   /** Request a pass; if one is running, queue exactly one follow-up after it. */
-  schedule(): void
+  schedule(this: void): void
   /** True once {@link dispose} has run — the `pass` body's `isStale` gate. */
   isStale(): boolean
   /** Retry the loop on window `focus` / `online` (the network's natural signals). */
@@ -46,7 +46,7 @@ export interface BackgroundReconciler {
    */
   onDispose(teardown: () => void): void
   /** Stop the loop (its next gate aborts the in-flight pass) and run teardowns. */
-  dispose(): void
+  dispose(this: void): void
 }
 
 /**

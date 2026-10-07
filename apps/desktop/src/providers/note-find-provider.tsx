@@ -1,15 +1,3 @@
-import {
-  createContext,
-  useCallback,
-  use,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactElement,
-  type ReactNode,
-} from 'react'
-import { getIsComposing, isModEvent, type SearchStatus } from '@meowdown/core'
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry.ts'
 import {
   listenForFocusedNoteMenuCommands,
@@ -20,6 +8,18 @@ import { isMainWindow } from '@/lib/windows/window-role.ts'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { focusedNotePathForRoute } from '@/routing/route.ts'
 import { useRouter } from '@/routing/router.tsx'
+import { getIsComposing, isModEvent, type SearchStatus } from '@meowdown/core'
+import {
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react'
 
 const NO_MATCHES: SearchStatus = { total: 0, active: 0 }
 
@@ -37,18 +37,18 @@ export interface NoteFindValue {
   /** Increments whenever a repeated ⌘F should reselect the query. */
   readonly focusRequest: number
   updateQuery(query: string): void
-  next(): void
-  previous(): void
+  next(this: void): void
+  previous(this: void): void
   close(restoreFocus: boolean): void
 }
 
 /** Find actions for command and native-menu dispatch, stable across renders. */
 export interface NoteFindActions {
   /** Opens Find for a note path. Returns false when there is no note to search. */
-  openForPath(path: string | null): boolean
-  next(): void
-  previous(): void
-  close(restoreFocus: boolean): void
+  openForPath(this: void, path: string | null): boolean
+  next(this: void): void
+  previous(this: void): void
+  close(this: void, restoreFocus: boolean): void
 }
 
 const NoteFindContext = createContext<NoteFindValue | null>(null)

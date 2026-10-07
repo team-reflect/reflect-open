@@ -85,9 +85,9 @@ export interface BackupControllerOptions {
 export interface BackupController {
   /** Probe the graph and start the engine if fully connected. Idempotent. */
   start(): Promise<void>
-  getState(): BackupState
+  getState(this: void): BackupState
   /** Subscribe to state changes; returns the unsubscribe. */
-  subscribe(listener: () => void): () => void
+  subscribe(this: void, listener: () => void): () => void
   /**
    * Create a new **private** repo for the signed-in user and connect it.
    * `manualCreateNeeded` means the token *type* can't create repositories

@@ -1,5 +1,5 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { MONTH_TITLE_TRANSITION_MS, MonthTitle } from './month-title.tsx'
 
 /**
@@ -9,11 +9,9 @@ import { MONTH_TITLE_TRANSITION_MS, MonthTitle } from './month-title.tsx'
  * prefers-reduced-motion (which also disables the CSS animations), so tests
  * drive `animationend` by hand.
  */
-
-function stubMatchMedia(matches: boolean): () => void {
-  const original = window.matchMedia
-  window.matchMedia = ((query: string) => ({
-    matches,
+function stubMatchMedia(matches: boolean = false): void {
+  const matchMediaMock: typeof window.matchMedia = (query: string) => ({
+    matches: matches,
     media: query,
     onchange: null,
     addEventListener: () => {},
@@ -21,26 +19,17 @@ function stubMatchMedia(matches: boolean): () => void {
     addListener: () => {},
     removeListener: () => {},
     dispatchEvent: () => false,
-  })) as unknown as typeof window.matchMedia
-  return () => {
-    window.matchMedia = original
-  }
+  })
+  vi.stubGlobal('matchMedia', matchMediaMock)
 }
 
-// The Playwright context runs with reducedMotion: 'reduce'; the roll under
-// test only happens with no preference, so report that by default.
-let restoreMatchMedia: () => void
-
-beforeEach(() => {
-  restoreMatchMedia = stubMatchMedia(false)
-})
-
 afterEach(() => {
-  restoreMatchMedia()
+  vi.unstubAllGlobals()
 })
 
 describe('MonthTitle', () => {
   it('renders the settled label alone', async () => {
+    stubMatchMedia(false)
     const view = await render(<MonthTitle month="2026-06" />)
     const settled = view.container.querySelector('[data-slot="month-title"]')
     expect(settled?.textContent).toBe('June 2026')
@@ -48,6 +37,7 @@ describe('MonthTitle', () => {
   })
 
   it('rolls up to a later month and clears the outgoing label on animationend', async () => {
+    stubMatchMedia(false)
     const view = await render(<MonthTitle month="2026-06" />)
     await view.rerender(<MonthTitle month="2026-07" />)
 
@@ -64,6 +54,7 @@ describe('MonthTitle', () => {
   })
 
   it('rolls down to an earlier month, across the year boundary', async () => {
+    stubMatchMedia(false)
     const view = await render(<MonthTitle month="2027-01" />)
     await view.rerender(<MonthTitle month="2026-12" />)
 
@@ -74,6 +65,7 @@ describe('MonthTitle', () => {
   })
 
   it('removes the outgoing label by timer when animationend never fires', async () => {
+    stubMatchMedia(false)
     const view = await render(<MonthTitle month="2026-06" />)
     await view.rerender(<MonthTitle month="2026-07" />)
     expect(view.container.querySelector('.month-title-exit-up')).toBeTruthy()
@@ -86,18 +78,14 @@ describe('MonthTitle', () => {
   })
 
   it('swaps instantly under reduced motion', async () => {
-    const restore = stubMatchMedia(true)
-    try {
-      const view = await render(<MonthTitle month="2026-06" />)
-      await view.rerender(<MonthTitle month="2026-07" />)
+    stubMatchMedia(true)
+    const view = await render(<MonthTitle month="2026-06" />)
+    await view.rerender(<MonthTitle month="2026-07" />)
 
-      expect(view.container.textContent).toBe('July 2026')
-      expect(view.container.querySelector('.month-title-exit-up')).toBeNull()
-      expect(view.container.querySelector('[data-slot="month-title"]')?.className).not.toContain(
-        'month-title-enter-up',
-      )
-    } finally {
-      restore()
-    }
+    expect(view.container.textContent).toBe('July 2026')
+    expect(view.container.querySelector('.month-title-exit-up')).toBeNull()
+    expect(view.container.querySelector('[data-slot="month-title"]')?.className).not.toContain(
+      'month-title-enter-up',
+    )
   })
 })

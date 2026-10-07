@@ -45,7 +45,6 @@ export default defineESLintConfig(
       '@typescript-eslint/only-throw-error': 'off',
       '@typescript-eslint/prefer-promise-reject-errors': 'off',
       '@typescript-eslint/require-await': 'off',
-      '@typescript-eslint/unbound-method': 'off',
       'no-var': 'off',
       'react-hooks/exhaustive-deps': 'off',
       'react-hooks/globals': 'off',
