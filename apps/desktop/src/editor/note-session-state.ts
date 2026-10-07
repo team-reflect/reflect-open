@@ -444,12 +444,15 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
    * the Tasks list can't diverge, then re-throws the failure.
    */
   async function commitBodyEdit(transform: (full: string) => string): Promise<boolean> {
+    if (io.write === null || disposed || isProtected || conflict !== null) {
+      return false
+    }
     if (status === 'loading') {
       // Never rejects: a failed load settles as `status === 'error'`, which the
       // gate below refuses like any other unready session.
       await loadPromise
     }
-    if (io.write === null || disposed || isProtected || status !== 'ready' || conflict !== null) {
+    if (status !== 'ready') {
       return false
     }
     reconcilePendingEditorInput?.()
