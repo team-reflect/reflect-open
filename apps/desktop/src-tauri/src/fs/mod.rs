@@ -18,9 +18,10 @@ mod x_download;
 pub mod x_media_protocol;
 pub mod x_syndication;
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use serde::Serialize;
 use tauri::{Emitter, Manager, State};
@@ -414,7 +415,29 @@ pub async fn note_read_local(
     .await
 }
 
-static NOTE_WRITE_LOCK: Mutex<()> = Mutex::new(());
+/// One lock per graph, shared by every mutation of the working tree: note,
+/// asset, and sweep writes, and the git commands that touch the index or
+/// the tree. A fast-forward moves the branch and rewrites the tree in two
+/// steps; a commit or a save landing between them records the stale tree
+/// over the moved ref (#1405, S4 in `docs/git-backup-safety.md`). Network
+/// commands (fetch, push) stay outside: a slow push must not block saves.
+static GRAPH_LOCKS: LazyLock<Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>> =
+    LazyLock::new(Mutex::default);
+
+/// Run `f` while holding the graph lock for `root`. A lock poisoned by a
+/// panicking holder is taken anyway: the guarded code never leaves partial
+/// state behind that the next holder could misread.
+pub(crate) fn with_graph_lock<T>(root: &Path, f: impl FnOnce() -> T) -> T {
+    let lock = Arc::clone(
+        GRAPH_LOCKS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .entry(root.to_path_buf())
+            .or_default(),
+    );
+    let _guard = lock.lock().unwrap_or_else(PoisonError::into_inner);
+    f()
+}
 
 /// Atomically write a note's markdown by graph-relative path. `generation` pins
 /// the write to the graph it was issued for (see `root_for_generation`).
@@ -447,27 +470,26 @@ pub fn note_write(
     Ok(modified_ms)
 }
 
-fn write_note_revision(
+pub(crate) fn write_note_revision(
     root: &Path,
     target: &Path,
     contents: &str,
     checked: bool,
     expected: Option<&str>,
 ) -> AppResult<Option<u64>> {
-    let _guard = NOTE_WRITE_LOCK
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    if checked {
-        let current = match io::read_note_no_follow(root, target) {
-            Ok(value) => Some(value),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-            Err(error) => return Err(error.into()),
-        };
-        if current.as_deref() != expected {
-            return Err(AppError::io("Note changed on disk; reload before retrying"));
+    with_graph_lock(root, || {
+        if checked {
+            let current = match io::read_note_no_follow(root, target) {
+                Ok(value) => Some(value),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+                Err(error) => return Err(error.into()),
+            };
+            if current.as_deref() != expected {
+                return Err(AppError::io("Note changed on disk; reload before retrying"));
+            }
         }
-    }
-    atomic_write(root, target, contents)
+        atomic_write(root, target, contents)
+    })
 }
 
 /// Atomically create a note only when `path` is still free. Unlike
@@ -481,11 +503,8 @@ pub fn note_create(
     state: State<GraphState>,
 ) -> AppResult<NoteCreateOutcome> {
     let root = root_for_generation(&state, generation)?;
-    let _guard = NOTE_WRITE_LOCK
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let target = resolve(&root, &path)?;
-    match atomic_create(&root, &target, &contents)? {
+    match with_graph_lock(&root, || atomic_create(&root, &target, &contents))? {
         AtomicCreateOutcome::Created(modified_ms) => {
             invalidate_file_catalog(&state, &root);
             Ok(NoteCreateOutcome::Created { modified_ms })
@@ -509,7 +528,8 @@ pub fn asset_write(
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(contents_base64.as_bytes())
         .map_err(|err| AppError::io(format!("invalid base64 asset payload: {err}")))?;
-    atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)?;
+    let target = resolve(&root, &path)?;
+    with_graph_lock(&root, || atomic_write_bytes(&root, &target, &bytes))?;
     invalidate_file_catalog(&state, &root);
     Ok(())
 }
@@ -1298,14 +1318,11 @@ mod note_revision_tests {
     use super::*;
 
     #[test]
-    fn poisoned_ordering_lock_does_not_disable_note_writes() {
-        let _ = std::panic::catch_unwind(|| {
-            let _guard = NOTE_WRITE_LOCK
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            panic!("simulated writer panic");
-        });
+    fn poisoned_graph_lock_does_not_disable_note_writes() {
         let directory = tempfile::tempdir().unwrap();
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            with_graph_lock(directory.path(), || panic!("simulated writer panic"))
+        }));
         let target = directory.path().join("note.md");
         write_note_revision(directory.path(), &target, "saved", true, None).unwrap();
         assert_eq!(fs::read_to_string(target).unwrap(), "saved");

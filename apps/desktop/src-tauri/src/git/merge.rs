@@ -97,6 +97,10 @@ fn side_of(entry: Option<IndexEntry>) -> Option<ConflictSide> {
 /// Merge the fetched `origin/<branch>` into the local branch. Pre-condition
 /// (the sync engine guarantees it): local changes are already committed.
 pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
+    crate::fs::with_graph_lock(root, || merge_remote_locked(root))
+}
+
+fn merge_remote_locked(root: &Path) -> AppResult<MergeOutcome> {
     let repo = open_existing(root)?;
     ensure_clean_state(&repo)?;
     let branch = current_branch(&repo)?;

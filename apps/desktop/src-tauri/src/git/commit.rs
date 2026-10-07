@@ -47,6 +47,16 @@ pub(super) fn commit_all(
 ) -> AppResult<CommitOutcome> {
     #[cfg(test)]
     super::fault::trip(super::fault::FaultPoint::BeforeCommit)?;
+    crate::fs::with_graph_lock(root, || {
+        commit_all_locked(root, fallback_message, max_file_bytes)
+    })
+}
+
+fn commit_all_locked(
+    root: &Path,
+    fallback_message: &str,
+    max_file_bytes: u64,
+) -> AppResult<CommitOutcome> {
     let repo = open_existing(root)?;
     ensure_clean_state(&repo)?;
     // In-memory hard guarantee, independent of any on-disk ignore file: the

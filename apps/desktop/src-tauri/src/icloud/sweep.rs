@@ -125,13 +125,17 @@ pub async fn icloud_conflicts_scan(
     let sweep_root = root.clone();
     let outcome = crate::blocking::run_blocking(move || {
         let candidates = conflict_candidates(scope, &ingested_paths);
-        run_sweep(
-            &sweep_root,
-            &skip_paths,
-            &ingested_paths,
-            record_baseline,
-            candidates,
-        )
+        // Sweep writes share the graph lock with saves and git commands: a
+        // marker write must not interleave with a checkout of the same note.
+        crate::fs::with_graph_lock(&sweep_root, || {
+            run_sweep(
+                &sweep_root,
+                &skip_paths,
+                &ingested_paths,
+                record_baseline,
+                candidates,
+            )
+        })
     })
     .await;
     if let Ok(outcome) = &outcome {
