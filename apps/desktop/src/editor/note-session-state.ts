@@ -432,15 +432,23 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
    * the suggested-contact card's append) transactionally:
    * `transform` rewrites the live document — header plus the unsaved buffer, so
    * concurrent editor edits survive — then we land it now so the Tasks view
-   * refreshes promptly. Returns false when the session can't safely take a body
-   * edit (no write channel, disposed, protected/read-only, still loading, or a
-   * parked conflict) so the caller refuses rather than clobber the buffer via disk.
-   * `transform` runs before any mutation, so a `TaskStaleError` (the marker can't
-   * be located) propagates with nothing changed. And the write is all-or-nothing:
-   * a failed flush reverts the in-memory edit so the editor and the Tasks list
-   * can't diverge, then re-throws the failure.
+   * refreshes promptly. A session still loading waits for the load first:
+   * navigating to a note (⌘D to today) opens its session in the same tick the
+   * Tasks view's unmount flush writes to it, and the pending read is a moment,
+   * not a reason to refuse. Returns false when the session can't safely take a
+   * body edit (no write channel, disposed, protected/read-only, failed to load,
+   * or a parked conflict) so the caller refuses rather than clobber the buffer
+   * via disk. `transform` runs before any mutation, so a `TaskStaleError` (the
+   * marker can't be located) propagates with nothing changed. And the write is
+   * all-or-nothing: a failed flush reverts the in-memory edit so the editor and
+   * the Tasks list can't diverge, then re-throws the failure.
    */
   async function commitBodyEdit(transform: (full: string) => string): Promise<boolean> {
+    if (status === 'loading') {
+      // Never rejects: a failed load settles as `status === 'error'`, which the
+      // gate below refuses like any other unready session.
+      await loadPromise
+    }
     if (io.write === null || disposed || isProtected || status !== 'ready' || conflict !== null) {
       return false
     }

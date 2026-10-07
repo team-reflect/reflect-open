@@ -202,9 +202,11 @@ export interface NoteSession {
    * Apply a synchronous full-source transform to the live buffer (so unsaved
    * edits survive), reflect it in the open editor, and flush now. The Tasks
    * view routes its edits here whenever the note is open: the buffer is read
-   * synchronously, so there is no read/write race with the editor. Returns
-   * false when the session can't take it (loading, protected, disposed, or a
-   * parked conflict) so the caller refuses rather than clobber the buffer; an
+   * synchronously, so there is no read/write race with the editor. A session
+   * still loading waits for the load, then applies the edit to the loaded
+   * buffer. Returns false when the session can't take it (failed to load,
+   * protected, disposed, or a parked conflict) so the caller refuses rather
+   * than clobber the buffer; an
    * error thrown by `transform` (a stale task locator) propagates untouched,
    * and a failed flush reverts the in-memory edit before rethrowing.
    */

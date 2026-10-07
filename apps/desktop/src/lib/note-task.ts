@@ -87,7 +87,8 @@ async function readSource(notePath: string, createIfMissing: boolean): Promise<s
  * which transforms its in-memory buffer synchronously, so unsaved edits survive
  * and there's no read-then-write gap for a concurrent keystroke. The session
  * declines (and we refuse rather than clobber via disk) only when it can't
- * persist now (loading, protected/read-only, or a parked conflict), surfaced as
+ * persist now (failed to load, protected/read-only, or a parked conflict); a
+ * session still loading waits for its load instead. A decline is surfaced as
  * {@link NoteBusyError}. When the note is **not** open, disk is the source of
  * truth. Every locator in `edits` describes the note as the index last saw it;
  * one whose task is gone surfaces as `TaskStaleError` from the core edit
