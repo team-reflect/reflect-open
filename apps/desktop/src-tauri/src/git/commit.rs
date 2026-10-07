@@ -45,6 +45,8 @@ pub(super) fn commit_all(
     fallback_message: &str,
     max_file_bytes: u64,
 ) -> AppResult<CommitOutcome> {
+    #[cfg(test)]
+    super::fault::trip(super::fault::FaultPoint::BeforeCommit)?;
     let repo = open_existing(root)?;
     ensure_clean_state(&repo)?;
     // In-memory hard guarantee, independent of any on-disk ignore file: the

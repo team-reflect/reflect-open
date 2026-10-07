@@ -50,7 +50,7 @@ jobs:
         config:
           - os: ubuntu-latest
             browser: chromium
-          - os: macos-latest
+          - os: blacksmith-6vcpu-macos-26
             browser: webkit
 
     name: test-${{ matrix.config.browser }}
@@ -115,49 +115,6 @@ jobs:
 
       - name: Test
         run: cargo test --workspace
-
-  build:
-    if: >-
-      ${{
-        github.repository == 'team-reflect/reflect-open' &&
-        (github.event_name == 'workflow_dispatch' ||
-          (github.event_name == 'pull_request' &&
-            startsWith(github.head_ref, 'release-please')))
-      }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: macos
-            os: macos-26
-            command: pnpm release:macos --no-sign
-          - name: ios
-            os: macos-26
-            target: aarch64-apple-ios
-            command: pnpm release:ios --build-number=1 --no-sign
-          - name: windows
-            os: windows-latest
-            command: pnpm release:windows
-
-    name: build-${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-node
-
-      - uses: ./.github/actions/setup-rust
-        with:
-          targets: ${{ matrix.target }}
-          cache-key: build-${{ matrix.name }}
-
-      - name: Build
-        shell: bash
-        run: ${{ matrix.command }}
 
   # A single job for branch protection to require, instead of listing every
   # job (and every matrix entry) as a required status check.

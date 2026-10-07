@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ReflectError } from '../errors.ts'
 import { deleteSecret, getSecret, setSecret } from '../secrets/keychain.ts'
+import type { GitCredential } from './commands.ts'
 import { apiHeaders, JSON_HEADERS, readJson, type FetchFn } from './github-api.ts'
 
 /**
@@ -288,6 +289,11 @@ export async function refreshGithubAuth(
     'auth',
     `GitHub token refresh failed${parsed.error === undefined ? '' : ` (${parsed.error})`}`,
   )
+}
+
+/** GitHub accepts any token as the password of the `x-access-token` user. */
+export function githubCredential(token: string): GitCredential {
+  return { username: 'x-access-token', secret: token }
 }
 
 /** Proactive-refresh margin: refresh when within 5 minutes of expiry. */
