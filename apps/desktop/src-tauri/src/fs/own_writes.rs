@@ -64,6 +64,7 @@ pub(crate) fn take_own_write(rel: &str, modified_ms: Option<u64>) -> bool {
 /// an item need not equal the filesystem mtime the write produced; the path
 /// is enough there because the query is the only observer on that platform.
 /// Consumes every entry for the path.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 pub(crate) fn take_own_write_by_path(rel: &str) -> bool {
     let rel = normalize(rel);
     with(|recent| {
@@ -77,6 +78,7 @@ pub(crate) fn take_own_write_by_path(rel: &str) -> bool {
 mod tests {
     use super::*;
 
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
     #[test]
     fn a_recorded_write_matches_by_path_alone_for_the_metadata_query() {
         record_own_write("notes/q.md", Some(1));
