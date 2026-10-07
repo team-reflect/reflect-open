@@ -24,6 +24,9 @@ pub(super) enum FaultPoint {
     BeforeFastForwardCheckout,
     /// Merge: after libgit2 entered merge state, before the merge commit.
     AfterMergeBeforeCommit,
+    /// Commit: on entry, before the repository is touched (and, once
+    /// commands are serialized per graph, before the lock is taken).
+    BeforeCommit,
 }
 
 /// What happens when an armed point is reached.

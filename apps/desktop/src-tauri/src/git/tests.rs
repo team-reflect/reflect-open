@@ -991,20 +991,31 @@ fn commit_during_fast_forward_never_reverts_pulled_notes() {
     // The competing commit runs on its own worker: once git commands are
     // serialized per graph it blocks until the pull finishes, so the pull
     // must be released without waiting for it.
+    let (at_boundary_tx, at_boundary_rx) = mpsc::channel::<()>();
     let (commit_done_tx, commit_done_rx) = mpsc::channel::<()>();
     let commit = thread::spawn({
         let root = root_a.clone();
         move || {
+            // Handshake at the commit's entry: past this point the worker is
+            // inside `commit_all`, about to take the graph lock (once one
+            // exists) and touch the repository.
+            fault::arm(
+                FaultPoint::BeforeCommit,
+                Fault::hook(move || at_boundary_tx.send(()).unwrap()),
+            );
             let outcome = commit_all(&root, "Update notes", MAX_FILE_BYTES);
             let _ = commit_done_tx.send(());
             outcome
         }
     });
-    // Two outcomes are possible here, and both are the race under test: the
-    // commit completes inside the window (today: it sees the moved ref over
-    // the stale tree and commits the revert), or it blocks behind the graph
-    // lock until the pull finishes (once commands are serialized), in which
-    // case this wait times out and the pull is released below.
+    at_boundary_rx
+        .recv_timeout(WAIT)
+        .expect("the competing commit never reached the repository boundary");
+    // From the boundary, two outcomes are possible and both are the race
+    // under test: the commit completes inside the window (today: it sees the
+    // moved ref over the stale tree and commits the revert), or it blocks on
+    // the graph lock until the pull finishes (once commands are serialized),
+    // in which case this bounded wait times out and the pull is released.
     let _ = commit_done_rx.recv_timeout(Duration::from_secs(2));
     resume_tx.send(()).unwrap();
     pull.join().unwrap().unwrap();
