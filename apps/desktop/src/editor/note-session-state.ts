@@ -157,13 +157,19 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     }
   }
 
-  function flush(): Promise<void> {
+  async function flush(): Promise<void> {
     reconcilePendingEditorInput?.()
     cancelScheduledSave()
     save()
     // save() extended the chain synchronously (or left it settled when there
-    // was nothing to do) — the chain as of now is exactly this flush's write.
-    return saveChain
+    // was nothing to do). Settle the whole chain, not just that step: a
+    // refused write reconciles, and a clean merge appends its own write,
+    // which the quit flush must see land before it reports done.
+    let tail: Promise<void>
+    do {
+      tail = saveChain
+      await tail
+    } while (tail !== saveChain)
   }
 
   function editorChanged(markdown: string): void {
@@ -355,13 +361,13 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   /**
    * Keep the buffer beside the note before external content replaces it.
    * Keystrokes that land during the copy are copied again, so the copy holds
-   * what the user last saw. A copy that cannot be made keeps the dirty
-   * buffer with the error: its next save fails against the changed file and
-   * comes back here to retry.
+   * what the user last saw. A copy that cannot be made (or a session with
+   * nowhere to make one) keeps the dirty buffer: its next save fails against
+   * the changed file and comes back here to retry.
    */
   async function keepAside(): Promise<boolean> {
     if (io.copyAside === undefined) {
-      return true
+      return false // nowhere to keep them: the buffer stays, the external version waits
     }
     let copy: ConflictCopy | null = null // this reconciliation's copy only
     for (let round = 0; round < 3; round += 1) {
@@ -382,7 +388,11 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     return false
   }
 
-  /** Put `merged` in the editor as the dirty buffer over `onDisk`, and keep saving. */
+  /**
+   * Put `merged` in the editor as the dirty buffer over `onDisk` and write
+   * it now: a merge is already the reconciled state of two writers, and a
+   * flush that ran into the external change is waiting on exactly this.
+   */
   function adoptMerged(merged: string, onDisk: string): void {
     const doc = splitDoc(merged)
     header = doc.header
@@ -393,9 +403,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     error = null
     emit()
     applyToEditor(doc.body)
-    if (dirty) {
-      scheduleSave()
-    }
+    save()
   }
 
   /** The initial read; with `createIfMissing`, a missing file is an empty note. */
