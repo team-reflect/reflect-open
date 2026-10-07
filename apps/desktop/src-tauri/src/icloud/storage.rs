@@ -526,6 +526,7 @@ fn settle_repository(target: &Path) -> AppResult<()> {
 /// into them — `.reflect/` and `.git/` are marked sync-excluded at bootstrap
 /// (`fs::io::mark_dir_local_only`), so iCloud can never hold a placeholder
 /// under either.
+#[cfg(any(target_os = "ios", target_os = "macos"))]
 fn local_only_name(name: &str) -> bool {
     matches!(name, ".reflect" | ".git" | ".DS_Store")
 }
