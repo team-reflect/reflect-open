@@ -208,7 +208,7 @@ export function BackupSettingsField(): ReactElement {
           suggestedRepoName={suggestRepoName(graph?.name)}
           onClose={() => setConnectOpen(false)}
         />
-      ) : null}{' '}
+      ) : null}
       {signInOpen ? <GithubSignInDialog onClose={() => setSignInOpen(false)} /> : null}
     </>
   )
