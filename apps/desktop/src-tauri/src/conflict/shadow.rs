@@ -153,13 +153,6 @@ impl ShadowStore {
         low == in_low && high == in_high
     }
 
-    /// Clear the merge-pair record (a conflict resolved by other means).
-    pub fn clear_merge_pair(&self, rel: &str) {
-        if let Some(path) = self.entry_path(rel, ".pair") {
-            let _ = fs::remove_file(path);
-        }
-    }
-
     /// Drop bases (and pair records) for notes that no longer exist. In-app
     /// deletes route through `forget`, but external deletions (another
     /// device, a file manager) don't — without this the store grows
@@ -252,7 +245,7 @@ mod tests {
     }
 
     #[test]
-    fn merge_pairs_match_in_either_order_and_clear() {
+    fn merge_pairs_match_in_either_order() {
         let (_dir, store) = store();
         let (a, b) = (content_hash("one").unwrap(), content_hash("two").unwrap());
         assert!(!store.is_repeated_merge("notes/a.md", &a, &b));
@@ -260,8 +253,6 @@ mod tests {
         assert!(store.is_repeated_merge("notes/a.md", &a, &b));
         assert!(store.is_repeated_merge("notes/a.md", &b, &a));
         assert!(!store.is_repeated_merge("notes/a.md", &a, &content_hash("three").unwrap()));
-        store.clear_merge_pair("notes/a.md");
-        assert!(!store.is_repeated_merge("notes/a.md", &a, &b));
     }
 
     #[test]

@@ -11,7 +11,6 @@ use reconcile_text::{reconcile, BuiltinTokenizer};
 /// sides are ordered by content before the library sees them. The trivial
 /// shapes (identical sides, one side untouched) return the other side
 /// unchanged without touching the library.
-#[cfg_attr(not(test), expect(dead_code))]
 pub(super) fn merge(base: &str, first: &str, second: &str) -> String {
     if first == second || second == base {
         return first.to_string();

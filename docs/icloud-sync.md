@@ -41,10 +41,12 @@ resolving the same conflict produce identical bytes and converge):
    both tails are kept, oldest first. Two devices creating the same day's
    note offline (iCloud leaves a `2026-07-04 2.md` behind) fold back into one
    file the same way.
-5. **Genuinely overlapping edits** — the note keeps *both* versions between
-   labeled conflict markers, opens protected, and shows a **Needs review**
-   banner whose buttons name the devices ("Keep 'Alex's MacBook Pro'").
-   Nothing is ever discarded silently.
+5. **Genuinely overlapping edits** — both versions are archived first, then
+   merged word by word so that every word from both devices stays in the
+   note; the result may read oddly where the edits collided, and the
+   archive holds each side's exact text. Notes that already carry conflict
+   markers from an older version still open protected with the **Needs
+   review** banner until resolved.
 
 Before any resolution is written, every involved version is archived under
 `.reflect/conflict-archive/<note-path>/` (kept ~90 days / 20 versions per

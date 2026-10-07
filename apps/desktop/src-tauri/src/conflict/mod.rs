@@ -4,10 +4,11 @@
 //! unresolved `NSFileVersion`s. This module turns one such pair into a single
 //! resolved note through a **deterministic ladder** ([`ladder::resolve`]):
 //! identical/whitespace → three-way merge over the shadow base ([`shadow`]) →
-//! structural rules (key-wise frontmatter, append-union) → labeled conflict
-//! markers in the exact Plan 12 grammar, so everything downstream
-//! (`detectConflictMarkers`, `has_conflict`, the protected view, the notice)
-//! works unchanged whichever backend produced the conflict.
+//! structural rules (key-wise frontmatter, append-union) → a total word-level
+//! merge ([`total`]). A resolution is always a usable note. Conflict markers
+//! are still *detected* (`detectConflictMarkers`, `has_conflict`, the
+//! protected view, the notice) for files older versions left behind, but
+//! never written.
 //!
 //! **Determinism is a sync property, not a nicety**: both devices may resolve
 //! the same conflict concurrently (each sees itself as the current version),
@@ -43,8 +44,8 @@ pub(crate) const OTHER_DEVICE: &str = "other device";
 pub struct ConflictSide {
     /// The complete note source (frontmatter + body).
     pub content: String,
-    /// Display label for conflict markers — the saving device's name when the
-    /// provider knows it (`NSFileVersion.localizedNameOfSavingComputer`).
+    /// The saving device's name when the provider knows it
+    /// (`NSFileVersion.localizedNameOfSavingComputer`); diagnostics only.
     pub label: String,
     /// Last-modified time in epoch milliseconds. Shared metadata: both
     /// devices see the same value for the same version, which is what makes
@@ -58,12 +59,12 @@ pub enum Resolution {
     /// The sides carry identical content — nothing to write; the caller just
     /// marks the provider versions resolved.
     AlreadyResolved,
-    /// Auto-merged (or a deterministic winner was chosen); write this content
-    /// and mark the versions resolved. No user interaction needed.
+    /// Every line of `content` comes from one side unchanged (a clean
+    /// three-way merge, a structural rule, or a deterministic winner).
     Merged { content: String },
-    /// Overlapping edits: `content` carries labeled conflict markers. Write
-    /// it and let the indexer flag `has_conflict` → "Needs review".
-    Marked { content: String },
+    /// A side's text may be dropped (the loop breaker) or interleaved (the
+    /// total merge). Callers archive both sides before they write this.
+    Reconciled { content: String },
 }
 
 /// How a buffer-level merge ended.
@@ -72,8 +73,6 @@ pub enum Resolution {
 pub enum MergeTextKind {
     /// `content` is the merge; nothing needs review.
     Clean,
-    /// `content` carries labeled markers where the edits overlap.
-    Conflicted,
     /// A side already carried markers (a pull wrote a conflicted note while
     /// the buffer was dirty). Nothing was merged: `content` is `theirs`, and
     /// the caller keeps `ours`. Nesting new markers around old ones would
@@ -93,30 +92,31 @@ pub struct MergeTextOutcome {
 /// arrived on disk (`theirs`) over the last content both derived from
 /// (`base`), through the same ladder Git pulls and iCloud sweeps use, so the
 /// editor resolves what they resolve: identical and whitespace-only
-/// differences, disjoint edits, key-wise frontmatter, and (by `path`) the
-/// daily-note append-union. Overlapping edits come back as labeled markers;
-/// an input that already carries markers is [`MergeTextKind::Unmergeable`].
+/// differences, disjoint edits, key-wise frontmatter, and append-union. A
+/// merge the ladder could only reconcile (overlapping edits) is reported as
+/// [`MergeTextKind::Unmergeable`] here: this command has no graph root to
+/// archive the buffer into, and the editor keeps the buffer beside the note
+/// instead. An input that already carries markers is unmergeable as well.
 #[tauri::command]
 pub fn conflict_merge_text(
-    path: String,
+    _path: String,
     base: String,
     ours: String,
     theirs: String,
 ) -> AppResult<MergeTextOutcome> {
+    let unmergeable = |theirs: String| MergeTextOutcome {
+        kind: MergeTextKind::Unmergeable,
+        content: theirs,
+    };
     if markers::contains_conflict_markers(&ours) || markers::contains_conflict_markers(&theirs) {
         // The ladder's own rule for this (keep the newer side whole) is right
         // for two synced files and wrong for an unsaved buffer: it would
         // drop the user's edits and call the result clean.
-        return Ok(MergeTextOutcome {
-            kind: MergeTextKind::Unmergeable,
-            content: theirs,
-        });
+        return Ok(unmergeable(theirs));
     }
     let input = ladder::ConflictInput {
-        path: &path,
         base: Some(&base),
-        // Fixed stamps keep "ours" the first side, so markers read
-        // `<<<<<<< this device` / `>>>>>>> other device` like a Git pull's.
+        // Fixed stamps keep "ours" the first side.
         sides: (
             ConflictSide {
                 content: ours.clone(),
@@ -124,12 +124,11 @@ pub fn conflict_merge_text(
                 modified_ms: 0,
             },
             ConflictSide {
-                content: theirs,
+                content: theirs.clone(),
                 label: OTHER_DEVICE.to_string(),
                 modified_ms: 1,
             },
         ),
-        creation_collision: false,
         merge_loop_detected: false,
     };
     Ok(match ladder::resolve(input)? {
@@ -141,10 +140,7 @@ pub fn conflict_merge_text(
             kind: MergeTextKind::Clean,
             content,
         },
-        Resolution::Marked { content } => MergeTextOutcome {
-            kind: MergeTextKind::Conflicted,
-            content,
-        },
+        Resolution::Reconciled { .. } => unmergeable(theirs),
     })
 }
 
@@ -201,19 +197,24 @@ mod merge_text_tests {
     }
 
     #[test]
-    fn overlapping_edits_come_back_marked_with_device_labels() {
+    fn overlapping_edits_are_unmergeable_until_the_editor_archives() {
+        // The same line rewritten on both sides inside a note (the tails
+        // overlap on "tail", so append-union cannot keep both).
+        let out = merge(
+            "notes/a.md",
+            "a\nline\ntail\n",
+            "a\nmine\ntail\n",
+            "a\ntheirs\ntail\n",
+        );
+        assert_eq!(out.kind, MergeTextKind::Unmergeable);
+        assert_eq!(out.content, "a\ntheirs\ntail\n");
+    }
+
+    #[test]
+    fn whole_note_rewrites_on_both_sides_keep_both() {
         let out = merge("notes/a.md", "line\n", "mine\n", "theirs\n");
-        assert_eq!(out.kind, MergeTextKind::Conflicted);
-        assert!(
-            out.content.contains("<<<<<<< this device"),
-            "{}",
-            out.content
-        );
-        assert!(
-            out.content.contains(">>>>>>> other device"),
-            "{}",
-            out.content
-        );
+        assert_eq!(out.kind, MergeTextKind::Clean);
+        assert_eq!(out.content, "mine\ntheirs\n");
     }
 
     #[test]

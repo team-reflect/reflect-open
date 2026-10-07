@@ -1,11 +1,9 @@
-//! Conflict-marker primitives: the Rust twin of
+//! Conflict-marker detection: the Rust twin of
 //! `packages/core/src/markdown/conflict-markers.ts`. Detection requires the
 //! full `<<<<<<< ` → `=======` → `>>>>>>> ` sequence in order (same rule as
-//! the TS detector, so both sides agree on what "carries a conflict" means),
-//! and the whole-note builder emits the exact grammar the indexer, protected
-//! view, and resolution notice already handle.
-
-use super::ConflictSide;
+//! the TS detector, so both sides agree on what "carries a conflict" means).
+//! Nothing here writes markers; files that carry them were left by older
+//! versions.
 
 /// True when `source` contains a complete conflict-marker block.
 pub fn contains_conflict_markers(source: &str) -> bool {
@@ -22,70 +20,9 @@ pub fn contains_conflict_markers(source: &str) -> bool {
     false
 }
 
-/// Whole-note markers for **three or more** sides: the first block carries
-/// the first two, and every further side appends a block whose ours-half is
-/// empty. Mechanically compatible with the splice grammar, with the same
-/// semantics as two-way resolution: `ours` keeps the first side, `theirs`
-/// keeps every other side, `both` keeps everything — choosing a side
-/// discards the rest *by explicit user choice*, exactly like the two-way
-/// notice, and every consumed version stays in the conflict archive. (The
-/// notice pluralizes its buttons for multi-block conflicts so that choice is
-/// honest.) Used when a multi-version fold hits overlapping edits: pairwise
-/// marker output can't be folded again (nesting corrupts the grammar), and
-/// the marked file itself must carry every side.
-pub(crate) fn stacked_whole_note_markers(sides: &[ConflictSide]) -> String {
-    debug_assert!(sides.len() >= 2, "stacking needs at least two sides");
-    let mut out = whole_note_markers(&sides[0], &sides[1]);
-    for side in &sides[2..] {
-        out.push_str(&format!(
-            "<<<<<<< {}\n=======\n{}\n>>>>>>> {}\n",
-            marker_label(&sides[0].label),
-            side.content.trim_end_matches('\n'),
-            marker_label(&side.label),
-        ));
-    }
-    out
-}
-
-/// A single whole-note marker block holding both sides, used when there is no
-/// base to produce hunk-level markers from. Output depends only on the
-/// (already deterministically ordered) sides, never on which device runs it.
-pub(super) fn whole_note_markers(first: &ConflictSide, second: &ConflictSide) -> String {
-    format!(
-        "<<<<<<< {}\n{}\n=======\n{}\n>>>>>>> {}\n",
-        marker_label(&first.label),
-        first.content.trim_end_matches('\n'),
-        second.content.trim_end_matches('\n'),
-        marker_label(&second.label),
-    )
-}
-
-/// Labels must be one non-empty line — the detector keys on `"<<<<<<< "` with
-/// a trailing space, and an embedded newline would corrupt the grammar.
-fn marker_label(label: &str) -> String {
-    let cleaned: String = label
-        .chars()
-        .map(|ch| if ch == '\n' || ch == '\r' { ' ' } else { ch })
-        .collect();
-    let cleaned = cleaned.trim().to_string();
-    if cleaned.is_empty() {
-        "unknown device".to_string()
-    } else {
-        cleaned
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn side(content: &str, label: &str) -> ConflictSide {
-        ConflictSide {
-            content: content.to_string(),
-            label: label.to_string(),
-            modified_ms: 0,
-        }
-    }
 
     #[test]
     fn detects_only_the_full_sequence_in_order() {
@@ -101,22 +38,5 @@ mod tests {
         assert!(!contains_conflict_markers(
             "<<<<<<<\nx\n=======\ny\n>>>>>>> b\n"
         ));
-    }
-
-    #[test]
-    fn whole_note_markers_round_trip_through_detection() {
-        let marked = whole_note_markers(&side("mine\n", "Mac"), &side("theirs\n", "iPhone"));
-        assert!(contains_conflict_markers(&marked));
-        assert_eq!(
-            marked,
-            "<<<<<<< Mac\nmine\n=======\ntheirs\n>>>>>>> iPhone\n"
-        );
-    }
-
-    #[test]
-    fn labels_are_sanitized_to_one_nonempty_line() {
-        let marked = whole_note_markers(&side("a", "Mac\nBook"), &side("b", "  "));
-        assert!(marked.contains("<<<<<<< Mac Book\n"));
-        assert!(marked.contains(">>>>>>> unknown device\n"));
     }
 }

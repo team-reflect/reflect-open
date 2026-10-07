@@ -3,20 +3,23 @@
 //!
 //! 1. **Identical** → nothing to write.
 //! 2. **Whitespace-equal** → keep the newer side.
-//! 3. **A side already carries markers** → keep the newer side whole. The
-//!    marked file holds both originals in its hunks and the clean one is
-//!    either the user's resolution of it (newer) or stale pre-conflict
-//!    content (older) — and nesting new markers around old ones would corrupt
-//!    the grammar the resolution UI splices by.
-//! 4. **Merge-loop breaker** → straight to whole-note markers (base-dependent
-//!    auto-merges on two devices can swap contents forever; markers depend
-//!    only on the ordered pair, so both devices emit identical bytes and the
-//!    loop dies).
-//! 5. **Three-way merge** over the shadow base, when one exists.
+//! 3. **A side already carries markers** (a file an older version left
+//!    behind) → keep the newer side whole: the marked file holds both
+//!    originals in its hunks, and the clean one is either the user's
+//!    resolution of it (newer) or stale pre-conflict content (older).
+//! 4. **Merge-loop breaker** → keep the newer side whole. Base-dependent
+//!    auto-merges on two devices can swap contents forever; a choice that
+//!    depends only on the ordered pair ends the loop on both.
+//! 5. **Three-way merge** over the shadow base, when one exists and the
+//!    edits do not overlap.
 //! 6. **Key-wise frontmatter** when only the header diverged.
-//! 7. **Append-union** for daily notes and creation collisions.
-//! 8. **Markers** — hunk-level from the three-way merge when a base existed,
-//!    whole-note otherwise.
+//! 7. **Append-union** when both sides only appended.
+//! 8. **Total merge** ([`super::total`]): overlapping edits interleaved word
+//!    by word, both sides' text kept.
+//!
+//! Rules 1 to 7 are exact: every line of the result comes from one side.
+//! Rules 4 and 8 are [`Resolution::Reconciled`], and callers archive both
+//! sides before writing them.
 //!
 //! Every rule sees the sides ordered by `(modified_ms, content)` — shared
 //! version metadata — so concurrent resolution on two devices converges.
@@ -25,23 +28,19 @@ use crate::error::AppResult;
 
 use super::frontmatter;
 use super::markers;
-use super::merge3::{diff3, Diff3Outcome};
+use super::merge3::diff3;
+use super::total;
 use super::union::append_union;
 use super::{ConflictSide, Resolution};
 
 /// Everything the ladder needs to know about one conflicted note.
 pub struct ConflictInput<'a> {
-    /// Graph-relative path — `daily/` notes qualify for append-union.
-    pub path: &'a str,
     /// The shadow base (last synced content), when the store has one.
     pub base: Option<&'a str>,
     /// The two conflicting versions, in any order.
     pub sides: (ConflictSide, ConflictSide),
-    /// True when the pair comes from a creation collision (`note 2.md`):
-    /// append-union applies regardless of directory.
-    pub creation_collision: bool,
     /// True when the sweep recognized this exact content pair from a previous
-    /// auto-merge — the deterministic-markers loop breaker (rule 4).
+    /// auto-merge — the loop breaker (rule 4).
     pub merge_loop_detected: bool,
 }
 
@@ -66,16 +65,14 @@ pub fn resolve(input: ConflictInput<'_>) -> AppResult<Resolution> {
         });
     }
     if input.merge_loop_detected {
-        return Ok(Resolution::Marked {
-            content: markers::whole_note_markers(&first, &second),
+        return Ok(Resolution::Reconciled {
+            content: second.content,
         });
     }
 
-    let mut marked_from_diff3: Option<String> = None;
     if let Some(base) = input.base {
-        match diff3(base, &first, &second)? {
-            Diff3Outcome::Clean(content) => return Ok(Resolution::Merged { content }),
-            Diff3Outcome::Conflicted(content) => marked_from_diff3 = Some(content),
+        if let Some(content) = diff3(base, &first, &second)? {
+            return Ok(Resolution::Merged { content });
         }
     }
 
@@ -83,14 +80,12 @@ pub fn resolve(input: ConflictInput<'_>) -> AppResult<Resolution> {
         return Ok(Resolution::Merged { content });
     }
 
-    if input.creation_collision || input.path.starts_with("daily/") {
-        if let Some(content) = append_union(&first.content, &second.content) {
-            return Ok(Resolution::Merged { content });
-        }
+    if let Some(content) = append_union(&first.content, &second.content) {
+        return Ok(Resolution::Merged { content });
     }
 
-    Ok(Resolution::Marked {
-        content: marked_from_diff3.unwrap_or_else(|| markers::whole_note_markers(&first, &second)),
+    Ok(Resolution::Reconciled {
+        content: total::merge(input.base.unwrap_or(""), &first.content, &second.content),
     })
 }
 
@@ -150,16 +145,10 @@ mod tests {
         }
     }
 
-    fn input<'a>(
-        path: &'a str,
-        base: Option<&'a str>,
-        sides: (ConflictSide, ConflictSide),
-    ) -> ConflictInput<'a> {
+    fn input<'a>(base: Option<&'a str>, sides: (ConflictSide, ConflictSide)) -> ConflictInput<'a> {
         ConflictInput {
-            path,
             base,
             sides,
-            creation_collision: false,
             merge_loop_detected: false,
         }
     }
@@ -167,7 +156,6 @@ mod tests {
     #[test]
     fn identical_content_is_already_resolved() {
         let result = resolve(input(
-            "notes/a.md",
             None,
             (side("same\n", "Mac", 1), side("same\n", "iPhone", 2)),
         ))
@@ -178,7 +166,6 @@ mod tests {
     #[test]
     fn whitespace_noise_keeps_the_newer_side() {
         let result = resolve(input(
-            "notes/a.md",
             None,
             (side("text  \n\n", "Mac", 1), side("text\n", "iPhone", 2)),
         ))
@@ -195,7 +182,6 @@ mod tests {
     fn disjoint_edits_over_a_base_merge_clean() {
         let base = "# T\n\nalpha\n\nomega\n";
         let result = resolve(input(
-            "notes/a.md",
             Some(base),
             (
                 side("# T\n\nALPHA\n\nomega\n", "Mac", 1),
@@ -212,19 +198,41 @@ mod tests {
     }
 
     #[test]
-    fn overlapping_edits_over_a_base_mark_with_hunk_level_labels() {
-        let base = "line\n";
+    fn overlapping_edits_reconcile_without_markers() {
+        // The same line rewritten on both sides, with a shared tail after it
+        // (so the append-union guard refuses).
+        let base = "a\nline\ntail\n";
         let result = resolve(input(
-            "notes/a.md",
             Some(base),
+            (
+                side("a\nmac\ntail\n", "Mac", 1),
+                side("a\nphone\ntail\n", "iPhone", 2),
+            ),
+        ))
+        .unwrap();
+        let Resolution::Reconciled { content } = result else {
+            panic!("expected a reconciled merge, got {result:?}");
+        };
+        assert!(!content.contains("<<<<<<< "), "{content}");
+        assert!(
+            content.contains("mac") && content.contains("phone"),
+            "{content}"
+        );
+    }
+
+    #[test]
+    fn whole_note_rewrites_on_both_sides_keep_both_lines() {
+        let result = resolve(input(
+            Some("line\n"),
             (side("mac\n", "Mac", 1), side("phone\n", "iPhone", 2)),
         ))
         .unwrap();
-        let Resolution::Marked { content } = result else {
-            panic!("expected markers, got {result:?}");
-        };
-        assert!(content.contains("<<<<<<< Mac"));
-        assert!(content.contains(">>>>>>> iPhone"));
+        assert_eq!(
+            result,
+            Resolution::Merged {
+                content: "mac\nphone\n".to_string()
+            }
+        );
     }
 
     #[test]
@@ -233,7 +241,6 @@ mod tests {
         // (same-position append), the union rule resolves it.
         let base = "# 2026-07-04\n\n- seed\n";
         let result = resolve(input(
-            "daily/2026-07-04.md",
             Some(base),
             (
                 side("# 2026-07-04\n\n- seed\n- mac\n", "Mac", 1),
@@ -254,8 +261,8 @@ mod tests {
         let older = side("- seed\n- older tail\n", "Mac", 1);
         let newer = side("- seed\n- newer tail\n", "iPhone", 2);
         // Same pair, both argument orders → identical bytes (convergence).
-        let one = resolve(input("daily/x.md", None, (older.clone(), newer.clone()))).unwrap();
-        let two = resolve(input("daily/x.md", None, (newer, older))).unwrap();
+        let one = resolve(input(None, (older.clone(), newer.clone()))).unwrap();
+        let two = resolve(input(None, (newer, older))).unwrap();
         assert_eq!(one, two);
         assert_eq!(
             one,
@@ -266,9 +273,8 @@ mod tests {
     }
 
     #[test]
-    fn non_daily_notes_do_not_union_without_a_collision_flag() {
+    fn any_note_unions_disjoint_appends() {
         let result = resolve(input(
-            "notes/topic.md",
             None,
             (
                 side("- a\n- mac\n", "Mac", 1),
@@ -276,21 +282,10 @@ mod tests {
             ),
         ))
         .unwrap();
-        assert!(matches!(result, Resolution::Marked { .. }));
-    }
-
-    #[test]
-    fn creation_collisions_union_anywhere() {
-        let mut conflict = input(
-            "notes/topic.md",
-            None,
-            (side("- mac\n", "Mac", 1), side("- phone\n", "iPhone", 2)),
-        );
-        conflict.creation_collision = true;
         assert_eq!(
-            resolve(conflict).unwrap(),
+            result,
             Resolution::Merged {
-                content: "- mac\n- phone\n".to_string()
+                content: "- a\n- mac\n- phone\n".to_string()
             }
         );
     }
@@ -299,7 +294,6 @@ mod tests {
     fn frontmatter_only_divergence_merges_key_wise() {
         let base = "---\nid: abc\n---\n# Body\n";
         let result = resolve(input(
-            "notes/a.md",
             Some(base),
             (
                 side("---\nid: abc\nisPinned: true\n---\n# Body\n", "Mac", 1),
@@ -321,7 +315,6 @@ mod tests {
         let clean = "user resolved\n";
         // The clean side is newer — the user resolved on the other device.
         let result = resolve(input(
-            "notes/a.md",
             None,
             (side(marked, "Mac", 1), side(clean, "iPhone", 2)),
         ))
@@ -334,7 +327,6 @@ mod tests {
         );
         // The marked side is newer — markers just materialized; keep them.
         let result = resolve(input(
-            "notes/a.md",
             None,
             (side(clean, "iPhone", 1), side(marked, "Mac", 2)),
         ))
@@ -348,19 +340,17 @@ mod tests {
     }
 
     #[test]
-    fn the_loop_breaker_forces_deterministic_whole_note_markers() {
+    fn the_loop_breaker_keeps_the_newer_side() {
         let mut conflict = input(
-            "notes/a.md",
             Some("base\n"),
             (side("merge A\n", "Mac", 1), side("merge B\n", "iPhone", 2)),
         );
         conflict.merge_loop_detected = true;
-        let Resolution::Marked { content } = resolve(conflict).unwrap() else {
-            panic!("loop breaker must mark");
-        };
         assert_eq!(
-            content,
-            "<<<<<<< Mac\nmerge A\n=======\nmerge B\n>>>>>>> iPhone\n"
+            resolve(conflict).unwrap(),
+            Resolution::Reconciled {
+                content: "merge B\n".to_string()
+            }
         );
     }
 
@@ -368,8 +358,8 @@ mod tests {
     fn resolution_is_argument_order_independent() {
         let a = side("# T\n\nmac edit\n", "Mac", 5);
         let b = side("# T\n\nphone edit\n", "iPhone", 5); // equal stamps → content tiebreak
-        let one = resolve(input("notes/a.md", None, (a.clone(), b.clone()))).unwrap();
-        let two = resolve(input("notes/a.md", None, (b, a))).unwrap();
+        let one = resolve(input(None, (a.clone(), b.clone()))).unwrap();
+        let two = resolve(input(None, (b, a))).unwrap();
         assert_eq!(one, two);
     }
 }

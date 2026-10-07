@@ -5,8 +5,8 @@
 //!
 //! The guard that keeps this from mangling *edits*: the two tails must be
 //! line-disjoint. A mid-note edit puts the note's own following lines in both
-//! tails (they overlap), which refuses the union and falls through to markers
-//! — never a silently duplicated half-note.
+//! tails (they overlap), which refuses the union and leaves the merge to the
+//! next rule — never a silently duplicated half-note.
 
 /// Union `first` and `second` when they diverge append-only. `None` when the
 /// shape doesn't qualify (overlapping tails — a real edit, not an append).
