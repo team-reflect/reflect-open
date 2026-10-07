@@ -267,11 +267,27 @@ fn prestaged_oversized_file_is_withheld() {
     let outcome = commit_all(root, "guarded", 32).unwrap();
     assert_eq!(outcome.skipped_large_files.len(), 1);
     assert_eq!(outcome.skipped_large_files[0].path, "assets/big.bin");
-    assert!(
-        outcome.committed,
-        "the removal from the index is itself a change"
-    );
-    assert!(!head_tree_paths(root).contains(&"assets/big.bin".to_string()));
+    // The tracked path keeps its committed blob: nothing new to commit, and
+    // no deletion for other devices to pull.
+    assert!(!outcome.committed);
+    assert_eq!(head_blob(root, "assets/big.bin"), "small");
+}
+
+#[test]
+fn prestaged_oversized_new_file_stays_out_of_the_commit() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    commit_all(root, "scaffold", MAX_FILE_BYTES).unwrap();
+    {
+        let repo = Repository::open(root).unwrap();
+        let mut index = repo.index().unwrap();
+        write(root, "assets/new.bin", "0123456789abcdef");
+        index.add_path(Path::new("assets/new.bin")).unwrap();
+        index.write().unwrap();
+    }
+    let outcome = commit_all(root, "guarded", 10).unwrap();
+    assert_eq!(outcome.skipped_large_files[0].path, "assets/new.bin");
+    assert!(!head_tree_paths(root).contains(&"assets/new.bin".to_string()));
 }
 
 #[test]

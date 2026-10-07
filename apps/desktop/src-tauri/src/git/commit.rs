@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 use std::path::Path;
 
-use git2::{Index, IndexAddOption};
+use git2::{Index, IndexAddOption, IndexEntry};
 use serde::Serialize;
 
 use crate::error::AppResult;
@@ -180,9 +180,9 @@ fn add_all_with_size_guard(
 
 /// Withhold index entries that carry new oversized content: a file staged
 /// before it grew, or staged by another tool, is already in the index and
-/// the add-time guard never saw it. Entries whose blob is the one `HEAD`
-/// already holds are left alone, like oversized-but-unchanged files at add
-/// time: their old version is in the backup and nothing new is at stake.
+/// the add-time guard never saw it. A path `HEAD` already tracks keeps its
+/// committed blob (the backup holds the old version; recording a deletion
+/// would delete it on every other device), a new path leaves the index.
 fn withhold_oversized_entries(
     repo: &git2::Repository,
     index: &mut Index,
@@ -191,23 +191,27 @@ fn withhold_oversized_entries(
     skipped: &mut Vec<SkippedFile>,
 ) -> AppResult<()> {
     let head_tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
-    let oversized: Vec<(String, u64)> = index
+    let oversized: Vec<(IndexEntry, String, u64)> = index
         .iter()
         .filter_map(|entry| {
             let rel = String::from_utf8_lossy(&entry.path).into_owned();
             let size = root.join(&rel).metadata().ok()?.len();
-            if size < max_file_bytes {
-                return None;
-            }
-            let backed_up = head_tree
-                .as_ref()
-                .and_then(|tree| tree.get_path(Path::new(&rel)).ok())
-                .is_some_and(|committed| committed.id() == entry.id);
-            (!backed_up).then_some((rel, size))
+            (size >= max_file_bytes).then_some((entry, rel, size))
         })
         .collect();
-    for (rel, size) in oversized {
-        index.remove_path(Path::new(&rel))?;
+    for (entry, rel, size) in oversized {
+        let path = Path::new(&rel);
+        let committed = head_tree.as_ref().and_then(|tree| tree.get_path(path).ok());
+        match committed {
+            Some(committed) if committed.id() == entry.id => continue, // unchanged, already backed up
+            Some(committed) => index.add(&IndexEntry {
+                id: committed.id(),
+                mode: committed.filemode() as u32,
+                file_size: 0,
+                ..entry
+            })?,
+            None => index.remove_path(path)?,
+        }
         if !skipped.iter().any(|file| file.path == rel) {
             skipped.push(SkippedFile { path: rel, size });
         }
