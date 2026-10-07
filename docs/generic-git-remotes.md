@@ -1,16 +1,24 @@
-# Back up to any git host (SSH)
+# Back up to any git host
 
 GitHub gets the guided in-app flow (Settings → Backup → Connect GitHub…).
 Every other git host — GitLab, Gitea, Codeberg, GitHub Enterprise, your own
-server, a bare repo on a NAS — works with zero UI: wire the remote yourself
-and Reflect's sync loop adopts it (Plan 16).
+server, a bare repo on a NAS — connects one of two ways.
+
+## In the app (HTTPS)
+
+Settings → Backup → **Connect another host…** (on iOS: Settings → Backup →
+Connect another host) asks for the repository's `https://` URL, a username,
+and a personal access token with write access to the repository. Reflect
+checks the sign-in against the host before storing anything, so a wrong URL
+or token fails right there with the host's own answer. The token lives in
+the OS keychain under that host and is sent nowhere else; the managed GitHub
+sign-in is never sent anywhere but github.com.
+
+## In the terminal (SSH)
 
 The contract: **if `ssh -T git@host` works in your terminal, sync works.**
 Reflect authenticates SSH remotes through your ssh-agent — it never asks for,
-stores, or manages credentials for non-GitHub hosts, and the managed GitHub
-sign-in is never sent anywhere but github.com. HTTPS URLs for non-GitHub
-hosts aren't supported yet (that's Plan 16 V2, via git credential helpers) —
-use the SSH form.
+stores, or manages SSH credentials.
 
 ## Recipe
 

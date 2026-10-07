@@ -3,6 +3,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog.tsx'
+import { ConnectHostDialog } from '@/components/settings/connect-host-dialog.tsx'
 import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links.tsx'
 import { SettingsField } from '@/components/settings/field.tsx'
 import { GithubSignOutRow } from '@/components/settings/github-sign-out-row.tsx'
@@ -44,8 +45,9 @@ function githubRepoBrowserUrl(
 }
 
 /**
- * Settings → Sync → GitHub sync: connect a GitHub repository, see the current
- * backup state in product language, back up on demand, and disconnect.
+ * Settings → Sync → GitHub sync: connect a GitHub repository (or another
+ * HTTPS host), see the current backup state in product language, back up on
+ * demand, and disconnect.
  * Conflicted notes ("needs review") surface here with a count; each conflicted
  * note also shows its own banner when opened.
  */
@@ -54,6 +56,7 @@ export function BackupSettingsField(): ReactElement {
   const { graph } = useGraph()
   const githubConnected = useGithubConnected()
   const [connectOpen, setConnectOpen] = useState(false)
+  const [connectHostOpen, setConnectHostOpen] = useState(false)
   const openRepoAttempt = useRef(0)
   const action = useAsyncAction()
 
@@ -121,9 +124,17 @@ export function BackupSettingsField(): ReactElement {
 
           {backup.phase === 'disconnected' ? (
             <>
-              <div>
+              <div className="flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => setConnectOpen(true)}>
                   Connect GitHub…
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  title="GitLab, Gitea, Codeberg, or your own server, over HTTPS"
+                  onClick={() => setConnectHostOpen(true)}
+                >
+                  Connect another host…
                 </Button>
               </div>
               {githubConnected ? (
@@ -197,6 +208,7 @@ export function BackupSettingsField(): ReactElement {
           onClose={() => setConnectOpen(false)}
         />
       ) : null}
+      {connectHostOpen ? <ConnectHostDialog onClose={() => setConnectHostOpen(false)} /> : null}
     </>
   )
 }

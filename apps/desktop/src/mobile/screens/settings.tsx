@@ -29,6 +29,7 @@ import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer.tsx'
 import { AiPromptDrawer } from '@/mobile/ai-prompt-drawer.tsx'
 import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer.tsx'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer.tsx'
+import { ConnectHostDrawer } from '@/mobile/connect-host-drawer.tsx'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
 import { TextSettingDrawer } from '@/mobile/text-setting-drawer.tsx'
@@ -84,7 +85,8 @@ const TEXT_SIZE_OPTIONS: readonly SegmentedOption<EditorTextSize>[] = [
  * graph row discloses into the Graphs switcher screen; appearance and editor
  * preferences edit the shared settings document (the same keys desktop
  * exposes); the backup group mirrors the status pill's engine state, connects
- * GitHub for the local graph (the {@link ConnectGithubDrawer} sheet — iCloud
+ * GitHub or another HTTPS host for the local graph (the
+ * {@link ConnectGithubDrawer} and {@link ConnectHostDrawer} sheets — iCloud
  * graphs sync through the container instead, Plan 21), and can disconnect.
  */
 export function MobileSettings(): ReactElement {
@@ -142,6 +144,7 @@ export function MobileSettings(): ReactElement {
   const status = useMobileSyncStatus()
   const [disconnecting, setDisconnecting] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)
+  const [connectHostOpen, setConnectHostOpen] = useState(false)
   const { providers, defaultProvider, addProvider, removeProvider, makeDefault, setDefaultModel } =
     useAiProviders()
   const [addProviderOpen, setAddProviderOpen] = useState(false)
@@ -344,6 +347,12 @@ export function MobileSettings(): ReactElement {
               {canConnect ? (
                 <SettingsActionRow label="Connect GitHub" onPress={() => setConnectOpen(true)} />
               ) : null}
+              {canConnect ? (
+                <SettingsActionRow
+                  label="Connect another host"
+                  onPress={() => setConnectHostOpen(true)}
+                />
+              ) : null}
               {repo !== null ? (
                 <SettingsActionRow
                   label="Disconnect GitHub"
@@ -471,6 +480,7 @@ export function MobileSettings(): ReactElement {
         </div>
       </main>
       <ConnectGithubDrawer open={connectOpen} onOpenChange={setConnectOpen} />
+      <ConnectHostDrawer open={connectHostOpen} onOpenChange={setConnectHostOpen} />
       <AddAiProviderDrawer
         open={addProviderOpen}
         onOpenChange={setAddProviderOpen}

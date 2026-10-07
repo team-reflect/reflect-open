@@ -46,6 +46,14 @@ const AUTH_ERROR = {
 } as const
 
 describe('BackupSettingsField', () => {
+  it('offers another host next to GitHub when disconnected and opens its dialog', async () => {
+    await renderSection({ phase: 'disconnected' })
+
+    await userEvent.click(page.getByRole('button', { name: 'Connect another host…' }))
+
+    await expect.element(page.getByRole('dialog', { name: 'Connect another host' })).toBeVisible()
+  })
+
   it('renders a generic remote host-neutrally with the engine’s own auth message', async () => {
     await renderSection({
       phase: 'connected',

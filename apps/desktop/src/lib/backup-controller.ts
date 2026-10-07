@@ -11,6 +11,7 @@ import {
   githubCredential,
   githubRemoteUrl,
   gitDisconnect,
+  gitRemoteHead,
   gitSetup,
   gitStatus,
   isCaptureSpoolPath,
@@ -21,8 +22,10 @@ import {
   parseGithubRemote,
   remoteHost,
   ReflectError,
+  saveHostCredential,
   subscribeFileChanges,
   type ChangedFile,
+  type GitCredential,
   type GithubRepoRef,
   type GraphInfo,
   type SyncEngine,
@@ -108,6 +111,13 @@ export interface BackupController {
     ref: GithubRepoRef,
     options?: { allowPublic?: boolean },
   ): Promise<ConnectExistingResult>
+  /**
+   * Connect a repository on another HTTPS host (GitLab, Gitea, Codeberg, a
+   * server of your own) with a username and token. The sign-in is checked
+   * against the host first, so a wrong URL or token fails here with the
+   * host's own answer, before anything is stored or `origin` is set.
+   */
+  connectHost(remoteUrl: string, credential: GitCredential): Promise<void>
   /**
    * Stop backing **this graph** up (drops its remote; history and the
    * machine-level GitHub credential stay — other graphs keep syncing).
@@ -458,7 +468,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
     return token
   }
 
-  async function connectRemote(remoteUrl: string, branch: string): Promise<void> {
+  async function connectRemote(remoteUrl: string, branch: string | null): Promise<void> {
     await gitSetup(remoteUrl, branch, generation)
     await start()
   }
@@ -500,6 +510,16 @@ export function createBackupController(options: BackupControllerOptions): Backup
       // the local branch must match or sync would fork a parallel branch.
       await connectRemote(githubRemoteUrl(ref), repo.defaultBranch)
       return 'connected'
+    },
+    connectHost: async (remoteUrl, credential) => {
+      const host = remoteHost(remoteUrl)
+      if (host === null) {
+        throw new ReflectError('parse', 'a host sign-in needs an https:// remote URL')
+      }
+      await gitSetup(null, null, generation) // the repository the probe runs from
+      await gitRemoteHead(credential, generation, remoteUrl)
+      await saveHostCredential(host, credential)
+      await connectRemote(remoteUrl, null)
     },
     disconnectGraph: async () => {
       await gitDisconnect(generation)
