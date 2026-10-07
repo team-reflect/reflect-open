@@ -898,6 +898,32 @@ describe('commitSourceEdit', () => {
     expect(result).toBe(true)
     expect(h.writes.at(-1)?.contents).toBe('# Todo\n\n+ [ ] buy oat milk\n')
     expect(h.applied.at(-1)).toBe('# Todo\n\n+ [ ] buy oat milk\n')
+    // The pane mounts its editor from `initialContent` only after the ready
+    // snapshot renders, so `applyContent` above reached no editor yet: the seed
+    // must already carry the edit or the editor opens on the pre-edit body.
+    expect(h.snapshots.at(-1)?.initialContent).toBe('# Todo\n\n+ [ ] buy oat milk\n')
+  })
+
+  it('refuses (returns false) a note that loads as protected while the edit waits', async () => {
+    // Protection is decided by the load, so the gate must run after the wait.
+    let finishRead = (): void => {}
+    const h = harness({
+      disk: '+ [ ] x\n',
+      classify: () => 'lossy',
+      beforeRead: () =>
+        new Promise<void>((resolve) => {
+          finishRead = resolve
+        }),
+    })
+    h.session.load()
+
+    const transform = vi.fn(toggleTransform(firstTask('+ [ ] x\n')))
+    const commit = h.session.commitSourceEdit(transform)
+    finishRead()
+    expect(await commit).toBe(false)
+    expect(h.snapshots.at(-1)?.protected).toBe(true)
+    expect(transform).not.toHaveBeenCalled()
+    expect(h.writes).toEqual([])
   })
 
   it('refuses (returns false) a session whose load failed', async () => {
@@ -953,6 +979,7 @@ describe('commitSourceEdit', () => {
     // the un-toggled line (no divergence with the rolled-back Tasks list).
     expect(h.session.content()).toBe('+ [ ] x\n')
     expect(h.applied.at(-1)).toBe('+ [ ] x\n')
+    expect(h.snapshots.at(-1)?.initialContent).toBe('+ [ ] x\n')
     expect(h.snapshots.at(-1)?.error).toBeNull()
   })
 
