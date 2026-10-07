@@ -55,12 +55,16 @@ interface FakeOptions {
   failStatus?: boolean
   /** Make the keychain read throw (locked keychain, stale ACL after re-signing). */
   failSecretGet?: boolean
+  /** A stored sign-in for a non-GitHub host (`git-host:<host>`), as JSON. */
+  hostSecret?: string | null
   /** Scripted `git_merge_remote` outcome (defaults to up-to-date). */
   mergeOutcome?: unknown
   /** Per-call merge outcomes for retry/convergence tests. */
   mergeOutcomes?: unknown[]
   /** Per-call push outcomes for retry/convergence tests. */
   pushOutcomes?: unknown[]
+  /** Make every `git_push` throw this AppError (transport-level failures). */
+  pushError?: unknown
   /** The graph's origin (defaults to a GitHub HTTPS remote; null = none). */
   remoteUrl?: string | null
   /** Whether the graph already has a repository (defaults to true). */
@@ -110,6 +114,9 @@ function fakeBridge(options: FakeOptions = {}) {
           if (options.failSecretGet === true) {
             throw { kind: 'io', message: 'keychain unavailable' }
           }
+          if (String(args['name']).startsWith('git-host:')) {
+            return options.hostSecret ?? null
+          }
           return auth
         case 'secret_delete':
           auth = null
@@ -133,6 +140,9 @@ function fakeBridge(options: FakeOptions = {}) {
           }
           return mergeOutcomes.shift() ?? options.mergeOutcome ?? UP_TO_DATE
         case 'git_push':
+          if (options.pushError !== undefined) {
+            throw options.pushError
+          }
           return (
             pushOutcomes.shift() ?? {
               pushed: true,
@@ -279,7 +289,7 @@ describe('createBackupController', () => {
     controller.dispose()
   })
 
-  it('refuses a generic HTTPS remote at adoption with the SSH suggestion', async () => {
+  it('refuses a generic HTTPS remote without a stored sign-in', async () => {
     // A *public* generic HTTPS remote would pull anonymously and only fail
     // on push — edits arriving while the user's own never leave. The guard
     // surfaces the error before the engine ever starts.
@@ -309,6 +319,48 @@ describe('createBackupController', () => {
     expect(commitCount(calls)).toBe(1)
     expect(calls).not.toContain('git_fetch')
     expect(calls).not.toContain('git_push')
+    controller.dispose()
+  })
+
+  it('adopts a generic HTTPS remote with a stored host sign-in and sends it', async () => {
+    const { calls, invocations } = fakeBridge({
+      auth: null,
+      remoteUrl: 'https://gitlab.com/alex/notes.git',
+      hostSecret: JSON.stringify({ username: 'alex', secret: 'glpat-xyz' }),
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_fetch')
+    })
+    const fetch = invocations.find((call) => call.command === 'git_fetch')
+    expect(fetch?.args).toMatchObject({ credential: { username: 'alex', secret: 'glpat-xyz' } })
+    expect(controller.getState()).toMatchObject({ phase: 'connected', repo: null })
+    controller.dispose()
+  })
+
+  it('keeps local history when the host sign-in cannot be read', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { calls } = fakeBridge({
+      auth: null,
+      remoteUrl: 'https://gitlab.com/alex/notes.git',
+      failSecretGet: true,
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    expect(controller.getState()).toMatchObject({
+      phase: 'connected',
+      status: { state: 'error', errorKind: 'rejected' },
+    })
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_commit_all')
+    })
+    expect(calls).not.toContain('git_fetch')
+    expect(consoleError).toHaveBeenCalledWith(
+      'reading the host sign-in failed:',
+      expect.any(String),
+    )
+    consoleError.mockRestore()
     controller.dispose()
   })
 
@@ -540,12 +592,79 @@ describe('createBackupController', () => {
     controller.dispose()
   })
 
-  // Safety invariant S4 (docs/git-backup-safety.md): the quit-time commit must
-  // queue behind an in-flight cycle. Today `flushBackup` calls
-  // `gitCommitAll` directly, so a commit can land between a pull's ref move
-  // and its checkout and commit the stale tree (#1405). Red on purpose until
-  // the flusher routes through the engine.
-  it.fails('quit flush waits for an in-flight pull before committing', async () => {
+  // libgit2 reports every 403 as an auth failure, but GitHub also answers
+  // 403 for a token without access to the repo and for rate limiting; the
+  // controller asks GitHub whether the token is good before blaming it.
+  const FORBIDDEN = { kind: 'auth', message: 'request failed with status code: 403' }
+  const MERGED = { kind: 'merged', conflictedPaths: [], changedFiles: [] }
+
+  it('a 403 with a valid token reports a refused sync, not a bad credential', async () => {
+    fakeBridge({ mergeOutcome: MERGED, pushError: FORBIDDEN })
+    httpFetch.mockResolvedValueOnce(jsonResponse({ login: 'alex' }))
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(controller.getState()).toMatchObject({
+        phase: 'connected',
+        status: { state: 'error', errorKind: 'rejected' },
+      })
+    })
+    const state = controller.getState()
+    expect(
+      state.phase === 'connected' && state.status.state === 'error' && state.status.message,
+    ).toContain('alex/notes')
+    controller.dispose()
+  })
+
+  it('a 403 with a rejected token stays an auth error', async () => {
+    fakeBridge({ mergeOutcome: MERGED, pushError: FORBIDDEN })
+    httpFetch.mockResolvedValueOnce(jsonResponse({ message: 'Bad credentials' }, 401))
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(httpFetch).toHaveBeenCalled()
+    })
+    // Let the probe's rejection settle before asserting nothing changed.
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(controller.getState()).toMatchObject({
+      phase: 'connected',
+      status: { state: 'error', errorKind: 'auth' },
+    })
+    controller.dispose()
+  })
+
+  it('a 403 with a token probe that never reaches GitHub reports offline', async () => {
+    fakeBridge({ mergeOutcome: MERGED, pushError: FORBIDDEN })
+    httpFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(controller.getState()).toMatchObject({
+        phase: 'connected',
+        status: { state: 'offline' },
+      })
+    })
+    controller.dispose()
+  })
+
+  it('a 403 with a rate-limited token probe reports offline, not a bad credential', async () => {
+    fakeBridge({ mergeOutcome: MERGED, pushError: FORBIDDEN })
+    httpFetch.mockResolvedValueOnce(jsonResponse({ message: 'API rate limit exceeded' }, 403))
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(controller.getState()).toMatchObject({
+        phase: 'connected',
+        status: { state: 'offline' },
+      })
+    })
+    controller.dispose()
+  })
+
+  // Safety invariant S4 (docs/git-backup-safety.md): the quit-time commit
+  // queues behind an in-flight cycle, so it can never land between a pull's
+  // ref move and its checkout and commit the stale tree (#1405).
+  it('quit flush waits for an in-flight pull before committing', async () => {
     const { calls, releaseMerge, releaseCommit } = fakeBridge({
       gateMerge: true,
       gateSecondCommit: true,
@@ -581,6 +700,29 @@ describe('createBackupController', () => {
       releaseMerge()
       releaseCommit()
       controller.dispose()
+    }
+  })
+
+  it('the mobile background flush commits while the document is hidden', async () => {
+    setPlatformSurface({ mobileApp: true })
+    const visibility = vi.spyOn(document, 'visibilityState', 'get')
+    const { calls } = fakeBridge()
+    visibility.mockReturnValue('visible')
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    try {
+      await controller.start()
+      await vi.waitFor(() => {
+        expect(calls).toContain('git_merge_remote') // the launch cycle ran
+      })
+      const before = commitCount(calls)
+
+      visibility.mockReturnValue('hidden')
+      await flushBackup()
+      expect(commitCount(calls)).toBe(before + 1)
+    } finally {
+      controller.dispose()
+      visibility.mockRestore()
+      setPlatformSurface({ mobileApp: false })
     }
   })
 
@@ -655,8 +797,8 @@ describe('createBackupController', () => {
       document.dispatchEvent(new Event('visibilitychange'))
       await vi.waitFor(() => {
         expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(1)
+        expect(calls.filter((command) => command === 'git_fetch')).toHaveLength(1)
       })
-      expect(calls.filter((command) => command === 'git_fetch')).toHaveLength(1)
 
       visibility.mockReturnValue('hidden')
       vi.useFakeTimers()

@@ -47,7 +47,8 @@ queue, never straight to `git_commit_all`.
 - Test: `git::tests::commit_during_fast_forward_never_reverts_pulled_notes`,
   `git::tests::note_write_waits_for_a_running_checkout`,
   `backup-controller.test.tsx` "quit flush waits for an in-flight pull before
-  committing" (`test.fails`).
+  committing", `engine.test.ts` "commitNow joins the single-flight queue and
+  never touches the network".
 
 ## S5. The repository is never left in app-made merge state
 
@@ -66,8 +67,8 @@ rule, and (pending) by removing entries an older repository already
 tracked.
 
 - Test: `git::tests::commit_excludes_reflect_and_skips_when_clean` (untracked
-  `.reflect/` files only). Known gap: tracked-entry cleanup is pending its own
-  regression (`commit_removes_previously_tracked_reflect_files`).
+  files), `git::tests::tracked_reflect_entries_are_dropped_from_the_next_commit`
+  (entries an adopted repository already tracked).
 
 ## S7. Conflicts are committed and pushed, never left pending
 

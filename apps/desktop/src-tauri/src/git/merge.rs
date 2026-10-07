@@ -24,6 +24,7 @@ use std::path::Path;
 
 use git2::build::CheckoutBuilder;
 use git2::{Index, IndexEntry, MergeOptions, Repository};
+use reflect_graph_paths::to_slash_lossy;
 use serde::Serialize;
 
 use crate::error::AppResult;
@@ -239,7 +240,7 @@ fn changed_between(
         };
         if let Some(path) = file.path() {
             out.push(ChangedFile {
-                path: path.to_string_lossy().replace('\\', "/"),
+                path: to_slash_lossy(path),
                 kind: if removed {
                     ChangeKind::Remove
                 } else {

@@ -220,6 +220,172 @@ describe('createSyncEngine', () => {
     engine.stop()
   })
 
+  it('commitNow joins the single-flight queue and never touches the network', async () => {
+    const gate: { release: () => void } = { release: () => {} }
+    const calls = fakeGit((command) => {
+      if (command === 'git_merge_remote') {
+        return new Promise((resolve) => {
+          gate.release = () => resolve(MERGED)
+        })
+      }
+      return defaultResponses(command)
+    })
+    const engine = createSyncEngine({ generation: 1, getCredential: async () => CRED })
+
+    const full = engine.syncNow()
+    await vi.waitFor(() => expect(commandsOf(calls)).toContain('git_merge_remote'))
+    const flushed = engine.commitNow()
+    await Promise.resolve()
+    // The pull is mid-merge: the flush commit waits instead of interleaving.
+    expect(commandsOf(calls).filter((command) => command === 'git_commit_all')).toHaveLength(1)
+
+    gate.release()
+    await full
+    await flushed
+    const commands = commandsOf(calls)
+    expect(commands.filter((command) => command === 'git_commit_all')).toHaveLength(2)
+    expect(commands.lastIndexOf('git_commit_all')).toBeGreaterThan(commands.indexOf('git_push'))
+    engine.stop()
+  })
+
+  it('a flush queued behind a sync still commits when the app hides meanwhile', async () => {
+    // Visible: a sync is mid-merge and another syncNow queues a full
+    // follow-up. The app goes to the background and the flush joins that
+    // follow-up. The gate must not swallow the commit the flush is owed.
+    const gate: { release: () => void } = { release: () => {} }
+    const calls = fakeGit((command) => {
+      if (command === 'git_merge_remote') {
+        return new Promise((resolve) => {
+          gate.release = () => resolve(MERGED)
+        })
+      }
+      return defaultResponses(command)
+    })
+    let canStartCycle = true
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => CRED,
+      canStartCycle: () => canStartCycle,
+    })
+    const first = engine.syncNow()
+    await vi.waitFor(() => expect(commandsOf(calls)).toContain('git_merge_remote'))
+    const second = engine.syncNow()
+    canStartCycle = false
+    const flushed = engine.commitNow()
+    gate.release()
+    await first
+    await flushed
+    await second
+    const commands = commandsOf(calls)
+    // The running sync stopped at the gate after its merge, and the queued
+    // full follow-up ran as the commit the flush was owed: no push, two commits.
+    expect(commands.filter((command) => command === 'git_push')).toHaveLength(0)
+    expect(commands.filter((command) => command === 'git_commit_all')).toHaveLength(2)
+    expect(commands.lastIndexOf('git_commit_all')).toBeGreaterThan(
+      commands.indexOf('git_merge_remote'),
+    )
+    engine.stop()
+  })
+
+  it('a queued flush commits before the follow-up resolves its credential', async () => {
+    // The follow-up starts visible, so it runs as a full sync; the app hides
+    // while the credential is being resolved. The commit has already landed.
+    const gate: { release: () => void } = { release: () => {} }
+    const calls = fakeGit((command) => {
+      if (command === 'git_merge_remote') {
+        return new Promise((resolve) => {
+          gate.release = () => resolve(MERGED)
+        })
+      }
+      return defaultResponses(command)
+    })
+    const credentialGate: { release: () => void } = { release: () => {} }
+    let credentials = 0
+    let canStartCycle = true
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => {
+        credentials += 1
+        if (credentials === 2) {
+          await new Promise<void>((resolve) => {
+            credentialGate.release = resolve
+          })
+        }
+        return CRED
+      },
+      canStartCycle: () => canStartCycle,
+    })
+    const first = engine.syncNow()
+    await vi.waitFor(() => expect(commandsOf(calls)).toContain('git_merge_remote'))
+    const second = engine.syncNow()
+    const flushed = engine.commitNow()
+    gate.release()
+    await first
+    // The follow-up is running: its commit landed before it asked for a credential.
+    await vi.waitFor(() => expect(credentials).toBe(2))
+    expect(commandsOf(calls).filter((command) => command === 'git_commit_all')).toHaveLength(2)
+    canStartCycle = false
+    credentialGate.release()
+    await flushed
+    await second
+    expect(commandsOf(calls).filter((command) => command === 'git_push')).toHaveLength(1) // the first sync only
+    engine.stop()
+  })
+
+  it('commitNow runs even when the owner gates cycles (the hidden-app flush)', async () => {
+    // iOS fires the background flush after the document is hidden, exactly
+    // when canStartCycle says no to network cycles.
+    const calls = fakeGit(defaultResponses)
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => CRED,
+      canStartCycle: () => false,
+    })
+    await engine.commitNow()
+    expect(commandsOf(calls)).toEqual(['git_commit_all'])
+    await engine.syncNow()
+    expect(commandsOf(calls)).toEqual(['git_commit_all']) // still gated
+    engine.stop()
+  })
+
+  it('after an auth failure, edits commit locally and skip the network until a resume', async () => {
+    // A rejected sign-in (or an ssh agent with no key) does not fix itself
+    // between keystrokes: per-edit retries would only repeat the error and
+    // the reconnect prompt. Local history keeps accumulating meanwhile.
+    let pushes = 0
+    const calls = fakeGit((command) => {
+      if (command === 'git_push') {
+        pushes += 1
+        throw { kind: 'auth', message: 'token rejected' }
+      }
+      return defaultResponses(command)
+    })
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => CRED,
+      onStatus: (status) => {
+        statuses.push(status)
+      },
+      idleMs: 10,
+    })
+
+    engine.noteChanged()
+    await vi.runAllTimersAsync()
+    expect(statuses.at(-1)).toMatchObject({ state: 'error', errorKind: 'auth' })
+    const emitted = statuses.length
+
+    engine.noteChanged()
+    await vi.runAllTimersAsync()
+    expect(commandsOf(calls).filter((command) => command === 'git_commit_all')).toHaveLength(2)
+    expect(pushes).toBe(1)
+    expect(statuses).toHaveLength(emitted) // the auth error stays on screen
+
+    await engine.syncNow() // focus / online / manual: try the network again
+    expect(pushes).toBe(2)
+    engine.stop()
+  })
+
   it('surfaces a non-divergence rejection (e.g. push protection) as an error', async () => {
     fakeGit((command) => {
       if (command === 'git_push') {

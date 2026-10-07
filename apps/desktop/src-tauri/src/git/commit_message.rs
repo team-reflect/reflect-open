@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use git2::{Commit, Delta, DiffOptions, Repository, Tree};
+use reflect_graph_paths::to_slash_lossy;
 
 use crate::error::AppResult;
 
@@ -97,7 +98,7 @@ fn tree_change_from_delta(status: Delta, delta: &git2::DiffDelta<'_>) -> Option<
 }
 
 fn diff_path(path: Option<&Path>) -> Option<String> {
-    path.map(|path| path.to_string_lossy().replace('\\', "/"))
+    path.map(to_slash_lossy)
 }
 
 fn describe_changes(
