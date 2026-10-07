@@ -310,6 +310,71 @@ describe('createNoteSession', () => {
     })
   })
 
+  it('typing after the banner drops the preview, so Keep both cannot discard it', async () => {
+    const marked = '<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
+    const { session, writes, snapshots, setDisk } = harness({
+      merge: { kind: 'conflicted', content: marked },
+    })
+    session.load()
+    await settled()
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    session.externalChanged()
+    await settled()
+    expect(snapshots.at(-1)?.mergedPreview).toBe(marked)
+
+    session.editorChanged('mine, and more\n')
+    expect(snapshots.at(-1)).toMatchObject({ conflict: 'theirs\n', mergedPreview: null })
+    session.keepBoth() // no preview: nothing happens, the newer buffer stays
+    await settled()
+    expect(writes).toEqual([])
+  })
+
+  it('review refuses to overwrite a file that changed again since the merge', async () => {
+    const marked = '<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
+    const { session, writes, snapshots, setDisk, expectedContents } = harness({
+      merge: { kind: 'conflicted', content: marked },
+    })
+    session.load()
+    await settled()
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    session.externalChanged()
+    await settled()
+
+    setDisk('theirs, newer\n') // another device wrote again before Review landed
+    session.review()
+    await settled()
+    expect(expectedContents.at(-1)).toBe('theirs\n') // the CAS expectation is the merged version
+    expect(writes).toEqual([]) // refused as stale
+    expect(session.content()).toBe('mine\n') // the buffer is intact
+    expect(snapshots.at(-1)).toMatchObject({ conflict: 'theirs, newer\n', protected: false })
+  })
+
+  it('a failed review write keeps the conflict and leaves the save chain usable', async () => {
+    const marked = '<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
+    const { session, writes, snapshots, setDisk, failWrites } = harness({
+      merge: { kind: 'conflicted', content: marked },
+    })
+    session.load()
+    await settled()
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    session.externalChanged()
+    await settled()
+
+    failWrites('disk full')
+    session.review()
+    await settled()
+    expect(writes).toEqual([])
+    expect(snapshots.at(-1)).toMatchObject({ conflict: 'theirs\n', error: 'disk full' })
+
+    failWrites(null)
+    session.keepMine()
+    await settled()
+    expect(writes).toEqual([{ path: 'notes/a.md', contents: 'mine\n' }])
+  })
+
   it('an unmergeable change parks without a preview', async () => {
     const { session, snapshots, setDisk } = harness({
       merge: { kind: 'unmergeable', content: 'theirs\n' },

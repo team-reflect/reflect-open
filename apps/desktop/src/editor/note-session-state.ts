@@ -187,6 +187,9 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     }
     buffer = markdown
     dirty = header + markdown !== disk
+    // A parked preview was merged from the buffer as it was; later typing
+    // would be lost under Keep both or Review, so those options go away.
+    mergedPreview = null
     if (missing && markdown.trim() === '') {
       // A still-unwritten note cleared back to nothing (e.g. the seeded
       // empty-title template deleted wholesale) stays unwritten: creating an
@@ -296,14 +299,16 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       return
     }
     // Typing continued while the merge ran: its result no longer covers the
-    // buffer. Park instead of applying a stale merge over newer keystrokes.
-    if (merged?.kind === 'clean' && header + buffer === ours) {
+    // buffer. Park without it instead of applying a stale merge over newer
+    // keystrokes.
+    const current = header + buffer === ours
+    if (merged?.kind === 'clean' && current) {
       adoptMerged(merged.content, content)
       return
     }
     cancelScheduledSave()
     conflict = content
-    mergedPreview = merged?.kind === 'conflicted' ? merged.content : null
+    mergedPreview = merged?.kind === 'conflicted' && current ? merged.content : null
     emit()
   }
 
@@ -439,14 +444,30 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     }
     // The marked merge becomes the file, exactly as a Git pull leaves a
     // conflicted note, and opens protected: the notice resolves it block by
-    // block, and every side stays recoverable on disk meanwhile.
+    // block, and every side stays recoverable on disk meanwhile. The write
+    // expects the external version this merge was made from; a newer one on
+    // disk means the preview is stale, so the conflict stays parked and is
+    // reconciled afresh. The parked state is only cleared once the write
+    // lands, and the chain settles either way.
     const marked = mergedPreview
+    const onDisk = conflict
     const write = io.write
-    conflict = null
-    mergedPreview = null
     saveChain = saveChain.then(async () => {
-      await write(path, marked)
+      try {
+        await write(path, marked, onDisk)
+      } catch (cause) {
+        if (disposed) {
+          return
+        }
+        error = errorMessage(cause)
+        emit()
+        await reconcileFromDisk()
+        return
+      }
       if (!disposed) {
+        conflict = null
+        mergedPreview = null
+        error = null
         adoptCleanContent(marked)
       }
     })
