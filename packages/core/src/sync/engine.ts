@@ -135,12 +135,19 @@ const DEFAULT_MAX_WAIT_MS = 5 * 60_000
 const MAX_PUSH_ATTEMPTS = 3
 
 /**
- * What a cycle does after its commit: `commit` stops there, `push` pushes if
- * anything is pending, `full` fetches and merges first. Ordered weakest to
- * strongest; a follow-up requested mid-cycle keeps the strongest.
+ * What a cycle does after its commit. The debounce asks for `network` only
+ * (push if anything is pending); launch, focus, and manual syncs add
+ * `fetch` (pull and merge first); the quit and background flush ask for
+ * neither and stop at the commit. A follow-up requested mid-cycle is the
+ * union of what was asked.
  */
-const MODES = ['commit', 'push', 'full'] as const
-type Mode = (typeof MODES)[number]
+interface CycleRequest {
+  fetch: boolean
+  network: boolean
+}
+const COMMIT: CycleRequest = { fetch: false, network: false }
+const PUSH: CycleRequest = { fetch: false, network: true }
+const FULL: CycleRequest = { fetch: true, network: true }
 
 /** A push the remote refused for a non-divergence reason (e.g. push protection). */
 class PushRejectedError extends Error {}
@@ -166,15 +173,15 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   let deadline: number | null = null
   let running: Promise<void> | null = null
   /**
-   * The one follow-up requested while a cycle was in flight (strongest mode
-   * wins). Its callers await `done`, which settles when the follow-up itself
-   * finishes, not when the cycle they landed behind does: the quit flush
-   * must not report done before its own commit ran. `flush` remembers that
-   * a commit-only request joined: a network follow-up the owner gates in the
-   * meantime still owes that commit.
+   * The one follow-up requested while a cycle was in flight (the union of
+   * every request). Its callers await `done`, which settles when the
+   * follow-up itself finishes, not when the cycle they landed behind does:
+   * the quit flush must not report done before its own commit ran. `flush`
+   * remembers that a commit-only request joined: a network follow-up the
+   * owner gates in the meantime still owes that commit.
    */
   let followUp: {
-    mode: Mode
+    request: CycleRequest
     flush: boolean
     done: Promise<void>
     settle: () => void
@@ -256,7 +263,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     }
     timer = setTimeout(() => {
       timer = null
-      void run('push')
+      void run(PUSH)
     }, delayMs)
   }
 
@@ -273,15 +280,15 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     schedule(Math.max(0, Math.min(idleMs, deadline - now)))
   }
 
-  async function run(mode: Mode): Promise<void> {
+  async function run(request: CycleRequest): Promise<void> {
     // A commit-only cycle is the background/quit flush: it must run while the
     // document is hidden (that is when it fires), so only network cycles
     // honor the owner's gate.
-    if (signal.aborted || (mode !== 'commit' && options.canStartCycle?.() === false)) {
+    if (signal.aborted || (request.network && options.canStartCycle?.() === false)) {
       return
     }
     if (running !== null) {
-      // Queue one follow-up, keeping the strongest mode requested: a syncNow
+      // Queue one follow-up that does everything asked of it: a syncNow
       // landing mid-cycle must still get its fetch+merge, not be downgraded
       // to a push-only pass.
       if (followUp === null) {
@@ -289,17 +296,19 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         const done = new Promise<void>((resolve) => {
           settle = resolve
         })
-        followUp = { mode, flush: mode === 'commit', done, settle }
+        followUp = { request, flush: !request.network, done, settle }
       } else {
-        if (MODES.indexOf(mode) > MODES.indexOf(followUp.mode)) {
-          followUp.mode = mode
+        const queued = followUp.request
+        followUp.request = {
+          fetch: queued.fetch || request.fetch,
+          network: queued.network || request.network,
         }
-        followUp.flush ||= mode === 'commit'
+        followUp.flush ||= !request.network
       }
       return await followUp.done
     }
     running = (async () => {
-      const quiet = mode === 'push' && authFailed
+      const quiet = !request.fetch && authFailed
       const remoteChangeTasks: Promise<void>[] = []
       // This cycle commits everything dirty so far — a pending debounce pass
       // (e.g. queued before a launch/focus/manual sync) would only duplicate it.
@@ -312,7 +321,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         emit({ state: 'syncing' })
       }
       try {
-        await cycle(mode, quiet, (changes) => {
+        await cycle(request, quiet, (changes) => {
           remoteChangeTasks.push(startRemoteChanges(changes))
         })
         await settleRemoteChanges(remoteChangeTasks)
@@ -346,8 +355,8 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
           // A stopped engine runs nothing more, but its awaiters must not hang.
           // A gated network follow-up still runs the commit a flush asked for.
           const gated = options.canStartCycle?.() === false
-          const mode = gated && next.flush ? 'commit' : next.mode
-          void (signal.aborted ? Promise.resolve() : run(mode)).finally(next.settle)
+          const request = gated && next.flush ? COMMIT : next.request
+          void (signal.aborted ? Promise.resolve() : run(request)).finally(next.settle)
         }
       }
     })()
@@ -355,11 +364,11 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   }
 
   async function cycle(
-    mode: Mode,
+    request: CycleRequest,
     quiet: boolean,
     remoteChanges: (changes: ChangedFile[]) => void,
   ): Promise<void> {
-    if (mode === 'commit') {
+    if (!request.network) {
       // One command, no gate: the flush's commit must finish even hidden.
       const flushed = await gitCommitAll('Update notes', options.generation)
       signal.throwIfAborted()
@@ -380,7 +389,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       return // the commit is the whole cycle: no remote, or the sign-in is known bad
     }
     const credential = await step(options.getCredential())
-    if (mode === 'push') {
+    if (!request.fetch) {
       // The debounce path often fires for changes that are already committed
       // and pushed (a pull's own writes re-enter via the watcher). Nothing
       // committed and nothing ahead means a push would be a pointless network
@@ -428,11 +437,11 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   function syncNow(): Promise<void> {
     authFailed = false // a resume trigger: the user may have fixed the sign-in
-    return run('full')
+    return run(FULL)
   }
 
   function commitNow(): Promise<void> {
-    return run('commit')
+    return run(COMMIT)
   }
 
   function stop(): void {

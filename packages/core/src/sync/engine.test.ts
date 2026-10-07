@@ -332,6 +332,38 @@ describe('createSyncEngine', () => {
     engine.stop()
   })
 
+  it('requests queued behind a running cycle merge into one follow-up that does their union', async () => {
+    const gate: { release: () => void } = { release: () => {} }
+    const calls = fakeGit((command) => {
+      if (command === 'git_merge_remote') {
+        return new Promise((resolve) => {
+          gate.release = () => resolve(MERGED)
+        })
+      }
+      return defaultResponses(command)
+    })
+    const engine = createSyncEngine({ generation: 1, getCredential: async () => CRED, idleMs: 10 })
+    const first = engine.syncNow()
+    await vi.waitFor(() => expect(commandsOf(calls)).toContain('git_merge_remote'))
+    engine.noteChanged() // the debounce asks for a push
+    await vi.advanceTimersByTimeAsync(10)
+    const flushed = engine.commitNow() // the flush asks for a commit
+    gate.release()
+    await first
+    await flushed
+    // One follow-up: its commit, then the push the debounce asked for; no
+    // fetch, because nobody asked to pull.
+    expect(commandsOf(calls)).toEqual([
+      'git_commit_all',
+      'git_fetch',
+      'git_merge_remote',
+      'git_push',
+      'git_commit_all',
+      'git_push',
+    ])
+    engine.stop()
+  })
+
   it('commitNow runs even when the owner gates cycles (the hidden-app flush)', async () => {
     // iOS fires the background flush after the document is hidden, exactly
     // when canStartCycle says no to network cycles.
