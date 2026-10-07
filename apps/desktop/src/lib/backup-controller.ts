@@ -398,26 +398,33 @@ export function createBackupController(options: BackupControllerOptions): Backup
     remoteUrl: string,
     repo: GithubRepoRef,
   ): Promise<void> {
+    let next: SyncStatus
     try {
       const token = await getGithubToken(providerFetch)
       if (token === null) {
         return
       }
       await getAuthenticatedUser(token, providerFetch)
-    } catch {
-      return // the token really is bad, or GitHub is unreachable: `auth` stands
+      next = {
+        state: 'error',
+        errorKind: 'rejected',
+        message: `GitHub refused the sync (403). Check that Reflect has access to ${repo.owner}/${repo.name}, or wait a few minutes if GitHub is rate limiting.`,
+      }
+    } catch (cause) {
+      // A rejected probe confirms the bad credential: `auth` stands. A probe
+      // GitHub throttled, or that never reached it, says nothing about the
+      // credential, so it must not keep asking for a reconnect either.
+      if (!(cause instanceof ReflectError) || cause.kind !== 'network') {
+        return
+      }
+      next = {
+        state: 'offline',
+        message: 'GitHub is rate limiting or unreachable; the backup will retry',
+      }
     }
+    // Only replace the exact status this probe was asked about.
     if (state.phase === 'connected' && state.status === status) {
-      setState({
-        phase: 'connected',
-        remoteUrl,
-        repo,
-        status: {
-          state: 'error',
-          errorKind: 'rejected',
-          message: `GitHub refused the sync (403). Check that Reflect has access to ${repo.owner}/${repo.name}, or wait a few minutes if GitHub is rate limiting.`,
-        },
-      })
+      setState({ phase: 'connected', remoteUrl, repo, status: next })
     }
   }
 
