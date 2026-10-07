@@ -235,7 +235,7 @@ describe('createSyncEngine', () => {
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
       generation: 1,
-      getToken: async () => 'tok',
+      getCredential: async () => CRED,
       onStatus: (status) => {
         statuses.push(status)
       },
