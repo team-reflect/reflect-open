@@ -25,6 +25,7 @@ pub mod ladder;
 pub mod markers;
 mod merge3;
 pub mod shadow;
+mod total;
 mod union;
 
 use serde::Serialize;

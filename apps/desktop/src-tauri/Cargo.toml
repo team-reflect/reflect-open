@@ -56,6 +56,7 @@ keyring-core = "1.0.0"
 # openssl must never link against homebrew dylibs the distributed app won't
 # have (libssh2-sys only consults pkg-config when LIBSSH2_SYS_USE_PKG_CONFIG
 # is set, and vendored-openssl pins the rest).
+reconcile-text = "=0.13.2"
 git2 = { version = "0.21.0", default-features = false, features = [
   "https",
   "ssh",
@@ -216,3 +217,4 @@ dbus-secret-service-keyring-store = { version = "1.0.1", features = ["crypto-rus
 
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }
+proptest = "1"
