@@ -7,7 +7,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { ReflectError, type GithubRepoRef, type GraphInfo } from '@reflect/core'
+import { ReflectError, type GitCredential, type GithubRepoRef, type GraphInfo } from '@reflect/core'
 import {
   createBackupController,
   type BackupController,
@@ -30,6 +30,8 @@ interface SyncContextValue {
     ref: GithubRepoRef,
     options?: { allowPublic?: boolean },
   ) => Promise<ConnectExistingResult>
+  /** Connect a non-GitHub host over HTTPS with a stored username + token. */
+  connectHostRemote: (remoteUrl: string, credential: GitCredential) => Promise<void>
   /** Stop backing this graph up (other graphs and the credential stay). */
   disconnectGraph: () => Promise<void>
   /** Sign the machine out of GitHub (every connected graph stops syncing). */
@@ -109,6 +111,8 @@ export function SyncProvider({ graph, children }: SyncProviderProps): ReactEleme
       backup,
       connectNewRepo: (name) => require().connectNewRepo(name),
       connectExistingRepo: (ref, options) => require().connectExistingRepo(ref, options),
+      connectHostRemote: (remoteUrl, credential) =>
+        require().connectHostRemote(remoteUrl, credential),
       disconnectGraph: () => require().disconnectGraph(),
       signOut: () => require().signOut(),
       backUpNow: () => require().backUpNow(),

@@ -35,7 +35,7 @@ use crate::fs::GraphState;
 
 use self::commit::CommitOutcome;
 use self::merge::MergeOutcome;
-use self::remote::{PushOutcome, RemoteDelta};
+use self::remote::{BasicCredential, PushOutcome, RemoteDelta};
 
 /// GitHub rejects files over 100 MB, failing the whole push; stop just under.
 const MAX_FILE_BYTES: u64 = 95 * 1024 * 1024;
@@ -153,8 +153,12 @@ pub async fn git_disconnect(generation: u64, state: State<'_, GraphState>) -> Ap
 /// before any graph is open, so it takes an absolute destination rather than
 /// a graph-relative path; the caller opens the result as a graph afterwards.
 #[tauri::command]
-pub async fn git_clone(url: String, path: String, token: Option<String>) -> AppResult<()> {
-    run_blocking(move || remote::clone(&url, Path::new(&path), token)).await
+pub async fn git_clone(
+    url: String,
+    path: String,
+    credential: Option<BasicCredential>,
+) -> AppResult<()> {
+    run_blocking(move || remote::clone(&url, Path::new(&path), credential)).await
 }
 
 /// Commit every pending change (no-op when clean). See [`commit::commit_all`].
@@ -181,12 +185,12 @@ pub async fn git_commit_all(
 /// Fetch `origin` and report ahead/behind for the current branch.
 #[tauri::command]
 pub async fn git_fetch(
-    token: Option<String>,
+    credential: Option<BasicCredential>,
     generation: u64,
     state: State<'_, GraphState>,
 ) -> AppResult<RemoteDelta> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || remote::fetch(&root, token)).await
+    run_blocking(move || remote::fetch(&root, credential)).await
 }
 
 /// Merge the fetched remote branch; conflicts are committed into the notes as
@@ -209,10 +213,10 @@ pub async fn git_merge_remote(
 /// sync engine can branch on them.
 #[tauri::command]
 pub async fn git_push(
-    token: Option<String>,
+    credential: Option<BasicCredential>,
     generation: u64,
     state: State<'_, GraphState>,
 ) -> AppResult<PushOutcome> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || remote::push(&root, token)).await
+    run_blocking(move || remote::push(&root, credential)).await
 }
