@@ -12,7 +12,6 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use crate::error::{AppError, AppResult};
 
@@ -28,20 +27,19 @@ pub(super) enum FaultPoint {
 }
 
 /// What happens when an armed point is reached.
-#[derive(Clone)]
 pub(super) enum Fault {
     /// Return an error from the command, as a failed syscall would.
     Fail,
     /// Unwind, standing in for the process being killed mid-command.
     Panic,
-    /// Run a closure (block on a channel to let another thread race in).
-    /// Faults run on the thread that armed them, so no `Send`/`Sync` bound.
-    Hook(Arc<dyn Fn()>),
+    /// Run a closure once (block on a channel to let another thread race
+    /// in). Faults run on the thread that armed them, so no `Send`/`Sync`.
+    Hook(Box<dyn FnOnce()>),
 }
 
 impl Fault {
-    pub(super) fn hook(f: impl Fn() + 'static) -> Fault {
-        Fault::Hook(Arc::new(f))
+    pub(super) fn hook(f: impl FnOnce() + 'static) -> Fault {
+        Fault::Hook(Box::new(f))
     }
 }
 

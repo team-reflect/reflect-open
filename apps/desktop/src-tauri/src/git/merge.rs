@@ -159,8 +159,6 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
     // behind would trip `ensure_clean_state` on every later cycle and wedge
     // sync until a manual repair — exactly what this design forbids. Clear it
     // on every path; the next cycle re-derives anything a failed attempt lost.
-    #[cfg(test)]
-    super::fault::trip(super::fault::FaultPoint::AfterMergeBeforeCommit)?;
     let result = complete_merge(&repo, root, remote_oid);
     if result.is_err() {
         let _ = repo.cleanup_state();
@@ -188,6 +186,8 @@ fn complete_merge(
     root: &Path,
     remote_oid: git2::Oid,
 ) -> AppResult<(Vec<String>, Vec<ChangedFile>)> {
+    #[cfg(test)]
+    super::fault::trip(super::fault::FaultPoint::AfterMergeBeforeCommit)?;
     let mut index = repo.index()?;
     let conflicted_paths = resolve_conflicts(repo, root, &mut index)?;
     index.write()?;

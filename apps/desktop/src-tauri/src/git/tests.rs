@@ -2,6 +2,7 @@ use std::fs;
 use std::panic::AssertUnwindSafe;
 use std::sync::mpsc;
 use std::thread;
+use std::time::Duration;
 
 use git2::{Repository, RepositoryInitOptions};
 use tempfile::tempdir;
@@ -11,8 +12,8 @@ use super::fault::{self, Fault, FaultPoint};
 use super::merge::{merge_remote, MergeKind};
 use super::remote::{fetch, push};
 use super::test_support::{
-    fixture, head_message, head_tree_paths, read, remote_tree_paths, scaffold_graph, second_device,
-    write, Fixture,
+    fixture, head_blob, head_message, head_tree_paths, read, remote_blob, scaffold_graph,
+    second_device, write, Fixture,
 };
 use super::{setup, status, MAX_FILE_BYTES};
 
@@ -892,12 +893,8 @@ fn pulled_note_fixture() -> Fixture {
     push(root_a, None).unwrap();
 
     let root_b = second_device(&fixture);
-    write(&root_b, "notes/from-phone.md", "# From phone\n");
-    write(
-        &root_b,
-        "daily/2026-10-01.md",
-        "# 2026-10-01\n\n- morning\n- [[From phone]]\n",
-    );
+    write(&root_b, "notes/from-phone.md", PHONE_NOTE);
+    write(&root_b, "daily/2026-10-01.md", PHONE_DAILY);
     commit_all(&root_b, "phone", MAX_FILE_BYTES).unwrap();
     push(&root_b, None).unwrap();
 
@@ -905,10 +902,17 @@ fn pulled_note_fixture() -> Fixture {
     fixture
 }
 
+/// Bound on every cross-thread wait so a regression hangs loudly, not forever.
+const WAIT: Duration = Duration::from_secs(10);
+
+const PHONE_NOTE: &str = "# From phone\n";
+const PHONE_DAILY: &str = "# 2026-10-01\n\n- morning\n- [[From phone]]\n";
+
 /// The next cycle after a failed pull (commit, fetch, merge, push) must keep
-/// the phone's note on disk, in HEAD, and on the remote. The failure mode
-/// this guards against is a commit of the stale working tree: the pulled
-/// note deleted, the daily note reverted, and both pushed (#1405).
+/// the phone's note and its daily-note link on disk, in `HEAD`, and on the
+/// remote, byte for byte. The failure mode this guards against is a commit
+/// of the stale working tree: the pulled note deleted, the daily note
+/// reverted, and both pushed (#1405).
 fn assert_next_cycle_keeps_pulled_notes(fixture: &Fixture) {
     let root_a = &fixture.graph_a;
     commit_all(root_a, "Update notes", MAX_FILE_BYTES).unwrap();
@@ -921,21 +925,14 @@ fn assert_next_cycle_keeps_pulled_notes(fixture: &Fixture) {
         "the pulled note was deleted from the working tree ({})",
         head_message(root_a)
     );
-    assert_eq!(read(root_a, "notes/from-phone.md"), "# From phone\n");
-    assert!(
-        read(root_a, "daily/2026-10-01.md").contains("[[From phone]]"),
-        "the daily note was reverted to its pre-pull content"
-    );
-    let local = head_tree_paths(root_a);
-    assert!(
-        local.contains(&"notes/from-phone.md".to_string()),
-        "{local:?}"
-    );
-    let remote = remote_tree_paths(fixture);
-    assert!(
-        remote.contains(&"notes/from-phone.md".to_string()),
-        "{remote:?}"
-    );
+    for (rel, expected) in [
+        ("notes/from-phone.md", PHONE_NOTE),
+        ("daily/2026-10-01.md", PHONE_DAILY),
+    ] {
+        assert_eq!(read(root_a, rel), expected, "{rel} on disk");
+        assert_eq!(head_blob(root_a, rel), expected, "{rel} in HEAD");
+        assert_eq!(remote_blob(fixture, rel), expected, "{rel} on the remote");
+    }
 }
 
 #[test]
@@ -990,10 +987,23 @@ fn commit_during_fast_forward_never_reverts_pulled_notes() {
             merge_remote(&root)
         }
     });
-    entered_rx.recv().unwrap();
-    commit_all(&root_a, "Update notes", MAX_FILE_BYTES).unwrap();
+    entered_rx.recv_timeout(WAIT).unwrap();
+    // The competing commit runs on its own worker: once git commands are
+    // serialized per graph it blocks until the pull finishes, so the pull
+    // must be released without waiting for it.
+    let (commit_started_tx, commit_started_rx) = mpsc::channel::<()>();
+    let commit = thread::spawn({
+        let root = root_a.clone();
+        move || {
+            commit_started_tx.send(()).unwrap();
+            commit_all(&root, "Update notes", MAX_FILE_BYTES)
+        }
+    });
+    commit_started_rx.recv_timeout(WAIT).unwrap();
+    thread::sleep(Duration::from_millis(200)); // let the commit land in the window, or block
     resume_tx.send(()).unwrap();
     pull.join().unwrap().unwrap();
+    commit.join().unwrap().unwrap();
 
     assert_next_cycle_keeps_pulled_notes(&fixture);
 }
@@ -1028,17 +1038,13 @@ fn merge_interrupted_before_commit_converges_next_cycle() {
     assert!(push(root_a, None).unwrap().pushed);
     let repo = Repository::open(root_a).unwrap();
     assert_eq!(repo.state(), git2::RepositoryState::Clean);
-    for path in ["notes/a.md", "notes/a2.md", "notes/b.md"] {
-        assert!(
-            root_a.join(path).exists(),
-            "{path} missing from the working tree"
-        );
-    }
-    let remote = remote_tree_paths(&fixture);
-    for path in ["notes/a.md", "notes/a2.md", "notes/b.md"] {
-        assert!(
-            remote.contains(&path.to_string()),
-            "{path} missing from the remote: {remote:?}"
-        );
+    for (rel, expected) in [
+        ("notes/a.md", "# A\n"),
+        ("notes/a2.md", "# A2\n"),
+        ("notes/b.md", "# B\n"),
+    ] {
+        assert_eq!(read(root_a, rel), expected, "{rel} on disk");
+        assert_eq!(head_blob(root_a, rel), expected, "{rel} in HEAD");
+        assert_eq!(remote_blob(&fixture, rel), expected, "{rel} on the remote");
     }
 }

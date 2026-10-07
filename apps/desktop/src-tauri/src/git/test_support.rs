@@ -80,15 +80,30 @@ pub(super) fn head_tree_paths(root: &Path) -> Vec<String> {
     tree_paths(&tree)
 }
 
-/// Blob paths in the bare remote's `main` tree.
-pub(super) fn remote_tree_paths(fixture: &Fixture) -> Vec<String> {
+/// The blob at `rel` in HEAD's tree, as text.
+pub(super) fn head_blob(root: &Path, rel: &str) -> String {
+    let repo = Repository::open(root).unwrap();
+    let tree = repo.head().unwrap().peel_to_tree().unwrap();
+    tree_blob(&repo, &tree, rel)
+}
+
+/// The blob at `rel` in the bare remote's `main` tree, as text.
+pub(super) fn remote_blob(fixture: &Fixture, rel: &str) -> String {
     let repo = Repository::open_bare(&fixture.remote_url).unwrap();
     let tree = repo
         .find_reference("refs/heads/main")
         .unwrap()
         .peel_to_tree()
         .unwrap();
-    tree_paths(&tree)
+    tree_blob(&repo, &tree, rel)
+}
+
+fn tree_blob(repo: &Repository, tree: &git2::Tree<'_>, rel: &str) -> String {
+    let entry = tree
+        .get_path(Path::new(rel))
+        .unwrap_or_else(|_| panic!("{rel} is missing from the tree"));
+    let blob = repo.find_blob(entry.id()).unwrap();
+    String::from_utf8(blob.content().to_vec()).unwrap()
 }
 
 fn tree_paths(tree: &git2::Tree<'_>) -> Vec<String> {
