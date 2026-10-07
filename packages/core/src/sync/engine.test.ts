@@ -219,6 +219,44 @@ describe('createSyncEngine', () => {
     engine.stop()
   })
 
+  it('after an auth failure, edits commit locally and skip the network until a resume', async () => {
+    // A rejected sign-in (or an ssh agent with no key) does not fix itself
+    // between keystrokes: per-edit retries would only repeat the error and
+    // the reconnect prompt. Local history keeps accumulating meanwhile.
+    let pushes = 0
+    const calls = fakeGit((command) => {
+      if (command === 'git_push') {
+        pushes += 1
+        throw { kind: 'auth', message: 'token rejected' }
+      }
+      return defaultResponses(command)
+    })
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => 'tok',
+      onStatus: (status) => {
+        statuses.push(status)
+      },
+      idleMs: 10,
+    })
+
+    engine.noteChanged()
+    await vi.runAllTimersAsync()
+    expect(statuses.at(-1)).toMatchObject({ state: 'error', errorKind: 'auth' })
+    const emitted = statuses.length
+
+    engine.noteChanged()
+    await vi.runAllTimersAsync()
+    expect(commandsOf(calls).filter((command) => command === 'git_commit_all')).toHaveLength(2)
+    expect(pushes).toBe(1)
+    expect(statuses).toHaveLength(emitted) // the auth error stays on screen
+
+    await engine.syncNow() // focus / online / manual: try the network again
+    expect(pushes).toBe(2)
+    engine.stop()
+  })
+
   it('surfaces a non-divergence rejection (e.g. push protection) as an error', async () => {
     fakeGit((command) => {
       if (command === 'git_push') {
