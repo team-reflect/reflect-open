@@ -1,5 +1,6 @@
 use std::fs;
 use std::panic::AssertUnwindSafe;
+use std::path::Path;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -213,6 +214,80 @@ fn commit_records_deletions() {
     let outcome = commit_all(root, "delete", MAX_FILE_BYTES).unwrap();
     assert!(outcome.committed);
     assert!(!head_tree_paths(root).contains(&"notes/gone.md".to_string()));
+}
+
+#[test]
+fn tracked_reflect_entries_are_dropped_from_the_next_commit() {
+    // A repository adopted from another tool already tracked the runtime
+    // directory; the next commit must record its removal.
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    {
+        let repo = Repository::open(root).unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(Path::new(".reflect/index.sqlite")).unwrap();
+        index.write().unwrap();
+        let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+        let sig = repo
+            .signature()
+            .unwrap_or_else(|_| git2::Signature::now("t", "t@t").unwrap());
+        repo.commit(Some("HEAD"), &sig, &sig, "tracked .reflect", &tree, &[])
+            .unwrap();
+    }
+    assert!(head_tree_paths(root).contains(&".reflect/index.sqlite".to_string()));
+
+    write(root, "notes/a.md", "# A\n");
+    let outcome = commit_all(root, "next", MAX_FILE_BYTES).unwrap();
+    assert!(outcome.committed);
+    let paths = head_tree_paths(root);
+    assert!(
+        !paths.iter().any(|path| path.starts_with(".reflect/")),
+        "{paths:?}"
+    );
+    assert!(
+        root.join(".reflect/index.sqlite").exists(),
+        "only untracked, never deleted"
+    );
+}
+
+#[test]
+fn prestaged_oversized_file_is_withheld() {
+    // Staged before it grew: the add-time guard never sees it again.
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "assets/big.bin", "small");
+    commit_all(root, "small", MAX_FILE_BYTES).unwrap();
+    {
+        let repo = Repository::open(root).unwrap();
+        let mut index = repo.index().unwrap();
+        fs::write(root.join("assets/big.bin"), vec![0u8; 64]).unwrap();
+        index.add_path(Path::new("assets/big.bin")).unwrap();
+        index.write().unwrap();
+    }
+    let outcome = commit_all(root, "guarded", 32).unwrap();
+    assert_eq!(outcome.skipped_large_files.len(), 1);
+    assert_eq!(outcome.skipped_large_files[0].path, "assets/big.bin");
+    // The tracked path keeps its committed blob: nothing new to commit, and
+    // no deletion for other devices to pull.
+    assert!(!outcome.committed);
+    assert_eq!(head_blob(root, "assets/big.bin"), "small");
+}
+
+#[test]
+fn prestaged_oversized_new_file_stays_out_of_the_commit() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    commit_all(root, "scaffold", MAX_FILE_BYTES).unwrap();
+    {
+        let repo = Repository::open(root).unwrap();
+        let mut index = repo.index().unwrap();
+        write(root, "assets/new.bin", "0123456789abcdef");
+        index.add_path(Path::new("assets/new.bin")).unwrap();
+        index.write().unwrap();
+    }
+    let outcome = commit_all(root, "guarded", 10).unwrap();
+    assert_eq!(outcome.skipped_large_files[0].path, "assets/new.bin");
+    assert!(!head_tree_paths(root).contains(&"assets/new.bin".to_string()));
 }
 
 #[test]

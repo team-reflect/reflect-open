@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 use std::path::Path;
 
-use git2::{Index, IndexAddOption};
+use git2::{Index, IndexAddOption, IndexEntry};
 use reflect_graph_paths::to_slash_lossy;
 use serde::Serialize;
 
@@ -56,7 +56,15 @@ pub(super) fn commit_all(
     repo.add_ignore_rule("/.reflect/")?;
 
     let mut index = repo.index()?;
-    let skipped = add_all_with_size_guard(&mut index, root, max_file_bytes)?;
+    let mut skipped = add_all_with_size_guard(&mut index, root, max_file_bytes)?;
+    // A repository adopted from elsewhere may already track `.reflect/`;
+    // the ignore rule above only keeps *new* paths out. Drop the tracked
+    // entries so the next commit records their removal.
+    index.remove_dir(Path::new(".reflect"), 0)?;
+    // Likewise a file staged before it grew (or by another tool) is already
+    // in the index: the add-time guard never saw it. Withhold it here.
+    withhold_oversized_entries(&repo, &mut index, root, max_file_bytes, &mut skipped)?;
+    index.write()?;
 
     let parent = repo.head().ok().and_then(|head| head.peel_to_commit().ok());
     if parent.is_none() && index.is_empty() {
@@ -169,6 +177,47 @@ fn add_all_with_size_guard(
     index.update_all(["*"], Some(&mut size_guard))?;
     index.write()?;
     Ok(skipped.into_inner())
+}
+
+/// Withhold index entries that carry new oversized content: a file staged
+/// before it grew, or staged by another tool, is already in the index and
+/// the add-time guard never saw it. A path `HEAD` already tracks keeps its
+/// committed blob (the backup holds the old version; recording a deletion
+/// would delete it on every other device), a new path leaves the index.
+fn withhold_oversized_entries(
+    repo: &git2::Repository,
+    index: &mut Index,
+    root: &Path,
+    max_file_bytes: u64,
+    skipped: &mut Vec<SkippedFile>,
+) -> AppResult<()> {
+    let head_tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
+    let oversized: Vec<(IndexEntry, String, u64)> = index
+        .iter()
+        .filter_map(|entry| {
+            let rel = String::from_utf8_lossy(&entry.path).into_owned();
+            let size = root.join(&rel).metadata().ok()?.len();
+            (size >= max_file_bytes).then_some((entry, rel, size))
+        })
+        .collect();
+    for (entry, rel, size) in oversized {
+        let path = Path::new(&rel);
+        let committed = head_tree.as_ref().and_then(|tree| tree.get_path(path).ok());
+        match committed {
+            Some(committed) if committed.id() == entry.id => continue, // unchanged, already backed up
+            Some(committed) => index.add(&IndexEntry {
+                id: committed.id(),
+                mode: committed.filemode() as u32,
+                file_size: 0,
+                ..entry
+            })?,
+            None => index.remove_path(path)?,
+        }
+        if !skipped.iter().any(|file| file.path == rel) {
+            skipped.push(SkippedFile { path: rel, size });
+        }
+    }
+    Ok(())
 }
 
 /// Ahead-count vs the last-fetched remote branch. When it can't be computed
