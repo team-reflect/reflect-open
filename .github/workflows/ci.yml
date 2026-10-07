@@ -193,14 +193,12 @@ jobs:
         with:
           cache-key: build-windows-desktop
 
-      # Without the updater key, the script writes no updater signature.
       - name: Build
         shell: bash
         run: pnpm release:windows
 
   # A single job for branch protection to require, instead of listing every
-  # job (and every matrix entry) as a required status check. The `build-*`
-  # jobs are not listed: they are skipped on most pull requests.
+  # job (and every matrix entry) as a required status check.
   all-green:
     runs-on: ubuntu-slim
     timeout-minutes: 10
