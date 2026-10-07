@@ -4,6 +4,7 @@
 //
 //   --build-number=<digits>   Required
 //   --export-method=<name>    Default: app-store-connect
+//   --no-upload               Build and check only: no Sentry or TestFlight upload
 
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -46,6 +47,7 @@ interface Credentials {
 interface Options {
   readonly buildNumber: string
   readonly exportMethod: string
+  readonly upload: boolean
 }
 
 /** The App Store Connect API key, as altool arguments and as the environment Tauri reads. */
@@ -144,7 +146,7 @@ async function uploadDebugFiles(): Promise<void> {
 }
 
 async function build(
-  { buildNumber, exportMethod }: Options,
+  { buildNumber, exportMethod, upload }: Options,
   credentials: Credentials,
 ): Promise<void> {
   const config = JSON.stringify({ bundle: { iOS: { bundleVersion: buildNumber } } })
@@ -155,7 +157,9 @@ async function build(
   })
   await assertIpa()
   await assertArchiveSymbols()
-  await uploadDebugFiles()
+  if (upload) {
+    await uploadDebugFiles()
+  }
   log(`built ${IPA_PATH} (build ${buildNumber})`)
 }
 
@@ -172,6 +176,7 @@ async function main(): Promise<void> {
     options: {
       'build-number': { type: 'string', default: '' },
       'export-method': { type: 'string', default: 'app-store-connect' },
+      'no-upload': { type: 'boolean', default: false },
     },
   })
   const buildNumber = values['build-number']
@@ -182,9 +187,12 @@ async function main(): Promise<void> {
 
   await runWithTempDir(async (tempDir) => {
     const credentials = resolveCredentials(tempDir)
-    await build({ buildNumber, exportMethod: values['export-method'] }, credentials)
-    // --wait blocks until App Store Connect has processed the build.
-    await runAltool(['--upload-package', IPA_PATH, '--show-progress', '--wait'], credentials)
+    const upload = !values['no-upload']
+    await build({ buildNumber, exportMethod: values['export-method'], upload }, credentials)
+    if (upload) {
+      // --wait blocks until App Store Connect has processed the build.
+      await runAltool(['--upload-package', IPA_PATH, '--show-progress', '--wait'], credentials)
+    }
   })
 }
 

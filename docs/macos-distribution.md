@@ -131,6 +131,11 @@ PRs created with `GITHUB_TOKEN` do not start `pull_request` workflows, so checks
 not appear automatically on the bot-created Release PRs. Use the run-checks button
 before merging one.
 
+On a Release PR, CI also runs the `build-macos-desktop`, `build-ios-mobile`, and
+`build-windows-desktop` jobs. They run the release scripts as a rehearsal: they build
+and sign, but they do not notarize and they upload nothing. A manual run of the CI
+workflow starts them on any branch.
+
 ### Beta (the everyday release)
 
 1. Land PRs on `master` as usual.
