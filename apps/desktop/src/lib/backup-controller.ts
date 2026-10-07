@@ -16,7 +16,9 @@ import {
   isCaptureSpoolPath,
   isNotePath,
   loadGithubAuth,
+  loadHostCredential,
   parseGithubRemote,
+  remoteHost,
   ReflectError,
   subscribeFileChanges,
   type ChangedFile,
@@ -321,12 +323,14 @@ export function createBackupController(options: BackupControllerOptions): Backup
         await startLocalHistory(status.initialized)
         return
       }
-      if (repo === null && /^https?:\/\//i.test(remoteUrl)) {
-        // Plan 16 V1 speaks SSH (and paths) to generic hosts, not HTTPS.
-        // Fail at adoption, not at the first push: a *public* HTTPS remote
-        // would pull anonymously and only 401 on push — the other device's
-        // edits arriving while this one's silently never leave. The engine
-        // never starts; `rejected` = acting (not retrying) is the fix.
+      // A non-GitHub HTTPS host needs a stored sign-in (SSH and path remotes
+      // need none: the agent or the filesystem answers). Fail at adoption,
+      // not at the first push: a *public* HTTPS remote would pull anonymously
+      // and only 401 on push — the other device's edits arriving while this
+      // one's silently never leave. `rejected` = acting (not retrying) is
+      // the fix.
+      const host = repo === null ? remoteHost(remoteUrl) : null
+      if (host !== null && (await loadHostCredential(host)) === null) {
         setState({
           phase: 'connected',
           remoteUrl,
@@ -334,8 +338,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
           status: {
             state: 'error',
             errorKind: 'rejected',
-            message:
-              'HTTPS isn’t supported for this host yet — switch the remote to its SSH form: git remote set-url origin git@<host>:<owner>/<repo>.git',
+            message: `No sign-in is stored for ${host}. Add one in Settings → GitHub sync, or switch the remote to its SSH form: git remote set-url origin git@${host}:<owner>/<repo>.git`,
           },
         })
         await startLocalHistory(status.initialized)
@@ -350,15 +353,18 @@ export function createBackupController(options: BackupControllerOptions): Backup
         // The background flusher's protected local commit bypasses this
         // engine deliberately.
         canStartCycle: () => !isMobileSurface() || document.visibilityState !== 'hidden',
-        // The managed sign-in is for github.com only — a generic host must
-        // never receive it. Rust resolves generic credentials locally.
+        // The managed sign-in is for github.com only; another HTTPS host gets
+        // its own stored sign-in; SSH and path remotes get none and Rust
+        // resolves them locally.
         getCredential:
-          repo === null
-            ? async () => null
-            : async () => {
+          repo !== null
+            ? async () => {
                 const token = await getGithubToken(providerFetch)
                 return token === null ? null : githubCredential(token)
-              },
+              }
+            : host !== null
+              ? () => loadHostCredential(host)
+              : async () => null,
         onStatus: (engineStatus) => {
           setState({ phase: 'connected', remoteUrl, repo, status: engineStatus })
         },

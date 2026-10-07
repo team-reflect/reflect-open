@@ -50,6 +50,8 @@ interface FakeOptions {
   failStatus?: boolean
   /** Make the keychain read throw (locked keychain, stale ACL after re-signing). */
   failSecretGet?: boolean
+  /** A stored sign-in for a non-GitHub host (`git-host:<host>`), as JSON. */
+  hostSecret?: string | null
   /** Scripted `git_merge_remote` outcome (defaults to up-to-date). */
   mergeOutcome?: unknown
   /** Per-call merge outcomes for retry/convergence tests. */
@@ -100,6 +102,9 @@ function fakeBridge(options: FakeOptions = {}) {
         case 'secret_get':
           if (options.failSecretGet === true) {
             throw { kind: 'io', message: 'keychain unavailable' }
+          }
+          if (String(args['name']).startsWith('git-host:')) {
+            return options.hostSecret ?? null
           }
           return auth
         case 'secret_delete':
@@ -256,7 +261,7 @@ describe('createBackupController', () => {
     controller.dispose()
   })
 
-  it('refuses a generic HTTPS remote at adoption with the SSH suggestion', async () => {
+  it('refuses a generic HTTPS remote without a stored sign-in', async () => {
     // A *public* generic HTTPS remote would pull anonymously and only fail
     // on push — edits arriving while the user's own never leave. The guard
     // surfaces the error before the engine ever starts.
@@ -286,6 +291,23 @@ describe('createBackupController', () => {
     expect(commitCount(calls)).toBe(1)
     expect(calls).not.toContain('git_fetch')
     expect(calls).not.toContain('git_push')
+    controller.dispose()
+  })
+
+  it('adopts a generic HTTPS remote with a stored host sign-in and sends it', async () => {
+    const { calls, invocations } = fakeBridge({
+      auth: null,
+      remoteUrl: 'https://gitlab.com/alex/notes.git',
+      hostSecret: JSON.stringify({ username: 'alex', secret: 'glpat-xyz' }),
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_fetch')
+    })
+    const fetch = invocations.find((call) => call.command === 'git_fetch')
+    expect(fetch?.args).toMatchObject({ credential: { username: 'alex', secret: 'glpat-xyz' } })
+    expect(controller.getState()).toMatchObject({ phase: 'connected', repo: null })
     controller.dispose()
   })
 
