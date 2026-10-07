@@ -501,17 +501,41 @@ fn copy_and_verify(root: &Path, target: &Path) -> AppResult<()> {
             copied.0, copied.1, landed.0, landed.1
         )));
     }
+    settle_repository(target)
+}
+
+/// The copied backup repository at its new home: excluded from iCloud (an
+/// object store must never sync file by file) and without `origin`, so the
+/// moved graph starts with iCloud as its only sync method. History stays;
+/// the user reconnects a remote from Settings when they want one.
+fn settle_repository(target: &Path) -> AppResult<()> {
+    let git_dir = target.join(".git");
+    if !git_dir.exists() {
+        return Ok(());
+    }
+    crate::fs::mark_dir_local_only(&git_dir);
+    let repo = git2::Repository::open(target)?;
+    if repo.find_remote("origin").is_ok() {
+        repo.remote_delete("origin")?;
+    }
     Ok(())
 }
 
 /// Names that never ride a file-sync provider: the rebuildable local state,
-/// the backup repo, and OS litter. A move-in leaves them behind
-/// ([`copy_graph_tree`]), and the pending-download walk never descends into
-/// them — `.reflect/` and `.git/` are marked sync-excluded at bootstrap
+/// the backup repo, and OS litter. The pending-download walk never descends
+/// into them — `.reflect/` and `.git/` are marked sync-excluded at bootstrap
 /// (`fs::io::mark_dir_local_only`), so iCloud can never hold a placeholder
 /// under either.
 fn local_only_name(name: &str) -> bool {
     matches!(name, ".reflect" | ".git" | ".DS_Store")
+}
+
+/// What a move-in leaves behind ([`copy_graph_tree`]): the rebuildable local
+/// state and OS litter. The backup repository travels with the graph (its
+/// history is the user's) and is settled at the new home by
+/// [`settle_repository`].
+fn left_behind(name: &str) -> bool {
+    matches!(name, ".reflect" | ".DS_Store")
 }
 
 /// Recursively copy the graph tree, returning `(files, bytes)` copied.
@@ -524,7 +548,7 @@ fn copy_graph_tree(source: &Path, target: &Path) -> AppResult<(u64, u64)> {
         for entry in std::fs::read_dir(&from_dir)? {
             let entry = entry?;
             let name = entry.file_name();
-            if local_only_name(&name.to_string_lossy()) {
+            if left_behind(&name.to_string_lossy()) {
                 continue;
             }
             let file_type = entry.file_type()?;
@@ -553,7 +577,7 @@ fn count_graph_tree(root: &Path) -> AppResult<(u64, u64)> {
     while let Some(dir) = stack.pop() {
         for entry in std::fs::read_dir(&dir)? {
             let entry = entry?;
-            if local_only_name(&entry.file_name().to_string_lossy()) {
+            if left_behind(&entry.file_name().to_string_lossy()) {
                 continue;
             }
             let file_type = entry.file_type()?;
@@ -609,28 +633,39 @@ mod tests {
     }
 
     #[test]
-    fn adopt_copy_skips_local_state_and_verifies() {
+    fn adopt_copy_keeps_history_marked_local_only_without_origin() {
         let source = tempfile::tempdir().expect("tempdir");
         std::fs::create_dir_all(source.path().join("notes")).expect("mkdir");
         std::fs::create_dir_all(source.path().join(".reflect")).expect("mkdir");
-        std::fs::create_dir_all(source.path().join(".git")).expect("mkdir");
         std::fs::write(source.path().join("notes/a.md"), b"# A").expect("write");
         std::fs::write(source.path().join(".reflect/index.sqlite"), b"db").expect("write");
-        std::fs::write(source.path().join(".git/HEAD"), b"ref").expect("write");
         std::fs::write(source.path().join(".DS_Store"), b"junk").expect("write");
+        let repo = git2::Repository::init(source.path()).expect("init");
+        repo.remote("origin", "https://example.com/owner/notes.git")
+            .expect("remote");
 
         let container = tempfile::tempdir().expect("tempdir");
         let target = container.path().join("Notes");
-        let copied = copy_graph_tree(source.path(), &target).expect("copy");
-        assert_eq!(copied, (1, 3)); // one file, three bytes — the note alone
-        assert_eq!(count_graph_tree(&target).expect("count"), copied);
+        adopt_into(source.path(), &target).expect("adopt");
+
         assert_eq!(
             std::fs::read_to_string(target.join("notes/a.md")).expect("read"),
             "# A"
         );
         assert!(!target.join(".reflect").exists());
-        assert!(!target.join(".git").exists());
         assert!(!target.join(".DS_Store").exists());
+        // The repository came along, without its remote: the moved graph
+        // syncs through iCloud only until the user reconnects one.
+        let copy = git2::Repository::open(&target).expect("open copy");
+        assert!(copy.find_remote("origin").is_err());
+        // The original keeps everything, remote included: it is the
+        // recovery copy.
+        assert!(repo.find_remote("origin").is_ok());
+        // The verification counts the repository too.
+        let again = container.path().join("Again");
+        let copied = copy_graph_tree(source.path(), &again).expect("copy");
+        assert!(copied.0 > 1, "{copied:?}");
+        assert_eq!(count_graph_tree(&again).expect("count"), copied);
     }
 
     /// The pending walk must count placeholders anywhere in the graph but
