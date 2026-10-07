@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog.tsx'
 import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links.tsx'
 import { SettingsField } from '@/components/settings/field.tsx'
+import { GithubSignInDialog } from '@/components/settings/github-sign-in-dialog.tsx'
 import { GithubSignOutRow } from '@/components/settings/github-sign-out-row.tsx'
 import { SyncForkNotice } from '@/components/settings/sync-fork-notice.tsx'
 import { Button } from '@/components/ui/button.tsx'
@@ -54,6 +55,7 @@ export function BackupSettingsField(): ReactElement {
   const { graph } = useGraph()
   const githubConnected = useGithubConnected()
   const [connectOpen, setConnectOpen] = useState(false)
+  const [signInOpen, setSignInOpen] = useState(false)
   const openRepoAttempt = useRef(0)
   const action = useAsyncAction()
 
@@ -121,10 +123,20 @@ export function BackupSettingsField(): ReactElement {
 
           {backup.phase === 'disconnected' ? (
             <>
-              <div>
+              <div className="flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => setConnectOpen(true)}>
                   Connect GitHub…
                 </Button>
+                {githubConnected ? null : (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    title="Store a GitHub sign-in without backing up this graph, for publishing notes as gists"
+                    onClick={() => setSignInOpen(true)}
+                  >
+                    Sign in only…
+                  </Button>
+                )}
               </div>
               {githubConnected ? (
                 <GithubSignOutRow
@@ -196,7 +208,8 @@ export function BackupSettingsField(): ReactElement {
           suggestedRepoName={suggestRepoName(graph?.name)}
           onClose={() => setConnectOpen(false)}
         />
-      ) : null}
+      ) : null}{' '}
+      {signInOpen ? <GithubSignInDialog onClose={() => setSignInOpen(false)} /> : null}
     </>
   )
 }

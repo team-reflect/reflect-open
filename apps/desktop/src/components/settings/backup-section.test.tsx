@@ -253,6 +253,23 @@ describe('BackupSettingsField', () => {
       .not.toBeInTheDocument()
   })
 
+  it('offers a sign-in without a backup when not signed in to GitHub', async () => {
+    // #1375: iCloud and generic-remote graphs still want gist publishing,
+    // which only needs the credential, not a backup repository.
+    github.connected = false
+    await renderSection({ phase: 'disconnected' })
+
+    await userEvent.click(page.getByRole('button', { name: /Sign in only/ }))
+    await expect.element(page.getByRole('heading', { name: 'Sign in to GitHub' })).toBeVisible()
+  })
+
+  it('hides the sign-in-only button once signed in', async () => {
+    github.connected = true
+    await renderSection({ phase: 'disconnected' })
+
+    await expect.element(page.getByRole('button', { name: /Sign in only/ })).not.toBeInTheDocument()
+  })
+
   it('signs out of GitHub from the disconnected state', async () => {
     github.connected = true
     await renderSection({ phase: 'disconnected' })
