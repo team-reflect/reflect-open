@@ -58,6 +58,7 @@ export {
   type GithubUser,
 } from './github.ts'
 export { createGist, updateGist, deleteGist, type PublishedGist, type GistFile } from './gists.ts'
+export { getSyncPrefs, setSyncPrefs, syncPrefsSchema, type SyncPrefs } from './prefs.ts'
 export {
   createSyncEngine,
   isSyncError,

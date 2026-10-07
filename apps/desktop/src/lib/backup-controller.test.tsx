@@ -60,6 +60,8 @@ interface FakeOptions {
   remoteUrl?: string | null
   /** Whether the graph already has a repository (defaults to true). */
   initialized?: boolean
+  /** This device's `.reflect/sync.json` (defaults to not the backup writer). */
+  backupWriter?: boolean
 }
 
 /** Bridge fake with a mutable repo status, recording every command. */
@@ -133,6 +135,10 @@ function fakeBridge(options: FakeOptions = {}) {
               releaseIndexApply = resolve
             })
           }
+          return null
+        case 'sync_prefs_get':
+          return { backupWriter: options.backupWriter ?? false }
+        case 'sync_prefs_set':
           return null
         case 'git_disconnect':
           status.remoteUrl = null
@@ -230,6 +236,7 @@ describe('createBackupController', () => {
 
     expect(controller.getState()).toMatchObject({
       phase: 'connected',
+      role: 'writer',
       remoteUrl: 'git@gitlab.com:alex/notes.git',
       repo: null,
     })
@@ -266,6 +273,7 @@ describe('createBackupController', () => {
 
     expect(controller.getState()).toMatchObject({
       phase: 'connected',
+      role: 'writer',
       repo: null,
       status: { state: 'error', errorKind: 'rejected' },
     })
@@ -299,6 +307,7 @@ describe('createBackupController', () => {
 
     expect(controller.getState()).toMatchObject({
       phase: 'connected',
+      role: 'writer',
       repo: null,
       status: { state: 'error', errorKind: 'rejected' },
     })
@@ -465,6 +474,7 @@ describe('createBackupController', () => {
     })
     expect(controller.getState()).toMatchObject({
       phase: 'connected',
+      role: 'writer',
       repo: { owner: 'alex', name: 'g-backup' },
     })
     controller.dispose()
@@ -514,6 +524,48 @@ describe('createBackupController', () => {
 
     expect(calls).toContain('secret_delete')
     expect(controller.getState()).toEqual({ phase: 'disconnected' })
+    controller.dispose()
+  })
+
+  const ICLOUD_GRAPH: GraphInfo = {
+    ...GRAPH,
+    root: '/Users/alex/Library/Mobile Documents/iCloud~app~reflect/Documents/G',
+  }
+
+  it('an iCloud graph with a remote is a reader by default: local history, no network', async () => {
+    // iCloud Drive moves the files; a second device pushing the same
+    // changes only produces duplicate commits and a merge per edit.
+    const { calls } = fakeBridge()
+    const controller = createBackupController({ graph: ICLOUD_GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_commit_all')
+    })
+    expect(controller.getState()).toMatchObject({ phase: 'connected', role: 'reader' })
+    expect(calls).not.toContain('git_fetch')
+    expect(calls).not.toContain('git_push')
+    controller.dispose()
+  })
+
+  it('the chosen backup writer on an iCloud graph syncs normally', async () => {
+    const { calls } = fakeBridge({ backupWriter: true })
+    const controller = createBackupController({ graph: ICLOUD_GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_fetch')
+    })
+    expect(controller.getState()).toMatchObject({ phase: 'connected', role: 'writer' })
+    controller.dispose()
+  })
+
+  it('setBackupWriter persists the choice and restarts', async () => {
+    const { calls, invocations } = fakeBridge()
+    const controller = createBackupController({ graph: ICLOUD_GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await controller.setBackupWriter(true)
+    const saved = invocations.find((call) => call.command === 'sync_prefs_set')
+    expect(saved?.args).toMatchObject({ prefs: { backupWriter: true }, generation: 3 })
+    expect(calls.filter((command) => command === 'git_status')).toHaveLength(2)
     controller.dispose()
   })
 
@@ -722,6 +774,7 @@ describe('createBackupController', () => {
       expect(calls.filter((command) => command === 'index_apply_batch')).toHaveLength(1)
       expect(controller.getState()).toMatchObject({
         phase: 'connected',
+        role: 'writer',
         status: { state: 'syncing' },
       })
 
@@ -730,6 +783,7 @@ describe('createBackupController', () => {
         expect(calls.filter((command) => command === 'index_apply_batch')).toHaveLength(2)
         expect(controller.getState()).toMatchObject({
           phase: 'connected',
+          role: 'writer',
           status: { state: 'idle' },
         })
       })
@@ -794,6 +848,7 @@ describe('createBackupController', () => {
     })
     expect(controller.getState()).toMatchObject({
       phase: 'connected',
+      role: 'writer',
       status: { state: 'syncing' },
     })
 
@@ -801,6 +856,7 @@ describe('createBackupController', () => {
     await vi.waitFor(() => {
       expect(controller.getState()).toMatchObject({
         phase: 'connected',
+        role: 'writer',
         status: { state: 'idle' },
       })
     })
@@ -823,6 +879,7 @@ describe('createBackupController', () => {
     await vi.waitFor(() => {
       expect(controller.getState()).toMatchObject({
         phase: 'connected',
+        role: 'writer',
         status: { state: 'idle' },
       })
     })

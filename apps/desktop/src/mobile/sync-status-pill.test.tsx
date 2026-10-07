@@ -31,6 +31,7 @@ vi.mock('@/providers/sync-provider.tsx', () => ({
 function connected(status: Extract<BackupState, { phase: 'connected' }>['status']): BackupState {
   return {
     phase: 'connected',
+    role: 'writer',
     remoteUrl: 'https://github.com/alex/notes.git',
     repo: { owner: 'alex', name: 'notes' },
     status,

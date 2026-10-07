@@ -35,6 +35,7 @@ mod recents;
 mod secrets;
 mod settings;
 mod skill;
+mod sync_prefs;
 #[cfg(target_os = "macos")]
 mod wake;
 mod web_fetch;
@@ -323,6 +324,8 @@ pub fn run() {
             recents::recent_graphs,
             recents::forget_recent,
             settings::settings_load,
+            sync_prefs::sync_prefs_get,
+            sync_prefs::sync_prefs_set,
             settings::settings_save,
             skill::skill_status,
             skill::skill_install,

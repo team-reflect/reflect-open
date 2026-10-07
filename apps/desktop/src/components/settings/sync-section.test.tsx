@@ -155,6 +155,7 @@ describe('SyncSection', () => {
     core.conflictedNotes = [{ path: 'notes/conflicted.md', title: 'Conflicted note' }]
     sync.backup = {
       phase: 'connected',
+      role: 'writer',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
@@ -172,6 +173,7 @@ describe('SyncSection', () => {
     core.conflictedNotes = [{ path: 'notes/conflicted.md', title: 'Conflicted note' }]
     sync.backup = {
       phase: 'connected',
+      role: 'writer',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },

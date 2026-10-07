@@ -17,17 +17,24 @@ const sync = vi.hoisted(() => ({
   disconnectGraph: vi.fn(async () => {}),
   signOut: vi.fn(async () => {}),
   backUpNow: vi.fn(async () => {}),
+  setBackupWriter: vi.fn(async () => {}),
 }))
 const github = vi.hoisted(() => ({ connected: false }))
+const graphMock = vi.hoisted(() => ({ root: null as string | null }))
 vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn(async () => {}) }))
 vi.mock('@/providers/sync-provider.tsx', () => ({ useSync: () => sync }))
-vi.mock('@/providers/graph-provider.tsx', () => ({ useGraph: () => ({ graph: null }) }))
+vi.mock('@/providers/graph-provider.tsx', () => ({
+  useGraph: () => ({
+    graph: graphMock.root === null ? null : { root: graphMock.root, name: 'G', generation: 1 },
+  }),
+}))
 vi.mock('@/hooks/use-github-connected.ts', () => ({ useGithubConnected: () => github.connected }))
 
 afterEach(async () => {
   await cleanup()
   vi.clearAllMocks()
   github.connected = false
+  graphMock.root = null
 })
 
 async function renderSection(backup: BackupState): Promise<void> {
@@ -49,6 +56,7 @@ describe('BackupSettingsField', () => {
   it('renders a generic remote host-neutrally with the engine’s own auth message', async () => {
     await renderSection({
       phase: 'connected',
+      role: 'writer',
       remoteUrl: 'git@gitlab.com:alex/notes.git',
       repo: null,
       status: AUTH_ERROR,
@@ -72,6 +80,7 @@ describe('BackupSettingsField', () => {
   it('renders a GitHub remote with the reconnect affordances', async () => {
     await renderSection({
       phase: 'connected',
+      role: 'writer',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: AUTH_ERROR,
@@ -89,6 +98,7 @@ describe('BackupSettingsField', () => {
   it('opens the connected GitHub repository', async () => {
     await renderSection({
       phase: 'connected',
+      role: 'writer',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
@@ -103,6 +113,7 @@ describe('BackupSettingsField', () => {
     vi.mocked(openUrl).mockRejectedValueOnce(new Error('No browser'))
     await renderSection({
       phase: 'connected',
+      role: 'writer',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
@@ -123,6 +134,7 @@ describe('BackupSettingsField', () => {
     vi.mocked(openUrl).mockRejectedValueOnce(new Error('No browser'))
     await renderSection({
       phase: 'connected',
+      role: 'writer',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
@@ -149,6 +161,7 @@ describe('BackupSettingsField', () => {
       .mockResolvedValueOnce()
     await renderSection({
       phase: 'connected',
+      role: 'writer',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
@@ -167,6 +180,7 @@ describe('BackupSettingsField', () => {
   it('confirms before signing out of GitHub', async () => {
     await renderSection({
       phase: 'connected',
+      role: 'writer',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
@@ -192,6 +206,7 @@ describe('BackupSettingsField', () => {
     sync.signOut.mockRejectedValueOnce(new Error('Keychain denied'))
     await renderSection({
       phase: 'connected',
+      role: 'writer',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
@@ -215,6 +230,7 @@ describe('BackupSettingsField', () => {
     )
     await renderSection({
       phase: 'connected',
+      role: 'writer',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
@@ -231,6 +247,33 @@ describe('BackupSettingsField', () => {
     await expect
       .element(page.getByRole('heading', { name: 'Sign out of GitHub?' }))
       .not.toBeInTheDocument()
+  })
+
+  it('lets an iCloud graph choose this device as the backup writer', async () => {
+    graphMock.root = '/Users/alex/Library/Mobile Documents/iCloud~app~reflect/Documents/G'
+    await renderSection({
+      phase: 'connected',
+      role: 'reader',
+      remoteUrl: 'https://github.com/alex/notes.git',
+      repo: { owner: 'alex', name: 'notes' },
+      status: { state: 'idle' },
+    })
+
+    await expect.element(page.getByText(/another device pushes the backup/)).toBeVisible()
+    await userEvent.click(page.getByRole('switch'))
+    await vi.waitFor(() => expect(sync.setBackupWriter).toHaveBeenCalledWith(true))
+  })
+
+  it('shows no backup-writer switch outside iCloud', async () => {
+    await renderSection({
+      phase: 'connected',
+      role: 'writer',
+      remoteUrl: 'https://github.com/alex/notes.git',
+      repo: { owner: 'alex', name: 'notes' },
+      status: { state: 'idle' },
+    })
+
+    await expect.element(page.getByRole('switch')).not.toBeInTheDocument()
   })
 
   it('offers sign-out with no connected graph when signed in to GitHub', async () => {

@@ -35,6 +35,8 @@ interface SyncContextValue {
   /** Sign the machine out of GitHub (every connected graph stops syncing). */
   signOut: () => Promise<void>
   backUpNow: () => Promise<void>
+  /** On an iCloud graph: make this device the one that pushes the backup (or stop). */
+  setBackupWriter: (enabled: boolean) => Promise<void>
 }
 
 const SyncContext = createContext<SyncContextValue | null>(null)
@@ -112,6 +114,7 @@ export function SyncProvider({ graph, children }: SyncProviderProps): ReactEleme
       disconnectGraph: () => require().disconnectGraph(),
       signOut: () => require().signOut(),
       backUpNow: () => require().backUpNow(),
+      setBackupWriter: (enabled) => require().setBackupWriter(enabled),
     }
   }, [controller, backup])
 

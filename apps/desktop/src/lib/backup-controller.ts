@@ -7,6 +7,7 @@ import {
   errorMessage,
   getGithubRepo,
   getGithubToken,
+  getSyncPrefs,
   githubRemoteUrl,
   gitCommitAll,
   gitDisconnect,
@@ -17,6 +18,7 @@ import {
   loadGithubAuth,
   parseGithubRemote,
   ReflectError,
+  setSyncPrefs,
   subscribeFileChanges,
   type ChangedFile,
   type GithubRepoRef,
@@ -27,6 +29,7 @@ import {
 } from '@reflect/core'
 import { setBackupFlusher } from '@/lib/backup-flush.ts'
 import { invalidateGithubAuth } from '@/lib/github-auth-state.ts'
+import { isICloudRoot } from '@/lib/icloud-controller.ts'
 import { startOperation } from '@/lib/operations.ts'
 import { isNativeShell } from '@/lib/platform.ts'
 import { isMobileSurface } from '@/lib/platform-surface.ts'
@@ -43,12 +46,25 @@ import { attachResumeListeners } from '@/lib/resume-listeners.ts'
  *
  * `disconnected` means no *backup*: on desktop such graphs still run the
  * local-history commit loop (see `startLocalHistory`), which the UI never
- * surfaces.
+ * surfaces. A graph that iCloud Drive syncs may hold a remote and still be
+ * a `reader` here (see `BackupState.role`): one device pushes the backup,
+ * the others would only produce duplicate commits and merge churn.
  */
 export type BackupState =
   | { phase: 'loading' }
   | { phase: 'disconnected' }
-  | { phase: 'connected'; remoteUrl: string; repo: GithubRepoRef | null; status: SyncStatus }
+  | {
+      phase: 'connected'
+      remoteUrl: string
+      repo: GithubRepoRef | null
+      status: SyncStatus
+      /**
+       * `reader` on a graph iCloud Drive already syncs when this device is
+       * not the chosen backup writer: the remote stays connected, edits land
+       * in local history, but nothing is fetched or pushed from here.
+       */
+      role: 'writer' | 'reader'
+    }
 
 /** Outcome of connecting to an existing repo (the public case needs consent). */
 export type ConnectExistingResult = 'connected' | 'needsPublicConfirm' | 'notFound'
@@ -113,12 +129,15 @@ export interface BackupController {
   signOut(): Promise<void>
   /** Full cycle now: commit, pull/merge, push. */
   backUpNow(): Promise<void>
+  /** On an iCloud graph: make this device the one that pushes the backup (or stop). */
+  setBackupWriter(enabled: boolean): Promise<void>
   /** Tear everything down; the controller is unusable afterwards. */
   dispose(): void
 }
 
 export function createBackupController(options: BackupControllerOptions): BackupController {
-  const generation = options.graph.generation
+  const graph = options.graph
+  const generation = graph.generation
   const indexGeneration = options.indexGeneration
 
   let state: BackupState = { phase: 'loading' }
@@ -330,6 +349,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
           phase: 'connected',
           remoteUrl,
           repo: null,
+          role: 'writer',
           status: {
             state: 'error',
             errorKind: 'rejected',
@@ -340,8 +360,16 @@ export function createBackupController(options: BackupControllerOptions): Backup
         await startLocalHistory(status.initialized)
         return
       }
+      // iCloud Drive already moves the files of a graph in its container;
+      // one device pushing the backup is enough, and two fight over every
+      // edit. The others keep the remote connected but run commit-only.
+      const role =
+        isICloudRoot(graph.root) && !(await getSyncPrefs(generation)).backupWriter
+          ? 'reader'
+          : 'writer'
       const next = createSyncEngine({
         generation,
+        localOnly: role === 'reader',
         ...(isMobileSurface() ? { idleMs: MOBILE_IDLE_MS } : {}),
         // iOS can suspend us at any await. Do not begin a launch, online, or
         // debounced Git cycle after the document is hidden; the existing
@@ -353,7 +381,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
         // never receive it. Rust resolves generic credentials locally.
         getToken: repo === null ? async () => null : () => getGithubToken(providerFetch),
         onStatus: (engineStatus) => {
-          setState({ phase: 'connected', remoteUrl, repo, status: engineStatus })
+          setState({ phase: 'connected', remoteUrl, repo, role, status: engineStatus })
         },
         onLargeFilesSkipped: (files) => {
           // Surface the guardrail loudly: these files are NOT in the backup.
@@ -362,7 +390,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
         },
         onRemoteChanges,
       })
-      setState({ phase: 'connected', remoteUrl, repo, status: { state: 'idle' } })
+      setState({ phase: 'connected', remoteUrl, repo, role, status: { state: 'idle' } })
       if (!(await adoptEngine(next))) {
         return
       }
@@ -443,6 +471,10 @@ export function createBackupController(options: BackupControllerOptions): Backup
     },
     backUpNow: async () => {
       await engine?.syncNow()
+    },
+    setBackupWriter: async (enabled) => {
+      await setSyncPrefs({ backupWriter: enabled }, generation)
+      await start()
     },
     dispose: () => {
       disposed = true

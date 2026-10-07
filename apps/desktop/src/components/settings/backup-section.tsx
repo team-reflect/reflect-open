@@ -8,10 +8,12 @@ import { SettingsField } from '@/components/settings/field.tsx'
 import { GithubSignOutRow } from '@/components/settings/github-sign-out-row.tsx'
 import { SyncForkNotice } from '@/components/settings/sync-fork-notice.tsx'
 import { Button } from '@/components/ui/button.tsx'
+import { Switch } from '@/components/ui/switch.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useBridgeReady } from '@/hooks/use-bridge-ready.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
 import { suggestRepoName } from '@/lib/github-repos.ts'
+import { isICloudRoot } from '@/lib/icloud-controller.ts'
 import {
   createConflictedNotesQueryOptions,
   createDuplicateNoteIdsQueryOptions,
@@ -21,6 +23,9 @@ import { useSync, type BackupState } from '@/providers/sync-provider.tsx'
 
 /** A short, plain-language line for each backup state — never Git jargon. */
 function statusLine(backup: Extract<BackupState, { phase: 'connected' }>): string {
+  if (backup.role === 'reader') {
+    return 'Local history only; another device pushes the backup'
+  }
   switch (backup.status.state) {
     case 'idle':
       return 'Backed up'
@@ -50,7 +55,7 @@ function githubRepoBrowserUrl(
  * note also shows its own banner when opened.
  */
 export function BackupSettingsField(): ReactElement {
-  const { backup, disconnectGraph, signOut, backUpNow } = useSync()
+  const { backup, disconnectGraph, signOut, backUpNow, setBackupWriter } = useSync()
   const { graph } = useGraph()
   const githubConnected = useGithubConnected()
   const [connectOpen, setConnectOpen] = useState(false)
@@ -153,11 +158,30 @@ export function BackupSettingsField(): ReactElement {
                 </div>
               ) : null}
               <SyncForkNotice groups={forkGroups} />
+              {graph !== null && isICloudRoot(graph.root) ? (
+                <label className="flex items-center justify-between gap-4 text-sm text-text">
+                  <span>
+                    Back up from this device
+                    <span className="block text-xs text-text-muted">
+                      iCloud Drive already syncs this graph. One device should push the backup; the
+                      others keep local history only.
+                    </span>
+                  </span>
+                  <Switch
+                    className="shrink-0"
+                    checked={backup.role === 'writer'}
+                    disabled={action.pending}
+                    onCheckedChange={(checked) => void action.run(() => setBackupWriter(checked))}
+                  />
+                </label>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={backup.status.state === 'syncing' || action.pending}
+                  disabled={
+                    backup.role === 'reader' || backup.status.state === 'syncing' || action.pending
+                  }
                   onClick={() => void action.run(backUpNow)}
                 >
                   Back up now
