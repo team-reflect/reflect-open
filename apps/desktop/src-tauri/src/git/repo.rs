@@ -1,7 +1,8 @@
 //! Repository plumbing: open/init/adopt, branch + signature resolution, and
 //! graph `.gitignore` defaults.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use git2::{Repository, RepositoryInitOptions, Signature};
 
@@ -28,12 +29,62 @@ pub(super) fn open_or_init(root: &Path) -> AppResult<Repository> {
     Ok(repo)
 }
 
+/// A `.git/*.lock` older than this was left by a process that died holding
+/// it: libgit2 holds a lock for one operation, well under a second.
+const STALE_LOCK_AGE: Duration = Duration::from_secs(10 * 60);
+
 /// Open the graph's repository; errors if backup was never set up.
 pub(super) fn open_existing(root: &Path) -> AppResult<Repository> {
-    if !root.join(".git").exists() {
+    let git_dir = root.join(".git");
+    if !git_dir.exists() {
         return Err(AppError::not_found("backup is not set up for this graph"));
     }
+    sweep_stale_locks(&git_dir);
     Ok(Repository::open(root)?)
+}
+
+/// Remove the lock files a killed process left behind (`HEAD.lock`,
+/// `index.lock`, `packed-refs.lock`, `refs/**/*.lock`): libgit2 refuses to
+/// write past them, which would fail every later cycle until a manual
+/// repair. Only a lock older than [`STALE_LOCK_AGE`] goes; a fresh one may
+/// belong to a `git` the user is running right now. Best effort: a lock that
+/// stays fails the operation as it always did.
+fn sweep_stale_locks(git_dir: &Path) {
+    let mut locks: Vec<PathBuf> = ["HEAD.lock", "index.lock", "packed-refs.lock"]
+        .iter()
+        .map(|name| git_dir.join(name))
+        .collect();
+    collect_ref_locks(&git_dir.join("refs"), &mut locks);
+    for path in locks {
+        let age = path
+            .metadata()
+            .and_then(|meta| meta.modified())
+            .ok()
+            .and_then(|modified| modified.elapsed().ok());
+        if !age.is_some_and(|age| age > STALE_LOCK_AGE) {
+            continue;
+        }
+        match std::fs::remove_file(&path) {
+            Ok(()) => tracing::warn!(path = %path.display(), "removed a stale lock file"),
+            Err(err) => {
+                tracing::warn!(path = %path.display(), %err, "failed to remove a stale lock file");
+            }
+        }
+    }
+}
+
+fn collect_ref_locks(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_ref_locks(&path, out);
+        } else if path.extension().is_some_and(|ext| ext == "lock") {
+            out.push(path);
+        }
+    }
 }
 
 /// Refuse to operate on a repository mid-operation (a rebase/merge the user

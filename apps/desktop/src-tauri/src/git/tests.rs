@@ -3,7 +3,7 @@ use std::panic::AssertUnwindSafe;
 use std::path::Path;
 use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use git2::{Repository, RepositoryInitOptions};
 use tempfile::tempdir;
@@ -1147,4 +1147,53 @@ fn merge_interrupted_before_commit_converges_next_cycle() {
         assert_eq!(head_blob(root_a, rel), expected, "{rel} in HEAD");
         assert_eq!(remote_blob(&fixture, rel), expected, "{rel} on the remote");
     }
+}
+
+/// Write an empty lock file whose mtime is `age` in the past.
+fn plant_lock(path: &Path, age: Duration) {
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, b"").unwrap();
+    fs::File::options()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(SystemTime::now() - age)
+        .unwrap();
+}
+
+#[test]
+fn stale_locks_are_removed_on_open() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    let git_dir = root.join(".git");
+    let stale = [
+        git_dir.join("HEAD.lock"),
+        git_dir.join("index.lock"),
+        git_dir.join("refs/heads/main.lock"),
+    ];
+    for path in &stale {
+        plant_lock(path, Duration::from_secs(11 * 60));
+    }
+
+    // The next operation opens the repository, sweeps, and succeeds where
+    // libgit2 would otherwise refuse to touch the index and the branch.
+    write(root, "notes/a.md", "# A\n");
+    assert!(commit_all(root, "a", MAX_FILE_BYTES).unwrap().committed);
+    for path in &stale {
+        assert!(!path.exists(), "{} should be gone", path.display());
+    }
+}
+
+#[test]
+fn fresh_locks_are_left_alone() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    // A lock on a ref no operation here touches: it may belong to a `git`
+    // the user is running, so a sweep must not take it.
+    let fresh = root.join(".git/refs/heads/other.lock");
+    plant_lock(&fresh, Duration::from_secs(60));
+
+    write(root, "notes/a.md", "# A\n");
+    assert!(commit_all(root, "a", MAX_FILE_BYTES).unwrap().committed);
+    assert!(fresh.exists());
 }
