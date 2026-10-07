@@ -47,14 +47,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ['1/3', '2/3', '3/3']
         config:
           - os: ubuntu-latest
             browser: chromium
           - os: macos-latest
             browser: webkit
 
-    name: test-${{ matrix.config.browser }} ${{ matrix.shard }}
+    name: test-${{ matrix.config.browser }}
     runs-on: ${{ matrix.config.os }}
 
     steps:
@@ -68,13 +67,15 @@ jobs:
         run: pnpm --filter @reflect/desktop exec playwright install ${{ matrix.config.browser }}
 
       - name: Test
-        run: pnpm run test --shard ${{ matrix.shard }}
+        run: pnpm run test
         env:
           REFLECT_TEST_BROWSER: ${{ matrix.config.browser }}
 
   rust-lint:
     if: github.event_name != 'merge_group'
-    runs-on: ubuntu-latest
+    # The Apple checks below need a macOS runner. Pull requests skip them, so
+    # they stay on Linux.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'macos-latest' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -83,6 +84,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           components: rustfmt, clippy
+          targets: ${{ github.event_name != 'pull_request' && 'aarch64-apple-ios' || '' }}
 
       # The sidecar script imports npm packages.
       - uses: ./.github/actions/setup-node
@@ -96,6 +98,18 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # Check the Apple Rust bindings. These two checks do not run on pull
+      # requests, to keep pull request CI short.
+      - name: Check desktop library
+        if: github.event_name != 'pull_request'
+        run: cargo check -p reflect-open --lib
+
+      # The TestFlight workflow is the only full iOS build, so type-check the
+      # iOS target here with the same feature set `tauri ios` builds with.
+      - name: Check iOS library
+        if: github.event_name != 'pull_request'
+        run: cargo check -p reflect-open --lib --target aarch64-apple-ios --no-default-features
 
   rust-test:
     if: github.event_name != 'merge_group'
@@ -117,43 +131,14 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-  # check Apple Rust bindings
-  apple-lint:
-    if: github.event_name != 'merge_group'
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-rust
-        with:
-          targets: aarch64-apple-ios
-
-      # The sidecar script imports npm packages.
-      - uses: ./.github/actions/setup-node
-
-      # tauri-build requires the sidecars before the desktop crate compiles.
-      - name: Stage desktop sidecars
-        run: node apps/desktop/scripts/build-sidecar.ts
-
-      - name: Check desktop library
-        run: cargo check -p reflect-open --lib
-
-      # The TestFlight workflow is the only full iOS build and it never runs on
-      # pull requests, so type-check the iOS target here with the same feature
-      # set `tauri ios` builds with.
-      - name: Check iOS library
-        run: cargo check -p reflect-open --lib --target aarch64-apple-ios --no-default-features
-
   # A single job for branch protection to require, instead of listing every
-  # job (and every matrix shard) as a required status check.
+  # job (and every matrix entry) as a required status check.
   all-green:
     runs-on: ubuntu-slim
     timeout-minutes: 10
 
     if: always()
-    needs: [node-lint, node-test, rust-lint, rust-test, apple-lint]
+    needs: [node-lint, node-test, rust-lint, rust-test]
 
     steps:
       - name: Verify that all jobs succeeded
