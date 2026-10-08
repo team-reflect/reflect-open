@@ -10,7 +10,6 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { useModKeyHeld } from '@/hooks/use-mod-key-held.ts'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { useReorderPinnedNotes } from '@/hooks/use-reorder-pinned-notes.ts'
 import {
@@ -20,7 +19,6 @@ import {
   routesEqual,
 } from '@reflect/app'
 import { useRouterState } from '@/routing/router.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
 import { SidebarPinnedRowPreview } from './sidebar-pinned-row-preview.tsx'
 import { SidebarSortablePinnedRow } from './sidebar-sortable-pinned-row.tsx'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
@@ -32,16 +30,18 @@ function pinnedShortcutFor(index: number): string | null {
   return id === undefined ? null : PINNED_NOTE_COMMANDS[id].keybinding
 }
 
+interface SidebarPinnedProps {
+  /** Reveal the open-pinned-note shortcut beside the top rows (while `Mod` is held). */
+  showShortcuts?: boolean
+}
+
 /**
  * The sidebar's Pinned section (the Mac app's "Pinned notes" shelf):
  * every pinned note, shelf-ordered, above the Recents feed. Hidden entirely
  * while nothing is pinned — an empty shelf is sidebar noise, not an affordance.
- * Holding `Mod` reveals the open-pinned-note shortcut beside the top rows.
  */
-export function SidebarPinned(): ReactElement | null {
+export function SidebarPinned({ showShortcuts = false }: SidebarPinnedProps): ReactElement | null {
   const pinned = usePinnedNotes()
-  const { platform } = useCoreServices()
-  const modHeld = useModKeyHeld(platform.isApplePlatform)
   const reorder = useReorderPinnedNotes(pinned)
   const noteLabel = useNoteLabel()
   const { route } = useRouterState()
@@ -94,7 +94,7 @@ export function SidebarPinned(): ReactElement | null {
               <SidebarSortablePinnedRow
                 key={note.path}
                 note={note}
-                shortcut={modHeld ? pinnedShortcutFor(index) : null}
+                shortcut={showShortcuts ? pinnedShortcutFor(index) : null}
               />
             ))}
           </ul>

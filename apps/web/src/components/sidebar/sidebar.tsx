@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { ListIcon } from '@/components/icons/list-icon.tsx'
 import { PencilIcon } from '@/components/icons/pencil-icon.tsx'
+import { useModKeyHeld } from '@/hooks/use-mod-key-held.ts'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { cn } from '@/lib/utils.ts'
@@ -31,8 +32,8 @@ const CHAT_BINDING = APP_COMMANDS['chat.open'].keybinding
 
 /**
  * The workspace sidebar, in the original app's shape: history arrows top
- * right, search with the compose and audio memo buttons, primary navigation with hover-revealed shortcut keycaps, the
- * Pinned shelf, and the graph switcher footer. Nav rows run registered
+ * right, search with the compose and audio memo buttons, primary navigation with hover-revealed shortcut keycaps
+ * (or all at once while `Mod` is held), the Pinned shelf, and the graph switcher footer. Nav rows run registered
  * commands so a binding and its behavior stay one definition, and light for
  * the section of the screen on view. Daily notes is the exception: off the
  * stream it returns to the stream's last day, and on it it is the `Mod-D`
@@ -47,6 +48,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
   const onDailySurface = route.kind === 'today' || route.kind === 'daily'
   const today = useToday()
   const pinned = usePinnedNotes()
+  const modHeld = useModKeyHeld(platform.isApplePlatform)
   const currentNotePath = notePathForRoute(route, today)
   const hasActivePinnedNote =
     currentNotePath !== null && pinned.some((note) => note.path === currentNotePath)
@@ -103,6 +105,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
             icon={<PencilIcon className="shrink-0" />}
             label="Daily notes"
             binding={TODAY_BINDING}
+            revealBinding={modHeld}
             active={sectionRowsLit && section === 'daily'}
             onClick={() => {
               if (onDailySurface) {
@@ -116,6 +119,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
             icon={<ListIcon className="shrink-0" />}
             label="All notes"
             binding={ALL_NOTES_BINDING}
+            revealBinding={modHeld}
             active={sectionRowsLit && section === 'all'}
             onClick={() => commands.run('nav.allNotes')}
           />
@@ -127,6 +131,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
             }
             label="Tasks"
             binding={TASKS_BINDING}
+            revealBinding={modHeld}
             active={sectionRowsLit && section === 'tasks'}
             onClick={() => commands.run('nav.tasks')}
           />
@@ -138,6 +143,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
             }
             label="Chat"
             binding={CHAT_BINDING}
+            revealBinding={modHeld}
             active={sectionRowsLit && section === 'chat'}
             onClick={() => commands.run('chat.open')}
           />
@@ -145,7 +151,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
       </div>
 
       <div className="mt-1 min-h-0 flex-1 overflow-y-auto pb-2">
-        <SidebarPinned />
+        <SidebarPinned showShortcuts={modHeld} />
       </div>
 
       <GraphFooter graph={graph} />
