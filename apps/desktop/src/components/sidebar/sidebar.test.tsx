@@ -281,6 +281,38 @@ describe('Sidebar', () => {
     expect(roadmapPreview?.getAttribute('class')).toContain('dark:text-accent')
   })
 
+  it('holding Mod reveals open shortcuts beside the top four pinned notes', async () => {
+    getPinnedNotes.mockResolvedValue(
+      ['One', 'Two', 'Three', 'Four', 'Five'].map((title) => ({
+        path: `notes/${title.toLowerCase()}.md`,
+        title,
+        dailyDate: null,
+      })),
+    )
+    const { view, core } = await renderSidebar()
+    const pinnedSection = view.getByRole('region', { name: /pinned notes/i })
+    await expect.element(pinnedSection).toMatchTextContent('Five')
+    const keycaps = (): string[] => {
+      return Array.from(
+        pinnedSection.element().querySelectorAll('kbd'),
+        (key) => key.textContent ?? '',
+      )
+    }
+
+    expect(keycaps()).toEqual([])
+    const apple = core.platform.isApplePlatform
+    const modKey = apple ? 'Meta' : 'Control'
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: modKey, metaKey: apple, ctrlKey: !apple }),
+    )
+    await vi.waitFor(() => {
+      return expect(keycaps().filter((key) => /\d/.test(key))).toEqual(['6', '7', '8', '9'])
+    })
+
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: modKey }))
+    await vi.waitFor(() => expect(keycaps()).toEqual([]))
+  })
+
   it('modifier-click opens a pinned note in a new window without changing routes', async () => {
     getPinnedNotes.mockResolvedValue([
       { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null },
