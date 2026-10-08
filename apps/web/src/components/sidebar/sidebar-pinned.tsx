@@ -10,21 +10,38 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { useModKeyHeld } from '@/hooks/use-mod-key-held.ts'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { useReorderPinnedNotes } from '@/hooks/use-reorder-pinned-notes.ts'
-import { routeForPath, routesEqual } from '@reflect/app'
+import {
+  PINNED_NOTE_COMMAND_IDS,
+  PINNED_NOTE_COMMANDS,
+  routeForPath,
+  routesEqual,
+} from '@reflect/app'
 import { useRouterState } from '@/routing/router.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
 import { SidebarPinnedRowPreview } from './sidebar-pinned-row-preview.tsx'
 import { SidebarSortablePinnedRow } from './sidebar-sortable-pinned-row.tsx'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
+
+function pinnedShortcutFor(index: number): string | null {
+  // Rows past the bound commands get null, so only the top of the shelf
+  // shows a hint.
+  const id = PINNED_NOTE_COMMAND_IDS[index]
+  return id === undefined ? null : PINNED_NOTE_COMMANDS[id].keybinding
+}
 
 /**
  * The sidebar's Pinned section (the Mac app's "Pinned notes" shelf):
  * every pinned note, shelf-ordered, above the Recents feed. Hidden entirely
  * while nothing is pinned — an empty shelf is sidebar noise, not an affordance.
+ * Holding `Mod` reveals the open-pinned-note shortcut beside the top rows.
  */
 export function SidebarPinned(): ReactElement | null {
   const pinned = usePinnedNotes()
+  const { platform } = useCoreServices()
+  const modHeld = useModKeyHeld(platform.isApplePlatform)
   const reorder = useReorderPinnedNotes(pinned)
   const noteLabel = useNoteLabel()
   const { route } = useRouterState()
@@ -73,8 +90,12 @@ export function SidebarPinned(): ReactElement | null {
           strategy={verticalListSortingStrategy}
         >
           <ul className="mt-2 flex flex-col space-y-1">
-            {pinned.map((note) => (
-              <SidebarSortablePinnedRow key={note.path} note={note} />
+            {pinned.map((note, index) => (
+              <SidebarSortablePinnedRow
+                key={note.path}
+                note={note}
+                shortcut={modHeld ? pinnedShortcutFor(index) : null}
+              />
             ))}
           </ul>
         </SortableContext>

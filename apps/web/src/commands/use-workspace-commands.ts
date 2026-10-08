@@ -15,6 +15,7 @@ import {
 import { useCommandBlock, useCommandHandler } from './use-commands.ts'
 import { useCommandKeys } from './use-command-keys.ts'
 import { useNoteCommands } from './use-note-commands.ts'
+import { usePinnedNoteCommands } from './use-pinned-note-commands.ts'
 
 const NO_COMMANDS: readonly AppCommandId[] = []
 const SHORTCUTS_SHOW: readonly AppCommandId[] = ['shortcuts.show']
@@ -133,6 +134,7 @@ export function useWorkspaceCommands(): void {
     }
   })
   useNoteCommands(notePath)
+  usePinnedNoteCommands()
 
   // The palette and the template dialogs are modal: nothing may run behind
   // them. The cheat-sheet is modal too, but ⌘/ closes it again.

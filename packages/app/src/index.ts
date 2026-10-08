@@ -128,6 +128,11 @@ export {
   type Command,
   type CommandDeclaration,
 } from './commands/app-commands.ts'
+export {
+  PINNED_NOTE_COMMAND_IDS,
+  PINNED_NOTE_COMMANDS,
+  type PinnedNoteCommandId,
+} from './commands/pinned-note-commands.ts'
 export { installNativeMenu } from './commands/app-menu.ts'
 export { attachFilesToNote } from './commands/attach-files.ts'
 export {
