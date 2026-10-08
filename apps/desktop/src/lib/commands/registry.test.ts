@@ -23,6 +23,7 @@ function fakeContext(overrides?: Partial<CommandContext>): CommandContext {
     findNextInNote: vi.fn(),
     findPreviousInNote: vi.fn(),
     switchGraph: vi.fn(),
+    openPinnedNote: vi.fn(async () => {}),
     toggleAudioMemo: vi.fn(),
     generation: () => 1,
     graphRoot: () => '/g',

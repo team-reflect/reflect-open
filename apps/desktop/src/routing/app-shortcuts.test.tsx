@@ -125,6 +125,10 @@ function shortcutsHook(client = new QueryClient()) {
   )
 }
 
+function pinnedNote(path: string, pinnedOrder: number): PinnedNote {
+  return { path, title: path, dailyDate: null, pinnedOrder }
+}
+
 function press(key: string, options: KeyboardEventInit = {}) {
   window.dispatchEvent(
     new KeyboardEvent('keydown', { key, ...MOD_KEY, cancelable: true, ...options }),
@@ -231,6 +235,8 @@ describe('app shortcuts', () => {
       'Mod-\\',
       'Alt-Mod-l',
       'Mod-1',
+      'Mod-5',
+      'Mod-6',
       'Mod-9',
     ]) {
       expect(bindings.get(key)).toBe('app')
@@ -405,8 +411,54 @@ describe('app shortcuts', () => {
     await act(() => press('2'))
     expect(openRecent).toHaveBeenCalledWith('/work')
 
+    await act(() => press('5'))
+    expect(openRecent).toHaveBeenCalledTimes(1) // only three recent graphs
+  })
+
+  it('⌘6–⌘9 open the matching pinned note in shelf order', async () => {
+    const client = new QueryClient()
+    client.setQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'), [
+      pinnedNote('notes/first.md', 1024),
+      pinnedNote('notes/second.md', 2048),
+    ])
+    const { result, act } = await shortcutsHook(client)
+
+    // The shelf lookup is async, so let it land inside act before asserting.
+    await act(async () => {
+      press('7')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(result.current.router.route).toEqual({ kind: 'note', path: 'notes/second.md' })
+
+    await act(async () => {
+      press('6')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(result.current.router.route).toEqual({ kind: 'note', path: 'notes/first.md' })
+    expect(openRecent).not.toHaveBeenCalled() // ⌘6+ no longer switch graphs
+  })
+
+  it('a pinned note shortcut past the end of the shelf does nothing', async () => {
+    const client = new QueryClient()
+    client.setQueryData<PinnedNote[]>(queryKeys.index.pinnedNotes('/g'), [
+      pinnedNote('notes/first.md', 1024),
+    ])
+    const { result, act } = await shortcutsHook(client)
+
+    await act(() => result.current.context.openPinnedNote(3))
     await act(() => press('9'))
-    expect(openRecent).toHaveBeenCalledTimes(1)
+
+    expect(result.current.router.route).toEqual({ kind: 'today' })
+  })
+
+  it('pinned note shortcuts no-op without a graph', async () => {
+    graphState.graph = null
+    const client = new QueryClient()
+    const { result, act } = await shortcutsHook(client)
+
+    await act(() => result.current.context.openPinnedNote(0))
+
+    expect(result.current.router.route).toEqual({ kind: 'today' })
   })
 
   it('⌘number switches graphs from a focused editor that leaves the chord alone', async () => {

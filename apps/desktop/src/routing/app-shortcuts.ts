@@ -1,7 +1,9 @@
 import { isNotNullish } from '@ocavue/utils'
 import { useEffect, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { getPinnedNotes } from '@reflect/core'
 import { toggleNotePinned } from '@/lib/note-pin.ts'
+import { queryKeys } from '@/lib/query-client.ts'
 import { toggleNotePrivate } from '@/lib/note-private.ts'
 import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
@@ -25,7 +27,7 @@ import { useSettings } from '@/providers/settings-provider.tsx'
 import { useShortcuts } from '@/providers/shortcuts-provider.tsx'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
 import { useTheme } from '@/providers/theme-provider.tsx'
-import { focusedNotePathForRoute } from './route.ts'
+import { focusedNotePathForRoute, routeForPath } from './route.ts'
 import { useRouter } from './router.tsx'
 
 /**
@@ -266,6 +268,23 @@ export function useAppShortcuts(): CommandContext {
           return
         }
         void openRecentRef.current(recent.root)
+      },
+      openPinnedNote: async (index) => {
+        const root = graphRootRef.current
+        if (root === null) {
+          return
+        }
+        // The sidebar's shelf query is normally warm; a collapsed or not-yet
+        // mounted sidebar falls back to one fetch under the same key.
+        const shelf = await queryClient.ensureQueryData({
+          queryKey: queryKeys.index.pinnedNotes(root),
+          queryFn: () => getPinnedNotes(),
+        })
+        const note = shelf[index]
+        if (note === undefined || graphRootRef.current !== root) {
+          return
+        }
+        navigate(routeForPath(note.path))
       },
       toggleAudioMemo,
       generation: () => generationRef.current,

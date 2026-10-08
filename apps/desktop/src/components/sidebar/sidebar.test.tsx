@@ -14,7 +14,9 @@ import type { NoteRoute, Route } from '@/routing/route.ts'
 import { TooltipProvider } from '@/components/ui/tooltip.tsx'
 import { UpdateProvider } from '@/providers/update-provider.tsx'
 import { RouterProvider } from '@/routing/router.tsx'
+import { isApplePlatform } from '@/lib/keybindings.ts'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
+import { MOD_KEY } from '@/test-utils/mod-key.ts'
 
 const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async () => []))
 const revealItemInDir = vi.hoisted(() => vi.fn<(path: string) => Promise<void>>(async () => {}))
@@ -158,6 +160,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     findNextInNote: vi.fn(),
     findPreviousInNote: vi.fn(),
     switchGraph: vi.fn(),
+    openPinnedNote: vi.fn(async () => {}),
     toggleAudioMemo: vi.fn(),
     generation: () => 1,
     graphRoot: () => '/notes',
@@ -294,6 +297,31 @@ describe('Sidebar', () => {
     await roadmap.click()
     await expect.element(roadmap).toHaveAttribute('aria-current', 'page')
     expect(roadmapPreview?.getAttribute('class')).toContain('dark:text-accent')
+  })
+
+  it('holding Mod reveals open shortcuts beside the top four pinned notes', async () => {
+    getPinnedNotes.mockResolvedValue(
+      ['One', 'Two', 'Three', 'Four', 'Five'].map((title) => ({
+        path: `notes/${title.toLowerCase()}.md`,
+        title,
+        dailyDate: null,
+      })),
+    )
+    const { view } = await renderSidebar()
+    const pinnedSection = view.getByRole('region', { name: /pinned notes/i })
+    await expect.element(pinnedSection).toMatchTextContent('Five')
+    const keycaps = (): string[] =>
+      Array.from(pinnedSection.element().querySelectorAll('kbd'), (key) => key.textContent ?? '')
+
+    expect(keycaps()).toEqual([])
+    const modKey = isApplePlatform() ? 'Meta' : 'Control'
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: modKey, ...MOD_KEY }))
+    await vi.waitFor(() =>
+      expect(keycaps().filter((key) => /\d/.test(key))).toEqual(['6', '7', '8', '9']),
+    )
+
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: modKey }))
+    await vi.waitFor(() => expect(keycaps()).toEqual([]))
   })
 
   it('modifier-click opens a pinned note in a new window without changing routes', async () => {
