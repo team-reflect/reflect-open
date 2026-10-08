@@ -1,8 +1,9 @@
 import { isNotNullish } from '@ocavue/utils'
 import { useEffect, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { getPinnedNotes } from '@reflect/core'
+import { errorMessage, getPinnedNotes, type PinnedNote } from '@reflect/core'
 import { toggleNotePinned } from '@/lib/note-pin.ts'
+import { startOperation } from '@/lib/operations.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { toggleNotePrivate } from '@/lib/note-private.ts'
 import { getIsComposing } from '@meowdown/core'
@@ -276,10 +277,18 @@ export function useAppShortcuts(): CommandContext {
         }
         // The sidebar's shelf query is normally warm; a collapsed or not-yet
         // mounted sidebar falls back to one fetch under the same key.
-        const shelf = await queryClient.ensureQueryData({
-          queryKey: queryKeys.index.pinnedNotes(root),
-          queryFn: () => getPinnedNotes(),
-        })
+        let shelf: PinnedNote[]
+        try {
+          shelf = await queryClient.ensureQueryData({
+            queryKey: queryKeys.index.pinnedNotes(root),
+            queryFn: () => getPinnedNotes(),
+          })
+        } catch (cause) {
+          // Callers fire commands without awaiting, so a failed index read
+          // must surface here rather than as an unhandled rejection.
+          startOperation('Opening pinned note').fail(errorMessage(cause))
+          return
+        }
         const note = shelf[index]
         if (note === undefined || graphRootRef.current !== root) {
           return

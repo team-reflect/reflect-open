@@ -12,6 +12,7 @@ import { renderHook } from 'vitest-browser-react'
 import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider.tsx'
 import { listRegisteredBindings } from '@/editor/keymap.ts'
 import { registerAppCommands } from '@/lib/commands/app-commands.ts'
+import { getOperations, resetOperations } from '@/lib/operations.ts'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
 import { ShortcutsProvider, useShortcuts } from '@/providers/shortcuts-provider.tsx'
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
@@ -26,6 +27,12 @@ const graphState = vi.hoisted((): { graph: GraphInfo | null } => ({
 vi.mock('@/lib/note-frontmatter.ts', () => ({
   commitNoteFrontmatter,
   readNoteSource: async () => '# A\n',
+}))
+
+const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async () => []))
+vi.mock('@reflect/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@reflect/core')>()),
+  getPinnedNotes,
 }))
 
 const newChat = vi.hoisted(() => vi.fn())
@@ -85,6 +92,8 @@ registerAppCommands() // production does this in main.tsx
 beforeEach(() => {
   graphState.graph = { root: '/g', name: 'g', generation: 1 }
   commitNoteFrontmatter.mockReset().mockResolvedValue(undefined)
+  getPinnedNotes.mockReset().mockResolvedValue([])
+  resetOperations()
   openRecent.mockClear()
   openRouteInNewWindow.mockClear()
   openNoteFindForPath.mockClear()
@@ -449,6 +458,27 @@ describe('app shortcuts', () => {
     await act(() => press('9'))
 
     expect(result.current.router.route).toEqual({ kind: 'today' })
+  })
+
+  it('fetches the shelf when the sidebar has not loaded it yet', async () => {
+    getPinnedNotes.mockResolvedValue([pinnedNote('notes/first.md', 1024)])
+    const { result, act } = await shortcutsHook()
+
+    await act(() => result.current.context.openPinnedNote(0))
+
+    expect(result.current.router.route).toEqual({ kind: 'note', path: 'notes/first.md' })
+  })
+
+  it('reports a failed shelf read instead of rejecting', async () => {
+    getPinnedNotes.mockRejectedValue(new Error('index closed'))
+    const { result, act } = await shortcutsHook()
+
+    await act(() => result.current.context.openPinnedNote(0))
+
+    expect(result.current.router.route).toEqual({ kind: 'today' })
+    expect(getOperations()).toEqual([
+      expect.objectContaining({ label: 'Opening pinned note', status: 'failed' }),
+    ])
   })
 
   it('pinned note shortcuts no-op without a graph', async () => {
