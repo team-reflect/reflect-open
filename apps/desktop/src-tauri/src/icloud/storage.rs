@@ -517,6 +517,17 @@ fn settle_repository(target: &Path) -> AppResult<()> {
     // object landed in it, and this keeps the guarantee if that mark failed.
     crate::fs::mark_dir_local_only(&git_dir);
     let repo = git2::Repository::open(target)?;
+    // The copy takes no lock, so a commit or fetch running in the source
+    // meanwhile can leave a branch pointing at an object copied too early to
+    // include it. Refuse such a copy: the caller removes it and the user
+    // retries, instead of a moved graph whose history cannot be read.
+    match repo.head() {
+        Ok(head) => {
+            head.peel_to_tree()?;
+        }
+        Err(err) if err.code() == git2::ErrorCode::UnbornBranch => {}
+        Err(err) => return Err(err.into()),
+    }
     if repo.find_remote("origin").is_ok() {
         repo.remote_delete("origin")?;
     }
@@ -697,6 +708,28 @@ mod tests {
         let copied = copy_graph_tree(source.path(), &again).expect("copy");
         assert!(copied.0 > 1, "{copied:?}");
         assert_eq!(count_graph_tree(&again).expect("count"), copied);
+    }
+
+    #[test]
+    fn a_copy_whose_history_cannot_be_read_is_refused_and_removed() {
+        // What a commit racing the copy can leave: a branch naming an object
+        // the copy does not hold.
+        let source = tempfile::tempdir().expect("tempdir");
+        std::fs::write(source.path().join("a.md"), b"# A").expect("write");
+        git2::Repository::init(source.path()).expect("init");
+        std::fs::create_dir_all(source.path().join(".git/refs/heads")).expect("mkdir");
+        for branch in ["main", "master"] {
+            std::fs::write(
+                source.path().join(".git/refs/heads").join(branch),
+                "1111111111111111111111111111111111111111\n",
+            )
+            .expect("write");
+        }
+
+        let container = tempfile::tempdir().expect("tempdir");
+        let target = container.path().join("Notes");
+        assert!(adopt_into(source.path(), &target).is_err());
+        assert!(!target.exists(), "a refused copy leaves nothing behind");
     }
 
     #[test]
