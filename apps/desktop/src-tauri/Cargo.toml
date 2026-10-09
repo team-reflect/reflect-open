@@ -51,6 +51,7 @@ base64 = "0.23.1"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 keyring-core = "1.0.0"
+reconcile-text = "0.13.2"
 # Git backup/sync primitives (Plan 12) + SSH transport for generic remotes
 # (Plan 16 V1: agent auth only). Everything is vendored/static — libssh2 and
 # openssl must never link against homebrew dylibs the distributed app won't
@@ -216,3 +217,4 @@ dbus-secret-service-keyring-store = { version = "1.0.1", features = ["crypto-rus
 
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }
+proptest = "1.11.0"
