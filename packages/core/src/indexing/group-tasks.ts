@@ -32,13 +32,18 @@ export interface TaskGroup {
   tasks: OpenTask[]
 }
 
+const PUNCTUATION_RE = /[\p{P}\p{S}]/gu
+
+/** What a label reduces to, spacing and punctuation removed, when it only says "these are tasks". */
+const GENERIC_TASK_WORDS: ReadonlySet<string> = new Set(['task', 'tasks', 'todo', 'todos'])
+
 /**
  * A parent that only says "these are tasks": `Tasks`, `TODO:`, `To do`, …
  * in any casing, spacing, or punctuation.
  */
 export function isGenericTaskLabel(label: string): boolean {
-  const word = label.replaceAll(/[\s\p{P}\p{S}]/gu, '').toLowerCase()
-  return word === 'task' || word === 'tasks' || word === 'todo' || word === 'todos'
+  const word = label.replaceAll(/\s+/g, '').replaceAll(PUNCTUATION_RE, '').toLowerCase()
+  return GENERIC_TASK_WORDS.has(word)
 }
 
 /**
