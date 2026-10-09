@@ -3,7 +3,7 @@ use std::panic::AssertUnwindSafe;
 use std::path::Path;
 use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use git2::{Repository, RepositoryInitOptions};
 use tempfile::tempdir;
@@ -1147,4 +1147,94 @@ fn merge_interrupted_before_commit_converges_next_cycle() {
         assert_eq!(head_blob(root_a, rel), expected, "{rel} in HEAD");
         assert_eq!(remote_blob(&fixture, rel), expected, "{rel} on the remote");
     }
+}
+
+/// Write an empty lock file whose mtime is `age` in the past.
+fn plant_lock(path: &Path, age: Duration) {
+    plant_lock_dated(path, SystemTime::now() - age);
+}
+
+fn plant_lock_dated(path: &Path, modified: SystemTime) {
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, b"").unwrap();
+    fs::File::options()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(modified)
+        .unwrap();
+}
+
+#[test]
+fn stale_locks_are_removed_on_open() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    let git_dir = root.join(".git");
+    let stale = [
+        git_dir.join("HEAD.lock"),
+        git_dir.join("index.lock"),
+        git_dir.join("FETCH_HEAD.lock"),
+        git_dir.join("MERGE_HEAD.lock"),
+        git_dir.join("config.lock"),
+        git_dir.join("refs/heads/main.lock"),
+    ];
+    for path in &stale {
+        plant_lock(path, Duration::from_secs(11 * 60));
+    }
+    // A lock dated far in the future cannot be live either.
+    let future = git_dir.join("ORIG_HEAD.lock");
+    plant_lock_dated(&future, SystemTime::now() + Duration::from_secs(3600));
+
+    // The next operation opens the repository, sweeps, and succeeds where
+    // libgit2 would otherwise refuse to touch the index and the branch.
+    write(root, "notes/a.md", "# A\n");
+    assert!(commit_all(root, "a", MAX_FILE_BYTES).unwrap().committed);
+    for path in stale.iter().chain([&future]) {
+        assert!(!path.exists(), "{} should be gone", path.display());
+    }
+}
+
+#[test]
+fn fresh_locks_are_left_alone() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    // A lock on a ref no operation here touches: it may belong to a `git`
+    // the user is running, so a sweep must not take it.
+    let fresh = root.join(".git/refs/heads/other.lock");
+    plant_lock(&fresh, Duration::from_secs(60));
+    // So may one dated slightly ahead: created while a sweep was running,
+    // or on a clock that was just corrected.
+    let ahead = root.join(".git/refs/heads/ahead.lock");
+    plant_lock_dated(&ahead, SystemTime::now() + Duration::from_secs(60));
+    // A symlink under `refs/` must not lead the sweep out of `.git`.
+    let outside = fixture._dir.path().join("outside/old.lock");
+    plant_lock(&outside, Duration::from_secs(11 * 60));
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(outside.parent().unwrap(), root.join(".git/refs/outside")).unwrap();
+
+    write(root, "notes/a.md", "# A\n");
+    assert!(commit_all(root, "a", MAX_FILE_BYTES).unwrap().committed);
+    assert!(fresh.exists());
+    assert!(ahead.exists());
+    assert!(outside.exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_symlinked_refs_directory_is_not_swept() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n");
+    commit_all(root, "a", MAX_FILE_BYTES).unwrap();
+
+    // `.git/refs` itself points out of the repository.
+    let outside = fixture._dir.path().join("elsewhere");
+    fs::rename(root.join(".git/refs"), &outside).unwrap();
+    std::os::unix::fs::symlink(&outside, root.join(".git/refs")).unwrap();
+    let lock = outside.join("heads/old.lock");
+    plant_lock(&lock, Duration::from_secs(11 * 60));
+
+    // The repository still opens (git follows the link), so the sweep ran.
+    assert!(status(root).unwrap().initialized);
+    assert!(lock.exists());
 }
