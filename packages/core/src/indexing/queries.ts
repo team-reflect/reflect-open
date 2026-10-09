@@ -23,8 +23,6 @@ export {
   getCompletedTasks,
   getOpenTasks,
   type OpenTask,
-  renderTaskSnapshot,
-  type TaskRow,
 } from './queries-tasks.ts'
 export {
   getWikiAddressForPath,

@@ -97,8 +97,6 @@ export {
   type PinnedNote,
   type TagSuggestion,
   type WikiLinkSuggestionResult,
-  renderTaskSnapshot,
-  type TaskRow,
 } from './queries.ts'
 export { resolveNoteTarget } from './resolve-target.ts'
 export {
