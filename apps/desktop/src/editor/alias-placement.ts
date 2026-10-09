@@ -16,8 +16,8 @@ import { openSession } from './open-documents.ts'
  * Placement routes through the live session whenever the note is open — in
  * the renaming pane or a *reopened* one (the open-documents service is the
  * one liveness signal). A direct disk write under a reopened dirty buffer
- * would park a conflict caused by our own background work, and "keep mine"
- * would silently drop the alias. Only when no session can take the patch
+ * would force a merge against our own background work. Only when no
+ * session can take the patch
  * does the alias go straight to disk; a loading/clean session reconciles it
  * like any external change, and a header-only patch is body-safe even for
  * protected notes.

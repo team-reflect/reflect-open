@@ -7,6 +7,7 @@ export { frontmatterPatchToYaml } from './note-session-frontmatter.ts'
 export { INITIAL_NOTE_SNAPSHOT } from './note-session-types.ts'
 export type { FrontmatterPatch } from './note-session-frontmatter.ts'
 export type {
+  ConflictCopy,
   NoteContentOrigin,
   NoteSession,
   NoteSessionIo,
