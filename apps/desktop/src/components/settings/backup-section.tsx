@@ -12,6 +12,7 @@ import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useBridgeReady } from '@/hooks/use-bridge-ready.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
 import { suggestRepoName } from '@/lib/github-repos.ts'
+import { isICloudRoot } from '@/lib/icloud-controller.ts'
 import {
   createConflictedNotesQueryOptions,
   createDuplicateNoteIdsQueryOptions,
@@ -82,6 +83,9 @@ export function BackupSettingsField(): ReactElement {
       : null
   // A hand-wired non-GitHub remote (Plan 16) renders the section host-neutral.
   const genericRemote = backup.phase === 'connected' && backup.repo === null
+  // iCloud Drive already syncs this graph; a Git backup here is a second
+  // channel that runs only after five quiet minutes (docs/icloud-sync.md).
+  const hosted = graph !== null && isICloudRoot(graph.root)
 
   function openGithubRepo(): void {
     if (backup.phase !== 'connected' || backup.repo === null) {
@@ -109,9 +113,11 @@ export function BackupSettingsField(): ReactElement {
       <SettingsField
         legend={genericRemote ? 'Backup' : 'GitHub sync'}
         description={
-          genericRemote
-            ? 'This graph backs up to its own git remote. Edits back up automatically a few moments after you stop typing.'
-            : 'Back up this graph to a GitHub repository. Edits back up automatically a few moments after you stop typing.'
+          hosted && backup.phase === 'connected'
+            ? 'This graph syncs through iCloud Drive. It also backs up here, five minutes after iCloud and your edits go quiet.'
+            : genericRemote
+              ? 'This graph backs up to its own git remote. Edits back up automatically a few moments after you stop typing.'
+              : 'Back up this graph to a GitHub repository. Edits back up automatically a few moments after you stop typing.'
         }
       >
         <div className="mt-3 flex flex-col gap-2">
@@ -126,6 +132,12 @@ export function BackupSettingsField(): ReactElement {
                   Connect GitHub…
                 </Button>
               </div>
+              {hosted ? (
+                <p className="text-xs text-text-muted">
+                  This graph already syncs through iCloud Drive. One sync method per graph is
+                  simplest; a GitHub backup here pushes only after five quiet minutes.
+                </p>
+              ) : null}
               {githubConnected ? (
                 <GithubSignOutRow
                   signOut={signOut}
@@ -158,6 +170,11 @@ export function BackupSettingsField(): ReactElement {
                   variant="outline"
                   size="sm"
                   disabled={backup.status.state === 'syncing' || action.pending}
+                  title={
+                    hosted
+                      ? 'Saves a snapshot now; it reaches the remote after five quiet minutes'
+                      : undefined
+                  }
                   onClick={() => void action.run(backUpNow)}
                 >
                   Back up now
