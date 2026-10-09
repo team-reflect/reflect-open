@@ -60,18 +60,18 @@ function reviewLine(conflictCount: number, forkCount: number): string {
 /**
  * Settings → Sync → iCloud Drive (Plan 21 Phase 1, the desktop leg): see
  * whether the graph syncs through iCloud Drive, and move a local graph into the
- * container. The move copies (count+byte verified), then disconnects the old
- * folder's Git backup remote before reopening the graph at its iCloud home.
- * Ordered copy-first so a failed copy leaves everything — including the backup
- * — exactly as it was; the original folder stays on disk untouched as the
- * recovery copy either way.
+ * container. The move copies (count+byte verified), history included, and
+ * reopens the graph at its iCloud home. The copy carries no remote: one sync
+ * method per graph, and the user reconnects GitHub from Settings if they
+ * want it. A failed copy leaves everything exactly as it was; the original
+ * folder stays on disk untouched as the recovery copy either way.
  *
  * macOS only — Windows/Linux have no iCloud Drive, and mobile chooses its
  * storage in onboarding.
  */
 export function IcloudSettingsField(): ReactElement | null {
   const { graph, openRecent } = useGraph()
-  const { backup, disconnectGraph } = useSync()
+  const { backup } = useSync()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -119,34 +119,12 @@ export function IcloudSettingsField(): ReactElement | null {
     setBusy(true)
     setError(null)
     try {
-      // Copy first: if it fails, nothing changed — the backup is still
-      // connected and the graph untouched.
+      // Copy first: if it fails, nothing changed and the graph is untouched.
       const newRoot = await icloudAdoptGraph(graph.generation)
-      if (backupConnected) {
-        try {
-          await disconnectGraph()
-        } catch (caught) {
-          // The iCloud copy has no .git, so exclusivity holds for the new
-          // graph regardless; the original folder keeping its backup is the
-          // recovery copy working as intended. Tell the user, don't block.
-          setError(
-            `The graph moved to iCloud, but GitHub sync could not be disconnected from the original folder: ${errorMessage(caught)}`,
-          )
-        }
-      }
       setConfirmOpen(false)
       const opened = await openRecent(newRoot)
       if (!opened) {
-        // Append rather than replace: a disconnect failure above must stay
-        // visible alongside this one — both tell the user something distinct.
-        setError((previous) =>
-          [
-            previous,
-            'The copy landed in iCloud but could not be opened — open it from Saved graphs.',
-          ]
-            .filter(Boolean)
-            .join(' '),
-        )
+        setError('The copy landed in iCloud but could not be opened — open it from Saved graphs.')
       }
     } catch (caught) {
       setError(errorMessage(caught))
@@ -188,7 +166,13 @@ export function IcloudSettingsField(): ReactElement | null {
             <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <DialogTrigger
                 render={
-                  <Button size="xs" variant="outline" disabled={status?.available !== true}>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    // Until the backup state is known, the dialog cannot say
+                    // whether a GitHub connection stays behind.
+                    disabled={status?.available !== true || backup.phase === 'loading'}
+                  >
                     Move graph to iCloud…
                   </Button>
                 }
@@ -197,10 +181,10 @@ export function IcloudSettingsField(): ReactElement | null {
                 <DialogHeader>
                   <DialogTitle>Move this graph to iCloud Drive?</DialogTitle>
                   <DialogDescription>
-                    Your notes are copied into iCloud Drive and the graph reopens there. The current
-                    folder stays on disk, untouched, as a recovery copy.
+                    Your notes and their version history are copied into iCloud Drive and the graph
+                    reopens there. The current folder stays on disk, untouched, as a recovery copy.
                     {backupConnected
-                      ? ' GitHub sync is disconnected from the recovery copy; you can reconnect GitHub sync after the iCloud graph opens.'
+                      ? ' GitHub sync is not carried over (one sync method per graph); you can reconnect it after the iCloud graph opens.'
                       : ''}
                   </DialogDescription>
                 </DialogHeader>
