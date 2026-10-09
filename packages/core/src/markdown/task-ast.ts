@@ -148,7 +148,7 @@ export interface TaskLocator {
 
 export type InsertPosition =
   | { kind: 'documentEnd' }
-  /** The end of the task's parent list item; refused when the task is at the root. */
+  /** The end of the task's context: its parent list item, or at the root the end of its own list. */
   | { kind: 'contextEnd'; task: TaskLocator }
   | { kind: 'afterTask'; task: TaskLocator }
   /** After any block, for example the last item of the list under a heading. */
@@ -329,11 +329,11 @@ function resolveInsertPosition(
       return { kind: 'end', container: document }
     }
     case 'contextEnd': {
-      const { parent } = locateTask(before, at.task)
-      if (parent.type !== 'listItem') {
-        throw new TaskStaleError('task no longer has a parent list context')
+      const { node, parent } = locateTask(before, at.task)
+      if (parent.type === 'listItem') {
+        return { kind: 'end', container: parent }
       }
-      return { kind: 'end', container: parent }
+      return { kind: 'after', anchor: lastOfListRun(parent, node) }
     }
     case 'afterTask': {
       const { node } = locateTask(before, at.task)
@@ -352,6 +352,23 @@ function resolveInsertPosition(
       return { kind: 'after', anchor }
     }
   }
+}
+
+/** The character an item is written with; meowdown leaves it unset on a folded bullet, which it writes as `+`. */
+function markerOf(item: MarkdownListItem): string | undefined {
+  return item.marker ?? (item.kind === 'bullet' && item.collapsed ? '+' : undefined)
+}
+
+/** The last item of the list `item` belongs to: same marker, no other block between. */
+function lastOfListRun(parent: BlockParent, item: MarkdownListItem): MarkdownListItem {
+  let last = item
+  for (const block of parent.children.slice(parent.children.indexOf(item) + 1)) {
+    if (block.type !== 'listItem' || markerOf(block) !== markerOf(item)) {
+      break
+    }
+    last = block
+  }
+  return last
 }
 
 /**

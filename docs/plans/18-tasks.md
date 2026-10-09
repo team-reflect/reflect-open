@@ -97,7 +97,7 @@ markers in markdown, AI task extraction (later, over this projection), CLI
 interface ParsedTask {
   astPath: number[]     // child indexes from the body's AST root, e.g. [2, 1]
   markdown: string      // the item's first paragraph, marker excluded
-  breadcrumbs: string[] // ancestor items' first paragraphs, outermost first
+  breadcrumbs: string[] // headings above the task, then ancestor items' first paragraphs, outermost first
   checked: boolean
   dueDate: string | null // ISO date per the resolution rules above
 }

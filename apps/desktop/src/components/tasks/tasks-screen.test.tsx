@@ -430,9 +430,8 @@ describe('TasksScreen', () => {
     ])
     const view = await renderScreen()
 
-    await view.findByText('project task')
-    expect(view.getByRole('button', { name: 'Home → House chore' })).toBeDefined()
-    expect(view.getByRole('button', { name: 'Tasks → Kitchen' })).toBeDefined()
+    await view.findByRole('button', { name: 'Home → House chore' })
+    await view.findByRole('button', { name: 'Tasks → Kitchen' })
     await view.findByText('lone task')
     expect(view.queryByRole('button', { name: 'Tasks', exact: true })).toBeNull()
     await view.unmount()
@@ -471,7 +470,7 @@ describe('TasksScreen', () => {
     const contexts = view.getAllByRole('button', { name: 'House chore', exact: true })
     expect(contexts).toHaveLength(2)
     await userEvent.click(contexts[0]!)
-    expect(view.getByRole('button', { name: 'Convert to bullet 2' })).toBeDefined()
+    await view.findByRole('button', { name: 'Convert to bullet 2' })
     await view.unmount()
   })
 

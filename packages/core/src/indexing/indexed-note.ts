@@ -99,8 +99,8 @@ import { serializeWikiSuggestionAddress } from './suggest.ts'
  * reproject.
  * 21 - tasks are keyed by AST path (`tasks.ast_path`) and store Markdown instead
  * of plain text, so every note's tasks must reproject.
- * 22 - task breadcrumbs start with the chain of headings above the task, the
- * automatic Tasks heading excluded, so every note's tasks must reproject.
+ * 22 - task breadcrumbs start with the chain of headings above the task (the
+ * `Tasks` heading included), so every note's tasks must reproject.
  */
 export const PROJECTION_VERSION = 22
 

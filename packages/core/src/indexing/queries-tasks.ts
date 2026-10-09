@@ -15,7 +15,7 @@ export interface OpenTask extends TaskLocator {
   notePath: string
   /** `markdown` rendered to plain text, for search and labels. */
   text: string
-  /** Ancestor list items' labels, outermost first, rendered to plain text. */
+  /** The headings above the task, then its ancestor list items' labels, outermost first, rendered to plain text. */
   breadcrumbs: readonly string[]
   noteTitle: string
   /** The task's explicit `[[YYYY-MM-DD]]` due date, or null. */

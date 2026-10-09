@@ -373,13 +373,16 @@ describe('continueTaskInContext', () => {
     )
   })
 
-  it('refuses a root-level task, which has no context to continue', async () => {
+  it('continues the own list of a root-level task', async () => {
     const source = '+ [ ] alone\n'
     openSession.mockReturnValue(null)
     readNote.mockResolvedValue(source)
+    writeNote.mockResolvedValue(undefined)
 
-    await expect(continueTaskInContext(ref(source), null, 7)).rejects.toThrow()
-    expect(writeNote).not.toHaveBeenCalled()
+    const result = await continueTaskInContext(ref(source), null, 7)
+
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '+ [ ] alone\n+ [ ] \n', 7)
+    expect(result.created).toMatchObject({ astPath: [1] })
   })
 
   it('returns a result shaped for the cache', async () => {

@@ -408,13 +408,24 @@ describe('applyTaskEdits: insert', () => {
     expect(result.inserted[0]).toMatchObject({ astPath: [0, 3] })
   })
 
-  it('refuses a context insert for a task at the root', () => {
-    const source = '+ [ ] root\n'
-    expect(() =>
-      applyTaskEdits(source, [
-        { kind: 'insert', at: { kind: 'contextEnd', task: locate(source) }, markdown: '' },
-      ]),
-    ).toThrow(TaskStaleError)
+  it('continues the task’s own list when the task is at the root', () => {
+    const source =
+      '## Chores\n\n+ [ ] first\n  + [ ] nested\n+ [ ] peer\n\nprose\n\n### Sub\n\n+ [ ] later\n'
+    const result = applyTaskEdits(source, [
+      { kind: 'insert', at: { kind: 'contextEnd', task: locate(source, 0) }, markdown: '' },
+    ])
+    expect(result.source).toBe(
+      '## Chores\n\n+ [ ] first\n  + [ ] nested\n+ [ ] peer\n+ [ ] \n\nprose\n\n### Sub\n\n+ [ ] later\n',
+    )
+    expect(result.inserted[0]).toMatchObject({ astPath: [3], breadcrumbs: ['Chores'] })
+  })
+
+  it('stops a root list at a list with another marker', () => {
+    const source = '+ [ ] a\n- bullet\n'
+    const result = applyTaskEdits(source, [
+      { kind: 'insert', at: { kind: 'contextEnd', task: locate(source) }, markdown: '' },
+    ])
+    expect(result.source).toBe('+ [ ] a\n+ [ ] \n- bullet\n')
   })
 
   it('inserts right after a task and shifts the siblings behind it', () => {

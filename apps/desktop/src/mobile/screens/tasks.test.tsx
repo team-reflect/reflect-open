@@ -348,9 +348,8 @@ describe('MobileTasks', () => {
     ])
     const view = await renderScreen()
 
-    await view.findByText('project task')
-    expect(view.getByText('Home → House chore')).toBeDefined()
-    expect(view.getByText('Tasks → Kitchen')).toBeDefined()
+    await view.findByText('Home → House chore')
+    await view.findByText('Tasks → Kitchen')
     await view.findByText('lone task')
     expect(view.getAllByText('Tasks', { exact: true })).toHaveLength(0)
     await view.unmount()
