@@ -32,24 +32,25 @@ export interface TaskGroup {
   tasks: OpenTask[]
 }
 
-const PUNCTUATION_RE = /[\p{P}\p{S}]/gu
-
-function normalizedBreadcrumb(text: string): string {
-  return text.replaceAll(/\s+/g, '').replaceAll(PUNCTUATION_RE, '')
+/**
+ * A parent that only says "these are tasks": `Tasks`, `TODO:`, `To do`, …
+ * in any casing, spacing, or punctuation.
+ */
+export function isGenericTaskLabel(label: string): boolean {
+  const word = label.replaceAll(/[\s\p{P}\p{S}]/gu, '').toLowerCase()
+  return word === 'task' || word === 'tasks' || word === 'todo' || word === 'todos'
 }
 
 /**
  * Trim breadcrumb labels and hide the one chain that says nothing: a lone
- * generic parent such as `Tasks`, `TODO:`, or `To do`, whether it is the
- * note's `## Tasks` section or a list item. Any longer chain is shown as is,
- * because every label in it, `Tasks` included, is a real level of the outline.
+ * generic parent, whether the note's `## Tasks` section or a list item wrote
+ * it. A longer chain is shown as is, because every label in it, `Tasks`
+ * included, is a real level of the outline.
  */
 export function visibleTaskBreadcrumbs(breadcrumbs: readonly string[]): string[] {
   const visible = breadcrumbs.map((text) => text.trim()).filter((text) => text.length > 0)
-  if (visible.length !== 1) {
-    return visible
-  }
-  return /^(?:task|todo)s?$/i.test(normalizedBreadcrumb(visible[0]!)) ? [] : visible
+  const lone = visible.length === 1 ? visible[0] : undefined
+  return lone !== undefined && isGenericTaskLabel(lone) ? [] : visible
 }
 
 /** One consecutive run of task rows sharing the same parent outline labels. */
