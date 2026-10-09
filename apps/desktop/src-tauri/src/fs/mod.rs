@@ -299,9 +299,11 @@ pub async fn graph_import_reflect_v1_zip(
     // large graph doesn't flood the webview.
     let mut last_emitted = 0usize;
     let summary = with_graph_lock(&root, || {
-        // The wait for the lock can outlast a pull's checkout: a cancel that
-        // came during it still means nothing is written.
+        // The wait for the lock can outlast a pull's checkout: a cancel, a
+        // graph switch, or a deletion that came during it still means nothing
+        // is written.
         cancel.ensure_active()?;
+        root_for_generation(&state, generation)?;
         import::finalize_import(&root, prepared, downloads, |done, total| {
             let step = (total / 100).max(1);
             if done == total || done >= last_emitted + step {
@@ -1369,9 +1371,9 @@ mod note_revision_tests {
     }
 
     #[test]
-    fn a_write_that_waited_out_a_graph_deletion_does_not_recreate_the_graph() {
-        // `graph_delete` trashes the directory under the graph lock, so a
-        // save that waited for the lock runs with its root gone.
+    fn a_write_to_a_trashed_graph_fails_without_recreating_it() {
+        // What a save meets when it waited for the lock behind
+        // `graph_delete`, which trashes the directory under it.
         let holder = tempfile::tempdir().unwrap();
         let root = holder.path().join("graph");
         fs::create_dir_all(root.join("notes")).unwrap();
