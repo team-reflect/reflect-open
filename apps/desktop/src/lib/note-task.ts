@@ -15,7 +15,8 @@ export interface TaskRef extends TaskLocator {
   notePath: string
 }
 
-export interface ContinuedTaskInContext {
+/** A write that added one task: the new row's address and where the note's other tasks went. */
+export interface InsertedTask {
   /** The new empty task, as the written note addresses it. */
   readonly created: TaskSnapshot
   /** Where every pre-existing task of the note ended up after the write. */
@@ -136,85 +137,38 @@ function requireInserted(result: TaskEditResult): TaskSnapshot {
   return created
 }
 
-/**
- * Toggle a task's checkbox from the Tasks view (Plan 18). The open-tasks view
- * only ever flips `[ ]`→`[x]`, but the primitive toggles, hence the name.
- */
-export function toggleTask(task: TaskRef, generation: number): Promise<TaskEditResult> {
-  return writeTaskEdits(task.notePath, [{ kind: 'toggle', task: toLocator(task) }], generation)
-}
+/** One change to the task `writeTask` addresses; `writeTask` supplies the locator. */
+export type TaskAction =
+  | { kind: 'toggle' }
+  | { kind: 'setMarkdown'; markdown: string }
+  | { kind: 'remove' }
+  | { kind: 'toBullet' }
 
 /**
- * Replace a task's Markdown from the inline Tasks editor (Plan 18), keeping its
- * checked state. `markdown` is the task's first paragraph without the marker.
+ * Apply `actions` to one task in one write (Plan 18): toggle its checkbox,
+ * replace its Markdown (the first paragraph without the marker), remove it
+ * (nested items move up), or demote it to a plain bullet so it leaves the
+ * Tasks projection but stays in the note. Several actions land together, so
+ * an inline edit and the toggle or convert that ends it are one write; every
+ * action addresses the task as the index knew it.
  */
-export function editTask(
+export function writeTask(
   task: TaskRef,
-  markdown: string,
-  generation: number,
-): Promise<TaskEditResult> {
-  return writeTaskEdits(
-    task.notePath,
-    [{ kind: 'setMarkdown', task: toLocator(task), markdown }],
-    generation,
-  )
-}
-
-/** Delete a task from the Tasks view (Plan 18), the ⌫/⌘⌫ path. Nested items move up. */
-export function deleteTask(task: TaskRef, generation: number): Promise<TaskEditResult> {
-  return writeTaskEdits(task.notePath, [{ kind: 'remove', task: toLocator(task) }], generation)
-}
-
-/**
- * Demote a task to a plain bullet from the Tasks view — "Convert to bullet"
- * (Plan 18 follow-up). Drops just the checkbox, keeping the bullet and its
- * content, so the item leaves the Tasks projection while staying in the note.
- */
-export function convertTaskToBullet(task: TaskRef, generation: number): Promise<TaskEditResult> {
-  return writeTaskEdits(task.notePath, [{ kind: 'toBullet', task: toLocator(task) }], generation)
-}
-
-/**
- * Save an inline edit and toggle the task's checkbox in one write. Both edits
- * address the task as the index knew it; the batch resolves them before it
- * changes anything, so the toggle lands on the rewritten task.
- */
-export function editAndToggleTask(
-  task: TaskRef,
-  markdown: string,
+  actions: readonly TaskAction[],
   generation: number,
 ): Promise<TaskEditResult> {
   const locator = toLocator(task)
   return writeTaskEdits(
     task.notePath,
-    [
-      { kind: 'setMarkdown', task: locator, markdown },
-      { kind: 'toggle', task: locator },
-    ],
-    generation,
-  )
-}
-
-/** Save an inline edit and convert the task to a bullet in one write. */
-export function editAndConvertTaskToBullet(
-  task: TaskRef,
-  markdown: string,
-  generation: number,
-): Promise<TaskEditResult> {
-  const locator = toLocator(task)
-  return writeTaskEdits(
-    task.notePath,
-    [
-      { kind: 'setMarkdown', task: locator, markdown },
-      { kind: 'toBullet', task: locator },
-    ],
+    actions.map((action) => ({ ...action, task: locator })),
     generation,
   )
 }
 
 /**
  * Continue entry from a grouped task: resolve the current draft and add a new
- * empty task at the end of the same parent item, in one write. Changed content
+ * empty task at the end of the same parent item, or of the task's own list
+ * under a heading, in one write. Changed content
  * replaces the anchor's Markdown; cleared content removes the anchor. The
  * result addresses the new row and every moved row in the written note, so the
  * Tasks view can select the new task and re-key cached rows before reindexing
@@ -224,7 +178,7 @@ export async function continueTaskInContext(
   task: TaskRef,
   content: string | null,
   generation: number,
-): Promise<ContinuedTaskInContext> {
+): Promise<InsertedTask> {
   const locator = toLocator(task)
   const edits: TaskEdit[] = [
     { kind: 'insert', at: { kind: 'contextEnd', task: locator }, markdown: '' },
@@ -239,17 +193,18 @@ export async function continueTaskInContext(
 }
 
 /**
- * Insert a new empty `+ [ ]` task at the end of `notePath` (Plan 18's Return-
- * to-add) and return its address, so the Tasks view can select the new row and
- * open its inline editor. A missing note (today's daily not yet created)
- * starts empty.
+ * Insert a new empty `+ [ ]` task into `notePath`'s `## Tasks` section
+ * (Plan 18's Return-to-add), creating the section at the end of the note when
+ * it has none, and return the new row's address plus where the note's other
+ * tasks moved, so the Tasks view can re-key cached rows and select the new
+ * one. A missing note (today's daily not yet created) starts empty.
  */
-export async function insertTask(notePath: string, generation: number): Promise<TaskSnapshot> {
+export async function insertTask(notePath: string, generation: number): Promise<InsertedTask> {
   const result = await writeTaskEdits(
     notePath,
-    [{ kind: 'insert', at: { kind: 'documentEnd' }, markdown: '' }],
+    [{ kind: 'insert', at: { kind: 'tasksSection' }, markdown: '' }],
     generation,
     { createIfMissing: true },
   )
-  return requireInserted(result)
+  return { created: requireInserted(result), moved: result.moved }
 }

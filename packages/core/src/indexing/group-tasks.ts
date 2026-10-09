@@ -1,3 +1,4 @@
+import { DefaultMap } from '@ocavue/utils'
 import { displayNoteTitle } from '../markdown/note-title.ts'
 import { compareTaskPaths } from '../markdown/task-path.ts'
 import type { OpenTask } from './queries.ts'
@@ -23,6 +24,15 @@ import type { OpenTask } from './queries.ts'
 /** A date bucket (tasks aggregated across daily notes) or a single regular note. */
 export type TaskGroupKind = 'current' | 'overdue' | 'upcoming' | 'note'
 
+type DateGroupKind = Exclude<TaskGroupKind, 'note'>
+
+/** The date buckets in display order, with their section headings. */
+const DATE_GROUPS: ReadonlyArray<readonly [DateGroupKind, string]> = [
+  ['current', 'Current'],
+  ['overdue', 'Overdue'],
+  ['upcoming', 'Upcoming'],
+]
+
 export interface TaskGroup {
   kind: TaskGroupKind
   /** Section heading — the bucket name, or (for `note` groups) the note's display title. */
@@ -34,17 +44,28 @@ export interface TaskGroup {
 
 const PUNCTUATION_RE = /[\p{P}\p{S}]/gu
 
-function normalizedBreadcrumb(text: string): string {
-  return text.replaceAll(/\s+/g, '').replaceAll(PUNCTUATION_RE, '')
+/** What a label reduces to, spacing and punctuation removed, when it only says "these are tasks". */
+const GENERIC_TASK_WORDS: ReadonlySet<string> = new Set(['task', 'tasks', 'todo', 'todos'])
+
+/**
+ * A parent that only says "these are tasks": `Tasks`, `TODO:`, `To do`, …
+ * in any casing, spacing, or punctuation.
+ */
+export function isGenericTaskLabel(label: string): boolean {
+  const word = label.replaceAll(/\s+/g, '').replaceAll(PUNCTUATION_RE, '').toLowerCase()
+  return GENERIC_TASK_WORDS.has(word)
 }
 
-/** Trim breadcrumb labels and hide a lone generic Tasks/Todo parent. */
+/**
+ * Trim breadcrumb labels and hide the one chain that says nothing: a lone
+ * generic parent, whether the note's `## Tasks` section or a list item wrote
+ * it. A longer chain is shown as is, because every label in it, `Tasks`
+ * included, is a real level of the outline.
+ */
 export function visibleTaskBreadcrumbs(breadcrumbs: readonly string[]): string[] {
   const visible = breadcrumbs.map((text) => text.trim()).filter((text) => text.length > 0)
-  if (visible.length !== 1) {
-    return visible
-  }
-  return /^(?:task|todo)s?$/i.test(normalizedBreadcrumb(visible[0]!)) ? [] : visible
+  const lone = visible.length === 1 ? visible[0] : undefined
+  return lone !== undefined && isGenericTaskLabel(lone) ? [] : visible
 }
 
 /** One consecutive run of task rows sharing the same parent outline labels. */
@@ -59,7 +80,7 @@ function haveSameBreadcrumbs(left: readonly string[], right: readonly string[]):
   return left.length === right.length && left.every((part, index) => part === right[index])
 }
 
-/** Group consecutive task rows that share the same parent outline context. */
+/** Group consecutive task rows of one note that share the same visible context. */
 export function groupTaskContexts(tasks: readonly OpenTask[]): TaskContext[] {
   const contexts: {
     breadcrumbs: readonly string[]
@@ -69,14 +90,15 @@ export function groupTaskContexts(tasks: readonly OpenTask[]): TaskContext[] {
 
   for (const task of tasks) {
     const previous = contexts.at(-1)
-    if (previous !== undefined && haveSameBreadcrumbs(previous.breadcrumbs, task.breadcrumbs)) {
+    const visibleBreadcrumbs = visibleTaskBreadcrumbs(task.breadcrumbs)
+    if (
+      previous !== undefined &&
+      previous.tasks[0]?.notePath === task.notePath &&
+      haveSameBreadcrumbs(previous.visibleBreadcrumbs, visibleBreadcrumbs)
+    ) {
       previous.tasks.push(task)
     } else {
-      contexts.push({
-        breadcrumbs: task.breadcrumbs,
-        visibleBreadcrumbs: visibleTaskBreadcrumbs(task.breadcrumbs),
-        tasks: [task],
-      })
+      contexts.push({ breadcrumbs: task.breadcrumbs, visibleBreadcrumbs, tasks: [task] })
     }
   }
 
@@ -89,17 +111,19 @@ function effectiveDate(task: OpenTask): string | null {
 }
 
 /**
- * Which bucket a single task falls in, by the same rules {@link groupTasks} uses
- * — so a caller (e.g. the view's Return-to-add, deciding which note a new task
- * joins) can place one task without rebuilding every group. `today` is an ISO
- * `YYYY-MM-DD`. `'note'` means undated (grouped under its source note).
+ * Which bucket a task falls in: the one rule {@link groupTasks} and the view's
+ * Return-to-add (deciding which note a new task joins) share. `today` is an
+ * ISO `YYYY-MM-DD`. `'note'` means undated (grouped under its source note).
  */
 export function taskDateBucket(task: OpenTask, today: string): TaskGroupKind {
   const date = effectiveDate(task)
   if (date === null) {
+    // No due date and no daily date: V1's "unscheduled", grouped by note.
     return 'note'
   }
   if (task.dueDate !== null && task.dueDate < today) {
+    // Overdue keys off the explicit due date ALONE (V1's asymmetry): a bare
+    // task in a past daily note is not overdue, it is Current.
     return 'overdue'
   }
   if (date > today) {
@@ -177,61 +201,23 @@ function compareNoteGroups(left: TaskGroup, right: TaskGroup): number {
  * depend on the order the index read returns.
  */
 export function groupTasks(tasks: readonly OpenTask[], today: string): TaskGroup[] {
-  const current: OpenTask[] = []
-  const overdue: OpenTask[] = []
-  const upcoming: OpenTask[] = []
-  const byNote = new Map<string, OpenTask[]>()
-
+  const dated = new DefaultMap<DateGroupKind, OpenTask[]>(() => [])
+  const byNote = new DefaultMap<string, OpenTask[]>(() => [])
   for (const task of tasks) {
-    const date = effectiveDate(task)
-    if (date === null) {
-      // No due date and no daily date — V1's "unscheduled": grouped by note.
-      const group = byNote.get(task.notePath)
-      if (group === undefined) {
-        byNote.set(task.notePath, [task])
-      } else {
-        group.push(task)
-      }
-    } else if (task.dueDate !== null && task.dueDate < today) {
-      // Overdue keys off the explicit due date ALONE (V1's asymmetry): a bare
-      // task in a past daily note is not overdue — it lands in Current below.
-      overdue.push(task)
-    } else if (date > today) {
-      upcoming.push(task)
-    } else {
-      current.push(task)
-    }
+    const kind = taskDateBucket(task, today)
+    const bucket = kind === 'note' ? byNote.get(task.notePath) : dated.get(kind)
+    bucket.push(task)
   }
 
-  const dateGroups: TaskGroup[] = []
-  if (current.length > 0) {
-    dateGroups.push({
-      kind: 'current',
-      label: 'Current',
-      notePath: null,
-      tasks: current.sort(compareDated),
-    })
-  }
-  if (overdue.length > 0) {
-    dateGroups.push({
-      kind: 'overdue',
-      label: 'Overdue',
-      notePath: null,
-      tasks: overdue.sort(compareDated),
-    })
-  }
-  if (upcoming.length > 0) {
-    dateGroups.push({
-      kind: 'upcoming',
-      label: 'Upcoming',
-      notePath: null,
-      tasks: upcoming.sort(compareDated),
-    })
-  }
-
-  const noteGroups: TaskGroup[] = [...byNote.values()]
-    .map((noteTasks) => ({
-      kind: 'note' as const,
+  const dateGroups = DATE_GROUPS.flatMap(([kind, label]): TaskGroup[] => {
+    const bucket = dated.get(kind)
+    return bucket.length === 0
+      ? []
+      : [{ kind, label, notePath: null, tasks: bucket.sort(compareDated) }]
+  })
+  const noteGroups = [...byNote.values()]
+    .map((noteTasks): TaskGroup => ({
+      kind: 'note',
       // A `byNote` entry only exists once a task has been pushed into it.
       label: displayNoteTitle(noteTasks[0]!.noteTitle),
       notePath: noteTasks[0]!.notePath,

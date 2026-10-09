@@ -1,8 +1,8 @@
 import {
   compareTaskPaths,
   decodeTaskPath,
-  renderInlineText,
-  type TaskLocator,
+  renderTaskSnapshot,
+  type TaskRow,
 } from '../markdown/index.ts'
 import { db } from './db.ts'
 import { decodeTaskBreadcrumbs } from './indexed-note.ts'
@@ -11,15 +11,9 @@ import { decodeTaskBreadcrumbs } from './indexed-note.ts'
  * One task plus the note context the Tasks view (Plan 18) groups and renders
  * by. `astPath`, `markdown`, and `checked` address the task for writes.
  */
-export interface OpenTask extends TaskLocator {
+export interface OpenTask extends TaskRow {
   notePath: string
-  /** `markdown` rendered to plain text, for search and labels. */
-  text: string
-  /** Ancestor list items' labels, outermost first, rendered to plain text. */
-  breadcrumbs: readonly string[]
   noteTitle: string
-  /** The task's explicit `[[YYYY-MM-DD]]` due date, or null. */
-  dueDate: string | null
   /** ISO date for daily-note tasks; null for tasks in regular notes. */
   dailyDate: string | null
   /** Pin flag mapped to a real boolean at the read boundary. */
@@ -39,7 +33,6 @@ function taskRowsQuery() {
       'tasks.markdown',
       'tasks.breadcrumbs',
       'tasks.checked',
-      'tasks.dueDate',
       'notes.title as noteTitle',
       'notes.dailyDate',
       'notes.isPinned',
@@ -48,13 +41,12 @@ function taskRowsQuery() {
     ])
 }
 
-interface TaskRow {
+interface TaskRecord {
   notePath: string
   astPath: string
   markdown: string
   breadcrumbs: string
   checked: number
-  dueDate: string | null
   noteTitle: string
   dailyDate: string | null
   isPinned: number
@@ -67,18 +59,19 @@ interface TaskRow {
  * do not decode is skipped and reported instead of failing the whole read: the
  * projection is rebuilt from Markdown, so such a row is a bug, not data.
  */
-function toTaskRows(rows: readonly TaskRow[]): OpenTask[] {
+function toTaskRows(rows: readonly TaskRecord[]): OpenTask[] {
   const tasks: OpenTask[] = []
   for (const row of rows) {
     const { astPath, markdown, breadcrumbs, checked, isPinned, ...rest } = row
     try {
       tasks.push({
         ...rest,
-        astPath: decodeTaskPath(astPath),
-        markdown,
-        text: renderInlineText(markdown),
-        breadcrumbs: decodeTaskBreadcrumbs(breadcrumbs).map((label) => renderInlineText(label)),
-        checked: checked !== 0,
+        ...renderTaskSnapshot({
+          astPath: decodeTaskPath(astPath),
+          markdown,
+          breadcrumbs: decodeTaskBreadcrumbs(breadcrumbs),
+          checked: checked !== 0,
+        }),
         isPinned: isPinned !== 0,
       })
     } catch (cause) {

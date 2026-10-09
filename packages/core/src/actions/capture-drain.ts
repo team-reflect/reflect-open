@@ -17,9 +17,9 @@ import {
   appendListItemUnderBacklinkedHeading,
   headingMatchesBacklinkedTitle,
   upgradeSectionHeadingBacklink,
-  type ListItemKind,
 } from '../markdown/edit.ts'
 import { parseNote } from '../markdown/extract.ts'
+import { applyTaskEdits } from '../markdown/task-ast.ts'
 import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks.ts'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter.ts'
 import type { ReconcileStop } from './audio-memo.ts'
@@ -335,9 +335,19 @@ async function drainTextCapture(envelope: TextCaptureEnvelope, generation: numbe
   const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
   const dailySource = await noteSource(daily, generation)
   // `task` is Reflect's round `+` checkbox, the only marker the Tasks
-  // projection reads; `checkbox` is the square `- [ ]`, an inert daily item.
-  const kind: ListItemKind = envelope.kind === 'append' ? 'bullet' : envelope.kind
-  await writeNote(daily, appendListItem(dailySource, envelope.text, kind), generation)
+  // projection reads, and lands in the `## Tasks` section; `checkbox` is the
+  // square `- [ ]`, an inert daily item appended at the end.
+  const next =
+    envelope.kind === 'task'
+      ? applyTaskEdits(dailySource, [
+          { kind: 'insert', at: { kind: 'tasksSection' }, markdown: envelope.text },
+        ]).source
+      : appendListItem(
+          dailySource,
+          envelope.text,
+          envelope.kind === 'append' ? 'bullet' : 'checkbox',
+        )
+  await writeNote(daily, next, generation)
 }
 
 async function sweepOrphanSpools(
