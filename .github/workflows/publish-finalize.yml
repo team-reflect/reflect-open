@@ -75,7 +75,6 @@ jobs:
       - name: Write the release notes
         env:
           ASSET: ${{ steps.release.outputs.asset }}
-          VERSION: ${{ steps.release.outputs.version }}
         run: |
           notes="$RUNNER_TEMP/release-notes.md"
           gh release view "$TAG" --json body --jq .body > "$notes"
@@ -83,7 +82,7 @@ jobs:
             mapfile -t assets < <(gh release view "$TAG" --json assets --jq '.assets[].name')
             echo >> "$notes"
             node apps/desktop/scripts/release-downloads.ts \
-              --repo="$GITHUB_REPOSITORY" --tag="$TAG" --version="$VERSION" --asset="$ASSET" \
+              --repo="$GITHUB_REPOSITORY" --tag="$TAG" --asset="$ASSET" \
               "${assets[@]}" >> "$notes"
           fi
 
