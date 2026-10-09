@@ -1149,6 +1149,51 @@ fn merge_interrupted_before_commit_converges_next_cycle() {
 }
 
 #[test]
+fn merge_interrupted_on_a_text_conflict_does_not_commit_its_output() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/shared.md", "# Shared\n\nline\n");
+    commit_all(root_a, "shared", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/shared.md", "# Shared\n\nedited on b\n");
+    commit_all(&root_b, "b edit", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, "notes/shared.md", "# Shared\n\nedited on a\n");
+    commit_all(root_a, "a edit", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+
+    // The process dies with the merge's checkout on disk.
+    fault::arm(FaultPoint::AfterMergeBeforeCommit, Fault::Panic);
+    let crashed = std::panic::catch_unwind(AssertUnwindSafe(|| merge_remote(root_a)));
+    assert!(crashed.is_err(), "the injected crash must unwind");
+
+    // The cycle commits first: the crashed merge's output must not become
+    // this device's edit, or the redone merge conflicts against it.
+    commit_all(root_a, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(
+        head_blob(root_a, "notes/shared.md"),
+        "# Shared\n\nedited on a\n"
+    );
+
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert_eq!(merged.conflicted_paths, vec!["notes/shared.md".to_string()]);
+    let content = read(root_a, "notes/shared.md");
+    assert_eq!(
+        content.matches("<<<<<<< ").count(),
+        1,
+        "one marker layer: {content}"
+    );
+    assert!(
+        content.contains("edited on a") && content.contains("edited on b"),
+        "{content}"
+    );
+}
+
+#[test]
 fn a_foreign_rebase_is_still_refused() {
     let fixture = fixture();
     let root = &fixture.graph_a;

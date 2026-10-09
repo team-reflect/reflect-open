@@ -3,6 +3,7 @@
 
 use std::path::Path;
 
+use git2::build::CheckoutBuilder;
 use git2::{Repository, RepositoryInitOptions, Signature};
 
 use crate::error::{AppError, AppResult};
@@ -40,16 +41,37 @@ pub(super) fn open_existing(root: &Path) -> AppResult<Repository> {
 /// or revert the user started with the git CLI): guessing there could
 /// destroy their state. A merge is the one state this app itself produces,
 /// between `repo.merge` and the merge commit; one left behind by a crash is
-/// cleared here (index back to `HEAD`, working tree untouched) so the next
-/// cycle re-derives it instead of refusing forever.
+/// cleared here so the next cycle re-derives it instead of refusing forever.
+///
+/// The index goes back to `HEAD`. So do the paths the crashed merge left
+/// conflicted: their checkout (marker text, or ours) is the merge's output,
+/// and the cycle commits before it merges, so leaving it on disk would record
+/// it as the user's edit and the redone merge would conflict against it.
+/// Cleanly merged paths stay: their content is what the redone merge
+/// produces anyway, and an edit the user made since must not be thrown away.
 pub(super) fn ensure_clean_state(repo: &Repository) -> AppResult<()> {
     match repo.state() {
         git2::RepositoryState::Clean => Ok(()),
         git2::RepositoryState::Merge => {
             tracing::warn!("clearing a merge an earlier run left unfinished");
+            let head = repo.head()?.peel_to_tree()?;
             let mut index = repo.index()?;
-            index.read_tree(&repo.head()?.peel_to_tree()?)?;
+            let conflicted: Vec<Vec<u8>> = index
+                .conflicts()?
+                .flatten()
+                .filter_map(|conflict| conflict.our.or(conflict.their).or(conflict.ancestor))
+                .map(|entry| entry.path)
+                .collect();
+            index.read_tree(&head)?;
             index.write()?;
+            if !conflicted.is_empty() {
+                let mut checkout = CheckoutBuilder::new();
+                checkout.force().remove_untracked(true);
+                for path in &conflicted {
+                    checkout.path(path);
+                }
+                repo.checkout_tree(head.as_object(), Some(&mut checkout))?;
+            }
             repo.cleanup_state()?;
             Ok(())
         }
