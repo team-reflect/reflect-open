@@ -199,6 +199,30 @@ describe('NoteEditor time format', () => {
   })
 })
 
+describe('NoteEditor Backspace in an empty first paragraph', () => {
+  it('keeps the empty paragraph by default', async () => {
+    const handleRef = createRef<NoteEditorHandle>()
+    await render(<NoteEditor initialContent="" handleRef={handleRef} />)
+
+    await pmRoot.click()
+    await userEvent.keyboard('{Enter}foo{ArrowUp}{Backspace}')
+
+    expect(handleRef.current?.getMarkdown()).toBe('\nfoo\n')
+  })
+
+  it('deletes the empty paragraph when backspaceDeletesEmptyFirstBlock is on', async () => {
+    const handleRef = createRef<NoteEditorHandle>()
+    await render(
+      <NoteEditor initialContent="" backspaceDeletesEmptyFirstBlock handleRef={handleRef} />,
+    )
+
+    await pmRoot.click()
+    await userEvent.keyboard('{Enter}foo{ArrowUp}{Backspace}')
+
+    expect(handleRef.current?.getMarkdown()).toBe('foo\n')
+  })
+})
+
 describe('NoteEditor smooth caret animation', () => {
   it('enables the caret glide by default', async () => {
     await render(<NoteEditor initialContent="Hello" />)

@@ -136,6 +136,13 @@ interface NoteEditorProps {
    */
   bulletAfterHeading?: boolean
   /**
+   * Whether Backspace in an empty first paragraph deletes that paragraph, so
+   * the rest of the note moves up one line. Off by default. The daily stream
+   * opts in: its date heading sits outside the editor, so nothing else can
+   * remove a leading empty line.
+   */
+  backspaceDeletesEmptyFirstBlock?: boolean
+  /**
    * Whether to show meowdown's per-block gutter handle: a grip to drag-reorder
    * blocks and a "+" to insert a paragraph below. Off by default. The main note
    * editor opts in; one-line surfaces like the inline task editor leave it off so
@@ -252,6 +259,7 @@ export function NoteEditor({
   smoothCaretAnimation = true,
   timeFormat = '12h',
   bulletAfterHeading = false,
+  backspaceDeletesEmptyFirstBlock = false,
   blockHandle = false,
   resolveImageUrl,
   resolveWikiEmbed,
@@ -492,6 +500,7 @@ export function NoteEditor({
         timeFormat={timeFormat === '24h' ? '24' : '12'}
         caretGlide={smoothCaretAnimation}
         bulletAfterHeading={bulletAfterHeading}
+        backspaceDeletesEmptyFirstBlock={backspaceDeletesEmptyFirstBlock}
         // Pinned off on the touch surface regardless of the caller: the grip is
         // revealed on hover and drag-reorders blocks with a pointer, neither of
         // which a touch webview can express. Turning it off also drops the drop
