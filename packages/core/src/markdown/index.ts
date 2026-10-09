@@ -73,6 +73,7 @@ export {
   type AsyncWikiLookup,
 } from './resolve.ts'
 export { renderInlineText } from './inline-text.ts'
+export { isTasksLabel } from './task-heading.ts'
 export { compareTaskPaths, decodeTaskPath, encodeTaskPath, isSameTaskPath } from './task-path.ts'
 export {
   applyTaskEdits,

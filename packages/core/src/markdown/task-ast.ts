@@ -16,6 +16,7 @@ import { DefaultMap } from '@ocavue/utils'
 import { splitFrontmatter } from './frontmatter.ts'
 import { normalizeWikiTarget } from './resolve.ts'
 import { scanInlineWikiLinks } from './scan.ts'
+import { isTasksHeading } from './task-heading.ts'
 import { isSameTaskPath } from './task-path.ts'
 
 /** The task a caller addressed is not in the note anymore: the write is refused. */
@@ -65,14 +66,35 @@ export interface TaskEntry extends TaskSnapshot {
   parent: BlockParent
 }
 
+/** One heading a document-level block sits under. */
+interface Section {
+  level: number
+  /** Empty for the automatic Tasks heading, which labels nothing. */
+  label: string
+}
+
+/** The labels of the open sections, outermost first. */
+function sectionLabels(sections: readonly Section[]): string[] {
+  return sections.map((section) => section.label).filter((label) => label !== '')
+}
+
 export function getRoundTasks(document: MarkdownDocument): TaskEntry[] {
   const breadcrumbsOf = new DefaultMap<MarkdownNode, readonly string[]>(() => [])
   const entries: TaskEntry[] = []
+  // The headings above the current document-level block, like an outline.
+  const sections: Section[] = []
   for (const { node, parent, path } of walkMarkdownAst(document)) {
     if (parent === undefined) {
       continue
     }
-    const inherited = breadcrumbsOf.get(parent)
+    if (parent === document && node.type === 'heading') {
+      // A heading closes every section of its own level or deeper.
+      while ((sections.at(-1)?.level ?? 0) >= node.level) {
+        sections.pop()
+      }
+      sections.push({ level: node.level, label: isTasksHeading(node) ? '' : node.value.trim() })
+    }
+    const inherited = parent === document ? sectionLabels(sections) : breadcrumbsOf.get(parent)
     const label = node.type === 'listItem' ? getFirstParagraphMarkdown(node) : ''
     breadcrumbsOf.set(node, label === '' ? inherited : [...inherited, label])
     if (isRoundTask(node) && isBlockParent(parent)) {
@@ -104,7 +126,7 @@ export interface ParsedTask {
   astPath: MarkdownAstPath
   /** The task's first paragraph, marker excluded. */
   markdown: string
-  /** Ancestor list items' first paragraphs, outermost first. */
+  /** The headings above the task, then its ancestor list items' first paragraphs, outermost first. */
   breadcrumbs: readonly string[]
   checked: boolean
   dueDate: string | null
@@ -151,7 +173,7 @@ export type TaskEdit = TaskEditItem | TaskEditInsert
 
 /** A round task as it stands in a note body. */
 export interface TaskSnapshot extends TaskLocator {
-  /** Ancestor list items' first paragraphs, outermost first. */
+  /** The headings above the task, then its ancestor list items' first paragraphs, outermost first. */
   breadcrumbs: readonly string[]
 }
 

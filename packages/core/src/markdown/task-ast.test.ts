@@ -128,6 +128,57 @@ describe('projectTasks', () => {
     expect(tasks.map((task) => task.breadcrumbs)).toEqual([[], ['parent task']])
   })
 
+  it('starts breadcrumbs with the chain of headings above the task', () => {
+    const body =
+      '# Home\n\n## House chore\n\n+ Kitchen\n  + [ ] wash dishes\n\n### Garden\n\n+ [ ] water plants\n\n## Work\n\n+ [ ] send update\n'
+    expect(projectTasks(body).map((task) => task.breadcrumbs)).toEqual([
+      ['Home', 'House chore', 'Kitchen'],
+      ['Home', 'House chore', 'Garden'],
+      ['Home', 'Work'],
+    ])
+  })
+
+  it.each(['Tasks', 'tAsKs', '**Tasks**', '`Tasks`', '[[Tasks]]', '[[tasks]]'])(
+    'skips the %s heading in the chain',
+    (heading) => {
+      const body = `# Home\n\n## ${heading}\n\n+ [ ] top\n+ Kitchen\n  + [ ] child\n`
+      expect(projectTasks(body).map((task) => task.breadcrumbs)).toEqual([
+        ['Home'],
+        ['Home', 'Kitchen'],
+      ])
+    },
+  )
+
+  it.each(['Task', 'Todo', 'Tasks:', 'House tasks', '[[Tasks|To do]]', String.raw`\[[Tasks]]`])(
+    'keeps the %s heading as a label',
+    (heading) => {
+      expect(projectTasks(`## ${heading}\n\n+ [ ] first\n`)[0]?.breadcrumbs).toEqual([heading])
+    },
+  )
+
+  it('keeps a Tasks subheading inside its parent section', () => {
+    const body = '## House chore\n\n+ [ ] first\n\n### Tasks\n\n+ [ ] second\n'
+    expect(projectTasks(body).map((task) => task.breadcrumbs)).toEqual([
+      ['House chore'],
+      ['House chore'],
+    ])
+  })
+
+  it('ignores quoted, nested, and fenced headings as sections', () => {
+    const body =
+      '## House chore\n\n> ## Quoted\n\n- ## Listed\n\n+ [ ] first\n\n```\n## Fenced\n```\n\n+ [ ] second\n'
+    expect(projectTasks(body).map((task) => task.breadcrumbs)).toEqual([
+      ['House chore'],
+      ['House chore'],
+    ])
+  })
+
+  it('stores heading labels as Markdown', () => {
+    expect(projectTasks('## **House chore**\n\n+ [ ] a\n')[0]?.breadcrumbs).toEqual([
+      '**House chore**',
+    ])
+  })
+
   it('reads the first calendar date link as the due date, per task', () => {
     expect(
       projectTasks('+ [ ] ship it [[2026-07-01]] and review [[2026-08-01]]\n')[0]?.dueDate,
@@ -156,6 +207,14 @@ describe('getRoundTasks', () => {
       [0, 2],
     ])
     expect(entries[0]?.parent).toBe(document.children[0])
+  })
+
+  it('reports the same breadcrumbs as the projection and the edit result', () => {
+    const body = '# Home\n\n## Chores\n\n+ [ ] a\n'
+    const breadcrumbs = ['Home', 'Chores']
+    expect(getRoundTasks(parseMarkdownAst(body))[0]?.breadcrumbs).toEqual(breadcrumbs)
+    expect(projectTasks(body)[0]?.breadcrumbs).toEqual(breadcrumbs)
+    expect(applyTaskEdits(body, []).tasks[0]?.breadcrumbs).toEqual(breadcrumbs)
   })
 })
 

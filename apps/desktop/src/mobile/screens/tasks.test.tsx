@@ -340,14 +340,41 @@ describe('MobileTasks', () => {
     await view.unmount()
   })
 
-  it('hides a lone generic task breadcrumb', async () => {
+  it('shows the heading chain above a context and hides the Tasks label', async () => {
     getOpenTasks.mockResolvedValue([
-      task({ astPath: [2], text: 'project task', breadcrumbs: ['Tasks:'] }),
+      task({ astPath: [2], text: 'chore task', breadcrumbs: ['Home', 'House chore'] }),
+      task({ astPath: [5], text: 'project task', breadcrumbs: ['Tasks', 'Kitchen'] }),
     ])
     const view = await renderScreen()
 
     await view.findByText('project task')
-    expect(view.queryByText('Tasks:')).toBeNull()
+    expect(view.getByText('Home → House chore')).toBeDefined()
+    expect(view.getByText('Kitchen')).toBeDefined()
+    expect(view.queryByText('Tasks → Kitchen')).toBeNull()
+    await view.unmount()
+  })
+
+  it('keeps matching heading contexts separate across source notes in date buckets', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({
+        notePath: 'notes/a.md',
+        astPath: [1],
+        text: 'tidy desk',
+        dailyDate: '2026-06-14',
+        breadcrumbs: ['House chore'],
+      }),
+      task({
+        notePath: 'notes/b.md',
+        astPath: [1],
+        text: 'water plants',
+        dailyDate: '2026-06-14',
+        breadcrumbs: ['House chore'],
+      }),
+    ])
+    const view = await renderScreen()
+
+    await view.findByText('water plants')
+    expect(view.getAllByText('House chore')).toHaveLength(2)
     await view.unmount()
   })
 

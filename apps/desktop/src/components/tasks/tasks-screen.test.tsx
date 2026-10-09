@@ -404,20 +404,66 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('hides a lone generic task breadcrumb', async () => {
+  it('shows the heading chain above a context and hides the Tasks label', async () => {
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
         astPath: [2],
+        text: 'chore task',
+        noteTitle: 'Project',
+        breadcrumbs: ['Home', 'House chore'],
+      }),
+      task({
+        notePath: 'notes/p.md',
+        astPath: [5],
         text: 'project task',
         noteTitle: 'Project',
-        breadcrumbs: ['Tasks:'],
+        breadcrumbs: ['Tasks', 'Kitchen'],
       }),
     ])
     const view = await renderScreen()
 
     await view.findByText('project task')
-    expect(view.queryByText('Tasks:')).toBeNull()
+    expect(view.getByRole('button', { name: 'Home → House chore' })).toBeDefined()
+    expect(view.getByRole('button', { name: 'Kitchen', exact: true })).toBeDefined()
+    expect(view.queryByText('Tasks → Kitchen')).toBeNull()
+    await view.unmount()
+  })
+
+  it('selects a heading context only within its source note in date buckets', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({
+        notePath: 'notes/a.md',
+        astPath: [1],
+        text: 'tidy desk',
+        noteTitle: 'A',
+        dailyDate: '2026-06-14',
+        breadcrumbs: ['House chore'],
+      }),
+      task({
+        notePath: 'notes/a.md',
+        astPath: [2],
+        text: 'clean kitchen',
+        noteTitle: 'A',
+        dailyDate: '2026-06-14',
+        breadcrumbs: ['House chore'],
+      }),
+      task({
+        notePath: 'notes/b.md',
+        astPath: [1],
+        text: 'water plants',
+        noteTitle: 'B',
+        dailyDate: '2026-06-14',
+        breadcrumbs: ['House chore'],
+      }),
+    ])
+    const view = await renderScreen()
+
+    await view.findByText('water plants')
+    const contexts = view.getAllByRole('button', { name: 'House chore', exact: true })
+    expect(contexts).toHaveLength(2)
+    await userEvent.click(contexts[0]!)
+    expect(view.getByRole('button', { name: 'Convert to bullet 2' })).toBeDefined()
     await view.unmount()
   })
 

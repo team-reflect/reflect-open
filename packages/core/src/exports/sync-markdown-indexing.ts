@@ -69,6 +69,7 @@ export {
   clearTaskDueDate,
   TaskStaleError,
   renderInlineText,
+  isTasksLabel,
   compareTaskPaths,
   decodeTaskPath,
   encodeTaskPath,

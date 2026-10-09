@@ -35,14 +35,17 @@ describe('visibleTaskBreadcrumbs', () => {
     expect(visibleTaskBreadcrumbs(['', ' Project ', '  '])).toEqual(['Project'])
   })
 
-  it('hides common single task headings', () => {
-    for (const heading of ['Task', 'Tasks:', 'todo', 'TODOs', 'To Do', "To Do's: "]) {
-      expect(visibleTaskBreadcrumbs([heading])).toEqual([])
+  it('hides the Tasks label regardless of casing, spacing, or position', () => {
+    for (const label of ['Tasks', ' tasks ', 'TASKS', '\tTaSkS\t']) {
+      expect(visibleTaskBreadcrumbs([label])).toEqual([])
     }
+    expect(visibleTaskBreadcrumbs(['Tasks', 'House chore', ' tasks '])).toEqual(['House chore'])
   })
 
-  it('keeps multi-part breadcrumbs even when one part is common', () => {
-    expect(visibleTaskBreadcrumbs(['Tasks', 'Project'])).toEqual(['Tasks', 'Project'])
+  it('keeps every other label, including generic ones', () => {
+    for (const label of ['Task', 'Tasks:', 'House tasks', 'todo', 'TODOs', 'To Do']) {
+      expect(visibleTaskBreadcrumbs([label])).toEqual([label])
+    }
   })
 })
 
@@ -71,9 +74,29 @@ describe('groupTaskContexts', () => {
   it('labels each context with its visible breadcrumbs', () => {
     const contexts = groupTaskContexts([
       task({ astPath: [1], breadcrumbs: [' Project '] }),
-      task({ astPath: [2], breadcrumbs: ['Tasks:'] }),
+      task({ astPath: [2], breadcrumbs: ['Tasks'] }),
     ])
     expect(contexts.map((context) => context.visibleBreadcrumbs)).toEqual([['Project'], []])
+  })
+
+  it('groups by visible breadcrumbs without rewriting the stored ones', () => {
+    const contexts = groupTaskContexts([
+      task({ astPath: [1], breadcrumbs: ['Tasks', 'Kitchen'] }),
+      task({ astPath: [2], breadcrumbs: ['Kitchen'] }),
+    ])
+    expect(contexts).toHaveLength(1)
+    expect(contexts[0]?.breadcrumbs).toEqual(['Tasks', 'Kitchen'])
+  })
+
+  it('keeps matching contexts in different notes separate', () => {
+    const contexts = groupTaskContexts([
+      task({ notePath: 'notes/a.md', astPath: [1], breadcrumbs: ['House chore'] }),
+      task({ notePath: 'notes/b.md', astPath: [1], breadcrumbs: ['House chore'] }),
+    ])
+    expect(contexts.map((context) => context.tasks[0]?.notePath)).toEqual([
+      'notes/a.md',
+      'notes/b.md',
+    ])
   })
 
   it('returns no contexts for no tasks', () => {

@@ -57,17 +57,16 @@ markers in markdown, AI task extraction (later, over this projection), CLI
 - **The `tasks` table is a pure projection** (rebuildable, wiped + rebuilt on schema
   bump), keyed by `notes(path)` with `ON UPDATE CASCADE ON DELETE CASCADE` like the
   other child tables — so Plan 17 moves and deletes need zero new handling.
-- **Task context breadcrumbs are ancestor-list labels** (added post-release, PR #685).
-  Each projected task carries the rendered text of its ancestor `ListItem` nodes,
-  outermost first (`markdown/task-breadcrumbs.ts`); the Tasks view shows one
-  `Parent → Child` row above each consecutive run of same-context rows — V1's
-  context-row behavior, not a per-row label (the reverted #660 got this wrong). A
-  label is the item's lead textblock (first paragraph, or the task line itself for a
-  parent task) rendered through the same plain-text pass as task text, so formatting
-  is stripped and wrapped lines stay one label. Only list ancestry counts: headings
-  and sibling items are never context; a parent task labels its nested subtasks.
-  A lone generic parent (`Tasks:`, `TODO`, … in any spacing/punctuation) is hidden at
-  display time (`visibleTaskBreadcrumbs`) — the stored array keeps it. Storage is
+- **Task context breadcrumbs are the headings above the task, then its ancestor
+  list items**, outermost first. Every heading level counts (`# Home` →
+  `## House chore` → `### Garden`), so a breadcrumb reads like the note's outline;
+  only headings that are direct blocks of the document open a section (`> ## Quoted`
+  does not). The automatic `Tasks` heading labels nothing: it is skipped in the chain,
+  and `visibleTaskBreadcrumbs` also hides the label at display time. A list label is
+  the item's first paragraph; a parent task labels its nested subtasks. The Tasks
+  view shows one `Parent → Child` row above each consecutive run of rows **of one
+  note** with the same visible breadcrumbs, so two notes' `House chore` sections
+  never merge (V1's context-row behavior, not a per-row label). Storage is
   derived projection data: `tasks.breadcrumbs` holds one JSON string array written
   and read only through `encodeTaskBreadcrumbs`/`decodeTaskBreadcrumbs` (mirrored by
   `write.rs`). Task search matches task text, note title, and breadcrumb labels.
