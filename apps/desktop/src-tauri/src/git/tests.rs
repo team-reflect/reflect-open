@@ -1151,13 +1151,17 @@ fn merge_interrupted_before_commit_converges_next_cycle() {
 
 /// Write an empty lock file whose mtime is `age` in the past.
 fn plant_lock(path: &Path, age: Duration) {
+    plant_lock_dated(path, SystemTime::now() - age);
+}
+
+fn plant_lock_dated(path: &Path, modified: SystemTime) {
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(path, b"").unwrap();
     fs::File::options()
         .write(true)
         .open(path)
         .unwrap()
-        .set_modified(SystemTime::now() - age)
+        .set_modified(modified)
         .unwrap();
 }
 
@@ -1177,15 +1181,9 @@ fn stale_locks_are_removed_on_open() {
     for path in &stale {
         plant_lock(path, Duration::from_secs(11 * 60));
     }
-    // A lock dated in the future cannot be live either.
+    // A lock dated far in the future cannot be live either.
     let future = git_dir.join("ORIG_HEAD.lock");
-    plant_lock(&future, Duration::ZERO);
-    fs::File::options()
-        .write(true)
-        .open(&future)
-        .unwrap()
-        .set_modified(SystemTime::now() + Duration::from_secs(3600))
-        .unwrap();
+    plant_lock_dated(&future, SystemTime::now() + Duration::from_secs(3600));
 
     // The next operation opens the repository, sweeps, and succeeds where
     // libgit2 would otherwise refuse to touch the index and the branch.
@@ -1204,6 +1202,10 @@ fn fresh_locks_are_left_alone() {
     // the user is running, so a sweep must not take it.
     let fresh = root.join(".git/refs/heads/other.lock");
     plant_lock(&fresh, Duration::from_secs(60));
+    // So may one dated slightly ahead: created while a sweep was running,
+    // or on a clock that was just corrected.
+    let ahead = root.join(".git/refs/heads/ahead.lock");
+    plant_lock_dated(&ahead, SystemTime::now() + Duration::from_secs(60));
     // A symlink under `refs/` must not lead the sweep out of `.git`.
     let outside = fixture._dir.path().join("outside/old.lock");
     plant_lock(&outside, Duration::from_secs(11 * 60));
@@ -1213,5 +1215,25 @@ fn fresh_locks_are_left_alone() {
     write(root, "notes/a.md", "# A\n");
     assert!(commit_all(root, "a", MAX_FILE_BYTES).unwrap().committed);
     assert!(fresh.exists());
+    assert!(ahead.exists());
     assert!(outside.exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_symlinked_refs_directory_is_not_swept() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n");
+    commit_all(root, "a", MAX_FILE_BYTES).unwrap();
+
+    // `.git/refs` itself points out of the repository.
+    let outside = fixture._dir.path().join("elsewhere");
+    fs::rename(root.join(".git/refs"), &outside).unwrap();
+    std::os::unix::fs::symlink(&outside, root.join(".git/refs")).unwrap();
+    let lock = outside.join("heads/old.lock");
+    plant_lock(&lock, Duration::from_secs(11 * 60));
+
+    let _ = status(root);
+    assert!(lock.exists());
 }
