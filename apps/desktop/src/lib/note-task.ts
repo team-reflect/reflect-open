@@ -15,7 +15,8 @@ export interface TaskRef extends TaskLocator {
   notePath: string
 }
 
-export interface ContinuedTaskInContext {
+/** A write that added one task: the new row's address and where the note's other tasks went. */
+export interface InsertedTask {
   /** The new empty task, as the written note addresses it. */
   readonly created: TaskSnapshot
   /** Where every pre-existing task of the note ended up after the write. */
@@ -214,7 +215,8 @@ export function editAndConvertTaskToBullet(
 
 /**
  * Continue entry from a grouped task: resolve the current draft and add a new
- * empty task at the end of the same parent item, in one write. Changed content
+ * empty task at the end of the same parent item, or of the task's own list
+ * under a heading, in one write. Changed content
  * replaces the anchor's Markdown; cleared content removes the anchor. The
  * result addresses the new row and every moved row in the written note, so the
  * Tasks view can select the new task and re-key cached rows before reindexing
@@ -224,7 +226,7 @@ export async function continueTaskInContext(
   task: TaskRef,
   content: string | null,
   generation: number,
-): Promise<ContinuedTaskInContext> {
+): Promise<InsertedTask> {
   const locator = toLocator(task)
   const edits: TaskEdit[] = [
     { kind: 'insert', at: { kind: 'contextEnd', task: locator }, markdown: '' },
@@ -239,17 +241,18 @@ export async function continueTaskInContext(
 }
 
 /**
- * Insert a new empty `+ [ ]` task at the end of `notePath` (Plan 18's Return-
- * to-add) and return its address, so the Tasks view can select the new row and
- * open its inline editor. A missing note (today's daily not yet created)
- * starts empty.
+ * Insert a new empty `+ [ ]` task into `notePath`'s `## Tasks` section
+ * (Plan 18's Return-to-add), creating the section at the end of the note when
+ * it has none, and return the new row's address plus where the note's other
+ * tasks moved, so the Tasks view can re-key cached rows and select the new
+ * one. A missing note (today's daily not yet created) starts empty.
  */
-export async function insertTask(notePath: string, generation: number): Promise<TaskSnapshot> {
+export async function insertTask(notePath: string, generation: number): Promise<InsertedTask> {
   const result = await writeTaskEdits(
     notePath,
-    [{ kind: 'insert', at: { kind: 'documentEnd' }, markdown: '' }],
+    [{ kind: 'insert', at: { kind: 'tasksSection' }, markdown: '' }],
     generation,
     { createIfMissing: true },
   )
-  return requireInserted(result)
+  return { created: requireInserted(result), moved: result.moved }
 }

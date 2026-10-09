@@ -74,6 +74,13 @@ markers in markdown, AI task extraction (later, over this projection), CLI
   Both desktop and mobile render the same context runs. Clicking a desktop breadcrumb
   selects exactly the rows it labels; mobile renders the breadcrumb as a read-only
   grouping label because its Tasks tab has no multi-select mode.
+- **Automatic inserts land in the `## Tasks` section.** The Tasks view's
+  Return-to-add and "+ Add", and browser task captures, insert into the first `+`
+  list of the note's top-level `## Tasks` heading (any inline form that reads
+  "Tasks": `## [[Tasks]]`, `## **Tasks**`), directly under the heading when that
+  list is missing, and append a new `## Tasks` section when the heading is missing.
+  Typing in the editor is unaffected. Enter on a row that sits under a heading
+  continues that row's own list in place.
 - **Write-back is surgical and guarded.** Toggling from the Tasks view replaces
   exactly the three-character marker (`[ ]` ↔ `[x]`) at the indexed position **only
   if** the surrounding item text still matches what the index recorded. On mismatch

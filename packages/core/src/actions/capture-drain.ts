@@ -17,9 +17,9 @@ import {
   appendListItemUnderBacklinkedHeading,
   headingMatchesBacklinkedTitle,
   upgradeSectionHeadingBacklink,
-  type ListItemKind,
 } from '../markdown/edit.ts'
 import { parseNote } from '../markdown/extract.ts'
+import { applyTaskEdits, NoteNotSerializableError, TaskStaleError } from '../markdown/task-ast.ts'
 import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks.ts'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter.ts'
 import type { ReconcileStop } from './audio-memo.ts'
@@ -331,13 +331,36 @@ function parseEnvelope(raw: string): InboxEnvelope | null {
  * duplication risk left is a crash between this write and the spool removal,
  * which re-appends one line once on retry.
  */
+/**
+ * Put a captured task into the daily note's `## Tasks` section. A note the
+ * AST cannot rewrite faithfully, or a capture of more than one paragraph,
+ * falls back to the trailing-list append so the capture is never lost.
+ */
+function insertCapturedTask(source: string, text: string): string {
+  try {
+    return applyTaskEdits(source, [
+      { kind: 'insert', at: { kind: 'tasksSection' }, markdown: text },
+    ]).source
+  } catch (cause) {
+    if (cause instanceof NoteNotSerializableError || cause instanceof TaskStaleError) {
+      console.warn('capture: appending the task at the end of the daily note instead', cause)
+      return appendListItem(source, text, 'task')
+    }
+    throw cause
+  }
+}
+
 async function drainTextCapture(envelope: TextCaptureEnvelope, generation: number): Promise<void> {
   const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
   const dailySource = await noteSource(daily, generation)
   // `task` is Reflect's round `+` checkbox, the only marker the Tasks
-  // projection reads; `checkbox` is the square `- [ ]`, an inert daily item.
-  const kind: ListItemKind = envelope.kind === 'append' ? 'bullet' : envelope.kind
-  await writeNote(daily, appendListItem(dailySource, envelope.text, kind), generation)
+  // projection reads, and lands in the `## Tasks` section; `checkbox` is the
+  // square `- [ ]`, an inert daily item appended at the end.
+  const next =
+    envelope.kind === 'task'
+      ? insertCapturedTask(dailySource, envelope.text)
+      : appendListItem(dailySource, envelope.text, envelope.kind === 'append' ? 'bullet' : 'checkbox')
+  await writeNote(daily, next, generation)
 }
 
 async function sweepOrphanSpools(

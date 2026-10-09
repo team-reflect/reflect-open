@@ -268,7 +268,10 @@ beforeEach(async () => {
   editTask.mockReset()
   editTask.mockResolvedValue(WRITTEN)
   insertTask.mockReset()
-  insertTask.mockResolvedValue({ astPath: [0], markdown: '', breadcrumbs: [], checked: false })
+  insertTask.mockResolvedValue({
+    created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+    moved: [],
+  })
   continueTaskInContext.mockReset()
   continueTaskInContext.mockResolvedValue({
     created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },

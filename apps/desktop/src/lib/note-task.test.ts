@@ -257,27 +257,33 @@ describe('editAndConvertTaskToBullet', () => {
 })
 
 describe('insertTask', () => {
-  it('writes round task syntax to an empty note', async () => {
+  it('starts an empty note with a Tasks section and reports the new address', async () => {
     openSession.mockReturnValue(null)
     readNote.mockResolvedValue('')
     writeNote.mockResolvedValue(undefined)
 
     await expect(insertTask('notes/a.md', 7)).resolves.toEqual({
-      astPath: [0],
-      markdown: '',
-      breadcrumbs: [],
-      checked: false,
+      created: { astPath: [1], markdown: '', breadcrumbs: [], checked: false },
+      moved: [],
     })
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '+ [ ] \n', 7)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '## Tasks\n\n+ [ ] \n', 7)
   })
 
-  it('appends round task syntax after existing content', async () => {
+  it('joins an existing Tasks section and reports the tasks it shifted', async () => {
     openSession.mockReturnValue(null)
-    readNote.mockResolvedValue('# Notes\n\nbody\n')
+    readNote.mockResolvedValue('## Tasks\n\n+ [ ] a\n\n## Later\n\n+ [ ] b\n')
     writeNote.mockResolvedValue(undefined)
 
-    await expect(insertTask('notes/a.md', 7)).resolves.toMatchObject({ astPath: [2] })
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '# Notes\n\nbody\n\n+ [ ] \n', 7)
+    const result = await insertTask('notes/a.md', 7)
+
+    expect(result.created).toMatchObject({ astPath: [2] })
+    expect(movedFrom(result, [1])).toMatchObject({ astPath: [1], markdown: 'a' })
+    expect(movedFrom(result, [4])).toMatchObject({ astPath: [5], markdown: 'b' })
+    expect(writeNote).toHaveBeenCalledWith(
+      'notes/a.md',
+      '## Tasks\n\n+ [ ] a\n+ [ ] \n\n## Later\n\n+ [ ] b\n',
+      7,
+    )
   })
 
   it('starts a note that does not exist yet', async () => {
@@ -286,14 +292,14 @@ describe('insertTask', () => {
     writeNote.mockResolvedValue(undefined)
 
     await insertTask('daily/2026-06-14.md', 7)
-    expect(writeNote).toHaveBeenCalledWith('daily/2026-06-14.md', '+ [ ] \n', 7)
+    expect(writeNote).toHaveBeenCalledWith('daily/2026-06-14.md', '## Tasks\n\n+ [ ] \n', 7)
   })
 
   it('appends through the live session when the note is open', async () => {
-    const session = sessionOver('+ [ ] first\n')
+    const session = sessionOver('## Tasks\n\n+ [ ] first\n')
     openSession.mockReturnValue(session)
 
-    await expect(insertTask('notes/a.md', 7)).resolves.toMatchObject({ astPath: [1] })
+    await expect(insertTask('notes/a.md', 7)).resolves.toMatchObject({ created: { astPath: [2] } })
     expect(writeNote).not.toHaveBeenCalled()
   })
 })

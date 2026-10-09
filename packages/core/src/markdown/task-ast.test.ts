@@ -455,6 +455,65 @@ describe('applyTaskEdits: insert', () => {
   })
 })
 
+describe('applyTaskEdits: insert into the Tasks section', () => {
+  const section = { kind: 'insert', at: { kind: 'tasksSection' }, markdown: '' } as const
+
+  it.each([
+    ['', '## Tasks\n\n+ [ ] \n'],
+    ['intro\n', 'intro\n\n## Tasks\n\n+ [ ] \n'],
+    ['## Tasks\n\n+ [ ] old\n', '## Tasks\n\n+ [ ] old\n+ [ ] \n'],
+    ['## tasks\n\nprose\n', '## tasks\n\n+ [ ] \n\nprose\n'],
+    ['## [[Tasks]]\n', '## [[Tasks]]\n\n+ [ ] \n'],
+    ['## **Tasks**\n\n+ [ ] old\n', '## **Tasks**\n\n+ [ ] old\n+ [ ] \n'],
+    ['## Tasks\n\n- [ ] checkbox\n', '## Tasks\n\n+ [ ] \n- [ ] checkbox\n'],
+    ['## Tasks\n\n* bullet\n', '## Tasks\n\n+ [ ] \n* bullet\n'],
+    [
+      '## Tasks\n\n- bullet\n\n+ [ ] old\n\nprose\n\n## Later\n\n+ [ ] later\n',
+      '## Tasks\n\n- bullet\n\n+ [ ] old\n+ [ ] \n\nprose\n\n## Later\n\n+ [ ] later\n',
+    ],
+    [
+      '## Tasks\n\nintro\n\n### Child\n\n+ [ ] nested\n',
+      '## Tasks\n\n+ [ ] \n\nintro\n\n### Child\n\n+ [ ] nested\n',
+    ],
+    ['## Tasks\n\n+ Project\n  + [ ] nested\n', '## Tasks\n\n+ Project\n  + [ ] nested\n+ [ ] \n'],
+    ['## Tasks\n\n\n+ [ ] old\n', '## Tasks\n\n\n+ [ ] old\n+ [ ] \n'],
+  ])('inserts an empty task into %j', (source, expected) => {
+    expect(applyTaskEdits(source, [section]).source).toBe(expected)
+  })
+
+  it.each([
+    '# Tasks',
+    '### Tasks',
+    '> ## Tasks',
+    '- ## Tasks',
+    '## [[Tasks|To do]]',
+    String.raw`## \[[Tasks]]`,
+  ])('does not reuse %s', (heading) => {
+    const source = `${heading}\n\nexisting\n`
+    expect(applyTaskEdits(source, [{ ...section, markdown: 'new' }]).source).toBe(
+      `${source}\n## Tasks\n\n+ [ ] new\n`,
+    )
+  })
+
+  it('keeps frontmatter and reports where the other tasks moved', () => {
+    const source = '---\nid: x\n---\n## Tasks\n\n+ [ ] a\n\n## Later\n\n+ [ ] b\n+ [ ] c\n'
+    const result = applyTaskEdits(source, [section])
+    expect(result.source).toBe(
+      '---\nid: x\n---\n## Tasks\n\n+ [ ] a\n+ [ ] \n\n## Later\n\n+ [ ] b\n+ [ ] c\n',
+    )
+    expect(result.inserted[0]).toMatchObject({ astPath: [2], breadcrumbs: [] })
+    expect(movedFrom(result, [1])).toMatchObject({ astPath: [1] })
+    expect(movedFrom(result, [4])).toMatchObject({ astPath: [5], breadcrumbs: ['Later'] })
+    expect(movedFrom(result, [5])).toMatchObject({ astPath: [6] })
+  })
+
+  it('places the new task with the given text', () => {
+    expect(applyTaskEdits('## Tasks\n', [{ ...section, markdown: 'buy milk' }]).source).toBe(
+      '## Tasks\n\n+ [ ] buy milk\n',
+    )
+  })
+})
+
 describe('applyTaskEdits: batches', () => {
   it('resolves a removed anchor and inserts at its context end in one write', () => {
     const source = '- Shopping\n  + [ ] milk\n  + [ ] eggs\n- Other\n'

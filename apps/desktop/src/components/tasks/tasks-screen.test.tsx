@@ -254,7 +254,10 @@ beforeEach(() => {
   editTask.mockReset()
   editTask.mockResolvedValue(WRITTEN)
   insertTask.mockReset()
-  insertTask.mockResolvedValue({ astPath: [0], markdown: '', breadcrumbs: [], checked: false })
+  insertTask.mockResolvedValue({
+    created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+    moved: [],
+  })
   continueTaskInContext.mockReset()
   continueTaskInContext.mockResolvedValue({
     created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
@@ -886,7 +889,10 @@ describe('TasksScreen', () => {
   })
 
   it('a note group’s "+ Add" button inserts into that note and opens the editor', async () => {
-    insertTask.mockResolvedValue({ astPath: [0], markdown: '', breadcrumbs: [], checked: false })
+    insertTask.mockResolvedValue({
+      created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+      moved: [],
+    })
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/proj.md',
@@ -903,6 +909,40 @@ describe('TasksScreen', () => {
     await waitFor(() => expect(insertTask).toHaveBeenCalledWith('notes/proj.md', 1))
     // The new row's editor opens, ready to type.
     await view.findByTestId('task-editor')
+    await view.unmount()
+  })
+
+  it('re-keys the cached rows a section insert shifted before selecting the new row', async () => {
+    const later = task({
+      notePath: 'notes/proj.md',
+      noteTitle: 'Project',
+      astPath: [1],
+      text: 'later',
+      markdown: 'later',
+    })
+    getOpenTasks.mockResolvedValue([later])
+    insertTask.mockResolvedValue({
+      created: { astPath: [1], markdown: '', breadcrumbs: [], checked: false },
+      moved: [
+        {
+          from: { astPath: [1], markdown: 'later', breadcrumbs: [], checked: false },
+          to: { astPath: [2], markdown: 'later', breadcrumbs: [], checked: false },
+        },
+      ],
+    })
+    const view = await renderScreen()
+
+    await userEvent.click(await view.findByRole('button', { name: 'Add a task to Project' }))
+    await view.findByTestId('task-editor')
+    await userEvent.click(view.getByRole('button', { name: 'cancel-edit' }))
+    await userEvent.click(await view.findByRole('button', { name: 'later' }))
+    await userEvent.click(view.getByRole('button', { name: 'delete-edit' }))
+    await waitFor(() =>
+      expect(deleteTask).toHaveBeenCalledWith(
+        expect.objectContaining({ notePath: 'notes/proj.md', astPath: [2] }),
+        1,
+      ),
+    )
     await view.unmount()
   })
 
@@ -1037,7 +1077,10 @@ describe('TasksScreen', () => {
 
   it('Enter in the editor saves the row and opens the next task (continuous entry)', async () => {
     editTask.mockResolvedValue(WRITTEN)
-    insertTask.mockResolvedValue({ astPath: [7], markdown: '', breadcrumbs: [], checked: false })
+    insertTask.mockResolvedValue({
+      created: { astPath: [7], markdown: '', breadcrumbs: [], checked: false },
+      moved: [],
+    })
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1176,7 +1219,10 @@ describe('TasksScreen', () => {
 
   it('Enter on a cleared row deletes it instead of leaving a bare task (no ghost)', async () => {
     deleteTask.mockResolvedValue(WRITTEN)
-    insertTask.mockResolvedValue({ astPath: [0], markdown: '', breadcrumbs: [], checked: false })
+    insertTask.mockResolvedValue({
+      created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+      moved: [],
+    })
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',

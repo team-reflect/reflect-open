@@ -8,6 +8,7 @@ import {
   type MarkdownBlock,
   type MarkdownBlockquote,
   type MarkdownDocument,
+  type MarkdownHeading,
   type MarkdownListItem,
   type MarkdownNode,
   type MarkdownTableCell,
@@ -153,6 +154,8 @@ export type InsertPosition =
   | { kind: 'afterTask'; task: TaskLocator }
   /** After any block, for example the last item of the list under a heading. */
   | { kind: 'afterBlock'; astPath: MarkdownAstPath }
+  /** The end of the first `+` list in the top-level `## Tasks` section, created at the end when missing. */
+  | { kind: 'tasksSection' }
 
 /** An edit of one existing round task. */
 export type TaskEditItem =
@@ -205,6 +208,8 @@ export function findTaskMove(moves: readonly TaskMove[], task: TaskLocator): Tas
 type SlotTarget =
   | { kind: 'after'; anchor: MarkdownBlock }
   | { kind: 'end'; container: MarkdownDocument | MarkdownListItem }
+  /** A new `## <heading>` section at the end of the document, holding the item. */
+  | { kind: 'newSection'; heading: string }
 
 /**
  * Apply `edits` to a note and serialize its body once. Every locator describes
@@ -335,6 +340,13 @@ function resolveInsertPosition(
       }
       return { kind: 'after', anchor: lastOfListRun(parent, node) }
     }
+    case 'tasksSection': {
+      const heading = findTasksHeading(document)
+      if (heading === undefined) {
+        return { kind: 'newSection', heading: 'Tasks' }
+      }
+      return { kind: 'after', anchor: lastOfSectionTaskList(document, heading) ?? heading }
+    }
     case 'afterTask': {
       const { node } = locateTask(before, at.task)
       return { kind: 'after', anchor: node }
@@ -371,6 +383,35 @@ function lastOfListRun(parent: BlockParent, item: MarkdownListItem): MarkdownLis
   return last
 }
 
+/** The first top-level H2 that reads "Tasks". */
+function findTasksHeading(document: MarkdownDocument): MarkdownHeading | undefined {
+  return document.children.find(
+    (block): block is MarkdownHeading =>
+      block.type === 'heading' && block.level === 2 && isTasksHeading(block),
+  )
+}
+
+/**
+ * The last item of the first `+` list between `heading` and the next heading
+ * of any level, or undefined when the section has none. Blank-line paragraphs
+ * are skipped; a list with another marker is skipped too, so a `- [ ]`
+ * checklist in the section never receives a round task.
+ */
+function lastOfSectionTaskList(
+  document: MarkdownDocument,
+  heading: MarkdownHeading,
+): MarkdownListItem | undefined {
+  for (const block of document.children.slice(document.children.indexOf(heading) + 1)) {
+    if (block.type === 'heading') {
+      return undefined
+    }
+    if (block.type === 'listItem' && block.marker === '+') {
+      return lastOfListRun(document, block)
+    }
+  }
+  return undefined
+}
+
 /**
  * Parents and indexes are looked up when the edit is applied, not when it was
  * resolved: an earlier edit in the batch may have shifted the siblings or
@@ -385,6 +426,8 @@ function insertTaskItem(
   if (slot.kind === 'after') {
     const { parent, index } = requireAttached(document, slot.anchor)
     parent.children.splice(index + 1, 0, item)
+  } else if (slot.kind === 'newSection') {
+    document.children.push({ type: 'heading', level: 2, value: slot.heading }, item)
   } else {
     if (slot.container.type === 'listItem') {
       requireAttached(document, slot.container)

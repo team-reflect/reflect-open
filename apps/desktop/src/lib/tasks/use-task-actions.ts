@@ -61,7 +61,8 @@ export interface TaskActions {
   /** Toggle one row checkbox with exact rollback semantics for inline-editor checkbox clicks. */
   checkboxToggle: (task: OpenTask) => void
   /**
-   * Add a new empty task to `target`'s note (Return-to-add, V1) and return the
+   * Add a new empty task to the `## Tasks` section of `target`'s note
+   * (Return-to-add, V1) and return the
    * optimistic row to select — its inline editor opens focused. Resolves to
    * `null` when there's no graph or the write failed (the toast already fired).
    */
@@ -444,7 +445,10 @@ export function useTaskActions(): TaskActions {
         return null
       }
       try {
-        const created = createInsertedTaskRow(target, await insertMutation.mutateAsync(target))
+        const result = await insertMutation.mutateAsync(target)
+        // The section can sit above other tasks of the note: re-key them first.
+        relocate(target.notePath, result.moved)
+        const created = createInsertedTaskRow(target, result.created)
         cache.addOpen(created)
         return created
       } catch {
@@ -475,7 +479,10 @@ export function useTaskActions(): TaskActions {
         return null // the edit/delete rollback already surfaced the failure
       }
       try {
-        const created = createInsertedTaskRow(target, await insertMutation.mutateAsync(target))
+        const result = await insertMutation.mutateAsync(target)
+        // The section can sit above other tasks of the note: re-key them first.
+        relocate(target.notePath, result.moved)
+        const created = createInsertedTaskRow(target, result.created)
         cache.addOpen(created)
         return created
       } catch {

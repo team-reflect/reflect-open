@@ -523,12 +523,34 @@ describe('drainCaptureInbox (text captures)', () => {
     expect(spool.size).toBe(0)
   })
 
-  it('appends a task envelope as a round (+) task the Tasks view projects', async () => {
+  it('puts a task envelope in a new Tasks section as a round (+) task', async () => {
     addTextSpool(textEnvelope({ kind: 'task', text: 'buy milk' }))
 
     await drain()
 
-    expect(files.get(DAILY)).toBe('+ [ ] buy milk\n')
+    expect(files.get(DAILY)).toBe('## Tasks\n\n+ [ ] buy milk\n')
+  })
+
+  it('places a task capture in the existing Tasks section without creating a note', async () => {
+    files.set(DAILY, '## Tasks\n\n+ [ ] old\n\n## Later\n\nprose\n')
+    addTextSpool(textEnvelope({ kind: 'task', text: 'buy milk' }))
+
+    await drain()
+
+    expect(files.get(DAILY)).toBe('## Tasks\n\n+ [ ] old\n+ [ ] buy milk\n\n## Later\n\nprose\n')
+    expect([...files.keys()].filter((path) => path !== DAILY)).toEqual([])
+  })
+
+  it('falls back to a trailing task when the capture cannot be one task paragraph', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    files.set(DAILY, '- morning standup\n')
+    addTextSpool(textEnvelope({ kind: 'task', text: 'buy milk\n\nand eggs' }))
+
+    await drain()
+
+    expect(files.get(DAILY)).toBe('- morning standup\n\n+ [ ] buy milk\n\nand eggs\n')
+    expect(warn).toHaveBeenCalledOnce()
+    warn.mockRestore()
   })
 
   it('appends a checkbox envelope as a square GFM checkbox', async () => {
