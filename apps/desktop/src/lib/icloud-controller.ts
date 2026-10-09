@@ -221,7 +221,11 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       // A failed sweep leaves versions unresolved; the next signal retries.
       console.error('iCloud conflict sweep failed:', err)
       for (const entry of ingested) {
-        pendingIngest.set(entry.path, entry.modifiedMs) // don't lose the base advances
+        // Don't lose the base advances; an arrival recorded during the
+        // sweep is newer and stays.
+        if (!pendingIngest.has(entry.path)) {
+          pendingIngest.set(entry.path, entry.modifiedMs)
+        }
       }
       if (recordBaseline) {
         baselinePending = true // the adoption baseline must survive a failed first sweep

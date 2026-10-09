@@ -7,9 +7,11 @@
 //! shadow base) branch on provenance instead of guessing from timing or
 //! content.
 //!
-//! Entries are consumed on match and expire after a few seconds either way:
-//! the watcher's debounce delivers an echo well within that, and a stale
-//! entry must never relabel a later, genuinely external write.
+//! Entries are consumed on match. Matching is exact on `(path, mtime)`, so
+//! an entry whose echo never came cannot relabel a later, genuinely external
+//! write (that write has its own mtime); expiry is only a memory bound, and
+//! it is long enough for a slow echo (the iOS metadata query under a busy
+//! `fileproviderd`) to still find its entry.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -18,7 +20,7 @@ use std::time::{Duration, Instant};
 
 use reflect_graph_paths::to_slash;
 
-const TTL: Duration = Duration::from_secs(5);
+const TTL: Duration = Duration::from_secs(10 * 60);
 
 static RECENT: Mutex<Option<HashMap<(String, u64), Instant>>> = Mutex::new(None);
 

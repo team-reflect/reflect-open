@@ -41,7 +41,7 @@ let invoked: Array<[string, Record<string, unknown>]>
 let scanCalls: ScanCall[]
 /** Scripted sweep outcomes; `'hang'` parks the sweep until {@link releaseScan}. */
 let scanResults: Array<Record<string, unknown> | Error | 'hang'>
-let releaseScan: (() => void) | null
+let releaseScan: ((failure?: Error) => void) | null
 let listeners: Map<string, (payload: unknown) => void>
 
 beforeEach(() => {
@@ -77,9 +77,14 @@ beforeEach(() => {
             throw scripted
           }
           if (scripted === 'hang') {
-            return await new Promise((resolve) => {
-              releaseScan = () =>
+            return await new Promise((resolve, reject) => {
+              releaseScan = (failure?: Error) => {
+                if (failure !== undefined) {
+                  reject(failure)
+                  return
+                }
                 resolve({ changed: [], needsReview: [], deferred: [], autoResolved: 0 })
+              }
             })
           }
           return scripted ?? { changed: [], needsReview: [], deferred: [], autoResolved: 0 }
@@ -399,6 +404,22 @@ describe('createIcloudController', () => {
     expect(scanCalls[0]?.recordBaseline).toBe(true)
     expect(scanCalls[1]?.recordBaseline).toBe(true)
     expect(scanCalls[1]?.ingestedPaths).toContain('notes/external.md')
+  })
+
+  it('an arrival during a failed sweep keeps its newer mtime for the retry', async () => {
+    const icloud = controller()
+    await icloud.start()
+    await settleScan() // baseline out of the way
+
+    scanResults.push('hang')
+    emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 }], 'external')
+    await settleScan(INGEST_SETTLE_MS) // scan #2 carries mtime 2 and hangs
+    emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 3 }], 'external')
+    releaseScan?.(new Error('container hiccup'))
+    await settleScan(INGEST_SETTLE_MS) // the retry
+
+    expect(scanCalls).toHaveLength(3)
+    expect(scanCalls[2]?.arrivals).toEqual([{ path: 'notes/external.md', modifiedMs: 3 }])
   })
 
   it('spaces arrival-driven sweeps apart during a download stream', async () => {
