@@ -53,10 +53,3 @@ minimumReleaseAgeExclude:
 #   '@meowdown/core': https://pkg.pr.new/@meowdown/core@346867e5f1b5336c889e829b146a04fcc0c115c1
 #   '@meowdown/react': https://pkg.pr.new/@meowdown/react@346867e5f1b5336c889e829b146a04fcc0c115c1
 #   '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@346867e5f1b5336c889e829b146a04fcc0c115c1
-
-# TODO: remove after https://github.com/prosekit/meowdown/pull/682 is released.
-blockExoticSubdeps: false
-overrides:
-  '@meowdown/core': https://pkg.pr.new/@meowdown/core@698a1570fbce13ec7e1e52b64f43ec6bb31aaa66
-  '@meowdown/react': https://pkg.pr.new/@meowdown/react@698a1570fbce13ec7e1e52b64f43ec6bb31aaa66
-  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@698a1570fbce13ec7e1e52b64f43ec6bb31aaa66
