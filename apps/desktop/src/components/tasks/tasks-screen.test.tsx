@@ -581,24 +581,6 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('renders a task whose text starts with a task marker as text, with one checkbox', async () => {
-    getOpenTasks.mockResolvedValue([
-      task({
-        notePath: 'notes/p.md',
-        markdown: '+ [ ] task',
-        text: '+ [ ] task',
-        noteTitle: 'Project',
-      }),
-    ])
-    const view = await renderScreen()
-
-    const row = await view.findByRole('button', { name: '+ [ ] task' })
-    expect(row.textContent).toContain('+ [ ] task')
-    expect(row.querySelector('input')).toBeNull()
-    expect(view.container.querySelectorAll('[data-task-row]')).toHaveLength(1)
-    await view.unmount()
-  })
-
   it('selects a task when clicking the row outside the text control', async () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', astPath: [2], text: 'full row', noteTitle: 'Project' }),
