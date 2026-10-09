@@ -81,7 +81,7 @@ for (const os of ['macOS', 'Windows']) {
   const badges = INSTALLERS.filter((item) => item.os === os && assetNames.includes(item.file)).map(
     ({ chip, color, file }) => {
       const icon = os === 'macOS' ? 'apple' : 'windows'
-      const image = `https://badgen.net/badge/${os}/${encodeURIComponent(chip)}/${color}?icon=${icon}&style=flat`
+      const image = `https://badgen.net/badge/${os}/${encodeURIComponent(chip)}/${color}?icon=${icon}`
       return `[![${os} ${chip}](${image})](https://github.com/${repo}/releases/download/${tag}/${file})`
     },
   )
