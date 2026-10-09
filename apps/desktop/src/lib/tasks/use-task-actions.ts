@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import type { OpenTask, TaskEditResult } from '@reflect/core'
 import {
+  continueTaskInContext,
   convertTaskToBullet,
   deleteTask,
   editAndConvertTaskToBullet,
@@ -29,8 +30,7 @@ import {
 import { getTaskKey } from '@/lib/tasks/task-identity.ts'
 import { createInsertedTaskRow, type InsertTaskTarget } from '@/lib/tasks/task-insert-target.ts'
 import { useTaskCheckboxAction } from '@/lib/tasks/use-task-checkbox-action.ts'
-import { useTaskCacheWriter } from '@/lib/tasks/use-task-cache.ts'
-import { useTaskContextInsert } from '@/lib/tasks/use-task-context-insert.ts'
+import { useTaskCacheWriter, type TaskCacheSnapshot } from '@/lib/tasks/use-task-cache.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 
 /**
@@ -102,12 +102,17 @@ export interface TaskActions {
   isPending: boolean
 }
 
+interface InsertInput {
+  readonly target: InsertTaskTarget
+  /** Continue from this row: resolve its draft and add the new task after it, in one write. */
+  readonly after?: { readonly task: OpenTask; readonly content: string | null }
+}
+
 export function useTaskActions(): TaskActions {
   const { graph } = useGraph()
   const root = graph?.root ?? null
   const cache = useTaskCacheWriter()
   const checkboxAction = useTaskCheckboxAction()
-  const contextInsert = useTaskContextInsert()
 
   /** Re-key the cached rows and the session's struck set from a write's `moved` map. */
   const relocate = (notePath: string, moved: TaskMoves): void => {
@@ -329,14 +334,38 @@ export function useTaskActions(): TaskActions {
 
   const insertMutation = useMutation({
     mutationKey: mutationKeys.tasks.insert(graph?.root),
-    mutationFn: (target: InsertTaskTarget) => {
+    mutationFn: ({ target, after }: InsertInput) => {
       const generation = graph?.generation
       if (generation === undefined) {
         throw new Error('No graph is open.')
       }
-      return insertTask(target.notePath, generation)
+      return after === undefined
+        ? insertTask(target.notePath, generation)
+        : continueTaskInContext(after.task, after.content, generation)
     },
-    onError: (cause) => cache.reconcile('Adding task', cause),
+    onMutate: async ({ after }: InsertInput): Promise<TaskCacheSnapshot | undefined> => {
+      if (after === undefined) {
+        return undefined
+      }
+      // The anchor row resolves with the same write: a cleared row leaves the
+      // lists, an edited one shows its new text, an unchanged one stays.
+      const snapshot = await cache.snapshot()
+      const patch = (rows: OpenTask[] | undefined): OpenTask[] | undefined =>
+        after.content === ''
+          ? withoutTasks(rows, [after.task])
+          : after.content === null
+            ? rows
+            : withEditedTask(rows, after.task, after.content)
+      cache.patch(patch, patch)
+      return snapshot
+    },
+    onError: (cause, _input, snapshot) => {
+      if (snapshot === undefined) {
+        cache.reconcile('Adding task', cause)
+      } else {
+        cache.rollback(snapshot, 'Adding task', cause)
+      }
+    },
   })
 
   const editAndToggleMutation = useMutation({
@@ -386,9 +415,12 @@ export function useTaskActions(): TaskActions {
    * The Tasks section can sit above other tasks of the note, so their cached
    * rows are re-keyed from the write's `moved` map before the new row is added.
    */
-  async function insertInto(target: InsertTaskTarget): Promise<OpenTask | null> {
+  async function insertInto(
+    target: InsertTaskTarget,
+    after?: InsertInput['after'],
+  ): Promise<OpenTask | null> {
     try {
-      const result = await insertMutation.mutateAsync(target)
+      const result = await insertMutation.mutateAsync({ target, after })
       relocate(target.notePath, result.moved)
       const created = createInsertedTaskRow(target, result.created)
       cache.addOpen(created)
@@ -419,7 +451,6 @@ export function useTaskActions(): TaskActions {
       editAndToggleMutation.isPending ||
       checkboxAction.isPending ||
       insertMutation.isPending ||
-      contextInsert.isPending ||
       scheduleMutation.isPending ||
       convertMutation.isPending ||
       editAndConvertMutation.isPending,
@@ -469,14 +500,11 @@ export function useTaskActions(): TaskActions {
         return null
       }
       if (task.breadcrumbs.length > 0) {
-        try {
-          const created = await contextInsert.insert(task, content)
-          if (created !== null) {
-            return created
-          }
-        } catch {
-          // Failure already surfaced; fall through to preserve the draft.
+        const created = await insertInto(target, { task, content })
+        if (created !== null) {
+          return created
         }
+        // The failure is surfaced and rolled back; still keep the draft.
         await persistTaskDraft(task, content)
         return null
       }
