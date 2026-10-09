@@ -93,8 +93,6 @@ pub enum SweepScope {
     Ingested,
 }
 
-/// The version-check candidate set for `scope` ([`run_sweep`]'s
-/// `conflict_candidates`): `None` checks every note.
 /// An external change the frontend ingested, with the mtime it arrived with.
 /// The base advances only while the file still carries that mtime: a save or
 /// a pull that landed since is nobody's common ancestor yet.
@@ -105,6 +103,8 @@ pub struct IngestedPath {
     pub modified_ms: Option<u64>,
 }
 
+/// The version-check candidate set for `scope` ([`run_sweep`]'s
+/// `conflict_candidates`): `None` checks every note.
 fn conflict_candidates(
     scope: SweepScope,
     ingested_paths: &[IngestedPath],
@@ -330,6 +330,15 @@ fn advance_base_if_clean(
         return;
     }
     let abs = root.join(rel);
+    if !unresolved_versions(&abs).none() {
+        return;
+    }
+    let Ok(content) = fs::read_to_string(&abs) else {
+        return;
+    };
+    // Checked after the read, so the content in hand is the arrival's: a
+    // write that landed before the read, or between it and this stat, moved
+    // the mtime.
     if let Some(arrived) = arrived_ms {
         let current = abs
             .metadata()
@@ -340,12 +349,6 @@ fn advance_base_if_clean(
             return; // written since it arrived: not yet a common ancestor
         }
     }
-    if !unresolved_versions(&abs).none() {
-        return;
-    }
-    let Ok(content) = fs::read_to_string(&abs) else {
-        return;
-    };
     if markers::contains_conflict_markers(&content) {
         return;
     }
@@ -650,6 +653,7 @@ fn fold_duplicate(
         if fs::rename(&dup_abs, &canonical_abs).is_err() {
             return;
         }
+        crate::fs::record_own_write(canonical_rel, modified_ms_of(&canonical_abs));
         // Any lingering base under the canonical path belongs to the *old*
         // note that used to live there — the adopted duplicate is an
         // independent creation, and merging against a dead lineage's

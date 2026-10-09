@@ -11,7 +11,9 @@
 //! an entry whose echo never came cannot relabel a later, genuinely external
 //! write (that write has its own mtime); expiry is only a memory bound, and
 //! it is long enough for a slow echo (the iOS metadata query under a busy
-//! `fileproviderd`) to still find its entry.
+//! `fileproviderd`) to still find its entry. Mtimes compare at millisecond
+//! precision: an external write within the same tick as an own write to the
+//! same path reads as its echo, which errs toward a base that stays put.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -22,15 +24,22 @@ use reflect_graph_paths::to_slash;
 
 const TTL: Duration = Duration::from_secs(10 * 60);
 
-static RECENT: Mutex<Option<HashMap<(String, u64), Instant>>> = Mutex::new(None);
+/// The entries, and when the expired ones were last dropped.
+type Registry = (HashMap<(String, u64), Instant>, Instant);
+
+static RECENT: Mutex<Option<Registry>> = Mutex::new(None);
 
 fn with<R>(f: impl FnOnce(&mut HashMap<(String, u64), Instant>) -> R) -> R {
     let mut guard = RECENT
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let recent = guard.get_or_insert_with(HashMap::new);
     let now = Instant::now();
-    recent.retain(|_, at| now.duration_since(*at) < TTL);
+    let (recent, pruned_at) = guard.get_or_insert_with(|| (HashMap::new(), now));
+    // Once per TTL, not per call: an import registers every file it writes.
+    if now.duration_since(*pruned_at) >= TTL {
+        recent.retain(|_, at| now.duration_since(*at) < TTL);
+        *pruned_at = now;
+    }
     f(recent)
 }
 

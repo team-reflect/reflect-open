@@ -194,6 +194,14 @@ fn tracked_relpath(path: &Path, root: &Path) -> Option<String> {
     tracked.then_some(wire)
 }
 
+/// Separate the echoes of this app's own writes (path and mtime recorded by
+/// the write command) from everything else: `(own, external)`.
+fn split_own_writes(changes: Vec<FileChange>) -> (Vec<FileChange>, Vec<FileChange>) {
+    changes.into_iter().partition(|change| {
+        change.kind == "upsert" && crate::fs::take_own_write(&change.path, change.modified_ms)
+    })
+}
+
 /// Reduce a debounced batch of paths to unique tracked changes (last kind
 /// wins) plus the coarse reconcile signal. Create/modify vs delete is decided
 /// by whether the file currently stats; the same stat supplies the upsert's
@@ -206,14 +214,6 @@ fn tracked_relpath(path: &Path, root: &Path) -> Option<String> {
 /// descendants the platform never enumerates. Hidden paths (`.reflect/`
 /// index churn, `.git/`) can never flip it — that is what keeps the
 /// reconcile pass's own index writes from looping back in here.
-/// Separate the echoes of this app's own writes (path and mtime recorded by
-/// the write command) from everything else: `(own, external)`.
-fn split_own_writes(changes: Vec<FileChange>) -> (Vec<FileChange>, Vec<FileChange>) {
-    changes.into_iter().partition(|change| {
-        change.kind == "upsert" && crate::fs::take_own_write(&change.path, change.modified_ms)
-    })
-}
-
 fn collect_changes(paths: &[PathBuf], root: &Path) -> BatchEffects {
     let mut seen: std::collections::BTreeMap<String, FileChange> =
         std::collections::BTreeMap::new();

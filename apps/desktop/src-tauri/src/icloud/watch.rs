@@ -1046,6 +1046,28 @@ mod platform {
         }
 
         #[test]
+        fn an_upsert_reports_the_files_own_mtime_not_the_querys_date() {
+            // The own-write registry matches on the mtime a write produced;
+            // the query's content-change date can differ from it.
+            let dir = tempfile::tempdir().unwrap();
+            let abs = dir.path().join("a.md");
+            std::fs::write(&abs, "# A\n").unwrap();
+            let on_disk = std::fs::metadata(&abs)
+                .ok()
+                .as_ref()
+                .and_then(crate::fs::modified_ms);
+            let listing = vec![ItemState {
+                abs: abs.to_string_lossy().into_owned(),
+                ..item("notes/a.md", true, Some(2))
+            }];
+            assert_eq!(
+                shapes(&apply_update_delta(&mut state(&[]), &listing, &[])),
+                vec![("notes/a.md".to_string(), "upsert".to_string(), on_disk)]
+            );
+            assert_ne!(on_disk, Some(2));
+        }
+
+        #[test]
         fn eviction_is_not_deletion_but_disappearance_is() {
             let mut snapshot = state(&[
                 ("notes/evicted.md", local(1)),
