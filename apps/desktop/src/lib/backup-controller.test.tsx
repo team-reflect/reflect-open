@@ -30,8 +30,8 @@ const GRAPH: GraphInfo = { root: '/g', name: 'G', generation: 3 }
 const AUTH = JSON.stringify({ kind: 'pat', token: 'ghp_abc' })
 const CLEAN_COMMIT = { committed: false, sha: null, ahead: 0, skippedLargeFiles: [] }
 const UP_TO_DATE = { kind: 'upToDate', conflictedPaths: [], changedFiles: [] }
-const UNMOVED_TIP = { remoteOid: 'aaa', trackingOid: 'aaa' }
-const MOVED_TIP = { remoteOid: 'bbb', trackingOid: 'aaa' }
+const UNMOVED_TIP = { remoteOid: 'aaa', trackingOid: 'aaa', defaultBranch: null }
+const MOVED_TIP = { remoteOid: 'bbb', trackingOid: 'aaa', defaultBranch: null }
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -800,7 +800,7 @@ describe('createBackupController', () => {
   })
 
   it('a remote without the branch starts no cycle', async () => {
-    const { calls } = fakeBridge({ remoteTips: [{ remoteOid: null, trackingOid: 'aaa' }] })
+    const { calls } = fakeBridge({ remoteTips: [{ ...UNMOVED_TIP, remoteOid: null }] })
     vi.useFakeTimers()
     const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
     try {
