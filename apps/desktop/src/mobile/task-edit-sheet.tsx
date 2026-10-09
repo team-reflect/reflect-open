@@ -221,6 +221,7 @@ export function MobileTaskEditSheet({
             <NoteEditor
               key={editorSeed}
               initialContent={draft}
+              singleParagraph
               onChange={handleChange}
               markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
               spellCheck={settings.editorSpellCheck}

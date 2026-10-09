@@ -215,6 +215,7 @@ export function TaskEditor({
     <div data-task-editor className="min-w-0 flex-1">
       <NoteEditor
         initialContent={initial}
+        singleParagraph
         onChange={onChange}
         markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
         spellCheck={settings.editorSpellCheck}

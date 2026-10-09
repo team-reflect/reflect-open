@@ -119,6 +119,13 @@ interface NoteEditorProps {
   initialContent: string
   /** Called with the current markdown whenever the user edits the document. */
   onChange?: (markdown: string) => void
+  /**
+   * Edit one paragraph of inline Markdown (the task editors). A typed block
+   * prefix (`+ [ ] `, `# `, `- `, a fence) stays text, pasted blocks flatten
+   * into the paragraph, and `onChange` reports paragraph Markdown. Off by
+   * default: a note is a whole document.
+   */
+  singleParagraph?: boolean
   /** How markdown syntax characters are shown. */
   markMode?: MarkMode
   /** Whether the browser underlines misspelled words (default on). */
@@ -253,6 +260,7 @@ interface NoteEditorProps {
 
 export function NoteEditor({
   initialContent,
+  singleParagraph = false,
   onChange,
   markMode = 'hide',
   spellCheck = true,
@@ -487,6 +495,7 @@ export function NoteEditor({
         handleRef={innerRef}
         mode={markMode}
         initialMarkdown={initialContent}
+        singleParagraph={singleParagraph}
         // On the touch surface spellcheck is pinned off regardless of the
         // setting: iOS derives the keyboard's smart-quotes/smart-dashes traits
         // from it at focus time, and smart punctuation corrupts markdown

@@ -43,12 +43,19 @@ interface MarkdownPreviewProps {
    * or remote embeds.
    */
   interactive?: boolean
+  /**
+   * Render `content` as one paragraph of inline Markdown. A block prefix at
+   * the start (`+ [ ] `, `# `, `> `) stays text instead of opening a block.
+   * Task rows pass this: their content is one paragraph by definition.
+   */
+  singleParagraph?: boolean
   /** Extra classes for the rendered root. */
   className?: string
 }
 
 export function MarkdownPreview({
   content,
+  singleParagraph = false,
   resolveImageUrl,
   resolveWikiEmbed,
   onWikiLinkClick,
@@ -83,6 +90,7 @@ export function MarkdownPreview({
       resolveYouTubeVideo={resolveYouTubeVideo}
       mediaUrlProtocols={X_MEDIA_URL_PROTOCOLS}
       markdown={content}
+      singleParagraph={singleParagraph}
       markMode="hide"
       interactive={interactive}
       resolveWikilink={resolveWikilink}
