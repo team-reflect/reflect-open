@@ -64,6 +64,10 @@ interface CloseRequestForTest {
   preventDefault: ReturnType<typeof vi.fn>
 }
 
+/**
+ * Exposes synchronous close prevention separately from async persistence so
+ * tests can assert that the window hides while saves are still pending.
+ */
 function closeCurrentWindow(): CloseRequestForTest {
   const preventDefault = vi.fn()
   const closeRequested = windowMock.closeRequested
@@ -72,7 +76,88 @@ function closeCurrentWindow(): CloseRequestForTest {
   return { completed, preventDefault }
 }
 
+/** Lets tests control save completion order without relying on real I/O timing. */
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void
+  const promise = new Promise<void>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 describe('installQuitFlush', () => {
+  it.each(['documents', 'settings'])(
+    'hides the main window before pending saves and backup finish (%s finish first)',
+    async (firstSave) => {
+      const documents = deferred()
+      const settings = deferred()
+      const backup = deferred()
+      flushOpenDocuments.mockReturnValueOnce(documents.promise)
+      flushSettings.mockReturnValueOnce(settings.promise)
+      flushBackup.mockReturnValueOnce(backup.promise)
+      const dispose = installQuitFlush()
+      const closeRequest = closeCurrentWindow()
+
+      try {
+        expect(closeRequest.preventDefault).toHaveBeenCalledOnce()
+        expect(windowMock.hide).toHaveBeenCalledOnce()
+        await vi.waitFor(() => expect(flushOpenDocuments).toHaveBeenCalledOnce())
+        expect(flushSettings).toHaveBeenCalledOnce()
+        expect(flushBackup).not.toHaveBeenCalled()
+
+        const first = firstSave === 'documents' ? documents : settings
+        const last = firstSave === 'documents' ? settings : documents
+        first.resolve()
+        // Drain promise continuations so an incorrectly unblocked backup can run.
+        await new Promise<void>((resolve) => setTimeout(resolve, 0))
+        expect(flushBackup).not.toHaveBeenCalled()
+        last.resolve()
+        await vi.waitFor(() => expect(flushBackup).toHaveBeenCalledOnce())
+        expect(windowMock.hide).toHaveBeenCalledOnce()
+      } finally {
+        documents.resolve()
+        settings.resolve()
+        backup.resolve()
+        await closeRequest.completed
+        dispose()
+      }
+    },
+  )
+
+  it('still flushes if hiding the main window fails', async () => {
+    windowMock.hide.mockRejectedValueOnce(new Error('hide failed'))
+    const dispose = installQuitFlush()
+    const closeRequest = closeCurrentWindow()
+
+    await expect(closeRequest.completed).rejects.toThrow('hide failed')
+    expect(closeRequest.preventDefault).toHaveBeenCalledOnce()
+    expect(flushOpenDocuments).toHaveBeenCalledOnce()
+    expect(flushSettings).toHaveBeenCalledOnce()
+    expect(flushBackup).toHaveBeenCalledOnce()
+
+    dispose()
+  })
+
+  it('waits for backup before confirming app quit', async () => {
+    const backup = deferred()
+    flushBackup.mockReturnValueOnce(backup.promise)
+    const dispose = installQuitFlush()
+
+    try {
+      expect(core.quitRequested).not.toBeNull()
+      core.quitRequested?.()
+      await vi.waitFor(() => expect(flushBackup).toHaveBeenCalledOnce())
+      expect(core.confirmQuit).not.toHaveBeenCalled()
+      expect(windowMock.hide).not.toHaveBeenCalled()
+
+      backup.resolve()
+      await vi.waitFor(() => expect(core.confirmQuit).toHaveBeenCalledOnce())
+    } finally {
+      backup.resolve()
+      dispose()
+    }
+  })
+
   it('flushes and hides the macOS main window even when one flush rejects', async () => {
     flushSettings.mockRejectedValueOnce(new Error('settings flush failed'))
     const dispose = installQuitFlush()
