@@ -301,7 +301,7 @@ pub struct NoteMoveRequest {
     from_address: write::MovedNoteAddress,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn note_move_indexed<R: tauri::Runtime>(
     request: NoteMoveRequest,
     generation: u64,
@@ -312,7 +312,14 @@ pub fn note_move_indexed<R: tauri::Runtime>(
 ) -> AppResult<()> {
     let _background_task = background_task::scoped(&background_tasks, "Reflect note move");
     let root = crate::fs::root_for_generation(&graph, generation)?;
-    {
+    // The graph lock first, then the index: the wait behind a pull's
+    // checkout must not hold the index away from every other command, and
+    // the rows and the file move as one step that no merge can split.
+    crate::fs::with_graph_lock(&root, || {
+        // Still this graph: the index connection below is whatever is
+        // current, and a switch during the wait would move the other
+        // graph's rows.
+        crate::fs::root_for_generation(&graph, generation)?;
         let mut state = lock_state(&index)?;
         let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
         move_rows(conn, &request.from, &request.to, &request.to_address)?;
@@ -328,7 +335,8 @@ pub fn note_move_indexed<R: tauri::Runtime>(
             }
             return Err(err);
         }
-    }
+        Ok(())
+    })?;
     crate::fs::invalidate_file_catalog(&graph, &root);
     emit_index_written(&app);
     emit_note_moved(&app, &request.from, &request.to);
