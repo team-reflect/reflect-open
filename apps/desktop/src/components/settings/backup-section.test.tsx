@@ -253,6 +253,39 @@ describe('BackupSettingsField', () => {
       .not.toBeInTheDocument()
   })
 
+  it('offers a sign-in without a backup when not signed in to GitHub', async () => {
+    // #1375: iCloud and generic-remote graphs still want gist publishing,
+    // which only needs the credential, not a backup repository.
+    github.connected = false
+    await renderSection({ phase: 'disconnected' })
+
+    await userEvent.click(page.getByRole('button', { name: /Sign in only/ }))
+    await expect.element(page.getByRole('heading', { name: 'Sign in to GitHub' })).toBeVisible()
+  })
+
+  it('offers the sign-in-only action beside a connected generic remote', async () => {
+    // A GitLab/SSH or path remote never stores a GitHub credential; the user
+    // must not have to disconnect a working backup to sign in for gists.
+    github.connected = false
+    await renderSection({
+      phase: 'connected',
+      remoteUrl: 'git@gitlab.com:alex/notes.git',
+      repo: null,
+      status: { state: 'idle' },
+    })
+
+    await userEvent.click(page.getByRole('button', { name: /Sign in only/ }))
+    await expect.element(page.getByRole('heading', { name: 'Sign in to GitHub' })).toBeVisible()
+    expect(sync.disconnectGraph).not.toHaveBeenCalled()
+  })
+
+  it('hides the sign-in-only button once signed in', async () => {
+    github.connected = true
+    await renderSection({ phase: 'disconnected' })
+
+    await expect.element(page.getByRole('button', { name: /Sign in only/ })).not.toBeInTheDocument()
+  })
+
   it('signs out of GitHub from the disconnected state', async () => {
     github.connected = true
     await renderSection({ phase: 'disconnected' })

@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog.tsx'
 import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links.tsx'
 import { SettingsField } from '@/components/settings/field.tsx'
+import { GithubSignInDialog } from '@/components/settings/github-sign-in-dialog.tsx'
 import { GithubSignOutRow } from '@/components/settings/github-sign-out-row.tsx'
 import { SyncForkNotice } from '@/components/settings/sync-fork-notice.tsx'
 import { Button } from '@/components/ui/button.tsx'
@@ -54,6 +55,7 @@ export function BackupSettingsField(): ReactElement {
   const { graph } = useGraph()
   const githubConnected = useGithubConnected()
   const [connectOpen, setConnectOpen] = useState(false)
+  const [signInOpen, setSignInOpen] = useState(false)
   const openRepoAttempt = useRef(0)
   const action = useAsyncAction()
 
@@ -82,6 +84,9 @@ export function BackupSettingsField(): ReactElement {
       : null
   // A hand-wired non-GitHub remote (Plan 16) renders the section host-neutral.
   const genericRemote = backup.phase === 'connected' && backup.repo === null
+  // Gist publishing only needs the credential. A graph with no backup, or
+  // one backed up to a non-GitHub host, has no other way to store it.
+  const signInOnlyAvailable = !githubConnected && (backup.phase === 'disconnected' || genericRemote)
 
   function openGithubRepo(): void {
     if (backup.phase !== 'connected' || backup.repo === null) {
@@ -186,6 +191,19 @@ export function BackupSettingsField(): ReactElement {
             </>
           ) : null}
 
+          {signInOnlyAvailable ? (
+            <div>
+              <Button
+                size="sm"
+                variant="ghost"
+                title="Store a GitHub sign-in without backing up this graph, for publishing notes as gists"
+                onClick={() => setSignInOpen(true)}
+              >
+                Sign in only…
+              </Button>
+            </div>
+          ) : null}
+
           {action.error !== null ? (
             <p className="text-xs text-red-700 dark:text-red-300">{action.error}</p>
           ) : null}
@@ -197,6 +215,7 @@ export function BackupSettingsField(): ReactElement {
           onClose={() => setConnectOpen(false)}
         />
       ) : null}
+      {signInOpen ? <GithubSignInDialog onClose={() => setSignInOpen(false)} /> : null}
     </>
   )
 }
