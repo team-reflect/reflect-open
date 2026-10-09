@@ -19,7 +19,7 @@ import {
   upgradeSectionHeadingBacklink,
 } from '../markdown/edit.ts'
 import { parseNote } from '../markdown/extract.ts'
-import { applyTaskEdits, NoteNotSerializableError, TaskStaleError } from '../markdown/task-ast.ts'
+import { applyTaskEdits } from '../markdown/task-ast.ts'
 import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks.ts'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter.ts'
 import type { ReconcileStop } from './audio-memo.ts'
@@ -326,25 +326,6 @@ function parseEnvelope(raw: string): InboxEnvelope | null {
 }
 
 /**
- * Put a captured task into the daily note's `## Tasks` section. A note the
- * AST cannot rewrite faithfully, or a capture of more than one paragraph,
- * falls back to the trailing-list append so the capture is never lost.
- */
-function insertCapturedTask(source: string, text: string): string {
-  try {
-    return applyTaskEdits(source, [
-      { kind: 'insert', at: { kind: 'tasksSection' }, markdown: text },
-    ]).source
-  } catch (cause) {
-    if (cause instanceof NoteNotSerializableError || cause instanceof TaskStaleError) {
-      console.warn('capture: appending the task at the end of the daily note instead', cause)
-      return appendListItem(source, text, 'task')
-    }
-    throw cause
-  }
-}
-
-/**
  * Append one text capture to its capture-day daily note. Deliberately no
  * dedup: identical text captured twice is two entries (Plan 24) — the only
  * duplication risk left is a crash between this write and the spool removal,
@@ -358,7 +339,9 @@ async function drainTextCapture(envelope: TextCaptureEnvelope, generation: numbe
   // square `- [ ]`, an inert daily item appended at the end.
   const next =
     envelope.kind === 'task'
-      ? insertCapturedTask(dailySource, envelope.text)
+      ? applyTaskEdits(dailySource, [
+          { kind: 'insert', at: { kind: 'tasksSection' }, markdown: envelope.text },
+        ]).source
       : appendListItem(
           dailySource,
           envelope.text,

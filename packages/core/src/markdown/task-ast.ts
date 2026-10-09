@@ -405,7 +405,7 @@ function lastOfSectionTaskList(
     if (block.type === 'heading') {
       return undefined
     }
-    if (block.type === 'listItem' && block.marker === '+') {
+    if (block.type === 'listItem' && markerOf(block) === '+') {
       return lastOfListRun(document, block)
     }
   }

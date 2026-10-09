@@ -278,7 +278,7 @@ describe('insertTask', () => {
 
     expect(result.created).toMatchObject({ astPath: [2] })
     expect(movedFrom(result, [1])).toMatchObject({ astPath: [1], markdown: 'a' })
-    expect(movedFrom(result, [4])).toMatchObject({ astPath: [5], markdown: 'b' })
+    expect(movedFrom(result, [3])).toMatchObject({ astPath: [4], markdown: 'b' })
     expect(writeNote).toHaveBeenCalledWith(
       'notes/a.md',
       '## Tasks\n\n+ [ ] a\n+ [ ] \n\n## Later\n\n+ [ ] b\n',

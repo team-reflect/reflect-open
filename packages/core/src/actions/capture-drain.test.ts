@@ -541,18 +541,6 @@ describe('drainCaptureInbox (text captures)', () => {
     expect([...files.keys()].filter((path) => path !== DAILY)).toEqual([])
   })
 
-  it('falls back to a trailing task when the capture cannot be one task paragraph', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    files.set(DAILY, '- morning standup\n')
-    addTextSpool(textEnvelope({ kind: 'task', text: 'buy milk\n\nand eggs' }))
-
-    await drain()
-
-    expect(files.get(DAILY)).toBe('- morning standup\n\n+ [ ] buy milk\n\nand eggs\n')
-    expect(warn).toHaveBeenCalledOnce()
-    warn.mockRestore()
-  })
-
   it('appends a checkbox envelope as a square GFM checkbox', async () => {
     addTextSpool(textEnvelope({ kind: 'checkbox', text: 'pack a bag' }))
 

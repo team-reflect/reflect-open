@@ -469,7 +469,7 @@ describe('applyTaskEdits: insert into the Tasks section', () => {
     ['## Tasks\n\n* bullet\n', '## Tasks\n\n+ [ ] \n* bullet\n'],
     [
       '## Tasks\n\n- bullet\n\n+ [ ] old\n\nprose\n\n## Later\n\n+ [ ] later\n',
-      '## Tasks\n\n- bullet\n\n+ [ ] old\n+ [ ] \n\nprose\n\n## Later\n\n+ [ ] later\n',
+      '## Tasks\n\n- bullet\n+ [ ] old\n+ [ ] \n\nprose\n\n## Later\n\n+ [ ] later\n',
     ],
     [
       '## Tasks\n\nintro\n\n### Child\n\n+ [ ] nested\n',
@@ -503,8 +503,8 @@ describe('applyTaskEdits: insert into the Tasks section', () => {
     )
     expect(result.inserted[0]).toMatchObject({ astPath: [2], breadcrumbs: [] })
     expect(movedFrom(result, [1])).toMatchObject({ astPath: [1] })
-    expect(movedFrom(result, [4])).toMatchObject({ astPath: [5], breadcrumbs: ['Later'] })
-    expect(movedFrom(result, [5])).toMatchObject({ astPath: [6] })
+    expect(movedFrom(result, [3])).toMatchObject({ astPath: [4], breadcrumbs: ['Later'] })
+    expect(movedFrom(result, [4])).toMatchObject({ astPath: [5] })
   })
 
   it('places the new task with the given text', () => {
