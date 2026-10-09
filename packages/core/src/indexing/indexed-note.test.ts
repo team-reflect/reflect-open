@@ -276,7 +276,13 @@ describe('buildIndexedNote', () => {
       source,
     })
     expect(indexed.tasks).toEqual([
-      { astPath: '[1]', markdown: 'buy milk', breadcrumbs: ['Todo'], checked: false, dueDate: null },
+      {
+        astPath: '[1]',
+        markdown: 'buy milk',
+        breadcrumbs: ['Todo'],
+        checked: false,
+        dueDate: null,
+      },
       { astPath: '[5]', markdown: 'call mum', breadcrumbs: ['Todo'], checked: true, dueDate: null },
     ])
   })
