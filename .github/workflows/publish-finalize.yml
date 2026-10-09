@@ -82,8 +82,8 @@ jobs:
           if ! grep -qxF -e '## Download' -e '## Which Mac download should I choose?' "$notes"; then
             mapfile -t assets < <(gh release view "$TAG" --json assets --jq '.assets[].name')
             echo >> "$notes"
-            .github/scripts/release-downloads.sh \
-              --repo "$GITHUB_REPOSITORY" --tag "$TAG" --version "$VERSION" --asset "$ASSET" \
+            node apps/desktop/scripts/release-downloads.ts \
+              --repo="$GITHUB_REPOSITORY" --tag="$TAG" --version="$VERSION" --asset="$ASSET" \
               "${assets[@]}" >> "$notes"
           fi
 
