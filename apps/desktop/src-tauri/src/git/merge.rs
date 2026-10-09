@@ -167,17 +167,15 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
         .conflict_style_merge(true)
         .our_label(OUR_LABEL)
         .their_label(THEIR_LABEL);
+    // Recorded first: a merge of this commit left in progress is ours to
+    // finish ([`finish_interrupted`]).
+    repo.reference(PULL_REF, remote_oid, true, "reflect sync: pull")?;
     repo.merge(&[&annotated], Some(&mut merge_opts), Some(&mut checkout))?;
 
-    // From here the repo carries MERGE_* state; a failure that leaves it
-    // behind would trip `ensure_clean_state` on every later cycle and wedge
-    // sync until a manual repair — exactly what this design forbids. Clear it
-    // on every path; the next cycle re-derives anything a failed attempt lost.
-    let result = complete_merge(&repo, root, remote_oid);
-    if result.is_err() {
-        let _ = repo.cleanup_state();
-    }
-    let (conflicted_paths, changed_files) = result?;
+    // From here the repo carries MERGE_* state. A failure below leaves it in
+    // place: the next command finishes the merge, where clearing it would
+    // let the next commit record the merge's checkout as a local edit.
+    let (conflicted_paths, changed_files) = complete_merge(&repo, root, remote_oid)?;
 
     let kind = if conflicted_paths.is_empty() {
         MergeKind::Merged
@@ -191,42 +189,39 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
     })
 }
 
-/// Finish a pull that died between `repo.merge` and the merge commit (the
-/// process was killed): the index still holds the merge and its conflicts,
-/// and the working tree holds its checkout. Completing it yields what the
-/// pull would have committed, with anything the user typed into a conflicted
-/// note since (the text path stages the file as it is now). Clearing the
-/// state instead would let the next commit record the merge's output as a
-/// local edit, and the redone merge would conflict against its own markers.
+/// The commit the app last started to merge. A merge of exactly this commit
+/// left in progress is the app's own; any other was started with the git CLI.
+const PULL_REF: &str = "refs/reflect/pull";
+
+/// Finish a pull that stopped between `repo.merge` and the merge commit (the
+/// process was killed, or a step failed): the index still holds the merge
+/// and its conflicts, and the working tree holds its checkout. Completing it
+/// yields what the pull would have committed, with anything the user wrote
+/// to a conflicted file since. Clearing the state instead would let the next
+/// commit record the merge's output as a local edit, and the redone merge
+/// would conflict against its own markers.
 ///
-/// Only a merge of the branch's own remote is this app's. Any other merge
-/// was started with the git CLI and stays for [`ensure_clean_state`] to
-/// refuse. A completion that fails clears the state like a failed pull does,
-/// so a crash never wedges the backup.
+/// Only the merge this app started is finished ([`PULL_REF`]). Any other
+/// stays for [`ensure_clean_state`] to refuse. A completion that fails
+/// leaves the state for the next command to retry.
 pub(super) fn finish_interrupted(repo: &Repository, root: &Path) -> AppResult<()> {
     if repo.state() != git2::RepositoryState::Merge {
         return Ok(());
     }
-    let tracking = format!("refs/remotes/origin/{}", current_branch(repo)?);
-    let (Ok(theirs), Ok(remote)) = (
-        repo.refname_to_id("MERGE_HEAD"),
-        repo.refname_to_id(&tracking),
-    ) else {
+    let Ok(theirs) = repo.refname_to_id("MERGE_HEAD") else {
         return Ok(());
     };
-    if theirs != remote && !repo.graph_descendant_of(remote, theirs)? {
+    if repo.refname_to_id(PULL_REF).ok() != Some(theirs) {
         return Ok(());
     }
     tracing::warn!("finishing a merge an earlier run left unfinished");
-    // The crash may have come after the merge commit and before the cleanup.
+    // The stop may have come after the merge commit and before the cleanup.
     let ours = repo.head()?.peel_to_commit()?.id();
-    let committed = ours == theirs || repo.graph_descendant_of(ours, theirs)?;
-    if !committed {
-        if let Err(err) = complete_merge(repo, root, theirs) {
-            tracing::warn!(?err, "could not finish the interrupted merge; clearing it");
-        }
+    if ours == theirs || repo.graph_descendant_of(ours, theirs)? {
+        repo.cleanup_state()?;
+    } else {
+        complete_merge(repo, root, theirs)?;
     }
-    repo.cleanup_state()?;
     Ok(())
 }
 
@@ -380,7 +375,9 @@ fn resolve_both_edited(
         index.add_path(Path::new(&our.path))?;
         return Ok(vec![our.path]);
     }
-    write_blob(repo, root, &our.path, our.id)?;
+    if !written_since(root, &our.path, &[our.id, their.id]) {
+        write_blob(repo, root, &our.path, our.id)?;
+    }
     let copy = conflict_copy_path(&their.path);
     write_blob(repo, root, &copy, their.id)?;
     index.add_path(Path::new(&our.path))?;
@@ -397,9 +394,21 @@ fn resolve_edit_vs_delete(
     index: &mut Index,
     edited: ConflictSide,
 ) -> AppResult<String> {
-    write_blob(repo, root, &edited.path, edited.id)?;
+    if !written_since(root, &edited.path, &[edited.id]) {
+        write_blob(repo, root, &edited.path, edited.id)?;
+    }
     index.add_path(Path::new(&edited.path))?;
     Ok(edited.path)
+}
+
+/// Whether the file at `rel` holds something other than a side of its
+/// conflict. A pull's checkout leaves one of the sides (or nothing), so this
+/// is true only when a merge is being finished after a stop
+/// ([`finish_interrupted`]) and the user has written the file in between:
+/// that content is kept and staged, not overwritten.
+fn written_since(root: &Path, rel: &str, sides: &[git2::Oid]) -> bool {
+    git2::Oid::hash_file(git2::ObjectType::Blob, root.join(rel))
+        .is_ok_and(|on_disk| !sides.contains(&on_disk))
 }
 
 fn write_blob(repo: &Repository, root: &Path, rel: &str, id: git2::Oid) -> AppResult<()> {

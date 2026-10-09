@@ -51,18 +51,21 @@ queue, never straight to `git_commit_all`.
 
 ## S5. The repository is never left in app-made merge state
 
-A pull that dies between `repo.merge()` and the merge commit leaves
-`MERGE_HEAD`, a merged index, and the merge's checkout behind. The next
-command finishes that merge (both parents, conflicts handled as the pull
-would have, a conflicted note staged as it is on disk now) and carries on,
-so a crash never wedges the backup and never records the merge's output as a
-local edit. Only a merge of the branch's own remote is finished this way;
-any other in-progress state (a rebase or a merge the user started with the
-git CLI) is still refused.
+A pull that stops between `repo.merge()` and the merge commit (the process
+is killed, or a step fails) leaves `MERGE_HEAD`, a merged index, and the
+merge's checkout behind. The next command finishes that merge (both parents,
+conflicts handled as the pull would have, and a file the user has written
+since staged as it is) and carries on, so a crash never wedges the backup and
+never records the merge's output as a local edit. Only the merge this app
+started is finished (it records the commit in `refs/reflect/pull` before it
+merges); any other in-progress state (a rebase, or a merge the user started
+with the git CLI) is still refused.
 
 - Test: `git::tests::merge_interrupted_before_commit_converges_next_cycle`,
   `git::tests::merge_interrupted_on_a_text_conflict_is_finished_not_recommitted`,
   `git::tests::an_edit_made_after_the_crash_survives_the_finished_merge`,
+  `git::tests::a_note_rewritten_after_the_crash_survives_an_edit_versus_delete_conflict`,
+  `git::tests::a_finish_that_fails_is_retried_not_recommitted`,
   `git::tests::a_crash_after_the_merge_commit_only_clears_the_state`,
   `git::tests::a_merge_the_user_started_is_still_refused`,
   `git::tests::a_foreign_rebase_is_still_refused`.

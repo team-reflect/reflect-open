@@ -1248,23 +1248,79 @@ fn a_crash_after_the_merge_commit_only_clears_the_state() {
 #[test]
 fn a_merge_the_user_started_is_still_refused() {
     let fixture = fixture();
-    let root = &fixture.graph_a;
-    write(root, "notes/a.md", "# A\n");
-    commit_all(root, "a", MAX_FILE_BYTES).unwrap();
-    push(root, None).unwrap();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/shared.md", "# Shared\n\nline\n");
+    commit_all(root_a, "shared", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/shared.md", "# Shared\n\nedited on b\n");
+    commit_all(&root_b, "b edit", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+    write(root_a, "notes/shared.md", "# Shared\n\nedited on a\n");
+    commit_all(root_a, "a edit", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
 
-    // `git merge side`, left in progress: not a merge of the branch's remote.
-    let repo = Repository::open(root).unwrap();
-    let head = repo.head().unwrap().peel_to_commit().unwrap();
-    let sig = git2::Signature::now("Alex", "alex@example.com").unwrap();
-    let side = repo
-        .commit(None, &sig, &sig, "side", &head.tree().unwrap(), &[&head])
-        .unwrap();
-    fs::write(root.join(".git/MERGE_HEAD"), format!("{side}\n")).unwrap();
+    // `git merge origin/main`, left unresolved: the same commit a pull would
+    // merge, but not a merge this app started.
+    let repo = Repository::open(root_a).unwrap();
+    let theirs = repo.refname_to_id("refs/remotes/origin/main").unwrap();
+    let annotated = repo.find_annotated_commit(theirs).unwrap();
+    repo.merge(&[&annotated], None, None).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Merge);
 
-    let err = commit_all(root, "again", MAX_FILE_BYTES).unwrap_err();
+    let err = commit_all(root_a, "again", MAX_FILE_BYTES).unwrap_err();
     assert!(format!("{err:?}").contains("in progress"), "{err:?}");
     assert_eq!(repo.state(), git2::RepositoryState::Merge);
+    assert_eq!(head_parents(root_a), 1);
+}
+
+#[test]
+fn a_finish_that_fails_is_retried_not_recommitted() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    crash_mid_merge_on_a_text_conflict(&fixture);
+
+    // The first attempt to finish fails too (the same fault point).
+    fault::arm(FaultPoint::AfterMergeBeforeCommit, Fault::Fail);
+    assert!(commit_all(root_a, "Update notes", MAX_FILE_BYTES).is_err());
+    assert_eq!(head_parents(root_a), 1, "nothing was committed");
+
+    commit_all(root_a, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_parents(root_a), 2);
+    let content = head_blob(root_a, "notes/shared.md");
+    assert_eq!(content.matches("<<<<<<< ").count(), 1, "{content}");
+}
+
+#[test]
+fn a_note_rewritten_after_the_crash_survives_an_edit_versus_delete_conflict() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/gone.md", "# Gone\n\nline\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+    let root_b = second_device(&fixture);
+    fs::remove_file(root_b.join("notes/gone.md")).unwrap();
+    commit_all(&root_b, "b deletes", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+    write(root_a, "notes/gone.md", "# Gone\n\nedited on a\n");
+    commit_all(root_a, "a edits", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    fault::arm(FaultPoint::AfterMergeBeforeCommit, Fault::Panic);
+    let crashed = std::panic::catch_unwind(AssertUnwindSafe(|| merge_remote(root_a)));
+    assert!(crashed.is_err());
+
+    write(
+        root_a,
+        "notes/gone.md",
+        "# Gone\n\nedited again after the crash\n",
+    );
+    commit_all(root_a, "Update notes", MAX_FILE_BYTES).unwrap();
+
+    assert_eq!(head_parents(root_a), 2);
+    assert_eq!(
+        head_blob(root_a, "notes/gone.md"),
+        "# Gone\n\nedited again after the crash\n"
+    );
 }
 
 #[test]
