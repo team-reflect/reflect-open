@@ -10,7 +10,6 @@ import { displayNoteTitle, type OpenTask } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
 import { formatDayLabel } from '@/lib/dates.ts'
 import { getTaskKey } from '@/lib/tasks/task-identity.ts'
-import { useTaskCheckboxToggle } from '@/lib/tasks/use-task-checkbox-toggle.ts'
 import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/lib/windows/open-in-new-window.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
@@ -31,6 +30,8 @@ interface TaskRowProps {
   togglesSelection: boolean
   /** Select the row, honoring ⌘/Ctrl (toggle) and Shift (range) modifiers. */
   onSelect: (event: Pick<MouseEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>) => void
+  /** Checkbox click on an unselected or solely selected row: toggle this task. */
+  onCheckboxToggle: () => void
   /** Checkbox click while part of a multi-selection: apply this row's next state to it. */
   onSelectionCheckboxToggle: () => void
   /** Persist an inline edit (content after the marker) and exit edit mode. */
@@ -76,6 +77,7 @@ export function TaskRow({
   taskActionPending,
   togglesSelection,
   onSelect,
+  onCheckboxToggle,
   onSelectionCheckboxToggle,
   onEditCommit,
   onEditContinue,
@@ -91,9 +93,7 @@ export function TaskRow({
   onOpen,
 }: TaskRowProps): ReactElement {
   const { settings } = useSettings()
-  const { toggle, isPending } = useTaskCheckboxToggle(task)
   const checkboxToggleControllerRef = useRef<(() => void) | null>(null)
-  const checkboxPending = isPending || taskActionPending
   const done = task.checked
   const label = task.text || 'Empty task'
   const selectFromKeyboard = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -134,7 +134,7 @@ export function TaskRow({
         type="button"
         data-task-row
         aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
-        disabled={checkboxPending}
+        disabled={taskActionPending}
         onClick={(event) => {
           event.stopPropagation()
           if (editing) {
@@ -145,7 +145,7 @@ export function TaskRow({
             onSelectionCheckboxToggle()
             return
           }
-          toggle()
+          onCheckboxToggle()
         }}
         // h-6 matches the text/editor's 24px line so the circle centers on
         // the first line (items-start keeps it there when a task wraps).

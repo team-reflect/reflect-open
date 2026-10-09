@@ -330,6 +330,7 @@ export function TasksScreen(): ReactElement {
                 selection={selection}
                 editHandlers={editHandlers}
                 taskActionPending={actions.isPending}
+                onCheckboxToggle={actions.checkboxToggle}
                 onSelectionCheckboxToggle={onSelectionCheckboxToggle}
                 today={today}
                 onAdd={onAdd}
