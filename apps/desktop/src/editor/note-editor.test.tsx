@@ -205,9 +205,15 @@ describe('NoteEditor Backspace in an empty first paragraph', () => {
     await render(<NoteEditor initialContent="" handleRef={handleRef} />)
 
     await pmRoot.click()
-    await userEvent.keyboard('{Enter}foo{ArrowUp}{Backspace}')
+    await userEvent.keyboard('{Enter}foo')
+    // Not ArrowUp: a native caret move reaches the editor state one
+    // `selectionchange` later, which an immediate Backspace would outrun.
+    handleRef.current?.setSelection('start')
+    await userEvent.keyboard('{Backspace}x')
 
-    expect(handleRef.current?.getMarkdown()).toBe('\nfoo\n')
+    await vi.waitFor(() => {
+      expect(handleRef.current?.getMarkdown()).toBe('x\n\nfoo\n')
+    })
   })
 
   it('deletes the empty paragraph when backspaceDeletesEmptyFirstBlock is on', async () => {
@@ -217,9 +223,15 @@ describe('NoteEditor Backspace in an empty first paragraph', () => {
     )
 
     await pmRoot.click()
-    await userEvent.keyboard('{Enter}foo{ArrowUp}{Backspace}')
+    await userEvent.keyboard('{Enter}foo')
+    // Not ArrowUp: a native caret move reaches the editor state one
+    // `selectionchange` later, which an immediate Backspace would outrun.
+    handleRef.current?.setSelection('start')
+    await userEvent.keyboard('{Backspace}x')
 
-    expect(handleRef.current?.getMarkdown()).toBe('foo\n')
+    await vi.waitFor(() => {
+      expect(handleRef.current?.getMarkdown()).toBe('xfoo\n')
+    })
   })
 })
 
