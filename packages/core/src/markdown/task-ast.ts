@@ -173,7 +173,7 @@ export type InsertPosition =
   | { kind: 'documentEnd' }
   /** The end of the task's context: its parent list item, or at the root the end of its own list. */
   | { kind: 'contextEnd'; task: TaskLocator }
-  /** The end of the first `+` list in the top-level `## Tasks` section, created at the end when missing. */
+  /** The end of the first `+` list in the top-level `## Tasks` section, created after the note's last content when missing. */
   | { kind: 'tasksSection' }
 
 /** An edit of one existing round task. */
@@ -227,7 +227,7 @@ export function findTaskMove(moves: readonly TaskMove[], task: TaskLocator): Tas
 type SlotTarget =
   | { kind: 'after'; anchor: MarkdownBlock }
   | { kind: 'end'; container: MarkdownDocument | MarkdownListItem }
-  /** A new section at the end of the document, holding the item. */
+  /** A new section after the document's last content, holding the item. */
   | { kind: 'newSection'; heading: string }
 
 /**
@@ -401,8 +401,8 @@ type BulletMarker = '-' | '*' | '+'
 
 /**
  * Where an automatic entry lands: the first list it can join under a
- * top-level H1 or H2 that names the section, created at the end of the note
- * when missing.
+ * top-level H1 or H2 that names the section, created after the note's last
+ * content when missing.
  */
 export interface SectionTarget {
   /** The titles the heading may read as; the first one names a new heading. */
@@ -479,7 +479,7 @@ function findSectionList(
   return undefined
 }
 
-/** After the section's list, else right under its heading, else in a new section at the end. */
+/** After the section's list, else right under its heading, else in a new section after the last content. */
 function sectionSlot(
   document: MarkdownDocument,
   section: SectionTarget,
@@ -498,16 +498,21 @@ function sectionSlot(
   }
 }
 
-/** After the last block that is not a blank line, so trailing blank lines stay below the entry. */
-function bodyEndSlot(document: MarkdownDocument): SlotTarget {
-  const { children } = document
+/** The index after the last block that is not a blank line: `children.length` without the trailing blank lines. */
+function contentEnd(children: readonly MarkdownBlock[]): number {
   for (let i = children.length - 1; i >= 0; i--) {
     const block = children[i]
     if (block !== undefined && !(block.type === 'paragraph' && block.value === '')) {
-      return { kind: 'after', anchor: block }
+      return i + 1
     }
   }
-  return { kind: 'end', container: document }
+  return 0
+}
+
+/** After the last block that is not a blank line, so trailing blank lines stay below the entry. */
+function bodyEndSlot(document: MarkdownDocument): SlotTarget {
+  const anchor = document.children[contentEnd(document.children) - 1]
+  return anchor === undefined ? { kind: 'end', container: document } : { kind: 'after', anchor }
 }
 
 /** The marker a new item is written with: the list it joins, else the kind's own. */
@@ -550,8 +555,9 @@ export interface ListItemInsert {
 /**
  * Append one list item to a note the way captures, meetings, and audio memos
  * file their entries: into the section's first joinable list, directly under
- * its heading when it has none, or in a new section at the end; without a
- * section, after the note's last block. The serializer decides the blank
+ * its heading when it has none, or in a new section after the note's last
+ * content; without a section, after the note's last content too. Trailing
+ * blank lines stay below the entry. The serializer decides the other blank
  * lines and keeps a list of another marker separate.
  */
 export function appendListItem(source: string, insert: ListItemInsert): string {
@@ -619,7 +625,14 @@ function insertItem(
     const { parent, index } = requireAttached(document, slot.anchor)
     parent.children.splice(index + 1, 0, item)
   } else if (slot.kind === 'newSection') {
-    document.children.push({ type: 'heading', level: 2, value: slot.heading }, item)
+    // Trailing blank lines stay below the new section.
+    const { children } = document
+    children.splice(
+      contentEnd(children),
+      0,
+      { type: 'heading', level: 2, value: slot.heading },
+      item,
+    )
   } else {
     if (slot.container.type === 'listItem') {
       requireAttached(document, slot.container)

@@ -437,6 +437,10 @@ describe('applyTaskEdits: insert into the Tasks section', () => {
   it.each([
     ['', '## Tasks\n\n+ [ ] \n'],
     ['intro\n', 'intro\n\n## Tasks\n\n+ [ ] \n'],
+    ['intro\n\n\n', 'intro\n\n## Tasks\n\n+ [ ] \n\n\n'],
+    ['- a\n\n\n', '- a\n\n## Tasks\n\n+ [ ] \n\n\n'],
+    ['intro\n\n\n\nmore\n\n', 'intro\n\n\n\nmore\n\n## Tasks\n\n+ [ ] \n\n'],
+    ['\n\n', '## Tasks\n\n+ [ ] \n\n\n'],
     ['## Tasks\n\n+ [ ] old\n', '## Tasks\n\n+ [ ] old\n+ [ ] \n'],
     ['## tasks\n\nprose\n', '## tasks\n\n+ [ ] \n\nprose\n'],
     ['## [[Tasks]]\n', '## [[Tasks]]\n\n+ [ ] \n'],
@@ -548,6 +552,7 @@ describe('appendListItem', () => {
     ['## Meetings\n\n1. Standup\n', '## Meetings\n\n- [[Standup]]\n1. Standup\n'],
     ['# meetings\n\nprose\n', '# meetings\n\n- [[Standup]]\n\nprose\n'],
     ['morning notes\n', 'morning notes\n\n## Meetings\n\n- [[Standup]]\n'],
+    ['morning notes\n\n\n', 'morning notes\n\n## Meetings\n\n- [[Standup]]\n\n\n'],
     [
       '> ## Meetings\n> - [[Quoted]]\n\nOutside the quote.\n',
       '> ## Meetings\n>\n> - [[Quoted]]\n\nOutside the quote.\n\n## Meetings\n\n- [[Standup]]\n',

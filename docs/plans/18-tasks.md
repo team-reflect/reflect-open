@@ -78,7 +78,8 @@ markers in markdown, AI task extraction (later, over this projection), CLI
   Return-to-add and "+ Add", and browser task captures, insert into the first `+`
   list of the note's first top-level H1 or H2 that reads "Tasks" (`## Tasks`,
   `# Tasks`, `## [[Tasks]]`, `## **Tasks**`), directly under the heading when that
-  list is missing, and append a new `## Tasks` section when the heading is missing.
+  list is missing, and add a new `## Tasks` section when the heading is missing: after
+  the note's last content, so trailing blank lines stay below it.
   Typing in the editor is unaffected. Enter on a row that sits under a heading
   continues that row's own list in place.
 - **Write-back is surgical and guarded.** Toggling from the Tasks view replaces

@@ -194,10 +194,11 @@ export async function continueTaskInContext(
 
 /**
  * Insert a new empty `+ [ ]` task into `notePath`'s `## Tasks` section
- * (Plan 18's Return-to-add), creating the section at the end of the note when
- * it has none, and return the new row's address plus where the note's other
- * tasks moved, so the Tasks view can re-key cached rows and select the new
- * one. A missing note (today's daily not yet created) starts empty.
+ * (Plan 18's Return-to-add), creating the section after the note's last
+ * content when it has none, and return the new row's address plus where the
+ * note's other tasks moved, so the Tasks view can re-key cached rows and
+ * select the new one. A missing note (today's daily not yet created) starts
+ * empty.
  */
 export async function insertTask(notePath: string, generation: number): Promise<InsertedTask> {
   const result = await writeTaskEdits(
