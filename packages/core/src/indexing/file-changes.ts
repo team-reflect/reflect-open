@@ -10,6 +10,12 @@ import { getBridge, type Unlisten } from '../ipc/bridge.ts'
 
 /** Event name the Rust watcher emits tracked-file changes on. */
 export const FILE_CHANGES_EVENT = 'index:changed'
+/**
+ * Event name the Rust watcher emits for the echo of this app's own writes:
+ * changes whose path and mtime match a write a command just made. Same
+ * payload as {@link FILE_CHANGES_EVENT}, delivered as `own-write`.
+ */
+export const OWN_WRITES_EVENT = 'index:own-write'
 
 const fileChangeSchema = z.object({
   path: z.string(),
@@ -54,27 +60,40 @@ const localHandlers = new Set<FileChangeHandler>()
  */
 export function subscribeFileChanges(handler: FileChangeHandler): Promise<Unlisten> {
   localHandlers.add(handler)
-  return getBridge()
-    .listen(FILE_CHANGES_EVENT, (payload) => {
+  const bridge = getBridge()
+  const listen = (event: string, source: FileChangeSource): Promise<Unlisten> =>
+    bridge.listen(event, (payload) => {
       const parsed = fileChangesSchema.safeParse(payload)
       if (parsed.success) {
-        handler(parsed.data, 'external')
+        handler(parsed.data, source)
       } else {
         // A malformed payload means the Rust↔TS event contract drifted — loud
         // beats silently-stale indexes and editors.
-        console.error('invalid index:changed payload:', parsed.error)
+        console.error(`invalid ${event} payload:`, parsed.error)
       }
     })
-    .then(
-      (unlisten) => () => {
-        localHandlers.delete(handler)
-        unlisten()
-      },
-      (error: unknown) => {
-        localHandlers.delete(handler)
-        throw error
-      },
+  return Promise.allSettled([
+    listen(FILE_CHANGES_EVENT, 'external'),
+    listen(OWN_WRITES_EVENT, 'own-write'),
+  ]).then((results) => {
+    const unlistens = results.flatMap((result) =>
+      result.status === 'fulfilled' ? [result.value] : [],
     )
+    const failed = results.find((result) => result.status === 'rejected')
+    if (failed !== undefined) {
+      localHandlers.delete(handler)
+      for (const unlisten of unlistens) {
+        unlisten()
+      }
+      throw failed.reason
+    }
+    return () => {
+      localHandlers.delete(handler)
+      for (const unlisten of unlistens) {
+        unlisten()
+      }
+    }
+  })
 }
 
 /**

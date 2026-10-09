@@ -8,7 +8,6 @@ import {
   subscribeFileChanges,
   subscribeIcloudConflicts,
   subscribeIcloudWatchFailed,
-  subscribeOwnWrites,
   type FileChange,
   type GraphInfo,
   type IcloudSweepScope,
@@ -26,8 +25,6 @@ export function isICloudRoot(root: string): boolean {
   return root.includes('/Mobile Documents/')
 }
 
-/** How long after a save a watcher event still counts as our own write. */
-const OWN_WRITE_TTL_MS = 5_000
 /** Debounce between a change signal and the sweep it triggers. */
 const SCAN_DEBOUNCE_MS = 1_000
 /**
@@ -76,8 +73,8 @@ export interface IcloudController {
  *
  * - Debounces external file-change batches into conflict sweeps
  *   (`icloud_conflicts_scan`), scoped to the arrivals themselves.
- * - Classifies external arrivals (not this device's own writes — tracked via
- *   the own-write echo — and not the sweep's own output) as clean ingests,
+ * - Classifies external arrivals (`external` provenance: not this device's
+ *   own writes, not a pull, not the sweep's own output) as clean ingests,
  *   which advance the notes' shadow merge bases.
  * - Fans a sweep's rewrites to every file-change subscriber and reindexes
  *   them directly, exactly like the backup controller's pull path.
@@ -104,9 +101,8 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
   let disposed = false
   let baselinePending = true
   const disposers: Array<() => void> = []
-  const ownWrites = new Map<string, number>()
-  let pendingIngest = new Set<string>()
-  let applyingSweepResult = false
+  /** External arrivals awaiting an ingest sweep: path → the mtime they arrived with. */
+  let pendingIngest = new Map<string, number | undefined>()
   let scanTimer: ReturnType<typeof setTimeout> | null = null
   let scanTimerDue = 0
   let scanRunning = false
@@ -204,8 +200,8 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       return
     }
     scanRunning = true
-    const ingested = [...pendingIngest]
-    pendingIngest = new Set()
+    const ingested = [...pendingIngest].map(([path, modifiedMs]) => ({ path, modifiedMs }))
+    pendingIngest = new Map()
     const recordBaseline = baselinePending
     baselinePending = false
     const scope = recordBaseline ? 'full' : nextScanScope
@@ -224,8 +220,12 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     } catch (err) {
       // A failed sweep leaves versions unresolved; the next signal retries.
       console.error('iCloud conflict sweep failed:', err)
-      for (const path of ingested) {
-        pendingIngest.add(path) // don't lose the base advances
+      for (const entry of ingested) {
+        // Don't lose the base advances; an arrival recorded during the
+        // sweep is newer and stays.
+        if (!pendingIngest.has(entry.path)) {
+          pendingIngest.set(entry.path, entry.modifiedMs)
+        }
       }
       if (recordBaseline) {
         baselinePending = true // the adoption baseline must survive a failed first sweep
@@ -253,22 +253,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
    * wait on the watcher to notice its own writes.
    */
   function applySweepChanges(changes: FileChange[]): void {
-    // Sweep rewrites ARE this device's writes, but they don't route through
-    // writeNote, so no own-write echo fires — and `applyingSweepResult`
-    // below can't cover the *debounced* watcher echo that follows. Mark
-    // them so that echo never classifies as an external base ingest. (The
-    // Rust side independently refuses marker-bearing content as a base;
-    // this also keeps clean-merge echoes from scheduling useless rescans.)
-    const now = Date.now()
-    for (const change of changes) {
-      ownWrites.set(change.path, now)
-    }
-    applyingSweepResult = true
-    try {
-      emitFileChanges(changes, 'icloud-sweep')
-    } finally {
-      applyingSweepResult = false
-    }
+    emitFileChanges(changes, 'icloud-sweep')
     const indexable = changes.filter((change) => isNotePath(change.path))
     if (indexGeneration !== null && indexable.length > 0) {
       void applyIndexChanges(
@@ -282,14 +267,6 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
           throttledInvalidateIndexQueries()
         }
       })
-    }
-  }
-
-  function pruneOwnWrites(now: number): void {
-    for (const [path, stamp] of ownWrites) {
-      if (now - stamp > OWN_WRITE_TTL_MS) {
-        ownWrites.delete(path)
-      }
     }
   }
 
@@ -339,33 +316,25 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
         // Sweeps still run off file-change batches; carry on.
       }
     }
-    disposers.push(
-      subscribeOwnWrites((path) => {
-        const now = Date.now()
-        ownWrites.set(path, now)
-        pruneOwnWrites(now)
-      }),
-    )
     // Subscriptions are defensive like the watch above: a failed listen must
     // not reject start() (an unhandled rejection at the provider's call site)
     // or skip the initial sweep below — resume triggers and the baseline scan
     // keep conflict handling alive without them.
     try {
       disposers.push(
-        await subscribeFileChanges((changes) => {
-          if (disposed || applyingSweepResult) {
+        await subscribeFileChanges((changes, source) => {
+          // Only content observed on disk from elsewhere may advance a base.
+          // This device's saves, a pull, and the sweep's own rewrites are
+          // registered as own writes in Rust, so both their in-process batch
+          // and their watcher echo arrive labeled and are skipped here.
+          if (disposed || source !== 'external') {
             return
           }
-          const now = Date.now()
-          pruneOwnWrites(now)
           for (const change of changes) {
             if (change.kind !== 'upsert' || !isNotePath(change.path)) {
               continue
             }
-            if (ownWrites.has(change.path)) {
-              continue // our own save landing — never advances the base
-            }
-            pendingIngest.add(change.path)
+            pendingIngest.set(change.path, change.modifiedMs)
           }
           // Arrival-driven: the wide window plus the minimum spacing, so a
           // download burst folds into a handful of sweeps rather than one

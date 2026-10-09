@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { emitFileChanges, setBridge, writeNote } from '@reflect/core'
+import { emitFileChanges, setBridge } from '@reflect/core'
 import { createIcloudController, isICloudRoot } from './icloud-controller.ts'
 
 /**
@@ -25,6 +25,8 @@ vi.mock('@/lib/query-client.ts', () => ({
 interface ScanCall {
   skipPaths: string[]
   ingestedPaths: string[]
+  /** The arrivals as sent: each path with the mtime it arrived with. */
+  arrivals: Array<{ path: string; modifiedMs?: number }>
   recordBaseline: boolean
   scope: string
 }
@@ -39,7 +41,7 @@ let invoked: Array<[string, Record<string, unknown>]>
 let scanCalls: ScanCall[]
 /** Scripted sweep outcomes; `'hang'` parks the sweep until {@link releaseScan}. */
 let scanResults: Array<Record<string, unknown> | Error | 'hang'>
-let releaseScan: (() => void) | null
+let releaseScan: ((failure?: Error) => void) | null
 let listeners: Map<string, (payload: unknown) => void>
 
 beforeEach(() => {
@@ -60,9 +62,13 @@ beforeEach(() => {
       invoked.push([command, args ?? {}])
       switch (command) {
         case 'icloud_conflicts_scan': {
+          const arrivals =
+            (args?.['ingestedPaths'] as Array<{ path: string; modifiedMs?: number }> | undefined) ??
+            []
           scanCalls.push({
             skipPaths: (args?.['skipPaths'] as string[] | undefined) ?? [],
-            ingestedPaths: (args?.['ingestedPaths'] as string[] | undefined) ?? [],
+            ingestedPaths: arrivals.map((entry) => entry.path),
+            arrivals,
             recordBaseline: args?.['recordBaseline'] === true,
             scope: String(args?.['scope']),
           })
@@ -71,9 +77,14 @@ beforeEach(() => {
             throw scripted
           }
           if (scripted === 'hang') {
-            return await new Promise((resolve) => {
-              releaseScan = () =>
+            return await new Promise((resolve, reject) => {
+              releaseScan = (failure?: Error) => {
+                if (failure !== undefined) {
+                  reject(failure)
+                  return
+                }
                 resolve({ changed: [], needsReview: [], deferred: [], autoResolved: 0 })
+              }
             })
           }
           return scripted ?? { changed: [], needsReview: [], deferred: [], autoResolved: 0 }
@@ -191,10 +202,11 @@ describe('createIcloudController', () => {
     await icloud.start()
     await settleScan() // baseline out of the way
 
-    await writeNote('notes/own.md', '# mine\n', GRAPH.generation)
+    // The watcher reports our own save's echo with its provenance (Rust
+    // matches the path and mtime it just wrote); only `external` ingests.
+    emitFileChanges([{ path: 'notes/own.md', kind: 'upsert', modifiedMs: 1 }], 'own-write')
     emitFileChanges(
       [
-        { path: 'notes/own.md', kind: 'upsert', modifiedMs: 1 },
         { path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 },
         { path: 'notes/gone.md', kind: 'remove' },
       ],
@@ -204,6 +216,9 @@ describe('createIcloudController', () => {
 
     expect(scanCalls).toHaveLength(2)
     expect(scanCalls[1]?.ingestedPaths).toEqual(['notes/external.md'])
+    // The arrival's mtime rides along: the sweep advances the base only while
+    // the file still carries it.
+    expect(scanCalls[1]?.arrivals).toEqual([{ path: 'notes/external.md', modifiedMs: 2 }])
     expect(scanCalls[1]?.recordBaseline).toBe(false)
   })
 
@@ -229,13 +244,10 @@ describe('createIcloudController', () => {
     // …and neither the controller's own synchronous fan-out nor the file
     // watcher's later echo of the sweep's write may come back as an ingest —
     // only the genuinely external change does.
-    emitFileChanges(
-      [
-        { path: 'notes/merged.md', kind: 'upsert', modifiedMs: 6 }, // watcher echo
-        { path: 'notes/other.md', kind: 'upsert', modifiedMs: 9 },
-      ],
-      'external',
-    )
+    // (The sweep records what it wrote, so the watcher's echo of merged.md
+    // arrives as `own-write`, like any other write this device made.)
+    emitFileChanges([{ path: 'notes/merged.md', kind: 'upsert', modifiedMs: 6 }], 'own-write')
+    emitFileChanges([{ path: 'notes/other.md', kind: 'upsert', modifiedMs: 9 }], 'external')
     await settleScan(INGEST_SETTLE_MS) // arrival-driven: debounce + minimum spacing
     expect(scanCalls[1]?.ingestedPaths).toEqual(['notes/other.md'])
   })
@@ -392,6 +404,22 @@ describe('createIcloudController', () => {
     expect(scanCalls[0]?.recordBaseline).toBe(true)
     expect(scanCalls[1]?.recordBaseline).toBe(true)
     expect(scanCalls[1]?.ingestedPaths).toContain('notes/external.md')
+  })
+
+  it('an arrival during a failed sweep keeps its newer mtime for the retry', async () => {
+    const icloud = controller()
+    await icloud.start()
+    await settleScan() // baseline out of the way
+
+    scanResults.push('hang')
+    emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 }], 'external')
+    await settleScan(INGEST_SETTLE_MS) // scan #2 carries mtime 2 and hangs
+    emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 3 }], 'external')
+    releaseScan?.(new Error('container hiccup'))
+    await settleScan(INGEST_SETTLE_MS) // the retry
+
+    expect(scanCalls).toHaveLength(3)
+    expect(scanCalls[2]?.arrivals).toEqual([{ path: 'notes/external.md', modifiedMs: 3 }])
   })
 
   it('spaces arrival-driven sweeps apart during a download stream', async () => {
