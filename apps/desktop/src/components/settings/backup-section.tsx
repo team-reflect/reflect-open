@@ -170,6 +170,11 @@ export function BackupSettingsField(): ReactElement {
                   variant="outline"
                   size="sm"
                   disabled={backup.status.state === 'syncing' || action.pending}
+                  title={
+                    hosted
+                      ? 'Saves a snapshot now; it reaches the remote after five quiet minutes'
+                      : undefined
+                  }
                   onClick={() => void action.run(backUpNow)}
                 >
                   Back up now

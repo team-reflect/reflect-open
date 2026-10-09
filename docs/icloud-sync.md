@@ -26,7 +26,9 @@ edit the same note while apart.
   edits, no iCloud arrivals, no pull, and no pending iCloud downloads), by
   which time both devices hold the same bytes and Git has nothing to merge
   in the text. Expect noisy GitHub history (each change lands as two commits
-  plus a merge) and a backup that trails by at least five minutes. Moving a
+  plus a merge) and a backup that trails by at least five minutes: **Back up
+  now** on such a graph commits at once, and the push still follows the quiet
+  window. Moving a
   graph to iCloud disconnects its GitHub backup, and `.git`/`.reflect` are
   always marked local-only so a repository never rides the file-sync
   provider (object-store corruption).
