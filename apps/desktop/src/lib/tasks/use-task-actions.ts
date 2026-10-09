@@ -105,7 +105,7 @@ export interface TaskActions {
 interface InsertInput {
   readonly target: InsertTaskTarget
   /** Continue from this row: resolve its draft and add the new task after it, in one write. */
-  readonly after?: { readonly task: OpenTask; readonly content: string | null }
+  readonly after?: { readonly task: OpenTask; readonly content: string | null } | undefined
 }
 
 export function useTaskActions(): TaskActions {
