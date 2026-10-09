@@ -122,11 +122,9 @@ export function useTaskKeyboard({
         return
       }
       const inSearch = target instanceof HTMLInputElement
-      // Resolve the active row that Return pivots from. Breadcrumb context takes
-      // precedence and can always be continued structurally; otherwise the bucket
-      // decides whether insertion is available (Current/note yes, aggregate
-      // Overdue/Upcoming no). The pivot must still be selected: `activeKey()` keeps
-      // pointing at the last touched row after deselection, which falls back to today.
+      // Resolve the active row that Return pivots from: the next task continues
+      // its list. The pivot must still be selected: `activeKey()` keeps pointing
+      // at the last touched row after deselection, which falls back to today.
       const activeTask = (): OpenTask | undefined => {
         const activeKey = selection.activeKey()
         return activeKey !== null && selection.selected.has(activeKey)

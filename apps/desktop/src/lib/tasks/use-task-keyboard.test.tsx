@@ -417,6 +417,32 @@ describe('useTaskKeyboard', () => {
     expect(insert).not.toHaveBeenCalled()
   })
 
+  it.each([
+    [
+      'an undated row in a past daily note',
+      task({ notePath: 'daily/2026-06-01.md', noteTitle: '2026-06-01', dailyDate: '2026-06-01' }),
+    ],
+    ['an overdue row', task({ notePath: 'notes/a.md', noteTitle: 'A', dueDate: '2026-06-01' })],
+    ['an upcoming row', task({ notePath: 'notes/a.md', noteTitle: 'A', dueDate: '2026-06-20' })],
+  ])('Return continues %s instead of picking a bucket target', async (_name, row) => {
+    const insert = vi.fn().mockResolvedValue(null)
+    const insertAfter = vi.fn().mockResolvedValue(null)
+    const selection = makeSelection({
+      selected: new Set(['row']),
+      selectedCount: 1,
+      activeKey: () => 'row',
+    })
+    await mount({
+      selection,
+      actions: makeActions({ insert, insertAfter }),
+      tasksByKey: new Map([['row', row]]),
+    })
+
+    press(root, 'Enter')
+    expect(insertAfter).toHaveBeenCalledWith(row, null)
+    expect(insert).not.toHaveBeenCalled()
+  })
+
   it('Return falls to today’s daily when the pivot is no longer selected', async () => {
     const deselected = task({ notePath: 'notes/a.md', noteTitle: 'A' })
     const insert = vi.fn().mockResolvedValue(null)
