@@ -124,23 +124,17 @@ export function getTaskDueDate(markdown: string): string | null {
   return null
 }
 
-export interface ParsedTask {
-  astPath: MarkdownAstPath
-  /** The task's first paragraph, marker excluded. */
-  markdown: string
-  /** The headings above the task, then its ancestor list items' first paragraphs, outermost first. */
-  breadcrumbs: readonly string[]
-  checked: boolean
+/** A round task as the projection stores it: its snapshot plus its explicit due date. */
+export interface ParsedTask extends TaskSnapshot {
   dueDate: string | null
 }
 
 /** The round tasks of a note body, in document order. */
 export function projectTasks(body: string): ParsedTask[] {
-  return getRoundTasks(parseMarkdownAst(body)).map(toParsedTask)
-}
-
-function toParsedTask(entry: TaskEntry): ParsedTask {
-  return { ...toTaskSnapshot(entry), dueDate: getTaskDueDate(entry.markdown) }
+  return getRoundTasks(parseMarkdownAst(body)).map((entry) => ({
+    ...toTaskSnapshot(entry),
+    dueDate: getTaskDueDate(entry.markdown),
+  }))
 }
 
 /** Where a task was last seen; `markdown` and `checked` are the staleness guard. */
