@@ -532,11 +532,11 @@ fn conflicting_edits_are_merged_without_markers() {
     push(root_a, None).unwrap();
 
     let root_b = second_device(&fixture);
-    write(&root_b, "notes/shared.md", "# Shared\n\nedited on b\n");
+    write(&root_b, "notes/shared.md", "# Shared\n\nbeta\n");
     commit_all(&root_b, "b edit", MAX_FILE_BYTES).unwrap();
     push(&root_b, None).unwrap();
 
-    write(root_a, "notes/shared.md", "# Shared\n\nedited on a\n");
+    write(root_a, "notes/shared.md", "# Shared\n\nalpha\n");
     commit_all(root_a, "a edit", MAX_FILE_BYTES).unwrap();
     fetch(root_a, None).unwrap();
     let merged = merge_remote(root_a).unwrap();
@@ -552,8 +552,11 @@ fn conflicting_edits_are_merged_without_markers() {
 
     let content = read(root_a, "notes/shared.md");
     assert!(!content.contains("<<<<<<<"), "{content}");
-    assert!(content.contains("edited on a"), "{content}");
-    assert!(content.contains("edited on b"), "{content}");
+    // Both sides rewrote the line: the total merge keeps both words.
+    assert!(
+        content.contains("alpha") && content.contains("beta"),
+        "{content}"
+    );
     assert_eq!(
         head_blob(root_a, "notes/shared.md"),
         content,

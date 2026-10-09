@@ -415,13 +415,14 @@ fn write_blob(repo: &Repository, root: &Path, rel: &str, id: git2::Oid) -> AppRe
     write_file(root, rel, repo.find_blob(id)?.content())
 }
 
+/// Atomic (temp file + rename): merged note text lands here too now, and the
+/// watcher or an iCloud sweep must never observe a half-written note.
 fn write_file(root: &Path, rel: &str, bytes: &[u8]) -> AppResult<()> {
     let target = root.join(rel);
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::write(target, bytes)?;
-    Ok(())
+    crate::fs::atomic_write_bytes(root, &target, bytes).map(|_modified_ms| ())
 }
 
 /// `assets/img.png` → `assets/img (conflict).png`; no extension → appended.
