@@ -71,22 +71,35 @@ jobs:
       - name: Write the updater manifest
         run: pnpm release:manifest --tag="$TAG"
 
-      # Keep the changelog release-please wrote and add the download guide.
+      # Keep the changelog release-please wrote and add one download badge per
+      # installer. Windows installers are optional, so a badge is written only
+      # for an asset the release has.
       - name: Write the release notes
         env:
           ASSET: ${{ steps.release.outputs.asset }}
+          VERSION: ${{ steps.release.outputs.version }}
         run: |
-          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/release-notes.md"
-          if ! grep -qF '## Which Mac download should I choose?' "$RUNNER_TEMP/release-notes.md"; then
-            cat >> "$RUNNER_TEMP/release-notes.md" <<EOF
-
-          ## Which Mac download should I choose?
-
-          - **Apple Silicon (M-series Macs):** download \`${ASSET}_aarch64.dmg\`.
-          - **Intel Macs:** download \`${ASSET}_x86_64.dmg\`.
-
-          To check your Mac, open **Apple menu -> About This Mac**. If it shows **Chip** with M1, M2, M3, M4, or newer, choose Apple Silicon. If it shows **Processor** with Intel, choose Intel.
-          EOF
+          notes="$RUNNER_TEMP/release-notes.md"
+          gh release view "$TAG" --json body --jq .body > "$notes"
+          if ! grep -qF -e '<!-- downloads -->' -e '## Which Mac download should I choose?' "$notes"; then
+            assets="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+            badge() {
+              local file="$1" label="$2" color="$3" icon="$4"
+              if grep -qxF "$file" <<< "$assets"; then
+                printf '[![%s](https://badgen.net/badge/%s/v%s/%s?icon=%s)](%s/%s/releases/download/%s/%s) ' \
+                  "$label" "${label// /%20}" "$VERSION" "$color" "$icon" \
+                  "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$TAG" "$file"
+              fi
+            }
+            {
+              printf '\n<!-- downloads -->\n\n'
+              badge "${ASSET}_aarch64.dmg" 'macOS Apple Silicon' 7C3AED apple
+              badge "${ASSET}_x86_64.dmg" 'macOS Intel' D97706 apple
+              printf '\n\n'
+              badge "${ASSET}_${VERSION}_x64-setup.exe" 'Windows x64' 2563EB windows
+              badge "${ASSET}_${VERSION}_arm64-setup.exe" 'Windows ARM64' 0D9488 windows
+              printf '\n'
+            } >> "$notes"
           fi
 
       - name: Publish the release
