@@ -12,7 +12,13 @@ and a personal access token with write access to the repository. Reflect
 checks the sign-in against the host before storing anything, so a wrong URL
 or token fails right there with the host's own answer. The token lives in
 the OS keychain under that host and is sent nowhere else; the managed GitHub
-sign-in is never sent anywhere but github.com.
+sign-in is never sent anywhere but github.com. Plain `http://` URLs and URLs
+with a username or token in them are refused, so the token only ever travels
+encrypted and never lands in `.git/config`. A repository that already holds
+notes on another branch (`master`, say) keeps it: the graph's branch takes
+that name. When the host later refuses the sign-in (an expired token), or a
+remote set up in the terminal has none stored, the same form opens from
+**Update sign-in…**.
 
 ## In the terminal (SSH)
 

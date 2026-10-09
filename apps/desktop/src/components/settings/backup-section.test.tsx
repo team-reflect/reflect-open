@@ -54,6 +54,21 @@ describe('BackupSettingsField', () => {
     await expect.element(page.getByRole('dialog', { name: 'Connect another host' })).toBeVisible()
   })
 
+  it('offers a sign-in for an HTTPS host that has none, prefilled with its remote', async () => {
+    await renderSection({
+      phase: 'connected',
+      remoteUrl: 'https://gitlab.com/alex/notes.git',
+      repo: null,
+      status: { state: 'error', errorKind: 'rejected', message: 'No sign-in is stored' },
+    })
+
+    await userEvent.click(page.getByRole('button', { name: 'Update sign-in…' }))
+
+    await expect
+      .element(page.getByLabelText('Repository URL'))
+      .toHaveValue('https://gitlab.com/alex/notes.git')
+  })
+
   it('renders a generic remote host-neutrally with the engine’s own auth message', async () => {
     await renderSection({
       phase: 'connected',

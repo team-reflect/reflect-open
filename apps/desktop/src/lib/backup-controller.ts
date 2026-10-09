@@ -358,7 +358,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
           status: {
             state: 'error',
             errorKind: 'rejected',
-            message: `No sign-in is stored for ${host}. Add one in Settings → GitHub sync, or switch the remote to its SSH form: git remote set-url origin git@${host}:<owner>/<repo>.git`,
+            message: `No sign-in is stored for ${host}. Add one in Settings → Sync, or switch the remote to its SSH form: git remote set-url origin git@${host}:<owner>/<repo>.git`,
           },
         })
         await startLocalHistory(status.initialized)
@@ -512,14 +512,25 @@ export function createBackupController(options: BackupControllerOptions): Backup
       return 'connected'
     },
     connectHost: async (remoteUrl, credential) => {
-      const host = remoteHost(remoteUrl)
+      // The token travels encrypted and lives in the keychain only: plain
+      // http, and a sign-in written into the URL, are refused.
+      const host = /^https:\/\/[^/@]+\//i.test(remoteUrl) ? remoteHost(remoteUrl) : null
       if (host === null) {
-        throw new ReflectError('parse', 'a host sign-in needs an https:// remote URL')
+        throw new ReflectError(
+          'parse',
+          'Enter the repository’s https:// URL, without a username or token in it.',
+        )
+      }
+      if (parseGithubRemote(remoteUrl) !== null) {
+        // start() only syncs a GitHub remote with the managed GitHub sign-in.
+        throw new ReflectError('parse', 'This is a GitHub repository: connect it with GitHub.')
       }
       await gitSetup(null, null, generation) // the repository the probe runs from
-      await gitRemoteHead(credential, generation, remoteUrl)
+      const tip = await gitRemoteHead(credential, generation, remoteUrl)
       await saveHostCredential(host, credential)
-      await connectRemote(remoteUrl, null)
+      // A remote that already holds notes on another branch keeps it: the
+      // local branch takes that name, or sync would fork a parallel branch.
+      await connectRemote(remoteUrl, tip.defaultBranch)
     },
     disconnectGraph: async () => {
       await gitDisconnect(generation)

@@ -13,6 +13,8 @@ import { useConnectHost } from '@/hooks/use-connect-host.ts'
 
 interface ConnectHostDialogProps {
   onClose: () => void
+  /** The graph's current remote, when only its sign-in is being replaced. */
+  remoteUrl?: string
 }
 
 /**
@@ -20,8 +22,8 @@ interface ConnectHostDialogProps {
  * {@link useConnectHost}. The mobile drawer renders the same hook and
  * fields; flow changes belong in the hook, not here.
  */
-export function ConnectHostDialog({ onClose }: ConnectHostDialogProps): ReactElement {
-  const form = useConnectHost(onClose)
+export function ConnectHostDialog({ onClose, remoteUrl }: ConnectHostDialogProps): ReactElement {
+  const form = useConnectHost(onClose, remoteUrl)
 
   return (
     <Dialog

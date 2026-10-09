@@ -71,6 +71,8 @@ interface FakeOptions {
   initialized?: boolean
   /** Make `git_remote_head` throw this AppError (the host refusing the sign-in). */
   probeError?: unknown
+  /** Overrides for the `git_remote_head` answer (defaults to an unmoved remote). */
+  remoteTip?: Record<string, unknown>
 }
 
 /** Bridge fake with a mutable repo status, recording every command. */
@@ -137,7 +139,7 @@ function fakeBridge(options: FakeOptions = {}) {
           if (options.probeError !== undefined) {
             throw options.probeError
           }
-          return { remoteOid: 'aaa', trackingOid: 'aaa' }
+          return { remoteOid: 'aaa', trackingOid: 'aaa', defaultBranch: null, ...options.remoteTip }
         case 'git_merge_remote':
           mergeCount += 1
           if (options.gateMerge === true && mergeCount === 1) {
@@ -536,6 +538,52 @@ describe('createBackupController', () => {
       expect(calls).not.toContain('secret_set')
       expect(status.remoteUrl).toBeNull()
       expect(controller.getState()).toEqual({ phase: 'disconnected' })
+    } finally {
+      controller.dispose()
+    }
+  })
+
+  it('connectHost adopts the branch of a remote that already holds notes elsewhere', async () => {
+    const { invocations } = fakeBridge({
+      remoteUrl: null,
+      hostSecret: JSON.stringify({ username: 'alex', secret: 'glpat-123' }),
+      remoteTip: { remoteOid: null, defaultBranch: 'master' },
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    try {
+      await controller.start()
+      await controller.connectHost('https://gitlab.com/alex/notes.git', {
+        username: 'alex',
+        secret: 'glpat-123',
+      })
+
+      const setups = invocations.filter((call) => call.command === 'git_setup')
+      expect(setups.at(-1)?.args).toMatchObject({
+        remoteUrl: 'https://gitlab.com/alex/notes.git',
+        branch: 'master',
+      })
+    } finally {
+      controller.dispose()
+    }
+  })
+
+  it('connectHost refuses plain http, a sign-in in the URL, SSH, and GitHub before touching anything', async () => {
+    const { calls } = fakeBridge({ remoteUrl: null })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    try {
+      await controller.start()
+      const before = calls.length
+      for (const url of [
+        'http://gitlab.internal/alex/notes.git',
+        'https://alex:glpat-123@gitlab.com/alex/notes.git',
+        'git@gitlab.com:alex/notes.git',
+        'https://github.com/alex/notes.git',
+      ]) {
+        await expect(
+          controller.connectHost(url, { username: 'alex', secret: 'glpat-123' }),
+        ).rejects.toMatchObject({ kind: 'parse' })
+      }
+      expect(calls.slice(before)).toEqual([])
     } finally {
       controller.dispose()
     }

@@ -35,15 +35,6 @@ describe('ConnectHostDialog', () => {
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 
-  it('refuses a non-HTTPS URL before touching anything', async () => {
-    await render(<ConnectHostDialog onClose={vi.fn()} />)
-
-    await fillAndConnect('git@gitlab.com:alex/notes.git')
-
-    await expect.element(page.getByText('Enter the repository’s https:// URL.')).toBeVisible()
-    expect(sync.connectHost).not.toHaveBeenCalled()
-  })
-
   it('shows the host’s answer when the sign-in is refused and stays open', async () => {
     sync.connectHost.mockRejectedValueOnce(new Error('unexpected http status code: 401'))
     const onClose = vi.fn()
