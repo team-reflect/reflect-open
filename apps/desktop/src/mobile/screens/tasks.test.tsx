@@ -4,6 +4,7 @@ import { cleanup, render } from 'vitest-browser-react'
 import { page, userEvent, type Locator } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenTask } from '@reflect/core'
+import type { TaskAction } from '@/lib/note-task.ts'
 import { makeOpenTask as task } from '@/lib/tasks/open-task-fixture.ts'
 import { resetRecentlyCompleted } from '@/lib/tasks/recently-completed.ts'
 import { RouterProvider, useRouter } from '@/routing/router.tsx'
@@ -138,27 +139,28 @@ vi.mock('@/editor/note-editor.tsx', async () => {
   }
 })
 
-const toggleTask = vi.hoisted(() => vi.fn())
-const deleteTask = vi.hoisted(() => vi.fn())
-const editTask = vi.hoisted(() => vi.fn())
 const insertTask = vi.hoisted(() => vi.fn())
 const continueTaskInContext = vi.hoisted(() => vi.fn())
-const convertTaskToBullet = vi.hoisted(() => vi.fn())
-const editAndToggleTask = vi.hoisted(() => vi.fn())
-const editAndConvertTaskToBullet = vi.hoisted(() => vi.fn())
+const writeTask = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/note-task.ts', () => ({
-  toggleTask,
-  deleteTask,
-  editTask,
+  writeTask,
   insertTask,
   continueTaskInContext,
-  convertTaskToBullet,
-  editAndToggleTask,
-  editAndConvertTaskToBullet,
 }))
 
 /** The result of a write that changed nothing the cache needs to re-address. */
 const WRITTEN = { source: '', moved: [], inserted: [], tasks: [] }
+
+type TaskActionKind = TaskAction['kind']
+
+function isWrite(actions: readonly TaskAction[], kinds: readonly TaskActionKind[]): boolean {
+  return actions.length === kinds.length && actions.every((action, i) => action.kind === kinds[i])
+}
+
+/** The `writeTask` calls whose actions are exactly `kinds`, e.g. `('setMarkdown', 'toggle')`. */
+function writesOf(...kinds: TaskActionKind[]): unknown[][] {
+  return writeTask.mock.calls.filter((call: unknown[]) => isWrite(call[1] as TaskAction[], kinds))
+}
 
 const fail = vi.hoisted(() => vi.fn())
 const startOperation = vi.hoisted(() => vi.fn(() => ({ fail })))
@@ -261,12 +263,8 @@ beforeEach(async () => {
   getOpenTasks.mockReset()
   getCompletedTasks.mockReset()
   getCompletedTasks.mockResolvedValue([])
-  toggleTask.mockReset()
-  toggleTask.mockResolvedValue(WRITTEN)
-  deleteTask.mockReset()
-  deleteTask.mockResolvedValue(WRITTEN)
-  editTask.mockReset()
-  editTask.mockResolvedValue(WRITTEN)
+  writeTask.mockReset()
+  writeTask.mockResolvedValue(WRITTEN)
   insertTask.mockReset()
   insertTask.mockResolvedValue({
     created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
@@ -277,12 +275,6 @@ beforeEach(async () => {
     created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
     moved: [],
   })
-  convertTaskToBullet.mockReset()
-  convertTaskToBullet.mockResolvedValue(WRITTEN)
-  editAndToggleTask.mockReset()
-  editAndToggleTask.mockResolvedValue(WRITTEN)
-  editAndConvertTaskToBullet.mockReset()
-  editAndConvertTaskToBullet.mockResolvedValue(WRITTEN)
   startOperation.mockClear()
   fail.mockReset()
   resolveOrCreateNoteWithTitle.mockReset()
@@ -390,7 +382,7 @@ describe('MobileTasks', () => {
     await user.click(await view.findByRole('button', { name: 'Complete: buy milk' }))
 
     expect(hapticImpactLight).toHaveBeenCalledTimes(1)
-    expect(toggleTask).toHaveBeenCalledTimes(1)
+    expect(writesOf('toggle')).toHaveLength(1)
     // V1's middle state: the completed row stays visible, struck, reopenable.
     await view.findByRole('button', { name: 'Reopen: buy milk' })
 
@@ -435,8 +427,12 @@ describe('MobileTasks', () => {
     await user.type(input, 'buy oat milk')
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
 
-    expect(editTask).toHaveBeenCalledTimes(1)
-    expect(editTask.mock.calls[0]?.[1]).toBe('buy oat milk')
+    expect(writesOf('setMarkdown')).toHaveLength(1)
+    expect(writeTask).toHaveBeenCalledWith(
+      expect.anything(),
+      [{ kind: 'setMarkdown', markdown: 'buy oat milk' }],
+      1,
+    )
     await view.unmount()
   })
 
@@ -448,8 +444,8 @@ describe('MobileTasks', () => {
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
 
-    expect(editTask).not.toHaveBeenCalled()
-    expect(deleteTask).not.toHaveBeenCalled()
+    expect(writesOf('setMarkdown')).toHaveLength(0)
+    expect(writesOf('remove')).toHaveLength(0)
     await view.unmount()
   })
 
@@ -462,8 +458,8 @@ describe('MobileTasks', () => {
     await user.clear(view.getByRole('textbox', { name: 'Task text' }))
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
 
-    expect(deleteTask).toHaveBeenCalledTimes(1)
-    expect(editTask).not.toHaveBeenCalled()
+    expect(writesOf('remove')).toHaveLength(1)
+    expect(writesOf('setMarkdown')).toHaveLength(0)
     await view.unmount()
   })
 
@@ -479,8 +475,12 @@ describe('MobileTasks', () => {
     )
 
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
-    expect(editTask).toHaveBeenCalledTimes(1)
-    expect(editTask.mock.calls[0]?.[1]).toBe('buy milk [[2026-06-15]]')
+    expect(writesOf('setMarkdown')).toHaveLength(1)
+    expect(writeTask).toHaveBeenCalledWith(
+      expect.anything(),
+      [{ kind: 'setMarkdown', markdown: 'buy milk [[2026-06-15]]' }],
+      1,
+    )
     await view.unmount()
   })
 
@@ -503,7 +503,7 @@ describe('MobileTasks', () => {
 
     await user.click(view.getByRole('button', { name: 'Convert to bullet' }))
     expect(hapticImpactLight).toHaveBeenCalledTimes(4)
-    await waitFor(() => expect(convertTaskToBullet).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(writesOf('toBullet')).toHaveLength(1))
     await view.unmount()
   })
 
@@ -533,12 +533,16 @@ describe('MobileTasks', () => {
     await user.type(input, 'buy oat milk')
     await user.click(view.getByRole('button', { name: 'Complete', exact: true }))
 
-    await waitFor(() => expect(editAndToggleTask).toHaveBeenCalledTimes(1))
-    expect(editAndToggleTask).toHaveBeenCalledWith(expect.anything(), 'buy oat milk', 1)
+    await waitFor(() => expect(writesOf('setMarkdown', 'toggle')).toHaveLength(1))
+    expect(writeTask).toHaveBeenCalledWith(
+      expect.anything(),
+      [{ kind: 'setMarkdown', markdown: 'buy oat milk' }, { kind: 'toggle' }],
+      1,
+    )
     // One write: dismissal must not commit again after the action closed the
     // sheet, and the draft is not saved separately.
-    expect(editTask).not.toHaveBeenCalled()
-    expect(toggleTask).not.toHaveBeenCalled()
+    expect(writesOf('setMarkdown')).toHaveLength(0)
+    expect(writesOf('toggle')).toHaveLength(0)
     await view.unmount()
   })
 
@@ -551,7 +555,7 @@ describe('MobileTasks', () => {
     // dismissal commit. The sheet stays mounted for the same task afterwards.
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.click(view.getByRole('button', { name: 'Complete', exact: true }))
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(writesOf('toggle')).toHaveLength(1))
 
     // Second visit (the struck row): its edits must still commit on dismiss.
     await user.click(view.getByRole('button', { name: 'Edit: buy milk' }))
@@ -560,8 +564,12 @@ describe('MobileTasks', () => {
     await user.type(input, 'buy oat milk')
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
 
-    expect(editTask).toHaveBeenCalledTimes(1)
-    expect(editTask.mock.calls[0]?.[1]).toBe('buy oat milk')
+    expect(writesOf('setMarkdown')).toHaveLength(1)
+    expect(writeTask).toHaveBeenCalledWith(
+      expect.anything(),
+      [{ kind: 'setMarkdown', markdown: 'buy oat milk' }],
+      1,
+    )
     await view.unmount()
   })
 
@@ -573,7 +581,7 @@ describe('MobileTasks', () => {
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.click(view.getByRole('button', { name: 'Convert to bullet' }))
 
-    await waitFor(() => expect(convertTaskToBullet).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(writesOf('toBullet')).toHaveLength(1))
     await view.unmount()
   })
 
@@ -586,8 +594,8 @@ describe('MobileTasks', () => {
     await user.clear(view.getByRole('textbox', { name: 'Task text' }))
     await user.click(view.getByRole('button', { name: 'Complete', exact: true }))
 
-    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
-    expect(toggleTask).not.toHaveBeenCalled()
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
+    expect(writesOf('toggle')).toHaveLength(0)
     await view.unmount()
   })
 
@@ -600,8 +608,8 @@ describe('MobileTasks', () => {
     await user.clear(view.getByRole('textbox', { name: 'Task text' }))
     await user.click(view.getByRole('button', { name: 'Convert to bullet' }))
 
-    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
-    expect(convertTaskToBullet).not.toHaveBeenCalled()
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
+    expect(writesOf('toBullet')).toHaveLength(0)
     await view.unmount()
   })
 
@@ -640,7 +648,7 @@ describe('MobileTasks', () => {
     // Navigates to the line's note — deleting it out from under the visit
     // would be wrong; only dismissal treats an abandoned empty row as delete.
     expect(view.getByTestId('route').element().textContent).toContain('notes/n.md')
-    expect(deleteTask).not.toHaveBeenCalled()
+    expect(writesOf('remove')).toHaveLength(0)
     await view.unmount()
   })
 
@@ -652,7 +660,7 @@ describe('MobileTasks', () => {
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.click(view.getByRole('button', { name: 'Delete' }))
 
-    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
     await view.unmount()
   })
 
@@ -672,8 +680,12 @@ describe('MobileTasks', () => {
 
     await user.type(input, 'new thing')
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
-    expect(editTask).toHaveBeenCalledTimes(1)
-    expect(editTask.mock.calls[0]?.[1]).toBe('new thing')
+    expect(writesOf('setMarkdown')).toHaveLength(1)
+    expect(writeTask).toHaveBeenCalledWith(
+      expect.anything(),
+      [{ kind: 'setMarkdown', markdown: 'new thing' }],
+      1,
+    )
     await view.unmount()
   })
 
@@ -732,8 +744,12 @@ describe('MobileTasks', () => {
 
     // Commit-then-navigate, like "Open note": the edit lands exactly once, and
     // the resolved target opens.
-    expect(editTask).toHaveBeenCalledTimes(1)
-    expect(editTask.mock.calls[0]?.[1]).toBe('buy oat milk')
+    expect(writesOf('setMarkdown')).toHaveLength(1)
+    expect(writeTask).toHaveBeenCalledWith(
+      expect.anything(),
+      [{ kind: 'setMarkdown', markdown: 'buy oat milk' }],
+      1,
+    )
     await waitFor(() =>
       expect(view.getByTestId('route').element().textContent).toContain('notes/other.md'),
     )
@@ -751,8 +767,8 @@ describe('MobileTasks', () => {
     await view.findByRole('textbox', { name: 'Task text' })
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
 
-    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
-    expect(editTask).not.toHaveBeenCalled()
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
+    expect(writesOf('setMarkdown')).toHaveLength(0)
     await view.unmount()
   })
 
@@ -769,8 +785,12 @@ describe('MobileTasks', () => {
     // A tab switch unmounts the whole screen — no dismissal callback fires.
     await view.unmount()
 
-    await waitFor(() => expect(editTask).toHaveBeenCalledTimes(1))
-    expect(editTask.mock.calls[0]?.[1]).toBe('buy oat milk')
+    await waitFor(() => expect(writesOf('setMarkdown')).toHaveLength(1))
+    expect(writeTask).toHaveBeenCalledWith(
+      expect.anything(),
+      [{ kind: 'setMarkdown', markdown: 'buy oat milk' }],
+      1,
+    )
   })
 
   it('deletes an abandoned "+"-added task when the screen unmounts', async () => {
@@ -784,8 +804,8 @@ describe('MobileTasks', () => {
     await view.findByRole('textbox', { name: 'Task text' })
     await view.unmount()
 
-    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
-    expect(editTask).not.toHaveBeenCalled()
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
+    expect(writesOf('setMarkdown')).toHaveLength(0)
   })
 
   it('hides buckets through the filter sheet', async () => {
@@ -889,7 +909,7 @@ describe('MobileTasks', () => {
     await revealSwipeActions(view, 'buy milk')
     await view.getByRole('button', { name: 'Delete: buy milk' }).click()
 
-    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
     // Optimistic removal: the row leaves the list before the reindex.
     await waitFor(() => expect(view.queryByRole('button', { name: 'Edit: buy milk' })).toBeNull())
     expect(view.queryByText('dismiss-drawer')).toBeNull()
