@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.6...v0.15.0-beta.7) (2026-10-09)
+
+
+### Bug Fixes
+
+* **tasks:** add a new `## Tasks` section above trailing blank lines ([#1512](https://github.com/team-reflect/reflect-open/issues/1512)) ([c87fee5](https://github.com/team-reflect/reflect-open/commit/c87fee59e832b1fe3b7f7ec9290369ff09711e66))
+
 ## [0.15.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.5...v0.15.0-beta.6) (2026-10-09)
 
 
