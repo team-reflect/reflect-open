@@ -17,6 +17,7 @@ import { DefaultMap } from '@ocavue/utils'
 import { splitFrontmatter } from './frontmatter.ts'
 import { normalizeWikiTarget } from './resolve.ts'
 import { scanInlineWikiLinks } from './scan.ts'
+import { isTasksHeading } from './task-heading.ts'
 import { isSameTaskPath } from './task-path.ts'
 
 /** The task a caller addressed is not in the note anymore: the write is refused. */
