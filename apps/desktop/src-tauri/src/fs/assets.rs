@@ -182,7 +182,7 @@ pub fn asset_upload_append(request: Request<'_>, uploads: State<AssetUploads>) -
 /// Finish a streamed upload: fsync, then move the staged file into `assets/`
 /// under `desired_name` (or the first free `-2`-suffixed variant). Returns the
 /// final graph-relative `assets/…` path.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn asset_upload_commit(
     id: String,
     desired_name: String,
@@ -241,7 +241,7 @@ fn persist_exact(temp: tempfile::NamedTempFile, target: &Path) -> AppResult<()> 
 /// the `assets/` collision renaming of [`asset_upload_commit`] would corrupt
 /// it. Memo basenames carry millisecond precision; an existing file at
 /// `path` is a bug and fails loudly rather than being clobbered.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn asset_upload_commit_path(
     id: String,
     path: String,
@@ -276,7 +276,7 @@ pub fn asset_upload_abort(id: String, uploads: State<AssetUploads>) -> AppResult
 /// Copy a file the OS gave us a real path for (file picker) into `assets/`
 /// under `desired_name`, with the same collision policy as uploads. The bytes
 /// never cross the IPC. Returns the final graph-relative `assets/…` path.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn asset_import(
     source_path: String,
     desired_name: String,
@@ -327,7 +327,7 @@ fn import_exact(source: &Path, staging: &Path, target: &Path) -> AppResult<()> {
 /// affordable on a phone. The destination is fenced to `audio-memos/` like
 /// `audio_memo_delete`, and the path *is* the memo's identity, so the
 /// `assets/` collision renaming of [`asset_import`] would corrupt it.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_memo_import(
     source_path: String,
     path: String,

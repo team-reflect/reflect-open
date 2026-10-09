@@ -301,7 +301,7 @@ pub struct NoteMoveRequest {
     from_address: write::MovedNoteAddress,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn note_move_indexed<R: tauri::Runtime>(
     request: NoteMoveRequest,
     generation: u64,

@@ -470,7 +470,7 @@ pub(crate) fn with_graph_lock<T>(root: &Path, f: impl FnOnce() -> T) -> T {
 ///
 /// `expected_contents` is compared with the note as [`note_read`] returns it,
 /// with `\n` line endings. `contents` is written as given.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn note_write(
     path: String,
     contents: String,
@@ -517,7 +517,7 @@ pub(crate) fn write_note_revision(
 /// Atomically create a note only when `path` is still free. Unlike
 /// [`note_write`], this is a no-clobber claim: a concurrent sync checkout or
 /// creator wins as `Collision`, with its file left byte-for-byte intact.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn note_create(
     path: String,
     contents: String,
@@ -539,7 +539,7 @@ pub fn note_create(
 /// Atomically write a binary asset (pasted/dropped image) by graph-relative
 /// path. Contents arrive base64-encoded — Tauri IPC args are JSON, and pasted
 /// images are small enough that the ~33% encoding overhead is irrelevant.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn asset_write(
     path: String,
     contents_base64: String,
@@ -563,7 +563,7 @@ pub fn asset_write(
 /// `audio-memos/` prefix so this command can never grow into a general
 /// file-delete IPC. Idempotent — a segment deleted twice (or never written)
 /// is fine.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
     if !path.starts_with("audio-memos/") {
         return Err(AppError::traversal(format!(
@@ -826,7 +826,7 @@ pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()>
 /// `generation`). Mobile has no OS trash: the file moves into the graph-local
 /// `.reflect/trash/` instead (Plan 19), the same recoverability promise, and
 /// `.reflect/` is already excluded from sync and indexing.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
     let root = root_for_generation(&state, generation)?;
     with_graph_lock(&root, || {
