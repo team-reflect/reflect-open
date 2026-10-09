@@ -1,7 +1,6 @@
 import {
   isMarkdownAstEqual,
   parseMarkdownAst,
-  resolveMarkdownAstPath,
   serializeMarkdownAst,
   walkMarkdownAst,
   type MarkdownAstPath,
@@ -124,23 +123,17 @@ export function getTaskDueDate(markdown: string): string | null {
   return null
 }
 
-export interface ParsedTask {
-  astPath: MarkdownAstPath
-  /** The task's first paragraph, marker excluded. */
-  markdown: string
-  /** The headings above the task, then its ancestor list items' first paragraphs, outermost first. */
-  breadcrumbs: readonly string[]
-  checked: boolean
+/** A round task as the projection stores it: its snapshot plus its explicit due date. */
+export interface ParsedTask extends TaskSnapshot {
   dueDate: string | null
 }
 
 /** The round tasks of a note body, in document order. */
 export function projectTasks(body: string): ParsedTask[] {
-  return getRoundTasks(parseMarkdownAst(body)).map(toParsedTask)
-}
-
-function toParsedTask(entry: TaskEntry): ParsedTask {
-  return { ...toTaskSnapshot(entry), dueDate: getTaskDueDate(entry.markdown) }
+  return getRoundTasks(parseMarkdownAst(body)).map((entry) => ({
+    ...toTaskSnapshot(entry),
+    dueDate: getTaskDueDate(entry.markdown),
+  }))
 }
 
 /** Where a task was last seen; `markdown` and `checked` are the staleness guard. */
@@ -154,9 +147,6 @@ export type InsertPosition =
   | { kind: 'documentEnd' }
   /** The end of the task's context: its parent list item, or at the root the end of its own list. */
   | { kind: 'contextEnd'; task: TaskLocator }
-  | { kind: 'afterTask'; task: TaskLocator }
-  /** After any block, for example the last item of the list under a heading. */
-  | { kind: 'afterBlock'; astPath: MarkdownAstPath }
   /** The end of the first `+` list in the top-level `## Tasks` section, created at the end when missing. */
   | { kind: 'tasksSection' }
 
@@ -354,22 +344,6 @@ function resolveInsertPosition(
         kind: 'after',
         anchor: children[list === undefined ? heading : endOfListRun(children, list)]!,
       }
-    }
-    case 'afterTask': {
-      const { node } = locateTask(before, at.task)
-      return { kind: 'after', anchor: node }
-    }
-    case 'afterBlock': {
-      const found = resolveMarkdownAstPath(document, at.astPath)
-      if (found?.parent === undefined || !isBlockParent(found.parent)) {
-        throw new TaskStaleError('insert position is gone')
-      }
-      const target = found.node
-      const anchor = found.parent.children.find((child) => child === target)
-      if (anchor === undefined) {
-        throw new TaskStaleError('insert position is gone')
-      }
-      return { kind: 'after', anchor }
     }
   }
 }
