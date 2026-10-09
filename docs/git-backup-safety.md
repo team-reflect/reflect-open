@@ -94,4 +94,6 @@ stays dirty with the error shown, and its next save tries again.
 - Test: `note-session.test.ts` "a clean three-way merge applies silently and
   keeps saving", "overlapping edits are written into the file as markers and
   open protected", "edits that cannot be merged are kept beside the note",
-  "a dispose flush refused by an external change still merges the buffer".
+  "a dispose flush refused by an external change still merges the buffer",
+  "a failed conflict copy keeps the dirty buffer, and the next save retries
+  it".
