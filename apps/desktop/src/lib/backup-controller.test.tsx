@@ -50,6 +50,8 @@ interface FakeOptions {
   gateMerge?: boolean
   /** Hold the second `git_commit_all` until `releaseCommit()` (a flush still in flight). */
   gateSecondCommit?: boolean
+  /** What every `git_commit_all` reports (defaults to nothing to commit). */
+  commitOutcome?: unknown
   /** Make the watcher subscription throw (the unusable-watcher path). */
   failListen?: boolean
   failStatus?: boolean
@@ -128,7 +130,7 @@ function fakeBridge(options: FakeOptions = {}) {
               releaseCommit = resolve
             })
           }
-          return CLEAN_COMMIT
+          return options.commitOutcome ?? CLEAN_COMMIT
         case 'git_fetch':
           return { ahead: 0, behind: 0 }
         case 'git_merge_remote':
@@ -818,6 +820,41 @@ describe('createBackupController', () => {
       // Foreground replay is full, so it fetches rather than merely pushing
       // the edit that arrived while hidden.
       expect(calls.filter((command) => command === 'git_fetch')).toHaveLength(2)
+    } finally {
+      vi.useRealTimers()
+      controller.dispose()
+      visibility.mockRestore()
+      setPlatformSurface({ mobileApp: false })
+    }
+  })
+
+  it('a mobile push cycle hidden between its commit and its push still pushes', async () => {
+    setPlatformSurface({ mobileApp: true })
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    const { calls, releaseCommit } = fakeBridge({
+      gateSecondCommit: true,
+      commitOutcome: { ...CLEAN_COMMIT, committed: true, sha: 'abc' },
+    })
+    const count = (name: string): number => calls.filter((command) => command === name).length
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    try {
+      await controller.start()
+      await vi.waitFor(() => {
+        expect(count('git_push')).toBe(1) // the launch cycle
+      })
+
+      vi.useFakeTimers()
+      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }], 'external')
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(count('git_commit_all')).toBe(2) // the debounced commit is in flight
+
+      visibility.mockReturnValue('hidden') // the user switches apps
+      releaseCommit()
+      await vi.runAllTimersAsync()
+
+      // The commit is on disk; the push only sends it. Nothing is fetched.
+      expect(count('git_push')).toBe(2)
+      expect(count('git_fetch')).toBe(1)
     } finally {
       vi.useRealTimers()
       controller.dispose()

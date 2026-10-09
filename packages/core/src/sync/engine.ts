@@ -94,10 +94,11 @@ export interface SyncEngineOptions {
    * Checked before a new cycle and again after every awaited command boundary.
    * Returning false at admission drops the trigger without issuing Git work;
    * returning false mid-cycle lets the already-issued command finish but
-   * suppresses every subsequent command, except the push of what is already
-   * committed: that one command finishes the cycle's work rather than
-   * leaving it for the next foreground. The lifecycle owner must replay a
-   * full cycle when work is allowed again.
+   * suppresses every subsequent command, with two exceptions that only send
+   * what is already committed: a push-only cycle (the debounce) runs to
+   * completion once admitted, its commit and credential resolution
+   * included, and the push that ends a full cycle still runs. The lifecycle
+   * owner must replay a full cycle when work is allowed again.
    */
   canStartCycle?: () => boolean
   /**
