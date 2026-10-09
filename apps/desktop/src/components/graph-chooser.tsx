@@ -17,6 +17,7 @@ import { cleanGraphName, graphNameFromRoot, isGraphNameTaken } from '@/lib/graph
 import { queryKeys } from '@/lib/query-client.ts'
 import { parseBackupSource, restoreBackup } from '@/lib/restore-backup.ts'
 import { graphColorCss } from '@/lib/graph-colors.ts'
+import { isICloudRoot } from '@/lib/icloud-controller.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 
@@ -374,15 +375,25 @@ function RestoreCard({
     if (source === null) {
       return
     }
-    const picked = await open({
-      directory: true,
-      multiple: false,
-      title: 'Choose where to restore',
-    })
-    if (typeof picked !== 'string') {
-      return
-    }
+    // The picker runs inside the action too: a rejection from it lands in
+    // the card's alert like any other failure.
     await action.run(async () => {
+      const picked = await open({
+        directory: true,
+        multiple: false,
+        title: 'Choose where to restore',
+      })
+      if (typeof picked !== 'string') {
+        return
+      }
+      if (isICloudRoot(picked)) {
+        // One sync method per graph: a clone here would sync through iCloud
+        // and its remote at once. The supported way in is the move, which
+        // settles the repository for iCloud.
+        throw new Error(
+          'Choose a folder outside iCloud Drive. To keep the graph in iCloud, restore it first, then use Settings → iCloud sync → Move graph to iCloud.',
+        )
+      }
       await openRecent(await restoreBackup(source, picked))
     })
   }

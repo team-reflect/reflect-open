@@ -300,6 +300,29 @@ fn clone_restores_a_backup_into_an_empty_destination() {
     fs::create_dir_all(&occupied).unwrap();
     fs::write(occupied.join("keep.txt"), "existing").unwrap();
     assert!(super::remote::clone(&fixture.remote_url, &occupied, None).is_err());
+
+    // Neither is a destination inside a graph: the outer graph would index
+    // the restored notes and commit the clone as a gitlink.
+    let nested = root.join("restored");
+    assert!(super::remote::clone(&fixture.remote_url, &nested, None).is_err());
+    assert!(!nested.exists());
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn clone_marks_the_new_repository_local_only() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n");
+    commit_all(root, "first", MAX_FILE_BYTES).unwrap();
+    push(root, None).unwrap();
+
+    let target = fixture._dir.path().join("restored");
+    super::remote::clone(&fixture.remote_url, &target, None).unwrap();
+    assert_eq!(
+        xattr::get(target.join(".git"), "com.apple.fileprovider.ignore#P").unwrap(),
+        Some(b"1".to_vec())
+    );
 }
 
 #[test]

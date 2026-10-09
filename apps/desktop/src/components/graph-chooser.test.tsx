@@ -317,4 +317,33 @@ describe('GraphChooser', () => {
     await vi.waitFor(() => expect(vi.mocked(open)).toHaveBeenCalled())
     expect(invokeLog.map(([command]) => command)).not.toContain('git_clone')
   })
+
+  it('refuses to restore into iCloud Drive, where the graph would sync twice', async () => {
+    secrets['git-host:gitlab.com'] = JSON.stringify({ username: 'alex', secret: 'glpat' })
+    vi.mocked(open).mockResolvedValue('/Users/alex/Library/Mobile Documents/com~apple~CloudDocs')
+    await render(<GraphChooser />, { wrapper })
+
+    await userEvent.type(
+      page.getByRole('textbox', { name: 'Repository' }),
+      'https://gitlab.com/alex/notes.git',
+    )
+    await userEvent.click(page.getByRole('button', { name: /Choose where to restore/ }))
+
+    await expect.element(page.getByText(/Choose a folder outside iCloud Drive/)).toBeVisible()
+    expect(invokeLog.map(([command]) => command)).not.toContain('git_clone')
+  })
+
+  it('a folder picker that fails shows the failure in the card', async () => {
+    secrets['git-host:gitlab.com'] = JSON.stringify({ username: 'alex', secret: 'glpat' })
+    vi.mocked(open).mockRejectedValue(new Error('the dialog could not open'))
+    await render(<GraphChooser />, { wrapper })
+
+    await userEvent.type(
+      page.getByRole('textbox', { name: 'Repository' }),
+      'https://gitlab.com/alex/notes.git',
+    )
+    await userEvent.click(page.getByRole('button', { name: /Choose where to restore/ }))
+
+    await expect.element(page.getByText('the dialog could not open')).toBeVisible()
+  })
 })
