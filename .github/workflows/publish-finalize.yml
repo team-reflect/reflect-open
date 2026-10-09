@@ -71,9 +71,7 @@ jobs:
       - name: Write the updater manifest
         run: pnpm release:manifest --tag="$TAG"
 
-      # Keep the changelog release-please wrote and add one download badge per
-      # installer. Windows installers are optional, so a badge is written only
-      # for an asset the release has.
+      # Keep the changelog release-please wrote and add the download badges.
       - name: Write the release notes
         env:
           ASSET: ${{ steps.release.outputs.asset }}
@@ -81,25 +79,12 @@ jobs:
         run: |
           notes="$RUNNER_TEMP/release-notes.md"
           gh release view "$TAG" --json body --jq .body > "$notes"
-          if ! grep -qF -e '<!-- downloads -->' -e '## Which Mac download should I choose?' "$notes"; then
-            assets="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
-            badge() {
-              local file="$1" label="$2" color="$3" icon="$4"
-              if grep -qxF "$file" <<< "$assets"; then
-                printf '[![%s](https://badgen.net/badge/%s/v%s/%s?icon=%s)](%s/%s/releases/download/%s/%s) ' \
-                  "$label" "${label// /%20}" "$VERSION" "$color" "$icon" \
-                  "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$TAG" "$file"
-              fi
-            }
-            {
-              printf '\n<!-- downloads -->\n\n'
-              badge "${ASSET}_aarch64.dmg" 'macOS Apple Silicon' 7C3AED apple
-              badge "${ASSET}_x86_64.dmg" 'macOS Intel' D97706 apple
-              printf '\n\n'
-              badge "${ASSET}_${VERSION}_x64-setup.exe" 'Windows x64' 2563EB windows
-              badge "${ASSET}_${VERSION}_arm64-setup.exe" 'Windows ARM64' 0D9488 windows
-              printf '\n'
-            } >> "$notes"
+          if ! grep -qxF -e '## Download' -e '## Which Mac download should I choose?' "$notes"; then
+            mapfile -t assets < <(gh release view "$TAG" --json assets --jq '.assets[].name')
+            echo >> "$notes"
+            .github/scripts/release-downloads.sh \
+              --repo "$GITHUB_REPOSITORY" --tag "$TAG" --version "$VERSION" --asset "$ASSET" \
+              "${assets[@]}" >> "$notes"
           fi
 
       - name: Publish the release
