@@ -226,9 +226,10 @@ pub(super) fn finish_interrupted(repo: &Repository, root: &Path) -> AppResult<()
 }
 
 /// The post-`repo.merge` half: materialize conflicts, commit the merge with
-/// both parents, and clear the merge state. Split out so [`merge_remote`] can
-/// guarantee `cleanup_state` runs even when any step here fails. Returns the
-/// conflicted paths and every file the merge changed relative to local HEAD.
+/// both parents, and clear the merge state. A step that fails leaves the
+/// state in place, and the next command runs this again
+/// ([`finish_interrupted`]). Returns the conflicted paths and every file the
+/// merge changed relative to local HEAD.
 fn complete_merge(
     repo: &Repository,
     root: &Path,
@@ -379,7 +380,9 @@ fn resolve_both_edited(
         write_blob(repo, root, &our.path, our.id)?;
     }
     let copy = conflict_copy_path(&their.path);
-    write_blob(repo, root, &copy, their.id)?;
+    if !written_since(root, &copy, &[their.id]) {
+        write_blob(repo, root, &copy, their.id)?;
+    }
     index.add_path(Path::new(&our.path))?;
     index.add_path(Path::new(&copy))?;
     Ok(vec![our.path, copy])
