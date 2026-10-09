@@ -1,8 +1,8 @@
 import {
   findTaskMove,
-  getTaskDueDate,
   isSameTaskPath,
   renderInlineText,
+  renderTaskSnapshot,
   type OpenTask,
   type TaskMove,
   type TaskSnapshot,
@@ -37,23 +37,13 @@ function isSameLabels(left: readonly string[], right: readonly string[]): boolea
 
 /** The row as the write left its task; the row itself when nothing differs. */
 function withSnapshot(task: OpenTask, to: TaskSnapshot): OpenTask {
-  const breadcrumbs = to.breadcrumbs.map((label) => renderInlineText(label))
-  const moved = !isSameTaskPath(to.astPath, task.astPath) || to.checked !== task.checked
-  if (to.markdown === task.markdown) {
-    if (!moved && isSameLabels(breadcrumbs, task.breadcrumbs)) {
-      return task
-    }
-    return { ...task, astPath: to.astPath, checked: to.checked, breadcrumbs }
-  }
-  return {
-    ...task,
-    astPath: to.astPath,
-    checked: to.checked,
-    breadcrumbs,
-    markdown: to.markdown,
-    text: renderInlineText(to.markdown),
-    dueDate: getTaskDueDate(to.markdown),
-  }
+  const next = { ...task, ...renderTaskSnapshot(to) }
+  const same =
+    isSameTaskPath(next.astPath, task.astPath) &&
+    next.checked === task.checked &&
+    next.markdown === task.markdown &&
+    isSameLabels(next.breadcrumbs, task.breadcrumbs)
+  return same ? task : next
 }
 
 /**

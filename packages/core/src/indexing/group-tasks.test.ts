@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   groupTaskContexts,
   groupTasks,
+  isGenericTaskLabel,
   taskDateBucket,
   visibleTaskBreadcrumbs,
 } from './group-tasks.ts'
@@ -30,19 +31,35 @@ function task(overrides: Partial<OpenTask> = {}): OpenTask {
   }
 }
 
+describe('isGenericTaskLabel', () => {
+  it('matches the task and todo words in any casing, spacing, or punctuation', () => {
+    for (const label of ['Tasks', ' tasks ', 'TASKS', 'Task', 'Tasks:', 'todo', 'TODOs', 'To Do']) {
+      expect(isGenericTaskLabel(label)).toBe(true)
+    }
+    expect(isGenericTaskLabel("To Do's: ")).toBe(true)
+  })
+
+  it('does not match a label that says more', () => {
+    for (const label of ['House chore', 'House tasks', 'Todo list', '']) {
+      expect(isGenericTaskLabel(label)).toBe(false)
+    }
+  })
+})
+
 describe('visibleTaskBreadcrumbs', () => {
   it('trims empty breadcrumb entries', () => {
     expect(visibleTaskBreadcrumbs(['', ' Project ', '  '])).toEqual(['Project'])
   })
 
-  it('hides common single task headings', () => {
-    for (const heading of ['Task', 'Tasks:', 'todo', 'TODOs', 'To Do', "To Do's: "]) {
-      expect(visibleTaskBreadcrumbs([heading])).toEqual([])
-    }
+  it('hides a lone generic parent and keeps a lone specific one', () => {
+    expect(visibleTaskBreadcrumbs(['Tasks:'])).toEqual([])
+    expect(visibleTaskBreadcrumbs(['House chore'])).toEqual(['House chore'])
   })
 
-  it('keeps multi-part breadcrumbs even when one part is common', () => {
-    expect(visibleTaskBreadcrumbs(['Tasks', 'Project'])).toEqual(['Tasks', 'Project'])
+  it('keeps every label of a longer chain, Tasks included', () => {
+    expect(visibleTaskBreadcrumbs(['Home', 'Tasks'])).toEqual(['Home', 'Tasks'])
+    expect(visibleTaskBreadcrumbs(['Tasks', 'Kitchen'])).toEqual(['Tasks', 'Kitchen'])
+    expect(visibleTaskBreadcrumbs(['Tasks', 'Tasks'])).toEqual(['Tasks', 'Tasks'])
   })
 })
 
@@ -71,9 +88,29 @@ describe('groupTaskContexts', () => {
   it('labels each context with its visible breadcrumbs', () => {
     const contexts = groupTaskContexts([
       task({ astPath: [1], breadcrumbs: [' Project '] }),
-      task({ astPath: [2], breadcrumbs: ['Tasks:'] }),
+      task({ astPath: [2], breadcrumbs: ['Tasks'] }),
     ])
     expect(contexts.map((context) => context.visibleBreadcrumbs)).toEqual([['Project'], []])
+  })
+
+  it('groups by visible breadcrumbs without rewriting the stored ones', () => {
+    const contexts = groupTaskContexts([
+      task({ astPath: [1], breadcrumbs: ['Tasks'] }),
+      task({ astPath: [2], breadcrumbs: ['Todo:'] }),
+    ])
+    expect(contexts).toHaveLength(1)
+    expect(contexts[0]?.breadcrumbs).toEqual(['Tasks'])
+  })
+
+  it('keeps matching contexts in different notes separate', () => {
+    const contexts = groupTaskContexts([
+      task({ notePath: 'notes/a.md', astPath: [1], breadcrumbs: ['House chore'] }),
+      task({ notePath: 'notes/b.md', astPath: [1], breadcrumbs: ['House chore'] }),
+    ])
+    expect(contexts.map((context) => context.tasks[0]?.notePath)).toEqual([
+      'notes/a.md',
+      'notes/b.md',
+    ])
   })
 
   it('returns no contexts for no tasks', () => {

@@ -1,7 +1,6 @@
 import {
   isMarkdownAstEqual,
   parseMarkdownAst,
-  resolveMarkdownAstPath,
   serializeMarkdownAst,
   walkMarkdownAst,
   type MarkdownAstPath,
@@ -14,6 +13,7 @@ import {
 } from '@meowdown/markdown'
 import { DefaultMap } from '@ocavue/utils'
 import { splitFrontmatter } from './frontmatter.ts'
+import { renderInlineText } from './inline-text.ts'
 import { normalizeWikiTarget } from './resolve.ts'
 import { scanInlineWikiLinks } from './scan.ts'
 import { isSameTaskPath } from './task-path.ts'
@@ -63,22 +63,45 @@ export function getFirstParagraphMarkdown(item: MarkdownListItem): string {
 export interface TaskEntry extends TaskSnapshot {
   node: MarkdownListItem
   parent: BlockParent
+  /** The item's index in `parent.children`, valid until the tree is edited. */
+  index: number
+}
+
+/** One heading a document-level block sits under. */
+interface Section {
+  level: number
+  label: string
+}
+
+/** The labels of the open sections, outermost first; an empty heading labels nothing. */
+function sectionLabels(sections: readonly Section[]): string[] {
+  return sections.map((section) => section.label).filter((label) => label !== '')
 }
 
 export function getRoundTasks(document: MarkdownDocument): TaskEntry[] {
   const breadcrumbsOf = new DefaultMap<MarkdownNode, readonly string[]>(() => [])
   const entries: TaskEntry[] = []
-  for (const { node, parent, path } of walkMarkdownAst(document)) {
-    if (parent === undefined) {
+  // The headings above the current document-level block, like an outline.
+  const sections: Section[] = []
+  for (const { node, parent, path, index } of walkMarkdownAst(document)) {
+    if (parent === undefined || index === undefined) {
       continue
     }
-    const inherited = breadcrumbsOf.get(parent)
+    if (parent === document && node.type === 'heading') {
+      // A heading closes every section of its own level or deeper.
+      while ((sections.at(-1)?.level ?? 0) >= node.level) {
+        sections.pop()
+      }
+      sections.push({ level: node.level, label: node.value.trim() })
+    }
+    const inherited = parent === document ? sectionLabels(sections) : breadcrumbsOf.get(parent)
     const label = node.type === 'listItem' ? getFirstParagraphMarkdown(node) : ''
     breadcrumbsOf.set(node, label === '' ? inherited : [...inherited, label])
     if (isRoundTask(node) && isBlockParent(parent)) {
       entries.push({
         node,
         parent,
+        index,
         astPath: path,
         markdown: label,
         breadcrumbs: inherited,
@@ -100,23 +123,40 @@ export function getTaskDueDate(markdown: string): string | null {
   return null
 }
 
-export interface ParsedTask {
-  astPath: MarkdownAstPath
-  /** The task's first paragraph, marker excluded. */
-  markdown: string
-  /** Ancestor list items' first paragraphs, outermost first. */
-  breadcrumbs: readonly string[]
-  checked: boolean
+/** A round task as the projection stores it: its snapshot plus its explicit due date. */
+export interface ParsedTask extends TaskSnapshot {
   dueDate: string | null
 }
 
 /** The round tasks of a note body, in document order. */
 export function projectTasks(body: string): ParsedTask[] {
-  return getRoundTasks(parseMarkdownAst(body)).map(toParsedTask)
+  return getRoundTasks(parseMarkdownAst(body)).map((entry) => ({
+    ...toTaskSnapshot(entry),
+    dueDate: getTaskDueDate(entry.markdown),
+  }))
 }
 
-function toParsedTask(entry: TaskEntry): ParsedTask {
-  return { ...toTaskSnapshot(entry), dueDate: getTaskDueDate(entry.markdown) }
+/** A task row's own fields: its snapshot plus what the view derives from the Markdown. */
+export interface TaskRow extends TaskSnapshot {
+  /** `markdown` rendered to plain text, for search and labels. */
+  text: string
+  /** The headings above the task, then its ancestor list items' labels, outermost first, rendered to plain text. */
+  breadcrumbs: readonly string[]
+  /** The task's explicit `[[YYYY-MM-DD]]` due date, or null. */
+  dueDate: string | null
+}
+
+/**
+ * Derive a row's display fields from a task snapshot: the one rendering the
+ * index read, an optimistic insert, and a cache relocation all share.
+ */
+export function renderTaskSnapshot(snapshot: TaskSnapshot): TaskRow {
+  return {
+    ...snapshot,
+    text: renderInlineText(snapshot.markdown),
+    breadcrumbs: snapshot.breadcrumbs.map((label) => renderInlineText(label)),
+    dueDate: getTaskDueDate(snapshot.markdown),
+  }
 }
 
 /** Where a task was last seen; `markdown` and `checked` are the staleness guard. */
@@ -128,11 +168,10 @@ export interface TaskLocator {
 
 export type InsertPosition =
   | { kind: 'documentEnd' }
-  /** The end of the task's parent list item; refused when the task is at the root. */
+  /** The end of the task's context: its parent list item, or at the root the end of its own list. */
   | { kind: 'contextEnd'; task: TaskLocator }
-  | { kind: 'afterTask'; task: TaskLocator }
-  /** After any block, for example the last item of the list under a heading. */
-  | { kind: 'afterBlock'; astPath: MarkdownAstPath }
+  /** The end of the first `+` list in the top-level `## Tasks` section, created at the end when missing. */
+  | { kind: 'tasksSection' }
 
 /** An edit of one existing round task. */
 export type TaskEditItem =
@@ -151,7 +190,7 @@ export type TaskEdit = TaskEditItem | TaskEditInsert
 
 /** A round task as it stands in a note body. */
 export interface TaskSnapshot extends TaskLocator {
-  /** Ancestor list items' first paragraphs, outermost first. */
+  /** The headings above the task, then its ancestor list items' first paragraphs, outermost first. */
   breadcrumbs: readonly string[]
 }
 
@@ -185,6 +224,8 @@ export function findTaskMove(moves: readonly TaskMove[], task: TaskLocator): Tas
 type SlotTarget =
   | { kind: 'after'; anchor: MarkdownBlock }
   | { kind: 'end'; container: MarkdownDocument | MarkdownListItem }
+  /** A new `## <heading>` section at the end of the document, holding the item. */
+  | { kind: 'newSection'; heading: string }
 
 /**
  * Apply `edits` to a note and serialize its body once. Every locator describes
@@ -309,29 +350,78 @@ function resolveInsertPosition(
       return { kind: 'end', container: document }
     }
     case 'contextEnd': {
-      const { parent } = locateTask(before, at.task)
-      if (parent.type !== 'listItem') {
-        throw new TaskStaleError('task no longer has a parent list context')
+      const { parent, index } = locateTask(before, at.task)
+      if (parent.type === 'listItem') {
+        return { kind: 'end', container: parent }
       }
-      return { kind: 'end', container: parent }
+      return { kind: 'after', anchor: parent.children[endOfListRun(parent.children, index)]! }
     }
-    case 'afterTask': {
-      const { node } = locateTask(before, at.task)
-      return { kind: 'after', anchor: node }
-    }
-    case 'afterBlock': {
-      const found = resolveMarkdownAstPath(document, at.astPath)
-      if (found?.parent === undefined || !isBlockParent(found.parent)) {
-        throw new TaskStaleError('insert position is gone')
+    case 'tasksSection': {
+      const { children } = document
+      const heading = findTasksHeading(children)
+      if (heading === undefined) {
+        return { kind: 'newSection', heading: 'Tasks' }
       }
-      const target = found.node
-      const anchor = found.parent.children.find((child) => child === target)
-      if (anchor === undefined) {
-        throw new TaskStaleError('insert position is gone')
+      const list = findSectionTaskList(children, heading)
+      return {
+        kind: 'after',
+        anchor: children[list === undefined ? heading : endOfListRun(children, list)]!,
       }
-      return { kind: 'after', anchor }
     }
   }
+}
+
+/** The character an item is written with; meowdown leaves it unset on a folded bullet, which it writes as `+`. */
+function markerOf(item: MarkdownListItem): string | undefined {
+  return item.marker ?? (item.kind === 'bullet' && item.collapsed ? '+' : undefined)
+}
+
+/** The index of the last item of the list that starts at `children[start]`: same marker, nothing else between. */
+function endOfListRun(children: readonly MarkdownBlock[], start: number): number {
+  const first = children[start]
+  const marker = first?.type === 'listItem' ? markerOf(first) : undefined
+  let end = start
+  for (let i = start + 1; i < children.length; i++) {
+    const block = children[i]
+    if (block?.type !== 'listItem' || markerOf(block) !== marker) {
+      break
+    }
+    end = i
+  }
+  return end
+}
+
+/** The index of the first top-level H1 or H2 that reads "Tasks" once its inline Markdown is rendered. */
+function findTasksHeading(children: readonly MarkdownBlock[]): number | undefined {
+  const index = children.findIndex(
+    (block) =>
+      block.type === 'heading' &&
+      block.level <= 2 &&
+      renderInlineText(block.value).trim().toLowerCase() === 'tasks',
+  )
+  return index === -1 ? undefined : index
+}
+
+/**
+ * The index of the first `+` list item between the heading at `heading` and
+ * the next heading of any level, or undefined when the section has none. A
+ * list with another marker is skipped, so a `- [ ]` checklist in the section
+ * never receives a round task.
+ */
+function findSectionTaskList(
+  children: readonly MarkdownBlock[],
+  heading: number,
+): number | undefined {
+  for (let i = heading + 1; i < children.length; i++) {
+    const block = children[i]
+    if (block?.type === 'heading') {
+      return undefined
+    }
+    if (block?.type === 'listItem' && markerOf(block) === '+') {
+      return i
+    }
+  }
+  return undefined
 }
 
 /**
@@ -348,6 +438,8 @@ function insertTaskItem(
   if (slot.kind === 'after') {
     const { parent, index } = requireAttached(document, slot.anchor)
     parent.children.splice(index + 1, 0, item)
+  } else if (slot.kind === 'newSection') {
+    document.children.push({ type: 'heading', level: 2, value: slot.heading }, item)
   } else {
     if (slot.container.type === 'listItem') {
       requireAttached(document, slot.container)

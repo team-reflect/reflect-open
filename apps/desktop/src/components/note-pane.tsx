@@ -339,6 +339,7 @@ export function NotePaneComponent({
         smoothCaretAnimation={settings.editorSmoothCaretAnimation}
         timeFormat={settings.timeFormat}
         bulletAfterHeading={settings.editorBulletAfterHeading}
+        backspaceDeletesEmptyFirstBlock={dailyNote}
         // The grip drag-reorders blocks and the "+" inserts a paragraph below.
         blockHandle={true}
         resolveImageUrl={resolveImageUrl}

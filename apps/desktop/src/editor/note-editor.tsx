@@ -29,7 +29,7 @@ import type {
   YouTubeVideoClickHandler,
 } from '@meowdown/core'
 import {
-  MeowdownEditor,
+  MarkdownEditor,
   useLightbox,
   WikilinkHoverCard,
   type EditorHandle,
@@ -58,7 +58,7 @@ const YOUTUBE_RELAY_URL = 'https://youtube-relay-reflect.vercel.app/'
 
 /**
  * Reflect's note editor: a thin wrapper over `@meowdown/react`'s
- * `<MeowdownEditor>`. meowdown owns the editing surface (wiki-link clicks,
+ * `<MarkdownEditor>`. meowdown owns the editing surface (wiki-link clicks,
  * image rendering/persistence, headings, placeholder, the `[[` menu); this
  * wrapper only adapts Reflect's prop shapes and exposes the imperative handle
  * the document pipeline binds to.
@@ -135,6 +135,13 @@ interface NoteEditorProps {
    * (the `editorBulletAfterHeading` setting). Off by default.
    */
   bulletAfterHeading?: boolean
+  /**
+   * Whether Backspace in an empty first paragraph deletes that paragraph, so
+   * the rest of the note moves up one line. Off by default. Daily notes opt
+   * in on every surface: the day's heading sits outside the editor, so nothing
+   * else can remove a leading empty line.
+   */
+  backspaceDeletesEmptyFirstBlock?: boolean
   /**
    * Whether to show meowdown's per-block gutter handle: a grip to drag-reorder
    * blocks and a "+" to insert a paragraph below. Off by default. The main note
@@ -252,6 +259,7 @@ export function NoteEditor({
   smoothCaretAnimation = true,
   timeFormat = '12h',
   bulletAfterHeading = false,
+  backspaceDeletesEmptyFirstBlock = false,
   blockHandle = false,
   resolveImageUrl,
   resolveWikiEmbed,
@@ -472,7 +480,7 @@ export function NoteEditor({
 
   return (
     <>
-      <MeowdownEditor
+      <MarkdownEditor
         resolveXPost={resolveXPost}
         resolveYouTubeVideo={resolveYouTubeVideo}
         mediaUrlProtocols={X_MEDIA_URL_PROTOCOLS}
@@ -492,6 +500,7 @@ export function NoteEditor({
         timeFormat={timeFormat === '24h' ? '24' : '12'}
         caretGlide={smoothCaretAnimation}
         bulletAfterHeading={bulletAfterHeading}
+        backspaceDeletesEmptyFirstBlock={backspaceDeletesEmptyFirstBlock}
         // Pinned off on the touch surface regardless of the caller: the grip is
         // revealed on hover and drag-reorders blocks with a pointer, neither of
         // which a touch webview can express. Turning it off also drops the drop
@@ -532,7 +541,7 @@ export function NoteEditor({
           <WikilinkHoverCard>{renderWikilinkHoverCard}</WikilinkHoverCard>
         ) : null}
         {children}
-      </MeowdownEditor>
+      </MarkdownEditor>
       <MediaLightbox lightbox={lightbox} onOpenImage={openLightboxImage} />
     </>
   )
