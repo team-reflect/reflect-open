@@ -1,5 +1,5 @@
 //! The merge that always has an answer: the ladder's last rule. Any
-//! `(base, first, second)` in, one marker-free text out, by
+//! `(base, first, second)` in, one text out with no markers of its own, by
 //! `reconcile-text`'s word-level operational merge. Overlapping edits come
 //! out interleaved rather than marked, so callers archive both sides before
 //! they write the result; disjoint edits merge the way a three-way merge
@@ -19,12 +19,12 @@ pub(super) fn merge(base: &str, first: &str, second: &str) -> String {
     if first == base {
         return second.to_string();
     }
-    let (a, b) = if first <= second {
+    let (low, high) = if first <= second {
         (first, second)
     } else {
         (second, first)
     };
-    reconcile(base, &a.into(), &b.into(), &*BuiltinTokenizer::Word)
+    reconcile(base, &low.into(), &high.into(), &*BuiltinTokenizer::Word)
         .apply()
         .text()
         .to_string()
@@ -158,12 +158,15 @@ mod tests {
         counts
     }
 
-    /// Random notes: a few lines over a small vocabulary, then one to three
-    /// edits per side (append a word to a line, insert a line, drop a line).
+    /// Random notes: a few lines over a small vocabulary (Markdown syntax,
+    /// accents, and CJK included), then one to three edits per side: append
+    /// a word to a line, replace a line's first word, insert a line, or drop
+    /// a line (down to an empty note).
     fn note() -> impl Strategy<Value = Vec<String>> {
         let line = prop::collection::vec(
             prop::sample::select(vec![
-                "alpha", "beta", "gamma", "- item", "# head", "x", "[[link]]", "**b**",
+                "alpha", "beta", "gamma", "- item", "# head", "x", "[[link]]", "**b**", "café",
+                "笔记", "今天",
             ]),
             1..5,
         )
@@ -173,7 +176,7 @@ mod tests {
 
     fn edited(base: &[String]) -> impl Strategy<Value = Vec<String>> {
         let base = base.to_vec();
-        prop::collection::vec((0..3u8, 0..8usize, 0..9u8), 1..4).prop_map(move |edits| {
+        prop::collection::vec((0..4u8, 0..8usize, 0..9u8), 1..4).prop_map(move |edits| {
             let mut out = base.clone();
             for (kind, at, n) in edits {
                 match kind {
@@ -181,8 +184,13 @@ mod tests {
                         let i = at % out.len();
                         out[i] = format!("{} edited{n}", out[i]);
                     }
-                    1 => out.insert(at % (out.len() + 1), format!("new{n}")),
-                    _ if out.len() > 1 => {
+                    1 if !out.is_empty() => {
+                        let i = at % out.len();
+                        let rest = out[i].split_once(' ').map_or("", |(_, rest)| rest);
+                        out[i] = format!("改{n} {rest}").trim_end().to_string();
+                    }
+                    2 => out.insert(at % (out.len() + 1), format!("new{n}")),
+                    3 if !out.is_empty() => {
                         out.remove(at % out.len());
                     }
                     _ => {}
