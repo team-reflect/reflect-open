@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   groupTaskContexts,
   groupTasks,
+  isGenericTaskLabel,
   taskDateBucket,
   visibleTaskBreadcrumbs,
 } from './group-tasks.ts'
@@ -30,31 +31,29 @@ function task(overrides: Partial<OpenTask> = {}): OpenTask {
   }
 }
 
+describe('isGenericTaskLabel', () => {
+  it('matches the task and todo words in any casing, spacing, or punctuation', () => {
+    for (const label of ['Tasks', ' tasks ', 'TASKS', 'Task', 'Tasks:', 'todo', 'TODOs', 'To Do']) {
+      expect(isGenericTaskLabel(label)).toBe(true)
+    }
+    expect(isGenericTaskLabel("To Do's: ")).toBe(true)
+  })
+
+  it('does not match a label that says more', () => {
+    for (const label of ['House chore', 'House tasks', 'Todo list', '']) {
+      expect(isGenericTaskLabel(label)).toBe(false)
+    }
+  })
+})
+
 describe('visibleTaskBreadcrumbs', () => {
   it('trims empty breadcrumb entries', () => {
     expect(visibleTaskBreadcrumbs(['', ' Project ', '  '])).toEqual(['Project'])
   })
 
-  it('hides a lone generic parent, whether a heading or a list item wrote it', () => {
-    for (const label of [
-      'Tasks',
-      ' tasks ',
-      'TASKS',
-      'Task',
-      'Tasks:',
-      'todo',
-      'TODOs',
-      'To Do',
-      "To Do's: ",
-    ]) {
-      expect(visibleTaskBreadcrumbs([label])).toEqual([])
-    }
-  })
-
-  it('keeps a lone specific parent', () => {
-    for (const label of ['House chore', 'House tasks', 'Todo list']) {
-      expect(visibleTaskBreadcrumbs([label])).toEqual([label])
-    }
+  it('hides a lone generic parent and keeps a lone specific one', () => {
+    expect(visibleTaskBreadcrumbs(['Tasks:'])).toEqual([])
+    expect(visibleTaskBreadcrumbs(['House chore'])).toEqual(['House chore'])
   })
 
   it('keeps every label of a longer chain, Tasks included', () => {
