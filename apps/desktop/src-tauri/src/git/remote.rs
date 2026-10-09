@@ -213,8 +213,9 @@ pub struct RemoteTip {
     pub default_branch: Option<String>,
 }
 
-/// Ask the remote for its branch tip in one ref-advertisement round trip,
-/// without downloading objects or touching the working tree. A tip that
+/// Ask the remote for its branch tip in one ref-advertisement round trip
+/// (two when the default branch has to be asked for, see below), without
+/// downloading objects or touching the working tree. A tip that
 /// differs from the tracking ref means the remote moved since the last fetch.
 /// `url` probes another remote instead of `origin` (a host the user is about
 /// to connect: the credential is checked here, not at the first push).
@@ -259,11 +260,11 @@ pub(super) fn remote_head(
             Some(callbacks_with_credentials(credential)),
             None,
         )?;
-        let name = remote.default_branch()?;
+        // A remote whose `HEAD` names no branch has no default to report.
+        let name = remote.default_branch().ok();
         let _ = remote.disconnect();
-        name.as_str()
-            .ok()
-            .and_then(|name| name.strip_prefix("refs/heads/"))
+        name.as_ref()
+            .and_then(|name| name.as_str().ok()?.strip_prefix("refs/heads/"))
             .map(str::to_string)
     } else {
         None

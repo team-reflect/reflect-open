@@ -1225,13 +1225,22 @@ fn remote_head_names_the_default_branch_of_a_remote_on_another_branch() {
     opts.bare(true).initial_head("trunk");
     Repository::init_opts(&bare, &opts).unwrap();
     let url = bare.to_string_lossy().into_owned();
-    Repository::open(root)
-        .unwrap()
-        .remote_anonymous(&url)
-        .unwrap()
-        .push(&["refs/heads/main:refs/heads/trunk"], None)
-        .unwrap();
+    let push_as = |branch: &str| {
+        Repository::open(root)
+            .unwrap()
+            .remote_anonymous(&url)
+            .unwrap()
+            .push(&[format!("refs/heads/main:refs/heads/{branch}")], None)
+            .unwrap();
+    };
 
+    // Branches, but `HEAD` names one that does not exist: no default to
+    // report, and still an answer.
+    push_as("other");
+    let tip = remote_head(root, Some(&url), None).unwrap();
+    assert_eq!((tip.remote_oid, tip.default_branch), (None, None));
+
+    push_as("trunk");
     let tip = remote_head(root, Some(&url), None).unwrap();
     assert_eq!(tip.remote_oid, None);
     assert_eq!(tip.default_branch.as_deref(), Some("trunk"));
