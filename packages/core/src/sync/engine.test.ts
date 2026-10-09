@@ -457,6 +457,65 @@ describe('createSyncEngine', () => {
       expect(commandsOf(calls)).toContain('git_fetch')
       engine.stop()
     })
+
+    it('an edit while the provider is being asked restarts the window', async () => {
+      let answer: (ready: boolean) => void = () => {}
+      const networkReady = vi.fn(
+        () =>
+          new Promise<boolean>((resolve) => {
+            answer = resolve
+          }),
+      )
+      const { calls, engine } = quietEngine({ networkReady })
+      engine.noteChanged()
+      await vi.advanceTimersByTimeAsync(QUIET_MS + 10)
+      expect(networkReady).toHaveBeenCalledTimes(1)
+
+      engine.noteChanged() // the walk is still running
+      answer(true)
+      await vi.advanceTimersByTimeAsync(QUIET_MS - 10)
+      expect(commandsOf(calls)).not.toContain('git_fetch')
+      await vi.advanceTimersByTimeAsync(20)
+      expect(networkReady).toHaveBeenCalledTimes(2)
+      engine.stop()
+    })
+
+    it('an edit during an unready answer leaves one timer, which stop() clears', async () => {
+      let answer: (ready: boolean) => void = () => {}
+      const networkReady = vi.fn(
+        () =>
+          new Promise<boolean>((resolve) => {
+            answer = resolve
+          }),
+      )
+      const { calls, engine } = quietEngine({ networkReady })
+      engine.noteChanged()
+      await vi.advanceTimersByTimeAsync(QUIET_MS + 10)
+      engine.noteChanged()
+      answer(false)
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(networkReady).toHaveBeenCalledTimes(1) // no thirty-second retry beside the window
+
+      engine.stop()
+      await vi.advanceTimersByTimeAsync(QUIET_MS)
+      expect(networkReady).toHaveBeenCalledTimes(1)
+      expect(commandsOf(calls)).not.toContain('git_fetch')
+    })
+
+    it('a provider that stays unready is asked at doubling intervals', async () => {
+      const networkReady = vi.fn(async () => false)
+      const { engine } = quietEngine({ networkReady })
+      engine.noteChanged()
+      await vi.advanceTimersByTimeAsync(QUIET_MS + 10)
+      expect(networkReady).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(networkReady).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(networkReady).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(networkReady).toHaveBeenCalledTimes(3)
+      engine.stop()
+    })
   })
 
   it('commitNow runs even when the owner gates cycles (the hidden-app flush)', async () => {
