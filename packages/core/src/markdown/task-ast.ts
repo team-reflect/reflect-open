@@ -136,6 +136,29 @@ export function projectTasks(body: string): ParsedTask[] {
   }))
 }
 
+/** A task row's own fields: its snapshot plus what the view derives from the Markdown. */
+export interface TaskRow extends TaskSnapshot {
+  /** `markdown` rendered to plain text, for search and labels. */
+  text: string
+  /** The headings above the task, then its ancestor list items' labels, outermost first, rendered to plain text. */
+  breadcrumbs: readonly string[]
+  /** The task's explicit `[[YYYY-MM-DD]]` due date, or null. */
+  dueDate: string | null
+}
+
+/**
+ * Derive a row's display fields from a task snapshot: the one rendering the
+ * index read, an optimistic insert, and a cache relocation all share.
+ */
+export function renderTaskSnapshot(snapshot: TaskSnapshot): TaskRow {
+  return {
+    ...snapshot,
+    text: renderInlineText(snapshot.markdown),
+    breadcrumbs: snapshot.breadcrumbs.map((label) => renderInlineText(label)),
+    dueDate: getTaskDueDate(snapshot.markdown),
+  }
+}
+
 /** Where a task was last seen; `markdown` and `checked` are the staleness guard. */
 export interface TaskLocator {
   astPath: MarkdownAstPath
