@@ -207,6 +207,8 @@ export function MobileTasks(): ReactElement {
               today={today}
               onAdd={onAdd}
               onEdit={editTask}
+              onToggle={actions.checkboxToggle}
+              togglePending={actions.isPending}
               onOpen={(path) => navigate(routeForPath(path))}
               onDelete={(task) => actions.remove([task])}
               revealedTaskKey={revealedTaskKey}

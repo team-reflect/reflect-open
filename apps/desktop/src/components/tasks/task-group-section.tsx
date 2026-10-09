@@ -19,6 +19,7 @@ interface TaskGroupSectionProps {
   /** Whether a Tasks-view write is already in flight. */
   taskActionPending: boolean
   /** Complete/reopen the selected rows using the clicked task's next checkbox state. */
+  onCheckboxToggle: (task: OpenTask) => void
   onSelectionCheckboxToggle: (task: OpenTask) => void
   /** Today's ISO date — the Current group's "+ Add" targets today's daily. */
   today: string
@@ -40,6 +41,7 @@ export function TaskGroupSection({
   selection,
   editHandlers,
   taskActionPending,
+  onCheckboxToggle,
   onSelectionCheckboxToggle,
   today,
   onAdd,
@@ -106,6 +108,7 @@ export function TaskGroupSection({
                       taskActionPending={taskActionPending}
                       togglesSelection={selected && selection.selectedCount > 1}
                       onSelect={(event) => selection.clickSelect(key, event)}
+                      onCheckboxToggle={() => onCheckboxToggle(task)}
                       onSelectionCheckboxToggle={() => onSelectionCheckboxToggle(task)}
                       {...editHandlers(task)}
                       convertControllerRef={convertControllerRef}

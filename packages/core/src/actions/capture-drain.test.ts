@@ -233,6 +233,23 @@ describe('drainCaptureInbox', () => {
     expect(files.get(DAILY)).not.toContain('## Links\n')
   })
 
+  it('deduplicates under an H1 or formatted Links heading, as insertion files there', async () => {
+    addSpool(
+      envelope({
+        id: '00000000-0000-4000-8000-000000000001',
+        capturedAt: new Date(2026, 5, 11, 9, 30, 0, 0).toISOString(),
+      }),
+    )
+    await drain()
+    files.set(DAILY, (files.get(DAILY) ?? '').replace('## [[Links]]', '# **Links**'))
+
+    addSpool(envelope())
+    const outcome = await drain()
+
+    expect(outcome.deduped).toBe(1)
+    expect(files.has(IDENTITY.notePath)).toBe(false)
+  })
+
   it('deduplicates across every matching Links section', async () => {
     addSpool(
       envelope({
@@ -608,7 +625,7 @@ describe('drainCaptureInbox (text captures)', () => {
 
     await drain()
 
-    expect(files.get(DAILY)).toBe('+ [ ] buy milk\n\n- [ ] pack a bag\n')
+    expect(files.get(DAILY)).toBe('+ [ ] buy milk\n- [ ] pack a bag\n')
   })
 
   it('still appends to a private daily — the write is entirely local', async () => {

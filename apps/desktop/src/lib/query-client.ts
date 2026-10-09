@@ -235,9 +235,6 @@ export const mutationKeys = {
     editAndToggle(root: GraphRoot) {
       return [...this.graph(root), 'edit-and-toggle'] as const
     },
-    checkboxToggle(root: GraphRoot) {
-      return [...this.graph(root), 'checkbox-toggle'] as const
-    },
     snippetToggle(root: GraphRoot) {
       return [...this.graph(root), 'snippet-toggle'] as const
     },

@@ -20,7 +20,6 @@ import {
 } from '@/lib/tasks/task-cache.ts'
 import { getTaskKey } from '@/lib/tasks/task-identity.ts'
 import { createInsertedTaskRow, type InsertTaskTarget } from '@/lib/tasks/task-insert-target.ts'
-import { useTaskCheckboxAction } from '@/lib/tasks/use-task-checkbox-action.ts'
 import { useTaskCacheWriter, type TaskCacheSnapshot } from '@/lib/tasks/use-task-cache.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 
@@ -65,8 +64,8 @@ export interface TaskActions {
    * already fired) and the draft was persisted on its own instead.
    */
   insertAfter: (task: OpenTask, content: string | null) => Promise<OpenTask | null>
-  /** Save an inline edit and toggle the task checkbox in one write. */
-  editAndToggle: (task: OpenTask, content: string) => void
+  /** Save an inline edit and toggle the task checkbox in one write; `null` content toggles only. */
+  editAndToggle: (task: OpenTask, content: string | null) => void
   /**
    * Schedule a selection (⌘⇧S / the calendar, V1): set each task's due date to
    * `isoDate`, or clear it when `isoDate` is null. Written as a content edit that
@@ -99,7 +98,6 @@ export function useTaskActions(): TaskActions {
   const { graph } = useGraph()
   const root = graph?.root ?? null
   const cache = useTaskCacheWriter()
-  const checkboxAction = useTaskCheckboxAction()
 
   /** Re-key the cached rows and the session's struck set from a write's `moved` map. */
   const relocate = (notePath: string, moved: TaskMoves): void => {
@@ -365,20 +363,22 @@ export function useTaskActions(): TaskActions {
 
   const editAndToggleMutation = useMutation({
     mutationKey: mutationKeys.tasks.editAndToggle(graph?.root),
-    mutationFn: async ({ task, content }: { task: OpenTask; content: string }) => {
+    mutationFn: async ({ task, content }: { task: OpenTask; content: string | null }) => {
       const generation = graph?.generation
       if (generation === undefined) {
         throw new Error('No graph is open.')
       }
       await writeTask(
         task,
-        [{ kind: 'setMarkdown', markdown: content }, { kind: 'toggle' }],
+        content === null
+          ? [{ kind: 'toggle' }]
+          : [{ kind: 'setMarkdown', markdown: content }, { kind: 'toggle' }],
         generation,
       )
     },
-    onMutate: async ({ task, content }: { task: OpenTask; content: string }) => {
+    onMutate: async ({ task, content }: { task: OpenTask; content: string | null }) => {
       const snapshot = await cache.snapshot()
-      const edited = withEditedTask([task], task, content)?.[0] ?? task
+      const edited = content === null ? task : (withEditedTask([task], task, content)?.[0] ?? task)
       const wasRecentlyCompleted = hasRecentlyCompleted(root, getTaskKey(task))
       if (task.checked) {
         cache.patch(
@@ -448,7 +448,6 @@ export function useTaskActions(): TaskActions {
       deleteMutation.isPending ||
       editMutation.isPending ||
       editAndToggleMutation.isPending ||
-      checkboxAction.isPending ||
       insertMutation.isPending ||
       scheduleMutation.isPending ||
       convertMutation.isPending ||
@@ -487,7 +486,11 @@ export function useTaskActions(): TaskActions {
         editMutation.mutate({ task, content })
       }
     },
-    checkboxToggle: (task) => checkboxAction.toggle(task),
+    checkboxToggle: (task) => {
+      if (graph?.generation !== undefined) {
+        editAndToggleMutation.mutate({ task, content: null })
+      }
+    },
     insert: async (target) => {
       if (graph?.generation === undefined) {
         return null
@@ -507,7 +510,7 @@ export function useTaskActions(): TaskActions {
       return null
     },
     editAndToggle: (task, content) => {
-      if (graph?.generation !== undefined && !editAndToggleMutation.isPending) {
+      if (graph?.generation !== undefined) {
         editAndToggleMutation.mutate({ task, content })
       }
     },

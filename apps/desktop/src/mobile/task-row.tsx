@@ -5,7 +5,6 @@ import { getIsComposing } from '@meowdown/core'
 import { TaskText } from '@/components/tasks/task-text.tsx'
 import { formatShortDate } from '@/lib/dates.ts'
 import { getTaskKey } from '@/lib/tasks/task-identity.ts'
-import { useTaskCheckboxToggle } from '@/lib/tasks/use-task-checkbox-toggle.ts'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
@@ -19,6 +18,10 @@ interface MobileTaskRowProps {
   task: OpenTask
   /** Show the source-note date — date buckets aggregate tasks from many notes. */
   showSource: boolean
+  /** Toggle the task's checkbox through the guarded write-back. */
+  onToggle: () => void
+  /** Whether a Tasks write is in flight; the checkbox waits for it. */
+  togglePending: boolean
   /** Open the quick-edit sheet for this task (V1 mobile: tap edits in place). */
   onEdit: (task: OpenTask) => void
   revealed: boolean
@@ -44,6 +47,8 @@ interface MobileTaskRowProps {
 export function MobileTaskRow({
   task,
   showSource,
+  onToggle,
+  togglePending,
   onEdit,
   revealed,
   onReveal,
@@ -53,7 +58,6 @@ export function MobileTaskRow({
   onDelete,
 }: MobileTaskRowProps): ReactElement {
   const { settings } = useSettings()
-  const { toggle, isPending } = useTaskCheckboxToggle(task)
   const label = task.text || 'Empty task'
   const edit = (): void => onEdit(task)
   const swipe = useRowSwipe({
@@ -123,10 +127,10 @@ export function MobileTaskRow({
         <button
           type="button"
           aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
-          disabled={isPending}
+          disabled={togglePending}
           onClick={() => {
             hapticImpactLight()
-            toggle()
+            onToggle()
           }}
           // A generous touch target around the small glyph; self-stretch keeps
           // the circle vertically centered in the row as task text wraps.

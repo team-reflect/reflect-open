@@ -174,6 +174,18 @@ describe('addMeetingToDaily', () => {
     )
   })
 
+  it('recognizes the day’s meeting under a linked Meetings heading, where insertion files it', async () => {
+    readNoteMock.mockResolvedValue(
+      '## [[Meetings]]\n\n- 9:00am met with [[Ada Lovelace]] for [[Standup]]\n',
+    )
+
+    await expect(addMeetingToDaily(input({ attendees: [{ name: 'Carol' }] }))).resolves.toEqual({
+      appended: false,
+      createdNotes: [],
+    })
+    expect(writeNoteMock).not.toHaveBeenCalled()
+  })
+
   it('is a full no-op when the meeting is already linked that day', async () => {
     readNoteMock.mockResolvedValue(
       '## Meetings\n\n- 9:00am met with [[Ada Lovelace]] for [[Standup]]\n',
@@ -196,7 +208,7 @@ describe('addMeetingToDaily', () => {
     expect(outcome.appended).toBe(true)
     expect(writeNoteMock).toHaveBeenCalledWith(
       DAILY,
-      '> ## Meetings\n> - [[Standup]]\n\n## Meetings\n\n- [[Standup]]\n',
+      '> ## Meetings\n>\n> - [[Standup]]\n\n## Meetings\n\n- [[Standup]]\n',
       GENERATION,
     )
   })
