@@ -1,25 +1,43 @@
 import {
   compareTaskPaths,
   decodeTaskPath,
+  getTaskDueDate,
   renderInlineText,
-  type TaskLocator,
+  type TaskSnapshot,
 } from '../markdown/index.ts'
 import { db } from './db.ts'
 import { decodeTaskBreadcrumbs } from './indexed-note.ts'
+
+/** A task row's own fields: its snapshot plus what the view derives from the Markdown. */
+export interface TaskRow extends TaskSnapshot {
+  /** `markdown` rendered to plain text, for search and labels. */
+  text: string
+  /** The headings above the task, then its ancestor list items' labels, outermost first, rendered to plain text. */
+  breadcrumbs: readonly string[]
+  /** The task's explicit `[[YYYY-MM-DD]]` due date, or null. */
+  dueDate: string | null
+}
+
+/**
+ * Derive a row's display fields from a task snapshot: the one rendering the
+ * index read, an optimistic insert, and a cache relocation all share.
+ */
+export function renderTaskSnapshot(snapshot: TaskSnapshot): TaskRow {
+  return {
+    ...snapshot,
+    text: renderInlineText(snapshot.markdown),
+    breadcrumbs: snapshot.breadcrumbs.map((label) => renderInlineText(label)),
+    dueDate: getTaskDueDate(snapshot.markdown),
+  }
+}
 
 /**
  * One task plus the note context the Tasks view (Plan 18) groups and renders
  * by. `astPath`, `markdown`, and `checked` address the task for writes.
  */
-export interface OpenTask extends TaskLocator {
+export interface OpenTask extends TaskRow {
   notePath: string
-  /** `markdown` rendered to plain text, for search and labels. */
-  text: string
-  /** The headings above the task, then its ancestor list items' labels, outermost first, rendered to plain text. */
-  breadcrumbs: readonly string[]
   noteTitle: string
-  /** The task's explicit `[[YYYY-MM-DD]]` due date, or null. */
-  dueDate: string | null
   /** ISO date for daily-note tasks; null for tasks in regular notes. */
   dailyDate: string | null
   /** Pin flag mapped to a real boolean at the read boundary. */
@@ -39,7 +57,6 @@ function taskRowsQuery() {
       'tasks.markdown',
       'tasks.breadcrumbs',
       'tasks.checked',
-      'tasks.dueDate',
       'notes.title as noteTitle',
       'notes.dailyDate',
       'notes.isPinned',
@@ -54,7 +71,6 @@ interface TaskRow {
   markdown: string
   breadcrumbs: string
   checked: number
-  dueDate: string | null
   noteTitle: string
   dailyDate: string | null
   isPinned: number
@@ -74,11 +90,12 @@ function toTaskRows(rows: readonly TaskRow[]): OpenTask[] {
     try {
       tasks.push({
         ...rest,
-        astPath: decodeTaskPath(astPath),
-        markdown,
-        text: renderInlineText(markdown),
-        breadcrumbs: decodeTaskBreadcrumbs(breadcrumbs).map((label) => renderInlineText(label)),
-        checked: checked !== 0,
+        ...renderTaskSnapshot({
+          astPath: decodeTaskPath(astPath),
+          markdown,
+          breadcrumbs: decodeTaskBreadcrumbs(breadcrumbs),
+          checked: checked !== 0,
+        }),
         isPinned: isPinned !== 0,
       })
     } catch (cause) {
