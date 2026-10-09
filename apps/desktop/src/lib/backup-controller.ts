@@ -408,8 +408,15 @@ export function createBackupController(options: BackupControllerOptions): Backup
         domDisposers.push(
           attachRemoteProbe(
             async () => {
+              // A sync that is failing (a refused sign-in above all) must not
+              // keep knocking on the host; the resume triggers retry it.
+              if (state.phase === 'connected' && state.status.state === 'error') {
+                return false
+              }
               const tip = await gitRemoteHead(await getCredential(), generation)
-              return tip.remoteOid !== tip.trackingOid
+              // A remote without the branch (unborn, or deleted) has nothing
+              // to pull, and no fetch would ever close that difference.
+              return tip.remoteOid !== null && tip.remoteOid !== tip.trackingOid
             },
             () => void next.syncNow(),
           ),

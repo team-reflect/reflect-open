@@ -799,6 +799,44 @@ describe('createBackupController', () => {
     }
   })
 
+  it('a remote without the branch starts no cycle', async () => {
+    const { calls } = fakeBridge({ remoteTips: [{ remoteOid: null, trackingOid: 'aaa' }] })
+    vi.useFakeTimers()
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    try {
+      await controller.start()
+      await vi.waitFor(() => {
+        expect(commitCount(calls)).toBe(1)
+      })
+      await vi.advanceTimersByTimeAsync(90_000)
+      expect(probeCount(calls)).toBe(1)
+      expect(commitCount(calls)).toBe(1)
+    } finally {
+      vi.useRealTimers()
+      controller.dispose()
+    }
+  })
+
+  it('does not probe while the sync is failing', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { calls } = fakeBridge({ mergeOutcome: MERGED, pushError: FORBIDDEN })
+    httpFetch.mockResolvedValueOnce(jsonResponse({ message: 'Bad credentials' }, 401))
+    vi.useFakeTimers()
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    try {
+      await controller.start()
+      await vi.waitFor(() => {
+        expect(controller.getState()).toMatchObject({ status: { state: 'error' } })
+      })
+      await vi.advanceTimersByTimeAsync(90_000)
+      expect(probeCount(calls)).toBe(0)
+    } finally {
+      vi.useRealTimers()
+      controller.dispose()
+      consoleError.mockRestore()
+    }
+  })
+
   it('does not probe while hidden, on mobile, or for an iCloud-hosted graph', async () => {
     async function probesAfterATick(options: {
       hidden?: boolean
