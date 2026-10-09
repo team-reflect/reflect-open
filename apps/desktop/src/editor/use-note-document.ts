@@ -91,9 +91,13 @@ async function keepBesideNote(
     const copy = `${stem} (conflict${n === 1 ? '' : ` ${n}`})${ext}`
     const outcome = await createNoteIfAbsent(copy, contents, generation)
     if (outcome.kind === 'created') {
-      // Stays until dismissed: the editor has just swapped to the other
+      // Stays until acknowledged: the editor has just swapped to the other
       // version, and this line is what says where the replaced text went.
-      startOperation('Edits kept beside the note', { persistent: true }).warn(
+      const notice = startOperation('Edits kept beside the note', {
+        persistent: true,
+        action: { label: 'OK', run: () => notice.dismiss() },
+      })
+      notice.warn(
         `${path} changed on disk in a way that could not be merged. Your version is at ${copy}.`,
       )
       return copy
