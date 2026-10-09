@@ -138,29 +138,21 @@ describe('projectTasks', () => {
     ])
   })
 
-  it.each(['Tasks', 'tAsKs', '**Tasks**', '`Tasks`', '[[Tasks]]', '[[tasks]]'])(
-    'skips the %s heading in the chain',
-    (heading) => {
-      const body = `# Home\n\n## ${heading}\n\n+ [ ] top\n+ Kitchen\n  + [ ] child\n`
-      expect(projectTasks(body).map((task) => task.breadcrumbs)).toEqual([
-        ['Home'],
-        ['Home', 'Kitchen'],
-      ])
-    },
-  )
+  it('keeps a Tasks heading in the chain like any other', () => {
+    const body = '# Home\n\n## Tasks\n\n+ [ ] top\n+ Kitchen\n  + [ ] child\n'
+    expect(projectTasks(body).map((task) => task.breadcrumbs)).toEqual([
+      ['Home', 'Tasks'],
+      ['Home', 'Tasks', 'Kitchen'],
+    ])
+  })
 
-  it.each(['Task', 'Todo', 'Tasks:', 'House tasks', '[[Tasks|To do]]', String.raw`\[[Tasks]]`])(
-    'keeps the %s heading as a label',
-    (heading) => {
-      expect(projectTasks(`## ${heading}\n\n+ [ ] first\n`)[0]?.breadcrumbs).toEqual([heading])
-    },
-  )
-
-  it('keeps a Tasks subheading inside its parent section', () => {
-    const body = '## House chore\n\n+ [ ] first\n\n### Tasks\n\n+ [ ] second\n'
+  it('closes a section at the next heading of the same or a higher level', () => {
+    const body =
+      '## House chore\n\n+ [ ] first\n\n### Tasks\n\n+ [ ] second\n\n## Work\n\n+ [ ] third\n'
     expect(projectTasks(body).map((task) => task.breadcrumbs)).toEqual([
       ['House chore'],
-      ['House chore'],
+      ['House chore', 'Tasks'],
+      ['Work'],
     ])
   })
 

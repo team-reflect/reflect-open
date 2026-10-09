@@ -35,17 +35,32 @@ describe('visibleTaskBreadcrumbs', () => {
     expect(visibleTaskBreadcrumbs(['', ' Project ', '  '])).toEqual(['Project'])
   })
 
-  it('hides the Tasks label regardless of casing, spacing, or position', () => {
-    for (const label of ['Tasks', ' tasks ', 'TASKS', '\tTaSkS\t']) {
+  it('hides a lone generic parent, whether a heading or a list item wrote it', () => {
+    for (const label of [
+      'Tasks',
+      ' tasks ',
+      'TASKS',
+      'Task',
+      'Tasks:',
+      'todo',
+      'TODOs',
+      'To Do',
+      "To Do's: ",
+    ]) {
       expect(visibleTaskBreadcrumbs([label])).toEqual([])
     }
-    expect(visibleTaskBreadcrumbs(['Tasks', 'House chore', ' tasks '])).toEqual(['House chore'])
   })
 
-  it('keeps every other label, including generic ones', () => {
-    for (const label of ['Task', 'Tasks:', 'House tasks', 'todo', 'TODOs', 'To Do']) {
+  it('keeps a lone specific parent', () => {
+    for (const label of ['House chore', 'House tasks', 'Todo list']) {
       expect(visibleTaskBreadcrumbs([label])).toEqual([label])
     }
+  })
+
+  it('keeps every label of a longer chain, Tasks included', () => {
+    expect(visibleTaskBreadcrumbs(['Home', 'Tasks'])).toEqual(['Home', 'Tasks'])
+    expect(visibleTaskBreadcrumbs(['Tasks', 'Kitchen'])).toEqual(['Tasks', 'Kitchen'])
+    expect(visibleTaskBreadcrumbs(['Tasks', 'Tasks'])).toEqual(['Tasks', 'Tasks'])
   })
 })
 
@@ -81,11 +96,11 @@ describe('groupTaskContexts', () => {
 
   it('groups by visible breadcrumbs without rewriting the stored ones', () => {
     const contexts = groupTaskContexts([
-      task({ astPath: [1], breadcrumbs: ['Tasks', 'Kitchen'] }),
-      task({ astPath: [2], breadcrumbs: ['Kitchen'] }),
+      task({ astPath: [1], breadcrumbs: ['Tasks'] }),
+      task({ astPath: [2], breadcrumbs: ['Todo:'] }),
     ])
     expect(contexts).toHaveLength(1)
-    expect(contexts[0]?.breadcrumbs).toEqual(['Tasks', 'Kitchen'])
+    expect(contexts[0]?.breadcrumbs).toEqual(['Tasks'])
   })
 
   it('keeps matching contexts in different notes separate', () => {

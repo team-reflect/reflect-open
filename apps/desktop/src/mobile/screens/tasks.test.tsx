@@ -340,17 +340,19 @@ describe('MobileTasks', () => {
     await view.unmount()
   })
 
-  it('shows the heading chain above a context and hides the Tasks label', async () => {
+  it('shows the full heading chain and hides only a lone Tasks parent', async () => {
     getOpenTasks.mockResolvedValue([
       task({ astPath: [2], text: 'chore task', breadcrumbs: ['Home', 'House chore'] }),
       task({ astPath: [5], text: 'project task', breadcrumbs: ['Tasks', 'Kitchen'] }),
+      task({ astPath: [8], text: 'lone task', breadcrumbs: ['Tasks'] }),
     ])
     const view = await renderScreen()
 
     await view.findByText('project task')
     expect(view.getByText('Home → House chore')).toBeDefined()
-    expect(view.getByText('Kitchen')).toBeDefined()
-    expect(view.queryByText('Tasks → Kitchen')).toBeNull()
+    expect(view.getByText('Tasks → Kitchen')).toBeDefined()
+    await view.findByText('lone task')
+    expect(view.getAllByText('Tasks', { exact: true })).toHaveLength(0)
     await view.unmount()
   })
 

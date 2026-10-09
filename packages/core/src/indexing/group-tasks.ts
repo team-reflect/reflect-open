@@ -1,5 +1,4 @@
 import { displayNoteTitle } from '../markdown/note-title.ts'
-import { isTasksLabel } from '../markdown/task-heading.ts'
 import { compareTaskPaths } from '../markdown/task-path.ts'
 import type { OpenTask } from './queries.ts'
 
@@ -33,11 +32,24 @@ export interface TaskGroup {
   tasks: OpenTask[]
 }
 
-/** Trim breadcrumb labels and drop the automatic Tasks label wherever it sits. */
+const PUNCTUATION_RE = /[\p{P}\p{S}]/gu
+
+function normalizedBreadcrumb(text: string): string {
+  return text.replaceAll(/\s+/g, '').replaceAll(PUNCTUATION_RE, '')
+}
+
+/**
+ * Trim breadcrumb labels and hide the one chain that says nothing: a lone
+ * generic parent such as `Tasks`, `TODO:`, or `To do`, whether it is the
+ * note's `## Tasks` section or a list item. Any longer chain is shown as is,
+ * because every label in it, `Tasks` included, is a real level of the outline.
+ */
 export function visibleTaskBreadcrumbs(breadcrumbs: readonly string[]): string[] {
-  return breadcrumbs
-    .map((text) => text.trim())
-    .filter((text) => text.length > 0 && !isTasksLabel(text))
+  const visible = breadcrumbs.map((text) => text.trim()).filter((text) => text.length > 0)
+  if (visible.length !== 1) {
+    return visible
+  }
+  return /^(?:task|todo)s?$/i.test(normalizedBreadcrumb(visible[0]!)) ? [] : visible
 }
 
 /** One consecutive run of task rows sharing the same parent outline labels. */

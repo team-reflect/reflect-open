@@ -61,8 +61,9 @@ markers in markdown, AI task extraction (later, over this projection), CLI
   list items**, outermost first. Every heading level counts (`# Home` →
   `## House chore` → `### Garden`), so a breadcrumb reads like the note's outline;
   only headings that are direct blocks of the document open a section (`> ## Quoted`
-  does not). The automatic `Tasks` heading labels nothing: it is skipped in the chain,
-  and `visibleTaskBreadcrumbs` also hides the label at display time. A list label is
+  does not). The stored chain is complete, the app's own `## Tasks` heading included;
+  display hides only a lone generic parent (`Tasks`, `TODO:`, `To do`, …), since a
+  longer chain's `Tasks` is a real level of the outline (`visibleTaskBreadcrumbs`). A list label is
   the item's first paragraph; a parent task labels its nested subtasks. The Tasks
   view shows one `Parent → Child` row above each consecutive run of rows **of one
   note** with the same visible breadcrumbs, so two notes' `House chore` sections

@@ -404,7 +404,7 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('shows the heading chain above a context and hides the Tasks label', async () => {
+  it('shows the full heading chain and hides only a lone Tasks parent', async () => {
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -420,13 +420,21 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
         breadcrumbs: ['Tasks', 'Kitchen'],
       }),
+      task({
+        notePath: 'notes/p.md',
+        astPath: [8],
+        text: 'lone task',
+        noteTitle: 'Project',
+        breadcrumbs: ['Tasks'],
+      }),
     ])
     const view = await renderScreen()
 
     await view.findByText('project task')
     expect(view.getByRole('button', { name: 'Home → House chore' })).toBeDefined()
-    expect(view.getByRole('button', { name: 'Kitchen', exact: true })).toBeDefined()
-    expect(view.queryByText('Tasks → Kitchen')).toBeNull()
+    expect(view.getByRole('button', { name: 'Tasks → Kitchen' })).toBeDefined()
+    await view.findByText('lone task')
+    expect(view.queryByRole('button', { name: 'Tasks', exact: true })).toBeNull()
     await view.unmount()
   })
 
