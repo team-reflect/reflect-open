@@ -198,9 +198,6 @@ pub(super) fn clone(url: &str, target: &Path, credential: Option<GitCredential>)
     Ok(())
 }
 
-/// Push the current branch to `origin`. Rejections come back as data, not
-/// errors — the sync engine branches on them (non-fast-forward → pull/merge/
-/// retry; anything else → surface the remote's message).
 /// Where `origin` says its branch is, next to where the last fetch left it.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -209,6 +206,10 @@ pub struct RemoteTip {
     pub remote_oid: Option<String>,
     /// `refs/remotes/origin/<branch>` as the last fetch left it.
     pub tracking_oid: Option<String>,
+    /// The remote's default branch, reported only when the remote holds
+    /// branches but not this graph's: a graph connecting to it adopts that
+    /// branch, so both sides sync one branch instead of forking a second.
+    pub default_branch: Option<String>,
 }
 
 /// Ask the remote for its branch tip in one ref-advertisement round trip,
@@ -216,6 +217,10 @@ pub struct RemoteTip {
 /// differs from the tracking ref means the remote moved since the last fetch.
 /// `url` probes another remote instead of `origin` (a host the user is about
 /// to connect: the credential is checked here, not at the first push).
+///
+/// The connection is made in the push direction: a host asks for the
+/// credential there even on a public repository, where a fetch would succeed
+/// with a wrong token. A probe that succeeds proves the sign-in can push.
 pub(super) fn remote_head(
     root: &Path,
     url: Option<&str>,
@@ -229,16 +234,37 @@ pub(super) fn remote_head(
     };
     let refname = format!("refs/heads/{branch}");
     remote.connect_auth(
-        git2::Direction::Fetch,
-        Some(callbacks_with_credentials(credential)),
+        git2::Direction::Push,
+        Some(callbacks_with_credentials(credential.clone())),
         None,
     )?;
-    let remote_oid = remote
-        .list()?
+    let heads = remote.list()?;
+    let remote_oid = heads
         .iter()
         .find(|head| head.name() == refname)
         .map(|head| head.oid().to_string());
+    let elsewhere = remote_oid.is_none()
+        && heads
+            .iter()
+            .any(|head| head.name().starts_with("refs/heads/"));
     remote.disconnect()?;
+    // Only a fetch-direction advertisement names the default branch (`HEAD`),
+    // so the one case that needs it pays a second round trip.
+    let default_branch = if elsewhere {
+        remote.connect_auth(
+            git2::Direction::Fetch,
+            Some(callbacks_with_credentials(credential)),
+            None,
+        )?;
+        let name = remote.default_branch()?;
+        remote.disconnect()?;
+        name.as_str()
+            .ok()
+            .and_then(|name| name.strip_prefix("refs/heads/"))
+            .map(str::to_string)
+    } else {
+        None
+    };
     let tracking_oid = repo
         .refname_to_id(&format!("refs/remotes/origin/{branch}"))
         .ok()
@@ -246,9 +272,13 @@ pub(super) fn remote_head(
     Ok(RemoteTip {
         remote_oid,
         tracking_oid,
+        default_branch,
     })
 }
 
+/// Push the current branch to `origin`. Rejections come back as data, not
+/// errors — the sync engine branches on them (non-fast-forward → pull/merge/
+/// retry; anything else → surface the remote's message).
 pub(super) fn push(root: &Path, credential: Option<GitCredential>) -> AppResult<PushOutcome> {
     let repo = open_existing(root)?;
     let branch = current_branch(&repo)?;
