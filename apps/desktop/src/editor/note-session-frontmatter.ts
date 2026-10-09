@@ -8,7 +8,7 @@ export interface FrontmatterPatch {
    * on it.
    */
   id?: string
-  /** Alternative wiki-link titles for this note (the Plan 07b auto-alias). */
+  /** Alternative wiki-link titles for this note (the Plan 07b auto-alias). The empty list deletes the key. */
   aliases?: string[]
   /**
    * Sidebar pin. `true` pins; a number pins with an explicit order (what the
@@ -48,7 +48,7 @@ export function frontmatterPatchToYaml(patch: FrontmatterPatch): Record<string, 
     yaml['id'] = patch.id
   }
   if (patch.aliases !== undefined) {
-    yaml['aliases'] = patch.aliases
+    yaml['aliases'] = patch.aliases.length === 0 ? undefined : patch.aliases
   }
   if (patch.pinned !== undefined) {
     yaml['pinned'] = patch.pinned === false ? undefined : patch.pinned

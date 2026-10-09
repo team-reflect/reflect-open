@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Lock } from 'lucide-react'
+import { AtSign, Lock } from 'lucide-react'
 import { PinIcon } from '@/components/icons/pin-icon.tsx'
 import { useNoteRow } from '@/hooks/use-note-row.ts'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
@@ -18,6 +18,8 @@ interface NoteActionsSectionProps {
   path: string
   /** Whether this context can offer deleting the note. Daily sidebars leave this off. */
   showTrash?: boolean
+  /** Reveal the Note aliases input. The action is offered only when this is given. */
+  onAddAlias?: (() => void) | undefined
 }
 
 // Derived from the command definitions so the hints can never drift from the
@@ -36,6 +38,7 @@ const GIST_KEYBINDING = keybindingFor('note.publishGist')
 export function NoteActionsSection({
   path,
   showTrash = false,
+  onAddAlias,
 }: NoteActionsSectionProps): ReactElement {
   const isPinned = usePinnedNotes().some((note) => note.path === path)
   const noteRow = useNoteRow(path)
@@ -79,6 +82,15 @@ export function NoteActionsSection({
         keybinding={PRIVATE_KEYBINDING}
         tooltip="Locks this note out of AI. Backup and sync still include it."
       />
+      {onAddAlias ? (
+        <NoteActionButton
+          isActive={false}
+          onClick={async () => onAddAlias()}
+          icon={<AtSign size={14} aria-hidden />}
+          labels={{ active: 'Add alias', inactive: 'Add alias' }}
+          tooltip="Another name this note can be linked by"
+        />
+      ) : null}
       <NoteGistAction path={path} keybinding={GIST_KEYBINDING} />
       {showTrash ? <NoteTrashAction path={path} /> : null}
     </SidebarSection>
