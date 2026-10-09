@@ -1,11 +1,7 @@
 import { useCallback } from 'react'
 import type { OpenTask } from '@reflect/core'
 import type { TaskNavigate } from '@/components/tasks/task-editor.tsx'
-import {
-  insertTargetForBucket,
-  insertTargetForTask,
-  previousTaskKey,
-} from '@/lib/tasks/task-navigation.ts'
+import { previousTaskKey } from '@/lib/tasks/task-navigation.ts'
 import { getTaskKey } from '@/lib/tasks/task-identity.ts'
 import type { TaskActions } from '@/lib/tasks/use-task-actions.ts'
 import type { TaskSelection } from '@/lib/tasks/use-task-selection.ts'
@@ -29,8 +25,6 @@ export interface TaskRowHandlerDeps {
   actions: TaskActions
   /** The flat, render-order tasks — used to pick the row to select after a delete. */
   orderedTasks: readonly OpenTask[]
-  /** Today's ISO date — Enter adds the next task into the row's group (V1). */
-  today: string
   /** Bring a row into view after a keyboard move (V1 scrolls the selection). */
   scrollToKey: (key: string | null) => void
 }
@@ -47,7 +41,6 @@ export function useTaskRowHandlers({
   selection,
   actions,
   orderedTasks,
-  today,
   scrollToKey,
 }: TaskRowHandlerDeps): (task: OpenTask) => TaskRowEditHandlers {
   const selectExclusively = useCallback(
@@ -65,25 +58,9 @@ export function useTaskRowHandlers({
         selection.clear()
       },
       onEditContinue: (content) => {
-        // Enter: persist this row, add the next task into its breadcrumb context
-        // when it has one (otherwise use V1's Current/note bucket target), and
-        // select the new row so its editor opens.
-        const target =
-          task.breadcrumbs.length > 0
-            ? insertTargetForTask(task)
-            : insertTargetForBucket(task, today)
-        if (target === null) {
-          // An ungrouped Overdue/Upcoming bucket spans many notes, so V1 can't add
-          // there. Persist the edit (or delete an emptied row) and exit cleanly.
-          if (content === '') {
-            actions.remove([task])
-          } else if (content !== null) {
-            actions.edit(task, content)
-          }
-          selection.clear()
-          return
-        }
-        void actions.insertAfter(task, content, target).then((created) => {
+        // Enter: persist this row and add the next task after it, in its own
+        // list, then select the new row so its editor opens.
+        void actions.insertAfter(task, content).then((created) => {
           if (created !== null) {
             selectExclusively(getTaskKey(created))
           } else {
@@ -155,6 +132,6 @@ export function useTaskRowHandlers({
         scrollToKey(selection.activeKey())
       },
     }),
-    [actions, selection, orderedTasks, today, selectExclusively, scrollToKey],
+    [actions, selection, orderedTasks, selectExclusively, scrollToKey],
   )
 }

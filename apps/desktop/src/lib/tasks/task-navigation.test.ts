@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { OpenTask } from '@reflect/core'
 import { makeOpenTask } from './open-task-fixture.ts'
-import { insertTargetForTask, previousTaskKey } from './task-navigation.ts'
+import { previousTaskKey } from './task-navigation.ts'
 import { getTaskKey } from './task-identity.ts'
 
 function task(over: Partial<OpenTask> = {}): OpenTask {
@@ -28,24 +28,5 @@ describe('previousTaskKey', () => {
 
   it('returns null when the row is not in the order', () => {
     expect(previousTaskKey(ordered, task({ notePath: 'z.md', astPath: [9] }))).toBeNull()
-  })
-})
-
-describe('insertTargetForTask', () => {
-  it('carries the task’s note context, dropping the marker fields', () => {
-    const t = task({
-      notePath: 'notes/p.md',
-      noteTitle: 'P',
-      dailyDate: '2026-06-15',
-      isPinned: true,
-      pinnedOrder: 4,
-    })
-    expect(insertTargetForTask(t)).toEqual({
-      notePath: 'notes/p.md',
-      noteTitle: 'P',
-      dailyDate: '2026-06-15',
-      isPinned: true,
-      pinnedOrder: 4,
-    })
   })
 })

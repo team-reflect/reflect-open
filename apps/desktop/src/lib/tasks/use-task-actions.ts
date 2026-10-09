@@ -68,16 +68,12 @@ export interface TaskActions {
    */
   insert: (target: InsertTaskTarget) => Promise<OpenTask | null>
   /**
-   * Enter while editing (V1 continuous entry): persist the current row's edit
-   * (when `content` isn't null), then add the next task in `target` and return it
-   * to select. A task with breadcrumb context is continued structurally inside
-   * that context; other tasks retain the V1 bucket-target behavior.
+   * Enter on a row (V1 continuous entry): persist the row's edit (when `content`
+   * isn't null) and add the next task after it, in its own list, in one write.
+   * Returns the new row to select, or null when the write failed (the toast
+   * already fired) and the draft was persisted on its own instead.
    */
-  insertAfter: (
-    task: OpenTask,
-    content: string | null,
-    target: InsertTaskTarget,
-  ) => Promise<OpenTask | null>
+  insertAfter: (task: OpenTask, content: string | null) => Promise<OpenTask | null>
   /** Save an inline edit and toggle the task checkbox in one write. */
   editAndToggle: (task: OpenTask, content: string) => void
   /**
@@ -464,30 +460,20 @@ export function useTaskActions(): TaskActions {
       }
       return await insertInto(target)
     },
-    insertAfter: async (task, content, target) => {
+    insertAfter: async (task, content) => {
       if (graph?.generation === undefined) {
         return null
       }
-      if (task.breadcrumbs.length > 0) {
-        try {
-          const created = await contextInsert.insert(task, content)
-          if (created !== null) {
-            return created
-          }
-        } catch {
-          // Failure already surfaced; fall through to preserve the draft.
+      try {
+        const created = await contextInsert.insert(task, content)
+        if (created !== null) {
+          return created
         }
-        await persistTaskDraft(task, content)
-        return null
+      } catch {
+        // Failure already surfaced; fall through to preserve the draft.
       }
-      // Resolve the current row first and *await* it, so the append reads the
-      // settled source. Emptied content (the row was cleared) deletes that row
-      // rather than leaving a bare `+ [ ]` ghost; a real change persists; null
-      // (unchanged) is left be.
-      if (!(await persistTaskDraft(task, content))) {
-        return null // the edit/delete rollback already surfaced the failure
-      }
-      return await insertInto(target)
+      await persistTaskDraft(task, content)
+      return null
     },
     editAndToggle: (task, content) => {
       if (graph?.generation !== undefined && !editAndToggleMutation.isPending) {

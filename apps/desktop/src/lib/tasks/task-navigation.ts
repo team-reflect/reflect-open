@@ -1,4 +1,4 @@
-import { dailyPath, taskDateBucket, type OpenTask } from '@reflect/core'
+import { dailyPath, type OpenTask } from '@reflect/core'
 import type { InsertTaskTarget } from '@/lib/tasks/task-insert-target.ts'
 import { isSameTask, getTaskKey } from '@/lib/tasks/task-identity.ts'
 
@@ -10,17 +10,6 @@ import { isSameTask, getTaskKey } from '@/lib/tasks/task-identity.ts'
  * not-editing paths.
  */
 
-/** The note context a new task inherits when added next to `task` (V1: same note/group). */
-export function insertTargetForTask(task: OpenTask): InsertTaskTarget {
-  return {
-    notePath: task.notePath,
-    noteTitle: task.noteTitle,
-    dailyDate: task.dailyDate,
-    isPinned: task.isPinned,
-    pinnedOrder: task.pinnedOrder,
-  }
-}
-
 /** Today's daily note as an insert target — V1's "add to Today" / Current bucket. */
 export function todaysDailyTarget(today: string): InsertTaskTarget {
   return {
@@ -29,23 +18,6 @@ export function todaysDailyTarget(today: string): InsertTaskTarget {
     dailyDate: today,
     isPinned: false,
     pinnedOrder: null,
-  }
-}
-
-/**
- * Where a task added next to `task` lands, by V1's **group-based** rule
- * (`insertIntoGroup`): a Current task adds to today's daily, an undated (note)
- * task adds to its own note, and Overdue/Upcoming refuse — those buckets
- * aggregate tasks across many notes, so "add here" has no single home (`null`).
- */
-export function insertTargetForBucket(task: OpenTask, today: string): InsertTaskTarget | null {
-  switch (taskDateBucket(task, today)) {
-    case 'current':
-      return todaysDailyTarget(today)
-    case 'note':
-      return insertTargetForTask(task)
-    default:
-      return null // overdue / upcoming — no single note to add into
   }
 }
 

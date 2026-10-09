@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { AlarmClock, Calendar, FileText, Pin, Star } from 'lucide-react'
 import type { TaskGroup } from '@reflect/core'
 import type { InsertTaskTarget } from '@/lib/tasks/task-insert-target.ts'
-import { insertTargetForTask, todaysDailyTarget } from '@/lib/tasks/task-navigation.ts'
+import { todaysDailyTarget } from '@/lib/tasks/task-navigation.ts'
 
 /**
  * The presentation contract a task-group section shares across surfaces —
@@ -42,5 +42,5 @@ export function addTargetForGroup(group: TaskGroup, today: string): InsertTaskTa
     return todaysDailyTarget(today)
   }
   const first = group.tasks[0]
-  return group.kind === 'note' && first !== undefined ? insertTargetForTask(first) : null
+  return group.kind === 'note' && first !== undefined ? first : null
 }

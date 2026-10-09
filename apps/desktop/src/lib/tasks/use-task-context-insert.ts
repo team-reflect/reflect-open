@@ -5,7 +5,6 @@ import { mutationKeys } from '@/lib/query-client.ts'
 import { relocateRecentlyCompleted } from '@/lib/tasks/recently-completed.ts'
 import { withEditedTask, withoutTasks } from '@/lib/tasks/task-cache.ts'
 import { createInsertedTaskRow } from '@/lib/tasks/task-insert-target.ts'
-import { insertTargetForTask } from '@/lib/tasks/task-navigation.ts'
 import { useTaskCacheWriter } from '@/lib/tasks/use-task-cache.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 
@@ -65,7 +64,7 @@ export function useTaskContextInsert(): TaskContextInsert {
       })
       cache.relocate(task.notePath, result.moved)
       relocateRecentlyCompleted(root, task.notePath, result.moved)
-      const created = createInsertedTaskRow(insertTargetForTask(task), result.created)
+      const created = createInsertedTaskRow(task, result.created)
       cache.addOpen(created)
       return created
     },
