@@ -1132,16 +1132,21 @@ fn note_write_waits_for_a_running_checkout() {
         }
     });
     entered_rx.recv_timeout(WAIT).unwrap();
+    let (started_tx, started_rx) = mpsc::channel::<()>();
     let (written_tx, written_rx) = mpsc::channel::<()>();
     let save = thread::spawn({
         let root = root_a.clone();
         move || {
+            started_tx.send(()).unwrap();
             let outcome =
                 crate::fs::write_note_revision(&root, "notes/typed.md", "typed\n", false, None);
             let _ = written_tx.send(());
             outcome
         }
     });
+    // The worker is running: the wait below measures the lock, not the
+    // scheduler.
+    started_rx.recv_timeout(WAIT).unwrap();
     assert!(
         written_rx.recv_timeout(Duration::from_millis(500)).is_err(),
         "the save landed while the pull held the graph lock"

@@ -299,6 +299,9 @@ pub async fn graph_import_reflect_v1_zip(
     // large graph doesn't flood the webview.
     let mut last_emitted = 0usize;
     let summary = with_graph_lock(&root, || {
+        // The wait for the lock can outlast a pull's checkout: a cancel that
+        // came during it still means nothing is written.
+        cancel.ensure_active()?;
         import::finalize_import(&root, prepared, downloads, |done, total| {
             let step = (total / 100).max(1);
             if done == total || done >= last_emitted + step {
@@ -417,12 +420,15 @@ pub async fn note_read_local(
     .await
 }
 
-/// One lock per graph, shared by every mutation of the working tree: note,
-/// asset, and sweep writes, and the git commands that touch the index or
-/// the tree. A fast-forward moves the branch and rewrites the tree in two
-/// steps; a commit or a save landing between them records the stale tree
-/// over the moved ref (#1405, S4 in `docs/git-backup-safety.md`). Network
-/// commands (fetch, push) stay outside: a slow push must not block saves.
+/// One lock per graph, shared by what rewrites or removes tracked files:
+/// the note and asset commands, the import's write pass, sweep writes, graph
+/// deletion, and the git commands that touch the index or the tree. A
+/// fast-forward moves the branch and rewrites the tree in two steps; a
+/// commit or a save landing between them records the stale tree over the
+/// moved ref (#1405, S4 in `docs/git-backup-safety.md`). Network commands
+/// (fetch, push) stay outside: a slow push must not block saves. So do the
+/// writers that only ever add a file under a fresh name (a promoted
+/// screenshot, downloaded link media): the next commit simply includes it.
 static GRAPH_LOCKS: LazyLock<Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>> =
     LazyLock::new(Mutex::default);
 
@@ -799,27 +805,26 @@ pub fn note_exists(path: String, state: State<GraphState>) -> AppResult<bool> {
 /// (`db::write::move_note`): the collision probe raced something — nothing is
 /// deleted or overwritten, the caller compensates, and the rename simply
 /// reports failed. One rule, no adoption heuristics; the filename drifts
-/// until the next settled rename retries.
+/// until the next settled rename retries. The caller holds the graph lock
+/// ([`with_graph_lock`]) around this and the row move that goes with it.
 pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()> {
-    with_graph_lock(root, || {
-        let from_abs = resolve(root, from)?;
-        let to_abs = resolve(root, to)?;
-        // Occupied includes an evicted iCloud note (placeholder only on disk):
-        // renaming onto it would collide with the re-download (Plan 21).
-        if io::file_occupied(&to_abs) {
-            return Err(AppError::io(format!(
-                "cannot move note: {to} already exists on disk"
-            )));
-        }
-        if let Some(parent) = to_abs.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::rename(from_abs, to_abs)?;
-        // Carry the note's sync ancestor across the rename (Plan 21) — a missed
-        // move only degrades one future merge, never blocks the rename.
-        crate::conflict::shadow::ShadowStore::new(root).record_move(from, to);
-        Ok(())
-    })
+    let from_abs = resolve(root, from)?;
+    let to_abs = resolve(root, to)?;
+    // Occupied includes an evicted iCloud note (placeholder only on disk):
+    // renaming onto it would collide with the re-download (Plan 21).
+    if io::file_occupied(&to_abs) {
+        return Err(AppError::io(format!(
+            "cannot move note: {to} already exists on disk"
+        )));
+    }
+    if let Some(parent) = to_abs.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::rename(from_abs, to_abs)?;
+    // Carry the note's sync ancestor across the rename (Plan 21) — a missed
+    // move only degrades one future merge, never blocks the rename.
+    crate::conflict::shadow::ShadowStore::new(root).record_move(from, to);
+    Ok(())
 }
 
 /// Send a note to the OS trash (recoverable), not a hard delete (pinned to
@@ -863,7 +868,7 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
 /// Pinned to `generation` — a delete enqueued before a graph switch must
 /// never trash the newly opened graph. Desktop-only: mobile's fixed roots
 /// have no OS trash and no delete UI.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> {
     #[cfg(desktop)]
     {
@@ -883,7 +888,11 @@ pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> 
             inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
             root
         };
-        os_trash_delete(&root)?;
+        // Under the graph lock: a write that already holds it lands first
+        // and goes to the trash with the directory; one still waiting finds
+        // no root to resolve its path against and fails, instead of
+        // recreating the directory.
+        with_graph_lock(&root, || os_trash_delete(&root))?;
         // Recents is a convenience cache (same stance as `activate`): the
         // directory is already in the trash, so a failure to persist must not
         // report the delete as failed. A stale entry fails loudly on open.
@@ -1357,6 +1366,19 @@ mod note_revision_tests {
         let target = directory.path().join("note.md");
         write_note_revision(directory.path(), "note.md", "saved", true, None).unwrap();
         assert_eq!(fs::read_to_string(target).unwrap(), "saved");
+    }
+
+    #[test]
+    fn a_write_that_waited_out_a_graph_deletion_does_not_recreate_the_graph() {
+        // `graph_delete` trashes the directory under the graph lock, so a
+        // save that waited for the lock runs with its root gone.
+        let holder = tempfile::tempdir().unwrap();
+        let root = holder.path().join("graph");
+        fs::create_dir_all(root.join("notes")).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+
+        assert!(write_note_revision(&root, "notes/a.md", "typed", false, None).is_err());
+        assert!(!root.exists());
     }
 
     #[test]
