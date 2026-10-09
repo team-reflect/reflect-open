@@ -263,7 +263,7 @@ describe('insertTask', () => {
     writeNote.mockResolvedValue(undefined)
 
     await expect(insertTask('notes/a.md', 7)).resolves.toEqual({
-      created: { astPath: [1], markdown: '', breadcrumbs: [], checked: false },
+      created: { astPath: [1], markdown: '', breadcrumbs: ['Tasks'], checked: false },
       moved: [],
     })
     expect(writeNote).toHaveBeenCalledWith('notes/a.md', '## Tasks\n\n+ [ ] \n', 7)

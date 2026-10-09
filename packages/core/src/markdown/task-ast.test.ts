@@ -501,7 +501,7 @@ describe('applyTaskEdits: insert into the Tasks section', () => {
     expect(result.source).toBe(
       '---\nid: x\n---\n## Tasks\n\n+ [ ] a\n+ [ ] \n\n## Later\n\n+ [ ] b\n+ [ ] c\n',
     )
-    expect(result.inserted[0]).toMatchObject({ astPath: [2], breadcrumbs: [] })
+    expect(result.inserted[0]).toMatchObject({ astPath: [2], breadcrumbs: ['Tasks'] })
     expect(movedFrom(result, [1])).toMatchObject({ astPath: [1] })
     expect(movedFrom(result, [3])).toMatchObject({ astPath: [4], breadcrumbs: ['Later'] })
     expect(movedFrom(result, [4])).toMatchObject({ astPath: [5] })
