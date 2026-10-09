@@ -109,8 +109,8 @@ export async function cancelReflectV1Import(): Promise<void> {
  * Call only after the UI confirms the imported graph is still the active graph:
  * these paths are graph-relative and the file-change channel carries no graph
  * identity, so every subscriber takes them as the open graph's. On desktop
- * this is a no-op: the Rust
- * importer records what it wrote and the watcher labels the echo itself.
+ * this is a no-op: the Rust importer records what it wrote and the watcher
+ * labels the echo itself.
  */
 export function markReflectV1ImportOwnWrites(summary: GraphImportSummary): void {
   const modifiedMs = Date.now()
