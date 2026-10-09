@@ -1153,6 +1153,12 @@ fn merge_interrupted_before_commit_converges_next_cycle() {
 fn remote_head_reports_the_remote_tip_without_fetching() {
     let fixture = fixture();
     let root_a = &fixture.graph_a;
+    // Nothing pushed yet: the branch is unborn on the remote, which is a
+    // valid answer (connecting an empty repository must succeed).
+    let tip = remote_head(root_a, None, None).unwrap();
+    assert_eq!(tip.remote_oid, None);
+    assert_eq!(tip.tracking_oid, None);
+
     write(root_a, "notes/a.md", "# A\n");
     commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
     push(root_a, None).unwrap();
