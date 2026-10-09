@@ -326,12 +326,6 @@ function parseEnvelope(raw: string): InboxEnvelope | null {
 }
 
 /**
- * Append one text capture to its capture-day daily note. Deliberately no
- * dedup: identical text captured twice is two entries (Plan 24) — the only
- * duplication risk left is a crash between this write and the spool removal,
- * which re-appends one line once on retry.
- */
-/**
  * Put a captured task into the daily note's `## Tasks` section. A note the
  * AST cannot rewrite faithfully, or a capture of more than one paragraph,
  * falls back to the trailing-list append so the capture is never lost.
@@ -350,6 +344,12 @@ function insertCapturedTask(source: string, text: string): string {
   }
 }
 
+/**
+ * Append one text capture to its capture-day daily note. Deliberately no
+ * dedup: identical text captured twice is two entries (Plan 24) — the only
+ * duplication risk left is a crash between this write and the spool removal,
+ * which re-appends one line once on retry.
+ */
 async function drainTextCapture(envelope: TextCaptureEnvelope, generation: number): Promise<void> {
   const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
   const dailySource = await noteSource(daily, generation)
@@ -359,7 +359,11 @@ async function drainTextCapture(envelope: TextCaptureEnvelope, generation: numbe
   const next =
     envelope.kind === 'task'
       ? insertCapturedTask(dailySource, envelope.text)
-      : appendListItem(dailySource, envelope.text, envelope.kind === 'append' ? 'bullet' : 'checkbox')
+      : appendListItem(
+          dailySource,
+          envelope.text,
+          envelope.kind === 'append' ? 'bullet' : 'checkbox',
+        )
   await writeNote(daily, next, generation)
 }
 
