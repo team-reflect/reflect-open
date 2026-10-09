@@ -1112,6 +1112,36 @@ describe('createSyncEngine', () => {
     engine.stop()
   })
 
+  it('a cycle hidden after its commit still pushes it', async () => {
+    let canStartCycle = true
+    const commitGate: { resolve: ((value: unknown) => void) | null } = { resolve: null }
+    const calls = fakeGit((command) => {
+      if (command === 'git_commit_all') {
+        return new Promise((resolve) => {
+          commitGate.resolve = resolve
+        })
+      }
+      return defaultResponses(command)
+    })
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => CRED,
+      idleMs: 10,
+      canStartCycle: () => canStartCycle,
+    })
+
+    engine.noteChanged()
+    await vi.advanceTimersByTimeAsync(10)
+    expect(commandsOf(calls)).toEqual(['git_commit_all'])
+
+    // The app goes to the background while the commit runs.
+    canStartCycle = false
+    commitGate.resolve?.(defaultResponses('git_commit_all'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_push'])
+    engine.stop()
+  })
+
   it('stops at the next command boundary when cycles become suppressed', async () => {
     let canStartCycle = true
     const fetchGate: { resolve: ((value: unknown) => void) | null } = { resolve: null }
