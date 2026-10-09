@@ -464,6 +464,7 @@ describe('applyTaskEdits: insert into the Tasks section', () => {
     ['## Tasks\n\n+ [ ] old\n', '## Tasks\n\n+ [ ] old\n+ [ ] \n'],
     ['## tasks\n\nprose\n', '## tasks\n\n+ [ ] \n\nprose\n'],
     ['## [[Tasks]]\n', '## [[Tasks]]\n\n+ [ ] \n'],
+    ['# Tasks\n\n+ [ ] old\n', '# Tasks\n\n+ [ ] old\n+ [ ] \n'],
     ['## **Tasks**\n\n+ [ ] old\n', '## **Tasks**\n\n+ [ ] old\n+ [ ] \n'],
     ['## Tasks\n\n- [ ] checkbox\n', '## Tasks\n\n+ [ ] \n- [ ] checkbox\n'],
     ['## Tasks\n\n* bullet\n', '## Tasks\n\n+ [ ] \n* bullet\n'],
@@ -482,7 +483,6 @@ describe('applyTaskEdits: insert into the Tasks section', () => {
   })
 
   it.each([
-    '# Tasks',
     '### Tasks',
     '> ## Tasks',
     '- ## Tasks',

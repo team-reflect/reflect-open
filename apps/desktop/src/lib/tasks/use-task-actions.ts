@@ -380,6 +380,24 @@ export function useTaskActions(): TaskActions {
     },
   })
 
+  /**
+   * Write a new empty task into `target`'s note and surface it as the optimistic
+   * row to select, or null when the write failed (reconcile already surfaced it).
+   * The Tasks section can sit above other tasks of the note, so their cached
+   * rows are re-keyed from the write's `moved` map before the new row is added.
+   */
+  async function insertInto(target: InsertTaskTarget): Promise<OpenTask | null> {
+    try {
+      const result = await insertMutation.mutateAsync(target)
+      relocate(target.notePath, result.moved)
+      const created = createInsertedTaskRow(target, result.created)
+      cache.addOpen(created)
+      return created
+    } catch {
+      return null
+    }
+  }
+
   async function persistTaskDraft(task: OpenTask, content: string | null): Promise<boolean> {
     try {
       if (content === '') {
@@ -444,16 +462,7 @@ export function useTaskActions(): TaskActions {
       if (graph?.generation === undefined) {
         return null
       }
-      try {
-        const result = await insertMutation.mutateAsync(target)
-        // The section can sit above other tasks of the note: re-key them first.
-        relocate(target.notePath, result.moved)
-        const created = createInsertedTaskRow(target, result.created)
-        cache.addOpen(created)
-        return created
-      } catch {
-        return null // reconcile already surfaced the failure
-      }
+      return insertInto(target)
     },
     insertAfter: async (task, content, target) => {
       if (graph?.generation === undefined) {
@@ -478,16 +487,7 @@ export function useTaskActions(): TaskActions {
       if (!(await persistTaskDraft(task, content))) {
         return null // the edit/delete rollback already surfaced the failure
       }
-      try {
-        const result = await insertMutation.mutateAsync(target)
-        // The section can sit above other tasks of the note: re-key them first.
-        relocate(target.notePath, result.moved)
-        const created = createInsertedTaskRow(target, result.created)
-        cache.addOpen(created)
-        return created
-      } catch {
-        return null
-      }
+      return insertInto(target)
     },
     editAndToggle: (task, content) => {
       if (graph?.generation !== undefined && !editAndToggleMutation.isPending) {

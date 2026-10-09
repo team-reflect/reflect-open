@@ -8,16 +8,15 @@ import {
   type MarkdownBlock,
   type MarkdownBlockquote,
   type MarkdownDocument,
-  type MarkdownHeading,
   type MarkdownListItem,
   type MarkdownNode,
   type MarkdownTableCell,
 } from '@meowdown/markdown'
 import { DefaultMap } from '@ocavue/utils'
 import { splitFrontmatter } from './frontmatter.ts'
+import { renderInlineText } from './inline-text.ts'
 import { normalizeWikiTarget } from './resolve.ts'
 import { scanInlineWikiLinks } from './scan.ts'
-import { isTasksHeading } from './task-heading.ts'
 import { isSameTaskPath } from './task-path.ts'
 
 /** The task a caller addressed is not in the note anymore: the write is refused. */
@@ -65,6 +64,8 @@ export function getFirstParagraphMarkdown(item: MarkdownListItem): string {
 export interface TaskEntry extends TaskSnapshot {
   node: MarkdownListItem
   parent: BlockParent
+  /** The item's index in `parent.children`, valid until the tree is edited. */
+  index: number
 }
 
 /** One heading a document-level block sits under. */
@@ -83,8 +84,8 @@ export function getRoundTasks(document: MarkdownDocument): TaskEntry[] {
   const entries: TaskEntry[] = []
   // The headings above the current document-level block, like an outline.
   const sections: Section[] = []
-  for (const { node, parent, path } of walkMarkdownAst(document)) {
-    if (parent === undefined) {
+  for (const { node, parent, path, index } of walkMarkdownAst(document)) {
+    if (parent === undefined || index === undefined) {
       continue
     }
     if (parent === document && node.type === 'heading') {
@@ -101,6 +102,7 @@ export function getRoundTasks(document: MarkdownDocument): TaskEntry[] {
       entries.push({
         node,
         parent,
+        index,
         astPath: path,
         markdown: label,
         breadcrumbs: inherited,
@@ -335,18 +337,23 @@ function resolveInsertPosition(
       return { kind: 'end', container: document }
     }
     case 'contextEnd': {
-      const { node, parent } = locateTask(before, at.task)
+      const { parent, index } = locateTask(before, at.task)
       if (parent.type === 'listItem') {
         return { kind: 'end', container: parent }
       }
-      return { kind: 'after', anchor: lastOfListRun(parent, node) }
+      return { kind: 'after', anchor: parent.children[endOfListRun(parent.children, index)]! }
     }
     case 'tasksSection': {
-      const heading = findTasksHeading(document)
+      const { children } = document
+      const heading = findTasksHeading(children)
       if (heading === undefined) {
         return { kind: 'newSection', heading: 'Tasks' }
       }
-      return { kind: 'after', anchor: lastOfSectionTaskList(document, heading) ?? heading }
+      const list = findSectionTaskList(children, heading)
+      return {
+        kind: 'after',
+        anchor: children[list === undefined ? heading : endOfListRun(children, list)]!,
+      }
     }
     case 'afterTask': {
       const { node } = locateTask(before, at.task)
@@ -372,42 +379,49 @@ function markerOf(item: MarkdownListItem): string | undefined {
   return item.marker ?? (item.kind === 'bullet' && item.collapsed ? '+' : undefined)
 }
 
-/** The last item of the list `item` belongs to: same marker, no other block between. */
-function lastOfListRun(parent: BlockParent, item: MarkdownListItem): MarkdownListItem {
-  let last = item
-  for (const block of parent.children.slice(parent.children.indexOf(item) + 1)) {
-    if (block.type !== 'listItem' || markerOf(block) !== markerOf(item)) {
+/** The index of the last item of the list that starts at `children[start]`: same marker, nothing else between. */
+function endOfListRun(children: readonly MarkdownBlock[], start: number): number {
+  const first = children[start]
+  const marker = first?.type === 'listItem' ? markerOf(first) : undefined
+  let end = start
+  for (let i = start + 1; i < children.length; i++) {
+    const block = children[i]
+    if (block?.type !== 'listItem' || markerOf(block) !== marker) {
       break
     }
-    last = block
+    end = i
   }
-  return last
+  return end
 }
 
-/** The first top-level H2 that reads "Tasks". */
-function findTasksHeading(document: MarkdownDocument): MarkdownHeading | undefined {
-  return document.children.find(
-    (block): block is MarkdownHeading =>
-      block.type === 'heading' && block.level === 2 && isTasksHeading(block),
+/** The index of the first top-level H1 or H2 that reads "Tasks" once its inline Markdown is rendered. */
+function findTasksHeading(children: readonly MarkdownBlock[]): number | undefined {
+  const index = children.findIndex(
+    (block) =>
+      block.type === 'heading' &&
+      block.level <= 2 &&
+      renderInlineText(block.value).trim().toLowerCase() === 'tasks',
   )
+  return index === -1 ? undefined : index
 }
 
 /**
- * The last item of the first `+` list between `heading` and the next heading
- * of any level, or undefined when the section has none. Blank-line paragraphs
- * are skipped; a list with another marker is skipped too, so a `- [ ]`
- * checklist in the section never receives a round task.
+ * The index of the first `+` list item between the heading at `heading` and
+ * the next heading of any level, or undefined when the section has none. A
+ * list with another marker is skipped, so a `- [ ]` checklist in the section
+ * never receives a round task.
  */
-function lastOfSectionTaskList(
-  document: MarkdownDocument,
-  heading: MarkdownHeading,
-): MarkdownListItem | undefined {
-  for (const block of document.children.slice(document.children.indexOf(heading) + 1)) {
-    if (block.type === 'heading') {
+function findSectionTaskList(
+  children: readonly MarkdownBlock[],
+  heading: number,
+): number | undefined {
+  for (let i = heading + 1; i < children.length; i++) {
+    const block = children[i]
+    if (block?.type === 'heading') {
       return undefined
     }
-    if (block.type === 'listItem' && markerOf(block) === '+') {
-      return lastOfListRun(document, block)
+    if (block?.type === 'listItem' && markerOf(block) === '+') {
+      return i
     }
   }
   return undefined

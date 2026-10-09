@@ -76,8 +76,8 @@ markers in markdown, AI task extraction (later, over this projection), CLI
   grouping label because its Tasks tab has no multi-select mode.
 - **Automatic inserts land in the `## Tasks` section.** The Tasks view's
   Return-to-add and "+ Add", and browser task captures, insert into the first `+`
-  list of the note's top-level `## Tasks` heading (any inline form that reads
-  "Tasks": `## [[Tasks]]`, `## **Tasks**`), directly under the heading when that
+  list of the note's first top-level H1 or H2 that reads "Tasks" (`## Tasks`,
+  `# Tasks`, `## [[Tasks]]`, `## **Tasks**`), directly under the heading when that
   list is missing, and append a new `## Tasks` section when the heading is missing.
   Typing in the editor is unaffected. Enter on a row that sits under a heading
   continues that row's own list in place.
