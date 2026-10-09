@@ -226,7 +226,6 @@ export function applyTaskEdits(source: string, edits: readonly TaskEdit[]): Task
   if (body === '') {
     document.children = []
   }
-  assertSerializable(document)
 
   const before = getRoundTasks(document)
   const created: MarkdownListItem[] = []
@@ -263,7 +262,7 @@ export function applyTaskEdits(source: string, edits: readonly TaskEdit[]): Task
   })
 
   const nextBody = document.children.length === 0 ? '' : serializeMarkdownAst(document)
-  assertTasksSurvive(nextBody, after)
+  assertRoundTrips(nextBody, document)
   return {
     source: source.slice(0, bodyOffset) + nextBody,
     moved,
@@ -276,12 +275,13 @@ function toTaskSnapshot({ astPath, markdown, breadcrumbs, checked }: TaskEntry):
   return { astPath, markdown, breadcrumbs, checked }
 }
 
-function assertSerializable(document: MarkdownDocument): void {
-  if (document.children.length === 0) {
-    return
-  }
-  const reparsed = parseMarkdownAst(serializeMarkdownAst(document))
-  if (!isMarkdownAstEqual(reparsed, document)) {
+/**
+ * The written bytes must read back as the edited tree. A note the serializer
+ * cannot express faithfully, or inserted text that starts a new block, is
+ * refused rather than written wrong.
+ */
+function assertRoundTrips(body: string, document: MarkdownDocument): void {
+  if (body !== '' && !isMarkdownAstEqual(parseMarkdownAst(body), document)) {
     throw new NoteNotSerializableError(
       'This note cannot be rewritten faithfully. Edit the task in the note itself.',
     )
@@ -524,25 +524,5 @@ function createTaskItem(markdown: string): MarkdownListItem {
     checked: false,
     collapsed: false,
     children: [{ type: 'paragraph', value: markdown }],
-  }
-}
-
-/** The written bytes must read back with the same tasks at the same paths. */
-function assertTasksSurvive(body: string, expected: readonly TaskEntry[]): void {
-  const actual = getRoundTasks(parseMarkdownAst(body))
-  const survives =
-    actual.length === expected.length &&
-    actual.every((entry, i) => {
-      const wanted = expected[i]
-      return (
-        wanted !== undefined &&
-        isSameTaskPath(entry.astPath, wanted.astPath) &&
-        hasSameContent(entry, wanted)
-      )
-    })
-  if (!survives) {
-    throw new NoteNotSerializableError(
-      'This text cannot be saved as one task. Remove the line that starts a new block and try again.',
-    )
   }
 }
