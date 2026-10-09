@@ -1234,6 +1234,7 @@ fn a_symlinked_refs_directory_is_not_swept() {
     let lock = outside.join("heads/old.lock");
     plant_lock(&lock, Duration::from_secs(11 * 60));
 
-    let _ = status(root);
+    // The repository still opens (git follows the link), so the sweep ran.
+    assert!(status(root).unwrap().initialized);
     assert!(lock.exists());
 }

@@ -100,13 +100,14 @@ fn collect_locks(dir: &Path, recurse: bool, out: &mut Vec<PathBuf>) {
         return;
     };
     for entry in entries.flatten() {
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
         let path = entry.path();
-        if path.extension().is_some_and(|ext| ext == "lock") {
-            if entry.file_type().is_ok_and(|kind| kind.is_file()) {
-                out.push(path);
-            }
-        } else if recurse {
+        if kind.is_dir() && recurse {
             collect_locks(&path, true, out);
+        } else if kind.is_file() && path.extension().is_some_and(|ext| ext == "lock") {
+            out.push(path);
         }
     }
 }
