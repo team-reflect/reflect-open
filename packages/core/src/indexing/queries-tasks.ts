@@ -65,7 +65,7 @@ function taskRowsQuery() {
     ])
 }
 
-interface TaskRow {
+interface TaskRecord {
   notePath: string
   astPath: string
   markdown: string
@@ -83,7 +83,7 @@ interface TaskRow {
  * do not decode is skipped and reported instead of failing the whole read: the
  * projection is rebuilt from Markdown, so such a row is a bug, not data.
  */
-function toTaskRows(rows: readonly TaskRow[]): OpenTask[] {
+function toTaskRows(rows: readonly TaskRecord[]): OpenTask[] {
   const tasks: OpenTask[] = []
   for (const row of rows) {
     const { astPath, markdown, breadcrumbs, checked, isPinned, ...rest } = row
