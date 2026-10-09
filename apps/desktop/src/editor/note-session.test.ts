@@ -160,6 +160,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.restoreAllMocks() // a `console.error` spy must not outlive a failed test
 })
 
 async function settled(): Promise<void> {
