@@ -49,6 +49,7 @@ pub(super) fn commit_all(
     #[cfg(test)]
     super::fault::trip(super::fault::FaultPoint::BeforeCommit)?;
     let repo = open_existing(root)?;
+    super::merge::finish_interrupted(&repo, root)?;
     ensure_clean_state(&repo)?;
     // In-memory hard guarantee, independent of any on-disk ignore file: the
     // runtime directory must never enter a backup commit (Plan 21 — a synced
