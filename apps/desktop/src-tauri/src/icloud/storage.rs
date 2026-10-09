@@ -510,9 +510,11 @@ fn copy_and_verify(root: &Path, target: &Path) -> AppResult<()> {
 /// the user reconnects a remote from Settings when they want one.
 fn settle_repository(target: &Path) -> AppResult<()> {
     let git_dir = target.join(".git");
-    if !git_dir.exists() {
+    if !is_dir_no_follow(&git_dir) {
         return Ok(());
     }
+    // Marked once more here: the copy marked the empty directory before any
+    // object landed in it, and this keeps the guarantee if that mark failed.
     crate::fs::mark_dir_local_only(&git_dir);
     let repo = git2::Repository::open(target)?;
     if repo.find_remote("origin").is_ok() {
@@ -539,28 +541,48 @@ fn left_behind(name: &str) -> bool {
     matches!(name, ".reflect" | ".DS_Store")
 }
 
+/// A real directory at `path`: a symlink or a gitfile (`.git` as a file,
+/// pointing at a repository elsewhere) is not one.
+fn is_dir_no_follow(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|meta| meta.is_dir())
+}
+
 /// Recursively copy the graph tree, returning `(files, bytes)` copied.
+///
+/// The backup repository comes along when `.git` is a real directory (a
+/// gitfile points at a repository elsewhere, which is not this graph's to
+/// move). Its copy is marked local-only while still empty, before iCloud can
+/// start uploading objects into it, and `*.lock` files under it stay behind:
+/// a lock belongs to the operation that took it, not to the repository.
 fn copy_graph_tree(source: &Path, target: &Path) -> AppResult<(u64, u64)> {
     std::fs::create_dir_all(target)?;
     let mut files = 0u64;
     let mut bytes = 0u64;
-    let mut stack = vec![(source.to_path_buf(), target.to_path_buf())];
-    while let Some((from_dir, to_dir)) = stack.pop() {
+    let mut stack = vec![(source.to_path_buf(), target.to_path_buf(), false)];
+    while let Some((from_dir, to_dir, in_repo)) = stack.pop() {
         for entry in std::fs::read_dir(&from_dir)? {
             let entry = entry?;
             let name = entry.file_name();
-            if left_behind(&name.to_string_lossy()) {
+            let name_str = name.to_string_lossy();
+            if left_behind(&name_str) || (in_repo && name_str.ends_with(".lock")) {
                 continue;
             }
             let file_type = entry.file_type()?;
             if file_type.is_symlink() {
                 continue; // never follow links out of the graph
             }
+            let is_repo = from_dir == source && name_str == ".git";
+            if is_repo && !file_type.is_dir() {
+                continue;
+            }
             let from = entry.path();
             let to = to_dir.join(&name);
             if file_type.is_dir() {
                 std::fs::create_dir_all(&to)?;
-                stack.push((from, to));
+                if is_repo {
+                    crate::fs::mark_dir_local_only(&to);
+                }
+                stack.push((from, to, in_repo || is_repo));
             } else {
                 bytes += std::fs::copy(&from, &to)?;
                 files += 1;
@@ -644,6 +666,8 @@ mod tests {
         let repo = git2::Repository::init(source.path()).expect("init");
         repo.remote("origin", "https://example.com/owner/notes.git")
             .expect("remote");
+        // A lock a running operation holds (or a crash left) stays behind.
+        std::fs::write(source.path().join(".git/index.lock"), b"").expect("write");
 
         let container = tempfile::tempdir().expect("tempdir");
         let target = container.path().join("Notes");
@@ -659,6 +683,12 @@ mod tests {
         // syncs through iCloud only until the user reconnects one.
         let copy = git2::Repository::open(&target).expect("open copy");
         assert!(copy.find_remote("origin").is_err());
+        assert!(!target.join(".git/index.lock").exists());
+        #[cfg(target_os = "macos")]
+        assert_eq!(
+            xattr::get(target.join(".git"), "com.apple.fileprovider.ignore#P").expect("xattr"),
+            Some(b"1".to_vec())
+        );
         // The original keeps everything, remote included: it is the
         // recovery copy.
         assert!(repo.find_remote("origin").is_ok());
@@ -667,6 +697,23 @@ mod tests {
         let copied = copy_graph_tree(source.path(), &again).expect("copy");
         assert!(copied.0 > 1, "{copied:?}");
         assert_eq!(count_graph_tree(&again).expect("count"), copied);
+    }
+
+    #[test]
+    fn a_gitfile_is_not_a_repository_to_move() {
+        // `.git` as a file points at a repository elsewhere (a worktree, or
+        // `--separate-git-dir`): copying it would make the moved graph open,
+        // and settle, the original's repository.
+        let source = tempfile::tempdir().expect("tempdir");
+        std::fs::write(source.path().join("a.md"), b"# A").expect("write");
+        std::fs::write(source.path().join(".git"), b"gitdir: /elsewhere/.git\n").expect("write");
+
+        let container = tempfile::tempdir().expect("tempdir");
+        let target = container.path().join("Notes");
+        adopt_into(source.path(), &target).expect("adopt");
+
+        assert!(!target.join(".git").exists());
+        assert_eq!(count_graph_tree(&target).expect("count"), (1, 3));
     }
 
     /// The pending walk must count placeholders anywhere in the graph but
