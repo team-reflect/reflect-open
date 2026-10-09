@@ -206,6 +206,10 @@ pub struct RemoteTip {
     pub remote_oid: Option<String>,
     /// `refs/remotes/origin/<branch>` as the last fetch left it.
     pub tracking_oid: Option<String>,
+    /// The remote's default branch, reported only when the remote holds
+    /// branches but not this graph's: a graph connecting to it adopts that
+    /// branch, so both sides sync one branch instead of forking a second.
+    pub default_branch: Option<String>,
 }
 
 /// Ask the remote for its branch tip in one ref-advertisement round trip,
@@ -231,15 +235,36 @@ pub(super) fn remote_head(
     let refname = format!("refs/heads/{branch}");
     remote.connect_auth(
         git2::Direction::Push,
-        Some(callbacks_with_credentials(credential)),
+        Some(callbacks_with_credentials(credential.clone())),
         None,
     )?;
-    let remote_oid = remote
-        .list()?
+    let heads = remote.list()?;
+    let remote_oid = heads
         .iter()
         .find(|head| head.name() == refname)
         .map(|head| head.oid().to_string());
+    let elsewhere = remote_oid.is_none()
+        && heads
+            .iter()
+            .any(|head| head.name().starts_with("refs/heads/"));
     remote.disconnect()?;
+    // Only a fetch-direction advertisement names the default branch (`HEAD`),
+    // so the one case that needs it pays a second round trip.
+    let default_branch = if elsewhere {
+        remote.connect_auth(
+            git2::Direction::Fetch,
+            Some(callbacks_with_credentials(credential)),
+            None,
+        )?;
+        let name = remote.default_branch()?;
+        remote.disconnect()?;
+        name.as_str()
+            .ok()
+            .and_then(|name| name.strip_prefix("refs/heads/"))
+            .map(str::to_string)
+    } else {
+        None
+    };
     let tracking_oid = repo
         .refname_to_id(&format!("refs/remotes/origin/{branch}"))
         .ok()
@@ -247,6 +272,7 @@ pub(super) fn remote_head(
     Ok(RemoteTip {
         remote_oid,
         tracking_oid,
+        default_branch,
     })
 }
 

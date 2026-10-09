@@ -1158,6 +1158,7 @@ fn remote_head_reports_the_remote_tip_without_fetching() {
     let tip = remote_head(root_a, None, None).unwrap();
     assert_eq!(tip.remote_oid, None);
     assert_eq!(tip.tracking_oid, None);
+    assert_eq!(tip.default_branch, None);
 
     write(root_a, "notes/a.md", "# A\n");
     commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
@@ -1165,6 +1166,7 @@ fn remote_head_reports_the_remote_tip_without_fetching() {
 
     let tip = remote_head(root_a, None, None).unwrap();
     assert!(tip.remote_oid.is_some());
+    assert_eq!(tip.default_branch, None, "the remote has this branch");
     assert_eq!(
         tip.remote_oid, tip.tracking_oid,
         "nothing moved since the push"
@@ -1200,4 +1202,29 @@ fn remote_head_reports_the_remote_tip_without_fetching() {
     assert_eq!(probed.remote_oid, tip.remote_oid);
     let missing = fixture._dir.path().join("nowhere.git");
     assert!(remote_head(root_a, missing.to_str(), None).is_err());
+}
+
+#[test]
+fn remote_head_names_the_default_branch_of_a_remote_on_another_branch() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n");
+    commit_all(root, "a", MAX_FILE_BYTES).unwrap();
+
+    // A remote whose notes live on `trunk`, probed from a graph on `main`.
+    let bare = fixture._dir.path().join("trunk.git");
+    let mut opts = git2::RepositoryInitOptions::new();
+    opts.bare(true).initial_head("trunk");
+    Repository::init_opts(&bare, &opts).unwrap();
+    let url = bare.to_string_lossy().into_owned();
+    Repository::open(root)
+        .unwrap()
+        .remote_anonymous(&url)
+        .unwrap()
+        .push(&["refs/heads/main:refs/heads/trunk"], None)
+        .unwrap();
+
+    let tip = remote_head(root, Some(&url), None).unwrap();
+    assert_eq!(tip.remote_oid, None);
+    assert_eq!(tip.default_branch.as_deref(), Some("trunk"));
 }

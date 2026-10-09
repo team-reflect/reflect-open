@@ -139,6 +139,7 @@ export async function gitCommitAll(
 export const remoteTipSchema = z.object({
   remoteOid: z.string().nullable(),
   trackingOid: z.string().nullable(),
+  defaultBranch: z.string().nullable(),
 })
 export type RemoteTip = z.infer<typeof remoteTipSchema>
 
@@ -146,6 +147,8 @@ export type RemoteTip = z.infer<typeof remoteTipSchema>
  * Where the remote's branch is right now, in one round trip and without a
  * fetch. `remoteOid !== trackingOid` means the remote moved since the last
  * fetch; `remoteOid === null` means the branch does not exist there yet.
+ * `defaultBranch` is set only when the remote holds branches but not this
+ * graph's: the branch a connecting graph adopts.
  * `url` probes that remote instead of `origin`: rejects when the host is
  * unreachable or refuses the credential.
  */
