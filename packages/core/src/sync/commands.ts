@@ -150,7 +150,8 @@ export type RemoteTip = z.infer<typeof remoteTipSchema>
  * `defaultBranch` is set only when the remote holds branches but not this
  * graph's: the branch a connecting graph adopts.
  * `url` probes that remote instead of `origin`: rejects when the host is
- * unreachable or refuses the credential.
+ * unreachable or refuses the credential, and reports `trackingOid: null`
+ * (nothing was ever fetched from it).
  */
 export async function gitRemoteHead(
   credential: GitCredential | null,

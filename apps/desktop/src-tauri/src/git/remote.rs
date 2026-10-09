@@ -204,7 +204,8 @@ pub(super) fn clone(url: &str, target: &Path, credential: Option<GitCredential>)
 pub struct RemoteTip {
     /// The remote branch's commit, `None` while the branch is unborn there.
     pub remote_oid: Option<String>,
-    /// `refs/remotes/origin/<branch>` as the last fetch left it.
+    /// `refs/remotes/origin/<branch>` as the last fetch left it; `None` when
+    /// another remote was probed.
     pub tracking_oid: Option<String>,
     /// The remote's default branch, reported only when the remote holds
     /// branches but not this graph's: a graph connecting to it adopts that
@@ -247,7 +248,9 @@ pub(super) fn remote_head(
         && heads
             .iter()
             .any(|head| head.name().starts_with("refs/heads/"));
-    remote.disconnect()?;
+    // The answer is in hand: a teardown that fails must not turn it into an
+    // error.
+    let _ = remote.disconnect();
     // Only a fetch-direction advertisement names the default branch (`HEAD`),
     // so the one case that needs it pays a second round trip.
     let default_branch = if elsewhere {
@@ -257,7 +260,7 @@ pub(super) fn remote_head(
             None,
         )?;
         let name = remote.default_branch()?;
-        remote.disconnect()?;
+        let _ = remote.disconnect();
         name.as_str()
             .ok()
             .and_then(|name| name.strip_prefix("refs/heads/"))
@@ -265,10 +268,14 @@ pub(super) fn remote_head(
     } else {
         None
     };
-    let tracking_oid = repo
-        .refname_to_id(&format!("refs/remotes/origin/{branch}"))
-        .ok()
-        .map(|oid| oid.to_string());
+    // Another remote has no last fetch here to compare with.
+    let tracking_oid = match url {
+        Some(_) => None,
+        None => repo
+            .refname_to_id(&format!("refs/remotes/origin/{branch}"))
+            .ok()
+            .map(|oid| oid.to_string()),
+    };
     Ok(RemoteTip {
         remote_oid,
         tracking_oid,

@@ -1191,6 +1191,13 @@ fn remote_head_reports_the_remote_tip_without_fetching() {
         !root_a.join("notes/b.md").exists(),
         "the probe downloads nothing"
     );
+    assert!(
+        Repository::open(root_a)
+            .unwrap()
+            .find_commit(git2::Oid::from_str(&b_head).unwrap())
+            .is_err(),
+        "not even the commit object"
+    );
 
     fetch(root_a, None).unwrap();
     let tip = remote_head(root_a, None, None).unwrap();
@@ -1200,6 +1207,7 @@ fn remote_head_reports_the_remote_tip_without_fetching() {
     // host connection runs before it saves anything.
     let probed = remote_head(root_a, Some(&fixture.remote_url), None).unwrap();
     assert_eq!(probed.remote_oid, tip.remote_oid);
+    assert_eq!(probed.tracking_oid, None, "no last fetch from that remote");
     let missing = fixture._dir.path().join("nowhere.git");
     assert!(remote_head(root_a, missing.to_str(), None).is_err());
 }
