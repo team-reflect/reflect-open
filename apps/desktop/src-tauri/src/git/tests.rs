@@ -1191,6 +1191,13 @@ fn remote_head_reports_the_remote_tip_without_fetching() {
         !root_a.join("notes/b.md").exists(),
         "the probe downloads nothing"
     );
+    assert!(
+        Repository::open(root_a)
+            .unwrap()
+            .find_commit(git2::Oid::from_str(&b_head).unwrap())
+            .is_err(),
+        "not even the commit object"
+    );
 
     fetch(root_a, None).unwrap();
     let tip = remote_head(root_a, None, None).unwrap();
@@ -1200,6 +1207,7 @@ fn remote_head_reports_the_remote_tip_without_fetching() {
     // host connection runs before it saves anything.
     let probed = remote_head(root_a, Some(&fixture.remote_url), None).unwrap();
     assert_eq!(probed.remote_oid, tip.remote_oid);
+    assert_eq!(probed.tracking_oid, None, "no last fetch from that remote");
     let missing = fixture._dir.path().join("nowhere.git");
     assert!(remote_head(root_a, missing.to_str(), None).is_err());
 }
@@ -1217,13 +1225,22 @@ fn remote_head_names_the_default_branch_of_a_remote_on_another_branch() {
     opts.bare(true).initial_head("trunk");
     Repository::init_opts(&bare, &opts).unwrap();
     let url = bare.to_string_lossy().into_owned();
-    Repository::open(root)
-        .unwrap()
-        .remote_anonymous(&url)
-        .unwrap()
-        .push(&["refs/heads/main:refs/heads/trunk"], None)
-        .unwrap();
+    let push_as = |branch: &str| {
+        Repository::open(root)
+            .unwrap()
+            .remote_anonymous(&url)
+            .unwrap()
+            .push(&[format!("refs/heads/main:refs/heads/{branch}")], None)
+            .unwrap();
+    };
 
+    // Branches, but `HEAD` names one that does not exist: no default to
+    // report, and still an answer.
+    push_as("other");
+    let tip = remote_head(root, Some(&url), None).unwrap();
+    assert_eq!((tip.remote_oid, tip.default_branch), (None, None));
+
+    push_as("trunk");
     let tip = remote_head(root, Some(&url), None).unwrap();
     assert_eq!(tip.remote_oid, None);
     assert_eq!(tip.default_branch.as_deref(), Some("trunk"));

@@ -38,6 +38,7 @@ export {
   type CommitOutcome,
   type MergeOutcome,
   type PushOutcome,
+  type RemoteTip,
   type SkippedFile,
   type ChangedFile,
   type GithubAuth,

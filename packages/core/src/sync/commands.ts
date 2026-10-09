@@ -144,13 +144,14 @@ export const remoteTipSchema = z.object({
 export type RemoteTip = z.infer<typeof remoteTipSchema>
 
 /**
- * Where the remote's branch is right now, in one round trip and without a
- * fetch. `remoteOid !== trackingOid` means the remote moved since the last
+ * Where the remote's branch is right now, without a fetch: one round trip,
+ * or two when `defaultBranch` has to be asked for. `remoteOid !== trackingOid` means the remote moved since the last
  * fetch; `remoteOid === null` means the branch does not exist there yet.
  * `defaultBranch` is set only when the remote holds branches but not this
  * graph's: the branch a connecting graph adopts.
  * `url` probes that remote instead of `origin`: rejects when the host is
- * unreachable or refuses the credential.
+ * unreachable or refuses the credential, and reports `trackingOid: null`
+ * (nothing was ever fetched from it).
  */
 export async function gitRemoteHead(
   credential: GitCredential | null,
