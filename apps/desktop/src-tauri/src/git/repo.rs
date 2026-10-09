@@ -2,7 +2,7 @@
 //! graph `.gitignore` defaults.
 
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use git2::{Repository, RepositoryInitOptions, Signature};
 
@@ -43,25 +43,28 @@ pub(super) fn open_existing(root: &Path) -> AppResult<Repository> {
     Ok(Repository::open(root)?)
 }
 
-/// Remove the lock files a killed process left behind (`HEAD.lock`,
-/// `index.lock`, `packed-refs.lock`, `refs/**/*.lock`): libgit2 refuses to
-/// write past them, which would fail every later cycle until a manual
-/// repair. Only a lock older than [`STALE_LOCK_AGE`] goes; a fresh one may
-/// belong to a `git` the user is running right now. Best effort: a lock that
-/// stays fails the operation as it always did.
+/// Remove the lock files a killed process left behind: every `.git/*.lock`
+/// (`index.lock`, `HEAD.lock`, `FETCH_HEAD.lock`, `MERGE_HEAD.lock`,
+/// `config.lock`, ...) and `refs/**/*.lock`. libgit2 refuses to write past
+/// them, which would fail every later cycle until a manual repair. Only a
+/// lock older than [`STALE_LOCK_AGE`] goes; a fresh one may belong to a `git`
+/// the user is running right now. A lock dated in the future (clock
+/// correction, restore from a backup) is not live either. Best effort: a lock
+/// that stays fails the operation as it always did.
 fn sweep_stale_locks(git_dir: &Path) {
-    let mut locks: Vec<PathBuf> = ["HEAD.lock", "index.lock", "packed-refs.lock"]
-        .iter()
-        .map(|name| git_dir.join(name))
-        .collect();
-    collect_ref_locks(&git_dir.join("refs"), &mut locks);
+    let now = SystemTime::now();
+    let mut locks = Vec::new();
+    collect_locks(git_dir, false, &mut locks);
+    collect_locks(&git_dir.join("refs"), true, &mut locks);
     for path in locks {
-        let age = path
-            .metadata()
-            .and_then(|meta| meta.modified())
-            .ok()
-            .and_then(|modified| modified.elapsed().ok());
-        if !age.is_some_and(|age| age > STALE_LOCK_AGE) {
+        let Ok(modified) = path.metadata().and_then(|meta| meta.modified()) else {
+            continue;
+        };
+        if now
+            .duration_since(modified)
+            .is_ok_and(|age| age <= STALE_LOCK_AGE)
+        {
+            tracing::debug!(path = %path.display(), "keeping a fresh lock file");
             continue;
         }
         match std::fs::remove_file(&path) {
@@ -73,15 +76,21 @@ fn sweep_stale_locks(git_dir: &Path) {
     }
 }
 
-fn collect_ref_locks(dir: &Path, out: &mut Vec<PathBuf>) {
+/// `*.lock` files directly in `dir`, and below it when `recurse`. Symlinks
+/// are skipped (`file_type` does not follow them), so a link out of `.git`
+/// or a link cycle cannot steer the sweep.
+fn collect_locks(dir: &Path, recurse: bool, out: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
     for entry in entries.flatten() {
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
         let path = entry.path();
-        if path.is_dir() {
-            collect_ref_locks(&path, out);
-        } else if path.extension().is_some_and(|ext| ext == "lock") {
+        if kind.is_dir() && recurse {
+            collect_locks(&path, true, out);
+        } else if kind.is_file() && path.extension().is_some_and(|ext| ext == "lock") {
             out.push(path);
         }
     }

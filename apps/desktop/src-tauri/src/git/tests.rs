@@ -1169,17 +1169,29 @@ fn stale_locks_are_removed_on_open() {
     let stale = [
         git_dir.join("HEAD.lock"),
         git_dir.join("index.lock"),
+        git_dir.join("FETCH_HEAD.lock"),
+        git_dir.join("MERGE_HEAD.lock"),
+        git_dir.join("config.lock"),
         git_dir.join("refs/heads/main.lock"),
     ];
     for path in &stale {
         plant_lock(path, Duration::from_secs(11 * 60));
     }
+    // A lock dated in the future cannot be live either.
+    let future = git_dir.join("ORIG_HEAD.lock");
+    plant_lock(&future, Duration::ZERO);
+    fs::File::options()
+        .write(true)
+        .open(&future)
+        .unwrap()
+        .set_modified(SystemTime::now() + Duration::from_secs(3600))
+        .unwrap();
 
     // The next operation opens the repository, sweeps, and succeeds where
     // libgit2 would otherwise refuse to touch the index and the branch.
     write(root, "notes/a.md", "# A\n");
     assert!(commit_all(root, "a", MAX_FILE_BYTES).unwrap().committed);
-    for path in &stale {
+    for path in stale.iter().chain([&future]) {
         assert!(!path.exists(), "{} should be gone", path.display());
     }
 }
@@ -1192,8 +1204,14 @@ fn fresh_locks_are_left_alone() {
     // the user is running, so a sweep must not take it.
     let fresh = root.join(".git/refs/heads/other.lock");
     plant_lock(&fresh, Duration::from_secs(60));
+    // A symlink under `refs/` must not lead the sweep out of `.git`.
+    let outside = fixture._dir.path().join("outside/old.lock");
+    plant_lock(&outside, Duration::from_secs(11 * 60));
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(outside.parent().unwrap(), root.join(".git/refs/outside")).unwrap();
 
     write(root, "notes/a.md", "# A\n");
     assert!(commit_all(root, "a", MAX_FILE_BYTES).unwrap().committed);
     assert!(fresh.exists());
+    assert!(outside.exists());
 }
