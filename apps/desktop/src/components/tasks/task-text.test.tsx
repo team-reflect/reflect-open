@@ -16,6 +16,13 @@ describe('TaskText', () => {
     await view.unmount()
   })
 
+  it('renders a heading marker at the start of the text as text, not a heading', async () => {
+    const view = await render(<TaskText task={makeOpenTask({ markdown: '# task' })} />)
+    expect(view.container.textContent).toContain('# task')
+    expect(view.container.querySelector('h1, h2, h3, h4, h5, h6')).toBeNull()
+    await view.unmount()
+  })
+
   it('would render that marker as a checkbox without single-paragraph mode', async () => {
     const view = await render(<MarkdownPreview content="+ [ ] task" />)
     expect(view.container.querySelector('input[type="checkbox"]')).not.toBeNull()
