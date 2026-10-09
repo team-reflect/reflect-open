@@ -99,6 +99,7 @@ fn side_of(entry: Option<IndexEntry>) -> Option<ConflictSide> {
 /// (the sync engine guarantees it): local changes are already committed.
 pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
     let repo = open_existing(root)?;
+    finish_interrupted(&repo, root)?;
     ensure_clean_state(&repo)?;
     let branch = current_branch(&repo)?;
     let Ok(remote_oid) = repo.refname_to_id(&format!("refs/remotes/origin/{branch}")) else {
@@ -188,6 +189,45 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
         conflicted_paths,
         changed_files,
     })
+}
+
+/// Finish a pull that died between `repo.merge` and the merge commit (the
+/// process was killed): the index still holds the merge and its conflicts,
+/// and the working tree holds its checkout. Completing it yields what the
+/// pull would have committed, with anything the user typed into a conflicted
+/// note since (the text path stages the file as it is now). Clearing the
+/// state instead would let the next commit record the merge's output as a
+/// local edit, and the redone merge would conflict against its own markers.
+///
+/// Only a merge of the branch's own remote is this app's. Any other merge
+/// was started with the git CLI and stays for [`ensure_clean_state`] to
+/// refuse. A completion that fails clears the state like a failed pull does,
+/// so a crash never wedges the backup.
+pub(super) fn finish_interrupted(repo: &Repository, root: &Path) -> AppResult<()> {
+    if repo.state() != git2::RepositoryState::Merge {
+        return Ok(());
+    }
+    let tracking = format!("refs/remotes/origin/{}", current_branch(repo)?);
+    let (Ok(theirs), Ok(remote)) = (
+        repo.refname_to_id("MERGE_HEAD"),
+        repo.refname_to_id(&tracking),
+    ) else {
+        return Ok(());
+    };
+    if theirs != remote && !repo.graph_descendant_of(remote, theirs)? {
+        return Ok(());
+    }
+    tracing::warn!("finishing a merge an earlier run left unfinished");
+    // The crash may have come after the merge commit and before the cleanup.
+    let ours = repo.head()?.peel_to_commit()?.id();
+    let committed = ours == theirs || repo.graph_descendant_of(ours, theirs)?;
+    if !committed {
+        if let Err(err) = complete_merge(repo, root, theirs) {
+            tracing::warn!(?err, "could not finish the interrupted merge; clearing it");
+        }
+    }
+    repo.cleanup_state()?;
+    Ok(())
 }
 
 /// The post-`repo.merge` half: materialize conflicts, commit the merge with
