@@ -1,8 +1,10 @@
 import { useRef, useState, type ReactElement } from 'react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { useQuery } from '@tanstack/react-query'
+import { remoteHost } from '@reflect/core'
 import { ExternalLink } from 'lucide-react'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog.tsx'
+import { ConnectHostDialog } from '@/components/settings/connect-host-dialog.tsx'
 import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links.tsx'
 import { SettingsField } from '@/components/settings/field.tsx'
 import { GithubSignOutRow } from '@/components/settings/github-sign-out-row.tsx'
@@ -44,8 +46,9 @@ function githubRepoBrowserUrl(
 }
 
 /**
- * Settings → Sync → GitHub sync: connect a GitHub repository, see the current
- * backup state in product language, back up on demand, and disconnect.
+ * Settings → Sync → GitHub sync: connect a GitHub repository (or another
+ * HTTPS host), see the current backup state in product language, back up on
+ * demand, and disconnect.
  * Conflicted notes ("needs review") surface here with a count; each conflicted
  * note also shows its own banner when opened.
  */
@@ -54,6 +57,7 @@ export function BackupSettingsField(): ReactElement {
   const { graph } = useGraph()
   const githubConnected = useGithubConnected()
   const [connectOpen, setConnectOpen] = useState(false)
+  const [connectHostOpen, setConnectHostOpen] = useState(false)
   const openRepoAttempt = useRef(0)
   const action = useAsyncAction()
 
@@ -82,6 +86,16 @@ export function BackupSettingsField(): ReactElement {
       : null
   // A hand-wired non-GitHub remote (Plan 16) renders the section host-neutral.
   const genericRemote = backup.phase === 'connected' && backup.repo === null
+  // An HTTPS host that refuses the sync, or has no sign-in stored (a remote
+  // set up in the terminal), is fixed by entering one: the same form.
+  const hostSignInUrl =
+    backup.phase === 'connected' &&
+    backup.repo === null &&
+    backup.status.state === 'error' &&
+    (backup.status.errorKind === 'auth' || backup.status.errorKind === 'rejected') &&
+    remoteHost(backup.remoteUrl) !== null
+      ? backup.remoteUrl
+      : null
 
   function openGithubRepo(): void {
     if (backup.phase !== 'connected' || backup.repo === null) {
@@ -121,9 +135,17 @@ export function BackupSettingsField(): ReactElement {
 
           {backup.phase === 'disconnected' ? (
             <>
-              <div>
+              <div className="flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => setConnectOpen(true)}>
                   Connect GitHub…
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  title="GitLab, Gitea, Codeberg, or your own server, over HTTPS"
+                  onClick={() => setConnectHostOpen(true)}
+                >
+                  Connect another host…
                 </Button>
               </div>
               {githubConnected ? (
@@ -170,6 +192,11 @@ export function BackupSettingsField(): ReactElement {
                 >
                   Stop backing up
                 </Button>
+                {hostSignInUrl !== null ? (
+                  <Button variant="outline" size="sm" onClick={() => setConnectHostOpen(true)}>
+                    Update sign-in…
+                  </Button>
+                ) : null}
                 {backup.repo !== null ? (
                   <Button variant="ghost" size="sm" onClick={openGithubRepo}>
                     <ExternalLink aria-hidden />
@@ -195,6 +222,12 @@ export function BackupSettingsField(): ReactElement {
         <ConnectGithubDialog
           suggestedRepoName={suggestRepoName(graph?.name)}
           onClose={() => setConnectOpen(false)}
+        />
+      ) : null}
+      {connectHostOpen ? (
+        <ConnectHostDialog
+          remoteUrl={hostSignInUrl ?? ''}
+          onClose={() => setConnectHostOpen(false)}
         />
       ) : null}
     </>

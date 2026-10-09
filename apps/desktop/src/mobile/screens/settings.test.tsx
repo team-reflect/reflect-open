@@ -77,6 +77,9 @@ vi.mock('@/mobile/connect-github-drawer.tsx', () => ({
   ConnectGithubDrawer: ({ open }: { open: boolean }) =>
     open ? <div>connect-github-sheet</div> : null,
 }))
+vi.mock('@/mobile/connect-host-drawer.tsx', () => ({
+  ConnectHostDrawer: ({ open }: { open: boolean }) => (open ? <div>connect-host-sheet</div> : null),
+}))
 
 function connected(status: Extract<BackupState, { phase: 'connected' }>['status']): BackupState {
   return {
@@ -367,6 +370,20 @@ describe('MobileSettings', () => {
     await user.click(page.getByRole('button', { name: 'Connect GitHub' }))
 
     await expect.element(page.getByText('connect-github-sheet')).toBeVisible()
+  })
+
+  it('offers Connect another host for a disconnected local graph and opens its sheet', async () => {
+    graphState.mobileStorageKind = 'local'
+    sync.value = {
+      backup: { phase: 'disconnected' },
+      disconnectGraph: vi.fn(async () => {}),
+      signOut: vi.fn(async () => {}),
+    }
+    await mount()
+
+    await userEvent.click(page.getByRole('button', { name: 'Connect another host' }))
+
+    await expect.element(page.getByText('connect-host-sheet')).toBeVisible()
   })
 
   it('hides the connect row once the local graph is connected', async () => {

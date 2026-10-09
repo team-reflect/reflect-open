@@ -11,6 +11,7 @@ import {
   githubCredential,
   githubRemoteUrl,
   gitDisconnect,
+  gitRemoteHead,
   gitSetup,
   gitStatus,
   isCaptureSpoolPath,
@@ -21,8 +22,10 @@ import {
   parseGithubRemote,
   remoteHost,
   ReflectError,
+  saveHostCredential,
   subscribeFileChanges,
   type ChangedFile,
+  type GitCredential,
   type GithubRepoRef,
   type GraphInfo,
   type SyncEngine,
@@ -108,6 +111,13 @@ export interface BackupController {
     ref: GithubRepoRef,
     options?: { allowPublic?: boolean },
   ): Promise<ConnectExistingResult>
+  /**
+   * Connect a repository on another HTTPS host (GitLab, Gitea, Codeberg, a
+   * server of your own) with a username and token. The sign-in is checked
+   * against the host first, so a wrong URL or token fails here with the
+   * host's own answer, before anything is stored or `origin` is set.
+   */
+  connectHost(remoteUrl: string, credential: GitCredential): Promise<void>
   /**
    * Stop backing **this graph** up (drops its remote; history and the
    * machine-level GitHub credential stay — other graphs keep syncing).
@@ -348,7 +358,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
           status: {
             state: 'error',
             errorKind: 'rejected',
-            message: `No sign-in is stored for ${host}. Add one in Settings → GitHub sync, or switch the remote to its SSH form: git remote set-url origin git@${host}:<owner>/<repo>.git`,
+            message: `No sign-in is stored for ${host}. Add one in Settings → Sync, or switch the remote to its SSH form: git remote set-url origin git@${host}:<owner>/<repo>.git`,
           },
         })
         await startLocalHistory(status.initialized)
@@ -458,7 +468,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
     return token
   }
 
-  async function connectRemote(remoteUrl: string, branch: string): Promise<void> {
+  async function connectRemote(remoteUrl: string, branch: string | null): Promise<void> {
     await gitSetup(remoteUrl, branch, generation)
     await start()
   }
@@ -500,6 +510,27 @@ export function createBackupController(options: BackupControllerOptions): Backup
       // the local branch must match or sync would fork a parallel branch.
       await connectRemote(githubRemoteUrl(ref), repo.defaultBranch)
       return 'connected'
+    },
+    connectHost: async (remoteUrl, credential) => {
+      // The token travels encrypted and lives in the keychain only: plain
+      // http, and a sign-in written into the URL, are refused.
+      const host = /^https:\/\/[^/@]+\//i.test(remoteUrl) ? remoteHost(remoteUrl) : null
+      if (host === null) {
+        throw new ReflectError(
+          'parse',
+          'Enter the repository’s https:// URL, without a username or token in it.',
+        )
+      }
+      if (parseGithubRemote(remoteUrl) !== null) {
+        // start() only syncs a GitHub remote with the managed GitHub sign-in.
+        throw new ReflectError('parse', 'This is a GitHub repository: connect it with GitHub.')
+      }
+      await gitSetup(null, null, generation) // the repository the probe runs from
+      const tip = await gitRemoteHead(credential, generation, remoteUrl)
+      await saveHostCredential(host, credential)
+      // A remote that already holds notes on another branch keeps it: the
+      // local branch takes that name, or sync would fork a parallel branch.
+      await connectRemote(remoteUrl, tip.defaultBranch)
     },
     disconnectGraph: async () => {
       await gitDisconnect(generation)
