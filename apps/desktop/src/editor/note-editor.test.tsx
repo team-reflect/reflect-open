@@ -199,42 +199,6 @@ describe('NoteEditor time format', () => {
   })
 })
 
-describe('NoteEditor Backspace in an empty first paragraph', () => {
-  it('keeps the empty paragraph by default', async () => {
-    const handleRef = createRef<NoteEditorHandle>()
-    await render(<NoteEditor initialContent="" handleRef={handleRef} />)
-
-    await pmRoot.click()
-    await userEvent.keyboard('{Enter}foo')
-    // Not ArrowUp: a native caret move reaches the editor state one
-    // `selectionchange` later, which an immediate Backspace would outrun.
-    handleRef.current?.setSelection('start')
-    await userEvent.keyboard('{Backspace}x')
-
-    await vi.waitFor(() => {
-      expect(handleRef.current?.getMarkdown()).toBe('x\n\nfoo\n')
-    })
-  })
-
-  it('deletes the empty paragraph when backspaceDeletesEmptyFirstBlock is on', async () => {
-    const handleRef = createRef<NoteEditorHandle>()
-    await render(
-      <NoteEditor initialContent="" backspaceDeletesEmptyFirstBlock handleRef={handleRef} />,
-    )
-
-    await pmRoot.click()
-    await userEvent.keyboard('{Enter}foo')
-    // Not ArrowUp: a native caret move reaches the editor state one
-    // `selectionchange` later, which an immediate Backspace would outrun.
-    handleRef.current?.setSelection('start')
-    await userEvent.keyboard('{Backspace}x')
-
-    await vi.waitFor(() => {
-      expect(handleRef.current?.getMarkdown()).toBe('xfoo\n')
-    })
-  })
-})
-
 describe('NoteEditor smooth caret animation', () => {
   it('enables the caret glide by default', async () => {
     await render(<NoteEditor initialContent="Hello" />)

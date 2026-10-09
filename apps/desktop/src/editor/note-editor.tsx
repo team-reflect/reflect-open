@@ -137,9 +137,9 @@ interface NoteEditorProps {
   bulletAfterHeading?: boolean
   /**
    * Whether Backspace in an empty first paragraph deletes that paragraph, so
-   * the rest of the note moves up one line. Off by default. The daily stream
-   * opts in: its date heading sits outside the editor, so nothing else can
-   * remove a leading empty line.
+   * the rest of the note moves up one line. Off by default. Daily notes opt
+   * in on every surface: the day's heading sits outside the editor, so nothing
+   * else can remove a leading empty line.
    */
   backspaceDeletesEmptyFirstBlock?: boolean
   /**
