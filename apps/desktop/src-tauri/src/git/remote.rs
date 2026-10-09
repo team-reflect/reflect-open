@@ -198,9 +198,6 @@ pub(super) fn clone(url: &str, target: &Path, credential: Option<GitCredential>)
     Ok(())
 }
 
-/// Push the current branch to `origin`. Rejections come back as data, not
-/// errors — the sync engine branches on them (non-fast-forward → pull/merge/
-/// retry; anything else → surface the remote's message).
 /// Where `origin` says its branch is, next to where the last fetch left it.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -216,6 +213,10 @@ pub struct RemoteTip {
 /// differs from the tracking ref means the remote moved since the last fetch.
 /// `url` probes another remote instead of `origin` (a host the user is about
 /// to connect: the credential is checked here, not at the first push).
+///
+/// The connection is made in the push direction: a host asks for the
+/// credential there even on a public repository, where a fetch would succeed
+/// with a wrong token. A probe that succeeds proves the sign-in can push.
 pub(super) fn remote_head(
     root: &Path,
     url: Option<&str>,
@@ -229,7 +230,7 @@ pub(super) fn remote_head(
     };
     let refname = format!("refs/heads/{branch}");
     remote.connect_auth(
-        git2::Direction::Fetch,
+        git2::Direction::Push,
         Some(callbacks_with_credentials(credential)),
         None,
     )?;
@@ -249,6 +250,9 @@ pub(super) fn remote_head(
     })
 }
 
+/// Push the current branch to `origin`. Rejections come back as data, not
+/// errors — the sync engine branches on them (non-fast-forward → pull/merge/
+/// retry; anything else → surface the remote's message).
 pub(super) fn push(root: &Path, credential: Option<GitCredential>) -> AppResult<PushOutcome> {
     let repo = open_existing(root)?;
     let branch = current_branch(&repo)?;
