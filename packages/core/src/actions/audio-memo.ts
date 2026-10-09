@@ -33,7 +33,8 @@ import {
   type AudioMemoSession,
 } from './audio-memo-session.ts'
 import { AUDIO_MEMOS_DIR, audioMemoPath, dailyPath, notePath } from '../graph/paths.ts'
-import { appendListItemUnderBacklinkedHeading, wikiLinkSafe } from '../markdown/edit.ts'
+import { wikiLinkSafe } from '../markdown/edit.ts'
+import { appendListItem } from '../markdown/task-ast.ts'
 import { getSecret } from '../secrets/keychain.ts'
 import { ensureBacklinkTarget } from './backlink-target.ts'
 
@@ -405,9 +406,11 @@ async function ensureDailyBacklink(
   }
   const displayTitle = wikiLinkSafe(title) || memo.title
   const entry = `[[${memo.base}|${displayTitle}]]`
-  const updated = appendListItemUnderBacklinkedHeading(source, memosNoteTitle, entry, [
-    MEMOS_NOTE_TITLE,
-  ])
+  const updated = appendListItem(source, {
+    kind: 'bullet',
+    markdown: entry,
+    section: { titles: [memosNoteTitle, MEMOS_NOTE_TITLE], linked: true },
+  })
   await writeNote(dailyPath(memo.date), updated, generation)
 }
 

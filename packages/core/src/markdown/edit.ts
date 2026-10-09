@@ -1,14 +1,9 @@
-import { appendListItemAtHeading, listItemBlock } from './append-list-item.ts'
-import { appendHeadingSection } from './append-section.ts'
-import { parseNote } from './extract.ts'
-import { topLevelHeadings } from './heading-blocks.ts'
 import { foldKey } from './keys.ts'
 import type { Heading, WikiLink } from './model.ts'
 import { normalizeWikiTarget } from './resolve.ts'
 import { scanInlineWikiLinks } from './scan.ts'
 
 export { appendBlock } from './append-section.ts'
-export { appendListItem, type ListItemKind } from './append-list-item.ts'
 
 /**
  * Source-level edit helpers (Plan 03). These splice the original string by node
@@ -64,28 +59,6 @@ export function wikiLinkSafe(text: string): string {
     .trim()
 }
 
-/**
- * Insert an unordered-list item into the list beneath the first matching
- * top-level heading. If the heading is missing, append a new H2 section.
- * `content` carries no bullet marker; see {@link appendListItemAtHeading}.
- */
-export function appendListItemUnderHeading(
-  source: string,
-  heading: string,
-  content: string,
-): string {
-  const headingKey = heading.trim().toLowerCase()
-  const { headings } = parseNote({ path: '', source })
-  const target = topLevelHeadings(headings).find(
-    (candidate) => candidate.text.toLowerCase() === headingKey,
-  )
-
-  if (target === undefined) {
-    return appendHeadingSection(source, heading, listItemBlock(content))
-  }
-  return appendListItemAtHeading(source, target, content)
-}
-
 /** The target when a heading consists entirely of one parsed wiki link. */
 function linkedHeadingTarget(
   source: string,
@@ -124,79 +97,4 @@ export function headingMatchesBacklinkedTitle(
   title: string,
 ): boolean {
   return foldKey(linkedHeadingTarget(source, heading, wikiLinks) ?? heading.text) === foldKey(title)
-}
-
-function matchingBacklinkedHeading(
-  source: string,
-  headings: readonly Heading[],
-  wikiLinks: readonly WikiLink[],
-  titles: readonly string[],
-): Heading | undefined {
-  const matches = topLevelHeadings(headings).filter(
-    (heading) =>
-      heading.level === 2 &&
-      titles.some((title) => headingMatchesBacklinkedTitle(source, heading, wikiLinks, title)),
-  )
-  return (
-    matches.find((heading) => linkedHeadingTarget(source, heading, wikiLinks) !== null) ??
-    matches[0]
-  )
-}
-
-/**
- * Add the missing wiki link to an existing legacy `## Title` section heading.
- * Missing or already-linked sections are byte-identical no-ops.
- */
-export function upgradeSectionHeadingBacklink(
-  source: string,
-  title: string,
-  matchingTitles: readonly string[] = [],
-): string {
-  const safeTitle = wikiLinkSafe(title)
-  if (safeTitle === '') {
-    throw new Error('a backlinked heading needs a title')
-  }
-  const { headings, wikiLinks } = parseNote({ path: '', source })
-  const target = matchingBacklinkedHeading(source, headings, wikiLinks, [
-    safeTitle,
-    ...matchingTitles,
-  ])
-  if (target === undefined || linkedHeadingTarget(source, target, wikiLinks) !== null) {
-    return source
-  }
-  return (
-    source.slice(0, target.from) +
-    `${'#'.repeat(target.level)} [[${safeTitle}]]` +
-    source.slice(target.to)
-  )
-}
-
-/**
- * Insert one unordered-list item into the list beneath a backlinked H2.
- * Existing legacy plain headings are upgraded in place; a missing section is
- * appended as `## [[Title]]`. `content` carries no bullet marker; see
- * {@link appendListItemAtHeading}.
- */
-export function appendListItemUnderBacklinkedHeading(
-  source: string,
-  title: string,
-  content: string,
-  matchingTitles: readonly string[] = [],
-): string {
-  const safeTitle = wikiLinkSafe(title)
-  if (safeTitle === '') {
-    throw new Error('a backlinked heading needs a title')
-  }
-  const linkedHeading = `[[${safeTitle}]]`
-  const upgraded = upgradeSectionHeadingBacklink(source, safeTitle, matchingTitles)
-  const { headings, wikiLinks } = parseNote({ path: '', source: upgraded })
-  const target = matchingBacklinkedHeading(upgraded, headings, wikiLinks, [
-    safeTitle,
-    ...matchingTitles,
-  ])
-
-  if (target === undefined) {
-    return appendHeadingSection(upgraded, linkedHeading, listItemBlock(content))
-  }
-  return appendListItemAtHeading(upgraded, target, content)
 }

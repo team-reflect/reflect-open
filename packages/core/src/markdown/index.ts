@@ -35,14 +35,7 @@ export {
   type InlineImage,
   type InlineSegment,
 } from './scan.ts'
-export {
-  appendBlock,
-  appendListItem,
-  type ListItemKind,
-  wikiLinkSafe,
-  setTaskDueDate,
-  clearTaskDueDate,
-} from './edit.ts'
+export { appendBlock, wikiLinkSafe, setTaskDueDate, clearTaskDueDate } from './edit.ts'
 export { retitleWikiLinks, type WikiLinkRetitleOptions } from './retitle.ts'
 export { displayNoteTitle, wikiLinkTargetForTitle } from './note-title.ts'
 export {
@@ -75,6 +68,11 @@ export {
 export { renderInlineText } from './inline-text.ts'
 export { compareTaskPaths, decodeTaskPath, encodeTaskPath, isSameTaskPath } from './task-path.ts'
 export {
+  appendListItem,
+  linkSectionHeading,
+  type ListItemInsert,
+  type ListItemKind,
+  type SectionTarget,
   applyTaskEdits,
   findTaskMove,
   getFirstParagraphMarkdown,

@@ -12,14 +12,14 @@ import {
 } from '../graph/commands.ts'
 import { dailyPath, notePath } from '../graph/paths.ts'
 import { hashContent } from '../indexing/hash.ts'
+import { headingMatchesBacklinkedTitle } from '../markdown/edit.ts'
+import { parseNote } from '../markdown/extract.ts'
 import {
   appendListItem,
-  appendListItemUnderBacklinkedHeading,
-  headingMatchesBacklinkedTitle,
-  upgradeSectionHeadingBacklink,
-} from '../markdown/edit.ts'
-import { parseNote } from '../markdown/extract.ts'
-import { applyTaskEdits } from '../markdown/task-ast.ts'
+  applyTaskEdits,
+  linkSectionHeading,
+  type SectionTarget,
+} from '../markdown/task-ast.ts'
 import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks.ts'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter.ts'
 import type { ReconcileStop } from './audio-memo.ts'
@@ -277,14 +277,14 @@ export async function drainCaptureInbox(
         // daily's link text in step.
         updatedDaily = retitleDailyEntry(updatedDaily, identity.base, existing.title, freshTitle)
       }
-      updatedDaily = upgradeSectionHeadingBacklink(updatedDaily, linksNoteTitle, [LINKS_NOTE_TITLE])
+      const section: SectionTarget = { titles: [linksNoteTitle, LINKS_NOTE_TITLE], linked: true }
+      updatedDaily = linkSectionHeading(updatedDaily, section)
       if (!updatedDaily.includes(`[[${identity.base}`)) {
-        updatedDaily = appendListItemUnderBacklinkedHeading(
-          updatedDaily,
-          linksNoteTitle,
-          `[[${identity.base}|${freshTitle}]]`,
-          [LINKS_NOTE_TITLE],
-        )
+        updatedDaily = appendListItem(updatedDaily, {
+          kind: 'bullet',
+          markdown: `[[${identity.base}|${freshTitle}]]`,
+          section,
+        })
       }
       if (updatedDaily !== dailySource) {
         await writeNote(daily, updatedDaily, input.generation)
@@ -342,11 +342,10 @@ async function drainTextCapture(envelope: TextCaptureEnvelope, generation: numbe
       ? applyTaskEdits(dailySource, [
           { kind: 'insert', at: { kind: 'tasksSection' }, markdown: envelope.text },
         ]).source
-      : appendListItem(
-          dailySource,
-          envelope.text,
-          envelope.kind === 'append' ? 'bullet' : 'checkbox',
-        )
+      : appendListItem(dailySource, {
+          kind: envelope.kind === 'append' ? 'bullet' : 'checkbox',
+          markdown: envelope.text,
+        })
   await writeNote(daily, next, generation)
 }
 

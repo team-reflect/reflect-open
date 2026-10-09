@@ -6,7 +6,8 @@ import { noteExists, readNote, writeNote } from '../graph/commands.ts'
 import { createNoteWithTitle } from '../graph/create-note.ts'
 import { dailyPath, notePath } from '../graph/paths.ts'
 import { resolveWikiTarget } from '../indexing/queries.ts'
-import { appendListItemUnderHeading, wikiLinkSafe } from '../markdown/edit.ts'
+import { wikiLinkSafe } from '../markdown/edit.ts'
+import { appendListItem, type SectionTarget } from '../markdown/task-ast.ts'
 import { canonicalEmails } from '../markdown/email-fields.ts'
 import { parseNote } from '../markdown/extract.ts'
 import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks.ts'
@@ -41,8 +42,9 @@ import { resolveMeetingAttendeeTargets, type ResolvedMeetingAttendee } from './r
  * lazy-daily contract), so writing one would just be normalized away.
  */
 
-/** Where the daily-note entry lands (`appendListItemUnderHeading` creates it). */
+/** Where the daily-note entry lands (`appendListItem` creates it). */
 export const MEETINGS_HEADING = 'Meetings'
+const MEETINGS_SECTION: SectionTarget = { titles: [MEETINGS_HEADING], linked: false }
 
 /** Created notes are typed like v1 tagged them (`- Type: #link` in capture is
  * the same convention); `#person` feeds the All Notes person filter. */
@@ -207,7 +209,7 @@ export type MeetingLineAttendee =
  * shorten to `9:00am [[Standup]]`; without a start time the phrasing
  * capitalizes to `Met with`; an un-backlinked meeting name is plain text.
  * The bullet marker itself belongs to the list this lands in, so it is added
- * by {@link appendListItemUnderHeading} rather than written here.
+ * by {@link appendListItem} rather than written here.
  */
 export function meetingLine(input: {
   title: string
@@ -277,7 +279,7 @@ export async function addMeetingToDaily(input: AddMeetingInput): Promise<AddMeet
   })
   await writeNote(
     daily,
-    appendListItemUnderHeading(source, MEETINGS_HEADING, line),
+    appendListItem(source, { kind: 'bullet', markdown: line, section: MEETINGS_SECTION }),
     input.generation,
   )
 

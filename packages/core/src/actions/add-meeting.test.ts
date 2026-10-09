@@ -196,7 +196,7 @@ describe('addMeetingToDaily', () => {
     expect(outcome.appended).toBe(true)
     expect(writeNoteMock).toHaveBeenCalledWith(
       DAILY,
-      '> ## Meetings\n> - [[Standup]]\n\n## Meetings\n\n- [[Standup]]\n',
+      '> ## Meetings\n>\n> - [[Standup]]\n\n## Meetings\n\n- [[Standup]]\n',
       GENERATION,
     )
   })

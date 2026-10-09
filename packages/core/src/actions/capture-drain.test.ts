@@ -608,7 +608,7 @@ describe('drainCaptureInbox (text captures)', () => {
 
     await drain()
 
-    expect(files.get(DAILY)).toBe('+ [ ] buy milk\n\n- [ ] pack a bag\n')
+    expect(files.get(DAILY)).toBe('+ [ ] buy milk\n- [ ] pack a bag\n')
   })
 
   it('still appends to a private daily — the write is entirely local', async () => {
