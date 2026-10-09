@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render } from 'vitest-browser-react'
 import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { open } from '@tauri-apps/plugin-dialog'
 import { setBridge } from '@reflect/core'
 import { GraphProvider } from '@/providers/graph-provider.tsx'
 import { SettingsProvider } from '@/providers/settings-provider.tsx'
@@ -10,10 +11,17 @@ import '@/test-utils/locator.ts'
 import { GraphChooser } from './graph-chooser.tsx'
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }))
+// The restore card's GitHub step probes the stored sign-in over the network.
+vi.mock('@/lib/github-account.ts', () => ({
+  fetchSignedInUser: vi.fn(async () =>
+    secrets['github-auth'] === undefined ? null : { login: 'alex', avatarUrl: null },
+  ),
+}))
 
 let invokeLog: Array<[string, Record<string, unknown>]>
 let recents: Array<{ root: string; name: string; openedMs: number }>
 let storedSettings: Record<string, unknown>
+let secrets: Record<string, string>
 let icloudStatusResponse: {
   available: boolean
   documentsRoot: string | null
@@ -40,6 +48,8 @@ beforeEach(() => {
     { root: '/graphs/personal', name: 'personal', openedMs: 1 },
   ]
   storedSettings = {}
+  secrets = {}
+  vi.mocked(open).mockReset()
   icloudStatusResponse = { available: false, documentsRoot: null, existingGraphRoots: [] }
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
@@ -67,6 +77,10 @@ beforeEach(() => {
           return { notes: 0, attachments: 0, skipped: 0 }
         case 'settings_load':
           return storedSettings
+        case 'secret_get':
+          return secrets[String(args['name'])] ?? null
+        case 'git_clone':
+          return null
         default:
           return null
       }
@@ -228,5 +242,108 @@ describe('GraphChooser', () => {
       .getByRole('button', { name: 'work /graphs/work', exact: true })
       .locate('svg')
     await expect.element(workIcon).toHaveClass('text-text-muted')
+  })
+  it('restores a GitHub backup into the chosen folder and opens it', async () => {
+    secrets['github-auth'] = JSON.stringify({ kind: 'pat', token: 'tok' })
+    vi.mocked(open).mockResolvedValue('/graphs')
+    await render(<GraphChooser />, { wrapper })
+
+    await expect.element(page.getByRole('heading', { name: 'Restore from a backup' })).toBeVisible()
+    const restore = page.getByRole('button', { name: /Choose where to restore/ })
+    await expect.element(restore).toBeDisabled() // nothing typed yet
+    await userEvent.type(page.getByRole('textbox', { name: 'Repository' }), 'alex/notes')
+    await expect.element(restore).toBeEnabled()
+    await userEvent.click(restore)
+
+    await vi.waitFor(() =>
+      expect(invokeLog).toContainEqual([
+        'git_clone',
+        {
+          url: 'https://github.com/alex/notes.git',
+          path: '/graphs/notes',
+          credential: { username: 'x-access-token', secret: 'tok' },
+        },
+      ]),
+    )
+    await vi.waitFor(() =>
+      expect(invokeLog).toContainEqual(['graph_open', { path: '/graphs/notes' }]),
+    )
+  })
+
+  it('asks for the GitHub sign-in before restoring a GitHub repository', async () => {
+    await render(<GraphChooser />, { wrapper })
+
+    await userEvent.type(page.getByRole('textbox', { name: 'Repository' }), 'alex/notes')
+    await expect.element(page.getByRole('button', { name: 'Sign in with GitHub' })).toBeVisible()
+    await expect
+      .element(page.getByRole('button', { name: /Choose where to restore/ }))
+      .toBeDisabled()
+  })
+
+  it('restores from another host with its stored sign-in, without the GitHub step', async () => {
+    secrets['git-host:gitlab.com'] = JSON.stringify({ username: 'alex', secret: 'glpat' })
+    vi.mocked(open).mockResolvedValue('/graphs')
+    await render(<GraphChooser />, { wrapper })
+
+    await userEvent.type(
+      page.getByRole('textbox', { name: 'Repository' }),
+      'https://gitlab.com/alex/my-notes.git',
+    )
+    expect(page.getByRole('button', { name: 'Sign in with GitHub' }).query()).toBeNull()
+    await userEvent.click(page.getByRole('button', { name: /Choose where to restore/ }))
+
+    await vi.waitFor(() =>
+      expect(invokeLog).toContainEqual([
+        'git_clone',
+        {
+          url: 'https://gitlab.com/alex/my-notes.git',
+          path: '/graphs/my-notes',
+          credential: { username: 'alex', secret: 'glpat' },
+        },
+      ]),
+    )
+  })
+
+  it('a cancelled folder picker restores nothing', async () => {
+    secrets['git-host:gitlab.com'] = JSON.stringify({ username: 'alex', secret: 'glpat' })
+    vi.mocked(open).mockResolvedValue(null)
+    await render(<GraphChooser />, { wrapper })
+
+    await userEvent.type(
+      page.getByRole('textbox', { name: 'Repository' }),
+      'https://gitlab.com/alex/notes.git',
+    )
+    await userEvent.click(page.getByRole('button', { name: /Choose where to restore/ }))
+    await vi.waitFor(() => expect(vi.mocked(open)).toHaveBeenCalled())
+    expect(invokeLog.map(([command]) => command)).not.toContain('git_clone')
+  })
+
+  it('refuses to restore into iCloud Drive, where the graph would sync twice', async () => {
+    secrets['git-host:gitlab.com'] = JSON.stringify({ username: 'alex', secret: 'glpat' })
+    vi.mocked(open).mockResolvedValue('/Users/alex/Library/Mobile Documents/com~apple~CloudDocs')
+    await render(<GraphChooser />, { wrapper })
+
+    await userEvent.type(
+      page.getByRole('textbox', { name: 'Repository' }),
+      'https://gitlab.com/alex/notes.git',
+    )
+    await userEvent.click(page.getByRole('button', { name: /Choose where to restore/ }))
+
+    await expect.element(page.getByText(/Choose a folder outside iCloud Drive/)).toBeVisible()
+    expect(invokeLog.map(([command]) => command)).not.toContain('git_clone')
+  })
+
+  it('a folder picker that fails shows the failure in the card', async () => {
+    secrets['git-host:gitlab.com'] = JSON.stringify({ username: 'alex', secret: 'glpat' })
+    vi.mocked(open).mockRejectedValue(new Error('the dialog could not open'))
+    await render(<GraphChooser />, { wrapper })
+
+    await userEvent.type(
+      page.getByRole('textbox', { name: 'Repository' }),
+      'https://gitlab.com/alex/notes.git',
+    )
+    await userEvent.click(page.getByRole('button', { name: /Choose where to restore/ }))
+
+    await expect.element(page.getByText('the dialog could not open')).toBeVisible()
   })
 })
