@@ -462,7 +462,7 @@ export function useTaskActions(): TaskActions {
       if (graph?.generation === undefined) {
         return null
       }
-      return insertInto(target)
+      return await insertInto(target)
     },
     insertAfter: async (task, content, target) => {
       if (graph?.generation === undefined) {
@@ -487,7 +487,7 @@ export function useTaskActions(): TaskActions {
       if (!(await persistTaskDraft(task, content))) {
         return null // the edit/delete rollback already surfaced the failure
       }
-      return insertInto(target)
+      return await insertInto(target)
     },
     editAndToggle: (task, content) => {
       if (graph?.generation !== undefined && !editAndToggleMutation.isPending) {
