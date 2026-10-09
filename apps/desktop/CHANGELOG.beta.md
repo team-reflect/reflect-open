@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.15.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.5...v0.15.0-beta.6) (2026-10-09)
+
+
+### Features
+
+* **core:** expose a three-way text merge command ([#1453](https://github.com/team-reflect/reflect-open/issues/1453)) ([2d26cc5](https://github.com/team-reflect/reflect-open/commit/2d26cc5aaacc2a1643f219ee9053e27a8872690b))
+* **core:** store per-host git credentials in the keychain ([#1466](https://github.com/team-reflect/reflect-open/issues/1466)) ([43e13ba](https://github.com/team-reflect/reflect-open/commit/43e13ba3ca8a601fa87b4124114bbe1b5b3e4c28))
+* **editor:** delete a leading empty paragraph with Backspace in daily notes ([#1496](https://github.com/team-reflect/reflect-open/issues/1496)) ([26dcf39](https://github.com/team-reflect/reflect-open/commit/26dcf3932499c8556e6bd2ed17c8fc91ed8e56ae))
+* **tasks:** add new tasks under the note's Tasks heading ([#1494](https://github.com/team-reflect/reflect-open/issues/1494)) ([09bdec7](https://github.com/team-reflect/reflect-open/commit/09bdec7b6deca7af90402efca40ab9dcffdc6410))
+* **tasks:** show the headings above a task as its breadcrumb ([#1493](https://github.com/team-reflect/reflect-open/issues/1493)) ([aa4b8e0](https://github.com/team-reflect/reflect-open/commit/aa4b8e0c8a9b8c9437bd32a6497abfd9668c91cf))
+
+
+### Bug Fixes
+
+* **core:** route the quit-time commit through the sync engine ([#1467](https://github.com/team-reflect/reflect-open/issues/1467)) ([58c87ce](https://github.com/team-reflect/reflect-open/commit/58c87ce19a5251ddfbe2a770de43f4ca8033ea4b))
+* **core:** stop retrying the network per edit after an auth failure ([#1456](https://github.com/team-reflect/reflect-open/issues/1456)) ([5c97f0c](https://github.com/team-reflect/reflect-open/commit/5c97f0ce4398d00d7c41892ccc55f08e24a7adec))
+* **desktop:** tell a 403 from a bad token before asking to reconnect ([#1452](https://github.com/team-reflect/reflect-open/issues/1452)) ([1178359](https://github.com/team-reflect/reflect-open/commit/117835930eed09d3a48d1fbeca8398c237367441))
+* **git:** check out the tree before moving the branch on fast-forward ([#1468](https://github.com/team-reflect/reflect-open/issues/1468)) ([f95e4c2](https://github.com/team-reflect/reflect-open/commit/f95e4c2765186b5b9d2456f8110bb18c448f17e7))
+* **git:** untrack .reflect and withhold pre-staged oversized files ([#1470](https://github.com/team-reflect/reflect-open/issues/1470)) ([89c38e6](https://github.com/team-reflect/reflect-open/commit/89c38e6f537c3314f87425f7d1cf4b6384a8d9ff))
+* **tasks:** render and edit task text as one paragraph ([#1509](https://github.com/team-reflect/reflect-open/issues/1509)) ([99c9f2c](https://github.com/team-reflect/reflect-open/commit/99c9f2c6ddd473570562149468bd523985de0fde))
+* update meowdown ([#1491](https://github.com/team-reflect/reflect-open/issues/1491)) ([a678916](https://github.com/team-reflect/reflect-open/commit/a6789160fbcaebbe2ac3e130804bc64c432d1662))
+* update meowdown ([#1497](https://github.com/team-reflect/reflect-open/issues/1497)) ([6603556](https://github.com/team-reflect/reflect-open/commit/66035562beeff77084700d92e68a72b3f3ef767f))
+
 ## [0.15.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.4...v0.15.0-beta.5) (2026-10-07)
 
 
