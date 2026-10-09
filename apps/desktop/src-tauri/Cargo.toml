@@ -51,12 +51,13 @@ base64 = "0.23.1"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 keyring-core = "1.0.0"
+# Total three-way text merge for the conflict ladder (Plan 12, rule 8).
+reconcile-text = "=0.13.2"
 # Git backup/sync primitives (Plan 12) + SSH transport for generic remotes
 # (Plan 16 V1: agent auth only). Everything is vendored/static — libssh2 and
 # openssl must never link against homebrew dylibs the distributed app won't
 # have (libssh2-sys only consults pkg-config when LIBSSH2_SYS_USE_PKG_CONFIG
 # is set, and vendored-openssl pins the rest).
-reconcile-text = "=0.13.2"
 git2 = { version = "0.21.0", default-features = false, features = [
   "https",
   "ssh",
@@ -65,7 +66,7 @@ git2 = { version = "0.21.0", default-features = false, features = [
 ] }
 # unsafe-headers lets provider-fetch.ts pass an explicit empty Origin, which
 # the plugin treats as "send no Origin header" (see providerFetch's doc).
-tauri-plugin-http = { version = "2.8.0", features = ["unsafe-headers"] }
+tauri-plugin-http = { version = "2.8.1", features = ["unsafe-headers"] }
 # Link capture (Plan 11): screenshot downscale + the bounded meta-scrape fetch.
 # reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
 image = { version = "0.25.10", default-features = false, features = [
@@ -166,7 +167,7 @@ apple-native-keyring-store = { version = "1.0.2", features = ["protected"] }
 # semantic search is desktop-only in the first mobile wave), and OS-trash
 # deletes (mobile moves into the graph-local `.reflect/trash/` instead).
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2.13.1"
+tauri-plugin-updater = "2.13.2"
 tauri-plugin-process = "2.4.0"
 tauri-plugin-window-state = "2.5.0"
 trash = "5.2.8"

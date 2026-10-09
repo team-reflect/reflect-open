@@ -13,7 +13,8 @@
 //! 5. **Three-way merge** over the shadow base, when one exists and the
 //!    edits do not overlap.
 //! 6. **Key-wise frontmatter** when only the header diverged.
-//! 7. **Append-union** when both sides only appended.
+//! 7. **Append-union** when both sides only appended (to the shadow base,
+//!    when one exists; to their common prefix otherwise).
 //! 8. **Total merge** ([`super::total`]): overlapping edits interleaved word
 //!    by word, both sides' text kept.
 //!
@@ -80,7 +81,7 @@ pub fn resolve(input: ConflictInput<'_>) -> AppResult<Resolution> {
         return Ok(Resolution::Merged { content });
     }
 
-    if let Some(content) = append_union(&first.content, &second.content) {
+    if let Some(content) = append_union(input.base, &first.content, &second.content) {
         return Ok(Resolution::Merged { content });
     }
 
@@ -222,15 +223,37 @@ mod tests {
 
     #[test]
     fn whole_note_rewrites_on_both_sides_keep_both_lines() {
+        // Neither side starts with the base, so this is not an append: the
+        // total merge keeps both wordings, and callers archive both sides.
         let result = resolve(input(
             Some("line\n"),
             (side("mac\n", "Mac", 1), side("phone\n", "iPhone", 2)),
         ))
         .unwrap();
+        let Resolution::Reconciled { content } = result else {
+            panic!("{result:?}");
+        };
+        assert!(
+            content.contains("mac") && content.contains("phone"),
+            "{content:?}"
+        );
+    }
+
+    #[test]
+    fn a_deletion_beside_an_append_does_not_come_back_as_an_append() {
+        // diff3 conflicts (adjacent hunks). A prefix-only union would return
+        // the appending side whole and resurrect the deleted line as an
+        // exact result; with a base the union needs both sides to start
+        // with it, so the total merge takes over and honours the deletion.
+        let result = resolve(input(
+            Some("a\nb\nc\n"),
+            (side("a\nb\n", "Mac", 1), side("a\nb\nc\nd\n", "iPhone", 2)),
+        ))
+        .unwrap();
         assert_eq!(
             result,
-            Resolution::Merged {
-                content: "mac\nphone\n".to_string()
+            Resolution::Reconciled {
+                content: "a\nb\nd\n".to_string()
             }
         );
     }

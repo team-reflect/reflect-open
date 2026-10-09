@@ -1,4 +1,4 @@
-import { LEZER_NODE_IDS, parseMarkdownAst, type SyntaxNode, type Tree } from '@meowdown/markdown'
+import { parseMarkdownAst, type SyntaxNode } from '@meowdown/markdown'
 import { parseBody } from '../markdown/grammar.ts'
 import { getRoundTasks, type TaskLocator } from '../markdown/task-ast.ts'
 import type { BlockContextSource } from './block-context.ts'
@@ -17,9 +17,10 @@ import type { BlockContextSource } from './block-context.ts'
  * index would toggle a *different* task, silently. Both sides parse with
  * Lezer's GFM grammar, and meowdown renders a checkbox for precisely the
  * `Task` nodes sitting in a **bullet** list item (`-`/`*`/`+`); a task marker
- * in an ordered list stays literal paragraph text. The click payload's
- * `checked`/`text` are cross-checked by the caller as a second line of
- * defense.
+ * in an ordered list stays literal paragraph text. The source side maps each
+ * checkbox's offset to an AST locator through meowdown's node positions. The
+ * click payload's `checked`/`text` are cross-checked by the caller as a
+ * second line of defense.
  */
 
 /** One rendered checkbox in a snippet, with its source-note write-back anchor. */
@@ -36,68 +37,20 @@ export interface SnippetTask {
 export type SourceTaskLocate = (markerOffset: number) => TaskLocator | undefined
 
 /**
- * Map the whole-file marker offsets of a source note's round tasks to their
- * AST locators. The Lezer tree and the AST share one block grammar, so their
- * round tasks line up in document order; the pairing is still verified item by
- * item, and any disagreement leaves every checkbox of the note read-only.
+ * Map the whole-file offset of each round task's `[` to the task's AST
+ * locator. meowdown positions every item at its line start, so the marker's
+ * `[` is the first one after that position.
  */
 export function createSourceTaskLocator(source: BlockContextSource): SourceTaskLocate {
-  const none: SourceTaskLocate = () => undefined
-  const markerOffsets = collectRoundTaskMarkerOffsets(source.tree, source.body)
-  const entries = getRoundTasks(parseMarkdownAst(source.body))
-  if (entries.length !== markerOffsets.length) {
-    return none
-  }
   const locators = new Map<number, TaskLocator>()
-  for (const [i, offset] of markerOffsets.entries()) {
-    const entry = entries[i]
-    if (entry === undefined) {
-      return none
+  for (const { node, astPath, markdown, checked } of getRoundTasks(parseMarkdownAst(source.body))) {
+    const from = node.position?.from
+    if (from !== undefined) {
+      const markerOffset = source.bodyOffset + source.body.indexOf('[', from)
+      locators.set(markerOffset, { astPath, markdown, checked })
     }
-    const locator: TaskLocator = {
-      astPath: entry.astPath,
-      markdown: entry.markdown,
-      checked: entry.checked,
-    }
-    if (!matchesFirstLine(source.body, offset, locator)) {
-      return none
-    }
-    locators.set(source.bodyOffset + offset, locator)
   }
   return (markerOffset) => locators.get(markerOffset)
-}
-
-/** Offsets of the `[` of every `Task` under a `+` bullet, in document order. */
-function collectRoundTaskMarkerOffsets(tree: Tree, body: string): number[] {
-  const offsets: number[] = []
-  tree.iterate({
-    enter: (node) => {
-      if (node.type.id !== LEZER_NODE_IDS.Task) {
-        return
-      }
-      const item = node.node.parent
-      const mark = item?.firstChild
-      if (
-        item?.type.id === LEZER_NODE_IDS.ListItem &&
-        mark?.type.id === LEZER_NODE_IDS.ListMark &&
-        body.slice(mark.from, mark.to) === '+'
-      ) {
-        offsets.push(node.from)
-      }
-    },
-  })
-  return offsets
-}
-
-/** Both sides drop surrounding whitespace, as the projected Markdown does. */
-function matchesFirstLine(body: string, markerOffset: number, locator: TaskLocator): boolean {
-  const checked = body[markerOffset + 1] !== ' '
-  const contentStart = markerOffset + 3
-  const newline = body.indexOf('\n', contentStart)
-  const lineEnd = newline === -1 ? body.length : newline
-  const firstLine = body.slice(contentStart, lineEnd).trim()
-  const [expected = ''] = locator.markdown.split('\n')
-  return checked === locator.checked && firstLine === expected.trim()
 }
 
 /** Start offset of every line of `text`. */

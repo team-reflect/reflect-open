@@ -33,6 +33,7 @@ pub(super) fn merge(base: &str, first: &str, second: &str) -> String {
 mod tests {
     use super::merge;
     use proptest::prelude::*;
+    use std::collections::HashMap;
 
     /// The probe cases behind the design: the first group is the same change
     /// arriving twice (a stale base), the second is two genuinely different
@@ -147,8 +148,13 @@ mod tests {
         }
     }
 
-    fn words(text: &str) -> Vec<String> {
-        text.split_whitespace().map(str::to_string).collect()
+    /// Occurrences of each whitespace-separated word.
+    fn words(text: &str) -> HashMap<&str, usize> {
+        let mut counts = HashMap::new();
+        for word in text.split_whitespace() {
+            *counts.entry(word).or_insert(0) += 1;
+        }
+        counts
     }
 
     /// Random notes: a few lines over a small vocabulary, then one to three
@@ -213,10 +219,12 @@ mod tests {
         fn nothing_either_side_added_is_lost((base, left, right) in triple()) {
             let out = merge(&base, &left, &right);
             let had = words(&base);
-            for word in words(&left).into_iter().chain(words(&right)) {
-                if !had.contains(&word) {
-                    prop_assert!(out.contains(&word), "{word:?} missing from {out:?}");
-                }
+            for (word, count) in words(&left).into_iter().chain(words(&right)) {
+                let added = count.saturating_sub(had.get(word).copied().unwrap_or(0));
+                // Substring matches, not whitespace-split words: two
+                // replacements of one token come out glued ("new0new1").
+                let kept = out.matches(word).count();
+                prop_assert!(kept >= added, "{word:?} x{added} added, x{kept} kept in {out:?}");
             }
         }
     }

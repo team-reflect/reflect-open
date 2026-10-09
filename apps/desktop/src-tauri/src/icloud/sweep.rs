@@ -538,35 +538,39 @@ fn fold_duplicate(
     let Ok(canonical_content) = fs::read_to_string(&canonical_abs) else {
         return; // occupied but unreadable (evicted): retry once downloaded
     };
-    if let Err(err) = archive::archive_version(
-        root,
-        &file.path,
-        None,
-        file.modified_ms,
-        dup_content.as_bytes(),
-    ) {
-        tracing::warn!(path = %file.path, ?err, "failed to archive collision duplicate");
-        return;
+    // Version-store dates, not filesystem mtimes, for the same reason as the
+    // edit-conflict pass: both devices fold this same pair, and the store's
+    // dates are the metadata iCloud actually propagates.
+    let canonical = ConflictSide {
+        content: canonical_content.clone(),
+        label: canonical_rel.to_string(),
+        modified_ms: current_version_modified_ms(&canonical_abs)
+            .or_else(|| modified_ms_of(&canonical_abs))
+            .unwrap_or(0),
+    };
+    let duplicate = ConflictSide {
+        content: dup_content,
+        label: file.path.clone(),
+        modified_ms: current_version_modified_ms(&dup_abs).unwrap_or(file.modified_ms),
+    };
+    // Archive both sides before anything is written: the canonical is a
+    // plain file, not an NSFileVersion, so once the fold rewrites it no
+    // other copy of its exact bytes exists anywhere.
+    for side in [&canonical, &duplicate] {
+        if let Err(err) = archive::archive_version(
+            root,
+            &side.label,
+            None,
+            side.modified_ms,
+            side.content.as_bytes(),
+        ) {
+            tracing::warn!(path = %side.label, ?err, "failed to archive collision side");
+            return;
+        }
     }
     let input = ConflictInput {
         base: None, // independent creations share no ancestor
-        // Version-store dates, not filesystem mtimes, for the same reason as
-        // the edit-conflict pass: both devices fold this same pair, and the
-        // store's dates are the metadata iCloud actually propagates.
-        sides: (
-            ConflictSide {
-                content: canonical_content.clone(),
-                label: canonical_rel.to_string(),
-                modified_ms: current_version_modified_ms(&canonical_abs)
-                    .or_else(|| modified_ms_of(&canonical_abs))
-                    .unwrap_or(0),
-            },
-            ConflictSide {
-                content: dup_content,
-                label: file.path.clone(),
-                modified_ms: current_version_modified_ms(&dup_abs).unwrap_or(file.modified_ms),
-            },
-        ),
+        sides: (canonical, duplicate),
         merge_loop_detected: false,
     };
     let resolution = match ladder::resolve(input) {
@@ -815,6 +819,12 @@ mod tests {
             "{merged}"
         );
         assert!(!root.path().join("daily/2026-07-04 2.md").exists());
+        // Both originals are archived: the canonical's exact bytes survive
+        // nowhere else once the fold rewrites it.
+        for rel in ["daily/2026-07-04.md", "daily/2026-07-04 2.md"] {
+            let archived = root.path().join(".reflect/conflict-archive").join(rel);
+            assert_eq!(fs::read_dir(archived).unwrap().count(), 1, "{rel}");
+        }
     }
 
     #[test]
@@ -1140,11 +1150,9 @@ mod tests {
             "{}",
             resolution.final_content
         );
-        for wording in [
-            "wording from mac",
-            "wording from phone",
-            "wording from ipad",
-        ] {
+        // Every device rewrote the line, so the words interleave
+        // ("wording from ipad mac phone"); nothing any side wrote is gone.
+        for wording in ["mac", "phone", "ipad"] {
             assert!(
                 resolution.final_content.contains(wording),
                 "lost {wording} in: {}",

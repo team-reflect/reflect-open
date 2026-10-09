@@ -128,6 +128,49 @@ describe('projectTasks', () => {
     expect(tasks.map((task) => task.breadcrumbs)).toEqual([[], ['parent task']])
   })
 
+  it('starts breadcrumbs with the chain of headings above the task', () => {
+    const body =
+      '# Home\n\n## House chore\n\n+ Kitchen\n  + [ ] wash dishes\n\n### Garden\n\n+ [ ] water plants\n\n## Work\n\n+ [ ] send update\n'
+    expect(projectTasks(body).map((task) => task.breadcrumbs)).toEqual([
+      ['Home', 'House chore', 'Kitchen'],
+      ['Home', 'House chore', 'Garden'],
+      ['Home', 'Work'],
+    ])
+  })
+
+  it('keeps a Tasks heading in the chain like any other', () => {
+    const body = '# Home\n\n## Tasks\n\n+ [ ] top\n+ Kitchen\n  + [ ] child\n'
+    expect(projectTasks(body).map((task) => task.breadcrumbs)).toEqual([
+      ['Home', 'Tasks'],
+      ['Home', 'Tasks', 'Kitchen'],
+    ])
+  })
+
+  it('closes a section at the next heading of the same or a higher level', () => {
+    const body =
+      '## House chore\n\n+ [ ] first\n\n### Tasks\n\n+ [ ] second\n\n## Work\n\n+ [ ] third\n'
+    expect(projectTasks(body).map((task) => task.breadcrumbs)).toEqual([
+      ['House chore'],
+      ['House chore', 'Tasks'],
+      ['Work'],
+    ])
+  })
+
+  it('ignores quoted, nested, and fenced headings as sections', () => {
+    const body =
+      '## House chore\n\n> ## Quoted\n\n- ## Listed\n\n+ [ ] first\n\n```\n## Fenced\n```\n\n+ [ ] second\n'
+    expect(projectTasks(body).map((task) => task.breadcrumbs)).toEqual([
+      ['House chore'],
+      ['House chore'],
+    ])
+  })
+
+  it('stores heading labels as Markdown', () => {
+    expect(projectTasks('## **House chore**\n\n+ [ ] a\n')[0]?.breadcrumbs).toEqual([
+      '**House chore**',
+    ])
+  })
+
   it('reads the first calendar date link as the due date, per task', () => {
     expect(
       projectTasks('+ [ ] ship it [[2026-07-01]] and review [[2026-08-01]]\n')[0]?.dueDate,
@@ -156,6 +199,14 @@ describe('getRoundTasks', () => {
       [0, 2],
     ])
     expect(entries[0]?.parent).toBe(document.children[0])
+  })
+
+  it('reports the same breadcrumbs as the projection and the edit result', () => {
+    const body = '# Home\n\n## Chores\n\n+ [ ] a\n'
+    const breadcrumbs = ['Home', 'Chores']
+    expect(getRoundTasks(parseMarkdownAst(body))[0]?.breadcrumbs).toEqual(breadcrumbs)
+    expect(projectTasks(body)[0]?.breadcrumbs).toEqual(breadcrumbs)
+    expect(applyTaskEdits(body, []).tasks[0]?.breadcrumbs).toEqual(breadcrumbs)
   })
 })
 
@@ -357,39 +408,83 @@ describe('applyTaskEdits: insert', () => {
     expect(result.inserted[0]).toMatchObject({ astPath: [0, 3] })
   })
 
-  it('refuses a context insert for a task at the root', () => {
-    const source = '+ [ ] root\n'
-    expect(() =>
-      applyTaskEdits(source, [
-        { kind: 'insert', at: { kind: 'contextEnd', task: locate(source) }, markdown: '' },
-      ]),
-    ).toThrow(TaskStaleError)
-  })
-
-  it('inserts right after a task and shifts the siblings behind it', () => {
-    const source = '- Shopping\n  + [ ] milk\n  + [ ] eggs\n'
+  it('continues the task’s own list when the task is at the root', () => {
+    const source =
+      '## Chores\n\n+ [ ] first\n  + [ ] nested\n+ [ ] peer\n\nprose\n\n### Sub\n\n+ [ ] later\n'
     const result = applyTaskEdits(source, [
-      { kind: 'insert', at: { kind: 'afterTask', task: locate(source, 0) }, markdown: 'bread' },
+      { kind: 'insert', at: { kind: 'contextEnd', task: locate(source, 0) }, markdown: '' },
     ])
-    expect(result.source).toBe('- Shopping\n  + [ ] milk\n  + [ ] bread\n  + [ ] eggs\n')
-    expect(movedFrom(result, [0, 1])).toMatchObject({ astPath: [0, 1] })
-    expect(movedFrom(result, [0, 2])).toMatchObject({ astPath: [0, 3] })
-    expect(result.inserted[0]).toMatchObject({ astPath: [0, 2], markdown: 'bread' })
+    expect(result.source).toBe(
+      '## Chores\n\n+ [ ] first\n  + [ ] nested\n+ [ ] peer\n+ [ ] \n\nprose\n\n### Sub\n\n+ [ ] later\n',
+    )
+    expect(result.inserted[0]).toMatchObject({ astPath: [3], breadcrumbs: ['Chores'] })
   })
 
-  it('inserts after any block, such as a heading', () => {
-    const result = applyTaskEdits('# T\n\npara\n', [
-      { kind: 'insert', at: { kind: 'afterBlock', astPath: [0] }, markdown: 'todo' },
+  it('stops a root list at a list with another marker', () => {
+    const source = '+ [ ] a\n- bullet\n'
+    const result = applyTaskEdits(source, [
+      { kind: 'insert', at: { kind: 'contextEnd', task: locate(source) }, markdown: '' },
     ])
-    expect(result.source).toBe('# T\n\n+ [ ] todo\n\npara\n')
+    expect(result.source).toBe('+ [ ] a\n+ [ ] \n- bullet\n')
+  })
+})
+
+describe('applyTaskEdits: insert into the Tasks section', () => {
+  const section = { kind: 'insert', at: { kind: 'tasksSection' }, markdown: '' } as const
+
+  it.each([
+    ['', '## Tasks\n\n+ [ ] \n'],
+    ['intro\n', 'intro\n\n## Tasks\n\n+ [ ] \n'],
+    ['## Tasks\n\n+ [ ] old\n', '## Tasks\n\n+ [ ] old\n+ [ ] \n'],
+    ['## tasks\n\nprose\n', '## tasks\n\n+ [ ] \n\nprose\n'],
+    ['## [[Tasks]]\n', '## [[Tasks]]\n\n+ [ ] \n'],
+    ['# Tasks\n\n+ [ ] old\n', '# Tasks\n\n+ [ ] old\n+ [ ] \n'],
+    ['## **Tasks**\n\n+ [ ] old\n', '## **Tasks**\n\n+ [ ] old\n+ [ ] \n'],
+    ['## Tasks\n\n- [ ] checkbox\n', '## Tasks\n\n+ [ ] \n- [ ] checkbox\n'],
+    ['## Tasks\n\n* bullet\n', '## Tasks\n\n+ [ ] \n* bullet\n'],
+    [
+      '## Tasks\n\n- bullet\n\n+ [ ] old\n\nprose\n\n## Later\n\n+ [ ] later\n',
+      '## Tasks\n\n- bullet\n+ [ ] old\n+ [ ] \n\nprose\n\n## Later\n\n+ [ ] later\n',
+    ],
+    [
+      '## Tasks\n\nintro\n\n### Child\n\n+ [ ] nested\n',
+      '## Tasks\n\n+ [ ] \n\nintro\n\n### Child\n\n+ [ ] nested\n',
+    ],
+    ['## Tasks\n\n+ Project\n  + [ ] nested\n', '## Tasks\n\n+ Project\n  + [ ] nested\n+ [ ] \n'],
+    ['## Tasks\n\n\n+ [ ] old\n', '## Tasks\n\n\n+ [ ] old\n+ [ ] \n'],
+  ])('inserts an empty task into %j', (source, expected) => {
+    expect(applyTaskEdits(source, [section]).source).toBe(expected)
   })
 
-  it('refuses an insert position that no longer exists', () => {
-    expect(() =>
-      applyTaskEdits('# T\n', [
-        { kind: 'insert', at: { kind: 'afterBlock', astPath: [4] }, markdown: '' },
-      ]),
-    ).toThrow(TaskStaleError)
+  it.each([
+    '### Tasks',
+    '> ## Tasks',
+    '- ## Tasks',
+    '## [[Tasks|To do]]',
+    String.raw`## \[[Tasks]]`,
+  ])('does not reuse %s', (heading) => {
+    const source = `${heading}\n\nexisting\n`
+    expect(applyTaskEdits(source, [{ ...section, markdown: 'new' }]).source).toBe(
+      `${source}\n## Tasks\n\n+ [ ] new\n`,
+    )
+  })
+
+  it('keeps frontmatter and reports where the other tasks moved', () => {
+    const source = '---\nid: x\n---\n## Tasks\n\n+ [ ] a\n\n## Later\n\n+ [ ] b\n+ [ ] c\n'
+    const result = applyTaskEdits(source, [section])
+    expect(result.source).toBe(
+      '---\nid: x\n---\n## Tasks\n\n+ [ ] a\n+ [ ] \n\n## Later\n\n+ [ ] b\n+ [ ] c\n',
+    )
+    expect(result.inserted[0]).toMatchObject({ astPath: [2], breadcrumbs: ['Tasks'] })
+    expect(movedFrom(result, [1])).toMatchObject({ astPath: [1] })
+    expect(movedFrom(result, [3])).toMatchObject({ astPath: [4], breadcrumbs: ['Later'] })
+    expect(movedFrom(result, [4])).toMatchObject({ astPath: [5] })
+  })
+
+  it('places the new task with the given text', () => {
+    expect(applyTaskEdits('## Tasks\n', [{ ...section, markdown: 'buy milk' }]).source).toBe(
+      '## Tasks\n\n+ [ ] buy milk\n',
+    )
   })
 })
 
@@ -438,16 +533,6 @@ describe('applyTaskEdits: batches', () => {
       null,
       { astPath: [0], markdown: 'after', breadcrumbs: [], checked: false },
     ])
-  })
-
-  it('inserts after a child whose parent was removed earlier in the batch', () => {
-    const source = '+ [ ] parent\n  + [ ] child\n+ [ ] after\n'
-    const result = applyTaskEdits(source, [
-      { kind: 'remove', task: locate(source, 0) },
-      { kind: 'insert', at: { kind: 'afterTask', task: locate(source, 1) }, markdown: 'new' },
-    ])
-    expect(result.source).toBe('+ [ ] child\n+ [ ] new\n+ [ ] after\n')
-    expect(result.inserted[0]).toMatchObject({ astPath: [1], breadcrumbs: [] })
   })
 
   it('refuses a context insert into a parent removed earlier in the batch', () => {

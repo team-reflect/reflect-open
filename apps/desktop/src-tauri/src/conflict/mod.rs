@@ -211,10 +211,13 @@ mod merge_text_tests {
     }
 
     #[test]
-    fn whole_note_rewrites_on_both_sides_keep_both() {
+    fn whole_note_rewrites_on_both_sides_are_unmergeable_until_the_editor_archives() {
+        // Neither side still starts with the base, so this is a rewrite, not
+        // an append: the total merge would keep both, but its result needs
+        // an archive first.
         let out = merge("notes/a.md", "line\n", "mine\n", "theirs\n");
-        assert_eq!(out.kind, MergeTextKind::Clean);
-        assert_eq!(out.content, "mine\ntheirs\n");
+        assert_eq!(out.kind, MergeTextKind::Unmergeable);
+        assert_eq!(out.content, "theirs\n");
     }
 
     #[test]
