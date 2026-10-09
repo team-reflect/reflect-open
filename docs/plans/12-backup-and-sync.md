@@ -72,8 +72,10 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
   the next launch pushes. A debounced pass that finds nothing committed and nothing
   ahead ends **without touching the network** (a pull's own writes re-enter via the
   watcher and must not buy a push negotiation each time).
-- **Pull cadence:** on launch, on window focus, on a periodic timer, and on a
-  **non-fast-forward** push rejection: fetch → merge → push again (bounded retries).
+- **Pull cadence:** on launch, on window focus, on a periodic timer (desktop: a
+  cheap remote-tip probe every 90 s while the window is visible, a full pull only
+  when the remote moved), and on a **non-fast-forward** push rejection: fetch →
+  merge → push again (bounded retries).
   Auth, push-protection, and size failures surface immediately — only divergence retries.
 - **Merge, not rebase.** Single branch; merge commits are fine — history is invisible
   product-wise, and rewriting published history breaks multi-device.

@@ -30,6 +30,8 @@ const GRAPH: GraphInfo = { root: '/g', name: 'G', generation: 3 }
 const AUTH = JSON.stringify({ kind: 'pat', token: 'ghp_abc' })
 const CLEAN_COMMIT = { committed: false, sha: null, ahead: 0, skippedLargeFiles: [] }
 const UP_TO_DATE = { kind: 'upToDate', conflictedPaths: [], changedFiles: [] }
+const UNMOVED_TIP = { remoteOid: 'aaa', trackingOid: 'aaa', defaultBranch: null }
+const MOVED_TIP = { remoteOid: 'bbb', trackingOid: 'aaa', defaultBranch: null }
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -69,6 +71,8 @@ interface FakeOptions {
   remoteUrl?: string | null
   /** Whether the graph already has a repository (defaults to true). */
   initialized?: boolean
+  /** Per-call `git_remote_head` tips (defaults to an unmoved remote). */
+  remoteTips?: unknown[]
 }
 
 /** Bridge fake with a mutable repo status, recording every command. */
@@ -96,6 +100,7 @@ function fakeBridge(options: FakeOptions = {}) {
   let indexApplyCount = 0
   const mergeOutcomes = [...(options.mergeOutcomes ?? [])]
   const pushOutcomes = [...(options.pushOutcomes ?? [])]
+  const remoteTips = [...(options.remoteTips ?? [])]
   setBridge({
     invoke: async (command, args) => {
       calls.push(command)
@@ -131,6 +136,8 @@ function fakeBridge(options: FakeOptions = {}) {
           return CLEAN_COMMIT
         case 'git_fetch':
           return { ahead: 0, behind: 0 }
+        case 'git_remote_head':
+          return remoteTips.shift() ?? UNMOVED_TIP
         case 'git_merge_remote':
           mergeCount += 1
           if (options.gateMerge === true && mergeCount === 1) {
@@ -197,6 +204,10 @@ function fakeBridge(options: FakeOptions = {}) {
 
 function commitCount(calls: string[]): number {
   return calls.filter((command) => command === 'git_commit_all').length
+}
+
+function probeCount(calls: string[]): number {
+  return calls.filter((command) => command === 'git_remote_head').length
 }
 
 function trackStates(controller: ReturnType<typeof createBackupController>): BackupState[] {
@@ -760,6 +771,111 @@ describe('createBackupController', () => {
     } finally {
       controller.dispose()
     }
+  })
+
+  it('probes the remote while visible and pulls only when it moved', async () => {
+    const { calls } = fakeBridge({ remoteTips: [UNMOVED_TIP, MOVED_TIP] })
+    vi.useFakeTimers() // before start: the probe timer is armed there
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    try {
+      await controller.start()
+      await vi.waitFor(() => {
+        expect(commitCount(calls)).toBe(1) // the launch pull's commit
+      })
+
+      await vi.advanceTimersByTimeAsync(90_000)
+      expect(probeCount(calls)).toBe(1)
+      expect(commitCount(calls)).toBe(1) // the remote did not move: no cycle
+
+      await vi.advanceTimersByTimeAsync(90_000)
+      expect(probeCount(calls)).toBe(2)
+      await vi.waitFor(() => {
+        expect(commitCount(calls)).toBe(2) // it moved: a full cycle
+      })
+      expect(calls.filter((command) => command === 'git_fetch')).toHaveLength(2)
+    } finally {
+      vi.useRealTimers()
+      controller.dispose()
+    }
+  })
+
+  it('a remote without the branch starts no cycle', async () => {
+    const { calls } = fakeBridge({ remoteTips: [{ ...UNMOVED_TIP, remoteOid: null }] })
+    vi.useFakeTimers()
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    try {
+      await controller.start()
+      await vi.waitFor(() => {
+        expect(commitCount(calls)).toBe(1)
+      })
+      await vi.advanceTimersByTimeAsync(90_000)
+      expect(probeCount(calls)).toBe(1)
+      expect(commitCount(calls)).toBe(1)
+    } finally {
+      vi.useRealTimers()
+      controller.dispose()
+    }
+  })
+
+  it('does not probe while the sync is failing', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { calls } = fakeBridge({ mergeOutcome: MERGED, pushError: FORBIDDEN })
+    httpFetch.mockResolvedValueOnce(jsonResponse({ message: 'Bad credentials' }, 401))
+    vi.useFakeTimers()
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    try {
+      await controller.start()
+      await vi.waitFor(() => {
+        expect(controller.getState()).toMatchObject({ status: { state: 'error' } })
+      })
+      await vi.advanceTimersByTimeAsync(90_000)
+      expect(probeCount(calls)).toBe(0)
+    } finally {
+      vi.useRealTimers()
+      controller.dispose()
+      consoleError.mockRestore()
+    }
+  })
+
+  it('does not probe while hidden, on mobile, or for an iCloud-hosted graph', async () => {
+    async function probesAfterATick(options: {
+      hidden?: boolean
+      mobile?: boolean
+      root?: string
+    }): Promise<number> {
+      setPlatformSurface({ mobileApp: options.mobile ?? false })
+      const visibility = vi
+        .spyOn(document, 'visibilityState', 'get')
+        .mockReturnValue(options.hidden === true ? 'hidden' : 'visible')
+      const { calls } = fakeBridge({ remoteTips: [MOVED_TIP] })
+      vi.useFakeTimers()
+      const controller = createBackupController({
+        graph: { ...GRAPH, root: options.root ?? GRAPH.root },
+        indexGeneration: 1,
+      })
+      try {
+        await controller.start()
+        await vi.waitFor(() => {
+          expect(commitCount(calls)).toBe(1)
+        })
+        await vi.advanceTimersByTimeAsync(90_000)
+        return probeCount(calls)
+      } finally {
+        vi.useRealTimers()
+        visibility.mockRestore()
+        setPlatformSurface({ mobileApp: false })
+        controller.dispose()
+      }
+    }
+
+    expect(await probesAfterATick({ hidden: true })).toBe(0)
+    expect(await probesAfterATick({ mobile: true })).toBe(0)
+    expect(
+      await probesAfterATick({
+        root: '/Users/alex/Library/Mobile Documents/iCloud~com~reflect/Documents/Notes',
+      }),
+    ).toBe(0)
+    expect(await probesAfterATick({})).toBe(1)
   })
 
   it('going hidden does not trigger a cycle (backgrounding is the flush path)', async () => {
