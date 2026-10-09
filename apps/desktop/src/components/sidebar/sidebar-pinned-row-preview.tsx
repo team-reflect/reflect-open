@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
 import { cn } from '@/lib/utils.ts'
 
 interface SidebarPinnedRowPreviewProps {
@@ -6,6 +7,8 @@ interface SidebarPinnedRowPreviewProps {
   active: boolean
   overlay?: boolean
   placeholder?: boolean
+  /** A keymap-registry binding to show beside the label, e.g. `Mod-6`. */
+  shortcut?: string | null
 }
 
 export function SidebarPinnedRowPreview({
@@ -13,6 +16,7 @@ export function SidebarPinnedRowPreview({
   label,
   overlay = false,
   placeholder = false,
+  shortcut = null,
 }: SidebarPinnedRowPreviewProps): ReactElement {
   const stateClass = placeholder
     ? 'bg-surface-hover text-transparent'
@@ -33,6 +37,9 @@ export function SidebarPinnedRowPreview({
       <span className={cn('min-w-0 flex-1 py-1 px-2.5 text-left', placeholder && 'invisible')}>
         <span className="block truncate text-xs font-medium">{label}</span>
       </span>
+      {shortcut !== null && !placeholder ? (
+        <ShortcutKeys binding={shortcut} className="mr-1.5 text-[10px]" />
+      ) : null}
     </span>
   )
 }

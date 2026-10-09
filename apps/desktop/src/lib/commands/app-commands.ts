@@ -40,19 +40,43 @@ function openNewNote(context: CommandContext): void {
   context.navigate(newNoteRoute())
 }
 
-const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from({ length: 9 }, (_, index) => {
-  const position = index + 1
-  return {
-    id: `graph.switch${position}`,
-    title: `Switch to graph ${position}`,
-    keywords: ['graph', 'workspace', 'switch', 'recent'],
-    keybinding: `Mod-${position}`,
-    run: (context) => context.switchGraph(index),
-  }
-})
+// The number row is shared: ⌘1–⌘5 switch graphs and ⌘6–⌘9 open the top
+// pinned notes. Few people keep more than five graphs, so the high digits
+// buy more as one-keystroke access to the Pinned shelf.
+const GRAPH_SWITCH_COUNT = 5
+const PINNED_NOTE_SHORTCUT_COUNT = 4
+
+const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from(
+  { length: GRAPH_SWITCH_COUNT },
+  (_, index) => {
+    const position = index + 1
+    return {
+      id: `graph.switch${position}`,
+      title: `Switch to graph ${position}`,
+      keywords: ['graph', 'workspace', 'switch', 'recent'],
+      keybinding: `Mod-${position}`,
+      run: (context) => context.switchGraph(index),
+    }
+  },
+)
+
+const PINNED_NOTE_COMMANDS: AppCommand[] = Array.from(
+  { length: PINNED_NOTE_SHORTCUT_COUNT },
+  (_, index) => {
+    const position = index + 1
+    return {
+      id: `pinned.open${position}`,
+      title: `Open pinned note ${position}`,
+      keywords: ['pinned', 'pin', 'shelf', 'favorite'],
+      keybinding: `Mod-${GRAPH_SWITCH_COUNT + position}`,
+      run: (context) => context.openPinnedNote(index),
+    }
+  },
+)
 
 const APP_COMMANDS: AppCommand[] = [
   ...GRAPH_SWITCH_COMMANDS,
+  ...PINNED_NOTE_COMMANDS,
   {
     id: 'nav.today',
     title: 'Go to today',

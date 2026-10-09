@@ -18,10 +18,13 @@ import { isModEvent } from '@meowdown/core'
 
 interface SidebarSortablePinnedRowProps {
   note: PinnedNote
+  /** The row's open-pinned-note binding while hints are revealed, else null. */
+  shortcut?: string | null
 }
 
 export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
   note,
+  shortcut = null,
 }: SidebarSortablePinnedRowProps): ReactElement {
   const { route } = useRouter()
   const navigateNoteLink = useNoteLinkNavigation()
@@ -81,7 +84,12 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
         className="block w-full"
         {...listeners}
       >
-        <SidebarPinnedRowPreview active={active} label={label} placeholder={isDragging} />
+        <SidebarPinnedRowPreview
+          active={active}
+          label={label}
+          placeholder={isDragging}
+          shortcut={shortcut}
+        />
       </button>
     </li>
   )
