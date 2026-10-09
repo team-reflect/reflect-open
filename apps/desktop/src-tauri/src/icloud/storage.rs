@@ -463,7 +463,8 @@ fn adopt_graph(root: &Path) -> AppResult<String> {
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| DEFAULT_ICLOUD_GRAPH_DIR.to_string());
     let target = documents.join(&name);
-    if dir_has_notes(&target) {
+    // A repository there counts too: the move would fetch into it.
+    if dir_has_notes(&target) || target.join(".git").exists() {
         return Err(AppError::io(format!(
             "iCloud Drive already contains a graph named \"{name}\" — open that one instead, or rename one of the two"
         )));
@@ -501,99 +502,81 @@ fn copy_and_verify(root: &Path, target: &Path) -> AppResult<()> {
             copied.0, copied.1, landed.0, landed.1
         )));
     }
-    settle_repository(target)
+    carry_history(root, target)
 }
 
-/// The copied backup repository at its new home: excluded from iCloud (an
-/// object store must never sync file by file) and without `origin`, so the
-/// moved graph starts with iCloud as its only sync method. History stays;
-/// the user reconnects a remote from Settings when they want one.
-fn settle_repository(target: &Path) -> AppResult<()> {
-    let git_dir = target.join(".git");
-    if !is_dir_no_follow(&git_dir) {
+/// Give the moved graph the backup repository's history: its branches and
+/// tags, fetched into a fresh repository at the new home.
+///
+/// Git moves the history, not a file copy of `.git`: the fetch reads one
+/// consistent set of refs and exactly the objects they reach, so a commit
+/// running in the source meanwhile cannot tear it, and no lock file, hook,
+/// or reference to another object store comes along. The new repository has
+/// no remote, so the moved graph starts with iCloud as its only sync method
+/// and the user reconnects one from Settings when they want it. It is marked
+/// local-only while still empty (an object store must never sync file by
+/// file), and its index is set to `HEAD` without touching the copied notes,
+/// so an edit that was not committed yet shows up as one.
+fn carry_history(source: &Path, target: &Path) -> AppResult<()> {
+    if !source.join(".git").exists() {
         return Ok(());
     }
-    // Marked once more here: the copy marked the empty directory before any
-    // object landed in it, and this keeps the guarantee if that mark failed.
-    crate::fs::mark_dir_local_only(&git_dir);
-    let repo = git2::Repository::open(target)?;
-    // The copy takes no lock, so a commit or fetch running in the source
-    // meanwhile can leave a branch pointing at an object copied too early to
-    // include it. Refuse such a copy: the caller removes it and the user
-    // retries, instead of a moved graph whose history cannot be read.
-    match repo.head() {
-        Ok(head) => {
-            head.peel_to_tree()?;
-        }
-        Err(err) if err.code() == git2::ErrorCode::UnbornBranch => {}
-        Err(err) => return Err(err.into()),
+    let from = git2::Repository::open(source)?;
+    let mut options = git2::RepositoryInitOptions::new();
+    if let Some(branch) = from.find_reference("HEAD")?.symbolic_target()? {
+        options.initial_head(branch);
     }
-    if repo.find_remote("origin").is_ok() {
-        repo.remote_delete("origin")?;
+    let repo = git2::Repository::init_opts(target, &options)?;
+    crate::fs::mark_dir_local_only(repo.path());
+    repo.remote_anonymous(&from.path().to_string_lossy())?
+        .fetch(
+            &["+refs/heads/*:refs/heads/*", "+refs/tags/*:refs/tags/*"],
+            None,
+            None,
+        )?;
+    if let Ok(head) = repo.head() {
+        repo.reset(
+            &head.peel(git2::ObjectType::Commit)?,
+            git2::ResetType::Mixed,
+            None,
+        )?;
     }
     Ok(())
 }
 
 /// Names that never ride a file-sync provider: the rebuildable local state,
-/// the backup repo, and OS litter. The pending-download walk never descends
-/// into them — `.reflect/` and `.git/` are marked sync-excluded at bootstrap
+/// the backup repo, and OS litter. A move-in leaves them behind
+/// ([`copy_graph_tree`]; the repository's history follows through
+/// [`carry_history`]), and the pending-download walk never descends into
+/// them — `.reflect/` and `.git/` are marked sync-excluded at bootstrap
 /// (`fs::io::mark_dir_local_only`), so iCloud can never hold a placeholder
 /// under either.
-#[cfg(any(target_os = "ios", target_os = "macos"))]
 fn local_only_name(name: &str) -> bool {
     matches!(name, ".reflect" | ".git" | ".DS_Store")
 }
 
-/// What a move-in leaves behind ([`copy_graph_tree`]): the rebuildable local
-/// state and OS litter. The backup repository travels with the graph (its
-/// history is the user's) and is settled at the new home by
-/// [`settle_repository`].
-fn left_behind(name: &str) -> bool {
-    matches!(name, ".reflect" | ".DS_Store")
-}
-
-/// A real directory at `path`: a symlink or a gitfile (`.git` as a file,
-/// pointing at a repository elsewhere) is not one.
-fn is_dir_no_follow(path: &Path) -> bool {
-    std::fs::symlink_metadata(path).is_ok_and(|meta| meta.is_dir())
-}
-
 /// Recursively copy the graph tree, returning `(files, bytes)` copied.
-///
-/// The backup repository comes along when `.git` is a real directory (a
-/// gitfile points at a repository elsewhere, which is not this graph's to
-/// move). Its copy is marked local-only while still empty, before iCloud can
-/// start uploading objects into it, and `*.lock` files under it stay behind:
-/// a lock belongs to the operation that took it, not to the repository.
 fn copy_graph_tree(source: &Path, target: &Path) -> AppResult<(u64, u64)> {
     std::fs::create_dir_all(target)?;
     let mut files = 0u64;
     let mut bytes = 0u64;
-    let mut stack = vec![(source.to_path_buf(), target.to_path_buf(), false)];
-    while let Some((from_dir, to_dir, in_repo)) = stack.pop() {
+    let mut stack = vec![(source.to_path_buf(), target.to_path_buf())];
+    while let Some((from_dir, to_dir)) = stack.pop() {
         for entry in std::fs::read_dir(&from_dir)? {
             let entry = entry?;
             let name = entry.file_name();
-            let name_str = name.to_string_lossy();
-            if left_behind(&name_str) || (in_repo && name_str.ends_with(".lock")) {
+            if local_only_name(&name.to_string_lossy()) {
                 continue;
             }
             let file_type = entry.file_type()?;
             if file_type.is_symlink() {
                 continue; // never follow links out of the graph
             }
-            let is_repo = from_dir == source && name_str == ".git";
-            if is_repo && !file_type.is_dir() {
-                continue;
-            }
             let from = entry.path();
             let to = to_dir.join(&name);
             if file_type.is_dir() {
                 std::fs::create_dir_all(&to)?;
-                if is_repo {
-                    crate::fs::mark_dir_local_only(&to);
-                }
-                stack.push((from, to, in_repo || is_repo));
+                stack.push((from, to));
             } else {
                 bytes += std::fs::copy(&from, &to)?;
                 files += 1;
@@ -611,7 +594,7 @@ fn count_graph_tree(root: &Path) -> AppResult<(u64, u64)> {
     while let Some(dir) = stack.pop() {
         for entry in std::fs::read_dir(&dir)? {
             let entry = entry?;
-            if left_behind(&entry.file_name().to_string_lossy()) {
+            if local_only_name(&entry.file_name().to_string_lossy()) {
                 continue;
             }
             let file_type = entry.file_type()?;
@@ -667,86 +650,133 @@ mod tests {
     }
 
     #[test]
-    fn adopt_copy_keeps_history_marked_local_only_without_origin() {
+    fn adopt_copy_skips_local_state_and_verifies() {
         let source = tempfile::tempdir().expect("tempdir");
         std::fs::create_dir_all(source.path().join("notes")).expect("mkdir");
         std::fs::create_dir_all(source.path().join(".reflect")).expect("mkdir");
+        std::fs::create_dir_all(source.path().join(".git")).expect("mkdir");
         std::fs::write(source.path().join("notes/a.md"), b"# A").expect("write");
         std::fs::write(source.path().join(".reflect/index.sqlite"), b"db").expect("write");
+        std::fs::write(source.path().join(".git/HEAD"), b"ref").expect("write");
         std::fs::write(source.path().join(".DS_Store"), b"junk").expect("write");
-        let repo = git2::Repository::init(source.path()).expect("init");
-        repo.remote("origin", "https://example.com/owner/notes.git")
-            .expect("remote");
-        // A lock a running operation holds (or a crash left) stays behind.
-        std::fs::write(source.path().join(".git/index.lock"), b"").expect("write");
 
         let container = tempfile::tempdir().expect("tempdir");
         let target = container.path().join("Notes");
-        adopt_into(source.path(), &target).expect("adopt");
-
+        let copied = copy_graph_tree(source.path(), &target).expect("copy");
+        assert_eq!(copied, (1, 3)); // one file, three bytes — the note alone
+        assert_eq!(count_graph_tree(&target).expect("count"), copied);
         assert_eq!(
             std::fs::read_to_string(target.join("notes/a.md")).expect("read"),
             "# A"
         );
         assert!(!target.join(".reflect").exists());
+        assert!(!target.join(".git").exists());
         assert!(!target.join(".DS_Store").exists());
-        // The repository came along, without its remote: the moved graph
-        // syncs through iCloud only until the user reconnects one.
+    }
+
+    /// A source graph with two commits, a remote, a tag, and an edit that is
+    /// not committed yet.
+    fn graph_with_history() -> (tempfile::TempDir, git2::Oid) {
+        let source = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(source.path().join("notes")).expect("mkdir");
+        let repo = git2::Repository::init(source.path()).expect("init");
+        let sig = git2::Signature::now("Alex", "alex@example.com").expect("signature");
+        let mut head = None;
+        for text in ["# A", "# A\n\nmore"] {
+            std::fs::write(source.path().join("notes/a.md"), text).expect("write");
+            let mut index = repo.index().expect("index");
+            index.add_path(Path::new("notes/a.md")).expect("add");
+            index.write().expect("write index");
+            let tree = repo
+                .find_tree(index.write_tree().expect("tree"))
+                .expect("tree");
+            let parent = head.map(|id| repo.find_commit(id).expect("parent"));
+            let parents: Vec<&git2::Commit> = parent.iter().collect();
+            head = Some(
+                repo.commit(Some("HEAD"), &sig, &sig, "save", &tree, &parents)
+                    .expect("commit"),
+            );
+        }
+        let head = head.expect("two commits");
+        repo.remote("origin", "https://example.com/owner/notes.git")
+            .expect("remote");
+        repo.tag_lightweight("v1", &repo.find_object(head, None).expect("object"), false)
+            .expect("tag");
+        std::fs::write(source.path().join("notes/a.md"), "# A\n\nmore, unsaved").expect("write");
+        std::fs::write(source.path().join(".git/index.lock"), b"").expect("write");
+        (source, head)
+    }
+
+    #[test]
+    fn adopt_carries_history_without_a_remote() {
+        let (source, head) = graph_with_history();
+        let container = tempfile::tempdir().expect("tempdir");
+        let target = container.path().join("Notes");
+        adopt_into(source.path(), &target).expect("adopt");
+
         let copy = git2::Repository::open(&target).expect("open copy");
-        assert!(copy.find_remote("origin").is_err());
+        let copied = copy.head().expect("head");
+        assert_eq!(copied.target(), Some(head));
+        assert_eq!(
+            copied.name(),
+            git2::Repository::open(source.path())
+                .expect("open source")
+                .head()
+                .expect("head")
+                .name()
+        );
+        // The whole history is there, not only its tip.
+        let commit = copied.peel_to_commit().expect("commit");
+        assert_eq!(
+            commit
+                .parent(0)
+                .expect("parent")
+                .tree()
+                .expect("tree")
+                .len(),
+            1
+        );
+        assert_eq!(copy.refname_to_id("refs/tags/v1").expect("tag"), head);
+        // No remote, no lock: the moved graph syncs through iCloud only.
+        assert!(copy.remotes().expect("remotes").is_empty());
         assert!(!target.join(".git/index.lock").exists());
+        // The copied notes are the working tree: the unsaved edit is the one
+        // change the new graph's first commit will pick up.
+        let statuses = copy.statuses(None).expect("statuses");
+        let changed: Vec<_> = statuses
+            .iter()
+            .filter_map(|entry| entry.path().ok().map(str::to_string))
+            .collect();
+        assert_eq!(changed, vec!["notes/a.md".to_string()]);
         #[cfg(target_os = "macos")]
         assert_eq!(
             xattr::get(target.join(".git"), "com.apple.fileprovider.ignore#P").expect("xattr"),
             Some(b"1".to_vec())
         );
-        // The original keeps everything, remote included: it is the
-        // recovery copy.
-        assert!(repo.find_remote("origin").is_ok());
-        // The verification counts the repository too.
-        let again = container.path().join("Again");
-        let copied = copy_graph_tree(source.path(), &again).expect("copy");
-        assert!(copied.0 > 1, "{copied:?}");
-        assert_eq!(count_graph_tree(&again).expect("count"), copied);
+        // The original keeps everything, remote included: the recovery copy.
+        assert!(git2::Repository::open(source.path())
+            .expect("open source")
+            .find_remote("origin")
+            .is_ok());
     }
 
     #[test]
-    fn a_copy_whose_history_cannot_be_read_is_refused_and_removed() {
-        // What a commit racing the copy can leave: a branch naming an object
-        // the copy does not hold.
-        let source = tempfile::tempdir().expect("tempdir");
-        std::fs::write(source.path().join("a.md"), b"# A").expect("write");
-        git2::Repository::init(source.path()).expect("init");
-        std::fs::create_dir_all(source.path().join(".git/refs/heads")).expect("mkdir");
-        for branch in ["main", "master"] {
-            std::fs::write(
-                source.path().join(".git/refs/heads").join(branch),
-                "1111111111111111111111111111111111111111\n",
-            )
-            .expect("write");
-        }
+    fn adopt_carries_the_history_of_a_linked_worktree() {
+        // `.git` is a file here, pointing into the main repository.
+        let (main, head) = graph_with_history();
+        let repo = git2::Repository::open(main.path()).expect("open");
+        let holder = tempfile::tempdir().expect("tempdir");
+        let graph = holder.path().join("graph");
+        repo.worktree("graph", &graph, None).expect("worktree");
+        assert!(graph.join(".git").is_file());
 
         let container = tempfile::tempdir().expect("tempdir");
         let target = container.path().join("Notes");
-        assert!(adopt_into(source.path(), &target).is_err());
-        assert!(!target.exists(), "a refused copy leaves nothing behind");
-    }
+        adopt_into(&graph, &target).expect("adopt");
 
-    #[test]
-    fn a_gitfile_is_not_a_repository_to_move() {
-        // `.git` as a file points at a repository elsewhere (a worktree, or
-        // `--separate-git-dir`): copying it would make the moved graph open,
-        // and settle, the original's repository.
-        let source = tempfile::tempdir().expect("tempdir");
-        std::fs::write(source.path().join("a.md"), b"# A").expect("write");
-        std::fs::write(source.path().join(".git"), b"gitdir: /elsewhere/.git\n").expect("write");
-
-        let container = tempfile::tempdir().expect("tempdir");
-        let target = container.path().join("Notes");
-        adopt_into(source.path(), &target).expect("adopt");
-
-        assert!(!target.join(".git").exists());
-        assert_eq!(count_graph_tree(&target).expect("count"), (1, 3));
+        let copy = git2::Repository::open(&target).expect("open copy");
+        assert!(target.join(".git").is_dir());
+        assert_eq!(copy.head().expect("head").target(), Some(head));
     }
 
     /// The pending walk must count placeholders anywhere in the graph but

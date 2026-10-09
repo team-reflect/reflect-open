@@ -166,7 +166,13 @@ export function IcloudSettingsField(): ReactElement | null {
             <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <DialogTrigger
                 render={
-                  <Button size="xs" variant="outline" disabled={status?.available !== true}>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    // Until the backup state is known, the dialog cannot say
+                    // whether a GitHub connection stays behind.
+                    disabled={status?.available !== true || backup.phase === 'loading'}
+                  >
                     Move graph to iCloud…
                   </Button>
                 }

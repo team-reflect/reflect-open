@@ -16,9 +16,10 @@ edit the same note while apart.
   opens one (or stores fresh notes in iCloud), and its settings sheet
   switches between graphs later. An existing
   local graph moves later via Settings → **iCloud sync** → *Move graph to
-  iCloud…*, which copies it into the container (verified file-by-file,
-  version history included) and reopens it there; the original folder stays
-  on disk, untouched, as a recovery copy.
+  iCloud…*, which copies it into the container (verified file-by-file),
+  brings its version history along (branches and tags, fetched into a fresh
+  repository without a remote), and reopens it there; the original folder
+  stays on disk, untouched, as a recovery copy.
 - **iCloud or GitHub, not both.** A graph syncs through iCloud Drive *or* a
   Git remote. Two sync engines merging the same files fight each other, and a
   `.git` directory must never ride a file-sync provider (object-store
