@@ -587,10 +587,10 @@ describe('appendListItem', () => {
     },
   )
 
-  it('refuses a note the serializer would change elsewhere', () => {
-    expect(() =>
+  it('normalizes layout the serializer owns while appending', () => {
+    expect(
       appendListItem('- p\n    - c\n        + [ ] t\n', { kind: 'bullet', markdown: 'x' }),
-    ).not.toThrow()
+    ).toBe('- p\n  - c\n    + [ ] t\n- x\n')
   })
 })
 

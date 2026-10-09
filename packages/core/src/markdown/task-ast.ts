@@ -13,6 +13,7 @@ import {
   type MarkdownTableCell,
 } from '@meowdown/markdown'
 import { DefaultMap } from '@ocavue/utils'
+import { appendBlock } from './append-section.ts'
 import { splitFrontmatter } from './frontmatter.ts'
 import { renderInlineText } from './inline-text.ts'
 import { foldKey } from './keys.ts'
@@ -302,7 +303,7 @@ function parseEditable(source: string): { document: MarkdownDocument; bodyOffset
     !isMarkdownAstEqual(parseMarkdownAst(serializeMarkdownAst(document)), document)
   ) {
     throw new NoteNotSerializableError(
-      'This note cannot be rewritten faithfully. Edit the task in the note itself.',
+      'This note cannot be rewritten faithfully. Edit it in the note itself.',
     )
   }
   return { document, bodyOffset }
@@ -554,7 +555,22 @@ export interface ListItemInsert {
  * lines and keeps a list of another marker separate.
  */
 export function appendListItem(source: string, insert: ListItemInsert): string {
-  const { document, bodyOffset } = parseEditable(source)
+  let editable: ReturnType<typeof parseEditable>
+  try {
+    editable = parseEditable(source)
+  } catch (cause) {
+    if (!(cause instanceof NoteNotSerializableError)) {
+      throw cause
+    }
+    // A note the serializer would alter still takes the entry: as a fresh
+    // list at the end, the way captures were always filed. Nothing is lost,
+    // and no capture, meeting, or memo stalls on one unusual note.
+    const marker = insert.kind === 'task' ? '+' : '-'
+    const payload =
+      insert.kind === 'bullet' ? insert.markdown.trim() : `[ ] ${insert.markdown.trim()}`
+    return appendBlock(source, `${marker} ${payload}`)
+  }
+  const { document, bodyOffset } = editable
   if (insert.section?.linked) {
     linkHeading(document, insert.section)
   }

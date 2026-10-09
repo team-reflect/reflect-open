@@ -12,7 +12,6 @@ import {
 } from '../graph/commands.ts'
 import { dailyPath, notePath } from '../graph/paths.ts'
 import { hashContent } from '../indexing/hash.ts'
-import { headingMatchesBacklinkedTitle } from '../markdown/edit.ts'
 import { parseNote } from '../markdown/extract.ts'
 import {
   appendListItem,
@@ -20,7 +19,7 @@ import {
   linkSectionHeading,
   type SectionTarget,
 } from '../markdown/task-ast.ts'
-import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks.ts'
+import { headingNamesSection, sectionEnd, topLevelHeadings } from '../markdown/heading-blocks.ts'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter.ts'
 import type { ReconcileStop } from './audio-memo.ts'
 import { ensureBacklinkTarget } from './backlink-target.ts'
@@ -106,11 +105,7 @@ async function findSameDayCapture(
   const { headings, wikiLinks } = parseNote({ path: '', source: dailySource })
   const sectionHeadings = topLevelHeadings(headings)
   const linkSections = sectionHeadings.filter(
-    (heading) =>
-      heading.level === 2 &&
-      sectionTitles.some((title) =>
-        headingMatchesBacklinkedTitle(dailySource, heading, wikiLinks, title),
-      ),
+    (heading) => heading.level <= 2 && headingNamesSection(heading, wikiLinks, sectionTitles),
   )
   if (linkSections.length === 0) {
     return null

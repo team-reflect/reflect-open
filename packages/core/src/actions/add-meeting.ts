@@ -10,7 +10,7 @@ import { wikiLinkSafe } from '../markdown/edit.ts'
 import { appendListItem, type SectionTarget } from '../markdown/task-ast.ts'
 import { canonicalEmails } from '../markdown/email-fields.ts'
 import { parseNote } from '../markdown/extract.ts'
-import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks.ts'
+import { headingNamesSection, sectionEnd, topLevelHeadings } from '../markdown/heading-blocks.ts'
 import { foldKey } from '../markdown/keys.ts'
 import { slugForTitle } from '../markdown/slug.ts'
 import { resolveMeetingAttendeeTargets, type ResolvedMeetingAttendee } from './resolve-attendees.ts'
@@ -138,7 +138,8 @@ function meetingAlreadyLinked(source: string, title: string): boolean {
   const { headings, wikiLinks } = parseNote({ path: '', source })
   const sectionHeadings = topLevelHeadings(headings)
   const heading = sectionHeadings.find(
-    (candidate) => candidate.text.toLowerCase() === MEETINGS_HEADING.toLowerCase(),
+    (candidate) =>
+      candidate.level <= 2 && headingNamesSection(candidate, wikiLinks, [MEETINGS_HEADING]),
   )
   if (!heading) {
     return false
