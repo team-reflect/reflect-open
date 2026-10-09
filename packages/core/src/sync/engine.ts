@@ -104,6 +104,21 @@ export interface SyncEngineOptions {
    * no push. Edits still land in Git history and stay revertable.
    */
   localOnly?: boolean
+  /**
+   * Coexistence with a file-sync provider (an iCloud-hosted graph with a
+   * remote): edits still commit on the idle debounce, but a network cycle
+   * runs only after this much quiet. Every edit, every arrival the watcher
+   * reports, every resume trigger, and every pull restarts the window, so
+   * the provider converges both devices before Git looks at the remote.
+   */
+  quietMs?: number
+  /**
+   * Asked when the quiet window elapses; `false` (or a rejection) re-asks
+   * thirty seconds later, then at doubling intervals up to five minutes. The
+   * owner answers from the provider's download state, so a half-arrived
+   * graph is never snapshotted.
+   */
+  networkReady?: () => Promise<boolean>
 }
 
 export interface SyncEngine {
@@ -126,6 +141,9 @@ export interface SyncEngine {
 
 const DEFAULT_IDLE_MS = 30_000
 const DEFAULT_MAX_WAIT_MS = 5 * 60_000
+/** How long a quiet window waits before asking `networkReady` again, at first and at most. */
+const NETWORK_RETRY_MS = 30_000
+const NETWORK_RETRY_MAX_MS = 5 * 60_000
 
 /**
  * Push attempts per cycle. Each retry fetches + merges first, so two devices
@@ -169,6 +187,10 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   const abort = new AbortController()
   const signal = abort.signal
   let timer: ReturnType<typeof setTimeout> | null = null
+  /** The coexistence quiet window; null when none is running or configured. */
+  let quietTimer: ReturnType<typeof setTimeout> | null = null
+  const quietMs = options.quietMs ?? null
+  let retryMs = NETWORK_RETRY_MS
   /** Hard deadline (first unflushed edit + maxWaitMs); null = nothing pending. */
   let deadline: number | null = null
   let running: Promise<void> | null = null
@@ -223,6 +245,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   /** Start one merge notification now, without making later Git commands wait. */
   function startRemoteChanges(changes: ChangedFile[]): Promise<void> {
+    restartQuiet() // a pull wrote files: the provider has them to carry now
     let task: Promise<void>
     try {
       task = Promise.resolve(options.onRemoteChanges?.(changes))
@@ -263,8 +286,46 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     }
     timer = setTimeout(() => {
       timer = null
-      void run(PUSH)
+      void run(quietMs === null ? PUSH : COMMIT)
     }, delayMs)
+  }
+
+  /** Arm the one pending look at the network, replacing any earlier one. */
+  function armQuiet(delayMs: number): void {
+    if (quietTimer !== null) {
+      clearTimeout(quietTimer)
+    }
+    quietTimer = setTimeout(() => {
+      quietTimer = null
+      void afterQuiet()
+    }, delayMs)
+  }
+
+  /** Restart the quiet window (a no-op without `quietMs`). */
+  function restartQuiet(): void {
+    if (quietMs === null || signal.aborted) {
+      return
+    }
+    retryMs = NETWORK_RETRY_MS
+    armQuiet(quietMs)
+  }
+
+  async function afterQuiet(): Promise<void> {
+    const ready =
+      options.networkReady === undefined ? true : await options.networkReady().catch(() => false)
+    // Activity during the ask restarted the window: that timer owns the next
+    // look, and running now would fetch seconds after an edit.
+    if (signal.aborted || quietTimer !== null) {
+      return
+    }
+    if (!ready) {
+      // A download that never finishes must not walk the graph every thirty
+      // seconds forever: each unanswered ask waits twice as long.
+      armQuiet(retryMs)
+      retryMs = Math.min(retryMs * 2, NETWORK_RETRY_MAX_MS)
+      return
+    }
+    await run(FULL)
   }
 
   function noteChanged(): void {
@@ -278,6 +339,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     // Wait for the idle window, but never past the deadline — a continuously
     // edited graph still backs up at least every maxWaitMs.
     schedule(Math.max(0, Math.min(idleMs, deadline - now)))
+    restartQuiet()
   }
 
   async function run(request: CycleRequest): Promise<void> {
@@ -437,6 +499,12 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   function syncNow(): Promise<void> {
     authFailed = false // a resume trigger: the user may have fixed the sign-in
+    if (quietMs !== null) {
+      // Coexistence: launch, focus, online, and "back up now" commit at once;
+      // the network waits for the window like everything else.
+      restartQuiet()
+      return run(COMMIT)
+    }
     return run(FULL)
   }
 
@@ -449,6 +517,10 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     if (timer !== null) {
       clearTimeout(timer)
       timer = null
+    }
+    if (quietTimer !== null) {
+      clearTimeout(quietTimer)
+      quietTimer = null
     }
   }
 

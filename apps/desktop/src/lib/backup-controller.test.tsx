@@ -129,6 +129,8 @@ function fakeBridge(options: FakeOptions = {}) {
             })
           }
           return CLEAN_COMMIT
+        case 'icloud_pending_count':
+          return 0
         case 'git_fetch':
           return { ahead: 0, behind: 0 }
         case 'git_merge_remote':
@@ -398,6 +400,31 @@ describe('createBackupController', () => {
     expect(calls).not.toContain('git_push')
     controller.dispose()
     errorSpy.mockRestore()
+  })
+
+  it('an iCloud-hosted graph commits on launch and fetches only after five quiet minutes', async () => {
+    vi.useFakeTimers()
+    try {
+      const { calls } = fakeBridge()
+      const controller = createBackupController({
+        graph: {
+          ...GRAPH,
+          root: '/Users/alex/Library/Mobile Documents/iCloud~app~reflect/Documents/G',
+        },
+        indexGeneration: 1,
+      })
+      await controller.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(calls).toContain('git_commit_all')
+      expect(calls).not.toContain('git_fetch')
+
+      await vi.advanceTimersByTimeAsync(5 * 60_000)
+      expect(calls).toContain('icloud_pending_count')
+      expect(calls).toContain('git_fetch')
+      controller.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('runs the launch pull when fully connected — and skips the idle push', async () => {

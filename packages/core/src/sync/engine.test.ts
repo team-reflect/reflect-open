@@ -364,6 +364,160 @@ describe('createSyncEngine', () => {
     engine.stop()
   })
 
+  describe('quiet mode (an iCloud-hosted graph with a remote)', () => {
+    const QUIET_MS = 5 * 60_000
+
+    function quietEngine(overrides: { networkReady?: () => Promise<boolean> } = {}) {
+      const calls = fakeGit(defaultResponses)
+      const engine = createSyncEngine({
+        generation: 1,
+        getCredential: async () => CRED,
+        idleMs: 10,
+        quietMs: QUIET_MS,
+        ...overrides,
+      })
+      return { calls, engine }
+    }
+
+    it('an edit commits after the debounce and the network waits for the quiet window', async () => {
+      const { calls, engine } = quietEngine()
+      engine.noteChanged()
+      await vi.advanceTimersByTimeAsync(10)
+      expect(commandsOf(calls)).toEqual(['git_commit_all'])
+
+      await vi.advanceTimersByTimeAsync(QUIET_MS - 20)
+      expect(commandsOf(calls)).toEqual(['git_commit_all'])
+
+      await vi.advanceTimersByTimeAsync(20)
+      expect(commandsOf(calls)).toEqual([
+        'git_commit_all',
+        'git_commit_all',
+        'git_fetch',
+        'git_merge_remote',
+        'git_push',
+      ])
+      engine.stop()
+    })
+
+    it('every edit restarts the window', async () => {
+      const { calls, engine } = quietEngine()
+      engine.noteChanged()
+      await vi.advanceTimersByTimeAsync(QUIET_MS / 2)
+      engine.noteChanged()
+      await vi.advanceTimersByTimeAsync(QUIET_MS / 2 + 10)
+      expect(commandsOf(calls)).not.toContain('git_fetch')
+      await vi.advanceTimersByTimeAsync(QUIET_MS / 2)
+      expect(commandsOf(calls)).toContain('git_fetch')
+      engine.stop()
+    })
+
+    it('syncNow commits at once and defers the network like an edit', async () => {
+      const { calls, engine } = quietEngine()
+      await engine.syncNow()
+      expect(commandsOf(calls)).toEqual(['git_commit_all'])
+      await vi.advanceTimersByTimeAsync(QUIET_MS)
+      expect(commandsOf(calls)).toContain('git_fetch')
+      engine.stop()
+    })
+
+    it('a pull that changed files restarts the window', async () => {
+      const calls = fakeGit((command) =>
+        command === 'git_merge_remote'
+          ? {
+              kind: 'merged',
+              conflictedPaths: [],
+              changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
+            }
+          : defaultResponses(command),
+      )
+      const engine = createSyncEngine({
+        generation: 1,
+        getCredential: async () => CRED,
+        idleMs: 10,
+        quietMs: QUIET_MS,
+        onRemoteChanges: () => {},
+      })
+      await engine.syncNow()
+      await vi.advanceTimersByTimeAsync(QUIET_MS)
+      expect(commandsOf(calls).filter((command) => command === 'git_fetch')).toHaveLength(1)
+      // The pull wrote files: another window, then another look at the remote.
+      await vi.advanceTimersByTimeAsync(QUIET_MS)
+      expect(commandsOf(calls).filter((command) => command === 'git_fetch')).toHaveLength(2)
+      engine.stop()
+    })
+
+    it('a provider that is still downloading is asked again thirty seconds later', async () => {
+      let ready = false
+      const { calls, engine } = quietEngine({ networkReady: async () => ready })
+      engine.noteChanged()
+      await vi.advanceTimersByTimeAsync(QUIET_MS + 10)
+      expect(commandsOf(calls)).not.toContain('git_fetch')
+      ready = true
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(commandsOf(calls)).toContain('git_fetch')
+      engine.stop()
+    })
+
+    it('an edit while the provider is being asked restarts the window', async () => {
+      let answer: (ready: boolean) => void = () => {}
+      const networkReady = vi.fn(
+        () =>
+          new Promise<boolean>((resolve) => {
+            answer = resolve
+          }),
+      )
+      const { calls, engine } = quietEngine({ networkReady })
+      engine.noteChanged()
+      await vi.advanceTimersByTimeAsync(QUIET_MS + 10)
+      expect(networkReady).toHaveBeenCalledTimes(1)
+
+      engine.noteChanged() // the walk is still running
+      answer(true)
+      await vi.advanceTimersByTimeAsync(QUIET_MS - 10)
+      expect(commandsOf(calls)).not.toContain('git_fetch')
+      await vi.advanceTimersByTimeAsync(20)
+      expect(networkReady).toHaveBeenCalledTimes(2)
+      engine.stop()
+    })
+
+    it('an edit during an unready answer leaves one timer, which stop() clears', async () => {
+      let answer: (ready: boolean) => void = () => {}
+      const networkReady = vi.fn(
+        () =>
+          new Promise<boolean>((resolve) => {
+            answer = resolve
+          }),
+      )
+      const { calls, engine } = quietEngine({ networkReady })
+      engine.noteChanged()
+      await vi.advanceTimersByTimeAsync(QUIET_MS + 10)
+      engine.noteChanged()
+      answer(false)
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(networkReady).toHaveBeenCalledTimes(1) // no thirty-second retry beside the window
+
+      engine.stop()
+      await vi.advanceTimersByTimeAsync(QUIET_MS)
+      expect(networkReady).toHaveBeenCalledTimes(1)
+      expect(commandsOf(calls)).not.toContain('git_fetch')
+    })
+
+    it('a provider that stays unready is asked at doubling intervals', async () => {
+      const networkReady = vi.fn(async () => false)
+      const { engine } = quietEngine({ networkReady })
+      engine.noteChanged()
+      await vi.advanceTimersByTimeAsync(QUIET_MS + 10)
+      expect(networkReady).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(networkReady).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(networkReady).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(networkReady).toHaveBeenCalledTimes(3)
+      engine.stop()
+    })
+  })
+
   it('commitNow runs even when the owner gates cycles (the hidden-app flush)', async () => {
     // iOS fires the background flush after the document is hidden, exactly
     // when canStartCycle says no to network cycles.

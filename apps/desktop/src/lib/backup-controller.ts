@@ -13,6 +13,7 @@ import {
   gitDisconnect,
   gitSetup,
   gitStatus,
+  icloudPendingCount,
   isCaptureSpoolPath,
   isNotePath,
   isSyncError,
@@ -30,6 +31,7 @@ import {
   type Unlisten,
 } from '@reflect/core'
 import { setBackupFlusher } from '@/lib/backup-flush.ts'
+import { isICloudRoot } from '@/lib/icloud-controller.ts'
 import { invalidateGithubAuth } from '@/lib/github-auth-state.ts'
 import { startOperation } from '@/lib/operations.ts'
 import { isNativeShell } from '@/lib/platform.ts'
@@ -66,6 +68,8 @@ export type ConnectExistingResult = 'connected' | 'needsPublicConfirm' | 'notFou
  * flush commits locally.)
  */
 const MOBILE_IDLE_MS = 10_000
+/** Quiet needed before a Git network cycle on an iCloud-hosted graph. */
+const COEXIST_QUIET_MS = 5 * 60_000
 
 export interface BackupControllerOptions {
   graph: GraphInfo
@@ -354,9 +358,20 @@ export function createBackupController(options: BackupControllerOptions): Backup
         await startLocalHistory(status.initialized)
         return
       }
+      // An iCloud-hosted graph already syncs through the file provider; Git
+      // is a delayed backup there (docs/icloud-sync.md): commits as usual,
+      // network only after five quiet minutes with no pending downloads.
+      const coexisting = isICloudRoot(options.graph.root)
       const next = createSyncEngine({
         generation,
         ...(isMobileSurface() ? { idleMs: MOBILE_IDLE_MS } : {}),
+        ...(coexisting
+          ? {
+              quietMs: COEXIST_QUIET_MS,
+              networkReady: () =>
+                icloudPendingCount(options.graph.root, 'notes').then((pending) => pending === 0),
+            }
+          : {}),
         // iOS can suspend us at any await. Do not begin a launch, online, or
         // debounced Git cycle after the document is hidden; the existing
         // visible/focus trigger below replays a full cycle on foreground.
