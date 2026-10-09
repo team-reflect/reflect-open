@@ -522,24 +522,43 @@ fn carry_history(source: &Path, target: &Path) -> AppResult<()> {
         return Ok(());
     }
     let from = git2::Repository::open(source)?;
+    // The same refusal as sync: a detached `HEAD` names no branch to carry,
+    // and its commits may be on none.
+    let branch = from
+        .find_reference("HEAD")?
+        .symbolic_target()?
+        .ok_or_else(|| {
+            AppError::io(
+                "the backup repository is on a detached HEAD; check out a branch with git first",
+            )
+        })?
+        .to_string();
     let mut options = git2::RepositoryInitOptions::new();
-    if let Some(branch) = from.find_reference("HEAD")?.symbolic_target()? {
-        options.initial_head(branch);
-    }
+    options.initial_head(&branch);
     let repo = git2::Repository::init_opts(target, &options)?;
     crate::fs::mark_dir_local_only(repo.path());
-    repo.remote_anonymous(&from.path().to_string_lossy())?
-        .fetch(
-            &["+refs/heads/*:refs/heads/*", "+refs/tags/*:refs/tags/*"],
-            None,
-            None,
-        )?;
-    if let Ok(head) = repo.head() {
-        repo.reset(
-            &head.peel(git2::ObjectType::Commit)?,
-            git2::ResetType::Mixed,
-            None,
-        )?;
+    let fetched = repo
+        .remote_anonymous(&from.path().to_string_lossy())
+        .and_then(|mut remote| {
+            remote.fetch(
+                &["+refs/heads/*:refs/heads/*", "+refs/tags/*:refs/tags/*"],
+                None,
+                None,
+            )
+        })
+        .and_then(|()| match repo.head() {
+            Ok(head) => repo.reset(
+                &head.peel(git2::ObjectType::Commit)?,
+                git2::ResetType::Mixed,
+                None,
+            ),
+            Err(_) => Ok(()), // an unborn branch: nothing to index yet
+        });
+    if let Err(err) = fetched {
+        // Leave no half-made repository: a retry must find the destination
+        // as this attempt found it.
+        let _ = std::fs::remove_dir_all(repo.path());
+        return Err(err.into());
     }
     Ok(())
 }
@@ -758,6 +777,38 @@ mod tests {
             .expect("open source")
             .find_remote("origin")
             .is_ok());
+    }
+
+    #[test]
+    fn adopt_refuses_a_detached_head_and_leaves_nothing_behind() {
+        let (source, head) = graph_with_history();
+        std::fs::remove_file(source.path().join(".git/index.lock")).expect("unlock");
+        git2::Repository::open(source.path())
+            .expect("open")
+            .set_head_detached(head)
+            .expect("detach");
+
+        let container = tempfile::tempdir().expect("tempdir");
+        let target = container.path().join("Notes");
+        assert!(adopt_into(source.path(), &target).is_err());
+        assert!(!target.exists());
+    }
+
+    #[test]
+    fn a_failed_history_transfer_removes_the_repository_it_started() {
+        // A destination that already holds a file is never deleted
+        // wholesale, so the new `.git` must go on its own.
+        let (source, _) = graph_with_history();
+        std::fs::write(source.path().join(".git/refs/heads/broken"), "not an oid\n")
+            .expect("write");
+        let container = tempfile::tempdir().expect("tempdir");
+        let target = container.path().join("Notes");
+        std::fs::create_dir_all(&target).expect("mkdir");
+        std::fs::write(target.join("keep.txt"), b"mine").expect("write");
+
+        assert!(adopt_into(source.path(), &target).is_err());
+        assert!(!target.join(".git").exists());
+        assert!(target.join("keep.txt").exists());
     }
 
     #[test]
