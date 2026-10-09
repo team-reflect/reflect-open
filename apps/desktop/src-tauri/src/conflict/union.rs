@@ -3,14 +3,18 @@
 //! or the template seed both devices created it from) and diverge only by what
 //! each appended. Keep the prefix and both tails, older side's tail first.
 //!
-//! The guard that keeps this from mangling *edits*: the two tails must be
-//! line-disjoint. A mid-note edit puts the note's own following lines in both
-//! tails (they overlap), which refuses the union and falls through to markers
-//! — never a silently duplicated half-note.
+//! Two guards keep this from mangling *edits*. The tails must be
+//! line-disjoint: a mid-note edit puts the note's own following lines in both
+//! tails (they overlap), which refuses the union and leaves the merge to the
+//! next rule — never a silently duplicated half-note. And when a base is
+//! known, both sides must still start with it: a deletion on one side next to
+//! an append on the other is an edit too, and a prefix-only union would bring
+//! the deleted lines back as an exact result.
 
 /// Union `first` and `second` when they diverge append-only. `None` when the
-/// shape doesn't qualify (overlapping tails — a real edit, not an append).
-pub(super) fn append_union(first: &str, second: &str) -> Option<String> {
+/// shape doesn't qualify (overlapping tails, or a side that no longer starts
+/// with `base` — a real edit, not an append).
+pub(super) fn append_union(base: Option<&str>, first: &str, second: &str) -> Option<String> {
     let first_lines: Vec<&str> = first.split('\n').collect();
     let second_lines: Vec<&str> = second.split('\n').collect();
 
@@ -19,6 +23,13 @@ pub(super) fn append_union(first: &str, second: &str) -> Option<String> {
         .zip(second_lines.iter())
         .take_while(|(a, b)| a == b)
         .count();
+    if let Some(base) = base {
+        let base_lines: Vec<&str> = base.split('\n').collect();
+        let base_lines = trim_trailing_blank(&base_lines);
+        if !first_lines[..shared].starts_with(base_lines) {
+            return None;
+        }
+    }
     let first_tail = trim_trailing_blank(&first_lines[shared..]);
     let second_tail = trim_trailing_blank(&second_lines[shared..]);
 
@@ -76,7 +87,7 @@ mod tests {
         let first = "# 2026-07-04\n\n- morning standup\n- mac task\n";
         let second = "# 2026-07-04\n\n- morning standup\n- phone capture\n";
         assert_eq!(
-            append_union(first, second),
+            append_union(None, first, second),
             Some("# 2026-07-04\n\n- morning standup\n- mac task\n- phone capture\n".to_string())
         );
     }
@@ -85,8 +96,8 @@ mod tests {
     fn a_pure_append_keeps_the_longer_side() {
         let first = "# Note\n\n- a\n";
         let second = "# Note\n\n- a\n- b\n";
-        assert_eq!(append_union(first, second), Some(second.to_string()));
-        assert_eq!(append_union(second, first), Some(second.to_string()));
+        assert_eq!(append_union(None, first, second), Some(second.to_string()));
+        assert_eq!(append_union(None, second, first), Some(second.to_string()));
     }
 
     #[test]
@@ -96,7 +107,7 @@ mod tests {
         let first = "- from the mac\n";
         let second = "- from the phone\n";
         assert_eq!(
-            append_union(first, second),
+            append_union(None, first, second),
             Some("- from the mac\n- from the phone\n".to_string())
         );
     }
@@ -106,7 +117,7 @@ mod tests {
         // First edited line two; second appended. Tails overlap on "- c".
         let first = "- a\n- B\n- c\n";
         let second = "- a\n- b\n- c\n- d\n";
-        assert_eq!(append_union(first, second), None);
+        assert_eq!(append_union(None, first, second), None);
     }
 
     #[test]
@@ -116,6 +127,6 @@ mod tests {
         // catches whitespace-equality earlier) — determinism is what matters.
         let first = "- a\n";
         let second = "- a\n\n";
-        assert_eq!(append_union(first, second), Some(second.to_string()));
+        assert_eq!(append_union(None, first, second), Some(second.to_string()));
     }
 }

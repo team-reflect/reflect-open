@@ -175,10 +175,10 @@ export type IcloudSweepScope = 'full' | 'candidates' | 'ingested'
 
 const mergeTextOutcomeSchema = z.object({
   /**
-   * `clean`: `content` is the merge. `conflicted`: `content` carries labeled
-   * markers where the edits overlap. `unmergeable`: a side already carried
-   * markers (a pull wrote a conflicted note while the buffer was dirty);
-   * nothing was merged, `content` is `theirs`, and the caller keeps `ours`.
+   * `clean`: `content` is the merge. `unmergeable`: nothing was merged,
+   * `content` is `theirs`, and the caller keeps `ours` (a side already
+   * carried markers, or the edits overlap and only a lossy merge was
+   * possible). `conflicted` is no longer produced.
    */
   kind: z.enum(['clean', 'conflicted', 'unmergeable']),
   content: z.string(),
