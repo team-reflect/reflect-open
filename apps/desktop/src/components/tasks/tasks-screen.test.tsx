@@ -3,6 +3,7 @@ import { cleanup, render } from 'vitest-browser-react'
 import { userEvent, type Locator } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenTask } from '@reflect/core'
+import type { TaskAction } from '@/lib/note-task.ts'
 import { act, useEffect, useState, type MutableRefObject, type ReactNode } from 'react'
 import { queryKeys } from '@/lib/query-client.ts'
 import { makeOpenTask as task } from '@/lib/tasks/open-task-fixture.ts'
@@ -55,27 +56,35 @@ vi.mock('@/editor/markdown-preview.tsx', () => ({
   },
 }))
 
-const toggleTask = vi.hoisted(() => vi.fn())
-const deleteTask = vi.hoisted(() => vi.fn())
-const editTask = vi.hoisted(() => vi.fn())
 const insertTask = vi.hoisted(() => vi.fn())
 const continueTaskInContext = vi.hoisted(() => vi.fn())
-const convertTaskToBullet = vi.hoisted(() => vi.fn())
-const editAndToggleTask = vi.hoisted(() => vi.fn())
-const editAndConvertTaskToBullet = vi.hoisted(() => vi.fn())
+const writeTask = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/note-task.ts', () => ({
-  toggleTask,
-  deleteTask,
-  editTask,
+  writeTask,
   insertTask,
   continueTaskInContext,
-  convertTaskToBullet,
-  editAndToggleTask,
-  editAndConvertTaskToBullet,
 }))
 
 /** The result of a write that changed nothing the cache needs to re-address. */
 const WRITTEN = { source: '', moved: [], inserted: [], tasks: [] }
+
+type TaskActionKind = TaskAction['kind']
+
+function isWrite(actions: readonly TaskAction[], kinds: readonly TaskActionKind[]): boolean {
+  return actions.length === kinds.length && actions.every((action, i) => action.kind === kinds[i])
+}
+
+/** The `writeTask` calls whose actions are exactly `kinds`, e.g. `('setMarkdown', 'toggle')`. */
+function writesOf(...kinds: TaskActionKind[]): unknown[][] {
+  return writeTask.mock.calls.filter((call: unknown[]) => isWrite(call[1] as TaskAction[], kinds))
+}
+
+/** Reject the writes whose actions are exactly `kinds`; every other write succeeds. */
+function failWrites(kinds: TaskActionKind[], cause: Error): void {
+  writeTask.mockImplementation((_task: unknown, actions: TaskAction[]) =>
+    isWrite(actions, kinds) ? Promise.reject(cause) : Promise.resolve(WRITTEN),
+  )
+}
 
 // Stub the real inline editor with the callback surface the row
 // wires up, so selection + edit/delete/cancel routing is testable here; the
@@ -247,12 +256,8 @@ beforeEach(() => {
   getCompletedTasks.mockReset()
   getCompletedTasks.mockResolvedValue([])
   openRouteInNewWindow.mockReset().mockResolvedValue(true)
-  toggleTask.mockReset()
-  toggleTask.mockResolvedValue(WRITTEN)
-  deleteTask.mockReset()
-  deleteTask.mockResolvedValue(WRITTEN)
-  editTask.mockReset()
-  editTask.mockResolvedValue(WRITTEN)
+  writeTask.mockReset()
+  writeTask.mockResolvedValue(WRITTEN)
   insertTask.mockReset()
   insertTask.mockResolvedValue({
     created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
@@ -263,12 +268,6 @@ beforeEach(() => {
     created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
     moved: [],
   })
-  convertTaskToBullet.mockReset()
-  convertTaskToBullet.mockResolvedValue(WRITTEN)
-  editAndToggleTask.mockReset()
-  editAndToggleTask.mockResolvedValue(WRITTEN)
-  editAndConvertTaskToBullet.mockReset()
-  editAndConvertTaskToBullet.mockResolvedValue(WRITTEN)
   startOperation.mockClear()
   fail.mockReset()
   resetRecentlyCompleted()
@@ -642,9 +641,6 @@ describe('TasksScreen', () => {
   })
 
   it('commits, deletes, or cancels an inline edit through the editor', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
-    editTask.mockResolvedValue(WRITTEN)
-    deleteTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -656,13 +652,13 @@ describe('TasksScreen', () => {
     ])
     const view = await renderScreen()
 
-    // Commit → editTask with the new content, and edit mode exits.
+    // Commit → one setMarkdown write with the new content, and edit mode exits.
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await userEvent.click(view.getByText('commit-edit'))
     await waitFor(() =>
-      expect(editTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/p.md', astPath: [2] }),
-        'edited content',
+        [{ kind: 'setMarkdown', markdown: 'edited content' }],
         1,
       ),
     )
@@ -673,15 +669,14 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByText('cancel-edit'))
     expect(view.queryByTestId('task-editor')).toBeNull()
 
-    // Re-select and delete → deleteTask, row gone.
+    // Re-select and delete → a remove write, row gone.
     await userEvent.click(view.getByRole('button', { name: 'edited content' }))
     await userEvent.click(view.getByText('delete-edit'))
-    await waitFor(() => expect(deleteTask).toHaveBeenCalled())
+    await waitFor(() => expect(writesOf('remove')).not.toHaveLength(0))
     await view.unmount()
   })
 
   it('flush persists an edit without exiting edit mode (selection unchanged)', async () => {
-    editTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -696,9 +691,9 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await userEvent.click(view.getByText('flush-edit'))
     await waitFor(() =>
-      expect(editTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/p.md', astPath: [2] }),
-        'edited content',
+        [{ kind: 'setMarkdown', markdown: 'edited content' }],
         1,
       ),
     )
@@ -708,8 +703,6 @@ describe('TasksScreen', () => {
   })
 
   it('completes from the editor: edit+complete sequences the two writes', async () => {
-    editTask.mockResolvedValue(WRITTEN)
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -725,9 +718,9 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await userEvent.click(view.getByText('complete-edited'))
     await waitFor(() =>
-      expect(editAndToggleTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/p.md', astPath: [2] }),
-        'edited content',
+        [{ kind: 'setMarkdown', markdown: 'edited content' }, { kind: 'toggle' }],
         1,
       ),
     )
@@ -736,8 +729,6 @@ describe('TasksScreen', () => {
 
   it('editing an already-completed task with ⌘↵ saves the text, never reopens it', async () => {
     window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
-    editTask.mockResolvedValue(WRITTEN)
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([])
     getCompletedTasks.mockResolvedValue([
       task({
@@ -753,14 +744,13 @@ describe('TasksScreen', () => {
 
     await userEvent.click(await view.findByRole('button', { name: 'done task' }))
     await userEvent.click(view.getByText('complete-edited'))
-    await waitFor(() => expect(editTask).toHaveBeenCalled())
+    await waitFor(() => expect(writesOf('setMarkdown')).not.toHaveLength(0))
     // The marker stays `[x]` — no toggle back to open.
-    expect(toggleTask).not.toHaveBeenCalled()
+    expect(writesOf('toggle')).toHaveLength(0)
     await view.unmount()
   })
 
   it('completes from the editor: an unchanged task just toggles, no edit', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -774,8 +764,8 @@ describe('TasksScreen', () => {
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await userEvent.click(view.getByText('complete-unchanged'))
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
-    expect(editTask).not.toHaveBeenCalled()
+    await waitFor(() => expect(writesOf('toggle')).toHaveLength(1))
+    expect(writesOf('setMarkdown')).toHaveLength(0)
     await view.unmount()
   })
 
@@ -829,7 +819,6 @@ describe('TasksScreen', () => {
   })
 
   it('completes the selection with ⌘↵', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -851,7 +840,7 @@ describe('TasksScreen', () => {
     await view.findByRole('button', { name: 'first' })
     await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}') // select all
     await userEvent.keyboard('{ControlOrMeta>}{Enter}{/ControlOrMeta}')
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(writesOf('toggle')).toHaveLength(2))
     // Completing keeps both showing struck (the middle state), not dropped.
     await waitFor(() => expect(view.getAllByRole('button', { name: /^Reopen:/ })).toHaveLength(2))
     expect(view.getByText('first')).toBeDefined()
@@ -859,7 +848,6 @@ describe('TasksScreen', () => {
   })
 
   it('deletes a multi-selection with ⌘⌫', async () => {
-    deleteTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -883,7 +871,7 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     fireEvent.click(view.getByRole('button', { name: 'second' }), MOD_KEY)
     await userEvent.keyboard('{ControlOrMeta>}{Backspace}{/ControlOrMeta}')
-    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(2))
     await waitFor(() => expect(view.queryByText('first')).toBeNull())
     await view.unmount()
   })
@@ -938,8 +926,9 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'later' }))
     await userEvent.click(view.getByRole('button', { name: 'delete-edit' }))
     await waitFor(() =>
-      expect(deleteTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/proj.md', astPath: [2] }),
+        [{ kind: 'remove' }],
         1,
       ),
     )
@@ -986,7 +975,6 @@ describe('TasksScreen', () => {
   })
 
   it('dismissing the inserted row deletes the right note line (V1 empty cleanup)', async () => {
-    deleteTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1007,8 +995,9 @@ describe('TasksScreen', () => {
     // through, deleting the freshly written daily-note line, not some other row.
     await userEvent.click(view.getByRole('button', { name: 'delete-edit' }))
     await waitFor(() =>
-      expect(deleteTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'daily/2026-06-14.md' }),
+        [{ kind: 'remove' }],
         1,
       ),
     )
@@ -1016,7 +1005,6 @@ describe('TasksScreen', () => {
   })
 
   it('Backspace deletes a row and lands the editor on the previous one (V1)', async () => {
-    deleteTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1041,8 +1029,9 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'delete-empty-edit' }))
 
     await waitFor(() =>
-      expect(deleteTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/b.md' }),
+        [{ kind: 'remove' }],
         1,
       ),
     )
@@ -1052,7 +1041,6 @@ describe('TasksScreen', () => {
   })
 
   it('plain ⌫ leaves a multi-selection untouched (ambiguous, V1)', async () => {
-    deleteTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/a.md', astPath: [2], markdown: '', text: '', noteTitle: 'A' }),
       task({
@@ -1071,7 +1059,7 @@ describe('TasksScreen', () => {
       fireEvent.keyDown(view.getByLabelText('Tasks', { exact: true }), { key: 'Backspace' })
     })
     // V1 refuses a multi-row ⌫ (which row would survive is unclear).
-    expect(deleteTask).not.toHaveBeenCalled()
+    expect(writesOf('remove')).toHaveLength(0)
     await view.unmount()
   })
 
@@ -1166,7 +1154,6 @@ describe('TasksScreen', () => {
 
   it('preserves a grouped task draft when contextual insertion is refused', async () => {
     continueTaskInContext.mockRejectedValue(new Error('This note is open.'))
-    editTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1183,9 +1170,9 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
 
     await waitFor(() =>
-      expect(editTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/a.md', markdown: 'first' }),
-        'edited content',
+        [{ kind: 'setMarkdown', markdown: 'edited content' }],
         1,
       ),
     )
@@ -1246,8 +1233,7 @@ describe('TasksScreen', () => {
         1,
       ),
     )
-    expect(editTask).not.toHaveBeenCalled()
-    expect(deleteTask).not.toHaveBeenCalled()
+    expect(writeTask).not.toHaveBeenCalled()
     await view.unmount()
   })
 
@@ -1280,7 +1266,6 @@ describe('TasksScreen', () => {
 
   it('does not reopen an already-completed task when ⌘↵ hits the selection', async () => {
     window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1306,13 +1291,16 @@ describe('TasksScreen', () => {
     await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}') // selects the open and the completed row
     await userEvent.keyboard('{ControlOrMeta>}{Enter}{/ControlOrMeta}')
     // Only the open row toggles; the completed one is left untouched.
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
-    expect(toggleTask).toHaveBeenCalledWith(expect.objectContaining({ notePath: 'notes/a.md' }), 1)
+    await waitFor(() => expect(writesOf('toggle')).toHaveLength(1))
+    expect(writeTask).toHaveBeenCalledWith(
+      expect.objectContaining({ notePath: 'notes/a.md' }),
+      [{ kind: 'toggle' }],
+      1,
+    )
     await view.unmount()
   })
 
   it('scheduling the selection writes a due-date link to each task (V1)', async () => {
-    editTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1337,10 +1325,10 @@ describe('TasksScreen', () => {
     // Pick June 20 in the calendar (today mock = 2026-06-14, so it opens on June).
     await userEvent.click(await view.findByText('20'))
 
-    await waitFor(() => expect(editTask).toHaveBeenCalledTimes(2))
-    expect(editTask).toHaveBeenCalledWith(
+    await waitFor(() => expect(writesOf('setMarkdown')).toHaveLength(2))
+    expect(writeTask).toHaveBeenCalledWith(
       expect.objectContaining({ notePath: 'notes/a.md' }),
-      'plan [[2026-06-20]]',
+      [{ kind: 'setMarkdown', markdown: 'plan [[2026-06-20]]' }],
       1,
     )
     await view.unmount()
@@ -1369,13 +1357,15 @@ describe('TasksScreen', () => {
     await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}') // select both (no editor mounts)
     await userEvent.click(view.getByRole('button', { name: /Convert to bullet 2/ }))
 
-    await waitFor(() => expect(convertTaskToBullet).toHaveBeenCalledTimes(2))
-    expect(convertTaskToBullet).toHaveBeenCalledWith(
+    await waitFor(() => expect(writesOf('toBullet')).toHaveLength(2))
+    expect(writeTask).toHaveBeenCalledWith(
       expect.objectContaining({ notePath: 'notes/a.md' }),
+      [{ kind: 'toBullet' }],
       1,
     )
-    expect(convertTaskToBullet).toHaveBeenCalledWith(
+    expect(writeTask).toHaveBeenCalledWith(
       expect.objectContaining({ notePath: 'notes/b.md' }),
+      [{ kind: 'toBullet' }],
       1,
     )
     // The converted rows are no longer checkboxes, so they leave the view.
@@ -1406,7 +1396,7 @@ describe('TasksScreen', () => {
     await view.findByText('plan')
     await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}') // select both (no editor mounts)
     await userEvent.keyboard('{ControlOrMeta>}{Shift>}k{/Shift}{/ControlOrMeta}')
-    await waitFor(() => expect(convertTaskToBullet).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(writesOf('toBullet')).toHaveLength(2))
     await waitFor(() => expect(view.queryByText('plan')).toBeNull())
     await view.unmount()
   })
@@ -1415,7 +1405,6 @@ describe('TasksScreen', () => {
     // The toolbar button on the sole (edited) row routes through the editor so the
     // unsaved draft is saved first, then the marker is stripped — the data-loss race
     // Bugbot flagged (convert landing before the editor's commit) can't happen.
-    editTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1432,9 +1421,9 @@ describe('TasksScreen', () => {
 
     // Edit first (persist the draft), then convert the rewritten line.
     await waitFor(() =>
-      expect(editAndConvertTaskToBullet).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/a.md', astPath: [2] }),
-        'edited content',
+        [{ kind: 'setMarkdown', markdown: 'edited content' }, { kind: 'toBullet' }],
         1,
       ),
     )
@@ -1443,7 +1432,6 @@ describe('TasksScreen', () => {
   })
 
   it('converts an edited row from the editor’s own ⌘⇧K (save then convert)', async () => {
-    editTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1458,19 +1446,18 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'plan' }))
     await userEvent.click(view.getByRole('button', { name: 'convert-edited' }))
     await waitFor(() =>
-      expect(editAndConvertTaskToBullet).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.anything(),
-        'edited content',
+        [{ kind: 'setMarkdown', markdown: 'edited content' }, { kind: 'toBullet' }],
         1,
       ),
     )
-    expect(editTask).not.toHaveBeenCalled()
-    expect(convertTaskToBullet).not.toHaveBeenCalled()
+    expect(writesOf('setMarkdown')).toHaveLength(0)
+    expect(writesOf('toBullet')).toHaveLength(0)
     await view.unmount()
   })
 
   it('⌘↵ reopens a selection that is already all checked (toggle both ways, V1)', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1492,11 +1479,11 @@ describe('TasksScreen', () => {
     await view.findByText('one')
     await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}') // select both (no editor)
     await userEvent.keyboard('{ControlOrMeta>}{Enter}{/ControlOrMeta}') // complete both
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(writesOf('toggle')).toHaveLength(2))
 
     // The struck rows stay selected; ⌘↵ again reopens them (two more toggles).
     await userEvent.keyboard('{ControlOrMeta>}{Enter}{/ControlOrMeta}')
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(4))
+    await waitFor(() => expect(writesOf('toggle')).toHaveLength(4))
     await view.unmount()
   })
 
@@ -1526,7 +1513,6 @@ describe('TasksScreen', () => {
   })
 
   it('completes a task when its checkbox is clicked', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -1540,12 +1526,13 @@ describe('TasksScreen', () => {
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     await waitFor(() =>
-      expect(toggleTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
           markdown: 'project task',
         }),
+        [{ kind: 'toggle' }],
         1,
       ),
     )
@@ -1556,7 +1543,6 @@ describe('TasksScreen', () => {
   })
 
   it('yields the struck row to the index when the task is reopened at its source note', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -1595,7 +1581,6 @@ describe('TasksScreen', () => {
   })
 
   it('keeps the struck row when a refetch races the completion’s reindex', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
     const staleRow = task({
       notePath: 'notes/p.md',
       astPath: [5],
@@ -1622,7 +1607,6 @@ describe('TasksScreen', () => {
   })
 
   it('completes a selected task when its checkbox is clicked', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -1639,12 +1623,13 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'Complete: project task' }))
 
     await waitFor(() =>
-      expect(toggleTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
           markdown: 'project task',
         }),
+        [{ kind: 'toggle' }],
         1,
       ),
     )
@@ -1652,7 +1637,6 @@ describe('TasksScreen', () => {
   })
 
   it('completes every selected open task when a selected checkbox is clicked', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1675,15 +1659,17 @@ describe('TasksScreen', () => {
     await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}')
     await userEvent.click(view.getByRole('button', { name: 'Complete: first task' }))
 
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(2))
-    expect(toggleTask).toHaveBeenNthCalledWith(
+    await waitFor(() => expect(writesOf('toggle')).toHaveLength(2))
+    expect(writeTask).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ notePath: 'notes/a.md', astPath: [5], markdown: 'first task' }),
+      [{ kind: 'toggle' }],
       1,
     )
-    expect(toggleTask).toHaveBeenNthCalledWith(
+    expect(writeTask).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ notePath: 'notes/b.md', astPath: [9], markdown: 'second task' }),
+      [{ kind: 'toggle' }],
       1,
     )
     await view.findByRole('button', { name: 'Reopen: first task' })
@@ -1693,7 +1679,6 @@ describe('TasksScreen', () => {
 
   it('reopens selected checked tasks when a checked selected checkbox is clicked', async () => {
     window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1720,9 +1705,10 @@ describe('TasksScreen', () => {
     await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}')
     await userEvent.click(view.getByRole('button', { name: 'Reopen: done task' }))
 
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
-    expect(toggleTask).toHaveBeenCalledWith(
+    await waitFor(() => expect(writesOf('toggle')).toHaveLength(1))
+    expect(writeTask).toHaveBeenCalledWith(
       expect.objectContaining({ notePath: 'notes/b.md', astPath: [9], markdown: 'done task' }),
+      [{ kind: 'toggle' }],
       1,
     )
     await view.findByRole('button', { name: 'Complete: open task' })
@@ -1731,8 +1717,6 @@ describe('TasksScreen', () => {
   })
 
   it('saves an edited selected task before completing it from the checkbox', async () => {
-    editTask.mockResolvedValue(WRITTEN)
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -1749,13 +1733,13 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'Complete: project task' }))
 
     await waitFor(() =>
-      expect(editAndToggleTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
           markdown: 'project task',
         }),
-        'edited content',
+        [{ kind: 'setMarkdown', markdown: 'edited content' }, { kind: 'toggle' }],
         1,
       ),
     )
@@ -1766,7 +1750,7 @@ describe('TasksScreen', () => {
     let resolveWrite = (): void => {
       throw new Error('write promise was not created')
     }
-    editAndToggleTask.mockImplementation(
+    writeTask.mockImplementation(
       () =>
         new Promise<typeof WRITTEN>((resolve) => {
           resolveWrite = () => resolve(WRITTEN)
@@ -1787,11 +1771,11 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'stage-checkbox-edit' }))
     await userEvent.click(view.getByRole('button', { name: 'Complete: project task' }))
 
-    await waitFor(() => expect(editAndToggleTask).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(writesOf('setMarkdown', 'toggle')).toHaveLength(1))
     const reopen = await view.findByRole('button', { name: 'Reopen: edited content' })
     await waitFor(() => expect((reopen as HTMLButtonElement).disabled).toBe(true))
     fireEvent.click(reopen)
-    expect(toggleTask).not.toHaveBeenCalled()
+    expect(writesOf('toggle')).toHaveLength(0)
 
     resolveWrite()
     await waitFor(() => expect((reopen as HTMLButtonElement).disabled).toBe(false))
@@ -1799,7 +1783,6 @@ describe('TasksScreen', () => {
   })
 
   it('reopens a completed task when its checkbox is clicked', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -1815,12 +1798,13 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'Reopen: project task' }))
 
     await waitFor(() =>
-      expect(toggleTask).toHaveBeenLastCalledWith(
+      expect(writeTask).toHaveBeenLastCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
           markdown: 'project task',
         }),
+        [{ kind: 'toggle' }],
         1,
       ),
     )
@@ -1830,7 +1814,6 @@ describe('TasksScreen', () => {
 
   it('reopens an archived completed task when its checkbox is clicked', async () => {
     window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([])
     getCompletedTasks.mockResolvedValue([
       task({
@@ -1847,12 +1830,13 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'Reopen: project task' }))
 
     await waitFor(() =>
-      expect(toggleTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
           markdown: 'project task',
         }),
+        [{ kind: 'toggle' }],
         1,
       ),
     )
@@ -1865,7 +1849,7 @@ describe('TasksScreen', () => {
     let resolveToggle = (): void => {
       throw new Error('toggle promise was not created')
     }
-    toggleTask.mockImplementation(
+    writeTask.mockImplementation(
       () =>
         new Promise<void>((resolve) => {
           resolveToggle = resolve
@@ -1891,12 +1875,12 @@ describe('TasksScreen', () => {
     expect(complete.querySelector('.lucide-circle')).not.toBeNull()
 
     resolveToggle()
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(writesOf('toggle')).toHaveLength(1))
     await view.unmount()
   })
 
   it('restores a struck task when an unchanged editor checkbox reopen fails', async () => {
-    toggleTask.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('stale index'))
+    writeTask.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('stale index'))
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -1924,7 +1908,6 @@ describe('TasksScreen', () => {
 
   it('reopens a selected completed task when its checkbox is clicked', async () => {
     window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([])
     getCompletedTasks.mockResolvedValue([
       task({
@@ -1943,12 +1926,13 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'Reopen: project task' }))
 
     await waitFor(() =>
-      expect(toggleTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
           markdown: 'project task',
         }),
+        [{ kind: 'toggle' }],
         1,
       ),
     )
@@ -1957,8 +1941,6 @@ describe('TasksScreen', () => {
 
   it('saves an edited selected completed task before reopening it from the checkbox', async () => {
     window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
-    editTask.mockResolvedValue(WRITTEN)
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([])
     getCompletedTasks.mockResolvedValue([
       task({
@@ -1977,13 +1959,13 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'Reopen: project task' }))
 
     await waitFor(() =>
-      expect(editAndToggleTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
           markdown: 'project task',
         }),
-        'edited content',
+        [{ kind: 'setMarkdown', markdown: 'edited content' }, { kind: 'toggle' }],
         1,
       ),
     )
@@ -1991,8 +1973,7 @@ describe('TasksScreen', () => {
   })
 
   it('restores the struck row when an edit-and-reopen write fails', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
-    editAndToggleTask.mockRejectedValue(new Error('disk full'))
+    failWrites(['setMarkdown', 'toggle'], new Error('disk full'))
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -2023,7 +2004,6 @@ describe('TasksScreen', () => {
     // With "show archived" on, completing must move the row into the completed
     // list (struck), not drop it until the refetch (Bugbot regression).
     window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
-    toggleTask.mockResolvedValue(WRITTEN)
     getCompletedTasks.mockResolvedValue([])
     getOpenTasks.mockResolvedValue([
       task({
@@ -2044,7 +2024,6 @@ describe('TasksScreen', () => {
   })
 
   it('shows the Archive button after completing, and Archive hides the row', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -2069,7 +2048,6 @@ describe('TasksScreen', () => {
   })
 
   it('archives the session’s completed tasks with ⌘⇧↵', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -2089,8 +2067,7 @@ describe('TasksScreen', () => {
   })
 
   it('a failed delete restores a struck task instead of dropping it (V1 middle state)', async () => {
-    toggleTask.mockResolvedValue(WRITTEN)
-    deleteTask.mockRejectedValue(new Error('disk full'))
+    failWrites(['remove'], new Error('disk full'))
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -2109,14 +2086,14 @@ describe('TasksScreen', () => {
     await view.findByTestId('task-editor')
     await userEvent.click(view.getByRole('button', { name: 'delete-edit' }))
 
-    await waitFor(() => expect(deleteTask).toHaveBeenCalled())
+    await waitFor(() => expect(writesOf('remove')).not.toHaveLength(0))
     // The write failed, so the struck row is restored, not lost.
     await view.findByRole('button', { name: 'Reopen: one' })
     await view.unmount()
   })
 
   it('rolls the row back and surfaces a failed completion via the operations toast', async () => {
-    toggleTask.mockRejectedValue(new Error('stale index'))
+    failWrites(['toggle'], new Error('stale index'))
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', text: 'project task', noteTitle: 'Project' }),
     ])
@@ -2131,7 +2108,7 @@ describe('TasksScreen', () => {
   })
 
   it('refetches (does not restore a stale snapshot) when a bulk complete fails', async () => {
-    toggleTask.mockRejectedValue(new Error('stale index'))
+    failWrites(['toggle'], new Error('stale index'))
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',

@@ -1,14 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import type { OpenTask, TaskEditResult } from '@reflect/core'
-import {
-  convertTaskToBullet,
-  deleteTask,
-  editAndConvertTaskToBullet,
-  editAndToggleTask,
-  editTask,
-  insertTask,
-  toggleTask,
-} from '@/lib/note-task.ts'
+import { insertTask, writeTask } from '@/lib/note-task.ts'
 import { mutationKeys } from '@/lib/query-client.ts'
 import {
   archiveRecentlyCompleted,
@@ -136,7 +128,7 @@ export function useTaskActions(): TaskActions {
       if (generation === undefined) {
         throw new Error('No graph is open.')
       }
-      await writeEach(tasks, (task) => toggleTask(task, generation))
+      await writeEach(tasks, (task) => writeTask(task, [{ kind: 'toggle' }], generation))
     },
     onMutate: async (tasks: OpenTask[]) => {
       const snapshot = await cache.snapshot()
@@ -165,7 +157,7 @@ export function useTaskActions(): TaskActions {
       if (generation === undefined) {
         throw new Error('No graph is open.')
       }
-      await writeEach(tasks, (task) => toggleTask(task, generation)) // [x] → [ ]
+      await writeEach(tasks, (task) => writeTask(task, [{ kind: 'toggle' }], generation)) // [x] → [ ]
     },
     onMutate: async (tasks: OpenTask[]) => {
       const snapshot = await cache.snapshot()
@@ -188,7 +180,7 @@ export function useTaskActions(): TaskActions {
       if (generation === undefined) {
         throw new Error('No graph is open.')
       }
-      await writeEach(tasks, (task) => deleteTask(task, generation))
+      await writeEach(tasks, (task) => writeTask(task, [{ kind: 'remove' }], generation))
     },
     onMutate: async (tasks: OpenTask[]) => {
       const snapshot = await cache.snapshot()
@@ -220,7 +212,7 @@ export function useTaskActions(): TaskActions {
       if (generation === undefined) {
         throw new Error('No graph is open.')
       }
-      return editTask(task, content, generation)
+      return writeTask(task, [{ kind: 'setMarkdown', markdown: content }], generation)
     },
     onMutate: async ({ task, content }: { task: OpenTask; content: string }) => {
       const snapshot = await cache.snapshot()
@@ -243,7 +235,11 @@ export function useTaskActions(): TaskActions {
         throw new Error('No graph is open.')
       }
       await writeEach(tasks, (task) =>
-        editTask(task, getScheduledMarkdown(task, isoDate), generation),
+        writeTask(
+          task,
+          [{ kind: 'setMarkdown', markdown: getScheduledMarkdown(task, isoDate) }],
+          generation,
+        ),
       )
     },
     onMutate: async ({ tasks, isoDate }: { tasks: OpenTask[]; isoDate: string | null }) => {
@@ -268,7 +264,7 @@ export function useTaskActions(): TaskActions {
       if (generation === undefined) {
         throw new Error('No graph is open.')
       }
-      await writeEach(tasks, (task) => convertTaskToBullet(task, generation))
+      await writeEach(tasks, (task) => writeTask(task, [{ kind: 'toBullet' }], generation))
     },
     onMutate: async (tasks: OpenTask[]) => {
       const snapshot = await cache.snapshot()
@@ -301,7 +297,11 @@ export function useTaskActions(): TaskActions {
       if (generation === undefined) {
         throw new Error('No graph is open.')
       }
-      const result = await editAndConvertTaskToBullet(task, content, generation)
+      const result = await writeTask(
+        task,
+        [{ kind: 'setMarkdown', markdown: content }, { kind: 'toBullet' }],
+        generation,
+      )
       relocate(task.notePath, result.moved)
     },
     onMutate: async ({ task }: { task: OpenTask; content: string }) => {
@@ -342,7 +342,11 @@ export function useTaskActions(): TaskActions {
       if (generation === undefined) {
         throw new Error('No graph is open.')
       }
-      await editAndToggleTask(task, content, generation)
+      await writeTask(
+        task,
+        [{ kind: 'setMarkdown', markdown: content }, { kind: 'toggle' }],
+        generation,
+      )
     },
     onMutate: async ({ task, content }: { task: OpenTask; content: string }) => {
       const snapshot = await cache.snapshot()
