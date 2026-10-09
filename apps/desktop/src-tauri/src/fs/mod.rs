@@ -874,27 +874,29 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
 pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> {
     #[cfg(desktop)]
     {
-        // Check-and-invalidate under one lock hold — `root_for_generation`
-        // followed by a separate invalidation would leave a window where a
-        // pinned write still resolves the doomed root.
-        let root = {
-            let mut inner = lock_graph(&state)?;
-            if inner.generation != generation {
-                return Err(AppError::io(
-                    "the graph changed since this command was issued; dropping it",
-                ));
-            }
-            let root = inner.root.take().ok_or_else(AppError::no_graph)?;
-            inner.generation += 1;
-            inner.catalog = None;
-            inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
-            root
-        };
         // Under the graph lock: a write that already holds it lands first
         // and goes to the trash with the directory; one still waiting finds
         // no root to resolve its path against and fails, instead of
         // recreating the directory.
-        with_graph_lock(&root, || os_trash_delete(&root))?;
+        let root = root_for_generation(&state, generation)?;
+        with_graph_lock(&root, || {
+            // Check-and-invalidate under one hold of the session mutex, and
+            // only now: a session invalidated before the wait for the graph
+            // lock could be reopened at the same path and then trashed.
+            {
+                let mut inner = lock_graph(&state)?;
+                if inner.generation != generation {
+                    return Err(AppError::io(
+                        "the graph changed since this command was issued; dropping it",
+                    ));
+                }
+                inner.root = None;
+                inner.generation += 1;
+                inner.catalog = None;
+                inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
+            }
+            os_trash_delete(&root)
+        })?;
         // Recents is a convenience cache (same stance as `activate`): the
         // directory is already in the trash, so a failure to persist must not
         // report the delete as failed. A stale entry fails loudly on open.
