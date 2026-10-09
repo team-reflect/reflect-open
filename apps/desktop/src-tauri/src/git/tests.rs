@@ -11,7 +11,7 @@ use tempfile::tempdir;
 use super::commit::commit_all;
 use super::fault::{self, Fault, FaultPoint};
 use super::merge::{merge_remote, MergeKind};
-use super::remote::{fetch, push};
+use super::remote::{fetch, push, remote_head};
 use super::test_support::{
     fixture, head_blob, head_message, head_tree_paths, read, remote_blob, scaffold_graph,
     second_device, write, Fixture,
@@ -1147,4 +1147,101 @@ fn merge_interrupted_before_commit_converges_next_cycle() {
         assert_eq!(head_blob(root_a, rel), expected, "{rel} in HEAD");
         assert_eq!(remote_blob(&fixture, rel), expected, "{rel} on the remote");
     }
+}
+
+#[test]
+fn remote_head_reports_the_remote_tip_without_fetching() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    // Nothing pushed yet: the branch is unborn on the remote, which is a
+    // valid answer (connecting an empty repository must succeed).
+    let tip = remote_head(root_a, None, None).unwrap();
+    assert_eq!(tip.remote_oid, None);
+    assert_eq!(tip.tracking_oid, None);
+    assert_eq!(tip.default_branch, None);
+
+    write(root_a, "notes/a.md", "# A\n");
+    commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let tip = remote_head(root_a, None, None).unwrap();
+    assert!(tip.remote_oid.is_some());
+    assert_eq!(tip.default_branch, None, "the remote has this branch");
+    assert_eq!(
+        tip.remote_oid, tip.tracking_oid,
+        "nothing moved since the push"
+    );
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/b.md", "# B\n");
+    commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    let tip = remote_head(root_a, None, None).unwrap();
+    let b_head = Repository::open(&root_b)
+        .unwrap()
+        .head()
+        .unwrap()
+        .target()
+        .unwrap()
+        .to_string();
+    assert_eq!(tip.remote_oid.as_deref(), Some(b_head.as_str()));
+    assert_ne!(tip.remote_oid, tip.tracking_oid, "the remote moved");
+    assert!(
+        !root_a.join("notes/b.md").exists(),
+        "the probe downloads nothing"
+    );
+    assert!(
+        Repository::open(root_a)
+            .unwrap()
+            .find_commit(git2::Oid::from_str(&b_head).unwrap())
+            .is_err(),
+        "not even the commit object"
+    );
+
+    fetch(root_a, None).unwrap();
+    let tip = remote_head(root_a, None, None).unwrap();
+    assert_eq!(tip.remote_oid, tip.tracking_oid, "the fetch caught up");
+
+    // An explicit URL probes that remote instead of `origin`: the check a
+    // host connection runs before it saves anything.
+    let probed = remote_head(root_a, Some(&fixture.remote_url), None).unwrap();
+    assert_eq!(probed.remote_oid, tip.remote_oid);
+    assert_eq!(probed.tracking_oid, None, "no last fetch from that remote");
+    let missing = fixture._dir.path().join("nowhere.git");
+    assert!(remote_head(root_a, missing.to_str(), None).is_err());
+}
+
+#[test]
+fn remote_head_names_the_default_branch_of_a_remote_on_another_branch() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n");
+    commit_all(root, "a", MAX_FILE_BYTES).unwrap();
+
+    // A remote whose notes live on `trunk`, probed from a graph on `main`.
+    let bare = fixture._dir.path().join("trunk.git");
+    let mut opts = git2::RepositoryInitOptions::new();
+    opts.bare(true).initial_head("trunk");
+    Repository::init_opts(&bare, &opts).unwrap();
+    let url = bare.to_string_lossy().into_owned();
+    let push_as = |branch: &str| {
+        Repository::open(root)
+            .unwrap()
+            .remote_anonymous(&url)
+            .unwrap()
+            .push(&[format!("refs/heads/main:refs/heads/{branch}")], None)
+            .unwrap();
+    };
+
+    // Branches, but `HEAD` names one that does not exist: no default to
+    // report, and still an answer.
+    push_as("other");
+    let tip = remote_head(root, Some(&url), None).unwrap();
+    assert_eq!((tip.remote_oid, tip.default_branch), (None, None));
+
+    push_as("trunk");
+    let tip = remote_head(root, Some(&url), None).unwrap();
+    assert_eq!(tip.remote_oid, None);
+    assert_eq!(tip.default_branch.as_deref(), Some("trunk"));
 }

@@ -136,6 +136,31 @@ export async function gitCommitAll(
   return await call('git_commit_all', { message: fallbackMessage, generation }, commitOutcomeSchema)
 }
 
+export const remoteTipSchema = z.object({
+  remoteOid: z.string().nullable(),
+  trackingOid: z.string().nullable(),
+  defaultBranch: z.string().nullable(),
+})
+export type RemoteTip = z.infer<typeof remoteTipSchema>
+
+/**
+ * Where the remote's branch is right now, without a fetch: one round trip,
+ * or two when `defaultBranch` has to be asked for. `remoteOid !== trackingOid` means the remote moved since the last
+ * fetch; `remoteOid === null` means the branch does not exist there yet.
+ * `defaultBranch` is set only when the remote holds branches but not this
+ * graph's: the branch a connecting graph adopts.
+ * `url` probes that remote instead of `origin`: rejects when the host is
+ * unreachable or refuses the credential, and reports `trackingOid: null`
+ * (nothing was ever fetched from it).
+ */
+export async function gitRemoteHead(
+  credential: GitCredential | null,
+  generation: number,
+  url: string | null = null,
+): Promise<RemoteTip> {
+  return await call('git_remote_head', { url, credential, generation }, remoteTipSchema)
+}
+
 /** Fetch `origin`; returns ahead/behind for the current branch. */
 export async function gitFetch(
   credential: GitCredential | null,
