@@ -1,3 +1,4 @@
+import { DefaultMap } from '@ocavue/utils'
 import { displayNoteTitle } from '../markdown/note-title.ts'
 import { compareTaskPaths } from '../markdown/task-path.ts'
 import type { OpenTask } from './queries.ts'
@@ -22,6 +23,15 @@ import type { OpenTask } from './queries.ts'
 
 /** A date bucket (tasks aggregated across daily notes) or a single regular note. */
 export type TaskGroupKind = 'current' | 'overdue' | 'upcoming' | 'note'
+
+type DateGroupKind = Exclude<TaskGroupKind, 'note'>
+
+/** The date buckets in display order, with their section headings. */
+const DATE_GROUPS: ReadonlyArray<readonly [DateGroupKind, string]> = [
+  ['current', 'Current'],
+  ['overdue', 'Overdue'],
+  ['upcoming', 'Upcoming'],
+]
 
 export interface TaskGroup {
   kind: TaskGroupKind
@@ -101,17 +111,19 @@ function effectiveDate(task: OpenTask): string | null {
 }
 
 /**
- * Which bucket a single task falls in, by the same rules {@link groupTasks} uses
- * — so a caller (e.g. the view's Return-to-add, deciding which note a new task
- * joins) can place one task without rebuilding every group. `today` is an ISO
- * `YYYY-MM-DD`. `'note'` means undated (grouped under its source note).
+ * Which bucket a task falls in: the one rule {@link groupTasks} and the view's
+ * Return-to-add (deciding which note a new task joins) share. `today` is an
+ * ISO `YYYY-MM-DD`. `'note'` means undated (grouped under its source note).
  */
 export function taskDateBucket(task: OpenTask, today: string): TaskGroupKind {
   const date = effectiveDate(task)
   if (date === null) {
+    // No due date and no daily date: V1's "unscheduled", grouped by note.
     return 'note'
   }
   if (task.dueDate !== null && task.dueDate < today) {
+    // Overdue keys off the explicit due date ALONE (V1's asymmetry): a bare
+    // task in a past daily note is not overdue, it is Current.
     return 'overdue'
   }
   if (date > today) {
@@ -189,61 +201,23 @@ function compareNoteGroups(left: TaskGroup, right: TaskGroup): number {
  * depend on the order the index read returns.
  */
 export function groupTasks(tasks: readonly OpenTask[], today: string): TaskGroup[] {
-  const current: OpenTask[] = []
-  const overdue: OpenTask[] = []
-  const upcoming: OpenTask[] = []
-  const byNote = new Map<string, OpenTask[]>()
-
+  const dated = new DefaultMap<DateGroupKind, OpenTask[]>(() => [])
+  const byNote = new DefaultMap<string, OpenTask[]>(() => [])
   for (const task of tasks) {
-    const date = effectiveDate(task)
-    if (date === null) {
-      // No due date and no daily date — V1's "unscheduled": grouped by note.
-      const group = byNote.get(task.notePath)
-      if (group === undefined) {
-        byNote.set(task.notePath, [task])
-      } else {
-        group.push(task)
-      }
-    } else if (task.dueDate !== null && task.dueDate < today) {
-      // Overdue keys off the explicit due date ALONE (V1's asymmetry): a bare
-      // task in a past daily note is not overdue — it lands in Current below.
-      overdue.push(task)
-    } else if (date > today) {
-      upcoming.push(task)
-    } else {
-      current.push(task)
-    }
+    const kind = taskDateBucket(task, today)
+    const bucket = kind === 'note' ? byNote.get(task.notePath) : dated.get(kind)
+    bucket.push(task)
   }
 
-  const dateGroups: TaskGroup[] = []
-  if (current.length > 0) {
-    dateGroups.push({
-      kind: 'current',
-      label: 'Current',
-      notePath: null,
-      tasks: current.sort(compareDated),
-    })
-  }
-  if (overdue.length > 0) {
-    dateGroups.push({
-      kind: 'overdue',
-      label: 'Overdue',
-      notePath: null,
-      tasks: overdue.sort(compareDated),
-    })
-  }
-  if (upcoming.length > 0) {
-    dateGroups.push({
-      kind: 'upcoming',
-      label: 'Upcoming',
-      notePath: null,
-      tasks: upcoming.sort(compareDated),
-    })
-  }
-
-  const noteGroups: TaskGroup[] = [...byNote.values()]
-    .map((noteTasks) => ({
-      kind: 'note' as const,
+  const dateGroups = DATE_GROUPS.flatMap(([kind, label]): TaskGroup[] => {
+    const bucket = dated.get(kind)
+    return bucket.length === 0
+      ? []
+      : [{ kind, label, notePath: null, tasks: bucket.sort(compareDated) }]
+  })
+  const noteGroups = [...byNote.values()]
+    .map((noteTasks): TaskGroup => ({
+      kind: 'note',
       // A `byNote` entry only exists once a task has been pushed into it.
       label: displayNoteTitle(noteTasks[0]!.noteTitle),
       notePath: noteTasks[0]!.notePath,

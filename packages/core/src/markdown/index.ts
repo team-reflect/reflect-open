@@ -81,6 +81,7 @@ export {
   isRoundTask,
   NoteNotSerializableError,
   projectTasks,
+  renderTaskSnapshot,
   TaskStaleError,
   type InsertPosition,
   type ParsedTask,
@@ -91,5 +92,6 @@ export {
   type TaskMove,
   type TaskEntry,
   type TaskLocator,
+  type TaskRow,
   type TaskSnapshot,
 } from './task-ast.ts'

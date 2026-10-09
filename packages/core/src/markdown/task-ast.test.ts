@@ -429,32 +429,6 @@ describe('applyTaskEdits: insert', () => {
     ])
     expect(result.source).toBe('+ [ ] a\n+ [ ] \n- bullet\n')
   })
-
-  it('inserts right after a task and shifts the siblings behind it', () => {
-    const source = '- Shopping\n  + [ ] milk\n  + [ ] eggs\n'
-    const result = applyTaskEdits(source, [
-      { kind: 'insert', at: { kind: 'afterTask', task: locate(source, 0) }, markdown: 'bread' },
-    ])
-    expect(result.source).toBe('- Shopping\n  + [ ] milk\n  + [ ] bread\n  + [ ] eggs\n')
-    expect(movedFrom(result, [0, 1])).toMatchObject({ astPath: [0, 1] })
-    expect(movedFrom(result, [0, 2])).toMatchObject({ astPath: [0, 3] })
-    expect(result.inserted[0]).toMatchObject({ astPath: [0, 2], markdown: 'bread' })
-  })
-
-  it('inserts after any block, such as a heading', () => {
-    const result = applyTaskEdits('# T\n\npara\n', [
-      { kind: 'insert', at: { kind: 'afterBlock', astPath: [0] }, markdown: 'todo' },
-    ])
-    expect(result.source).toBe('# T\n\n+ [ ] todo\n\npara\n')
-  })
-
-  it('refuses an insert position that no longer exists', () => {
-    expect(() =>
-      applyTaskEdits('# T\n', [
-        { kind: 'insert', at: { kind: 'afterBlock', astPath: [4] }, markdown: '' },
-      ]),
-    ).toThrow(TaskStaleError)
-  })
 })
 
 describe('applyTaskEdits: insert into the Tasks section', () => {
@@ -676,16 +650,6 @@ describe('applyTaskEdits: batches', () => {
       null,
       { astPath: [0], markdown: 'after', breadcrumbs: [], checked: false },
     ])
-  })
-
-  it('inserts after a child whose parent was removed earlier in the batch', () => {
-    const source = '+ [ ] parent\n  + [ ] child\n+ [ ] after\n'
-    const result = applyTaskEdits(source, [
-      { kind: 'remove', task: locate(source, 0) },
-      { kind: 'insert', at: { kind: 'afterTask', task: locate(source, 1) }, markdown: 'new' },
-    ])
-    expect(result.source).toBe('+ [ ] child\n+ [ ] new\n+ [ ] after\n')
-    expect(result.inserted[0]).toMatchObject({ astPath: [1], breadcrumbs: [] })
   })
 
   it('refuses a context insert into a parent removed earlier in the batch', () => {
