@@ -18,6 +18,8 @@ import type {
 } from './note-session-types.ts'
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 800
+/** The commit's edit went into a conflict copy, not the note. */
+const KEPT_ASIDE = 'The note changed on disk; the edit was kept beside it'
 
 /** Create the document session for one note. See note-session.ts for semantics. */
 export function createNoteSession(options: NoteSessionOptions): NoteSession {
@@ -62,6 +64,11 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   /** A watcher event arrived during the load; replay reconciliation after it. */
   let missedChange = false
   let disposed = false
+  /** The one reconciliation in flight, and whether another was asked for during it. */
+  let reconciling: Promise<void> | null = null
+  let reconcileAgain = false
+  /** Buffers kept beside the note so far: a commit whose edit went there did not land. */
+  let keptAside = 0
   /** True while deletion has paused this session's persistence pipeline. */
   let deleting = false
   // Set by `discard` — tells `dispose` to skip its flush (the file is being
@@ -198,8 +205,15 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     }
   }
 
-  /** Apply external content to the live editor without entering the save path. */
+  /**
+   * Apply external content to the live editor without entering the save path.
+   * Nothing after dispose: the editor belongs to the next session by then,
+   * while the buffer here stays frozen for the final flush's reconciliation.
+   */
   function applyToEditor(content: string): void {
+    if (disposed) {
+      return
+    }
     applyingContent = true
     try {
       // The editor dispatches synchronously, so its change handler runs (and is
@@ -237,9 +251,30 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
 
   /**
    * Re-read the note and reconcile the buffer with what's on disk (the
-   * external-change path).
+   * external-change path). One reconciliation runs at a time: the watcher
+   * and a refused save both lead here for the same change, and two
+   * interleaved merges would merge the first one's result again. A call
+   * during one schedules a rerun, which finds nothing left to do when the
+   * first one landed. Disposal does not stop it: a save the final flush
+   * started may be the one refused, and its buffer must still reach the
+   * note or a copy beside it.
    */
-  async function reconcileFromDisk(): Promise<void> {
+  function reconcileFromDisk(): Promise<void> {
+    reconcileAgain = true
+    reconciling ??= (async () => {
+      try {
+        while (reconcileAgain) {
+          reconcileAgain = false
+          await reconcileOnce()
+        }
+      } finally {
+        reconciling = null
+      }
+    })()
+    return reconciling
+  }
+
+  async function reconcileOnce(): Promise<void> {
     let content: string
     try {
       content = await io.read(path)
@@ -250,8 +285,8 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       }
       return // preserve the buffer if the file disappeared or cannot be read
     }
-    if (disposed) {
-      return
+    if (discarded || (disposed && !dirty)) {
+      return // being deleted, or closed with nothing left to save
     }
     if (content === disk || content === inFlightWrite) {
       // Nothing to reconcile (stale, or an echo of our own possibly
@@ -260,6 +295,12 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       // verbatim), so record that transition before skipping.
       if (missing) {
         missing = false
+        emit()
+      }
+      if (!dirty && error?.includes('changed on disk') === true) {
+        // A save refused by a change that an earlier reconciliation has
+        // already taken in: nothing is pending, so nothing is failing.
+        error = null
         emit()
       }
       return
@@ -297,7 +338,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         console.error('three-way merge failed:', cause)
       }
     }
-    if (disposed) {
+    if (discarded) {
       return
     }
     if (header + buffer !== ours) {
@@ -309,17 +350,13 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       }
       merged = null
     }
-    if (merged?.kind === 'clean') {
-      if (io.write !== null && classify(splitDoc(merged.content).body) === 'lossy') {
-        // Syntax the editor cannot round-trip: the exact merge goes to disk
-        // and the note opens protected, never into the live editor.
-        await materialize(merged.content, ours, content, io.write)
-      } else {
-        adoptMerged(merged.content, content)
-      }
+    if (merged?.kind === 'clean' && classify(splitDoc(merged.content).body) !== 'lossy') {
+      adoptMerged(merged.content, content)
       return
     }
-    if (merged?.kind === 'conflicted' && io.write !== null) {
+    if (merged !== null && merged.kind !== 'unmergeable' && io.write !== null) {
+      // Markers, or syntax the editor cannot round-trip: the exact merge goes
+      // to disk and the note opens protected, never into the live editor.
       await materialize(merged.content, ours, content, io.write)
       return
     }
@@ -344,19 +381,16 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     try {
       await write(path, unsafe, onDisk)
     } catch (cause) {
-      if (disposed) {
-        return
-      }
       error = errorMessage(cause)
       emit()
       if (error.includes('changed on disk')) {
-        await reconcileFromDisk()
+        reconcileAgain = true // the file moved again: the rerun merges afresh
       }
       // Any other failure keeps the dirty buffer; its next save expects the
       // old disk content, fails the same way, and reconciles again.
       return
     }
-    if (disposed) {
+    if (discarded) {
       return
     }
     error = null
@@ -387,6 +421,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         return false
       }
       if (disposed || header + buffer === contents) {
+        keptAside += 1
         return true
       }
     }
@@ -518,9 +553,10 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     const attemptedHeader = header
     try {
       const shouldPersist = dirty
+      const keptAsideBefore = keptAside
       await flush()
-      if (shouldPersist && error !== null) {
-        throw new Error(error)
+      if (shouldPersist && (error !== null || keptAside !== keptAsideBefore)) {
+        throw new Error(error ?? KEPT_ASIDE)
       }
       return true
     } catch (cause) {
@@ -580,12 +616,15 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     // A no-op edit (transform changed nothing) writes nothing, so a *prior*
     // surfaced save error must not be mistaken for this edit's failure.
     const shouldPersist = dirty
+    const keptAsideBefore = keptAside
     emit()
     await flush()
     // `flush()` resolves even when the write failed (captured in `error`, not
-    // thrown). Revert and surface the failure: it persists, or nothing changes.
-    if (shouldPersist && error !== null) {
-      const message = error
+    // thrown), and a write refused by an external change may have left the
+    // edit in a copy beside the note. Revert and surface the failure: it
+    // persists, or nothing changes.
+    if (shouldPersist && (error !== null || keptAside !== keptAsideBefore)) {
+      const message = error ?? KEPT_ASIDE
       if (header === doc.header) header = previousHeader
       if (buffer === doc.body) {
         buffer = previousBuffer

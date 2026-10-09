@@ -85,8 +85,12 @@ session merges three-way. Disjoint edits apply and keep saving; overlapping
 edits are written into the file as labeled markers (the note opens
 protected, like a conflicted pull); edits that cannot be merged are kept as
 `<note> (conflict).md` beside the note. The buffer is never left in a state
-it cannot save from, so no exit path has to rescue it.
+it cannot save from, so no exit path has to rescue it: a final flush that an
+external change refuses (the pane closes right after another device wrote
+the note) runs the same reconciliation to completion after the session is
+disposed.
 
 - Test: `note-session.test.ts` "a clean three-way merge applies silently and
   keeps saving", "overlapping edits are written into the file as markers and
-  open protected", "edits that cannot be merged are kept beside the note".
+  open protected", "edits that cannot be merged are kept beside the note",
+  "a dispose flush refused by an external change still merges the buffer".

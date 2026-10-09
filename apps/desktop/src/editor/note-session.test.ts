@@ -416,6 +416,80 @@ describe('createNoteSession', () => {
     expect(snapshots.at(-1)).toMatchObject({ dirty: false, protected: false, error: null })
   })
 
+  it('a dispose flush refused by an external change still merges the buffer', async () => {
+    const merged = '# Hello\n\n+ mine\n- from the script\n'
+    const { session, writes, copies, setDisk } = harness({
+      merge: { kind: 'clean', content: merged },
+    })
+    session.load()
+    await settled()
+    session.editorChanged('# Hello\n\n+ mine\n')
+    setDisk('# Hello\n\n- from the script\n')
+    // The pane unmounts: flush, then dispose in the same tick.
+    const flushed = session.flush()
+    session.dispose()
+    await flushed
+
+    expect(writes).toEqual([{ path: 'notes/a.md', contents: merged }])
+    expect(copies).toEqual([])
+  })
+
+  it('a dispose flush refused with no merge available keeps the buffer beside the note', async () => {
+    const { session, writes, copies, setDisk } = harness()
+    session.load()
+    await settled()
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    const flushed = session.flush()
+    session.dispose()
+    await flushed
+
+    expect(writes).toEqual([])
+    expect(copies).toMatchObject([{ path: 'notes/a.md', contents: 'mine\n' }])
+  })
+
+  it('two signals for one external change reconcile once', async () => {
+    const marked = '<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
+    const { session, writes, copies, snapshots, setDisk } = harness({
+      merge: { kind: 'conflicted', content: marked },
+    })
+    session.load()
+    await settled()
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    session.externalChanged() // the watcher
+    session.externalChanged() // a reload of the open documents
+    await settled()
+
+    // Merged and written once; the second signal found nothing left to do.
+    expect(writes).toEqual([{ path: 'notes/a.md', contents: marked }])
+    expect(copies).toEqual([])
+    expect(snapshots.at(-1)).toMatchObject({
+      protected: true,
+      dirty: false,
+      error: null,
+      initialContent: marked,
+    })
+  })
+
+  it('a lossy clean merge stays out of the live editor even without a writer', async () => {
+    const merged = '+ [ ] mine\n+ [ ] theirs\n'
+    const { session, applied, copies, setDisk } = harness({
+      write: false,
+      merge: { kind: 'clean', content: merged },
+      classify: (markdown) => (markdown.includes('+ [ ]') ? 'lossy' : 'exact'),
+    })
+    session.load()
+    await settled()
+    session.editorChanged('mine\n')
+    setDisk('theirs\n')
+    session.externalChanged()
+    await settled()
+
+    expect(applied).not.toContain(merged)
+    expect(copies).toMatchObject([{ path: 'notes/a.md', contents: 'mine\n' }])
+  })
+
   it('a failed conflict copy keeps the dirty buffer, and the next save retries it', async () => {
     const { session, writes, applied, copies, snapshots, setDisk, failCopies } = harness({
       merge: { kind: 'unmergeable', content: 'theirs\n' },
@@ -748,6 +822,23 @@ describe('frontmatter ownership (Plan 07b)', () => {
       h.failWrites(null)
       await h.session.flush()
       expect(h.writes.at(-1)?.contents).toBe('# Typed during pin\n')
+    } finally {
+      h.session.discard()
+      consoleError.mockRestore()
+    }
+  })
+
+  it('a frontmatter commit whose edit was kept beside the note reports the failure', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const h = harness({ merge: { kind: 'unmergeable', content: 'theirs\n' } })
+    try {
+      h.session.load()
+      await settled()
+      h.setDisk('theirs\n') // changed on disk, not yet noticed
+      await expect(h.session.commitFrontmatter({ pinned: true })).rejects.toThrow('kept beside')
+      expect(h.copies).toHaveLength(1)
+      expect(h.session.content()).toBe('theirs\n')
+      expect(h.snapshots.at(-1)).toMatchObject({ dirty: false, error: null })
     } finally {
       h.session.discard()
       consoleError.mockRestore()
