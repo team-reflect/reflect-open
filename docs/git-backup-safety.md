@@ -69,13 +69,18 @@ tracked.
   files), `git::tests::tracked_reflect_entries_are_dropped_from_the_next_commit`
   (entries an adopted repository already tracked).
 
-## S7. Conflicts are committed and pushed, never left pending
+## S7. Conflicts are merged, committed and pushed, never left pending
 
-A merge with conflicts writes labeled markers into the note, commits with
-both parents, and pushes. Other notes keep syncing; both devices converge on
-the same marked-up file.
+A note both devices edited is merged by the shared resolution ladder (the
+same rules iCloud sync uses: three-way merge, key-wise frontmatter,
+append-union, and a word-level merge as the last resort) and committed with
+both parents. No conflict markers are written; the originals stay in the
+merge commit's parents. Both devices order the two sides by commit time, so
+they converge on the same bytes. Binary conflicts keep both copies, and an
+edit-vs-delete restores the edit.
 
-- Test: `git::tests::conflicting_edits_are_committed_with_labeled_markers`,
+- Test: `git::tests::conflicting_edits_are_merged_without_markers`,
+  `git::tests::both_devices_merge_the_same_pair_to_the_same_bytes`,
   `git::tests::edit_vs_delete_keeps_the_edit`,
   `git::tests::binary_conflict_keeps_both_copies`.
 

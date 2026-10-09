@@ -15,8 +15,8 @@ import {
  * reach the UI — only {@link SyncStatus}.
  *
  * Invariants:
- * - **Never wedged.** Merges commit their conflicts (markers in the note), so
- *   a conflict pauses nothing; the indexer surfaces `Needs review` per note.
+ * - **Never wedged.** Merges resolve text conflicts to merged notes and
+ *   commit, so a conflict pauses nothing.
  * - **No write loops, no idle network.** Pull-applied file changes re-enter
  *   `noteChanged` via the watcher, but the next cycle finds nothing committed
  *   and nothing ahead and ends without touching the network.
@@ -415,7 +415,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         throw new PushRejectedError(push.rejectionMessage ?? 'the remote rejected the backup')
       }
       // The normal two-device race: another device pushed first. Converge and
-      // retry — a conflicted merge still commits (markers in the note).
+      // retry — a merge always commits, conflicts included.
       await step(gitFetch(credential, options.generation))
       await merge(remoteChanges)
     }
