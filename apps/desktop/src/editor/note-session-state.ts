@@ -172,11 +172,15 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     // was nothing to do). Settle the whole chain, not just that step: a
     // refused write reconciles, and a clean merge appends its own write,
     // which the quit flush must see land before it reports done.
-    let tail: Promise<void>
-    do {
-      tail = saveChain
+    // Bounded: a writer that changes the file again before every retry must
+    // not keep a closing window waiting forever.
+    for (let round = 0; round < 5; round += 1) {
+      const tail = saveChain
       await tail
-    } while (tail !== saveChain)
+      if (tail === saveChain) {
+        return
+      }
+    }
   }
 
   function editorChanged(markdown: string): void {
@@ -439,12 +443,16 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     const doc = splitDoc(merged)
     header = doc.header
     buffer = doc.body
+    initialContent = doc.body // an editor that mounts later starts from the merge
     disk = onDisk
     dirty = merged !== onDisk
     missing = false
     error = null
     emit()
     applyToEditor(doc.body)
+    // The other writer's version is the new ground truth first: a title it
+    // changed must not read as this user's rename when the merge is saved.
+    onContent?.(onDisk, 'external')
     save()
   }
 

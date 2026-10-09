@@ -278,6 +278,29 @@ describe('createNoteSession', () => {
     expect(expectedContents.at(-1)).toBe('# Hello\n\n- mine\n- from the script\n')
   })
 
+  it('a clean merge reports the other version as external before its own save', async () => {
+    // The other device retitled the note; the user edited the body. The
+    // rename tracker must take the new title as ground truth, not as this
+    // user's rename, so it hears `external` before `saved`.
+    const theirs = '# Renamed elsewhere\n\nbody\n'
+    const merged = '# Renamed elsewhere\n\nbody, edited here\n'
+    const { session, contents, setDisk } = harness({
+      disk: '# Hello\n\nbody\n',
+      merge: { kind: 'clean', content: merged },
+    })
+    session.load()
+    await settled()
+    session.editorChanged('# Hello\n\nbody, edited here\n')
+    setDisk(theirs)
+    session.externalChanged()
+    await settled()
+
+    expect(contents.slice(-2)).toEqual([
+      { content: theirs, origin: 'external' },
+      { content: merged, origin: 'saved' },
+    ])
+  })
+
   it('a clean merge the editor cannot round-trip is written exactly and opens protected', async () => {
     const merged = '+ [ ] mine\n+ [ ] theirs\n'
     const { session, writes, applied, snapshots, setDisk, expectedContents } = harness({

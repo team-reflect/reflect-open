@@ -88,7 +88,8 @@ protected, like a conflicted pull); edits that cannot be merged are kept as
 it cannot save from, so no exit path has to rescue it: a final flush that an
 external change refuses (the pane closes right after another device wrote
 the note) runs the same reconciliation to completion after the session is
-disposed.
+disposed. When the copy itself cannot be written (a full disk), the buffer
+stays dirty with the error shown, and its next save tries again.
 
 - Test: `note-session.test.ts` "a clean three-way merge applies silently and
   keeps saving", "overlapping edits are written into the file as markers and

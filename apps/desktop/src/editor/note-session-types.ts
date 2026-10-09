@@ -40,13 +40,13 @@ export const INITIAL_NOTE_SNAPSHOT: NoteSessionSnapshot = {
   error: null,
 }
 
-/** File access injected by the host (the hook binds `@reflect/core` commands). */
 /** A conflict copy as last written: its path and the contents it holds. */
 export interface ConflictCopy {
   path: string
   contents: string
 }
 
+/** File access injected by the host (the hook binds `@reflect/core` commands). */
 export interface NoteSessionIo {
   read: (path: string) => Promise<string>
   /**
