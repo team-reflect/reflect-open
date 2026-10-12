@@ -92,10 +92,7 @@ describe('dev bridge desktop boot surface', () => {
       documentsRoot: null,
       existingGraphRoots: [],
     })
-    await expect(bridge.invoke('embed_status', {})).resolves.toEqual({
-      status: 'failed',
-      message: 'embeddings are unavailable in browser dev',
-    })
+    await expect(bridge.invoke('embed_status', {})).resolves.toEqual({ status: 'unsupported' })
     await expect(bridge.invoke('vault_scan_stats', { generation: 1 })).resolves.toEqual({
       notes: 2,
       attachments: 0,

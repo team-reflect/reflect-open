@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react'
 import { embedStatus, subscribeEmbedStatus, type EmbedStatus } from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready.ts'
 
+/** The last status any mount received, so a later mount starts from it. */
+let lastStatus: EmbedStatus = { status: 'uninitialized' }
+
 /**
  * The embedding runtime's live status (Plan 09). Polls once on mount, then
  * tracks `embed:status` events. Without a bridge semantic features stay in
  * `uninitialized` — i.e. invisible.
  */
 export function useEmbedStatus(): EmbedStatus {
-  const [status, setStatus] = useState<EmbedStatus>({ status: 'uninitialized' })
+  const [status, setStatus] = useState<EmbedStatus>(lastStatus)
   const bridgeReady = useBridgeReady()
 
   useEffect(() => {
@@ -18,11 +21,13 @@ export function useEmbedStatus(): EmbedStatus {
     let active = true
     let unlisten: (() => void) | null = null
     void embedStatus().then((current) => {
+      lastStatus = current
       if (active) {
         setStatus(current)
       }
     })
     void subscribeEmbedStatus((next) => {
+      lastStatus = next
       if (active) {
         setStatus(next)
       }

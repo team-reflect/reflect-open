@@ -94,12 +94,11 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   const activeModelRef = useRef<AiProviderConfig | null>(activeModel)
   const conversationIdRef = useRef(conversationId)
   const generationRef = useRef<number | null>(indexGeneration)
-  // Without an embedding runtime the tool must *say* it is lexical, not lean
-  // on hybrid's degrade-on-error to absorb the missing runtime. A stray
-  // enabled flag must lose to the platform here.
+  // Without a loaded embedding model the tool must *say* it is lexical, not
+  // lean on hybrid's degrade-on-error to absorb the missing runtime. A stray
+  // enabled flag must lose to the runtime here.
   const embedStatus = useEmbedStatus()
-  const semanticSearchEnabled =
-    settings.semanticSearchEnabled && embedStatus.status !== 'unsupported'
+  const semanticSearchEnabled = settings.semanticSearchEnabled && embedStatus.status === 'ready'
   const semanticSearchEnabledRef = useRef(semanticSearchEnabled)
   const chatSystemPromptRef = useRef(settings.chatSystemPrompt)
   useEffect(() => {

@@ -137,9 +137,8 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         // No iCloud container in a browser; the chooser's iCloud card hides.
         return { available: false, documentsRoot: null, existingGraphRoots: [] }
       case 'embed_status':
-        // `failed` is the designed recoverable "unavailable" state — semantic
-        // search surfaces show it honestly instead of offering a download.
-        return { status: 'failed', message: 'embeddings are unavailable in browser dev' }
+        // A browser has no embedding runtime.
+        return { status: 'unsupported' }
       case 'vault_scan_stats':
         return { notes: files.list().length, attachments: 0, skipped: 0 }
       case 'list_attachments':
