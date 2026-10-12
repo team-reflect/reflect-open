@@ -3,9 +3,10 @@ import { resolveYouTubeVideo } from '@/editor/youtube-video-resolver.ts'
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
 import type { ImageUrlResolver, WikiEmbedResolver } from '@meowdown/core'
 import { MarkdownView } from '@meowdown/react'
-import { useOpenExternalLink } from '@/editor/open-external-link.ts'
+import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
 import { resolveWikilink } from '@/editor/resolve-wikilink.ts'
 import { cn } from '@/lib/utils.ts'
+import { useGraph } from '@/providers/graph-provider.tsx'
 
 /**
  * A read-only rendering of note markdown via @meowdown/react's `<MarkdownView>`
@@ -21,6 +22,12 @@ import { cn } from '@/lib/utils.ts'
 interface MarkdownPreviewProps {
   /** The markdown body to render (callers strip frontmatter first). */
   content: string
+  /**
+   * Graph-relative path of the note `content` comes from; relative Markdown
+   * links and attachment links resolve from it. `null` when the content
+   * belongs to no note.
+   */
+  sourcePath: string | null
   /**
    * Resolve `![…](…)` sources to displayable URLs, possibly later; unresolved
    * images are skipped. Pass a stable function.
@@ -55,6 +62,7 @@ interface MarkdownPreviewProps {
 
 export function MarkdownPreview({
   content,
+  sourcePath,
   singleParagraph = false,
   resolveImageUrl,
   resolveWikiEmbed,
@@ -62,7 +70,8 @@ export function MarkdownPreview({
   interactive = true,
   className,
 }: MarkdownPreviewProps): ReactElement {
-  const openExternalLink = useOpenExternalLink()
+  const generation = useGraph({ optional: true })?.graph?.generation ?? null
+  const onLinkClick = useMarkdownLinkClick(generation, sourcePath)
   // The click handler is read through a ref so a changing prop never gives
   // MarkdownView a new callback identity (which would re-render its whole
   // tree).
@@ -96,7 +105,7 @@ export function MarkdownPreview({
       resolveWikilink={resolveWikilink}
       {...(resolveImageUrl !== undefined ? { resolveImageUrl } : {})}
       {...(resolveWikiEmbed !== undefined ? { resolveWikiEmbed } : {})}
-      {...(interactive ? { onLinkClick: openExternalLink } : {})}
+      {...(interactive ? { onLinkClick } : {})}
       {...(navigates ? { onWikilinkClick: onWikilinkClickStable } : {})}
       className={cn('reflect-editor', className)}
     />

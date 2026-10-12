@@ -1,9 +1,3 @@
-import { useCallback } from 'react'
-import type { LinkClickHandler } from '@meowdown/core'
-import { isDeepLinkUrl } from '@/lib/deep-links/parse.ts'
-import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link.ts'
-import { openUrlSync } from '@/lib/open-url.ts'
-
 /**
  * Schemes that must never reach the OS opener: script and data URIs carry
  * executable content rather than an address, and `file:`/`blob:` open
@@ -28,28 +22,4 @@ const BLOCKED_SCHEMES: ReadonlySet<string> = new Set([
 export function isOpenableExternalUrl(href: string): boolean {
   const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(href)?.[1]
   return scheme !== undefined && !BLOCKED_SCHEMES.has(scheme.toLowerCase())
-}
-
-/**
- * Open a rendered Markdown link in its OS default app instead of letting the
- * click navigate the app's WebView frame. The static `MarkdownView` surfaces
- * aren't contenteditable, so an `<a href>` click would otherwise unload the
- * whole app. A `reflect://` link routes through the in-app deep-link pipeline
- * instead — the OS opener denies the scheme.
- */
-export function useOpenExternalLink(): LinkClickHandler {
-  const followDeepLink = useFollowDeepLink()
-  return useCallback<LinkClickHandler>(
-    ({ href, event, mod }) => {
-      event.preventDefault()
-      if (isDeepLinkUrl(href)) {
-        followDeepLink({ href, openInNewWindow: mod })
-        return
-      }
-      if (isOpenableExternalUrl(href)) {
-        openUrlSync(href)
-      }
-    },
-    [followDeepLink],
-  )
 }

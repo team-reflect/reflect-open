@@ -29,7 +29,7 @@ import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete.ts'
 import { useNoteDocument } from '@/editor/use-note-document.ts'
 import { useTagNavigation } from '@/editor/use-tag-navigation.ts'
 import { useTemplateSlashItems } from '@/editor/use-template-slash-items.ts'
-import { useMarkdownLinkNavigation } from '@/editor/use-markdown-link-navigation.ts'
+import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
 import { useLinkPreview } from '@/editor/use-link-preview.ts'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
 import { useWikiLinkHoverPreview } from '@/editor/use-wiki-link-hover-preview.tsx'
@@ -183,7 +183,7 @@ export function NotePaneComponent({
     dateFormat: settings.dateFormat,
   })
   const onWikiLinkClick = useWikiLinkNavigation(generation)
-  const onNoteLinkClick = useMarkdownLinkNavigation(generation, path)
+  const onLinkClick = useMarkdownLinkClick(generation, path)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
   const linkPreviewSession = useMemo(
@@ -353,7 +353,7 @@ export function NotePaneComponent({
         resolveFileLink={resolveFileLink}
         resolveFileInfo={resolveFileInfo}
         onWikiLinkClick={onWikiLinkClick}
-        onNoteLinkClick={onNoteLinkClick}
+        onLinkClick={onLinkClick}
         {...(resolveLinkPreview !== undefined ? { resolveLinkPreview } : {})}
         {...(generation !== null && !isTouchEditorSurface() ? { renderWikilinkHoverCard } : {})}
         onTagClick={onTagClick}

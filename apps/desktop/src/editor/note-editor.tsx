@@ -1,24 +1,20 @@
 import { EditorInputTraits } from '@/editor/editor-input-traits.tsx'
 import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge.tsx'
 import { MediaLightbox } from '@/editor/media-lightbox.tsx'
-import { isOpenableExternalUrl } from '@/editor/open-external-link.ts'
 import { resolveWikilink } from '@/editor/resolve-wikilink.ts'
 import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver.ts'
 import { lightboxItemFromXPostMedia } from '@/editor/x-post-media-lightbox-item.ts'
 import { resolveYouTubeVideo } from '@/editor/youtube-video-resolver.ts'
-import { isDeepLinkUrl } from '@/lib/deep-links/parse.ts'
-import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link.ts'
-import { openUrlSync } from '@/lib/open-url.ts'
 import { isTouchEditorSurface } from '@/lib/platform-surface.ts'
 import { cn } from '@/lib/utils.ts'
 import type {
   AcceptPendingReplacementOptions,
   ExitBoundaryHandler,
-  FileClickHandler,
   FileInfoResolver,
   FileLinkResolver,
   ImageClickHandler,
   ImageUrlResolver,
+  LinkClickHandler,
   LinkPreviewResolver,
   MarkMode,
   SearchStatus,
@@ -196,11 +192,10 @@ interface NoteEditorProps {
    */
   onWikiLinkClick?: (options: { target: string; openInNewWindow: boolean }) => void
   /**
-   * Click on a rendered Markdown link whose href is graph-local (scheme-less
-   * and not an asset): a note link like `[Plan](./Plan.md)`. Receives the
-   * authored href; the handler owns source-relative resolution.
+   * Click or Mod-Enter on a rendered Markdown link or file pill. Omitted,
+   * links do nothing.
    */
-  onNoteLinkClick?: (options: { href: string; openInNewWindow: boolean }) => void
+  onLinkClick?: LinkClickHandler
   /** Resolve privacy-gated metadata for an HTTP(S) link popup. */
   readonly resolveLinkPreview?: LinkPreviewResolver
   /**
@@ -277,7 +272,7 @@ export function NoteEditor({
   resolveFileLink,
   resolveFileInfo,
   onWikiLinkClick,
-  onNoteLinkClick,
+  onLinkClick,
   resolveLinkPreview,
   renderWikilinkHoverCard,
   onTagClick,
@@ -297,14 +292,12 @@ export function NoteEditor({
 }: NoteEditorProps): ReactElement {
   const resolveXPost = useXPostResolver()
   const innerRef = useRef<EditorHandle>(null)
-  const followDeepLink = useFollowDeepLink()
 
   // Latest callbacks, read through refs so a changing prop identity never
   // rebuilds meowdown's extensions (the uncontrolled-editor contract).
   // TODO: This violates "Rule of hooks". Refactor this later.
   const onChangeRef = useRef(onChange)
   const onWikiLinkClickRef = useRef(onWikiLinkClick)
-  const onNoteLinkClickRef = useRef(onNoteLinkClick)
   const onTagClickRef = useRef(onTagClick)
   const resolveImageUrlRef = useRef(resolveImageUrl)
   const resolveWikiEmbedRef = useRef(resolveWikiEmbed)
@@ -316,7 +309,6 @@ export function NoteEditor({
   useLayoutEffect(() => {
     onChangeRef.current = onChange
     onWikiLinkClickRef.current = onWikiLinkClick
-    onNoteLinkClickRef.current = onNoteLinkClick
     onTagClickRef.current = onTagClick
     resolveImageUrlRef.current = resolveImageUrl
     resolveWikiEmbedRef.current = resolveWikiEmbed
@@ -384,46 +376,6 @@ export function NoteEditor({
   const handleFilePaste = useCallback(
     async (file: File) => (await saveFileRef.current?.(file)) ?? undefined,
     [],
-  )
-  const handleLinkClick = useCallback(
-    // The event may also be the Mod-Enter key press that followed the link
-    // (meowdown ≥0.33).
-    ({ href, mod }: { href: string; event: MouseEvent | KeyboardEvent; mod: boolean }) => {
-      // An attachment href (resolved from the note's folder) opens through
-      // the generation-pinned asset command, never the URL opener — which
-      // would receive a meaningless relative string.
-      const assetPath = resolveAssetOpenPathRef.current?.(href) ?? null
-      if (assetPath !== null) {
-        void Promise.resolve(openAssetRef.current?.(assetPath)).catch((cause) => {
-          console.error('open asset failed:', errorMessage(cause))
-        })
-        return
-      }
-      // A `reflect://` link routes through the in-app deep-link pipeline —
-      // the OS opener would deny the scheme (and a round-trip could land on
-      // another installed flavor). ⌘-click or a spare-`mod` keyboard follow sends an
-      // *addressing* link to a new window instead; a declined open (capture link, browser dev)
-      // degrades to the normal dispatch.
-      if (isDeepLinkUrl(href)) {
-        followDeepLink({ href, openInNewWindow: mod })
-        return
-      }
-      if (!isOpenableExternalUrl(href)) {
-        // A scheme-less local href is a note link; the host resolves it
-        // against this note's own directory.
-        onNoteLinkClickRef.current?.({ href, openInNewWindow: mod })
-        return
-      }
-      openUrlSync(href)
-    },
-    [followDeepLink],
-  )
-  // A file pill is a claimed link, so a click on it routes exactly like a
-  // link click: an attachment through the asset opener, anything else through
-  // the deep-link/URL path.
-  const handleFileClick: FileClickHandler = useCallback(
-    ({ href, event, mod }) => handleLinkClick({ href, event, mod }),
-    [handleLinkClick],
   )
   const handleResolveFileInfo: FileInfoResolver = useCallback(
     (href) => resolveFileInfoRef.current?.(href),
@@ -520,7 +472,7 @@ export function NoteEditor({
         onDocChange={handleDocChange}
         onWikilinkClick={handleWikilinkClick}
         onTagClick={handleTagClick}
-        onLinkClick={handleLinkClick}
+        {...(onLinkClick !== undefined ? { onLinkClick, onFileClick: onLinkClick } : {})}
         {...(resolveLinkPreview !== undefined ? { resolveLinkPreview } : {})}
         onImageClick={handleImageClick}
         onXPostMediaClick={handleXPostMediaClick}
@@ -537,7 +489,6 @@ export function NoteEditor({
         onFilePaste={handleFilePaste}
         {...(resolveFileLink !== undefined ? { resolveFileLink } : {})}
         resolveFileInfo={handleResolveFileInfo}
-        onFileClick={handleFileClick}
         onExitBoundary={handleExitBoundary}
       >
         <EditorInputTraits />

@@ -3,6 +3,7 @@ import { userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SnippetTask } from '@reflect/core'
+import { RouterProvider } from '@/routing/router.tsx'
 import { BacklinkSnippet } from './backlink-snippet.tsx'
 
 const writeTask = vi.hoisted(() => vi.fn())
@@ -49,14 +50,16 @@ function anchors(): SnippetTask[] {
 function renderSnippet(tasks: SnippetTask[] = anchors()) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
-    <QueryClientProvider client={client}>
-      <BacklinkSnippet
-        text={SNIPPET}
-        notePath="notes/meeting.md"
-        tasks={tasks}
-        onWikilinkClick={() => {}}
-      />
-    </QueryClientProvider>,
+    <RouterProvider>
+      <QueryClientProvider client={client}>
+        <BacklinkSnippet
+          text={SNIPPET}
+          notePath="notes/meeting.md"
+          tasks={tasks}
+          onWikilinkClick={() => {}}
+        />
+      </QueryClientProvider>
+    </RouterProvider>,
   )
 }
 
@@ -121,16 +124,18 @@ describe('BacklinkSnippet task checkboxes', () => {
     // sliced into the context verbatim; the snippet must still show the
     // mention underneath instead of folding it away.
     const view = await render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <BacklinkSnippet
-          text={'+ parent line\n  - mention of [[Roadmap]]'}
-          notePath="notes/meeting.md"
-          tasks={[]}
-          onWikilinkClick={() => {}}
-        />
-      </QueryClientProvider>,
+      <RouterProvider>
+        <QueryClientProvider
+          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+        >
+          <BacklinkSnippet
+            text={'+ parent line\n  - mention of [[Roadmap]]'}
+            notePath="notes/meeting.md"
+            tasks={[]}
+            onWikilinkClick={() => {}}
+          />
+        </QueryClientProvider>
+      </RouterProvider>,
     )
     expect(view.container.querySelector('[data-list-collapsed]')).toBeNull()
     expect(view.container.textContent).toContain('mention of')
@@ -140,16 +145,18 @@ describe('BacklinkSnippet task checkboxes', () => {
   it('renders checkboxes inert when the snippet has no round tasks', async () => {
     const squareOnly: SnippetTask[] = [{ locator: null, checked: true, text: 'square box' }]
     const view = await render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <BacklinkSnippet
-          text={'- [[Roadmap]] plan\n  - [x] square box'}
-          notePath="notes/meeting.md"
-          tasks={squareOnly}
-          onWikilinkClick={() => {}}
-        />
-      </QueryClientProvider>,
+      <RouterProvider>
+        <QueryClientProvider
+          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+        >
+          <BacklinkSnippet
+            text={'- [[Roadmap]] plan\n  - [x] square box'}
+            notePath="notes/meeting.md"
+            tasks={squareOnly}
+            onWikilinkClick={() => {}}
+          />
+        </QueryClientProvider>
+      </RouterProvider>,
     )
     const box = view.container.querySelector('input[type="checkbox"]')!
     await userEvent.click(box, { force: true })
@@ -162,16 +169,18 @@ describe('BacklinkSnippet wiki-link chips', () => {
   it('labels chips through the host resolver and reports the full target', async () => {
     const onWikilinkClick = vi.fn()
     const view = await render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <BacklinkSnippet
-          text={'- see [[Tim MacCaw // Dad|Dad]] and [[Tim MacCaw // Dad]]'}
-          notePath="notes/meeting.md"
-          tasks={[]}
-          onWikilinkClick={onWikilinkClick}
-        />
-      </QueryClientProvider>,
+      <RouterProvider>
+        <QueryClientProvider
+          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+        >
+          <BacklinkSnippet
+            text={'- see [[Tim MacCaw // Dad|Dad]] and [[Tim MacCaw // Dad]]'}
+            notePath="notes/meeting.md"
+            tasks={[]}
+            onWikilinkClick={onWikilinkClick}
+          />
+        </QueryClientProvider>
+      </RouterProvider>,
     )
     const chips = view.getByTestId('wikilink')
     await expect.element(chips.first()).toMatchTextContent(/^Dad$/)

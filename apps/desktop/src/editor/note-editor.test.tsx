@@ -1,9 +1,7 @@
 import { createRef } from 'react'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
-import { dispatchDeepLink } from '@/lib/deep-links/intake.ts'
 import { setPlatformSurface } from '@/lib/platform-surface.ts'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { pasteFiles } from '@/test-utils/file-events.ts'
@@ -11,20 +9,6 @@ import '@/test-utils/locator.ts'
 import { hover, unhover } from '@/test-utils/mouse.ts'
 import type { XPost } from '@post-embed/types'
 import { NoteEditor, type NoteEditorHandle } from './note-editor.tsx'
-
-vi.mock('@tauri-apps/plugin-opener', () => ({
-  openUrl: vi.fn(async () => {}),
-}))
-
-vi.mock('@/lib/deep-links/intake.ts', () => ({
-  dispatchDeepLink: vi.fn(),
-}))
-
-const openDeepLinkInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
-vi.mock('@/lib/windows/open-in-new-window.ts', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window.ts')>()),
-  openDeepLinkInNewWindow,
-}))
 
 // Media that loads without the network: the card hides a photo that fails.
 const X_PHOTO_URL =
@@ -506,80 +490,32 @@ describe('NoteEditor attachment resolution', () => {
 })
 
 describe('NoteEditor link opening', () => {
-  it('opens external links through the OS opener', async () => {
-    await render(<NoteEditor initialContent="see [Docs](https://example.com) here" />)
-
-    await pmRoot.getByRole('link').click()
-    await vi.waitFor(() => {
-      expect(openUrl).toHaveBeenCalledWith('https://example.com')
-    })
-  })
-
-  it('opens a custom app scheme link via the URL opener', async () => {
-    await render(
-      <NoteEditor initialContent="[note](x-devonthink-item://40C88434-68B6-4DCB) here" />,
-    )
-
-    await pmRoot.getByRole('link').click()
-    await vi.waitFor(() => {
-      expect(openUrl).toHaveBeenCalledWith('x-devonthink-item://40C88434-68B6-4DCB')
-    })
-  })
-
-  it('drops an unsafe scheme link without opening anything', async () => {
-    await render(<NoteEditor initialContent="[secret](file:///etc/passwd) here" />)
-
-    await pmRoot.getByRole('link').click()
-    await expect.element(pmRoot.getByRole('link')).toBeVisible()
-    expect(openUrl).not.toHaveBeenCalled()
-    expect(dispatchDeepLink).not.toHaveBeenCalled()
-  })
-
-  it('opens an assets/ link through the graph asset opener, not the URL opener', async () => {
-    const openAsset = vi.fn(async () => {})
+  it('reports a clicked link to the host', async () => {
+    const onLinkClick = vi.fn()
     await render(
       <NoteEditor
-        initialContent="[cat](assets/cat.png) here"
-        resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
-        openAsset={openAsset}
+        initialContent="see [Docs](https://example.com) here"
+        onLinkClick={onLinkClick}
       />,
     )
 
     await pmRoot.getByRole('link').click()
     await vi.waitFor(() => {
-      expect(openAsset).toHaveBeenCalledWith('assets/cat.png')
+      expect(onLinkClick).toHaveBeenCalledWith(
+        expect.objectContaining({ href: 'https://example.com', mod: false }),
+      )
     })
-    expect(openUrl).not.toHaveBeenCalled()
   })
 
-  it('routes a reflect:// link through the in-app deep-link intake, not the URL opener', async () => {
-    await render(<NoteEditor initialContent="[note](reflect://note/abc123) here" />)
-
-    await pmRoot.getByRole('link').click()
-    await vi.waitFor(() => {
-      expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/abc123')
-    })
-    expect(openUrl).not.toHaveBeenCalled()
-  })
-
-  it('⌘-click sends a reflect:// link to a new window instead of dispatching', async () => {
-    openDeepLinkInNewWindow.mockResolvedValue(true)
-    await render(<NoteEditor initialContent="[note](reflect://note/abc123) here" />)
+  it('reports a ⌘-clicked link with the modifier', async () => {
+    const onLinkClick = vi.fn()
+    await render(<NoteEditor initialContent="[plan](./plan.md) here" onLinkClick={onLinkClick} />)
 
     await pmRoot.getByRole('link').click({ modifiers: ['ControlOrMeta'] })
     await vi.waitFor(() => {
-      expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/abc123')
-    })
-    expect(dispatchDeepLink).not.toHaveBeenCalled()
-  })
-
-  it('a declined ⌘-click open degrades to the normal deep-link dispatch', async () => {
-    openDeepLinkInNewWindow.mockResolvedValue(false)
-    await render(<NoteEditor initialContent="[append](reflect://append?text=hi) here" />)
-
-    await pmRoot.getByRole('link').click({ modifiers: ['ControlOrMeta'] })
-    await vi.waitFor(() => {
-      expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://append?text=hi')
+      expect(onLinkClick).toHaveBeenCalledWith(
+        expect.objectContaining({ href: './plan.md', mod: true }),
+      )
     })
   })
 })
@@ -608,22 +544,22 @@ describe('NoteEditor file pills', () => {
     await expectLocatorToHaveCount(pmRoot.getByTestId('file-pill'), 0)
   })
 
-  it('opens a clicked assets/ pill through the graph asset opener, not the URL opener', async () => {
-    const openAsset = vi.fn(async () => {})
+  it('reports a clicked pill to the host like a link click', async () => {
+    const onLinkClick = vi.fn()
     await render(
       <NoteEditor
         initialContent="[cat.png](assets/cat.png)"
         resolveFileLink={claimAssets}
-        resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
-        openAsset={openAsset}
+        onLinkClick={onLinkClick}
       />,
     )
 
     await pmRoot.getByTestId('file-pill').click()
     await vi.waitFor(() => {
-      expect(openAsset).toHaveBeenCalledWith('assets/cat.png')
+      expect(onLinkClick).toHaveBeenCalledWith(
+        expect.objectContaining({ href: 'assets/cat.png', mod: false }),
+      )
     })
-    expect(openUrl).not.toHaveBeenCalled()
   })
 })
 

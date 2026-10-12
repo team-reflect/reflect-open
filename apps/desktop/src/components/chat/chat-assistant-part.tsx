@@ -53,6 +53,7 @@ function ChatAssistantText({
       <BubbleContent className="max-w-full text-text">
         <MarkdownPreview
           content={content}
+          sourcePath={null}
           onWikiLinkClick={onWikiLinkClick}
           className="reflect-chat-message text-sm"
         />

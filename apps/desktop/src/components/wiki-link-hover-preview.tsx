@@ -85,6 +85,7 @@ export function WikiLinkHoverPreview({
         ) : (
           <MarkdownPreview
             content={markdown}
+            sourcePath={path}
             resolveImageUrl={resolveImageUrl}
             {...(resolveWikiEmbed !== undefined ? { resolveWikiEmbed } : {})}
             interactive={false}

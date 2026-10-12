@@ -13,6 +13,7 @@ export function TaskText({ task }: { task: OpenTask }): ReactElement {
   return (
     <MarkdownPreview
       content={task.markdown}
+      sourcePath={task.notePath}
       singleParagraph
       className="reflect-task-preview pointer-events-none text-sm"
     />

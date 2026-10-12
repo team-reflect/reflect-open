@@ -13,6 +13,7 @@ import { markModeFromSyntax } from '@/editor/mark-mode.ts'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor.tsx'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete.ts'
 import { useTagNavigation } from '@/editor/use-tag-navigation.ts'
+import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
 import {
   useTaskEditorFinalizer,
@@ -165,6 +166,7 @@ export function TaskEditor({
   const { settings } = useSettings()
   const generation = graph?.generation ?? null
   const navigate = useWikiLinkNavigation(generation)
+  const onLinkClick = useMarkdownLinkClick(generation, null)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
 
@@ -224,6 +226,7 @@ export function TaskEditor({
         // A one-line editor has nothing to reorder, so keep the gutter grip off.
         blockHandle={false}
         onWikiLinkClick={navigate}
+        onLinkClick={onLinkClick}
         onTagClick={onTagClick}
         onWikilinkSearch={onWikilinkSearch}
         onTagSearch={onTagSearch}

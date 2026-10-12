@@ -42,6 +42,33 @@ function isManagedAssetPath(path: string): boolean {
   return path.startsWith('assets/') && !path.includes('\0') && isSafeVisibleGraphPath(path)
 }
 
+/** The graph-relative asset path a link or image source opens, or null. */
+export function resolveAssetOpenPath(
+  source: string,
+  resolveAttachmentPath: (destination: string) => string | null,
+): string | null {
+  return resolveAttachmentPath(source) ?? (isManagedAssetPath(source) ? source : null)
+}
+
+/** Open an asset in its default app, or reveal it when the open is refused. */
+export async function openAssetOrReveal(assetPath: string, generation: number): Promise<void> {
+  try {
+    await openAssetCommand(assetPath, generation)
+  } catch (openCause) {
+    // A refused file type still deserves a visible outcome: fall back to
+    // the file manager. When even the reveal fails (missing or evicted
+    // file), report the original open error — that is the user's intent.
+    try {
+      await revealAssetCommand(assetPath, generation)
+      startOperation('Opening attachment').warn(
+        'This file type can’t be opened directly, so it was revealed in Finder instead.',
+      )
+    } catch {
+      startOperation('Opening attachment').fail(errorMessage(openCause))
+    }
+  }
+}
+
 /** The failed save the pane reports on: which banner copy, and the cause. */
 export interface AssetSaveError {
   /** 'image' for `image/*` files, 'file' for everything else. */
@@ -131,11 +158,9 @@ export function useAssetPersistence(generation: number | null, path: string): As
     }
   }, [generation])
 
-  const resolveAssetOpenPath = useCallback(
+  const resolveOpenPath = useCallback(
     (source: string): string | null =>
-      generation === null
-        ? null
-        : (resolveAttachmentPath(source) ?? (isManagedAssetPath(source) ? source : null)),
+      generation === null ? null : resolveAssetOpenPath(source, resolveAttachmentPath),
     [generation, resolveAttachmentPath],
   )
   const resolveFileLink = useCallback<FileLinkResolver>(
@@ -145,23 +170,8 @@ export function useAssetPersistence(generation: number | null, path: string): As
 
   const openAsset = useCallback(
     async (assetPath: string): Promise<void> => {
-      if (generation === null) {
-        return
-      }
-      try {
-        await openAssetCommand(assetPath, generation)
-      } catch (openCause) {
-        // A refused file type still deserves a visible outcome: fall back to
-        // the file manager. When even the reveal fails (missing or evicted
-        // file), report the original open error — that is the user's intent.
-        try {
-          await revealAssetCommand(assetPath, generation)
-          startOperation('Opening attachment').warn(
-            'This file type can’t be opened directly, so it was revealed in Finder instead.',
-          )
-        } catch {
-          startOperation('Opening attachment').fail(errorMessage(openCause))
-        }
+      if (generation !== null) {
+        await openAssetOrReveal(assetPath, generation)
       }
     },
     [generation],
@@ -243,7 +253,7 @@ export function useAssetPersistence(generation: number | null, path: string): As
   return useMemo<AssetPersistence>(
     () => ({
       resolveImageUrl,
-      resolveAssetOpenPath,
+      resolveAssetOpenPath: resolveOpenPath,
       resolveWikiEmbed,
       resolveFileLink,
       openAsset,
@@ -253,7 +263,7 @@ export function useAssetPersistence(generation: number | null, path: string): As
     }),
     [
       resolveImageUrl,
-      resolveAssetOpenPath,
+      resolveOpenPath,
       resolveWikiEmbed,
       resolveFileLink,
       openAsset,

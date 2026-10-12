@@ -1,5 +1,6 @@
 import { render } from 'vitest-browser-react'
 import { describe, expect, it, vi } from 'vitest'
+import { RouterProvider } from '@/routing/router.tsx'
 import { MarkdownPreview } from './markdown-preview.tsx'
 
 vi.mock('@/providers/graph-provider.tsx', () => ({
@@ -10,10 +11,13 @@ describe('MarkdownPreview wiki-link chips', () => {
   it('labels chips through the host resolver and reports the full target', async () => {
     const onWikiLinkClick = vi.fn()
     const view = await render(
-      <MarkdownPreview
-        content={'see [[Tim MacCaw // Dad|Dad]] and [[Tim MacCaw // Dad]]'}
-        onWikiLinkClick={onWikiLinkClick}
-      />,
+      <RouterProvider>
+        <MarkdownPreview
+          content={'see [[Tim MacCaw // Dad|Dad]] and [[Tim MacCaw // Dad]]'}
+          sourcePath={null}
+          onWikiLinkClick={onWikiLinkClick}
+        />
+      </RouterProvider>,
     )
     const chips = view.getByTestId('wikilink')
     await expect.element(chips.first()).toMatchTextContent(/^Dad$/)

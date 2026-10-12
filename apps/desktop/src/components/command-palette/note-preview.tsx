@@ -60,6 +60,7 @@ export function NotePreview({ entry }: NotePreviewProps): ReactElement {
     content = (
       <MarkdownPreview
         content={body}
+        sourcePath={entry.path}
         resolveImageUrl={resolveImageUrl}
         resolveWikiEmbed={resolveWikiEmbed}
       />
