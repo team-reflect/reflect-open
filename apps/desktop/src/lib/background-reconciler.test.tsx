@@ -1,15 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createBackgroundReconciler } from './background-reconciler.ts'
 
-/** A promise whose resolution the test controls, to hold a pass mid-flight. */
-function deferred<T = void>(): { promise: Promise<T>; resolve: (value: T) => void } {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((res) => {
-    resolve = res
-  })
-  return { promise, resolve }
-}
-
 /** Drain the microtask/macrotask queue so the loop's awaits settle. */
 function tick(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
@@ -22,7 +13,7 @@ describe('createBackgroundReconciler', () => {
     const reconciler = createBackgroundReconciler({
       pass: async () => {
         calls += 1
-        const gate = deferred()
+        const gate = Promise.withResolvers<void>()
         gates.push(gate)
         await gate.promise
       },
@@ -46,7 +37,7 @@ describe('createBackgroundReconciler', () => {
   })
 
   it('ends the loop on a "stop" result even when a follow-up was queued', async () => {
-    const gate = deferred()
+    const gate = Promise.withResolvers<void>()
     let calls = 0
     const reconciler = createBackgroundReconciler({
       pass: async () => {
@@ -66,7 +57,7 @@ describe('createBackgroundReconciler', () => {
   })
 
   it('exposes the dispose state to the pass via isStale', async () => {
-    const gate = deferred()
+    const gate = Promise.withResolvers<void>()
     let seenAtStart: boolean | null = null
     let seenAfterDispose: boolean | null = null
     const reconciler = createBackgroundReconciler({

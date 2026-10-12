@@ -45,25 +45,6 @@ function never<T>(): Promise<T> {
 }
 
 /**
- * A StoreKit answer the case settles by hand, for the two that have to see
- * the gate before and after it arrives.
- */
-function deferred<T>(): { answer: () => Promise<T>; settle: (value: T) => void } {
-  const resolvers: ((value: T) => void)[] = []
-  return {
-    answer: () =>
-      new Promise<T>((resolve) => {
-        resolvers.push(resolve)
-      }),
-    settle: (value) => {
-      for (const resolve of resolvers) {
-        resolve(value)
-      }
-    },
-  }
-}
-
-/**
  * Run a launch to the answer it should reach, then close it. What that launch
  * remembered is all the next `renderHook` starts from.
  */
@@ -312,8 +293,8 @@ describe('usePaywallGate', () => {
     const { result } = await renderHook(() => usePaywallGate(), { wrapper })
     await vi.waitFor(() => expect(result.current).toBe('show'))
 
-    const storeKit = deferred<boolean>()
-    owned = storeKit.answer
+    const storeKit = Promise.withResolvers<boolean>()
+    owned = () => storeKit.promise
     focusManager.setFocused(false)
     focusManager.setFocused(true)
     await vi.waitFor(() =>
@@ -321,7 +302,7 @@ describe('usePaywallGate', () => {
     )
     expect(result.current).toBe('show')
 
-    storeKit.settle(true)
+    storeKit.resolve(true)
     await vi.waitFor(() => expect(result.current).toBe('hide'))
   })
 
@@ -416,11 +397,11 @@ describe('usePaywallGate', () => {
       owned = (productId) => Promise.resolve(productId.endsWith('.yearly'))
       await runLaunch('hide')
 
-      const storeKit = deferred<boolean>()
-      owned = storeKit.answer
+      const storeKit = Promise.withResolvers<boolean>()
+      owned = () => storeKit.promise
       const { result } = await renderHook(() => usePaywallGate(), { wrapper })
       expect(result.current).toBe('hide')
-      storeKit.settle(false)
+      storeKit.resolve(false)
       await vi.waitFor(() => expect(result.current).toBe('show'))
     })
 
@@ -487,11 +468,11 @@ describe('usePaywallGate', () => {
       environment = () => Promise.resolve('Sandbox')
       await runLaunch('hide')
 
-      const probe = deferred<string>()
-      environment = probe.answer
+      const probe = Promise.withResolvers<string>()
+      environment = () => probe.promise
       const { result } = await renderHook(() => usePaywallGate(), { wrapper })
       expect(result.current).toBe('hide')
-      probe.settle('Production')
+      probe.resolve('Production')
       await vi.waitFor(() => expect(result.current).toBe('show'))
     })
 

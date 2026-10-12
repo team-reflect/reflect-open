@@ -4,7 +4,6 @@ import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PinnedNote } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
-import { deferred } from '@/test-utils/deferred.ts'
 import { useReorderPinnedNotes } from './use-reorder-pinned-notes.ts'
 
 const reorderPinnedNotes = vi.hoisted(() =>
@@ -76,9 +75,9 @@ describe('useReorderPinnedNotes', () => {
   })
 
   it('updates optimistically and serializes disk writes after an earlier failure', async () => {
-    const first = deferred<void>()
-    const second = deferred<void>()
-    const third = deferred<void>()
+    const first = Promise.withResolvers<void>()
+    const second = Promise.withResolvers<void>()
+    const third = Promise.withResolvers<void>()
     reorderPinnedNotes
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise)

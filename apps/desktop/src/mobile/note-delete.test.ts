@@ -34,19 +34,6 @@ afterEach(() => {
   openSessionMock.mockReset()
 })
 
-interface Deferred {
-  readonly promise: Promise<void>
-  readonly resolve: () => void
-}
-
-function deferred(): Deferred {
-  let resolve = () => {}
-  const promise = new Promise<void>((settle) => {
-    resolve = settle
-  })
-  return { promise, resolve }
-}
-
 function lazySession(write: (path: string, contents: string) => Promise<void>): {
   readonly session: NoteSession
   readonly snapshots: NoteSessionSnapshot[]
@@ -86,8 +73,8 @@ describe('deleteOpenNote', () => {
   })
 
   it("waits for a new note's in-flight first write before deleting its file", async () => {
-    const writeStarted = deferred()
-    const allowWrite = deferred()
+    const writeStarted = Promise.withResolvers<void>()
+    const allowWrite = Promise.withResolvers<void>()
     let fileExists = false
     const { session, snapshots } = lazySession(async () => {
       writeStarted.resolve()

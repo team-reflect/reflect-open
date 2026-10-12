@@ -4,7 +4,6 @@ import type { ReactNode } from 'react'
 import type { ImageUrlResolver, WikiEmbedResolver, WikilinkHoverHit } from '@meowdown/core'
 import { setBridge, type FileMeta } from '@reflect/core'
 import { queryClient } from '@/lib/query-client.ts'
-import { deferred } from '@/test-utils/deferred.ts'
 import { useWikiLinkHoverPreview } from './use-wiki-link-hover-preview.tsx'
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -163,7 +162,7 @@ describe('useWikiLinkHoverPreview', () => {
   })
 
   it('waits for the catalog before resolving a bare image embed', async () => {
-    const listing = deferred<FileMeta[]>()
+    const listing = Promise.withResolvers<FileMeta[]>()
     setBridge({ invoke: () => listing.promise, listen: async () => () => {} })
     mocks.resolveExistingWikiTarget.mockResolvedValue({ kind: 'resolved', path: 'notes/alpha.md' })
     mocks.readExistingNoteSource.mockResolvedValue('![[photo.png]]')

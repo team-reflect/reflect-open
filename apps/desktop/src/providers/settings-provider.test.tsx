@@ -7,7 +7,6 @@ import { resetOperations, useOperations } from '@/lib/operations.ts'
 import { flushSettings } from '@/lib/settings-flush.ts'
 import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client.ts'
 import { createSettingsQueryOptions } from '@/lib/query-options.ts'
-import { deferred, type Deferred } from '@/test-utils/deferred.ts'
 import { SettingsProvider, useSettings } from './settings-provider.tsx'
 
 /**
@@ -26,7 +25,7 @@ let pendingLoad: (() => void) | null
 let gateLoad: boolean
 let loadCalls: number
 let gateSaves: boolean
-let pendingSaves: Deferred<void>[]
+let pendingSaves: PromiseWithResolvers<void>[]
 let saveAttempts: Settings[]
 
 function releaseLoad(): void {
@@ -61,7 +60,7 @@ function installFakeBridge(): void {
           saveAttempts.push(args['settings'] as Settings)
           const shouldFail = failSaves
           if (gateSaves) {
-            const pending = deferred<void>()
+            const pending = Promise.withResolvers<void>()
             pendingSaves.push(pending)
             await pending.promise
           }

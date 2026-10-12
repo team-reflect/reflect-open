@@ -4,7 +4,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge, type AgentSkillStatus } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
-import { deferred } from '@/test-utils/deferred.ts'
 import { AgentsSection } from './agents-section.tsx'
 
 // A browser-mode module mock materializes value exports once, so this file
@@ -178,7 +177,7 @@ describe('AgentsSection', () => {
   })
 
   it('writes a completed mutation to its original graph cache', async () => {
-    const pendingInstall = deferred<AgentSkillStatus>()
+    const pendingInstall = Promise.withResolvers<AgentSkillStatus>()
     installResult = () => pendingInstall.promise
     const view = await renderSection()
     await page.getByRole('button', { name: 'Install skill' }).click()

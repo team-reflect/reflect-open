@@ -76,22 +76,13 @@ function closeCurrentWindow(): CloseRequestForTest {
   return { completed, preventDefault }
 }
 
-/** Lets tests control save completion order without relying on real I/O timing. */
-function deferred(): { promise: Promise<void>; resolve: () => void } {
-  let resolve!: () => void
-  const promise = new Promise<void>((resolvePromise) => {
-    resolve = resolvePromise
-  })
-  return { promise, resolve }
-}
-
 describe('installQuitFlush', () => {
   it.each(['documents', 'settings'])(
     'hides the main window before pending saves and backup finish (%s finish first)',
     async (firstSave) => {
-      const documents = deferred()
-      const settings = deferred()
-      const backup = deferred()
+      const documents = Promise.withResolvers<void>()
+      const settings = Promise.withResolvers<void>()
+      const backup = Promise.withResolvers<void>()
       flushOpenDocuments.mockReturnValueOnce(documents.promise)
       flushSettings.mockReturnValueOnce(settings.promise)
       flushBackup.mockReturnValueOnce(backup.promise)
@@ -139,7 +130,7 @@ describe('installQuitFlush', () => {
   })
 
   it('waits for backup before confirming app quit', async () => {
-    const backup = deferred()
+    const backup = Promise.withResolvers<void>()
     flushBackup.mockReturnValueOnce(backup.promise)
     const dispose = installQuitFlush()
 

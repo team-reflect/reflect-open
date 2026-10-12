@@ -12,7 +12,6 @@ import {
   type IpcBridge,
 } from '@reflect/core'
 import { mutationKeys, mutationScopeIds } from '@/lib/query-client.ts'
-import { deferred } from '@/test-utils/deferred.ts'
 import { PaywallScreen } from './paywall-screen.tsx'
 
 type SignInOptions = Parameters<typeof signInWithClassic>[0]
@@ -123,7 +122,7 @@ describe('PaywallScreen products', () => {
 
 describe('PaywallScreen purchase mutation', () => {
   it('purchases the yearly plan, disables every action, and invalidates on success', async () => {
-    const pendingPurchase = deferred<null>()
+    const pendingPurchase = Promise.withResolvers<null>()
     purchase = () => pendingPurchase.promise
     const view = await render(<PaywallScreen />, { wrapper })
     const trial = view.getByRole('button', { name: 'Start 7-day free trial' })
@@ -177,7 +176,7 @@ describe('PaywallScreen purchase mutation', () => {
 
 describe('PaywallScreen offer code', () => {
   it('opens the in-app redemption sheet and refetches entitlements after it closes', async () => {
-    const pendingRedeem = deferred<null>()
+    const pendingRedeem = Promise.withResolvers<null>()
     redeem = () => pendingRedeem.promise
     const view = await render(<PaywallScreen />, { wrapper })
     const button = view.getByRole('button', { name: 'Redeem a code' })
@@ -269,7 +268,7 @@ describe('PaywallScreen restore mutation', () => {
   })
 
   it('clears an old restore message when a purchase starts', async () => {
-    const pendingPurchase = deferred<null>()
+    const pendingPurchase = Promise.withResolvers<null>()
     purchase = () => pendingPurchase.promise
     const view = await render(<PaywallScreen />, { wrapper })
     await expect.element(view.getByRole('button', { name: 'Restore Purchases' })).toBeVisible()
@@ -286,7 +285,7 @@ describe('PaywallScreen restore mutation', () => {
   })
 
   it('uses the shared IAP scope and only restore shows progress while restoring', async () => {
-    const pendingSync = deferred<null>()
+    const pendingSync = Promise.withResolvers<null>()
     sync = () => pendingSync.promise
     const view = await render(<PaywallScreen />, { wrapper })
     await expect.element(view.getByRole('button', { name: 'Restore Purchases' })).toBeVisible()
@@ -384,7 +383,7 @@ describe('PaywallScreen Reflect Classic verification', () => {
   })
 
   it('shows each step after the sheet closes, then the unlocked date', async () => {
-    const check = deferred<ClassicSignInResult>()
+    const check = Promise.withResolvers<ClassicSignInResult>()
     mocks.signInWithClassic.mockImplementation(afterSheet(() => check.promise))
     const view = await openSignIn()
 
