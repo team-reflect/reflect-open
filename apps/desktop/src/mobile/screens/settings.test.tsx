@@ -168,6 +168,17 @@ describe('MobileSettings', () => {
     expect(updateSettings).toHaveBeenCalledWith({ dateFormat: 'iso' })
   })
 
+  it('writes the week start and time format choices', async () => {
+    const user = userEvent
+    await mount()
+
+    await user.click(page.getByRole('radio', { name: 'Sunday' }))
+    expect(updateSettings).toHaveBeenCalledWith({ weekStartDay: 'sunday' })
+
+    await user.click(page.getByRole('radio', { name: '24-hour' }))
+    expect(updateSettings).toHaveBeenCalledWith({ timeFormat: '24h' })
+  })
+
   it('toggles the editor switches', async () => {
     const user = userEvent
     await mount()

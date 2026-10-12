@@ -16,6 +16,8 @@ import {
   type DateFormat,
   type EditorTextSize,
   type ThemePreference,
+  type TimeFormat,
+  type WeekStartDay,
 } from '@reflect/core'
 import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
@@ -82,6 +84,17 @@ const TEXT_SIZE_OPTIONS: readonly SegmentedOption<EditorTextSize>[] = [
 ]
 
 const DATE_FORMATS: readonly DateFormat[] = ['mdy', 'dmy', 'iso']
+
+const WEEK_START_OPTIONS: readonly SegmentedOption<WeekStartDay>[] = [
+  { value: 'sunday', label: 'Sunday' },
+  { value: 'monday', label: 'Monday' },
+  { value: 'saturday', label: 'Saturday' },
+]
+
+const TIME_FORMAT_OPTIONS: readonly SegmentedOption<TimeFormat>[] = [
+  { value: '12h', label: '12-hour' },
+  { value: '24h', label: '24-hour' },
+]
 
 /**
  * The mobile Settings screen — a pushed card (route kind `settings`) in the
@@ -254,6 +267,21 @@ export function MobileSettings(): ReactElement {
                 onPress={() => updateSettings({ dateFormat })}
               />
             ))}
+          </SettingsGroup>
+
+          <SettingsGroup header="Week and time">
+            <SettingsSegmentedRow
+              label="Week start"
+              value={settings.weekStartDay}
+              options={WEEK_START_OPTIONS}
+              onChange={(weekStartDay) => updateSettings({ weekStartDay })}
+            />
+            <SettingsSegmentedRow
+              label="Time format"
+              value={settings.timeFormat}
+              options={TIME_FORMAT_OPTIONS}
+              onChange={(timeFormat) => updateSettings({ timeFormat })}
+            />
           </SettingsGroup>
 
           <SettingsGroup header="Editor">
