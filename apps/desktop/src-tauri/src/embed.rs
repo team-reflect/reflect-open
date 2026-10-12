@@ -32,6 +32,11 @@ const MODEL_FILES: [&str; 5] = [
     "special_tokens_map.json",
     "tokenizer_config.json",
 ];
+/// ONNX Runtime intra-op threads. The default is one per logical CPU, and the
+/// workers spin-wait between ops. A call embeds one note (two or three
+/// chunks), so a large pool mostly spins.
+const INTRA_OP_THREADS: usize = 2;
+
 /// Byte counts for an active model download. Absent until the download
 /// starts (cache probing, or a cached model that skips downloading); after
 /// the last byte it stays at 100% through the model-load phase.
@@ -280,7 +285,9 @@ pub async fn embed_ensure(app: AppHandle, state: State<'_, EmbedState>) -> AppRe
         match tauri::async_runtime::spawn_blocking(move || {
             download_model_files(&app_for_progress, &cache_dir)?;
             TextEmbedding::try_new(
-                TextInitOptions::new(EmbeddingModel::AllMiniLML6V2).with_cache_dir(cache_dir),
+                TextInitOptions::new(EmbeddingModel::AllMiniLML6V2)
+                    .with_cache_dir(cache_dir)
+                    .with_intra_threads(INTRA_OP_THREADS),
             )
             .map_err(|err| err.to_string())
         })
