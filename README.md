@@ -161,6 +161,12 @@ Windows, Android, and a plugin API are out of scope for now. See the
 [V2 product vision](docs/reflect-v2-product-vision.md) and the implementation
 plans in [docs/plans/](docs/plans/) for the longer-term direction.
 
+## Community
+
+Join the [Reflect Discord server](https://reflect.app/discord) to ask questions,
+share feedback, and follow the project. Report bugs and request features in
+[GitHub issues](https://github.com/team-reflect/reflect-open/issues).
+
 ## License
 
 [MIT](LICENSE).
