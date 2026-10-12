@@ -1075,6 +1075,18 @@ describe('SettingsScreen', () => {
     expect(page.getByText(/next launch/i).query()).toBeNull()
   })
 
+  it('offers no semantic search control without an embedding runtime', async () => {
+    stored = { semanticSearchEnabled: true }
+    embedStatus = { status: 'unsupported' }
+    await renderScreen()
+
+    await expect
+      .element(page.getByText('Semantic search is not available on this device.'))
+      .toBeInTheDocument()
+    expect(page.getByRole('button', { name: /enable semantic search/i }).query()).toBeNull()
+    expect(page.getByRole('progressbar', { name: /model download/i }).query()).toBeNull()
+  })
+
   it('re-enabling after a failed load retries the download', async () => {
     embedStatus = { status: 'failed', message: 'offline' }
     await renderScreen()

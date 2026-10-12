@@ -32,9 +32,9 @@ import {
 import { useBridgeReady } from '@/hooks/use-bridge-ready.ts'
 import { toChatAttachment, type ChatAttachment } from '@/lib/chat-attachments.ts'
 import { todayIso } from '@/lib/dates.ts'
-import { isMobileSurface } from '@/lib/platform-surface.ts'
 import { providerFetch } from '@/lib/provider-fetch.ts'
 import { invalidateChatQueries } from '@/lib/query-client.ts'
+import { useEmbedStatus } from '@/lib/use-embed-status.ts'
 import { ChatContext, type ChatContextValue, type ChatStatus } from '@/providers/chat-context.tsx'
 import { conversationTitle } from '@/providers/chat-title.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
@@ -94,12 +94,12 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   const activeModelRef = useRef<AiProviderConfig | null>(activeModel)
   const conversationIdRef = useRef(conversationId)
   const generationRef = useRef<number | null>(indexGeneration)
-  // Semantic search never runs on the mobile surface — the embed runtime is
-  // desktop-only (Plan 23, contract 3) — and the tool must *say* it is
-  // lexical, not lean on hybrid's degrade-on-error to absorb the missing
-  // runtime. The settings document syncs no further than the device, but a
-  // stray enabled flag must still lose to the platform here.
-  const semanticSearchEnabled = settings.semanticSearchEnabled && !isMobileSurface()
+  // Without an embedding runtime the tool must *say* it is lexical, not lean
+  // on hybrid's degrade-on-error to absorb the missing runtime. A stray
+  // enabled flag must lose to the platform here.
+  const embedStatus = useEmbedStatus()
+  const semanticSearchEnabled =
+    settings.semanticSearchEnabled && embedStatus.status !== 'unsupported'
   const semanticSearchEnabledRef = useRef(semanticSearchEnabled)
   const chatSystemPromptRef = useRef(settings.chatSystemPrompt)
   useEffect(() => {

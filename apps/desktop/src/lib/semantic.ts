@@ -33,6 +33,10 @@ export function consumeLegacySemanticOptIn(): boolean {
   }
 }
 
+function isTerminalStatus(status: EmbedStatus): boolean {
+  return status.status !== 'uninitialized' && status.status !== 'loading'
+}
+
 /**
  * Resolve once the runtime reaches a terminal state. `embed_ensure` returns
  * `loading` to a caller that raced an in-flight load — the event stream (plus
@@ -40,14 +44,14 @@ export function consumeLegacySemanticOptIn(): boolean {
  * real outcome.
  */
 async function awaitTerminalStatus(initial: EmbedStatus): Promise<EmbedStatus> {
-  if (initial.status === 'ready' || initial.status === 'failed') {
+  if (isTerminalStatus(initial)) {
     return initial
   }
   return await new Promise((resolve) => {
     let unlisten: (() => void) | null = null
     let settled = false
     const settle = (status: EmbedStatus): void => {
-      if (!settled && (status.status === 'ready' || status.status === 'failed')) {
+      if (!settled && isTerminalStatus(status)) {
         settled = true
         unlisten?.()
         resolve(status)

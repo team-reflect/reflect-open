@@ -5,6 +5,7 @@ import { useBridgeReady } from '@/hooks/use-bridge-ready.ts'
 import { readNoteSource } from '@/lib/note-frontmatter.ts'
 import { isOstensiblyEmptyNoteSource } from '@/lib/note-emptiness.ts'
 import { queryKeys } from '@/lib/query-client.ts'
+import { useEmbedStatus } from '@/lib/use-embed-status.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useSettings } from '@/providers/settings-provider.tsx'
 
@@ -46,10 +47,13 @@ export function useSimilarNotes(path: string): RetrievalHit[] {
   const queryClient = useQueryClient()
   const bridgeAvailable = useBridgeReady()
   const dailyNote = isDaily(path)
+  const embedStatus = useEmbedStatus()
+  const semanticSearchEnabled =
+    settings.semanticSearchEnabled && embedStatus.status !== 'unsupported'
   const { data: dailyNoteIsEmpty } = useQuery({
     queryKey: queryKeys.index.dailyEmpty(graph?.root, path),
     queryFn: async () => isOstensiblyEmptyNoteSource(await readNoteSource(path)),
-    enabled: bridgeAvailable && graph !== null && dailyNote && settings.semanticSearchEnabled,
+    enabled: bridgeAvailable && graph !== null && dailyNote && semanticSearchEnabled,
   })
   const graphRoot = graph?.root
   // A daily observed empty was cleared: its cached neighbors (frozen at
@@ -68,7 +72,7 @@ export function useSimilarNotes(path: string): RetrievalHit[] {
   const enabled =
     bridgeAvailable &&
     graph !== null &&
-    settings.semanticSearchEnabled &&
+    semanticSearchEnabled &&
     (!dailyNote || dailyNoteIsEmpty === false)
   const { data } = useQuery({
     queryKey: queryKeys.similar.note(graph?.root, path),

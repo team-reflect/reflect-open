@@ -111,7 +111,7 @@ part that makes chat *work* at all — no way to configure an AI provider on the
 phone: the settings document lives in the **OS config dir per device**
 (`src-tauri/src/settings.rs`), so desktop-configured providers and their
 keychain keys do not exist on the phone. Mobile also must not offer semantic
-search: `embed_mobile.rs` stubs fail loudly by design.
+search: the `embed_unsupported.rs` stand-in reports the `unsupported` status.
 
 ## Contracts
 

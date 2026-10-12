@@ -41,12 +41,12 @@ mod web_fetch;
 mod windows;
 
 // The watcher and the embedding runtime are desktop capabilities (Plan 19):
-// mobile swaps in stand-ins with the identical command surface, so the
-// `invoke_handler` list below needs no platform branches.
+// other platforms swap in stand-ins with the identical command surface, so
+// the `invoke_handler` list below needs no platform branches.
 #[cfg(desktop)]
 mod embed;
 #[cfg(mobile)]
-#[path = "embed_mobile.rs"]
+#[path = "embed_unsupported.rs"]
 mod embed;
 #[cfg(desktop)]
 mod watcher;

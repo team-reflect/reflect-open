@@ -7,12 +7,12 @@ import type {
   ChatModelSelection,
   ChatStreamEvent,
   ChatTurn,
+  EmbedStatus,
   GraphInfo,
   Settings,
   StreamChatOptions,
 } from '@reflect/core'
 import { NO_REPLY_NOTICE } from '@reflect/core'
-import { setPlatformSurface } from '@/lib/platform-surface.ts'
 import { ChatProvider, useChatSession } from '@/providers/chat-provider.tsx'
 
 /**
@@ -38,6 +38,9 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   ...core,
 }))
+
+const embedState = vi.hoisted(() => ({ status: { status: 'uninitialized' } as EmbedStatus }))
+vi.mock('@/lib/use-embed-status.ts', () => ({ useEmbedStatus: () => embedState.status }))
 
 const settingsState = vi.hoisted(() => ({
   models: [] as AiProviderConfig[],
@@ -263,9 +266,9 @@ describe('ChatProvider persistence', () => {
     )
   })
 
-  it('forces lexical search on the mobile surface, over an enabled setting', async () => {
+  it('forces lexical search without an embedding runtime, over an enabled setting', async () => {
     settingsState.semanticSearchEnabled = true
-    setPlatformSurface({ mobileApp: true })
+    embedState.status = { status: 'unsupported' }
     try {
       scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] }])
       const { act } = await renderProvider()
@@ -277,7 +280,7 @@ describe('ChatProvider persistence', () => {
         expect.objectContaining({ semanticSearchEnabled: false }),
       )
     } finally {
-      setPlatformSurface({ mobileApp: false })
+      embedState.status = { status: 'uninitialized' }
     }
   })
 

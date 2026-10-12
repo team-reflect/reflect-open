@@ -21,6 +21,7 @@ export const embedStatusSchema = z.discriminatedUnion('status', [
   }),
   z.object({ status: z.literal('ready'), model: z.string() }),
   z.object({ status: z.literal('failed'), message: z.string() }),
+  z.object({ status: z.literal('unsupported') }),
 ])
 export type EmbedStatus = z.infer<typeof embedStatusSchema>
 

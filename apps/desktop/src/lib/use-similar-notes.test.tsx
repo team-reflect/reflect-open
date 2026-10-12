@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
-import type { RetrievalHit } from '@reflect/core'
+import type { EmbedStatus, RetrievalHit } from '@reflect/core'
 import { queryKeys } from './query-client.ts'
 import { useSimilarNotes } from './use-similar-notes.ts'
 
@@ -17,6 +17,8 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 vi.mock('@/providers/graph-provider.tsx', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
 }))
+const embedState = vi.hoisted(() => ({ status: { status: 'uninitialized' } as EmbedStatus }))
+vi.mock('./use-embed-status.ts', () => ({ useEmbedStatus: () => embedState.status }))
 const semanticSetting = vi.hoisted(() => ({ enabled: true }))
 vi.mock('@/providers/settings-provider.tsx', () => ({
   useSettings: () => ({
@@ -37,6 +39,7 @@ function wrapper(client: QueryClient) {
 
 beforeEach(() => {
   semanticSetting.enabled = true
+  embedState.status = { status: 'uninitialized' }
   readNote.mockReset().mockResolvedValue('- real entry\n')
   relatedNotes.mockReset().mockResolvedValue([hit('notes/a.md'), hit('notes/b.md')])
 })
@@ -73,6 +76,18 @@ describe('useSimilarNotes', () => {
     // The disabled path is stable too.
     await rerender()
     expect(result.current).toBe(first)
+  })
+
+  it('never queries related notes without an embedding runtime', async () => {
+    embedState.status = { status: 'unsupported' }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { result } = await renderHook(() => useSimilarNotes('notes/x.md'), {
+      wrapper: wrapper(client),
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(relatedNotes).not.toHaveBeenCalled()
+    expect(result.current).toEqual([])
   })
 
   it('returns an empty array and never queries related notes for an empty daily note', async () => {

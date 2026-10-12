@@ -19,7 +19,7 @@ fallback with explicit triggers.
 > **Status (2026-06-14): In progress in source.** The app has the platform root gate
 > (`src/platform-root.tsx`), mobile route shell (`src/mobile/`), fixed-root graph
 > bootstrap/onboarding in `GraphProvider`, mobile-gated Rust commands and stand-ins
-> (`mobile_graph_root`, `watcher_mobile.rs`, `embed_mobile.rs`), iOS identity/config, and
+> (`mobile_graph_root`, `watcher_mobile.rs`, `embed_unsupported.rs`), iOS identity/config, and
 > the first-party `tauri-plugin-keyboard`. The Daily/All shell, editable note screen,
 > note actions, share helper, and settings sheet exist. Still open: physical-device
 > editing validation, full GitHub-connect restore polish on mobile, foreground-sync
