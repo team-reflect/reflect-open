@@ -23,7 +23,7 @@ crate-type = ["staticlib", "rlib"]
 tauri-build = { version = "2.7.1", features = [] }
 
 [dependencies]
-infer = "0.19"
+infer = "0.22.0"
 http-range-header = "0.4"
 
 # `devtools` compiles the web inspector into release builds too (it is otherwise
