@@ -60,7 +60,8 @@ export function NotePreview({ entry }: NotePreviewProps): ReactElement {
     content = (
       <MarkdownPreview
         content={body}
-        sourcePath={entry.path}
+        // Note links stay inert, like the preview's wiki link chips.
+        sourcePath={null}
         resolveImageUrl={resolveImageUrl}
         resolveWikiEmbed={resolveWikiEmbed}
       />
