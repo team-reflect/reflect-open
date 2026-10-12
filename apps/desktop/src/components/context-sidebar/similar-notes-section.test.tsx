@@ -19,6 +19,9 @@ vi.mock('@/lib/windows/open-in-new-window.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window.ts')>()),
   openRouteInNewWindow,
 }))
+vi.mock('@/lib/use-embed-status.ts', () => ({
+  useEmbedStatus: () => ({ status: 'ready', model: 'all-MiniLM-L6-v2' }),
+}))
 vi.mock('@/providers/graph-provider.tsx', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
 }))

@@ -13,6 +13,9 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   hasBridge: () => true,
   relatedNotes,
 }))
+vi.mock('@/lib/use-embed-status.ts', () => ({
+  useEmbedStatus: () => ({ status: 'ready', model: 'all-MiniLM-L6-v2' }),
+}))
 vi.mock('@/providers/graph-provider.tsx', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
 }))
