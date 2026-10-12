@@ -29,6 +29,7 @@ import {
   isSessionReady,
   stitchSessionTranscript,
   transcribeSessionParts,
+  type AudioMemoIdentity,
   type AudioMemoPart,
   type AudioMemoSession,
 } from './audio-memo-session.ts'
@@ -76,28 +77,6 @@ import { ensureBacklinkTarget } from './backlink-target.ts'
  * content. All output is written locally, so recording is allowed even when the
  * daily note is `private: true`.
  */
-
-/** Everything derivable from a memo's shared basename. */
-export interface AudioMemoIdentity {
-  /**
-   * The shared basename, e.g. `audio-memo-2026-06-11-153022-845` — also the
-   * daily-note wikilink target, resolvable through the transcription note's
-   * frontmatter alias.
-   */
-  base: string
-  /** Local ISO day it was recorded — the daily note that backlinks it. */
-  date: string
-  /** The timestamp fallback title, before the transcript-derived name exists. */
-  title: string
-  /** Timestamp fallback alias for the daily-note link, e.g. `Audio memo 15:30`. */
-  alias: string
-  /** Graph-relative path of the recording under `audio-memos/`. */
-  audioPath: string
-  /** Graph-relative path of the transcription note, `notes/<base>.md`. */
-  notePath: string
-  /** The recording's MIME type, as stored (derived from the extension). */
-  mimeType: string
-}
 
 /** `audio/mp4` ← `m4a` etc. — the inverse of the storage-naming map. */
 const MIME_BY_EXTENSION: Record<string, string> = Object.fromEntries(

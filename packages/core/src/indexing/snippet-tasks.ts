@@ -1,6 +1,7 @@
 import { parseMarkdownAst, type SyntaxNode } from '@meowdown/markdown'
 import { parseBody } from '../markdown/grammar.ts'
-import { getRoundTasks, type TaskLocator } from '../markdown/task-ast.ts'
+import { getRoundTasks } from '../markdown/task-ast.ts'
+import type { TaskLocator } from '../markdown/task-model.ts'
 import type { BlockContextSource } from './block-context.ts'
 
 /**

@@ -3,7 +3,12 @@ import { resolveAttendeeContact } from '../contacts/resolve.ts'
 import { serializeWikiSuggestionAddress } from '../indexing/suggest.ts'
 import { canonicalEmail, canonicalEmails } from '../markdown/email-fields.ts'
 import { wikiLinkSafe } from '../markdown/edit.ts'
-import type { MeetingAttendee } from './add-meeting.ts'
+
+/** One attendee entering the flow: a display name and every known email. */
+export interface MeetingAttendee {
+  name: string
+  emails?: readonly string[] | undefined
+}
 
 /** An attendee classified for linked or plain-text meeting serialization. */
 export type ResolvedMeetingAttendee =

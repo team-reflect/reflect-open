@@ -12,9 +12,8 @@ import {
   projectTasks,
   TaskStaleError,
   type TaskEditResult,
-  type TaskLocator,
-  type TaskSnapshot,
 } from './task-ast.ts'
+import type { TaskLocator, TaskSnapshot } from './task-model.ts'
 import { isSameTaskPath } from './task-path.ts'
 
 afterEach(() => {

@@ -1,7 +1,7 @@
 import { render } from 'vitest-browser-react'
 import { page, type Locator } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { V1ImportState } from '@/providers/v1-import-provider.tsx'
+import type { V1ImportState } from '@/lib/v1-import-state.ts'
 
 const open = vi.hoisted(() => vi.fn<() => Promise<string | null>>())
 const startImport = vi.hoisted(() => vi.fn())

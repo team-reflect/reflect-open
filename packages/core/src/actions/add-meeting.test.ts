@@ -5,13 +5,8 @@ import { createNoteWithTitle } from '../graph/create-note.ts'
 import { resolveWikiTarget } from '../indexing/queries.ts'
 import { setBridge } from '../ipc/bridge.ts'
 import { resolved, unresolved } from '../markdown/resolve.ts'
-import {
-  addMeetingToDaily,
-  meetingLine,
-  type AddMeetingInput,
-  type MeetingAttendee,
-} from './add-meeting.ts'
-import { resolveMeetingAttendeeTargets } from './resolve-attendees.ts'
+import { addMeetingToDaily, meetingLine, type AddMeetingInput } from './add-meeting.ts'
+import { resolveMeetingAttendeeTargets, type MeetingAttendee } from './resolve-attendees.ts'
 
 vi.mock('../contacts/person', () => ({
   ensurePersonNote: vi.fn(),

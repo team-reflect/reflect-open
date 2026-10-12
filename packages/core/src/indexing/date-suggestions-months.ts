@@ -1,5 +1,5 @@
 import { isCalendarDate, isoFromParts } from '@reflect/utils'
-import type { DateSuggestion, DateSuggestionContext } from './date-suggestions.ts'
+import type { DateSuggestion, DateSuggestionContext } from './date-suggestion-types.ts'
 
 const MIN_PHRASE_CHARS = 3
 

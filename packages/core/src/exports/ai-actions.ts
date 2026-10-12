@@ -138,7 +138,6 @@ export {
   listAudioMemoSegments,
   listPendingAudioMemoSessions,
   reconcileAudioMemos,
-  type AudioMemoIdentity,
   type AudioMemoSource,
   type CaptureAudioMemoOutcome,
   type CaptureAudioMemoPartInput,
@@ -149,6 +148,7 @@ export {
 export {
   AUDIO_MEMO_REMINDER_MS,
   AUDIO_MEMO_SEGMENT_MS,
+  type AudioMemoIdentity,
   type AudioMemoSession,
 } from '../actions/audio-memo-session.ts'
 export {
@@ -213,11 +213,11 @@ export {
   type AddMeetingInput,
   type AddMeetingOutcome,
   type MeetingLineAttendee,
-  type MeetingAttendee,
 } from '../actions/add-meeting.ts'
 export {
   resolveMeetingAttendees,
   resolveMeetingAttendeeTargets,
+  type MeetingAttendee,
   type ResolvedMeetingAttendee,
 } from '../actions/resolve-attendees.ts'
 export {

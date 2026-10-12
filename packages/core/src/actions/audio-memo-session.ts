@@ -14,7 +14,6 @@ import {
   writeTranscriptCache,
 } from '../graph/commands.ts'
 import { hasBinaryIpc } from '../ipc/bridge.ts'
-import type { AudioMemoIdentity } from './audio-memo.ts'
 
 /**
  * Session semantics for segmented audio memos. One recording session rotates
@@ -56,6 +55,28 @@ export const AUDIO_MEMO_REMINDER_MS = 30 * 60_000
  * slack cannot still be live — the recorder would have rotated by now.
  */
 const SESSION_CLOSE_SLACK_MS = 10 * 60_000
+
+/** Everything derivable from a memo's shared basename. */
+export interface AudioMemoIdentity {
+  /**
+   * The shared basename, e.g. `audio-memo-2026-06-11-153022-845` — also the
+   * daily-note wikilink target, resolvable through the transcription note's
+   * frontmatter alias.
+   */
+  base: string
+  /** Local ISO day it was recorded — the daily note that backlinks it. */
+  date: string
+  /** The timestamp fallback title, before the transcript-derived name exists. */
+  title: string
+  /** Timestamp fallback alias for the daily-note link, e.g. `Audio memo 15:30`. */
+  alias: string
+  /** Graph-relative path of the recording under `audio-memos/`. */
+  audioPath: string
+  /** Graph-relative path of the transcription note, `notes/<base>.md`. */
+  notePath: string
+  /** The recording's MIME type, as stored (derived from the extension). */
+  mimeType: string
+}
 
 /** One recording segment, parsed from its `audio-memos/` listing entry. */
 export interface AudioMemoPart {

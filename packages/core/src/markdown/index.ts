@@ -84,14 +84,12 @@ export {
   renderTaskSnapshot,
   TaskStaleError,
   type InsertPosition,
-  type ParsedTask,
   type TaskEdit,
   type TaskEditInsert,
   type TaskEditItem,
   type TaskEditResult,
   type TaskMove,
   type TaskEntry,
-  type TaskLocator,
   type TaskRow,
-  type TaskSnapshot,
 } from './task-ast.ts'
+export type { ParsedTask, TaskLocator, TaskSnapshot } from './task-model.ts'

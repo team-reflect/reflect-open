@@ -1,7 +1,8 @@
 import { sql } from 'kysely'
 import { wikiNoteReference } from '../graph/note-reference.ts'
 import { foldTag, normalizeWikiTarget } from '../markdown/index.ts'
-import { generateDateSuggestions, type DateSuggestionContext } from './date-suggestions.ts'
+import type { DateSuggestionContext } from './date-suggestion-types.ts'
+import { generateDateSuggestions } from './date-suggestions.ts'
 import { db } from './db.ts'
 import { inClauseChunks, likeContains } from './query-utils.ts'
 import {

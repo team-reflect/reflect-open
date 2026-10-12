@@ -13,7 +13,11 @@ import { parseNote } from '../markdown/extract.ts'
 import { headingNamesSection, sectionEnd, topLevelHeadings } from '../markdown/heading-blocks.ts'
 import { foldKey } from '../markdown/keys.ts'
 import { slugForTitle } from '../markdown/slug.ts'
-import { resolveMeetingAttendeeTargets, type ResolvedMeetingAttendee } from './resolve-attendees.ts'
+import {
+  resolveMeetingAttendeeTargets,
+  type MeetingAttendee,
+  type ResolvedMeetingAttendee,
+} from './resolve-attendees.ts'
 
 /**
  * "Add to daily note" for a calendar event — the write half of the calendar
@@ -50,12 +54,6 @@ const MEETINGS_SECTION: SectionTarget = { titles: [MEETINGS_HEADING], linked: fa
  * the same convention); `#person` feeds the All Notes person filter. */
 const MEETING_NOTE_BODY = '- Type: #meeting'
 const PERSON_NOTE_BODY = '- Type: #person'
-
-/** One attendee entering the flow: a display name and every known email. */
-export interface MeetingAttendee {
-  name: string
-  emails?: readonly string[] | undefined
-}
 
 export interface AddMeetingInput {
   /** ISO `YYYY-MM-DD` day of the daily note receiving the entry. */

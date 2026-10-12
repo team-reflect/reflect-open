@@ -15,23 +15,11 @@ import {
   importReflectV1Zip,
   markReflectV1ImportOwnWrites,
   subscribeImportProgress,
-  type GraphImportProgress,
-  type GraphImportSummary,
   type GraphInfo,
 } from '@reflect/core'
 import { V1ImportDialog } from '@/components/v1-import-dialog.tsx'
+import type { V1ImportState } from '@/lib/v1-import-state.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
-
-/**
- * Where the Reflect V1 import stands. `running.progress` is null until the
- * first native progress tick (the zip is being read); `cancelling` means the
- * user asked to stop and the native side is winding down.
- */
-export type V1ImportState =
-  | { phase: 'idle' }
-  | { phase: 'running'; progress: GraphImportProgress | null; cancelling: boolean }
-  | { phase: 'done'; summary: GraphImportSummary }
-  | { phase: 'failed'; message: string }
 
 interface V1ImportContextValue {
   state: V1ImportState

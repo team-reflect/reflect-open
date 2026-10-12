@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { generateDateSuggestions, type DateSuggestion } from './date-suggestions.ts'
+import type { DateSuggestion } from './date-suggestion-types.ts'
+import { generateDateSuggestions } from './date-suggestions.ts'
 import type { DateFormat, WeekStartDay } from '../settings/schema.ts'
 
 /**

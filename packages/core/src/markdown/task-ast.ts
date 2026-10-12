@@ -3,7 +3,6 @@ import {
   parseMarkdownAst,
   serializeMarkdownAst,
   walkMarkdownAst,
-  type MarkdownAstPath,
   type MarkdownBlock,
   type MarkdownBlockquote,
   type MarkdownDocument,
@@ -19,6 +18,7 @@ import { renderInlineText } from './inline-text.ts'
 import { foldKey } from './keys.ts'
 import { normalizeWikiTarget } from './resolve.ts'
 import { scanInlineWikiLinks } from './scan.ts'
+import type { ParsedTask, TaskLocator, TaskSnapshot } from './task-model.ts'
 import { isSameTaskPath } from './task-path.ts'
 
 /** The task a caller addressed is not in the note anymore: the write is refused. */
@@ -126,11 +126,6 @@ export function getTaskDueDate(markdown: string): string | null {
   return null
 }
 
-/** A round task as the projection stores it: its snapshot plus its explicit due date. */
-export interface ParsedTask extends TaskSnapshot {
-  dueDate: string | null
-}
-
 /** The round tasks of a note body, in document order. */
 export function projectTasks(body: string): ParsedTask[] {
   return getRoundTasks(parseMarkdownAst(body)).map((entry) => ({
@@ -162,13 +157,6 @@ export function renderTaskSnapshot(snapshot: TaskSnapshot): TaskRow {
   }
 }
 
-/** Where a task was last seen; `markdown` and `checked` are the staleness guard. */
-export interface TaskLocator {
-  astPath: MarkdownAstPath
-  markdown: string
-  checked: boolean
-}
-
 export type InsertPosition =
   | { kind: 'documentEnd' }
   /** The end of the task's context: its parent list item, or at the root the end of its own list. */
@@ -190,12 +178,6 @@ export interface TaskEditInsert {
 }
 
 export type TaskEdit = TaskEditItem | TaskEditInsert
-
-/** A round task as it stands in a note body. */
-export interface TaskSnapshot extends TaskLocator {
-  /** The headings above the task, then its ancestor list items' first paragraphs, outermost first. */
-  breadcrumbs: readonly string[]
-}
 
 /** One pre-edit round task and where the edit left it: null once removed or no longer a task. */
 export interface TaskMove {

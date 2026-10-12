@@ -126,11 +126,8 @@ export {
   type WikiSuggestion,
   type GeneratedDate,
 } from './suggest.ts'
-export {
-  generateDateSuggestions,
-  type DateSuggestion,
-  type DateSuggestionContext,
-} from './date-suggestions.ts'
+export type { DateSuggestion, DateSuggestionContext } from './date-suggestion-types.ts'
+export { generateDateSuggestions } from './date-suggestions.ts'
 export {
   parseHighlights,
   randomNotePath,
