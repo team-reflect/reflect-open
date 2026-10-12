@@ -13,6 +13,7 @@ import {
   syncAppStore,
   type AiPrompt,
   type AiProviderConfig,
+  type DateFormat,
   type EditorTextSize,
   type ThemePreference,
 } from '@reflect/core'
@@ -37,6 +38,7 @@ import {
   SettingsGroup,
   SettingsNavRow,
   SettingsSegmentedRow,
+  SettingsSelectRow,
   SettingsSwitchRow,
   SettingsValueRow,
   type SegmentedOption,
@@ -54,6 +56,7 @@ import {
 } from '@/mobile/use-classic-access.ts'
 import { useMobileSyncStatus } from '@/mobile/use-sync-status.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
+import { formatFullDate } from '@/lib/dates.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { useSyncContext } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
@@ -77,6 +80,8 @@ const TEXT_SIZE_OPTIONS: readonly SegmentedOption<EditorTextSize>[] = [
   { value: 'medium', label: 'Medium' },
   { value: 'large', label: 'Large' },
 ]
+
+const DATE_FORMATS: readonly DateFormat[] = ['mdy', 'dmy', 'iso']
 
 /**
  * The mobile Settings screen — a pushed card (route kind `settings`) in the
@@ -131,6 +136,7 @@ export function MobileSettings(): ReactElement {
     }
   }
   const { settings, updateSettings } = useSettings()
+  const [today] = useState(() => new Date())
   const version = useAppVersion()
   const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
   const crashTest = useCrashTest()
@@ -234,6 +240,20 @@ export function MobileSettings(): ReactElement {
               options={TEXT_SIZE_OPTIONS}
               onChange={(editorTextSize) => updateSettings({ editorTextSize })}
             />
+          </SettingsGroup>
+
+          <SettingsGroup
+            header="Date format"
+            footer="The style for dates shown throughout Reflect, including daily note titles."
+          >
+            {DATE_FORMATS.map((dateFormat) => (
+              <SettingsSelectRow
+                key={dateFormat}
+                label={formatFullDate(today, dateFormat)}
+                selected={settings.dateFormat === dateFormat}
+                onPress={() => updateSettings({ dateFormat })}
+              />
+            ))}
           </SettingsGroup>
 
           <SettingsGroup header="Editor">

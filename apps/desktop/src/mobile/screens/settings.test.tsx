@@ -4,6 +4,7 @@ import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SETTINGS, getConflictedNotes, type GraphInfo, type Settings } from '@reflect/core'
 import type { BackupState } from '@/lib/backup-controller.ts'
+import { formatFullDate } from '@/lib/dates.ts'
 import '@/test-utils/locator.ts'
 import { MobileSettings } from './settings.tsx'
 
@@ -149,6 +150,21 @@ describe('MobileSettings', () => {
 
     await user.click(page.getByRole('radio', { name: 'Large' }))
     expect(updateSettings).toHaveBeenCalledWith({ editorTextSize: 'large' })
+  })
+
+  it('offers each date format as today in that format and writes the choice', async () => {
+    const user = userEvent
+    await mount()
+    const today = new Date()
+
+    const selected = page.getByRole('button', { name: formatFullDate(today, 'mdy') })
+    await expect.element(selected).toHaveAttribute('aria-current', 'true')
+
+    await user.click(page.getByRole('button', { name: formatFullDate(today, 'dmy') }))
+    expect(updateSettings).toHaveBeenCalledWith({ dateFormat: 'dmy' })
+
+    await user.click(page.getByRole('button', { name: formatFullDate(today, 'iso') }))
+    expect(updateSettings).toHaveBeenCalledWith({ dateFormat: 'iso' })
   })
 
   it('toggles the editor switches', async () => {
