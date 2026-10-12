@@ -38,6 +38,9 @@ export const queryKeys = {
     notePreview(root: GraphRoot, path: string) {
       return [...this.graph(root), 'note-preview', path] as const
     },
+    noteAliases(root: GraphRoot, path: string) {
+      return [...this.graph(root), 'note-aliases', path] as const
+    },
     attendeeSuggestions(root: GraphRoot, text: string, contacts: boolean) {
       return [...this.graph(root), 'attendee-suggestions', text, contacts] as const
     },

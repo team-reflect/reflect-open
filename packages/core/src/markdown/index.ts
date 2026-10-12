@@ -55,6 +55,14 @@ export { gistBodyHash, gistFilename } from './gist.ts'
 export { slugForTitle } from './slug.ts'
 export { subjectAliases } from './subject-aliases.ts'
 export {
+  readNoteAliases,
+  rejectAlias,
+  withAlias,
+  withoutAlias,
+  type AliasRejection,
+  type NoteAliases,
+} from './note-aliases.ts'
+export {
   normalizeWikiTarget,
   resolved,
   resolveWikiLink,

@@ -39,13 +39,13 @@ vi.mock('@/providers/graph-provider.tsx', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 7 } }),
 }))
 
-async function renderSection(path: string, showTrash = false) {
+async function renderSection(path: string, showTrash = false, onAddAlias?: () => void) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const view = await render(
     <TooltipProvider>
       <QueryClientProvider client={client}>
         <RouterProvider initialRoute={{ kind: 'note', path }}>
-          <NoteActionsSection path={path} showTrash={showTrash} />
+          <NoteActionsSection path={path} showTrash={showTrash} onAddAlias={onAddAlias} />
         </RouterProvider>
       </QueryClientProvider>
     </TooltipProvider>,
@@ -235,6 +235,23 @@ describe('NoteActionsSection deep-link action', () => {
   it('does not offer Copy deep link in note actions', async () => {
     const view = await renderSection('notes/a.md')
     expect(view.getByRole('button', { name: /Copy deep link/ }).query()).toBeNull()
+    await view.unmount()
+  })
+})
+
+describe('NoteActionsSection add-alias action', () => {
+  it('is offered only when the sidebar can show the aliases input', async () => {
+    const view = await renderSection('notes/a.md')
+    await expect.element(view.getByText('Lock note')).toBeInTheDocument()
+    expect(view.getByRole('button', { name: 'Add alias' }).elements()).toHaveLength(0)
+    await view.unmount()
+  })
+
+  it('opens the aliases input on click', async () => {
+    const onAddAlias = vi.fn()
+    const view = await renderSection('notes/a.md', false, onAddAlias)
+    await userEvent.click(view.getByRole('button', { name: 'Add alias' }))
+    expect(onAddAlias).toHaveBeenCalledTimes(1)
     await view.unmount()
   })
 })
