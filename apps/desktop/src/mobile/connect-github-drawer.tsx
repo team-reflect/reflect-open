@@ -47,10 +47,7 @@ export function ConnectGithubDrawer({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Connect GitHub">
         {open ? (
-          <ConnectWizardSheet
-            onClose={() => onOpenChange(false)}
-            {...(pollIntervalMs !== undefined ? { pollIntervalMs } : {})}
-          />
+          <ConnectWizardSheet onClose={() => onOpenChange(false)} pollIntervalMs={pollIntervalMs} />
         ) : null}
       </DrawerContent>
     </Drawer>
@@ -63,14 +60,14 @@ function ConnectWizardSheet({
   pollIntervalMs,
 }: {
   onClose: () => void
-  pollIntervalMs?: number
+  pollIntervalMs?: number | undefined
 }): ReactElement {
   // Never derived from the graph name: the local graph's display name is the
   // sandbox folder's basename — literally "Documents".
   const wizard = useConnectGithubWizard({
     suggestedRepoName: 'reflect-backup',
     onClose,
-    ...(pollIntervalMs !== undefined ? { pollIntervalMs } : {}),
+    pollIntervalMs,
   })
   const createNameId = useId()
   const existingRepoId = useId()

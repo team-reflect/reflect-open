@@ -160,7 +160,7 @@ export interface IndexPassOptions {
    * carry live sessions and rewrite routes, exactly as for an in-app rename
    * — without it, history entries keep pointing at the dead path.
    */
-  onMoved?: (from: string, to: string) => void
+  onMoved?: ((from: string, to: string) => void) | undefined
   /**
    * Called as the pass advances through the file listing — at every pacing
    * break and once at the end — so a first index over thousands of notes can
@@ -182,7 +182,7 @@ export interface IndexPassOptions {
    * upserts and are indexed live. Without a caller wired, evicted content
    * simply stays unindexed until it materializes some other way.
    */
-  onStalePlaceholders?: (paths: readonly string[]) => void
+  onStalePlaceholders?: ((paths: readonly string[]) => void) | undefined
 }
 
 /** One note omitted from a rebuild because its projection could not be written. */

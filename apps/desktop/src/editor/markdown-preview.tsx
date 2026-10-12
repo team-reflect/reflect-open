@@ -37,7 +37,7 @@ interface MarkdownPreviewProps {
    * Classify Obsidian `![[target]]` embeds (images, file pills, note chips);
    * omitted, embeds stay literal text. Pass a stable function.
    */
-  resolveWikiEmbed?: WikiEmbedResolver
+  resolveWikiEmbed?: WikiEmbedResolver | undefined
   /**
    * Navigate a clicked `[[wiki link]]` target. Omitted, links render as
    * inert chips (the palette preview's behavior). `event` carries the
@@ -103,8 +103,8 @@ export function MarkdownPreview({
       markMode="hide"
       interactive={interactive}
       resolveWikilink={resolveWikilink}
-      {...(resolveImageUrl !== undefined ? { resolveImageUrl } : {})}
-      {...(resolveWikiEmbed !== undefined ? { resolveWikiEmbed } : {})}
+      resolveImageUrl={resolveImageUrl}
+      resolveWikiEmbed={resolveWikiEmbed}
       {...(interactive ? { onLinkClick } : {})}
       {...(navigates ? { onWikilinkClick: onWikilinkClickStable } : {})}
       className={cn('reflect-editor', className)}

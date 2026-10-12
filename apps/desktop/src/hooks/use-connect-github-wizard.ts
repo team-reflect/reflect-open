@@ -39,7 +39,7 @@ export interface ConnectGithubWizardOptions {
   /** Called once the repository is connected (the surface dismisses itself). */
   onClose: () => void
   /** Delay between repo-existence polls on the create/grant handoffs (test hook). */
-  pollIntervalMs?: number
+  pollIntervalMs?: number | undefined
 }
 
 export interface ConnectGithubWizard {

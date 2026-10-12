@@ -175,7 +175,7 @@ interface NoteEditorProps {
    * destination, or null to decline. meowdown inserts `![](dest)` for images
    * and `[name](dest)` for everything else.
    */
-  saveFile?: (file: File) => Promise<string | null>
+  saveFile?: ((file: File) => Promise<string | null>) | undefined
   /**
    * Claim a `[label](url)` link as a file attachment, rendered as an inline
    * file pill instead of a plain link. Clicking a pill routes through the
@@ -197,7 +197,7 @@ interface NoteEditorProps {
    */
   onLinkClick?: LinkClickHandler
   /** Resolve privacy-gated metadata for an HTTP(S) link popup. */
-  readonly resolveLinkPreview?: LinkPreviewResolver
+  readonly resolveLinkPreview?: LinkPreviewResolver | undefined
   /**
    * Resolve the passive body of Meowdown's editor-scoped wiki-link hover
    * card. Resolving `null` (missing, ambiguous, or unavailable targets)
@@ -215,7 +215,7 @@ interface NoteEditorProps {
    * Search prompts for the selection AI menu. Omitting it disables the menu
    * and its selection affordance entirely (e.g. for `private: true` notes).
    */
-  onSelectionMenuSearch?: SelectionMenuSearchHandler
+  onSelectionMenuSearch?: SelectionMenuSearchHandler | undefined
   /** Extra controls in the pending-replacement preview footer (e.g. Retry). */
   pendingReplacementActions?: ReactNode
   /** Called when a staged replacement is accepted or discarded. */
@@ -455,7 +455,7 @@ export function NoteEditor({
         // Autocorrect is independent and stays on (EditorInputTraits).
         spellCheck={isTouchEditorSurface() ? false : spellCheck}
         searchQuery={searchQuery ?? ''}
-        {...(onSearchChange !== undefined ? { onSearchChange } : {})}
+        onSearchChange={onSearchChange}
         // Reflect's implementation-neutral `12h`/`24h` maps to meowdown's
         // `12`/`24` here at the boundary, like `markModeFromSyntax`.
         timeFormat={timeFormat === '24h' ? '24' : '12'}
@@ -468,35 +468,34 @@ export function NoteEditor({
         // indicator, which meowdown gates on the same prop.
         blockHandle={isTouchEditorSurface() ? false : blockHandle}
         editorClassName={cn('reflect-editor', className)}
-        {...(titlePlaceholder !== undefined ? { placeholder: titlePlaceholder } : {})}
+        placeholder={titlePlaceholder}
         onDocChange={handleDocChange}
         onWikilinkClick={handleWikilinkClick}
         onTagClick={handleTagClick}
-        {...(onLinkClick !== undefined ? { onLinkClick, onFileClick: onLinkClick } : {})}
-        {...(resolveLinkPreview !== undefined ? { resolveLinkPreview } : {})}
+        onLinkClick={onLinkClick}
+        onFileClick={onLinkClick}
+        resolveLinkPreview={resolveLinkPreview}
         onImageClick={handleImageClick}
         onXPostMediaClick={handleXPostMediaClick}
         onYouTubeVideoClick={handleYouTubeVideoClick}
-        {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}
-        {...(onTagSearch !== undefined ? { onTagSearch } : {})}
-        {...(onSelectionMenuSearch !== undefined ? { onSelectionMenuSearch } : {})}
-        {...(pendingReplacementActions !== undefined ? { pendingReplacementActions } : {})}
-        {...(onPendingReplacementResolve !== undefined ? { onPendingReplacementResolve } : {})}
-        {...(onSlashMenuSearch !== undefined ? { onSlashMenuSearch } : {})}
+        onWikilinkSearch={onWikilinkSearch}
+        onTagSearch={onTagSearch}
+        onSelectionMenuSearch={onSelectionMenuSearch}
+        pendingReplacementActions={pendingReplacementActions}
+        onPendingReplacementResolve={onPendingReplacementResolve}
+        onSlashMenuSearch={onSlashMenuSearch}
         resolveImageUrl={handleResolveImageUrl}
         resolveWikiEmbed={handleResolveWikiEmbed}
         resolveWikilink={resolveWikilink}
         onFilePaste={handleFilePaste}
-        {...(resolveFileLink !== undefined ? { resolveFileLink } : {})}
+        resolveFileLink={resolveFileLink}
         resolveFileInfo={handleResolveFileInfo}
         onExitBoundary={handleExitBoundary}
       >
         <EditorInputTraits />
         {/* Only a pane that persists files gets the toolbar's attach button;
             `handleFilePaste` is the same handler meowdown pastes through. */}
-        <FormattingToolbarBridge
-          {...(saveFile !== undefined ? { saveFile: handleFilePaste } : {})}
-        />
+        <FormattingToolbarBridge saveFile={saveFile !== undefined ? handleFilePaste : undefined} />
         {renderWikilinkHoverCard !== undefined ? (
           <WikilinkHoverCard>{renderWikilinkHoverCard}</WikilinkHoverCard>
         ) : null}

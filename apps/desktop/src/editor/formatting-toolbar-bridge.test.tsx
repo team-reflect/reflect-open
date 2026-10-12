@@ -36,7 +36,7 @@ async function setupEditor(
     <NoteEditor
       initialContent={initialContent}
       onWikilinkSearch={async () => []}
-      {...(saveFile !== undefined ? { saveFile } : {})}
+      saveFile={saveFile}
       handleRef={(handle) => {
         grabbed.current = handle
       }}

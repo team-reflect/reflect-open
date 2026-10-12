@@ -181,7 +181,7 @@ export interface RunDeviceFlowOptions {
   /** Called once GitHub issues the code — show it and the verification URI. */
   onCode: (code: { userCode: string; verificationUri: string }) => void
   /** Aborting stops polling and resolves `null` (the dialog was closed). */
-  signal?: AbortSignal
+  signal?: AbortSignal | undefined
   /** Injected for tests; defaults to real timers. */
   sleep?: (ms: number) => Promise<void>
   now?: () => number

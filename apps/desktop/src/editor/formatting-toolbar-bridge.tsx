@@ -40,7 +40,7 @@ export function FormattingToolbarBridge({
   saveFile,
 }: {
   /** Persist a file and resolve its markdown destination (undefined declines). */
-  saveFile?: (file: File) => Promise<string | undefined>
+  saveFile?: ((file: File) => Promise<string | undefined>) | undefined
 }): null {
   const editor = useEditor<EditorExtension>()
   // Read through a ref like the editor's other host callbacks: a changing

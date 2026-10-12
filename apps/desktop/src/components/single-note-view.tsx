@@ -34,7 +34,7 @@ export function SingleNoteView({ path, dailyDate, heading }: SingleNoteViewProps
         {heading}
         <NotePane
           path={path}
-          {...(dailyDate !== undefined ? { dailyDate } : {})}
+          dailyDate={dailyDate}
           lazy
           autoFocus
           className="flex grow flex-col"

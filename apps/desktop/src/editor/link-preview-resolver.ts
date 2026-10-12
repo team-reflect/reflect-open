@@ -137,7 +137,7 @@ export function createNoteLinkPreviewResolver(
       preview: {
         title: metadata.title,
         ...(metadata.description === null ? {} : { description: metadata.description }),
-        ...(iconSrc === undefined ? {} : { iconSrc }),
+        iconSrc,
       },
       cacheable,
     }

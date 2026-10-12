@@ -86,7 +86,7 @@ export interface NoteSessionOptions {
    * before returning. A normalized but unchanged snapshot must not be emitted
    * as an edit.
    */
-  reconcilePendingEditorInput?: () => void
+  reconcilePendingEditorInput?: (() => void) | undefined
   /**
    * Treat a missing file as an empty note on load instead of an error; the
    * file is then created by the first save — Plan 06's lazy daily-note

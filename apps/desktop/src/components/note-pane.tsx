@@ -92,7 +92,7 @@ interface NotePaneProps {
    * Required for {@link registerHandle} and {@link onExitBoundary} to identify
    * which day fired.
    */
-  dailyDate?: string
+  dailyDate?: string | undefined
   /**
    * Register (or, with `null`, unregister) this pane's editor handle with the
    * daily stream, so it can move the caret here from an adjacent day. Keyed by
@@ -354,14 +354,12 @@ export function NotePaneComponent({
         resolveFileInfo={resolveFileInfo}
         onWikiLinkClick={onWikiLinkClick}
         onLinkClick={onLinkClick}
-        {...(resolveLinkPreview !== undefined ? { resolveLinkPreview } : {})}
+        resolveLinkPreview={resolveLinkPreview}
         {...(generation !== null && !isTouchEditorSurface() ? { renderWikilinkHoverCard } : {})}
         onTagClick={onTagClick}
         onWikilinkSearch={onWikilinkSearch}
         onTagSearch={onTagSearch}
-        {...(aiMenu.onSelectionMenuSearch !== undefined
-          ? { onSelectionMenuSearch: aiMenu.onSelectionMenuSearch }
-          : {})}
+        onSelectionMenuSearch={aiMenu.onSelectionMenuSearch}
         pendingReplacementActions={aiMenu.pendingReplacementActions}
         onPendingReplacementResolve={aiMenu.onPendingReplacementResolve}
         onSlashMenuSearch={onSlashMenuSearch}

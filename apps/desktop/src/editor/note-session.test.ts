@@ -85,9 +85,7 @@ function harness(options?: {
     applyContent: (markdown) => {
       applied.push(markdown)
     },
-    ...(options?.reconcilePendingEditorInput === undefined
-      ? {}
-      : { reconcilePendingEditorInput: options.reconcilePendingEditorInput }),
+    reconcilePendingEditorInput: options?.reconcilePendingEditorInput,
     onContent: (content, origin) => {
       contents.push({ content, origin })
     },

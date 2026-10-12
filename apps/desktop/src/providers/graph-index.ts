@@ -233,19 +233,18 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
         await syncIndex({
           generation,
           signal: controller.signal,
-          ...(onMoved !== undefined ? { onMoved } : {}),
+          onMoved,
           // Guarded: `openGraph` swaps the Rust root *before* this pass is
           // stopped, so a superseded pass could otherwise request its old
           // paths against the newly opened graph.
-          ...(onStalePlaceholders !== undefined
-            ? {
-                onStalePlaceholders: (paths: readonly string[]) => {
+          onStalePlaceholders:
+            onStalePlaceholders !== undefined
+              ? (paths: readonly string[]) => {
                   if (!controller.signal.aborted && !isStale() && !isSuspended()) {
                     onStalePlaceholders(paths)
                   }
-                },
-              }
-            : {}),
+                }
+              : undefined,
           onFileProgress: (progressDone: number, total: number, worked: number) => {
             passTotal = total
             passWorked = worked
