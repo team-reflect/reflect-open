@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.8...v0.15.0-beta.9) (2026-10-12)
+
+
+### Features
+
+* **mobile:** add the date format setting ([#1532](https://github.com/team-reflect/reflect-open/issues/1532)) ([e1351f1](https://github.com/team-reflect/reflect-open/commit/e1351f1dc0a78195fc0e26594779dd150cd73050))
+* **mobile:** add the week start and time format settings ([#1533](https://github.com/team-reflect/reflect-open/issues/1533)) ([eb12782](https://github.com/team-reflect/reflect-open/commit/eb12782688b8bcec08125d27566b0616831f67fe))
+
+
+### Bug Fixes
+
+* follow the date format setting wherever a date is shown ([#1531](https://github.com/team-reflect/reflect-open/issues/1531)) ([5b2283a](https://github.com/team-reflect/reflect-open/commit/5b2283afaae59037450a3b262f46944b8e51063a))
+
 ## [0.15.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.7...v0.15.0-beta.8) (2026-10-12)
 
 
