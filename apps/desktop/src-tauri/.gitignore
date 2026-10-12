@@ -8,6 +8,3 @@
 
 # Tauri sidecar staging (built by scripts/build-sidecar.ts; never committed)
 /binaries
-
-# Release-only native runtime resources (downloaded by scripts/release-macos.ts)
-/resources/onnxruntime

@@ -65,9 +65,6 @@ can still build unsigned bundles with plain `pnpm tauri build`.
    `.app` with its entitlement file plus the flavor-specific identity entitlements from
    its embedded provisioning profile, notarizes the finalized `.app` via `notarytool`,
    staples the ticket, and verifies the signed identity entitlements and sidecars.
-   Intel builds also download Microsoft's official ONNX Runtime macOS x86_64 archive
-   into `src-tauri/resources/onnxruntime/` and bundle `libonnxruntime.dylib` as a
-   Tauri resource before signing; that directory is generated and gitignored.
 4. Creates the updater `.app.tar.gz` from the finalized app and signs it with the Tauri
    updater key.
 5. Builds and signs the DMG directly from the notarized app. In CI, the release helper

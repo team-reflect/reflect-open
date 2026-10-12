@@ -46,6 +46,7 @@ disk at call time), and it is covered by tests.
   and stored in `.reflect/`. Note content never leaves the machine for embedding.
 - Enabling it downloads the model (~90 MB) **from Hugging Face, once**. That request
   carries no user data; the model is cached locally afterwards.
+- It is not available on Intel Macs or on iOS, which have no embedding runtime.
 
 ## Backup & sync (off until you connect)
 
