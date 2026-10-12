@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.15.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.7...v0.15.0-beta.8) (2026-10-12)
+
+
+### Features
+
+* ship a universal macOS app ([#1529](https://github.com/team-reflect/reflect-open/issues/1529)) ([043fdcc](https://github.com/team-reflect/reflect-open/commit/043fdcc02a66a86d4f938895e224ef00c02923b1))
+
+
+### Bug Fixes
+
+* **embed:** run ONNX Runtime on two intra-op threads ([#1521](https://github.com/team-reflect/reflect-open/issues/1521)) ([50ead1b](https://github.com/team-reflect/reflect-open/commit/50ead1bd3a058ed73706580efe0746668b6c9d0a))
+* hide the Mac window before flushing changes ([#1425](https://github.com/team-reflect/reflect-open/issues/1425)) ([8443923](https://github.com/team-reflect/reflect-open/commit/8443923662ae52bd43c22f8a66ab8d78412e7123))
+* open relative Markdown links in backlink snippets and previews ([#1518](https://github.com/team-reflect/reflect-open/issues/1518)) ([01c9039](https://github.com/team-reflect/reflect-open/commit/01c90390f405f8a59ebb54b8f2b4f8ce73553f4b))
+* turn semantic search off on Intel Macs and update `fastembed` to 7.1.1 ([#1520](https://github.com/team-reflect/reflect-open/issues/1520)) ([adb4c4b](https://github.com/team-reflect/reflect-open/commit/adb4c4b52684edeb857413ed5060c909e2cf1a5d))
+* update meowdown ([#1510](https://github.com/team-reflect/reflect-open/issues/1510)) ([712e7e8](https://github.com/team-reflect/reflect-open/commit/712e7e8487dc45e191edd9cb9bd3c22848ac081d))
+
 ## [0.15.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.6...v0.15.0-beta.7) (2026-10-09)
 
 
