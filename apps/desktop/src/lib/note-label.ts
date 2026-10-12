@@ -1,5 +1,5 @@
 import { dateFromDailyPath, displayNoteTitle, type DateFormat } from '@reflect/core'
-import { formatDayLabel, isIsoDate } from '@/lib/dates.ts'
+import { formatDayLabel } from '@/lib/dates.ts'
 
 /** The two fields that decide how a note is named. */
 export interface LabeledNote {
@@ -14,7 +14,5 @@ export interface LabeledNote {
  */
 export function formatNoteLabel(note: LabeledNote, dateFormat: DateFormat): string {
   const date = dateFromDailyPath(note.path)
-  return date !== null && isIsoDate(date)
-    ? formatDayLabel(date, dateFormat)
-    : displayNoteTitle(note.title)
+  return date !== null ? formatDayLabel(date, dateFormat) : displayNoteTitle(note.title)
 }

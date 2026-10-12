@@ -54,6 +54,12 @@ describe('dates', () => {
     expect(formatShortDate('2026-06-09', 'iso')).toBe('2026-06-09')
   })
 
+  it('renders a date-shaped string that names no real day as itself', () => {
+    expect(formatDayLabel('2026-13-45', 'mdy')).toBe('2026-13-45')
+    expect(formatShortDate('2026-02-31', 'dmy')).toBe('2026-02-31')
+    expect(formatMonthDay('2026-13-45', 'mdy')).toBe('2026-13-45')
+  })
+
   it('formatMonthDay drops the year per the date format', () => {
     expect(formatMonthDay('2026-06-09', 'mdy')).toBe('Jun 9')
     expect(formatMonthDay('2026-06-09', 'dmy')).toBe('9 Jun')

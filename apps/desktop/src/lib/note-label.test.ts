@@ -19,7 +19,7 @@ describe('formatNoteLabel', () => {
     expect(formatNoteLabel(note, 'mdy')).toBe('Alpha')
   })
 
-  it('falls back to the title when a daily path is not a real calendar day', () => {
+  it('names a daily note whose path is not a real calendar day by that date', () => {
     const note = { path: 'daily/2026-13-45.md', title: '2026-13-45' }
     expect(formatNoteLabel(note, 'mdy')).toBe('2026-13-45')
   })

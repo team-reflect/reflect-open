@@ -9,7 +9,7 @@ import { useRouter } from '@/routing/router.tsx'
 import { isModEvent } from '@meowdown/core'
 import { useDateFormat } from '@/hooks/use-date-format.ts'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
-import { formatShortDate, isIsoDate } from '@/lib/dates.ts'
+import { formatShortDate } from '@/lib/dates.ts'
 
 interface ChatToolChipProps {
   part: Extract<AssistantPart, { kind: 'tool' }>
@@ -87,9 +87,6 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
   const pending = isToolPending(part)
   const noteLabel = useNoteLabel()
   const dateFormat = useDateFormat()
-  // The model writes the range, so a date-shaped string may not be a real day.
-  const rangeDay = (date: string): string =>
-    isIsoDate(date) ? formatShortDate(date, dateFormat) : date
   const call = part.call
 
   if (call.tool === 'search') {
@@ -137,7 +134,8 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
     const result = part.result?.tool === 'dailies' ? part.result : null
     return (
       <ChipFrame pending={pending} icon={<CalendarDays aria-hidden className="size-3.5" />}>
-        Listed daily notes {rangeDay(call.start)} – {rangeDay(call.end)}
+        Listed daily notes {formatShortDate(call.start, dateFormat)} –{' '}
+        {formatShortDate(call.end, dateFormat)}
         {result !== null ? countSuffix(result.days.length, 'day') : ''}
         {result !== null ? <NoteLinks notes={result.days} onOpen={openNote} /> : null}
       </ChipFrame>

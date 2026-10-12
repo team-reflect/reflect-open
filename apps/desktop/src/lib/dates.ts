@@ -1,5 +1,6 @@
 import { format, isSameDay, isSameWeek, parse } from 'date-fns'
 import type { DateFormat, TimeFormat } from '@reflect/core'
+import { addDaysIso, isIsoDate } from '@reflect/utils'
 
 /**
  * The app's date layer (Plan 06). Daily notes are keyed by **local** calendar
@@ -10,7 +11,7 @@ import type { DateFormat, TimeFormat } from '@reflect/core'
  */
 
 // Pure calendar math is shared with the indexing layer — one implementation.
-export { addDaysIso, isIsoDate } from '@reflect/utils'
+export { addDaysIso, isIsoDate }
 
 const ISO_DATE_FORMAT = 'yyyy-MM-dd'
 
@@ -25,19 +26,27 @@ export function todayIso(): string {
 }
 
 /**
+ * Render an ISO date with the date-fns pattern of the chosen format; `iso`
+ * renders the date itself. A date-shaped string that names no real day (a
+ * file called `daily/2026-13-45.md`) also renders as itself.
+ */
+function formatIsoDate(
+  date: string,
+  dateFormat: DateFormat,
+  patterns: Record<Exclude<DateFormat, 'iso'>, string>,
+): string {
+  return dateFormat === 'iso' || !isIsoDate(date)
+    ? date
+    : format(parseIsoDate(date), patterns[dateFormat])
+}
+
+/**
  * Label for an ISO date per the user's date-format setting. `mdy` and `dmy`
  * keep the original app's daily-subject form (`Tue, June 9th, 2026` /
  * `Tue, 9th June, 2026`); `iso` renders the daily-note key itself.
  */
 export function formatDayLabel(date: string, dateFormat: DateFormat): string {
-  switch (dateFormat) {
-    case 'dmy':
-      return format(parseIsoDate(date), 'EEE, do MMMM, yyyy')
-    case 'iso':
-      return date
-    case 'mdy':
-      return format(parseIsoDate(date), 'EEE, MMMM do, yyyy')
-  }
+  return formatIsoDate(date, dateFormat, { dmy: 'EEE, do MMMM, yyyy', mdy: 'EEE, MMMM do, yyyy' })
 }
 
 /**
@@ -46,14 +55,7 @@ export function formatDayLabel(date: string, dateFormat: DateFormat): string {
  * `2025-12-31` for `iso`.
  */
 export function formatShortDate(date: string, dateFormat: DateFormat): string {
-  switch (dateFormat) {
-    case 'dmy':
-      return format(parseIsoDate(date), 'd/M/yyyy')
-    case 'iso':
-      return date
-    case 'mdy':
-      return format(parseIsoDate(date), 'M/d/yyyy')
-  }
+  return formatIsoDate(date, dateFormat, { dmy: 'd/M/yyyy', mdy: 'M/d/yyyy' })
 }
 
 /**
@@ -61,14 +63,7 @@ export function formatShortDate(date: string, dateFormat: DateFormat): string {
  * range): `Jun 9` for `mdy`, `9 Jun` for `dmy`, and `2026-06-09` for `iso`.
  */
 export function formatMonthDay(date: string, dateFormat: DateFormat): string {
-  switch (dateFormat) {
-    case 'dmy':
-      return format(parseIsoDate(date), 'd MMM')
-    case 'iso':
-      return date
-    case 'mdy':
-      return format(parseIsoDate(date), 'MMM d')
-  }
+  return formatIsoDate(date, dateFormat, { dmy: 'd MMM', mdy: 'MMM d' })
 }
 
 /**
