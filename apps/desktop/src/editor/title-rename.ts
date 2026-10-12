@@ -43,13 +43,6 @@ export interface TitleRenameTrackerOptions {
   /** Graph-relative path (feeds title derivation's path fallback). */
   path: string
   onRename: (rename: TitleRename) => void
-  /**
-   * Gate checked at fire time (e.g. "no conflict is parked"). When false the
-   * pending rename is kept, not dropped: a post-resolution save re-arms it
-   * ("keep mine"), while adopted external content clears it via `baseline`
-   * ("load theirs") — exactly the two ways a conflict can end.
-   */
-  canFire?: (() => boolean) | undefined
   quietMs?: number
 }
 
@@ -66,7 +59,7 @@ export interface TitleRenameTracker {
 const DEFAULT_QUIET_MS = 5000
 
 export function createTitleRenameTracker(options: TitleRenameTrackerOptions): TitleRenameTracker {
-  const { path, onRename, canFire } = options
+  const { path, onRename } = options
   const quietMs = options.quietMs ?? DEFAULT_QUIET_MS
 
   let baselineTitle: string | null = null
@@ -99,9 +92,6 @@ export function createTitleRenameTracker(options: TitleRenameTrackerOptions): Ti
     cancelTimer()
     if (disposed || pending === null) {
       return
-    }
-    if (canFire !== undefined && !canFire()) {
-      return // blocked (conflict parked): keep pending, mutate nothing
     }
     const rename: TitleRename = {
       from: baselineTitle,

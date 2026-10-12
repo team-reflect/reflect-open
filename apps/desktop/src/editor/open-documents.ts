@@ -52,7 +52,7 @@ export function openSession(path: string): NoteSession | null {
 
 /**
  * Paths of open documents holding unsaved edits right now. The iCloud
- * conflict sweep (Plan 21) defers these — the session's own conflict parking
+ * conflict sweep (Plan 21) defers these — the session's own three-way merge
  * protects the buffer regardless, but skipping avoids churning a note the
  * user is mid-thought in.
  */
@@ -65,7 +65,7 @@ export function dirtyOpenPaths(): string[] {
 /**
  * Ask every open document to reconcile against disk, exactly as if a watcher
  * upsert had arrived for its path: an unchanged file is a no-op, a clean
- * buffer adopts silently, a dirty buffer parks the conflict banner. The index
+ * buffer adopts silently, a dirty buffer merges three-way. The index
  * lifecycle calls this after each completed reconcile pass, because the pass
  * reads changed files into the index without emitting per-file events. On iOS
  * there is no file watcher, so a resume reconcile is the only signal a remote

@@ -19,12 +19,10 @@ function fakeSession(path: string, log: string[]): NoteSession {
     flush: async () => {
       log.push(`flush:${path}`)
     },
-    keepMine: () => {},
     isDirty: () => false,
     isUnpersisted: () => false,
     prepareDelete: async () => false,
     cancelDelete: () => {},
-    loadTheirs: () => {},
     commitFrontmatter: async () => true,
     content: () => '',
     liveContent: () => '',
@@ -153,12 +151,20 @@ describe('reloadOpenDocuments with live sessions', () => {
     read: () => string,
     applied: string[],
     snapshots: NoteSessionSnapshot[],
+    copies: string[] = [],
   ): NoteSession {
     return createNoteSession({
       path: 'notes/stale.md',
       // No writer: the session tracks dirtiness but never writes, so a dirty
       // buffer can't race a debounced save into the assertions.
-      io: { read: async () => read(), write: null },
+      io: {
+        read: async () => read(),
+        write: null,
+        copyAside: async (path, contents) => {
+          copies.push(contents)
+          return `${path} (conflict).md`
+        },
+      },
       classify: () => 'exact',
       onSnapshot: (snapshot) => {
         snapshots.push(snapshot)
@@ -183,17 +189,19 @@ describe('reloadOpenDocuments with live sessions', () => {
       reloadOpenDocuments()
 
       await vi.waitFor(() => expect(applied).toContain('# New from the Mac\n'))
-      expect(snapshots.at(-1)?.conflict).toBeNull()
+      expect(snapshots.at(-1)?.dirty).toBe(false)
     } finally {
       unregister()
       session.dispose()
     }
   })
 
-  it('a dirty open note parks the conflict banner instead of losing edits', async () => {
+  it('a dirty open note keeps its edits beside the note instead of losing them', async () => {
     let disk = '# Old\n'
+    const applied: string[] = []
+    const copies: string[] = []
     const snapshots: NoteSessionSnapshot[] = []
-    const session = liveSession(() => disk, [], snapshots)
+    const session = liveSession(() => disk, applied, snapshots, copies)
     const unregister = registerOpenDocument({ session })
     try {
       session.load()
@@ -203,15 +211,16 @@ describe('reloadOpenDocuments with live sessions', () => {
       disk = '# New from the Mac\n'
       reloadOpenDocuments()
 
-      await vi.waitFor(() => expect(snapshots.at(-1)?.conflict).toBe('# New from the Mac\n'))
-      expect(snapshots.at(-1)?.dirty).toBe(true)
+      await vi.waitFor(() => expect(applied).toContain('# New from the Mac\n'))
+      expect(copies).toEqual(['# Old\nmy unsaved line\n'])
+      expect(snapshots.at(-1)?.dirty).toBe(false)
     } finally {
       unregister()
-      session.discard() // never flush the deliberately-dirty buffer
+      session.dispose()
     }
   })
 
-  it('an unchanged file is a no-op read: no editor push, no conflict', async () => {
+  it('an unchanged file is a no-op read: no editor push, no merge', async () => {
     const applied: string[] = []
     const snapshots: NoteSessionSnapshot[] = []
     const session = liveSession(() => '# Old\n', applied, snapshots)

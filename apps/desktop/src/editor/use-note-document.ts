@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { readNote, writeNote, type FileChange } from '@reflect/core'
+import { createNoteIfAbsent, mergeText, readNote, writeNote, type FileChange } from '@reflect/core'
+import { startOperation } from '@/lib/operations.ts'
 import { useFileChanges } from '@/lib/use-file-changes.ts'
 import { createDocumentBinding, type DocumentBinding } from './document-binding.ts'
 import type { NoteEditorHandle } from './note-editor.tsx'
@@ -7,6 +8,7 @@ import { createRenameCoordinator } from './rename-coordinator.ts'
 import {
   createNoteSession,
   INITIAL_NOTE_SNAPSHOT,
+  type ConflictCopy,
   type NoteSessionSnapshot,
 } from './note-session.ts'
 import { checkRoundTrip } from './roundtrip.ts'
@@ -26,10 +28,6 @@ export interface NoteDocument extends NoteSessionSnapshot {
   onEditorChange: (markdown: string) => void
   /** Wire to the editor's imperative handle (reload/conflict application). */
   bindEditor: (handle: NoteEditorHandle | null) => void
-  /** Resolve a conflict by keeping the buffer (rewrites the file). */
-  keepMine: () => void
-  /** Resolve a conflict by loading the external content (discards the buffer). */
-  loadTheirs: () => void
   /**
    * Stable identity of the underlying session: increments when a session is
    * *created*, not when a rename retargets one (Plan 17). Key the editor on
@@ -62,6 +60,53 @@ export interface NoteDocumentOptions {
 }
 
 /**
+ * Keep edits beside a note as `<note> (conflict).md` (then `(conflict 2)`,
+ * … up to the same bound as other claimed note paths) when they could not be
+ * merged into an external change. Newer
+ * keystrokes during one reconciliation overwrite the copy it already made,
+ * checked against what was written: a copy that moved meanwhile (another
+ * window, another device) is left alone and a fresh sibling is made.
+ */
+async function keepBesideNote(
+  path: string,
+  contents: string,
+  previous: ConflictCopy | null,
+  generation: number | null,
+): Promise<string> {
+  if (generation === null) {
+    throw new Error('no graph generation available for the conflict copy')
+  }
+  if (previous !== null) {
+    try {
+      await writeNote(previous.path, contents, generation, previous.contents)
+      return previous.path
+    } catch {
+      // The copy changed under us: keep it, and make a fresh one below.
+    }
+  }
+  const slash = path.lastIndexOf('/')
+  const dot = path.lastIndexOf('.')
+  const [stem, ext] = dot > slash ? [path.slice(0, dot), path.slice(dot)] : [path, '']
+  for (let n = 1; n <= 1000; n += 1) {
+    const copy = `${stem} (conflict${n === 1 ? '' : ` ${n}`})${ext}`
+    const outcome = await createNoteIfAbsent(copy, contents, generation)
+    if (outcome.kind === 'created') {
+      // Stays until acknowledged: the editor has just swapped to the other
+      // version, and this line is what says where the replaced text went.
+      const notice = startOperation('Edits kept beside the note', {
+        persistent: true,
+        action: { label: 'OK', run: () => notice.dismiss() },
+      })
+      notice.warn(
+        `${path} changed on disk in a way that could not be merged. Your version is at ${copy}.`,
+      )
+      return copy
+    }
+  }
+  throw new Error('no free name for the conflict copy')
+}
+
+/**
  * @param path graph-relative path of the open note
  * @param generation the open graph's session generation (`GraphInfo.generation`);
  *   pins every write to that graph — Rust rejects a write whose generation is
@@ -77,8 +122,6 @@ export function useNoteDocument(
   const missingSeed = options?.missingSeed
   const [snapshot, setSnapshot] = useState<NoteSessionSnapshot>(INITIAL_NOTE_SNAPSHOT)
   const editorRef = useRef<NoteEditorHandle | null>(null)
-  /** Mirrors the snapshot's conflict for non-reactive checks (rename gating). */
-  const conflictRef = useRef<string | null>(null)
   /** The pane's lifecycle policy object — one per hook instance. */
   const [binding] = useState<DocumentBinding>(() => createDocumentBinding())
 
@@ -111,7 +154,6 @@ export function useNoteDocument(
           ? createRenameCoordinator({
               path,
               generation: () => generationRef.current,
-              canFire: () => conflictRef.current === null,
             })
           : null,
       session: (coordinator) =>
@@ -128,10 +170,14 @@ export function useNoteDocument(
                   return writeNote(forPath, contents, current, expectedContents)
                 }
               : null,
+            mergeText: canWrite ? mergeText : undefined,
+            copyAside: canWrite
+              ? (forPath, contents, previous) =>
+                  keepBesideNote(forPath, contents, previous, generationRef.current)
+              : undefined,
           },
           classify: checkRoundTrip,
           onSnapshot: (next) => {
-            conflictRef.current = next.conflict
             setSnapshot(next)
           },
           applyContent: (markdown) => editorRef.current?.setMarkdown(markdown),
@@ -215,20 +261,10 @@ export function useNoteDocument(
     editorRef.current = handle
   }, [])
 
-  const keepMine = useCallback(() => {
-    binding.session()?.keepMine()
-  }, [binding])
-
-  const loadTheirs = useCallback(() => {
-    binding.session()?.loadTheirs()
-  }, [binding])
-
   return {
     ...snapshot,
     onEditorChange,
     bindEditor,
-    keepMine,
-    loadTheirs,
     sessionEpoch: binding.epoch(),
   }
 }

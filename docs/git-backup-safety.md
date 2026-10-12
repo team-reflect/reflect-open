@@ -82,8 +82,19 @@ the same marked-up file.
 ## S8. Edits in an open note are never silently discarded
 
 When external content arrives while the buffer has unsaved edits, the
-session merges, or parks the conflict and keeps both sides. Leaving the note
-with a parked conflict archives the buffer instead of dropping it.
+session merges three-way. Disjoint edits apply and keep saving; overlapping
+edits are written into the file as labeled markers (the note opens
+protected, like a conflicted pull); edits that cannot be merged are kept as
+`<note> (conflict).md` beside the note. The buffer is never left in a state
+it cannot save from, so no exit path has to rescue it: a final flush that an
+external change refuses (the pane closes right after another device wrote
+the note) runs the same reconciliation to completion after the session is
+disposed. When the copy itself cannot be written (a full disk), the buffer
+stays dirty with the error shown, and its next save tries again.
 
-- Test: `note-session.test.ts` "keepMine rewrites the file even when the
-  conflict content equals the buffer"; archive-on-dispose pending.
+- Test: `note-session.test.ts` "a clean three-way merge applies silently and
+  keeps saving", "overlapping edits are written into the file as markers and
+  open protected", "edits that cannot be merged are kept beside the note",
+  "a dispose flush refused by an external change still merges the buffer",
+  "a failed conflict copy keeps the dirty buffer, and the next save retries
+  it".
