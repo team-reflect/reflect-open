@@ -188,12 +188,32 @@ fn count_commits(repo: &Repository, from: git2::Oid) -> AppResult<usize> {
 
 /// Clone `url` into `target` (restore on a fresh machine). git2 refuses a
 /// non-empty existing directory, which is exactly the safety we want — a
-/// restore must never write into a folder that already has content.
+/// restore must never write into a folder that already has content. A target
+/// inside an existing graph is refused too: that graph would index the
+/// restored notes as its own and commit the clone as a gitlink.
+///
+/// The new `.git` is marked local-only while still empty, before the fetch
+/// fills it: a restore into a file-sync folder (iCloud Drive) must not start
+/// uploading the object store (Plan 21).
 pub(super) fn clone(url: &str, target: &Path, credential: Option<GitCredential>) -> AppResult<()> {
+    if let Some(graph) = target
+        .ancestors()
+        .skip(1)
+        .find(|dir| dir.join(".reflect").is_dir())
+    {
+        return Err(AppError::io(format!(
+            "{} is already a Reflect graph; choose a folder outside it",
+            graph.display()
+        )));
+    }
     let mut fetch_options = FetchOptions::new();
     fetch_options.remote_callbacks(callbacks_with_credentials(credential));
     git2::build::RepoBuilder::new()
         .fetch_options(fetch_options)
+        .remote_create(|repo, name, url| {
+            crate::fs::mark_dir_local_only(repo.path());
+            repo.remote(name, url)
+        })
         .clone(url, target)?;
     Ok(())
 }

@@ -205,7 +205,9 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
 - Going offline shows `Offline`; reconnecting (the `online` event, focus, or the next
   edit) pushes without user action.
 - "Restore from GitHub" in the graph chooser reproduces the graph on a fresh machine;
-  the index rebuilds; a non-empty destination is refused.
+  the index rebuilds; a non-empty destination is refused, as is a folder inside
+  another graph or inside iCloud Drive (restore first, then move the graph to
+  iCloud from Settings: one sync method per graph).
 - Public-repo selection requires explicit confirmation; an oversized file warns/excludes
   without failing the rest of the backup.
 - `pnpm typecheck` + targeted tests pass.
