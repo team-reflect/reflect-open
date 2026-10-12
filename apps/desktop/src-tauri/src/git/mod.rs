@@ -127,7 +127,7 @@ fn setup(root: &Path, remote_url: Option<String>, branch: Option<String>) -> App
 #[tauri::command]
 pub async fn git_status(generation: u64, state: State<'_, GraphState>) -> AppResult<GitStatus> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || status(&root)).await
+    run_blocking(move || crate::fs::with_graph_lock(&root, || status(&root))).await
 }
 
 /// Initialize (or adopt) the graph's repository, optionally point `origin` at
@@ -143,7 +143,8 @@ pub async fn git_setup(
     state: State<'_, GraphState>,
 ) -> AppResult<GitStatus> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || setup(&root, remote_url, branch)).await
+    run_blocking(move || crate::fs::with_graph_lock(&root, || setup(&root, remote_url, branch)))
+        .await
 }
 
 /// Stop backing this graph up (drop `origin`; repo, history, and the
@@ -151,7 +152,7 @@ pub async fn git_setup(
 #[tauri::command]
 pub async fn git_disconnect(generation: u64, state: State<'_, GraphState>) -> AppResult<GitStatus> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || disconnect(&root)).await
+    run_blocking(move || crate::fs::with_graph_lock(&root, || disconnect(&root))).await
 }
 
 /// Clone a backup repository into `path` (restore on a fresh machine). Runs
@@ -163,7 +164,11 @@ pub async fn git_clone(
     path: String,
     credential: Option<GitCredential>,
 ) -> AppResult<()> {
-    run_blocking(move || remote::clone(&url, Path::new(&path), credential)).await
+    run_blocking(move || {
+        let target = Path::new(&path);
+        crate::fs::with_graph_lock(target, || remote::clone(&url, target, credential))
+    })
+    .await
 }
 
 /// Commit every pending change (no-op when clean). See [`commit::commit_all`].

@@ -44,10 +44,11 @@ Git commands, note writes, and iCloud sweep writes on the same graph are
 serialized. The quit-time and background flush go through the sync engine's
 queue, never straight to `git_commit_all`.
 
-- Test: `git::tests::commit_during_fast_forward_never_reverts_pulled_notes`
-  (`#[ignore]`), `backup-controller.test.tsx` "quit flush waits for an
-  in-flight pull before committing", `engine.test.ts` "commitNow joins the
-  single-flight queue and never touches the network".
+- Test: `git::tests::commit_during_fast_forward_never_reverts_pulled_notes`,
+  `git::tests::note_write_waits_for_a_running_checkout`,
+  `backup-controller.test.tsx` "quit flush waits for an in-flight pull before
+  committing", `engine.test.ts` "commitNow joins the single-flight queue and
+  never touches the network".
 
 ## S5. The repository is never left in app-made merge state
 

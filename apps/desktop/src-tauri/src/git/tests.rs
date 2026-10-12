@@ -1050,10 +1050,10 @@ fn stale_head_lock_fast_forward_never_reverts_pulled_notes() {
 }
 
 #[test]
-#[ignore = "red until P1.2: a concurrent commit must wait for the running pull"]
 fn commit_during_fast_forward_never_reverts_pulled_notes() {
     // The quit-time flush commits outside the engine's queue, so it can land
-    // while a pull is between the ref move and the checkout.
+    // while a pull is between the ref move and the checkout. The graph lock
+    // makes it wait for the pull instead.
     let fixture = pulled_note_fixture();
     let root_a = fixture.graph_a.clone();
     let (entered_tx, entered_rx) = mpsc::channel::<()>();
@@ -1095,16 +1095,69 @@ fn commit_during_fast_forward_never_reverts_pulled_notes() {
     at_boundary_rx
         .recv_timeout(WAIT)
         .expect("the competing commit never reached the repository boundary");
-    // From the boundary, two outcomes are possible and both are the race
-    // under test: the commit completes inside the window (today: it sees the
-    // moved ref over the stale tree and commits the revert), or it blocks on
-    // the graph lock until the pull finishes (once commands are serialized),
-    // in which case this bounded wait times out and the pull is released.
-    let _ = commit_done_rx.recv_timeout(Duration::from_secs(2));
+    // The commit blocks on the graph lock until the pull finishes, so this
+    // bounded wait times out and the pull is released.
+    assert!(
+        commit_done_rx
+            .recv_timeout(Duration::from_millis(500))
+            .is_err(),
+        "the commit ran while the pull was between its ref move and checkout"
+    );
     resume_tx.send(()).unwrap();
     pull.join().unwrap().unwrap();
     commit.join().unwrap().unwrap();
 
+    assert_next_cycle_keeps_pulled_notes(&fixture);
+}
+
+#[test]
+fn note_write_waits_for_a_running_checkout() {
+    // A save shares the graph lock with git: it lands after the pull has
+    // rewritten the tree, never in the middle of the checkout.
+    let fixture = pulled_note_fixture();
+    let root_a = fixture.graph_a.clone();
+    let (entered_tx, entered_rx) = mpsc::channel::<()>();
+    let (resume_tx, resume_rx) = mpsc::channel::<()>();
+    let pull = thread::spawn({
+        let root = root_a.clone();
+        move || {
+            fault::arm(
+                FaultPoint::BeforeFastForwardCheckout,
+                Fault::hook(move || {
+                    entered_tx.send(()).unwrap();
+                    resume_rx.recv().unwrap();
+                }),
+            );
+            merge_remote(&root)
+        }
+    });
+    entered_rx.recv_timeout(WAIT).unwrap();
+    let (started_tx, started_rx) = mpsc::channel::<()>();
+    let (written_tx, written_rx) = mpsc::channel::<()>();
+    let save = thread::spawn({
+        let root = root_a.clone();
+        move || {
+            started_tx.send(()).unwrap();
+            let outcome =
+                crate::fs::write_note_revision(&root, "notes/typed.md", "typed\n", false, None);
+            let _ = written_tx.send(());
+            outcome
+        }
+    });
+    // The worker is running: the wait below measures the lock, not the
+    // scheduler.
+    started_rx.recv_timeout(WAIT).unwrap();
+    assert!(
+        written_rx.recv_timeout(Duration::from_millis(500)).is_err(),
+        "the save landed while the pull held the graph lock"
+    );
+    resume_tx.send(()).unwrap();
+    pull.join().unwrap().unwrap();
+    save.join().unwrap().unwrap();
+    assert_eq!(
+        fs::read_to_string(root_a.join("notes/typed.md")).unwrap(),
+        "typed\n"
+    );
     assert_next_cycle_keeps_pulled_notes(&fixture);
 }
 
