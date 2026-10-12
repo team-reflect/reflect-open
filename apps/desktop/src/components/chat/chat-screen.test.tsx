@@ -494,9 +494,9 @@ describe('ChatScreen', () => {
     // A refused listing shows the refusal, not a misleading count.
     await expect.element(view.getByText(/Listed #\* notes — Not a tag/)).toBeInTheDocument()
     await expect
-      .element(view.getByText(/Listed daily notes 2026-06-01 – 2026-06-11 · 2 days/))
+      .element(view.getByText(/Listed daily notes 6\/1\/2026 – 6\/11\/2026 · 2 days/))
       .toBeInTheDocument()
-    await view.getByRole('button', { name: '2026-06-10' }).click()
+    await view.getByRole('button', { name: 'Wed, June 10th, 2026' }).click()
     expect(probedRoute).toEqual({ kind: 'daily', date: '2026-06-10' })
   })
 

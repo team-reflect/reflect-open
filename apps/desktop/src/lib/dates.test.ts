@@ -3,6 +3,7 @@ import {
   addDaysIso,
   formatDayLabel,
   formatFullDate,
+  formatMonthDay,
   formatRecencyLabel,
   formatShortDate,
   formatTimeOfDay,
@@ -51,6 +52,12 @@ describe('dates', () => {
     expect(formatShortDate('2026-06-09', 'mdy')).toBe('6/9/2026')
     expect(formatShortDate('2026-06-09', 'dmy')).toBe('9/6/2026')
     expect(formatShortDate('2026-06-09', 'iso')).toBe('2026-06-09')
+  })
+
+  it('formatMonthDay drops the year per the date format', () => {
+    expect(formatMonthDay('2026-06-09', 'mdy')).toBe('Jun 9')
+    expect(formatMonthDay('2026-06-09', 'dmy')).toBe('9 Jun')
+    expect(formatMonthDay('2026-06-09', 'iso')).toBe('2026-06-09')
   })
 
   describe('formatTimeOfDay', () => {

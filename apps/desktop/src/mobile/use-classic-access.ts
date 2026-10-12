@@ -101,10 +101,6 @@ export function useClassicSignOut() {
   })
 }
 
-export function formatClassicDate(epochMs: number): string {
-  return new Date(epochMs).toLocaleDateString(undefined, { dateStyle: 'medium' })
-}
-
 /** The status line for a stored verification, or `null` for none. */
 export function classicAccessMessage(classicAccess: {
   value: ClassicAccess | null

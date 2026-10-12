@@ -65,7 +65,7 @@ const noteRows = [
 ]
 const taggedDailyRow = {
   path: 'daily/2026-06-09.md',
-  title: 'June 9, 2026',
+  title: '2026-06-09',
   mtime: TOKYO_MTIME,
   preview: 'Daily travel notes.',
 }
@@ -392,14 +392,14 @@ describe('AllNotesScreen', () => {
     await page.getByRole('option', { name: /#travel/ }).click()
 
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: 'travel' })
-    await expect.element(view.getByText('June 9, 2026')).toBeInTheDocument()
+    await expect.element(view.getByText('Tue, June 9th, 2026')).toBeInTheDocument()
     await expect.element(view.getByText('Daily travel notes.')).toBeInTheDocument()
     expect(view.getByText('Health Stacked').query()).toBeNull()
     // The trigger adopts the active custom tag.
     await expect
       .element(view.getByRole('button', { name: /#travel/, expanded: false }))
       .toBeInTheDocument()
-    await view.getByRole('button', { name: 'June 9, 2026' }).click()
+    await view.getByRole('button', { name: 'Tue, June 9th, 2026' }).click()
     expect(probedRoute(view)).toEqual({ kind: 'daily', date: '2026-06-09' })
     await view.unmount()
   })
@@ -596,7 +596,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
 
     await view.getByRole('button', { name: /Custom/ }).click()
     await page.getByRole('option', { name: /#travel/ }).click()
-    await expect.element(view.getByText('June 9, 2026')).toBeInTheDocument()
+    await expect.element(view.getByText('Tue, June 9th, 2026')).toBeInTheDocument()
 
     await view.getByText('Daily travel notes.').click()
     expect(view.getByRole('button', { name: /Trash \(/ }).query()).toBeNull()

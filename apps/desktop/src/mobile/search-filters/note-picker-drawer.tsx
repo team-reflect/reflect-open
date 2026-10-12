@@ -1,6 +1,6 @@
 import { useDeferredValue, useState, type ReactElement } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { displayNoteTitle, parseSearchQuery, searchWithFilters } from '@reflect/core'
+import { parseSearchQuery, searchWithFilters } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
 import { useBridgeReady } from '@/hooks/use-bridge-ready.ts'
@@ -8,6 +8,7 @@ import { queryKeys } from '@/lib/query-client.ts'
 import { SearchInput } from '@/mobile/search-input.tsx'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import type { NoteFilterRef } from './filter-state.ts'
+import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 const PICKER_LIMIT = 20
 
@@ -56,6 +57,8 @@ export function NotePickerDrawer({
     onOpenChange(nextOpen)
   }
 
+  const noteLabel = useNoteLabel()
+
   const pick = (note: NoteFilterRef | null): void => {
     onPick(note)
     setOpen(false)
@@ -83,7 +86,7 @@ export function NotePickerDrawer({
                 onClick={() => pick({ path: hit.path, title: hit.title })}
                 className="flex h-12 w-full items-center border-b border-border text-left text-base last:border-b-0"
               >
-                <span className="min-w-0 flex-1 truncate">{displayNoteTitle(hit.title)}</span>
+                <span className="min-w-0 flex-1 truncate">{noteLabel(hit)}</span>
               </button>
             ))}
           </div>

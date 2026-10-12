@@ -1,10 +1,10 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { WikilinkClickHandler } from '@meowdown/core'
-import { displayNoteTitle } from '@reflect/core'
 import { BacklinkSnippet } from '@/components/backlink-snippet.tsx'
 import type { BacklinkSource } from '@/lib/group-backlinks.ts'
 import type { ModClickEvent } from '@/lib/windows/open-in-new-window.ts'
+import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 interface BacklinkSourceGroupProps {
   source: BacklinkSource
@@ -41,6 +41,7 @@ export function BacklinkSourceGroup({
   onOpen,
   onWikilinkClick,
 }: BacklinkSourceGroupProps): ReactElement {
+  const label = useNoteLabel()(source)
   const [expanded, setExpanded] = useState(expandedOverride)
 
   // Reset to the panel-level toggle whenever it changes; the group chevron can
@@ -67,14 +68,14 @@ export function BacklinkSourceGroup({
           onClick={(event) => onOpen(source.path, event)}
           className="min-w-0 cursor-pointer truncate text-left text-xs text-accent"
         >
-          {displayNoteTitle(source.title)}
+          {label}
         </button>
 
         {source.snippets.length > 0 ? (
           <button
             type="button"
             aria-expanded={expanded}
-            aria-label={`${expanded ? 'Collapse' : 'Expand'} references from ${displayNoteTitle(source.title)}`}
+            aria-label={`${expanded ? 'Collapse' : 'Expand'} references from ${label}`}
             onClick={() => setExpanded(!expanded)}
             className="absolute inset-y-0 -left-5 flex items-center text-text-muted opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
           >

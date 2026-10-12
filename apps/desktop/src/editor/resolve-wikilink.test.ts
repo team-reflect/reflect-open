@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { resolveWikilink } from './resolve-wikilink.ts'
+import { createWikilinkResolver } from './resolve-wikilink.ts'
 
-describe('resolveWikilink', () => {
+describe('createWikilinkResolver', () => {
+  const resolveWikilink = createWikilinkResolver('mdy')
+
   it('splits an alias at the first pipe, trimming both halves', () => {
     expect(resolveWikilink({ target: 'Tim MacCaw // Dad|Dad' })).toEqual({
       target: 'Tim MacCaw // Dad',
@@ -29,5 +31,25 @@ describe('resolveWikilink', () => {
   it('leaves a plain target and a URL-shaped target alone', () => {
     expect(resolveWikilink({ target: 'Note' })).toBeUndefined()
     expect(resolveWikilink({ target: 'https://reflect.app' })).toBeUndefined()
+  })
+
+  it('shows a date target as its day in the chosen date format', () => {
+    expect(resolveWikilink({ target: '2026-06-09' })).toEqual({
+      target: '2026-06-09',
+      display: 'Tue, June 9th, 2026',
+    })
+    expect(createWikilinkResolver('dmy')({ target: '2026-06-09' })).toEqual({
+      target: '2026-06-09',
+      display: 'Tue, 9th June, 2026',
+    })
+    expect(createWikilinkResolver('iso')({ target: '2026-06-09' })).toBeUndefined()
+  })
+
+  it('keeps the alias of a date target and leaves an impossible date alone', () => {
+    expect(resolveWikilink({ target: '2026-06-09|launch day' })).toEqual({
+      target: '2026-06-09',
+      display: 'launch day',
+    })
+    expect(resolveWikilink({ target: '2026-13-45' })).toBeUndefined()
   })
 })

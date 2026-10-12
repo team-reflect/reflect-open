@@ -150,11 +150,11 @@ describe('updatedPresetFilter', () => {
 
 describe('updatedRangeFilter', () => {
   it('returns null when both sides are empty', () => {
-    expect(updatedRangeFilter('', '')).toBeNull()
+    expect(updatedRangeFilter('', '', 'mdy')).toBeNull()
   })
 
   it('makes the end date inclusive by bounding at the next day start', () => {
-    const filter = updatedRangeFilter('2026-06-01', '2026-06-15')
+    const filter = updatedRangeFilter('2026-06-01', '2026-06-15', 'mdy')
     expect(filter).toEqual({
       label: 'Jun 1 – Jun 15',
       afterMs: new Date(2026, 5, 1).getTime(),
@@ -163,7 +163,12 @@ describe('updatedRangeFilter', () => {
   })
 
   it('labels one-sided ranges', () => {
-    expect(updatedRangeFilter('2026-06-01', '')?.label).toBe('Since Jun 1')
-    expect(updatedRangeFilter('', '2026-06-15')?.label).toBe('Until Jun 15')
+    expect(updatedRangeFilter('2026-06-01', '', 'mdy')?.label).toBe('Since Jun 1')
+    expect(updatedRangeFilter('', '2026-06-15', 'mdy')?.label).toBe('Until Jun 15')
+  })
+
+  it('labels the days in the chosen date format', () => {
+    expect(updatedRangeFilter('2026-06-01', '2026-06-15', 'dmy')?.label).toBe('1 Jun – 15 Jun')
+    expect(updatedRangeFilter('2026-06-01', '', 'iso')?.label).toBe('Since 2026-06-01')
   })
 })

@@ -27,7 +27,7 @@ describe('WeekRow', () => {
     )
 
     const selected = page.getByRole('button', {
-      name: 'Thursday, July 16th, has daily note',
+      name: 'Thu, July 16th, 2026, has daily note',
     })
     await expect.element(selected).toHaveAttribute('aria-current', 'date')
     await expect.element(page.getByTestId('note-dot-2026-07-16')).toBeVisible()

@@ -2,7 +2,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render } from 'vitest-browser-react'
 import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { format } from 'date-fns'
 import { act, StrictMode, type ReactElement } from 'react'
 import { setBridge } from '@reflect/core'
 import {
@@ -11,7 +10,7 @@ import {
 } from '@/editor/formatting-toolbar-store.ts'
 import { RouterProvider, useRouter } from '@/routing/router.tsx'
 import type { Route } from '@/routing/route.ts'
-import { addDaysIso, formatDayLabel, parseIsoDate, todayIso } from '@/lib/dates.ts'
+import { addDaysIso, formatDayLabel, todayIso } from '@/lib/dates.ts'
 import { monthLabel, monthOf } from '@/lib/month-grid.ts'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
@@ -292,7 +291,7 @@ async function fireClick(element: Element): Promise<void> {
 
 /** The calendar strip's per-day aria-label (CalendarStrip uses this form). */
 function dayCellLabel(date: string): string {
-  return format(parseIsoDate(date), 'EEEE, MMMM do')
+  return formatDayLabel(date, 'mdy')
 }
 
 /**

@@ -204,9 +204,11 @@ export function SettingsProvider({ children }: { children: ReactNode }): ReactEl
 }
 
 /** Access the current settings and the updater. Use within a SettingsProvider. */
-export function useSettings(): SettingsContextValue {
+export function useSettings(options: { optional: true }): SettingsContextValue | null
+export function useSettings(): SettingsContextValue
+export function useSettings(options?: { optional: true }): SettingsContextValue | null {
   const context = use(SettingsContext)
-  if (!context) {
+  if (!context && !options?.optional) {
     throw new Error('useSettings must be used within a SettingsProvider')
   }
   return context

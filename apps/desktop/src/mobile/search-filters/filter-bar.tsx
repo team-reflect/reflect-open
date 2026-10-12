@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { X } from 'lucide-react'
-import { displayNoteTitle, foldTag, type NoteTagFacet } from '@reflect/core'
+import { foldTag, type NoteTagFacet } from '@reflect/core'
 import { FilterChip } from './filter-chip.tsx'
 import {
   EMPTY_ALL_NOTES_FILTERS,
@@ -11,6 +11,7 @@ import {
 import { NotePickerDrawer } from './note-picker-drawer.tsx'
 import { TagFilterDrawer } from './tag-filter-drawer.tsx'
 import { UpdatedFilterDrawer } from './updated-filter-drawer.tsx'
+import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 type OpenDrawer = 'tags' | 'linkedTo' | 'linkedBy' | 'updated' | null
 
@@ -34,11 +35,6 @@ function tagsLabel(selected: string[], facets: NoteTagFacet[]): string {
   return selected.length === 1 ? `#${first}` : `#${first} +${selected.length - 1}`
 }
 
-/** A link chip's label: the direction word plus the chosen note. */
-function linkLabel(word: string, note: NoteFilterRef | null): string {
-  return note === null ? word : `${word}: ${displayNoteTitle(note.title)}`
-}
-
 /**
  * The filter badge row under the All tab's search bar (Plan 19, V1 parity):
  * horizontally scrollable chips that AND together — Pinned, Tags, Linked
@@ -54,6 +50,11 @@ export function FilterBar({
 }: FilterBarProps): ReactElement {
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>(null)
   const active = hasActiveFilters(filters) || routeTag !== null
+  const noteLabel = useNoteLabel()
+
+  /** A link chip's label: the direction word plus the chosen note. */
+  const linkLabel = (word: string, note: NoteFilterRef | null): string =>
+    note === null ? word : `${word}: ${noteLabel(note)}`
 
   const patch = (changes: Partial<AllNotesFilters>): void => {
     onFiltersChange({ ...filters, ...changes })

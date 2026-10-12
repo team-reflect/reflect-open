@@ -1,9 +1,10 @@
 import { memo, type MouseEvent, type ReactElement } from 'react'
-import { displayNoteTitle, type NoteListEntry } from '@reflect/core'
+import type { NoteListEntry } from '@reflect/core'
 import { formatRecencyLabel } from '@/lib/dates.ts'
 import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/lib/windows/open-in-new-window.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
+import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 /**
  * The shared column template (Subject · Snippet · Tags · Updated) — the header
@@ -38,6 +39,7 @@ export const AllNotesRow = memo(function AllNotesRow({
   onOpen,
 }: AllNotesRowProps): ReactElement {
   const { settings } = useSettings()
+  const noteLabel = useNoteLabel()
   return (
     <div
       onClick={(event) => {
@@ -96,7 +98,7 @@ export const AllNotesRow = memo(function AllNotesRow({
           selected ? 'text-accent' : 'text-text',
         )}
       >
-        {displayNoteTitle(note.title)}
+        {noteLabel(note)}
       </button>
       <span
         className={cn('truncate text-[13px]', selected ? 'text-accent' : 'text-text-secondary')}

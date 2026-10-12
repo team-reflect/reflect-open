@@ -1,10 +1,10 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { WikilinkClickHandler } from '@meowdown/core'
-import { displayNoteTitle } from '@reflect/core'
 import { BacklinkSnippet } from '@/components/backlink-snippet.tsx'
 import type { BacklinkSource } from '@/lib/group-backlinks.ts'
 import { cn } from '@/lib/utils.ts'
+import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 interface IncomingBacklinkGroupProps {
   source: BacklinkSource
@@ -39,6 +39,7 @@ export function IncomingBacklinkGroup({
   onOpen,
   onWikilinkClick,
 }: IncomingBacklinkGroupProps): ReactElement {
+  const label = useNoteLabel()(source)
   const [expanded, setExpanded] = useState(expandedOverride)
 
   // Reset to the section-level toggle whenever it changes; the group chevron
@@ -61,14 +62,14 @@ export function IncomingBacklinkGroup({
           onClick={() => onOpen(source.path)}
           className="flex min-h-11 min-w-0 flex-1 items-center text-left text-sm text-accent"
         >
-          <span className="truncate">{displayNoteTitle(source.title)}</span>
+          <span className="truncate">{label}</span>
         </button>
 
         {source.snippets.length > 0 ? (
           <button
             type="button"
             aria-expanded={expanded}
-            aria-label={`${expanded ? 'Collapse' : 'Expand'} references from ${displayNoteTitle(source.title)}`}
+            aria-label={`${expanded ? 'Collapse' : 'Expand'} references from ${label}`}
             onClick={() => setExpanded(!expanded)}
             className="flex size-11 shrink-0 items-center justify-center text-text-muted"
           >

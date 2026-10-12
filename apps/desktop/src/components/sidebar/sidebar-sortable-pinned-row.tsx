@@ -2,19 +2,18 @@ import { memo, useCallback, type CSSProperties, type MouseEvent, type ReactEleme
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useQueryClient } from '@tanstack/react-query'
-import { displayNoteTitle, errorMessage } from '@reflect/core'
+import { errorMessage } from '@reflect/core'
 import type { PinnedNote } from '@reflect/core'
 import { unpinNote } from '@/lib/note-pin.ts'
-import { formatDayLabel } from '@/lib/dates.ts'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { openNativeContextMenu } from '@/lib/native-menu/context-menu.ts'
 import { startOperation } from '@/lib/operations.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
 import { routeForPath, routesEqual } from '@/routing/route.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { SidebarPinnedRowPreview } from './sidebar-pinned-row-preview.tsx'
 import { isModEvent } from '@meowdown/core'
+import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 interface SidebarSortablePinnedRowProps {
   note: PinnedNote
@@ -25,15 +24,12 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
 }: SidebarSortablePinnedRowProps): ReactElement {
   const { route } = useRouter()
   const navigateNoteLink = useNoteLinkNavigation()
-  const { settings } = useSettings()
+  const noteLabel = useNoteLabel()
   const { graph } = useGraph()
   const queryClient = useQueryClient()
   const target = routeForPath(note.path)
   const active = routesEqual(route, target)
-  const label =
-    note.dailyDate !== null
-      ? formatDayLabel(note.dailyDate, settings.dateFormat)
-      : displayNoteTitle(note.title)
+  const label = noteLabel(note)
   const { isDragging, listeners, setNodeRef, transform, transition } = useSortable({
     id: note.path,
   })

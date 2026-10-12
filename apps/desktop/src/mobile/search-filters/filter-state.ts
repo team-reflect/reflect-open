@@ -1,10 +1,11 @@
-import { format } from 'date-fns'
 import {
   foldTag,
   parseSearchQuery,
+  type DateFormat,
   type FilteredSearchOptions,
   type ParsedSearchQuery,
 } from '@reflect/core'
+import { formatMonthDay } from '@/lib/dates.ts'
 
 /**
  * The All tab's badge-filter model (Plan 19, V1 parity): AND-composed filters
@@ -202,13 +203,17 @@ function isoDayStartMs(date: string, days = 0): number {
  * The end date is inclusive — its bound is the start of the following day.
  * Returns null when both sides are empty (no constraint was formed).
  */
-export function updatedRangeFilter(fromIso: string, toIso: string): UpdatedFilter | null {
+export function updatedRangeFilter(
+  fromIso: string,
+  toIso: string,
+  dateFormat: DateFormat,
+): UpdatedFilter | null {
   const from = fromIso === '' ? null : fromIso
   const to = toIso === '' ? null : toIso
   if (from === null && to === null) {
     return null
   }
-  const dayLabel = (iso: string): string => format(isoDayStartMs(iso), 'MMM d')
+  const dayLabel = (iso: string): string => formatMonthDay(iso, dateFormat)
   const label =
     from !== null && to !== null
       ? `${dayLabel(from)} – ${dayLabel(to)}`

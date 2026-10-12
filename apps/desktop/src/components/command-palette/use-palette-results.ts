@@ -1,6 +1,12 @@
 import { useDeferredValue, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { parseSearchQuery, retrieve, searchWithFilters, suggestWikiTargets } from '@reflect/core'
+import {
+  dateFromDailyPath,
+  parseSearchQuery,
+  retrieve,
+  searchWithFilters,
+  suggestWikiTargets,
+} from '@reflect/core'
 import { useBridgeReady } from '@/hooks/use-bridge-ready.ts'
 import { listCommands } from '@/lib/commands/registry.ts'
 import { todayIso } from '@/lib/dates.ts'
@@ -83,13 +89,13 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
         return await searchWithFilters(parsed)
       }
       // Adapt RetrievalHit → PaletteHit: semantic chunk text rides in
-      // the snippet slot (dailies fall back to their ISO-titled row — the
-      // retrieval contract doesn't carry dailyDate).
+      // the snippet slot, and the path stands in for the dailyDate the
+      // retrieval contract doesn't carry.
       const hits = await retrieve(trimmed, { mode: 'hybrid' })
       return hits.map((hit) => ({
         path: hit.path,
         title: hit.title,
-        dailyDate: null,
+        dailyDate: dateFromDailyPath(hit.path),
         snippet: hit.snippet === '' ? null : hit.snippet,
       }))
     },

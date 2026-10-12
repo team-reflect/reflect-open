@@ -6,15 +6,14 @@ import {
   type ReactElement,
 } from 'react'
 import { Circle, CircleCheck } from 'lucide-react'
-import { displayNoteTitle, type OpenTask } from '@reflect/core'
+import type { OpenTask } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
-import { formatDayLabel } from '@/lib/dates.ts'
 import { getTaskKey } from '@/lib/tasks/task-identity.ts'
 import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/lib/windows/open-in-new-window.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
 import { TaskEditor, type TaskNavigate } from './task-editor.tsx'
 import { TaskText } from './task-text.tsx'
+import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 interface TaskRowProps {
   task: OpenTask
@@ -92,7 +91,7 @@ export function TaskRow({
   convertControllerRef,
   onOpen,
 }: TaskRowProps): ReactElement {
-  const { settings } = useSettings()
+  const noteLabel = useNoteLabel()
   const checkboxToggleControllerRef = useRef<(() => void) | null>(null)
   const done = task.checked
   const label = task.text || 'Empty task'
@@ -197,9 +196,7 @@ export function TaskRow({
           }}
           className="flex h-6 shrink-0 items-center whitespace-nowrap text-xs text-text-muted transition-colors hover:text-accent focus-visible:text-accent focus-visible:outline-none"
         >
-          {task.dailyDate !== null
-            ? formatDayLabel(task.dailyDate, settings.dateFormat)
-            : displayNoteTitle(task.noteTitle)}
+          {noteLabel({ path: task.notePath, title: task.noteTitle })}
         </button>
       ) : null}
     </li>

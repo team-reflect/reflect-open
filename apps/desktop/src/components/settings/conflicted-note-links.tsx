@@ -1,9 +1,10 @@
 import type { ReactElement } from 'react'
-import { displayNoteTitle, type ConflictedNote } from '@reflect/core'
+import type { ConflictedNote } from '@reflect/core'
 import { ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { isModEvent } from '@meowdown/core'
+import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 interface ConflictedNoteLinksProps {
   readonly notes: readonly ConflictedNote[]
@@ -15,6 +16,7 @@ interface ConflictedNoteLinkProps {
 
 function ConflictedNoteLink({ note }: ConflictedNoteLinkProps): ReactElement {
   const navigateNoteLink = useNoteLinkNavigation()
+  const noteLabel = useNoteLabel()
 
   return (
     <li>
@@ -30,7 +32,7 @@ function ConflictedNoteLink({ note }: ConflictedNoteLinkProps): ReactElement {
         }
       >
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium">{displayNoteTitle(note.title)}</span>
+          <span className="block truncate font-medium">{noteLabel(note)}</span>
           <span className="block truncate text-[11px] opacity-75">{note.path}</span>
         </span>
         <ChevronRight aria-hidden className="size-3.5 shrink-0 opacity-60" strokeWidth={1.75} />

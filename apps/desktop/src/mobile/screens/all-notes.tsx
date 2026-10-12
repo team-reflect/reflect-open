@@ -6,11 +6,13 @@ import {
   listNoteTags,
   parseHighlights,
   searchWithFilters,
+  type DateFormat,
   type FilteredSearchHit,
   type NoteTagFacet,
 } from '@reflect/core'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { useBridgeReady } from '@/hooks/use-bridge-ready.ts'
+import { formatDayLabel } from '@/lib/dates.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'
 import {
@@ -30,14 +32,20 @@ import {
 } from '@/mobile/top-bar.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
+import { useDateFormat } from '@/hooks/use-date-format.ts'
 import { routeForPath } from '@/routing/route.ts'
 import { useRouter } from '@/routing/router.tsx'
 
 /** A search hit resolved into the shared row shape. */
-export function rowForHit(hit: FilteredSearchHit): NoteRowModel {
+export function rowForHit(hit: FilteredSearchHit, dateFormat: DateFormat): NoteRowModel {
   return {
     path: hit.path,
-    titleSegments: parseHighlights(hit.highlightedTitle),
+    // A daily note reads as its day, which no longer lines up with the match
+    // offsets of its ISO title.
+    titleSegments:
+      hit.dailyDate !== null
+        ? [{ text: formatDayLabel(hit.dailyDate, dateFormat), highlighted: false }]
+        : parseHighlights(hit.highlightedTitle),
     mtime: hit.mtime,
     isPinned: hit.isPinned,
     canDelete: hit.dailyDate === null,
@@ -99,6 +107,7 @@ export function MobileAllNotes({
   // Defer the query the index sees (desktop's search debounce): fast typing
   // coalesces while the input stays live, and a seeded query (a `search`
   // history entry) catches up within a frame instead of a fixed delay.
+  const dateFormat = useDateFormat()
   const deferredQuery = useDeferredValue(query)
   const pending = pendingTagToken(query)
   const parsed = useMemo(
@@ -120,7 +129,10 @@ export function MobileAllNotes({
     placeholderData: keepPreviousData,
   })
 
-  const rows = useMemo(() => (hits ?? []).map(rowForHit), [hits])
+  const rows = useMemo(
+    () => (hits ?? []).map((hit) => rowForHit(hit, dateFormat)),
+    [hits, dateFormat],
+  )
   const pristine = parsed.text === '' && !parsed.filtered
 
   const removeDeletedRow = (path: string): void => {

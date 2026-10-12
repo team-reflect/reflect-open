@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, type ReactElement } from 'react'
 import type { ImageUrlResolver, WikiEmbedResolver } from '@meowdown/core'
 import { MarkdownView } from '@meowdown/react'
 import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
-import { resolveWikilink } from '@/editor/resolve-wikilink.ts'
+import { useWikilinkResolver } from '@/editor/resolve-wikilink.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 
@@ -76,6 +76,7 @@ export function MarkdownPreview({
   // MarkdownView a new callback identity (which would re-render its whole
   // tree).
   const resolveXPost = useXPostResolver()
+  const resolveWikilink = useWikilinkResolver()
   const navigateRef = useRef(onWikiLinkClick)
   useEffect(() => {
     navigateRef.current = onWikiLinkClick

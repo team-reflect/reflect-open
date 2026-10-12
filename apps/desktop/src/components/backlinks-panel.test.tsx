@@ -121,6 +121,25 @@ describe('BacklinksPanel', () => {
     await view.unmount()
   })
 
+  it('names a daily-note source and a date chip by their day, not the ISO date', async () => {
+    getBacklinksWithContext.mockResolvedValue([
+      {
+        sourcePath: 'daily/2026-06-09.md',
+        sourceTitle: '2026-06-09',
+        snippet: 'moved from [[2026-06-08]]',
+        posFrom: 12,
+        tasks: [],
+      },
+    ])
+    const view = await renderPanel('notes/roadmap.md')
+
+    await expect
+      .element(view.getByRole('button', { name: 'Tue, June 9th, 2026', exact: true }))
+      .toBeInTheDocument()
+    await expect.element(view.getByTestId('wikilink')).toMatchTextContent(/^Mon, June 8th, 2026$/)
+    await view.unmount()
+  })
+
   it('opens a relative Markdown link in a snippet from its source note', async () => {
     getBacklinksWithContext.mockResolvedValue([
       {

@@ -57,6 +57,21 @@ export function formatShortDate(date: string, dateFormat: DateFormat): string {
 }
 
 /**
+ * Month and day without the year, for labels short on room (a filter chip's
+ * range): `Jun 9` for `mdy`, `9 Jun` for `dmy`, and `2026-06-09` for `iso`.
+ */
+export function formatMonthDay(date: string, dateFormat: DateFormat): string {
+  switch (dateFormat) {
+    case 'dmy':
+      return format(parseIsoDate(date), 'd MMM')
+    case 'iso':
+      return date
+    case 'mdy':
+      return format(parseIsoDate(date), 'MMM d')
+  }
+}
+
+/**
  * A date label per the date-format setting: `June 10th, 2026` for `mdy`,
  * `10th June, 2026` for `dmy`, and `2026-06-10` for `iso` (the forms the
  * settings screen shows as the options themselves).

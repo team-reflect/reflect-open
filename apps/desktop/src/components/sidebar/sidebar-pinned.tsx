@@ -10,15 +10,13 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { displayNoteTitle } from '@reflect/core'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { useReorderPinnedNotes } from '@/hooks/use-reorder-pinned-notes.ts'
-import { formatDayLabel } from '@/lib/dates.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
 import { routeForPath, routesEqual } from '@/routing/route.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { SidebarPinnedRowPreview } from './sidebar-pinned-row-preview.tsx'
 import { SidebarSortablePinnedRow } from './sidebar-sortable-pinned-row.tsx'
+import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 /**
  * The sidebar's Pinned section (the Mac app's "Pinned notes" shelf):
@@ -28,7 +26,7 @@ import { SidebarSortablePinnedRow } from './sidebar-sortable-pinned-row.tsx'
 export function SidebarPinned(): ReactElement | null {
   const pinned = usePinnedNotes()
   const reorder = useReorderPinnedNotes(pinned)
-  const { settings } = useSettings()
+  const noteLabel = useNoteLabel()
   const { route } = useRouter()
   const [activePath, setActivePath] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
@@ -85,11 +83,7 @@ export function SidebarPinned(): ReactElement | null {
             <SidebarPinnedRowPreview
               active={routesEqual(route, routeForPath(activeNote.path))}
               overlay
-              label={
-                activeNote.dailyDate === null
-                  ? displayNoteTitle(activeNote.title)
-                  : formatDayLabel(activeNote.dailyDate, settings.dateFormat)
-              }
+              label={noteLabel(activeNote)}
             />
           )}
         </DragOverlay>

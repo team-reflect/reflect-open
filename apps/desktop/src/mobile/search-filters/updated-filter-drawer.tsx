@@ -3,6 +3,7 @@ import { Check } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
 import { Input } from '@/components/ui/input.tsx'
+import { useDateFormat } from '@/hooks/use-date-format.ts'
 import {
   UPDATED_PRESETS,
   updatedPresetFilter,
@@ -28,6 +29,7 @@ export function UpdatedFilterDrawer({
   current,
   onApply,
 }: UpdatedFilterDrawerProps): ReactElement {
+  const dateFormat = useDateFormat()
   const [fromIso, setFromIso] = useState('')
   const [toIso, setToIso] = useState('')
 
@@ -46,7 +48,7 @@ export function UpdatedFilterDrawer({
     setOpen(false)
   }
 
-  const range = updatedRangeFilter(fromIso, toIso)
+  const range = updatedRangeFilter(fromIso, toIso, dateFormat)
 
   return (
     <Drawer open={open} onOpenChange={setOpen}>
