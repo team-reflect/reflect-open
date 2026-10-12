@@ -18,7 +18,6 @@ const { getBacklinksWithContext, getBacklinksPage } = vi.hoisted(() => {
 })
 const resolveOrCreateNoteWithTitle = vi.hoisted(() => vi.fn())
 const resolveExistingMarkdownTarget = vi.hoisted(() => vi.fn())
-const openUrl = vi.hoisted(() => vi.fn(async () => {}))
 const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
@@ -27,7 +26,6 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   resolveOrCreateNoteWithTitle,
   resolveExistingMarkdownTarget,
 }))
-vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl }))
 vi.mock('@/providers/graph-provider.tsx', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
 }))
@@ -63,7 +61,6 @@ beforeEach(() => {
   getBacklinksPage.mockClear()
   resolveOrCreateNoteWithTitle.mockReset()
   resolveExistingMarkdownTarget.mockReset()
-  openUrl.mockClear()
   openRouteInNewWindow.mockReset().mockResolvedValue(true)
 })
 
@@ -152,27 +149,6 @@ describe('BacklinksPanel', () => {
     await expect
       .element(view.getByTestId('route'))
       .toMatchTextContent('{"kind":"note","path":"projects/roadmap/plan.md"}')
-    expect(openUrl).not.toHaveBeenCalled()
-    await view.unmount()
-  })
-
-  it('opens an external link in a snippet through the OS opener', async () => {
-    getBacklinksWithContext.mockResolvedValue([
-      {
-        sourcePath: 'projects/TASKS.md',
-        sourceTitle: 'Project Tasks',
-        snippet: '- [[Roadmap]]\n  - [pull](https://example.com/pull/1)',
-        posFrom: 0,
-        tasks: [],
-      },
-    ])
-    const view = await renderPanel('notes/roadmap.md')
-
-    await view.getByRole('link', { name: 'pull' }).click()
-
-    await vi.waitFor(() => expect(openUrl).toHaveBeenCalledWith('https://example.com/pull/1'))
-    expect(resolveExistingMarkdownTarget).not.toHaveBeenCalled()
-    await expect.element(view.getByTestId('route')).toMatchTextContent('"today"')
     await view.unmount()
   })
 

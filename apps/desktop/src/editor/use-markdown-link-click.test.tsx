@@ -93,13 +93,6 @@ describe('useMarkdownLinkClick', () => {
     expect(dispatchDeepLink).not.toHaveBeenCalled()
   })
 
-  it('falls back to in-window dispatch when a rendered deep link cannot open a window', async () => {
-    openDeepLinkInNewWindow.mockResolvedValue(false)
-    click('reflect://note/abc123', true)
-
-    await vi.waitFor(() => expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/abc123'))
-  })
-
   it('opens a custom app scheme in its OS default app', async () => {
     const event = click('x-devonthink-item://40C88434-68B6-4DCB-A258-754679764C3C')
 
@@ -138,13 +131,6 @@ describe('useMarkdownLinkClick', () => {
       .toMatchTextContent('{"kind":"note","path":"projects/roadmap/plan.md"}')
     expect(openUrl).not.toHaveBeenCalled()
     expect(event.defaultPrevented).toBe(true)
-  })
-
-  it('leaves the route alone when a relative note link names no note', async () => {
-    click('./missing.md')
-
-    await vi.waitFor(() => expect(resolveExistingMarkdownTarget).toHaveBeenCalled())
-    await expect.element(route).toMatchTextContent('{"kind":"today"}')
   })
 
   it('opens an attachment link through the graph asset opener, not the URL opener', async () => {

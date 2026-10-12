@@ -164,8 +164,8 @@ interface NoteEditorProps {
    */
   resolveWikiEmbed?: WikiEmbedResolver
   /**
-   * Vet a source (an image `src` or a link `href`) as a graph-relative asset
-   * path for {@link openAsset}. Returns null for remote or unsafe sources.
+   * Vet an image `src` as a graph-relative asset path for {@link openAsset}.
+   * Returns null for remote or unsafe sources.
    */
   resolveAssetOpenPath?: (src: string) => string | null
   /** Open a vetted graph-relative asset path in the OS default application. */

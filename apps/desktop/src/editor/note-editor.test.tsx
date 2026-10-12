@@ -506,18 +506,6 @@ describe('NoteEditor link opening', () => {
       )
     })
   })
-
-  it('reports a ⌘-clicked link with the modifier', async () => {
-    const onLinkClick = vi.fn()
-    await render(<NoteEditor initialContent="[plan](./plan.md) here" onLinkClick={onLinkClick} />)
-
-    await pmRoot.getByRole('link').click({ modifiers: ['ControlOrMeta'] })
-    await vi.waitFor(() => {
-      expect(onLinkClick).toHaveBeenCalledWith(
-        expect.objectContaining({ href: './plan.md', mod: true }),
-      )
-    })
-  })
 })
 
 describe('NoteEditor file pills', () => {

@@ -9,22 +9,11 @@ import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link.ts'
 import { openUrlSync } from '@/lib/open-url.ts'
 
 /**
- * The click policy for a rendered Markdown link, shared by every Markdown
- * surface. An attachment href opens through the generation-pinned asset
- * command, a `reflect://` link routes through the in-app deep-link pipeline,
- * any other URL with an allowed scheme goes to the OS opener, and a
- * scheme-less href is a note link that resolves from `sourcePath`.
- *
- * The handler always blocks the default action: a static `<a href>` click
- * would otherwise navigate the app's WebView frame and unload the app.
- *
- * @param generation the open graph's write generation, or `null` when no
- *   graph is open. Attachment and note links then do nothing.
- * @param sourcePath graph-relative path of the note the Markdown comes from,
- *   or `null` when it belongs to no note. Attachment and note links then do
- *   nothing.
- * @returns a handler that changes identity only with `generation` or
- *   `sourcePath`.
+ * The click policy for a rendered Markdown link: an attachment opens through
+ * the asset command, a `reflect://` link through the deep-link pipeline, any
+ * other allowed scheme through the OS opener, and a scheme-less href is a
+ * note link resolved from `sourcePath`. A `null` `sourcePath` means the
+ * Markdown belongs to no note, so attachment and note links do nothing.
  */
 export function useMarkdownLinkClick(
   generation: number | null,
