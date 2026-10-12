@@ -122,29 +122,22 @@ async function renderPalette(query: string, context?: Partial<CommandContext>) {
 
 describe('CommandPalette', () => {
   it('never shows "No results" while the recall feed is still loading', async () => {
-    let release!: (value: never[]) => void
-    suggestWikiTargets.mockReturnValue(
-      new Promise((resolve) => {
-        release = resolve
-      }),
-    )
+    const pending = Promise.withResolvers<never[]>()
+    suggestWikiTargets.mockReturnValue(pending.promise)
     const { view } = await renderPalette('')
     expect(view.getByText('No results').query()).toBeNull() // loading ≠ empty
-    release([])
+    pending.resolve([])
     await expect.element(view.getByText('No results')).toBeInTheDocument()
   })
 
   it('no "No results" while FTS is still answering a non-empty query', async () => {
     suggestWikiTargets.mockResolvedValue([]) // titles answered: nothing
-    let release!: (value: never[]) => void
-    const pending = new Promise((resolve) => {
-      release = resolve
-    })
-    searchWithFilters.mockImplementation(() => pending)
+    const pending = Promise.withResolvers<never[]>()
+    searchWithFilters.mockImplementation(() => pending.promise)
     const { view } = await renderPalette('rust')
     await vi.waitFor(() => expect(suggestWikiTargets).toHaveBeenCalled())
     expect(view.getByText('No results').query()).toBeNull() // body hits still in flight
-    release([])
+    pending.resolve([])
     await expect.element(view.getByText('No results')).toBeInTheDocument()
   })
 
@@ -192,12 +185,8 @@ describe('CommandPalette', () => {
     searchWithFilters.mockResolvedValue([
       { path: 'notes/rust.md', title: 'Rust Notes', snippet: null, dailyDate: null },
     ])
-    let finishOpen: (opened: boolean) => void = () => {}
-    openRouteInNewWindow.mockReturnValue(
-      new Promise((resolve) => {
-        finishOpen = resolve
-      }),
-    )
+    const pendingOpen = Promise.withResolvers<boolean>()
+    openRouteInNewWindow.mockReturnValue(pendingOpen.promise)
     const { view } = await renderPalette('rust')
     const result = view.getByText('Rust Notes')
 
@@ -210,7 +199,7 @@ describe('CommandPalette', () => {
       path: 'notes/rust.md',
     })
     expect(view.getByTestId('route').element().textContent).toBe(JSON.stringify({ kind: 'today' }))
-    finishOpen(true)
+    pendingOpen.resolve(true)
   })
 
   it('falls back in-window after a declined modifier-click even though the palette closed', async () => {

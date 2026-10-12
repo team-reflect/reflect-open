@@ -72,15 +72,11 @@ describe('write serialization', () => {
   it('serializes concurrent writes to the same note — no read/write interleave', async () => {
     openSession.mockReturnValue(null)
     readNote.mockResolvedValue('+ [ ] do it\n')
-    let releaseFirstWrite: () => void = () => {}
+    const pendingFirstWrite = Promise.withResolvers<void>()
     let writes = 0
     writeNote.mockImplementation(() => {
       writes += 1
-      return writes === 1
-        ? new Promise<void>((resolve) => {
-            releaseFirstWrite = resolve
-          })
-        : Promise.resolve()
+      return writes === 1 ? pendingFirstWrite.promise : Promise.resolve()
     })
 
     const first = writeTask(task, [{ kind: 'toggle' }], 7)
@@ -91,7 +87,7 @@ describe('write serialization', () => {
     expect(readNote).toHaveBeenCalledTimes(1)
     expect(writeNote).toHaveBeenCalledTimes(1)
 
-    releaseFirstWrite()
+    pendingFirstWrite.resolve()
     await Promise.all([first, second])
     // The second only read after the first's write settled.
     expect(readNote).toHaveBeenCalledTimes(2)

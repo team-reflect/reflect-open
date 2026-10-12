@@ -214,12 +214,10 @@ describe('createGraphIndex', () => {
 
   it('stop() aborts the running reconcile and waits for it to settle', async () => {
     let captured: AbortSignal | undefined
-    let settle: () => void = () => {}
+    const pendingSync = Promise.withResolvers<void>()
     mockSync.mockImplementation((options) => {
       captured = options.signal
-      return new Promise<void>((resolve) => {
-        settle = resolve
-      })
+      return pendingSync.promise
     })
 
     const index = createGraphIndex()
@@ -229,7 +227,7 @@ describe('createGraphIndex', () => {
 
     const stopped = index.stop()
     expect(captured?.aborted).toBe(true) // aborted synchronously
-    settle()
+    pendingSync.resolve()
     await stopped
   })
 

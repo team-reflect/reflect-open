@@ -206,13 +206,8 @@ describe('BackupSettingsField', () => {
   })
 
   it('does not close the sign-out dialog while sign-out is pending', async () => {
-    let resolveSignOut: () => void = () => {}
-    sync.signOut.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveSignOut = resolve
-        }),
-    )
+    const pendingSignOut = Promise.withResolvers<void>()
+    sync.signOut.mockImplementationOnce(() => pendingSignOut.promise)
     await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
@@ -226,7 +221,7 @@ describe('BackupSettingsField', () => {
 
     await expect.element(page.getByRole('heading', { name: 'Sign out of GitHub?' })).toBeVisible()
 
-    resolveSignOut()
+    pendingSignOut.resolve()
 
     await expect
       .element(page.getByRole('heading', { name: 'Sign out of GitHub?' }))

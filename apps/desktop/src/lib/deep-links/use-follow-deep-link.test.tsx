@@ -91,30 +91,22 @@ describe('useFollowDeepLink', () => {
   })
 
   it('drops a failed fallback after a newer router navigation', async () => {
-    let finishOpen: (opened: boolean) => void = () => {}
-    openDeepLinkInNewWindow.mockReturnValue(
-      new Promise((resolve) => {
-        finishOpen = resolve
-      }),
-    )
+    const pendingOpen = Promise.withResolvers<boolean>()
+    openDeepLinkInNewWindow.mockReturnValue(pendingOpen.promise)
     const view = await render(<Harness />)
 
     modifierClick()
     expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/older')
     await view.getByRole('button', { name: 'Navigate away' }).click()
-    finishOpen(false)
+    pendingOpen.resolve(false)
     await settle()
 
     expect(dispatchDeepLink).not.toHaveBeenCalled()
   })
 
   it('drops a failed fallback after a newer note-link window intent', async () => {
-    let finishOpen: (opened: boolean) => void = () => {}
-    openDeepLinkInNewWindow.mockReturnValue(
-      new Promise((resolve) => {
-        finishOpen = resolve
-      }),
-    )
+    const pendingOpen = Promise.withResolvers<boolean>()
+    openDeepLinkInNewWindow.mockReturnValue(pendingOpen.promise)
     const view = await render(<Harness />)
 
     modifierClick()
@@ -123,7 +115,7 @@ describe('useFollowDeepLink', () => {
       modifiers: ['ControlOrMeta'],
     })
     await vi.waitFor(() => expect(openRouteInNewWindow).toHaveBeenCalledTimes(1))
-    finishOpen(false)
+    pendingOpen.resolve(false)
     await settle()
 
     expect(dispatchDeepLink).not.toHaveBeenCalled()
@@ -155,18 +147,14 @@ describe('useFollowDeepLink', () => {
     'reflect://task?text=captured',
     'reflect://edit-notes?content=invalid',
   ])('does not cancel a pending failed fallback for non-address URL %s', async (url) => {
-    let finishOpen: (opened: boolean) => void = () => {}
-    openDeepLinkInNewWindow.mockReturnValue(
-      new Promise((resolve) => {
-        finishOpen = resolve
-      }),
-    )
+    const pendingOpen = Promise.withResolvers<boolean>()
+    openDeepLinkInNewWindow.mockReturnValue(pendingOpen.promise)
     await render(<Harness />)
 
     modifierClick()
     expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/older')
     followDeepLink?.({ href: url, openInNewWindow: true })
-    finishOpen(false)
+    pendingOpen.resolve(false)
     await settle()
 
     expect(openDeepLinkInNewWindow).toHaveBeenCalledTimes(1)
@@ -176,18 +164,14 @@ describe('useFollowDeepLink', () => {
   it.each(['reflect://today', 'reflect://note/newer'])(
     'cancels a pending failed fallback for newer address URL %s',
     async (url) => {
-      let finishOpen: (opened: boolean) => void = () => {}
-      openDeepLinkInNewWindow.mockReturnValue(
-        new Promise((resolve) => {
-          finishOpen = resolve
-        }),
-      )
+      const pendingOpen = Promise.withResolvers<boolean>()
+      openDeepLinkInNewWindow.mockReturnValue(pendingOpen.promise)
       await render(<Harness />)
 
       modifierClick()
       expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/older')
       followDeepLink?.({ href: url, openInNewWindow: false })
-      finishOpen(false)
+      pendingOpen.resolve(false)
       await settle()
 
       expect(dispatchDeepLink).toHaveBeenCalledTimes(1)
@@ -196,18 +180,14 @@ describe('useFollowDeepLink', () => {
   )
 
   it('drops a failed fallback after its rendered-link host unmounts', async () => {
-    let finishOpen: (opened: boolean) => void = () => {}
-    openDeepLinkInNewWindow.mockReturnValue(
-      new Promise((resolve) => {
-        finishOpen = resolve
-      }),
-    )
+    const pendingOpen = Promise.withResolvers<boolean>()
+    openDeepLinkInNewWindow.mockReturnValue(pendingOpen.promise)
     const view = await render(<Harness />)
 
     modifierClick()
     expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/older')
     await view.rerender(<Harness showHost={false} />)
-    finishOpen(false)
+    pendingOpen.resolve(false)
     await settle()
 
     expect(dispatchDeepLink).not.toHaveBeenCalled()

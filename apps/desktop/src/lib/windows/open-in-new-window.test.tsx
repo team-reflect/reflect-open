@@ -30,18 +30,14 @@ describe('openRouteInNewWindow', () => {
   })
 
   it('shares one native request between concurrent opens of the same note', async () => {
-    let finishOpen: () => void = () => {}
-    openNoteWindow.mockReturnValue(
-      new Promise((resolve) => {
-        finishOpen = resolve
-      }),
-    )
+    const pendingOpen = Promise.withResolvers<void>()
+    openNoteWindow.mockReturnValue(pendingOpen.promise)
 
     const first = openRouteInNewWindow({ kind: 'note', path: 'notes/foo.md' })
     const second = openRouteInNewWindow({ kind: 'note', path: 'notes/foo.md' })
 
     expect(openNoteWindow).toHaveBeenCalledTimes(1)
-    finishOpen()
+    pendingOpen.resolve()
     await expect(Promise.all([first, second])).resolves.toEqual([true, true])
 
     await expect(openRouteInNewWindow({ kind: 'note', path: 'notes/foo.md' })).resolves.toBe(true)

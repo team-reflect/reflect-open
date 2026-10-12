@@ -92,17 +92,14 @@ interface GraphFakeOptions {
  */
 function gateInvokes(match: (command: string, args: Record<string, unknown>) => boolean) {
   const ungated = mockInvoke.getMockImplementation()
-  let release = () => {}
-  const gate = new Promise<void>((resolve) => {
-    release = resolve
-  })
+  const gate = Promise.withResolvers<void>()
   mockInvoke.mockImplementation(async (command, args) => {
     if (match(command, args)) {
-      await gate
+      await gate.promise
     }
     return await ungated?.(command, args)
   })
-  return release
+  return gate.resolve
 }
 
 /** One bridge fake for the rename scenarios: a files map + the index queries. */

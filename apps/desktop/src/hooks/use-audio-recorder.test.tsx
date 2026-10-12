@@ -204,13 +204,8 @@ describe('useAudioRecorder', () => {
 
   it('overlapping starts acquire a single stream', async () => {
     const track = { stop: vi.fn() }
-    let release: (stream: MediaStream) => void = () => {}
-    getUserMedia.mockImplementation(
-      () =>
-        new Promise<MediaStream>((resolve) => {
-          release = resolve
-        }),
-    )
+    const pendingStream = Promise.withResolvers<MediaStream>()
+    getUserMedia.mockImplementation(() => pendingStream.promise)
     const { result } = await renderHook(() => useAudioRecorder())
 
     let firstStart: Promise<void> = Promise.resolve()
@@ -220,7 +215,7 @@ describe('useAudioRecorder', () => {
       secondStart = result.current.start()
     })
     await act(async () => {
-      release(fakeStream([track]))
+      pendingStream.resolve(fakeStream([track]))
       await Promise.all([firstStart, secondStart])
     })
 
@@ -231,13 +226,8 @@ describe('useAudioRecorder', () => {
 
   it('a cancel during the permission prompt releases the stream it resolves into', async () => {
     const track = { stop: vi.fn() }
-    let release: (stream: MediaStream) => void = () => {}
-    getUserMedia.mockImplementation(
-      () =>
-        new Promise<MediaStream>((resolve) => {
-          release = resolve
-        }),
-    )
+    const pendingStream = Promise.withResolvers<MediaStream>()
+    getUserMedia.mockImplementation(() => pendingStream.promise)
     const { result } = await renderHook(() => useAudioRecorder())
 
     let pending: Promise<void> = Promise.resolve()
@@ -249,7 +239,7 @@ describe('useAudioRecorder', () => {
       result.current.cancel()
     })
     await act(async () => {
-      release(fakeStream([track]))
+      pendingStream.resolve(fakeStream([track]))
       await pending
     })
     expect(track.stop).toHaveBeenCalled()

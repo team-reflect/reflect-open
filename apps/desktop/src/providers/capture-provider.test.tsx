@@ -50,19 +50,14 @@ describe('CaptureProvider', () => {
   it('registers the host BEFORE the first drain pass', async () => {
     // Park registration: the controller must not start while the pointer
     // file may still name the previous graph.
-    let releaseRegistration: () => void = () => {}
-    captureHostRegister.mockImplementation(
-      () =>
-        new Promise<void>((resolve) => {
-          releaseRegistration = resolve
-        }),
-    )
+    const pendingRegistration = Promise.withResolvers<void>()
+    captureHostRegister.mockImplementation(() => pendingRegistration.promise)
 
     await mount()
     await vi.waitFor(() => expect(captureHostRegister).toHaveBeenCalledTimes(1))
     expect(controller.start).not.toHaveBeenCalled()
 
-    releaseRegistration()
+    pendingRegistration.resolve()
     await vi.waitFor(() => expect(controller.start).toHaveBeenCalledTimes(1))
   })
 

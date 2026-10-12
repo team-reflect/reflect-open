@@ -422,13 +422,8 @@ describe('AudioMemoProvider', () => {
   })
 
   it('a new recording can start while a capture is pending, and captures run serially in order', async () => {
-    let releaseFirst: (outcome: CaptureAudioMemoOutcome) => void = () => {}
-    captureAudioMemoPart.mockImplementationOnce(
-      () =>
-        new Promise<CaptureAudioMemoOutcome>((resolve) => {
-          releaseFirst = resolve
-        }),
-    )
+    const pendingFirst = Promise.withResolvers<CaptureAudioMemoOutcome>()
+    captureAudioMemoPart.mockImplementationOnce(() => pendingFirst.promise)
     const second = {
       blob: new Blob(['second'], { type: 'audio/mp4' }),
       mimeType: 'audio/mp4',
@@ -460,7 +455,7 @@ describe('AudioMemoProvider', () => {
     expect(captureAudioMemoPart).toHaveBeenCalledTimes(1)
 
     await act(async () => {
-      releaseFirst({ ok: true, memo: MEMO })
+      pendingFirst.resolve({ ok: true, memo: MEMO })
     })
     await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(result.current.pendingCount).toBe(0)
@@ -471,13 +466,8 @@ describe('AudioMemoProvider', () => {
   })
 
   it('a failure parks the queue; retry lands the failed memo before the ones behind it', async () => {
-    let releaseFirst: (outcome: CaptureAudioMemoOutcome) => void = () => {}
-    captureAudioMemoPart.mockImplementationOnce(
-      () =>
-        new Promise<CaptureAudioMemoOutcome>((resolve) => {
-          releaseFirst = resolve
-        }),
-    )
+    const pendingFirst = Promise.withResolvers<CaptureAudioMemoOutcome>()
+    captureAudioMemoPart.mockImplementationOnce(() => pendingFirst.promise)
     const second = {
       blob: new Blob(['second'], { type: 'audio/mp4' }),
       mimeType: 'audio/mp4',
@@ -500,7 +490,7 @@ describe('AudioMemoProvider', () => {
     })
 
     await act(async () => {
-      releaseFirst({ ok: false, message: 'disk full' })
+      pendingFirst.resolve({ ok: false, message: 'disk full' })
     })
     await vi.waitFor(() => expect(result.current.phase).toBe('error'))
     // The second memo holds behind the failure — retrying later must not
@@ -517,13 +507,8 @@ describe('AudioMemoProvider', () => {
   })
 
   it('discarding a failed memo releases the queue behind it', async () => {
-    let releaseFirst: (outcome: CaptureAudioMemoOutcome) => void = () => {}
-    captureAudioMemoPart.mockImplementationOnce(
-      () =>
-        new Promise<CaptureAudioMemoOutcome>((resolve) => {
-          releaseFirst = resolve
-        }),
-    )
+    const pendingFirst = Promise.withResolvers<CaptureAudioMemoOutcome>()
+    captureAudioMemoPart.mockImplementationOnce(() => pendingFirst.promise)
     const second = {
       blob: new Blob(['second'], { type: 'audio/mp4' }),
       mimeType: 'audio/mp4',
@@ -546,7 +531,7 @@ describe('AudioMemoProvider', () => {
     })
 
     await act(async () => {
-      releaseFirst({ ok: false, message: 'disk full' })
+      pendingFirst.resolve({ ok: false, message: 'disk full' })
     })
     await vi.waitFor(() => expect(result.current.phase).toBe('error'))
 

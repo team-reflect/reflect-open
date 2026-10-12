@@ -131,12 +131,8 @@ describe('DailyContextSidebar calendar', () => {
   })
 
   it('does not fall back after the calendar scope moves to another selected day', async () => {
-    let finishOpen: (opened: boolean) => void = () => {}
-    openRouteInNewWindow.mockReturnValue(
-      new Promise((resolve) => {
-        finishOpen = resolve
-      }),
-    )
+    const pendingOpen = Promise.withResolvers<boolean>()
+    openRouteInNewWindow.mockReturnValue(pendingOpen.promise)
     const view = await renderSidebar('2026-06-09')
     const day = page.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') })
 
@@ -156,7 +152,7 @@ describe('DailyContextSidebar calendar', () => {
     )
 
     await act(async () => {
-      finishOpen(false)
+      pendingOpen.resolve(false)
     })
 
     await expect

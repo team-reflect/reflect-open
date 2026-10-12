@@ -101,12 +101,8 @@ describe('handleDeepLink', () => {
   })
 
   it('drops a resolution that finished after the graph session ended', async () => {
-    let finishResolve: (path: string) => void = () => {}
-    resolveMock.mockReturnValue(
-      new Promise((resolve) => {
-        finishResolve = resolve
-      }),
-    )
+    const pendingResolve = Promise.withResolvers<string>()
+    resolveMock.mockReturnValue(pendingResolve.promise)
     let stale = false
 
     const pending = handleDeepLink('reflect://note/Project%20X', {
@@ -115,7 +111,7 @@ describe('handleDeepLink', () => {
       isStale: () => stale,
     })
     stale = true
-    finishResolve('notes/project-x.md')
+    pendingResolve.resolve('notes/project-x.md')
     await pending
 
     expect(navigate).not.toHaveBeenCalled()

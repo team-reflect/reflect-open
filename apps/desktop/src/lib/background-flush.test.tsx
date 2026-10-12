@@ -84,13 +84,8 @@ describe('installBackgroundFlush', () => {
   })
 
   it('commits only after the buffers have landed (the mid-debounce edit)', async () => {
-    let landBuffers: () => void = () => {}
-    seams.flushOpenDocuments.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          landBuffers = resolve
-        }),
-    )
+    const pendingFlush = Promise.withResolvers<void>()
+    seams.flushOpenDocuments.mockImplementation(() => pendingFlush.promise)
     dispose = installBackgroundFlush()
 
     goHidden()
@@ -98,7 +93,7 @@ describe('installBackgroundFlush', () => {
     // The note write is still in flight — a commit now would miss the edit.
     expect(seams.flushBackup).not.toHaveBeenCalled()
 
-    landBuffers()
+    pendingFlush.resolve()
     await settleMicrotasks()
     expect(seams.flushBackup).toHaveBeenCalledTimes(1)
   })
@@ -171,13 +166,8 @@ describe('installBackgroundFlush', () => {
   })
 
   it('coalesces visibilitychange and pagehide from one background transition', async () => {
-    let landBuffers: () => void = () => {}
-    seams.flushOpenDocuments.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          landBuffers = resolve
-        }),
-    )
+    const pendingFlush = Promise.withResolvers<void>()
+    seams.flushOpenDocuments.mockImplementationOnce(() => pendingFlush.promise)
     dispose = installBackgroundFlush()
 
     goHidden()
@@ -188,7 +178,7 @@ describe('installBackgroundFlush', () => {
     expect(seams.flushOpenDocuments).toHaveBeenCalledTimes(1)
     expect(seams.flushBackup).not.toHaveBeenCalled()
 
-    landBuffers()
+    pendingFlush.resolve()
     await settleMicrotasks()
     expect(seams.flushOpenDocuments).toHaveBeenCalledTimes(1)
     expect(seams.flushBackup).toHaveBeenCalledTimes(1)
@@ -196,13 +186,8 @@ describe('installBackgroundFlush', () => {
   })
 
   it('queues one rerun for a genuine visible-to-hidden transition in flight', async () => {
-    let landBuffers: () => void = () => {}
-    seams.flushOpenDocuments.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          landBuffers = resolve
-        }),
-    )
+    const pendingFlush = Promise.withResolvers<void>()
+    seams.flushOpenDocuments.mockImplementationOnce(() => pendingFlush.promise)
     dispose = installBackgroundFlush()
 
     goHidden()
@@ -213,7 +198,7 @@ describe('installBackgroundFlush', () => {
     await settleMicrotasks()
     expect(seams.flushOpenDocuments).toHaveBeenCalledTimes(1)
 
-    landBuffers()
+    pendingFlush.resolve()
     await settleMicrotasks()
     await settleMicrotasks()
     expect(seams.flushOpenDocuments).toHaveBeenCalledTimes(2)

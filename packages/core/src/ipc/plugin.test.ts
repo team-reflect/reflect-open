@@ -109,16 +109,13 @@ describe('definePluginEvent', () => {
   })
 
   it('an unlisten before registration resolves suppresses delivery', async () => {
-    let release: () => void = () => {}
-    const gate = new Promise<void>((resolve) => {
-      release = resolve
-    })
+    const gate = Promise.withResolvers<void>()
     const handlers = new Map<string, (payload: unknown) => void>()
     setBridge({
       invoke: async () => null,
       listen: async () => () => {},
       listenPlugin: async (plugin, event, handler) => {
-        await gate
+        await gate.promise
         handlers.set(`${plugin}:${event}`, handler)
       },
     })
@@ -128,7 +125,7 @@ describe('definePluginEvent', () => {
       seen.push(payload.n)
     })
     subscription.unlisten()
-    release()
+    gate.resolve()
     await subscription.ready
     handlers.get('demo:demoEvent')?.({ n: 3 })
     expect(seen).toEqual([])

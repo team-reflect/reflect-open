@@ -43,12 +43,8 @@ afterEach(() => {
 
 describe('DeepLinkProvider navigation intent integration', () => {
   it('keeps a deferred note resolution current when a capture arrives', async () => {
-    let finishResolution: (path: string) => void = () => {}
-    resolveNoteTarget.mockReturnValue(
-      new Promise((resolve) => {
-        finishResolution = resolve
-      }),
-    )
+    const pendingResolution = Promise.withResolvers<string>()
+    resolveNoteTarget.mockReturnValue(pendingResolution.promise)
     await render(<DeepLinkProvider graph={GRAPH}>{null}</DeepLinkProvider>)
 
     dispatchDeepLink('reflect://note/Project%20X')
@@ -57,7 +53,7 @@ describe('DeepLinkProvider navigation intent integration', () => {
     dispatchDeepLink('reflect://append?text=captured%20while%20resolving')
     await vi.waitFor(() => expect(captureInboxSpool).toHaveBeenCalledTimes(1))
 
-    finishResolution('notes/project-x.md')
+    pendingResolution.resolve('notes/project-x.md')
 
     await vi.waitFor(() =>
       expect(navigate).toHaveBeenCalledWith({ kind: 'note', path: 'notes/project-x.md' }),

@@ -124,14 +124,12 @@ describe('applyIndexChanges', () => {
 describe('subscribeIndexChanges', () => {
   it('serializes overlapping batches so later events cannot overtake earlier ones', async () => {
     const order: string[] = []
-    let releaseFirstRead: () => void = () => {}
+    const pendingFirstRead = Promise.withResolvers<void>()
     const { emitChanges } = fakeBridge(async (command, args) => {
       if (command === 'note_read') {
         order.push(`read:${String(args['path'])}`)
         if (args['path'] === 'notes/slow.md') {
-          await new Promise<void>((resolve) => {
-            releaseFirstRead = resolve
-          })
+          await pendingFirstRead.promise
         }
         return '# content'
       }
@@ -155,7 +153,7 @@ describe('subscribeIndexChanges', () => {
     // The second batch must not start while the first is still applying.
     expect(order).not.toContain('read:notes/fast.md')
 
-    releaseFirstRead()
+    pendingFirstRead.resolve()
     await vi.waitFor(() => {
       expect(order).toContain('apply:notes/fast.md')
     })
@@ -170,13 +168,11 @@ describe('subscribeIndexChanges', () => {
   it('drops queued live writes when the lifecycle suspends and leaves replay to reconcile', async () => {
     const order: string[] = []
     let canApply = true
-    let releaseRead: () => void = () => {}
+    const pendingRead = Promise.withResolvers<void>()
     const { emitChanges } = fakeBridge(async (command, args) => {
       if (command === 'note_read') {
         order.push(`read:${String(args['path'])}`)
-        await new Promise<void>((resolve) => {
-          releaseRead = resolve
-        })
+        await pendingRead.promise
         order.push(`read-finished:${String(args['path'])}`)
       }
       if (command === 'index_apply_batch') {
@@ -194,7 +190,7 @@ describe('subscribeIndexChanges', () => {
     await vi.waitFor(() => expect(order).toContain('read:notes/started-visible.md'))
 
     canApply = false
-    releaseRead()
+    pendingRead.resolve()
     await vi.waitFor(() => expect(order).toContain('read-finished:notes/started-visible.md'))
     await new Promise((resolve) => setTimeout(resolve, 0))
 

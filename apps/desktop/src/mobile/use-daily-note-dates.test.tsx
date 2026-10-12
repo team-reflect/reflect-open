@@ -23,13 +23,10 @@ afterEach(async () => await cleanup())
 
 describe('useDailyNoteDates', () => {
   it('keeps previous markers while a new range loads', async () => {
-    let resolveNextRange: (dates: string[]) => void = () => {}
-    dailyDatesInRange.mockResolvedValueOnce(['2026-07-14']).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveNextRange = resolve
-        }),
-    )
+    const pendingNextRange = Promise.withResolvers<string[]>()
+    dailyDatesInRange
+      .mockResolvedValueOnce(['2026-07-14'])
+      .mockImplementationOnce(() => pendingNextRange.promise)
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const wrapper = ({ children }: { children: ReactNode }): ReactNode => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -53,7 +50,7 @@ describe('useDailyNoteDates', () => {
     await vi.waitFor(() => expect(dailyDatesInRange).toHaveBeenCalledTimes(2))
     expect(hook.result.current.has('2026-07-14')).toBe(true)
 
-    await hook.act(() => resolveNextRange(['2027-01-05']))
+    await hook.act(() => pendingNextRange.resolve(['2027-01-05']))
     await vi.waitFor(() => expect(hook.result.current.has('2027-01-05')).toBe(true))
     expect(hook.result.current.has('2026-07-14')).toBe(false)
   })

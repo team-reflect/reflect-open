@@ -88,20 +88,15 @@ describe('flushQueue', () => {
     // flushed) during that window must NOT be handed the stale pass — its
     // own flush promise must cover it, and the stale pass's per-key removals
     // must not clobber it out of storage.
-    let releaseFirst: (outcome: SendOutcome) => void = () => {}
-    sendMock.mockImplementationOnce(
-      () =>
-        new Promise<SendOutcome>((resolve) => {
-          releaseFirst = resolve
-        }),
-    )
+    const pendingFirst = Promise.withResolvers<SendOutcome>()
+    sendMock.mockImplementationOnce(() => pendingFirst.promise)
     await enqueueCapture(wire(FIRST))
     const firstFlush = flushQueue()
     await vi.waitFor(() => expect(sendMock).toHaveBeenCalledTimes(1))
 
     await enqueueCapture(wire(SECOND))
     const secondFlush = flushQueue()
-    releaseFirst({ kind: 'queued' })
+    pendingFirst.resolve({ kind: 'queued' })
 
     expect((await firstFlush).sent).toBe(1)
     expect((await secondFlush).sent).toBe(1)

@@ -239,12 +239,10 @@ describe('useNativeAudioRecorder', () => {
 
   it('a native stop landing during start does not resurrect the recording', async () => {
     const path = '/staging/stop-during-start.m4a'
-    let releaseStart: () => void = () => {}
+    const pendingStart = Promise.withResolvers<void>()
     invoke.mockImplementation(async (command: string) => {
       if (command === 'plugin:recording|start_recording') {
-        await new Promise<void>((resolve) => {
-          releaseStart = resolve
-        })
+        await pendingStart.promise
         return { sessionStartedMs: SESSION_STARTED_MS }
       }
       return
@@ -269,7 +267,7 @@ describe('useNativeAudioRecorder', () => {
         durationMs: 200,
         reason: 'interruption',
       })
-      releaseStart()
+      pendingStart.resolve()
       await startPromise
     })
 

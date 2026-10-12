@@ -5,18 +5,15 @@ import { useAsyncAction } from './use-async-action.ts'
 describe('useAsyncAction', () => {
   it('flips pending for the duration of the action', async () => {
     const { result, act } = await renderHook(() => useAsyncAction())
-    let release: () => void = () => {}
-    const gate = new Promise<void>((resolve) => {
-      release = resolve
-    })
+    const gate = Promise.withResolvers<void>()
 
     let running: Promise<void> = Promise.resolve()
     await act(() => {
-      running = result.current.run(() => gate)
+      running = result.current.run(() => gate.promise)
     })
     expect(result.current.pending).toBe(true)
 
-    release()
+    gate.resolve()
     await act(async () => {
       await running
     })

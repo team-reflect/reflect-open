@@ -298,12 +298,8 @@ describe('useWikiLinkNavigation', () => {
   })
 
   it('drops a resolution that lands after the host unmounts', async () => {
-    let resolve: (value: { kind: 'resolved'; path: string }) => void = () => {}
-    resolveOrCreateNoteWithTitle.mockReturnValue(
-      new Promise((promiseResolve) => {
-        resolve = promiseResolve
-      }),
-    )
+    const pending = Promise.withResolvers<{ kind: 'resolved'; path: string }>()
+    resolveOrCreateNoteWithTitle.mockReturnValue(pending.promise)
     const view = await render(
       <RouterProvider>
         <Host key="host" generation={1} />
@@ -319,19 +315,17 @@ describe('useWikiLinkNavigation', () => {
         <RouteProbe key="probe" />
       </RouterProvider>,
     )
-    resolve({ kind: 'resolved', path: 'notes/target.md' })
+    pending.resolve({ kind: 'resolved', path: 'notes/target.md' })
     await new Promise((tick) => setTimeout(tick, 0))
     expect(view.getByTestId('route').element().textContent).toContain('"today"')
     await view.unmount()
   })
 
   it('drops an older resolution after a newer wiki-link click', async () => {
-    let finishOlder: (value: { kind: 'resolved'; path: string }) => void = () => {}
+    const pendingOlder = Promise.withResolvers<{ kind: 'resolved'; path: string }>()
     resolveOrCreateNoteWithTitle.mockImplementation((target: string) => {
       if (target === 'Older') {
-        return new Promise((resolve) => {
-          finishOlder = resolve
-        })
+        return pendingOlder.promise
       }
       return Promise.resolve({ kind: 'resolved', path: 'notes/newer.md' })
     })
@@ -341,7 +335,7 @@ describe('useWikiLinkNavigation', () => {
     await vi.waitFor(() => expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Older', 1))
     lastHandler?.({ target: 'Newer', openInNewWindow: false })
     await vi.waitFor(() => expect(currentRoute(view)).toContain('notes/newer.md'))
-    finishOlder({ kind: 'resolved', path: 'notes/older.md' })
+    pendingOlder.resolve({ kind: 'resolved', path: 'notes/older.md' })
     await new Promise((tick) => setTimeout(tick, 0))
 
     expect(currentRoute(view)).toContain('notes/newer.md')
@@ -350,12 +344,8 @@ describe('useWikiLinkNavigation', () => {
   })
 
   it('drops a pending resolution after unrelated router navigation', async () => {
-    let finishResolution: (value: { kind: 'resolved'; path: string }) => void = () => {}
-    resolveOrCreateNoteWithTitle.mockReturnValue(
-      new Promise((resolve) => {
-        finishResolution = resolve
-      }),
-    )
+    const pendingResolution = Promise.withResolvers<{ kind: 'resolved'; path: string }>()
+    resolveOrCreateNoteWithTitle.mockReturnValue(pendingResolution.promise)
     const view = await renderHost()
 
     lastHandler?.({ target: 'Target', openInNewWindow: false })
@@ -363,7 +353,7 @@ describe('useWikiLinkNavigation', () => {
     navigate?.({ kind: 'settings' })
     await vi.waitFor(() => expect(currentRoute(view)).toContain('"settings"'))
 
-    finishResolution({ kind: 'resolved', path: 'notes/target.md' })
+    pendingResolution.resolve({ kind: 'resolved', path: 'notes/target.md' })
     await new Promise((tick) => setTimeout(tick, 0))
 
     expect(currentRoute(view)).toContain('"settings"')
@@ -372,12 +362,8 @@ describe('useWikiLinkNavigation', () => {
   })
 
   it('drops a pending note creation after unrelated router navigation', async () => {
-    let finishCreation: (outcome: { kind: 'created'; path: string }) => void = () => {}
-    resolveOrCreateNoteWithTitle.mockReturnValue(
-      new Promise((resolve) => {
-        finishCreation = resolve
-      }),
-    )
+    const pendingCreation = Promise.withResolvers<{ kind: 'created'; path: string }>()
+    resolveOrCreateNoteWithTitle.mockReturnValue(pendingCreation.promise)
     const view = await renderHost(7)
 
     lastHandler?.({ target: 'Brand New', openInNewWindow: false })
@@ -387,7 +373,7 @@ describe('useWikiLinkNavigation', () => {
     navigate?.({ kind: 'settings' })
     await vi.waitFor(() => expect(currentRoute(view)).toContain('"settings"'))
 
-    finishCreation({ kind: 'created', path: 'notes/created.md' })
+    pendingCreation.resolve({ kind: 'created', path: 'notes/created.md' })
     await new Promise((tick) => setTimeout(tick, 0))
 
     expect(currentRoute(view)).toContain('"settings"')

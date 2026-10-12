@@ -361,29 +361,23 @@ describe('runGistUnpublish', () => {
   })
 
   it('blocks publish or update while an unpublish is in flight for the same note', async () => {
-    let resolveDelete: () => void = () => {}
-    let markDeleteStarted: () => void = () => {}
-    const deleteStarted = new Promise<void>((resolve) => {
-      markDeleteStarted = resolve
+    const deleteStarted = Promise.withResolvers<void>()
+    const pendingDelete = Promise.withResolvers<void>()
+    deleteGist.mockImplementationOnce(() => {
+      deleteStarted.resolve()
+      return pendingDelete.promise
     })
-    deleteGist.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          markDeleteStarted()
-          resolveDelete = resolve
-        }),
-    )
     readNote.mockResolvedValue(REPUBLISH_SOURCE)
 
     const unpublish = runGistUnpublish('notes/a.md', 3)
-    await deleteStarted
+    await deleteStarted.promise
 
     await expect(runGistPublish('notes/a.md', 3)).resolves.toBeNull()
     expect(createGist).not.toHaveBeenCalled()
     expect(updateGist).not.toHaveBeenCalled()
     expect(operationFail).toHaveBeenCalledWith(expect.stringMatching(/current gist operation/i))
 
-    resolveDelete()
+    pendingDelete.resolve()
     await expect(unpublish).resolves.toBe(true)
   })
 })

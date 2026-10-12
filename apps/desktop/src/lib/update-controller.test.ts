@@ -135,18 +135,13 @@ describe('createUpdateController', () => {
     await controller.checkNow()
 
     // A second check hangs in flight while the found update gets installed.
-    let resolveSecond: (value: null) => void = () => {}
-    checkMock.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveSecond = resolve
-        }),
-    )
+    const pendingSecond = Promise.withResolvers<null>()
+    checkMock.mockImplementationOnce(() => pendingSecond.promise)
     const second = controller.checkNow()
     await controller.install()
     expect(controller.getState()).toEqual({ phase: 'ready', version: '0.3.0' })
 
-    resolveSecond(null)
+    pendingSecond.resolve(null)
     await second
     expect(controller.getState()).toEqual({ phase: 'ready', version: '0.3.0' })
   })

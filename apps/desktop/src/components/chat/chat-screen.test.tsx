@@ -667,18 +667,15 @@ describe('ChatScreen', () => {
     const view = await renderChat()
 
     // A file whose read only settles when the test says so.
-    let releaseRead: (buffer: ArrayBuffer) => void = () => {}
+    const pendingRead = Promise.withResolvers<ArrayBuffer>()
     const file = pngFile('cat.png')
     Object.defineProperty(file, 'arrayBuffer', {
-      value: () =>
-        new Promise<ArrayBuffer>((resolve) => {
-          releaseRead = resolve
-        }),
+      value: () => pendingRead.promise,
     })
     dropFiles(view.getByLabelText('Chat message').element(), [file])
 
     probedNewChat?.()
-    releaseRead(new Uint8Array([0x89]).buffer)
+    pendingRead.resolve(new Uint8Array([0x89]).buffer)
     await new Promise((resolve) => setTimeout(resolve, 100))
 
     expect(view.getByAltText('cat.png').query()).toBeNull()
