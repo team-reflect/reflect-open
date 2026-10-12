@@ -4,7 +4,6 @@ import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SETTINGS, getConflictedNotes, type GraphInfo, type Settings } from '@reflect/core'
 import type { BackupState } from '@/lib/backup-controller.ts'
-import { formatFullDate } from '@/lib/dates.ts'
 import '@/test-utils/locator.ts'
 import { MobileSettings } from './settings.tsx'
 
@@ -107,6 +106,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
   await cleanup()
   queryClient.clear()
   vi.clearAllMocks()
@@ -154,16 +154,17 @@ describe('MobileSettings', () => {
 
   it('offers each date format as today in that format and writes the choice', async () => {
     const user = userEvent
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 5, 9))
     await mount()
-    const today = new Date()
 
-    const selected = page.getByRole('button', { name: formatFullDate(today, 'mdy') })
+    const selected = page.getByRole('button', { name: 'June 9th, 2026' })
     await expect.element(selected).toHaveAttribute('aria-current', 'true')
 
-    await user.click(page.getByRole('button', { name: formatFullDate(today, 'dmy') }))
+    await user.click(page.getByRole('button', { name: '9th June, 2026' }))
     expect(updateSettings).toHaveBeenCalledWith({ dateFormat: 'dmy' })
 
-    await user.click(page.getByRole('button', { name: formatFullDate(today, 'iso') }))
+    await user.click(page.getByRole('button', { name: '2026-06-09' }))
     expect(updateSettings).toHaveBeenCalledWith({ dateFormat: 'iso' })
   })
 
