@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.15.0...v0.16.0-beta) (2026-10-13)
+
+
+### Features
+
+* renumber ordered lists ([#1542](https://github.com/team-reflect/reflect-open/issues/1542)) ([9243977](https://github.com/team-reflect/reflect-open/commit/9243977f42f3b183038ba6d6d8dd3437f9c460b8))
+
 ## [0.15.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.8...v0.15.0-beta.9) (2026-10-12)
 
 
