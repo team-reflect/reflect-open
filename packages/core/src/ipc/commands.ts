@@ -201,6 +201,12 @@ export async function mergeText(
   return await call('conflict_merge_text', { path, base, ours, theirs }, mergeTextOutcomeSchema)
 }
 
+/** An external change the sweep should ingest, with the mtime it arrived with. */
+export interface IngestedPath {
+  path: string
+  modifiedMs?: number | undefined
+}
+
 /** Options for {@link icloudConflictsScan}. */
 export interface IcloudScanOptions {
   /** The open graph's generation — the scan is pinned to it. */
@@ -209,9 +215,11 @@ export interface IcloudScanOptions {
   skipPaths?: string[]
   /**
    * External changes just applied cleanly — their content becomes the new
-   * shadow merge base. Never pass this device's own writes.
+   * shadow merge base, provided the file still carries the mtime it arrived
+   * with (a save or a pull since then is not yet a common ancestor). Never
+   * pass this device's own writes.
    */
-  ingestedPaths?: string[]
+  ingestedPaths?: IngestedPath[]
   /**
    * Record a fill-only baseline (adoption): notes without a base snapshot
    * their current content. Safe to repeat — existing bases never move here.

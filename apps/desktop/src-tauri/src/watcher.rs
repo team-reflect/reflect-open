@@ -38,6 +38,9 @@ use crate::fs::GraphState;
 
 /// The Tauri event name carrying batched {@link FileChange}s to the frontend.
 const CHANGE_EVENT: &str = "index:changed";
+/// Same payload as [`CHANGE_EVENT`], for changes that are the echo of a write
+/// this app made itself (see `fs::own_writes`).
+const OWN_WRITE_EVENT: &str = "index:own-write";
 
 /// The coarse dirty signal: a visible directory was created, renamed, or
 /// removed (or the platform demanded a rescan), and its descendants were
@@ -191,6 +194,14 @@ fn tracked_relpath(path: &Path, root: &Path) -> Option<String> {
     tracked.then_some(wire)
 }
 
+/// Separate the echoes of this app's own writes (path and mtime recorded by
+/// the write command) from everything else: `(own, external)`.
+fn split_own_writes(changes: Vec<FileChange>) -> (Vec<FileChange>, Vec<FileChange>) {
+    changes.into_iter().partition(|change| {
+        change.kind == "upsert" && crate::fs::take_own_write(&change.path, change.modified_ms)
+    })
+}
+
 /// Reduce a debounced batch of paths to unique tracked changes (last kind
 /// wins) plus the coarse reconcile signal. Create/modify vs delete is decided
 /// by whether the file currently stats; the same stat supplies the upsert's
@@ -330,8 +341,12 @@ pub fn watch_start(
                 // follow-up `list_files` must re-walk, not replay the cache.
                 crate::fs::invalidate_file_catalog(&app.state::<GraphState>(), &handler_root);
             }
-            if !effects.changes.is_empty() {
-                let _ = app.emit(CHANGE_EVENT, &effects.changes);
+            let (own, external) = split_own_writes(effects.changes);
+            if !external.is_empty() {
+                let _ = app.emit(CHANGE_EVENT, &external);
+            }
+            if !own.is_empty() {
+                let _ = app.emit(OWN_WRITE_EVENT, &own);
             }
             if effects.reconcile {
                 let _ = app.emit(RECONCILE_EVENT, ());
@@ -495,6 +510,31 @@ mod tests {
             }]
         );
         assert!(!effects.reconcile);
+    }
+
+    #[test]
+    fn own_write_echoes_split_from_external_changes() {
+        crate::fs::record_own_write("notes/mine.md", Some(77));
+        let (own, external) = split_own_writes(vec![
+            FileChange {
+                path: "notes/mine.md".to_string(),
+                kind: "upsert".to_string(),
+                modified_ms: Some(77),
+            },
+            FileChange {
+                path: "notes/theirs.md".to_string(),
+                kind: "upsert".to_string(),
+                modified_ms: Some(77),
+            },
+            FileChange {
+                path: "notes/mine.md".to_string(),
+                kind: "remove".to_string(),
+                modified_ms: None,
+            },
+        ]);
+        assert_eq!(own.len(), 1);
+        assert_eq!(own[0].path, "notes/mine.md");
+        assert_eq!(external.len(), 2);
     }
 
     #[test]

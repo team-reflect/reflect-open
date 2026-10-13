@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { subscribeOwnWrites } from '../indexing/local-write-echo.ts'
+import { subscribeFileChanges, type FileChangeSource } from '../indexing/file-changes.ts'
+import { setLocalWriteEcho } from '../indexing/local-write-echo.ts'
 import { setBridge } from '../ipc/bridge.ts'
 import {
   cancelReflectV1Import,
@@ -13,15 +14,19 @@ import {
 
 afterEach(() => {
   setBridge(null)
+  setLocalWriteEcho(false)
 })
 
 describe('graph commands', () => {
   it('creates a note through the generation-pinned no-clobber boundary', async () => {
     const invoke = vi.fn(async () => ({ kind: 'created', modifiedMs: 1_234 }))
     setBridge({ invoke, listen: async () => () => {} })
+    setLocalWriteEcho(true)
     const ownWrites: string[] = []
-    const unlisten = subscribeOwnWrites((path) => {
-      ownWrites.push(path)
+    const sources: FileChangeSource[] = []
+    const unlisten = await subscribeFileChanges((changes, source) => {
+      ownWrites.push(...changes.map((change) => change.path))
+      sources.push(source)
     })
 
     try {
@@ -34,6 +39,7 @@ describe('graph commands', () => {
         generation: 7,
       })
       expect(ownWrites).toEqual(['notes/business-ideas.md'])
+      expect(sources).toEqual(['own-write'])
     } finally {
       unlisten()
     }
@@ -46,9 +52,10 @@ describe('graph commands', () => {
       throw { kind: 'io', message: 'the graph changed since this command was issued; dropping it' }
     })
     setBridge({ invoke, listen: async () => () => {} })
+    setLocalWriteEcho(true)
     const ownWrites: string[] = []
-    const unlisten = subscribeOwnWrites((path) => {
-      ownWrites.push(path)
+    const unlisten = await subscribeFileChanges((changes) => {
+      ownWrites.push(...changes.map((change) => change.path))
     })
 
     try {
@@ -64,9 +71,10 @@ describe('graph commands', () => {
   it('returns a note-create collision without echoing a local write', async () => {
     const invoke = vi.fn(async () => ({ kind: 'collision' }))
     setBridge({ invoke, listen: async () => () => {} })
+    setLocalWriteEcho(true)
     const ownWrites: string[] = []
-    const unlisten = subscribeOwnWrites((path) => {
-      ownWrites.push(path)
+    const unlisten = await subscribeFileChanges((changes) => {
+      ownWrites.push(...changes.map((change) => change.path))
     })
 
     try {
@@ -153,10 +161,14 @@ describe('graph commands', () => {
     expect(invoke).toHaveBeenCalledWith('graph_import_cancel', {})
   })
 
-  it('marks completed import files as this device’s own writes', () => {
+  it('marks completed import files as this device’s own writes', async () => {
+    setBridge({ invoke: async () => null, listen: async () => () => {} })
+    setLocalWriteEcho(true)
     const seen: string[] = []
-    const unlisten = subscribeOwnWrites((path) => {
-      seen.push(path)
+    const sources: FileChangeSource[] = []
+    const unlisten = await subscribeFileChanges((changes, source) => {
+      seen.push(...changes.map((change) => change.path))
+      sources.push(source)
     })
     try {
       markReflectV1ImportOwnWrites({
@@ -170,6 +182,7 @@ describe('graph commands', () => {
       })
 
       expect(seen).toEqual(['notes/a.md', 'daily/2026-07-04.md'])
+      expect(sources).toEqual(['own-write', 'own-write'])
     } finally {
       unlisten()
     }

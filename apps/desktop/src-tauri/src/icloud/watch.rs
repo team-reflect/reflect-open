@@ -663,7 +663,22 @@ mod platform {
                 crate::fs::invalidate_file_catalog(&state, root);
             }
             if is_update {
-                let _ = app.emit("index:changed", round.changes);
+                // The query also reports this device's own saves (and the
+                // sweep's rewrites) once iCloud notices them; those echoes
+                // must not read as external arrivals that advance a note's
+                // shadow base. Same `(path, mtime)` match as the desktop
+                // watcher.
+                let (own, external): (Vec<_>, Vec<_>) =
+                    round.changes.into_iter().partition(|change| {
+                        change.kind == "upsert"
+                            && crate::fs::take_own_write(&change.path, change.modified_ms)
+                    });
+                if !external.is_empty() {
+                    let _ = app.emit("index:changed", external);
+                }
+                if !own.is_empty() {
+                    let _ = app.emit("index:own-write", own);
+                }
             }
         }
         if !is_update {
@@ -828,10 +843,18 @@ mod platform {
                 continue; // placeholder (or eviction): bytes aren't local
             };
             if previous != Some(TrackedState::Local(mtime)) {
+                // The query's change date tracks the item, not the file:
+                // report the filesystem mtime, which is what a write
+                // produced and what the own-write registry matches on.
+                let modified_ms = std::fs::metadata(&item.abs)
+                    .ok()
+                    .as_ref()
+                    .and_then(crate::fs::modified_ms)
+                    .or(Some(mtime));
                 changes.push(FileChange {
                     path: item.rel.clone(),
                     kind: "upsert".to_string(),
-                    modified_ms: Some(mtime),
+                    modified_ms,
                 });
             }
         }
@@ -1020,6 +1043,28 @@ mod platform {
                     Some(2)
                 )]
             );
+        }
+
+        #[test]
+        fn an_upsert_reports_the_files_own_mtime_not_the_querys_date() {
+            // The own-write registry matches on the mtime a write produced;
+            // the query's content-change date can differ from it.
+            let dir = tempfile::tempdir().unwrap();
+            let abs = dir.path().join("a.md");
+            std::fs::write(&abs, "# A\n").unwrap();
+            let on_disk = std::fs::metadata(&abs)
+                .ok()
+                .as_ref()
+                .and_then(crate::fs::modified_ms);
+            let listing = vec![ItemState {
+                abs: abs.to_string_lossy().into_owned(),
+                ..item("notes/a.md", true, Some(2))
+            }];
+            assert_eq!(
+                shapes(&apply_update_delta(&mut state(&[]), &listing, &[])),
+                vec![("notes/a.md".to_string(), "upsert".to_string(), on_disk)]
+            );
+            assert_ne!(on_disk, Some(2));
         }
 
         #[test]

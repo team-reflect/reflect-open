@@ -154,7 +154,6 @@ export {
   subscribeReconcileRequests,
   emitFileChanges,
   setLocalWriteEcho,
-  subscribeOwnWrites,
   subscribeIcloudConflicts,
   subscribeIcloudWatchFailed,
   applyIndexChanges,

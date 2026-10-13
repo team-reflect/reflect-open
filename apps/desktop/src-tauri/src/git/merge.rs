@@ -261,7 +261,11 @@ fn changed_between(
     Ok(out)
 }
 
-/// Fill `modified_ms` for upserts from the (now final) working-tree files.
+/// Stamp each written file's real mtime on its change, and register the
+/// write as this app's own: the watcher's echo of a pull is then labeled
+/// `own-write`, exactly like a save, so it does not advance a note's shadow
+/// base. (It still ticks the commit debounce like a save; that cycle finds
+/// nothing to commit and nothing ahead, and ends there.)
 fn stamp_modified_times(root: &Path, changes: &mut [ChangedFile]) {
     for change in changes {
         if matches!(change.kind, ChangeKind::Remove) {
@@ -274,6 +278,7 @@ fn stamp_modified_times(root: &Path, changes: &mut [ChangedFile]) {
             .and_then(|meta| meta.modified().ok())
             .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|duration| duration.as_millis() as u64);
+        crate::fs::record_own_write(&change.path, change.modified_ms);
     }
 }
 

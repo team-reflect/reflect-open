@@ -23,7 +23,7 @@ export {
   type FileChangeHandler,
   type FileChangeSource,
 } from './file-changes.ts'
-export { setLocalWriteEcho, subscribeOwnWrites } from './local-write-echo.ts'
+export { setLocalWriteEcho } from './local-write-echo.ts'
 export { subscribeIcloudConflicts, subscribeIcloudWatchFailed } from './icloud-conflicts.ts'
 export { subscribeIndexApplied, type IndexAppliedListener } from './index-applied.ts'
 export { INDEX_WRITTEN_EVENT, subscribeIndexWritten } from './index-written.ts'
