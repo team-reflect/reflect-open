@@ -206,7 +206,7 @@ sits in a domain directory. A file that exports a service is named after it:
 2. Add the factory to `coreServiceFactories`.
 3. Build it in `composeCoreServices` through the table, after the services it
    depends on: `const noteMove = create.noteMove({ ipc, indexStore, openDocuments, logger })`.
-4. Export from a barrel in `packages/core/src/exports/` only the names another
+4. Export from `packages/core/src/index.ts` only the names another
    package imports. Apps import only from the package root and `/testing`.
 
 A service that only other services use stays a local and goes in

@@ -45,8 +45,8 @@ The resilience contract (it mirrors the frontmatter schema):
   any one library: `editorMarkdownSyntax`, not `meowdownMarkMode` — map to the
   library's vocabulary at the consuming boundary instead.
 
-Export any new value type from the package root, through the barrel
-`packages/core/src/exports/platform.ts` (alongside `EditorMarkdownSyntax`). Cover the new key in
+Export any new value type from the package root,
+`packages/core/src/index.ts` (alongside `EditorMarkdownSyntax`). Cover the new key in
 `packages/core/src/settings/schema.test.ts`: default on missing, degrade on
 invalid, accepted values pass through.
 
@@ -136,7 +136,7 @@ the common shapes). Add the test at the narrowest useful level:
 ## Checklist
 
 - [ ] Value schema with `.catch(default)` added to `settingsSchema`
-- [ ] New types exported from `packages/core/src/exports/platform.ts`
+- [ ] New types exported from `packages/core/src/index.ts`
 - [ ] Schema tests: missing → default, invalid → default, valid round-trips
 - [ ] Section under `components/settings/` built from the shared primitives,
       wired to `updateSettings`
