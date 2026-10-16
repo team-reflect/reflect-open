@@ -384,6 +384,7 @@ pub(super) fn finalize_import(
             NotePlan::Write { relative, renamed } => {
                 let target = resolve(root, &relative)?;
                 atomic_write_bytes(root, &target, &entry.bytes)?;
+                super::own_writes::record(root, &relative, &entry.bytes);
                 names.record(&target);
                 imported_files += 1;
                 if renamed {
@@ -394,6 +395,7 @@ pub(super) fn finalize_import(
             NotePlan::Merge { merged } => {
                 let target = resolve(root, &entry.relative)?;
                 atomic_write_bytes(root, &target, &merged)?;
+                super::own_writes::record(root, &entry.relative, &merged);
                 merged_files += 1;
                 changed_paths.push(entry.relative.clone());
             }

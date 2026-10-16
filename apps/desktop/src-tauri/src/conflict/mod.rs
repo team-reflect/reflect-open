@@ -31,6 +31,11 @@ use crate::fs::GraphState;
 
 use self::archive::ArchivedVersion;
 
+/// Archive and ladder label for the side this app is writing.
+pub(crate) const THIS_DEVICE: &str = "this device";
+/// Archive and ladder label for the side found on disk.
+pub(crate) const OTHER_DEVICE: &str = "other device";
+
 /// Command: the archived earlier versions of a note, newest first.
 #[tauri::command]
 pub async fn conflict_archive_list(
