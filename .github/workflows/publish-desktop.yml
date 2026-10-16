@@ -2,8 +2,7 @@ name: Publish desktop release
 
 # Builds, uploads, and publishes one desktop release (macOS, Windows, Linux,
 # and TestFlight) for a tag created by release-please. Called once per channel
-# by release.yml; the called workflows derive stable vs. beta from the tag's
-# prerelease suffix, so this workflow is channel-agnostic.
+# by release.yml.
 
 on:
   workflow_call:
@@ -21,13 +20,25 @@ permissions:
   contents: write
 
 jobs:
-  # The caller resolved the tag to its immutable commit once; the called
-  # workflows check out that SHA rather than resolving the tag name again. The
-  # builds upload into the draft release, and the finalize job at the end
-  # publishes it.
   macos:
     name: Build the macOS release
     uses: ./.github/workflows/publish-macos.yml
+    with:
+      tag: ${{ inputs.tag }}
+      commit: ${{ inputs.commit }}
+    secrets: inherit
+
+  windows:
+    name: Build the Windows installer
+    uses: ./.github/workflows/publish-windows.yml
+    with:
+      tag: ${{ inputs.tag }}
+      commit: ${{ inputs.commit }}
+    secrets: inherit
+
+  linux:
+    name: Build the Linux packages
+    uses: ./.github/workflows/publish-linux.yml
     with:
       tag: ${{ inputs.tag }}
       commit: ${{ inputs.commit }}
@@ -44,34 +55,8 @@ jobs:
       commit: ${{ inputs.commit }}
     secrets: inherit
 
-  # The experimental Windows build rides every release too: x64 and arm64
-  # installers plus their updater signatures go into the draft release. The
-  # installers are not code-signed; the secrets are only for the updater
-  # signature.
-  windows:
-    name: Build the Windows installer
-    uses: ./.github/workflows/publish-windows.yml
-    with:
-      tag: ${{ inputs.tag }}
-      commit: ${{ inputs.commit }}
-    secrets: inherit
-
-  # The experimental Linux build rides every release too: x64 and arm64
-  # AppImages and `.deb` packages plus their updater signatures go into the
-  # draft release. The packages are not code-signed; the secrets are only for
-  # the updater signature.
-  linux:
-    name: Build the Linux packages
-    uses: ./.github/workflows/publish-linux.yml
-    with:
-      tag: ${{ inputs.tag }}
-      commit: ${{ inputs.commit }}
-    secrets: inherit
-
-  # The builds only fill the draft release. Publishing waits for both macOS
-  # and Windows to succeed. It also waits for Linux to finish, but a Linux
-  # failure does not block it: the release then ships without the missing
-  # Linux packages.
+  # The builds only fill the draft release. Publishing waits for the macOS,
+  # Windows, and Linux builds to succeed.
   #
   # This job writes latest.json, completes the release notes, and publishes
   # the release. Nothing is visible to users, and releases/latest does not
@@ -80,7 +65,7 @@ jobs:
   finalize:
     name: Finalize the release
     needs: [macos, windows, linux]
-    if: ${{ !cancelled() && github.repository == 'team-reflect/reflect-open' && needs.macos.result == 'success' && needs.windows.result == 'success' }}
+    if: github.repository == 'team-reflect/reflect-open'
     runs-on: ubuntu-latest
     concurrency:
       group: publish-finalize

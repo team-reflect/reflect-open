@@ -217,8 +217,8 @@ for stable) because the release tag already identifies the version. That keeps
 `releases/latest/download/<asset>` stable across releases. Updater archives remain
 versioned because each manifest points at an immutable release payload.
 
-The finalize job in `publish-desktop.yml` runs once the macOS, Windows, and Linux builds have finished.
-The macOS and Windows builds have to succeed; a Linux failure does not block it. It runs `pnpm release:manifest --tag=<tag>`
+The finalize job in `publish-desktop.yml` runs once the macOS, Windows, and Linux builds have succeeded.
+All three builds have to succeed. It runs `pnpm release:manifest --tag=<tag>`
 (`apps/desktop/scripts/release-manifest.ts`), which downloads the `.sig` files from the
 release, writes `latest.json` with one entry per platform (`darwin-aarch64`,
 `darwin-x86_64`, plus `windows-x86_64`, `windows-aarch64`, `linux-x86_64-appimage`,
