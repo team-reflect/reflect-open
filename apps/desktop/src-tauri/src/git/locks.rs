@@ -24,19 +24,29 @@ pub(super) fn retry_after_stale_lock<T>(root: &Path, f: impl Fn() -> AppResult<T
     f()
 }
 
-fn clear_stale_locks(root: &Path, message: &str) -> usize {
+pub(super) fn clear_stale_locks(root: &Path, message: &str) -> usize {
+    let Ok(repo) = git2::Repository::open(root) else {
+        return 0;
+    };
     if let Some(path) = parse_lock_path(message) {
-        if remove_if_stale(&path) {
+        if is_repository_lock(&repo, &path) && remove_if_stale(&path) {
             return 1;
         }
     }
-    sweep(root)
+    sweep(&repo)
 }
 
 fn parse_lock_path(message: &str) -> Option<PathBuf> {
     let rest = &message[message.find('\'')? + 1..];
     let path = &rest[..rest.find('\'')?];
     (!path.is_empty()).then(|| PathBuf::from(path))
+}
+
+/// An absolute `.lock` path inside the git directory or the common directory.
+fn is_repository_lock(repo: &git2::Repository, path: &Path) -> bool {
+    path.is_absolute()
+        && path.extension().is_some_and(|ext| ext == "lock")
+        && (path.starts_with(repo.path()) || path.starts_with(repo.commondir()))
 }
 
 fn is_stale(modified: SystemTime) -> bool {
@@ -66,10 +76,7 @@ fn remove_if_stale(path: &Path) -> bool {
     }
 }
 
-fn sweep(root: &Path) -> usize {
-    let Ok(repo) = git2::Repository::open(root) else {
-        return 0;
-    };
+fn sweep(repo: &git2::Repository) -> usize {
     let mut dirs = vec![repo.path().to_path_buf()];
     if repo.commondir() != repo.path() {
         dirs.push(repo.commondir().to_path_buf());

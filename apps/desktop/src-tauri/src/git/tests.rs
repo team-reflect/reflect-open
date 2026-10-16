@@ -1402,3 +1402,45 @@ fn a_symlinked_lock_is_never_followed() {
     assert!(target.exists());
     assert!(fs::symlink_metadata(&lock).is_ok());
 }
+
+#[test]
+fn a_lock_path_outside_the_repository_is_never_removed() {
+    let fixture = fixture();
+    let outside = tempdir().unwrap();
+    let stale = outside.path().join("stale.lock");
+    fs::write(&stale, "").unwrap();
+    age_file(&stale, 10);
+    let message = format!(
+        "failed to lock file '{}' for writing: the file is locked (code -14)",
+        stale.display()
+    );
+
+    assert_eq!(
+        super::locks::clear_stale_locks(&fixture.graph_a, &message),
+        0
+    );
+    assert!(stale.exists());
+}
+
+#[test]
+fn a_relative_lock_path_in_the_message_is_ignored() {
+    let fixture = fixture();
+    let outside = tempdir().unwrap();
+    let stale = outside.path().join("stale.lock");
+    fs::write(&stale, "").unwrap();
+    age_file(&stale, 10);
+    let depth = std::env::current_dir().unwrap().components().count();
+    let relative = format!(
+        "{}{}",
+        "../".repeat(depth),
+        stale.strip_prefix("/").unwrap().display()
+    );
+    assert!(Path::new(&relative).exists());
+    let message = format!("failed to lock file '{relative}' for writing");
+
+    assert_eq!(
+        super::locks::clear_stale_locks(&fixture.graph_a, &message),
+        0
+    );
+    assert!(stale.exists());
+}
