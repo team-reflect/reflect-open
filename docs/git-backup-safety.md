@@ -25,13 +25,18 @@ Status (2026-10-16): implemented in phase 4 of the sync rework.
 
 On a fast-forward, files are written first and the branch pointer moves
 last. A failure in between leaves the ref where it was, so the next cycle
-retries the pull instead of committing the stale tree.
+retries the pull instead of committing the stale tree. A merge follows the
+same order: the merge commit is written, then its tree is checked out, and
+the ref moves last.
 
 - Test: `git::tests::fast_forward_checkout_failure_never_reverts_pulled_notes`,
   `git::tests::stale_head_lock_fast_forward_never_reverts_pulled_notes`,
-  `git::tests::fast_forward_with_a_stale_head_lock_succeeds`.
+  `git::tests::fast_forward_with_a_stale_head_lock_succeeds`,
+  `git::tests::merge_crash_before_checkout_converges_next_cycle`,
+  `git::tests::merge_crash_after_checkout_before_ref_move_converges_next_cycle`.
 
-Status (2026-10-16): already implemented (#1468).
+Status (2026-10-16): fast-forward implemented (#1468); merge implemented in
+phase 1 of the sync rework.
 
 ## S3. After any failed git command, the next cycle loses nothing
 
@@ -51,8 +56,8 @@ Git commands, note writes, and iCloud sweep writes on the same graph are
 serialized. The quit-time and background flush go through the sync engine's
 queue, never straight to `git_commit_all`.
 
-- Test: `git::tests::commit_during_fast_forward_never_reverts_pulled_notes`
-  (`#[ignore]`), `backup-service.test.ts` "quit flush waits for an
+- Test: `git::tests::commit_during_fast_forward_never_reverts_pulled_notes`,
+  `backup-service.test.ts` "quit flush waits for an
   in-flight pull before committing", `engine.test.ts` "commitNow joins the
   single-flight queue and never touches the network".
 
@@ -60,13 +65,15 @@ Status (2026-10-16): implemented in phase 1 of the sync rework.
 
 ## S5. The repository is never left in app-made merge state
 
-A pull that dies between `repo.merge()` and the merge commit must not leave
-`MERGE_HEAD` behind, because every later cycle refuses to run on a
-repository mid-merge. Foreign state (a rebase the user started with the
-git CLI) is still refused.
+A pull computes the merge in memory and never calls `repo.merge()`, so no
+stop can leave `MERGE_HEAD` behind. A stop after the checkout and before the
+ref move leaves the merged files on disk; the next cycle commits them as a
+local change and merges again. Foreign state (a merge or rebase the user
+started with the git CLI) is still refused.
 
-- Test: `git::tests::merge_interrupted_before_commit_converges_next_cycle`
-  (`#[ignore]`).
+- Test: `git::tests::merge_interrupted_before_commit_converges_next_cycle`,
+  `git::tests::merge_never_leaves_merge_head`,
+  `git::tests::edits_after_a_merge_crash_survive_the_next_cycle`.
 
 Status (2026-10-16): implemented in phase 1 of the sync rework.
 

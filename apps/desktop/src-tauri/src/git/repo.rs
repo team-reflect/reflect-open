@@ -41,7 +41,7 @@ pub(super) fn open_existing(root: &Path) -> AppResult<Repository> {
 pub(super) fn ensure_clean_state(repo: &Repository) -> AppResult<()> {
     if repo.state() != git2::RepositoryState::Clean {
         return Err(AppError::io(format!(
-            "the backup repository has a {:?} in progress; finish or abort it with git first",
+            "the backup repository has a {:?} in progress that this app did not start; finish or abort it with git first",
             repo.state()
         )));
     }
