@@ -18,7 +18,7 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 export function useMobileSyncStatus(): MobileSyncStatus | null {
   const { graph } = useGraph()
   const sync = useSyncContext()
-  const { indexQuery } = useCoreServices()
+  const { indexQuery, clock } = useCoreServices()
   const backup = sync?.backup ?? null
   const connected = backup !== null && backup.phase === 'connected'
 
@@ -31,5 +31,6 @@ export function useMobileSyncStatus(): MobileSyncStatus | null {
     backup,
     conflictCount: conflicted?.length,
     conflictCountUnavailable: countUnavailable,
+    now: clock.now(),
   })
 }

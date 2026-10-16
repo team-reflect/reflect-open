@@ -39,11 +39,14 @@ export type SyncErrorKind = 'auth' | 'rejected' | 'other'
  * The product states, as a discriminated union — `{ state: 'idle',
  * errorKind: … }` is unrepresentable. `offline` means the remote was
  * unreachable; changes stay committed locally and the next cycle (online
- * event, focus, or edit) retries.
+ * event, focus, or edit) retries. `waiting` is quiet mode between a local
+ * commit and the network pass; `until` is the epoch ms when the quiet window
+ * ends.
  */
 export type SyncStatus =
   | { state: 'idle' }
   | { state: 'syncing' }
+  | { state: 'waiting'; until: number }
   | { state: 'offline'; message: string }
   | { state: 'error'; errorKind: SyncErrorKind; message: string }
 
@@ -52,6 +55,13 @@ export type SyncStatus =
  */
 export function isSyncError(status: SyncStatus): status is Extract<SyncStatus, { state: 'error' }> {
   return status.state === 'error'
+}
+
+/**
+ * Whole minutes (rounded up, at least 1) until a `waiting` status ends.
+ */
+export function minutesUntil(until: number, now: number): number {
+  return Math.max(1, Math.ceil((until - now) / 60_000))
 }
 
 export interface SyncEngineOptions {
@@ -110,6 +120,17 @@ export interface SyncEngineOptions {
    * no push. Edits still land in Git history and stay revertable.
    */
   localOnly?: boolean
+  /**
+   * Quiet mode: edits and manual syncs only commit locally. The network pass
+   * (fetch, merge, push) runs once this many ms pass with no edit and no
+   * pulled change, and only when {@link networkReady} agrees.
+   */
+  quietMs?: number
+  /**
+   * Asked when the quiet window ends. False postpones the network pass with
+   * a growing delay, up to five minutes.
+   */
+  networkReady?: () => Promise<boolean>
 }
 
 export interface SyncEngine {
@@ -136,6 +157,8 @@ export interface SyncEngine {
 
 const DEFAULT_IDLE_MS = 30_000
 const DEFAULT_MAX_WAIT_MS = 5 * 60_000
+const QUIET_BACKOFF_START_MS = 30_000
+const QUIET_BACKOFF_MAX_MS = 5 * 60_000
 
 /**
  * Push attempts per cycle. Each retry fetches + merges first, so two devices
@@ -196,6 +219,7 @@ class SyncEngineImpl implements SyncEngine {
   readonly #options: SyncEngineOptions
   readonly #idleMs: number
   readonly #maxWaitMs: number
+  readonly #quietMs: number | null
   readonly #abort = new AbortController()
   readonly #signal = this.#abort.signal
   #timer: TimerHandle | null = null
@@ -226,12 +250,25 @@ class SyncEngineImpl implements SyncEngine {
    * the same reconnect prompt, with nothing having changed in between.
    */
   #authFailed = false
+  #quietTimer: TimerHandle | null = null
+  /**
+   * Bumped by every arm, so an ask that was in flight when the window moved
+   * can tell its answer is stale.
+   */
+  #quietGeneration = 0
+  /**
+   * The current back-off delay while the network is not ready; null otherwise.
+   */
+  #quietDelayMs: number | null = null
+  #quietUntil = 0
+  #current: SyncStatus = { state: 'idle' }
 
   constructor(deps: SyncEngineDeps, options: SyncEngineOptions) {
     this.#deps = deps
     this.#options = options
     this.#idleMs = options.idleMs ?? DEFAULT_IDLE_MS
     this.#maxWaitMs = options.maxWaitMs ?? DEFAULT_MAX_WAIT_MS
+    this.#quietMs = options.quietMs ?? null
   }
 
   noteChanged(): void {
@@ -249,6 +286,10 @@ class SyncEngineImpl implements SyncEngine {
 
   syncNow(): Promise<void> {
     this.#authFailed = false // a resume trigger: the user may have fixed the sign-in
+    if (this.#quietMs !== null) {
+      this.#armQuiet(this.#quietMs)
+      return this.#run(COMMIT)
+    }
     return this.#run(FULL)
   }
 
@@ -262,13 +303,74 @@ class SyncEngineImpl implements SyncEngine {
       this.#deps.clock.clearTimeout(this.#timer)
       this.#timer = null
     }
+    if (this.#quietTimer !== null) {
+      this.#deps.clock.clearTimeout(this.#quietTimer)
+      this.#quietTimer = null
+    }
   }
 
   #emit(status: SyncStatus): void {
     if (this.#signal.aborted) {
       return // a stopped engine must not resurrect UI state (e.g. post-disconnect)
     }
+    this.#current = status
     this.#options.onStatus?.(status)
+  }
+
+  /** Report the end of a cycle: `waiting` while a quiet window is open, else `idle`. */
+  #emitSettled(): void {
+    this.#emit(
+      this.#quietTimer === null ? { state: 'idle' } : { state: 'waiting', until: this.#quietUntil },
+    )
+  }
+
+  /** Open a fresh quiet window, replacing any window that is open. */
+  #armQuiet(delayMs: number, delayIsBackoff = false): void {
+    if (this.#signal.aborted) {
+      return
+    }
+    if (this.#quietTimer !== null) {
+      this.#deps.clock.clearTimeout(this.#quietTimer)
+    }
+    if (!delayIsBackoff) {
+      this.#quietDelayMs = null
+    }
+    const generation = ++this.#quietGeneration
+    this.#quietUntil = this.#deps.clock.now() + delayMs
+    this.#quietTimer = this.#deps.clock.setTimeout(() => {
+      this.#quietTimer = null
+      void this.#afterQuiet(generation)
+    }, delayMs)
+    // Keep an error visible, and leave a running cycle to report its own end.
+    if (this.#current.state !== 'error' && this.#running === null) {
+      this.#emit({ state: 'waiting', until: this.#quietUntil })
+    }
+  }
+
+  async #afterQuiet(generation: number): Promise<void> {
+    if (generation !== this.#quietGeneration || this.#signal.aborted) {
+      return
+    }
+    let ready: boolean
+    try {
+      ready = (await this.#options.networkReady?.()) ?? true
+    } catch {
+      ready = false
+    }
+    if (generation !== this.#quietGeneration || this.#signal.aborted) {
+      return
+    }
+    if (ready) {
+      this.#quietDelayMs = null
+      await this.#run(FULL)
+      return
+    }
+    const next =
+      this.#quietDelayMs === null
+        ? QUIET_BACKOFF_START_MS
+        : Math.min(this.#quietDelayMs * 2, QUIET_BACKOFF_MAX_MS)
+    this.#quietDelayMs = next
+    this.#armQuiet(next, true)
   }
 
   /**
@@ -332,7 +434,14 @@ class SyncEngineImpl implements SyncEngine {
     }
     this.#timer = this.#deps.clock.setTimeout(() => {
       this.#timer = null
-      void this.#run(PUSH)
+      const quietMs = this.#quietMs
+      if (quietMs === null) {
+        void this.#run(PUSH)
+        return
+      }
+      void this.#run(COMMIT).then(() => {
+        this.#armQuiet(quietMs)
+      })
     }, delayMs)
   }
 
@@ -383,7 +492,7 @@ class SyncEngineImpl implements SyncEngine {
         await this.#settleRemoteChanges(remoteChangeTasks)
         if (!quiet) {
           this.#authFailed = false
-          this.#emit({ state: 'idle' })
+          this.#emitSettled()
         }
       } catch (error) {
         if (error instanceof CycleSuppressedError) {
@@ -392,7 +501,7 @@ class SyncEngineImpl implements SyncEngine {
           // that notification before the suppressed cycle settles to idle.
           try {
             await this.#settleRemoteChanges(remoteChangeTasks, false)
-            this.#emit({ state: 'idle' })
+            this.#emitSettled()
           } catch (notificationError) {
             if (!this.#signal.aborted) {
               this.#emit(statusForError(notificationError))
@@ -489,6 +598,9 @@ class SyncEngineImpl implements SyncEngine {
       // those changes out before the boundary gate stops subsequent Git work.
       if (outcome.changedFiles.length > 0) {
         remoteChanges(outcome.changedFiles)
+        if (this.#quietMs !== null) {
+          this.#armQuiet(this.#quietMs)
+        }
       }
     }) // upToDate is a no-op
   }

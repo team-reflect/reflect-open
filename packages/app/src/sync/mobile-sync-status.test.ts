@@ -17,7 +17,7 @@ function connected(status: Extract<BackupState, { phase: 'connected' }>['status'
 }
 
 function statusFor(backup: BackupState, conflictCount: number): MobileSyncStatus | null {
-  return mobileSyncStatus({ backup, conflictCount, conflictCountUnavailable: false })
+  return mobileSyncStatus({ backup, conflictCount, conflictCountUnavailable: false, now: 0 })
 }
 
 describe('engine state and conflict count', () => {
@@ -29,6 +29,17 @@ describe('engine state and conflict count', () => {
   it('rests on Backed up — the quiet tone the pill hides on', () => {
     const status = statusFor(connected({ state: 'idle' }), 0)
     expect(status).toEqual({ label: 'Backed up', tone: 'ok', detail: null })
+  })
+
+  it('maps a waiting window to Backed up with the minutes left', () => {
+    expect(statusFor(connected({ state: 'waiting', until: 2 * 60_000 + 1 }), 0)).toEqual({
+      label: 'Backed up',
+      tone: 'ok',
+      detail: 'Backs up in 3 min',
+    })
+    expect(statusFor(connected({ state: 'waiting', until: 5 }), 0)?.detail).toBe(
+      'Backs up in 1 min',
+    )
   })
 
   it('shows Syncing while a cycle runs — even with conflicts pending', () => {
@@ -76,7 +87,7 @@ describe('engine state and conflict count', () => {
 describe('mobileSyncStatus', () => {
   it('has nothing to say without a backup lifecycle', () => {
     expect(
-      mobileSyncStatus({ backup: null, conflictCount: 0, conflictCountUnavailable: false }),
+      mobileSyncStatus({ backup: null, conflictCount: 0, conflictCountUnavailable: false, now: 0 }),
     ).toBeNull()
   })
 
@@ -86,6 +97,7 @@ describe('mobileSyncStatus', () => {
         backup: connected({ state: 'offline', message: 'Offline' }),
         conflictCount: undefined,
         conflictCountUnavailable: false,
+        now: 0,
       }),
     ).toBeNull()
   })
@@ -96,6 +108,7 @@ describe('mobileSyncStatus', () => {
         backup: connected({ state: 'offline', message: 'Offline' }),
         conflictCount: undefined,
         conflictCountUnavailable: true,
+        now: 0,
       }),
     ).toEqual({ label: 'Offline', tone: 'attention', detail: 'Offline' })
   })
@@ -106,6 +119,7 @@ describe('mobileSyncStatus', () => {
         backup: connected({ state: 'idle' }),
         conflictCount: 2,
         conflictCountUnavailable: false,
+        now: 0,
       })?.label,
     ).toBe('Needs review')
     expect(
@@ -113,6 +127,7 @@ describe('mobileSyncStatus', () => {
         backup: { phase: 'disconnected' },
         conflictCount: undefined,
         conflictCountUnavailable: false,
+        now: 0,
       }),
     ).toBeNull()
   })

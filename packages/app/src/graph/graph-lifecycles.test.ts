@@ -29,6 +29,7 @@ function graphDeps(core: TestCoreServices): GraphServicesDeps {
       activity,
       platform: core.platform,
       persistenceFlush: core.persistenceFlush,
+      icloudNative,
       logger,
     },
     icloudSync: {

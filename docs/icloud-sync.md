@@ -19,12 +19,17 @@ edit the same note while apart.
   iCloud…*, which copies it into the container (verified file-by-file) and
   reopens it there; the original folder stays on disk, untouched, as a
   recovery copy.
-- **iCloud or GitHub, not both.** A graph syncs through iCloud Drive *or* a
-  Git remote. Two sync engines merging the same files fight each other, and a
-  `.git` directory must never ride a file-sync provider (object-store
-  corruption). Moving a graph to iCloud disconnects its GitHub backup first,
-  and `.git`/`.reflect` are always marked local-only as a belt-and-braces
-  guard.
+- **One sync method per graph (recommended).** A graph syncs through iCloud
+  Drive *or* a Git remote. Two sync engines merging the same files fight each
+  other, and a `.git` directory must never ride a file-sync provider
+  (object-store corruption). Moving a graph to iCloud disconnects its GitHub
+  backup first, and `.git`/`.reflect` are always marked local-only as a
+  belt-and-braces guard. A graph that holds both anyway (for example a
+  Git-backed graph that lives in iCloud Drive) still works: Reflect commits
+  locally as you type, and touches the network only after five quiet minutes
+  with no pending iCloud downloads. The GitHub history is noisy, because
+  every device commits what iCloud delivered, and the backup trails your
+  edits by about five minutes.
 
 ## What happens on a conflict
 

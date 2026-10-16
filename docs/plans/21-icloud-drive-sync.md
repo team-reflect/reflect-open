@@ -196,6 +196,11 @@ rename seam; a miss is again just a degraded merge.
   histories pushing one remote would non-FF forever). Enabling iCloud sync
   disconnects a configured Git remote (with an explanatory prompt); local
   checkpoint commits remain allowed and useful for recovery.
+
+  2026-10 revision: a graph may hold both. One sync method per graph stays the
+  recommendation, but the engine now runs in quiet mode on an iCloud graph with
+  a remote: it commits locally, and fetches and pushes only after five quiet
+  minutes with no pending iCloud downloads (see `docs/icloud-sync.md`).
 - **`.reflect/` exclusion goes cross-platform.** `mark_reflect_dir_local_only`
   widens from `cfg(target_os = "macos")` to Apple targets; the
   `ubiquitousItemIsExcludedFromSync` resource key exists on iOS. Verified inside

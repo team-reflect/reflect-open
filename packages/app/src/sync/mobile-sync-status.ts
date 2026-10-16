@@ -1,4 +1,4 @@
-import type { BackupState } from '@reflect/core'
+import { minutesUntil, type BackupState } from '@reflect/core'
 
 /**
  * The plain-language sync status mobile shows (Plan 19, step 10). The phone
@@ -33,7 +33,11 @@ export interface MobileSyncStatus {
  * across idle cycles — conflicts never block other notes from syncing, so
  * the engine alone would happily report all-clear); errors and offline last.
  */
-function statusForBackup(backup: BackupState, conflictCount: number): MobileSyncStatus | null {
+function statusForBackup(
+  backup: BackupState,
+  conflictCount: number,
+  now: number,
+): MobileSyncStatus | null {
   if (backup.phase !== 'connected') {
     return null
   }
@@ -57,6 +61,13 @@ function statusForBackup(backup: BackupState, conflictCount: number): MobileSync
   if (status.state === 'offline') {
     return { label: 'Offline', tone: 'attention', detail: status.message }
   }
+  if (status.state === 'waiting') {
+    return {
+      label: 'Backed up',
+      tone: 'ok',
+      detail: `Backs up in ${minutesUntil(status.until, now)} min`,
+    }
+  }
   return { label: 'Backed up', tone: 'ok', detail: null }
 }
 
@@ -76,6 +87,10 @@ export interface SyncStatusInput {
    * Whether reading the conflicted-note count failed.
    */
   conflictCountUnavailable: boolean
+  /**
+   * The current time, epoch ms.
+   */
+  now: number
 }
 
 /**
@@ -90,6 +105,7 @@ export function mobileSyncStatus({
   backup,
   conflictCount,
   conflictCountUnavailable,
+  now,
 }: SyncStatusInput): MobileSyncStatus | null {
   const connected = backup !== null && backup.phase === 'connected'
   // Loading hides the status (no flip); a *failed* count must not — the
@@ -100,5 +116,5 @@ export function mobileSyncStatus({
   if (backup === null || (connected && conflictCount === undefined && !conflictCountUnavailable)) {
     return null
   }
-  return statusForBackup(backup, conflictCount ?? 0)
+  return statusForBackup(backup, conflictCount ?? 0, now)
 }

@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactElement } from 'react'
-import type { GraphInfo } from '@reflect/core'
+import { minutesUntil, type ClockService, type GraphInfo } from '@reflect/core'
 import { FolderOpen, GraduationCap, LocateFixed, PanelsTopLeft, Settings } from 'lucide-react'
 import { GraphSwatch } from '@/components/graph-swatch.tsx'
 import { ReflectAppsDialog } from '@/components/reflect-apps-dialog.tsx'
@@ -36,13 +36,21 @@ function graphSwitchBindingFor(index: number): string | null {
  * pulsing accent dot while backing up, amber when offline with queued
  * changes, red when backup needs attention. Detail lives in Settings.
  */
-function backupDot(backup: BackupState): { className: string; label: string } | null {
+function backupDot(
+  backup: BackupState,
+  clock: ClockService,
+): { className: string; label: string } | null {
   if (backup.phase !== 'connected' || backup.status.state === 'idle') {
     return null
   }
   switch (backup.status.state) {
     case 'syncing':
       return { className: 'bg-accent motion-safe:animate-pulse', label: 'Backing up' }
+    case 'waiting':
+      return {
+        className: 'bg-text-muted',
+        label: `Backs up in ${minutesUntil(backup.status.until, clock.now())} min`,
+      }
     case 'offline':
       return { className: 'bg-amber-500', label: 'Backup waiting for a connection' }
     case 'error':
@@ -65,13 +73,13 @@ interface GraphFooterProps {
 export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement {
   const [appsOpen, setAppsOpen] = useState(false)
   const graphTriggerRef = useRef<HTMLButtonElement>(null)
-  const { logger } = useCoreServices()
+  const { logger, clock } = useCoreServices()
   const { opener, window: appWindow } = useAppServices()
   const { recents, indexing, openRecent, chooseGraph } = useGraph()
   const { colorFor } = useGraphColors()
   const { backup } = useSync()
   const { route } = useRouter()
-  const dot = backupDot(backup)
+  const dot = backupDot(backup, clock)
   const settingsActive = route.kind === 'settings'
 
   return (

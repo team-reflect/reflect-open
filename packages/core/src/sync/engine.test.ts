@@ -31,10 +31,13 @@ function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 }
 
 /**
- * Let every promise chain that is already runnable settle.
+ * Let every promise chain that is already runnable settle. The git fake
+ * resolves on microtasks only, so draining microtask turns is deterministic.
  */
 async function flush(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  for (let turn = 0; turn < 200; turn++) {
+    await Promise.resolve()
+  }
 }
 
 /**
@@ -1080,5 +1083,195 @@ describe('createSyncEngineFactory', () => {
 
     expect(methodsOf(git)).toEqual(['commitAll', 'push'])
     expect(statuses.map((status) => status.state)).toEqual(['syncing'])
+  })
+})
+
+describe('quiet mode', () => {
+  const QUIET_MS = 1000
+
+  function quietEngine(
+    extra: Partial<SyncEngineOptions> = {},
+    statuses: SyncStatus[] = [],
+  ): SyncEngine {
+    return createSyncEngine({
+      generation: 1,
+      getCredential: async () => CRED,
+      onStatus: (status) => {
+        statuses.push(status)
+      },
+      idleMs: 100,
+      quietMs: QUIET_MS,
+      ...extra,
+    })
+  }
+
+  it('an edit commits after the debounce and fetches only after the quiet window', async () => {
+    const git = fakeGit()
+    const engine = quietEngine()
+
+    engine.noteChanged()
+    await advance(100)
+    expect(methodsOf(git)).toEqual(['commitAll'])
+    await advance(QUIET_MS - 1)
+    expect(methodsOf(git)).toEqual(['commitAll'])
+    await advance(1)
+    await vi.waitFor(() => {
+      expect(methodsOf(git)).toEqual(['commitAll', 'commitAll', 'fetch', 'mergeRemote', 'push'])
+    })
+    engine.stop()
+  })
+
+  it('every edit and every pull restarts the window', async () => {
+    const git = fakeGit()
+    const engine = quietEngine()
+
+    engine.noteChanged()
+    await advance(100) // window ends at 1100
+    await advance(500)
+    engine.noteChanged()
+    await advance(100) // second commit; window now ends at 1700
+    expect(methodsOf(git)).toEqual(['commitAll', 'commitAll'])
+    await advance(QUIET_MS - 1)
+    expect(methodsOf(git)).toEqual(['commitAll', 'commitAll'])
+    git.onMergeRemote(() => ({
+      kind: 'merged',
+      reviewPaths: [],
+      changedFiles: [{ path: 'a.md', kind: 'upsert', modifiedMs: 1 }],
+    }))
+    await advance(1)
+    await vi.waitFor(() => {
+      expect(methodsOf(git)).toContain('mergeRemote')
+    })
+    await advance(0)
+
+    // The pull restarted the window: the next network pass is a full window away.
+    const fetches = (): number => methodsOf(git).filter((method) => method === 'fetch').length
+    expect(fetches()).toBe(1)
+    await advance(QUIET_MS - 1)
+    expect(fetches()).toBe(1)
+    await advance(1)
+    await vi.waitFor(() => {
+      expect(fetches()).toBe(2)
+    })
+    engine.stop()
+  })
+
+  it('syncNow commits now and does not fetch', async () => {
+    const git = fakeGit()
+    const engine = quietEngine()
+
+    await engine.syncNow()
+    expect(methodsOf(git)).toEqual(['commitAll'])
+    await advance(QUIET_MS - 1)
+    expect(methodsOf(git)).toEqual(['commitAll'])
+    await advance(1)
+    await vi.waitFor(() => {
+      expect(methodsOf(git)).toContain('fetch')
+    })
+    engine.stop()
+  })
+
+  it('networkReady false backs off up to five minutes', async () => {
+    const git = fakeGit()
+    const asks: number[] = []
+    let ready = false
+    const engine = quietEngine({
+      networkReady: async () => {
+        asks.push(clock.now())
+        return ready
+      },
+    })
+
+    await engine.syncNow()
+    await advance(QUIET_MS)
+    for (const delay of [30_000, 60_000, 120_000, 240_000, 300_000, 300_000]) {
+      await advance(delay)
+    }
+    expect(asks).toEqual([1000, 31_000, 91_000, 211_000, 451_000, 751_000, 1_051_000])
+    expect(methodsOf(git)).toEqual(['commitAll'])
+
+    ready = true
+    await advance(300_000)
+    await vi.waitFor(() => {
+      expect(methodsOf(git)).toContain('fetch')
+    })
+    engine.stop()
+  })
+
+  it('activity during the readiness ask is honoured', async () => {
+    const git = fakeGit()
+    let answer: (ready: boolean) => void = () => {}
+    let asks = 0
+    const engine = quietEngine({
+      networkReady: () => {
+        asks += 1
+        return new Promise<boolean>((resolve) => {
+          answer = resolve
+        })
+      },
+    })
+
+    await engine.syncNow()
+    await advance(QUIET_MS)
+    expect(asks).toBe(1)
+    await engine.syncNow() // activity while the ask is open: a fresh window
+    answer(true)
+    await flush()
+    expect(methodsOf(git)).toEqual(['commitAll', 'commitAll'])
+
+    await advance(QUIET_MS)
+    expect(asks).toBe(2)
+    answer(true)
+    await vi.waitFor(() => {
+      expect(methodsOf(git)).toContain('fetch')
+    })
+    engine.stop()
+  })
+
+  it('a waiting status is emitted with the window end', async () => {
+    fakeGit()
+    const statuses: SyncStatus[] = []
+    const engine = quietEngine({}, statuses)
+
+    await clock.advance(400)
+    await engine.syncNow()
+    expect(statuses).toEqual([
+      { state: 'waiting', until: 1400 },
+      { state: 'syncing' },
+      { state: 'waiting', until: 1400 },
+    ])
+    engine.stop()
+  })
+})
+
+describe('without quietMs', () => {
+  it('without quietMs nothing changes', async () => {
+    const git = fakeGit()
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => CRED,
+      onStatus: (status) => {
+        statuses.push(status)
+      },
+      idleMs: 100,
+      networkReady: async () => false,
+    })
+
+    engine.noteChanged()
+    await advance(100)
+    expect(methodsOf(git)).toEqual(['commitAll', 'push'])
+    await engine.syncNow()
+    expect(methodsOf(git)).toEqual([
+      'commitAll',
+      'push',
+      'commitAll',
+      'fetch',
+      'mergeRemote',
+      'push',
+    ])
+    expect(statuses.map((status) => status.state)).toEqual(['syncing', 'idle', 'syncing', 'idle'])
+    expect(clock.pendingTimers()).toBe(0)
+    engine.stop()
   })
 })

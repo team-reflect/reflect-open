@@ -10,6 +10,8 @@ import { isNotePath } from '../graph/paths.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
 import type { Unlisten } from '../unlisten.ts'
+import type { ICloudNativeService } from '../ipc/icloud-native-service.ts'
+import { isICloudRoot } from './icloud-sync-service.ts'
 import { isSyncError, type SyncEngine, type SyncEngineFactory, type SyncStatus } from './engine.ts'
 import type { ChangedFile, GitRepositoryService } from './git-repository-service.ts'
 import { githubCredential, type GithubAuthService } from './github-auth-service.ts'
@@ -53,9 +55,20 @@ export type ConnectExistingResult = 'connected' | 'needsPublicConfirm' | 'notFou
 const MOBILE_IDLE_MS = 10_000
 
 /**
+ * Quiet period before the network pass on an iCloud-hosted graph with a
+ * remote. iCloud and Git then both move the same files, so Git waits until
+ * iCloud and the user have both stopped.
+ */
+const COEXIST_QUIET_MS = 5 * 60_000
+
+/**
  * The (graph, index session) pair one {@link BackupService} backs up.
  */
 export interface BackupServiceOptions {
+  /**
+   * The open graph's root folder.
+   */
+  readonly root: string
   /**
    * The open graph's generation — every git command is pinned to it.
    */
@@ -84,6 +97,10 @@ export interface BackupServiceDeps {
   readonly platform: PlatformFacts
   readonly persistenceFlush: PersistenceFlushService
   readonly logger: LoggerService
+  /**
+   * Reports the iCloud downloads still pending for an iCloud-hosted graph.
+   */
+  readonly icloudNative: ICloudNativeService
 }
 
 /**
@@ -136,7 +153,8 @@ export interface BackupService {
    */
   signOut(): Promise<void>
   /**
-   * Full cycle now: commit, pull/merge, push.
+   * Full cycle now: commit, pull/merge, push. On an iCloud-hosted graph with
+   * a remote it commits and re-arms the quiet window instead.
    */
   backUpNow(): Promise<void>
   /**
@@ -148,6 +166,7 @@ export interface BackupService {
 class BackupServiceImpl implements BackupService {
   readonly #deps: BackupServiceDeps
   readonly #generation: number
+  readonly #root: string
   readonly #indexGeneration: number | null
   readonly #mobile: boolean
   readonly #listeners = new Set<() => void>()
@@ -169,12 +188,13 @@ class BackupServiceImpl implements BackupService {
   constructor(deps: BackupServiceDeps, options: BackupServiceOptions) {
     this.#deps = deps
     this.#generation = options.generation
+    this.#root = options.root
     this.#indexGeneration = options.indexGeneration
     this.#mobile = isMobilePlatform(deps.platform.appPlatform) || deps.platform.surface.mobileApp
   }
 
   async start(): Promise<void> {
-    const { git, syncEngines, githubAuth, progress, activity, logger } = this.#deps
+    const { git, syncEngines, githubAuth, progress, activity, logger, icloudNative } = this.#deps
     this.#teardown()
     if (this.#disposed) {
       return
@@ -231,9 +251,17 @@ class BackupServiceImpl implements BackupService {
         await this.#startLocalHistory(status.initialized)
         return
       }
+      const root = this.#root
+      const coexisting = isICloudRoot(root)
       const next = syncEngines.create({
         generation: this.#generation,
         ...(this.#mobile ? { idleMs: MOBILE_IDLE_MS } : {}),
+        ...(coexisting
+          ? {
+              quietMs: COEXIST_QUIET_MS,
+              networkReady: async () => (await icloudNative.pendingCount(root, 'notes')) === 0,
+            }
+          : {}),
         // iOS can suspend us at any await. Do not begin a launch, online, or
         // debounced Git cycle after the document is hidden; the existing
         // visible/focus trigger below replays a full cycle on foreground.

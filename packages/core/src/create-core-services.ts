@@ -1128,6 +1128,7 @@ export function composeCoreServices(
     platform,
     persistenceFlush,
     logger,
+    icloudNative,
   }
   const icloudSyncDeps: ICloudSyncServiceDeps = {
     icloudNative,
