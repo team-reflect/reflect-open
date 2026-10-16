@@ -153,8 +153,6 @@ fn origin(repo: &Repository) -> AppResult<git2::Remote<'_>> {
 /// Fetch `origin` (configured refspecs) and report ahead/behind for the
 /// current branch.
 pub(super) fn fetch(root: &Path, credential: Option<GitCredential>) -> AppResult<RemoteDelta> {
-    #[cfg(test)]
-    super::fault::trip(super::fault::FaultPoint::BeforeFetch)?;
     let repo = open_existing(root)?;
     {
         let mut remote = origin(&repo)?;
@@ -168,8 +166,6 @@ pub(super) fn fetch(root: &Path, credential: Option<GitCredential>) -> AppResult
 /// Read the current branch's tip from the remote ref advertisement, without
 /// downloading objects or touching the working tree.
 pub(super) fn remote_head(root: &Path, credential: Option<GitCredential>) -> AppResult<RemoteTip> {
-    #[cfg(test)]
-    super::fault::trip(super::fault::FaultPoint::BeforeFetch)?;
     let repo = open_existing(root)?;
     let branch = current_branch(&repo)?;
     let ref_name = format!("refs/heads/{branch}");
@@ -245,8 +241,6 @@ pub(super) fn clone(url: &str, target: &Path, credential: Option<GitCredential>)
 /// errors — the sync engine branches on them (non-fast-forward → pull/merge/
 /// retry; anything else → surface the remote's message).
 pub(super) fn push(root: &Path, credential: Option<GitCredential>) -> AppResult<PushOutcome> {
-    #[cfg(test)]
-    super::fault::trip(super::fault::FaultPoint::BeforePush)?;
     let repo = open_existing(root)?;
     let branch = current_branch(&repo)?;
     let mut remote = origin(&repo)?;

@@ -3,9 +3,12 @@
 //! The merge is computed in memory (`merge_commits`), its conflicts are
 //! resolved in that index, and the result is committed with both parents.
 //! Only then is the merged tree checked out, and the branch ref moves last.
-//! The repository never enters libgit2's merge state. Until the ref moves,
-//! the merge commit is recorded in `refs/reflect/merge`, so a stop after the
-//! commit is finished by [`adopt_recorded_merge`] instead of merged again.
+//! The repository never enters libgit2's merge state. A stop before the ref
+//! moves leaves the working tree equal to HEAD or to the merge tree; the next
+//! commit and merge converge from either.
+//! The caller holds the graph lock and has committed the working tree, so the
+//! checkout never overwrites an unsaved edit. Files a commit withheld stay as
+//! they are on disk.
 //! A text conflict is resolved by the conflict ladder ([`ladder::resolve`]),
 //! so pulls never write conflict markers.
 //! A local deletion of a file the incoming side changed keeps the incoming
@@ -16,14 +19,14 @@ use std::path::Path;
 use git2::build::CheckoutBuilder;
 use git2::{Index, IndexEntry, IndexTime, MergeOptions, Repository};
 use reflect_graph_paths::to_slash_lossy;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-use crate::conflict::archive::{self, archive_unless_in_history};
+use crate::conflict::archive::archive_unless_in_history;
 use crate::conflict::ladder::{self, ConflictInput};
 use crate::conflict::{ConflictSide, Resolution};
 use crate::error::{AppError, AppResult};
 
-use super::repo::{current_branch, ensure_clean_state, open_existing, signature};
+use super::repo::{clear_foreign_state, current_branch, open_existing, signature};
 
 /// Side labels for the ladder. "this device" is the local side, "other device"
 /// the remote one — product language, not branch names.
@@ -36,7 +39,6 @@ pub enum MergeKind {
     UpToDate,
     FastForward,
     Merged,
-    MergedWithReview,
 }
 
 #[derive(Debug, Serialize)]
@@ -74,28 +76,34 @@ pub struct MergeOutcome {
     pub changed_files: Vec<ChangedFile>,
 }
 
-/// Merge the fetched `origin/<branch>` into the local branch. Local edits not
-/// yet committed are kept on disk and stay uncommitted.
-pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
-    crate::fs::with_graph_lock(root, || merge_remote_locked(root))
-}
-
-fn merge_remote_locked(root: &Path) -> AppResult<MergeOutcome> {
+/// Merge the fetched `origin/<branch>` into the local branch. The caller
+/// holds the graph lock; `skipped` lists the dirty files a commit withheld.
+pub(super) fn merge_locked(root: &Path, skipped: &[String]) -> AppResult<MergeOutcome> {
     let repo = open_existing(root)?;
-    // In-memory guarantee: the runtime directory never enters the merge.
-    repo.add_ignore_rule("/.reflect/")?;
-    let recovered = recover_interrupted_pull(&repo, root)?;
-    let mut outcome = pull(&repo, root)?;
-    fold_changes(&mut outcome.changed_files, recovered.changed_files);
-    outcome.review_paths.extend(recovered.review_paths);
-    if !outcome.review_paths.is_empty() && matches!(outcome.kind, MergeKind::Merged) {
-        outcome.kind = MergeKind::MergedWithReview;
-    }
-    Ok(outcome)
+    pull(&repo, root, skipped)
 }
 
-fn pull(repo: &Repository, root: &Path) -> AppResult<MergeOutcome> {
-    ensure_clean_state(repo)?;
+#[cfg(test)]
+pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
+    crate::fs::with_graph_lock(root, || merge_locked(root, &[]))
+}
+
+/// Check out `tree` over a working tree that equals HEAD, leaving the runtime
+/// directory and the `skipped` dirty files alone.
+fn checkout_target(repo: &Repository, tree: &git2::Tree<'_>, skipped: &[String]) -> AppResult<()> {
+    // The first matching pathspec wins, so the exclusions come before `*`.
+    let mut checkout = CheckoutBuilder::new();
+    checkout.force().path("!.reflect");
+    for path in skipped {
+        checkout.path(format!("!{path}"));
+    }
+    checkout.path("*");
+    repo.checkout_tree(tree.as_object(), Some(&mut checkout))?;
+    Ok(())
+}
+
+fn pull(repo: &Repository, root: &Path, skipped: &[String]) -> AppResult<MergeOutcome> {
+    clear_foreign_state(repo)?;
     let branch = current_branch(repo)?;
     let Ok(remote_oid) = repo.refname_to_id(&format!("refs/remotes/origin/{branch}")) else {
         // A brand-new (empty) backup repo has no remote branch until the
@@ -123,18 +131,15 @@ fn pull(repo: &Repository, root: &Path) -> AppResult<MergeOutcome> {
         // Capture the outgoing tree before anything moves (None on unborn).
         let old_oid = repo.head().ok().and_then(|head| head.target());
         let old_tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
-        let incoming = repo.find_commit(remote_oid)?;
-        let new_tree = incoming.tree()?;
+        let new_tree = repo.find_commit(remote_oid)?.tree()?;
         let mut changed_files = changed_between(repo, old_tree.as_ref(), &new_tree)?;
         // Files first, ref last: a failure in between leaves the branch where
         // it was, so the next cycle retries the pull instead of committing
         // the stale tree as a revert of it (#1405).
         #[cfg(test)]
         super::fault::trip(super::fault::FaultPoint::BeforeFastForwardCheckout)?;
-        let (written, review) =
-            checkout_keeping_local_edits(repo, root, old_tree.as_ref(), &new_tree, &incoming)?;
+        checkout_target(repo, &new_tree, skipped)?;
         stamp_modified_times(root, &mut changed_files);
-        fold_changes(&mut changed_files, written);
         #[cfg(test)]
         super::fault::trip(super::fault::FaultPoint::BeforeFastForwardRefMove)?;
         let refname = format!("refs/heads/{branch}");
@@ -150,7 +155,7 @@ fn pull(repo: &Repository, root: &Path) -> AppResult<MergeOutcome> {
         // `set_head`: it only added a `HEAD.lock` dependency to every pull.
         return Ok(MergeOutcome {
             kind: MergeKind::FastForward,
-            review_paths: review,
+            review_paths: Vec::new(),
             changed_files,
         });
     }
@@ -171,21 +176,14 @@ fn pull(repo: &Repository, root: &Path) -> AppResult<MergeOutcome> {
         "Merge changes from other devices (files to review)"
     };
     let merge_oid = repo.commit(None, &sig, &sig, message, &tree, &[&ours, &theirs])?;
-    repo.reference(RECORDED_MERGE_REF, merge_oid, true, "merge in progress")?;
-    let merge = repo.find_commit(merge_oid)?;
     let ours_tree = ours.tree()?;
     let mut changed_files = changed_between(repo, Some(&ours_tree), &tree)?;
 
-    // Same order as the fast-forward: tree first, ref last. A stop in between
-    // leaves the merge recorded for `adopt_recorded_merge`.
+    // Same order as the fast-forward: tree first, ref last.
     #[cfg(test)]
     super::fault::trip(super::fault::FaultPoint::AfterMergeCommitBeforeCheckout)?;
-    let (written, review) =
-        checkout_keeping_local_edits(repo, root, Some(&ours_tree), &tree, &merge)?;
+    checkout_target(repo, &tree, skipped)?;
     stamp_modified_times(root, &mut changed_files);
-    fold_changes(&mut changed_files, written);
-    let mut review_paths = review_paths;
-    review_paths.extend(review);
     #[cfg(test)]
     super::fault::trip(super::fault::FaultPoint::BeforeMergeRefMove)?;
     repo.reference_matching(
@@ -195,697 +193,12 @@ fn pull(repo: &Repository, root: &Path) -> AppResult<MergeOutcome> {
         head_oid,
         message,
     )?;
-    drop_recorded_merge(repo)?;
 
-    let kind = if review_paths.is_empty() {
-        MergeKind::Merged
-    } else {
-        MergeKind::MergedWithReview
-    };
     Ok(MergeOutcome {
-        kind,
+        kind: MergeKind::Merged,
         review_paths,
         changed_files,
     })
-}
-
-/// The merge commit `merge_remote` wrote and has not yet moved the branch to.
-const RECORDED_MERGE_REF: &str = "refs/reflect/merge";
-
-/// A commit whose tree holds the local edits a checkout is overwriting, kept
-/// until they are written back.
-const SAVED_EDITS_REF: &str = "refs/reflect/edits";
-/// The path, inside the saved-edits tree, of the [`SavedEditsRecord`] JSON.
-const SAVED_EDITS_RECORD: &str = ".reflect-edits.json";
-
-/// What the saved-edits tree cannot hold as entries: the deleted paths and
-/// the trees the checkout went from and to.
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct SavedEditsRecord {
-    /// The tree the edits were made against; `None` on an unborn branch.
-    base: Option<String>,
-    /// The tree the checkout wrote.
-    target: String,
-    /// The commit time of the incoming side, in epoch ms.
-    incoming_ms: u64,
-    /// Paths the working tree had deleted.
-    deleted: Vec<String>,
-}
-
-/// What finishing an interrupted pull changed on disk.
-#[derive(Default)]
-pub(super) struct Recovered {
-    pub(super) changed_files: Vec<ChangedFile>,
-    pub(super) review_paths: Vec<String>,
-}
-
-/// Finish a pull that stopped part-way: write back the local edits a stopped
-/// checkout saved, then adopt a recorded merge.
-pub(super) fn recover_interrupted_pull(repo: &Repository, root: &Path) -> AppResult<Recovered> {
-    let replayed = replay_saved_edits(repo, root)?;
-    let (adopted, review) = adopt_recorded_merge(repo, root)?;
-    let mut changed_files = replayed.written;
-    fold_changes(&mut changed_files, adopted);
-    let mut review_paths = replayed.review;
-    review_paths.extend(review);
-    Ok(Recovered {
-        changed_files,
-        review_paths,
-    })
-}
-
-/// Finish a merge that stopped between its commit and the branch move.
-///
-/// When `HEAD` is still the recorded merge's first parent, the merged tree is
-/// checked out (edits made since the stop are merged back in) and the branch
-/// moves to the merge. Any other recorded merge is dropped. Returns the files
-/// the adoption changed on disk and the paths to review.
-fn adopt_recorded_merge(
-    repo: &Repository,
-    root: &Path,
-) -> AppResult<(Vec<ChangedFile>, Vec<String>)> {
-    let Ok(merge_oid) = repo.refname_to_id(RECORDED_MERGE_REF) else {
-        return Ok((Vec::new(), Vec::new()));
-    };
-    let head_oid = repo.head().ok().and_then(|head| head.target());
-    let merge = repo.find_commit(merge_oid)?;
-    let mut changed_files = Vec::new();
-    let mut review = Vec::new();
-    match head_oid {
-        Some(head_oid) if merge.parent_id(0).ok() == Some(head_oid) => {
-            let branch = current_branch(repo)?;
-            let head_tree = repo.find_commit(head_oid)?.tree()?;
-            let merge_tree = merge.tree()?;
-            changed_files = changed_between(repo, Some(&head_tree), &merge_tree)?;
-            let written;
-            (written, review) =
-                checkout_keeping_local_edits(repo, root, Some(&head_tree), &merge_tree, &merge)?;
-            stamp_modified_times(root, &mut changed_files);
-            fold_changes(&mut changed_files, written);
-            repo.reference_matching(
-                &format!("refs/heads/{branch}"),
-                merge_oid,
-                true,
-                head_oid,
-                "reflect sync: adopt recorded merge",
-            )?;
-        }
-        Some(head_oid)
-            if head_oid == merge_oid || repo.graph_descendant_of(head_oid, merge_oid)? =>
-        {
-            tracing::debug!(merge = %merge_oid, "dropping a recorded merge HEAD already contains");
-        }
-        _ => {
-            tracing::warn!(
-                root = %root.display(),
-                merge = %merge_oid,
-                "dropping a recorded merge that does not continue HEAD"
-            );
-        }
-    }
-    drop_recorded_merge(repo)?;
-    Ok((changed_files, review))
-}
-
-/// One working-tree path whose content differs from `HEAD`.
-struct LocalEdit {
-    path: String,
-    content: LocalContent,
-}
-
-/// What the working tree holds at an edited path.
-enum LocalContent {
-    Deleted,
-    File(Vec<u8>),
-    /// A symlink, by its target.
-    Symlink(std::path::PathBuf),
-}
-
-impl LocalContent {
-    /// The bytes a blob of this content holds; `None` for a deletion.
-    fn bytes(&self) -> Option<&[u8]> {
-        match self {
-            LocalContent::Deleted => None,
-            LocalContent::File(bytes) => Some(bytes),
-            LocalContent::Symlink(link) => Some(link.as_os_str().as_encoded_bytes()),
-        }
-    }
-}
-
-/// What a tree holds at a path.
-enum TreeSide<'r> {
-    Absent,
-    File(git2::Blob<'r>),
-    /// A symlink; the blob holds its target.
-    Symlink(git2::Blob<'r>),
-    /// A directory or submodule.
-    Other(git2::Oid),
-}
-
-impl TreeSide<'_> {
-    fn id(&self) -> Option<git2::Oid> {
-        match self {
-            TreeSide::Absent => None,
-            TreeSide::File(blob) | TreeSide::Symlink(blob) => Some(blob.id()),
-            TreeSide::Other(id) => Some(*id),
-        }
-    }
-}
-
-fn tree_side<'r>(
-    repo: &'r Repository,
-    tree: Option<&git2::Tree<'_>>,
-    path: &str,
-) -> AppResult<TreeSide<'r>> {
-    let Some(entry) = tree.and_then(|tree| tree.get_path(Path::new(path)).ok()) else {
-        return Ok(TreeSide::Absent);
-    };
-    match entry.filemode() {
-        0o100644 | 0o100755 => Ok(TreeSide::File(repo.find_blob(entry.id())?)),
-        mode if mode == SYMLINK_MODE as i32 => Ok(TreeSide::Symlink(repo.find_blob(entry.id())?)),
-        _ => Ok(TreeSide::Other(entry.id())),
-    }
-}
-
-/// Check out `target` over a working tree whose committed state is `base`,
-/// keeping every local edit made since that commit.
-///
-/// The edits are saved in [`SAVED_EDITS_REF`] before the forced checkout and
-/// written back after it: unchanged by `target`, an edit is restored as it
-/// was; changed by both, a text file is resolved by the ladder (base, local
-/// edit, target), and any other file or symlink keeps the local version with
-/// the target's version written beside it as a conflict copy. A local
-/// deletion of a path `target` changed keeps the target's version and is
-/// reported for review. An untracked file under a directory that `target`
-/// replaces with a file moves under the conflict copy name of that directory.
-/// An edit that cannot be written back is archived and reported for review.
-/// `incoming` is the commit `target` belongs to. Returns the files written
-/// back and the paths to review.
-fn checkout_keeping_local_edits(
-    repo: &Repository,
-    root: &Path,
-    base: Option<&git2::Tree<'_>>,
-    target: &git2::Tree<'_>,
-    incoming: &git2::Commit<'_>,
-) -> AppResult<(Vec<ChangedFile>, Vec<String>)> {
-    let edits = local_edits(repo, root, base, target)?;
-    let incoming_ms = commit_ms(incoming);
-    save_edits(repo, base, target, incoming_ms, &edits)?;
-    // The first matching pathspec wins, so the runtime directory stays as it is.
-    let mut checkout = CheckoutBuilder::new();
-    checkout.force().path("!.reflect").path("*");
-    repo.checkout_tree(target.as_object(), Some(&mut checkout))?;
-    #[cfg(test)]
-    super::fault::trip(super::fault::FaultPoint::AfterCheckoutBeforeWriteBack)?;
-
-    let mut out = WriteBack::default();
-    for edit in edits {
-        let result = (|| {
-            let base_side = tree_side(repo, base, &edit.path)?;
-            let target_side = tree_side(repo, Some(target), &edit.path)?;
-            write_back_edit(
-                root,
-                &edit,
-                &base_side,
-                &target_side,
-                Some(target),
-                incoming_ms,
-                &mut out,
-            )
-        })();
-        if let Err(error) = result {
-            keep_unwritten_edit(root, &edit, &error, &mut out);
-        }
-    }
-    if !out.lost {
-        drop_saved_edits(repo)?;
-    }
-    Ok((out.written, out.review))
-}
-
-/// What writing local edits back produced.
-#[derive(Default)]
-struct WriteBack {
-    written: Vec<ChangedFile>,
-    review: Vec<String>,
-    /// Directory paths `target` replaced with a file, to the conflict copy
-    /// directory their untracked files move under.
-    relocated: std::collections::HashMap<String, String>,
-    /// Whether an edit could be neither written back nor archived.
-    lost: bool,
-}
-
-/// Write one local edit back over a working tree that holds `target_side` at
-/// its path (`target` is the tree that side belongs to).
-fn write_back_edit(
-    root: &Path,
-    edit: &LocalEdit,
-    base_side: &TreeSide<'_>,
-    target_side: &TreeSide<'_>,
-    target: Option<&git2::Tree<'_>>,
-    incoming_ms: u64,
-    out: &mut WriteBack,
-) -> AppResult<()> {
-    let unchanged = base_side.id() == target_side.id();
-    let taken = |path: &str| worktree_or_tree_has(root, target, path);
-    if matches!(base_side, TreeSide::Absent) {
-        if let Some(parent) = target.and_then(|tree| replaced_parent(tree, &edit.path)) {
-            let dir = out
-                .relocated
-                .entry(parent.clone())
-                .or_insert_with(|| free_conflict_copy_path(&parent, taken))
-                .clone();
-            let moved = format!("{dir}{}", &edit.path[parent.len()..]);
-            match &edit.content {
-                LocalContent::Deleted => return Ok(()),
-                LocalContent::File(bytes) => out.written.push(write_file(root, &moved, bytes)?),
-                LocalContent::Symlink(link) => out.written.push(write_symlink(root, &moved, link)?),
-            }
-            out.review.push(moved);
-            return Ok(());
-        }
-    }
-    let ours = match &edit.content {
-        LocalContent::Deleted => {
-            let target_path = root.join(&edit.path);
-            if unchanged {
-                if target_path.symlink_metadata().is_ok() {
-                    std::fs::remove_file(&target_path)?;
-                    out.written.push(ChangedFile {
-                        path: edit.path.clone(),
-                        kind: ChangeKind::Remove,
-                        modified_ms: None,
-                    });
-                }
-            } else if !matches!(target_side, TreeSide::Absent) {
-                out.review.push(edit.path.clone());
-            }
-            return Ok(());
-        }
-        LocalContent::Symlink(link) => {
-            match target_side {
-                _ if unchanged => {}
-                TreeSide::Absent => {}
-                TreeSide::Symlink(theirs)
-                    if theirs.content() == link.as_os_str().as_encoded_bytes() => {}
-                TreeSide::Other(_) => {
-                    // The target holds a directory or submodule here.
-                    let copy = free_conflict_copy_path(&edit.path, taken);
-                    out.written.push(write_symlink(root, &copy, link)?);
-                    out.review.push(copy);
-                    return Ok(());
-                }
-                TreeSide::File(theirs) | TreeSide::Symlink(theirs) => {
-                    let copy = free_conflict_copy_path(&edit.path, taken);
-                    out.written
-                        .push(write_side(root, &copy, target_side, theirs)?);
-                    out.review.push(copy);
-                }
-            }
-            out.written.push(write_symlink(root, &edit.path, link)?);
-            return Ok(());
-        }
-        LocalContent::File(bytes) => bytes,
-    };
-    let content = match (base_side, target_side) {
-        _ if unchanged => ours.clone(),
-        (_, TreeSide::Absent) => ours.clone(),
-        (TreeSide::Absent | TreeSide::File(_), TreeSide::File(theirs))
-            if is_text_bytes(ours)
-                && is_text_bytes(theirs.content())
-                && match base_side {
-                    TreeSide::File(blob) => is_text_bytes(blob.content()),
-                    _ => true,
-                } =>
-        {
-            let base_content = match base_side {
-                TreeSide::File(blob) => Some(blob.content()),
-                _ => None,
-            };
-            merge_local_edit(
-                root,
-                &edit.path,
-                base_content,
-                ours,
-                theirs.content(),
-                incoming_ms,
-            )?
-        }
-        (_, TreeSide::File(theirs)) => {
-            let copy = free_conflict_copy_path(&edit.path, taken);
-            out.written.push(write_file(root, &copy, theirs.content())?);
-            out.review.push(copy);
-            ours.clone()
-        }
-        (_, TreeSide::Symlink(_) | TreeSide::Other(_)) => {
-            // The target holds a directory, symlink, or submodule here.
-            let copy = free_conflict_copy_path(&edit.path, taken);
-            out.written.push(write_file(root, &copy, ours)?);
-            out.review.push(copy);
-            return Ok(());
-        }
-    };
-    out.written.push(write_file(root, &edit.path, &content)?);
-    Ok(())
-}
-
-/// Archive a local edit that could not be written back and report its path.
-fn keep_unwritten_edit(root: &Path, edit: &LocalEdit, error: &AppError, out: &mut WriteBack) {
-    tracing::warn!(path = %edit.path, ?error, "a local edit could not be written back");
-    if let Some(bytes) = edit.content.bytes() {
-        if let Err(error) =
-            archive::archive_version(root, &edit.path, Some(OUR_LABEL), now_ms(), bytes)
-        {
-            tracing::error!(path = %edit.path, ?error, "a local edit could not be archived");
-            out.lost = true;
-        }
-    }
-    out.review.push(edit.path.clone());
-}
-
-/// The closest parent directory of `rel` that `target` holds as something
-/// other than a directory.
-fn replaced_parent(target: &git2::Tree<'_>, rel: &str) -> Option<String> {
-    rel.match_indices('/').find_map(|(end, _)| {
-        let parent = &rel[..end];
-        let entry = target.get_path(Path::new(parent)).ok()?;
-        (entry.kind() != Some(git2::ObjectType::Tree)).then(|| parent.to_string())
-    })
-}
-
-/// Record `edits` in [`SAVED_EDITS_REF`]: a commit (parent: `HEAD`) whose
-/// tree holds each edited file and symlink at its path, plus the
-/// [`SavedEditsRecord`] at [`SAVED_EDITS_RECORD`].
-fn save_edits(
-    repo: &Repository,
-    base: Option<&git2::Tree<'_>>,
-    target: &git2::Tree<'_>,
-    incoming_ms: u64,
-    edits: &[LocalEdit],
-) -> AppResult<()> {
-    if edits.is_empty() {
-        return Ok(());
-    }
-    let mut index = Index::new()?;
-    let mut deleted = Vec::new();
-    for edit in edits {
-        let mode = match edit.content {
-            LocalContent::Deleted => {
-                deleted.push(edit.path.clone());
-                continue;
-            }
-            LocalContent::File(_) => 0o100644,
-            LocalContent::Symlink(_) => SYMLINK_MODE,
-        };
-        let id = repo.blob(edit.content.bytes().unwrap_or_default())?;
-        index.add(&stage0_entry(&edit.path, id, mode))?;
-    }
-    let record = SavedEditsRecord {
-        base: base.map(|tree| tree.id().to_string()),
-        target: target.id().to_string(),
-        incoming_ms,
-        deleted,
-    };
-    let record = serde_json::to_vec(&record).map_err(|error| AppError::io(error.to_string()))?;
-    index.add(&stage0_entry(
-        SAVED_EDITS_RECORD,
-        repo.blob(&record)?,
-        0o100644,
-    ))?;
-    let tree = repo.find_tree(index.write_tree_to(repo)?)?;
-    let sig = signature(repo)?;
-    let head = repo.head().ok().and_then(|head| head.peel_to_commit().ok());
-    let parents: Vec<&git2::Commit<'_>> = head.iter().collect();
-    let oid = repo.commit(
-        None,
-        &sig,
-        &sig,
-        "reflect sync: local edits held across a checkout",
-        &tree,
-        &parents,
-    )?;
-    repo.reference(SAVED_EDITS_REF, oid, true, "save local edits")?;
-    Ok(())
-}
-
-/// Write back the edits a stopped checkout saved in [`SAVED_EDITS_REF`].
-///
-/// An edit is written back only where the disk still holds what the checkout
-/// started from or wrote, so a later change on disk is never overwritten.
-fn replay_saved_edits(repo: &Repository, root: &Path) -> AppResult<WriteBack> {
-    let Ok(oid) = repo.refname_to_id(SAVED_EDITS_REF) else {
-        return Ok(WriteBack::default());
-    };
-    let tree = repo.find_commit(oid)?.tree()?;
-    let record = tree.get_path(Path::new(SAVED_EDITS_RECORD))?;
-    let record: SavedEditsRecord = serde_json::from_slice(repo.find_blob(record.id())?.content())
-        .map_err(|error| AppError::io(error.to_string()))?;
-    let base = match &record.base {
-        Some(id) => Some(repo.find_tree(git2::Oid::from_str(id)?)?),
-        None => None,
-    };
-    let target = repo.find_tree(git2::Oid::from_str(&record.target)?)?;
-
-    let mut edits = Vec::new();
-    let mut walk_error = None;
-    tree.walk(git2::TreeWalkMode::PreOrder, |dir, entry| {
-        let path = format!("{dir}{}", entry.name().unwrap_or_default());
-        let mode = entry.filemode() as u32;
-        if path == SAVED_EDITS_RECORD || entry.kind() != Some(git2::ObjectType::Blob) {
-            return git2::TreeWalkResult::Ok;
-        }
-        match repo.find_blob(entry.id()) {
-            Ok(blob) => {
-                let bytes = blob.content().to_vec();
-                let content = if mode == SYMLINK_MODE {
-                    LocalContent::Symlink(std::path::PathBuf::from(
-                        String::from_utf8_lossy(&bytes).as_ref(),
-                    ))
-                } else {
-                    LocalContent::File(bytes)
-                };
-                edits.push(LocalEdit { path, content });
-                git2::TreeWalkResult::Ok
-            }
-            Err(error) => {
-                walk_error = Some(error);
-                git2::TreeWalkResult::Abort
-            }
-        }
-    })?;
-    if let Some(error) = walk_error {
-        return Err(error.into());
-    }
-    edits.extend(record.deleted.into_iter().map(|path| LocalEdit {
-        path,
-        content: LocalContent::Deleted,
-    }));
-
-    let mut out = WriteBack::default();
-    for edit in edits {
-        let result = (|| {
-            let base_side = tree_side(repo, base.as_ref(), &edit.path)?;
-            let target_side = tree_side(repo, Some(&target), &edit.path)?;
-            let disk = DiskSide::read(root, &edit.path);
-            let (on_disk, tree) = if disk.holds(&target_side) {
-                (&target_side, Some(&target))
-            } else if disk.holds(&base_side) {
-                (&base_side, base.as_ref())
-            } else {
-                return Ok(());
-            };
-            write_back_edit(
-                root,
-                &edit,
-                &base_side,
-                on_disk,
-                tree,
-                record.incoming_ms,
-                &mut out,
-            )
-        })();
-        if let Err(error) = result {
-            keep_unwritten_edit(root, &edit, &error, &mut out);
-        }
-    }
-    if !out.lost {
-        drop_saved_edits(repo)?;
-    }
-    Ok(out)
-}
-
-/// What the working tree holds at a path.
-enum DiskSide {
-    Absent,
-    File(Vec<u8>),
-    /// A symlink, by its target's bytes.
-    Symlink(Vec<u8>),
-    Directory,
-}
-
-impl DiskSide {
-    fn read(root: &Path, rel: &str) -> DiskSide {
-        let full = root.join(rel);
-        let Ok(meta) = full.symlink_metadata() else {
-            return DiskSide::Absent;
-        };
-        if meta.is_dir() {
-            DiskSide::Directory
-        } else if meta.file_type().is_symlink() {
-            std::fs::read_link(&full).map_or(DiskSide::Absent, |link| {
-                DiskSide::Symlink(link.into_os_string().into_encoded_bytes())
-            })
-        } else {
-            std::fs::read(&full).map_or(DiskSide::Absent, DiskSide::File)
-        }
-    }
-
-    /// Whether the disk holds exactly `side`.
-    fn holds(&self, side: &TreeSide<'_>) -> bool {
-        match (self, side) {
-            (DiskSide::Absent, TreeSide::Absent) => true,
-            (DiskSide::File(bytes), TreeSide::File(blob)) => bytes.as_slice() == blob.content(),
-            (DiskSide::Symlink(bytes), TreeSide::Symlink(blob)) => {
-                bytes.as_slice() == blob.content()
-            }
-            (DiskSide::Directory, TreeSide::Other(_)) => true,
-            _ => false,
-        }
-    }
-}
-
-fn drop_saved_edits(repo: &Repository) -> AppResult<()> {
-    if let Ok(mut reference) = repo.find_reference(SAVED_EDITS_REF) {
-        reference.delete()?;
-    }
-    Ok(())
-}
-
-/// Every regular file and symlink in the working tree that differs from
-/// `base`, including deletions. An untracked path `target` does not hold is
-/// left out (the checkout never touches it) unless `target` replaces one of
-/// its parent directories with a file. Ignored files and the runtime
-/// directory are left out.
-fn local_edits(
-    repo: &Repository,
-    root: &Path,
-    base: Option<&git2::Tree<'_>>,
-    target: &git2::Tree<'_>,
-) -> AppResult<Vec<LocalEdit>> {
-    let mut opts = git2::DiffOptions::new();
-    opts.include_untracked(true).recurse_untracked_dirs(true);
-    let diff = repo.diff_tree_to_workdir(base, Some(&mut opts))?;
-    let mut edits = Vec::new();
-    for delta in diff.deltas() {
-        let deleted = delta.status() == git2::Delta::Deleted;
-        let file = if deleted {
-            delta.old_file()
-        } else {
-            delta.new_file()
-        };
-        let Some(path) = file.path() else {
-            continue;
-        };
-        let rel = to_slash_lossy(path);
-        if is_runtime_path(&rel) {
-            continue;
-        }
-        if deleted {
-            edits.push(LocalEdit {
-                path: rel,
-                content: LocalContent::Deleted,
-            });
-            continue;
-        }
-        let in_base = base.is_some_and(|tree| tree.get_path(path).is_ok());
-        if !in_base && target.get_path(path).is_err() && replaced_parent(target, &rel).is_none() {
-            continue;
-        }
-        let full = root.join(path);
-        let Ok(meta) = full.symlink_metadata() else {
-            continue;
-        };
-        let content = if meta.is_file() {
-            LocalContent::File(std::fs::read(&full)?)
-        } else if meta.file_type().is_symlink() {
-            LocalContent::Symlink(std::fs::read_link(&full)?)
-        } else {
-            continue;
-        };
-        edits.push(LocalEdit { path: rel, content });
-    }
-    Ok(edits)
-}
-
-/// Whether `rel` is taken on disk or in `tree`.
-fn worktree_or_tree_has(root: &Path, tree: Option<&git2::Tree<'_>>, rel: &str) -> bool {
-    root.join(rel).symlink_metadata().is_ok()
-        || tree.is_some_and(|tree| tree.get_path(Path::new(rel)).is_ok())
-}
-
-/// Write a tree side at `rel`: a file's bytes, or a symlink to its target.
-fn write_side(
-    root: &Path,
-    rel: &str,
-    side: &TreeSide<'_>,
-    blob: &git2::Blob<'_>,
-) -> AppResult<ChangedFile> {
-    match side {
-        TreeSide::Symlink(_) => {
-            let link = std::path::PathBuf::from(String::from_utf8_lossy(blob.content()).as_ref());
-            write_symlink(root, rel, &link)
-        }
-        _ => write_file(root, rel, blob.content()),
-    }
-}
-
-/// Replace whatever is at `rel` with a symlink to `link`.
-fn write_symlink(root: &Path, rel: &str, link: &Path) -> AppResult<ChangedFile> {
-    let full = root.join(rel);
-    if let Some(parent) = full.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    if full.symlink_metadata().is_ok() {
-        std::fs::remove_file(&full)?;
-    }
-    #[cfg(unix)]
-    std::os::unix::fs::symlink(link, &full)?;
-    #[cfg(windows)]
-    std::os::windows::fs::symlink_file(link, &full)?;
-    Ok(ChangedFile {
-        path: rel.to_string(),
-        kind: ChangeKind::Upsert,
-        modified_ms: None,
-    })
-}
-
-/// Resolve a local edit against an incoming text version through the ladder.
-/// The disk side is not in history, so a lossy result archives it first.
-fn merge_local_edit(
-    root: &Path,
-    rel: &str,
-    base: Option<&[u8]>,
-    ours: &[u8],
-    theirs: &[u8],
-    incoming_ms: u64,
-) -> AppResult<Vec<u8>> {
-    let ours_side = text_side(ours, OUR_LABEL, now_ms())?;
-    let theirs_side = text_side(theirs, THEIR_LABEL, incoming_ms)?;
-    let base = base.map(text_of).transpose()?;
-    let content = match ladder::resolve(ConflictInput {
-        base,
-        sides: (ours_side.clone(), theirs_side),
-        merge_loop_detected: false,
-    })? {
-        Resolution::AlreadyResolved => return Ok(ours.to_vec()),
-        Resolution::Merged { content } => content,
-        Resolution::Reconciled { content } => {
-            archive_side(root, rel, &ours_side)?;
-            content
-        }
-    };
-    Ok(content.into_bytes())
 }
 
 /// Resolve a text conflict of the in-memory merge through the ladder. Both
@@ -943,44 +256,9 @@ fn commit_ms(commit: &git2::Commit<'_>) -> u64 {
     commit.time().seconds().max(0) as u64 * 1000
 }
 
-fn now_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as u64)
-        .unwrap_or(0)
-}
-
-fn write_file(root: &Path, rel: &str, bytes: &[u8]) -> AppResult<ChangedFile> {
-    let modified_ms = crate::fs::atomic_write_bytes(root, &root.join(rel), bytes)?;
-    Ok(ChangedFile {
-        path: rel.to_string(),
-        kind: ChangeKind::Upsert,
-        modified_ms,
-    })
-}
-
-/// Add `extra` to `changes`; an entry for the same path replaces the old one.
-fn fold_changes(changes: &mut Vec<ChangedFile>, extra: Vec<ChangedFile>) {
-    for change in extra {
-        changes.retain(|existing| existing.path != change.path);
-        changes.push(change);
-    }
-}
-
 /// Whether `rel` is under the runtime directory, which a pull never touches.
 fn is_runtime_path(rel: &str) -> bool {
     rel.starts_with(".reflect/")
-}
-
-fn is_text_bytes(bytes: &[u8]) -> bool {
-    !bytes.contains(&0) && std::str::from_utf8(bytes).is_ok()
-}
-
-fn drop_recorded_merge(repo: &Repository) -> AppResult<()> {
-    if let Ok(mut reference) = repo.find_reference(RECORDED_MERGE_REF) {
-        reference.delete()?;
-    }
-    Ok(())
 }
 
 /// Diff two trees into the watcher's change shape: what the merge wrote or
