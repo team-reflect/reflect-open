@@ -22,8 +22,18 @@ pub(super) enum FaultPoint {
     BeforeFastForwardRefMove,
     /// Fast-forward: before the working tree is written.
     BeforeFastForwardCheckout,
-    /// Merge: after libgit2 entered merge state, before the merge commit.
-    AfterMergeBeforeCommit,
+    /// Merge: after the merge result is staged, before the merge commit is written.
+    BeforeMergeCommit,
+    /// Merge: after the merge commit is written, before the working tree is checked out.
+    #[allow(dead_code)]
+    AfterMergeCommitBeforeCheckout,
+    /// Merge: after the working tree is written, before the branch ref moves to the merge commit.
+    #[allow(dead_code)]
+    BeforeMergeRefMove,
+    /// Fetch: on entry, before the remote is contacted.
+    BeforeFetch,
+    /// Push: on entry, before the remote is contacted.
+    BeforePush,
     /// Commit: on entry, before the repository is touched (and, once
     /// commands are serialized per graph, before the lock is taken).
     BeforeCommit,
