@@ -193,10 +193,8 @@ fn run_sweep(
         if file.placeholder {
             continue;
         }
-        if let Some(candidates) = &conflict_candidates {
-            if !candidates.contains(&file.path) {
-                continue; // the provider says no conflict lives here
-            }
+        if !checks_versions(&file.path, conflict_candidates.as_ref()) {
+            continue;
         }
         let abs = root.join(&file.path);
         let scan = unresolved_versions(&abs);
@@ -270,6 +268,13 @@ fn run_sweep(
         shadow.prune_orphans(&live);
     }
     Ok(outcome)
+}
+
+/// Whether the version pass checks `rel`: a scoped sweep checks only its
+/// candidate notes, and attachments wait for a `Full` sweep.
+fn checks_versions(rel: &str, candidates: Option<&HashSet<String>>) -> bool {
+    candidates
+        .is_none_or(|candidates| reflect_graph_paths::is_note(rel) && candidates.contains(rel))
 }
 
 /// Whether `rel` carries no unresolved provider versions. The lookup is a
@@ -1397,6 +1402,15 @@ mod tests {
 
         assert!(outcome.copies.is_empty());
         assert_eq!(fs::read_dir(root.path().join("assets")).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn only_full_sweeps_check_attachments() {
+        let candidates = HashSet::from(["notes/a.md".to_string(), "assets/data.json".to_string()]);
+        assert!(checks_versions("assets/data.json", None));
+        assert!(checks_versions("notes/a.md", Some(&candidates)));
+        assert!(!checks_versions("notes/b.md", Some(&candidates)));
+        assert!(!checks_versions("assets/data.json", Some(&candidates)));
     }
 
     #[test]
