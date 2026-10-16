@@ -51,9 +51,8 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
    device's side, the other's, or both. Hand-merging stays possible in any external
    editor. Future: a meowdown conflict node unlocks in-editor resolution.
 
-   > **Current state:** the marker design below is historical. A pull writes no
-   > markers. Notes resolve through the ladder of [Plan 21](21-icloud-drive-sync.md)
-   > and other files keep a conflict copy. See [git-backup-safety.md](../git-backup-safety.md) S7 and S9.
+   > **Current state:** a pull writes no markers. See
+   > [git-backup-safety.md](../git-backup-safety.md) S7 and S9.
 5. **Full loop in the first wave** — debounced commit→push *and* pull/merge, plus
    restore-from-GitHub in the graph chooser. Backup-only was rejected: a second device
    needs pull-before-push anyway, so deferral bought little.
@@ -79,9 +78,8 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
   Back up now, and on a **non-fast-forward** push rejection: fetch → merge → push
   again (bounded retries). While the window is visible, a desktop folder graph asks
   the remote for its branch tip every 90 s (one ref advertisement, no fetch) and runs
-  a full cycle only when the tip moved. A graph in an iCloud
-  folder with a remote only commits on edits, and runs the network pass after five
-  quiet minutes, once iCloud has no downloads pending.
+  a full cycle only when the tip moved. For a graph in iCloud, see
+  [icloud-sync.md](../icloud-sync.md).
 - **Hidden windows (iOS):** a debounced commit that has begun still pushes after the
   app is hidden. A pull's fetch and merge do not start or continue once it is hidden.
   Auth, push-protection, and size failures surface immediately — only divergence retries.
@@ -126,8 +124,6 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
 4. **Conflict policy** (the load-bearing step):
    - **Content conflicts** → a `.md` note runs the conflict ladder and always resolves to
      text; any other file keeps both versions. The app writes no markers.
-   - **Resolution UX (historical):** markers were lossy in the editor, so conflicted
-     notes opened **protected** and a notice resolved them on the raw text.
    - **Edit vs delete** → keep the edited version (never silently delete); record it.
    - **Binary/asset conflicts** → keep both (suffix the incoming copy); newest wins links.
    - Merges return their **changed files** (with real mtimes); the controller reindexes

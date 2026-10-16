@@ -121,8 +121,8 @@ resolution reuse verbatim. Two iCloud-specific refinements:
 
 ### 3. The resolution ladder
 
-Runs in Rust, per conflicted note, first match wins. Steps 1–4 auto-resolve
-silently. `.md` notes never drop a word, and other files keep a conflict copy beside them.
+Runs in Rust, per conflicted note, first match wins. Every step resolves
+silently.
 
 1. **Identical / whitespace-only** → keep current, mark versions resolved.
 2. **Three-way merge with the shadow base** (contract 4) → clean merge auto-applies.
@@ -138,10 +138,10 @@ silently. `.md` notes never drop a word, and other files keep a conflict copy be
      version timestamp. Also the rule for **creation collisions**: merge
      `2026-07-04 2.md` into the canonical file (union; both seeded from the same
      template/bullet, so the common-prefix shape holds), then delete the
-     duplicate. The duplicate folds into the canonical note; nothing is archived.
+     duplicate.
 4. **Binary assets** → keep-both using `name (conflict <UTC time> <hash8>).ext`
-   from `conflict/copy.rs`
-5. **Overlapping text edits** → marker block (contract 2). *(Now a word-level merge that returns text.)* This is the floor: *never* silent last-writer-wins, *never* a
+   from `conflict/copy.rs`.
+5. **Overlapping text edits** → a word-level merge that returns text. This is the floor: *never* silent last-writer-wins, *never* a
    `note 2.md` left behind.
 
 Only after the resolved content is durably written: set `resolved = true` on the
@@ -181,9 +181,7 @@ rename seam; a miss is again just a degraded merge.
   disconnects a configured Git remote (with an explanatory prompt); local
   checkpoint commits remain allowed and useful for recovery.
 
-  A graph may hold both. The engine then commits locally, and fetches and
-  pushes only after five quiet minutes with no pending iCloud downloads (see
-  `docs/icloud-sync.md`).
+  A graph may still hold both, see [icloud-sync.md](../icloud-sync.md).
 - **`.reflect/` exclusion goes cross-platform.** `mark_reflect_dir_local_only`
   widens from `cfg(target_os = "macos")` to Apple targets; the
   `ubiquitousItemIsExcludedFromSync` resource key exists on iOS. Verified inside

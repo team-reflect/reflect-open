@@ -87,9 +87,8 @@ section is the mapping, not a proposal:
   (Plan 19 decision 6 and its acceptance criterion: kill the app
   mid-debounce, the edit is on disk).
 - **Conflicts merge on the device.** V1's CRDT silently merged concurrent
-  edits. Reflect v2 does the same through one ladder (Plan 21), for notes.
-  Other files keep a conflict copy. Conflict markers are plain text to Reflect. Conflicts never
-  block sync of other notes. The canonical case is phone + Mac both appending
+  edits. Reflect v2 merges notes through one ladder (Plan 21), and other
+  files keep a conflict copy. Conflicts never block sync of other notes. The canonical case is phone + Mac both appending
   to today's daily note; the append-union rung merges it.
 - **Contract 5 maps to first clone**: cloning a years-old graph over
   cellular, foregrounded, with progress UI; shallow/partial clone is the
