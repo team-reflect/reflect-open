@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
-import { format } from 'ms'
+import prettyMs from 'pretty-ms'
 import { FolderOpen, GraduationCap, LocateFixed, PanelsTopLeft, Settings } from 'lucide-react'
 import { GraphSwatch } from '@/components/graph-swatch.tsx'
 import { ReflectAppsDialog } from '@/components/reflect-apps-dialog.tsx'
@@ -48,7 +48,7 @@ function backupDot(backup: BackupState, now: number): { className: string; label
     case 'waiting':
       return {
         className: 'bg-text-muted',
-        label: `Backs up in ${format(backup.status.until - now, { long: true })}`,
+        label: `Backs up in ${prettyMs(backup.status.until - now, { compact: true, verbose: true })}`,
       }
     case 'offline':
       return { className: 'bg-amber-500', label: 'Backup waiting for a connection' }

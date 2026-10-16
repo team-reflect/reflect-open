@@ -1,5 +1,5 @@
 import type { BackupState } from '@reflect/core'
-import { format } from 'ms'
+import prettyMs from 'pretty-ms'
 
 /**
  * The plain-language sync status mobile shows (Plan 19, step 10). The phone
@@ -48,7 +48,7 @@ function statusForBackup(backup: BackupState, now: number): MobileSyncStatus | n
     return {
       label: 'Backed up',
       tone: 'ok',
-      detail: `Backs up in ${format(status.until - now, { long: true })}`,
+      detail: `Backs up in ${prettyMs(status.until - now, { compact: true, verbose: true })}`,
     }
   }
   return { label: 'Backed up', tone: 'ok', detail: null }

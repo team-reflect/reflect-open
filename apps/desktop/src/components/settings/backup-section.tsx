@@ -2,7 +2,7 @@ import { useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
 import { isICloudRoot, suggestRepoName } from '@reflect/core'
-import { format } from 'ms'
+import prettyMs from 'pretty-ms'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog.tsx'
 import { SettingsField } from '@/components/settings/field.tsx'
 import { GithubSignOutRow } from '@/components/settings/github-sign-out-row.tsx'
@@ -22,7 +22,7 @@ function statusLine(backup: Extract<BackupState, { phase: 'connected' }>, now: n
     case 'idle':
       return 'Backed up'
     case 'waiting':
-      return `Backs up in ${format(backup.status.until - now, { long: true })}`
+      return `Backs up in ${prettyMs(backup.status.until - now, { compact: true, verbose: true })}`
     case 'syncing':
       return 'Backing up…'
     case 'offline':
