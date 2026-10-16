@@ -13,11 +13,14 @@ import { useMobileSyncStatus } from '@/mobile/use-sync-status.ts'
  */
 export function SyncStatusPill(): ReactElement | null {
   const status = useMobileSyncStatus()
-  const keyboardVisible = useKeyboardVisible()
+  const keyboardVisible = useKeyboardVisible() // FIXME I do not think you need this keyboardVisible at all. SyncStatusPill only has one caller and it seems that caller already checks for keyboardVisible. So this is redundant and can be removed.
 
   if (status === null || status.tone === 'ok' || keyboardVisible) {
     return null
   }
+
+  // FIXME: just refactor this into an component. do not use useMobileSyncStatus. so that you
+  // do not need to expoort a useBackupCountdown function. you can just use the BackupCountdown component directly in the component that needs it.
 
   return (
     <div
