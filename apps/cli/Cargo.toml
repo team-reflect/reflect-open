@@ -18,7 +18,7 @@ clap = { version = "4.6.6", features = ["derive"] }
 jiff = "0.2.37"
 sha2 = { workspace = true }
 pulldown-cmark = "0.13.4"
-saphyr = "0.0.12"
+saphyr = "0.1.0"
 unicode-normalization = "0.1.25"
 
 [dev-dependencies]
