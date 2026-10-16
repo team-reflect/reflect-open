@@ -19,7 +19,9 @@ that lock, so a save can never fall between them. The pull reads every
 uncommitted local edit before the checkout and writes it back after it.
 When both sides changed a text file, the conflict ladder resolves it with
 the incoming version. Otherwise the edit is kept beside a conflict copy.
-The result stays uncommitted for the next commit.
+The result stays uncommitted for the next commit. Local edits captured
+before a checkout are saved in `refs/reflect/edits` until they are written
+back, so a failure or a stop in the write-back cannot lose them.
 
 - Test: `git::tests::a_save_between_commit_and_merge_survives_the_merge`,
   `git::tests::a_save_between_commit_and_fast_forward_survives`,
@@ -69,6 +71,11 @@ checks it out and moves the ref to it instead of merging again. Foreign
 state (a merge or rebase the user started with the git CLI) is still
 refused.
 
+Reserved refs: `refs/reflect/merge` holds a merge commit written before its
+checkout, and the next cycle adopts it. `refs/reflect/edits` holds local
+edits captured before a checkout, and the next cycle replays them if the
+write-back did not finish.
+
 - Test: `git::tests::merge_interrupted_before_commit_converges_next_cycle`,
   `git::tests::merge_never_leaves_merge_head`,
   `git::tests::edits_after_a_merge_crash_survive_the_next_cycle`,
@@ -112,7 +119,7 @@ session saves at once. The save is a checked write against the disk text
 the buffer was typed on, and `note_write` merges it with the newer disk
 text under the graph lock (merge-on-write). The session adopts the merged
 text; a result the editor cannot round-trip opens the note protected. When
-the disk file already holds conflict markers, nothing is written: the
+the disk file holds conflict markers (`keptTheirs`), nothing is written: the
 buffer goes to the note's earlier versions, the disk text is adopted, and
 a notice says where the edits went. There is no parked state, so every
 exit path only has to finish the write.
@@ -134,7 +141,10 @@ exit path only has to finish the write.
 No merge path writes `<<<<<<<` lines into a note: not the git pull, not
 the iCloud sweep, not the editor save. All three resolve a text conflict
 through the same ladder. A result that drops or interleaves a side is
-archived under Earlier versions, so no side is lost. Notes that an older
+handled by where each side lives. A Git pull keeps both sides in the
+parents of the merge commit, so it archives nothing. An iCloud sweep or an
+editor save archives a result that drops or interleaves a side under
+Earlier versions. Notes that an older
 version left with markers still open protected and stay resolvable.
 
 - Test: `git::tests::conflicting_edits_merge_without_markers`,

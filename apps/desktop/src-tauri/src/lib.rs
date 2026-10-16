@@ -291,6 +291,7 @@ pub fn run() {
             icloud::sweep::icloud_conflicts_scan,
             conflict::conflict_archive_list,
             conflict::conflict_archive_read,
+            conflict::conflict_archive_restore,
             icloud::watch::icloud_watch_start,
             icloud::watch::icloud_watch_stop,
             fs::graph_open,
