@@ -139,6 +139,29 @@ describe('dev bridge note_create parity', () => {
     }
   })
 
+  it('refuses a checked write when the note changed on disk', async () => {
+    const files = createDevFileStore({ 'notes/a.md': '# Disk\n' })
+    const bridge = createDevBridge({ files, index: await createDevIndexDb() })
+
+    await expect(
+      bridge.invoke('note_write', {
+        path: 'notes/a.md',
+        contents: '# Mine\n',
+        checkContents: true,
+        expectedContents: '# Old\n',
+      }),
+    ).rejects.toThrow('Note changed on disk')
+    expect(files.read('notes/a.md')).toBe('# Disk\n')
+
+    await bridge.invoke('note_write', {
+      path: 'notes/a.md',
+      contents: '# Mine\n',
+      checkContents: true,
+      expectedContents: '# Disk\n',
+    })
+    expect(files.read('notes/a.md')).toBe('# Mine\n')
+  })
+
   it('reports a collision without replacing the existing file', async () => {
     const files = createDevFileStore({
       'notes/business-ideas.md': '# Original\n',

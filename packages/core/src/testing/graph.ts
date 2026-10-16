@@ -156,6 +156,10 @@ class TestNoteFileServiceImpl implements TestNoteFileService {
       if (current !== expectedContents && current !== contents) {
         throw new ReflectError('io', 'Note changed on disk; reload before retrying')
       }
+      const existing = this.#files.get(path)
+      if (existing !== undefined && existing.contents === contents) {
+        return { modifiedMs: existing.modifiedMs, merged: null }
+      }
     }
     return { modifiedMs: this.#store(path, contents, pinned), merged: null }
   }
