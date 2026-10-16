@@ -72,10 +72,124 @@ jobs:
   # and Windows to succeed. It also waits for Linux to finish, but a Linux
   # failure does not block it: the release then ships without the missing
   # Linux packages.
+  #
+  # This job writes latest.json, completes the release notes, and publishes
+  # the release. Nothing is visible to users, and releases/latest does not
+  # move, until it undrafts the release as its last step on the tagged
+  # release. To retry, re-run this job from the workflow run.
   finalize:
     name: Finalize the release
     needs: [macos, windows, linux]
-    if: ${{ !cancelled() && needs.macos.result == 'success' && needs.windows.result == 'success' }}
-    uses: ./.github/workflows/publish-finalize.yml
-    with:
-      tag: ${{ inputs.tag }}
+    if: ${{ !cancelled() && github.repository == 'team-reflect/reflect-open' && needs.macos.result == 'success' && needs.windows.result == 'success' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: publish-finalize
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node
+
+      # A prerelease version is the beta flavor. Asset names use the flavor's
+      # product name with spaces as dots, which is how GitHub stores them.
+      - name: Resolve release
+        id: release
+        run: |
+          version="$(jq -r .version apps/desktop/package.json)"
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::tag $TAG does not match version $version in apps/desktop/package.json"
+            exit 1
+          fi
+          config=tauri.conf.json
+          prerelease=false
+          if [[ "$version" == *-* ]]; then
+            config=tauri.beta.conf.json
+            prerelease=true
+          fi
+          product="$(jq -r .productName "apps/desktop/src-tauri/$config")"
+          {
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+            echo "product=$product"
+            echo "asset=${product// /.}"
+          } >> "$GITHUB_OUTPUT"
+
+      # Installed apps find a new version through latest.json: stable apps read
+      # it from releases/latest, beta apps from the updater-beta release.
+      - name: Write the updater manifest
+        run: pnpm release:manifest --tag="$TAG"
+
+      # Keep the changelog release-please wrote and add the download badges.
+      # A rerun replaces the download section, so it lists the assets that a
+      # retried build uploaded since the last run.
+      - name: Write the release notes
+        env:
+          ASSET: ${{ steps.release.outputs.asset }}
+        run: |
+          notes="$RUNNER_TEMP/release-notes.md"
+          body="$(gh release view "$TAG" --json body --jq .body)"
+          body="$(printf '%s' "${body%%$'\n## Download\n'*}")"
+          printf '%s\n' "$body" > "$notes"
+          if ! grep -qxF '## Which Mac download should I choose?' "$notes"; then
+            mapfile -t assets < <(gh release view "$TAG" --json assets --jq '.assets[].name')
+            echo >> "$notes"
+            node apps/desktop/scripts/release-downloads.ts \
+              --repo="$GITHUB_REPOSITORY" --tag="$TAG" --asset="$ASSET" \
+              "${assets[@]}" >> "$notes"
+          fi
+
+      - name: Publish the release
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          PRODUCT: ${{ steps.release.outputs.product }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
+        run: |
+          flags=(--title "$PRODUCT $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" --draft=false)
+          if [ "$PRERELEASE" = true ]; then
+            flags+=(--prerelease --latest=false)
+          else
+            flags+=(--prerelease=false --latest)
+          fi
+          gh release edit "$TAG" "${flags[@]}"
+
+      # Beta apps and the README download links read from the moving
+      # updater-beta release. A failed sync can be retried by re-running this
+      # job: every step above gives the same result on a rerun.
+      - name: Sync beta downloads and updater feed
+        if: steps.release.outputs.prerelease == 'true'
+        working-directory: ${{ runner.temp }}
+        env:
+          GH_REPO: ${{ github.repository }}
+          ASSET: ${{ steps.release.outputs.asset }}
+        run: |
+          # A retry of an older release must not roll the channel back.
+          newest="$(gh api --paginate "repos/$GH_REPO/releases" \
+            --jq '.[] | select(.prerelease and (.draft | not)) | .tag_name' |
+            jq -Rrn '[inputs | select(test("^v\\d+\\.\\d+\\.\\d+-beta(\\.\\d+)?$"))]
+              | max_by(ltrimstr("v") | [scan("\\d+") | tonumber] | if length == 3 then . + [0] else . end)')"
+          if [ "$newest" != "$TAG" ]; then
+            echo "$newest is already published; skipping older $TAG"
+            exit 0
+          fi
+
+          dmgs=("${ASSET}_aarch64.dmg" "${ASSET}_universal.dmg")
+          gh release download "$TAG" --dir . --pattern "${dmgs[0]}" --pattern "${dmgs[1]}" --pattern latest.json
+
+          if gh release view updater-beta > /dev/null; then
+            # DMGs first, so a failed upload leaves the working manifest untouched.
+            gh release upload updater-beta "${dmgs[@]}" --clobber
+            gh release upload updater-beta latest.json --clobber
+          else
+            gh release create updater-beta "${dmgs[@]}" latest.json \
+              --title 'Latest Reflect Beta downloads' \
+              --target "$GITHUB_SHA" \
+              --prerelease \
+              --latest=false \
+              --notes 'Moving downloads and updater feed for the latest Reflect Beta release. Choose a DMG for a fresh install; installed beta apps use latest.json.'
+          fi
