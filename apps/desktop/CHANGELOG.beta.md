@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.4...v0.16.0-beta.5) (2026-10-16)
+
+
+### Features
+
+* add experimental Linux support ([#1559](https://github.com/team-reflect/reflect-open/issues/1559)) ([ad827f7](https://github.com/team-reflect/reflect-open/commit/ad827f7f91e941f96602d95b6202f5528e3bb607))
+
 ## [0.16.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.3...v0.16.0-beta.4) (2026-10-16)
 
 
