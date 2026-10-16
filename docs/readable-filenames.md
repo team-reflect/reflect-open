@@ -161,7 +161,7 @@ tests in `src-tauri/src/git/tests.rs`):
 - **Rename on one device + edit on another** converges cleanly — libgit2's
   default rename detection lands the edit in the moved file.
 - **Same title created on two devices offline** collides on one path and
-  surfaces through the existing conflict-marker flow (this was impossible
+  is merged by the conflict ladder (this was impossible
   under ULID names; accepted as rare and recoverable).
 - **The same note retitled differently on two devices** forks into two files
   sharing one id. Nothing wedges, both files survive, and the fork surfaces

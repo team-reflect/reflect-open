@@ -117,21 +117,17 @@ syncing.
 When external content arrives while the buffer has unsaved edits, the
 session saves at once. The save is a checked write against the disk text
 the buffer was typed on, and `note_write` merges it with the newer disk
-text under the graph lock (merge-on-write). The session adopts the merged
-text; a result the editor cannot round-trip opens the note protected. When
-the disk file holds conflict markers (`keptTheirs`), nothing is written: the
-buffer goes to the note's earlier versions, the disk text is adopted, and
-a notice says where the edits went. There is no parked state, so every
+text under the graph lock (merge-on-write). The session always adopts the
+ladder's result; a result the editor cannot round-trip opens the note
+protected. There is no parked state, so every
 exit path only has to finish the write.
 
 - Test: `fs::tests::a_checked_write_against_a_moved_file_merges_under_the_lock`,
-  `fs::tests::a_reconciled_write_archives_the_buffer`,
-  `fs::tests::a_marked_disk_file_keeps_theirs_and_archives_ours`;
+  `fs::tests::a_reconciled_write_archives_the_buffer`;
   `note-session-service.test.ts` "a dirty buffer saves at once when an
   external change arrives", "an exact merge adopts the merged text and the
   session is clean", "a reconciled merge adopts the merged text and stays
-  saveable", "a keptTheirs result notifies and adopts the disk content",
-  "a lossy merged result opens protected", "a merged title change is
+  saveable", "a lossy merged result opens protected", "a merged title change is
   reported as external before saved", "keystrokes during a merging write
   stay dirty and merge on the next write", "dispose after flush still
   completes a merging write".
@@ -144,8 +140,8 @@ through the same ladder. A result that drops or interleaves a side is
 handled by where each side lives. A Git pull keeps both sides in the
 parents of the merge commit, so it archives nothing. An iCloud sweep or an
 editor save archives a result that drops or interleaves a side under
-Earlier versions. Notes that an older
-version left with markers still open protected and stay resolvable.
+Earlier versions. Conflict markers are plain text to Reflect: the app
+neither writes nor interprets them.
 
 - Test: `git::tests::conflicting_edits_merge_without_markers`,
   `conflict::ladder::tests::overlapping_edits_reconcile_without_markers`,

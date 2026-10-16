@@ -56,8 +56,8 @@ link UX (create-from-unresolved largely subsumes the failure case).
   renamed from the editor yet (the heading isn't its title — `title:` is
   authoritative and the editor doesn't edit frontmatter; a title field editor
   is a later surface), and a rename pending while a conflict is parked stays
-  pending until the conflict resolves ("keep mine" re-arms it, "load theirs"
-  cancels it) — rewriting the graph for a title the user may discard would
+  pending until the conflict resolves (keeping the local text re-arms it, loading the
+  disk text cancels it) — rewriting the graph for a title the user may discard would
   strand every rewritten link.
 
 ## Steps

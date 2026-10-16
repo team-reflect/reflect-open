@@ -30,9 +30,9 @@ plain Markdown files, so any tool can read and write them.
 
 ## Notes that already hold markers
 
-An older version of Reflect could leave `<<<<<<<` markers in a note. Reflect opens
-such a note protected and offers to keep either side or both. Your tool can also
-edit the markers out by hand.
+An older version of Reflect could leave `<<<<<<<` markers in a note. Reflect treats
+markers as plain text. It does not write them and does not interpret them. Edit
+the markers out by hand, in Reflect or in your tool.
 
 See also: [iCloud sync](icloud-sync.md) for the conflict ladder, and
 [Git backup safety](git-backup-safety.md) for the rules the sync path keeps.

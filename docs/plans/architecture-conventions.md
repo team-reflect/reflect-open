@@ -177,7 +177,7 @@ The services only a mobile platform builds (`haptics`, `subscription`, `paywall`
 
   ```ts
   // apps/desktop/src/lib/query-options.ts
-  export function createConflictedNotesQueryOptions(
+  export function createDuplicateNoteIdsQueryOptions(
     indexQuery: IndexQueryService,
     root: string | undefined,
   )

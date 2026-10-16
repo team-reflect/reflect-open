@@ -8,7 +8,7 @@ missing is only the front door: sign in to GitHub and pick/create a repo from
 the phone. This plan builds that connect flow and nothing else; **no new sync
 mechanism, no engine changes.**
 
-**Depends on:** Plan 12 (backup controller, merge machinery, `has_conflict`),
+**Depends on:** Plan 12 (backup controller, merge machinery),
 Plan 19/PR #483 (SyncProvider mounted in the mobile tree, mobile quit-flush),
 Plan 21 (contract 5: iCloud sync and a Git remote are mutually exclusive per
 graph — which makes the local graph precisely the one allowed a remote).

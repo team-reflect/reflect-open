@@ -477,7 +477,7 @@ The product should distinguish:
 - **Sync**: multiple devices converge safely.
 - **Collaboration**: multiple users edit shared content.
 
-The app should hide adapter complexity from normal users. If a Git adapter is used, the UI should not expose commits, branches, rebases, or merge markers as product concepts. Users should see plain language like "Backed up", "Syncing", "Needs review", and "Resolved".
+The app should hide adapter complexity from normal users. If a Git adapter is used, the UI should not expose commits, branches, rebases, or merge markers as product concepts. Users should see plain language like "Backed up", "Syncing", and "Offline".
 
 GitHub setup should let the user choose a repository rather than assuming Reflect creates a managed private repo. Reflect should still configure safe defaults, ignores, and recovery behavior where possible.
 

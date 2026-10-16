@@ -32,7 +32,7 @@ fallback with explicit triggers.
 > settings sheet grew a **Switch graph** section — so "one graph per device / no
 > iCloud containers" no longer holds (one graph *open* at a time still does). The
 > formatting toolbar shipped **webview-drawn** (decision 8), spike B passed with
-> meowdown on device, mobile conflict resolution shipped (mine/theirs/both), and
+> meowdown on device, mobile conflict resolution shipped (removed in 2026-10: conflict markers are plain text), and
 > the TestFlight flow exists ([docs/ios-testflight.md](../ios-testflight.md)).
 
 **Depends on:** Plans 02–05 (graph/storage, document model, index, **editor**),
@@ -393,8 +393,8 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
    webview's Web Share API — `navigator.share`, verified working in the Tauri
    iOS WKWebView, so no native plugin — and trash).
 10. **Sync wiring.** Resume/edit/online triggers, background-flush + local
-    commit on pause, `onRemoteChanges` reindex (unchanged), conflicted notes
-    protected with raw-marker resolution actions, status pill live.
+    commit on pause, `onRemoteChanges` reindex (unchanged), status pill live. (2026-10 revision: the
+    marker resolution actions were removed.)
 11. **Harden + ship.** Memory pass on a large graph (webview process limits;
     editing a very large note), resume-after-process-death recovery check,
     a11y labels, TestFlight build (`pnpm release:ios testflight`; see
@@ -425,9 +425,10 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
 - The keyboard never permanently occludes the editor or capture input, and
   the caret stays visible above the keyboard while typing (notched device,
   portrait + landscape).
-- A conflicted note opens protected with its "Needs review" state, offers
-  mine/theirs/both resolution actions, and never blocks sync of other notes; a
-  lossy-round-trip note opens protected, same as desktop.
+- A conflict never blocks sync of other notes; a lossy-round-trip note opens
+  protected, same as desktop. (2026-10 revision: this originally also covered
+  marker-conflicted notes with side-picking actions; conflict markers are
+  plain text now.)
 - No `private: true` content leaves the device: mobile v1 makes **no** AI or
   transcription calls at all; network egress is GitHub (sync) only.
 - A TestFlight build installs and survives backgrounding/resume without a
