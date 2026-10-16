@@ -1253,6 +1253,29 @@ describe('quiet mode', () => {
     engine.stop()
   })
 
+  it('a quiet window after an auth failure skips the network until a resume', async () => {
+    let pushes = 0
+    const git = fakeGit()
+    git.onPush(() => {
+      pushes += 1
+      throw { kind: 'auth', message: 'token rejected' }
+    })
+    const engine = quietEngine()
+
+    engine.noteChanged()
+    await advance(100)
+    await advance(QUIET_MS)
+    await vi.waitFor(() => expect(pushes).toBe(1))
+
+    engine.noteChanged()
+    await advance(100)
+    await advance(QUIET_MS)
+    await runAllTimers()
+    expect(pushes).toBe(1)
+    expect(methodsOf(git).filter((method) => method === 'fetch')).toHaveLength(1)
+    engine.stop()
+  })
+
   it('focusing the window every minute does not postpone the backup', async () => {
     const git = fakeGit()
     const engine = quietEngine({ quietMs: 5 * 60_000 })
