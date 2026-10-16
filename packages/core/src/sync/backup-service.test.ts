@@ -63,7 +63,14 @@ const USER_URL = 'https://api.github.com/user'
 const GENERATION = 3
 
 const AUTH = JSON.stringify({ kind: 'pat', token: 'ghp_abc' })
-const CLEAN_COMMIT: CommitOutcome = { committed: false, sha: null, ahead: 0, skippedLargeFiles: [] }
+const CLEAN_COMMIT: CommitOutcome = {
+  committed: false,
+  sha: null,
+  ahead: 0,
+  skippedLargeFiles: [],
+  changedFiles: [],
+  reviewPaths: [],
+}
 const UP_TO_DATE: MergeOutcome = { kind: 'upToDate', reviewPaths: [], changedFiles: [] }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -108,6 +115,10 @@ interface FakeOptions {
    * Make the keychain read throw (locked keychain, stale ACL after re-signing).
    */
   failSecretGet?: boolean
+  /**
+   * Scripted `commitAll` outcome (defaults to a clean tree).
+   */
+  commitOutcome?: CommitOutcome
   /**
    * Scripted `mergeRemote` outcome (defaults to up-to-date).
    */
@@ -206,7 +217,7 @@ function fakeServices(options: FakeOptions = {}) {
     if (options.gateSecondCommit === true && commitInvocations === 2) {
       await commitGate.promise
     }
-    return CLEAN_COMMIT
+    return options.commitOutcome ?? CLEAN_COMMIT
   })
   git.onFetch((credential, generation) => {
     record('fetch', { credential, generation })
@@ -257,6 +268,7 @@ function fakeServices(options: FakeOptions = {}) {
     },
   )
 
+  const progress = createTestProgressPort()
   backupDeps = {
     git,
     syncEngines: createSyncEngineFactory({ git, clock }),
@@ -264,7 +276,7 @@ function fakeServices(options: FakeOptions = {}) {
     githubRepos: createGithubRepoService({ http }),
     fileChanges,
     indexLifecycle,
-    progress: createTestProgressPort(),
+    progress,
     clock,
     activity,
     platform: createTestPlatformService({ surface: { mobileApp: options.mobile ?? false } }),
@@ -276,6 +288,7 @@ function fakeServices(options: FakeOptions = {}) {
     git,
     calls,
     invocations,
+    progress,
     secrets: secretStore,
     status,
     releaseStatus: () => statusGate.resolve(),
@@ -451,6 +464,8 @@ describe('createBackupService', () => {
         sha: 'c',
         ahead: 1,
         skippedLargeFiles: [],
+        changedFiles: [],
+        reviewPaths: [],
       }))
       void failing.backup.backUpNow()
       await vi.waitFor(() => {
@@ -517,7 +532,14 @@ describe('createBackupService', () => {
       })
       git.onCommitAll(() => {
         activity.setHidden(true)
-        return { committed: true, sha: 'c', ahead: 1, skippedLargeFiles: [] }
+        return {
+          committed: true,
+          sha: 'c',
+          ahead: 1,
+          skippedLargeFiles: [],
+          changedFiles: [],
+          reviewPaths: [],
+        }
       })
       fileChanges.emit({
         changes: [{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }],
@@ -1225,6 +1247,56 @@ describe('createBackupService', () => {
       { path: 'notes/from-b.md', kind: 'upsert', modifiedMs: 123 },
       { path: 'daily/2026-06-11.md', kind: 'remove' },
       { path: 'audio-memos/audio-memo-2026-06-11-090000-000.m4a', kind: 'upsert', modifiedMs: 456 },
+    ])
+    backup.dispose()
+    unlisten()
+  })
+
+  it('reports files a merge kept for review', async () => {
+    const { progress } = fakeServices({
+      mergeOutcome: {
+        kind: 'mergedWithReview',
+        reviewPaths: ['notes/a.png', 'notes/b.md'],
+        changedFiles: [],
+      },
+    })
+    const backup = createBackup({ indexGeneration: 1 })
+    await backup.start()
+
+    await vi.waitFor(() => {
+      expect(progress.snapshot()).toEqual([
+        expect.objectContaining({
+          label: 'Syncing',
+          status: 'failed',
+          message: 'Kept 2 files for review beside their notes',
+        }),
+      ])
+    })
+    backup.dispose()
+  })
+
+  it('indexes files a commit adopted and reports its review paths', async () => {
+    const adopted: FileChange = { path: 'notes/adopted.md', kind: 'upsert', modifiedMs: 9 }
+    const { calls, progress } = fakeServices({
+      commitOutcome: { ...CLEAN_COMMIT, changedFiles: [adopted], reviewPaths: ['notes/x.md'] },
+    })
+    const batches: FileChange[][] = []
+    const unlisten = fileChanges.subscribe(({ changes }) => {
+      batches.push(changes)
+    })
+    const backup = createBackup({ indexGeneration: 1 })
+    await backup.start()
+
+    await vi.waitFor(() => {
+      expect(calls).toContain('applyChanges')
+    })
+    expect(batches[0]).toEqual([adopted])
+    expect(progress.snapshot()).toEqual([
+      expect.objectContaining({
+        label: 'Syncing',
+        status: 'failed',
+        message: 'Kept 1 file for review beside its note',
+      }),
     ])
     backup.dispose()
     unlisten()

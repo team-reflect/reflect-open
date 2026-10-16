@@ -168,7 +168,7 @@ export interface BackupService {
   signOut(): Promise<void>
   /**
    * Full cycle now: commit, pull/merge, push. On an iCloud-hosted graph with
-   * a remote it commits and re-arms the quiet window instead.
+   * a remote it commits, and opens a quiet window only when none is open.
    */
   backUpNow(): Promise<void>
   /**
@@ -307,6 +307,7 @@ class BackupServiceImpl implements BackupService {
           progress.fail('Backing up', `Too large to back up (kept local): ${names}`)
         },
         onRemoteChanges: (changes) => this.#onRemoteChanges(changes),
+        onReview: (paths) => this.#onReview(paths),
       })
       this.#setState({ phase: 'connected', remoteUrl, repo, status: { state: 'idle' } })
       this.#adoptEngine(next)
@@ -485,6 +486,15 @@ class BackupServiceImpl implements BackupService {
     return this.#state.phase === 'connected' && this.#state.status.state === 'error'
   }
 
+  #onReview(paths: string[]): void {
+    this.#deps.progress.fail(
+      'Syncing',
+      paths.length === 1
+        ? 'Kept 1 file for review beside its note'
+        : `Kept ${paths.length} files for review beside their notes`,
+    )
+  }
+
   #onRemoteChanges(changes: ChangedFile[]): void | Promise<void> {
     const { fileChanges, indexLifecycle, activity, logger } = this.#deps
     if (changes.length === 0) {
@@ -500,8 +510,11 @@ class BackupServiceImpl implements BackupService {
     // the index and embeddings take markdown notes, the audio-memo
     // reconciler takes recordings) — and the index additionally gets a
     // direct apply (idempotent if a live watcher subscription double-applies).
-    fileChanges.emit({ changes, source: 'pull' })
-    const indexable = changes.filter((change) => isNotePath(change.path))
+    const fileChangeBatch = changes.map(({ path, kind, modifiedMs }) =>
+      modifiedMs === null || modifiedMs === undefined ? { path, kind } : { path, kind, modifiedMs },
+    )
+    fileChanges.emit({ changes: fileChangeBatch, source: 'pull' })
+    const indexable = fileChangeBatch.filter((change) => isNotePath(change.path))
     const indexGeneration = this.#indexGeneration
     if (indexGeneration !== null && indexable.length > 0) {
       const task = this.#remoteIndexTail.then(async () => {
@@ -593,6 +606,8 @@ class BackupServiceImpl implements BackupService {
         generation: this.#generation,
         localOnly: true,
         getCredential: async () => null,
+        onRemoteChanges: (changes) => this.#onRemoteChanges(changes),
+        onReview: (paths) => this.#onReview(paths),
         onStatus: (engineStatus) => {
           // No UI surfaces local history, so a failing commit loop (disk full,
           // corrupted repo) must at least leave a trace for diagnosis.

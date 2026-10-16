@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { applyTaskEdits, projectTasks, TaskStaleError } from '../markdown/task-ast.ts'
 import type { TaskLocator } from '../markdown/task-model.ts'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
+import { createTestFileChangeService, type TestFileChangeService } from '../testing/file-change.ts'
 import { createTestNoteFileService, overrideNoteFileService } from '../testing/graph.ts'
 import type { NoteWriteMerge } from '../graph/note-file-service.ts'
 import {
@@ -16,6 +17,7 @@ import {
   type NoteSession,
   type NoteSessionSnapshot,
 } from './note-session-service.ts'
+import { createTitleRenameTracker, type TitleRename } from './title-rename-tracker.ts'
 
 /** The first task's locator as the index records it. */
 function firstTask(source: string): TaskLocator {
@@ -67,6 +69,7 @@ interface Harness {
    */
   disk: () => string | undefined
   progress: TestProgressPort
+  fileChanges: TestFileChangeService
   session: NoteSession
   /**
    * The graph open when the session was created.
@@ -129,8 +132,10 @@ function harness(options?: {
   })
   const graph = createTestGraphSessionService({ graph: { generation: 1 } })
   const progress = createTestProgressPort()
+  const fileChanges = createTestFileChangeService()
   const session = createNoteSessionService({
     noteFile,
+    fileChanges,
     clock,
     logger,
     graphSession: graph,
@@ -175,6 +180,7 @@ function harness(options?: {
     },
     disk: () => files.files().get(PATH),
     progress,
+    fileChanges,
     session,
     graph,
     generations: () => files.writes().map((write) => write.generation),
@@ -391,7 +397,7 @@ describe('external changes and saves', () => {
         label: 'Saving note',
         status: 'failed',
         message:
-          'Your edits were kept under Earlier versions because the note already holds conflict markers',
+          'Your edits were kept under Earlier versions because the note on disk holds conflict markers',
       }),
     ])
     expect(h.disk()).toBe(MARKERS)
@@ -448,6 +454,59 @@ describe('external changes and saves', () => {
     ])
   })
 
+  it('a title typed by the user survives a merged write and renames the file', async () => {
+    const h = harness({ disk: '# Old title\n\nbody\n' })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# New title\n\nbody\n')
+    h.setDisk('# Old title\n\nbody theirs\n')
+    h.mergeNextWrite({ content: '# New title\n\nbody theirs\n', kind: 'exact' })
+    h.session.externalChanged()
+    await settled()
+
+    expect(h.contents.at(-1)).toEqual({ content: '# New title\n\nbody theirs\n', origin: 'saved' })
+    const renames: TitleRename[] = []
+    const tracker = createTitleRenameTracker({
+      path: PATH,
+      clock,
+      onRename: (rename) => {
+        renames.push(rename)
+      },
+    })
+    for (const { content, origin } of h.contents) {
+      if (origin === 'saved') {
+        tracker.saved(content)
+      } else {
+        tracker.baseline(content)
+      }
+    }
+    tracker.settle()
+    expect(renames).toEqual([{ from: 'Old title', to: 'New title', previousAutoAlias: null }])
+  })
+
+  it('a reconciled or keptTheirs write reports the note on the change stream', async () => {
+    const h = harness()
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# Hello mine\n')
+    h.setDisk('# Hello theirs\n')
+    h.mergeNextWrite({ content: '# Hello mine theirs\n', kind: 'reconciled' })
+    h.session.externalChanged()
+    await settled()
+    expect(h.fileChanges.batches()).toEqual([
+      {
+        changes: [{ path: PATH, kind: 'upsert', modifiedMs: expect.any(Number) }],
+        source: 'own-write',
+      },
+    ])
+
+    h.session.editorChanged('# Hello mine theirs\n\nmore\n')
+    await settled()
+    expect(h.fileChanges.batches()).toHaveLength(1) // a plain write archives nothing
+  })
+
   it('keystrokes during a merging write stay dirty and merge on the next write', async () => {
     const started = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
@@ -475,8 +534,9 @@ describe('external changes and saves', () => {
 
     h.mergeNextWrite({ content: '# Hello\n\nmine typed on\n\ntheirs\n', kind: 'exact' })
     await h.session.flush()
-    // The second write still names the base the keystrokes were typed on.
-    expect(h.expectedContents).toEqual(['# Hello\n', '# Hello\n'])
+    // The second write names the text the keystrokes were typed on, which the
+    // first write already merged into the file.
+    expect(h.expectedContents).toEqual(['# Hello\n', '# Hello\n\nmine\n'])
     expect(h.session.content()).toBe('# Hello\n\nmine typed on\n\ntheirs\n')
     expect(h.snapshots.at(-1)?.dirty).toBe(false)
   })
@@ -812,7 +872,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
     h.mergeNextWrite({ content: MARKERS_FILE, kind: 'keptTheirs' })
 
     await expect(h.session.commitFrontmatter({ pinned: true })).rejects.toThrow(
-      'The note already holds conflict markers; the edit was kept under Earlier versions',
+      'Your edits were kept under Earlier versions because the note on disk holds conflict markers',
     )
     expect(h.disk()).toBe(MARKERS_FILE)
     expect(h.snapshots.at(-1)).toMatchObject({ dirty: false, protected: true })
@@ -1270,7 +1330,7 @@ describe('commitSourceEdit', () => {
     h.mergeNextWrite({ content: MARKERS_FILE, kind: 'keptTheirs' })
 
     await expect(h.session.commitSourceEdit(toggleTransform(firstTask(source)))).rejects.toThrow(
-      'The note already holds conflict markers; the edit was kept under Earlier versions',
+      'Your edits were kept under Earlier versions because the note on disk holds conflict markers',
     )
     expect(h.disk()).toBe(MARKERS_FILE)
     expect(h.snapshots.at(-1)).toMatchObject({ dirty: false, protected: true })

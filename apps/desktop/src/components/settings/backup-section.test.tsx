@@ -8,6 +8,7 @@ import {
   createTestCoreServices,
   createTestBackupService,
   type TestBackupService,
+  type TestCoreServices,
 } from '@reflect/core/testing'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import '@/test-utils/locator.ts'
@@ -35,7 +36,7 @@ beforeEach(() => {
   signOut = vi.spyOn(backup, 'signOut')
 })
 
-async function renderSection(state: BackupState, graph?: TestOpenGraph): Promise<void> {
+async function renderSection(state: BackupState, graph?: TestOpenGraph): Promise<TestCoreServices> {
   backup.setState(state)
   const app = createTestCoreServices({ backup })
   if (githubConnected) {
@@ -46,6 +47,7 @@ async function renderSection(state: BackupState, graph?: TestOpenGraph): Promise
     appServices: { opener },
     ...(graph === undefined ? {} : { graph }),
   })
+  return app
 }
 
 const AUTH_ERROR = {
@@ -92,6 +94,34 @@ describe('BackupSettingsField', () => {
       status: { state: 'waiting', until: 2 * 60_000 + 1 },
     })
     await expect.element(page.getByText('Backs up in 3 min')).toBeVisible()
+  })
+
+  it('counts the waiting countdown down as time passes', async () => {
+    const app = await renderSection({
+      phase: 'connected',
+      remoteUrl: 'https://github.com/alex/notes.git',
+      repo: { owner: 'alex', name: 'notes' },
+      status: { state: 'waiting', until: 3 * 60_000 },
+    })
+    await expect.element(page.getByText('Backs up in 3 min')).toBeVisible()
+    await app.clock.advance(60_000)
+    await expect.element(page.getByText('Backs up in 2 min')).toBeVisible()
+  })
+
+  it('names no host for an iCloud graph with a generic remote', async () => {
+    await renderSection(
+      {
+        phase: 'connected',
+        remoteUrl: 'git@gitlab.com:alex/notes.git',
+        repo: null,
+        status: { state: 'idle' },
+      },
+      ICLOUD_GRAPH,
+    )
+    await expect
+      .element(page.getByText(/Pushes to the backup five minutes after iCloud/))
+      .toBeVisible()
+    await expect.element(page.getByText(/GitHub/)).not.toBeInTheDocument()
   })
 
   it('renders a generic remote host-neutrally with the engine’s own auth message', async () => {

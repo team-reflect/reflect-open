@@ -48,10 +48,11 @@ const noteWriteOutcomeSchema = z.object({
 
 /**
  * How a checked write against a note that moved on disk was merged.
- * `content` is the full text now on disk. `exact` merged every line from one
- * side, `reconciled` merged word by word and archived both inputs, and
- * `keptTheirs` wrote nothing because the disk file holds conflict markers
- * (the given contents went to the note's earlier versions).
+ * `content` is the full text now on disk. `exact` took every line from one
+ * side (a diff3, union, or whitespace merge), `reconciled` merged word by word
+ * and archived both inputs, and `keptTheirs` wrote nothing because the disk
+ * file holds conflict markers (the given contents went to the note's earlier
+ * versions).
  */
 export interface NoteWriteMerge {
   content: string

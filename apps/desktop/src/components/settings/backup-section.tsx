@@ -9,6 +9,7 @@ import { GithubSignOutRow } from '@/components/settings/github-sign-out-row.tsx'
 import { SyncForkNotice } from '@/components/settings/sync-fork-notice.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
+import { useNow } from '@/hooks/use-now.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
 import {
   createConflictedNotesQueryOptions,
@@ -53,7 +54,8 @@ function githubRepoBrowserUrl(
 export function BackupSettingsField(): ReactElement {
   const { backup, disconnectGraph, signOut, backUpNow } = useSync()
   const { graph } = useGraph()
-  const { indexQuery, clock } = useCoreServices()
+  const { indexQuery } = useCoreServices()
+  const now = useNow(30_000)
   const { opener } = useAppServices()
   const githubConnected = useGithubConnected()
   const [connectOpen, setConnectOpen] = useState(false)
@@ -114,7 +116,7 @@ export function BackupSettingsField(): ReactElement {
         legend={genericRemote ? 'Backup' : 'GitHub sync'}
         description={
           hosted && backup.phase === 'connected'
-            ? 'Backs up to GitHub five minutes after iCloud and your edits go quiet. Back up now commits locally.'
+            ? `${genericRemote ? 'Pushes to the backup' : 'Backs up to GitHub'} five minutes after iCloud and your edits go quiet. Back up now commits locally.`
             : genericRemote
               ? 'This graph backs up to its own git remote. Edits back up automatically a few moments after you stop typing.'
               : 'Back up this graph to a GitHub repository. Edits back up automatically a few moments after you stop typing.'
@@ -151,9 +153,7 @@ export function BackupSettingsField(): ReactElement {
             <>
               <p className="text-sm text-text">
                 <span className="font-medium">{repoLabel}</span>
-                <span className="ml-2 text-xs text-text-muted">
-                  {statusLine(backup, clock.now())}
-                </span>
+                <span className="ml-2 text-xs text-text-muted">{statusLine(backup, now)}</span>
               </p>
               {conflictCount > 0 ? (
                 <div className="text-xs text-amber-700 dark:text-amber-300">

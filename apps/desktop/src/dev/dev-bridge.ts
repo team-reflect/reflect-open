@@ -326,6 +326,7 @@ class DevBridgeImpl implements IpcBridge {
       case 'conflict_archive_list':
         return []
       case 'conflict_archive_read':
+      case 'conflict_archive_restore':
         throw new ReflectError('notFound', 'dev bridge: the archive is empty')
 
       default:

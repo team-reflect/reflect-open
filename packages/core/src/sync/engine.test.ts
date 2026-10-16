@@ -60,8 +60,22 @@ async function runAllTimers(): Promise<void> {
 }
 
 const CRED = { username: 'x-access-token', secret: 'tok' }
-const CLEAN_COMMIT: CommitOutcome = { committed: false, sha: null, ahead: 0, skippedLargeFiles: [] }
-const COMMITTED: CommitOutcome = { committed: true, sha: 'abc', ahead: 1, skippedLargeFiles: [] }
+const CLEAN_COMMIT: CommitOutcome = {
+  committed: false,
+  sha: null,
+  ahead: 0,
+  skippedLargeFiles: [],
+  changedFiles: [],
+  reviewPaths: [],
+}
+const COMMITTED: CommitOutcome = {
+  committed: true,
+  sha: 'abc',
+  ahead: 1,
+  skippedLargeFiles: [],
+  changedFiles: [],
+  reviewPaths: [],
+}
 const PUSHED: PushOutcome = { pushed: true, nonFastForward: false, rejectionMessage: null }
 const NON_FAST_FORWARD: PushOutcome = {
   pushed: false,
@@ -850,6 +864,8 @@ describe('createSyncEngineFactory', () => {
       sha: 'abc',
       ahead: 1,
       skippedLargeFiles: [{ path: 'assets/movie.mp4', size: 200_000_000 }],
+      changedFiles: [],
+      reviewPaths: [],
     }))
     const skipped: Array<{ path: string }[]> = []
     const engine = createSyncEngine({
@@ -1199,12 +1215,52 @@ describe('quiet mode', () => {
 
     await engine.syncNow()
     expect(methodsOf(git)).toEqual(['commitAll'])
-    await advance(QUIET_MS - 1)
-    expect(methodsOf(git)).toEqual(['commitAll'])
+    await advance(QUIET_MS / 2)
+    await engine.syncNow() // the open window stays where it was
+    expect(methodsOf(git)).toEqual(['commitAll', 'commitAll'])
+    await advance(QUIET_MS / 2 - 1)
+    expect(methodsOf(git)).toEqual(['commitAll', 'commitAll'])
     await advance(1)
     await vi.waitFor(() => {
       expect(methodsOf(git)).toContain('fetch')
     })
+    engine.stop()
+  })
+
+  it('focusing the window every minute does not postpone the backup', async () => {
+    const git = fakeGit()
+    const engine = quietEngine({ quietMs: 5 * 60_000 })
+
+    await engine.syncNow()
+    for (let minute = 1; minute < 5; minute++) {
+      await advance(60_000)
+      await engine.syncNow()
+    }
+    expect(methodsOf(git)).not.toContain('fetch')
+    await advance(60_000)
+    await vi.waitFor(() => {
+      expect(methodsOf(git)).toContain('fetch')
+    })
+    engine.stop()
+  })
+
+  it('syncNow during a back-off keeps the back-off', async () => {
+    const git = fakeGit()
+    const asks: number[] = []
+    const engine = quietEngine({
+      networkReady: async () => {
+        asks.push(clock.now())
+        return false
+      },
+    })
+
+    await engine.syncNow()
+    await advance(QUIET_MS)
+    await advance(30_000)
+    await engine.syncNow()
+    await advance(60_000)
+    expect(asks).toEqual([1000, 31_000, 91_000])
+    expect(methodsOf(git)).not.toContain('fetch')
     engine.stop()
   })
 
@@ -1235,7 +1291,7 @@ describe('quiet mode', () => {
     engine.stop()
   })
 
-  it('activity during the readiness ask is honoured', async () => {
+  it('an edit during the readiness ask is honoured', async () => {
     const git = fakeGit()
     let answer: (ready: boolean) => void = () => {}
     let asks = 0
@@ -1251,7 +1307,8 @@ describe('quiet mode', () => {
     await engine.syncNow()
     await advance(QUIET_MS)
     expect(asks).toBe(1)
-    await engine.syncNow() // activity while the ask is open: a fresh window
+    engine.noteChanged() // an edit while the ask is open: a fresh window
+    await advance(100)
     answer(true)
     await flush()
     expect(methodsOf(git)).toEqual(['commitAll', 'commitAll'])
@@ -1277,6 +1334,53 @@ describe('quiet mode', () => {
       { state: 'syncing' },
       { state: 'waiting', until: 1400 },
     ])
+    engine.stop()
+  })
+})
+
+describe('review and adoption outcomes', () => {
+  it('reports the review paths of a merge', async () => {
+    const git = fakeGit()
+    git.onMergeRemote(() => ({
+      kind: 'mergedWithReview',
+      reviewPaths: ['a.png'],
+      changedFiles: [],
+    }))
+    const reviews: string[][] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => CRED,
+      onReview: (paths) => {
+        reviews.push(paths)
+      },
+    })
+
+    await engine.syncNow()
+    expect(reviews).toEqual([['a.png']])
+    engine.stop()
+  })
+
+  it('reports the files and review paths a commit adopted, also in a commit-only cycle', async () => {
+    const git = fakeGit()
+    const adopted = [{ path: 'notes/a.md', kind: 'upsert' as const, modifiedMs: 5 }]
+    git.onCommitAll(() => ({ ...COMMITTED, changedFiles: adopted, reviewPaths: ['notes/b.md'] }))
+    const changes: unknown[] = []
+    const reviews: string[][] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => CRED,
+      onRemoteChanges: (changed) => {
+        changes.push(changed)
+      },
+      onReview: (paths) => {
+        reviews.push(paths)
+      },
+    })
+
+    await engine.syncNow()
+    await engine.commitNow()
+    expect(changes).toEqual([adopted, adopted])
+    expect(reviews).toEqual([['notes/b.md'], ['notes/b.md']])
     engine.stop()
   })
 })

@@ -4,8 +4,10 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import { errorMessage, isAppError, ReflectError } from '../errors.ts'
 import type { NoteFileService, NoteWriteResult } from '../graph/note-file-service.ts'
+import type { FileChangeService } from '../indexing/file-change-service.ts'
 import { appendBlock } from '../markdown/append-section.ts'
 import { detectConflictMarkers } from '../markdown/conflict-markers.ts'
+import { hasAuthoredTitle, parseNote } from '../markdown/extract.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { splitDoc } from './note-session-doc.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
@@ -45,10 +47,11 @@ interface NoteSessionIo {
 const DEFAULT_SAVE_DEBOUNCE_MS = 800
 
 const KEPT_THEIRS_MESSAGE =
-  'The note already holds conflict markers; the edit was kept under Earlier versions'
+  'Your edits were kept under Earlier versions because the note on disk holds conflict markers'
 
 export interface NoteSessionServiceDeps {
   readonly noteFile: NoteFileService
+  readonly fileChanges: FileChangeService
   readonly clock: ClockService
   readonly logger: LoggerService
   readonly graphSession: GraphSessionSource
@@ -112,6 +115,11 @@ class NoteSessionImpl implements NoteSession {
    * The full content most recently read from or written to disk.
    */
   #disk = ''
+  /**
+   * The text the buffer was typed on: the base a checked write names. It
+   * differs from `#disk` only after a merged write raced newer keystrokes.
+   */
+  #writeBase = ''
   #saveTimer: TimerHandle | null = null
   /**
    * Serializes writes so a flush can't interleave with a debounced save.
@@ -264,17 +272,26 @@ class NoteSessionImpl implements NoteSession {
         const content = this.#header + this.#buffer
         this.#inFlightWrite = content
         try {
-          const result = await write(this.path, content, this.#missing ? null : this.#disk)
+          const base = this.#writeBase
+          const result = await write(this.path, content, this.#missing ? null : base)
           this.#missing = false // the landed write created the file if it was missing
           this.#error = null // a previous save failure is resolved by this success
           this.#retriedFailedSave = false
           if (result.merged === null) {
             this.#disk = content
+            this.#writeBase = content
             this.#dirty = this.#header + this.#buffer !== content
             this.#emit()
             this.#onContent?.(content, 'saved')
           } else {
-            this.#adoptMergedWrite(content, result.merged.content, result.merged.kind)
+            this.#adoptMergedWrite(base, content, result.merged.content, result.merged.kind)
+            if (result.merged.kind !== 'exact') {
+              // The write archived a version, so the note's earlier versions changed.
+              this.#deps.fileChanges.emit({
+                changes: [{ path: this.path, kind: 'upsert', modifiedMs: result.modifiedMs }],
+                source: 'own-write',
+              })
+            }
           }
         } finally {
           this.#inFlightWrite = null
@@ -291,33 +308,40 @@ class NoteSessionImpl implements NoteSession {
   }
 
   /**
-   * Take the text a write merged into the file. `sent` is the content the
-   * write was given.
+   * Take the text a write merged into the file. `base` and `sent` are the
+   * expected and given contents of that write.
    */
   #adoptMergedWrite(
+    base: string,
     sent: string,
     merged: string,
     kind: NonNullable<NoteWriteResult['merged']>['kind'],
   ): void {
     this.#inFlightWrite = null
-    // Another device may have changed the title, so the merged text is
-    // ground truth for the rename tracker, never a local save.
-    this.#onContent?.(merged, 'external')
+    // A title the user changed and the merge kept is a local save for the
+    // rename tracker; any other merged title is ground truth from elsewhere.
+    const sentTitle = this.#titleOf(sent)
+    const ownTitle = sentTitle !== this.#titleOf(base) && sentTitle === this.#titleOf(merged)
+    this.#onContent?.(merged, ownTitle ? 'saved' : 'external')
     if (kind === 'keptTheirs') {
       this.#keptTheirsCount += 1
-      this.#deps.progress.fail(
-        'Saving note',
-        'Your edits were kept under Earlier versions because the note already holds conflict markers',
-      )
+      this.#deps.progress.fail('Saving note', KEPT_THEIRS_MESSAGE)
     }
     if (this.#header + this.#buffer !== sent) {
-      // Keystrokes arrived during the write. Keep them dirty against the base
-      // they were typed on, so the next save merges them with the file again.
+      // Keystrokes arrived during the write. They were typed on `sent`, so the
+      // next save names it as the base and merges them with the file again.
+      this.#disk = merged
+      this.#writeBase = sent
       this.#dirty = true
       this.#emit()
       return
     }
     this.#adoptCleanContent(merged)
+  }
+
+  #titleOf(content: string): string | null {
+    const parsed = parseNote({ path: this.path, source: content })
+    return hasAuthoredTitle(parsed) ? parsed.title : null
   }
 
   #scheduleSave(): void {
@@ -362,6 +386,9 @@ class NoteSessionImpl implements NoteSession {
     }
     this.#buffer = markdown
     this.#dirty = this.#header + markdown !== this.#disk
+    if (!this.#dirty) {
+      this.#writeBase = this.#disk
+    }
     if (this.#missing && markdown.trim() === '') {
       // A still-unwritten note cleared back to nothing (e.g. the seeded
       // empty-title template deleted wholesale) stays unwritten: creating an
@@ -397,6 +424,7 @@ class NoteSessionImpl implements NoteSession {
     this.#header = doc.header
     this.#buffer = doc.body
     this.#disk = content
+    this.#writeBase = content
     this.#dirty = false
     this.#missing = false // external content means the file exists on disk now
     // Re-gate: the content may have introduced (or removed) syntax the editor
@@ -494,6 +522,7 @@ class NoteSessionImpl implements NoteSession {
         this.#header = doc.header
         this.#buffer = doc.body
         this.#disk = adopted
+        this.#writeBase = adopted
         this.#dirty = false
         this.#missing = fileMissing
         // The data-loss gate: a note the editor can't reproduce opens read-only.

@@ -26,10 +26,15 @@ beforeEach(() => {
       commands: {
         conflict_archive_list: () => versions,
         conflict_archive_read: (args) => `text of ${String(args.name)}`,
+        conflict_archive_restore: () => ({ modifiedMs: 3000 }),
       },
     }),
   })
 })
+
+function listCalls(): number {
+  return app.ipc.calls().filter(({ command }) => command === 'conflict_archive_list').length
+}
 
 describe('NoteVersionsAction', () => {
   it('shows the button without a click when versions exist', async () => {
@@ -39,19 +44,42 @@ describe('NoteVersionsAction', () => {
     await expect.element(view.getByText(/laptop, 2\.0 KB/)).toBeInTheDocument()
   })
 
-  it('shows a version read-only and restores it with a write', async () => {
+  it('shows a version read-only, restores it, and reloads the list', async () => {
     const view = await renderAction()
     await userEvent.click(view.getByRole('button', { name: /Earlier versions/ }))
     await userEvent.click(view.getByRole('button', { name: /laptop/ }))
     await expect.element(view.getByText('text of 1000-laptop.md')).toBeInTheDocument()
 
+    const listsBefore = listCalls()
     await userEvent.click(view.getByRole('button', { name: 'Restore this version' }))
     await expect
-      .poll(() => app.noteFile.writes())
-      .toEqual([{ path: PATH, contents: 'text of 1000-laptop.md', generation: 7 }])
+      .poll(() => app.ipc.calls().filter(({ command }) => command === 'conflict_archive_restore'))
+      .toEqual([
+        {
+          command: 'conflict_archive_restore',
+          args: { path: PATH, name: OLDER.name, generation: 7 },
+        },
+      ])
     expect(app.progress.started().map((operation) => operation.label)).toContain(
       'Restoring version',
     )
+    await expect.poll(listCalls).toBeGreaterThan(listsBefore)
+  })
+
+  it('reloads the list when a file change touches the note', async () => {
+    versions = []
+    const view = await renderAction()
+    await expect.poll(listCalls).toBe(1)
+    expect(view.getByRole('button').query()).toBeNull()
+
+    versions = [NEWER]
+    app.fileChanges.emit({
+      changes: [{ path: 'notes/other.md', kind: 'upsert' }],
+      source: 'external',
+    })
+    app.fileChanges.emit({ changes: [{ path: PATH, kind: 'upsert' }], source: 'own-write' })
+    await expect.element(view.getByRole('button', { name: /Earlier versions/ })).toBeInTheDocument()
+    expect(listCalls()).toBe(2)
   })
 
   it('renders no button when the list is empty', async () => {

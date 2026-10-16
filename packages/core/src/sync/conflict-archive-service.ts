@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
-import type { NoteFileService } from '../graph/note-file-service.ts'
+import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
+import type { ClockService } from '../ports/clock-service.ts'
 
 const archivedVersionSchema = z.object({
   name: z.string(),
@@ -12,6 +13,16 @@ const archivedVersionSchema = z.object({
 
 const archivedVersionsSchema = z.array(archivedVersionSchema)
 
+const restoreOutcomeSchema = z.object({
+  modifiedMs: z.number().nullable(),
+  merged: z
+    .object({
+      content: z.string(),
+      kind: z.enum(['exact', 'reconciled', 'keptTheirs']),
+    })
+    .optional(),
+})
+
 /**
  * One earlier version of a note that a merge or an overwrite set aside.
  */
@@ -19,7 +30,8 @@ export type ArchivedVersion = z.infer<typeof archivedVersionSchema>
 
 export interface ConflictArchiveServiceDeps {
   readonly ipc: IpcBridgeService
-  readonly noteFile: NoteFileService
+  readonly clock: ClockService
+  readonly fileChanges: FileChangeService
   readonly graphSession: GraphSessionSource
 }
 
@@ -36,7 +48,8 @@ export interface ConflictArchiveService {
    */
   read(path: string, name: string): Promise<string>
   /**
-   * Write an archived version over the note, without checking the file on disk.
+   * Write an archived version over the note. Every change is reported to
+   * {@link FileChangeService.reportOwnWrite} after it lands.
    */
   restore(path: string, name: string): Promise<void>
 }
@@ -67,9 +80,16 @@ class ConflictArchiveServiceImpl implements ConflictArchiveService {
   }
 
   async restore(path: string, name: string): Promise<void> {
-    const content = await this.read(path, name)
-    const { generation } = requireGraphSession(this.#deps.graphSession)
-    await this.#deps.noteFile.write(path, content, generation)
+    const { ipc, clock, fileChanges, graphSession } = this.#deps
+    const { generation } = requireGraphSession(graphSession)
+    const outcome = await ipc.call(
+      'conflict_archive_restore',
+      { path, name, generation },
+      restoreOutcomeSchema,
+    )
+    fileChanges.reportOwnWrite([
+      { path, kind: 'upsert', modifiedMs: outcome.modifiedMs ?? clock.now() },
+    ])
   }
 }
 

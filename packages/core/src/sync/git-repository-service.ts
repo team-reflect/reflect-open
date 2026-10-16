@@ -41,8 +41,9 @@ export const changedFileSchema = z.object({
   kind: z.enum(['upsert', 'remove']),
   /**
    * Last-modified time (epoch ms; upserts only) — real mtime for the reindex.
+   * A removed file carries `null` or omits it.
    */
-  modifiedMs: z.number().optional(),
+  modifiedMs: z.number().nullable().optional(),
 })
 export type ChangedFile = z.infer<typeof changedFileSchema>
 

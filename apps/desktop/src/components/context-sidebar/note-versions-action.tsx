@@ -26,57 +26,61 @@ function formatSize(bytes: number): string {
 /**
  * Lists the earlier versions that sync set aside for a note, shows one
  * read-only, and restores it over the note. Renders nothing while the note
- * has no earlier versions, which it checks when it mounts and again each time the dialog opens.
+ * has no earlier versions. The list loads when it mounts, when the dialog
+ * opens, after a restore, and on every file change of the note.
  */
 export function NoteVersionsAction({ path }: NoteVersionsActionProps): ReactElement | null {
-  const { conflictArchive } = useCoreServices()
+  const { conflictArchive, fileChanges } = useCoreServices()
   const { operations } = useAppServices()
   const { settings } = useSettings()
   const [open, setOpen] = useState(false)
   const [loaded, setLoaded] = useState<{ path: string; list: ArchivedVersion[] } | null>(null)
   const versions = loaded?.path === path ? loaded.list : null
-  const [selected, setSelected] = useState<{ name: string; content: string } | null>(null)
+  const [picked, setPicked] = useState<{ path: string; name: string; content: string } | null>(null)
+  const selected = picked?.path === path ? picked : null
   const [isRestoring, setIsRestoring] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const reload = async (): Promise<void> => {
-    try {
-      setLoaded({ path, list: await conflictArchive.list(path) })
-    } catch (cause) {
-      setError(errorMessage(cause))
-    }
-  }
+  const [requested, setRequested] = useState(0)
 
   useEffect(() => {
     let current = true
-    conflictArchive
-      .list(path)
-      .then((list) => {
-        if (current) {
-          setLoaded({ path, list })
-        }
-      })
-      .catch((cause: unknown) => {
-        if (current) {
-          setError(errorMessage(cause))
-        }
-      })
+    const load = (): void => {
+      conflictArchive
+        .list(path)
+        .then((list) => {
+          if (current) {
+            setLoaded({ path, list })
+          }
+        })
+        .catch((cause: unknown) => {
+          if (current) {
+            setError(errorMessage(cause))
+          }
+        })
+    }
+    load()
+    const stop = fileChanges.subscribe(({ changes }) => {
+      if (changes.some((change) => change.path === path)) {
+        load()
+      }
+    })
     return () => {
       current = false
+      stop()
     }
-  }, [path, conflictArchive])
+  }, [path, conflictArchive, fileChanges, requested])
 
   const onOpen = (): void => {
     setOpen(true)
     setError(null)
-    setSelected(null)
-    void reload()
+    setPicked(null)
+    setRequested((count) => count + 1)
   }
 
   const onSelect = async (name: string): Promise<void> => {
     setError(null)
     try {
-      setSelected({ name, content: await conflictArchive.read(path, name) })
+      setPicked({ path, name, content: await conflictArchive.read(path, name) })
     } catch (cause) {
       setError(errorMessage(cause))
     }
@@ -93,6 +97,8 @@ export function NoteVersionsAction({ path }: NoteVersionsActionProps): ReactElem
       await conflictArchive.restore(path, selected.name)
       operation.done()
       setOpen(false)
+      setPicked(null)
+      setRequested((count) => count + 1)
     } catch (cause) {
       const message = errorMessage(cause)
       setError(message)

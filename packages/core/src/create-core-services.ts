@@ -1208,7 +1208,7 @@ export function composeCoreServices(
       fileChanges,
       graphSession,
     }),
-    conflictArchive: create.conflictArchive({ ipc, noteFile, graphSession }),
+    conflictArchive: create.conflictArchive({ ipc, clock, fileChanges, graphSession }),
     embedMedia: create.embedMedia({
       xArchive,
       webFetch,
@@ -1227,7 +1227,14 @@ export function composeCoreServices(
     classicAccess,
     fileChanges,
     attachments,
-    noteSessions: create.noteSessions({ noteFile, clock, logger, graphSession, progress }),
+    noteSessions: create.noteSessions({
+      noteFile,
+      fileChanges,
+      clock,
+      logger,
+      graphSession,
+      progress,
+    }),
     openDocuments,
     noteMove,
     titleRename: create.titleRename({
