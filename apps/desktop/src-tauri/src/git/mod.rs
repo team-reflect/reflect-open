@@ -158,7 +158,9 @@ pub async fn git_setup(
 pub async fn git_disconnect(generation: u64, state: State<'_, GraphState>) -> AppResult<GitStatus> {
     let root = crate::fs::root_for_generation(&state, generation)?;
     run_blocking(move || {
-        locks::retry_after_stale_lock(&root, || crate::fs::with_graph_lock(&root, || disconnect(&root)))
+        locks::retry_after_stale_lock(&root, || {
+            crate::fs::with_graph_lock(&root, || disconnect(&root))
+        })
     })
     .await
 }
