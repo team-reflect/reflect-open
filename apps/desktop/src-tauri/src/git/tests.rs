@@ -1253,6 +1253,25 @@ fn merge_crash_after_checkout_before_ref_move_converges_next_cycle() {
 }
 
 #[test]
+fn an_adopted_merge_reports_its_files() {
+    let fixture = diverged_fixture();
+    let root_a = &fixture.graph_a;
+    fault::arm(FaultPoint::AfterMergeCommitBeforeCheckout, Fault::Fail);
+    assert!(merge_remote(root_a).is_err());
+
+    let outcome = merge_remote(root_a).unwrap();
+    for rel in ["notes/b.md", "notes/shared.md"] {
+        let change = outcome
+            .changed_files
+            .iter()
+            .find(|change| change.path == rel)
+            .unwrap_or_else(|| panic!("{rel} is not reported: {outcome:?}"));
+        assert!(change.modified_ms.is_some(), "{outcome:?}");
+    }
+    assert_eq!(recorded_merge(root_a), None);
+}
+
+#[test]
 fn a_recorded_merge_from_a_foreign_head_is_dropped() {
     let fixture = diverged_fixture();
     let root_a = &fixture.graph_a;
@@ -1330,6 +1349,135 @@ fn edits_after_a_crash_before_checkout_keep_the_merged_changes() {
         ],
     );
     assert_eq!(recorded_merge(root_a), None);
+}
+
+#[test]
+fn a_save_between_commit_and_merge_survives_the_merge() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/shared.md", SHARED_BASE);
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/shared.md", SHARED_FROM_B);
+    commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(
+        root_a,
+        "notes/shared.md",
+        "# Shared\n\ntop edited on a\n\nmiddle\n\nbottom\n",
+    );
+    commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
+    // A save lands after the cycle's commit and before the merge.
+    write(
+        root_a,
+        "notes/shared.md",
+        "# Shared\n\ntop edited on a\n\nmiddle saved later\n\nbottom\n",
+    );
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
+
+    let expected = "# Shared\n\ntop edited on a\n\nmiddle saved later\n\nbottom edited on b\n";
+    assert_eq!(read(root_a, "notes/shared.md"), expected);
+    assert_next_cycle_converges(&fixture, &[("notes/shared.md", expected)]);
+}
+
+#[test]
+fn a_save_between_commit_and_fast_forward_survives() {
+    let fixture = pulled_note_fixture();
+    let root_a = &fixture.graph_a;
+    write(
+        root_a,
+        "daily/2026-10-01.md",
+        "# 2026-10-01 saved\n\n- morning\n",
+    );
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::FastForward), "{merged:?}");
+
+    let expected = "# 2026-10-01 saved\n\n- morning\n- [[From phone]]\n";
+    assert_eq!(read(root_a, "daily/2026-10-01.md"), expected);
+    assert_next_cycle_converges(
+        &fixture,
+        &[
+            ("daily/2026-10-01.md", expected),
+            ("notes/from-phone.md", PHONE_NOTE),
+        ],
+    );
+}
+
+#[test]
+fn a_directory_file_conflict_keeps_the_file_as_a_conflict_copy() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/seed.md", "# Seed\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/x/y.md", "# Y\n");
+    commit_all(&root_b, "b dir", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, "notes/x", "file on a\n");
+    commit_all(root_a, "a file", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+
+    assert!(
+        merged
+            .conflicted_paths
+            .contains(&"notes/x (conflict)".to_string()),
+        "{merged:?}"
+    );
+    assert_eq!(read(root_a, "notes/x/y.md"), "# Y\n");
+    assert_eq!(read(root_a, "notes/x (conflict)"), "file on a\n");
+    assert_next_cycle_converges(
+        &fixture,
+        &[
+            ("notes/x/y.md", "# Y\n"),
+            ("notes/x (conflict)", "file on a\n"),
+        ],
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_symlink_conflict_keeps_both_sides() {
+    use std::os::unix::fs::symlink;
+
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    symlink("base-target", root_a.join("assets/link")).unwrap();
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    fs::remove_file(root_b.join("assets/link")).unwrap();
+    symlink("b-target", root_b.join("assets/link")).unwrap();
+    commit_all(&root_b, "b link", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    fs::remove_file(root_a.join("assets/link")).unwrap();
+    symlink("a-target", root_a.join("assets/link")).unwrap();
+    commit_all(root_a, "a link", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert!(
+        matches!(merged.kind, MergeKind::MergedWithConflicts),
+        "{merged:?}"
+    );
+
+    assert_eq!(
+        fs::read_link(root_a.join("assets/link")).unwrap(),
+        Path::new("a-target")
+    );
+    assert_eq!(
+        fs::read_link(root_a.join("assets/link (conflict)")).unwrap(),
+        Path::new("b-target")
+    );
 }
 
 #[test]
