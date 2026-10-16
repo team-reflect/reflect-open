@@ -1,11 +1,5 @@
 //! Test-only fault injection for the git primitives.
 //!
-//! Each [`FaultPoint`] names a step of a git command where a real process
-//! could die: between a checkout and the branch move, or between the steps
-//! of an in-memory merge (resolved, committed, checked out). Arming a point
-//! makes the next `trip` of it fail, panic, or run a hook, so a stop at that
-//! step is reproducible.
-//!
 //! Faults are thread-local and one-shot: a test arms a point on the thread
 //! that will run the git command, and the first `trip` of that point
 //! consumes it. Parallel tests never see each other's faults.
@@ -28,8 +22,7 @@ pub(super) enum FaultPoint {
     AfterMergeCommitBeforeCheckout,
     /// Merge: after the working tree is written, before the branch ref moves to the merge commit.
     BeforeMergeRefMove,
-    /// Commit: on entry, before the repository is touched and before the
-    /// graph lock is taken.
+    /// Commit: on entry, before the graph lock is taken.
     BeforeCommit,
 }
 

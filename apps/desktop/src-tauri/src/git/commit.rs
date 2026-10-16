@@ -10,11 +10,10 @@ use serde::Serialize;
 use crate::error::AppResult;
 
 use super::commit_message::message_for_commit;
-use super::repo::{clear_foreign_state, open_existing, reattach_head, signature};
+use super::repo::{clear_foreign_state, open_existing, reattach_head, signature, stage0_entry};
 
-/// A file whose *changes* were withheld from staging because it is at/above
-/// the size guardrail. Oversized-but-unchanged files are not reported — their
-/// old version is already in the backup.
+/// A file whose changes were withheld because it is at or above the size
+/// guardrail. An unchanged oversized file is not reported.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SkippedFile {
@@ -30,17 +29,13 @@ pub struct CommitOutcome {
     pub committed: bool,
     pub sha: Option<String>,
     /// Commits the local branch is ahead of the last-fetched remote (no
-    /// network). The sync engine skips the push entirely when a debounced
-    /// pass finds nothing committed and nothing ahead — pull-applied watcher
-    /// events would otherwise buy a pointless network negotiation each time.
+    /// network).
     pub ahead: usize,
     pub skipped_large_files: Vec<SkippedFile>,
 }
 
 /// Stage every change under the graph and commit. Returns `committed: false`
-/// when the staged tree already matches HEAD — the sync engine uses that
-/// (with `ahead`) to skip the network entirely, which is what makes the loop
-/// safe: pull-applied writes match HEAD and produce no-ops.
+/// when the staged tree already matches HEAD.
 pub(super) fn commit_all(
     root: &Path,
     fallback_message: &str,
@@ -61,19 +56,13 @@ pub(super) fn commit_locked(
     let repo = open_existing(root)?;
     clear_foreign_state(&repo)?;
     reattach_head(&repo)?;
-    // In-memory hard guarantee, independent of any on-disk ignore file: the
-    // runtime directory must never enter a backup commit (a synced
-    // `.reflect/` is index corruption on every other device).
+    // A synced `.reflect/` corrupts the index on every other device.
     repo.add_ignore_rule("/.reflect/")?;
 
     let mut index = repo.index()?;
     let mut skipped = add_all_with_size_guard(&mut index, root, max_file_bytes)?;
-    // A repository adopted from elsewhere may already track `.reflect/`;
-    // the ignore rule above only keeps *new* paths out. Drop the tracked
-    // entries so the next commit records their removal.
+    // The ignore rule keeps only new paths out: drop a tracked `.reflect/`.
     index.remove_dir(Path::new(".reflect"), 0)?;
-    // Likewise a file staged before it grew (or by another tool) is already
-    // in the index: the add-time guard never saw it. Withhold it here.
     withhold_oversized_entries(&repo, &mut index, root, max_file_bytes, &mut skipped)?;
     keep_head_entries_of_skipped(&repo, &mut index, &skipped)?;
     index.write()?;
@@ -113,26 +102,16 @@ pub(super) fn commit_locked(
     })
 }
 
-/// Stage every change (adds, edits, deletes — `.gitignore` respected) into
-/// `index` and write it, withholding files at/above `max_file_bytes`: GitHub
-/// rejects >100 MB files and the rejection fails the *whole* push, so one
-/// oversized video must not break backup for everything else. Returns the
-/// files whose changes were withheld.
+/// Stage every change into `index` and write it, withholding files at or
+/// above `max_file_bytes`: one file over GitHub's 100 MB limit fails the whole
+/// push. Returns the files whose changes were withheld.
 fn add_all_with_size_guard(
     index: &mut Index,
     root: &Path,
     max_file_bytes: u64,
 ) -> AppResult<Vec<SkippedFile>> {
-    // Size + mtime already in the index, so the guard can tell "oversized and
-    // unchanged" (skip silently — its old version is already backed up) from
-    // "oversized changes being withheld" (skip and report). Size alone would
-    // miss a same-length edit; matching git's own stat-based change detection
-    // (mtime, at nanosecond precision where the index recorded it) closes
-    // that without hashing gigabytes. When the index entry carries no nsec
-    // component (libgit2 built without USE_NSEC), the comparison falls back
-    // to whole seconds — a same-length edit inside that second is then
-    // reported as withheld rather than silently matched, erring toward the
-    // warning.
+    // Size and mtime (nanoseconds when the index has them) tell an unchanged
+    // oversized file, skipped silently, from a withheld change, reported.
     let tracked_stats: std::collections::HashMap<String, (u32, i32, u32)> = index
         .iter()
         .map(|entry| {
@@ -183,19 +162,15 @@ fn add_all_with_size_guard(
     };
 
     index.add_all(["*"], IndexAddOption::DEFAULT, Some(&mut size_guard))?;
-    // add_all stages new + modified paths; update_all records deletions of
-    // tracked files whose working copy is gone (and re-checks sizes for
-    // tracked files that have since grown past the guardrail).
+    // `update_all` records deletions, which `add_all` does not.
     index.update_all(["*"], Some(&mut size_guard))?;
     index.write()?;
     Ok(skipped.into_inner())
 }
 
-/// Withhold index entries that carry new oversized content: a file staged
-/// before it grew, or staged by another tool, is already in the index and
-/// the add-time guard never saw it. A path `HEAD` already tracks keeps its
-/// committed blob (the backup holds the old version; recording a deletion
-/// would delete it on every other device), a new path leaves the index.
+/// Withhold index entries with oversized content the add-time guard never
+/// saw. A path `HEAD` tracks keeps its committed blob; a new path leaves the
+/// index.
 fn withhold_oversized_entries(
     repo: &git2::Repository,
     index: &mut Index,
@@ -250,20 +225,11 @@ fn keep_head_entries_of_skipped(
         let Ok(committed) = head_tree.get_path(path) else {
             continue;
         };
-        index.add(&IndexEntry {
-            ctime: git2::IndexTime::new(0, 0),
-            mtime: git2::IndexTime::new(0, 0),
-            dev: 0,
-            ino: 0,
-            mode: committed.filemode() as u32,
-            uid: 0,
-            gid: 0,
-            file_size: 0,
-            id: committed.id(),
-            flags: file.path.len().min(0x0FFF) as u16,
-            flags_extended: 0,
-            path: file.path.as_bytes().to_vec(),
-        })?;
+        index.add(&stage0_entry(
+            &file.path,
+            committed.id(),
+            committed.filemode() as u32,
+        ))?;
     }
     Ok(())
 }

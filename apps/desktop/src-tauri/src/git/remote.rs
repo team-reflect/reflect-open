@@ -1,9 +1,9 @@
 //! Network operations: fetch and push over HTTPS or SSH.
 //!
-//! Credentials are supplied through libgit2's credential callback — they are
-//! **never** embedded in the remote URL, so they never touch `.git/config` or
-//! disk. A per-call [`GitCredential`] authenticates over HTTPS; without one,
-//! credentials resolve locally — the SSH agent for ssh remotes (Plan 16 V1).
+//! Credentials go through libgit2's credential callback, never into the
+//! remote URL, so they never touch `.git/config` or disk. A per-call
+//! [`GitCredential`] authenticates over HTTPS; without one, ssh remotes use
+//! the SSH agent.
 
 use std::cell::RefCell;
 use std::path::Path;
@@ -52,25 +52,17 @@ pub struct RemoteTip {
 #[serde(rename_all = "camelCase")]
 pub struct PushOutcome {
     pub pushed: bool,
-    /// The remote moved past us (another device pushed first): the caller
-    /// pulls, merges, and retries. Auth/network failures are `AppError`s,
-    /// never this.
+    /// Auth and network failures are `AppError`s, never this.
     pub non_fast_forward: bool,
     pub rejection_message: Option<String>,
 }
 
 /// Pick a credential for one callback invocation.
 ///
-/// With a [`GitCredential`] it is HTTPS basic auth, offered exactly once:
-/// libgit2 re-invokes the callback after a rejection, and re-offering the
-/// same sign-in only ends in "too many authentication replays" instead of
-/// an error that names the problem. It is never offered for any other
-/// credential type, so a sign-in cannot leak to a transport we didn't
-/// intend. Without one (generic remotes, Plan 16 V1) the chain is: answer
-/// a bare username probe, then offer the SSH agent, again once. Generic
-/// HTTPS fails fast until per-host sign-ins exist. Errors carry
-/// `ErrorCode::Auth` so they classify as `AppError::Auth` (surfaced as
-/// needs-attention, not retried blindly).
+/// A [`GitCredential`] is HTTPS basic auth, offered once and for no other
+/// credential type: libgit2 re-invokes the callback after a rejection. Without
+/// one, answer a username probe, then offer the SSH agent once. Errors carry
+/// `ErrorCode::Auth` so they classify as `AppError::Auth`.
 fn resolve_credential(
     credential: Option<&GitCredential>,
     username_from_url: Option<&str>,
@@ -133,9 +125,7 @@ struct Tried {
     ssh_agent: bool,
 }
 
-/// `RemoteCallbacks` pre-wired with the credential chain — the one
-/// configuration fetch, clone, and push all share. Callers layer their own
-/// callbacks (push status, sideband) on top.
+/// `RemoteCallbacks` with the credential chain, shared by every network call.
 fn callbacks_with_credentials<'cb>(credential: Option<GitCredential>) -> RemoteCallbacks<'cb> {
     let mut callbacks = RemoteCallbacks::new();
     let mut tried = Tried::default();
@@ -225,9 +215,8 @@ fn count_commits(repo: &Repository, from: git2::Oid) -> AppResult<usize> {
     Ok(walk.filter_map(Result::ok).count())
 }
 
-/// Clone `url` into `target` (restore on a fresh machine). git2 refuses a
-/// non-empty existing directory, which is exactly the safety we want — a
-/// restore must never write into a folder that already has content.
+/// Clone `url` into `target`. git2 refuses a non-empty directory, so a
+/// restore never writes into a folder that has content.
 pub(super) fn clone(url: &str, target: &Path, credential: Option<GitCredential>) -> AppResult<()> {
     let mut fetch_options = FetchOptions::new();
     fetch_options.remote_callbacks(callbacks_with_credentials(credential));
@@ -238,8 +227,7 @@ pub(super) fn clone(url: &str, target: &Path, credential: Option<GitCredential>)
 }
 
 /// Push the current branch to `origin`. Rejections come back as data, not
-/// errors — the sync engine branches on them (non-fast-forward → pull/merge/
-/// retry; anything else → surface the remote's message).
+/// errors.
 pub(super) fn push(root: &Path, credential: Option<GitCredential>) -> AppResult<PushOutcome> {
     let repo = open_existing(root)?;
     let branch = current_branch(&repo)?;
@@ -353,8 +341,6 @@ mod credential_tests {
 
     #[test]
     fn credential_is_offered_once_then_errors_actionably() {
-        // libgit2 re-invokes the callback after a rejection; replaying the
-        // same sign-in fifteen times ends in a generic replay error.
         let mut tried = Tried::default();
         expect_ok(resolve_credential(
             Some(&github()),
@@ -374,8 +360,6 @@ mod credential_tests {
 
     #[test]
     fn credential_is_never_offered_to_non_https_transports() {
-        // A github.com remote rewired to ssh, or any future transport, must
-        // not receive the sign-in as some other credential shape.
         let mut tried = Tried::default();
         let err = expect_err(resolve_credential(
             Some(&github()),

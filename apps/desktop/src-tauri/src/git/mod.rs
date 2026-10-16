@@ -235,17 +235,14 @@ pub struct PullOutcome {
     pub ahead: usize,
     pub skipped_large_files: Vec<SkippedFile>,
     pub kind: MergeKind,
-    /// Graph-relative paths of conflict copies and edits kept against a
-    /// deletion.
+    /// Graph-relative paths of the conflict copies the merge wrote.
     pub review_paths: Vec<String>,
     /// Every file the merge changed on disk.
     pub changed_files: Vec<ChangedFile>,
 }
 
 /// Commit local changes and merge the fetched remote branch under one graph
-/// lock, so no write lands between the commit and the checkout. Text
-/// conflicts are committed as merged text (see [`merge`]). The repo is never
-/// left mid-merge.
+/// lock, so no write lands between the commit and the checkout.
 fn pull_all(root: &Path, message: &str, max_file_bytes: u64) -> AppResult<PullOutcome> {
     crate::fs::with_graph_lock(root, || {
         #[cfg(test)]
@@ -269,8 +266,7 @@ fn pull_all(root: &Path, message: &str, max_file_bytes: u64) -> AppResult<PullOu
     })
 }
 
-/// Commit local changes, then merge the fetched remote branch. See
-/// [`pull_all`].
+/// Commit local changes, then merge the fetched remote branch.
 #[tauri::command]
 pub async fn git_pull(
     message: String,

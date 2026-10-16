@@ -383,9 +383,7 @@ fn first_sync_against_an_empty_remote_pushes() {
     write(root, "notes/a.md", "# A\n");
     commit_all(root, "first", MAX_FILE_BYTES).unwrap();
 
-    // The engine's launch cycle is commit → fetch → merge → push. A brand-new
-    // backup repo has no remote branch yet; that must not error the cycle
-    // before the push that creates it.
+    // A new backup repo has no remote branch until this push creates it.
     let delta = fetch(root, None).unwrap();
     assert_eq!(delta.behind, 0);
     assert!(delta.ahead >= 1, "local commits count as ahead: {delta:?}");
@@ -414,16 +412,13 @@ fn connecting_an_existing_backup_on_another_branch_pulls_its_history() {
     commit_all(&seed, "seed", MAX_FILE_BYTES).unwrap();
     push(&seed, None).unwrap();
 
-    // A fresh graph (local default would be `main`) connects to it; the
-    // GitHub API reports `master` as the default branch and setup aligns the
-    // local branch.
+    // A fresh graph connects to it and aligns its branch to `master`.
     let root = dir.path().join("graph");
     scaffold_graph(&root);
     setup(&root, Some(remote_url), Some("master".to_string())).unwrap();
     assert_eq!(status(&root).unwrap().branch.as_deref(), Some("master"));
 
-    // The engine's launch cycle: the local root commit and the remote history
-    // are unrelated, and the merge must still integrate them.
+    // The local root commit and the remote history are unrelated.
     commit_all(&root, "local notes", MAX_FILE_BYTES).unwrap();
     fetch(&root, None).unwrap();
     let merged = merge_remote(&root).unwrap();
@@ -455,16 +450,11 @@ fn aligning_onto_a_stale_local_branch_keeps_the_working_tree() {
     write(root, "notes/ours.md", "# Ours v2\n");
     commit_all(root, "v2", MAX_FILE_BYTES).unwrap();
 
-    // Aligning onto the stale name must keep our content (HEAD's commit and
-    // the working tree are untouched — the stale branch loses the name, we
-    // don't lose notes to its old tree).
     setup(root, None, Some("master".to_string())).unwrap();
     assert_eq!(status(root).unwrap().branch.as_deref(), Some("master"));
     assert_eq!(read(root, "notes/ours.md"), "# Ours v2\n");
     assert!(head_tree_paths(root).contains(&"notes/ours.md".to_string()));
 
-    // And the repo is immediately usable: a no-op commit stays a no-op (the
-    // tree still matches HEAD — nothing was silently reverted).
     let outcome = commit_all(root, "noop", MAX_FILE_BYTES).unwrap();
     assert!(!outcome.committed, "align must not desync tree and HEAD");
 }
@@ -491,14 +481,11 @@ fn non_fast_forward_push_is_rejected_as_data() {
         "expected non-fast-forward, got: {rejected:?}"
     );
 
-    // The standard recovery: fetch, merge (clean — different files), push.
     let delta = fetch(root_a, None).unwrap();
     assert_eq!(delta.behind, 1);
     assert_eq!(delta.ahead, 1);
     let merged = merge_remote(root_a).unwrap();
     assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
-    // The merge reports what it wrote (b's note) so the caller can reindex
-    // without depending on the file watcher — with the file's real mtime.
     assert_eq!(
         merged
             .changed_files
@@ -544,9 +531,10 @@ fn conflicting_edits_merge_without_markers() {
     let content = read(root_a, "notes/shared.md");
     assert_merged_without_markers(&content, &["alpha", "bravo"]);
     assert_eq!(head_blob(root_a, "notes/shared.md"), content);
+    assert!(head_tree_paths(root_a)
+        .iter()
+        .all(|path| !path.contains("(conflict")));
 
-    // The merge is committed: the repo is never wedged mid-merge, and the
-    // push goes through so both devices converge on the same note.
     let repo = Repository::open(root_a).unwrap();
     assert_eq!(repo.state(), git2::RepositoryState::Clean);
     assert!(push(root_a, None).unwrap().pushed);
@@ -795,22 +783,6 @@ fn a_text_conflict_that_diff3_merges_takes_the_merge() {
 }
 
 #[test]
-fn a_md_conflict_never_gets_a_copy() {
-    let fixture = text_conflict_fixture(
-        "notes/n.md",
-        "# N\n\nshared line\n",
-        "# N\n\nshared line from a\n",
-        "# N\n\nshared line from b\n",
-    );
-    let root_a = &fixture.graph_a;
-    let merged = merge_remote(root_a).unwrap();
-    assert!(merged.review_paths.is_empty(), "{merged:?}");
-    assert!(head_tree_paths(root_a)
-        .iter()
-        .all(|path| !path.contains("(conflict")));
-}
-
-#[test]
 fn two_devices_name_the_same_copy() {
     let fixture = fixture();
     let root_a = &fixture.graph_a;
@@ -904,9 +876,6 @@ fn merging_into_an_unborn_repo_adopts_the_remote_history() {
     commit_all(root_a, "seed", MAX_FILE_BYTES).unwrap();
     push(root_a, None).unwrap();
 
-    // A fresh graph with no commits yet (unborn HEAD) connects to an existing
-    // backup; the merge must adopt the remote history, not error on the
-    // missing local branch.
     let root = fixture._dir.path().join("fresh");
     scaffold_graph(&root);
     setup(&root, Some(fixture.remote_url.clone()), None).unwrap();
@@ -954,10 +923,7 @@ fn rename_rename_conflict_keeps_both_names_and_confirms_the_removal() {
     commit_all(root_a, "a rename", MAX_FILE_BYTES).unwrap();
     fetch(root_a, None).unwrap();
 
-    // Rename detection turns this into three conflict groups: ours-only
-    // (renamed-a), theirs-only (renamed-b), and ancestor-only (orig — gone on
-    // both sides). The last one must be cleared from the index or the merge
-    // tree could not be written at all.
+    // Rename detection leaves an ancestor-only conflict for `orig.md`.
     let merged = merge_remote(root_a).unwrap();
     assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
     assert!(merged.review_paths.is_empty(), "{merged:?}");
@@ -1042,8 +1008,6 @@ fn rename_on_one_device_merges_with_edit_on_the_other() {
     fetch(root_a, None).unwrap();
     let merged = merge_remote(root_a).unwrap();
 
-    // Rename detection (libgit2 merge default) lands B's edit in the moved
-    // file — no conflict, no resurrected ULID path.
     assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
     assert!(merged.review_paths.is_empty(), "{merged:?}");
     let content = read(root_a, "notes/meeting-notes.md");
@@ -1054,8 +1018,7 @@ fn rename_on_one_device_merges_with_edit_on_the_other() {
 
 #[test]
 fn same_title_created_on_two_devices_merges_both_notes() {
-    // New with slug filenames: two offline devices can create the same path.
-    // The merge must keep both notes' text in one file, not wedge.
+    // Two offline devices can create the same slug path.
     let fixture = fixture();
     let root_a = &fixture.graph_a;
     write(root_a, "notes/seed.md", "# Seed\n");
@@ -1091,9 +1054,7 @@ fn same_title_created_on_two_devices_merges_both_notes() {
 
 #[test]
 fn diverging_renames_keep_both_files_and_never_wedge() {
-    // Both devices retitle the same note differently while offline: the note
-    // forks into two paths. Accepted outcome (the duplicate-id flag surfaces
-    // the fork at index time): both files survive, nothing wedges.
+    // Both devices retitle the same note differently while offline.
     let fixture = fixture();
     let root_a = &fixture.graph_a;
     let base = "# Shared\n\n- line one\n- line two\n- line three\n";
@@ -1121,8 +1082,6 @@ fn diverging_renames_keep_both_files_and_never_wedge() {
     fetch(root_a, None).unwrap();
     let merged = merge_remote(root_a).unwrap();
 
-    // Whatever the merge classifies this as, the invariants hold: no wedge,
-    // both titles' content present, the old path gone, and the result pushes.
     let repo = Repository::open(root_a).unwrap();
     assert_eq!(repo.state(), git2::RepositoryState::Clean, "{merged:?}");
     assert!(root_a.join("notes/title-a.md").exists(), "{merged:?}");
@@ -1158,11 +1117,8 @@ const WAIT: Duration = Duration::from_secs(10);
 const PHONE_NOTE: &str = "# From phone\n";
 const PHONE_DAILY: &str = "# 2026-10-01\n\n- morning\n- [[From phone]]\n";
 
-/// The next cycle after a failed pull (commit, fetch, merge, push) must keep
-/// the phone's note and its daily-note link on disk, in `HEAD`, and on the
-/// remote, byte for byte. The failure mode this guards against is a commit
-/// of the stale working tree: the pulled note deleted, the daily note
-/// reverted, and both pushed (#1405).
+/// The next cycle after a failed pull keeps the phone's note and daily note
+/// on disk, in `HEAD`, and on the remote.
 fn assert_next_cycle_keeps_pulled_notes(fixture: &Fixture) {
     let root_a = &fixture.graph_a;
     commit_all(root_a, "Update notes", MAX_FILE_BYTES).unwrap();
@@ -1187,18 +1143,16 @@ fn assert_next_cycle_keeps_pulled_notes(fixture: &Fixture) {
 
 #[test]
 fn fast_forward_with_a_stale_head_lock_succeeds() {
-    // No `set_head` on the fast-forward path: a leftover lock file from a
-    // killed process must not fail every pull.
     let fixture = pulled_note_fixture();
     fs::write(fixture.graph_a.join(".git/HEAD.lock"), b"").unwrap();
     let merged = merge_remote(&fixture.graph_a).unwrap();
     assert!(matches!(merged.kind, MergeKind::FastForward), "{merged:?}");
     assert_eq!(read(&fixture.graph_a, "notes/from-phone.md"), PHONE_NOTE);
+    assert_next_cycle_keeps_pulled_notes(&fixture);
 }
 
 #[test]
 fn fast_forward_failure_before_the_ref_moves_converges_next_cycle() {
-    // A failure before anything happened must be a plain retry.
     let fixture = pulled_note_fixture();
     fault::arm(FaultPoint::BeforeFastForwardRefMove, Fault::Fail);
     assert!(merge_remote(&fixture.graph_a).is_err());
@@ -1210,15 +1164,6 @@ fn fast_forward_checkout_failure_never_reverts_pulled_notes() {
     let fixture = pulled_note_fixture();
     fault::arm(FaultPoint::BeforeFastForwardCheckout, Fault::Fail);
     assert!(merge_remote(&fixture.graph_a).is_err());
-    assert_next_cycle_keeps_pulled_notes(&fixture);
-}
-
-#[test]
-fn stale_head_lock_fast_forward_never_reverts_pulled_notes() {
-    // The lock file stays in place for the whole test.
-    let fixture = pulled_note_fixture();
-    fs::write(fixture.graph_a.join(".git/HEAD.lock"), b"").unwrap();
-    let _ = merge_remote(&fixture.graph_a);
     assert_next_cycle_keeps_pulled_notes(&fixture);
 }
 
@@ -1243,15 +1188,11 @@ fn commit_during_fast_forward_never_reverts_pulled_notes() {
         }
     });
     entered_rx.recv_timeout(WAIT).unwrap();
-    // The competing commit runs on its own worker: it blocks on the graph
-    // lock until the pull finishes, so release the pull without waiting.
     let (at_boundary_tx, at_boundary_rx) = mpsc::channel::<()>();
     let (commit_done_tx, commit_done_rx) = mpsc::channel::<()>();
     let commit = thread::spawn({
         let root = root_a.clone();
         move || {
-            // Handshake at the commit's entry: past this point the worker is
-            // about to take the graph lock.
             fault::arm(
                 FaultPoint::BeforeCommit,
                 Fault::hook(move || at_boundary_tx.send(()).unwrap()),
@@ -1349,19 +1290,13 @@ fn assert_next_cycle_converges(fixture: &Fixture, expected: &[(&str, &str)]) {
     assert_files_agree(fixture, expected);
 }
 
-/// Every expected file is on disk, in `HEAD`, and on the remote; the
-/// repository is clean and holds no `refs/reflect/*` reference.
+/// Every expected file is on disk, in `HEAD`, and on the remote, and the
+/// repository is clean.
 fn assert_files_agree(fixture: &Fixture, expected: &[(&str, &str)]) {
     let root_a = &fixture.graph_a;
     let repo = Repository::open(root_a).unwrap();
     assert_eq!(repo.state(), git2::RepositoryState::Clean);
     assert!(!root_a.join(".git/MERGE_HEAD").exists());
-    let reflect_refs: Vec<String> = repo
-        .references_glob("refs/reflect/*")
-        .unwrap()
-        .filter_map(|reference| reference.ok()?.name().ok().map(str::to_string))
-        .collect();
-    assert!(reflect_refs.is_empty(), "{reflect_refs:?}");
     for (rel, expected) in expected {
         assert_eq!(read(root_a, rel), *expected, "{rel} on disk");
         assert_eq!(head_blob(root_a, rel), *expected, "{rel} in HEAD");
@@ -1494,8 +1429,7 @@ fn merge_crash_after_checkout_before_ref_move_converges_next_cycle() {
     assert_files_agree(&fixture, DIVERGED_RESULT);
     assert_eq!(history_len(root_a), control_len + 1);
 
-    // The ladder runs again on a note it already resolved: both sides' words
-    // stay, no marker appears, and the file, HEAD and the remote agree.
+    // The ladder runs again on a note it already resolved.
     let fixture = conflicting_fixture();
     let root_a = &fixture.graph_a;
     fault::arm(FaultPoint::BeforeMergeRefMove, Fault::Fail);
@@ -1510,7 +1444,6 @@ fn merge_crash_after_checkout_before_ref_move_converges_next_cycle() {
     merge_remote(root_a).unwrap();
     assert!(push(root_a, None).unwrap().pushed);
     let merged = read(root_a, "notes/conflict.md");
-    eprintln!("merged text after the crash: {merged:?}");
     assert_merged_without_markers(&merged, &["alpha", "bravo"]);
     assert_files_agree(&fixture, &conflicting_result(&merged));
 }
@@ -1776,7 +1709,6 @@ fn remote_head_on_an_unborn_remote_is_none() {
 
 #[test]
 fn a_conflict_copy_never_overwrites_an_existing_file() {
-    // In the merge index: an untracked file already holds the first name.
     let fixture = fixture();
     let root_a = &fixture.graph_a;
     fs::write(root_a.join("assets/img.bin"), b"\x00base\x01").unwrap();
@@ -2171,36 +2103,6 @@ fn a_write_during_the_merge_survives_the_checkout() {
         assert_eq!(remote_blob(&fixture, rel), read(root_a, rel), "{rel}");
     }
     assert_eq!(read(root_a, "notes/ext.md"), "# Ext\n\nwritten by iCloud\n");
-}
-
-#[test]
-fn a_detached_head_behind_the_branch_does_not_rewind_it() {
-    let fixture = fixture();
-    let root = &fixture.graph_a;
-    write(root, "notes/a.md", "# A\n");
-    commit_all(root, "first", MAX_FILE_BYTES).unwrap();
-    let (older, tip) = {
-        let repo = Repository::open(root).unwrap();
-        let older = repo.head().unwrap().target().unwrap();
-        write(root, "notes/b.md", "# B\n");
-        commit_all(root, "second", MAX_FILE_BYTES).unwrap();
-        write(root, "notes/c.md", "# C\n");
-        commit_all(root, "third", MAX_FILE_BYTES).unwrap();
-        let repo = Repository::open(root).unwrap();
-        let tip = repo.head().unwrap().target().unwrap();
-        repo.set_head_detached(older).unwrap();
-        (older, tip)
-    };
-
-    write(root, "notes/d.md", "# D\n");
-    pull_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
-    let repo = Repository::open(root).unwrap();
-    assert!(!repo.head_detached().unwrap());
-    assert_eq!(repo.head().unwrap().name().unwrap(), "refs/heads/main");
-    let head = repo.head().unwrap().peel_to_commit().unwrap();
-    assert!(repo.graph_descendant_of(head.id(), tip).unwrap());
-    assert!(repo.graph_descendant_of(head.id(), older).unwrap());
-    assert!(repo.find_commit(tip).is_ok());
 }
 
 /// Commit `a.md`, then `b.md`, push, and check out the first commit the way

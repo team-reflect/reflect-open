@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use git2::{Oid, Repository, RepositoryInitOptions, Signature};
+use git2::{IndexEntry, IndexTime, Oid, Repository, RepositoryInitOptions, Signature};
 
 use crate::error::{AppError, AppResult};
 use crate::graph_gitignore;
@@ -146,6 +146,24 @@ pub(super) fn signature(repo: &Repository) -> AppResult<Signature<'static>> {
         return Ok(sig);
     }
     Ok(Signature::now("Reflect", "backup@reflect.app")?)
+}
+
+/// A stage-0 index entry for `path` with zeroed stat data.
+pub(super) fn stage0_entry(path: &str, id: Oid, mode: u32) -> IndexEntry {
+    IndexEntry {
+        ctime: IndexTime::new(0, 0),
+        mtime: IndexTime::new(0, 0),
+        dev: 0,
+        ino: 0,
+        mode,
+        uid: 0,
+        gid: 0,
+        file_size: 0,
+        id,
+        flags: path.len().min(0x0FFF) as u16,
+        flags_extended: 0,
+        path: path.as_bytes().to_vec(),
+    }
 }
 
 /// Make sure graph repositories carry Reflect's safe ignore defaults. The graph
