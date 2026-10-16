@@ -2280,6 +2280,54 @@ fn edits_made_on_a_detached_head_are_merged_into_the_branch() {
 }
 
 #[test]
+fn a_detached_head_unrelated_to_the_branch_merges_without_deleting() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n\nbranch line\n");
+    write(root, "notes/b.md", "# B\n");
+    commit_all(root, "branch", MAX_FILE_BYTES).unwrap();
+    push(root, None).unwrap();
+    let repo = Repository::open(root).unwrap();
+    let tip = repo.head().unwrap().target().unwrap();
+    let orphan = {
+        let blob = |text: &str| repo.blob(text.as_bytes()).unwrap();
+        let mut notes = repo.treebuilder(None).unwrap();
+        notes
+            .insert("a.md", blob("# A\n\ndetached line\n"), 0o100644)
+            .unwrap();
+        notes.insert("c.md", blob("# C\n"), 0o100644).unwrap();
+        let notes = notes.write().unwrap();
+        let mut top = repo.treebuilder(None).unwrap();
+        top.insert("notes", notes, 0o040000).unwrap();
+        let tree = repo.find_tree(top.write().unwrap()).unwrap();
+        let sig = git2::Signature::now("t", "t@example.com").unwrap();
+        repo.commit(None, &sig, &sig, "unrelated", &tree, &[])
+            .unwrap()
+    };
+    let mut checkout = git2::build::CheckoutBuilder::new();
+    checkout.force().remove_untracked(true);
+    repo.checkout_tree(
+        repo.find_commit(orphan).unwrap().as_object(),
+        Some(&mut checkout),
+    )
+    .unwrap();
+    repo.set_head_detached(orphan).unwrap();
+    assert!(repo.merge_base(orphan, tip).is_err());
+
+    let pulled = pull_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert!(matches!(pulled.kind, MergeKind::Merged), "{pulled:?}");
+    let repo = assert_attached_to_main(root);
+    let head = repo.head().unwrap().target().unwrap();
+    assert!(repo.graph_descendant_of(head, tip).unwrap());
+    assert!(repo.graph_descendant_of(head, orphan).unwrap());
+    assert_eq!(head_blob(root, "notes/b.md"), "# B\n");
+    assert_eq!(head_blob(root, "notes/c.md"), "# C\n");
+    let merged = head_blob(root, "notes/a.md");
+    assert!(!merged.contains("<<<<<<<"), "{merged}");
+    assert_eq!(read(root, "notes/a.md"), merged);
+}
+
+#[test]
 fn an_untracked_oversized_file_does_not_delete_the_remote_file() {
     let fixture = fixture();
     let root_a = &fixture.graph_a;
