@@ -62,7 +62,7 @@ pub(super) fn commit_locked(
     clear_foreign_state(&repo)?;
     reattach_head(&repo)?;
     // In-memory hard guarantee, independent of any on-disk ignore file: the
-    // runtime directory must never enter a backup commit (Plan 21 — a synced
+    // runtime directory must never enter a backup commit (a synced
     // `.reflect/` is index corruption on every other device).
     repo.add_ignore_rule("/.reflect/")?;
 
@@ -232,10 +232,8 @@ fn withhold_oversized_entries(
     Ok(())
 }
 
-/// A withheld file that is not in the index (it is untracked here) but that
-/// `HEAD` tracks, for example a small file a pull brought in at the same
-/// path, keeps the committed blob. Otherwise the commit would record a
-/// deletion of the other device's file.
+/// A withheld file that is not in the index but that `HEAD` tracks keeps the
+/// committed blob. Otherwise the commit would record a deletion.
 fn keep_head_entries_of_skipped(
     repo: &git2::Repository,
     index: &mut Index,

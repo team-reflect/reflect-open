@@ -385,7 +385,7 @@ fn first_sync_against_an_empty_remote_pushes() {
 
     // The engine's launch cycle is commit → fetch → merge → push. A brand-new
     // backup repo has no remote branch yet; that must not error the cycle
-    // before the push that creates it (PR #96 review).
+    // before the push that creates it.
     let delta = fetch(root, None).unwrap();
     assert_eq!(delta.behind, 0);
     assert!(delta.ahead >= 1, "local commits count as ahead: {delta:?}");
@@ -416,9 +416,7 @@ fn connecting_an_existing_backup_on_another_branch_pulls_its_history() {
 
     // A fresh graph (local default would be `main`) connects to it; the
     // GitHub API reports `master` as the default branch and setup aligns the
-    // local branch — without this, merge looks for origin/main, sees nothing,
-    // and push creates a parallel branch instead of integrating the backup
-    // (PR #96 review).
+    // local branch.
     let root = dir.path().join("graph");
     scaffold_graph(&root);
     setup(&root, Some(remote_url), Some("master".to_string())).unwrap();
@@ -1013,12 +1011,6 @@ fn adopting_an_existing_repo_appends_graph_gitignore_defaults() {
     assert_eq!(again.matches("*.swp").count(), 1, "{again}");
 }
 
-// ---- the Plan 17 rename matrix ----------------------------------------------
-// Title renames now move files (delete+add in git terms). These pin the three
-// new merge shapes: rename+edit must converge via rename detection, and the
-// two genuinely new conflict shapes (add/add, rename/rename) must surface
-// without wedging or losing content.
-
 #[test]
 fn rename_on_one_device_merges_with_edit_on_the_other() {
     let fixture = fixture();
@@ -1141,10 +1133,6 @@ fn diverging_renames_keep_both_files_and_never_wedge() {
     assert!(push(root_a, None).unwrap().pushed);
 }
 
-// ---- Sync safety regressions (Phase 0 of the sync rework) -------------------
-//
-// These pin the data-loss paths in `docs/git-backup-safety.md`.
-
 /// The phone pushed a new note and linked it from the daily note; the Mac
 /// still has the old tree checked out and has fetched the phone's commit.
 fn pulled_note_fixture() -> Fixture {
@@ -1227,9 +1215,7 @@ fn fast_forward_checkout_failure_never_reverts_pulled_notes() {
 
 #[test]
 fn stale_head_lock_fast_forward_never_reverts_pulled_notes() {
-    // The field case behind #1405: a lock file left by a killed process. It
-    // stays in place for the whole test, as it did for the user, because
-    // nothing in the app removes it.
+    // The lock file stays in place for the whole test.
     let fixture = pulled_note_fixture();
     fs::write(fixture.graph_a.join(".git/HEAD.lock"), b"").unwrap();
     let _ = merge_remote(&fixture.graph_a);
@@ -1238,8 +1224,7 @@ fn stale_head_lock_fast_forward_never_reverts_pulled_notes() {
 
 #[test]
 fn commit_during_fast_forward_never_reverts_pulled_notes() {
-    // The quit-time flush commits outside the engine's queue, so it can land
-    // while a pull is between the ref move and the checkout.
+    // The quit-time flush commits outside the engine's queue.
     let fixture = pulled_note_fixture();
     let root_a = fixture.graph_a.clone();
     let (entered_tx, entered_rx) = mpsc::channel::<()>();
@@ -1258,17 +1243,15 @@ fn commit_during_fast_forward_never_reverts_pulled_notes() {
         }
     });
     entered_rx.recv_timeout(WAIT).unwrap();
-    // The competing commit runs on its own worker: once git commands are
-    // serialized per graph it blocks until the pull finishes, so the pull
-    // must be released without waiting for it.
+    // The competing commit runs on its own worker: it blocks on the graph
+    // lock until the pull finishes, so release the pull without waiting.
     let (at_boundary_tx, at_boundary_rx) = mpsc::channel::<()>();
     let (commit_done_tx, commit_done_rx) = mpsc::channel::<()>();
     let commit = thread::spawn({
         let root = root_a.clone();
         move || {
             // Handshake at the commit's entry: past this point the worker is
-            // inside `commit_all`, about to take the graph lock (once one
-            // exists) and touch the repository.
+            // about to take the graph lock.
             fault::arm(
                 FaultPoint::BeforeCommit,
                 Fault::hook(move || at_boundary_tx.send(()).unwrap()),
@@ -1281,11 +1264,7 @@ fn commit_during_fast_forward_never_reverts_pulled_notes() {
     at_boundary_rx
         .recv_timeout(WAIT)
         .expect("the competing commit never reached the repository boundary");
-    // From the boundary, two outcomes are possible and both are the race
-    // under test: the commit completes inside the window (today: it sees the
-    // moved ref over the stale tree and commits the revert), or it blocks on
-    // the graph lock until the pull finishes (once commands are serialized),
-    // in which case this bounded wait times out and the pull is released.
+    // The commit blocks on the graph lock, so this bounded wait times out.
     let _ = commit_done_rx.recv_timeout(Duration::from_secs(2));
     resume_tx.send(()).unwrap();
     pull.join().unwrap().unwrap();

@@ -6,14 +6,10 @@
 //! The repository never enters libgit2's merge state. A stop before the ref
 //! moves leaves the working tree equal to HEAD or to the merge tree; the next
 //! commit and merge converge from either.
-//! The caller holds the graph lock and has committed the working tree. The
-//! checkout is safe, so a write by a tool outside the lock is never overwritten.
-//! Files a commit withheld stay as they are on disk.
+//! The caller holds the graph lock and has committed the working tree.
 //! A note conflict is resolved by the conflict ladder ([`ladder::resolve`]),
 //! so pulls never write conflict markers. Other files that cannot merge keep
-//! both versions as conflict copies.
-//! A local deletion of a file the incoming side changed keeps the incoming
-//! version (an edit wins over a delete).
+//! both versions as conflict copies. An edit wins over a delete.
 
 use std::path::Path;
 
@@ -53,8 +49,7 @@ pub struct ChangedFile {
     /// Graph-relative path, forward-slashed.
     pub path: String,
     pub kind: ChangeKind,
-    /// Last-modified time of the written file (epoch ms; upserts only), so
-    /// the reindex stamps the real mtime like the watcher path does.
+    /// Last-modified time of the written file (epoch ms; upserts only).
     pub modified_ms: Option<u64>,
 }
 
@@ -64,11 +59,7 @@ pub struct MergeOutcome {
     pub kind: MergeKind,
     /// Graph-relative paths of the conflict copies this merge wrote.
     pub review_paths: Vec<String>,
-    /// Every file this merge changed on disk. The sync layer reindexes these
-    /// directly — pulls must not depend on the file watcher being up (on
-    /// launch it may not be yet) to keep the index in step with the notes.
-    /// Deletions carry `modified_ms: None`; upserts carry the written file's
-    /// real mtime.
+    /// Every file this merge changed on disk, for the caller to reindex.
     pub changed_files: Vec<ChangedFile>,
 }
 
@@ -85,9 +76,8 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
 }
 
 /// Check out `tree` over a working tree that equals HEAD, leaving the runtime
-/// directory and the `skipped` dirty files alone. The checkout is safe: a file
-/// changed on disk since HEAD (by a tool that does not take the graph lock)
-/// makes it fail before it writes anything, and the next commit records it.
+/// directory and the `skipped` dirty files alone. The checkout must be safe:
+/// external writers do not hold the graph lock.
 fn checkout_target(repo: &Repository, tree: &git2::Tree<'_>, skipped: &[String]) -> AppResult<()> {
     // The first matching pathspec wins, so the exclusions come before `*`.
     let mut checkout = CheckoutBuilder::new();
@@ -104,10 +94,7 @@ fn pull(repo: &Repository, root: &Path, skipped: &[String]) -> AppResult<MergeOu
     clear_foreign_state(repo)?;
     let branch = current_branch(repo)?;
     let Ok(remote_oid) = repo.refname_to_id(&format!("refs/remotes/origin/{branch}")) else {
-        // A brand-new (empty) backup repo has no remote branch until the
-        // first push creates it. Nothing to merge is success, not an error —
-        // the launch cycle (commit → fetch → merge → push) must fall through
-        // to that push.
+        // A new backup repo has no remote branch until the first push.
         return Ok(MergeOutcome {
             kind: MergeKind::UpToDate,
             review_paths: Vec::new(),
@@ -132,8 +119,7 @@ fn pull(repo: &Repository, root: &Path, skipped: &[String]) -> AppResult<MergeOu
         let new_tree = repo.find_commit(remote_oid)?.tree()?;
         let mut changed_files = changed_between(repo, old_tree.as_ref(), &new_tree)?;
         // Files first, ref last: a failure in between leaves the branch where
-        // it was, so the next cycle retries the pull instead of committing
-        // the stale tree as a revert of it (#1405).
+        // it was, so the next cycle retries the pull.
         #[cfg(test)]
         super::fault::trip(super::fault::FaultPoint::BeforeFastForwardCheckout)?;
         checkout_target(repo, &new_tree, skipped)?;
@@ -149,8 +135,7 @@ fn pull(repo: &Repository, root: &Path, skipped: &[String]) -> AppResult<MergeOu
             }
             None => repo.reference(&refname, remote_oid, true, message)?,
         };
-        // HEAD already points at the branch (`current_branch` checked), so no
-        // `set_head`: it only added a `HEAD.lock` dependency to every pull.
+        // No `set_head`: a stale `HEAD.lock` must not fail a pull.
         return Ok(MergeOutcome {
             kind: MergeKind::FastForward,
             review_paths: Vec::new(),
@@ -177,7 +162,6 @@ fn pull(repo: &Repository, root: &Path, skipped: &[String]) -> AppResult<MergeOu
     let ours_tree = ours.tree()?;
     let mut changed_files = changed_between(repo, Some(&ours_tree), &tree)?;
 
-    // Same order as the fast-forward: tree first, ref last.
     #[cfg(test)]
     super::fault::trip(super::fault::FaultPoint::AfterMergeCommitBeforeCheckout)?;
     checkout_target(repo, &tree, skipped)?;
@@ -449,7 +433,7 @@ const SYMLINK_MODE: u32 = 0o120000;
 
 /// Stage a resolved conflict copy and record it for review. A file that collides with
 /// a directory (a path under it, or a file at one of its parent paths) moves
-/// to its conflict copy path, so neither side is dropped from the tree.
+/// to its conflict copy path.
 fn add_resolved(
     index: &mut Index,
     root: &Path,
