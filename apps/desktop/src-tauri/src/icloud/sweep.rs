@@ -3,7 +3,7 @@
 //!
 //! Per conflicted note: fold the conflict versions through
 //! [`crate::conflict::ladder`]. Then write the result atomically and, only
-//! then, mark the provider versions resolved. Per conflicted attachment
+//! then, mark the folded provider versions resolved. Per conflicted attachment
 //! (any other file type, seen by `Full` sweeps only): keep the working file
 //! and write each differing version beside it as a conflict copy. Creation
 //! collision duplicates (`2026-07-04 2.md`) fold into their canonical file
@@ -16,7 +16,7 @@
 
 use std::collections::{BTreeSet, HashSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -204,8 +204,7 @@ fn run_sweep(
             continue;
         }
         if !scan.complete {
-            // mark_resolved would purge a version with no readable store path.
-            continue;
+            continue; // a version with no readable store path cannot fold
         }
         if skip.contains(file.path.as_str()) {
             continue;
@@ -213,10 +212,15 @@ fn run_sweep(
         // Order by the version store's date, never the filesystem mtime,
         // which iCloud does not propagate bit-exactly.
         let current_ms = current_version_modified_ms(&abs).unwrap_or(file.modified_ms);
+        let handled: Vec<PathBuf> = scan
+            .versions
+            .iter()
+            .map(|version| version.store_path.clone())
+            .collect();
         if !reflect_graph_paths::is_note(&file.path) {
             locked(root, || {
                 if copy_conflict_versions(root, &file.path, scan.versions, &mut outcome) {
-                    mark_resolved(&abs);
+                    mark_resolved(&abs, &handled);
                     outcome.auto_resolved += 1;
                 }
             });
@@ -225,7 +229,14 @@ fn run_sweep(
         locked(root, || {
             match resolve_file(root, &file.path, current_ms, scan.versions, &shadow) {
                 Ok(resolved) => {
-                    apply_file_resolution(root, &file.path, resolved, &shadow, true, &mut outcome);
+                    apply_file_resolution(
+                        root,
+                        &file.path,
+                        resolved,
+                        &shadow,
+                        Some(&handled),
+                        &mut outcome,
+                    );
                 }
                 Err(err) => {
                     // One bad note must not stop the sweep; versions stay
@@ -408,15 +419,16 @@ fn read_sides(
     Ok(sides)
 }
 
-/// Write a resolution to disk, settle the provider's version state when
-/// `mark_versions` is set, and do the shadow bookkeeping. Returns `false`
-/// when the write failed and nothing else happened.
+/// Write a resolution to disk, mark the folded provider versions
+/// (`handled_versions`, by store path) resolved, and do the shadow
+/// bookkeeping. Returns `false` when the write failed and nothing else
+/// happened.
 fn apply_file_resolution(
     root: &Path,
     rel: &str,
     resolution: FileResolution,
     shadow: &ShadowStore,
-    mark_versions: bool,
+    handled_versions: Option<&[PathBuf]>,
     outcome: &mut SweepOutcome,
 ) -> bool {
     let abs = root.join(rel);
@@ -434,8 +446,8 @@ fn apply_file_resolution(
             modified_ms: modified_ms_of(&abs),
         });
     }
-    if mark_versions {
-        mark_resolved(&abs);
+    if let Some(handled) = handled_versions {
+        mark_resolved(&abs, handled);
     }
     if resolution.clear_merge_pair {
         shadow.clear_merge_pair(rel);
@@ -617,7 +629,7 @@ fn fold_duplicate(
             return;
         }
     };
-    if !apply_file_resolution(root, canonical_rel, resolution, shadow, false, outcome) {
+    if !apply_file_resolution(root, canonical_rel, resolution, shadow, None, outcome) {
         return; // duplicate stays; next sweep retries
     }
     // Report the remove only when it happened: a phantom `remove` would drop
@@ -1186,7 +1198,7 @@ mod tests {
             "notes/a.md",
             first,
             &shadow,
-            true,
+            Some(&[]),
             &mut outcome,
         );
         assert!(shadow.is_repeated_merge("notes/a.md", &mac_hash, &phone_hash));
@@ -1203,7 +1215,7 @@ mod tests {
             "notes/a.md",
             second,
             &shadow,
-            true,
+            Some(&[]),
             &mut outcome,
         );
         assert!(!shadow.is_repeated_merge("notes/a.md", &mac_hash, &phone_hash));
