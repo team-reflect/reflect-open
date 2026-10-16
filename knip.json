@@ -10,8 +10,7 @@
     "design-system": { "ignore": "./**/*" },
     "apps/desktop": {
       "ignoreDependencies": ["@sentry/cli"],
-      "ignore": "src-tauri/gen/**",
-      "ignoreFiles": ["src/components/icons/help-icon.tsx"]
+      "ignore": "src-tauri/gen/**"
     },
     "apps/extension": { "ignoreUnresolved": ["#imports"] }
   }
