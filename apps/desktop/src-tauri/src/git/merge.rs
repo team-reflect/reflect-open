@@ -30,11 +30,6 @@ use crate::error::{AppError, AppResult};
 
 use super::repo::{clear_foreign_state, current_branch, open_existing, signature};
 
-/// Side labels for the ladder. "this device" is the local side, "other device"
-/// the remote one — product language, not branch names.
-const OUR_LABEL: &str = "this device";
-const THEIR_LABEL: &str = "other device";
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum MergeKind {
@@ -210,8 +205,8 @@ fn merge_note(
     ours: (&[u8], &git2::Commit<'_>),
     theirs: (&[u8], &git2::Commit<'_>),
 ) -> AppResult<Vec<u8>> {
-    let ours_side = text_side(ours.0, OUR_LABEL, commit_ms(ours.1))?;
-    let theirs_side = text_side(theirs.0, THEIR_LABEL, commit_ms(theirs.1))?;
+    let ours_side = text_side(ours.0, commit_ms(ours.1))?;
+    let theirs_side = text_side(theirs.0, commit_ms(theirs.1))?;
     let base = base.map(text_of).transpose()?;
     let content = match ladder::resolve(ConflictInput {
         base,
@@ -228,10 +223,9 @@ fn text_of(bytes: &[u8]) -> AppResult<&str> {
     std::str::from_utf8(bytes).map_err(|_| AppError::io("a text side is not UTF-8"))
 }
 
-fn text_side(bytes: &[u8], label: &str, modified_ms: u64) -> AppResult<ConflictSide> {
+fn text_side(bytes: &[u8], modified_ms: u64) -> AppResult<ConflictSide> {
     Ok(ConflictSide {
         content: text_of(bytes)?.to_string(),
-        label: label.to_string(),
         modified_ms,
     })
 }
@@ -376,9 +370,8 @@ fn resolve_index_conflicts(
                         (their_blob.content(), theirs),
                     )?)
                 } else {
-                    let ours_side = text_side(our_blob.content(), OUR_LABEL, commit_ms(ours))?;
-                    let theirs_side =
-                        text_side(their_blob.content(), THEIR_LABEL, commit_ms(theirs))?;
+                    let ours_side = text_side(our_blob.content(), commit_ms(ours))?;
+                    let theirs_side = text_side(their_blob.content(), commit_ms(theirs))?;
                     merge3::diff3(
                         base.map(text_of).transpose()?.unwrap_or(""),
                         &ours_side,

@@ -32,8 +32,8 @@ pub(crate) fn diff3(
 
     let mut opts = MergeFileOptions::new();
     opts.ancestor_label("base")
-        .our_label(&first.label)
-        .their_label(&second.label)
+        .our_label("ours")
+        .their_label("theirs")
         .style_standard(true);
 
     let result = merge_file(&ancestor, &ours, &theirs, Some(&mut opts))
@@ -47,10 +47,9 @@ pub(crate) fn diff3(
 mod tests {
     use super::*;
 
-    fn side(content: &str, label: &str) -> ConflictSide {
+    fn side(content: &str) -> ConflictSide {
         ConflictSide {
             content: content.to_string(),
-            label: label.to_string(),
             modified_ms: 0,
         }
     }
@@ -58,8 +57,8 @@ mod tests {
     #[test]
     fn disjoint_edits_merge_clean() {
         let base = "alpha\nmiddle\nomega\n";
-        let first = side("ALPHA\nmiddle\nomega\n", "Mac");
-        let second = side("alpha\nmiddle\nOMEGA\n", "iPhone");
+        let first = side("ALPHA\nmiddle\nomega\n");
+        let second = side("alpha\nmiddle\nOMEGA\n");
         assert_eq!(
             diff3(base, &first, &second).unwrap(),
             Some("ALPHA\nmiddle\nOMEGA\n".to_string())
@@ -69,8 +68,8 @@ mod tests {
     #[test]
     fn overlapping_edits_return_none() {
         let base = "line\n";
-        let first = side("mac line\n", "Alex's MacBook Pro");
-        let second = side("phone line\n", "Alex's iPhone");
+        let first = side("mac line\n");
+        let second = side("phone line\n");
         assert_eq!(diff3(base, &first, &second).unwrap(), None);
     }
 
@@ -79,8 +78,8 @@ mod tests {
         // The daily-note shape: diff3 alone cannot union same-position
         // appends.
         let base = "# 2026-07-04\n\n- seed\n";
-        let first = side("# 2026-07-04\n\n- seed\n- from mac\n", "Mac");
-        let second = side("# 2026-07-04\n\n- seed\n- from phone\n", "iPhone");
+        let first = side("# 2026-07-04\n\n- seed\n- from mac\n");
+        let second = side("# 2026-07-04\n\n- seed\n- from phone\n");
         assert_eq!(diff3(base, &first, &second).unwrap(), None);
     }
 }

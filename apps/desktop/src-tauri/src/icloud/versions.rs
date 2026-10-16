@@ -3,7 +3,7 @@
 //!
 //! When two devices edit apart, iCloud keeps one content as the current file
 //! and stashes the others as conflict versions — full content in the local
-//! version store, plus the saving device's name and modification date. The
+//! version store, plus its modification date. The
 //! sweep reads them through this module, resolves, then marks the versions
 //! handled so iCloud stops reporting the conflict.
 
@@ -17,16 +17,14 @@ pub struct VersionRef {
     /// The version's modification time (epoch ms) — shared metadata, the
     /// deterministic ordering key.
     pub modified_ms: u64,
-    /// The saving device's name (`localizedNameOfSavingComputer`).
-    pub device: Option<String>,
 }
 
 /// A file's unresolved conflict versions, plus whether the listing is
 /// **complete**. `NSFileVersion.URL` can hand back a URL with no path (file
-/// reference URLs are id-based); such a version can't be read or archived.
+/// reference URLs are id-based); such a version can't be read.
 /// When that happens the sweep must not resolve the file at all this round —
 /// `mark_resolved` purges *every* version, including the one that was never
-/// archived, which is exactly the data loss the archive exists to prevent.
+/// read, which would lose its content.
 pub struct VersionScan {
     pub versions: Vec<VersionRef>,
     pub complete: bool,
@@ -88,8 +86,8 @@ mod platform {
     }
 
     /// Mark every conflict version of `abs` resolved and drop the stale
-    /// copies from the version store. Call strictly **after** the archive and
-    /// the resolved write have landed, and only when the version scan was
+    /// copies from the version store. Call strictly **after** the resolved
+    /// write has landed, and only when the version scan was
     /// complete. Best-effort: a failure leaves the versions unresolved and
     /// the next sweep retries.
     pub fn mark_resolved(abs: &Path) {
@@ -110,13 +108,9 @@ mod platform {
             .modificationDate()
             .map(|date| date_ms(&date))
             .unwrap_or(0);
-        let device = version
-            .localizedNameOfSavingComputer()
-            .map(|name| name.to_string());
         Some(VersionRef {
             store_path: store_path.into(),
             modified_ms,
-            device,
         })
     }
 
