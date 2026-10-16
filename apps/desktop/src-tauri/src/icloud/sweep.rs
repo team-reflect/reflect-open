@@ -334,6 +334,9 @@ fn advance_base_if_clean(
     let Ok(content) = fs::read_to_string(&abs) else {
         return;
     };
+    if crate::fs::own_writes::is_own(root, rel, content.as_bytes()) {
+        return;
+    }
     if markers::contains_conflict_markers(&content) {
         return;
     }
@@ -498,6 +501,7 @@ fn apply_file_resolution(
             tracing::warn!(path = rel, ?err, "failed to write conflict resolution");
             return; // versions stay unresolved; next sweep retries
         }
+        crate::fs::own_writes::record(root, rel, resolution.final_content.as_bytes());
         outcome.changed.push(SweepChange {
             path: rel.to_string(),
             kind: "upsert".to_string(),
@@ -1067,6 +1071,24 @@ mod tests {
         assert_eq!(
             shadow.base("notes/b.md"),
             Some("# B updated externally\n".to_string())
+        );
+    }
+
+    #[test]
+    fn own_writes_are_not_a_shadow_base() {
+        let root = graph();
+        let rel = "notes/own-write-base.md";
+        write(root.path(), rel, "# Written here\n");
+        crate::fs::own_writes::record(root.path(), rel, b"# Written here\n");
+        run_sweep(root.path(), &[], &[rel.to_string()], true, None).unwrap();
+        let shadow = ShadowStore::new(root.path());
+        assert_eq!(shadow.base(rel), None);
+
+        write(root.path(), rel, "# Arrived from elsewhere\n");
+        run_sweep(root.path(), &[], &[rel.to_string()], false, None).unwrap();
+        assert_eq!(
+            shadow.base(rel),
+            Some("# Arrived from elsewhere\n".to_string())
         );
     }
 
