@@ -79,8 +79,7 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
   Back up now, and on a **non-fast-forward** push rejection: fetch → merge → push
   again (bounded retries). While the window is visible, a desktop folder graph asks
   the remote for its branch tip every 90 s (one ref advertisement, no fetch) and runs
-  a full cycle only when the tip moved. After three failed probes in a row it runs a
-  full cycle every five minutes instead, until a probe succeeds. A graph in an iCloud
+  a full cycle only when the tip moved. A graph in an iCloud
   folder with a remote only commits on edits, and runs the network pass after five
   quiet minutes, once iCloud has no downloads pending.
 - **Hidden windows (iOS):** a debounced commit that has begun still pushes after the
@@ -125,8 +124,8 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
    fix.)
 
 4. **Conflict policy** (the load-bearing step):
-   - **Content conflicts** → marker blocks with readable labels (`<<<<<<< this device` /
-     `>>>>>>> other device`); merge committed + pushed.
+   - **Content conflicts** → a `.md` note runs the conflict ladder and always resolves to
+     text; any other file keeps both versions. The app writes no markers.
    - **Resolution UX (historical):** markers were lossy in the editor, so conflicted
      notes opened **protected** and a notice resolved them on the raw text.
    - **Edit vs delete** → keep the edited version (never silently delete); record it.

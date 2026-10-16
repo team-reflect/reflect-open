@@ -52,7 +52,7 @@ import { serializeWikiSuggestionAddress } from './suggest.ts'
  * first stamped version; v2 rows also carry the 0004 pinned columns) ·
  * 3 — repairs `notes.mtime` 0 rows written by the watcher path before it
  * carried `modifiedMs` (hash-reconcile can never refresh them) ·
- * 4 — unused ·
+ * 4 — retained `notes.has_conflict` column, no longer written or read ·
  * 5 — `notes.gist_url` + `notes.gist_stale` (gist publishing) ·
  * 6 — rendered Markdown escapes in titles, wiki-link targets, and previews ·
  * 7 — `tasks` projection (GFM checkboxes, Plan 18): existing notes carry no task

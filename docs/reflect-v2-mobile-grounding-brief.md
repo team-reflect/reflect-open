@@ -54,7 +54,7 @@ Plan 19 defines the binding scope. Summarized, with the product-owner calls of 2
 | iCloud Drive sync (Plan 21) | **In** | The primary transport: the graph lives in the app's iCloud container; the OS moves files; conflicts resolve on-device through the deterministic ladder (see section 6). iCloud and a Git remote are mutually exclusive per graph. |
 | GitHub sync (device flow, HTTPS) | **In** | For self-managed (on-device) graphs. Foreground-only; cycle on resume, after debounced edits, and on network regain. |
 | Onboarding: iCloud-first | **In** | Lists every graph already in the container (one-tap open) or stores fresh notes there; **Keep notes on this device** and a **Sync with GitHub instead** link behind it. Roots re-derived every launch; the chosen iCloud graph persists by *name*. |
-| Conflict **resolution** UI | **In** | Conflict markers are plain text to Reflect: the app neither writes nor interprets them. |
+| Conflict **resolution** UI | **Out of scope** | Conflicts resolve automatically (the ladder for `.md` notes, conflict copies for other files). Conflict markers are plain text to Reflect: the app neither writes nor interprets them. |
 | Audio memos | **Later wave** | Product owner: first post-release wave, reusing desktop's raw-first + async BYOK transcription pipeline; OS entry points (widget, Siri, Live Activity) come with it. |
 | Share-sheet capture | **Later wave** | Product owner: defer until the mobile share-target plugin can reuse the Plan 11 capture envelope/inbox model. Desktop Chrome capture has shipped; mobile still needs App Group ingestion. |
 | AI copilot (BYOK) | **Later wave** | Architecture holds (keys would live in the iOS keychain via the same secrets module); the surface is deferred. |
