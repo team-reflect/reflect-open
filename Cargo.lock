@@ -4961,6 +4961,7 @@ dependencies = [
  "http-range-header",
  "image",
  "infer",
+ "jiff",
  "keyring-core",
  "notify",
  "notify-debouncer-full",
