@@ -37,7 +37,9 @@ describe('engine state', () => {
       tone: 'ok',
       detail: 'Backs up in 2 minutes',
     })
-    expect(statusFor(connected({ state: 'waiting', until: 30_000 }))?.detail).toBe('Backs up in 30 seconds')
+    expect(statusFor(connected({ state: 'waiting', until: 30_000 }))?.detail).toBe(
+      'Backs up in 30 seconds',
+    )
   })
 
   it('shows Syncing while a cycle runs', () => {
