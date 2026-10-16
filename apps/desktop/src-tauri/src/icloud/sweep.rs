@@ -152,6 +152,14 @@ pub async fn icloud_conflicts_scan(
     outcome
 }
 
+/// Run one sweep step under the graph lock.
+fn locked(root: &Path, step: impl FnOnce()) {
+    let _ = crate::fs::with_graph_lock(root, || {
+        step();
+        Ok(())
+    });
+}
+
 /// The sweep body (blocking). Pure fs + ladder logic apart from the
 /// `NSFileVersion` calls, which no-op off Apple platforms.
 ///
@@ -182,7 +190,7 @@ fn run_sweep(
         if skip.contains(rel.as_str()) {
             continue;
         }
-        advance_base_if_clean(root, rel, &shadow, false);
+        locked(root, || advance_base_if_clean(root, rel, &shadow, false));
     }
 
     let files = crate::fs::note_files(root);
@@ -197,7 +205,9 @@ fn run_sweep(
                 // Overwriting an existing base here would advance it past
                 // unsynced local edits — exactly what the advance rule forbids
                 // — so a baseline pass is safe to repeat on every start.
-                advance_base_if_clean(root, &file.path, &shadow, true);
+                locked(root, || {
+                    advance_base_if_clean(root, &file.path, &shadow, true)
+                });
             }
         }
     }
@@ -234,16 +244,18 @@ fn run_sweep(
         // not propagate bit-exactly. Mixed keys would let two devices order
         // the same content pair differently and emit different merged bytes.
         let current_ms = current_version_modified_ms(&abs).unwrap_or(file.modified_ms);
-        match resolve_file(root, &file.path, current_ms, scan.versions, &shadow) {
-            Ok(resolved) => {
-                apply_file_resolution(root, &file.path, resolved, &shadow, &mut outcome)
+        locked(root, || {
+            match resolve_file(root, &file.path, current_ms, scan.versions, &shadow) {
+                Ok(resolved) => {
+                    apply_file_resolution(root, &file.path, resolved, &shadow, &mut outcome)
+                }
+                Err(err) => {
+                    // One bad note must not stop the sweep; versions stay
+                    // unresolved and the next sweep retries it.
+                    tracing::warn!(path = %file.path, ?err, "conflict resolution failed");
+                }
             }
-            Err(err) => {
-                // One bad note must not stop the sweep; versions stay
-                // unresolved and the next sweep retries it.
-                tracing::warn!(path = %file.path, ?err, "conflict resolution failed");
-            }
-        }
+        });
     }
 
     // External deletions never route through the store's `forget` — drop
@@ -576,7 +588,9 @@ fn fold_collision_duplicates(
             outcome.deferred.push(file.path.clone());
             continue;
         }
-        fold_duplicate(root, file, &canonical_rel, shadow, outcome);
+        locked(root, || {
+            fold_duplicate(root, file, &canonical_rel, shadow, outcome)
+        });
     }
 }
 

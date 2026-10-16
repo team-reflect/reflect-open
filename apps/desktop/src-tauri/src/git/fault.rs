@@ -34,8 +34,8 @@ pub(super) enum FaultPoint {
     BeforeFetch,
     /// Push: on entry, before the remote is contacted.
     BeforePush,
-    /// Commit: on entry, before the repository is touched (and, once
-    /// commands are serialized per graph, before the lock is taken).
+    /// Commit: on entry, before the repository is touched and before the
+    /// graph lock is taken.
     BeforeCommit,
 }
 
