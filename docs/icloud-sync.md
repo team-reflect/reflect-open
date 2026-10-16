@@ -29,8 +29,8 @@ edit the same note while apart.
   locally as you type, and touches the network only after five quiet minutes
   with no pending iCloud downloads. The GitHub history is noisy, because
   every device commits what iCloud delivered, and the backup trails your
-  edits by about five minutes. For a Git-only graph, the desktop app also
-  probes the remote every 90 seconds and pulls when it moved.
+  edits by about five minutes. For a Git-only graph, the desktop app probes
+  the remote every 90 seconds and pulls when it moved.
 
 ## What happens on a conflict
 
@@ -51,8 +51,7 @@ resolving the same conflict produce identical bytes and converge):
    `2026-07-04 2.md` behind) fold back into one file the same way.
 6. **Anything else**: a word-level merge keeps the words both sides added.
    It always produces text, so Reflect never writes conflict markers. A
-   file that already holds markers is plain text: the ladder merges it like
-   any other text.
+   file that already holds markers is plain text.
 
 The same ladder runs on every note path: a Git pull, the iCloud sweep, and an
 editor save that meets a newer file on disk. The path does not change the
@@ -69,9 +68,6 @@ graph path in the status hint.
 The sweep checks attachments only on a full sweep (resume and adoption), and
 only for extensions on the attachment whitelist. Files with other extensions
 get no copy, and their conflict versions stay in iCloud.
-
-There is no conflict archive and no version list in the note sidebar. A result is
-never archived before it is written.
 
 ## Building with iCloud
 

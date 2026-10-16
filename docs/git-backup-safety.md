@@ -7,24 +7,19 @@ engine and the backup service), the backup flusher of
 note session's external-change handling in
 `packages/core/src/documents/note-session-service.ts`.
 
-Each rule names the tests that enforce it. Every rule below is
-implemented.
+Each rule names the tests that enforce it.
 
 ## S1. A pull never overwrites uncommitted local changes
 
-A note saved after the cycle's commit (during the fetch, for example) is
-not clobbered by the checkout that applies the pull. Each cycle runs fetch,
-then `git_pull`, then push. `git_pull` commits the local changes and merges
-the remote under one graph lock. Every writer to a tracked file waits for
-that lock, so no save can land between the commit and the checkout. At
-checkout the working tree equals HEAD. The checkout is safe, not forced: a
-write by a tool outside the lock (an editor, iCloud) between the commit and
-the checkout makes it fail before it writes anything. The pull returns an
-error, the write stays on disk, and the next cycle commits it. `.reflect/`
-and files withheld for size stay out of the checkout, so their local bytes
-stay as they are. A note
-saved during the fetch is committed before the merge. S7 resolves any
-conflict with the remote.
+Each cycle runs fetch, `git_pull`, then push. `git_pull` commits the local
+changes and merges the remote under one graph lock. Every writer to a
+tracked file waits for that lock, so no save lands between the commit and
+the checkout. At checkout the working tree equals HEAD. The checkout is
+safe, not forced: a write by a tool outside the lock (an editor, iCloud)
+makes it fail before it writes anything. The pull returns an error, the
+write stays on disk, and the next cycle commits it. `.reflect/` and files
+withheld for size stay out of the checkout. S7 resolves any conflict with
+the remote.
 
 - Test: `git::tests::pull_all_holds_one_lock_for_commit_and_merge`,
   `git::tests::pull_all_commits_before_it_merges`,
@@ -33,11 +28,10 @@ conflict with the remote.
 
 ## S2. The branch ref moves only after the working tree matches it
 
-On a fast-forward, files are written first and the branch pointer moves
-last. A failure in between leaves the ref where it was, so the next cycle
-retries the pull instead of committing the stale tree. A merge follows the
-same order: the merge commit is written, then its tree is checked out, and
-the ref moves last.
+Files are written first and the branch pointer moves last. A failure in
+between leaves the ref where it was, so the next cycle retries the pull
+instead of committing the stale tree. A merge writes the merge commit, checks
+out its tree, then moves the ref.
 
 - Test: `git::tests::fast_forward_checkout_failure_never_reverts_pulled_notes`,
   `git::tests::stale_head_lock_fast_forward_never_reverts_pulled_notes`,
@@ -69,8 +63,7 @@ queue, never straight to `git_commit_all`.
 ## S5. The repository is never left in app-made merge state
 
 A pull computes the merge in memory and never calls `repo.merge()`, so no
-stop can leave `MERGE_HEAD` behind. The app keeps no merge commit outside the
-branch. If the user starts a merge, a rebase, or a detached HEAD with the git
+stop can leave `MERGE_HEAD` behind. If the user starts a merge, a rebase, or a detached HEAD with the git
 CLI, the app clears the leftover state and sync continues. A detached HEAD
 is reattached to the backup branch, and the working tree does not change.
 Sync never stops with a message that asks the user to run git.
@@ -91,8 +84,7 @@ The stop points of a pull, and what the next cycle does:
 ## S6. `.reflect/` never enters a commit
 
 The runtime directory is excluded by `.gitignore`, by an in-memory ignore
-rule, and by removing entries an older repository already
-tracked.
+rule, and by removing entries an adopted repository already tracks.
 
 - Test: `git::tests::commit_excludes_reflect_and_skips_when_clean` (untracked
   files), `git::tests::tracked_reflect_entries_are_dropped_from_the_next_commit`
@@ -141,9 +133,8 @@ When external content arrives while the buffer has unsaved edits, the
 session saves at once. The save is a checked write against the disk text
 the buffer was typed on, and `note_write` merges it with the newer disk
 text under the graph lock (merge-on-write). The session always adopts the
-ladder's result; a result the editor cannot round-trip opens the note
-protected. There is no parked state, so every
-exit path only has to finish the write.
+ladder's result. A result the editor cannot round-trip opens the note
+protected.
 
 - Test: `fs::tests::a_checked_write_against_a_moved_file_merges_under_the_lock`,
   `fs::tests::a_reconciled_write_keeps_both_words`;

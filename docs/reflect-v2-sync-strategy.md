@@ -25,9 +25,8 @@ It complements [Reflect V2 Product Vision](./reflect-v2-product-vision.md).
 >   deferred.
 > - **AI-assisted conflict resolution did not ship.** Text conflicts merge through
 >   one ladder on every note path (git pull, iCloud sweep, editor save). Other files
->   keep a conflict copy beside the original. Current
->   sync never writes conflict markers. Conflict markers are plain text to Reflect:
->   the app neither writes nor interprets them.
+>   keep a conflict copy beside the original. Conflict
+>   markers are plain text to Reflect: the app neither writes nor interprets them.
 > - Plain-language product states (Backed up / Backing up / Offline /
 >   Backup failed) shipped as described below.
 

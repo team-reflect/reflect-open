@@ -22,12 +22,11 @@ describe('checkRoundTrip', () => {
     expect(checkRoundTrip('- item one\n\n- item two\n')).toBe('normalizing')
   })
 
-  it('classifies git conflict markers as normalizing (they are plain text)', () => {
+  it('classifies git conflict markers as normalizing', () => {
     // meowdown grades conflict markers `normalizing`: `>>>>>>> other device`
     // re-serializes as `> > > > > > > other device`, which parses to the same
     // seven nested blockquotes, and `<<<<<<< ` / `=======` survive as a setext
-    // heading. The app treats them as plain text, so such a note opens in the
-    // editor. This case is here to notice if meowdown's verdict moves again.
+    // heading. This case is here to notice if meowdown's verdict moves again.
     const conflicted = [
       '# Shared',
       '',

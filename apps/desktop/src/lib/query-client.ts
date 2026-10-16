@@ -52,12 +52,6 @@ export const queryKeys = {
     templates(root: GraphRoot) {
       return [...this.graph(root), 'templates'] as const
     },
-    noteConflict(root: GraphRoot, path: string) {
-      return [...this.graph(root), 'note-conflict', path] as const
-    },
-    noteConflictLabels(root: GraphRoot, path: string) {
-      return [...this.graph(root), 'note-conflict-labels', path] as const
-    },
     backlinks(root: GraphRoot, path: string) {
       return [...this.graph(root), 'backlinks', path] as const
     },
