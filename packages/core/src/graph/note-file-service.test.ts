@@ -37,29 +37,16 @@ describe('createNoteFileService', () => {
     ])
   })
 
-  it('reports a write as an own write stamped with the disk mtime', async () => {
+  it('reports a write as an own write', async () => {
     const { ipc, fileChanges, noteFile } = setup()
     ipc.onCommand('note_write', () => ({ modifiedMs: 1_234, merged: null }))
 
-    await expect(noteFile.write('notes/a.md', 'new', 7)).resolves.toEqual({
-      modifiedMs: 1_234,
-      merged: null,
-    })
+    await expect(noteFile.write('notes/a.md', 'new', 7)).resolves.toEqual({ merged: null })
 
     expect(ipc.calls()).toEqual([
       { command: 'note_write', args: { path: 'notes/a.md', contents: 'new', generation: 7 } },
     ])
     expect(fileChanges.ownWrites()).toEqual([['notes/a.md']])
-  })
-
-  it('falls back to the clock when the platform reports no mtime', async () => {
-    const { ipc, noteFile } = setup()
-    ipc.onCommand('note_write', () => ({ modifiedMs: null, merged: null }))
-
-    await expect(noteFile.write('notes/a.md', 'new', 7)).resolves.toEqual({
-      modifiedMs: 9_000,
-      merged: null,
-    })
   })
 
   it('returns the merged text of a checked write that merged with the disk', async () => {
@@ -70,7 +57,6 @@ describe('createNoteFileService', () => {
     }))
 
     await expect(noteFile.write('notes/a.md', 'a\nB', 7, 'a\nb')).resolves.toEqual({
-      modifiedMs: 1_234,
       merged: 'a\nB\nc',
     })
   })
@@ -239,9 +225,8 @@ describe('local write echo (Plan 19, decision 5)', () => {
 
     await noteFile.write('daily/2026-06-12.md', 'hello', 1)
 
-    expect(seen).toHaveLength(1)
-    expect(seen[0]![0]).toMatchObject({ path: 'daily/2026-06-12.md', kind: 'upsert' })
-    expect(seen[0]![0]!.modifiedMs).toBeTypeOf('number')
+    // The platform reported no mtime: the echo carries the clock's time.
+    expect(seen).toEqual([[{ path: 'daily/2026-06-12.md', kind: 'upsert', modifiedMs: 0 }]])
     unlisten()
   })
 

@@ -161,8 +161,8 @@ export interface BackupService {
    */
   signOut(): Promise<void>
   /**
-   * Full cycle now: commit, pull/merge, push. On an iCloud-hosted graph with
-   * a remote it commits, and opens a quiet window only when none is open.
+   * Full cycle now: fetch, pull, push. On an iCloud-hosted graph with a remote
+   * it commits, and opens a quiet window only when none is open.
    */
   backUpNow(): Promise<void>
   /**
@@ -270,14 +270,13 @@ class BackupServiceImpl implements BackupService {
               return token === null ? null : githubCredential(token)
             }
           : async () => null
-      const root = this.#root
-      const coexisting = isICloudRoot(root)
+      const coexisting = isICloudRoot(this.#root)
       const next = syncEngines.create({
         generation: this.#generation,
         idleMs: this.#mobile ? MOBILE_IDLE_MS : undefined,
         quietMs: coexisting ? COEXIST_QUIET_MS : undefined,
         networkReady: coexisting
-          ? async () => (await icloudNative.pendingCount(root, 'notes')) === 0
+          ? async () => (await icloudNative.pendingCount(this.#root, 'notes')) === 0
           : undefined,
         // iOS can suspend us at any await. Do not begin a launch, online, or
         // debounced Git cycle after the document is hidden; the existing
@@ -298,7 +297,7 @@ class BackupServiceImpl implements BackupService {
           progress.fail('Backing up', `Too large to back up (kept local): ${names}`)
         },
         onRemoteChanges: (changes) => this.#onRemoteChanges(changes),
-        onReview: (paths) => this.#onReview(paths),
+        onReview: (paths) => progress.fail('Syncing', describeConflictCopies(paths)),
       })
       this.#setState({ phase: 'connected', remoteUrl, repo, status: { state: 'idle' } })
       this.#adoptEngine(next)
@@ -435,7 +434,8 @@ class BackupServiceImpl implements BackupService {
     getCredential: () => Promise<GitCredential | null>,
   ): Promise<void> {
     const { git, activity, logger } = this.#deps
-    if (!activity.isHidden() && !this.#hasError()) {
+    const failed = this.#state.phase === 'connected' && this.#state.status.state === 'error'
+    if (!activity.isHidden() && !failed) {
       try {
         const tip = await git.remoteHead(await getCredential(), this.#generation)
         if (this.#engine !== engine) {
@@ -454,14 +454,6 @@ class BackupServiceImpl implements BackupService {
     if (this.#engine === engine) {
       this.#armProbe(engine, getCredential)
     }
-  }
-
-  #hasError(): boolean {
-    return this.#state.phase === 'connected' && this.#state.status.state === 'error'
-  }
-
-  #onReview(paths: string[]): void {
-    this.#deps.progress.fail('Syncing', describeConflictCopies(paths))
   }
 
   #onRemoteChanges(changes: ChangedFile[]): void | Promise<void> {
@@ -575,8 +567,6 @@ class BackupServiceImpl implements BackupService {
         generation: this.#generation,
         localOnly: true,
         getCredential: async () => null,
-        onRemoteChanges: (changes) => this.#onRemoteChanges(changes),
-        onReview: (paths) => this.#onReview(paths),
         onStatus: (engineStatus) => {
           // No UI surfaces local history, so a failing commit loop (disk full,
           // corrupted repo) must at least leave a trace for diagnosis.

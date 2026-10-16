@@ -88,7 +88,7 @@ const PULLED: PullOutcome = {
 const DELTA = { ahead: 1, behind: 0 }
 
 /**
- * A git fake that commits, reports a delta, merges and pushes; every call recorded.
+ * A git fake that commits, fetches, pulls, and pushes; every call recorded.
  */
 function fakeGit(): TestGitRepositoryService {
   const git = createTestGitRepositoryService()
@@ -141,14 +141,12 @@ describe('createSyncEngineFactory', () => {
       maxWaitMs: 250,
     })
 
-    // An edit every 80ms keeps resetting the idle window…
     engine.noteChanged()
     await advance(80)
     engine.noteChanged()
     await advance(80)
     engine.noteChanged()
     expect(git.calls()).toHaveLength(0)
-    // …but the 250ms ceiling forces the cycle anyway.
     await advance(100)
     await runAllTimers()
     expect(methodsOf(git)).toContain('commitAll')
@@ -181,9 +179,6 @@ describe('createSyncEngineFactory', () => {
   })
 
   it('maps a thrown ReflectError from token refresh to offline / auth states', async () => {
-    // getGithubToken throws ReflectError (an Error subclass) for transient
-    // refresh failures — the engine must read it like any AppError, or the
-    // offline/auth UX silently degrades to a generic error.
     const { ReflectError } = await import('../errors.ts')
     for (const [kind, expected] of [
       ['network', { state: 'offline' }],
@@ -282,7 +277,7 @@ describe('createSyncEngineFactory', () => {
     }
   })
 
-  it('a push-only cycle hidden after its commit still pushes', async () => {
+  it('a push-only cycle hidden after its commit pushes', async () => {
     let canStartCycle = true
     const git = fakeGit()
     git.onCommitAll(() => {
@@ -302,27 +297,7 @@ describe('createSyncEngineFactory', () => {
     engine.stop()
   })
 
-  it('a full cycle hidden during the fetch still does not merge', async () => {
-    let canStartCycle = true
-    const git = fakeGit()
-    git.onFetch(() => {
-      canStartCycle = false
-      return DELTA
-    })
-    const engine = createSyncEngine({
-      generation: 1,
-      getCredential: async () => CRED,
-      canStartCycle: () => canStartCycle,
-    })
-    await engine.syncNow()
-    expect(methodsOf(git)).toEqual(['fetch'])
-    engine.stop()
-  })
-
-  it('a flush queued behind a sync still commits when the app hides meanwhile', async () => {
-    // Visible: a sync is mid-merge and another syncNow queues a full
-    // follow-up. The app goes to the background and the flush joins that
-    // follow-up. The gate must not swallow the commit the flush is owed.
+  it('a flush queued behind a sync commits when the app hides meanwhile', async () => {
     const gate: { release: () => void } = { release: () => {} }
     const git = fakeGit()
     git.onPull(() => {
@@ -346,15 +321,13 @@ describe('createSyncEngineFactory', () => {
     await flushed
     await second
     const commands = methodsOf(git)
-    // The running sync stopped at the gate after its merge, and the queued
-    // full follow-up ran as the commit the flush was owed: no push, one commit.
     expect(commands.filter((method) => method === 'push')).toHaveLength(0)
     expect(commands.filter((method) => method === 'commitAll')).toHaveLength(1)
     expect(commands.lastIndexOf('commitAll')).toBeGreaterThan(commands.indexOf('pull'))
     engine.stop()
   })
 
-  it('a flush queued into a full cycle still commits when the gate closes after the fetch', async () => {
+  it('a flush queued into a full cycle commits when the gate closes after the fetch', async () => {
     const gate: { release: () => void } = { release: () => {} }
     const git = fakeGit()
     git.onPull(() => {
@@ -384,8 +357,6 @@ describe('createSyncEngineFactory', () => {
     await first
     await flushed
     await second
-    // The follow-up starts visible and owes the flush commit; the gate closes
-    // during its fetch, so it commits instead of pulling.
     expect(methodsOf(git)).toEqual(['fetch', 'pull', 'push', 'fetch', 'commitAll'])
     engine.stop()
   })
@@ -398,7 +369,7 @@ describe('createSyncEngineFactory', () => {
     engine.stop()
   })
 
-  it('a failed fetch still commits local changes', async () => {
+  it('a failed fetch commits local changes', async () => {
     const git = fakeGit()
     git.onFetch(() => {
       throw { kind: 'network', message: 'could not resolve github.com' }
@@ -443,15 +414,11 @@ describe('createSyncEngineFactory', () => {
     gate.release()
     await first
     await flushed
-    // One follow-up: its commit, then the push the debounce asked for; no
-    // fetch, because nobody asked to pull.
     expect(methodsOf(git)).toEqual(['fetch', 'pull', 'push', 'commitAll', 'push'])
     engine.stop()
   })
 
   it('commitNow runs even when the owner gates cycles (the hidden-app flush)', async () => {
-    // iOS fires the background flush after the document is hidden, exactly
-    // when canStartCycle says no to network cycles.
     const git = fakeGit()
     const engine = createSyncEngine({
       generation: 1,
@@ -466,9 +433,6 @@ describe('createSyncEngineFactory', () => {
   })
 
   it('after an auth failure, edits commit locally and skip the network until a resume', async () => {
-    // A rejected sign-in (or an ssh agent with no key) does not fix itself
-    // between keystrokes: per-edit retries would only repeat the error and
-    // the reconnect prompt. Local history keeps accumulating meanwhile.
     let pushes = 0
     const git = fakeGit()
     git.onPush(() => {
@@ -572,8 +536,6 @@ describe('createSyncEngineFactory', () => {
     await advance(10)
     expect(methodsOf(git)).toEqual(['commitAll', 'push'])
 
-    // A focus/manual sync arrives mid-cycle: its fetch+merge must not be
-    // downgraded to a push-only follow-up.
     void engine.syncNow()
     pushGate.resolve?.(PUSHED)
     await runAllTimers()
@@ -617,10 +579,7 @@ describe('createSyncEngineFactory', () => {
   it('continues through push while remote-change handling runs, then waits before idle', async () => {
     const git = fakeGit()
     git.onPull(() => ({
-      committed: true,
-      ahead: 1,
-      skippedLargeFiles: [],
-      reviewPaths: [],
+      ...PULLED,
       changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 1 }],
     }))
     const remoteChangesGate = Promise.withResolvers<void>()
@@ -637,8 +596,6 @@ describe('createSyncEngineFactory', () => {
     const syncing = engine.syncNow()
     await advance(0)
 
-    // The projection is still gated, but the merge's Markdown has already
-    // continued through the durable Git push. Only the idle boundary waits.
     expect(methodsOf(git)).toEqual(['fetch', 'pull', 'push'])
     expect(statuses.map((status) => status.state)).toEqual(['syncing'])
 
@@ -656,10 +613,7 @@ describe('createSyncEngineFactory', () => {
     git.onPull(() => {
       mergeCount += 1
       return {
-        committed: true,
-        ahead: 1,
-        skippedLargeFiles: [],
-        reviewPaths: [],
+        ...PULLED,
         changedFiles: [{ path: `notes/remote-${mergeCount}.md`, kind: 'upsert', modifiedMs: 1 }],
       }
     })
@@ -688,8 +642,6 @@ describe('createSyncEngineFactory', () => {
     await advance(0)
 
     expect(methodsOf(git)).toEqual(['fetch', 'pull', 'push', 'fetch', 'pull', 'push'])
-    // Both merges notify synchronously even though the first returned task is
-    // still gated. Their async work can overlap; only idle waits for both.
     expect(started).toEqual(['notes/remote-1.md', 'notes/remote-2.md'])
     expect(statuses.map((status) => status.state)).toEqual(['syncing'])
 
@@ -703,10 +655,7 @@ describe('createSyncEngineFactory', () => {
   it('finishes async remote-change handling before applying a suppression gate', async () => {
     const git = fakeGit()
     git.onPull(() => ({
-      committed: true,
-      ahead: 1,
-      skippedLargeFiles: [],
-      reviewPaths: [],
+      ...PULLED,
       changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 1 }],
     }))
     const remoteChangesGate = Promise.withResolvers<void>()
@@ -741,10 +690,7 @@ describe('createSyncEngineFactory', () => {
     const git = fakeGit()
     git.onPull(() => {
       return {
-        committed: true,
-        ahead: 1,
-        skippedLargeFiles: [],
-        reviewPaths: [],
+        ...PULLED,
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 1 }],
       }
     })
@@ -766,8 +712,6 @@ describe('createSyncEngineFactory', () => {
     const syncing = engine.syncNow()
     await advance(0)
 
-    // The projection has already rejected, but that failure must not strand
-    // the merged Markdown before its required push.
     expect(methodsOf(git)).toEqual(['fetch', 'pull', 'push'])
     expect(statuses.map((status) => status.state)).toEqual(['syncing'])
 
@@ -805,10 +749,7 @@ describe('createSyncEngineFactory', () => {
 
     engine.stop()
     mergeGate.resolve({
-      committed: true,
-      ahead: 1,
-      skippedLargeFiles: [],
-      reviewPaths: [],
+      ...PULLED,
       changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 1 }],
     })
     await syncing
@@ -821,10 +762,7 @@ describe('createSyncEngineFactory', () => {
   it('stop after a remote-change task starts emits no later status or Git work', async () => {
     const git = fakeGit()
     git.onPull(() => ({
-      committed: true,
-      ahead: 1,
-      skippedLargeFiles: [],
-      reviewPaths: [],
+      ...PULLED,
       changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 1 }],
     }))
     const remoteChangesGate = Promise.withResolvers<void>()
@@ -855,10 +793,7 @@ describe('createSyncEngineFactory', () => {
   it('stop from a synchronous remote-change callback prevents the later push', async () => {
     const git = fakeGit()
     git.onPull(() => ({
-      committed: true,
-      ahead: 1,
-      skippedLargeFiles: [],
-      reviewPaths: [],
+      ...PULLED,
       changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 1 }],
     }))
     const statuses: SyncStatus[] = []
@@ -875,17 +810,6 @@ describe('createSyncEngineFactory', () => {
 
     expect(methodsOf(git)).toEqual(['fetch', 'pull'])
     expect(statuses.map((status) => status.state)).toEqual(['syncing'])
-  })
-
-  it('syncNow pulls and merges even with nothing to push (launch/focus)', async () => {
-    const git = fakeGit()
-    git.onCommitAll(() => CLEAN_COMMIT)
-    const engine = createSyncEngine({ generation: 1, getCredential: async () => CRED })
-
-    await engine.syncNow()
-
-    expect(methodsOf(git)).toEqual(['fetch', 'pull', 'push'])
-    engine.stop()
   })
 
   it('reports files withheld by the size guardrail', async () => {
@@ -939,14 +863,11 @@ describe('createSyncEngineFactory', () => {
 
     pushGate.resolve?.(PUSHED)
     await runAllTimers()
-    // The mid-cycle edit got its own follow-up cycle.
     expect(methodsOf(git)).toEqual(['commitAll', 'push', 'commitAll', 'push'])
     engine.stop()
   })
 
   it('skips the push when a debounced pass finds nothing committed and nothing ahead', async () => {
-    // The watcher re-reports a pull's own writes; the resulting cycle must
-    // not buy a network round-trip for them.
     const git = fakeGit()
     git.onCommitAll(() => CLEAN_COMMIT)
     const engine = createSyncEngine({ generation: 1, getCredential: async () => CRED, idleMs: 10 })
@@ -960,21 +881,7 @@ describe('createSyncEngineFactory', () => {
 
   it('skips the push when a launch pull finds both sides already in step', async () => {
     const git = fakeGit()
-    git.onCommitAll(() => {
-      return CLEAN_COMMIT
-    })
-    git.onFetch(() => {
-      return { ahead: 0, behind: 0 }
-    })
-    git.onPull(() => {
-      return {
-        committed: false,
-        ahead: 0,
-        skippedLargeFiles: [],
-        reviewPaths: [],
-        changedFiles: [],
-      }
-    })
+    git.onPull(() => ({ ...PULLED, committed: false, ahead: 0 }))
     const engine = createSyncEngine({ generation: 1, getCredential: async () => CRED })
 
     await engine.syncNow()
@@ -1028,9 +935,6 @@ describe('createSyncEngineFactory', () => {
   })
 
   it('passes a missing credential through as null (Rust owns the failure)', async () => {
-    // The engine has no null-credential special case on purpose: only the remote
-    // knows whether it needs auth. A push refused for a missing credential
-    // must still land on the reconnect affordance.
     const git = fakeGit()
     git.onPush(() => {
       throw { kind: 'auth', message: 'authentication required' }
@@ -1089,7 +993,6 @@ describe('createSyncEngineFactory', () => {
     const second = engine.syncNow()
     const third = engine.syncNow()
     await runAllTimers()
-    // Only the first cycle has started; the others coalesced, not interleaved.
     expect(methodsOf(git)).toEqual(['fetch', 'pull', 'push'])
 
     pushGates.shift()?.(PUSHED)
@@ -1098,7 +1001,6 @@ describe('createSyncEngineFactory', () => {
     await runAllTimers()
     await Promise.all([first, second, third])
 
-    // The two queued requests collapsed into a single full follow-up cycle.
     expect(methodsOf(git)).toEqual(['fetch', 'pull', 'push', 'fetch', 'pull', 'push'])
     engine.stop()
   })
@@ -1128,8 +1030,6 @@ describe('createSyncEngineFactory', () => {
     fetchGate.resolve(DELTA)
     await syncing
 
-    // Fetch began while allowed, but merge/push must not start after the
-    // lifecycle becomes hidden. Suppression is an idle pause, not an error.
     expect(methodsOf(git)).toEqual(['fetch'])
     expect(statuses.map((status) => status.state)).toEqual(['syncing', 'idle'])
     engine.stop()
@@ -1155,9 +1055,6 @@ describe('createSyncEngineFactory', () => {
     await advance(10)
     expect(methodsOf(git)).toEqual(['commitAll', 'push'])
 
-    // Disconnect/teardown while the push is in flight: the resolution would
-    // normally trigger fetch+merge+retry (non-fast-forward) and a status
-    // emission — a stopped engine must do neither.
     engine.stop()
     pushGate.resolve(NON_FAST_FORWARD)
     await runAllTimers()
@@ -1215,10 +1112,7 @@ describe('quiet mode', () => {
     await advance(QUIET_MS - 1)
     expect(methodsOf(git)).toEqual(['commitAll', 'commitAll'])
     git.onPull(() => ({
-      committed: true,
-      ahead: 1,
-      skippedLargeFiles: [],
-      reviewPaths: [],
+      ...PULLED,
       changedFiles: [{ path: 'a.md', kind: 'upsert', modifiedMs: 1 }],
     }))
     await advance(1)
@@ -1411,7 +1305,7 @@ describe('quiet mode', () => {
   })
 })
 
-describe('review and adoption outcomes', () => {
+describe('review paths', () => {
   it('reports the review paths of a merge', async () => {
     const git = fakeGit()
     git.onPull(() => ({

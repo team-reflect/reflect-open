@@ -114,10 +114,7 @@ export interface ICloudSyncServiceDeps {
  *   a silently dead watch means a Mac edit synced while backgrounded stays
  *   invisible until the app is relaunched.
  *
- * Dirty open sessions are deferred (their paths ride `skipPaths`) as a
- * courtesy, not a safety net — even without it, a sweep write lands on disk
- * and the session's own external-change handling saves and merges it, the
- * same as any external edit.
+ * Dirty open sessions are deferred: their paths ride `skipPaths`.
  */
 export interface ICloudSyncService {
   start(): Promise<void>

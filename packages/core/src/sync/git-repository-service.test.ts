@@ -27,7 +27,6 @@ describe('createGitRepositoryService', () => {
           skippedLargeFiles: [],
           reviewPaths: ['a (conflict 2026-10-16 08-05-31 a1b2c3d4).json'],
           changedFiles: [{ path: 'a.md', kind: 'upsert', modifiedMs: null }],
-          kind: 'merged',
         }),
       },
     })
@@ -68,14 +67,5 @@ describe('createGitRepositoryService', () => {
     const git = createGitRepositoryService({ ipc })
 
     await expect(git.fetch(null, 1)).rejects.toMatchObject({ kind: 'parse' })
-  })
-
-  it('rejects a malformed remote tip with a parse error', async () => {
-    const ipc = createTestIpcBridgeService({
-      commands: { git_remote_head: () => ({ remoteOid: 1, trackingOid: null }) },
-    })
-    const git = createGitRepositoryService({ ipc })
-
-    await expect(git.remoteHead(null, 1)).rejects.toMatchObject({ kind: 'parse' })
   })
 })

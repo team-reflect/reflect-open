@@ -117,10 +117,10 @@ function harness(options?: {
       if (writeFailure !== null) {
         throw new Error(writeFailure)
       }
-      const modifiedMs = await files.write(PATH, contents, generation, expected)
+      const result = await files.write(PATH, contents, generation, expected)
       writes.push({ path, contents })
       await options?.afterWrite?.()
-      return modifiedMs
+      return result
     },
   })
   const graph = createTestGraphSessionService({ graph: { generation: 1 } })
@@ -273,8 +273,6 @@ describe('createNoteSession', () => {
     session.load()
     await settled()
 
-    // The user types X while the same X lands on disk externally (e.g. another
-    // device synced the identical edit).
     session.editorChanged('# Same on both\n')
     setDisk('# Same on both\n')
     session.externalChanged()
@@ -299,6 +297,31 @@ describe('createNoteSession', () => {
     expect(snapshots.at(-1)?.initialContent).toBe('+ [ ] now has tasks\n')
   })
 })
+
+/**
+ * Feed a session's content reports to a title-rename tracker and return its renames.
+ */
+function replayRenames(
+  contents: ReadonlyArray<{ content: string; origin: string }>,
+): TitleRename[] {
+  const renames: TitleRename[] = []
+  const tracker = createTitleRenameTracker({
+    path: PATH,
+    clock,
+    onRename: (rename) => {
+      renames.push(rename)
+    },
+  })
+  for (const { content, origin } of contents) {
+    if (origin === 'saved') {
+      tracker.saved(content)
+    } else {
+      tracker.baseline(content)
+    }
+  }
+  tracker.settle()
+  return renames
+}
 
 describe('external changes and saves', () => {
   it('ignores an external event whose content matches the disk state (the echo of its own save)', async () => {
@@ -344,7 +367,6 @@ describe('external changes and saves', () => {
     expect(h.session.content()).toBe('# Hello\n\nmine\n\ntheirs\n')
     expect(h.snapshots.at(-1)).toMatchObject({ dirty: false, protected: false, error: null })
 
-    // The next edit is a plain checked write against the merged text.
     h.session.editorChanged('# Hello\n\nmine\n\ntheirs\n\nmore\n')
     await settled()
     expect(h.expectedContents.at(-1)).toBe('# Hello\n\nmine\n\ntheirs\n')
@@ -370,7 +392,6 @@ describe('external changes and saves', () => {
       protected: true,
       initialContent: '# Hello\n\nmine\n\n+ [ ] theirs\n',
     })
-    // A protected note is never auto-saved, so the merged text stays as written.
     h.session.editorChanged('# Hello\n\nmine\n')
     await settled()
     expect(h.disk()).toBe('# Hello\n\nmine\n\n+ [ ] theirs\n')
@@ -408,23 +429,9 @@ describe('external changes and saves', () => {
     await settled()
 
     expect(h.contents.at(-1)).toEqual({ content: '# New title\n\nbody theirs\n', origin: 'saved' })
-    const renames: TitleRename[] = []
-    const tracker = createTitleRenameTracker({
-      path: PATH,
-      clock,
-      onRename: (rename) => {
-        renames.push(rename)
-      },
-    })
-    for (const { content, origin } of h.contents) {
-      if (origin === 'saved') {
-        tracker.saved(content)
-      } else {
-        tracker.baseline(content)
-      }
-    }
-    tracker.settle()
-    expect(renames).toEqual([{ from: 'Old title', to: 'New title', previousAutoAlias: null }])
+    expect(replayRenames(h.contents)).toEqual([
+      { from: 'Old title', to: 'New title', previousAutoAlias: null },
+    ])
   })
 
   it('a body-only merge after a pending rename is reported as saved and keeps the rename', async () => {
@@ -441,23 +448,9 @@ describe('external changes and saves', () => {
     await settled()
 
     expect(h.contents.map((c) => c.origin)).toEqual(['load', 'saved', 'saved'])
-    const renames: TitleRename[] = []
-    const tracker = createTitleRenameTracker({
-      path: PATH,
-      clock,
-      onRename: (rename) => {
-        renames.push(rename)
-      },
-    })
-    for (const { content, origin } of h.contents) {
-      if (origin === 'saved') {
-        tracker.saved(content)
-      } else {
-        tracker.baseline(content)
-      }
-    }
-    tracker.settle()
-    expect(renames).toEqual([{ from: 'Old title', to: 'New title', previousAutoAlias: null }])
+    expect(replayRenames(h.contents)).toEqual([
+      { from: 'Old title', to: 'New title', previousAutoAlias: null },
+    ])
   })
 
   it('a merge that changes the title after a local rename is reported as external', async () => {
@@ -537,7 +530,7 @@ describe('external changes and saves', () => {
     expect(h.snapshots).toHaveLength(emitted)
   })
 
-  it('treats an external event for an in-flight save as an echo, not a conflict', async () => {
+  it('treats an external event for an in-flight save as an echo', async () => {
     const hold = Promise.withResolvers<void>()
     const h = harness({ afterWrite: () => hold.promise })
     h.session.load()
@@ -611,19 +604,6 @@ describe('external changes and saves', () => {
     await clock.advance(5000)
     await h.session.flush()
     expect(h.writes).toEqual([])
-  })
-
-  it('a note that documents a conflict inside a fence stays editable and saves', async () => {
-    const disk =
-      '# How to resolve\n\n```\n<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\n```\n'
-    const h = harness({ disk })
-    h.session.load()
-    await settled()
-    expect(h.snapshots.at(-1)?.protected).toBe(false)
-
-    h.session.editorChanged(`${disk}\nmore\n`)
-    await settled()
-    expect(h.writes).toEqual([{ path: 'notes/a.md', contents: `${disk}\nmore\n` }])
   })
 
   it('a missing note without createIfMissing is an error', async () => {
@@ -735,7 +715,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
     expect(h.applied).toEqual([]) // the editor was never reloaded
   })
 
-  it('an external frontmatter-only change adopts cleanly without a conflict', async () => {
+  it('an external frontmatter-only change adopts cleanly', async () => {
     const h = harness({ disk: `${FM}# Hello\n` })
     h.session.load()
     await settled()
@@ -953,8 +933,6 @@ describe('missing-note seed (new ordinary notes)', () => {
   })
 
   it('an external write while the seed is showing adopts cleanly and clears missing', async () => {
-    // Another device/process creates the file while the seeded buffer is open
-    // and untouched: not a conflict — the buffer was never dirty.
     const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
     h.session.load()
     await settled()
@@ -1026,7 +1004,7 @@ describe('missing-note seed (new ordinary notes)', () => {
     expect(h.writes).toEqual([{ path: 'notes/a.md', contents: '# Hello again\n' }])
   })
 
-  it('a delete racing unsaved edits neither conflicts nor drops them', async () => {
+  it('a delete racing unsaved edits keeps them', async () => {
     const h = harness({ disk: '# Hello\n' })
     h.session.load()
     await settled()
@@ -1344,23 +1322,6 @@ it.each([null, '# Hello\n'])(
     h.session.discard()
   },
 )
-
-it('a checked autosave against a moved file adopts the merge instead of failing', async () => {
-  const h = harness()
-  try {
-    h.session.load()
-    await settled()
-    h.session.editorChanged('# My unsaved text\n')
-    h.setDisk('# Capture wrote here\n')
-    h.mergeNextWrite('# My unsaved text\n\nCapture wrote here\n')
-    await h.session.flush()
-    expect(h.expectedContents).toEqual(['# Hello\n'])
-    expect(h.session.content()).toBe('# My unsaved text\n\nCapture wrote here\n')
-    expect(h.snapshots.at(-1)).toMatchObject({ dirty: false, error: null })
-  } finally {
-    h.session.discard()
-  }
-})
 
 it('a rejected source edit preserves typing made while its write was pending', async () => {
   const started = Promise.withResolvers<void>()

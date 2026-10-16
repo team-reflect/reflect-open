@@ -180,9 +180,7 @@ describe('write serialization', () => {
     let writes = 0
     const writeNote = vi.spyOn(noteFile, 'write').mockImplementation(() => {
       writes += 1
-      return writes === 1
-        ? pendingFirstWrite.promise
-        : Promise.resolve({ modifiedMs: 0, merged: null })
+      return writes === 1 ? pendingFirstWrite.promise : Promise.resolve({ merged: null })
     })
 
     const first = tasks.writeTask(task, [{ kind: 'toggle' }])
@@ -193,7 +191,7 @@ describe('write serialization', () => {
     expect(noteFile.getReads()).toHaveLength(1)
     expect(writeNote).toHaveBeenCalledTimes(1)
 
-    pendingFirstWrite.resolve({ modifiedMs: 0, merged: null })
+    pendingFirstWrite.resolve({ merged: null })
     await Promise.all([first, second])
     // The second only read after the first's write settled.
     expect(noteFile.getReads()).toHaveLength(2)

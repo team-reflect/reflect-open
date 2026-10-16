@@ -111,10 +111,7 @@ describe('createCoreServices', () => {
     services.fileChanges.subscribe((batch) => {
       seen.push({ source: batch.source, paths: batch.changes.map((change) => change.path) })
     })
-    await expect(internal.noteFile.write('notes/a.md', 'a', 1)).resolves.toEqual({
-      modifiedMs: 5,
-      merged: null,
-    })
+    await expect(internal.noteFile.write('notes/a.md', 'a', 1)).resolves.toEqual({ merged: null })
     expect(seen).toEqual([{ source: 'own-write', paths: ['notes/a.md'] }])
   })
 

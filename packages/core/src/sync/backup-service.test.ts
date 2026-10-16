@@ -64,13 +64,13 @@ const USER_URL = 'https://api.github.com/user'
 const GENERATION = 3
 
 const AUTH = JSON.stringify({ kind: 'pat', token: 'ghp_abc' })
-const CLEAN_COMMIT: CommitOutcome = {
+const COMMITTED: CommitOutcome = {
   committed: true,
   sha: null,
   ahead: 0,
   skippedLargeFiles: [],
 }
-const UP_TO_DATE: PullOutcome = {
+const PULLED: PullOutcome = {
   committed: true,
   ahead: 0,
   skippedLargeFiles: [],
@@ -129,7 +129,7 @@ interface FakeOptions {
    */
   pullOutcome?: PullOutcome
   /**
-   * Per-call merge outcomes for retry/convergence tests.
+   * Per-call pull outcomes for retry/convergence tests.
    */
   pullOutcomes?: PullOutcome[]
   /**
@@ -177,10 +177,10 @@ function fakeServices(options: FakeOptions = {}) {
   const statusGate = Promise.withResolvers<void>()
   const indexApplyGate = Promise.withResolvers<void>()
   const setupGate = Promise.withResolvers<void>()
-  const mergeGate = Promise.withResolvers<void>()
+  const pullGate = Promise.withResolvers<void>()
   const commitGate = Promise.withResolvers<void>()
   let statusCount = 0
-  let mergeCount = 0
+  let pullCount = 0
   let commitInvocations = 0
   let indexApplyCount = 0
   const pullOutcomes = [...(options.pullOutcomes ?? [])]
@@ -221,7 +221,7 @@ function fakeServices(options: FakeOptions = {}) {
     if (options.gateCommit === true && commitInvocations === 1) {
       await commitGate.promise
     }
-    const outcome = options.commitOutcome ?? CLEAN_COMMIT
+    const outcome = options.commitOutcome ?? COMMITTED
     if (outcome.committed) {
       calls.push('committed')
     }
@@ -231,13 +231,13 @@ function fakeServices(options: FakeOptions = {}) {
     record('fetch', { credential, generation })
     return { ahead: 0, behind: 0 }
   })
-  git.onPull(async (generation) => {
+  git.onPull(async (_fallbackMessage, generation) => {
     record('pull', { generation })
-    mergeCount += 1
-    if (options.gatePull === true && mergeCount === 1) {
-      await mergeGate.promise
+    pullCount += 1
+    if (options.gatePull === true && pullCount === 1) {
+      await pullGate.promise
     }
-    const outcome = pullOutcomes.shift() ?? options.pullOutcome ?? UP_TO_DATE
+    const outcome = pullOutcomes.shift() ?? options.pullOutcome ?? PULLED
     if (outcome.committed) {
       calls.push('committed')
     }
@@ -306,7 +306,7 @@ function fakeServices(options: FakeOptions = {}) {
     releaseStatus: () => statusGate.resolve(),
     releaseSetup: () => setupGate.resolve(),
     releaseIndexApply: () => indexApplyGate.resolve(),
-    releasePull: () => mergeGate.resolve(),
+    releasePull: () => pullGate.resolve(),
     releaseCommit: () => commitGate.resolve(),
   }
 }
@@ -474,7 +474,7 @@ describe('createBackupService', () => {
       failing.git.onPush(() => {
         throw new ReflectError('auth', 'bad token')
       })
-      failing.git.onPull(() => ({ ...UP_TO_DATE, committed: true, ahead: 1 }))
+      failing.git.onPull(() => ({ ...PULLED, committed: true, ahead: 1 }))
       void failing.backup.backUpNow()
       await vi.waitFor(() => {
         expect(failing.backup.getState()).toMatchObject({ status: { state: 'error' } })
@@ -486,10 +486,10 @@ describe('createBackupService', () => {
     })
   })
 
-  it('hidden after commit still pushes', async () => {
+  it('a mobile cycle hidden after its commit pushes', async () => {
     const { git, calls } = fakeServices({
       mobile: true,
-      pullOutcome: { ...UP_TO_DATE, committed: false },
+      pullOutcome: { ...PULLED, committed: false },
     })
     const backup = createBackup({ indexGeneration: 1 })
     try {
@@ -499,14 +499,7 @@ describe('createBackupService', () => {
       })
       git.onCommitAll(() => {
         activity.setHidden(true)
-        return {
-          committed: true,
-          sha: 'c',
-          ahead: 1,
-          skippedLargeFiles: [],
-          changedFiles: [],
-          reviewPaths: [],
-        }
+        return { committed: true, sha: 'c', ahead: 1, skippedLargeFiles: [] }
       })
       fileChanges.emit({
         changes: [{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }],
@@ -674,7 +667,7 @@ describe('createBackupService', () => {
   })
 
   it('runs the launch pull when fully connected — and skips the idle push', async () => {
-    const { calls } = fakeServices({ pullOutcome: { ...UP_TO_DATE, committed: false } })
+    const { calls } = fakeServices({ pullOutcome: { ...PULLED, committed: false } })
     const backup = createBackup({ indexGeneration: 1 })
     const states = trackStates(backup)
     await backup.start()
@@ -934,7 +927,7 @@ describe('createBackupService', () => {
   // 403 for a token without access to the repo and for rate limiting; the
   // backup asks GitHub whether the token is good before blaming it.
   const FORBIDDEN = { kind: 'auth', message: 'request failed with status code: 403' }
-  const MERGED: PullOutcome = { ...UP_TO_DATE, ahead: 1 }
+  const MERGED: PullOutcome = { ...PULLED, ahead: 1 }
 
   it('a 403 with a valid token reports a refused sync, not a bad credential', async () => {
     fakeServices({ pullOutcome: MERGED, pushError: FORBIDDEN })
@@ -1033,9 +1026,6 @@ describe('createBackupService', () => {
       releaseCommit()
       await flushed
     } finally {
-      // The expected failure above throws past the lines after it, so the
-      // gate and the backup are released here, or the suspended merge
-      // and the live listeners leak into the next test.
       releasePull()
       releaseCommit()
       backup.dispose()
@@ -1263,8 +1253,8 @@ describe('createBackupService', () => {
     const { calls, releaseIndexApply } = fakeServices({
       gateIndexApply: true,
       pullOutcomes: [
-        { ...UP_TO_DATE, ahead: 1, reviewPaths: [], changedFiles: [firstChange] },
-        { ...UP_TO_DATE, ahead: 1, reviewPaths: [], changedFiles: [secondChange] },
+        { ...PULLED, ahead: 1, changedFiles: [firstChange] },
+        { ...PULLED, ahead: 1, changedFiles: [secondChange] },
       ],
       pushOutcomes: [
         { pushed: false, nonFastForward: true, rejectionMessage: 'fetch first' },
@@ -1310,17 +1300,15 @@ describe('createBackupService', () => {
       gateIndexApply: true,
       pullOutcomes: [
         {
+          ...PULLED,
           committed: false,
           ahead: 1,
-          skippedLargeFiles: [],
-          reviewPaths: [],
           changedFiles: [{ path: 'notes/from-remote-1.md', kind: 'upsert', modifiedMs: 123 }],
         },
         {
+          ...PULLED,
           committed: false,
           ahead: 1,
-          skippedLargeFiles: [],
-          reviewPaths: [],
           changedFiles: [{ path: 'notes/from-remote-2.md', kind: 'upsert', modifiedMs: 456 }],
         },
       ],
@@ -1351,10 +1339,9 @@ describe('createBackupService', () => {
     const { calls, releaseIndexApply } = fakeServices({
       gateIndexApply: true,
       pullOutcome: {
+        ...PULLED,
         committed: false,
         ahead: 0,
-        skippedLargeFiles: [],
-        reviewPaths: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
     })
@@ -1383,10 +1370,9 @@ describe('createBackupService', () => {
     const { calls } = fakeServices({
       failIndexApply: true,
       pullOutcome: {
+        ...PULLED,
         committed: false,
         ahead: 0,
-        skippedLargeFiles: [],
-        reviewPaths: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
     })
@@ -1412,10 +1398,9 @@ describe('createBackupService', () => {
     const { calls } = fakeServices({
       mobile: true,
       pullOutcome: {
+        ...PULLED,
         committed: false,
         ahead: 1,
-        skippedLargeFiles: [],
-        reviewPaths: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
     })
@@ -1433,10 +1418,9 @@ describe('createBackupService', () => {
       mobile: true,
       gatePull: true,
       pullOutcome: {
+        ...PULLED,
         committed: false,
         ahead: 1,
-        skippedLargeFiles: [],
-        reviewPaths: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
     })

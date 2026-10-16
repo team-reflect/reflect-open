@@ -9,8 +9,8 @@ import type {
 } from './git-repository-service.ts'
 
 /**
- * The sync engine (Plan 12): debounced commit→push on edit, fetch→pull→push
- * with retry on divergence, every failure mapped to a product state. Git mechanics never
+ * The sync engine: debounced commit→push on edit, fetch→pull→push with retry
+ * on divergence, every failure mapped to a product state. Git mechanics never
  * reach the UI — only {@link SyncStatus}.
  *
  * Invariants:
@@ -452,9 +452,7 @@ class SyncEngineImpl implements SyncEngine {
       return
     }
     if (this.#running !== null) {
-      // Queue one follow-up that does everything asked of it: a syncNow
-      // landing mid-cycle must still get its fetch+merge, not be downgraded
-      // to a push-only pass.
+      // Queue one follow-up that does the union of every request.
       if (this.#followUp === null) {
         let settle = (): void => {}
         const done = new Promise<void>((resolve) => {
@@ -552,8 +550,7 @@ class SyncEngineImpl implements SyncEngine {
         return // the commit is the whole cycle: no remote, or the sign-in is known bad
       }
       const credential = await this.#step(this.#options.getCredential(), { gated: false })
-      // Nothing committed and nothing ahead: skip the push (a pull's own
-      // writes re-enter via the watcher).
+      // A pull's own writes re-enter via the watcher: nothing to push.
       if (!commit.committed && commit.ahead === 0) {
         return
       }
@@ -571,9 +568,8 @@ class SyncEngineImpl implements SyncEngine {
       }
       await this.#push(credential, remoteChanges)
     } catch (error) {
-      // Local edits must at least be committed when the cycle ends before
-      // its pull: after a failed fetch, or when the gate closes and the
-      // cycle owes the flush commit.
+      // A cycle that ends before its pull still commits local edits, unless
+      // the gate closed and no flush is owed.
       const owed = error instanceof CycleSuppressedError ? owesCommit : true
       if (!pullStarted && owed && !this.#signal.aborted) {
         const outcome = await this.#deps.git.commitAll('Update notes', this.#options.generation)
@@ -606,7 +602,6 @@ class SyncEngineImpl implements SyncEngine {
     )
   }
 
-  /** Report files the size guardrail withheld from backup. */
   #reportSkipped(files: SkippedFile[]): void {
     if (files.length > 0) {
       this.#options.onLargeFilesSkipped?.(files)

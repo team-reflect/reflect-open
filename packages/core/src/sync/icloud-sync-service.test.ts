@@ -215,7 +215,7 @@ describe('createICloudSyncService', () => {
     expect(scanCalls()[1]?.recordBaseline).toBe(false)
   })
 
-  it('an own-write batch is not ingested', async () => {
+  it('own-write and pull batches are not ingested', async () => {
     const sync = service()
     await sync.start()
     await settleScan()
@@ -224,16 +224,6 @@ describe('createICloudSyncService', () => {
       changes: [{ path: 'notes/own.md', kind: 'upsert', modifiedMs: 1 }],
       source: 'own-write',
     })
-    await settleScan(INGEST_SETTLE_MS)
-
-    expect(scanCalls()).toHaveLength(1)
-  })
-
-  it('a pull batch is not ingested', async () => {
-    const sync = service()
-    await sync.start()
-    await settleScan()
-
     fileChanges.emit({
       changes: [{ path: 'notes/pulled.md', kind: 'upsert', modifiedMs: 1 }],
       source: 'pull',
