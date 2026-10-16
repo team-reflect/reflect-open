@@ -1,4 +1,4 @@
-//! The resolution ladder (Plan 21): one conflicted note pair in, one
+//! The resolution ladder: one conflicted note pair in, one
 //! deterministic [`Resolution`] out. It always returns text and never writes
 //! conflict markers. First matching rule wins:
 //!
@@ -15,8 +15,7 @@
 //! 7. **Word-level merge** ([`total::merge`]) as [`Resolution::Reconciled`]:
 //!    both sides' words are kept.
 //!
-//! Every rule sees the sides ordered by `(modified_ms, content)` — shared
-//! version metadata — so concurrent resolution on two devices converges.
+//! Every rule sees the sides ordered by `(modified_ms, content)`, so concurrent resolution on two devices converges.
 
 use crate::error::AppResult;
 

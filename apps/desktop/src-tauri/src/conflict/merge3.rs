@@ -1,5 +1,4 @@
-//! Three-way text merge over the vendored libgit2 (`git2::merge_file`) —
-//! the same xdiff engine that produces the Git sync path's conflicts, run
+//! Three-way text merge over the vendored libgit2 (`git2::merge_file`), run
 //! buffer-level with no repository.
 
 use git2::{merge_file, MergeFileInput, MergeFileOptions};

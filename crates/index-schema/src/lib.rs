@@ -68,9 +68,6 @@ mod schema {
             M::up(include_str!("../migrations/0021_note_has_content.sql")),
             M::up(include_str!("../migrations/0022_drop_note_text.sql")),
             M::up(include_str!("../migrations/0023_task_ast_path.sql")),
-            // `notes.has_conflict` (0006) has no writer or reader since the app
-            // stopped reading conflict markers. It stays at its default 0; a
-            // migration to drop it is not worth a schema bump.
         ])
     });
 
