@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use git2::{Repository, RepositoryInitOptions, Signature};
+use git2::{Oid, Repository, RepositoryInitOptions, Signature};
 
 use crate::error::{AppError, AppResult};
 use crate::graph_gitignore;
@@ -91,27 +91,36 @@ fn backup_branch(repo: &Repository) -> String {
         .unwrap_or_else(|| DEFAULT_BRANCH.to_string())
 }
 
-/// Attach a detached HEAD to the backup branch. The branch moves to the HEAD
-/// commit only when it does not exist or its tip is HEAD or an ancestor of
-/// it; otherwise it stays where it is, so no commit leaves the branch. The
-/// working tree is not touched.
+/// Attach a detached HEAD to the backup branch, moving the branch forward to
+/// HEAD; HEAD stays detached while [`branch_tip_ahead_of_detached_head`] is set.
 pub(super) fn reattach_head(repo: &Repository) -> AppResult<()> {
     let head = repo.find_reference("HEAD")?;
-    if head.symbolic_target()?.is_some() {
+    if head.symbolic_target()?.is_some() || branch_tip_ahead_of_detached_head(repo)?.is_some() {
         return Ok(());
     }
     let commit = repo.head()?.peel_to_commit()?;
     let name = backup_branch(repo);
     tracing::warn!(%name, "reattaching a detached HEAD to the backup branch");
-    let tip = repo.refname_to_id(&format!("refs/heads/{name}")).ok();
-    let forward = tip.is_none_or(|tip| {
-        tip == commit.id() || repo.graph_descendant_of(commit.id(), tip).unwrap_or(false)
-    });
-    if forward {
-        repo.branch(&name, &commit, true)?;
-    }
+    repo.branch(&name, &commit, true)?;
     repo.set_head(&format!("refs/heads/{name}"))?;
     Ok(())
+}
+
+/// The backup branch tip when HEAD is detached and the tip is neither the
+/// HEAD commit nor an ancestor of it: moving the branch to HEAD would drop
+/// commits, so the tip must be merged into HEAD first.
+pub(super) fn branch_tip_ahead_of_detached_head(repo: &Repository) -> AppResult<Option<Oid>> {
+    let head = repo.find_reference("HEAD")?;
+    if head.symbolic_target()?.is_some() {
+        return Ok(None);
+    }
+    let head = repo.head()?.peel_to_commit()?.id();
+    let name = backup_branch(repo);
+    let Ok(tip) = repo.refname_to_id(&format!("refs/heads/{name}")) else {
+        return Ok(None);
+    };
+    let behind = tip != head && !repo.graph_descendant_of(head, tip)?;
+    Ok(behind.then_some(tip))
 }
 
 /// Rename the local branch to `name` so fetch/merge/push target the branch

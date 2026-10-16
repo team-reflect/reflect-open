@@ -65,7 +65,7 @@ queue, never straight to `git_commit_all`.
 A pull computes the merge in memory and never calls `repo.merge()`, so no
 stop can leave `MERGE_HEAD` behind. If the user starts a merge, a rebase, or a detached HEAD with the git
 CLI, the app clears the leftover state and sync continues. A detached HEAD
-is reattached to the backup branch, and the working tree does not change.
+behind the backup branch merges the branch in first, so the branch only moves forward.
 Sync never stops with a message that asks the user to run git.
 
 The stop points of a pull, and what the next cycle does:
