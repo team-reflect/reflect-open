@@ -1,6 +1,14 @@
 import { mobileSyncStatus, type MobileSyncStatus } from '@reflect/app'
+import { useBackupCountdown } from '@/components/backup-countdown.tsx'
 import { useSyncContext } from '@/providers/sync-provider.tsx'
-import { useNow } from '@/hooks/use-now.ts'
+
+/**
+ * {@link MobileSyncStatus} with its detail as text, the waiting countdown
+ * included.
+ */
+export interface MobileSyncStatusView extends Omit<MobileSyncStatus, 'detail'> {
+  detail: string | null
+}
 
 /**
  * The mobile sync status, ready to display. `null` when there is nothing
@@ -10,10 +18,27 @@ import { useNow } from '@/hooks/use-now.ts'
  * One hook for both surfaces (settings sheet, status pill) so they can never
  * disagree.
  */
-export function useMobileSyncStatus(): MobileSyncStatus | null {
+export function useMobileSyncStatus(): MobileSyncStatusView | null {
   const sync = useSyncContext()
-  const now = useNow(30_000)
-  const backup = sync?.backup ?? null
+  const status = mobileSyncStatus({ backup: sync?.backup ?? null })
+  const countdown = useBackupCountdown(
+    status?.detail?.kind === 'countdown' ? status.detail.until : null,
+  )
 
-  return mobileSyncStatus({ backup, now })
+  if (status === null) {
+    return null
+  }
+  const detail = status.detail
+  return {
+    label: status.label,
+    tone: status.tone,
+    detail:
+      detail === null
+        ? null
+        : detail.kind === 'message'
+          ? detail.text
+          : countdown === null
+            ? null
+            : `Backs up in ${countdown}`,
+  }
 }

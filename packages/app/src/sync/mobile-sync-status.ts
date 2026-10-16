@@ -1,5 +1,4 @@
 import type { BackupState } from '@reflect/core'
-import prettyMs from 'pretty-ms'
 
 /**
  * The plain-language sync status mobile shows (Plan 19, step 10). The phone
@@ -19,10 +18,19 @@ export interface MobileSyncStatus {
    */
   tone: 'ok' | 'active' | 'attention'
   /**
-   * A plain-language line with more detail (offline, error, and waiting states), if any.
+   * More detail, if any: a plain-language line (offline and error states), or
+   * the time the next backup is due (waiting state), which the surface counts
+   * down itself.
    */
-  detail: string | null
+  detail: MobileSyncDetail | null
 }
+
+/**
+ * The detail of a {@link MobileSyncStatus}.
+ */
+export type MobileSyncDetail =
+  | { kind: 'message'; text: string }
+  | { kind: 'countdown'; until: number }
 
 /**
  * Map the engine's product state to the mobile wording. `null` when the graph
@@ -30,7 +38,7 @@ export interface MobileSyncStatus {
  *
  * Precedence: an in-flight cycle shows as `Syncing`; errors and offline last.
  */
-function statusForBackup(backup: BackupState, now: number): MobileSyncStatus | null {
+function statusForBackup(backup: BackupState): MobileSyncStatus | null {
   if (backup.phase !== 'connected') {
     return null
   }
@@ -39,17 +47,21 @@ function statusForBackup(backup: BackupState, now: number): MobileSyncStatus | n
     return { label: 'Syncing', tone: 'active', detail: null }
   }
   if (status.state === 'error') {
-    return { label: 'Needs attention', tone: 'attention', detail: status.message }
+    return {
+      label: 'Needs attention',
+      tone: 'attention',
+      detail: { kind: 'message', text: status.message },
+    }
   }
   if (status.state === 'offline') {
-    return { label: 'Offline', tone: 'attention', detail: status.message }
+    return {
+      label: 'Offline',
+      tone: 'attention',
+      detail: { kind: 'message', text: status.message },
+    }
   }
   if (status.state === 'waiting') {
-    return {
-      label: 'Backed up',
-      tone: 'ok',
-      detail: `Backs up in ${prettyMs(Math.max(0, status.until - now), { compact: true, verbose: true })}`,
-    }
+    return { label: 'Backed up', tone: 'ok', detail: { kind: 'countdown', until: status.until } }
   }
   return { label: 'Backed up', tone: 'ok', detail: null }
 }
@@ -62,10 +74,6 @@ export interface SyncStatusInput {
    * The open graph's backup state; `null` when no backup lifecycle is mounted.
    */
   backup: BackupState | null
-  /**
-   * The current time, epoch ms.
-   */
-  now: number
 }
 
 /**
@@ -73,9 +81,9 @@ export interface SyncStatusInput {
  * truthful to say: no backup configured, or no sync lifecycle mounted (dev
  * harness, tests).
  */
-export function mobileSyncStatus({ backup, now }: SyncStatusInput): MobileSyncStatus | null {
+export function mobileSyncStatus({ backup }: SyncStatusInput): MobileSyncStatus | null {
   if (backup === null) {
     return null
   }
-  return statusForBackup(backup, now)
+  return statusForBackup(backup)
 }
