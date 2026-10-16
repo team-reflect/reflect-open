@@ -8,9 +8,8 @@ interface SyncForkNoticeProps {
 /**
  * The sync-fork review notice (Plan 17): two files claiming one frontmatter
  * `id` — the same note renamed differently on two devices, now existing as
- * separate files. Shown in the backup section in quiet amber
- * (informational, not a banner); repair is the user's call, never automatic. Renders nothing when
- * there are no forks.
+ * separate files. Repair is the user's call, never automatic. Renders nothing
+ * when there are no forks.
  */
 export function SyncForkNotice({ groups }: SyncForkNoticeProps): ReactElement | null {
   if (groups.length === 0) {

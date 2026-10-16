@@ -23,10 +23,7 @@ describe('checkRoundTrip', () => {
   })
 
   it('classifies git conflict markers as normalizing', () => {
-    // meowdown grades conflict markers `normalizing`: `>>>>>>> other device`
-    // re-serializes as `> > > > > > > other device`, which parses to the same
-    // seven nested blockquotes, and `<<<<<<< ` / `=======` survive as a setext
-    // heading. This case is here to notice if meowdown's verdict moves again.
+    // `>>>>>>> x` re-serializes as `> > > > > > > x`, the same nested blockquotes.
     const conflicted = [
       '# Shared',
       '',

@@ -1,6 +1,4 @@
-import { createTestWindowService } from '@reflect/app/testing'
 import { page, type Locator } from 'vitest/browser'
-import type { ReactElement } from 'react'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import {
   ReflectError,
@@ -19,15 +17,12 @@ import {
   type TestPlatformOptions,
   type TestBackupService,
 } from '@reflect/core/testing'
-import { useRouter } from '@/routing/router.tsx'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { SyncSection } from './sync-section.tsx'
 
 const ICLOUD_DOCUMENTS = '/Users/alex/Library/Mobile Documents/iCloud~app/Documents'
 const ICLOUD_GRAPH: TestOpenGraph = { root: `${ICLOUD_DOCUMENTS}/Notes`, name: 'Notes' }
-
-const openNoteWindow = vi.fn<(deepLink: string) => boolean | Promise<boolean>>()
 
 // What the app's fakes answer; each test sets them before `renderSection`.
 let icloud: {
@@ -68,23 +63,7 @@ async function renderSection(): Promise<void> {
   })
   vi.spyOn(app.indexQuery, 'getDuplicateNoteIds').mockImplementation(async () => duplicateIds)
   openRecent = vi.spyOn(app.graphSession, 'openRecent').mockImplementation(async () => reopens)
-  await renderInApp(
-    <>
-      <SyncSection />
-      <RouteProbe />
-    </>,
-    {
-      app,
-      appServices: { window: createTestWindowService({ openNoteWindow }) },
-      graph,
-      route: { kind: 'settings' },
-    },
-  )
-}
-
-function RouteProbe(): ReactElement {
-  const { route } = useRouter()
-  return <output data-testid="route">{route.kind === 'note' ? route.path : route.kind}</output>
+  await renderInApp(<SyncSection />, { app, graph, route: { kind: 'settings' } })
 }
 
 function legend(section: Locator, text: string): Locator {
@@ -106,7 +85,6 @@ beforeEach(() => {
   duplicateIds = []
   backupState = { phase: 'disconnected' }
   reopens = true
-  openNoteWindow.mockReset().mockResolvedValue(true)
   backup = createTestBackupService()
   disconnectGraph = vi.spyOn(backup, 'disconnectGraph')
 })
