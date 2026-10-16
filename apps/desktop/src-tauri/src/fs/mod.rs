@@ -520,6 +520,25 @@ fn write_note_revision(
     })
 }
 
+/// The note's text, or `None` when the file does not exist. The caller holds
+/// the graph lock.
+pub(crate) fn read_note_if_present(root: &Path, rel: &str) -> AppResult<Option<String>> {
+    match io::read_note_no_follow(root, &resolve(root, rel)?) {
+        Ok(value) => Ok(Some(value)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
+
+/// Write a note without a revision check. The caller holds the graph lock.
+pub(crate) fn write_unchecked(
+    root: &Path,
+    rel: &str,
+    contents: &str,
+) -> AppResult<NoteWriteOutcome> {
+    write_own(root, rel, &resolve(root, rel)?, contents)
+}
+
 fn write_own(root: &Path, rel: &str, target: &Path, contents: &str) -> AppResult<NoteWriteOutcome> {
     let modified_ms = atomic_write(root, target, contents)?;
     own_writes::record(root, rel, contents.as_bytes());
@@ -562,8 +581,8 @@ fn merge_into_moved_note(
             kind: MergedKind::KeptTheirs,
         })))
     };
-    // A marked side carries both originals in its hunks: the file stays whole.
-    if contains_conflict_markers(&current) || contains_conflict_markers(contents) {
+    // A marked file carries both originals in its hunks: it stays whole.
+    if contains_conflict_markers(&current) {
         return keep_theirs(current);
     }
     let resolution = ladder::resolve(ConflictInput {
@@ -1613,6 +1632,32 @@ mod note_revision_tests {
             crate::conflict::archive::read(root, "note.md", &versions[0].name).unwrap(),
             "x mine\n"
         );
+    }
+
+    #[test]
+    fn a_buffer_with_markers_wins_over_a_clean_disk_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path();
+        let target = root.join("note.md");
+        fs::write(&target, "x theirs\n").unwrap();
+        let documented = "```\n<<<<<<< mac\nx mac\n=======\nx phone\n>>>>>>> phone\n```\n";
+        let outcome =
+            write_note_revision(root, "note.md", documented, true, Some("x\n"), || Ok(())).unwrap();
+        assert_eq!(
+            outcome.merged,
+            Some(MergedWrite {
+                content: documented.to_string(),
+                kind: MergedKind::Reconciled,
+            })
+        );
+        assert_eq!(fs::read_to_string(&target).unwrap(), documented);
+        let mut archived: Vec<String> = crate::conflict::archive::list(root, "note.md")
+            .unwrap()
+            .iter()
+            .map(|version| crate::conflict::archive::read(root, "note.md", &version.name).unwrap())
+            .collect();
+        archived.sort();
+        assert_eq!(archived, [documented, "x theirs\n"]);
     }
 
     #[test]
