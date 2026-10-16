@@ -32,35 +32,12 @@ function render(message: string, cause: unknown): string {
 async function forward(
   write: (message: string) => Promise<void>,
   message: string,
-  cause: unknown,
+  cause?: unknown,
 ): Promise<void> {
   try {
     await write(render(message, cause))
   } catch {
     // A failed forward is dropped: logging it would forward again.
-  }
-}
-
-class TauriLoggerImpl implements LoggerService {
-  readonly #inner: LoggerService
-
-  constructor(inner: LoggerService) {
-    this.#inner = inner
-  }
-
-  error(...args: [message: string, cause?: unknown]): void {
-    this.#inner.error(...args)
-    void forward(error, args[0], args[1])
-  }
-
-  warn(...args: [message: string, cause?: unknown]): void {
-    this.#inner.warn(...args)
-    void forward(warn, args[0], args[1])
-  }
-
-  info(...args: [message: string, cause?: unknown]): void {
-    this.#inner.info(...args)
-    void forward(info, args[0], args[1])
   }
 }
 
@@ -70,5 +47,18 @@ class TauriLoggerImpl implements LoggerService {
  * error as `Name: message` without its stack, other values as JSON.
  */
 export function createTauriLogger(inner: LoggerService): LoggerService {
-  return new TauriLoggerImpl(inner)
+  return {
+    error: (...args) => {
+      inner.error(...args)
+      void forward(error, ...args)
+    },
+    warn: (...args) => {
+      inner.warn(...args)
+      void forward(warn, ...args)
+    },
+    info: (...args) => {
+      inner.info(...args)
+      void forward(info, ...args)
+    },
+  }
 }
