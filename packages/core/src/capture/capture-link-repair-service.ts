@@ -1,5 +1,5 @@
 import { captureFromPath, captureLocalDate, type CaptureIdentity } from './capture-identity.ts'
-import { captureNoteMeta, displayTitle, notePrivate, noteSource } from './capture-note.ts'
+import { captureNoteMeta, displayTitle, noteSource } from './capture-note.ts'
 import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
 import { isAppError } from '../errors.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
@@ -51,8 +51,9 @@ export function repairCaptureLinks(
 
 /**
  * The repair for a finished capture whose title replaced its placeholder, or
- * `null` when the capture does not qualify. Pending captures and private
- * notes are left to enrichment; skipped captures are left alone.
+ * `null` when the capture does not qualify. Pending captures are left to
+ * enrichment. Skipped captures are left alone, and so are private ones, so a
+ * private note's title never spreads into another note.
  */
 function findCaptureRepair(source: string, identity: CaptureIdentity): CaptureLinkRepair | null {
   const { frontmatter, title } = parseNote({ path: identity.notePath, source })
@@ -159,7 +160,7 @@ class CaptureLinkRepairServiceImpl implements CaptureLinkRepairService {
   ): Promise<void> {
     const { noteFile, openDocuments } = this.#deps
     const source = await noteSource(noteFile, path, generation)
-    if (source === '' || notePrivate(source)) {
+    if (source === '') {
       return
     }
     const next = repairCaptureLinks(source, repairs)

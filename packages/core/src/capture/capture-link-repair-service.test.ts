@@ -154,20 +154,23 @@ describe('CaptureLinkRepairService', () => {
     expect(read).not.toHaveBeenCalled()
   })
 
-  it('leaves a private daily and user-written link text alone', async () => {
+  it('repairs a private daily, which only changes local text', async () => {
     await addCapture()
-    const nextDay = new Date(2026, 5, 12, 9, 0, 0, 0)
-    const { identity, source } = await captureNote({ capturedAt: nextDay })
-    noteFile.set(identity.notePath, source)
-    const privateDaily = `---\nprivate: true\n---\n\n- ${PLACEHOLDER_LINK}\n`
-    const userDaily = `- [[${identity.base}|my own words]]\n`
-    noteFile.set(DAILY, privateDaily)
-    noteFile.set('daily/2026-06-12.md', userDaily)
+    noteFile.set(DAILY, `---\nprivate: true\n---\n\n- ${PLACEHOLDER_LINK}\n`)
 
     await repair.sweep(3)
 
-    expect(noteFile.files().get(DAILY)).toBe(privateDaily)
-    expect(noteFile.files().get('daily/2026-06-12.md')).toBe(userDaily)
+    expect(noteFile.files().get(DAILY)).toBe(`---\nprivate: true\n---\n\n- ${TITLED_LINK}\n`)
+  })
+
+  it('leaves user-written link text alone', async () => {
+    await addCapture()
+    const daily = `- [[${IDENTITY.base}|my own words]]\n`
+    noteFile.set(DAILY, daily)
+
+    await repair.sweep(3)
+
+    expect(noteFile.files().get(DAILY)).toBe(daily)
   })
 
   it('edits an open daily through its session', async () => {
