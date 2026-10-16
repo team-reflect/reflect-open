@@ -38,17 +38,6 @@ export {
 export { appendBlock, wikiLinkSafe, setTaskDueDate, clearTaskDueDate } from './edit.ts'
 export { retitleWikiLinks, type WikiLinkRetitleOptions } from './retitle.ts'
 export { displayNoteTitle, wikiLinkTargetForTitle } from './note-title.ts'
-export {
-  conflictMarkerBlockCount,
-  conflictMarkerLabels,
-  detectConflictMarkers,
-  parseConflictMarkers,
-  resolveConflictMarkers,
-  type ConflictMarkerLabels,
-  type ConflictResolution,
-  type ConflictSegment,
-  type ConflictSide,
-} from './conflict-markers.ts'
 export { canonicalEmail, canonicalEmails, extractEmailFields } from './email-fields.ts'
 export { foldFallbackTitleKey, foldKey, foldTag } from './keys.ts'
 export { gistBodyHash, gistFilename } from './gist.ts'

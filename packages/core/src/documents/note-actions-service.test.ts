@@ -153,7 +153,6 @@ function indexRow(path: string, overrides: Partial<NoteRow> = {}): NoteRow {
     title: path,
     dailyDate: null,
     isPrivate: false,
-    hasConflict: false,
     gistUrl: null,
     gistStale: false,
     ...overrides,

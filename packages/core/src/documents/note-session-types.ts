@@ -172,8 +172,7 @@ export interface NoteSession {
   /**
    * {@link NoteSession.updateFrontmatter}, but the patch **lands on disk now**
    * through a flush. Same gating and false-return as `updateFrontmatter`.
-   * Rejects when the write failed, or when the note already held conflict
-   * markers and the edit went to its earlier versions instead.
+   * Rejects when the write failed.
    */
   commitFrontmatter(patch: FrontmatterPatch): Promise<boolean>
   /**
@@ -195,8 +194,7 @@ export interface NoteSession {
    * protected, or disposed) so the caller refuses rather than clobber the
    * buffer; an error thrown by `transform` (a stale task locator) propagates
    * untouched, and a failed flush reverts the in-memory edit before
-   * rethrowing. Rejects as well when the note already held conflict markers
-   * and the edit went to its earlier versions instead.
+   * rethrowing.
    */
   commitSourceEdit(transform: (source: string) => string): Promise<boolean>
   /** Flush pending edits and detach: no further snapshots are emitted. */

@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
 import { isICloudRoot, minutesUntil, suggestRepoName } from '@reflect/core'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog.tsx'
-import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links.tsx'
 import { SettingsField } from '@/components/settings/field.tsx'
 import { GithubSignOutRow } from '@/components/settings/github-sign-out-row.tsx'
 import { SyncForkNotice } from '@/components/settings/sync-fork-notice.tsx'
@@ -11,10 +10,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useNow } from '@/hooks/use-now.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
-import {
-  createConflictedNotesQueryOptions,
-  createDuplicateNoteIdsQueryOptions,
-} from '@/lib/query-options.ts'
+import { createDuplicateNoteIdsQueryOptions } from '@/lib/query-options.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useSync, type BackupState } from '@/providers/sync-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
@@ -48,8 +44,6 @@ function githubRepoBrowserUrl(
 /**
  * Settings → Sync → GitHub sync: connect a GitHub repository, see the current
  * backup state in product language, back up on demand, and disconnect.
- * Conflicted notes ("needs review") surface here with a count; each conflicted
- * note also shows its own banner when opened.
  */
 export function BackupSettingsField(): ReactElement {
   const { backup, disconnectGraph, signOut, backUpNow } = useSync()
@@ -62,16 +56,9 @@ export function BackupSettingsField(): ReactElement {
   const openRepoAttempt = useRef(0)
   const action = useAsyncAction()
 
-  const conflicted = useQuery({
-    ...createConflictedNotesQueryOptions(indexQuery, graph?.root),
-    enabled: graph !== null,
-  })
-  const conflictedNotes = conflicted.data ?? []
-  const conflictCount = conflictedNotes.length
-
   // A sync fork (Plan 17): two files claiming one frontmatter id — the same
-  // note retitled differently on two devices. Surfaced for review beside the
-  // marker conflicts; repair is the user's call, never automatic.
+  // note retitled differently on two devices. Surfaced for review;
+  // repair is the user's call, never automatic.
   const duplicateIds = useQuery({
     ...createDuplicateNoteIdsQueryOptions(indexQuery, graph?.root),
     enabled: graph !== null,
@@ -155,17 +142,6 @@ export function BackupSettingsField(): ReactElement {
                 <span className="font-medium">{repoLabel}</span>
                 <span className="ml-2 text-xs text-text-muted">{statusLine(backup, now)}</span>
               </p>
-              {conflictCount > 0 ? (
-                <div className="text-xs text-amber-700 dark:text-amber-300">
-                  <p>
-                    {conflictCount === 1
-                      ? '1 note needs review'
-                      : `${conflictCount} notes need review`}{' '}
-                    — open {conflictCount === 1 ? 'it' : 'one'} to keep the version you want:
-                  </p>
-                  <ConflictedNoteLinks notes={conflictedNotes} />
-                </div>
-              ) : null}
               <SyncForkNotice groups={forkGroups} />
               <div className="flex flex-wrap gap-2">
                 <Button

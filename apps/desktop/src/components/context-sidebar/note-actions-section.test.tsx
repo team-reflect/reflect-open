@@ -93,7 +93,6 @@ function noteRow(path: string, isPrivate: boolean, title = 'A'): NoteRow {
     title,
     dailyDate: null,
     isPrivate,
-    hasConflict: false,
     gistUrl: null,
     gistStale: false,
   }

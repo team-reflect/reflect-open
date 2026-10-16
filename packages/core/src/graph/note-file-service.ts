@@ -41,7 +41,7 @@ const noteWriteOutcomeSchema = z.object({
   merged: z
     .object({
       content: z.string(),
-      kind: z.enum(['exact', 'reconciled', 'keptTheirs']),
+      kind: z.enum(['exact', 'reconciled']),
     })
     .optional(),
 })
@@ -50,13 +50,11 @@ const noteWriteOutcomeSchema = z.object({
  * How a checked write against a note that moved on disk was merged.
  * `content` is the full text now on disk. `exact` took every line from one
  * side (a diff3, union, or whitespace merge), `reconciled` merged word by word
- * and archived both inputs, and `keptTheirs` wrote nothing because the disk
- * file holds conflict markers (the given contents went to the note's earlier
- * versions).
+ * and archived both inputs.
  */
 export interface NoteWriteMerge {
   content: string
-  kind: 'exact' | 'reconciled' | 'keptTheirs'
+  kind: 'exact' | 'reconciled'
 }
 
 /**

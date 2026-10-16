@@ -29,12 +29,7 @@ export {
   type BacklinkContextPageOptions,
   type BacklinkSourceCursor,
 } from './backlink-service.ts'
-export {
-  type ConflictedNote,
-  type DuplicateIdGroup,
-  type NoteRow,
-  type PinnedNote,
-} from './index-query-service.ts'
+export { type DuplicateIdGroup, type NoteRow, type PinnedNote } from './index-query-service.ts'
 export { type DailyNoteRow, type DailyNotesRange } from '../daily/daily-note-service.ts'
 export { type TagSuggestion, type WikiLinkSuggestionResult } from './suggestion-service.ts'
 

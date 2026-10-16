@@ -1,7 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { isICloudRoot } from '@reflect/core'
-import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links.tsx'
 import { SettingsField } from '@/components/settings/field.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import {
@@ -15,10 +14,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog.tsx'
 import { queryKeys } from '@/lib/query-client.ts'
-import {
-  createConflictedNotesQueryOptions,
-  createDuplicateNoteIdsQueryOptions,
-} from '@/lib/query-options.ts'
+import { createDuplicateNoteIdsQueryOptions } from '@/lib/query-options.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useSync } from '@/providers/sync-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
@@ -41,18 +37,11 @@ function pendingNotesLine(count: number): string {
     : `${count} notes are still downloading from iCloud.`
 }
 
-function reviewLine(conflictCount: number, forkCount: number): string {
-  if (conflictCount === 0 && forkCount === 0) {
-    return 'No notes need review.'
+function forkLine(forkCount: number): string {
+  if (forkCount === 0) {
+    return 'No sync forks.'
   }
-  const parts: string[] = []
-  if (conflictCount > 0) {
-    parts.push(conflictCount === 1 ? '1 note needs review' : `${conflictCount} notes need review`)
-  }
-  if (forkCount > 0) {
-    parts.push(forkCount === 1 ? '1 sync fork' : `${forkCount} sync forks`)
-  }
-  return parts.join(', ')
+  return forkCount === 1 ? '1 sync fork' : `${forkCount} sync forks`
 }
 
 /**
@@ -91,10 +80,6 @@ export function IcloudSettingsField(): ReactElement | null {
       return typeof count === 'number' && count > 0 ? PENDING_NOTES_REFETCH_MS : false
     },
   })
-  const conflicted = useQuery({
-    ...createConflictedNotesQueryOptions(indexQuery, graph?.root),
-    enabled: hosted,
-  })
   const duplicateIds = useQuery({
     ...createDuplicateNoteIdsQueryOptions(indexQuery, graph?.root),
     enabled: hosted,
@@ -106,10 +91,7 @@ export function IcloudSettingsField(): ReactElement | null {
     return null
   }
   const backupConnected = backup.phase === 'connected'
-  const conflictCount = conflicted.data?.length
   const forkCount = duplicateIds.data?.length
-  const hasReviewIssues =
-    conflictCount !== undefined && forkCount !== undefined && (conflictCount > 0 || forkCount > 0)
 
   async function moveToICloud(): Promise<void> {
     setBusy(true)
@@ -135,7 +117,7 @@ export function IcloudSettingsField(): ReactElement | null {
         legend="iCloud Drive"
         description={
           hosted
-            ? 'This graph lives in iCloud Drive — edits sync to your other devices, and conflicts resolve automatically where possible.'
+            ? 'This graph lives in iCloud Drive — edits sync to your other devices, and the app merges concurrent edits where possible.'
             : status?.available === true
               ? 'Copy this graph into iCloud Drive to sync it with your other devices.'
               : 'iCloud Drive isn’t reachable from this app — sign in to iCloud, or use a build with iCloud enabled.'
@@ -145,11 +127,10 @@ export function IcloudSettingsField(): ReactElement | null {
           <div className="mt-3 flex flex-col gap-1 text-xs text-text-muted">
             {pendingNotes.isPending ? <p>Checking downloaded notes...</p> : null}
             {pendingNotes.data !== undefined ? <p>{pendingNotesLine(pendingNotes.data)}</p> : null}
-            {conflictCount !== undefined && forkCount !== undefined ? (
-              <div className={hasReviewIssues ? 'text-amber-700 dark:text-amber-300' : undefined}>
-                <p>{reviewLine(conflictCount, forkCount)}</p>
-                <ConflictedNoteLinks notes={conflicted.data ?? []} />
-              </div>
+            {forkCount !== undefined ? (
+              <p className={forkCount > 0 ? 'text-amber-700 dark:text-amber-300' : undefined}>
+                {forkLine(forkCount)}
+              </p>
             ) : null}
           </div>
         ) : status?.available === true ? (

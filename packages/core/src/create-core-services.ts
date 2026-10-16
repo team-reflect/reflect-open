@@ -92,10 +92,6 @@ import { createGithubRepoService, type GithubRepoService } from './sync/github-r
 import { createSyncEngineFactory, type SyncEngineFactory } from './sync/engine.ts'
 import type { BackupServiceDeps } from './sync/backup-service.ts'
 import {
-  createConflictResolutionService,
-  type ConflictResolutionService,
-} from './sync/conflict-resolution-service.ts'
-import {
   createConflictArchiveService,
   type ConflictArchiveService,
 } from './sync/conflict-archive-service.ts'
@@ -359,10 +355,6 @@ export interface CoreServices {
    * Moves a local graph into the iCloud Drive container.
    */
   readonly icloudMigration: ICloudMigrationService
-  /**
-   * Resolves the sync conflict markers of one note as raw-text surgery.
-   */
-  readonly conflictResolution: ConflictResolutionService
   readonly conflictArchive: ConflictArchiveService
   /**
    * The embedded media of the editor's cards: X posts and YouTube videos.
@@ -676,7 +668,6 @@ export const coreServiceFactories = {
   agentSkill: createAgentSkillService,
   gistPublish: createGistPublishService,
   icloudMigration: createICloudMigrationService,
-  conflictResolution: createConflictResolutionService,
   conflictArchive: createConflictArchiveService,
   embedMedia: createEmbedMediaService,
   linkPreview: createLinkPreviewService,
@@ -1202,12 +1193,6 @@ export function composeCoreServices(
     }),
     icloudNative,
     icloudMigration: create.icloudMigration({ icloudNative, graphSession }),
-    conflictResolution: create.conflictResolution({
-      noteFile,
-      indexLifecycle,
-      fileChanges,
-      graphSession,
-    }),
     conflictArchive: create.conflictArchive({ ipc, clock, fileChanges, graphSession }),
     embedMedia: create.embedMedia({
       xArchive,

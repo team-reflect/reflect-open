@@ -38,8 +38,6 @@ function toggleTransform(task: TaskLocator): (source: string) => string {
 
 const PATH = 'notes/a.md'
 
-const MARKERS_FILE = '# Hello\n\n<<<<<<< this device\na\n=======\nb\n>>>>>>> other device\n'
-
 let clock: TestClockService
 let logger: TestLoggerService
 
@@ -314,8 +312,6 @@ describe('createNoteSession', () => {
 })
 
 describe('external changes and saves', () => {
-  const MARKERS = '# Shared\n\n<<<<<<< this device\na\n=======\nb\n>>>>>>> other device\n'
-
   it('ignores an external event whose content matches the disk state (the echo of its own save)', async () => {
     const h = harness()
     h.session.load()
@@ -379,34 +375,6 @@ describe('external changes and saves', () => {
     await settled()
     expect(h.expectedContents.at(-1)).toBe('# Hello mine theirs\n')
     expect(h.disk()).toBe('# Hello mine theirs\n\nmore\n')
-  })
-
-  it('a keptTheirs result notifies and adopts the disk content', async () => {
-    const h = harness()
-    h.session.load()
-    await settled()
-
-    h.session.editorChanged('# Mine\n')
-    h.setDisk(MARKERS)
-    h.mergeNextWrite({ content: MARKERS, kind: 'keptTheirs' })
-    h.session.externalChanged()
-    await settled()
-
-    expect(h.progress.snapshot()).toEqual([
-      expect.objectContaining({
-        label: 'Saving note',
-        status: 'failed',
-        message:
-          'Your edits were kept under Earlier versions because the note on disk holds conflict markers',
-      }),
-    ])
-    expect(h.disk()).toBe(MARKERS)
-    expect(h.snapshots.at(-1)).toMatchObject({
-      dirty: false,
-      protected: true,
-      initialContent: MARKERS,
-    })
-    expect(h.applied).toEqual([]) // marker text never enters the live editor
   })
 
   it('a lossy merged result opens protected', async () => {
@@ -485,7 +453,7 @@ describe('external changes and saves', () => {
     expect(renames).toEqual([{ from: 'Old title', to: 'New title', previousAutoAlias: null }])
   })
 
-  it('a reconciled or keptTheirs write reports the note on the change stream', async () => {
+  it('a reconciled write reports the note on the change stream', async () => {
     const h = harness()
     h.session.load()
     await settled()
@@ -642,21 +610,6 @@ describe('external changes and saves', () => {
     await clock.advance(5000)
     await h.session.flush()
     expect(h.writes).toEqual([])
-  })
-
-  it('an external change that introduces conflict markers flips the note protected', async () => {
-    const h = harness()
-    h.session.load()
-    await settled()
-    expect(h.snapshots.at(-1)?.protected).toBe(false)
-
-    h.setDisk(MARKERS)
-    h.session.externalChanged()
-    await settled()
-
-    expect(h.snapshots.at(-1)?.protected).toBe(true)
-    expect(h.snapshots.at(-1)?.initialContent).toBe(MARKERS)
-    expect(h.applied).toEqual([]) // the conflicted bytes never enter a live editor
   })
 
   it('a note that documents a conflict inside a fence stays editable and saves', async () => {
@@ -862,20 +815,6 @@ describe('frontmatter ownership (Plan 07b)', () => {
 
     await expect(h.session.commitFrontmatter({ pinned: true })).resolves.toBe(false)
     expect(h.writes).toEqual([])
-  })
-
-  it('commitFrontmatter rejects when the note holds markers and the patch went to earlier versions', async () => {
-    const h = harness()
-    h.session.load()
-    await settled()
-    h.setDisk(MARKERS_FILE)
-    h.mergeNextWrite({ content: MARKERS_FILE, kind: 'keptTheirs' })
-
-    await expect(h.session.commitFrontmatter({ pinned: true })).rejects.toThrow(
-      'Your edits were kept under Earlier versions because the note on disk holds conflict markers',
-    )
-    expect(h.disk()).toBe(MARKERS_FILE)
-    expect(h.snapshots.at(-1)).toMatchObject({ dirty: false, protected: true })
   })
 
   it('commitFrontmatter reports a patch that landed through an exact merge', async () => {
@@ -1319,21 +1258,6 @@ describe('commitSourceEdit', () => {
     expect(await h.session.commitSourceEdit(transform)).toBe(false)
     expect(transform).not.toHaveBeenCalled()
     expect(h.writes).toEqual([])
-  })
-
-  it('rejects an edit that went to earlier versions because the note holds markers', async () => {
-    const source = '+ [ ] x\n'
-    const h = harness({ disk: source })
-    h.session.load()
-    await settled()
-    h.setDisk(MARKERS_FILE)
-    h.mergeNextWrite({ content: MARKERS_FILE, kind: 'keptTheirs' })
-
-    await expect(h.session.commitSourceEdit(toggleTransform(firstTask(source)))).rejects.toThrow(
-      'Your edits were kept under Earlier versions because the note on disk holds conflict markers',
-    )
-    expect(h.disk()).toBe(MARKERS_FILE)
-    expect(h.snapshots.at(-1)).toMatchObject({ dirty: false, protected: true })
   })
 
   it('reverts the edit and surfaces the error when the write fails', async () => {

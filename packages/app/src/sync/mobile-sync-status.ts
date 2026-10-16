@@ -8,7 +8,7 @@ import { minutesUntil, type BackupState } from '@reflect/core'
  */
 export interface MobileSyncStatus {
   /**
-   * What the user reads: `Backed up`, `Syncing`, `Needs review`, …
+   * What the user reads: `Backed up`, `Syncing`, `Offline`, …
    */
   label: string
   /**
@@ -24,36 +24,18 @@ export interface MobileSyncStatus {
 }
 
 /**
- * Map the engine's product state (plus the graph's conflicted-note count,
- * which outlives any one cycle) to the mobile wording. `null` when the graph
+ * Map the engine's product state to the mobile wording. `null` when the graph
  * has no backup configured — there is no status to speak of.
  *
- * Precedence: an in-flight cycle shows as `Syncing` (it may be resolving the
- * rest); conflicted notes then take the headline (`Needs review` persists
- * across idle cycles — conflicts never block other notes from syncing, so
- * the engine alone would happily report all-clear); errors and offline last.
+ * Precedence: an in-flight cycle shows as `Syncing`; errors and offline last.
  */
-function statusForBackup(
-  backup: BackupState,
-  conflictCount: number,
-  now: number,
-): MobileSyncStatus | null {
+function statusForBackup(backup: BackupState, now: number): MobileSyncStatus | null {
   if (backup.phase !== 'connected') {
     return null
   }
   const status = backup.status
   if (status.state === 'syncing') {
     return { label: 'Syncing', tone: 'active', detail: null }
-  }
-  if (conflictCount > 0) {
-    return {
-      label: 'Needs review',
-      tone: 'attention',
-      detail:
-        conflictCount === 1
-          ? 'A note was edited on two devices at once — open it to choose what to keep.'
-          : `${conflictCount} notes were edited on two devices at once — open them to choose what to keep.`,
-    }
   }
   if (status.state === 'error') {
     return { label: 'Needs attention', tone: 'attention', detail: status.message }
@@ -80,41 +62,19 @@ export interface SyncStatusInput {
    */
   backup: BackupState | null
   /**
-   * The graph's conflicted-note count; `undefined` until it is known.
-   */
-  conflictCount: number | undefined
-  /**
-   * Whether reading the conflicted-note count failed.
-   */
-  conflictCountUnavailable: boolean
-  /**
    * The current time, epoch ms.
    */
   now: number
 }
 
 /**
- * The mobile sync status, ready to display — engine state joined with the
- * graph's conflicted-note count (which outlives any one cycle). `null` when
- * there is nothing truthful to say: no backup configured, no sync lifecycle
- * mounted (dev harness, tests), or the conflict count still loading — a
- * status shown before the count is known could claim `Backed up` over
- * conflict markers already on disk, then flip.
+ * The mobile sync status, ready to display. `null` when there is nothing
+ * truthful to say: no backup configured, or no sync lifecycle mounted (dev
+ * harness, tests).
  */
-export function mobileSyncStatus({
-  backup,
-  conflictCount,
-  conflictCountUnavailable,
-  now,
-}: SyncStatusInput): MobileSyncStatus | null {
-  const connected = backup !== null && backup.phase === 'connected'
-  // Loading hides the status (no flip); a *failed* count must not — the
-  // engine-driven states (Syncing, Offline, Needs attention) don't depend on
-  // it, and blanking them over an unreadable index would hide real signal.
-  // The degradation is losing the Needs-review headline until the index
-  // recovers.
-  if (backup === null || (connected && conflictCount === undefined && !conflictCountUnavailable)) {
+export function mobileSyncStatus({ backup, now }: SyncStatusInput): MobileSyncStatus | null {
+  if (backup === null) {
     return null
   }
-  return statusForBackup(backup, conflictCount ?? 0, now)
+  return statusForBackup(backup, now)
 }

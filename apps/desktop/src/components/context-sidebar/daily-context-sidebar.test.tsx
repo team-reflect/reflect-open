@@ -72,7 +72,6 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
     title: '2026-06-09',
     dailyDate: '2026-06-09',
     isPrivate: false,
-    hasConflict: false,
     gistUrl: null,
     gistStale: false,
     ...overrides,

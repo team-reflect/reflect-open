@@ -86,7 +86,7 @@ export interface TestNoteFileService extends NoteFileService {
    * Make the next `write` of `path` return `merge`, ignoring its `expectedContents`.
    * Without one, a checked write against a file that holds neither
    * `expectedContents` nor the new contents rejects.
-   * `merge.content` becomes the file; a `keptTheirs` merge records no write.
+   * `merge.content` becomes the file.
    */
   mergeNextWrite(path: string, merge: NoteWriteMerge): void
   /**
@@ -151,11 +151,6 @@ class TestNoteFileServiceImpl implements TestNoteFileService {
     const merge = this.#merges.get(path)
     if (merge !== undefined) {
       this.#merges.delete(path)
-      if (merge.kind === 'keptTheirs') {
-        const modifiedMs = this.#files.get(path)?.modifiedMs ?? 0
-        this.#files.set(path, { contents: merge.content, modifiedMs })
-        return { modifiedMs, merged: { ...merge } }
-      }
       return { modifiedMs: this.#store(path, merge.content, pinned), merged: { ...merge } }
     }
     if (expectedContents !== undefined) {
