@@ -2,6 +2,6 @@ import { defineProject } from 'vitest/config'
 
 export default defineProject({
   test: {
-    name: { label: 'extension', color: 'red' },
+    name: { label: 'extension', color: 'magenta' },
   },
 })

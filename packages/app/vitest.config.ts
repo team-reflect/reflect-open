@@ -2,7 +2,7 @@ import { defineProject } from 'vitest/config'
 
 export default defineProject({
   test: {
-    name: { label: 'app', color: 'yellow' },
+    name: { label: 'app', color: 'magenta' },
     environment: 'node',
     fsModuleCache: true,
     isolate: false,
