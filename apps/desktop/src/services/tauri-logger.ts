@@ -29,9 +29,16 @@ function render(message: string, cause: unknown): string {
   return `${message} ${text.length > MAX_CAUSE_LENGTH ? `${text.slice(0, MAX_CAUSE_LENGTH)}…` : text}`
 }
 
-function forward(write: (message: string) => Promise<void>, message: string, cause: unknown) {
-  // A failed forward is dropped: logging it would forward again.
-  write(render(message, cause)).catch(() => {})
+async function forward(
+  write: (message: string) => Promise<void>,
+  message: string,
+  cause: unknown,
+): Promise<void> {
+  try {
+    await write(render(message, cause))
+  } catch {
+    // A failed forward is dropped: logging it would forward again.
+  }
 }
 
 class TauriLoggerImpl implements LoggerService {
@@ -43,17 +50,17 @@ class TauriLoggerImpl implements LoggerService {
 
   error(...args: [message: string, cause?: unknown]): void {
     this.#inner.error(...args)
-    forward(error, args[0], args[1])
+    void forward(error, args[0], args[1])
   }
 
   warn(...args: [message: string, cause?: unknown]): void {
     this.#inner.warn(...args)
-    forward(warn, args[0], args[1])
+    void forward(warn, args[0], args[1])
   }
 
   info(...args: [message: string, cause?: unknown]): void {
     this.#inner.info(...args)
-    forward(info, args[0], args[1])
+    void forward(info, args[0], args[1])
   }
 }
 
