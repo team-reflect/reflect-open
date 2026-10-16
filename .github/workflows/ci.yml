@@ -2,18 +2,15 @@ name: CI
 
 on:
   push:
-    # master is the only long-lived branch.
     branches: [master]
   pull_request:
   merge_group:
   workflow_dispatch:
 
-# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
-# Least-privilege default: CI only needs to read the repo.
 permissions:
   contents: read
 
@@ -45,6 +42,17 @@ jobs:
   test-chromium:
     if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
+    env:
+      REFLECT_TEST_BROWSER: chromium
+      # Chromium on Linux does not promptly free the iframe of a finished
+      # test file (https://issues.chromium.org/issues/530892387), so one
+      # browser process grows by 10 to 30 MB per file and dies near 2.5 GB,
+      # which Vitest reports as "Browser connection was closed". Vitest can
+      # collect garbage after each file, but only when the temp disk has
+      # less free space than this threshold; an unreachable threshold makes
+      # it collect every time (about 60 ms per file).
+      # Vitest reads this variable: https://github.com/vitest-dev/vitest/blob/v5.0.4/packages/vitest/src/node/pools/browser.ts#L773
+      VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB: "100000"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,26 +61,16 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - name: Install Playwright
-        run: pnpm --filter @reflect/desktop exec playwright install chromium
+        run: pnpm --filter @reflect/desktop test:install:chromium
 
       - name: Test
         run: pnpm run test
-        env:
-          REFLECT_TEST_BROWSER: chromium
-          # Chromium on Linux does not promptly free the iframe of a finished
-          # test file (https://issues.chromium.org/issues/530892387), so one
-          # browser process grows by 10 to 30 MB per file and dies near 2.5 GB,
-          # which Vitest reports as "Browser connection was closed". Vitest can
-          # collect garbage after each file, but only when the temp disk has
-          # less free space than this threshold; an unreachable threshold makes
-          # it collect every time (about 60 ms per file).
-          # Vitest reads this variable: https://github.com/vitest-dev/vitest/blob/33cadea62e8763c455c7fca38d9ab1dda87c5f75/packages/vitest/src/node/pools/browser.ts#L510-L516
-          VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB: '100000'
 
-  # Not part of `all-green`: a WebKit failure does not block merging.
   test-webkit:
     if: github.event_name != 'merge_group'
     runs-on: macos-latest
+    env:
+      REFLECT_TEST_BROWSER: webkit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -81,29 +79,21 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - name: Install Playwright
-        run: pnpm --filter @reflect/desktop exec playwright install webkit
+        run: pnpm --filter @reflect/desktop test:install:webkit
 
       # WebKit keeps the memory of every finished test file, so each shard
       # runs in its own Vitest process to restart the browser.
       - name: Test browser (shard 1/3)
-        run: pnpm exec vitest run --project '*browser*' --shard=1/3
-        env:
-          REFLECT_TEST_BROWSER: webkit
+        run: pnpm run test run --project '*browser*' --shard=1/3
 
       - name: Test browser (shard 2/3)
-        run: pnpm exec vitest run --project '*browser*' --shard=2/3
-        env:
-          REFLECT_TEST_BROWSER: webkit
+        run: pnpm run test run --project '*browser*' --shard=2/3
 
       - name: Test browser (shard 3/3)
-        run: pnpm exec vitest run --project '*browser*' --shard=3/3
-        env:
-          REFLECT_TEST_BROWSER: webkit
+        run: pnpm run test run --project '*browser*' --shard=3/3
 
       - name: Test others
-        run: pnpm exec vitest run --project '!*browser*'
-        env:
-          REFLECT_TEST_BROWSER: webkit
+        run: pnpm run test run --project '!*browser*'
 
   lint-rust:
     if: github.event_name != 'merge_group'
