@@ -65,13 +65,13 @@ const GENERATION = 3
 
 const AUTH = JSON.stringify({ kind: 'pat', token: 'ghp_abc' })
 const CLEAN_COMMIT: CommitOutcome = {
-  committed: false,
+  committed: true,
   sha: null,
   ahead: 0,
   skippedLargeFiles: [],
 }
 const UP_TO_DATE: PullOutcome = {
-  committed: false,
+  committed: true,
   ahead: 0,
   skippedLargeFiles: [],
   reviewPaths: [],
@@ -221,7 +221,11 @@ function fakeServices(options: FakeOptions = {}) {
     if (options.gateCommit === true && commitInvocations === 1) {
       await commitGate.promise
     }
-    return options.commitOutcome ?? CLEAN_COMMIT
+    const outcome = options.commitOutcome ?? CLEAN_COMMIT
+    if (outcome.committed) {
+      calls.push('committed')
+    }
+    return outcome
   })
   git.onFetch((credential, generation) => {
     record('fetch', { credential, generation })
@@ -233,7 +237,11 @@ function fakeServices(options: FakeOptions = {}) {
     if (options.gatePull === true && mergeCount === 1) {
       await mergeGate.promise
     }
-    return pullOutcomes.shift() ?? options.pullOutcome ?? UP_TO_DATE
+    const outcome = pullOutcomes.shift() ?? options.pullOutcome ?? UP_TO_DATE
+    if (outcome.committed) {
+      calls.push('committed')
+    }
+    return outcome
   })
   git.onPush((credential, generation) => {
     record('push', { credential, generation })
@@ -330,10 +338,10 @@ async function advance(ms: number): Promise<void> {
 }
 
 /**
- * Commits made: a full cycle commits inside `pull`, the other cycles in `commitAll`.
+ * Commits made: `commitAll` and `pull` outcomes that report `committed: true`.
  */
 function commitCount(calls: string[]): number {
-  return calls.filter((command) => command === 'commitAll' || command === 'pull').length
+  return calls.filter((command) => command === 'committed').length
 }
 
 function trackStates(backup: BackupService): BackupState[] {
@@ -479,7 +487,10 @@ describe('createBackupService', () => {
   })
 
   it('hidden after commit still pushes', async () => {
-    const { git, calls } = fakeServices({ mobile: true })
+    const { git, calls } = fakeServices({
+      mobile: true,
+      pullOutcome: { ...UP_TO_DATE, committed: false },
+    })
     const backup = createBackup({ indexGeneration: 1 })
     try {
       await backup.start()
@@ -663,7 +674,7 @@ describe('createBackupService', () => {
   })
 
   it('runs the launch pull when fully connected — and skips the idle push', async () => {
-    const { calls } = fakeServices()
+    const { calls } = fakeServices({ pullOutcome: { ...UP_TO_DATE, committed: false } })
     const backup = createBackup({ indexGeneration: 1 })
     const states = trackStates(backup)
     await backup.start()
@@ -774,7 +785,7 @@ describe('createBackupService', () => {
     backup.dispose()
   })
 
-  it('an icloud-sweep batch does not tick the commit debounce', async () => {
+  it('an icloud-sweep batch ticks the commit debounce', async () => {
     const { calls } = fakeServices({ auth: null, remoteUrl: null })
     const backup = createBackup({ indexGeneration: 1 })
     await backup.start()
@@ -787,7 +798,7 @@ describe('createBackupService', () => {
       source: 'icloud-sweep',
     })
     await advance(30_000)
-    expect(commitCount(calls)).toBe(1)
+    expect(commitCount(calls)).toBe(2)
     backup.dispose()
   })
 
@@ -1004,19 +1015,18 @@ describe('createBackupService', () => {
       await vi.waitFor(() => {
         expect(calls).toContain('pull')
       })
-      expect(commitCount(calls)).toBe(1) // the launch cycle's own commit
 
       let flushResolved = false
       const flushed = persistenceFlush.flushAll().then(() => {
         flushResolved = true
       })
       await Promise.resolve()
-      // The pull is still between fetch and merge: no second commit may run yet.
-      expect(commitCount(calls)).toBe(1)
+      // The pull is still between fetch and merge: no commit may run yet.
+      expect(calls).not.toContain('commitAll')
 
       releasePull()
       await vi.waitFor(() => {
-        expect(commitCount(calls)).toBe(2)
+        expect(calls).toContain('commitAll')
       })
       // The flush resolves with its commit, not before it.
       expect(flushResolved).toBe(false)

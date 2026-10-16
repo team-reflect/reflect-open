@@ -1069,6 +1069,27 @@ describe('missing-note seed (new ordinary notes)', () => {
     expect(h.writes).toEqual([{ path: 'notes/a.md', contents: '# Edited more\n' }])
   })
 
+  it('flush also waits for the retry of a failed save', async () => {
+    let attempts = 0
+    const h: Harness = harness({
+      beforeWrite: async () => {
+        attempts += 1
+        if (attempts === 1) {
+          h.setDisk('# Other\n') // the checked write lost a race with another writer
+          throw new Error('Note changed on disk; reload before retrying')
+        }
+      },
+    })
+    h.session.load()
+    await settled()
+
+    h.mergeNextWrite('# Other\n\nEdited\n')
+    h.session.editorChanged('# Edited\n')
+    await h.session.flush()
+    expect(h.writes).toEqual([{ path: 'notes/a.md', contents: '# Edited\n' }])
+    expect(h.disk()).toBe('# Other\n\nEdited\n')
+  })
+
   it('flush after a failed save retries the same buffer', async () => {
     const h = harness()
     h.session.load()

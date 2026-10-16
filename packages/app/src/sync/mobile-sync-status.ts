@@ -19,7 +19,7 @@ export interface MobileSyncStatus {
    */
   tone: 'ok' | 'active' | 'attention'
   /**
-   * A plain-language line with more detail (offline/error states), if any.
+   * A plain-language line with more detail (offline, error, and waiting states), if any.
    */
   detail: string | null
 }
@@ -48,7 +48,7 @@ function statusForBackup(backup: BackupState, now: number): MobileSyncStatus | n
     return {
       label: 'Backed up',
       tone: 'ok',
-      detail: `Backs up in ${prettyMs(status.until - now, { compact: true, verbose: true })}`,
+      detail: `Backs up in ${prettyMs(Math.max(0, status.until - now), { compact: true, verbose: true })}`,
     }
   }
   return { label: 'Backed up', tone: 'ok', detail: null }

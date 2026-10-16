@@ -22,7 +22,7 @@ function statusLine(backup: Extract<BackupState, { phase: 'connected' }>, now: n
     case 'idle':
       return 'Backed up'
     case 'waiting':
-      return `Backs up in ${prettyMs(backup.status.until - now, { compact: true, verbose: true })}`
+      return `Backs up in ${prettyMs(Math.max(0, backup.status.until - now), { compact: true, verbose: true })}`
     case 'syncing':
       return 'Backing up…'
     case 'offline':

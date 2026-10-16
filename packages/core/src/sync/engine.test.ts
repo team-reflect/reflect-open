@@ -262,20 +262,24 @@ describe('createSyncEngineFactory', () => {
     })
     const engine = createSyncEngine({ generation: 1, getCredential: async () => CRED })
 
-    const full = engine.syncNow()
-    await vi.waitFor(() => expect(methodsOf(git)).toContain('pull'))
-    const flushed = engine.commitNow()
-    await Promise.resolve()
-    // The pull is mid-merge: the flush commit waits instead of interleaving.
-    expect(methodsOf(git)).not.toContain('commitAll')
+    try {
+      const full = engine.syncNow()
+      await vi.waitFor(() => expect(methodsOf(git)).toContain('pull'))
+      const flushed = engine.commitNow()
+      await Promise.resolve()
+      // The pull is mid-merge: the flush commit waits instead of interleaving.
+      expect(methodsOf(git)).not.toContain('commitAll')
 
-    gate.release()
-    await full
-    await flushed
-    const commands = methodsOf(git)
-    expect(commands.filter((method) => method === 'commitAll')).toHaveLength(1)
-    expect(commands.lastIndexOf('commitAll')).toBeGreaterThan(commands.indexOf('push'))
-    engine.stop()
+      gate.release()
+      await full
+      await flushed
+      const commands = methodsOf(git)
+      expect(commands.filter((method) => method === 'commitAll')).toHaveLength(1)
+      expect(commands.lastIndexOf('commitAll')).toBeGreaterThan(commands.indexOf('push'))
+    } finally {
+      gate.release()
+      engine.stop()
+    }
   })
 
   it('a push-only cycle hidden after its commit still pushes', async () => {
@@ -1250,6 +1254,29 @@ describe('quiet mode', () => {
     await vi.waitFor(() => {
       expect(methodsOf(git)).toContain('fetch')
     })
+    engine.stop()
+  })
+
+  it('a quiet window after an auth failure skips the network until a resume', async () => {
+    let pushes = 0
+    const git = fakeGit()
+    git.onPush(() => {
+      pushes += 1
+      throw { kind: 'auth', message: 'token rejected' }
+    })
+    const engine = quietEngine()
+
+    engine.noteChanged()
+    await advance(100)
+    await advance(QUIET_MS)
+    await vi.waitFor(() => expect(pushes).toBe(1))
+
+    engine.noteChanged()
+    await advance(100)
+    await advance(QUIET_MS)
+    await runAllTimers()
+    expect(pushes).toBe(1)
+    expect(methodsOf(git).filter((method) => method === 'fetch')).toHaveLength(1)
     engine.stop()
   })
 

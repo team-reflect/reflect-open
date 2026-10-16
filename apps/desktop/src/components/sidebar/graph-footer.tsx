@@ -38,7 +38,10 @@ function graphSwitchBindingFor(index: number): string | null {
  * pulsing accent dot while backing up, amber when offline with queued
  * changes, red when backup needs attention. Detail lives in Settings.
  */
-function backupDot(backup: BackupState, now: number): { className: string; label: string } | null {
+function backupDot(
+  backup: BackupState,
+  now: number,
+): { className: string; label: string; detail?: string | undefined } | null {
   if (backup.phase !== 'connected' || backup.status.state === 'idle') {
     return null
   }
@@ -48,7 +51,8 @@ function backupDot(backup: BackupState, now: number): { className: string; label
     case 'waiting':
       return {
         className: 'bg-text-muted',
-        label: `Backs up in ${prettyMs(backup.status.until - now, { compact: true, verbose: true })}`,
+        label: 'Backup scheduled',
+        detail: `Backs up in ${prettyMs(Math.max(0, backup.status.until - now), { compact: true, verbose: true })}`,
       }
     case 'offline':
       return { className: 'bg-amber-500', label: 'Backup waiting for a connection' }
@@ -113,6 +117,9 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
                         <span role="status" className="sr-only">
                           {dot.label}
                         </span>
+                        {dot.detail !== undefined ? (
+                          <span className="sr-only">{dot.detail}</span>
+                        ) : null}
                       </>
                     ) : null}
                     {indexing ? (

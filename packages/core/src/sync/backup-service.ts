@@ -521,7 +521,7 @@ class BackupServiceImpl implements BackupService {
     // drained within seconds — they must not tick the commit debounce. The
     // drain's own note writes arrive as ordinary changes right after.
     this.#unlisten = fileChanges.subscribe(({ changes, source }) => {
-      if (source === 'pull' || source === 'icloud-sweep') {
+      if (source === 'pull') {
         return
       }
       if (changes.some((change) => !isCaptureSpoolPath(change.path))) {

@@ -353,6 +353,10 @@ class SyncEngineImpl implements SyncEngine {
   }
 
   async #quietPass(generation: number, backoffMs: number): Promise<void> {
+    // A rejected sign-in stays rejected until a resume trigger clears it.
+    if (this.#authFailed) {
+      return
+    }
     let ready: boolean
     try {
       ready = (await this.#options.networkReady?.()) ?? true
