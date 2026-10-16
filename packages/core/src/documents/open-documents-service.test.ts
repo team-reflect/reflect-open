@@ -209,6 +209,7 @@ describe('reloadAll with live sessions', () => {
   ): NoteSession {
     return createNoteSessionService({
       noteFile,
+      fileChanges,
       clock: createTestClockService(),
       logger: createTestLoggerService(),
       graphSession: createTestGraphSessionService({ graph: { generation: 1 } }),

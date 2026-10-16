@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { createTestClockService } from '../testing/clock.ts'
+import { createTestFileChangeService, type TestFileChangeService } from '../testing/file-change.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
-import { createTestNoteFileService, type TestNoteFileService } from '../testing/graph.ts'
 import { createTestIpcBridgeService, type TestIpcBridgeService } from '../testing/ipc.ts'
 import {
   createConflictArchiveService,
@@ -16,7 +17,7 @@ const VERSION = {
 }
 
 let ipc: TestIpcBridgeService
-let noteFile: TestNoteFileService
+let fileChanges: TestFileChangeService
 let service: ConflictArchiveService
 
 beforeEach(() => {
@@ -24,12 +25,14 @@ beforeEach(() => {
     commands: {
       conflict_archive_list: () => [VERSION],
       conflict_archive_read: () => 'older',
+      conflict_archive_restore: () => ({ modifiedMs: 1700000000500 }),
     },
   })
-  noteFile = createTestNoteFileService({ files: { [PATH]: 'current' } })
+  fileChanges = createTestFileChangeService({ echoOwnWrites: true })
   service = createConflictArchiveService({
     ipc,
-    noteFile,
+    clock: createTestClockService(),
+    fileChanges,
     graphSession: createTestGraphSessionService({ graph: { generation: 3, indexGeneration: 7 } }),
   })
 })
@@ -52,8 +55,19 @@ describe('ConflictArchiveService', () => {
     ])
   })
 
-  it('restores a version by writing it with the session generation', async () => {
+  it('restores a version through the native command and reports the write', async () => {
     await service.restore(PATH, VERSION.name)
-    expect(noteFile.writes()).toEqual([{ path: PATH, contents: 'older', generation: 3 }])
+    expect(ipc.calls()).toEqual([
+      {
+        command: 'conflict_archive_restore',
+        args: { path: PATH, name: VERSION.name, generation: 3 },
+      },
+    ])
+    expect(fileChanges.batches()).toEqual([
+      {
+        changes: [{ path: PATH, kind: 'upsert', modifiedMs: 1700000000500 }],
+        source: 'own-write',
+      },
+    ])
   })
 })
