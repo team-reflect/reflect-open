@@ -3,13 +3,13 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
 use crate::error::AppResult;
 
 type GraphMutex = Arc<Mutex<()>>;
 
-static LOCKS: Mutex<Option<HashMap<PathBuf, GraphMutex>>> = Mutex::new(None);
+static LOCKS: LazyLock<Mutex<HashMap<PathBuf, GraphMutex>>> = LazyLock::new(Mutex::default);
 
 /// The canonical root, or the canonical parent plus the final name when the
 /// root does not exist yet, or the path as given when nothing resolves.
@@ -25,39 +25,14 @@ fn lock_key(root: &Path) -> PathBuf {
     root.to_path_buf()
 }
 
-/// Drops the registry entry of `key` when no other holder or waiter remains.
-/// It runs on unwind too.
-struct Prune<'a> {
-    key: &'a Path,
-    mutex: GraphMutex,
-}
-
-impl Drop for Prune<'_> {
-    fn drop(&mut self) {
-        let mut locks = LOCKS.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(map) = locks.as_mut() {
-            // Two handles remain when this guard and the map entry are the only owners.
-            if Arc::strong_count(&self.mutex) == 2 {
-                map.remove(self.key);
-            }
-        }
-    }
-}
-
 /// Run `f` while holding the lock of the graph at `root`. The function is
 /// synchronous: never call it across an `.await`.
 pub fn with_graph_lock<T>(root: &Path, f: impl FnOnce() -> AppResult<T>) -> AppResult<T> {
-    let key = lock_key(root);
     let mutex = {
         let mut locks = LOCKS.lock().unwrap_or_else(PoisonError::into_inner);
-        locks
-            .get_or_insert_with(HashMap::new)
-            .entry(key.clone())
-            .or_default()
-            .clone()
+        locks.entry(lock_key(root)).or_default().clone()
     };
-    let prune = Prune { key: &key, mutex };
-    let _guard = prune.mutex.lock().unwrap_or_else(PoisonError::into_inner);
+    let _guard = mutex.lock().unwrap_or_else(PoisonError::into_inner);
     f()
 }
 
@@ -66,8 +41,7 @@ pub fn with_graph_lock<T>(root: &Path, f: impl FnOnce() -> AppResult<T>) -> AppR
 pub(crate) fn holders(root: &Path) -> usize {
     let locks = LOCKS.lock().unwrap_or_else(PoisonError::into_inner);
     locks
-        .as_ref()
-        .and_then(|map| map.get(&lock_key(root)))
+        .get(&lock_key(root))
         .map_or(0, |mutex| Arc::strong_count(mutex) - 1)
 }
 
@@ -130,26 +104,5 @@ mod tests {
         let alias = dir.path().join("alias");
         std::os::unix::fs::symlink(&real, &alias).unwrap();
         assert_eq!(lock_key(&real), lock_key(&alias));
-    }
-
-    #[test]
-    fn the_entry_is_removed_after_the_last_holder_leaves() {
-        let dir = tempfile::tempdir().unwrap();
-        let key = lock_key(dir.path());
-        with_graph_lock(dir.path(), || Ok(())).unwrap();
-        let locks = LOCKS.lock().unwrap_or_else(PoisonError::into_inner);
-        assert!(locks.as_ref().is_none_or(|map| !map.contains_key(&key)));
-    }
-
-    #[test]
-    fn a_panicking_closure_still_prunes_the_registry() {
-        let dir = tempfile::tempdir().unwrap();
-        let key = lock_key(dir.path());
-        let outcome = std::panic::catch_unwind(|| {
-            let _ = with_graph_lock(dir.path(), || -> AppResult<()> { panic!("boom") });
-        });
-        assert!(outcome.is_err());
-        let locks = LOCKS.lock().unwrap_or_else(PoisonError::into_inner);
-        assert!(locks.as_ref().is_none_or(|map| !map.contains_key(&key)));
     }
 }
