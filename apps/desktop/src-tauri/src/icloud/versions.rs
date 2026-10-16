@@ -1,10 +1,9 @@
 //! The `NSFileVersion` surface: what iCloud knows about a file's unresolved
-//! conflict versions, and the resolve/cleanup calls (Plan 21).
+//! conflict versions, and the resolve/cleanup calls.
 //!
 //! When two devices edit apart, iCloud keeps one content as the current file
 //! and stashes the others as conflict versions — full content in the local
-//! version store, plus its modification date. The
-//! sweep reads them through this module, resolves, then marks the versions
+//! version store, plus its modification date. The sweep reads them through this module, resolves, then marks the versions
 //! handled so iCloud stops reporting the conflict.
 
 use std::path::PathBuf;
@@ -20,11 +19,9 @@ pub struct VersionRef {
 }
 
 /// A file's unresolved conflict versions, plus whether the listing is
-/// **complete**. `NSFileVersion.URL` can hand back a URL with no path (file
-/// reference URLs are id-based); such a version can't be read.
-/// When that happens the sweep must not resolve the file at all this round —
-/// `mark_resolved` purges *every* version, including the one that was never
-/// read, which would lose its content.
+/// **complete**. `NSFileVersion.URL` can hand back a URL with no path; such a
+/// version can't be read. Then the sweep must not resolve the file, because
+/// `mark_resolved` purges every version.
 pub struct VersionScan {
     pub versions: Vec<VersionRef>,
     pub complete: bool,
@@ -87,8 +84,8 @@ mod platform {
 
     /// Mark every conflict version of `abs` resolved and drop the stale
     /// copies from the version store. Call strictly **after** the resolved
-    /// write has landed, and only when the version scan was
-    /// complete. Best-effort: a failure leaves the versions unresolved and
+    /// write has landed, and only when the version scan was complete.
+    /// Best-effort: a failure leaves the versions unresolved and
     /// the next sweep retries.
     pub fn mark_resolved(abs: &Path) {
         let url = file_url(abs);

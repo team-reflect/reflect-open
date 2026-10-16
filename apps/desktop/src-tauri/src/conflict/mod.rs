@@ -1,4 +1,4 @@
-//! Sync-conflict resolution (Plan 21).
+//! Sync-conflict resolution.
 //!
 //! iCloud reports a concurrent edit as the current file plus one or more
 //! unresolved `NSFileVersion`s. This module turns one such pair into a single

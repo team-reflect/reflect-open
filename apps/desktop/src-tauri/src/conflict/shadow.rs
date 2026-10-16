@@ -1,6 +1,6 @@
 //! The shadow base store: `.reflect/sync-base/<note-path>` holds each note's
 //! content at its **last synced state** — the common-ancestor approximation
-//! that turns two-way conflicts into three-way merges (Plan 21).
+//! that turns two-way conflicts into three-way merges.
 //!
 //! The advance rule is what makes it an ancestor and not just a copy: the
 //! base moves **only** when

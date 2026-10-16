@@ -1,21 +1,18 @@
-//! The conflict sweep (Plan 21 Phase 2): walk the graph, resolve every
-//! iCloud conflict, and report what changed so the caller reindexes directly
-//! (never waiting on the watcher — the same contract as the Git merge path).
+//! The conflict sweep: walk the graph, resolve every iCloud conflict, and
+//! report what changed so the caller reindexes directly.
 //!
 //! Per conflicted note: fold the conflict versions through
 //! [`crate::conflict::ladder`]. Then write the result atomically and, only
 //! then, mark the provider versions resolved. Per conflicted attachment
-//! (any other file type, checked on `Full` sweeps only): keep the working
-//! file and write each differing version beside it as a conflict copy, then
-//! mark the versions resolved. Creation-collision duplicates
-//! (`2026-07-04 2.md`, iCloud's rename when two devices create the same
-//! filename apart) are folded back into their canonical file by the same
-//! ladder.
+//! (any other file type, seen by `Full` sweeps only): keep the working file
+//! and write each differing version beside it as a conflict copy. Creation
+//! collision duplicates (`2026-07-04 2.md`) fold into their canonical file
+//! through the same ladder.
 //!
-//! Shadow-base bookkeeping rides the sweep: bases advance on resolutions and
-//! on the clean external ingests the frontend reports (`ingested_paths`),
-//! and `record_baseline` snapshots a graph on iCloud adoption — never on
-//! local saves (see [`crate::conflict::shadow`]).
+//! Shadow bases advance on resolutions and on the clean external ingests the
+//! frontend reports (`ingested_paths`). `record_baseline` snapshots a graph
+//! on iCloud adoption. Local saves never touch them (see
+//! [`crate::conflict::shadow`]).
 
 use std::collections::{BTreeSet, HashSet};
 use std::fs;
@@ -63,25 +60,19 @@ pub struct SweepOutcome {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SweepScope {
-    /// Check every note, and run the store-housekeeping passes. The backstop
-    /// — resume, adoption baseline, and any sweep without a live watch.
+    /// Check every note, and run the store-housekeeping passes. Used on
+    /// resume, adoption baseline, and any sweep without a live watch.
     Full,
     /// Restrict the per-note `NSFileVersion` checks to the paths the live
     /// metadata query flags as conflicted
-    /// ([`crate::icloud::watch::conflicted_paths`]) — each check is a
-    /// synchronous file-coordination round-trip to `fileproviderd`, and a
-    /// bulk-sync arrival sweep over a large graph paid one per note for a
-    /// listing the query already has. Mobile's signal and arrival sweeps.
-    /// Degrades to `Full` whenever the watch cannot answer completely (not
-    /// installed, or pre-gather).
+    /// ([`crate::icloud::watch::conflicted_paths`]). Each check is a
+    /// synchronous round-trip to `fileproviderd`. Mobile's signal and arrival
+    /// sweeps. Degrades to `Full` whenever the watch cannot answer completely.
     Candidates,
-    /// Restrict the version checks to this sweep's `ingested_paths` — the
-    /// notes external writes just landed on. Desktop's arrival sweeps: no
-    /// metadata watch runs there (see [`crate::icloud::watch`]), and a
-    /// conflict whose remote side became the working file is by definition
-    /// among the arrivals. A conflict version that never touches the working
-    /// file is the resume sweep's (`Full`) job, exactly as for graphs kept
-    /// outside the app's container.
+    /// Restrict the version checks to this sweep's `ingested_paths`. Desktop's
+    /// arrival sweeps: no metadata watch runs there (see
+    /// [`crate::icloud::watch`]). A conflict version that never touches the
+    /// working file is the `Full` sweep's job.
     Ingested,
 }
 
@@ -97,12 +88,11 @@ fn conflict_candidates(scope: SweepScope, ingested_paths: &[String]) -> Option<H
 
 /// Command: run a conflict sweep over the generation-pinned graph.
 ///
-/// `skip_paths` — notes with dirty open sessions (a dirty open session saves
-/// and merges on its own). `ingested_paths` — external changes
-/// the frontend just applied cleanly; their content becomes the new shadow
-/// base. `record_baseline` — snapshot every conflict-free note as its own
-/// base (iCloud adoption). `scope` — how much of the graph the version
-/// checks cover ([`SweepScope`]).
+/// `skip_paths`: notes with dirty open sessions, which merge on their own.
+/// `ingested_paths`: external changes the frontend just applied cleanly; their
+/// content becomes the new shadow base. `record_baseline`: snapshot every
+/// conflict-free note as its own base (iCloud adoption). `scope`: how much of
+/// the graph the version checks cover ([`SweepScope`]).
 #[tauri::command]
 pub async fn icloud_conflicts_scan(
     generation: u64,
@@ -137,8 +127,7 @@ pub async fn icloud_conflicts_scan(
             "icloud_conflicts_scan"
         );
     }
-    // The sweep folds conflict siblings into canonical notes; a cached
-    // listing from before those renames would pin the conflict names.
+    // Folds rename files; a cached listing would pin the old names.
     crate::fs::invalidate_file_catalog(&state, &root);
     outcome
 }
@@ -154,13 +143,9 @@ fn locked(root: &Path, step: impl FnOnce()) {
 /// The sweep body (blocking). Pure fs + ladder logic apart from the
 /// `NSFileVersion` calls, which no-op off Apple platforms.
 ///
-/// `conflict_candidates` — when `Some`, the per-note version checks cover
-/// only these paths (the metadata query's conflicted set); `None` checks
-/// everything. **Only** the version checks scope down: ingest base advances,
-/// collision folding, and the baseline all still see the full listing — and
-/// the store-housekeeping pass (orphan pruning) runs only
-/// on unscoped sweeps, because pruning against anything less than the full
-/// live set would drop bases for merely-unlisted notes.
+/// `conflict_candidates`: when `Some`, the per-note version checks cover only
+/// these paths; `None` checks everything. Only the version checks scope down.
+/// Orphan pruning runs only on unscoped sweeps.
 fn run_sweep(
     root: &Path,
     skip_paths: &[String],
@@ -173,11 +158,8 @@ fn run_sweep(
     let mut outcome = SweepOutcome::default();
 
     for rel in ingested_paths {
-        // A dirty open session may still overwrite this file with content
-        // derived from an *older* state — advancing the base to the external
-        // revision now would make a later diff3 read that overwrite as "we
-        // deleted the other device's lines" and drop them. Stale is the safe
-        // direction; the base advances once the session settles.
+        // A dirty session may overwrite this file from older state. Advancing
+        // the base now would make a later diff3 drop the external lines.
         if skip.contains(rel.as_str()) {
             continue;
         }
@@ -195,10 +177,8 @@ fn run_sweep(
                 continue; // same dirty-session rule as ingests above
             }
             if !file.placeholder {
-                // Fill-only: adoption snapshots notes that have no base yet.
-                // Overwriting an existing base here would advance it past
-                // unsynced local edits — exactly what the advance rule forbids
-                // — so a baseline pass is safe to repeat on every start.
+                // Fill-only: overwriting a base would advance it past
+                // unsynced local edits.
                 let clean = no_unresolved_versions(root, &file.path);
                 locked(root, || {
                     advance_base_if_clean(root, &file.path, &shadow, true, clean)
@@ -224,18 +204,14 @@ fn run_sweep(
             continue;
         }
         if !scan.complete {
-            // A version with no readable store path can't be read, and
-            // mark_resolved would purge it — skip the whole file instead.
+            // mark_resolved would purge a version with no readable store path.
             continue;
         }
         if skip.contains(file.path.as_str()) {
             continue;
         }
-        // Order the working copy by the version store's date for it — the
-        // metadata the *other* device sees for this same content as a
-        // conflict version — never the filesystem mtime, which iCloud does
-        // not propagate bit-exactly. Mixed keys would let two devices order
-        // the same content pair differently and emit different merged bytes.
+        // Order by the version store's date, never the filesystem mtime,
+        // which iCloud does not propagate bit-exactly.
         let current_ms = current_version_modified_ms(&abs).unwrap_or(file.modified_ms);
         if !reflect_graph_paths::is_note(&file.path) {
             locked(root, || {
@@ -260,15 +236,8 @@ fn run_sweep(
         });
     }
 
-    // External deletions never route through the store's `forget` — drop
-    // bases for notes that no longer exist so the store tracks the graph.
-    // The keep-set starts from the listing captured at sweep start, plus
-    // every path this sweep itself wrote: collision folding can create a
-    // canonical file (and record its base) *after* that listing, and pruning
-    // must not eat a base recorded moments earlier in the same pass. Paths
-    // this sweep itself *removed* (folded duplicates) leave the set again —
-    // they made the pre-sweep listing but their files are gone, and keeping
-    // them would strand their bases under `.reflect/sync-base/` for a sweep.
+    // Drop bases for notes deleted externally. The keep-set is the listing
+    // from sweep start, plus paths this sweep wrote, minus paths it removed.
     let mut live: BTreeSet<&str> = files.iter().map(|file| file.path.as_str()).collect();
     for change in &outcome.changed {
         if change.kind == "upsert" {
@@ -285,11 +254,7 @@ fn run_sweep(
             live.remove(change.path.as_str());
         }
     }
-    // Housekeeping only on unscoped sweeps: `live` is correct either way
-    // (built from the full listing above), but pruning is pure maintenance
-    // — external deletions' orphaned bases can wait for the next resume's
-    // full sweep instead of running on every
-    // 30-second arrival sweep of a bulk sync.
+    // Pruning is maintenance: it waits for a full sweep.
     if conflict_candidates.is_none() {
         shadow.prune_orphans(&live);
     }
@@ -305,9 +270,8 @@ fn no_unresolved_versions(root: &Path, rel: &str) -> bool {
 
 /// A clean external ingest (or adoption snapshot): the note's disk content is
 /// now what both sides derive from, so record it as the base. Skips notes
-/// that carry unresolved versions (`no_versions` is false; mid-conflict
-/// content is nobody's ancestor), and non-UTF-8 or missing files. `fill_only` restricts the write to notes without a base
-/// (the adoption case).
+/// with unresolved versions (`no_versions` is false), and non-UTF-8 or
+/// missing files. `fill_only` restricts the write to notes without a base.
 fn advance_base_if_clean(
     root: &Path,
     rel: &str,
@@ -315,8 +279,7 @@ fn advance_base_if_clean(
     fill_only: bool,
     no_versions: bool,
 ) {
-    // `ingested_paths` arrive over IPC: refuse traversal shapes before any
-    // filesystem access, like every other IPC-supplied graph path.
+    // `ingested_paths` arrive over IPC: refuse traversal shapes.
     if !no_versions || crate::fs::ensure_relative(rel).is_err() {
         return;
     }
@@ -363,11 +326,9 @@ fn resolve_file(
     fold_sides(rel, base.as_deref(), &original, sides, shadow, true)
 }
 
-/// Fold the sides through the ladder in `(modified_ms, content)` order. The
-/// ladder's ordering rule applies to the *fold sequence* too: a timestamp tie
-/// must not fall back to platform listing order, or two devices folding the
-/// same sides could interleave them differently and write different bytes
-/// forever.
+/// Fold the sides through the ladder in `(modified_ms, content)` order, so a
+/// timestamp tie never depends on platform listing order. `detect_loops` must
+/// be false for collision folds.
 fn fold_sides(
     rel: &str,
     base: Option<&str>,
@@ -399,9 +360,7 @@ fn fold_sides(
             Resolution::AlreadyResolved => {}
             Resolution::Merged { content } => {
                 if content != current.content {
-                    // A genuinely synthesized merge: remember the pair so a
-                    // cross-device re-conflict of two merge results is
-                    // recognized and broken deterministically.
+                    // Remember the pair so the loop breaker can recognize it.
                     merge_pairs.push((current_hash, side_hash));
                 }
                 current.content = content;
@@ -484,7 +443,6 @@ fn apply_file_resolution(
     for (first, second) in &resolution.merge_pairs {
         let _ = shadow.record_merge_pair(rel, first, second);
     }
-    // Both devices converge on the resolved content: it is the new base.
     if let Err(err) = shadow.record(rel, &resolution.final_content) {
         tracing::warn!(path = rel, ?err, "failed to advance shadow base");
     }
@@ -554,10 +512,8 @@ fn write_copy(source: &Path, target: &Path) -> AppResult<()> {
 }
 
 /// Fold creation-collision duplicates back into their canonical note. iCloud
-/// renames the losing side of a same-name creation to `name 2.md` — with
-/// deterministic daily filenames that is the *most common* conflict shape.
-/// Reflect's own collision suffixes are hyphenated (Plan 17), so the
-/// space-digit shape is unambiguously iCloud's.
+/// renames the losing side of a same-name creation to `name 2.md`. Reflect's
+/// own collision suffixes are hyphenated.
 fn fold_collision_duplicates(
     root: &Path,
     files: &[crate::fs::FileMeta],
@@ -588,11 +544,9 @@ fn fold_collision_duplicates(
 }
 
 /// Fold one duplicate into its canonical note: adopt a genuinely free
-/// canonical name outright, otherwise merge the pair through the ladder
-/// and remove the duplicate. Every early return leaves the duplicate in place for the next
-/// sweep to retry. Both files must carry no unresolved provider versions:
-/// folding first would advance the canonical's shadow base
-/// with content the other device has not seen.
+/// canonical name outright, otherwise merge the pair through the ladder and
+/// remove the duplicate. Every early return leaves the duplicate for the next
+/// sweep. Both files must carry no unresolved provider versions.
 fn fold_duplicate(
     root: &Path,
     file: &crate::fs::FileMeta,
@@ -606,23 +560,13 @@ fn fold_duplicate(
         return;
     };
     if !crate::fs::file_occupied(&canonical_abs) {
-        // The canonical name is genuinely free (the winner was
-        // deleted/renamed — and not merely evicted, which `file_occupied`
-        // sees through): the duplicate simply takes its place.
+        // `file_occupied` sees through eviction stubs.
         if fs::rename(&dup_abs, &canonical_abs).is_err() {
             return;
         }
-        // Any lingering base under the canonical path belongs to the *old*
-        // note that used to live there — the adopted duplicate is an
-        // independent creation, and merging against a dead lineage's
-        // ancestor would poison a later diff3. Drop it deliberately.
+        // A lingering base belongs to a dead lineage: drop it, then record
+        // the adopted content. Peers record it on ingest; own writes do not.
         shadow.forget(canonical_rel);
-        // Then record the adopted content as the canonical's base, exactly
-        // as the occupied-path fold records its merged result. Peers record
-        // one when the rename syncs over (external ingest), but this
-        // device's own sweep writes echo back as own-writes — without the
-        // record here it alone would stay baseless, and a later concurrent
-        // edit would diff3 on one device and not on the other.
         if let Err(err) = shadow.record(canonical_rel, &dup_content) {
             tracing::warn!(path = %canonical_rel, ?err, "failed to record adopted collision base");
         }
@@ -641,10 +585,7 @@ fn fold_duplicate(
         .or_else(|| modified_ms_of(&canonical_abs))
         .unwrap_or(0);
     let dup_ms = current_version_modified_ms(&dup_abs).unwrap_or(file.modified_ms);
-    // Version-store dates, not filesystem mtimes, for the same reason as the
-    // edit-conflict pass: both devices fold this same pair, and the store's
-    // dates are the metadata iCloud actually propagates. Independent
-    // creations share no ancestor.
+    // Version-store dates, as in the edit-conflict pass. No shared ancestor.
     let sides = vec![
         ConflictSide {
             content: canonical_content.clone(),
@@ -672,11 +613,9 @@ fn fold_duplicate(
     if !apply_file_resolution(root, canonical_rel, resolution, shadow, false, outcome) {
         return; // duplicate stays; next sweep retries
     }
-    // The canonical rewrite above is real either way, but the duplicate's
-    // disappearance must only be reported when it actually happened — a
-    // phantom `remove` would drop the index row while the file remains.
-    // The merged canonical already contains the duplicate's content, so
-    // the retry next sweep is an AlreadyResolved fold + remove.
+    // Report the remove only when it happened: a phantom `remove` would drop
+    // the index row while the file remains. A retry is an `AlreadyResolved`
+    // fold plus remove.
     if fs::remove_file(&dup_abs).is_ok() {
         outcome.changed.push(remove_change(&file.path));
     } else {
@@ -685,13 +624,9 @@ fn fold_duplicate(
 }
 
 /// `daily/2026-07-04 2.md` → `Some("daily/2026-07-04.md")`; `None` for
-/// anything else. **Daily notes only, with a strict date stem**: their
-/// filenames are machine-chosen dates, so a ` <digit>` suffix there can only
-/// be iCloud's collision rename (two devices creating the same day offline —
-/// the most common conflict shape). Everywhere else the same pattern is
-/// indistinguishable from a user-authored title (`notes/chapter 2.md`), and
-/// folding one of those would merge two intentional notes — titled notes'
-/// same-name collisions simply coexist until the user merges them.
+/// anything else. Daily notes only, with a strict date stem: elsewhere the
+/// pattern is indistinguishable from a user-authored title
+/// (`notes/chapter 2.md`).
 fn collision_canonical(rel: &str) -> Option<String> {
     let stem = rel.strip_prefix("daily/")?.strip_suffix(".md")?;
     let (date, suffix) = stem.rsplit_once(' ')?;

@@ -1,4 +1,4 @@
-//! iCloud Drive integration (Plan 21): storage roots, conflict detection and
+//! iCloud Drive integration: storage roots, conflict detection and
 //! resolution, and live change watching.
 //!
 //! - [`storage`] — container discovery, graph-dir resolution, and download

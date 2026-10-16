@@ -142,8 +142,6 @@ pub(super) struct IndexedTask {
 pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()> {
     remove_note(conn, &note.path)?;
 
-    // `has_conflict` is not written: the app no longer reads conflict markers,
-    // so the column keeps its default 0.
     conn.prepare_cached(
         "INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, gist_url, gist_stale, file_hash, mtime, updated_at, preview, has_content)
          VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14, ?15, ?16)",
