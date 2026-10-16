@@ -1,6 +1,14 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { exec } from 'tinyexec'
 import { z } from 'zod'
 
@@ -36,6 +44,20 @@ export async function runWithTempDir<Result>(
     return await action(dir)
   } finally {
     rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+/**
+ * Copies each existing file and its updater signature (`.sig`) into
+ * `artifactDir` under the name it is published with: GitHub stores a space in
+ * an asset name as a dot.
+ */
+export function exportArtifacts(paths: readonly string[], artifactDir: string): void {
+  mkdirSync(artifactDir, { recursive: true })
+  for (const path of paths.flatMap((path) => [path, `${path}.sig`])) {
+    if (existsSync(path)) {
+      copyFileSync(path, join(artifactDir, basename(path).replaceAll(' ', '.')))
+    }
   }
 }
 

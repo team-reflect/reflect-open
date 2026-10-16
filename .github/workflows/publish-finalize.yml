@@ -72,13 +72,17 @@ jobs:
         run: pnpm release:manifest --tag="$TAG"
 
       # Keep the changelog release-please wrote and add the download badges.
+      # A rerun replaces the download section, so it lists the assets that a
+      # retried build uploaded since the last run.
       - name: Write the release notes
         env:
           ASSET: ${{ steps.release.outputs.asset }}
         run: |
           notes="$RUNNER_TEMP/release-notes.md"
-          gh release view "$TAG" --json body --jq .body > "$notes"
-          if ! grep -qxF -e '## Download' -e '## Which Mac download should I choose?' "$notes"; then
+          body="$(gh release view "$TAG" --json body --jq .body)"
+          body="$(printf '%s' "${body%%$'\n## Download\n'*}")"
+          printf '%s\n' "$body" > "$notes"
+          if ! grep -qxF '## Which Mac download should I choose?' "$notes"; then
             mapfile -t assets < <(gh release view "$TAG" --json assets --jq '.assets[].name')
             echo >> "$notes"
             node apps/desktop/scripts/release-downloads.ts \

@@ -4,10 +4,11 @@
 //
 //   pnpm release:windows [--target=<triple>] [--artifact-dir=<path>]
 
-import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { readdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import {
+  exportArtifacts,
   getFlavorConfigArgs,
   getHostTriple,
   log,
@@ -40,19 +41,6 @@ async function buildInstaller(target: string, tempDir: string): Promise<string> 
   return join(bundleDir, installer)
 }
 
-/**
- * Copies the installer and its updater signature under the names they are
- * published with: GitHub stores a space in an asset name as a dot.
- */
-function exportArtifacts(installer: string, artifactDir: string): void {
-  mkdirSync(artifactDir, { recursive: true })
-  for (const path of [installer, `${installer}.sig`]) {
-    if (existsSync(path)) {
-      copyFileSync(path, join(artifactDir, basename(path).replaceAll(' ', '.')))
-    }
-  }
-}
-
 async function main(): Promise<void> {
   const { values } = parseArgs({
     options: {
@@ -66,7 +54,7 @@ async function main(): Promise<void> {
 
   const artifactDir = values['artifact-dir']
   if (artifactDir) {
-    exportArtifacts(installer, artifactDir)
+    exportArtifacts([installer], artifactDir)
   }
 }
 

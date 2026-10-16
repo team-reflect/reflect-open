@@ -4,10 +4,11 @@
 //
 //   pnpm release:linux [--target=<triple>] [--artifact-dir=<path>]
 
-import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import {
+  exportArtifacts,
   getFlavorConfigArgs,
   getHostTriple,
   log,
@@ -33,10 +34,17 @@ async function buildPackages(target: string, tempDir: string): Promise<string[]>
     // Without a password variable, Tauri asks for the password on stdin.
     env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD = process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? ''
   }
+  const bundles = BUNDLES.map(({ name, extension }) => ({
+    dir: join(TARGET_DIR, target, 'release', 'bundle', name),
+    extension,
+  }))
+  // Tauri keeps the packages of earlier versions in the bundle directories.
+  for (const { dir } of bundles) {
+    rmSync(dir, { recursive: true, force: true })
+  }
   await runTauri(args, env)
 
-  return BUNDLES.map(({ name, extension }) => {
-    const bundleDir = join(TARGET_DIR, target, 'release', 'bundle', name)
+  return bundles.map(({ dir: bundleDir, extension }) => {
     const packages = readdirSync(bundleDir).filter((file) => file.endsWith(extension))
     const [found] = packages
     if (!found || packages.length > 1) {
@@ -44,19 +52,6 @@ async function buildPackages(target: string, tempDir: string): Promise<string[]>
     }
     return join(bundleDir, found)
   })
-}
-
-/**
- * Copies the packages and their updater signatures under the names they are
- * published with: GitHub stores a space in an asset name as a dot.
- */
-function exportArtifacts(packages: readonly string[], artifactDir: string): void {
-  mkdirSync(artifactDir, { recursive: true })
-  for (const path of packages.flatMap((path) => [path, `${path}.sig`])) {
-    if (existsSync(path)) {
-      copyFileSync(path, join(artifactDir, basename(path).replaceAll(' ', '.')))
-    }
-  }
 }
 
 async function main(): Promise<void> {

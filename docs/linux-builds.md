@@ -5,7 +5,8 @@ code-signed**.
 
 ## Getting the packages
 
-Every release lists four packages on its GitHub release page:
+When the Linux builds succeed, a release lists four packages on its GitHub
+release page:
 
 - `*_amd64.AppImage` and `*_amd64.deb` for Intel and AMD machines.
 - `*_aarch64.AppImage` and `*_arm64.deb` for Arm machines.
@@ -42,12 +43,16 @@ Artifacts expire after 90 days.
   releases such as Ubuntu 22.04 and Debian 12 are not supported: the prebuilt
   ONNX Runtime used by semantic search needs glibc 2.38 and the libstdc++ of
   GCC 14. The app is a Tauri 2 shell over WebKitGTK 4.1.
+- **Semantic search on x64 needs AVX2.** The prebuilt ONNX Runtime requires
+  an x86-64-v3 CPU (most Intel and AMD CPUs since 2013-2015; some Atom,
+  Celeron, and Pentium models lack it). On a CPU without AVX2, the app can
+  crash when semantic search starts. arm64 has no such requirement.
 - **Secrets need a keyring.** AI provider keys and the GitHub token are kept in
   the Secret Service (GNOME Keyring or KWallet). Without one, the app cannot
   save them.
 - **Auto-update.** CI signs each package with the updater key (minisign, the
   same key as macOS and Windows). `latest.json` lists the AppImages as
-  `linux-x86_64` and `linux-aarch64`, and the `.deb` packages as
+  `linux-x86_64-appimage` and `linux-aarch64-appimage`, and the `.deb` packages as
   `linux-x86_64-deb` and `linux-aarch64-deb`. An AppImage replaces itself, so
   it must be in a folder you can write to. A `.deb` update asks for your
   password through `pkexec`.

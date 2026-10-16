@@ -68,9 +68,6 @@ runs:
       uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       with:
         key: ${{ inputs.cache-key }}
-        # A failed run still compiled the dependency tree; save it so the next
-        # run doesn't pay the cold-build cost again.
-        cache-on-failure: true
 
     # ort-sys (fastembed → ort) downloads prebuilt ONNX Runtime binaries at
     # build time and extracts them to ~/.cache/ort.pyke.io — outside target/,

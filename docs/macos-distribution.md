@@ -221,8 +221,8 @@ versioned because each manifest points at an immutable release payload.
 The macOS and Windows builds have to succeed; a Linux failure does not block it. It runs `pnpm release:manifest --tag=<tag>`
 (`apps/desktop/scripts/release-manifest.ts`), which downloads the `.sig` files from the
 release, writes `latest.json` with one entry per platform (`darwin-aarch64`,
-`darwin-x86_64`, plus `windows-x86_64`, `windows-aarch64`, `linux-x86_64`,
-`linux-aarch64`, `linux-x86_64-deb`, and `linux-aarch64-deb` when their signatures
+`darwin-x86_64`, plus `windows-x86_64`, `windows-aarch64`, `linux-x86_64-appimage`,
+`linux-aarch64-appimage`, `linux-x86_64-deb`, and `linux-aarch64-deb` when their signatures
 exist), and uploads it. `darwin-x86_64` points at the universal archive. The updater
 picks its entry from the architecture it runs as, so a universal app on Apple Silicon
 reads `darwin-aarch64` and moves to the smaller Apple Silicon app at its first update.

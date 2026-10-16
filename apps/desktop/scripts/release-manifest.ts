@@ -12,16 +12,17 @@ import { INHERIT, log, runWithTempDir } from './helpers.ts'
 
 /**
  * The updater looks up `<os>-<arch>-<installer>` and then `<os>-<arch>` in the
- * manifest, so a `.deb` install updates from the `.deb` and an AppImage from
- * the AppImage. An optional platform without a signature is left out.
+ * manifest. Linux entries name their installer, so an install never gets a
+ * package of the other format. An optional platform without a signature is
+ * left out.
  */
 const PLATFORMS = [
   { platform: 'darwin-aarch64', suffix: '_aarch64.app.tar.gz.sig', required: true },
   { platform: 'darwin-x86_64', suffix: '_universal.app.tar.gz.sig', required: true },
   { platform: 'windows-x86_64', suffix: '_x64-setup.exe.sig', required: false },
   { platform: 'windows-aarch64', suffix: '_arm64-setup.exe.sig', required: false },
-  { platform: 'linux-x86_64', suffix: '_amd64.AppImage.sig', required: false },
-  { platform: 'linux-aarch64', suffix: '_aarch64.AppImage.sig', required: false },
+  { platform: 'linux-x86_64-appimage', suffix: '_amd64.AppImage.sig', required: false },
+  { platform: 'linux-aarch64-appimage', suffix: '_aarch64.AppImage.sig', required: false },
   { platform: 'linux-x86_64-deb', suffix: '_amd64.deb.sig', required: false },
   { platform: 'linux-aarch64-deb', suffix: '_arm64.deb.sig', required: false },
 ]
