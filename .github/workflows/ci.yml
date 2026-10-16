@@ -66,14 +66,12 @@ jobs:
       - name: Test
         run: pnpm run test
 
+  # Not part of `all-green`: a WebKit failure does not block merging.
   test-webkit:
     if: github.event_name != 'merge_group'
     runs-on: macos-latest
     env:
       REFLECT_TEST_BROWSER: webkit
-    concurrency:
-      group: ci-test-webkit-${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
