@@ -1,5 +1,5 @@
 import { userEvent } from 'vitest/browser'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestCoreServices, createTestIpcBridgeService } from '@reflect/core/testing'
 import type { TestCoreServices } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -32,10 +32,8 @@ beforeEach(() => {
 })
 
 describe('NoteVersionsAction', () => {
-  it('lists the versions only after the dialog opens', async () => {
+  it('shows the button without a click when versions exist', async () => {
     const view = await renderAction()
-    expect(app.ipc.calls().map(({ command }) => command)).not.toContain('conflict_archive_list')
-
     await userEvent.click(view.getByRole('button', { name: /Earlier versions/ }))
     await expect.element(view.getByText(/phone, 5 B/)).toBeInTheDocument()
     await expect.element(view.getByText(/laptop, 2\.0 KB/)).toBeInTheDocument()
@@ -56,12 +54,12 @@ describe('NoteVersionsAction', () => {
     )
   })
 
-  it('renders nothing once the list turns out empty', async () => {
+  it('renders no button when the list is empty', async () => {
     versions = []
     const view = await renderAction()
-    await userEvent.click(view.getByRole('button', { name: /Earlier versions/ }))
-    await expect
-      .element(view.getByRole('button', { name: /Earlier versions/ }))
-      .not.toBeInTheDocument()
+    await vi.waitFor(() =>
+      expect(app.ipc.calls().map(({ command }) => command)).toContain('conflict_archive_list'),
+    )
+    expect(view.getByRole('button').query()).toBeNull()
   })
 })

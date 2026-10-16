@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { errorMessage, type ArchivedVersion } from '@reflect/core'
 import { History } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
@@ -26,27 +26,51 @@ function formatSize(bytes: number): string {
 /**
  * Lists the earlier versions that sync set aside for a note, shows one
  * read-only, and restores it over the note. Renders nothing while the note
- * has no earlier versions, which it learns when the dialog first opens.
+ * has no earlier versions, which it checks when it mounts and again each time the dialog opens.
  */
 export function NoteVersionsAction({ path }: NoteVersionsActionProps): ReactElement | null {
   const { conflictArchive } = useCoreServices()
   const { operations } = useAppServices()
   const { settings } = useSettings()
   const [open, setOpen] = useState(false)
-  const [versions, setVersions] = useState<ArchivedVersion[] | null>(null)
+  const [loaded, setLoaded] = useState<{ path: string; list: ArchivedVersion[] } | null>(null)
+  const versions = loaded?.path === path ? loaded.list : null
   const [selected, setSelected] = useState<{ name: string; content: string } | null>(null)
   const [isRestoring, setIsRestoring] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const onOpen = async (): Promise<void> => {
-    setOpen(true)
-    setError(null)
-    setSelected(null)
+  const reload = async (): Promise<void> => {
     try {
-      setVersions(await conflictArchive.list(path))
+      setLoaded({ path, list: await conflictArchive.list(path) })
     } catch (cause) {
       setError(errorMessage(cause))
     }
+  }
+
+  useEffect(() => {
+    let current = true
+    conflictArchive
+      .list(path)
+      .then((list) => {
+        if (current) {
+          setLoaded({ path, list })
+        }
+      })
+      .catch((cause: unknown) => {
+        if (current) {
+          setError(errorMessage(cause))
+        }
+      })
+    return () => {
+      current = false
+    }
+  }, [path, conflictArchive])
+
+  const onOpen = (): void => {
+    setOpen(true)
+    setError(null)
+    setSelected(null)
+    void reload()
   }
 
   const onSelect = async (name: string): Promise<void> => {
@@ -78,7 +102,7 @@ export function NoteVersionsAction({ path }: NoteVersionsActionProps): ReactElem
     }
   }
 
-  if (versions !== null && versions.length === 0) {
+  if (versions === null || (versions.length === 0 && !open)) {
     return null
   }
 
@@ -86,7 +110,7 @@ export function NoteVersionsAction({ path }: NoteVersionsActionProps): ReactElem
     <>
       <button
         type="button"
-        onClick={() => void onOpen()}
+        onClick={onOpen}
         className="group relative flex w-full items-center space-x-2 rounded-lg px-3 py-2 text-start hover:bg-surface-hover"
       >
         <span className="flex h-5 w-5 flex-none items-center justify-center text-text-muted">
@@ -102,7 +126,7 @@ export function NoteVersionsAction({ path }: NoteVersionsActionProps): ReactElem
             Sync set these versions aside when it merged overlapping edits.
           </DialogDescription>
           <ul className="max-h-48 space-y-1 overflow-y-auto">
-            {(versions ?? []).map((version) => {
+            {versions.map((version) => {
               const date = new Date(version.modifiedMs)
               return (
                 <li key={version.name}>
