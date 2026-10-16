@@ -10,8 +10,10 @@ plain Markdown files, so any tool can read and write them.
 - **Edit while Reflect is open.** If your edit overlaps an edit made in Reflect,
   Reflect merges the two word by word. It never writes conflict markers into the
   note.
-- **Both versions are kept.** When a merge drops or interleaves a side, Reflect
-  archives both versions. Find them under **Earlier versions** in the note sidebar.
+- **Both versions are kept.** For a note synced through Git, the previous
+  versions are in the Git history. For iCloud graphs, and for edits typed in
+  the app, a merge that drops or interleaves a side archives the versions.
+  Find them under **Earlier versions** in the note sidebar.
 - **Folding a bullet does not cause a conflict.** You can fold a bullet in Reflect
   while a script appends to the same note. Reflect keeps both changes and shows no
   conflict notice.

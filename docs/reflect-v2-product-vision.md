@@ -445,7 +445,7 @@ Windows and Android should remain possible. The implementation should avoid choi
 > device-flow auth, plus generic git remotes over SSH/path. File-sync folder providers
 > (iCloud Drive/Dropbox/Drive) are **unsupported for sync by design** in the first wave
 > (see Plan 12); the adapter list below is the long-term direction. AI-assisted conflict
-> resolution did not ship — text conflicts merge through one ladder, and a result
+> resolution did not ship: text conflicts merge through one ladder, and a result
 > that drops or interleaves a side is archived under Earlier versions. Current sync never
 > writes conflict markers.
 >
