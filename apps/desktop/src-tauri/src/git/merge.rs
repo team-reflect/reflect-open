@@ -302,16 +302,7 @@ fn resolve_index_conflicts(
         return Ok(Vec::new());
     }
     let stamp = utc_stamp(theirs.time().seconds());
-    let conflicts = index
-        .conflicts()?
-        .map(|conflict| {
-            conflict.map(|conflict| OwnedConflict {
-                ancestor: conflict.ancestor,
-                our: conflict.our,
-                their: conflict.their,
-            })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let conflicts = index.conflicts()?.collect::<Result<Vec<_>, _>>()?;
 
     let mut review = Vec::new();
     for conflict in conflicts {
@@ -505,14 +496,6 @@ fn stage_resolved(
     }
     index.add(&stage0_entry(&path, id, mode))?;
     Ok(path)
-}
-
-/// One conflict lifted out of the index, so the borrow ends before the index
-/// is changed.
-struct OwnedConflict {
-    ancestor: Option<IndexEntry>,
-    our: Option<IndexEntry>,
-    their: Option<IndexEntry>,
 }
 
 fn entry_path(entry: &IndexEntry) -> String {
