@@ -15,7 +15,12 @@ use serde::Serialize;
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum AppError {
     /// Filesystem / IO failure.
-    Io { message: String },
+    Io {
+        message: String,
+        /// The libgit2 error code when the failure came from `git2`.
+        #[serde(skip)]
+        git_code: Option<i32>,
+    },
     /// A requested note or file does not exist.
     NotFound { message: String },
     /// A path escaped the graph root (security guard).
@@ -36,6 +41,7 @@ impl AppError {
     pub fn io(message: impl Into<String>) -> Self {
         Self::Io {
             message: message.into(),
+            git_code: None,
         }
     }
 
@@ -60,6 +66,29 @@ impl AppError {
     pub fn no_graph() -> Self {
         Self::NoGraph {
             message: "No graph is open".into(),
+        }
+    }
+}
+
+impl AppError {
+    /// The libgit2 error code, when this error came from `git2`.
+    pub fn git_code(&self) -> Option<i32> {
+        match self {
+            Self::Io { git_code, .. } => *git_code,
+            _ => None,
+        }
+    }
+
+    pub fn message(&self) -> &str {
+        match self {
+            Self::Io { message, .. }
+            | Self::NotFound { message }
+            | Self::Traversal { message }
+            | Self::NoGraph { message }
+            | Self::Parse { message }
+            | Self::Auth { message }
+            | Self::Network { message }
+            | Self::Unknown { message } => message,
         }
     }
 }
@@ -97,7 +126,10 @@ impl From<git2::Error> for AppError {
         if err.class() == ErrorClass::Net {
             return Self::Network { message };
         }
-        Self::Io { message }
+        Self::Io {
+            message,
+            git_code: Some(err.raw_code()),
+        }
     }
 }
 
@@ -110,6 +142,7 @@ impl From<std::io::Error> for AppError {
         } else {
             Self::Io {
                 message: err.to_string(),
+                git_code: None,
             }
         }
     }
@@ -119,6 +152,7 @@ impl From<rusqlite::Error> for AppError {
     fn from(err: rusqlite::Error) -> Self {
         Self::Io {
             message: err.to_string(),
+            git_code: None,
         }
     }
 }

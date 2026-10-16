@@ -20,6 +20,7 @@ mod commit;
 mod commit_message;
 #[cfg(test)]
 mod fault;
+mod locks;
 mod merge;
 mod remote;
 mod repo;
@@ -143,8 +144,12 @@ pub async fn git_setup(
     state: State<'_, GraphState>,
 ) -> AppResult<GitStatus> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || crate::fs::with_graph_lock(&root, || setup(&root, remote_url, branch)))
-        .await
+    run_blocking(move || {
+        locks::retry_after_stale_lock(&root, || {
+            crate::fs::with_graph_lock(&root, || setup(&root, remote_url.clone(), branch.clone()))
+        })
+    })
+    .await
 }
 
 /// Stop backing this graph up (drop `origin`; repo, history, and the
@@ -152,7 +157,10 @@ pub async fn git_setup(
 #[tauri::command]
 pub async fn git_disconnect(generation: u64, state: State<'_, GraphState>) -> AppResult<GitStatus> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || crate::fs::with_graph_lock(&root, || disconnect(&root))).await
+    run_blocking(move || {
+        locks::retry_after_stale_lock(&root, || crate::fs::with_graph_lock(&root, || disconnect(&root)))
+    })
+    .await
 }
 
 /// Clone a backup repository into `path` (restore on a fresh machine). Runs
@@ -176,7 +184,12 @@ pub async fn git_commit_all(
 ) -> AppResult<CommitOutcome> {
     let root = crate::fs::root_for_generation(&state, generation)?;
     let started = std::time::Instant::now();
-    let outcome = run_blocking(move || commit::commit_all(&root, &message, MAX_FILE_BYTES)).await;
+    let outcome = run_blocking(move || {
+        locks::retry_after_stale_lock(&root, || {
+            commit::commit_all(&root, &message, MAX_FILE_BYTES)
+        })
+    })
+    .await;
     if let Ok(outcome) = &outcome {
         tracing::info!(
             committed = outcome.committed,
@@ -196,7 +209,10 @@ pub async fn git_fetch(
     state: State<'_, GraphState>,
 ) -> AppResult<RemoteDelta> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || remote::fetch(&root, credential)).await
+    run_blocking(move || {
+        locks::retry_after_stale_lock(&root, || remote::fetch(&root, credential.clone()))
+    })
+    .await
 }
 
 /// Merge the fetched remote branch; conflicts are committed into the notes as
@@ -207,7 +223,9 @@ pub async fn git_merge_remote(
     state: State<'_, GraphState>,
 ) -> AppResult<MergeOutcome> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    let outcome = run_blocking(move || merge::merge_remote(&root)).await;
+    let outcome =
+        run_blocking(move || locks::retry_after_stale_lock(&root, || merge::merge_remote(&root)))
+            .await;
     // Invalidate on both arms: a failed merge can still have moved the tree
     // partway through checkout, and a stale catalog would pin the old view.
     let root = crate::fs::root_for_generation(&state, generation)?;
@@ -224,5 +242,8 @@ pub async fn git_push(
     state: State<'_, GraphState>,
 ) -> AppResult<PushOutcome> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || remote::push(&root, credential)).await
+    run_blocking(move || {
+        locks::retry_after_stale_lock(&root, || remote::push(&root, credential.clone()))
+    })
+    .await
 }

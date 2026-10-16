@@ -649,7 +649,7 @@ fn detached_head_is_a_typed_error_not_a_panic() {
     }
 
     let err = merge_remote(root).unwrap_err();
-    let crate::error::AppError::Io { message } = err else {
+    let crate::error::AppError::Io { message, .. } = err else {
         panic!("expected an Io error, got {err:?}");
     };
     assert!(message.contains("detached HEAD"), "{message}");
@@ -1147,4 +1147,58 @@ fn merge_interrupted_before_commit_converges_next_cycle() {
         assert_eq!(head_blob(root_a, rel), expected, "{rel} in HEAD");
         assert_eq!(remote_blob(&fixture, rel), expected, "{rel} on the remote");
     }
+}
+
+fn age_file(path: &Path, minutes: u64) {
+    let file = fs::OpenOptions::new().write(true).open(path).unwrap();
+    file.set_modified(std::time::SystemTime::now() - Duration::from_secs(minutes * 60))
+        .unwrap();
+}
+
+fn commit_with_lock_retry(root: &Path) -> crate::error::AppResult<super::commit::CommitOutcome> {
+    super::locks::retry_after_stale_lock(root, || commit_all(root, "sync", MAX_FILE_BYTES))
+}
+
+#[test]
+fn a_stale_index_lock_is_cleared_and_the_commit_retried() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "one");
+    let lock = root.join(".git/index.lock");
+    fs::write(&lock, "").unwrap();
+    age_file(&lock, 10);
+
+    let outcome = commit_with_lock_retry(root).unwrap();
+    assert!(outcome.committed);
+    assert!(!lock.exists());
+}
+
+#[test]
+fn a_fresh_lock_is_left_alone_and_the_error_surfaces() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "one");
+    let lock = root.join(".git/index.lock");
+    fs::write(&lock, "").unwrap();
+
+    assert!(commit_with_lock_retry(root).is_err());
+    assert!(lock.exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_symlinked_lock_is_never_followed() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "one");
+    let outside = tempdir().unwrap();
+    let target = outside.path().join("precious");
+    fs::write(&target, "keep").unwrap();
+    age_file(&target, 10);
+    let lock = root.join(".git/index.lock");
+    std::os::unix::fs::symlink(&target, &lock).unwrap();
+
+    assert!(commit_with_lock_retry(root).is_err());
+    assert!(target.exists());
+    assert!(fs::symlink_metadata(&lock).is_ok());
 }
