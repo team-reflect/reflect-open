@@ -3,9 +3,10 @@
 //! The merge is computed in memory (`merge_commits`), its conflicts are
 //! resolved in that index, and the result is committed with both parents.
 //! Only then is the merged tree checked out, and the branch ref moves last.
-//! The repository never enters libgit2's merge state, so a stop at any point
-//! leaves nothing for the next cycle to clean up. A text conflict is
-//! committed as labeled marker text:
+//! The repository never enters libgit2's merge state. Until the ref moves,
+//! the merge commit is recorded in `refs/reflect/merge`, so a stop after the
+//! commit is finished by [`adopt_recorded_merge`] instead of merged again.
+//! A text conflict is committed as labeled marker text:
 //!
 //! ```text
 //! <<<<<<< this device
@@ -84,6 +85,7 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
 
 fn merge_remote_locked(root: &Path) -> AppResult<MergeOutcome> {
     let repo = open_existing(root)?;
+    adopt_recorded_merge(&repo, root)?;
     ensure_clean_state(&repo)?;
     let branch = current_branch(&repo)?;
     let Ok(remote_oid) = repo.refname_to_id(&format!("refs/remotes/origin/{branch}")) else {
@@ -160,11 +162,11 @@ fn merge_remote_locked(root: &Path) -> AppResult<MergeOutcome> {
         "Merge changes from other devices (conflicts to review)"
     };
     let merge_oid = repo.commit(None, &sig, &sig, message, &tree, &[&ours, &theirs])?;
+    repo.reference(RECORDED_MERGE_REF, merge_oid, true, "merge in progress")?;
     let mut changed_files = changed_between(&repo, Some(&ours.tree()?), &tree)?;
 
-    // Same order as the fast-forward: tree first, ref last. A stop after the
-    // checkout leaves the branch on `ours` with the merged files on disk; the
-    // next cycle commits them as a local change and merges again.
+    // Same order as the fast-forward: tree first, ref last. A stop in between
+    // leaves the merge recorded for `adopt_recorded_merge`.
     #[cfg(test)]
     super::fault::trip(super::fault::FaultPoint::AfterMergeCommitBeforeCheckout)?;
     repo.checkout_tree(tree.as_object(), Some(CheckoutBuilder::new().force()))?;
@@ -177,6 +179,7 @@ fn merge_remote_locked(root: &Path) -> AppResult<MergeOutcome> {
         head_oid,
         message,
     )?;
+    drop_recorded_merge(&repo)?;
     stamp_modified_times(root, &mut changed_files);
 
     let kind = if conflicted_paths.is_empty() {
@@ -189,6 +192,103 @@ fn merge_remote_locked(root: &Path) -> AppResult<MergeOutcome> {
         conflicted_paths,
         changed_files,
     })
+}
+
+/// The merge commit `merge_remote` wrote and has not yet moved the branch to.
+const RECORDED_MERGE_REF: &str = "refs/reflect/merge";
+
+/// Finish a merge that stopped between its commit and the branch move.
+///
+/// When `HEAD` is still the recorded merge's first parent, the merged tree is
+/// checked out in safe mode (a file changed since the stop is left as it is)
+/// and the branch moves to the merge. Any other recorded merge is dropped.
+pub(super) fn adopt_recorded_merge(repo: &Repository, root: &Path) -> AppResult<()> {
+    let Ok(merge_oid) = repo.refname_to_id(RECORDED_MERGE_REF) else {
+        return Ok(());
+    };
+    let head_oid = repo.head().ok().and_then(|head| head.target());
+    let merge = repo.find_commit(merge_oid)?;
+    match head_oid {
+        Some(head_oid) if merge.parent_id(0).ok() == Some(head_oid) => {
+            let branch = current_branch(repo)?;
+            let merge_tree = merge.tree()?;
+            repo.checkout_tree(
+                merge_tree.as_object(),
+                Some(CheckoutBuilder::new().safe().allow_conflicts(true)),
+            )?;
+            let head_tree = repo.find_commit(head_oid)?.tree()?;
+            merge_files_changed_since(repo, root, &head_tree, &merge_tree)?;
+            repo.reference_matching(
+                &format!("refs/heads/{branch}"),
+                merge_oid,
+                true,
+                head_oid,
+                "reflect sync: adopt recorded merge",
+            )?;
+        }
+        _ => {
+            tracing::warn!(
+                root = %root.display(),
+                merge = %merge_oid,
+                "dropping a recorded merge that does not continue HEAD"
+            );
+        }
+    }
+    drop_recorded_merge(repo)
+}
+
+/// The safe checkout leaves a file the user changed after the stop. Where the
+/// merge also changed that file, fold the merge's change into it with a
+/// three-way text merge whose base is the pre-merge version.
+fn merge_files_changed_since(
+    repo: &Repository,
+    root: &Path,
+    head_tree: &git2::Tree<'_>,
+    merge_tree: &git2::Tree<'_>,
+) -> AppResult<()> {
+    let diff = repo.diff_tree_to_workdir(Some(merge_tree), None)?;
+    for delta in diff.deltas() {
+        if delta.status() != git2::Delta::Modified {
+            continue;
+        }
+        let Some(path) = delta.new_file().path() else {
+            continue;
+        };
+        let merged = repo.find_blob(merge_tree.get_path(path)?.id())?;
+        let base = match head_tree.get_path(path) {
+            Ok(entry) if entry.id() == merged.id() => continue,
+            Ok(entry) => Some(repo.find_blob(entry.id())?),
+            Err(_) => None,
+        };
+        let on_disk = std::fs::read(root.join(path))?;
+        let base_content = base.as_ref().map_or(&b""[..], |blob| blob.content());
+        let all_text = [base_content, &on_disk, merged.content()]
+            .iter()
+            .all(|bytes| std::str::from_utf8(bytes).is_ok() && !bytes.contains(&0));
+        if !all_text {
+            continue;
+        }
+        let mut base_input = git2::MergeFileInput::new();
+        base_input.content(base_content);
+        let mut ours_input = git2::MergeFileInput::new();
+        ours_input.content(&on_disk);
+        let mut theirs_input = git2::MergeFileInput::new();
+        theirs_input.content(merged.content());
+        let mut opts = MergeFileOptions::new();
+        opts.our_label(OUR_LABEL)
+            .their_label(THEIR_LABEL)
+            .style_standard(true);
+        let result = git2::merge_file(&base_input, &ours_input, &theirs_input, Some(&mut opts))?;
+        std::fs::write(root.join(path), result.content())?;
+    }
+    Ok(())
+}
+
+fn drop_recorded_merge(repo: &Repository) -> AppResult<()> {
+    if let Ok(mut reference) = repo.find_reference(RECORDED_MERGE_REF) {
+        reference.delete()?;
+    }
+    Ok(())
 }
 
 /// Diff two trees into the watcher's change shape: what the merge wrote or

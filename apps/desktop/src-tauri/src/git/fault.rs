@@ -1,10 +1,11 @@
 //! Test-only fault injection for the git primitives.
 //!
 //! The sync safety tests (`docs/git-backup-safety.md`) need to stop a pull
-//! at a precise point: between the branch move and the checkout, or after
-//! libgit2 entered merge state but before the merge commit. A real process
-//! dies anywhere; these hooks make "anywhere" reproducible. The call sites
-//! in `merge.rs` are `#[cfg(test)]`, so release builds carry nothing.
+//! at a precise point: between the checkout and the branch move, or between
+//! the steps of an in-memory merge (resolved, committed, checked out). A
+//! real process dies anywhere; these hooks make "anywhere" reproducible.
+//! The call sites in `merge.rs` are `#[cfg(test)]`, so release builds carry
+//! nothing.
 //!
 //! Faults are thread-local and one-shot: a test arms a point on the thread
 //! that will run the git command, and the first `trip` of that point

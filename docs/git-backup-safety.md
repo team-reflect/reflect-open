@@ -66,14 +66,16 @@ Status (2026-10-16): implemented in phase 1 of the sync rework.
 ## S5. The repository is never left in app-made merge state
 
 A pull computes the merge in memory and never calls `repo.merge()`, so no
-stop can leave `MERGE_HEAD` behind. A stop after the checkout and before the
-ref move leaves the merged files on disk; the next cycle commits them as a
-local change and merges again. Foreign state (a merge or rebase the user
+stop can leave `MERGE_HEAD` behind. Until the branch ref moves, the merge
+commit is recorded in `refs/reflect/merge`, and the next commit or pull
+checks it out and moves the ref to it instead of merging again. Foreign state (a merge or rebase the user
 started with the git CLI) is still refused.
 
 - Test: `git::tests::merge_interrupted_before_commit_converges_next_cycle`,
   `git::tests::merge_never_leaves_merge_head`,
-  `git::tests::edits_after_a_merge_crash_survive_the_next_cycle`.
+  `git::tests::edits_after_a_merge_crash_survive_the_next_cycle`,
+  `git::tests::edits_after_a_crash_before_checkout_keep_the_merged_changes`,
+  `git::tests::a_recorded_merge_from_a_foreign_head_is_dropped`.
 
 Status (2026-10-16): implemented in phase 1 of the sync rework.
 
