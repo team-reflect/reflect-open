@@ -2191,3 +2191,33 @@ fn a_write_during_the_merge_survives_the_checkout() {
     }
     assert_eq!(read(root_a, "notes/ext.md"), "# Ext\n\nwritten by iCloud\n");
 }
+
+#[test]
+fn a_detached_head_behind_the_branch_does_not_rewind_it() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n");
+    commit_all(root, "first", MAX_FILE_BYTES).unwrap();
+    let (older, tip) = {
+        let repo = Repository::open(root).unwrap();
+        let older = repo.head().unwrap().target().unwrap();
+        write(root, "notes/b.md", "# B\n");
+        commit_all(root, "second", MAX_FILE_BYTES).unwrap();
+        write(root, "notes/c.md", "# C\n");
+        commit_all(root, "third", MAX_FILE_BYTES).unwrap();
+        let repo = Repository::open(root).unwrap();
+        let tip = repo.head().unwrap().target().unwrap();
+        repo.set_head_detached(older).unwrap();
+        (older, tip)
+    };
+
+    write(root, "notes/d.md", "# D\n");
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    let repo = Repository::open(root).unwrap();
+    assert!(!repo.head_detached().unwrap());
+    assert_eq!(repo.head().unwrap().name().unwrap(), "refs/heads/main");
+    let head = repo.head().unwrap().peel_to_commit().unwrap();
+    assert_eq!(head.parent_id(0).unwrap(), tip);
+    assert!(repo.graph_descendant_of(head.id(), older).unwrap());
+    assert!(repo.find_commit(tip).is_ok());
+}
