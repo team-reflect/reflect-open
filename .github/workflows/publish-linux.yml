@@ -25,14 +25,15 @@ jobs:
       fail-fast: false
       matrix:
         # Each runner's host triple is the build target, so no extra rustup
-        # target and no cross-compilation. Ubuntu 22.04 is the oldest supported
-        # release: the binaries need the glibc of the build machine or newer.
+        # target and no cross-compilation. Ubuntu 24.04 is the oldest release
+        # that can link the prebuilt ONNX Runtime, which needs glibc 2.38 and
+        # the libstdc++ of GCC 14.
         include:
           - name: x64
-            runner: ubuntu-22.04
+            runner: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
           - name: arm64
-            runner: ubuntu-22.04-arm
+            runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

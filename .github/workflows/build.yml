@@ -38,13 +38,13 @@ jobs:
           - name: windows
             os: windows-latest
             command: pnpm release:windows
-          # The oldest supported Ubuntu, because the binaries need the glibc
-          # of the build machine or newer.
+          # The oldest Ubuntu that can link the prebuilt ONNX Runtime, which
+          # needs glibc 2.38 and the libstdc++ of GCC 14.
           - name: linux-x64
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             command: pnpm release:linux
           - name: linux-arm64
-            os: ubuntu-22.04-arm
+            os: ubuntu-24.04-arm
             command: pnpm release:linux
 
     name: build-${{ matrix.name }}

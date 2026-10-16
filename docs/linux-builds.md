@@ -36,10 +36,12 @@ Artifacts expire after 90 days.
 
 ## What to expect
 
-- **Supported systems:** glibc 2.35 or newer, for example Ubuntu 22.04+,
-  Linux Mint 21+, Debian 12+, and Fedora 36+. CI builds on Ubuntu 22.04,
-  because a binary needs the glibc of its build machine or newer. The app is a
-  Tauri 2 shell over WebKitGTK 4.1.
+- **Supported systems:** glibc 2.39 or newer, for example Ubuntu 24.04+,
+  Linux Mint 22+, Debian 13+, and Fedora 40+. CI builds on Ubuntu 24.04,
+  because a binary needs the glibc of its build machine or newer. Older
+  releases such as Ubuntu 22.04 and Debian 12 are not supported: the prebuilt
+  ONNX Runtime used by semantic search needs glibc 2.38 and the libstdc++ of
+  GCC 14. The app is a Tauri 2 shell over WebKitGTK 4.1.
 - **Secrets need a keyring.** AI provider keys and the GitHub token are kept in
   the Secret Service (GNOME Keyring or KWallet). Without one, the app cannot
   save them.
