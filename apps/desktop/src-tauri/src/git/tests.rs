@@ -2146,3 +2146,145 @@ fn coexisting_devices_with_a_late_icloud_copy_keep_every_line() {
 
     assert_converged(&fixture, &root_b, &lines);
 }
+
+fn saved_edits(root: &Path) -> Option<git2::Oid> {
+    Repository::open(root)
+        .unwrap()
+        .refname_to_id("refs/reflect/edits")
+        .ok()
+}
+
+#[test]
+fn a_write_back_failure_keeps_every_other_local_edit() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/x/a.md", "# A\n");
+    write(root_a, "notes/z.md", "# Z\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    fs::remove_dir_all(root_b.join("notes/x")).unwrap();
+    write(&root_b, "notes/x", "now a file\n");
+    commit_all(&root_b, "df", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    fetch(root_a, None).unwrap();
+    write(root_a, "notes/x/a.md", "# A edited\n");
+    write(root_a, "notes/z.md", "# Z edited\n");
+    let outcome = merge_remote(root_a).unwrap();
+
+    assert_eq!(outcome.review_paths, ["notes/x/a.md"], "{outcome:?}");
+    assert_eq!(read(root_a, "notes/x"), "now a file\n");
+    assert_eq!(read(root_a, "notes/z.md"), "# Z edited\n");
+    let versions = crate::conflict::archive::list(root_a, "notes/x/a.md").unwrap();
+    assert_eq!(versions.len(), 1);
+    assert_eq!(
+        crate::conflict::archive::read(root_a, "notes/x/a.md", &versions[0].name).unwrap(),
+        "# A edited\n"
+    );
+    assert_eq!(saved_edits(root_a), None);
+}
+
+#[test]
+fn a_crash_after_the_checkout_replays_saved_edits_on_the_next_cycle() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/z.md", "# Z\n");
+    write(root_a, "notes/shared.md", SHARED_BASE);
+    write(root_a, "notes/gone.md", "# Gone\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/shared.md", SHARED_FROM_B);
+    commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    fetch(root_a, None).unwrap();
+    let shared_from_a = "# Shared\n\ntop edited on a\n\nmiddle\n\nbottom\n";
+    write(root_a, "notes/z.md", "# Z edited\n");
+    write(root_a, "notes/shared.md", shared_from_a);
+    fs::remove_file(root_a.join("notes/gone.md")).unwrap();
+    fault::arm(FaultPoint::AfterCheckoutBeforeWriteBack, Fault::Fail);
+    assert!(merge_remote(root_a).is_err());
+    assert_eq!(read(root_a, "notes/z.md"), "# Z\n");
+    assert_eq!(read(root_a, "notes/shared.md"), SHARED_FROM_B);
+    assert!(root_a.join("notes/gone.md").exists());
+    assert!(saved_edits(root_a).is_some());
+
+    let outcome = merge_remote(root_a).unwrap();
+    assert!(
+        matches!(outcome.kind, MergeKind::FastForward),
+        "{outcome:?}"
+    );
+    assert_eq!(read(root_a, "notes/z.md"), "# Z edited\n");
+    assert_eq!(
+        read(root_a, "notes/shared.md"),
+        "# Shared\n\ntop edited on a\n\nmiddle\n\nbottom edited on b\n"
+    );
+    assert!(!root_a.join("notes/gone.md").exists());
+    assert_eq!(saved_edits(root_a), None);
+}
+
+#[test]
+fn untracked_notes_under_a_directory_the_pull_replaces_are_kept() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/base.md", "# Base\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/foo", "incoming file\n");
+    commit_all(&root_b, "file", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    fetch(root_a, None).unwrap();
+    write(root_a, "notes/foo/new.md", "# Untracked new note\n");
+    write(root_a, "notes/foo/deep/other.md", "# Other\n");
+    let outcome = merge_remote(root_a).unwrap();
+
+    assert_eq!(read(root_a, "notes/foo"), "incoming file\n");
+    assert_eq!(
+        read(root_a, "notes/foo (conflict)/new.md"),
+        "# Untracked new note\n"
+    );
+    assert_eq!(
+        read(root_a, "notes/foo (conflict)/deep/other.md"),
+        "# Other\n"
+    );
+    let mut review = outcome.review_paths.clone();
+    review.sort();
+    assert_eq!(
+        review,
+        [
+            "notes/foo (conflict)/deep/other.md",
+            "notes/foo (conflict)/new.md"
+        ],
+        "{outcome:?}"
+    );
+}
+
+#[test]
+fn an_adopted_merge_during_commit_reports_its_files_and_review_paths() {
+    let fixture = diverged_fixture();
+    let root_a = &fixture.graph_a;
+    fault::arm(FaultPoint::AfterMergeCommitBeforeCheckout, Fault::Fail);
+    assert!(merge_remote(root_a).is_err());
+    fs::remove_file(root_a.join("notes/shared.md")).unwrap();
+
+    let outcome = commit_all(root_a, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(outcome.review_paths, ["notes/shared.md"], "{outcome:?}");
+    for rel in ["notes/b.md", "notes/shared.md"] {
+        assert!(
+            outcome
+                .changed_files
+                .iter()
+                .any(|change| change.path == rel),
+            "{rel} is not reported: {outcome:?}"
+        );
+    }
+    assert_eq!(read(root_a, "notes/shared.md"), SHARED_FROM_B);
+    assert_eq!(recorded_merge(root_a), None);
+}

@@ -95,6 +95,8 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
       sha: null,
       ahead: 0,
       skippedLargeFiles: [],
+      changedFiles: [],
+      reviewPaths: [],
     }),
     fetch: (): RemoteDelta => ({ ahead: 0, behind: 0 }),
     remoteHead: (): RemoteTip => ({ remoteOid: null, trackingOid: null }),
