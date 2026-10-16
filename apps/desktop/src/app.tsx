@@ -12,7 +12,6 @@ import { useAppServices } from '@/services/services-provider.tsx'
 export function App(): ReactElement {
   const { quitPolicy, window } = useAppServices()
   const { status, graph, error } = useGraph()
-
   // Quit-time persistence: flush dirty note buffers when exiting, awaiting
   // persistence before destruction but hiding the macOS main window first.
   // Unmount effects don't run on those paths.
