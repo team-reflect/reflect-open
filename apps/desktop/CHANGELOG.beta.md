@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.16.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.3...v0.16.0-beta.4) (2026-10-16)
+
+
+### Features
+
+* add automatic conflict resolution ([#1552](https://github.com/team-reflect/reflect-open/issues/1552)) ([16b0e06](https://github.com/team-reflect/reflect-open/commit/16b0e06e1b50f55cf95ab49302dd7223ef524c2c))
+* write logs to a file ([#1555](https://github.com/team-reflect/reflect-open/issues/1555)) ([cfa07c1](https://github.com/team-reflect/reflect-open/commit/cfa07c1b1dd6d64300e1073d5a8d68641426c244))
+
+
+### Bug Fixes
+
+* **capture:** repair placeholder capture link text in daily notes ([#1551](https://github.com/team-reflect/reflect-open/issues/1551)) ([e256c7b](https://github.com/team-reflect/reflect-open/commit/e256c7ba7eeba188c1a6b325dcac9f3c46e1516a))
+
 ## [0.16.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.2...v0.16.0-beta.3) (2026-10-16)
 
 
