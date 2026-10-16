@@ -33,6 +33,15 @@ pub(super) fn read(root: &Path, rel: &str) -> String {
     fs::read_to_string(root.join(rel)).unwrap()
 }
 
+/// Copy the note bytes at `rel` from one graph to another, the way iCloud
+/// does once both devices have converged.
+pub(super) fn copy_note(from_root: &Path, to_root: &Path, rel: &str) {
+    let bytes = fs::read(from_root.join(rel)).unwrap();
+    let path = to_root.join(rel);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, bytes).unwrap();
+}
+
 pub(super) fn head_message(root: &Path) -> String {
     let repo = Repository::open(root).unwrap();
     let commit = repo.head().unwrap().peel_to_commit().unwrap();
