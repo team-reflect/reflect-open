@@ -54,7 +54,7 @@ pub(crate) use self::io::file_occupied;
 pub(crate) use self::io::mark_dir_local_only;
 pub(crate) use self::io::modified_ms;
 /// The lexical traversal guard, shared with the conflict stores that mirror
-/// note paths under `.reflect/` (shadow bases, conflict archive).
+/// note paths under `.reflect/` (shadow bases).
 pub(crate) use self::resolve::ensure_relative;
 /// The full traversal guard, shared with sibling modules that address graph
 /// files (capture promotes screenshots into `assets/`).
@@ -460,33 +460,14 @@ pub fn note_write(
 pub struct NoteWriteOutcome {
     /// The note's on-disk mtime (epoch ms) after the call.
     pub modified_ms: Option<u64>,
-    /// Set when the note had moved past the expected revision and the file
-    /// now holds something other than `contents`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub merged: Option<MergedWrite>,
-}
-
-/// The note text a checked write settled on after merging with the file.
-#[derive(Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MergedWrite {
-    /// The full note text now on disk.
-    pub content: String,
-    pub kind: MergedKind,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum MergedKind {
-    /// A merge that kept every edit of both sides.
-    Exact,
-    /// A merge that may have changed text; both inputs are archived.
-    Reconciled,
+    /// The full note text now on disk, when the note had moved past the
+    /// expected revision and the file holds something other than `contents`.
+    pub merged: Option<String>,
 }
 
 /// Write a note. A checked write with an expected revision merges `contents`
 /// with a file that moved past that revision, under the graph lock, through
-/// the conflict ladder; any side a lossy outcome replaces is archived first.
+/// the conflict ladder.
 /// `still_current` runs under the lock before anything is written.
 fn write_note_revision(
     root: &Path,
@@ -518,17 +499,8 @@ fn write_note_revision(
     })
 }
 
-/// The note's text, or `None` when the file does not exist. The caller holds
-/// the graph lock.
-pub(crate) fn read_note_if_present(root: &Path, rel: &str) -> AppResult<Option<String>> {
-    match io::read_note_no_follow(root, &resolve(root, rel)?) {
-        Ok(value) => Ok(Some(value)),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(error.into()),
-    }
-}
-
 /// Write a note without a revision check. The caller holds the graph lock.
+#[cfg(test)]
 pub(crate) fn write_unchecked(
     root: &Path,
     rel: &str,
@@ -554,12 +526,11 @@ fn merge_into_moved_note(
     base: &str,
     current: String,
 ) -> AppResult<NoteWriteOutcome> {
-    use crate::conflict::archive::archive_unless_in_history;
     use crate::conflict::ladder::{self, ConflictInput};
-    use crate::conflict::{ConflictSide, Resolution, OTHER_DEVICE, THIS_DEVICE};
+    use crate::conflict::{ConflictSide, Resolution};
 
     let disk_ms = fs::metadata(target).ok().as_ref().and_then(modified_ms);
-    let unchanged = |merged: Option<MergedWrite>| NoteWriteOutcome {
+    let unchanged = |merged: Option<String>| NoteWriteOutcome {
         modified_ms: disk_ms,
         merged,
     };
@@ -576,39 +547,26 @@ fn merge_into_moved_note(
         sides: (
             ConflictSide {
                 content: contents.to_string(),
-                label: THIS_DEVICE.to_string(),
                 modified_ms: now_ms,
             },
             ConflictSide {
                 content: current.clone(),
-                label: OTHER_DEVICE.to_string(),
                 modified_ms: disk_ms_value,
             },
         ),
         merge_loop_detected: false,
     })?;
-    let (content, kind) = match resolution {
+    let content = match resolution {
         Resolution::AlreadyResolved => return Ok(unchanged(None)),
-        Resolution::Merged { content } => (content, MergedKind::Exact),
-        Resolution::Reconciled { content } => {
-            archive_unless_in_history(root, rel, Some(THIS_DEVICE), now_ms, contents.as_bytes())?;
-            archive_unless_in_history(
-                root,
-                rel,
-                Some(OTHER_DEVICE),
-                disk_ms_value,
-                current.as_bytes(),
-            )?;
-            (content, MergedKind::Reconciled)
-        }
+        Resolution::Merged { content } | Resolution::Reconciled { content } => content,
     };
     if content == current {
-        return Ok(unchanged(Some(MergedWrite { content, kind })));
+        return Ok(unchanged(Some(content)));
     }
     let modified_ms = write_own(root, rel, target, &content)?.modified_ms;
     Ok(NoteWriteOutcome {
         modified_ms,
-        merged: Some(MergedWrite { content, kind }),
+        merged: Some(content),
     })
 }
 
@@ -1508,7 +1466,7 @@ mod note_revision_tests {
         for word in ["user", "edited", "this", "bookmark"] {
             assert!(on_disk.contains(word), "{word} missing from {on_disk:?}");
         }
-        assert_eq!(outcome.merged.map(|merged| merged.content), Some(on_disk));
+        assert_eq!(outcome.merged, Some(on_disk));
         write_note_revision(
             directory.path(),
             "daily.md",
@@ -1538,13 +1496,7 @@ mod note_revision_tests {
             || Ok(()),
         )
         .unwrap();
-        assert_eq!(
-            outcome.merged,
-            Some(MergedWrite {
-                content: "A\nb\nc\nd\n".to_string(),
-                kind: MergedKind::Exact,
-            })
-        );
+        assert_eq!(outcome.merged, Some("A\nb\nc\nd\n".to_string()));
         assert_eq!(fs::read_to_string(&target).unwrap(), "A\nb\nc\nd\n");
         assert_eq!(
             outcome.modified_ms,
@@ -1555,11 +1507,10 @@ mod note_revision_tests {
             "note.md",
             b"A\nb\nc\nd\n"
         ));
-        assert!(!directory.path().join(".reflect/conflict-archive").exists());
     }
 
     #[test]
-    fn a_reconciled_write_archives_the_buffer() {
+    fn a_reconciled_write_keeps_both_words() {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path();
         let target = root.join("notes/color.md");
@@ -1575,19 +1526,8 @@ mod note_revision_tests {
         )
         .unwrap();
         let merged = outcome.merged.unwrap();
-        assert_eq!(merged.kind, MergedKind::Reconciled);
-        assert!(merged.content.contains("blue") && merged.content.contains("green"));
-        assert_eq!(fs::read_to_string(&target).unwrap(), merged.content);
-
-        let versions = crate::conflict::archive::list(root, "notes/color.md").unwrap();
-        let mut archived: Vec<String> = versions
-            .iter()
-            .map(|version| {
-                crate::conflict::archive::read(root, "notes/color.md", &version.name).unwrap()
-            })
-            .collect();
-        archived.sort();
-        assert_eq!(archived, ["color blue\n", "color green\n"]);
+        assert!(merged.contains("blue") && merged.contains("green"));
+        assert_eq!(fs::read_to_string(&target).unwrap(), merged);
     }
 
     #[test]
@@ -1603,16 +1543,12 @@ mod note_revision_tests {
         let outcome =
             write_note_revision(root, "note.md", mine, true, Some(base), || Ok(())).unwrap();
         let merged = outcome.merged.unwrap();
-        assert_eq!(merged.kind, MergedKind::Exact);
-        assert!(merged.content.starts_with("INTRO\n"), "{}", merged.content);
+        assert!(merged.starts_with("INTRO\n"), "{merged}");
         assert!(
-            merged
-                .content
-                .contains("<<<<<<< mac\nmiddle mac\n=======\nmiddle phone\n>>>>>>> phone\n"),
-            "{}",
-            merged.content
+            merged.contains("<<<<<<< mac\nmiddle mac\n=======\nmiddle phone\n>>>>>>> phone\n"),
+            "{merged}"
         );
-        assert_eq!(fs::read_to_string(&target).unwrap(), merged.content);
+        assert_eq!(fs::read_to_string(&target).unwrap(), merged);
     }
 
     #[test]
@@ -1648,20 +1584,17 @@ mod note_revision_tests {
                 merged: None,
             })
             .unwrap(),
-            serde_json::json!({ "modifiedMs": 7 })
+            serde_json::json!({ "modifiedMs": 7, "merged": null })
         );
         assert_eq!(
             serde_json::to_value(NoteWriteOutcome {
                 modified_ms: None,
-                merged: Some(MergedWrite {
-                    content: "x".to_string(),
-                    kind: MergedKind::Reconciled,
-                }),
+                merged: Some("x".to_string()),
             })
             .unwrap(),
             serde_json::json!({
                 "modifiedMs": null,
-                "merged": { "content": "x", "kind": "reconciled" },
+                "merged": "x",
             })
         );
     }

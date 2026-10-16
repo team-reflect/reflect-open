@@ -123,10 +123,9 @@ fn merge_frontmatter_only(
 mod tests {
     use super::*;
 
-    fn side(content: &str, label: &str, modified_ms: u64) -> ConflictSide {
+    fn side(content: &str, modified_ms: u64) -> ConflictSide {
         ConflictSide {
             content: content.to_string(),
-            label: label.to_string(),
             modified_ms,
         }
     }
@@ -141,21 +140,13 @@ mod tests {
 
     #[test]
     fn identical_content_is_already_resolved() {
-        let result = resolve(input(
-            None,
-            (side("same\n", "Mac", 1), side("same\n", "iPhone", 2)),
-        ))
-        .unwrap();
+        let result = resolve(input(None, (side("same\n", 1), side("same\n", 2)))).unwrap();
         assert_eq!(result, Resolution::AlreadyResolved);
     }
 
     #[test]
     fn whitespace_noise_keeps_the_newer_side() {
-        let result = resolve(input(
-            None,
-            (side("text  \n\n", "Mac", 1), side("text\n", "iPhone", 2)),
-        ))
-        .unwrap();
+        let result = resolve(input(None, (side("text  \n\n", 1), side("text\n", 2)))).unwrap();
         assert_eq!(
             result,
             Resolution::Merged {
@@ -170,8 +161,8 @@ mod tests {
         let result = resolve(input(
             Some(base),
             (
-                side("# T\n\nALPHA\n\nomega\n", "Mac", 1),
-                side("# T\n\nalpha\n\nOMEGA\n", "iPhone", 2),
+                side("# T\n\nALPHA\n\nomega\n", 1),
+                side("# T\n\nalpha\n\nOMEGA\n", 2),
             ),
         ))
         .unwrap();
@@ -186,11 +177,7 @@ mod tests {
     #[test]
     fn overlapping_edits_reconcile_without_markers() {
         let base = "line\n";
-        let result = resolve(input(
-            Some(base),
-            (side("mac\n", "Mac", 1), side("phone\n", "iPhone", 2)),
-        ))
-        .unwrap();
+        let result = resolve(input(Some(base), (side("mac\n", 1), side("phone\n", 2)))).unwrap();
         let Resolution::Reconciled { content } = result else {
             panic!("expected Reconciled, got {result:?}");
         };
@@ -207,8 +194,8 @@ mod tests {
         let result = resolve(input(
             Some(base),
             (
-                side("# 2026-07-04\n\n- seed\n- mac\n", "Mac", 1),
-                side("# 2026-07-04\n\n- seed\n- phone\n", "iPhone", 2),
+                side("# 2026-07-04\n\n- seed\n- mac\n", 1),
+                side("# 2026-07-04\n\n- seed\n- phone\n", 2),
             ),
         ))
         .unwrap();
@@ -222,8 +209,8 @@ mod tests {
 
     #[test]
     fn union_orders_tails_by_timestamp_not_argument_order() {
-        let older = side("- seed\n- older tail\n", "Mac", 1);
-        let newer = side("- seed\n- newer tail\n", "iPhone", 2);
+        let older = side("- seed\n- older tail\n", 1);
+        let newer = side("- seed\n- newer tail\n", 2);
         // Same pair, both argument orders → identical bytes (convergence).
         let one = resolve(input(None, (older.clone(), newer.clone()))).unwrap();
         let two = resolve(input(None, (newer, older))).unwrap();
@@ -240,10 +227,7 @@ mod tests {
     fn any_note_unions_disjoint_appends() {
         let result = resolve(input(
             None,
-            (
-                side("- a\n- mac\n", "Mac", 1),
-                side("- a\n- phone\n", "iPhone", 2),
-            ),
+            (side("- a\n- mac\n", 1), side("- a\n- phone\n", 2)),
         ))
         .unwrap();
         assert_eq!(
@@ -252,11 +236,7 @@ mod tests {
                 content: "- a\n- mac\n- phone\n".to_string()
             }
         );
-        let result = resolve(input(
-            None,
-            (side("- mac\n", "Mac", 1), side("- phone\n", "iPhone", 2)),
-        ))
-        .unwrap();
+        let result = resolve(input(None, (side("- mac\n", 1), side("- phone\n", 2)))).unwrap();
         assert_eq!(
             result,
             Resolution::Merged {
@@ -273,10 +253,7 @@ mod tests {
         let base = "- a\n- b\n";
         let result = resolve(input(
             Some(base),
-            (
-                side("- a\n- b\n- mac\n", "Mac", 1),
-                side("- a\n- phone\n", "iPhone", 2),
-            ),
+            (side("- a\n- b\n- mac\n", 1), side("- a\n- phone\n", 2)),
         ))
         .unwrap();
         let Resolution::Reconciled { content } = result else {
@@ -294,8 +271,8 @@ mod tests {
         let result = resolve(input(
             Some(base),
             (
-                side("---\nid: abc\nisPinned: true\n---\n# Body\n", "Mac", 1),
-                side("---\nid: abc\nprivate: true\n---\n# Body\n", "iPhone", 2),
+                side("---\nid: abc\nisPinned: true\n---\n# Body\n", 1),
+                side("---\nid: abc\nprivate: true\n---\n# Body\n", 2),
             ),
         ))
         .unwrap();
@@ -309,10 +286,7 @@ mod tests {
 
     #[test]
     fn the_loop_breaker_keeps_the_newer_side() {
-        let mut conflict = input(
-            Some("base\n"),
-            (side("merge A\n", "Mac", 1), side("merge B\n", "iPhone", 2)),
-        );
+        let mut conflict = input(Some("base\n"), (side("merge A\n", 1), side("merge B\n", 2)));
         conflict.merge_loop_detected = true;
         assert_eq!(
             resolve(conflict).unwrap(),
@@ -324,8 +298,8 @@ mod tests {
 
     #[test]
     fn resolution_is_argument_order_independent() {
-        let a = side("# T\n\nmac edit\n", "Mac", 5);
-        let b = side("# T\n\nphone edit\n", "iPhone", 5); // equal stamps → content tiebreak
+        let a = side("# T\n\nmac edit\n", 5);
+        let b = side("# T\n\nphone edit\n", 5); // equal stamps → content tiebreak
         let one = resolve(input(None, (a.clone(), b.clone()))).unwrap();
         let two = resolve(input(None, (b, a))).unwrap();
         assert_eq!(one, two);

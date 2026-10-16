@@ -572,11 +572,6 @@ fn assert_merged_without_markers(content: &str, words: &[&str]) {
     }
 }
 
-/// The archived versions of `rel` on the device at `root`.
-fn archived(root: &Path, rel: &str) -> Vec<crate::conflict::archive::ArchivedVersion> {
-    crate::conflict::archive::list(root, rel).unwrap()
-}
-
 #[test]
 fn daily_append_on_two_devices_merges_by_union() {
     let fixture = fixture();
@@ -604,7 +599,6 @@ fn daily_append_on_two_devices_merges_by_union() {
         "{content}"
     );
     assert_merged_without_markers(&content, &["- lunch on b\n", "- coffee on a\n"]);
-    assert!(archived(root_a, rel).is_empty());
 
     assert!(push(root_a, None).unwrap().pushed);
     fetch(&root_b, None).unwrap();
@@ -686,9 +680,6 @@ fn both_devices_resolve_the_same_pair_to_the_same_bytes() {
     assert_eq!(head_blob(&root_b, rel), content);
     assert_eq!(read(&root_b, rel), content);
     assert_merged_without_markers(&content, &["alpha", "bravo"]);
-    // Both sides are reachable from the merge's parents, so nothing is archived.
-    assert!(archived(root_a, rel).is_empty());
-    assert!(archived(&root_b, rel).is_empty());
 }
 
 #[test]
@@ -716,7 +707,6 @@ fn a_deletion_beside_an_append_is_reconciled_not_resurrected() {
 
     let side = |content: &str, modified_ms| crate::conflict::ConflictSide {
         content: content.to_string(),
-        label: String::new(),
         modified_ms,
     };
     let expected = crate::conflict::ladder::resolve(crate::conflict::ladder::ConflictInput {
@@ -731,8 +721,6 @@ fn a_deletion_beside_an_append_is_reconciled_not_resurrected() {
     let content = read(root_a, rel);
     assert_eq!(content, expected);
     assert_eq!(content, "a\nb\nd\n", "the deletion must stay deleted");
-    // Both sides are in history, so the reconcile archives neither.
-    assert!(archived(root_a, rel).is_empty());
 }
 
 /// The one path in `paths` that starts with `prefix`.
