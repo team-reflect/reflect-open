@@ -315,6 +315,11 @@ pub fn note_move_indexed<R: tauri::Runtime>(
     crate::fs::with_graph_lock(&root, || {
         crate::fs::root_for_generation(&graph, generation)?;
         let mut state = lock_state(&index)?;
+        if state.root.as_deref() != Some(root.as_path()) {
+            return Err(AppError::io(
+                "the index is open for another graph; dropping the move",
+            ));
+        }
         let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
         move_rows(conn, &request.from, &request.to, &request.to_address)?;
         if let Err(err) = crate::fs::move_note_file(&root, &request.from, &request.to) {

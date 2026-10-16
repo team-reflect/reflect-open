@@ -448,6 +448,7 @@ pub fn note_write(
         &contents,
         check_contents == Some(true),
         expected_contents.as_deref(),
+        || root_for_generation(&state, generation).map(drop),
     )?;
     invalidate_file_catalog(&state, &root);
     Ok(outcome)
@@ -488,14 +489,17 @@ pub enum MergedKind {
 /// Write a note. A checked write with an expected revision merges `contents`
 /// with a file that moved past that revision, under the graph lock, through
 /// the conflict ladder; any side a lossy outcome replaces is archived first.
+/// `still_current` runs under the lock before anything is written.
 fn write_note_revision(
     root: &Path,
     path: &str,
     contents: &str,
     checked: bool,
     expected: Option<&str>,
+    still_current: impl FnOnce() -> AppResult<()>,
 ) -> AppResult<NoteWriteOutcome> {
     with_graph_lock(root, || {
+        still_current()?;
         let target = resolve(root, path)?;
         if checked {
             let current = match io::read_note_no_follow(root, &target) {
@@ -616,6 +620,7 @@ pub fn note_create(
 ) -> AppResult<NoteCreateOutcome> {
     let root = root_for_generation(&state, generation)?;
     let outcome = with_graph_lock(&root, || {
+        root_for_generation(&state, generation)?;
         let target = resolve(&root, &path)?;
         let outcome = atomic_create(&root, &target, &contents)?;
         if matches!(outcome, AtomicCreateOutcome::Created(_)) {
@@ -648,6 +653,7 @@ pub fn asset_write(
         .decode(contents_base64.as_bytes())
         .map_err(|err| AppError::io(format!("invalid base64 asset payload: {err}")))?;
     with_graph_lock(&root, || {
+        root_for_generation(&state, generation)?;
         atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)
     })?;
     invalidate_file_catalog(&state, &root);
@@ -668,6 +674,7 @@ pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>
     }
     let root = root_for_generation(&state, generation)?;
     with_graph_lock(&root, || {
+        root_for_generation(&state, generation)?;
         let abs = resolve(&root, &path)?;
         // An iCloud-evicted segment exists only as its `.name.icloud` stub —
         // mirror `note_delete` so a cancelled session's evicted parts still
@@ -923,7 +930,10 @@ pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()>
 #[tauri::command(async)]
 pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
     let root = root_for_generation(&state, generation)?;
-    with_graph_lock(&root, || delete_note_locked(&root, &path))?;
+    with_graph_lock(&root, || {
+        root_for_generation(&state, generation)?;
+        delete_note_locked(&root, &path)
+    })?;
     invalidate_file_catalog(&state, &root);
     Ok(())
 }
@@ -951,9 +961,9 @@ fn delete_note_locked(root: &Path, path: &str) -> AppResult<()> {
 
 /// Move the open graph's **entire directory** to the OS trash (recoverable)
 /// and drop it from recents. The session is invalidated (root cleared,
-/// generation bumped) **before** the filesystem is touched: a concurrent
-/// write pinned to this generation must fail its root check instead of
-/// `create_dir_all`-recreating directories under a path being trashed. If
+/// generation bumped) **before** the filesystem is touched: a pinned write
+/// re-checks its generation under the graph lock, so one queued behind this
+/// delete fails instead of recreating directories under the trashed path. If
 /// the trash move itself then fails, the session stays invalidated and the
 /// frontend re-opens the intact directory to restore a writable session.
 /// Pinned to `generation` — a delete enqueued before a graph switch must
@@ -965,8 +975,8 @@ pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> 
     {
         let root = root_for_generation(&state, generation)?;
         // Take the graph lock first, then check the generation and invalidate
-        // under one session lock hold, so a pinned write that waited on the
-        // graph lock fails its root check instead of recreating the root.
+        // under one session lock hold. Pinned writes re-check the generation
+        // under the graph lock, so one that waited here fails afterwards.
         with_graph_lock(&root, || {
             {
                 let mut inner = lock_graph(&state)?;
@@ -1454,7 +1464,7 @@ mod note_revision_tests {
             let _: AppResult<()> = with_graph_lock(&root, || panic!("simulated writer panic"));
         });
         let target = directory.path().join("note.md");
-        write_note_revision(directory.path(), "note.md", "saved", true, None).unwrap();
+        write_note_revision(directory.path(), "note.md", "saved", true, None, || Ok(())).unwrap();
         assert_eq!(fs::read_to_string(target).unwrap(), "saved");
     }
 
@@ -1463,9 +1473,15 @@ mod note_revision_tests {
         let directory = tempfile::tempdir().unwrap();
         let target = directory.path().join("note.md");
         fs::write(&target, "a\r\nb\r\n").unwrap();
-        let outcome =
-            write_note_revision(directory.path(), "note.md", "a\nb!\n", true, Some("a\nb\n"))
-                .unwrap();
+        let outcome = write_note_revision(
+            directory.path(),
+            "note.md",
+            "a\nb!\n",
+            true,
+            Some("a\nb\n"),
+            || Ok(()),
+        )
+        .unwrap();
         assert_eq!(outcome.merged, None);
         assert_eq!(fs::read_to_string(target).unwrap(), "a\nb!\n");
     }
@@ -1481,6 +1497,7 @@ mod note_revision_tests {
             "bookmark",
             true,
             Some("old text"),
+            || Ok(()),
         )
         .unwrap();
         let on_disk = fs::read_to_string(&target).unwrap();
@@ -1494,6 +1511,7 @@ mod note_revision_tests {
             "user edited this\nbookmark",
             true,
             Some(&fs::read_to_string(&target).unwrap()),
+            || Ok(()),
         )
         .unwrap();
         assert_eq!(
@@ -1513,6 +1531,7 @@ mod note_revision_tests {
             "A\nb\nc\n",
             true,
             Some("a\nb\nc\n"),
+            || Ok(()),
         )
         .unwrap();
         assert_eq!(
@@ -1548,6 +1567,7 @@ mod note_revision_tests {
             "color blue\n",
             true,
             Some("color red\n"),
+            || Ok(()),
         )
         .unwrap();
         let merged = outcome.merged.unwrap();
@@ -1576,7 +1596,8 @@ mod note_revision_tests {
         let target = root.join("note.md");
         let marked = "<<<<<<< mac\nx mac\n=======\nx phone\n>>>>>>> phone\n";
         fs::write(&target, marked).unwrap();
-        let outcome = write_note_revision(root, "note.md", "x mine\n", true, Some("x\n")).unwrap();
+        let outcome =
+            write_note_revision(root, "note.md", "x mine\n", true, Some("x\n"), || Ok(())).unwrap();
         assert_eq!(
             outcome.merged,
             Some(MergedWrite {
@@ -1600,8 +1621,15 @@ mod note_revision_tests {
         let target = directory.path().join("note.md");
         fs::write(&target, "a\nb\n").unwrap();
         let before = fs::metadata(&target).ok().as_ref().and_then(modified_ms);
-        let outcome =
-            write_note_revision(directory.path(), "note.md", "a\nb\n", true, Some("a\n")).unwrap();
+        let outcome = write_note_revision(
+            directory.path(),
+            "note.md",
+            "a\nb\n",
+            true,
+            Some("a\n"),
+            || Ok(()),
+        )
+        .unwrap();
         assert_eq!(
             outcome,
             NoteWriteOutcome {
@@ -1642,8 +1670,82 @@ mod note_revision_tests {
     fn missing_revision_never_clobbers_an_existing_daily() {
         let directory = tempfile::tempdir().unwrap();
         let target = directory.path().join("daily.md");
-        write_note_revision(directory.path(), "daily.md", "first", true, None).unwrap();
-        assert!(write_note_revision(directory.path(), "daily.md", "second", true, None).is_err());
+        write_note_revision(directory.path(), "daily.md", "first", true, None, || Ok(())).unwrap();
+        assert!(write_note_revision(
+            directory.path(),
+            "daily.md",
+            "second",
+            true,
+            None,
+            || Ok(())
+        )
+        .is_err());
         assert_eq!(fs::read_to_string(&target).unwrap(), "first");
+    }
+}
+
+#[cfg(test)]
+mod graph_delete_race_tests {
+    use super::{graph_lock, note_write, with_graph_lock, GraphInner, GraphState};
+    use std::sync::{mpsc, Mutex};
+    use std::time::{Duration, Instant};
+    use tauri::Manager;
+
+    #[test]
+    fn a_write_queued_behind_graph_delete_does_not_recreate_the_root() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("graph");
+        std::fs::create_dir_all(root.join("notes")).unwrap();
+        let app = tauri::test::mock_builder()
+            .manage(GraphState(Mutex::new(GraphInner {
+                generation: 1,
+                root: Some(root.clone()),
+                catalog: None,
+                catalog_revision: 0,
+            })))
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock app");
+        let graph = app.state::<GraphState>().inner();
+        let handle = app.handle().clone();
+
+        std::thread::scope(|scope| {
+            let (locked_tx, locked_rx) = mpsc::channel();
+            let (release_tx, release_rx) = mpsc::channel::<()>();
+            // Stands in for `graph_delete`: invalidate and trash under the lock.
+            let root = &root;
+            let deleter = scope.spawn(move || {
+                with_graph_lock(root, || {
+                    locked_tx.send(()).unwrap();
+                    release_rx.recv().unwrap();
+                    let mut inner = graph.0.lock().unwrap();
+                    inner.root = None;
+                    inner.generation += 1;
+                    drop(inner);
+                    std::fs::remove_dir_all(root)?;
+                    Ok(())
+                })
+            });
+            locked_rx.recv().unwrap();
+            let writer = scope.spawn(move || {
+                note_write(
+                    "notes/late.md".to_string(),
+                    "# Late\n".to_string(),
+                    1,
+                    None,
+                    None,
+                    handle.state::<GraphState>(),
+                )
+            });
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while graph_lock::holders(root) < 2 {
+                assert!(Instant::now() < deadline, "the write never queued");
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            release_tx.send(()).unwrap();
+            deleter.join().unwrap().unwrap();
+            let error = writer.join().unwrap().unwrap_err();
+            assert!(error.message().contains("graph changed"), "{error:?}");
+        });
+        assert!(!root.exists());
     }
 }
