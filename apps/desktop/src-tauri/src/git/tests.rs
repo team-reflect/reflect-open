@@ -13,8 +13,8 @@ use super::fault::{self, Fault, FaultPoint};
 use super::merge::{merge_remote, MergeKind};
 use super::remote::{fetch, push, remote_head};
 use super::test_support::{
-    fixture, head_blob, head_message, head_tree_paths, read, remote_blob, scaffold_graph,
-    second_device, write, Fixture,
+    copy_note, fixture, head_blob, head_message, head_tree_paths, read, remote_blob,
+    scaffold_graph, second_device, write, Fixture,
 };
 use super::{setup, status, MAX_FILE_BYTES};
 
@@ -2021,4 +2021,128 @@ fn a_local_delete_of_an_incoming_change_is_reported_for_review() {
 
     assert_eq!(read(root_a, "daily/2026-10-01.md"), PHONE_DAILY);
     assert_eq!(merged.review_paths, vec!["daily/2026-10-01.md".to_string()]);
+}
+
+const COEXISTING_NOTE: &str = "daily/2026-10-16.md";
+
+fn append_line(root: &Path, line: &str) {
+    let mut text = read(root, COEXISTING_NOTE);
+    text.push_str(line);
+    text.push('\n');
+    write(root, COEXISTING_NOTE, &text);
+}
+
+fn assert_clean_merge(root: &Path) {
+    fetch(root, None).unwrap();
+    let merged = merge_remote(root).unwrap();
+    assert!(
+        matches!(
+            merged.kind,
+            MergeKind::UpToDate | MergeKind::FastForward | MergeKind::Merged
+        ),
+        "{merged:?}"
+    );
+    assert!(merged.review_paths.is_empty(), "{merged:?}");
+}
+
+fn sync_device(root: &Path) {
+    commit_all(root, "sync", MAX_FILE_BYTES).unwrap();
+    assert_clean_merge(root);
+    push(root, None).unwrap();
+}
+
+fn coexisting_pair() -> (Fixture, std::path::PathBuf) {
+    let fixture = fixture();
+    write(&fixture.graph_a, COEXISTING_NOTE, "# 2026-10-16\n\n");
+    commit_all(&fixture.graph_a, "base", MAX_FILE_BYTES).unwrap();
+    push(&fixture.graph_a, None).unwrap();
+    let root_b = second_device(&fixture);
+    (fixture, root_b)
+}
+
+fn assert_converged(fixture: &Fixture, root_b: &Path, lines: &[String]) {
+    let root_a = &fixture.graph_a;
+    let text = read(root_a, COEXISTING_NOTE);
+    assert_eq!(read(root_b, COEXISTING_NOTE), text);
+    assert_eq!(head_blob(root_a, COEXISTING_NOTE), text);
+    assert_eq!(head_blob(root_b, COEXISTING_NOTE), text);
+    assert_eq!(remote_blob(fixture, COEXISTING_NOTE), text);
+    for marker in ["<<<<<<<", "=======", ">>>>>>>"] {
+        assert!(!text.contains(marker), "{text}");
+    }
+    let body: Vec<&str> = text.lines().skip(2).collect();
+    assert_eq!(body.len(), lines.len(), "{text}");
+    for line in lines {
+        assert_eq!(body.iter().filter(|got| *got == line).count(), 1, "{text}");
+    }
+}
+
+#[test]
+fn coexisting_devices_converge_without_text_merges() {
+    let (fixture, root_b) = coexisting_pair();
+    let root_a = &fixture.graph_a;
+    let mut lines = Vec::new();
+    for round in 0..20 {
+        let line = format!("- line {round}");
+        let (editor, other) = if round % 2 == 0 {
+            (root_a.as_path(), root_b.as_path())
+        } else {
+            (root_b.as_path(), root_a.as_path())
+        };
+        append_line(editor, &line);
+        copy_note(editor, other, COEXISTING_NOTE);
+        commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
+        commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+        lines.push(line);
+    }
+
+    sync_device(root_a);
+    sync_device(&root_b);
+    assert_clean_merge(root_a);
+
+    assert_converged(&fixture, &root_b, &lines);
+}
+
+#[test]
+fn coexisting_devices_with_a_late_icloud_copy_keep_every_line() {
+    let (fixture, root_b) = coexisting_pair();
+    let root_a = &fixture.graph_a;
+    let mut lines = Vec::new();
+    for round in 0..20 {
+        if round == 10 {
+            append_line(root_a, "- late a");
+            append_line(&root_b, "- late b");
+            commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
+            push(root_a, None).unwrap();
+            commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+            fetch(&root_b, None).unwrap();
+            let merged = merge_remote(&root_b).unwrap();
+            assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
+            assert!(merged.review_paths.is_empty(), "{merged:?}");
+            push(&root_b, None).unwrap();
+            copy_note(&root_b, root_a, COEXISTING_NOTE);
+            commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
+            lines.push("- late a".to_string());
+            lines.push("- late b".to_string());
+            continue;
+        }
+        let line = format!("- line {round}");
+        let (editor, other) = if round % 2 == 0 {
+            (root_a.as_path(), root_b.as_path())
+        } else {
+            (root_b.as_path(), root_a.as_path())
+        };
+        append_line(editor, &line);
+        copy_note(editor, other, COEXISTING_NOTE);
+        commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
+        commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+        lines.push(line);
+    }
+
+    sync_device(root_a);
+    sync_device(&root_b);
+    assert_clean_merge(root_a);
+    assert_clean_merge(&root_b);
+
+    assert_converged(&fixture, &root_b, &lines);
 }
