@@ -30,7 +30,8 @@ edit the same note while apart.
   with no pending iCloud downloads. The GitHub history is noisy, because
   every device commits what iCloud delivered, and the backup trails your
   edits by about five minutes. For a Git-only graph, the desktop app probes
-  the remote every 90 seconds and pulls when it moved.
+  the remote every 90 seconds while the window is visible and sync is not in
+  error, and pulls when it moved.
 
 ## What happens on a conflict
 

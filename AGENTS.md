@@ -172,8 +172,8 @@ Safety rules for the sync path: [docs/git-backup-safety.md](docs/git-backup-safe
 - **Decision table for every conflict.** A side deleted: keep the changed side. Both sides changed and libgit2 merges cleanly: use the merge. Both sides changed a `.md` note: `conflict/ladder.rs` (also used by the editor save in `note_write`), which always returns text and never writes markers. Both sides changed any other file: keep the local file and write the other version as `<stem> (conflict <UTC time> <hash8>).<ext>` beside it (`conflict/copy.rs`). Conflict markers are plain text to Reflect: the app neither writes nor interprets them.
 - **One lock per graph.** `fs/graph_lock.rs` serializes git commands, note writes and sweep writes. Take it before you touch notes in Rust.
 - **Own writes.** `fs/own_writes.rs` records the note bytes this process wrote, so a later read can tell its own content from a change that arrived from elsewhere.
-- **Pull commits and merges under one lock.** The engine fetches first, then `git_pull` (`pull_all` in `git/mod.rs`) commits and merges under one graph lock, then it pushes. The working tree equals HEAD at checkout.
-- **Cadence.** Desktop probes the remote every 90 s while visible and pulls when it moved. A graph that holds both Git and iCloud waits five quiet minutes before it uses the network. One sync method per graph is recommended.
+- **Pull commits and merges under one lock.** The engine fetches first (`git_fetch` and `git_remote_head` run outside the graph lock), then `git_pull` (`pull_all` in `git/mod.rs`) commits and merges under one graph lock, then it pushes. The working tree equals HEAD at checkout.
+- **Cadence.** Desktop probes the remote every 90 s while the window is visible and sync is not in error, and pulls when it moved. A graph that holds both Git and iCloud waits five quiet minutes before it uses the network. One sync method per graph is recommended.
 - **`.reflect/` never syncs.** Git ignores it and iCloud marks it local-only.
 
 ### Related repos

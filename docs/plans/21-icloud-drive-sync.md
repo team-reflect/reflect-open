@@ -41,10 +41,9 @@ iOS Phase 1 leg); on-device verification is the release gate. What exists:
 - **Phase 3**: `src-tauri/src/conflict/` — the deterministic ladder
   (identical/whitespace → diff3 → key-wise frontmatter → guarded
   append-union → word-level merge), shadow store with the advance rule +
-  merge-pair loop breaker, conflict archive with age/count pruning.
+  merge-pair loop breaker.
   Convergence covered by argument-order-independence tests.
-- **Phase 4**: docs ([docs/icloud-sync.md](../icloud-sync.md)); archive
-  pruning shipped with the sweep. Remaining: spike 4 (above), the two-device
+- **Phase 4**: docs ([docs/icloud-sync.md](../icloud-sync.md)). Remaining: spike 4 (above), the two-device
   manual matrix, and the deferred status-line upload/download mapping.
 
 **Explicitly not in scope:** AI-assisted conflict resolution (deferred enhancement —
@@ -138,8 +137,8 @@ silently. `.md` notes never drop a word, and other files keep a conflict copy be
      both appended block sets, deduplicated by exact block match, ordered by
      version timestamp. Also the rule for **creation collisions**: merge
      `2026-07-04 2.md` into the canonical file (union; both seeded from the same
-     template/bullet, so the common-prefix shape holds), archive, delete the
-     duplicate.
+     template/bullet, so the common-prefix shape holds), then delete the
+     duplicate. The duplicate folds into the canonical note; nothing is archived.
 4. **Binary assets** → keep-both using `name (conflict <UTC time> <hash8>).ext`
    from `conflict/copy.rs`
 5. **Overlapping text edits** → marker block (contract 2). *(Now a word-level merge that returns text.)* This is the floor: *never* silent last-writer-wins, *never* a

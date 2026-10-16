@@ -73,7 +73,7 @@ The stop points of a pull, and what the next cycle does:
 | Stop point | Next cycle |
 | --- | --- |
 | Before the merge commit is written | Nothing is on disk. The pull runs again. |
-| After the merge commit, before checkout | The working tree still equals HEAD, so nothing is committed. The merge runs again and makes the same bytes. The only cost is one unreferenced commit. |
+| After the merge commit, before checkout | The working tree still equals HEAD, so nothing is committed. The merge runs again and makes the same bytes. The app keeps no extra reference to that commit. |
 | After checkout, before the branch ref moves | The working tree equals the merge tree. The next commit records it as a child of HEAD, and the merge with the remote runs again. Clean merges agree on both sides. A `.md` note that the ladder already resolved runs through the ladder again. The word-level merge can repeat a phrase, but it writes no marker and loses no word. |
 
 - Test: `git::tests::merge_interrupted_before_commit_converges_next_cycle`,
@@ -107,8 +107,7 @@ Other text files try a three-way merge (`conflict/merge3.rs`) before the last
 row applies. The UTC time is the commit time of the remote side. `hash8` is
 the first 8 hex digits of the blob hash of the remote version. If that name
 is taken, a counter is added before the extension, for example
-`(conflict 2026-10-16 08-05-31 a1b2c3d4 2)`. Symlinks and submodules keep both
-sides. The ladder orders the sides by commit time and content, so both devices
+`(conflict 2026-10-16 08-05-31 a1b2c3d4 2)`. Symlinks keep both sides. Submodule conflicts keep the local gitlink. The ladder orders the sides by commit time and content, so both devices
 produce the same bytes.
 
 - Test: `git::tests::conflicting_edits_merge_without_markers`,
