@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { canonicalEmail, canonicalEmails, extractEmailFields, foldEmail } from './email-fields.ts'
+import { canonicalEmail, canonicalEmails, extractEmailFields } from './email-fields.ts'
 
-describe('foldEmail', () => {
+describe('canonicalEmail', () => {
   it('trims and lowercases', () => {
-    expect(foldEmail('  Ada@Example.COM ')).toBe('ada@example.com')
+    expect(canonicalEmail('  Ada@Example.COM ')).toBe('ada@example.com')
   })
 
   it('treats envelopes, display names, and mailto values as one identity', () => {

@@ -49,7 +49,7 @@ export {
   type ConflictSegment,
   type ConflictSide,
 } from './conflict-markers.ts'
-export { canonicalEmail, canonicalEmails, extractEmailFields, foldEmail } from './email-fields.ts'
+export { canonicalEmail, canonicalEmails, extractEmailFields } from './email-fields.ts'
 export { foldFallbackTitleKey, foldKey, foldTag } from './keys.ts'
 export { gistBodyHash, gistFilename } from './gist.ts'
 export { slugForTitle } from './slug.ts'

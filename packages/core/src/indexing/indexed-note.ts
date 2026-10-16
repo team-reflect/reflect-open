@@ -13,10 +13,10 @@ import {
 } from '../graph/paths.ts'
 import { hasSearchableChar } from '../lib/searchable-char.ts'
 import {
+  canonicalEmail,
   detectConflictMarkers,
   encodeTaskPath,
   extractEmailFields,
-  foldEmail,
   foldKey,
   foldTag,
   gistBodyHash,
@@ -162,7 +162,7 @@ export type IndexedAlias = z.infer<typeof indexedAliasSchema>
 export const indexedEmailSchema = z.object({
   /** Display casing (as written in the field bullet). */
   email: z.string(),
-  /** Case-folded match key ({@link foldEmail}) — what resolution compares against. */
+  /** Case-folded match key ({@link canonicalEmail}) — what resolution compares against. */
   emailKey: z.string(),
 })
 export type IndexedEmail = z.infer<typeof indexedEmailSchema>
@@ -397,7 +397,7 @@ export function buildIndexedNote(
     tags: parsed.tags.map((tag) => ({ tag, tagKey: foldTag(tag) })),
     aliases,
     claims: projectNoteClaims(parsed, aliases),
-    emails: extractEmailFields(body).map((email) => ({ email, emailKey: foldEmail(email) })),
+    emails: extractEmailFields(body).map((email) => ({ email, emailKey: canonicalEmail(email) })),
     // One reference can contribute several candidate spellings; the
     // projection stores each path once.
     assets: [...new Set(parsed.assets.map((asset) => asset.path))],
