@@ -1,8 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreWorkspaces": ["design-system"],
-  "ignore": ["apps/desktop/src-tauri/gen/**"],
-  "ignoreUnresolved": ["#imports"],
   "ignoreIssues": {
     "apps/desktop/src/components/ui/**": ["exports", "types"],
     "packages/db/src/schema.gen.ts": ["types"]
@@ -11,6 +8,8 @@
     ".": { "entry": ["fixtures/*.mjs"] },
     "packages/app": { "includeEntryExports": true } ,
     "packages/core": { "includeEntryExports": true } ,
-    "apps/desktop": { "ignoreDependencies": ["@sentry/cli"] }
+    "apps/desktop": { "ignoreDependencies": ["@sentry/cli"], "ignore": "src-tauri/gen/**" },
+    "apps/extensions": {  "ignoreUnresolved": ["#imports"] },
+    "design-system": {"ignore": "./**/*"}
   }
 }
