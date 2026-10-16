@@ -1,5 +1,5 @@
 import { useId, useState, type ReactElement, type ReactNode } from 'react'
-import { mobileSyncStatus, type MobileSyncDetail } from '@reflect/app'
+import { getMobileSyncStatus, type MobileSyncDetail } from '@reflect/app'
 import { useQuery } from '@tanstack/react-query'
 import {
   aiProvider,
@@ -182,7 +182,7 @@ export function MobileSettings(): ReactElement {
   })
 
   const backup = sync?.backup ?? null
-  const status = mobileSyncStatus({ backup })
+  const status = getMobileSyncStatus(backup)
   const repo = backup !== null && backup.phase === 'connected' ? backup.repo : null
   // The connect entry point is local-graph-only (iCloud sync and a Git remote
   // are mutually exclusive per graph, Plan 21) and waits out the controller's

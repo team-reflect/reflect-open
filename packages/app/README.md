@@ -35,7 +35,7 @@ graph lifecycles run in this window.
 | `daily/` | The day-window, week-window and month-grid arithmetic of the daily surfaces. |
 | `calendar/` | `CalendarEventsService`, the daily note's events panel. |
 | `settings/` | `ThemeService`. |
-| `sync/` | `mobileSyncStatus` and the connect-GitHub wizard. |
+| `sync/` | `getMobileSyncStatus` and the connect-GitHub wizard. |
 | `mobile/` | `KeyboardService` and `ShareService`. |
 | `testing/` | The `@reflect/app/testing` entry. |
 

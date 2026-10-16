@@ -1,5 +1,4 @@
 import { useSyncExternalStore, type ReactElement } from 'react'
-import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -31,14 +30,8 @@ export function IndexProgressPill(): ReactElement | null {
     indexLifecycle.subscribeFileProgress,
     indexLifecycle.fileProgress,
   )
-  const keyboardVisible = useKeyboardVisible() // FIXME: is this keyboardVisible check necessary? MobileStatusLayer already checks for keyboardVisible and hides the entire layer, so this check may be redundant.
 
-  if (
-    progress === null ||
-    progress.total < MIN_TOTAL ||
-    progress.worked < MIN_WORKED ||
-    keyboardVisible
-  ) {
+  if (progress === null || progress.total < MIN_TOTAL || progress.worked < MIN_WORKED) {
     return null
   }
 

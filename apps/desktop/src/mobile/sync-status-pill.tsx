@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { mobileSyncStatus } from '@reflect/app'
+import { getMobileSyncStatus } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { useSyncContext } from '@/providers/sync-provider.tsx'
 
@@ -12,7 +12,7 @@ import { useSyncContext } from '@/providers/sync-provider.tsx'
  */
 export function SyncStatusPill(): ReactElement | null {
   const sync = useSyncContext()
-  const status = mobileSyncStatus({ backup: sync?.backup ?? null })
+  const status = getMobileSyncStatus(sync?.backup ?? null)
 
   if (status === null || status.tone === 'ok') {
     return null

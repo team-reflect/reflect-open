@@ -1,4 +1,3 @@
-import { createTestAppServices } from '@reflect/app/testing'
 import type { IndexFileProgress } from '@reflect/core'
 import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
 import { describe, expect, it } from 'vitest'
@@ -12,18 +11,10 @@ import { IndexProgressPill } from './index-progress-pill.tsx'
  * pill every single time even when everything skips read-free.
  */
 
-/**
- * Render the pill over a running pass at `progress`, with the keyboard at `keyboardInset`.
- */
-async function mount(
-  progress: IndexFileProgress,
-  keyboardInset = 0,
-): Promise<InAppRenderResult<TestCoreServices>> {
+async function mount(progress: IndexFileProgress): Promise<InAppRenderResult<TestCoreServices>> {
   const app = createTestCoreServices()
   app.indexLifecycle.setFileProgress(progress)
-  const appServices = createTestAppServices(app)
-  appServices.keyboard.publish(keyboardInset)
-  return await renderInApp(<IndexProgressPill />, { app, appServices })
+  return await renderInApp(<IndexProgressPill />, { app })
 }
 
 describe('IndexProgressPill', () => {
@@ -44,11 +35,6 @@ describe('IndexProgressPill', () => {
 
   it('stays hidden on a small graph even when every file is read', async () => {
     const view = await mount({ done: 90, total: 90, worked: 90 })
-    expect(view.getByRole('status').query()).toBeNull()
-  })
-
-  it('yields to the keyboard', async () => {
-    const view = await mount({ done: 500, total: 7_000, worked: 500 }, 300)
     expect(view.getByRole('status').query()).toBeNull()
   })
 })

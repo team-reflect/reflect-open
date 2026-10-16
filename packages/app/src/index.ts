@@ -38,10 +38,9 @@ export {
 export { type KeyboardService } from './mobile/keyboard-service.ts'
 export { type ShareService } from './mobile/share-service.ts'
 export {
-  mobileSyncStatus,
+  getMobileSyncStatus,
   type MobileSyncDetail,
   type MobileSyncStatus,
-  type SyncStatusInput,
 } from './sync/mobile-sync-status.ts'
 export {
   createConnectGithubWizardService,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BackupState } from '@reflect/core'
-import { mobileSyncStatus, type MobileSyncStatus } from './mobile-sync-status.ts'
+import { getMobileSyncStatus, type MobileSyncStatus } from './mobile-sync-status.ts'
 
 /**
  * The plain-language mapping (Plan 19, step 10): engine product states
@@ -17,7 +17,7 @@ function connected(status: Extract<BackupState, { phase: 'connected' }>['status'
 }
 
 function statusFor(backup: BackupState): MobileSyncStatus | null {
-  return mobileSyncStatus({ backup })
+  return getMobileSyncStatus(backup)
 }
 
 describe('engine state', () => {
@@ -66,14 +66,16 @@ describe('engine state', () => {
   })
 })
 
-describe('mobileSyncStatus', () => {
+describe('getMobileSyncStatus', () => {
   it('has nothing to say without a backup lifecycle', () => {
-    expect(mobileSyncStatus({ backup: null })).toBeNull()
+    expect(getMobileSyncStatus(null)).toBeNull()
   })
 
   it('reports engine states', () => {
-    expect(
-      mobileSyncStatus({ backup: connected({ state: 'offline', message: 'Offline' }) }),
-    ).toEqual({ label: 'Offline', tone: 'attention', detail: { kind: 'message', text: 'Offline' } })
+    expect(getMobileSyncStatus(connected({ state: 'offline', message: 'Offline' }))).toEqual({
+      label: 'Offline',
+      tone: 'attention',
+      detail: { kind: 'message', text: 'Offline' },
+    })
   })
 })

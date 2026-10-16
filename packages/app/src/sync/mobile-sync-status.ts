@@ -33,13 +33,14 @@ export type MobileSyncDetail =
   | { kind: 'countdown'; until: number }
 
 /**
- * Map the engine's product state to the mobile wording. `null` when the graph
- * has no backup configured — there is no status to speak of.
+ * Map the engine's product state to the mobile wording. `null` when no sync
+ * lifecycle is mounted (dev harness, tests) or the graph has no backup
+ * configured: there is no status to speak of.
  *
  * Precedence: an in-flight cycle shows as `Syncing`; errors and offline last.
  */
-function statusForBackup(backup: BackupState): MobileSyncStatus | null {
-  if (backup.phase !== 'connected') {
+export function getMobileSyncStatus(backup: BackupState | null): MobileSyncStatus | null {
+  if (backup === null || backup.phase !== 'connected') {
     return null
   }
   const status = backup.status
@@ -64,26 +65,4 @@ function statusForBackup(backup: BackupState): MobileSyncStatus | null {
     return { label: 'Backed up', tone: 'ok', detail: { kind: 'countdown', until: status.until } }
   }
   return { label: 'Backed up', tone: 'ok', detail: null }
-}
-
-/**
- * What {@link mobileSyncStatus} derives the status from.
- */
-export interface SyncStatusInput {
-  /**
-   * The open graph's backup state; `null` when no backup lifecycle is mounted.
-   */
-  backup: BackupState | null
-}
-
-/**
- * The mobile sync status, ready to display. `null` when there is nothing
- * truthful to say: no backup configured, or no sync lifecycle mounted (dev
- * harness, tests).
- */
-export function mobileSyncStatus({ backup }: SyncStatusInput): MobileSyncStatus | null {
-  if (backup === null) {
-    return null
-  }
-  return statusForBackup(backup) // FIXME: 1 merge statusForBackup and mobileSyncStatus into one function. // FIXME 2: rename mobileSyncStatus to something more descriptive, like getMobileSyncStatus.
 }
