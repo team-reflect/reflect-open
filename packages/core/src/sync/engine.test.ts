@@ -262,6 +262,43 @@ describe('createSyncEngineFactory', () => {
     engine.stop()
   })
 
+  it('a push-only cycle hidden after its commit still pushes', async () => {
+    let canStartCycle = true
+    const git = fakeGit()
+    git.onCommitAll(() => {
+      canStartCycle = false
+      return COMMITTED
+    })
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => CRED,
+      canStartCycle: () => canStartCycle,
+      idleMs: 100,
+    })
+    engine.noteChanged()
+    await advance(100)
+    await runAllTimers()
+    expect(methodsOf(git)).toEqual(['commitAll', 'push'])
+    engine.stop()
+  })
+
+  it('a full cycle hidden during the fetch still does not merge', async () => {
+    let canStartCycle = true
+    const git = fakeGit()
+    git.onFetch(() => {
+      canStartCycle = false
+      return DELTA
+    })
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: async () => CRED,
+      canStartCycle: () => canStartCycle,
+    })
+    await engine.syncNow()
+    expect(methodsOf(git)).toEqual(['commitAll', 'fetch'])
+    engine.stop()
+  })
+
   it('a flush queued behind a sync still commits when the app hides meanwhile', async () => {
     // Visible: a sync is mid-merge and another syncNow queues a full
     // follow-up. The app goes to the background and the flush joins that

@@ -110,8 +110,10 @@ export interface SyncEngineOptions {
    * Checked before a new cycle and again after every awaited command boundary.
    * Returning false at admission drops the trigger without issuing Git work;
    * returning false mid-cycle lets the already-issued command finish but
-   * suppresses every subsequent command. The lifecycle owner must replay a
-   * full cycle when work is allowed again.
+   * suppresses every subsequent command, except the commit, credential, and
+   * push of a push-only cycle and the push of a full cycle: they only send
+   * what is already committed, so they finish. The lifecycle owner must
+   * replay a full cycle when work is allowed again.
    */
   canStartCycle?: () => boolean
   /**
@@ -378,7 +380,10 @@ class SyncEngineImpl implements SyncEngine {
    * the engine stopped or the owner suppressed further cycles meanwhile. An
    * already-issued Git command cannot be recalled, but no later command starts.
    */
-  async #step<T>(promise: Promise<T>, onResult?: (result: T) => void): Promise<T> {
+  async #step<T>(
+    promise: Promise<T>,
+    { gated = true, onResult }: { gated?: boolean; onResult?: (result: T) => void } = {},
+  ): Promise<T> {
     const result = await promise
     this.#signal.throwIfAborted()
     onResult?.(result)
@@ -386,7 +391,7 @@ class SyncEngineImpl implements SyncEngine {
     // example, a file-change subscriber closing the graph). Preserve stop's
     // command boundary before the caller is allowed to issue later Git work.
     this.#signal.throwIfAborted()
-    if (this.#options.canStartCycle?.() === false) {
+    if (gated && this.#options.canStartCycle?.() === false) {
       throw new CycleSuppressedError()
     }
     return result
@@ -546,8 +551,10 @@ class SyncEngineImpl implements SyncEngine {
     // The commit comes first: it is the part of every cycle a flush is owed,
     // and it must land even if the owner gates the network work that follows
     // (the credential resolution is the first point a gate can interrupt).
+    const pushOnly = !request.fetch
     const commit = await this.#step(
       this.#deps.git.commitAll('Update notes', this.#options.generation),
+      { gated: !pushOnly },
     )
     if (commit.skippedLargeFiles.length > 0) {
       this.#options.onLargeFilesSkipped?.(commit.skippedLargeFiles)
@@ -555,8 +562,8 @@ class SyncEngineImpl implements SyncEngine {
     if (offline) {
       return // the commit is the whole cycle: no remote, or the sign-in is known bad
     }
-    const credential = await this.#step(this.#options.getCredential())
-    if (!request.fetch) {
+    const credential = await this.#step(this.#options.getCredential(), { gated: !pushOnly })
+    if (pushOnly) {
       // The debounce path often fires for changes that are already committed
       // and pushed (a pull's own writes re-enter via the watcher). Nothing
       // committed and nothing ahead means a push would be a pointless network
@@ -574,7 +581,9 @@ class SyncEngineImpl implements SyncEngine {
       }
     }
     for (let attempt = 0; attempt < MAX_PUSH_ATTEMPTS; attempt++) {
-      const push = await this.#step(this.#deps.git.push(credential, this.#options.generation))
+      const push = await this.#step(this.#deps.git.push(credential, this.#options.generation), {
+        gated: false,
+      })
       if (push.pushed) {
         return
       }
@@ -593,15 +602,17 @@ class SyncEngineImpl implements SyncEngine {
 
   /** Merge fetched changes and start any changed-file notification. */
   async #merge(remoteChanges: (changes: ChangedFile[]) => void): Promise<{ kind: string }> {
-    return await this.#step(this.#deps.git.mergeRemote(this.#options.generation), (outcome) => {
-      // The command may already have rewritten files before suspension. Fan
-      // those changes out before the boundary gate stops subsequent Git work.
-      if (outcome.changedFiles.length > 0) {
-        remoteChanges(outcome.changedFiles)
-        if (this.#quietMs !== null) {
-          this.#armQuiet(this.#quietMs)
+    return await this.#step(this.#deps.git.mergeRemote(this.#options.generation), {
+      onResult: (outcome) => {
+        // The command may already have rewritten files before suspension. Fan
+        // those changes out before the boundary gate stops subsequent Git work.
+        if (outcome.changedFiles.length > 0) {
+          remoteChanges(outcome.changedFiles)
+          if (this.#quietMs !== null) {
+            this.#armQuiet(this.#quietMs)
+          }
         }
-      }
+      },
     }) // upToDate is a no-op
   }
 }

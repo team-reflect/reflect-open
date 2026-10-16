@@ -72,8 +72,16 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
   the next launch pushes. A debounced pass that finds nothing committed and nothing
   ahead ends **without touching the network** (a pull's own writes re-enter via the
   watcher and must not buy a push negotiation each time).
-- **Pull cadence:** on launch, on window focus, on a periodic timer, and on a
-  **non-fast-forward** push rejection: fetch → merge → push again (bounded retries).
+- **Pull cadence:** on launch, on window resume (focus, visible, back online), on
+  Back up now, and on a **non-fast-forward** push rejection: fetch → merge → push
+  again (bounded retries). While the window is visible, a desktop folder graph asks
+  the remote for its branch tip every 90 s (one ref advertisement, no fetch) and runs
+  a full cycle only when the tip moved. After three failed probes in a row it runs a
+  full cycle every five minutes instead, until a probe succeeds. A graph in an iCloud
+  folder with a remote only commits on edits, and runs the network pass after five
+  quiet minutes, once iCloud has no downloads pending.
+- **Hidden windows (iOS):** a debounced commit that has begun still pushes after the
+  app is hidden. A pull's fetch and merge do not start or continue once it is hidden.
   Auth, push-protection, and size failures surface immediately — only divergence retries.
 - **Merge, not rebase.** Single branch; merge commits are fine — history is invisible
   product-wise, and rewriting published history breaks multi-device.
@@ -180,7 +188,7 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
   lists the rules S1 to S8 that every sync change must keep, each with the
   test that enforces it.
 - **libgit2 (`git2`) is the engine**; the Rust surface is remote-agnostic, GitHub
-  specifics live only in `actions/sync/github.ts`.
+  specifics live only in `packages/core/src/sync/`.
 - **GitHub is the only supported remote in the UX**; file-sync providers (iCloud/
   Dropbox/Drive) remain unsupported by design (no safe conflict semantics).
 - **GitHub App device flow + keychain; PAT fallback; token never on disk.**
