@@ -1348,6 +1348,26 @@ describe('quiet mode', () => {
     engine.stop()
   })
 
+  it('an edit just before the window ends moves the network pass to a new window', async () => {
+    const git = fakeGit()
+    const engine = quietEngine({ quietMs: 5 * 60_000, idleMs: 30_000 })
+
+    await engine.syncNow() // window ends at 300 s
+    await advance(299_000)
+    engine.noteChanged() // commit due at 329 s, which opens a window ending at 629 s
+    await advance(1000) // the old expiry
+    expect(methodsOf(git)).toEqual(['commitAll'])
+    await advance(30_000)
+    expect(methodsOf(git)).toEqual(['commitAll', 'commitAll'])
+    await advance(299_000 - 1) // 1 ms before the new expiry
+    expect(methodsOf(git)).not.toContain('fetch')
+    await advance(1)
+    await vi.waitFor(() => {
+      expect(methodsOf(git)).toEqual(['commitAll', 'commitAll', 'fetch', 'pull', 'push'])
+    })
+    engine.stop()
+  })
+
   it('a waiting status is emitted with the window end', async () => {
     fakeGit()
     const statuses: SyncStatus[] = []

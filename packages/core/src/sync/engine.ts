@@ -272,6 +272,10 @@ class SyncEngineImpl implements SyncEngine {
     // Wait for the idle window, but never past the deadline — a continuously
     // edited graph still backs up at least every maxWaitMs.
     this.#schedule(Math.max(0, Math.min(this.#idleMs, this.#deadline - now)))
+    // An edit invalidates an open window and any readiness answer already requested.
+    if (this.#quietMs !== null && (this.#quietTimer !== null || this.#quietBusy)) {
+      this.#armQuiet(this.#quietMs)
+    }
   }
 
   syncNow(): Promise<void> {
