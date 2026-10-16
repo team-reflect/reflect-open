@@ -9,7 +9,7 @@
     "packages/app": { "includeEntryExports": true } ,
     "packages/core": { "includeEntryExports": true } ,
     "apps/desktop": { "ignoreDependencies": ["@sentry/cli"], "ignore": "src-tauri/gen/**" },
-    "apps/extensions": {  "ignoreUnresolved": ["#imports"] },
+    "apps/extension": {  "ignoreUnresolved": ["#imports"] },
     "design-system": {"ignore": "./**/*"}
   }
 }
