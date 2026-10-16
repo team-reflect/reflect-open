@@ -8,6 +8,8 @@
 //! commit is finished by [`adopt_recorded_merge`] instead of merged again.
 //! A text conflict is resolved by the conflict ladder ([`ladder::resolve`]),
 //! so pulls never write conflict markers.
+//! A local deletion of a file the incoming side changed keeps the incoming
+//! version (an edit wins over a delete) and reports the path for review.
 
 use std::path::Path;
 
@@ -80,6 +82,8 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
 
 fn merge_remote_locked(root: &Path) -> AppResult<MergeOutcome> {
     let repo = open_existing(root)?;
+    // In-memory guarantee: the runtime directory never enters the merge.
+    repo.add_ignore_rule("/.reflect/")?;
     let adopted = adopt_recorded_merge(&repo, root)?;
     let mut outcome = pull(&repo, root)?;
     fold_changes(&mut outcome.changed_files, adopted);
@@ -252,18 +256,27 @@ pub(super) fn adopt_recorded_merge(repo: &Repository, root: &Path) -> AppResult<
     Ok(changed_files)
 }
 
-/// One working-tree path whose content differs from `HEAD`; `None` when the
-/// file was deleted.
+/// One working-tree path whose content differs from `HEAD`.
 struct LocalEdit {
     path: String,
-    bytes: Option<Vec<u8>>,
+    content: LocalContent,
+}
+
+/// What the working tree holds at an edited path.
+enum LocalContent {
+    Deleted,
+    File(Vec<u8>),
+    /// A symlink, by its target.
+    Symlink(std::path::PathBuf),
 }
 
 /// What a tree holds at a path.
 enum TreeSide<'r> {
     Absent,
     File(git2::Blob<'r>),
-    /// A directory, symlink, or submodule.
+    /// A symlink; the blob holds its target.
+    Symlink(git2::Blob<'r>),
+    /// A directory or submodule.
     Other(git2::Oid),
 }
 
@@ -271,7 +284,7 @@ impl TreeSide<'_> {
     fn id(&self) -> Option<git2::Oid> {
         match self {
             TreeSide::Absent => None,
-            TreeSide::File(blob) => Some(blob.id()),
+            TreeSide::File(blob) | TreeSide::Symlink(blob) => Some(blob.id()),
             TreeSide::Other(id) => Some(*id),
         }
     }
@@ -285,10 +298,10 @@ fn tree_side<'r>(
     let Some(entry) = tree.and_then(|tree| tree.get_path(Path::new(path)).ok()) else {
         return Ok(TreeSide::Absent);
     };
-    if matches!(entry.filemode(), 0o100644 | 0o100755) {
-        Ok(TreeSide::File(repo.find_blob(entry.id())?))
-    } else {
-        Ok(TreeSide::Other(entry.id()))
+    match entry.filemode() {
+        0o100644 | 0o100755 => Ok(TreeSide::File(repo.find_blob(entry.id())?)),
+        mode if mode == SYMLINK_MODE as i32 => Ok(TreeSide::Symlink(repo.find_blob(entry.id())?)),
+        _ => Ok(TreeSide::Other(entry.id())),
     }
 }
 
@@ -298,9 +311,11 @@ fn tree_side<'r>(
 /// The edits are read before the forced checkout and written back after it:
 /// unchanged by `target`, an edit is restored as it was; changed by both, a
 /// text file is resolved by the ladder (base, local edit, target), and any
-/// other file keeps the local bytes with the target's version written beside
-/// it as a conflict copy. `incoming` is the commit `target` belongs to.
-/// Returns the files written back and the conflict copies.
+/// other file or symlink keeps the local version with the target's version
+/// written beside it as a conflict copy. A local deletion of a path `target`
+/// changed keeps the target's version and is reported for review.
+/// `incoming` is the commit `target` belongs to. Returns the files written
+/// back and the paths to review.
 fn checkout_keeping_local_edits(
     repo: &Repository,
     root: &Path,
@@ -308,30 +323,65 @@ fn checkout_keeping_local_edits(
     target: &git2::Tree<'_>,
     incoming: &git2::Commit<'_>,
 ) -> AppResult<(Vec<ChangedFile>, Vec<String>)> {
-    let edits = local_edits(repo, root, base)?;
-    repo.checkout_tree(target.as_object(), Some(CheckoutBuilder::new().force()))?;
+    let edits = local_edits(repo, root, base, target)?;
+    // The first matching pathspec wins, so the runtime directory stays as it is.
+    let mut checkout = CheckoutBuilder::new();
+    checkout.force().path("!.reflect").path("*");
+    repo.checkout_tree(target.as_object(), Some(&mut checkout))?;
 
     let mut written = Vec::new();
     let mut review = Vec::new();
     for edit in edits {
         let base_side = tree_side(repo, base, &edit.path)?;
         let target_side = tree_side(repo, Some(target), &edit.path)?;
-        let Some(ours) = edit.bytes else {
-            if base_side.id() == target_side.id() {
+        let unchanged = base_side.id() == target_side.id();
+        let ours = match edit.content {
+            LocalContent::Deleted => {
                 let target_path = root.join(&edit.path);
-                if target_path.symlink_metadata().is_ok() {
-                    std::fs::remove_file(&target_path)?;
-                    written.push(ChangedFile {
-                        path: edit.path,
-                        kind: ChangeKind::Remove,
-                        modified_ms: None,
-                    });
+                if unchanged {
+                    if target_path.symlink_metadata().is_ok() {
+                        std::fs::remove_file(&target_path)?;
+                        written.push(ChangedFile {
+                            path: edit.path,
+                            kind: ChangeKind::Remove,
+                            modified_ms: None,
+                        });
+                    }
+                } else if !matches!(target_side, TreeSide::Absent) {
+                    review.push(edit.path);
                 }
+                continue;
             }
-            continue;
+            LocalContent::Symlink(link) => {
+                match &target_side {
+                    _ if unchanged => {}
+                    TreeSide::Absent => {}
+                    TreeSide::Symlink(theirs)
+                        if theirs.content() == link.as_os_str().as_encoded_bytes() => {}
+                    TreeSide::Other(_) => {
+                        // The target holds a directory or submodule here.
+                        let copy = free_conflict_copy_path(&edit.path, |path| {
+                            worktree_or_tree_has(root, target, path)
+                        });
+                        written.push(write_symlink(root, &copy, &link)?);
+                        review.push(copy);
+                        continue;
+                    }
+                    TreeSide::File(theirs) | TreeSide::Symlink(theirs) => {
+                        let copy = free_conflict_copy_path(&edit.path, |path| {
+                            worktree_or_tree_has(root, target, path)
+                        });
+                        written.push(write_side(root, &copy, &target_side, theirs)?);
+                        review.push(copy);
+                    }
+                }
+                written.push(write_symlink(root, &edit.path, &link)?);
+                continue;
+            }
+            LocalContent::File(bytes) => bytes,
         };
         let content = match (&base_side, &target_side) {
-            _ if base_side.id() == target_side.id() => ours,
+            _ if unchanged => ours,
             (_, TreeSide::Absent) => ours,
             (TreeSide::Absent | TreeSide::File(_), TreeSide::File(theirs))
                 if is_text_bytes(&ours)
@@ -355,14 +405,18 @@ fn checkout_keeping_local_edits(
                 )?
             }
             (_, TreeSide::File(theirs)) => {
-                let copy = conflict_copy_path(&edit.path);
+                let copy = free_conflict_copy_path(&edit.path, |path| {
+                    worktree_or_tree_has(root, target, path)
+                });
                 written.push(write_file(root, &copy, theirs.content())?);
                 review.push(copy);
                 ours
             }
-            (_, TreeSide::Other(_)) => {
+            (_, TreeSide::Symlink(_) | TreeSide::Other(_)) => {
                 // The target holds a directory, symlink, or submodule here.
-                let copy = conflict_copy_path(&edit.path);
+                let copy = free_conflict_copy_path(&edit.path, |path| {
+                    worktree_or_tree_has(root, target, path)
+                });
                 written.push(write_file(root, &copy, &ours)?);
                 review.push(copy);
                 continue;
@@ -373,12 +427,15 @@ fn checkout_keeping_local_edits(
     Ok((written, review))
 }
 
-/// Every regular file in the working tree that differs from `base`, including
-/// untracked files and deletions. Ignored files are left out.
+/// Every regular file and symlink in the working tree that differs from
+/// `base`, including deletions. An untracked path `target` does not hold is
+/// left out (the checkout never touches it), as are ignored files and the
+/// runtime directory.
 fn local_edits(
     repo: &Repository,
     root: &Path,
     base: Option<&git2::Tree<'_>>,
+    target: &git2::Tree<'_>,
 ) -> AppResult<Vec<LocalEdit>> {
     let mut opts = git2::DiffOptions::new();
     opts.include_untracked(true).recurse_untracked_dirs(true);
@@ -395,26 +452,75 @@ fn local_edits(
             continue;
         };
         let rel = to_slash_lossy(path);
+        if is_runtime_path(&rel) {
+            continue;
+        }
         if deleted {
             edits.push(LocalEdit {
                 path: rel,
-                bytes: None,
+                content: LocalContent::Deleted,
             });
             continue;
         }
-        let full = root.join(path);
-        let is_file = full
-            .symlink_metadata()
-            .map(|meta| meta.is_file())
-            .unwrap_or(false);
-        if is_file {
-            edits.push(LocalEdit {
-                path: rel,
-                bytes: Some(std::fs::read(&full)?),
-            });
+        let in_base = base.is_some_and(|tree| tree.get_path(path).is_ok());
+        if !in_base && target.get_path(path).is_err() {
+            continue;
         }
+        let full = root.join(path);
+        let Ok(meta) = full.symlink_metadata() else {
+            continue;
+        };
+        let content = if meta.is_file() {
+            LocalContent::File(std::fs::read(&full)?)
+        } else if meta.file_type().is_symlink() {
+            LocalContent::Symlink(std::fs::read_link(&full)?)
+        } else {
+            continue;
+        };
+        edits.push(LocalEdit { path: rel, content });
     }
     Ok(edits)
+}
+
+/// Whether `rel` is taken on disk or in `tree`.
+fn worktree_or_tree_has(root: &Path, tree: &git2::Tree<'_>, rel: &str) -> bool {
+    root.join(rel).symlink_metadata().is_ok() || tree.get_path(Path::new(rel)).is_ok()
+}
+
+/// Write a tree side at `rel`: a file's bytes, or a symlink to its target.
+fn write_side(
+    root: &Path,
+    rel: &str,
+    side: &TreeSide<'_>,
+    blob: &git2::Blob<'_>,
+) -> AppResult<ChangedFile> {
+    match side {
+        TreeSide::Symlink(_) => {
+            let link = std::path::PathBuf::from(String::from_utf8_lossy(blob.content()).as_ref());
+            write_symlink(root, rel, &link)
+        }
+        _ => write_file(root, rel, blob.content()),
+    }
+}
+
+/// Replace whatever is at `rel` with a symlink to `link`.
+fn write_symlink(root: &Path, rel: &str, link: &Path) -> AppResult<ChangedFile> {
+    let full = root.join(rel);
+    if let Some(parent) = full.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    if full.symlink_metadata().is_ok() {
+        std::fs::remove_file(&full)?;
+    }
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(link, &full)?;
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_file(link, &full)?;
+    Ok(ChangedFile {
+        path: rel.to_string(),
+        kind: ChangeKind::Upsert,
+        modified_ms: None,
+    })
 }
 
 /// Resolve a local edit against an incoming text version through the ladder.
@@ -524,6 +630,11 @@ fn fold_changes(changes: &mut Vec<ChangedFile>, extra: Vec<ChangedFile>) {
     }
 }
 
+/// Whether `rel` is under the runtime directory, which a pull never touches.
+fn is_runtime_path(rel: &str) -> bool {
+    rel.starts_with(".reflect/")
+}
+
 fn is_text_bytes(bytes: &[u8]) -> bool {
     !bytes.contains(&0) && std::str::from_utf8(bytes).is_ok()
 }
@@ -552,8 +663,12 @@ fn changed_between(
             delta.new_file()
         };
         if let Some(path) = file.path() {
+            let path = to_slash_lossy(path);
+            if is_runtime_path(&path) {
+                continue;
+            }
             out.push(ChangedFile {
-                path: to_slash_lossy(path),
+                path,
                 kind: if removed {
                     ChangeKind::Remove
                 } else {
@@ -633,7 +748,7 @@ fn resolve_index_conflicts(
             (Some(our), Some(their)) => {
                 let path = entry_path(&our);
                 if our.mode == GITLINK_MODE || their.mode == GITLINK_MODE {
-                    add_resolved(index, &path, our.id, our.mode, &mut review)?;
+                    add_resolved(index, root, &path, our.id, our.mode, &mut review)?;
                     continue;
                 }
                 let plain = our.mode != SYMLINK_MODE && their.mode != SYMLINK_MODE;
@@ -658,16 +773,18 @@ fn resolve_index_conflicts(
                         (their_blob.content(), theirs),
                     )?;
                     let id = repo.blob(&merged)?;
-                    add_resolved_unreviewed(index, &path, id, our.mode, &mut review)?;
+                    add_resolved_unreviewed(index, root, &path, id, our.mode, &mut review)?;
                 } else {
-                    let copy = conflict_copy_path(&entry_path(&their));
-                    add_resolved(index, &path, our.id, our.mode, &mut review)?;
-                    add_resolved(index, &copy, their.id, their.mode, &mut review)?;
+                    add_resolved(index, root, &path, our.id, our.mode, &mut review)?;
+                    let copy = free_conflict_copy_path(&entry_path(&their), |path| {
+                        index_or_worktree_has(index, root, path)
+                    });
+                    add_resolved(index, root, &copy, their.id, their.mode, &mut review)?;
                 }
             }
             (Some(edited), None) | (None, Some(edited)) => {
                 let path = entry_path(&edited);
-                add_resolved(index, &path, edited.id, edited.mode, &mut review)?;
+                add_resolved(index, root, &path, edited.id, edited.mode, &mut review)?;
             }
             (None, None) => {}
         }
@@ -686,12 +803,13 @@ const SYMLINK_MODE: u32 = 0o120000;
 /// to its conflict copy path, so neither side is dropped from the tree.
 fn add_resolved(
     index: &mut Index,
+    root: &Path,
     path: &str,
     id: git2::Oid,
     mode: u32,
     review: &mut Vec<String>,
 ) -> AppResult<()> {
-    let staged = stage_resolved(index, path, id, mode, review)?;
+    let staged = stage_resolved(index, root, path, id, mode, review)?;
     review.push(staged);
     Ok(())
 }
@@ -700,12 +818,13 @@ fn add_resolved(
 /// move to its conflict copy path.
 fn add_resolved_unreviewed(
     index: &mut Index,
+    root: &Path,
     path: &str,
     id: git2::Oid,
     mode: u32,
     review: &mut Vec<String>,
 ) -> AppResult<()> {
-    let staged = stage_resolved(index, path, id, mode, review)?;
+    let staged = stage_resolved(index, root, path, id, mode, review)?;
     if staged != path {
         review.push(staged);
     }
@@ -717,6 +836,7 @@ fn add_resolved_unreviewed(
 /// to their conflict copy paths and recorded in `review`.
 fn stage_resolved(
     index: &mut Index,
+    root: &Path,
     path: &str,
     id: git2::Oid,
     mode: u32,
@@ -727,14 +847,15 @@ fn stage_resolved(
         .iter()
         .any(|entry| entry.path.starts_with(dir_prefix.as_bytes()));
     let path = if is_dir {
-        conflict_copy_path(path)
+        free_conflict_copy_path(path, |path| index_or_worktree_has(index, root, path))
     } else {
         path.to_string()
     };
     let mut parent = path.as_str();
     while let Some((dir, _)) = parent.rsplit_once('/') {
         if let Some(file) = index.get_path(Path::new(dir), 0) {
-            let copy = conflict_copy_path(dir);
+            let copy =
+                free_conflict_copy_path(dir, |path| index_or_worktree_has(index, root, path));
             index.remove_path(Path::new(dir))?;
             index.add(&stage0_entry(&copy, file.id, file.mode))?;
             review.push(copy);
@@ -781,20 +902,45 @@ fn stage0_entry(path: &str, id: git2::Oid, mode: u32) -> IndexEntry {
 
 /// `assets/img.png` → `assets/img (conflict).png`; no extension → appended.
 /// Splits on the basename only — a dot in a *directory* name (`assets.v1/x`)
-/// must not relocate the copy out of the file's directory.
-fn conflict_copy_path(rel: &str) -> String {
+/// must not relocate the copy out of the file's directory. `n` above 1 gives
+/// `img (conflict n).png`.
+fn conflict_copy_path(rel: &str, n: u32) -> String {
     let (dir, file) = match rel.rsplit_once('/') {
         Some((dir, file)) => (Some(dir), file),
         None => (None, rel),
     };
+    let label = if n > 1 {
+        format!("conflict {n}")
+    } else {
+        "conflict".to_string()
+    };
     let renamed = match file.rsplit_once('.') {
-        Some((stem, ext)) if !stem.is_empty() => format!("{stem} (conflict).{ext}"),
-        _ => format!("{file} (conflict)"),
+        Some((stem, ext)) if !stem.is_empty() => format!("{stem} ({label}).{ext}"),
+        _ => format!("{file} ({label})"),
     };
     match dir {
         Some(dir) => format!("{dir}/{renamed}"),
         None => renamed,
     }
+}
+
+/// The first conflict copy path of `rel` that `taken` does not claim.
+fn free_conflict_copy_path(rel: &str, taken: impl Fn(&str) -> bool) -> String {
+    (1..)
+        .map(|n| conflict_copy_path(rel, n))
+        .find(|path| !taken(path))
+        .expect("an unbounded range always yields a free name")
+}
+
+/// Whether `rel` is taken in the merge index (as a file or a directory) or on
+/// disk.
+fn index_or_worktree_has(index: &Index, root: &Path, rel: &str) -> bool {
+    let dir_prefix = format!("{rel}/");
+    index.get_path(Path::new(rel), 0).is_some()
+        || index
+            .iter()
+            .any(|entry| entry.path.starts_with(dir_prefix.as_bytes()))
+        || root.join(rel).symlink_metadata().is_ok()
 }
 
 #[cfg(test)]
@@ -804,22 +950,29 @@ mod path_tests {
     #[test]
     fn conflict_copies_stay_in_their_directory() {
         assert_eq!(
-            conflict_copy_path("assets/img.png"),
+            conflict_copy_path("assets/img.png", 1),
             "assets/img (conflict).png"
         );
         assert_eq!(
-            conflict_copy_path("assets.v1/img"),
+            conflict_copy_path("assets.v1/img", 1),
             "assets.v1/img (conflict)"
         );
         assert_eq!(
-            conflict_copy_path("assets.v1/img.png"),
+            conflict_copy_path("assets.v1/img.png", 1),
             "assets.v1/img (conflict).png"
         );
-        assert_eq!(conflict_copy_path("topfile.bin"), "topfile (conflict).bin");
-        assert_eq!(conflict_copy_path("noext"), "noext (conflict)");
         assert_eq!(
-            conflict_copy_path("assets/.hidden"),
+            conflict_copy_path("topfile.bin", 1),
+            "topfile (conflict).bin"
+        );
+        assert_eq!(conflict_copy_path("noext", 1), "noext (conflict)");
+        assert_eq!(
+            conflict_copy_path("assets/.hidden", 1),
             "assets/.hidden (conflict)"
+        );
+        assert_eq!(
+            conflict_copy_path("assets/img.png", 2),
+            "assets/img (conflict 2).png"
         );
     }
 }
