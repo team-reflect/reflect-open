@@ -40,6 +40,7 @@ pub use platform::{current_version_modified_ms, mark_resolved, unresolved_versio
 /// them. A version that arrived after the sweep's scan, or has no store path,
 /// stays unresolved, and while one remains the version store keeps every
 /// version.
+#[cfg_attr(not(any(target_os = "macos", target_os = "ios")), allow(dead_code))]
 fn select_handled<T>(listed: Vec<(Option<PathBuf>, T)>, handled: &[PathBuf]) -> (Vec<T>, bool) {
     let mut selected = Vec::new();
     let mut all_handled = true;
