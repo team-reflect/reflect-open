@@ -338,9 +338,18 @@ class NoteSessionImpl implements NoteSession {
     this.#reconcilePendingEditorInput?.()
     this.#cancelScheduledSave()
     this.#save()
-    // save() extended the chain synchronously (or left it settled when there
-    // was nothing to do) — the chain as of now is exactly this flush's write.
-    return this.#saveChain
+    return this.#settleSaves()
+  }
+
+  /**
+   * Wait for the save chain, including the one retry a failed save queues behind itself.
+   */
+  async #settleSaves(): Promise<void> {
+    let chain: Promise<void>
+    do {
+      chain = this.#saveChain
+      await chain
+    } while (chain !== this.#saveChain)
   }
 
   editorChanged(markdown: string): void {
