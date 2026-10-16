@@ -33,6 +33,19 @@ export const skippedFileSchema = z.object({
 })
 export type SkippedFile = z.infer<typeof skippedFileSchema>
 
+/**
+ * A file a merge rewrote on disk — same shape as the watcher's FileChange.
+ */
+export const changedFileSchema = z.object({
+  path: z.string(),
+  kind: z.enum(['upsert', 'remove']),
+  /**
+   * Last-modified time (epoch ms; upserts only) — real mtime for the reindex.
+   */
+  modifiedMs: z.number().optional(),
+})
+export type ChangedFile = z.infer<typeof changedFileSchema>
+
 export const commitOutcomeSchema = z.object({
   /**
    * False when the tree already matched HEAD — nothing new to back up.
@@ -47,6 +60,14 @@ export const commitOutcomeSchema = z.object({
    */
   ahead: z.number(),
   skippedLargeFiles: z.array(skippedFileSchema),
+  /**
+   * Files that finishing an interrupted pull changed on disk.
+   */
+  changedFiles: z.array(changedFileSchema).default([]),
+  /**
+   * Paths that finishing an interrupted pull reported for review.
+   */
+  reviewPaths: z.array(z.string()).default([]),
 })
 export type CommitOutcome = z.infer<typeof commitOutcomeSchema>
 
@@ -70,19 +91,6 @@ export const remoteTipSchema = z.object({
   trackingOid: z.string().nullable(),
 })
 export type RemoteTip = z.infer<typeof remoteTipSchema>
-
-/**
- * A file a merge rewrote on disk — same shape as the watcher's FileChange.
- */
-export const changedFileSchema = z.object({
-  path: z.string(),
-  kind: z.enum(['upsert', 'remove']),
-  /**
-   * Last-modified time (epoch ms; upserts only) — real mtime for the reindex.
-   */
-  modifiedMs: z.number().optional(),
-})
-export type ChangedFile = z.infer<typeof changedFileSchema>
 
 export const mergeOutcomeSchema = z.object({
   kind: z.enum(['upToDate', 'fastForward', 'merged', 'mergedWithReview']),

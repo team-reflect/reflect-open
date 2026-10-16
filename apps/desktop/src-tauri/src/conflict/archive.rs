@@ -42,6 +42,7 @@ pub fn archive_version(
         target = dir.join(format!("{stem}~{attempt}.{ext}"));
     }
     crate::fs::atomic_write_bytes(root, &target, bytes)?;
+    prune_note(root, rel);
     Ok(())
 }
 
@@ -196,6 +197,41 @@ pub fn prune(root: &Path) {
     prune_dir(&archive, now_ms);
 }
 
+/// Prune one note's archive: keep its newest [`MAX_PER_NOTE`] versions and
+/// drop versions archived more than [`MAX_AGE_MS`] ago. Best-effort.
+pub fn prune_note(root: &Path, rel: &str) {
+    let Some(dir) = note_archive_dir(root, rel) else {
+        return;
+    };
+    let Ok(entries) = fs::read_dir(&dir) else {
+        return;
+    };
+    let now = SystemTime::now();
+    let mut versions: Vec<((u64, u32), PathBuf, Option<SystemTime>)> = Vec::new();
+    for entry in entries.flatten() {
+        let Some((modified_ms, _, attempt)) =
+            entry.file_name().to_str().and_then(parse_archive_name)
+        else {
+            continue;
+        };
+        let Ok(meta) = entry.metadata() else {
+            continue;
+        };
+        if meta.is_file() {
+            versions.push(((modified_ms, attempt), entry.path(), meta.modified().ok()));
+        }
+    }
+    versions.sort_by_key(|version| std::cmp::Reverse(version.0));
+    for (index, (_, path, archived)) in versions.iter().enumerate() {
+        let too_old = archived
+            .and_then(|archived| now.duration_since(archived).ok())
+            .is_some_and(|age| age.as_millis() > u128::from(MAX_AGE_MS));
+        if index >= MAX_PER_NOTE || too_old {
+            let _ = fs::remove_file(path);
+        }
+    }
+}
+
 fn prune_dir(dir: &Path, now_ms: u64) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
@@ -299,6 +335,37 @@ mod tests {
             .path()
             .join(".reflect/conflict-archive/notes/b.md")
             .exists());
+    }
+
+    #[test]
+    fn archiving_the_twenty_first_version_drops_the_oldest() {
+        let root = tempdir().unwrap();
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        for offset in (0..MAX_PER_NOTE as u64).rev() {
+            archive_version(
+                root.path(),
+                "notes/a.md",
+                None,
+                now_ms - 100 - offset,
+                b"old",
+            )
+            .unwrap();
+        }
+        assert_eq!(list(root.path(), "notes/a.md").unwrap().len(), MAX_PER_NOTE);
+        let oldest = format!("{}-unknown.md", now_ms - 100 - (MAX_PER_NOTE as u64 - 1));
+        assert!(list(root.path(), "notes/a.md")
+            .unwrap()
+            .iter()
+            .any(|version| version.name == oldest));
+
+        archive_version(root.path(), "notes/a.md", None, now_ms, b"newest").unwrap();
+        let versions = list(root.path(), "notes/a.md").unwrap();
+        assert_eq!(versions.len(), MAX_PER_NOTE);
+        assert_eq!(versions[0].name, format!("{now_ms}-unknown.md"));
+        assert!(!versions.iter().any(|version| version.name == oldest));
     }
 
     #[test]

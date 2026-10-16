@@ -26,6 +26,9 @@ pub(super) enum FaultPoint {
     BeforeMergeCommit,
     /// Merge: after the merge commit is written, before the working tree is checked out.
     AfterMergeCommitBeforeCheckout,
+    /// Fast-forward or merge: after the forced checkout, before the saved
+    /// local edits are written back.
+    AfterCheckoutBeforeWriteBack,
     /// Merge: after the working tree is written, before the branch ref moves to the merge commit.
     BeforeMergeRefMove,
     /// Fetch: on entry, before the remote is contacted.
