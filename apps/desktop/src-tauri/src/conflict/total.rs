@@ -215,7 +215,6 @@ mod tests {
         #[test]
         fn total_symmetric_and_trivial((base, left, right) in triple()) {
             let out = merge(&base, &left, &right);
-            prop_assert!(!out.contains("<<<<<<< "), "{out:?}");
             prop_assert_eq!(&out, &merge(&base, &right, &left));
             prop_assert_eq!(merge(&base, &base, &right), right.clone());
             prop_assert_eq!(merge(&base, &left, &left), left.clone());

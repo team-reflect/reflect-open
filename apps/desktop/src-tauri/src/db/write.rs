@@ -29,8 +29,6 @@ pub struct IndexedNote {
     pub(super) is_private: bool,
     pub(super) is_pinned: bool,
     pub(super) pinned_order: Option<f64>,
-    /// The file carries Git conflict markers (sync merge, Plan 12).
-    pub(super) has_conflict: bool,
     pub(super) has_content: bool,
     /// The published GitHub Gist's html url, when the note has one.
     pub(super) gist_url: Option<String>,
@@ -145,8 +143,8 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
     remove_note(conn, &note.path)?;
 
     conn.prepare_cached(
-        "INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview, has_content)
-         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15, ?16, ?17)",
+        "INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, gist_url, gist_stale, file_hash, mtime, updated_at, preview, has_content)
+         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14, ?15, ?16)",
     )?
     .execute(params![
         note.path,
@@ -159,7 +157,6 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
         i64::from(note.is_private),
         i64::from(note.is_pinned),
         note.pinned_order,
-        i64::from(note.has_conflict),
         note.gist_url,
         i64::from(note.gist_stale),
         note.file_hash,

@@ -26,7 +26,7 @@ use tauri::State;
 
 use crate::conflict::ladder::{self, ConflictInput};
 use crate::conflict::shadow::{content_hash, ShadowStore};
-use crate::conflict::{archive, markers, ConflictSide, Resolution};
+use crate::conflict::{archive, ConflictSide, Resolution};
 use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
 
@@ -303,9 +303,7 @@ fn no_unresolved_versions(root: &Path, rel: &str) -> bool {
 /// A clean external ingest (or adoption snapshot): the note's disk content is
 /// now what both sides derive from, so record it as the base. Skips notes
 /// that carry unresolved versions (`no_versions` is false; mid-conflict
-/// content is nobody's ancestor), notes whose content carries conflict
-/// markers (a marked file is never a synced ancestor), and non-UTF-8 or
-/// missing files. `fill_only` restricts the write to notes without a base
+/// content is nobody's ancestor), and non-UTF-8 or missing files. `fill_only` restricts the write to notes without a base
 /// (the adoption case).
 fn advance_base_if_clean(
     root: &Path,
@@ -327,9 +325,6 @@ fn advance_base_if_clean(
         return;
     };
     if crate::fs::own_writes::is_own(root, rel, content.as_bytes()) {
-        return;
-    }
-    if markers::contains_conflict_markers(&content) {
         return;
     }
     if let Err(err) = shadow.record(rel, &content) {
@@ -588,11 +583,8 @@ fn fold_duplicate(
         // device's own sweep writes echo back as own-writes — without the
         // record here it alone would stay baseless, and a later concurrent
         // edit would diff3 on one device and not on the other.
-        // Marker content stays unrecorded on every device alike.
-        if !markers::contains_conflict_markers(&dup_content) {
-            if let Err(err) = shadow.record(canonical_rel, &dup_content) {
-                tracing::warn!(path = %canonical_rel, ?err, "failed to record adopted collision base");
-            }
+        if let Err(err) = shadow.record(canonical_rel, &dup_content) {
+            tracing::warn!(path = %canonical_rel, ?err, "failed to record adopted collision base");
         }
         outcome.changed.push(remove_change(&file.path));
         outcome.changed.push(SweepChange {
@@ -748,7 +740,6 @@ fn modified_ms_of(abs: &Path) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::conflict::markers;
     use tempfile::tempdir;
 
     fn graph() -> tempfile::TempDir {
@@ -894,7 +885,6 @@ mod tests {
 
         assert_eq!(outcome.reconciled, vec!["daily/2026-07-04.md".to_string()]);
         let merged = fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap();
-        assert!(!markers::contains_conflict_markers(&merged));
         assert!(merged.contains("mac wording") && merged.contains("phone wording"));
         assert!(merged.contains("common tail"));
     }
@@ -1029,23 +1019,6 @@ mod tests {
     }
 
     #[test]
-    fn marker_carrying_content_never_becomes_a_base() {
-        // The sweep's own marker writes echo back through the file watcher
-        // as ordinary external upserts — an unresolved review state must
-        // never be recorded as a synced ancestor.
-        let root = graph();
-        write(
-            root.path(),
-            "notes/a.md",
-            "<<<<<<< Mac\nmine\n=======\ntheirs\n>>>>>>> iPhone\n",
-        );
-
-        run_sweep(root.path(), &[], &["notes/a.md".to_string()], true, None).unwrap();
-
-        assert_eq!(ShadowStore::new(root.path()).base("notes/a.md"), None);
-    }
-
-    #[test]
     fn baseline_and_ingest_record_shadow_bases() {
         let root = graph();
         write(root.path(), "notes/a.md", "# A\n");
@@ -1140,9 +1113,6 @@ mod tests {
         .unwrap();
 
         assert!(resolution.reconciled);
-        assert!(!markers::contains_conflict_markers(
-            &resolution.final_content
-        ));
         assert!(resolution.final_content.contains("mac"));
         assert!(resolution.final_content.contains("phone"));
     }
@@ -1234,9 +1204,6 @@ mod tests {
         .unwrap();
 
         assert!(resolution.reconciled);
-        assert!(!markers::contains_conflict_markers(
-            &resolution.final_content
-        ));
         for wording in ["mac", "phone", "ipad"] {
             assert!(
                 resolution.final_content.contains(wording),
@@ -1269,37 +1236,6 @@ mod tests {
         let two_root = graph();
         let two = run(two_root.path(), "- seed\n- pad\n", "- seed\n- phone\n");
         assert_eq!(one, two);
-    }
-
-    #[test]
-    fn multi_version_with_a_marked_side_drops_it_and_unions_the_clean_sides() {
-        // A side already carrying markers loses to the newer clean side at
-        // its fold step and is archived; the clean sides then union.
-        let root = graph();
-        let marked = "<<<<<<< Mac\nmine\n=======\ntheirs\n>>>>>>> iPhone\n";
-        write(root.path(), "notes/a.md", "current clean\n");
-        let shadow = ShadowStore::new(root.path());
-
-        let resolution = resolve_file(
-            root.path(),
-            "notes/a.md",
-            2_000,
-            vec![
-                fake_version(root.path(), "v1.md", marked, 1_000, "iPhone"),
-                fake_version(root.path(), "v2.md", "newest clean\n", 3_000, "iPad"),
-            ],
-            &shadow,
-        )
-        .unwrap();
-
-        assert_eq!(resolution.final_content, "current clean\nnewest clean\n");
-        assert!(resolution.reconciled);
-        let archived: Vec<String> = archive::list(root.path(), "notes/a.md")
-            .unwrap()
-            .into_iter()
-            .map(|version| archive::read(root.path(), "notes/a.md", &version.name).unwrap())
-            .collect();
-        assert!(archived.contains(&marked.to_string()), "{archived:?}");
     }
 
     fn archive_names(root: &Path, rel: &str) -> Vec<String> {

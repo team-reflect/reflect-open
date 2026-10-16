@@ -56,7 +56,6 @@ fn note(path: &str, title: &str, links: Vec<IndexedLink>) -> IndexedNote {
         is_private: false,
         is_pinned: false,
         pinned_order: None,
-        has_conflict: false,
         has_content: true,
         gist_url: None,
         gist_stale: false,
@@ -621,23 +620,6 @@ fn pinned_flag_and_order_round_trip_into_the_notes_row() {
 }
 
 #[test]
-fn conflict_flag_round_trips_into_the_notes_row() {
-    let conn = migrated();
-    let mut conflicted = note("notes/c.md", "C", vec![]);
-    conflicted.has_conflict = true;
-    apply_note(&conn, &conflicted).unwrap();
-    apply_note(&conn, &note("notes/clean.md", "Clean", vec![])).unwrap();
-    let rows = run_query(&conn, "SELECT path FROM notes WHERE has_conflict = 1", &[]).unwrap();
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0]["path"], Value::from("notes/c.md"));
-
-    // Re-indexing without markers clears the flag (resolution detection).
-    apply_note(&conn, &note("notes/c.md", "C", vec![])).unwrap();
-    let rows = run_query(&conn, "SELECT path FROM notes WHERE has_conflict = 1", &[]).unwrap();
-    assert!(rows.is_empty());
-}
-
-#[test]
 fn gist_columns_round_trip_into_the_notes_row() {
     let conn = migrated();
     let mut published = note("notes/g.md", "G", vec![]);
@@ -1078,7 +1060,6 @@ fn kind_invariant_migration_wipes_the_projection_for_reindex() {
         "notes_daily_date_mtime_path",
         "notes_non_daily_mtime",
         "notes_pinned",
-        "notes_has_conflict",
     ] {
         let exists: bool = conn
             .prepare("SELECT 1 FROM pragma_index_list('notes') WHERE name = ?1")
@@ -1661,7 +1642,6 @@ fn move_note_migrates_every_row_and_preserves_derived_state() {
     let mut moved = note("notes/old.md", "Kept Title", vec![wiki("Elsewhere")]);
     moved.is_pinned = true;
     moved.pinned_order = Some(2.5);
-    moved.has_conflict = true;
     moved.tasks = vec![task(0, "do thing", false)];
     apply_note(&conn, &moved).unwrap();
     apply_note(
@@ -1677,13 +1657,12 @@ fn move_note_migrates_every_row_and_preserves_derived_state() {
     // The notes row moved — same derived state, nothing re-created.
     let row = run_query(
         &conn,
-        "SELECT path, is_pinned, pinned_order, has_conflict FROM notes WHERE path = ?1",
+        "SELECT path, is_pinned, pinned_order FROM notes WHERE path = ?1",
         &[Value::String("notes/kept-title.md".to_string())],
     )
     .unwrap();
     assert_eq!(row.len(), 1);
     assert_eq!(row[0].get("is_pinned").unwrap().as_i64().unwrap(), 1);
-    assert_eq!(row[0].get("has_conflict").unwrap().as_i64().unwrap(), 1);
     let gone = run_query(
         &conn,
         "SELECT path FROM notes WHERE path = ?1",

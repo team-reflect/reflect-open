@@ -4,21 +4,15 @@
 //!
 //! 1. **Identical** → nothing to write.
 //! 2. **Whitespace-equal** → keep the newer side.
-//! 3. **A side already carries markers** → keep the newer side whole, as
-//!    [`Resolution::Reconciled`] so the dropped side is archived. The
-//!    marked file holds both originals in its hunks and the clean one is
-//!    either the user's resolution of it (newer) or stale pre-conflict
-//!    content (older) — and nesting new markers around old ones would corrupt
-//!    the grammar the resolution UI splices by.
-//! 4. **Merge-loop breaker** → keep the newer side, as
+//! 3. **Merge-loop breaker** → keep the newer side, as
 //!    [`Resolution::Reconciled`] (base-dependent auto-merges on two devices
 //!    can swap contents forever; the newer side depends only on the ordered
 //!    pair, so both devices emit identical bytes and the loop dies).
-//! 5. **Three-way merge** over the shadow base, when one exists and the
+//! 4. **Three-way merge** over the shadow base, when one exists and the
 //!    hunks do not overlap.
-//! 6. **Key-wise frontmatter** when only the header diverged.
-//! 7. **Append-union** for any note whose sides only appended to the base.
-//! 8. **Word-level merge** ([`total::merge`]) as [`Resolution::Reconciled`]:
+//! 5. **Key-wise frontmatter** when only the header diverged.
+//! 6. **Append-union** for any note whose sides only appended to the base.
+//! 7. **Word-level merge** ([`total::merge`]) as [`Resolution::Reconciled`]:
 //!    both sides' words are kept.
 //!
 //! Every rule sees the sides ordered by `(modified_ms, content)` — shared
@@ -27,7 +21,6 @@
 use crate::error::AppResult;
 
 use super::frontmatter;
-use super::markers;
 use super::merge3::diff3;
 use super::total;
 use super::union::append_union;
@@ -40,7 +33,7 @@ pub struct ConflictInput<'a> {
     /// The two conflicting versions, in any order.
     pub sides: (ConflictSide, ConflictSide),
     /// True when this exact content pair was already auto-merged once. It
-    /// selects the deterministic loop breaker (rule 4).
+    /// selects the deterministic loop breaker (rule 3).
     pub merge_loop_detected: bool,
 }
 
@@ -54,13 +47,6 @@ pub fn resolve(input: ConflictInput<'_>) -> AppResult<Resolution> {
     }
     if normalized(&first.content) == normalized(&second.content) {
         return Ok(Resolution::Merged {
-            content: second.content,
-        });
-    }
-    if markers::contains_conflict_markers(&first.content)
-        || markers::contains_conflict_markers(&second.content)
-    {
-        return Ok(Resolution::Reconciled {
             content: second.content,
         });
     }
@@ -110,7 +96,7 @@ fn normalized(content: &str) -> String {
     lines.join("\n")
 }
 
-/// Rule 6: identical bodies, divergent flat frontmatter → key-wise merge.
+/// Rule 5: identical bodies, divergent flat frontmatter → key-wise merge.
 fn merge_frontmatter_only(
     base: Option<&str>,
     first: &ConflictSide,
@@ -208,7 +194,6 @@ mod tests {
         let Resolution::Reconciled { content } = result else {
             panic!("expected Reconciled, got {result:?}");
         };
-        assert!(!markers::contains_conflict_markers(&content));
         assert!(!content.contains("<<<<<<<"));
         assert!(content.contains("mac"), "{content}");
         assert!(content.contains("phone"), "{content}");
@@ -281,8 +266,8 @@ mod tests {
     }
 
     #[test]
-    fn rule_7_falls_through_when_a_side_deleted_base_lines() {
-        // The second side deleted "- b" while the first appended. Rule 5
+    fn rule_6_falls_through_when_a_side_deleted_base_lines() {
+        // The second side deleted "- b" while the first appended. Rule 4
         // overlaps (adjacent hunks), and a base-blind union would bring "- b"
         // back as an exact `Merged`.
         let base = "- a\n- b\n";
@@ -318,36 +303,6 @@ mod tests {
             result,
             Resolution::Merged {
                 content: "---\nid: abc\nisPinned: true\nprivate: true\n---\n# Body\n".to_string()
-            }
-        );
-    }
-
-    #[test]
-    fn a_marked_side_never_gains_nested_markers() {
-        let marked = "<<<<<<< Mac\nmine\n=======\ntheirs\n>>>>>>> iPhone\n";
-        let clean = "user resolved\n";
-        // The clean side is newer — the user resolved on the other device.
-        let result = resolve(input(
-            None,
-            (side(marked, "Mac", 1), side(clean, "iPhone", 2)),
-        ))
-        .unwrap();
-        assert_eq!(
-            result,
-            Resolution::Reconciled {
-                content: clean.to_string()
-            }
-        );
-        // The marked side is newer — markers just materialized; keep them.
-        let result = resolve(input(
-            None,
-            (side(clean, "iPhone", 1), side(marked, "Mac", 2)),
-        ))
-        .unwrap();
-        assert_eq!(
-            result,
-            Resolution::Reconciled {
-                content: marked.to_string()
             }
         );
     }
