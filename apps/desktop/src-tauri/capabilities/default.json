@@ -16,6 +16,7 @@
       "deny": [{ "url": "file://*" }]
     },
     "dialog:default",
+    "log:default",
     {
       "identifier": "http:default",
       "allow": [{ "url": "https://*:*" }, { "url": "http://*:*" }]

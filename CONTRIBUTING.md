@@ -97,6 +97,7 @@ Step-by-step walkthroughs for the most common kinds of change:
   service over test doubles, and rendering components with `renderInApp`.
 - [Upgrading dependencies](docs/contributing/upgrading-dependencies.md) —
   age gates, manifests, local checks, draft PRs.
+- [Logging](docs/contributing/logging.md): log sinks and conventions.
 
 ## "Plan NN" in comments?
 

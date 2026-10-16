@@ -451,8 +451,46 @@ describe('backfill', () => {
     expect(runtime.embedCalls()).toHaveLength(embedded)
   })
 
+  it('logs one summary line per pass', async () => {
+    const { index, logger } = setupGraph()
+
+    await index.backfill({ generation: 3, fileGeneration: 1, modelId: MODEL })
+    await index.backfill({ generation: 3, fileGeneration: 1, modelId: MODEL })
+
+    expect(logger.getInfos()).toEqual([
+      {
+        message: 'embedding backfill finished',
+        cause: {
+          outcome: 'completed',
+          modelId: MODEL,
+          generation: 3,
+          notes: 2,
+          done: 2,
+          notesEmbedded: 2,
+          chunksEmbedded: 2,
+          failed: 0,
+          elapsedMs: 0,
+        },
+      },
+      {
+        message: 'embedding backfill finished',
+        cause: {
+          outcome: 'completed',
+          modelId: MODEL,
+          generation: 3,
+          notes: 2,
+          done: 2,
+          notesEmbedded: 0,
+          chunksEmbedded: 0,
+          failed: 0,
+          elapsedMs: 0,
+        },
+      },
+    ])
+  })
+
   it('aborts between notes once the signal aborts', async () => {
-    const { index } = setupGraph()
+    const { index, logger } = setupGraph()
     const controller = new AbortController()
 
     const result = await index.backfill({
@@ -467,6 +505,9 @@ describe('backfill', () => {
 
     expect(result).toBe('aborted')
     expect(index.applied().map((apply) => apply.path)).toEqual(['notes/a.md'])
+    expect(logger.getInfos().map((entry) => entry.cause)).toMatchObject([
+      { outcome: 'aborted', notes: 2, done: 1 },
+    ])
   })
 
   it('logs a note that fails and goes on with the next', async () => {
@@ -479,15 +520,21 @@ describe('backfill', () => {
     expect(index.applied().map((apply) => apply.path)).toEqual(['notes/b.md'])
     expect(logger.getErrors()).toHaveLength(1)
     expect(logger.getErrors()[0]!.message).toBe('embedding backfill failed for notes/a.md:')
+    expect(logger.getInfos().map((entry) => entry.cause)).toMatchObject([
+      { outcome: 'completed', done: 2, notesEmbedded: 1, failed: 1 },
+    ])
   })
 
   it('resolves `failed` when the note list cannot be read', async () => {
-    const { index, database } = setupGraph()
+    const { index, database, logger } = setupGraph()
     database.close()
 
     await expect(
       index.backfill({ generation: 3, fileGeneration: 1, modelId: MODEL }),
     ).resolves.toBe('failed')
+    expect(logger.getInfos().map((entry) => entry.cause)).toMatchObject([
+      { outcome: 'failed', notes: 0, done: 0 },
+    ])
   })
 })
 
