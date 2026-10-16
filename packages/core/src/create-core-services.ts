@@ -1058,6 +1058,7 @@ export function composeCoreServices(
     database,
     indexLifecycle,
     logger,
+    clock,
   })
   const transcription = create.transcription({ http: adapters.http })
   const transcriptEnrichment = create.transcriptEnrichment({ languageModel })

@@ -1,3 +1,4 @@
+import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 import type { StorageService } from '../ports/storage-service.ts'
@@ -35,6 +36,7 @@ import { createTestNoteFileService } from './graph.ts'
 import { createTestGraphSessionService } from './graph-session.ts'
 import { createTestIndexLifecycleService } from './index-lifecycle.ts'
 import { createTestIpcBridgeService, type TestIpcBridgeService } from './ipc.ts'
+import { createTestClockService } from './clock.ts'
 import { createTestLoggerService } from './logger.ts'
 import { createTestSettingsService } from './settings.ts'
 import { createTestStorageService } from './storage.ts'
@@ -257,6 +259,7 @@ export interface TestEmbeddingIndexServiceOptions {
   database?: DatabaseService
   indexLifecycle?: IndexLifecycleService
   logger?: LoggerService
+  clock?: ClockService
   /**
    * Write applied and removed chunk sets into `database` as the native
    * writer does, so later passes and retrieval read them back. Needs a
@@ -416,6 +419,7 @@ class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
       database,
       indexLifecycle: options?.indexLifecycle ?? createTestIndexLifecycleService({ database }),
       logger: options?.logger ?? createTestLoggerService(),
+      clock: options?.clock ?? createTestClockService(),
     })
   }
 

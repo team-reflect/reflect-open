@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { LocalNoteRead, NoteFileService } from '../graph/note-file-service.ts'
 import { isNotePath, isTemplatePath } from '../graph/paths.ts'
@@ -125,6 +126,18 @@ export interface EmbeddingIndexServiceDeps {
   readonly database: DatabaseService
   readonly indexLifecycle: IndexLifecycleService
   readonly logger: LoggerService
+  readonly clock: ClockService
+}
+
+/**
+ * What one backfill pass did, for its summary log line.
+ */
+interface BackfillCounts {
+  notes: number
+  done: number
+  notesEmbedded: number
+  chunksEmbedded: number
+  failed: number
 }
 
 class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
@@ -237,11 +250,29 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
   }
 
   async backfill(options: EmbeddingBackfillOptions): Promise<EmbeddingBackfillResult> {
-    try {
-      return await this.#backfillNotes(options)
-    } catch {
-      return 'failed'
+    const { clock, logger } = this.#deps
+    const started = clock.monotonicNow()
+    const counts: BackfillCounts = {
+      notes: 0,
+      done: 0,
+      notesEmbedded: 0,
+      chunksEmbedded: 0,
+      failed: 0,
     }
+    let outcome: EmbeddingBackfillResult
+    try {
+      outcome = await this.#backfillNotes(options, counts)
+    } catch {
+      outcome = 'failed'
+    }
+    logger.info('embedding backfill finished', {
+      outcome,
+      modelId: options.modelId,
+      generation: options.generation,
+      ...counts,
+      elapsedMs: clock.monotonicNow() - started,
+    })
+    return outcome
   }
 
   follow(options: { generation: number; fileGeneration: number; modelId: string }): Unlisten {
@@ -305,7 +336,10 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
     await this.#deps.ipc.call('embed_apply', { path, chunks, generation }, voidSchema)
   }
 
-  async #backfillNotes(options: EmbeddingBackfillOptions): Promise<'completed' | 'aborted'> {
+  async #backfillNotes(
+    options: EmbeddingBackfillOptions,
+    counts: BackfillCounts,
+  ): Promise<'completed' | 'aborted'> {
     const { database, logger } = this.#deps
     const { generation, fileGeneration, modelId, onProgress, signal } = options
     const rows = await database.db
@@ -314,18 +348,23 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
       .select('path')
       .orderBy('path')
       .execute()
-    let done = 0
+    counts.notes = rows.length
     for (const row of rows) {
       if (signal?.aborted === true) {
         return 'aborted'
       }
       try {
-        await this.embedNote({ path: row.path, generation, fileGeneration, modelId })
+        const chunks = await this.embedNote({ path: row.path, generation, fileGeneration, modelId })
+        if (chunks > 0) {
+          counts.notesEmbedded += 1
+          counts.chunksEmbedded += chunks
+        }
       } catch (cause) {
+        counts.failed += 1
         logger.error(`embedding backfill failed for ${row.path}:`, cause)
       }
-      done += 1
-      onProgress?.(done, rows.length)
+      counts.done += 1
+      onProgress?.(counts.done, rows.length)
     }
     return 'completed'
   }
