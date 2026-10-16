@@ -572,8 +572,11 @@ fn stamp_modified_times(root: &Path, changes: &mut [ChangedFile]) {
         if matches!(change.kind, ChangeKind::Remove) {
             continue;
         }
-        change.modified_ms = root
-            .join(&change.path)
+        let abs = root.join(&change.path);
+        if let Ok(bytes) = std::fs::read(&abs) {
+            crate::fs::own_writes::record(root, &change.path, &bytes);
+        }
+        change.modified_ms = abs
             .metadata()
             .ok()
             .and_then(|meta| meta.modified().ok())

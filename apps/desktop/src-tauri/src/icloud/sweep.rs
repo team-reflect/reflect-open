@@ -672,6 +672,7 @@ fn fold_duplicate(
         if crate::fs::atomic_write_bytes(root, &canonical_abs, merged.as_bytes()).is_err() {
             return; // duplicate stays; next sweep retries
         }
+        crate::fs::own_writes::record(root, canonical_rel, merged.as_bytes());
         outcome.changed.push(SweepChange {
             path: canonical_rel.to_string(),
             kind: "upsert".to_string(),
