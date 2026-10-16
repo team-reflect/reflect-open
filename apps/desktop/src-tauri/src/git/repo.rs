@@ -21,9 +21,7 @@ pub(super) fn open_or_init(root: &Path) -> AppResult<Repository> {
     let mut opts = RepositoryInitOptions::new();
     opts.initial_head(DEFAULT_BRANCH);
     let repo = Repository::init_opts(root, &opts)?;
-    // A repo created inside a file-sync folder (iCloud Drive) must not sync
-    // through it — two devices' object stores merging file-by-file corrupts
-    // the repository (Plan 21). Pre-existing repos are marked at graph open.
+    // Two devices syncing one object store through iCloud corrupts it.
     crate::fs::mark_dir_local_only(&root.join(".git"));
     Ok(repo)
 }
@@ -117,13 +115,8 @@ pub(super) fn reattach_head(repo: &Repository) -> AppResult<()> {
 }
 
 /// Rename the local branch to `name` so fetch/merge/push target the branch
-/// the backup repo actually uses.
-///
-/// HEAD's commit never changes here, so the working tree — the user's notes —
-/// is never rewritten and no checkout is needed. A stale local branch already
-/// carrying `name` loses the *name* (force rename), not our content: the
-/// local state always wins the collision, and the remote's history integrates
-/// through the next fetch + merge like any other divergence.
+/// the backup repo uses. HEAD's commit and the working tree do not change.
+/// A stale local branch already named `name` loses the name (force rename).
 pub(super) fn align_branch(repo: &Repository, name: &str) -> AppResult<()> {
     let current = current_branch(repo)?;
     if current == name {
@@ -132,8 +125,7 @@ pub(super) fn align_branch(repo: &Repository, name: &str) -> AppResult<()> {
     if let Ok(reference) = repo.find_reference(&format!("refs/heads/{current}")) {
         git2::Branch::wrap(reference).rename(name, true)?;
     }
-    // With no current ref (unborn HEAD) there is nothing to rename — pointing
-    // HEAD at the new name is enough; the first commit creates the branch.
+    // An unborn HEAD has no ref to rename; the first commit creates it.
     repo.set_head(&format!("refs/heads/{name}"))?;
     Ok(())
 }

@@ -1,4 +1,4 @@
-//! Git backup/sync primitives (Plan 12).
+//! Git backup/sync primitives.
 //!
 //! Rust owns the *capabilities* — init/adopt, commit, fetch, merge, push —
 //! while the sync **policy** (debounce cadence, retry loop, product states,
@@ -279,8 +279,7 @@ pub async fn git_pull(
 ) -> AppResult<PullOutcome> {
     let root = crate::fs::root_for_generation(&state, generation)?;
     let outcome = run_git(root, move |root| pull_all(root, &message, MAX_FILE_BYTES)).await;
-    // Invalidate on both arms: a failed pull can still have moved the tree
-    // partway through checkout, and a stale catalog would pin the old view.
+    // Invalidate on both arms: a failed pull can leave the tree half written.
     let root = crate::fs::root_for_generation(&state, generation)?;
     crate::fs::invalidate_file_catalog(&state, &root);
     outcome
