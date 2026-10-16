@@ -49,12 +49,6 @@ pub fn free_conflict_copy_path(
         .expect("an unbounded range always yields a free name")
 }
 
-/// The conflict copy path of `rel` for a version modified at `time_ms`. The
-/// name holds the content hash, so it needs no counter.
-pub fn copy_path(rel: &str, time_ms: u64, hash8: &str) -> String {
-    conflict_copy_path(rel, &utc_stamp((time_ms / 1000) as i64), hash8, 1)
-}
-
 #[cfg(test)]
 mod path_tests {
     use super::*;
@@ -109,14 +103,6 @@ mod path_tests {
             free_conflict_copy_path("assets/img.png", STAMP, "a1b2c3d4", |p| p == first
                 || p == second),
             "assets/img (conflict 2026-10-16 08-05-31 a1b2c3d4 3).png"
-        );
-    }
-
-    #[test]
-    fn copy_path_has_no_counter() {
-        assert_eq!(
-            copy_path("a/b.zip", 1_792_137_931_000, "a1b2c3d4"),
-            "a/b (conflict 2026-10-16 08-05-31 a1b2c3d4).zip"
         );
     }
 }

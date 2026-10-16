@@ -21,7 +21,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::conflict::copy::copy_path;
+use crate::conflict::copy::{free_conflict_copy_path, utc_stamp};
 use crate::conflict::ladder::{self, ConflictInput};
 use crate::conflict::shadow::{blob_hash8_of_file, content_hash, ShadowStore};
 use crate::conflict::{ConflictSide, Resolution};
@@ -451,7 +451,7 @@ fn apply_file_resolution(
 }
 
 /// Write every version of a non-note file that differs from the working file
-/// as a conflict copy beside it. A copy that already exists counts as done.
+/// as a conflict copy beside it. A copy with identical bytes counts as done.
 /// Returns `true` when every version is handled, so the caller may mark them
 /// resolved; a failure leaves the rest for the next sweep.
 fn copy_conflict_versions(
@@ -478,10 +478,17 @@ fn copy_conflict_versions(
         if hash8 == current_hash {
             continue;
         }
-        let copy_rel = copy_path(rel, version.modified_ms, &hash8);
+        // A name held by other bytes (an edited copy, an eviction stub) is not
+        // a saved version: take the next counter name.
+        let stamp = utc_stamp((version.modified_ms / 1000) as i64);
+        let copy_rel = free_conflict_copy_path(rel, &stamp, &hash8, |candidate| {
+            let path = root.join(candidate);
+            crate::fs::file_occupied(&path)
+                && blob_hash8_of_file(&path).ok().as_deref() != Some(hash8.as_str())
+        });
         let target = root.join(&copy_rel);
         if crate::fs::file_occupied(&target) {
-            continue;
+            continue; // identical bytes are already saved
         }
         if let Err(err) = write_copy(&version.store_path, &target) {
             tracing::warn!(path = rel, copy = %copy_rel, ?err, "failed to write conflict copy");
@@ -1333,6 +1340,51 @@ mod tests {
         assert_eq!(total, 1);
         let count = fs::read_dir(root.path().join("assets")).unwrap().count();
         assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn an_edited_conflict_copy_is_not_mistaken_for_the_version() {
+        let root = json_graph();
+        let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
+        let hash8 = blob_hash8_of_file(&v.store_path).unwrap();
+        let first = format!("assets/data (conflict 2026-10-16 03-04-05 {hash8}).json");
+        let second = format!("assets/data (conflict 2026-10-16 03-04-05 {hash8} 2).json");
+        write(root.path(), &first, "{\"a\":\"edited\"}");
+        let mut outcome = SweepOutcome::default();
+
+        assert!(copy_conflict_versions(
+            root.path(),
+            "assets/data.json",
+            vec![v],
+            &mut outcome
+        ));
+
+        assert_eq!(outcome.copies, vec![second.clone()]);
+        assert_eq!(fs::read(root.path().join(&second)).unwrap(), b"{\"a\":2}");
+        assert_eq!(
+            fs::read(root.path().join(&first)).unwrap(),
+            b"{\"a\":\"edited\"}"
+        );
+    }
+
+    #[test]
+    fn an_identical_conflict_copy_counts_as_done() {
+        let root = json_graph();
+        let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
+        let hash8 = blob_hash8_of_file(&v.store_path).unwrap();
+        let first = format!("assets/data (conflict 2026-10-16 03-04-05 {hash8}).json");
+        write(root.path(), &first, "{\"a\":2}");
+        let mut outcome = SweepOutcome::default();
+
+        assert!(copy_conflict_versions(
+            root.path(),
+            "assets/data.json",
+            vec![v],
+            &mut outcome
+        ));
+
+        assert!(outcome.copies.is_empty());
+        assert_eq!(fs::read_dir(root.path().join("assets")).unwrap().count(), 2);
     }
 
     #[test]
