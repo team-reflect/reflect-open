@@ -323,6 +323,11 @@ class DevBridgeImpl implements IpcBridge {
         return null
       }
 
+      case 'conflict_archive_list':
+        return []
+      case 'conflict_archive_read':
+        throw new ReflectError('notFound', 'dev bridge: the archive is empty')
+
       default:
         console.error(`[dev-bridge] unimplemented command "${command}"`, args)
         throw new ReflectError('unknown', `dev bridge: unimplemented command "${command}"`)
