@@ -524,7 +524,7 @@ pub fn asset_write(
 /// `audio-memos/` prefix so this command can never grow into a general
 /// file-delete IPC. Idempotent — a segment deleted twice (or never written)
 /// is fine.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
     if !path.starts_with("audio-memos/") {
         return Err(AppError::traversal(format!(
@@ -532,22 +532,24 @@ pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>
         )));
     }
     let root = root_for_generation(&state, generation)?;
-    let abs = resolve(&root, &path)?;
-    // An iCloud-evicted segment exists only as its `.name.icloud` stub —
-    // mirror `note_delete` so a cancelled session's evicted parts still
-    // delete (Plan 21).
-    let target = if abs.exists() {
-        abs
-    } else {
-        eviction_placeholder(&abs)
-            .filter(|stub| stub.exists())
-            .unwrap_or(abs)
-    };
-    match fs::remove_file(target) {
-        Ok(()) => Ok(()),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(err) => Err(err.into()),
-    }
+    with_graph_lock(&root, || {
+        let abs = resolve(&root, &path)?;
+        // An iCloud-evicted segment exists only as its `.name.icloud` stub —
+        // mirror `note_delete` so a cancelled session's evicted parts still
+        // delete (Plan 21).
+        let target = if abs.exists() {
+            abs
+        } else {
+            eviction_placeholder(&abs)
+                .filter(|stub| stub.exists())
+                .unwrap_or(abs)
+        };
+        match fs::remove_file(target) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(err.into()),
+        }
+    })
 }
 
 /// The per-segment transcript cache lives under `.reflect/transcripts/`:
