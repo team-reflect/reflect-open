@@ -1,10 +1,8 @@
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { writeGenerationFor, type GraphSessionSource } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
-import type { ProgressPort } from '../ports/progress-port.ts'
 import { errorMessage, isAppError, ReflectError } from '../errors.ts'
 import type { NoteFileService, NoteWriteResult } from '../graph/note-file-service.ts'
-import type { FileChangeService } from '../indexing/file-change-service.ts'
 import { appendBlock } from '../markdown/append-section.ts'
 import { hasAuthoredTitle, parseNote } from '../markdown/extract.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
@@ -47,11 +45,9 @@ const DEFAULT_SAVE_DEBOUNCE_MS = 800
 
 export interface NoteSessionServiceDeps {
   readonly noteFile: NoteFileService
-  readonly fileChanges: FileChangeService
   readonly clock: ClockService
   readonly logger: LoggerService
   readonly graphSession: GraphSessionSource
-  readonly progress: ProgressPort
 }
 
 class NoteSessionServiceImpl implements NoteSessionService {

@@ -1207,11 +1207,9 @@ export function composeCoreServices(
     attachments,
     noteSessions: create.noteSessions({
       noteFile,
-      fileChanges,
       clock,
       logger,
       graphSession,
-      progress,
     }),
     openDocuments,
     noteMove,

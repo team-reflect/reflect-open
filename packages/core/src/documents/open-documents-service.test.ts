@@ -5,7 +5,6 @@ import { createTestFileChangeService, type TestFileChangeService } from '../test
 import { createTestNoteFileService, type TestNoteFileService } from '../testing/graph.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
-import { createTestProgressPort } from '../testing/ports.ts'
 import {
   createNoteSessionService,
   type NoteSession,
@@ -209,11 +208,9 @@ describe('reloadAll with live sessions', () => {
   ): NoteSession {
     return createNoteSessionService({
       noteFile,
-      fileChanges,
       clock: createTestClockService(),
       logger: createTestLoggerService(),
       graphSession: createTestGraphSessionService({ graph: { generation: 1 } }),
-      progress: createTestProgressPort(),
     }).create({
       path: PATH,
       // Read-only by default: the session tracks dirtiness but never writes,
