@@ -47,6 +47,8 @@ export const commitOutcomeSchema = z.object({
    */
   ahead: z.number(),
   skippedLargeFiles: z.array(skippedFileSchema),
+  changedFiles: z.array(z.lazy(() => changedFileSchema)).optional(),
+  reviewPaths: z.array(z.string()).optional(),
 })
 export type CommitOutcome = z.infer<typeof commitOutcomeSchema>
 
