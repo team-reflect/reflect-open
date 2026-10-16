@@ -8,7 +8,6 @@ allowBuilds:
   better-sqlite3: true
   esbuild: true
   simple-git-hooks: false
-  spawn-sync: true
 
 dedupePeers: true
 
