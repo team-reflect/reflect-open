@@ -1060,6 +1060,7 @@ fn kind_invariant_migration_wipes_the_projection_for_reindex() {
         "notes_daily_date_mtime_path",
         "notes_non_daily_mtime",
         "notes_pinned",
+        "notes_has_conflict",
     ] {
         let exists: bool = conn
             .prepare("SELECT 1 FROM pragma_index_list('notes') WHERE name = ?1")
