@@ -175,7 +175,7 @@ interface NoteEditorProps {
    * destination, or null to decline. meowdown inserts `![](dest)` for images
    * and `[name](dest)` for everything else.
    */
-  saveFile?: (((file: File) => Promise<string | null>)) | undefined
+  saveFile?: ((file: File) => Promise<string | null>) | undefined
   /**
    * Claim a `[label](url)` link as a file attachment, rendered as an inline
    * file pill instead of a plain link. Clicking a pill routes through the

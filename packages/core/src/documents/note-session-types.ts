@@ -65,7 +65,7 @@ export interface NoteSessionOptions {
    * `saved` is the only user-driven origin — the title-rename tracker
    * (Plan 07b) keys off it.
    */
-  onContent?: (((content: string, origin: NoteContentOrigin) => void)) | undefined
+  onContent?: ((content: string, origin: NoteContentOrigin) => void) | undefined
   /**
    * Push content into the live editor (external reload or merged save). The
    * editor's change handler may fire synchronously during this call; the
@@ -79,7 +79,7 @@ export interface NoteSessionOptions {
    * before returning. A normalized but unchanged snapshot must not be emitted
    * as an edit.
    */
-  reconcilePendingEditorInput?: ((() => void)) | undefined
+  reconcilePendingEditorInput?: (() => void) | undefined
   /**
    * Treat a missing file as an empty note on load instead of an error; the
    * file is then created by the first save — Plan 06's lazy daily-note
