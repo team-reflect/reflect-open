@@ -62,6 +62,7 @@ export function isSyncError(status: SyncStatus): status is Extract<SyncStatus, {
  * Whole minutes (rounded up, at least 1) until a `waiting` status ends.
  */
 export function minutesUntil(until: number, now: number): number {
+  // 1. just use import { format } from 'ms'. we do not need minutesUntil function at all FIXME
   return Math.max(1, Math.ceil((until - now) / 60_000))
 }
 
