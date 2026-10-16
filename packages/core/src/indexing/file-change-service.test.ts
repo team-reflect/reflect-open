@@ -124,52 +124,28 @@ describe('createFileChangeService', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it('tells own-write observers but not the change stream when echo is off', () => {
+  it('keeps own writes off the change stream when echo is off', () => {
     const { fileChanges } = setup(false)
     const changes = vi.fn()
-    const ownWrites: (readonly string[])[] = []
     fileChanges.subscribe(changes)
-    fileChanges.subscribeOwnWrites((paths) => {
-      ownWrites.push(paths)
-    })
 
     fileChanges.reportOwnWrite([{ path: 'notes/a.md', kind: 'upsert', modifiedMs: 1 }])
 
-    expect(ownWrites).toEqual([['notes/a.md']])
     expect(changes).not.toHaveBeenCalled()
   })
 
   it('echoes own writes onto the change stream when echo is on', () => {
     const { fileChanges } = setup(true)
     const seen: FileChangeBatch[] = []
-    const ownWrites: (readonly string[])[] = []
     fileChanges.subscribe((batch) => {
       seen.push(batch)
-    })
-    fileChanges.subscribeOwnWrites((paths) => {
-      ownWrites.push(paths)
     })
 
     fileChanges.reportOwnWrite([{ path: 'notes/gone.md', kind: 'remove' }])
 
-    expect(ownWrites).toEqual([['notes/gone.md']])
     expect(seen).toEqual([
       { changes: [{ path: 'notes/gone.md', kind: 'remove' }], source: 'own-write' },
     ])
-  })
-
-  it('logs a failing own-write observer and still notifies the rest', () => {
-    const { logger, fileChanges } = setup(true)
-    const seen = vi.fn()
-    fileChanges.subscribeOwnWrites(() => {
-      throw new Error('boom')
-    })
-    fileChanges.subscribe(seen)
-
-    fileChanges.reportOwnWrite([{ path: 'notes/a.md', kind: 'upsert' }])
-
-    expect(logger.getErrors().map((entry) => entry.message)).toEqual(['own-write observer failed:'])
-    expect(seen).toHaveBeenCalledTimes(1)
   })
 
   it('shares one native listener across subscribers and parses each payload once', async () => {

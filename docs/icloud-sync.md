@@ -29,7 +29,8 @@ edit the same note while apart.
   locally as you type, and touches the network only after five quiet minutes
   with no pending iCloud downloads. The GitHub history is noisy, because
   every device commits what iCloud delivered, and the backup trails your
-  edits by about five minutes.
+  edits by about five minutes. For a Git-only graph, the desktop app also
+  probes the remote every 90 seconds and pulls when it moved.
 
 ## What happens on a conflict
 
@@ -51,14 +52,18 @@ resolving the same conflict produce identical bytes and converge):
    Two devices creating the same day's note offline (iCloud leaves a
    `2026-07-04 2.md` behind) fold back into one file the same way.
 7. **Anything else**: a word-level merge keeps the words both sides added.
-   It always produces text, so iCloud sync never writes conflict markers.
+   It always produces text, so Reflect never writes conflict markers.
+
+The same ladder runs on every path: a Git pull, the iCloud sweep, and an
+editor save that meets a newer file on disk. The path does not change the
+result.
 
 A result that drops or interleaves a side's text (a marked side, the loop
 breaker, the word-level merge) is archived first: Reflect archives each side
 under `.reflect/conflict-archive/<note-path>/` before it writes the result. It
 archives only content that Git history does not already hold (kept ~90 days /
-20 versions per note). A later change will show the archived versions under
-**Earlier versions** in the note sidebar. Binary assets never text-merge: the other device's copy
+20 versions per note). The archived versions show under **Earlier versions**
+in the note sidebar. Binary assets never text-merge: the other device's copy
 lands alongside as `name (conflict).ext`.
 
 ## Building with iCloud
@@ -143,5 +148,5 @@ entirely.
 - **AI-assisted resolution** — the ladder already produces the
   base/local/remote triple a BYOK provider would consume; see the plan's
   *Deferred* section. `private: true` notes will be hard-blocked from it.
-- A richer diff view than raw markers in the protected note.
+- A richer diff view in the protected view of a note that an older version left with markers.
 - Upload/download progress in the sync status line.

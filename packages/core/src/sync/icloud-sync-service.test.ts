@@ -30,9 +30,7 @@ const INDEX_GENERATION = 3
 
 const EMPTY_OUTCOME: IcloudSweepOutcome = {
   changed: [],
-  needsReview: [],
   reconciled: [],
-  deferred: [],
   autoResolved: 0,
 }
 
@@ -265,9 +263,7 @@ describe('createICloudSyncService', () => {
         { path: 'notes/merged.md', kind: 'upsert', modifiedMs: 5 },
         { path: 'assets/picture.png', kind: 'upsert', modifiedMs: 5 },
       ],
-      needsReview: ['notes/merged.md'],
       reconciled: [],
-      deferred: [],
       autoResolved: 0,
     })
     const sync = service()
@@ -614,6 +610,6 @@ describe('createICloudSyncService', () => {
 
     expect(scanCalls()).toHaveLength(0)
     expect(clock.pendingTimers()).toBe(0)
-    expect(fileChanges.listenerCount()).toEqual({ changes: 0, reconcile: 0, ownWrites: 0 })
+    expect(fileChanges.listenerCount()).toEqual({ changes: 0, reconcile: 0 })
   })
 })

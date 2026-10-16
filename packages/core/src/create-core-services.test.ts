@@ -105,16 +105,17 @@ describe('createCoreServices', () => {
       ipc,
       logger: createTestLoggerService(),
       clock: createTestClockService({ now: 5 }),
+      platform: createTestPlatformService({ appPlatform: 'ios' }),
     })
-    const written: string[] = []
-    services.fileChanges.subscribeOwnWrites((paths) => {
-      written.push(...paths)
+    const seen: { source: string; paths: string[] }[] = []
+    services.fileChanges.subscribe((batch) => {
+      seen.push({ source: batch.source, paths: batch.changes.map((change) => change.path) })
     })
     await expect(internal.noteFile.write('notes/a.md', 'a', 1)).resolves.toEqual({
       modifiedMs: 5,
       merged: null,
     })
-    expect(written).toEqual(['notes/a.md'])
+    expect(seen).toEqual([{ source: 'own-write', paths: ['notes/a.md'] }])
   })
 
   it('builds the index reads over the composed database', async () => {

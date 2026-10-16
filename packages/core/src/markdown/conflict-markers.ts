@@ -5,11 +5,11 @@ import { isCodeBlock } from './node-types.ts'
 /**
  * Git conflict-marker detection (Plan 12).
  *
- * A sync merge that conflicts writes standard markers into the note (labeled
- * `<<<<<<< this device` / `>>>>>>> other device` by the Rust merge) and
- * commits them — the note itself carries the conflict. The indexer calls this
- * on the raw source to project a `has_conflict` flag; when the user edits the
- * markers away, the next reindex clears it. Detection requires the full
+ * Current sync merges never write markers. This module serves notes that an
+ * older version left with markers (labeled `<<<<<<< this device` /
+ * `>>>>>>> other device`). The indexer calls it on the raw source to project
+ * a `has_conflict` flag; when the user edits the markers away, the next
+ * reindex clears it. Detection requires the full
  * `<<<<<<<` → `=======` → `>>>>>>>` sequence in order, so prose that merely
  * mentions a marker line doesn't false-positive.
  */

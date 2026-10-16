@@ -16,7 +16,7 @@ import type { OpenDocumentsService } from './open-documents-service.ts'
  *   isn't the truth yet), so we fall back to disk rather than act on a
  *   placeholder — the trap behind empty publishes and mis-read toggle states.
  * - **Writes** go through the session when it can take the patch (so our own
- *   write never parks a conflict under a dirty buffer), else a read-patch-write
+ *   write never races a dirty buffer), else a read-patch-write
  *   on disk that a loading/clean session reconciles like any external edit.
  *   Both encode the flag through {@link frontmatterPatchToYaml}, so a value
  *   lands identically whichever channel wins.
@@ -50,7 +50,7 @@ export interface NoteDocumentService {
    * unsaved edits survive and there's no read-then-write gap for a concurrent
    * keystroke. The session declines (and we refuse rather than clobber via
    * disk) only when it can't persist now (failed to load, protected/read-only,
-   * or a parked conflict); a session still loading waits for its load instead.
+   * or disposed); a session still loading waits for its load instead.
    * A decline is surfaced as {@link NoteBusyError}. When the note is **not**
    * open, disk is the source of truth: read, transform, write.
    *
@@ -82,8 +82,8 @@ export interface CommitSourceEditOptions {
 
 /**
  * A note couldn't be written because it is open with unsaved edits that
- * the session can't persist right now — it's read-only/protected, or a sync
- * conflict is parked. Distinct from `TaskStaleError` (a stale index): the
+ * the session can't persist right now — it's read-only/protected or disposed.
+ * Distinct from `TaskStaleError` (a stale index): the
  * recovery is "save or resolve the note", not "reindex". We refuse rather than
  * write to disk, which would clobber the live buffer.
  */

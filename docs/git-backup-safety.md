@@ -7,25 +7,23 @@ engine and the backup service), the backup flusher of
 note session's external-change handling in
 `packages/core/src/documents/note-session-service.ts`.
 
-Each rule names the test that enforces it. A rule whose test is still
-`#[ignore]` / `test.fails` is a known gap: the test is red on purpose and
-the fix that turns it green is named in its ignore reason.
+Each rule names the tests that enforce it. Every rule below is
+implemented.
 
 ## S1. A pull never overwrites uncommitted local changes
 
 A note saved after the cycle's commit (during the fetch, for example) is
-not clobbered by the checkout that applies the pull. The pull reads every
-uncommitted local edit before the checkout and writes it back after it:
-resolved by the conflict ladder with the incoming version when both
-changed a text file,
-or kept beside a conflict copy otherwise. The result stays uncommitted for
-the next commit.
+not clobbered by the checkout that applies the pull. The checked write
+merges inside the graph lock, and the pull's checkout also runs inside
+that lock, so a save can never fall between them. The pull reads every
+uncommitted local edit before the checkout and writes it back after it.
+When both sides changed a text file, the conflict ladder resolves it with
+the incoming version. Otherwise the edit is kept beside a conflict copy.
+The result stays uncommitted for the next commit.
 
 - Test: `git::tests::a_save_between_commit_and_merge_survives_the_merge`,
   `git::tests::a_save_between_commit_and_fast_forward_survives`,
   `git::tests::edits_after_a_crash_before_checkout_keep_the_merged_changes`.
-
-Status (2026-10-16): implemented in phase 1 of the sync rework.
 
 ## S2. The branch ref moves only after the working tree matches it
 
@@ -41,9 +39,6 @@ the ref moves last.
   `git::tests::merge_crash_before_checkout_converges_next_cycle`,
   `git::tests::merge_crash_after_checkout_before_ref_move_converges_next_cycle`.
 
-Status (2026-10-16): fast-forward implemented (#1468); merge implemented in
-phase 1 of the sync rework.
-
 ## S3. After any failed git command, the next cycle loses nothing
 
 Whatever step fails (lock file, disk, network, crash), running the normal
@@ -51,10 +46,8 @@ cycle again (commit, fetch, merge, push) converges on a tree that contains
 every local and every remote change. In particular it never pushes a commit
 that reverts a pull.
 
-- Test: `git::tests::fast_forward_failure_before_the_ref_moves_converges_next_cycle`
-  (green), plus every S2 and S5 test.
-
-Status (2026-10-16): already implemented.
+- Test: `git::tests::fast_forward_failure_before_the_ref_moves_converges_next_cycle`,
+  plus every S2 and S5 test.
 
 ## S4. One git command at a time per graph
 
@@ -63,11 +56,9 @@ serialized. The quit-time and background flush go through the sync engine's
 queue, never straight to `git_commit_all`.
 
 - Test: `git::tests::commit_during_fast_forward_never_reverts_pulled_notes`,
-  `backup-service.test.ts` "quit flush waits for an
-  in-flight pull before committing", `engine.test.ts` "commitNow joins the
-  single-flight queue and never touches the network".
-
-Status (2026-10-16): implemented in phase 1 of the sync rework.
+  `backup-service.test.ts` "quit flush waits for an in-flight pull before
+  committing", `engine.test.ts` "commitNow joins the single-flight queue
+  and never touches the network".
 
 ## S5. The repository is never left in app-made merge state
 
@@ -84,8 +75,6 @@ refused.
   `git::tests::edits_after_a_crash_before_checkout_keep_the_merged_changes`,
   `git::tests::a_recorded_merge_from_a_foreign_head_is_dropped`.
 
-Status (2026-10-16): implemented in phase 1 of the sync rework.
-
 ## S6. `.reflect/` never enters a commit
 
 The runtime directory is excluded by `.gitignore`, by an in-memory ignore
@@ -96,16 +85,14 @@ tracked.
   files), `git::tests::tracked_reflect_entries_are_dropped_from_the_next_commit`
   (entries an adopted repository already tracked).
 
-Status (2026-10-16): already implemented.
-
 ## S7. Merged content is committed and pushed, never left pending
 
-A pull never writes conflict markers. A text file both devices changed is
-resolved by the conflict ladder (`conflict::ladder`), committed with both
-parents, and pushed. The ladder orders the sides by commit time and
-content, so both devices produce the same bytes. A binary file keeps both
-copies and an edit kept against a deletion stays, and only those land in
-`reviewPaths`. Other notes keep syncing.
+A text file both devices changed is resolved by the conflict ladder
+(`conflict::ladder`), committed with both parents, and pushed. The ladder
+orders the sides by commit time and content, so both devices produce the
+same bytes. A binary file keeps both copies and an edit kept against a
+deletion stays, and only those land in `reviewPaths`. Other notes keep
+syncing.
 
 - Test: `git::tests::conflicting_edits_merge_without_markers`,
   `git::tests::daily_append_on_two_devices_merges_by_union`,
@@ -117,8 +104,6 @@ copies and an edit kept against a deletion stays, and only those land in
   `git::tests::binary_conflict_keeps_both_copies`,
   `git::tests::a_directory_file_conflict_keeps_the_file_as_a_conflict_copy`,
   `git::tests::a_symlink_conflict_keeps_both_sides`.
-
-Status (2026-10-16): implemented in phase 3 of the sync rework.
 
 ## S8. Edits in an open note are never silently discarded
 
@@ -144,4 +129,15 @@ exit path only has to finish the write.
   stay dirty and merge on the next write", "dispose after flush still
   completes a merging write".
 
-Status (2026-10-16): implemented in phase 4 of the sync rework.
+## S9. Merges never write conflict markers
+
+No merge path writes `<<<<<<<` lines into a note: not the git pull, not
+the iCloud sweep, not the editor save. All three resolve a text conflict
+through the same ladder. A result that drops or interleaves a side is
+archived under Earlier versions, so no side is lost. Notes that an older
+version left with markers still open protected and stay resolvable.
+
+- Test: `git::tests::conflicting_edits_merge_without_markers`,
+  `conflict::ladder::tests::overlapping_edits_reconcile_without_markers`,
+  `note-session-service.test.ts` "a dirty buffer saves at once when an
+  external change arrives".

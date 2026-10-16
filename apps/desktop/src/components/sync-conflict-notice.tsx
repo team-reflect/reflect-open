@@ -18,8 +18,8 @@ interface SyncConflictNoticeProps {
 
 /**
  * The `Needs review` banner + resolution actions for a note whose file
- * carries sync conflict markers (a backup merge where this and another
- * device edited the same note, Plan 12).
+ * carries conflict markers. It serves notes that an older version left with
+ * markers; the current sync never writes them.
  *
  * Conflict markers don't survive the editor's markdown round-trip (the
  * discovery spike showed `=======` re-parsing as a setext underline and both

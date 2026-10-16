@@ -74,13 +74,6 @@ export interface FileChangeService {
    */
   subscribeReconcile(listener: () => void): Unlisten
   /**
-   * Receive the paths of this device's own note and asset writes, on every
-   * platform and whatever `echoOwnWrites` says. Only external content may
-   * advance an iCloud shadow merge base, and a watcher event alone cannot
-   * tell the two apart.
-   */
-  subscribeOwnWrites(listener: (paths: readonly string[]) => void): Unlisten
-  /**
    * Fan an in-process batch to every {@link subscribe} listener, exactly as
    * if the watcher had reported it. Writes a sync pull applies must reach
    * open editors and the index even before the watcher runs.
@@ -88,8 +81,8 @@ export interface FileChangeService {
   emit(batch: FileChangeBatch): void
   /**
    * Report changes a write command just made, after the write has landed.
-   * Own-write listeners always hear the paths; the change stream hears the
-   * batch (tagged `own-write`) only when `echoOwnWrites` is on.
+   * The change stream hears the batch (tagged `own-write`) only when
+   * `echoOwnWrites` is on.
    */
   reportOwnWrite(changes: readonly FileChange[]): void
   /**
@@ -115,7 +108,6 @@ export interface FileChangeServiceDeps {
 
 class FileChangeServiceImpl implements FileChangeService {
   readonly #deps: FileChangeServiceDeps
-  readonly #ownWriteListeners = new Set<(paths: readonly string[]) => void>()
   readonly #batches: FanOut<FileChangeBatch>
 
   constructor(deps: FileChangeServiceDeps) {
@@ -145,32 +137,12 @@ class FileChangeServiceImpl implements FileChangeService {
     })
   }
 
-  subscribeOwnWrites(listener: (paths: readonly string[]) => void): Unlisten {
-    const deliver = (paths: readonly string[]): void => {
-      listener(paths)
-    }
-    this.#ownWriteListeners.add(deliver)
-    return () => {
-      this.#ownWriteListeners.delete(deliver)
-    }
-  }
-
   emit(batch: FileChangeBatch): void {
     this.#batches.emit(batch)
   }
 
   reportOwnWrite(changes: readonly FileChange[]): void {
-    const { logger, echoOwnWrites } = this.#deps
-    const paths = changes.map((change) => change.path)
-    for (const listener of this.#ownWriteListeners) {
-      try {
-        listener(paths)
-      } catch (error) {
-        // One failing observer must not break the echo for everyone.
-        logger.error('own-write observer failed:', error)
-      }
-    }
-    if (echoOwnWrites) {
+    if (this.#deps.echoOwnWrites) {
       this.#batches.emit({ changes: [...changes], source: 'own-write' })
     }
   }

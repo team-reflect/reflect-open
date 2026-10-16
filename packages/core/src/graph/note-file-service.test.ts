@@ -40,10 +40,6 @@ describe('createNoteFileService', () => {
   it('reports a write as an own write stamped with the disk mtime', async () => {
     const { ipc, fileChanges, noteFile } = setup()
     ipc.onCommand('note_write', () => ({ modifiedMs: 1_234 }))
-    const reported: unknown[] = []
-    fileChanges.subscribeOwnWrites((paths) => {
-      reported.push(paths)
-    })
 
     await expect(noteFile.write('notes/a.md', 'new', 7)).resolves.toEqual({
       modifiedMs: 1_234,

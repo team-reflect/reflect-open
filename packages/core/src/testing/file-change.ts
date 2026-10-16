@@ -32,7 +32,7 @@ export interface TestFileChangeService extends FileChangeService {
   /**
    * How many listeners of each kind are attached.
    */
-  listenerCount(): { changes: number; reconcile: number; ownWrites: number }
+  listenerCount(): { changes: number; reconcile: number }
 }
 
 function attach<Args extends unknown[]>(
@@ -53,7 +53,6 @@ class TestFileChangeServiceImpl implements TestFileChangeService {
   readonly #echoOwnWrites: boolean
   readonly #changeListeners = new Set<(batch: FileChangeBatch) => void>()
   readonly #reconcileListeners = new Set<() => void>()
-  readonly #ownWriteListeners = new Set<(paths: readonly string[]) => void>()
   readonly #delivered: FileChangeBatch[] = []
   readonly #reported: (readonly string[])[] = []
   #running = false
@@ -70,10 +69,6 @@ class TestFileChangeServiceImpl implements TestFileChangeService {
     return attach(this.#reconcileListeners, listener)
   }
 
-  subscribeOwnWrites(listener: (paths: readonly string[]) => void): Unlisten {
-    return attach(this.#ownWriteListeners, listener)
-  }
-
   emit(batch: FileChangeBatch): void {
     this.#delivered.push(batch)
     for (const listener of this.#changeListeners) {
@@ -82,11 +77,7 @@ class TestFileChangeServiceImpl implements TestFileChangeService {
   }
 
   reportOwnWrite(changes: readonly FileChange[]): void {
-    const paths = changes.map((change) => change.path)
-    this.#reported.push(paths)
-    for (const listener of this.#ownWriteListeners) {
-      listener(paths)
-    }
+    this.#reported.push(changes.map((change) => change.path))
     if (this.#echoOwnWrites) {
       this.emit({ changes: [...changes], source: 'own-write' })
     }
@@ -118,11 +109,10 @@ class TestFileChangeServiceImpl implements TestFileChangeService {
     return this.#running
   }
 
-  listenerCount(): { changes: number; reconcile: number; ownWrites: number } {
+  listenerCount(): { changes: number; reconcile: number } {
     return {
       changes: this.#changeListeners.size,
       reconcile: this.#reconcileListeners.size,
-      ownWrites: this.#ownWriteListeners.size,
     }
   }
 }

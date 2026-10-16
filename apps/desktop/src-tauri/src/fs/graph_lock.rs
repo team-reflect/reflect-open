@@ -61,7 +61,7 @@ pub fn with_graph_lock<T>(root: &Path, f: impl FnOnce() -> AppResult<T>) -> AppR
     f()
 }
 
-/// How many callers hold or wait on the lock of `root`.
+/// How many threads hold or wait on the lock of `root`.
 #[cfg(test)]
 pub(crate) fn holders(root: &Path) -> usize {
     let locks = LOCKS.lock().unwrap_or_else(PoisonError::into_inner);

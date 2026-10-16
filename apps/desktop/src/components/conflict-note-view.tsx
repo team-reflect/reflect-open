@@ -32,7 +32,8 @@ interface ConflictNoteViewProps {
 }
 
 /**
- * The read-only view for a sync-conflicted note: the file's text rendered
+ * The read-only view for a note that an older version left with conflict
+ * markers. The file's text is rendered
  * verbatim, with each conflict block shown as a card whose two sides are
  * color-coded and labeled with the device names from the marker lines
  * (instead of raw `<<<<<<<` noise). Display only — resolution is still the

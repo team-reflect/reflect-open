@@ -495,7 +495,7 @@ describe('watchCatalog', () => {
     )
 
     stop()
-    expect(fileChanges.listenerCount()).toEqual({ changes: 0, reconcile: 0, ownWrites: 0 })
+    expect(fileChanges.listenerCount()).toEqual({ changes: 0, reconcile: 0 })
   })
 
   it('re-lists on a folder-level reconcile request', async () => {

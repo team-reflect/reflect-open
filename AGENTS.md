@@ -164,6 +164,19 @@ reflect-open/
 └── turbo.json, pnpm-workspace.yaml
 ```
 
+### Sync
+
+Safety rules for the sync path: [docs/git-backup-safety.md](docs/git-backup-safety.md) (S1 to S9). Read them before you change `git/`, `conflict/`, `icloud/`, `fs/` or `packages/core/src/sync/`.
+
+- **TS owns policy.** Cadence, single-flight queueing and status live in `packages/core/src/sync/*-service.ts` (`engine.ts`, `backup-service.ts`, `icloud-sync-service.ts`). Rust owns the capabilities: `git/` (libgit2 commit, fetch, merge, push) and `icloud/` (sweep, versions, watch).
+- **One ladder for every text conflict.** `conflict/ladder.rs` resolves a pair on every path: git pull, iCloud sweep and editor save (merge-on-write in `note_write`). It always returns text and never writes conflict markers. A result that drops or interleaves a side is archived first (`conflict/archive.rs`) and shows under **Earlier versions** in the note sidebar.
+- **Old markers stay resolvable.** `detectConflictMarkers`, `has_conflict`, `SyncConflictNotice` and `conflict-resolution-service.ts` serve notes that an older version left with markers.
+- **One lock per graph.** `fs/graph_lock.rs` serializes git commands, note writes and sweep writes. Take it before you touch notes in Rust.
+- **Own writes.** `fs/own_writes.rs` records the note bytes this process wrote, so a later read can tell its own content from a change that arrived from elsewhere.
+- **Pull merges in memory.** A pull never calls `repo.merge()`. The merge commit waits in `refs/reflect/merge` until the working tree matches it, then the branch ref moves.
+- **Cadence.** Desktop probes the remote every 90 s while visible and pulls when it moved. A graph that holds both Git and iCloud waits five quiet minutes before it uses the network. One sync method per graph is recommended.
+- **`.reflect/` never syncs.** Git ignores it and iCloud marks it local-only. External tools: [docs/external-tools.md](docs/external-tools.md).
+
 ### Related repos
 
 - **Meowdown:** the local checkout lives at `~/repos/meowdown`. Meowdown is the
