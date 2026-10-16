@@ -82,19 +82,15 @@ export interface SyncEngineOptions {
    */
   onLargeFilesSkipped?: ((files: SkippedFile[]) => void) | undefined
   /**
-   * Files a pull's merge changed on disk. The caller reindexes them directly:
-   * pull-applied writes must reach the index even when the file watcher isn't
-   * up yet (the launch pull can race the watcher start). Invoked synchronously
-   * at the merge boundary so immediate notifications cannot lag a later merge;
-   * any returned promise runs alongside required Git convergence and push. A
-   * successful cycle waits for every returned task before reporting idle. A
-   * throw or rejection surfaces as an `error` only after that Git work has had
-   * its chance to make the Markdown source of truth durable.
+   * Files a pull's merge changed on disk. The caller reindexes them directly,
+   * because the file watcher may not be up yet. Invoked synchronously at the
+   * merge boundary. A returned promise runs alongside the push; the cycle
+   * waits for it before reporting idle, and a failure surfaces as `error`
+   * after that Git work.
    */
   onRemoteChanges?: ((changes: ChangedFile[]) => void | Promise<void>) | undefined
   /**
-   * Paths a pull kept for review beside their notes. Called
-   * synchronously at the boundary where the outcome arrives.
+   * Paths a pull kept for review beside their notes. Called synchronously.
    */
   onReview?: ((paths: string[]) => void) | undefined
   /**
@@ -110,28 +106,26 @@ export interface SyncEngineOptions {
    * Returning false at admission drops the trigger without issuing Git work;
    * returning false mid-cycle lets the already-issued command finish but
    * suppresses every subsequent command, except the commit, credential, and
-   * push of a push-only cycle and the push of a full cycle: they only send
-   * what is already committed, so they finish. A full cycle that owes a flush
-   * commit and is stopped before its pull commits once. The lifecycle owner must
-   * replay a full cycle when work is allowed again.
+   * push of a push-only cycle and the push of a full cycle (they only send
+   * what is already committed). A full cycle that owes a flush commit and is
+   * stopped before its pull commits once. The owner must replay a full cycle
+   * when work is allowed again.
    */
   canStartCycle?: (() => boolean) | undefined
   /**
-   * Commit-only mode, for a graph with no remote (local history): every
-   * cycle ends after the commit — no credential resolved, no fetch/pull,
-   * no push. Edits still land in Git history and stay revertable.
+   * Commit-only mode, for a graph with no remote: every cycle ends after
+   * the commit (no credential, fetch, pull, or push).
    */
   localOnly?: boolean | undefined
   /**
    * Quiet mode: edits and manual syncs only commit locally. The network pass
-   * (fetch, pull, push) runs once this many ms pass with no edit and no
-   * pulled change, and only when {@link networkReady} agrees. A manual sync
-   * opens a window only when none is open.
+   * runs once this many ms pass with no edit and no pulled change, and only
+   * when {@link networkReady} agrees.
    */
   quietMs?: number | undefined
   /**
-   * Asked when the quiet window ends. False postpones the network pass with
-   * a growing delay, up to five minutes.
+   * Asked when the quiet window ends. False postpones the network pass,
+   * with a growing delay up to five minutes.
    */
   networkReady?: (() => Promise<boolean>) | undefined
 }
@@ -172,10 +166,10 @@ const MAX_PUSH_ATTEMPTS = 3
 
 /**
  * What a cycle does. The debounce asks for `network` only (commit, then
- * push if anything is pending); launch, focus, and manual syncs add
- * `fetch` (fetch, then a pull that commits and merges, then push); the quit and background flush ask for
- * neither and stop at the commit. A follow-up requested mid-cycle is the
- * union of what was asked.
+ * push if anything is pending). Launch, focus, and manual syncs add `fetch`
+ * (fetch, pull, push). The quit and background flush ask for neither and
+ * stop at the commit. A follow-up requested mid-cycle is the union of the
+ * requests.
  */
 interface CycleRequest {
   readonly fetch: boolean
@@ -201,10 +195,8 @@ class CycleSuppressedError extends Error {}
 export interface SyncEngineFactory {
   /**
    * Build a sync engine for one graph session. The engine starts idle and does
-   * nothing until `noteChanged()` (debounced commit→push) or `syncNow()` (full
-   * fetch→pull→push, where the pull commits first) is called; all output flows through the
-   * {@link SyncEngineOptions} callbacks. `stop()` is terminal — build a new
-   * engine to resume.
+   * nothing until `noteChanged()` or `syncNow()` is called. All output flows
+   * through the {@link SyncEngineOptions} callbacks. `stop()` is terminal.
    */
   create(options: SyncEngineOptions): SyncEngine
 }
@@ -254,15 +246,10 @@ class SyncEngineImpl implements SyncEngine {
    */
   #authFailed = false
   #quietTimer: TimerHandle | null = null
-  /**
-   * Bumped by every arm, so an ask that was in flight when the window moved
-   * can tell its answer is stale.
-   */
+  /** Bumped by every arm, so a stale `networkReady` answer is ignored. */
   #quietGeneration = 0
   #quietUntil = 0
-  /**
-   * True from a quiet window's expiry until its network pass ends.
-   */
+  /** True from a quiet window's expiry until its network pass ends. */
   #quietBusy = false
   #current: SyncStatus = { state: 'idle' }
 
@@ -390,9 +377,7 @@ class SyncEngineImpl implements SyncEngine {
     const result = await promise
     this.#signal.throwIfAborted()
     onResult?.(result)
-    // A synchronous result notification can itself tear down the owner (for
-    // example, a file-change subscriber closing the graph). Preserve stop's
-    // command boundary before the caller is allowed to issue later Git work.
+    // onResult can tear down the owner (e.g. close the graph): re-check.
     this.#signal.throwIfAborted()
     if (gated && this.#options.canStartCycle?.() === false) {
       throw new CycleSuppressedError()
@@ -408,9 +393,7 @@ class SyncEngineImpl implements SyncEngine {
     } catch (error) {
       task = Promise.reject(error)
     }
-    // Attach a handler immediately: a synchronous throw or fast rejection can
-    // happen well before the successful cycle joins this task at its idle
-    // boundary, and must never become an unhandled rejection in between.
+    // Attach a handler now so an early rejection is never unhandled.
     void task.catch(() => {})
     return task
   }
@@ -504,9 +487,8 @@ class SyncEngineImpl implements SyncEngine {
         }
       } catch (error) {
         if (error instanceof CycleSuppressedError) {
-          // A merge can land and queue its changed files just before the owner
-          // suppresses later Git commands. Preserve the old boundary: finish
-          // that notification before the suppressed cycle settles to idle.
+          // A merge can land just before the owner suppresses later Git
+          // commands: finish its notification before settling.
           try {
             await this.#settleRemoteChanges(remoteChangeTasks, false)
             this.#emitSettled()
@@ -553,9 +535,7 @@ class SyncEngineImpl implements SyncEngine {
     }
     const offline = this.#options.localOnly === true || quiet
     if (offline || !request.fetch) {
-      // The commit comes first: it is the part of every cycle a flush is owed,
-      // and it must land even if the owner gates the network work that follows
-      // (the credential resolution is the first point a gate can interrupt).
+      // The commit lands even if the owner gates the network work after it.
       const commit = await this.#step(
         this.#deps.git.commitAll('Update notes', this.#options.generation),
         { gated: false, onResult: (outcome) => this.#reportSkipped(outcome.skippedLargeFiles) },
@@ -564,18 +544,14 @@ class SyncEngineImpl implements SyncEngine {
         return // the commit is the whole cycle: no remote, or the sign-in is known bad
       }
       const credential = await this.#step(this.#options.getCredential(), { gated: false })
-      // The debounce path often fires for changes that are already committed
-      // and pushed (a pull's own writes re-enter via the watcher). Nothing
-      // committed and nothing ahead means a push would be a pointless network
-      // negotiation — end the cycle without one.
+      // Nothing committed and nothing ahead: skip the push (a pull's own
+      // writes re-enter via the watcher).
       if (!commit.committed && commit.ahead === 0) {
         return
       }
       await this.#push(credential, remoteChanges)
       return
     }
-    // Launch/focus/manual: fetch first so the pull's commit and merge run
-    // back to back under one graph lock, then push.
     let pullStarted = false
     try {
       const credential = await this.#step(this.#options.getCredential())
@@ -613,8 +589,7 @@ class SyncEngineImpl implements SyncEngine {
       if (!push.nonFastForward) {
         throw new PushRejectedError(push.rejectionMessage ?? 'the remote rejected the backup')
       }
-      // The normal two-device race: another device pushed first. Converge and
-      // retry: every pull ends with the merge committed, so the next push can land.
+      // Another device pushed first: pull, then retry.
       await this.#step(this.#deps.git.fetch(credential, this.#options.generation))
       await this.#pull(remoteChanges)
     }
@@ -635,8 +610,7 @@ class SyncEngineImpl implements SyncEngine {
     return await this.#step(this.#deps.git.pull('Update notes', this.#options.generation), {
       onResult: (outcome) => {
         this.#reportSkipped(outcome.skippedLargeFiles)
-        // The command may already have rewritten files before suspension. Fan
-        // those changes out before the boundary gate stops subsequent Git work.
+        // The command may have rewritten files before the gate closes: report them first.
         if (outcome.changedFiles.length > 0) {
           remoteChanges(outcome.changedFiles)
           if (this.#quietMs !== null) {

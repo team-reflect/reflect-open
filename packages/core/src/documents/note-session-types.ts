@@ -172,7 +172,6 @@ export interface NoteSession {
   /**
    * {@link NoteSession.updateFrontmatter}, but the patch **lands on disk now**
    * through a flush. Same gating and false-return as `updateFrontmatter`.
-   * Rejects when the write failed.
    */
   commitFrontmatter(patch: FrontmatterPatch): Promise<boolean>
   /**

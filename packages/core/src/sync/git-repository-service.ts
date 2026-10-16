@@ -38,10 +38,7 @@ export type SkippedFile = z.infer<typeof skippedFileSchema>
 export const changedFileSchema = z.object({
   path: z.string(),
   kind: z.enum(['upsert', 'remove']),
-  /**
-   * Last-modified time (epoch ms; upserts only) — real mtime for the reindex.
-   * A removed file carries `null` or omits it.
-   */
+  /** Last-modified time in epoch ms; `null` for a removed file. */
   modifiedMs: z.number().nullable(),
 })
 export type ChangedFile = z.infer<typeof changedFileSchema>
@@ -85,13 +82,9 @@ export const remoteTipSchema = z.object({
 export type RemoteTip = z.infer<typeof remoteTipSchema>
 
 export const pullOutcomeSchema = z.object({
-  /**
-   * True when the pull committed local changes before it merged.
-   */
+  /** True when the pull committed local changes before it merged. */
   committed: z.boolean(),
-  /**
-   * Unpushed local commits after the merge — with `committed`, the engine's skip-push gate.
-   */
+  /** Unpushed local commits after the merge. */
   ahead: z.number(),
   skippedLargeFiles: z.array(skippedFileSchema),
   /** Graph-relative paths of the conflict copies the merge wrote. */

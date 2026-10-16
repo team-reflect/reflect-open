@@ -82,10 +82,9 @@ export interface TestNoteFileService extends NoteFileService {
    */
   evict(path: string): void
   /**
-   * Make the next `write` of `path` return `content` as merged, ignoring its `expectedContents`.
-   * Without one, a checked write against a file that holds neither
-   * `expectedContents` nor the new contents rejects.
-   * `content` becomes the file.
+   * Make the next `write` of `path` merge: `content` becomes the file and is
+   * returned as `merged`. Without it, a checked write against a file that
+   * holds neither `expectedContents` nor the new contents rejects.
    */
   mergeNextWrite(path: string, content: string): void
   /**
