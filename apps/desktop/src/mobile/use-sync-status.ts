@@ -3,6 +3,7 @@ import { mobileSyncStatus, type MobileSyncStatus } from '@reflect/app'
 import { createConflictedNotesQueryOptions } from '@/lib/query-options.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useSyncContext } from '@/providers/sync-provider.tsx'
+import { useNow } from '@/hooks/use-now.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -18,7 +19,8 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 export function useMobileSyncStatus(): MobileSyncStatus | null {
   const { graph } = useGraph()
   const sync = useSyncContext()
-  const { indexQuery, clock } = useCoreServices()
+  const { indexQuery } = useCoreServices()
+  const now = useNow(30_000)
   const backup = sync?.backup ?? null
   const connected = backup !== null && backup.phase === 'connected'
 
@@ -31,6 +33,6 @@ export function useMobileSyncStatus(): MobileSyncStatus | null {
     backup,
     conflictCount: conflicted?.length,
     conflictCountUnavailable: countUnavailable,
-    now: clock.now(),
+    now,
   })
 }
