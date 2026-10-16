@@ -109,6 +109,10 @@ interface FakeOptions {
    */
   failSecretGet?: boolean
   /**
+   * Scripted `commitAll` outcome (defaults to a clean tree).
+   */
+  commitOutcome?: CommitOutcome
+  /**
    * Scripted `mergeRemote` outcome (defaults to up-to-date).
    */
   mergeOutcome?: MergeOutcome
@@ -206,7 +210,7 @@ function fakeServices(options: FakeOptions = {}) {
     if (options.gateSecondCommit === true && commitInvocations === 2) {
       await commitGate.promise
     }
-    return CLEAN_COMMIT
+    return options.commitOutcome ?? CLEAN_COMMIT
   })
   git.onFetch((credential, generation) => {
     record('fetch', { credential, generation })
@@ -257,6 +261,7 @@ function fakeServices(options: FakeOptions = {}) {
     },
   )
 
+  const progress = createTestProgressPort()
   backupDeps = {
     git,
     syncEngines: createSyncEngineFactory({ git, clock }),
@@ -264,7 +269,7 @@ function fakeServices(options: FakeOptions = {}) {
     githubRepos: createGithubRepoService({ http }),
     fileChanges,
     indexLifecycle,
-    progress: createTestProgressPort(),
+    progress,
     clock,
     activity,
     platform: createTestPlatformService({ surface: { mobileApp: options.mobile ?? false } }),
@@ -276,6 +281,7 @@ function fakeServices(options: FakeOptions = {}) {
     git,
     calls,
     invocations,
+    progress,
     secrets: secretStore,
     status,
     releaseStatus: () => statusGate.resolve(),
@@ -1225,6 +1231,56 @@ describe('createBackupService', () => {
       { path: 'notes/from-b.md', kind: 'upsert', modifiedMs: 123 },
       { path: 'daily/2026-06-11.md', kind: 'remove' },
       { path: 'audio-memos/audio-memo-2026-06-11-090000-000.m4a', kind: 'upsert', modifiedMs: 456 },
+    ])
+    backup.dispose()
+    unlisten()
+  })
+
+  it('reports files a merge kept for review', async () => {
+    const { progress } = fakeServices({
+      mergeOutcome: {
+        kind: 'mergedWithReview',
+        reviewPaths: ['notes/a.png', 'notes/b.md'],
+        changedFiles: [],
+      },
+    })
+    const backup = createBackup({ indexGeneration: 1 })
+    await backup.start()
+
+    await vi.waitFor(() => {
+      expect(progress.snapshot()).toEqual([
+        expect.objectContaining({
+          label: 'Syncing',
+          status: 'failed',
+          message: 'Kept 2 files for review beside their notes',
+        }),
+      ])
+    })
+    backup.dispose()
+  })
+
+  it('indexes files a commit adopted and reports its review paths', async () => {
+    const adopted: FileChange = { path: 'notes/adopted.md', kind: 'upsert', modifiedMs: 9 }
+    const { calls, progress } = fakeServices({
+      commitOutcome: { ...CLEAN_COMMIT, changedFiles: [adopted], reviewPaths: ['notes/x.md'] },
+    })
+    const batches: FileChange[][] = []
+    const unlisten = fileChanges.subscribe(({ changes }) => {
+      batches.push(changes)
+    })
+    const backup = createBackup({ indexGeneration: 1 })
+    await backup.start()
+
+    await vi.waitFor(() => {
+      expect(calls).toContain('applyChanges')
+    })
+    expect(batches[0]).toEqual([adopted])
+    expect(progress.snapshot()).toEqual([
+      expect.objectContaining({
+        label: 'Syncing',
+        status: 'failed',
+        message: 'Kept 1 file for review beside its note',
+      }),
     ])
     backup.dispose()
     unlisten()

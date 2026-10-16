@@ -2,6 +2,7 @@ import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { isAppError } from '../errors.ts'
 import type {
   ChangedFile,
+  CommitOutcome,
   GitCredential,
   GitRepositoryService,
   SkippedFile,
@@ -99,6 +100,11 @@ export interface SyncEngineOptions {
    */
   onRemoteChanges?: (changes: ChangedFile[]) => void | Promise<void>
   /**
+   * Paths a merge or a commit kept for review beside their notes. Called
+   * synchronously at the boundary where the outcome arrives.
+   */
+  onReview?: (paths: string[]) => void
+  /**
    * Quiet period after the last edit before a backup commit.
    */
   idleMs?: number
@@ -125,7 +131,8 @@ export interface SyncEngineOptions {
   /**
    * Quiet mode: edits and manual syncs only commit locally. The network pass
    * (fetch, merge, push) runs once this many ms pass with no edit and no
-   * pulled change, and only when {@link networkReady} agrees.
+   * pulled change, and only when {@link networkReady} agrees. A manual sync
+   * opens a window only when none is open.
    */
   quietMs?: number
   /**
@@ -263,6 +270,10 @@ class SyncEngineImpl implements SyncEngine {
    */
   #quietDelayMs: number | null = null
   #quietUntil = 0
+  /**
+   * True from a quiet window's expiry until its network pass ends.
+   */
+  #quietBusy = false
   #current: SyncStatus = { state: 'idle' }
 
   constructor(deps: SyncEngineDeps, options: SyncEngineOptions) {
@@ -289,7 +300,9 @@ class SyncEngineImpl implements SyncEngine {
   syncNow(): Promise<void> {
     this.#authFailed = false // a resume trigger: the user may have fixed the sign-in
     if (this.#quietMs !== null) {
-      this.#armQuiet(this.#quietMs)
+      if (this.#quietTimer === null && !this.#quietBusy) {
+        this.#armQuiet(this.#quietMs)
+      }
       return this.#run(COMMIT)
     }
     return this.#run(FULL)
@@ -353,6 +366,15 @@ class SyncEngineImpl implements SyncEngine {
     if (generation !== this.#quietGeneration || this.#signal.aborted) {
       return
     }
+    this.#quietBusy = true
+    try {
+      await this.#quietPass(generation)
+    } finally {
+      this.#quietBusy = false
+    }
+  }
+
+  async #quietPass(generation: number): Promise<void> {
     let ready: boolean
     try {
       ready = (await this.#options.networkReady?.()) ?? true
@@ -542,9 +564,7 @@ class SyncEngineImpl implements SyncEngine {
       // One command, no gate: the flush's commit must finish even hidden.
       const flushed = await this.#deps.git.commitAll('Update notes', this.#options.generation)
       this.#signal.throwIfAborted()
-      if (flushed.skippedLargeFiles.length > 0) {
-        this.#options.onLargeFilesSkipped?.(flushed.skippedLargeFiles)
-      }
+      this.#afterCommit(flushed, remoteChanges)
       return
     }
     const offline = this.#options.localOnly === true || quiet
@@ -554,11 +574,8 @@ class SyncEngineImpl implements SyncEngine {
     const pushOnly = !request.fetch
     const commit = await this.#step(
       this.#deps.git.commitAll('Update notes', this.#options.generation),
-      { gated: !pushOnly },
+      { gated: !pushOnly, onResult: (outcome) => this.#afterCommit(outcome, remoteChanges) },
     )
-    if (commit.skippedLargeFiles.length > 0) {
-      this.#options.onLargeFilesSkipped?.(commit.skippedLargeFiles)
-    }
     if (offline) {
       return // the commit is the whole cycle: no remote, or the sign-in is known bad
     }
@@ -591,13 +608,28 @@ class SyncEngineImpl implements SyncEngine {
         throw new PushRejectedError(push.rejectionMessage ?? 'the remote rejected the backup')
       }
       // The normal two-device race: another device pushed first. Converge and
-      // retry — a conflicted merge still commits (markers in the note).
+      // retry: every merge ends in a commit, so the next push can land.
       await this.#step(this.#deps.git.fetch(credential, this.#options.generation))
       await this.#merge(remoteChanges)
     }
     throw new PushRejectedError(
       'the backup repo kept changing while syncing; will retry on the next edit',
     )
+  }
+
+  /** Report what a commit set aside, adopted, or kept for review. */
+  #afterCommit(commit: CommitOutcome, remoteChanges: (changes: ChangedFile[]) => void): void {
+    if (commit.skippedLargeFiles.length > 0) {
+      this.#options.onLargeFilesSkipped?.(commit.skippedLargeFiles)
+    }
+    const changed = commit.changedFiles ?? []
+    if (changed.length > 0) {
+      remoteChanges(changed)
+    }
+    const review = commit.reviewPaths ?? []
+    if (review.length > 0) {
+      this.#options.onReview?.(review)
+    }
   }
 
   /** Merge fetched changes and start any changed-file notification. */
@@ -611,6 +643,9 @@ class SyncEngineImpl implements SyncEngine {
           if (this.#quietMs !== null) {
             this.#armQuiet(this.#quietMs)
           }
+        }
+        if (outcome.reviewPaths.length > 0) {
+          this.#options.onReview?.(outcome.reviewPaths)
         }
       },
     }) // upToDate is a no-op
