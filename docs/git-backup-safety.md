@@ -16,7 +16,8 @@ the fix that turns it green is named in its ignore reason.
 A note saved after the cycle's commit (during the fetch, for example) is
 not clobbered by the checkout that applies the pull. The pull reads every
 uncommitted local edit before the checkout and writes it back after it:
-merged three-way with the incoming version when both changed a text file,
+resolved by the conflict ladder with the incoming version when both
+changed a text file,
 or kept beside a conflict copy otherwise. The result stays uncommitted for
 the next commit.
 
@@ -97,19 +98,27 @@ tracked.
 
 Status (2026-10-16): already implemented.
 
-## S7. Conflicts are committed and pushed, never left pending
+## S7. Merged content is committed and pushed, never left pending
 
-A merge with conflicts writes labeled markers into the note, commits with
-both parents, and pushes. Other notes keep syncing; both devices converge on
-the same marked-up file.
+A pull never writes conflict markers. A text file both devices changed is
+resolved by the conflict ladder (`conflict::ladder`), committed with both
+parents, and pushed. The ladder orders the sides by commit time and
+content, so both devices produce the same bytes. A binary file keeps both
+copies and an edit kept against a deletion stays, and only those land in
+`reviewPaths`. Other notes keep syncing.
 
-- Test: `git::tests::conflicting_edits_are_committed_with_labeled_markers`,
+- Test: `git::tests::conflicting_edits_merge_without_markers`,
+  `git::tests::daily_append_on_two_devices_merges_by_union`,
+  `git::tests::frontmatter_only_conflict_merges_keywise`,
+  `git::tests::both_devices_resolve_the_same_pair_to_the_same_bytes`,
+  `git::tests::a_deletion_beside_an_append_is_reconciled_not_resurrected`,
+  `git::tests::a_dirty_save_against_an_overlapping_pull_merges_through_the_ladder`,
   `git::tests::edit_vs_delete_keeps_the_edit`,
   `git::tests::binary_conflict_keeps_both_copies`,
   `git::tests::a_directory_file_conflict_keeps_the_file_as_a_conflict_copy`,
   `git::tests::a_symlink_conflict_keeps_both_sides`.
 
-Status (2026-10-16): planned for phase 3 of the sync rework.
+Status (2026-10-16): implemented in phase 3 of the sync rework.
 
 ## S8. Edits in an open note are never silently discarded
 

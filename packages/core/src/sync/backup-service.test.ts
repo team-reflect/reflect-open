@@ -56,7 +56,7 @@ const GENERATION = 3
 
 const AUTH = JSON.stringify({ kind: 'pat', token: 'ghp_abc' })
 const CLEAN_COMMIT: CommitOutcome = { committed: false, sha: null, ahead: 0, skippedLargeFiles: [] }
-const UP_TO_DATE: MergeOutcome = { kind: 'upToDate', conflictedPaths: [], changedFiles: [] }
+const UP_TO_DATE: MergeOutcome = { kind: 'upToDate', reviewPaths: [], changedFiles: [] }
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -692,7 +692,7 @@ describe('createBackupService', () => {
   // 403 for a token without access to the repo and for rate limiting; the
   // backup asks GitHub whether the token is good before blaming it.
   const FORBIDDEN = { kind: 'auth', message: 'request failed with status code: 403' }
-  const MERGED: MergeOutcome = { kind: 'merged', conflictedPaths: [], changedFiles: [] }
+  const MERGED: MergeOutcome = { kind: 'merged', reviewPaths: [], changedFiles: [] }
 
   it('a 403 with a valid token reports a refused sync, not a bad credential', async () => {
     fakeServices({ mergeOutcome: MERGED, pushError: FORBIDDEN })
@@ -944,7 +944,7 @@ describe('createBackupService', () => {
     fakeServices({
       mergeOutcome: {
         kind: 'merged',
-        conflictedPaths: [],
+        reviewPaths: [],
         changedFiles: [
           { path: 'notes/from-b.md', kind: 'upsert', modifiedMs: 123 },
           { path: 'daily/2026-06-11.md', kind: 'remove' },
@@ -991,8 +991,8 @@ describe('createBackupService', () => {
     const { calls, releaseIndexApply } = fakeServices({
       gateIndexApply: true,
       mergeOutcomes: [
-        { kind: 'merged', conflictedPaths: [], changedFiles: [firstChange] },
-        { kind: 'merged', conflictedPaths: [], changedFiles: [secondChange] },
+        { kind: 'merged', reviewPaths: [], changedFiles: [firstChange] },
+        { kind: 'merged', reviewPaths: [], changedFiles: [secondChange] },
       ],
       pushOutcomes: [
         { pushed: false, nonFastForward: true, rejectionMessage: 'fetch first' },
@@ -1039,12 +1039,12 @@ describe('createBackupService', () => {
       mergeOutcomes: [
         {
           kind: 'merged',
-          conflictedPaths: [],
+          reviewPaths: [],
           changedFiles: [{ path: 'notes/from-remote-1.md', kind: 'upsert', modifiedMs: 123 }],
         },
         {
           kind: 'merged',
-          conflictedPaths: [],
+          reviewPaths: [],
           changedFiles: [{ path: 'notes/from-remote-2.md', kind: 'upsert', modifiedMs: 456 }],
         },
       ],
@@ -1076,7 +1076,7 @@ describe('createBackupService', () => {
       gateIndexApply: true,
       mergeOutcome: {
         kind: 'fastForward',
-        conflictedPaths: [],
+        reviewPaths: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
     })
@@ -1106,7 +1106,7 @@ describe('createBackupService', () => {
       failIndexApply: true,
       mergeOutcome: {
         kind: 'fastForward',
-        conflictedPaths: [],
+        reviewPaths: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
     })
@@ -1133,7 +1133,7 @@ describe('createBackupService', () => {
       mobile: true,
       mergeOutcome: {
         kind: 'merged',
-        conflictedPaths: [],
+        reviewPaths: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
     })
@@ -1152,7 +1152,7 @@ describe('createBackupService', () => {
       gateMerge: true,
       mergeOutcome: {
         kind: 'merged',
-        conflictedPaths: [],
+        reviewPaths: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
     })

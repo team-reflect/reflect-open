@@ -431,10 +431,7 @@ fn connecting_an_existing_backup_on_another_branch_pulls_its_history() {
     fetch(&root, None).unwrap();
     let merged = merge_remote(&root).unwrap();
     assert!(
-        matches!(
-            merged.kind,
-            MergeKind::Merged | MergeKind::MergedWithConflicts
-        ),
+        matches!(merged.kind, MergeKind::Merged | MergeKind::MergedWithReview),
         "{merged:?}"
     );
     assert!(push(&root, None).unwrap().pushed);
@@ -524,7 +521,7 @@ fn non_fast_forward_push_is_rejected_as_data() {
 }
 
 #[test]
-fn conflicting_edits_are_committed_with_labeled_markers() {
+fn conflicting_edits_merge_without_markers() {
     let fixture = fixture();
     let root_a = &fixture.graph_a;
     write(root_a, "notes/shared.md", "# Shared\n\noriginal line\n");
@@ -532,19 +529,16 @@ fn conflicting_edits_are_committed_with_labeled_markers() {
     push(root_a, None).unwrap();
 
     let root_b = second_device(&fixture);
-    write(&root_b, "notes/shared.md", "# Shared\n\nedited on b\n");
+    write(&root_b, "notes/shared.md", "# Shared\n\nedited on bravo\n");
     commit_all(&root_b, "b edit", MAX_FILE_BYTES).unwrap();
     push(&root_b, None).unwrap();
 
-    write(root_a, "notes/shared.md", "# Shared\n\nedited on a\n");
+    write(root_a, "notes/shared.md", "# Shared\n\nedited on alpha\n");
     commit_all(root_a, "a edit", MAX_FILE_BYTES).unwrap();
     fetch(root_a, None).unwrap();
     let merged = merge_remote(root_a).unwrap();
-    assert!(
-        matches!(merged.kind, MergeKind::MergedWithConflicts),
-        "{merged:?}"
-    );
-    assert_eq!(merged.conflicted_paths, vec!["notes/shared.md".to_string()]);
+    assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
+    assert!(merged.review_paths.is_empty(), "{merged:?}");
     assert!(
         merged
             .changed_files
@@ -554,13 +548,11 @@ fn conflicting_edits_are_committed_with_labeled_markers() {
     );
 
     let content = read(root_a, "notes/shared.md");
-    assert!(content.contains("<<<<<<< this device"), "{content}");
-    assert!(content.contains("edited on a"), "{content}");
-    assert!(content.contains("edited on b"), "{content}");
-    assert!(content.contains(">>>>>>> other device"), "{content}");
+    assert_merged_without_markers(&content, &["alpha", "bravo"]);
+    assert_eq!(head_blob(root_a, "notes/shared.md"), content);
 
-    // The conflict is committed: the repo is never wedged mid-merge, and the
-    // push goes through so both devices converge on the same marked-up note.
+    // The merge is committed: the repo is never wedged mid-merge, and the
+    // push goes through so both devices converge on the same note.
     let repo = Repository::open(root_a).unwrap();
     assert_eq!(repo.state(), git2::RepositoryState::Clean);
     assert!(push(root_a, None).unwrap().pushed);
@@ -572,6 +564,179 @@ fn conflicting_edits_are_committed_with_labeled_markers() {
         "{converged:?}"
     );
     assert_eq!(read(&root_b, "notes/shared.md"), content);
+}
+
+/// `content` carries no conflict markers and holds every word in `words`.
+fn assert_merged_without_markers(content: &str, words: &[&str]) {
+    for marker in ["<<<<<<<", "=======", ">>>>>>>"] {
+        assert!(!content.contains(marker), "{content}");
+    }
+    for word in words {
+        assert!(content.contains(word), "{word} is missing: {content}");
+    }
+}
+
+/// The archived versions of `rel` on the device at `root`.
+fn archived(root: &Path, rel: &str) -> Vec<crate::conflict::archive::ArchivedVersion> {
+    crate::conflict::archive::list(root, rel).unwrap()
+}
+
+#[test]
+fn daily_append_on_two_devices_merges_by_union() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    let rel = "daily/2026-10-01.md";
+    write(root_a, rel, "# 2026-10-01\n\n- morning\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, rel, "# 2026-10-01\n\n- morning\n- lunch on b\n");
+    commit_all(&root_b, "b append", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, rel, "# 2026-10-01\n\n- morning\n- coffee on a\n");
+    commit_all(root_a, "a append", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
+    assert!(merged.review_paths.is_empty(), "{merged:?}");
+
+    let content = read(root_a, rel);
+    assert!(
+        content.starts_with("# 2026-10-01\n\n- morning\n"),
+        "{content}"
+    );
+    assert_merged_without_markers(&content, &["- lunch on b\n", "- coffee on a\n"]);
+    assert!(archived(root_a, rel).is_empty());
+
+    assert!(push(root_a, None).unwrap().pushed);
+    fetch(&root_b, None).unwrap();
+    merge_remote(&root_b).unwrap();
+    assert_eq!(read(&root_b, rel), content);
+}
+
+#[test]
+fn frontmatter_only_conflict_merges_keywise() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    let rel = "notes/tagged.md";
+    write(root_a, rel, "---\ntitle: Tagged\n---\n# Tagged\n\nbody\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(
+        &root_b,
+        rel,
+        "---\ntitle: Tagged\nstatus: draft\n---\n# Tagged\n\nbody\n",
+    );
+    commit_all(&root_b, "b header", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(
+        root_a,
+        rel,
+        "---\ntitle: Tagged\nowner: alex\n---\n# Tagged\n\nbody\n",
+    );
+    commit_all(root_a, "a header", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
+
+    let content = read(root_a, rel);
+    assert_merged_without_markers(
+        &content,
+        &["title: Tagged\n", "status: draft\n", "owner: alex\n"],
+    );
+    assert!(content.ends_with("---\n# Tagged\n\nbody\n"), "{content}");
+    assert_eq!(content.matches("---\n").count(), 2, "{content}");
+}
+
+#[test]
+fn both_devices_resolve_the_same_pair_to_the_same_bytes() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    let rel = "notes/shared.md";
+    write(root_a, rel, "# Shared\n\noriginal line\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, rel, "# Shared\n\nrewritten on bravo\n");
+    commit_all(&root_b, "b edit", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, rel, "# Shared\n\nchanged on alpha\n");
+    commit_all(root_a, "a edit", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+
+    // B fetches A's unpushed commit as its tracking branch, so each device
+    // merges the mirror of the other's pair.
+    {
+        let repo_b = Repository::open(&root_b).unwrap();
+        let mut remote = repo_b.remote_anonymous(&root_a.to_string_lossy()).unwrap();
+        remote
+            .fetch(&["+refs/heads/main:refs/remotes/origin/main"], None, None)
+            .unwrap();
+    }
+
+    let merged_a = merge_remote(root_a).unwrap();
+    let merged_b = merge_remote(&root_b).unwrap();
+    assert!(matches!(merged_a.kind, MergeKind::Merged), "{merged_a:?}");
+    assert!(matches!(merged_b.kind, MergeKind::Merged), "{merged_b:?}");
+
+    let content = head_blob(root_a, rel);
+    assert_eq!(head_blob(&root_b, rel), content);
+    assert_eq!(read(&root_b, rel), content);
+    assert_merged_without_markers(&content, &["alpha", "bravo"]);
+    // Both sides are reachable from the merge's parents, so nothing is archived.
+    assert!(archived(root_a, rel).is_empty());
+    assert!(archived(&root_b, rel).is_empty());
+}
+
+#[test]
+fn a_deletion_beside_an_append_is_reconciled_not_resurrected() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    let rel = "notes/list.md";
+    let base = "a\nb\nc\n";
+    let deleted = "a\nb\n";
+    let appended = "a\nb\nc\nd\n";
+    write(root_a, rel, base);
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, rel, appended);
+    commit_all(&root_b, "b append", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, rel, deleted);
+    commit_all(root_a, "a delete", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert!(merged.review_paths.is_empty(), "{merged:?}");
+
+    let side = |content: &str, modified_ms| crate::conflict::ConflictSide {
+        content: content.to_string(),
+        label: String::new(),
+        modified_ms,
+    };
+    let expected = crate::conflict::ladder::resolve(crate::conflict::ladder::ConflictInput {
+        base: Some(base),
+        sides: (side(deleted, 1), side(appended, 2)),
+        merge_loop_detected: false,
+    })
+    .unwrap();
+    let crate::conflict::Resolution::Reconciled { content: expected } = expected else {
+        panic!("the ladder must reconcile this pair, not merge it exactly: {expected:?}");
+    };
+    let content = read(root_a, rel);
+    assert_eq!(content, expected);
+    assert_eq!(content, "a\nb\nd\n", "the deletion must stay deleted");
+    // Both sides are in history, so the reconcile archives neither.
+    assert!(archived(root_a, rel).is_empty());
 }
 
 #[test]
@@ -592,7 +757,7 @@ fn edit_vs_delete_keeps_the_edit() {
     fetch(root_a, None).unwrap();
     let merged = merge_remote(root_a).unwrap();
     assert!(
-        matches!(merged.kind, MergeKind::MergedWithConflicts),
+        matches!(merged.kind, MergeKind::MergedWithReview),
         "{merged:?}"
     );
 
@@ -619,7 +784,7 @@ fn binary_conflict_keeps_both_copies() {
     fetch(root_a, None).unwrap();
     let merged = merge_remote(root_a).unwrap();
     assert!(
-        matches!(merged.kind, MergeKind::MergedWithConflicts),
+        matches!(merged.kind, MergeKind::MergedWithReview),
         "{merged:?}"
     );
 
@@ -722,7 +887,7 @@ fn rename_rename_conflict_keeps_both_names_and_confirms_the_removal() {
     // tree could not be written at all.
     let merged = merge_remote(root_a).unwrap();
     assert!(
-        matches!(merged.kind, MergeKind::MergedWithConflicts),
+        matches!(merged.kind, MergeKind::MergedWithReview),
         "{merged:?}"
     );
 
@@ -815,7 +980,7 @@ fn rename_on_one_device_merges_with_edit_on_the_other() {
     // Rename detection (libgit2 merge default) lands B's edit in the moved
     // file — no conflict, no resurrected ULID path.
     assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
-    assert!(merged.conflicted_paths.is_empty(), "{merged:?}");
+    assert!(merged.review_paths.is_empty(), "{merged:?}");
     let content = read(root_a, "notes/meeting-notes.md");
     assert!(content.contains("EDITED ON B"), "{content}");
     assert!(!root_a.join("notes/01arz3ndektsv4rrffq69g5fav.md").exists());
@@ -823,9 +988,9 @@ fn rename_on_one_device_merges_with_edit_on_the_other() {
 }
 
 #[test]
-fn same_title_created_on_two_devices_surfaces_as_a_review_conflict() {
+fn same_title_created_on_two_devices_merges_both_notes() {
     // New with slug filenames: two offline devices can create the same path.
-    // The merge must surface it through the existing marker flow, not wedge.
+    // The merge must keep both notes' text in one file, not wedge.
     let fixture = fixture();
     let root_a = &fixture.graph_a;
     write(root_a, "notes/seed.md", "# Seed\n");
@@ -850,17 +1015,10 @@ fn same_title_created_on_two_devices_surfaces_as_a_review_conflict() {
     fetch(root_a, None).unwrap();
     let merged = merge_remote(root_a).unwrap();
 
-    assert!(
-        matches!(merged.kind, MergeKind::MergedWithConflicts),
-        "{merged:?}"
-    );
-    assert_eq!(
-        merged.conflicted_paths,
-        vec!["notes/meeting.md".to_string()]
-    );
+    assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
+    assert!(merged.review_paths.is_empty(), "{merged:?}");
     let content = read(root_a, "notes/meeting.md");
-    assert!(content.contains("notes from device a"), "{content}");
-    assert!(content.contains("notes from device b"), "{content}");
+    assert_merged_without_markers(&content, &["# Meeting", "device a", "device b"]);
     let repo = Repository::open(root_a).unwrap();
     assert_eq!(repo.state(), git2::RepositoryState::Clean);
     assert!(push(root_a, None).unwrap().pushed);
@@ -1154,7 +1312,7 @@ const DIVERGED_RESULT: &[(&str, &str)] = &[
 ];
 
 /// Like [`diverged_fixture`], but both devices also edited the same line of
-/// `notes/conflict.md`, so the merge commits a marker block.
+/// `notes/conflict.md`, so the merge runs the ladder on it.
 fn conflicting_fixture() -> Fixture {
     let fixture = fixture();
     let root_a = &fixture.graph_a;
@@ -1165,24 +1323,43 @@ fn conflicting_fixture() -> Fixture {
 
     let root_b = second_device(&fixture);
     write(&root_b, "notes/b.md", "# B\n");
-    write(&root_b, "notes/conflict.md", "# Conflict\n\nedited on b\n");
+    write(
+        &root_b,
+        "notes/conflict.md",
+        "# Conflict\n\nedited on bravo\n",
+    );
     commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
     push(&root_b, None).unwrap();
 
-    write(root_a, "notes/conflict.md", "# Conflict\n\nedited on a\n");
+    write(
+        root_a,
+        "notes/conflict.md",
+        "# Conflict\n\nedited on alpha\n",
+    );
     commit_all(root_a, "a edit", MAX_FILE_BYTES).unwrap();
     fetch(root_a, None).unwrap();
     fixture
 }
 
-const CONFLICT_MERGED: &str =
-    "# Conflict\n\n<<<<<<< this device\nedited on a\n=======\nedited on b\n>>>>>>> other device\n";
+/// The ladder's text for `notes/conflict.md` in the recorded merge commit,
+/// checked to hold both sides and no markers.
+fn recorded_conflict_text(root: &Path, merge: git2::Oid) -> String {
+    let repo = Repository::open(root).unwrap();
+    let tree = repo.find_commit(merge).unwrap().tree().unwrap();
+    let entry = tree.get_path(Path::new("notes/conflict.md")).unwrap();
+    let blob = repo.find_blob(entry.id()).unwrap();
+    let content = String::from_utf8(blob.content().to_vec()).unwrap();
+    assert_merged_without_markers(&content, &["# Conflict", "alpha", "bravo"]);
+    content
+}
 
-const CONFLICTING_RESULT: &[(&str, &str)] = &[
-    ("notes/a.md", "# A\n"),
-    ("notes/b.md", "# B\n"),
-    ("notes/conflict.md", CONFLICT_MERGED),
-];
+fn conflicting_result(merged: &str) -> [(&str, &str); 3] {
+    [
+        ("notes/a.md", "# A\n"),
+        ("notes/b.md", "# B\n"),
+        ("notes/conflict.md", merged),
+    ]
+}
 
 fn recorded_merge(root: &Path) -> Option<git2::Oid> {
     Repository::open(root)
@@ -1217,9 +1394,10 @@ fn merge_crash_before_checkout_converges_next_cycle() {
     let merge = recorded_merge(root_a).expect("the merge commit is recorded");
     assert_eq!(
         read(root_a, "notes/conflict.md"),
-        "# Conflict\n\nedited on a\n"
+        "# Conflict\n\nedited on alpha\n"
     );
-    assert_next_cycle_converges(&fixture, CONFLICTING_RESULT);
+    let merged = recorded_conflict_text(root_a, merge);
+    assert_next_cycle_converges(&fixture, &conflicting_result(&merged));
     assert_head_contains(root_a, merge);
     assert_eq!(recorded_merge(root_a), None);
 }
@@ -1235,19 +1413,15 @@ fn merge_crash_after_checkout_before_ref_move_converges_next_cycle() {
     assert_next_cycle_converges(&fixture, DIVERGED_RESULT);
     assert_eq!(recorded_merge(&fixture.graph_a), None);
 
-    // A conflict that was already written as markers is adopted, not merged
-    // again, so the markers never nest.
+    // A merged note that is already on disk is adopted, not merged again.
     let fixture = conflicting_fixture();
     let root_a = &fixture.graph_a;
     fault::arm(FaultPoint::BeforeMergeRefMove, Fault::Fail);
     assert!(merge_remote(root_a).is_err());
     let merge = recorded_merge(root_a).expect("the merge commit is recorded");
-    assert_eq!(read(root_a, "notes/conflict.md"), CONFLICT_MERGED);
-    assert_next_cycle_converges(&fixture, CONFLICTING_RESULT);
-    assert_eq!(
-        read(root_a, "notes/conflict.md").matches("<<<<<<<").count(),
-        1
-    );
+    let merged = recorded_conflict_text(root_a, merge);
+    assert_eq!(read(root_a, "notes/conflict.md"), merged);
+    assert_next_cycle_converges(&fixture, &conflicting_result(&merged));
     assert_head_contains(root_a, merge);
     assert_eq!(recorded_merge(root_a), None);
 }
@@ -1409,6 +1583,30 @@ fn a_save_between_commit_and_fast_forward_survives() {
 }
 
 #[test]
+fn a_dirty_save_against_an_overlapping_pull_merges_through_the_ladder() {
+    let fixture = pulled_note_fixture();
+    let root_a = &fixture.graph_a;
+    let rel = "daily/2026-10-01.md";
+    // An uncommitted edit rewrites the line the phone's commit also changed.
+    let typed = "# 2026-10-01 typed\n\n- morning run\n";
+    write(root_a, rel, typed);
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::FastForward), "{merged:?}");
+    assert!(merged.review_paths.is_empty(), "{merged:?}");
+
+    let content = read(root_a, rel);
+    assert_merged_without_markers(&content, &["typed", "run", "[[From phone]]"]);
+    assert_eq!(head_blob(root_a, rel), PHONE_DAILY);
+    // The disk side is in no commit, so a lossy resolution archives it.
+    let archive = archived(root_a, rel);
+    assert_eq!(archive.len(), 1, "{archive:?}");
+    assert_eq!(
+        crate::conflict::archive::read(root_a, rel, &archive[0].name).unwrap(),
+        typed
+    );
+}
+
+#[test]
 fn a_directory_file_conflict_keeps_the_file_as_a_conflict_copy() {
     let fixture = fixture();
     let root_a = &fixture.graph_a;
@@ -1428,7 +1626,7 @@ fn a_directory_file_conflict_keeps_the_file_as_a_conflict_copy() {
 
     assert!(
         merged
-            .conflicted_paths
+            .review_paths
             .contains(&"notes/x (conflict)".to_string()),
         "{merged:?}"
     );
@@ -1466,7 +1664,7 @@ fn a_symlink_conflict_keeps_both_sides() {
     fetch(root_a, None).unwrap();
     let merged = merge_remote(root_a).unwrap();
     assert!(
-        matches!(merged.kind, MergeKind::MergedWithConflicts),
+        matches!(merged.kind, MergeKind::MergedWithReview),
         "{merged:?}"
     );
 

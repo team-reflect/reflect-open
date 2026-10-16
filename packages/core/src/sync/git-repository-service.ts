@@ -75,8 +75,9 @@ export const changedFileSchema = z.object({
 export type ChangedFile = z.infer<typeof changedFileSchema>
 
 export const mergeOutcomeSchema = z.object({
-  kind: z.enum(['upToDate', 'fastForward', 'merged', 'mergedWithConflicts']),
-  conflictedPaths: z.array(z.string()),
+  kind: z.enum(['upToDate', 'fastForward', 'merged', 'mergedWithReview']),
+  /** Paths to review: a binary conflict copy or an edit kept against a deletion. */
+  reviewPaths: z.array(z.string()),
   /**
    * Every file the merge changed. The caller reindexes these directly —
    * pulls must not depend on the file watcher being up (on launch it may
@@ -131,9 +132,9 @@ export interface GitRepositoryService {
    */
   push(credential: GitCredential | null, generation: number): Promise<PushOutcome>
   /**
-   * Merge the fetched remote branch. Conflicts are committed into the notes as
-   * labeled markers: the repo is never left mid-merge, and the indexer turns
-   * the markers into `Needs review` flags.
+   * Merge the fetched remote branch. Text conflicts are committed as merged
+   * text and binary conflicts keep a review copy: the repo is never left
+   * mid-merge.
    */
   mergeRemote(generation: number): Promise<MergeOutcome>
 }

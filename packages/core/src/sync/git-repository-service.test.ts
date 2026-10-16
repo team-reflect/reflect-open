@@ -21,7 +21,7 @@ describe('createGitRepositoryService', () => {
         git_commit_all: () => ({ committed: true, sha: 'abc', ahead: 1, skippedLargeFiles: [] }),
         git_fetch: () => ({ ahead: 1, behind: 2 }),
         git_push: () => ({ pushed: true, nonFastForward: false, rejectionMessage: null }),
-        git_merge_remote: () => ({ kind: 'merged', conflictedPaths: [], changedFiles: [] }),
+        git_merge_remote: () => ({ kind: 'merged', reviewPaths: [], changedFiles: [] }),
       },
     })
     const git = createGitRepositoryService({ ipc })
