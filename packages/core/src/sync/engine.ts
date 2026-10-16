@@ -622,11 +622,11 @@ class SyncEngineImpl implements SyncEngine {
     if (commit.skippedLargeFiles.length > 0) {
       this.#options.onLargeFilesSkipped?.(commit.skippedLargeFiles)
     }
-    const changed = commit.changedFiles ?? []
+    const changed = commit.changedFiles
     if (changed.length > 0) {
       remoteChanges(changed)
     }
-    const review = commit.reviewPaths ?? []
+    const review = commit.reviewPaths
     if (review.length > 0) {
       this.#options.onReview?.(review)
     }

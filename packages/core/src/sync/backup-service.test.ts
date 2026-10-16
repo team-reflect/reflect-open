@@ -63,7 +63,14 @@ const USER_URL = 'https://api.github.com/user'
 const GENERATION = 3
 
 const AUTH = JSON.stringify({ kind: 'pat', token: 'ghp_abc' })
-const CLEAN_COMMIT: CommitOutcome = { committed: false, sha: null, ahead: 0, skippedLargeFiles: [] }
+const CLEAN_COMMIT: CommitOutcome = {
+  committed: false,
+  sha: null,
+  ahead: 0,
+  skippedLargeFiles: [],
+  changedFiles: [],
+  reviewPaths: [],
+}
 const UP_TO_DATE: MergeOutcome = { kind: 'upToDate', reviewPaths: [], changedFiles: [] }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -457,6 +464,8 @@ describe('createBackupService', () => {
         sha: 'c',
         ahead: 1,
         skippedLargeFiles: [],
+        changedFiles: [],
+        reviewPaths: [],
       }))
       void failing.backup.backUpNow()
       await vi.waitFor(() => {
@@ -523,7 +532,14 @@ describe('createBackupService', () => {
       })
       git.onCommitAll(() => {
         activity.setHidden(true)
-        return { committed: true, sha: 'c', ahead: 1, skippedLargeFiles: [] }
+        return {
+          committed: true,
+          sha: 'c',
+          ahead: 1,
+          skippedLargeFiles: [],
+          changedFiles: [],
+          reviewPaths: [],
+        }
       })
       fileChanges.emit({
         changes: [{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }],

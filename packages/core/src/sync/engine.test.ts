@@ -60,8 +60,22 @@ async function runAllTimers(): Promise<void> {
 }
 
 const CRED = { username: 'x-access-token', secret: 'tok' }
-const CLEAN_COMMIT: CommitOutcome = { committed: false, sha: null, ahead: 0, skippedLargeFiles: [] }
-const COMMITTED: CommitOutcome = { committed: true, sha: 'abc', ahead: 1, skippedLargeFiles: [] }
+const CLEAN_COMMIT: CommitOutcome = {
+  committed: false,
+  sha: null,
+  ahead: 0,
+  skippedLargeFiles: [],
+  changedFiles: [],
+  reviewPaths: [],
+}
+const COMMITTED: CommitOutcome = {
+  committed: true,
+  sha: 'abc',
+  ahead: 1,
+  skippedLargeFiles: [],
+  changedFiles: [],
+  reviewPaths: [],
+}
 const PUSHED: PushOutcome = { pushed: true, nonFastForward: false, rejectionMessage: null }
 const NON_FAST_FORWARD: PushOutcome = {
   pushed: false,
@@ -850,6 +864,8 @@ describe('createSyncEngineFactory', () => {
       sha: 'abc',
       ahead: 1,
       skippedLargeFiles: [{ path: 'assets/movie.mp4', size: 200_000_000 }],
+      changedFiles: [],
+      reviewPaths: [],
     }))
     const skipped: Array<{ path: string }[]> = []
     const engine = createSyncEngine({

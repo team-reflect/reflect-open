@@ -510,8 +510,11 @@ class BackupServiceImpl implements BackupService {
     // the index and embeddings take markdown notes, the audio-memo
     // reconciler takes recordings) — and the index additionally gets a
     // direct apply (idempotent if a live watcher subscription double-applies).
-    fileChanges.emit({ changes, source: 'pull' })
-    const indexable = changes.filter((change) => isNotePath(change.path))
+    const fileChangeBatch = changes.map(({ path, kind, modifiedMs }) =>
+      modifiedMs === null || modifiedMs === undefined ? { path, kind } : { path, kind, modifiedMs },
+    )
+    fileChanges.emit({ changes: fileChangeBatch, source: 'pull' })
+    const indexable = fileChangeBatch.filter((change) => isNotePath(change.path))
     const indexGeneration = this.#indexGeneration
     if (indexGeneration !== null && indexable.length > 0) {
       const task = this.#remoteIndexTail.then(async () => {
