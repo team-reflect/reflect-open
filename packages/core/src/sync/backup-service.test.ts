@@ -30,9 +30,10 @@ import {
   type BackupState,
 } from './backup-service.ts'
 import type {
+  ChangedFile,
   CommitOutcome,
   GitStatus,
-  MergeOutcome,
+  PullOutcome,
   PushOutcome,
 } from './git-repository-service.ts'
 
@@ -68,10 +69,14 @@ const CLEAN_COMMIT: CommitOutcome = {
   sha: null,
   ahead: 0,
   skippedLargeFiles: [],
-  changedFiles: [],
-  reviewPaths: [],
 }
-const UP_TO_DATE: MergeOutcome = { kind: 'upToDate', reviewPaths: [], changedFiles: [] }
+const UP_TO_DATE: PullOutcome = {
+  committed: false,
+  ahead: 0,
+  skippedLargeFiles: [],
+  reviewPaths: [],
+  changedFiles: [],
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -99,13 +104,13 @@ interface FakeOptions {
    */
   gateSetup?: boolean
   /**
-   * Hold the first `mergeRemote` until `releaseMerge()` (the mid-pull window).
+   * Hold the first `pull` until `releasePull()` (the mid-pull window).
    */
-  gateMerge?: boolean
+  gatePull?: boolean
   /**
-   * Hold the second `commitAll` until `releaseCommit()` (a flush still in flight).
+   * Hold the first `commitAll` until `releaseCommit()` (a flush still in flight).
    */
-  gateSecondCommit?: boolean
+  gateCommit?: boolean
   /**
    * Make the watcher subscription throw (the unusable-watcher path).
    */
@@ -120,13 +125,13 @@ interface FakeOptions {
    */
   commitOutcome?: CommitOutcome
   /**
-   * Scripted `mergeRemote` outcome (defaults to up-to-date).
+   * Scripted `pull` outcome (defaults to up-to-date).
    */
-  mergeOutcome?: MergeOutcome
+  pullOutcome?: PullOutcome
   /**
    * Per-call merge outcomes for retry/convergence tests.
    */
-  mergeOutcomes?: MergeOutcome[]
+  pullOutcomes?: PullOutcome[]
   /**
    * Per-call push outcomes for retry/convergence tests.
    */
@@ -168,7 +173,6 @@ function fakeServices(options: FakeOptions = {}) {
       options.remoteUrl === undefined ? 'https://github.com/alex/notes.git' : options.remoteUrl,
     ahead: 0,
     behind: 0,
-    inProgress: false,
   }
   const statusGate = Promise.withResolvers<void>()
   const indexApplyGate = Promise.withResolvers<void>()
@@ -179,7 +183,7 @@ function fakeServices(options: FakeOptions = {}) {
   let mergeCount = 0
   let commitInvocations = 0
   let indexApplyCount = 0
-  const mergeOutcomes = [...(options.mergeOutcomes ?? [])]
+  const pullOutcomes = [...(options.pullOutcomes ?? [])]
   const pushOutcomes = [...(options.pushOutcomes ?? [])]
   const initialSecrets: Record<string, string> = {}
   if (auth !== null) {
@@ -214,7 +218,7 @@ function fakeServices(options: FakeOptions = {}) {
   git.onCommitAll(async (fallbackMessage, generation) => {
     record('commitAll', { fallbackMessage, generation })
     commitInvocations += 1
-    if (options.gateSecondCommit === true && commitInvocations === 2) {
+    if (options.gateCommit === true && commitInvocations === 1) {
       await commitGate.promise
     }
     return options.commitOutcome ?? CLEAN_COMMIT
@@ -223,13 +227,13 @@ function fakeServices(options: FakeOptions = {}) {
     record('fetch', { credential, generation })
     return { ahead: 0, behind: 0 }
   })
-  git.onMergeRemote(async (generation) => {
-    record('mergeRemote', { generation })
+  git.onPull(async (generation) => {
+    record('pull', { generation })
     mergeCount += 1
-    if (options.gateMerge === true && mergeCount === 1) {
+    if (options.gatePull === true && mergeCount === 1) {
       await mergeGate.promise
     }
-    return mergeOutcomes.shift() ?? options.mergeOutcome ?? UP_TO_DATE
+    return pullOutcomes.shift() ?? options.pullOutcome ?? UP_TO_DATE
   })
   git.onPush((credential, generation) => {
     record('push', { credential, generation })
@@ -294,7 +298,7 @@ function fakeServices(options: FakeOptions = {}) {
     releaseStatus: () => statusGate.resolve(),
     releaseSetup: () => setupGate.resolve(),
     releaseIndexApply: () => indexApplyGate.resolve(),
-    releaseMerge: () => mergeGate.resolve(),
+    releasePull: () => mergeGate.resolve(),
     releaseCommit: () => commitGate.resolve(),
   }
 }
@@ -325,8 +329,11 @@ async function advance(ms: number): Promise<void> {
   await flush()
 }
 
+/**
+ * Commits made: a full cycle commits inside `pull`, the other cycles in `commitAll`.
+ */
 function commitCount(calls: string[]): number {
-  return calls.filter((command) => command === 'commitAll').length
+  return calls.filter((command) => command === 'commitAll' || command === 'pull').length
 }
 
 function trackStates(backup: BackupService): BackupState[] {
@@ -459,14 +466,7 @@ describe('createBackupService', () => {
       failing.git.onPush(() => {
         throw new ReflectError('auth', 'bad token')
       })
-      failing.git.onCommitAll(() => ({
-        committed: true,
-        sha: 'c',
-        ahead: 1,
-        skippedLargeFiles: [],
-        changedFiles: [],
-        reviewPaths: [],
-      }))
+      failing.git.onPull(() => ({ ...UP_TO_DATE, committed: true, ahead: 1 }))
       void failing.backup.backUpNow()
       await vi.waitFor(() => {
         expect(failing.backup.getState()).toMatchObject({ status: { state: 'error' } })
@@ -475,50 +475,6 @@ describe('createBackupService', () => {
       await advance(5 * 60_000)
       expect(probed()).toBe(before)
       failing.backup.dispose()
-    })
-
-    it('falls back to a periodic full cycle after three failed probes and recovers after a success', async () => {
-      const { git, calls, backup } = await startSettled({})
-      try {
-        let probes = 0
-        let failing = true
-        git.onRemoteHead(() => {
-          probes += 1
-          if (failing) {
-            throw new ReflectError('network', 'unreachable')
-          }
-          return { remoteOid: 'a', trackingOid: 'a' }
-        })
-        const fetches = (): number => calls.filter((command) => command === 'fetch').length
-        const base = fetches()
-
-        await advance(90_000)
-        await advance(90_000)
-        expect(fetches()).toBe(base) // two failures: silent
-        await advance(90_000)
-        expect(probes).toBe(3)
-        await vi.waitFor(() => {
-          expect(fetches()).toBe(base + 1) // third failure: full cycle
-        })
-
-        await advance(90_000) // the interval is now five minutes
-        expect(probes).toBe(3)
-        await advance(3 * 60_000 + 30_000)
-        expect(probes).toBe(4)
-        await vi.waitFor(() => {
-          expect(fetches()).toBe(base + 2)
-        })
-
-        failing = false
-        await advance(5 * 60_000)
-        expect(probes).toBe(5)
-        expect(fetches()).toBe(base + 2) // success and nothing moved
-        await advance(90_000)
-        expect(probes).toBe(6) // back on the short interval
-        expect(logger.getInfos().length).toBeGreaterThan(0)
-      } finally {
-        backup.dispose()
-      }
     })
   })
 
@@ -712,7 +668,7 @@ describe('createBackupService', () => {
     const states = trackStates(backup)
     await backup.start()
     await vi.waitFor(() => {
-      expect(calls).toContain('mergeRemote')
+      expect(calls).toContain('pull')
     })
 
     expect(states.at(-1)).toMatchObject({ phase: 'connected', status: { state: 'idle' } })
@@ -967,10 +923,10 @@ describe('createBackupService', () => {
   // 403 for a token without access to the repo and for rate limiting; the
   // backup asks GitHub whether the token is good before blaming it.
   const FORBIDDEN = { kind: 'auth', message: 'request failed with status code: 403' }
-  const MERGED: MergeOutcome = { kind: 'merged', reviewPaths: [], changedFiles: [] }
+  const MERGED: PullOutcome = { ...UP_TO_DATE, ahead: 1 }
 
   it('a 403 with a valid token reports a refused sync, not a bad credential', async () => {
-    fakeServices({ mergeOutcome: MERGED, pushError: FORBIDDEN })
+    fakeServices({ pullOutcome: MERGED, pushError: FORBIDDEN })
     http.on('GET', USER_URL, jsonResponse({ login: 'alex' }))
     const backup = createBackup({ indexGeneration: 1 })
     await backup.start()
@@ -988,7 +944,7 @@ describe('createBackupService', () => {
   })
 
   it('a 403 with a rejected token stays an auth error', async () => {
-    fakeServices({ mergeOutcome: MERGED, pushError: FORBIDDEN })
+    fakeServices({ pullOutcome: MERGED, pushError: FORBIDDEN })
     http.on('GET', USER_URL, jsonResponse({ message: 'Bad credentials' }, 401))
     const backup = createBackup({ indexGeneration: 1 })
     await backup.start()
@@ -1005,7 +961,7 @@ describe('createBackupService', () => {
   })
 
   it('a 403 with a token probe that never reaches GitHub reports offline', async () => {
-    fakeServices({ mergeOutcome: MERGED, pushError: FORBIDDEN })
+    fakeServices({ pullOutcome: MERGED, pushError: FORBIDDEN })
     http.on('GET', USER_URL, () => {
       throw new TypeError('Failed to fetch')
     })
@@ -1021,7 +977,7 @@ describe('createBackupService', () => {
   })
 
   it('a 403 with a rate-limited token probe reports offline, not a bad credential', async () => {
-    fakeServices({ mergeOutcome: MERGED, pushError: FORBIDDEN })
+    fakeServices({ pullOutcome: MERGED, pushError: FORBIDDEN })
     http.on('GET', USER_URL, jsonResponse({ message: 'API rate limit exceeded' }, 403))
     const backup = createBackup({ indexGeneration: 1 })
     await backup.start()
@@ -1038,15 +994,15 @@ describe('createBackupService', () => {
   // queues behind an in-flight cycle, so it can never land between a pull's
   // ref move and its checkout and commit the stale tree (#1405).
   it('quit flush waits for an in-flight pull before committing', async () => {
-    const { calls, releaseMerge, releaseCommit } = fakeServices({
-      gateMerge: true,
-      gateSecondCommit: true,
+    const { calls, releasePull, releaseCommit } = fakeServices({
+      gatePull: true,
+      gateCommit: true,
     })
     const backup = createBackup({ indexGeneration: 1 })
     await backup.start()
     try {
       await vi.waitFor(() => {
-        expect(calls).toContain('mergeRemote')
+        expect(calls).toContain('pull')
       })
       expect(commitCount(calls)).toBe(1) // the launch cycle's own commit
 
@@ -1058,7 +1014,7 @@ describe('createBackupService', () => {
       // The pull is still between fetch and merge: no second commit may run yet.
       expect(commitCount(calls)).toBe(1)
 
-      releaseMerge()
+      releasePull()
       await vi.waitFor(() => {
         expect(commitCount(calls)).toBe(2)
       })
@@ -1070,7 +1026,7 @@ describe('createBackupService', () => {
       // The expected failure above throws past the lines after it, so the
       // gate and the backup are released here, or the suspended merge
       // and the live listeners leak into the next test.
-      releaseMerge()
+      releasePull()
       releaseCommit()
       backup.dispose()
     }
@@ -1082,7 +1038,7 @@ describe('createBackupService', () => {
     try {
       await backup.start()
       await vi.waitFor(() => {
-        expect(calls).toContain('mergeRemote') // the launch cycle ran
+        expect(calls).toContain('pull') // the launch cycle ran
       })
       const before = commitCount(calls)
 
@@ -1132,12 +1088,12 @@ describe('createBackupService', () => {
     const backup = createBackup({ indexGeneration: 1 })
     await backup.start()
     await vi.waitFor(() => {
-      expect(calls.filter((command) => command === 'commitAll')).toHaveLength(1)
+      expect(commitCount(calls)).toBe(1)
     })
 
     activity.emitHidden()
     await flush()
-    expect(calls.filter((command) => command === 'commitAll')).toHaveLength(1)
+    expect(commitCount(calls)).toBe(1)
 
     backup.dispose()
   })
@@ -1158,7 +1114,7 @@ describe('createBackupService', () => {
       activity.emitVisible()
       activity.emitResume()
       await vi.waitFor(() => {
-        expect(calls.filter((command) => command === 'commitAll')).toHaveLength(1)
+        expect(commitCount(calls)).toBe(1)
         expect(calls.filter((command) => command === 'fetch')).toHaveLength(1)
       })
 
@@ -1172,13 +1128,13 @@ describe('createBackupService', () => {
 
       // Both the immediate online trigger and the edit's 10s mobile debounce
       // are dropped while hidden.
-      expect(calls.filter((command) => command === 'commitAll')).toHaveLength(1)
+      expect(commitCount(calls)).toBe(1)
       expect(calls.filter((command) => command === 'fetch')).toHaveLength(1)
 
       activity.emitVisible()
       activity.emitResume()
       await flush()
-      expect(calls.filter((command) => command === 'commitAll')).toHaveLength(2)
+      expect(commitCount(calls)).toBe(2)
       // Foreground replay is full, so it fetches rather than merely pushing
       // the edit that arrived while hidden.
       expect(calls.filter((command) => command === 'fetch')).toHaveLength(2)
@@ -1217,12 +1173,14 @@ describe('createBackupService', () => {
 
   it('fans a pull’s writes whole to the local file-changes channel — consumers filter by path', async () => {
     fakeServices({
-      mergeOutcome: {
-        kind: 'merged',
+      pullOutcome: {
+        committed: false,
+        ahead: 1,
+        skippedLargeFiles: [],
         reviewPaths: [],
         changedFiles: [
           { path: 'notes/from-b.md', kind: 'upsert', modifiedMs: 123 },
-          { path: 'daily/2026-06-11.md', kind: 'remove' },
+          { path: 'daily/2026-06-11.md', kind: 'remove', modifiedMs: null },
           // Not a note — but a pulled recording must still reach the
           // audio-memo reconciler, which subscribes to this same channel.
           {
@@ -1252,11 +1210,16 @@ describe('createBackupService', () => {
     unlisten()
   })
 
-  it('reports files a merge kept for review', async () => {
+  it('a hint lists every copy by its graph path', async () => {
     const { progress } = fakeServices({
-      mergeOutcome: {
-        kind: 'mergedWithReview',
-        reviewPaths: ['notes/a.png', 'notes/b.md'],
+      pullOutcome: {
+        committed: false,
+        ahead: 0,
+        skippedLargeFiles: [],
+        reviewPaths: [
+          'notes/a (conflict 2026-10-16 08-05-31 a1b2c3d4).png',
+          'notes/b (conflict 2026-10-16 08-05-31 e5f6a7b8).md',
+        ],
         changedFiles: [],
       },
     })
@@ -1268,56 +1231,30 @@ describe('createBackupService', () => {
         expect.objectContaining({
           label: 'Syncing',
           status: 'failed',
-          message: 'Kept 2 files for review beside their notes',
+          message:
+            'Kept 2 conflict copies: notes/a (conflict 2026-10-16 08-05-31 a1b2c3d4).png, notes/b (conflict 2026-10-16 08-05-31 e5f6a7b8).md',
         }),
       ])
     })
     backup.dispose()
   })
 
-  it('indexes files a commit adopted and reports its review paths', async () => {
-    const adopted: FileChange = { path: 'notes/adopted.md', kind: 'upsert', modifiedMs: 9 }
-    const { calls, progress } = fakeServices({
-      commitOutcome: { ...CLEAN_COMMIT, changedFiles: [adopted], reviewPaths: ['notes/x.md'] },
-    })
-    const batches: FileChange[][] = []
-    const unlisten = fileChanges.subscribe(({ changes }) => {
-      batches.push(changes)
-    })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
-
-    await vi.waitFor(() => {
-      expect(calls).toContain('applyChanges')
-    })
-    expect(batches[0]).toEqual([adopted])
-    expect(progress.snapshot()).toEqual([
-      expect.objectContaining({
-        label: 'Syncing',
-        status: 'failed',
-        message: 'Kept 1 file for review beside its note',
-      }),
-    ])
-    backup.dispose()
-    unlisten()
-  })
-
   it('fans retry-merge batches immediately while serializing direct indexing', async () => {
-    const firstChange: FileChange = {
+    const firstChange: ChangedFile = {
       path: 'notes/from-remote-1.md',
       kind: 'upsert',
       modifiedMs: 123,
     }
-    const secondChange: FileChange = {
+    const secondChange: ChangedFile = {
       path: 'notes/from-remote-2.md',
       kind: 'upsert',
       modifiedMs: 456,
     }
     const { calls, releaseIndexApply } = fakeServices({
       gateIndexApply: true,
-      mergeOutcomes: [
-        { kind: 'merged', reviewPaths: [], changedFiles: [firstChange] },
-        { kind: 'merged', reviewPaths: [], changedFiles: [secondChange] },
+      pullOutcomes: [
+        { ...UP_TO_DATE, ahead: 1, reviewPaths: [], changedFiles: [firstChange] },
+        { ...UP_TO_DATE, ahead: 1, reviewPaths: [], changedFiles: [secondChange] },
       ],
       pushOutcomes: [
         { pushed: false, nonFastForward: true, rejectionMessage: 'fetch first' },
@@ -1361,14 +1298,18 @@ describe('createBackupService', () => {
   it('does not start queued direct indexing after backup teardown', async () => {
     const { calls, releaseIndexApply } = fakeServices({
       gateIndexApply: true,
-      mergeOutcomes: [
+      pullOutcomes: [
         {
-          kind: 'merged',
+          committed: false,
+          ahead: 1,
+          skippedLargeFiles: [],
           reviewPaths: [],
           changedFiles: [{ path: 'notes/from-remote-1.md', kind: 'upsert', modifiedMs: 123 }],
         },
         {
-          kind: 'merged',
+          committed: false,
+          ahead: 1,
+          skippedLargeFiles: [],
           reviewPaths: [],
           changedFiles: [{ path: 'notes/from-remote-2.md', kind: 'upsert', modifiedMs: 456 }],
         },
@@ -1399,8 +1340,10 @@ describe('createBackupService', () => {
   it('keeps launch sync active until pulled notes finish direct indexing', async () => {
     const { calls, releaseIndexApply } = fakeServices({
       gateIndexApply: true,
-      mergeOutcome: {
-        kind: 'fastForward',
+      pullOutcome: {
+        committed: false,
+        ahead: 0,
+        skippedLargeFiles: [],
         reviewPaths: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
@@ -1429,8 +1372,10 @@ describe('createBackupService', () => {
   it('still settles to idle when direct indexing fails — projection health never blocks backup', async () => {
     const { calls } = fakeServices({
       failIndexApply: true,
-      mergeOutcome: {
-        kind: 'fastForward',
+      pullOutcome: {
+        committed: false,
+        ahead: 0,
+        skippedLargeFiles: [],
         reviewPaths: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
@@ -1456,8 +1401,10 @@ describe('createBackupService', () => {
   it('defers a pulled note direct-index apply while the mobile app is hidden', async () => {
     const { calls } = fakeServices({
       mobile: true,
-      mergeOutcome: {
-        kind: 'merged',
+      pullOutcome: {
+        committed: false,
+        ahead: 1,
+        skippedLargeFiles: [],
         reviewPaths: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
@@ -1472,11 +1419,13 @@ describe('createBackupService', () => {
   })
 
   it('skips the direct-index apply when the mobile app went hidden mid-pull', async () => {
-    const { calls, releaseMerge } = fakeServices({
+    const { calls, releasePull } = fakeServices({
       mobile: true,
-      gateMerge: true,
-      mergeOutcome: {
-        kind: 'merged',
+      gatePull: true,
+      pullOutcome: {
+        committed: false,
+        ahead: 1,
+        skippedLargeFiles: [],
         reviewPaths: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
@@ -1488,11 +1437,11 @@ describe('createBackupService', () => {
     const backup = createBackup({ indexGeneration: 1 })
     await backup.start()
     await vi.waitFor(() => {
-      expect(calls).toContain('mergeRemote')
+      expect(calls).toContain('pull')
     })
 
     activity.setHidden(true)
-    releaseMerge()
+    releasePull()
     await vi.waitFor(() => {
       expect(batches).toHaveLength(1) // the landed merge still fans out
     })

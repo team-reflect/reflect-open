@@ -20,7 +20,6 @@ export const gitStatusSchema = z.object({
   remoteUrl: z.string().nullable(),
   ahead: z.number(),
   behind: z.number(),
-  inProgress: z.boolean(),
 })
 export type GitStatus = z.infer<typeof gitStatusSchema>
 
@@ -43,7 +42,7 @@ export const changedFileSchema = z.object({
    * Last-modified time (epoch ms; upserts only) — real mtime for the reindex.
    * A removed file carries `null` or omits it.
    */
-  modifiedMs: z.number().nullable().optional(),
+  modifiedMs: z.number().nullable(),
 })
 export type ChangedFile = z.infer<typeof changedFileSchema>
 
@@ -61,14 +60,6 @@ export const commitOutcomeSchema = z.object({
    */
   ahead: z.number(),
   skippedLargeFiles: z.array(skippedFileSchema),
-  /**
-   * Files that finishing an interrupted pull changed on disk.
-   */
-  changedFiles: z.array(changedFileSchema).default([]),
-  /**
-   * Paths that finishing an interrupted pull reported for review.
-   */
-  reviewPaths: z.array(z.string()).default([]),
 })
 export type CommitOutcome = z.infer<typeof commitOutcomeSchema>
 
@@ -93,9 +84,17 @@ export const remoteTipSchema = z.object({
 })
 export type RemoteTip = z.infer<typeof remoteTipSchema>
 
-export const mergeOutcomeSchema = z.object({
-  kind: z.enum(['upToDate', 'fastForward', 'merged', 'mergedWithReview']),
-  /** Paths to review: a binary conflict copy or an edit kept against a deletion. */
+export const pullOutcomeSchema = z.object({
+  /**
+   * True when the pull committed local changes before it merged.
+   */
+  committed: z.boolean(),
+  /**
+   * Unpushed local commits after the merge — with `committed`, the engine's skip-push gate.
+   */
+  ahead: z.number(),
+  skippedLargeFiles: z.array(skippedFileSchema),
+  /** Paths to review: a conflict copy or an edit kept against a deletion. */
   reviewPaths: z.array(z.string()),
   /**
    * Every file the merge changed. The caller reindexes these directly —
@@ -104,7 +103,7 @@ export const mergeOutcomeSchema = z.object({
    */
   changedFiles: z.array(changedFileSchema),
 })
-export type MergeOutcome = z.infer<typeof mergeOutcomeSchema>
+export type PullOutcome = z.infer<typeof pullOutcomeSchema>
 
 export const pushOutcomeSchema = z.object({
   pushed: z.boolean(),
@@ -155,11 +154,11 @@ export interface GitRepositoryService {
    */
   push(credential: GitCredential | null, generation: number): Promise<PushOutcome>
   /**
-   * Merge the fetched remote branch. Text conflicts are committed as merged
-   * text and binary conflicts keep a review copy: the repo is never left
-   * mid-merge.
+   * Commit local changes, then merge the fetched remote branch, under one
+   * graph lock. Text conflicts are committed as merged text and other
+   * conflicts keep a copy: the repo is never left mid-merge.
    */
-  mergeRemote(generation: number): Promise<MergeOutcome>
+  pull(fallbackMessage: string, generation: number): Promise<PullOutcome>
 }
 
 export interface GitRepositoryServiceDeps {
@@ -205,8 +204,12 @@ class GitRepositoryServiceImpl implements GitRepositoryService {
     return this.#deps.ipc.call('git_push', { credential, generation }, pushOutcomeSchema)
   }
 
-  mergeRemote(generation: number): Promise<MergeOutcome> {
-    return this.#deps.ipc.call('git_merge_remote', { generation }, mergeOutcomeSchema)
+  pull(fallbackMessage: string, generation: number): Promise<PullOutcome> {
+    return this.#deps.ipc.call(
+      'git_pull',
+      { message: fallbackMessage, generation },
+      pullOutcomeSchema,
+    )
   }
 }
 
