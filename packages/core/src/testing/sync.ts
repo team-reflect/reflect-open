@@ -17,7 +17,7 @@ import type {
   GitCredential,
   GitRepositoryService,
   GitStatus,
-  MergeOutcome,
+  PullOutcome,
   PushOutcome,
   RemoteDelta,
   RemoteTip,
@@ -63,13 +63,13 @@ export interface TestGitRepositoryService extends GitRepositoryService {
   onFetch(handler: GitRepositoryHandler<'fetch'>): void
   onRemoteHead(handler: GitRepositoryHandler<'remoteHead'>): void
   onPush(handler: GitRepositoryHandler<'push'>): void
-  onMergeRemote(handler: GitRepositoryHandler<'mergeRemote'>): void
+  onPull(handler: GitRepositoryHandler<'pull'>): void
 }
 
 /**
  * An in-memory {@link GitRepositoryService} that records every call. By
  * default `setup` and `disconnect` update the status, `commitAll` finds a
- * clean tree, `fetch` reports no delta, `push` succeeds and `mergeRemote` is
+ * clean tree, `fetch` reports no delta, `push` succeeds and `pull` is
  * up to date; the `onXxx` setters replace one method's answer.
  */
 class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
@@ -95,13 +95,17 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
       sha: null,
       ahead: 0,
       skippedLargeFiles: [],
-      changedFiles: [],
-      reviewPaths: [],
     }),
     fetch: (): RemoteDelta => ({ ahead: 0, behind: 0 }),
     remoteHead: (): RemoteTip => ({ remoteOid: null, trackingOid: null }),
     push: (): PushOutcome => ({ pushed: true, nonFastForward: false, rejectionMessage: null }),
-    mergeRemote: (): MergeOutcome => ({ kind: 'upToDate', reviewPaths: [], changedFiles: [] }),
+    pull: (): PullOutcome => ({
+      committed: false,
+      ahead: 0,
+      skippedLargeFiles: [],
+      reviewPaths: [],
+      changedFiles: [],
+    }),
   }
 
   constructor(initialStatus?: Partial<GitStatus>) {
@@ -111,7 +115,6 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
       remoteUrl: null,
       ahead: 0,
       behind: 0,
-      inProgress: false,
       ...initialStatus,
     }
   }
@@ -155,9 +158,9 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
     return await this.#handlers.push(credential, generation)
   }
 
-  async mergeRemote(generation: number): Promise<MergeOutcome> {
-    this.#log.push({ method: 'mergeRemote', args: [generation] })
-    return await this.#handlers.mergeRemote(generation)
+  async pull(fallbackMessage: string, generation: number): Promise<PullOutcome> {
+    this.#log.push({ method: 'pull', args: [fallbackMessage, generation] })
+    return await this.#handlers.pull(fallbackMessage, generation)
   }
 
   calls(): readonly GitRepositoryCall[] {
@@ -192,8 +195,8 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
     this.#handlers.push = handler
   }
 
-  onMergeRemote(handler: GitRepositoryHandler<'mergeRemote'>): void {
-    this.#handlers.mergeRemote = handler
+  onPull(handler: GitRepositoryHandler<'pull'>): void {
+    this.#handlers.pull = handler
   }
 }
 

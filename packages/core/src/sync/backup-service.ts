@@ -14,6 +14,7 @@ import type { ICloudNativeService } from '../ipc/icloud-native-service.ts'
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { isICloudRoot } from './icloud-sync-service.ts'
 import { isSyncError, type SyncEngine, type SyncEngineFactory, type SyncStatus } from './engine.ts'
+import { describeConflictCopies } from './conflict-copies.ts'
 import type { ChangedFile, GitCredential, GitRepositoryService } from './git-repository-service.ts'
 import { githubCredential, type GithubAuthService } from './github-auth-service.ts'
 import {
@@ -66,13 +67,6 @@ const COEXIST_QUIET_MS = 5 * 60_000
  * How often a visible desktop window asks the remote for its branch tip.
  */
 const REMOTE_PROBE_MS = 90_000
-
-/**
- * The interval of a full cycle in place of the probe, after
- * {@link PROBE_FAILURES_BEFORE_FALLBACK} failed probes in a row.
- */
-const FALLBACK_FULL_MS = 5 * 60_000
-const PROBE_FAILURES_BEFORE_FALLBACK = 3
 
 /**
  * The (graph, index session) pair one {@link BackupService} backs up.
@@ -191,7 +185,6 @@ class BackupServiceImpl implements BackupService {
   #unlisten: Unlisten | null = null
   #unregisterBackupFlusher: (() => void) | null = null
   #probeTimer: TimerHandle | null = null
-  #probeFailures = 0
   /**
    * Serializes direct index writes without delaying synchronous file-change fanout.
    */
@@ -314,7 +307,7 @@ class BackupServiceImpl implements BackupService {
 
       this.#resumeDisposers.push(activity.subscribeResume(() => void next.syncNow()))
       if (!coexisting && !this.#mobile && platform.isNativeShell) {
-        this.#armProbe(next, getCredential, REMOTE_PROBE_MS)
+        this.#armProbe(next, getCredential)
       }
 
       void next.syncNow() // launch pull: pick up other devices' changes
@@ -426,24 +419,18 @@ class BackupServiceImpl implements BackupService {
       this.#deps.clock.clearTimeout(this.#probeTimer)
       this.#probeTimer = null
     }
-    this.#probeFailures = 0
   }
 
-  #armProbe(
-    engine: SyncEngine,
-    getCredential: () => Promise<GitCredential | null>,
-    delayMs: number,
-  ): void {
+  #armProbe(engine: SyncEngine, getCredential: () => Promise<GitCredential | null>): void {
     this.#probeTimer = this.#deps.clock.setTimeout(() => {
       this.#probeTimer = null
       void this.#probe(engine, getCredential)
-    }, delayMs)
+    }, REMOTE_PROBE_MS)
   }
 
   /**
    * One probe tick: ask the remote for its branch tip and pull when it moved.
-   * After repeated failures, run a full cycle each tick at a slower pace
-   * until a probe succeeds again.
+   * A failed probe is logged and the next one runs on schedule.
    */
   async #probe(
     engine: SyncEngine,
@@ -456,7 +443,6 @@ class BackupServiceImpl implements BackupService {
         if (this.#engine !== engine) {
           return
         }
-        this.#probeFailures = 0
         if (tip.remoteOid !== null && tip.remoteOid !== tip.trackingOid) {
           void engine.syncNow()
         }
@@ -464,22 +450,12 @@ class BackupServiceImpl implements BackupService {
         if (this.#engine !== engine) {
           return
         }
-        this.#probeFailures += 1
         logger.info('remote probe failed:', errorMessage(error))
-        if (this.#probeFailures >= PROBE_FAILURES_BEFORE_FALLBACK) {
-          void engine.syncNow()
-        }
       }
     }
     if (this.#engine === engine) {
-      this.#armProbe(engine, getCredential, this.#probeDelay())
+      this.#armProbe(engine, getCredential)
     }
-  }
-
-  #probeDelay(): number {
-    return this.#probeFailures >= PROBE_FAILURES_BEFORE_FALLBACK
-      ? FALLBACK_FULL_MS
-      : REMOTE_PROBE_MS
   }
 
   #hasError(): boolean {
@@ -487,12 +463,7 @@ class BackupServiceImpl implements BackupService {
   }
 
   #onReview(paths: string[]): void {
-    this.#deps.progress.fail(
-      'Syncing',
-      paths.length === 1
-        ? 'Kept 1 file for review beside its note'
-        : `Kept ${paths.length} files for review beside their notes`,
-    )
+    this.#deps.progress.fail('Syncing', describeConflictCopies(paths))
   }
 
   #onRemoteChanges(changes: ChangedFile[]): void | Promise<void> {

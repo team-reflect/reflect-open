@@ -301,7 +301,6 @@ class DevBridgeImpl implements IpcBridge {
           remoteUrl: null,
           ahead: 0,
           behind: 0,
-          inProgress: false,
         }
 
       case 'calendar_authorization_status':
