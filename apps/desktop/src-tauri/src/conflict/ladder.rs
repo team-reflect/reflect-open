@@ -38,8 +38,8 @@ pub struct ConflictInput<'a> {
     pub base: Option<&'a str>,
     /// The two conflicting versions, in any order.
     pub sides: (ConflictSide, ConflictSide),
-    /// True when the sweep recognized this exact content pair from a previous
-    /// auto-merge — the deterministic loop breaker (rule 4).
+    /// True when this exact content pair was already auto-merged once. It
+    /// selects the deterministic loop breaker (rule 4).
     pub merge_loop_detected: bool,
 }
 

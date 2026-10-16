@@ -1,8 +1,7 @@
 //! The conflict archive: `.reflect/conflict-archive/<note-path>/` keeps the
-//! full content of every version a resolution consumed, stamped with its
-//! modification time and saving device. Resolution must never be the only
-//! copy-holder — `removeOtherVersionsOfItem` is called strictly after the
-//! archive write lands (Plan 21 layer 3). Local-only: `.reflect/` never syncs.
+//! full content of versions that a lossy resolution consumed, stamped with
+//! their modification time and saving device. Local-only: `.reflect/` never
+//! syncs.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -34,19 +33,21 @@ pub fn archive_version(
     let ext = Path::new(rel)
         .extension()
         .and_then(|ext| ext.to_str())
+        .filter(|ext| !ext.is_empty() && ext.bytes().all(|byte| byte.is_ascii_alphanumeric()))
         .unwrap_or("md");
     let mut target = dir.join(format!("{stem}.{ext}"));
     let mut attempt = 0u32;
     while target.exists() {
         attempt += 1;
-        target = dir.join(format!("{stem}-{attempt}.{ext}"));
+        target = dir.join(format!("{stem}~{attempt}.{ext}"));
     }
     crate::fs::atomic_write_bytes(root, &target, bytes)?;
     Ok(())
 }
 
-/// Archive one version unless the repository's object database already holds
-/// its exact bytes. Returns whether a copy was written.
+/// Archive one version unless Git history already holds its exact bytes at
+/// `rel`: in the `HEAD` tree or in the tracking branch's tree. Returns
+/// whether a copy was written.
 pub fn archive_unless_in_history(
     root: &Path,
     rel: &str,
@@ -55,13 +56,32 @@ pub fn archive_unless_in_history(
     bytes: &[u8],
 ) -> AppResult<bool> {
     let oid = git2::Oid::hash_object(git2::ObjectType::Blob, bytes)?;
-    if let Ok(repo) = git2::Repository::open(root) {
-        if repo.odb()?.exists(oid) {
-            return Ok(false);
-        }
+    if blob_in_history(root, rel, oid) {
+        return Ok(false);
     }
     archive_version(root, rel, device, modified_ms, bytes)?;
     Ok(true)
+}
+
+fn blob_in_history(root: &Path, rel: &str, oid: git2::Oid) -> bool {
+    let Ok(repo) = git2::Repository::open(root) else {
+        return false;
+    };
+    let holds = |reference: git2::Reference<'_>| -> bool {
+        reference
+            .peel_to_tree()
+            .ok()
+            .and_then(|tree| tree.get_path(Path::new(rel)).ok())
+            .is_some_and(|entry| entry.id() == oid)
+    };
+    let Ok(head) = repo.head() else {
+        return false;
+    };
+    let tracking = head.shorthand().ok().and_then(|branch| {
+        repo.find_reference(&format!("refs/remotes/origin/{branch}"))
+            .ok()
+    });
+    holds(head) || tracking.is_some_and(holds)
 }
 
 /// One archived version of a note.
@@ -82,12 +102,12 @@ pub fn list(root: &Path, rel: &str) -> AppResult<Vec<ArchivedVersion>> {
     let Ok(entries) = fs::read_dir(&dir) else {
         return Ok(Vec::new());
     };
-    let mut versions: Vec<ArchivedVersion> = Vec::new();
+    let mut versions: Vec<(u32, ArchivedVersion)> = Vec::new();
     for entry in entries.flatten() {
         let Some(name) = entry.file_name().to_str().map(str::to_string) else {
             continue;
         };
-        let Some((modified_ms, device)) = parse_archive_name(&name) else {
+        let Some((modified_ms, device, attempt)) = parse_archive_name(&name) else {
             continue;
         };
         let Ok(meta) = entry.metadata() else {
@@ -96,19 +116,19 @@ pub fn list(root: &Path, rel: &str) -> AppResult<Vec<ArchivedVersion>> {
         if !meta.is_file() {
             continue;
         }
-        versions.push(ArchivedVersion {
-            name,
-            modified_ms,
-            device,
-            size: meta.len(),
-        });
+        versions.push((
+            attempt,
+            ArchivedVersion {
+                name,
+                modified_ms,
+                device,
+                size: meta.len(),
+            },
+        ));
     }
-    versions.sort_by(|a, b| {
-        b.modified_ms
-            .cmp(&a.modified_ms)
-            .then_with(|| b.name.cmp(&a.name))
-    });
-    Ok(versions)
+    versions
+        .sort_by(|a, b| (b.1.modified_ms, b.0, &b.1.name).cmp(&(a.1.modified_ms, a.0, &a.1.name)));
+    Ok(versions.into_iter().map(|(_, version)| version).collect())
 }
 
 /// The text of one archived version, named as [`list`] returns it.
@@ -121,24 +141,33 @@ pub fn read(root: &Path, rel: &str, name: &str) -> AppResult<String> {
     Ok(fs::read_to_string(dir.join(name))?)
 }
 
-/// `<ms>-<device>[-n].<ext>` → `(ms, device)`. Names must match
-/// `^[0-9]+-[A-Za-z0-9-]+\.[A-Za-z0-9]+$`.
-fn parse_archive_name(name: &str) -> Option<(u64, String)> {
+/// `<ms>-<device>[~n].<ext>` → `(ms, device, n)`. Names must match
+/// `^[0-9]+-[A-Za-z0-9-]+(~[0-9]+)?\.[A-Za-z0-9]+$`.
+fn parse_archive_name(name: &str) -> Option<(u64, String, u32)> {
     let (stem, ext) = name.rsplit_once('.')?;
     if ext.is_empty() || !ext.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
         return None;
     }
     let (stamp, rest) = stem.split_once('-')?;
+    let (device, attempt) = match rest.rsplit_once('~') {
+        Some((device, attempt)) => {
+            if attempt.is_empty() || !attempt.bytes().all(|byte| byte.is_ascii_digit()) {
+                return None;
+            }
+            (device, attempt.parse().ok()?)
+        }
+        None => (rest, 0),
+    };
     if stamp.is_empty()
         || !stamp.bytes().all(|byte| byte.is_ascii_digit())
-        || rest.is_empty()
-        || !rest
+        || device.is_empty()
+        || !device
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
     {
         return None;
     }
-    Some((stamp.parse().ok()?, rest.to_string()))
+    Some((stamp.parse().ok()?, device.to_string(), attempt))
 }
 
 /// Prune the archive: per note, keep the newest [`MAX_PER_NOTE`] versions and
@@ -195,11 +224,13 @@ fn note_archive_dir(root: &Path, rel: &str) -> Option<PathBuf> {
 }
 
 fn sanitize_device(device: Option<&str>) -> String {
-    let cleaned: String = device
-        .unwrap_or("unknown")
-        .chars()
-        .map(|ch| if ch.is_alphanumeric() { ch } else { '-' })
-        .collect();
+    let mut cleaned = String::new();
+    for ch in device.unwrap_or("unknown").chars() {
+        let ch = if ch.is_ascii_alphanumeric() { ch } else { '-' };
+        if ch != '-' || !cleaned.ends_with('-') {
+            cleaned.push(ch);
+        }
+    }
     let trimmed = cleaned.trim_matches('-');
     if trimmed.is_empty() {
         "unknown".to_string()
@@ -225,7 +256,7 @@ mod tests {
             .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
             .collect();
         names.sort();
-        assert_eq!(names, vec!["1000-Alex-s-Mac-1.md", "1000-Alex-s-Mac.md"]);
+        assert_eq!(names, vec!["1000-Alex-s-Mac.md", "1000-Alex-s-Mac~1.md"]);
     }
 
     #[test]
@@ -262,17 +293,36 @@ mod tests {
         assert!(archive_version(root.path(), "../escape.md", None, 1, b"x").is_err());
     }
 
-    fn graph_with_git(bytes: &[u8]) -> tempfile::TempDir {
+    fn commit_file(repo: &git2::Repository, rel: &str, bytes: &[u8]) -> git2::Oid {
+        let path = repo.workdir().unwrap().join(rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, bytes).unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(Path::new(rel)).unwrap();
+        let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+        let sig = git2::Signature::now("t", "t@example.com").unwrap();
+        let parents: Vec<git2::Commit> = repo
+            .head()
+            .ok()
+            .and_then(|head| head.peel_to_commit().ok())
+            .into_iter()
+            .collect();
+        let parents: Vec<&git2::Commit> = parents.iter().collect();
+        repo.commit(Some("HEAD"), &sig, &sig, "c", &tree, &parents)
+            .unwrap()
+    }
+
+    fn graph_with_git(rel: &str, bytes: &[u8]) -> (tempfile::TempDir, git2::Repository) {
         let root = tempdir().unwrap();
         fs::create_dir_all(root.path().join(".reflect")).unwrap();
         let repo = git2::Repository::init(root.path()).unwrap();
-        repo.blob(bytes).unwrap();
-        root
+        commit_file(&repo, rel, bytes);
+        (root, repo)
     }
 
     #[test]
     fn content_in_the_git_odb_is_not_archived() {
-        let root = graph_with_git(b"in history");
+        let (root, repo) = graph_with_git("notes/a.md", b"in history");
         let skipped =
             archive_unless_in_history(root.path(), "notes/a.md", None, 1, b"in history").unwrap();
         assert!(!skipped);
@@ -282,6 +332,65 @@ mod tests {
             archive_unless_in_history(root.path(), "notes/a.md", None, 2, b"new text").unwrap();
         assert!(written);
         assert_eq!(list(root.path(), "notes/a.md").unwrap().len(), 1);
+
+        // A loose blob that no commit holds at this path is not history.
+        repo.blob(b"only an object").unwrap();
+        assert!(
+            archive_unless_in_history(root.path(), "notes/a.md", None, 3, b"only an object")
+                .unwrap()
+        );
+        // The same bytes committed at another path do not count either.
+        assert!(
+            archive_unless_in_history(root.path(), "notes/b.md", None, 4, b"in history").unwrap()
+        );
+    }
+
+    #[test]
+    fn the_tracking_branch_tree_counts_as_history() {
+        let (root, repo) = graph_with_git("notes/a.md", b"remote text");
+        let branch = repo.head().unwrap().shorthand().unwrap().to_string();
+        let first = repo.head().unwrap().target().unwrap();
+        repo.reference(&format!("refs/remotes/origin/{branch}"), first, true, "t")
+            .unwrap();
+        commit_file(&repo, "notes/a.md", b"local text");
+
+        assert!(
+            !archive_unless_in_history(root.path(), "notes/a.md", None, 1, b"remote text").unwrap()
+        );
+        assert!(
+            !archive_unless_in_history(root.path(), "notes/a.md", None, 2, b"local text").unwrap()
+        );
+        assert!(
+            archive_unless_in_history(root.path(), "notes/a.md", None, 3, b"other text").unwrap()
+        );
+    }
+
+    #[test]
+    fn a_non_ascii_device_name_round_trips() {
+        let root = tempdir().unwrap();
+        fs::create_dir_all(root.path().join(".reflect")).unwrap();
+        archive_version(root.path(), "notes/a.md", Some("Alex的MacBook"), 7, b"cjk").unwrap();
+        archive_version(
+            root.path(),
+            "notes/a.md",
+            Some("Alex的MacBook"),
+            7,
+            b"again",
+        )
+        .unwrap();
+        let versions = list(root.path(), "notes/a.md").unwrap();
+        assert_eq!(versions.len(), 2);
+        assert_eq!(versions[0].name, "7-Alex-MacBook~1.md");
+        assert_eq!(versions[0].device, "Alex-MacBook");
+        assert_eq!(versions[1].device, "Alex-MacBook");
+        assert_eq!(
+            read(root.path(), "notes/a.md", &versions[1].name).unwrap(),
+            "cjk"
+        );
+        assert_eq!(
+            read(root.path(), "notes/a.md", &versions[0].name).unwrap(),
+            "again"
+        );
     }
 
     #[test]
@@ -304,7 +413,7 @@ mod tests {
 
         let versions = list(root.path(), "notes/a.md").unwrap();
         let names: Vec<&str> = versions.iter().map(|v| v.name.as_str()).collect();
-        assert_eq!(names, vec!["300-Mac.md", "300-Mac-1.md", "100-iPhone.md"]);
+        assert_eq!(names, vec!["300-Mac~1.md", "300-Mac.md", "100-iPhone.md"]);
         assert_eq!(versions[2].modified_ms, 100);
         assert_eq!(versions[2].device, "iPhone");
         assert_eq!(versions[2].size, 3);

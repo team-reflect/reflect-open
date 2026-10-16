@@ -10,12 +10,10 @@
 //! **Determinism is a sync property, not a nicety**: both devices may resolve
 //! the same conflict concurrently (each sees itself as the current version),
 //! and only byte-identical outputs converge instead of ping-ponging. Every
-//! rule therefore orders the two sides by `(modified_ms, content)` — data both
-//! devices share — never by which side is local.
+//! rule therefore orders the two sides by `(modified_ms, content)`, data both
+//! devices share, never by which side is local.
 //!
-//! Pure text in, text out: no iCloud types here. The platform half (version
-//! discovery, archiving, applying results) lives in [`crate::icloud`] and the
-//! sweep.
+//! Pure text in, text out: no iCloud types here.
 
 pub mod archive;
 mod frontmatter;
@@ -62,7 +60,7 @@ pub async fn conflict_archive_read(
 pub struct ConflictSide {
     /// The complete note source (frontmatter + body).
     pub content: String,
-    /// Display label — the saving device's name when the
+    /// Display label: the saving device's name when the
     /// provider knows it (`NSFileVersion.localizedNameOfSavingComputer`).
     pub label: String,
     /// Last-modified time in epoch milliseconds. Shared metadata: both
@@ -74,14 +72,12 @@ pub struct ConflictSide {
 /// What the ladder decided for a conflict.
 #[derive(Debug, PartialEq)]
 pub enum Resolution {
-    /// The sides carry identical content — nothing to write; the caller just
-    /// marks the provider versions resolved.
+    /// The sides carry identical content: nothing to write.
     AlreadyResolved,
-    /// Auto-merged (or a deterministic winner was chosen); write this content
-    /// and mark the versions resolved. No user interaction needed.
+    /// Auto-merged (or a deterministic winner was chosen) without losing text.
     Merged { content: String },
     /// Auto-merged, but the result may have dropped one side's text (the
     /// merge-loop breaker) or interleaved both sides' words (the last-resort
-    /// merge). The caller must archive both sides before it writes `content`.
+    /// merge).
     Reconciled { content: String },
 }

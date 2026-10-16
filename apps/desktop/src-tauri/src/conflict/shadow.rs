@@ -21,7 +21,7 @@
 //! merge-loop breaker. When devices with different bases auto-merge the same
 //! pair to different results, iCloud re-conflicts them; seeing a pair you
 //! already merged once means base-dependent merging cannot converge, and the
-//! ladder falls to base-independent deterministic markers instead.
+//! ladder keeps the newer side instead.
 
 use std::fs;
 use std::path::{Path, PathBuf};
