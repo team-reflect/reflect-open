@@ -4,6 +4,7 @@ import {
   type OpenDocumentsService,
 } from '../documents/open-documents-service.ts'
 import { createGraphSession, type GraphSession } from '../graph/graph-session.ts'
+import type { NoteWriteResult } from '../graph/note-file-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createNoteDocumentService, NoteBusyError } from '../documents/note-document-service.ts'
 import {
@@ -175,11 +176,13 @@ const flushMicrotasks = () => new Promise((resolve) => setTimeout(resolve, 0))
 describe('write serialization', () => {
   it('serializes concurrent writes to the same note — no read/write interleave', async () => {
     noteFile.set('notes/a.md', '+ [ ] do it\n')
-    const pendingFirstWrite = Promise.withResolvers<number>()
+    const pendingFirstWrite = Promise.withResolvers<NoteWriteResult>()
     let writes = 0
     const writeNote = vi.spyOn(noteFile, 'write').mockImplementation(() => {
       writes += 1
-      return writes === 1 ? pendingFirstWrite.promise : Promise.resolve(0)
+      return writes === 1
+        ? pendingFirstWrite.promise
+        : Promise.resolve({ modifiedMs: 0, merged: null })
     })
 
     const first = tasks.writeTask(task, [{ kind: 'toggle' }])
@@ -190,7 +193,7 @@ describe('write serialization', () => {
     expect(noteFile.getReads()).toHaveLength(1)
     expect(writeNote).toHaveBeenCalledTimes(1)
 
-    pendingFirstWrite.resolve(0)
+    pendingFirstWrite.resolve({ modifiedMs: 0, merged: null })
     await Promise.all([first, second])
     // The second only read after the first's write settled.
     expect(noteFile.getReads()).toHaveLength(2)

@@ -173,7 +173,7 @@ class DevBridgeImpl implements IpcBridge {
       }
       case 'note_write': {
         const { path, contents } = writeArgsSchema.parse(args)
-        return files.write(path, contents)
+        return { modifiedMs: files.write(path, contents) }
       }
       case 'note_create': {
         const { path, contents, generation } = createArgsSchema.parse(args)

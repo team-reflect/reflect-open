@@ -39,13 +39,16 @@ describe('createNoteFileService', () => {
 
   it('reports a write as an own write stamped with the disk mtime', async () => {
     const { ipc, fileChanges, noteFile } = setup()
-    ipc.onCommand('note_write', () => 1_234)
+    ipc.onCommand('note_write', () => ({ modifiedMs: 1_234 }))
     const reported: unknown[] = []
     fileChanges.subscribeOwnWrites((paths) => {
       reported.push(paths)
     })
 
-    await expect(noteFile.write('notes/a.md', 'new', 7)).resolves.toBe(1_234)
+    await expect(noteFile.write('notes/a.md', 'new', 7)).resolves.toEqual({
+      modifiedMs: 1_234,
+      merged: null,
+    })
 
     expect(ipc.calls()).toEqual([
       { command: 'note_write', args: { path: 'notes/a.md', contents: 'new', generation: 7 } },
@@ -55,9 +58,25 @@ describe('createNoteFileService', () => {
 
   it('falls back to the clock when the platform reports no mtime', async () => {
     const { ipc, noteFile } = setup()
-    ipc.onCommand('note_write', () => null)
+    ipc.onCommand('note_write', () => ({ modifiedMs: null }))
 
-    await expect(noteFile.write('notes/a.md', 'new', 7)).resolves.toBe(9_000)
+    await expect(noteFile.write('notes/a.md', 'new', 7)).resolves.toEqual({
+      modifiedMs: 9_000,
+      merged: null,
+    })
+  })
+
+  it('returns the merged text of a checked write that merged with the disk', async () => {
+    const { ipc, noteFile } = setup()
+    ipc.onCommand('note_write', () => ({
+      modifiedMs: 1_234,
+      merged: { content: 'a\nB\nc', kind: 'exact' },
+    }))
+
+    await expect(noteFile.write('notes/a.md', 'a\nB', 7, 'a\nb')).resolves.toEqual({
+      modifiedMs: 1_234,
+      merged: { content: 'a\nB\nc', kind: 'exact' },
+    })
   })
 
   it('sends `expectedContents` for a checked write and does not report a rejected one', async () => {
@@ -200,7 +219,11 @@ describe('createTestNoteFileService', () => {
 /**
  * A note file service over a bridge answering `invoke` and a file-change fake with the given echo setting.
  */
-function installEcho(echoOwnWrites: boolean, invoke: (command: string) => unknown = () => null) {
+function installEcho(
+  echoOwnWrites: boolean,
+  invoke: (command: string) => unknown = (command) =>
+    command === 'note_write' ? { modifiedMs: null } : null,
+) {
   const ipc = createTestIpcBridgeService()
   for (const command of ['note_write', 'note_delete']) {
     ipc.onCommand(command, () => invoke(command))
@@ -243,7 +266,7 @@ describe('local write echo (Plan 19, decision 5)', () => {
     // The reconcile's read-free skip compares the stored row's mtime against
     // the file listing — only the write's own on-disk stamp can ever match.
     const { noteFile, fileChanges } = installEcho(true, (command) =>
-      command === 'note_write' ? 1_234 : null,
+      command === 'note_write' ? { modifiedMs: 1_234 } : null,
     )
     const seen: FileChange[][] = []
     const unlisten = fileChanges.subscribe(({ changes }) => {
