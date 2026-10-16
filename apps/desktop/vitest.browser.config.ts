@@ -12,7 +12,7 @@ if (process.env.CI) {
 export default defineDesktopProject({
   plugins: [tailwindcss(), playwrightCommands()],
   test: {
-    name: 'desktop-browser',
+    name: { label: 'desktop-browser', color: 'cyan' },
     include: ['src/**/*.test.tsx'],
     sequence: { groupOrder: browserName === 'chromium' ? 300 : 100 },
     setupFiles: ['./src/test-utils/setup-console.ts', './src/test-utils/setup-browser.ts'],
