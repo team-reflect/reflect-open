@@ -16,9 +16,10 @@
 //! Pure text in, text out: no iCloud types here.
 
 pub mod archive;
+pub mod copy;
 mod frontmatter;
 pub mod ladder;
-mod merge3;
+pub(crate) mod merge3;
 pub mod shadow;
 mod total;
 mod union;

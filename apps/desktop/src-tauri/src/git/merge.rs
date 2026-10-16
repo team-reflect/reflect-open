@@ -9,8 +9,9 @@
 //! The caller holds the graph lock and has committed the working tree, so the
 //! checkout never overwrites an unsaved edit. Files a commit withheld stay as
 //! they are on disk.
-//! A text conflict is resolved by the conflict ladder ([`ladder::resolve`]),
-//! so pulls never write conflict markers.
+//! A note conflict is resolved by the conflict ladder ([`ladder::resolve`]),
+//! so pulls never write conflict markers. Other files that cannot merge keep
+//! both versions as conflict copies.
 //! A local deletion of a file the incoming side changed keeps the incoming
 //! version (an edit wins over a delete) and reports the path for review.
 
@@ -21,8 +22,9 @@ use git2::{Index, IndexEntry, IndexTime, MergeOptions, Repository};
 use reflect_graph_paths::to_slash_lossy;
 use serde::Serialize;
 
-use crate::conflict::archive::archive_unless_in_history;
+use crate::conflict::copy::{free_conflict_copy_path, utc_stamp};
 use crate::conflict::ladder::{self, ConflictInput};
+use crate::conflict::merge3;
 use crate::conflict::{ConflictSide, Resolution};
 use crate::error::{AppError, AppResult};
 
@@ -201,11 +203,9 @@ fn pull(repo: &Repository, root: &Path, skipped: &[String]) -> AppResult<MergeOu
     })
 }
 
-/// Resolve a text conflict of the in-memory merge through the ladder. Both
+/// Resolve a note conflict of the in-memory merge through the ladder. Both
 /// sides are commit blobs, so their commit times order them on every device.
-fn merge_index_text(
-    root: &Path,
-    rel: &str,
+fn merge_note(
     base: Option<&[u8]>,
     ours: (&[u8], &git2::Commit<'_>),
     theirs: (&[u8], &git2::Commit<'_>),
@@ -215,16 +215,11 @@ fn merge_index_text(
     let base = base.map(text_of).transpose()?;
     let content = match ladder::resolve(ConflictInput {
         base,
-        sides: (ours_side.clone(), theirs_side.clone()),
+        sides: (ours_side, theirs_side),
         merge_loop_detected: false,
     })? {
         Resolution::AlreadyResolved => return Ok(ours.0.to_vec()),
-        Resolution::Merged { content } => content,
-        Resolution::Reconciled { content } => {
-            archive_side(root, rel, &ours_side)?;
-            archive_side(root, rel, &theirs_side)?;
-            content
-        }
+        Resolution::Merged { content } | Resolution::Reconciled { content } => content,
     };
     Ok(content.into_bytes())
 }
@@ -239,17 +234,6 @@ fn text_side(bytes: &[u8], label: &str, modified_ms: u64) -> AppResult<ConflictS
         label: label.to_string(),
         modified_ms,
     })
-}
-
-fn archive_side(root: &Path, rel: &str, side: &ConflictSide) -> AppResult<()> {
-    archive_unless_in_history(
-        root,
-        rel,
-        Some(&side.label),
-        side.modified_ms,
-        side.content.as_bytes(),
-    )?;
-    Ok(())
 }
 
 fn commit_ms(commit: &git2::Commit<'_>) -> u64 {
@@ -318,12 +302,14 @@ fn stamp_modified_times(root: &Path, changes: &mut [ChangedFile]) {
 /// Resolve every conflict of an in-memory merge index, so its tree can be
 /// written:
 ///
-/// - **text vs text**: the ladder's merged text, not reviewed;
 /// - **edit vs delete**: keep the edited version, never silently delete;
-/// - **binary or symlink**: keep ours at the path and the other device's
-///   version alongside (`name (conflict).ext`);
-/// - **submodule**: keep ours;
-/// - **deleted on both**: confirm the removal.
+/// - **deleted on both**: confirm the removal;
+/// - **note (`.md`)**: the ladder's merged text;
+/// - **other text**: the three-way merge when it is clean;
+/// - **anything else** (binary, symlink, an unclean text merge): keep ours at
+///   the path and the other device's version beside it as
+///   `name (conflict <stamp> <hash8>).ext`;
+/// - **submodule**: keep ours.
 ///
 /// Returns the paths the user should review.
 fn resolve_index_conflicts(
@@ -336,6 +322,7 @@ fn resolve_index_conflicts(
     if !index.has_conflicts() {
         return Ok(Vec::new());
     }
+    let stamp = utc_stamp(theirs.time().seconds());
     let conflicts = index
         .conflicts()?
         .map(|conflict| {
@@ -363,7 +350,7 @@ fn resolve_index_conflicts(
             (Some(our), Some(their)) => {
                 let path = entry_path(&our);
                 if our.mode == GITLINK_MODE || their.mode == GITLINK_MODE {
-                    add_resolved(index, root, &path, our.id, our.mode, &mut review)?;
+                    add_resolved(index, root, &stamp, &path, our.id, our.mode, &mut review)?;
                     continue;
                 }
                 let plain = our.mode != SYMLINK_MODE && their.mode != SYMLINK_MODE;
@@ -375,31 +362,71 @@ fn resolve_index_conflicts(
                     }
                     _ => None,
                 };
-                if plain
+                let all_text = plain
                     && is_text(&our_blob)
                     && is_text(&their_blob)
-                    && ancestor_blob.as_ref().is_none_or(is_text)
-                {
-                    let merged = merge_index_text(
-                        root,
-                        &path,
-                        ancestor_blob.as_ref().map(|blob| blob.content()),
+                    && ancestor_blob.as_ref().is_none_or(is_text);
+                let base = ancestor_blob.as_ref().map(|blob| blob.content());
+                let merged = if !all_text {
+                    None
+                } else if reflect_graph_paths::is_note(&path) {
+                    Some(merge_note(
+                        base,
                         (our_blob.content(), ours),
                         (their_blob.content(), theirs),
-                    )?;
-                    let id = repo.blob(&merged)?;
-                    add_resolved_unreviewed(index, root, &path, id, our.mode, &mut review)?;
+                    )?)
                 } else {
-                    add_resolved(index, root, &path, our.id, our.mode, &mut review)?;
-                    let copy = free_conflict_copy_path(&entry_path(&their), |path| {
-                        index_or_worktree_has(index, root, path)
-                    });
-                    add_resolved(index, root, &copy, their.id, their.mode, &mut review)?;
+                    let ours_side = text_side(our_blob.content(), OUR_LABEL, commit_ms(ours))?;
+                    let theirs_side =
+                        text_side(their_blob.content(), THEIR_LABEL, commit_ms(theirs))?;
+                    merge3::diff3(
+                        base.map(text_of).transpose()?.unwrap_or(""),
+                        &ours_side,
+                        &theirs_side,
+                    )?
+                    .map(String::into_bytes)
+                };
+                if let Some(merged) = merged {
+                    let id = repo.blob(&merged)?;
+                    add_resolved_unreviewed(index, root, &stamp, &path, id, our.mode, &mut review)?;
+                } else {
+                    add_resolved_unreviewed(
+                        index,
+                        root,
+                        &stamp,
+                        &path,
+                        our.id,
+                        our.mode,
+                        &mut review,
+                    )?;
+                    let copy = free_conflict_copy_path(
+                        &path,
+                        &stamp,
+                        &their.id.to_string()[..8],
+                        |path| index_or_worktree_has(index, root, path),
+                    );
+                    add_resolved(
+                        index,
+                        root,
+                        &stamp,
+                        &copy,
+                        their.id,
+                        their.mode,
+                        &mut review,
+                    )?;
                 }
             }
             (Some(edited), None) | (None, Some(edited)) => {
                 let path = entry_path(&edited);
-                add_resolved(index, root, &path, edited.id, edited.mode, &mut review)?;
+                add_resolved(
+                    index,
+                    root,
+                    &stamp,
+                    &path,
+                    edited.id,
+                    edited.mode,
+                    &mut review,
+                )?;
             }
             (None, None) => {}
         }
@@ -419,12 +446,13 @@ const SYMLINK_MODE: u32 = 0o120000;
 fn add_resolved(
     index: &mut Index,
     root: &Path,
+    stamp: &str,
     path: &str,
     id: git2::Oid,
     mode: u32,
     review: &mut Vec<String>,
 ) -> AppResult<()> {
-    let staged = stage_resolved(index, root, path, id, mode, review)?;
+    let staged = stage_resolved(index, root, stamp, path, id, mode, review)?;
     review.push(staged);
     Ok(())
 }
@@ -434,12 +462,13 @@ fn add_resolved(
 fn add_resolved_unreviewed(
     index: &mut Index,
     root: &Path,
+    stamp: &str,
     path: &str,
     id: git2::Oid,
     mode: u32,
     review: &mut Vec<String>,
 ) -> AppResult<()> {
-    let staged = stage_resolved(index, root, path, id, mode, review)?;
+    let staged = stage_resolved(index, root, stamp, path, id, mode, review)?;
     if staged != path {
         review.push(staged);
     }
@@ -452,6 +481,7 @@ fn add_resolved_unreviewed(
 fn stage_resolved(
     index: &mut Index,
     root: &Path,
+    stamp: &str,
     path: &str,
     id: git2::Oid,
     mode: u32,
@@ -462,15 +492,20 @@ fn stage_resolved(
         .iter()
         .any(|entry| entry.path.starts_with(dir_prefix.as_bytes()));
     let path = if is_dir {
-        free_conflict_copy_path(path, |path| index_or_worktree_has(index, root, path))
+        let hash8 = id.to_string();
+        free_conflict_copy_path(path, stamp, &hash8[..8], |path| {
+            index_or_worktree_has(index, root, path)
+        })
     } else {
         path.to_string()
     };
     let mut parent = path.as_str();
     while let Some((dir, _)) = parent.rsplit_once('/') {
         if let Some(file) = index.get_path(Path::new(dir), 0) {
-            let copy =
-                free_conflict_copy_path(dir, |path| index_or_worktree_has(index, root, path));
+            let hash8 = file.id.to_string();
+            let copy = free_conflict_copy_path(dir, stamp, &hash8[..8], |path| {
+                index_or_worktree_has(index, root, path)
+            });
             index.remove_path(Path::new(dir))?;
             index.add(&stage0_entry(&copy, file.id, file.mode))?;
             review.push(copy);
@@ -515,38 +550,6 @@ fn stage0_entry(path: &str, id: git2::Oid, mode: u32) -> IndexEntry {
     }
 }
 
-/// `assets/img.png` → `assets/img (conflict).png`; no extension → appended.
-/// Splits on the basename only — a dot in a *directory* name (`assets.v1/x`)
-/// must not relocate the copy out of the file's directory. `n` above 1 gives
-/// `img (conflict n).png`.
-fn conflict_copy_path(rel: &str, n: u32) -> String {
-    let (dir, file) = match rel.rsplit_once('/') {
-        Some((dir, file)) => (Some(dir), file),
-        None => (None, rel),
-    };
-    let label = if n > 1 {
-        format!("conflict {n}")
-    } else {
-        "conflict".to_string()
-    };
-    let renamed = match file.rsplit_once('.') {
-        Some((stem, ext)) if !stem.is_empty() => format!("{stem} ({label}).{ext}"),
-        _ => format!("{file} ({label})"),
-    };
-    match dir {
-        Some(dir) => format!("{dir}/{renamed}"),
-        None => renamed,
-    }
-}
-
-/// The first conflict copy path of `rel` that `taken` does not claim.
-fn free_conflict_copy_path(rel: &str, taken: impl Fn(&str) -> bool) -> String {
-    (1..)
-        .map(|n| conflict_copy_path(rel, n))
-        .find(|path| !taken(path))
-        .expect("an unbounded range always yields a free name")
-}
-
 /// Whether `rel` is taken in the merge index (as a file or a directory) or on
 /// disk.
 fn index_or_worktree_has(index: &Index, root: &Path, rel: &str) -> bool {
@@ -556,38 +559,4 @@ fn index_or_worktree_has(index: &Index, root: &Path, rel: &str) -> bool {
             .iter()
             .any(|entry| entry.path.starts_with(dir_prefix.as_bytes()))
         || root.join(rel).symlink_metadata().is_ok()
-}
-
-#[cfg(test)]
-mod path_tests {
-    use super::conflict_copy_path;
-
-    #[test]
-    fn conflict_copies_stay_in_their_directory() {
-        assert_eq!(
-            conflict_copy_path("assets/img.png", 1),
-            "assets/img (conflict).png"
-        );
-        assert_eq!(
-            conflict_copy_path("assets.v1/img", 1),
-            "assets.v1/img (conflict)"
-        );
-        assert_eq!(
-            conflict_copy_path("assets.v1/img.png", 1),
-            "assets.v1/img (conflict).png"
-        );
-        assert_eq!(
-            conflict_copy_path("topfile.bin", 1),
-            "topfile (conflict).bin"
-        );
-        assert_eq!(conflict_copy_path("noext", 1), "noext (conflict)");
-        assert_eq!(
-            conflict_copy_path("assets/.hidden", 1),
-            "assets/.hidden (conflict)"
-        );
-        assert_eq!(
-            conflict_copy_path("assets/img.png", 2),
-            "assets/img (conflict 2).png"
-        );
-    }
 }

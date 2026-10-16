@@ -10,7 +10,7 @@ use super::ConflictSide;
 
 /// Merge `first`/`second` over `base`. `None` when hunks overlap. The result
 /// depends on the order of the sides; libgit2 requires labels.
-pub(super) fn diff3(
+pub(crate) fn diff3(
     base: &str,
     first: &ConflictSide,
     second: &ConflictSide,

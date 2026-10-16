@@ -735,6 +735,124 @@ fn a_deletion_beside_an_append_is_reconciled_not_resurrected() {
     assert!(archived(root_a, rel).is_empty());
 }
 
+/// The one path in `paths` that starts with `prefix`.
+fn copy_in(paths: &[String], prefix: &str) -> String {
+    let found: Vec<&String> = paths.iter().filter(|p| p.starts_with(prefix)).collect();
+    assert_eq!(found.len(), 1, "{prefix:?} in {paths:?}");
+    found[0].clone()
+}
+
+/// Commit `rel` on `root` with `contents`, and push when `push_it`.
+fn commit_file(root: &Path, rel: &str, contents: &str, push_it: bool) {
+    write(root, rel, contents);
+    commit_all(root, "edit", MAX_FILE_BYTES).unwrap();
+    if push_it {
+        push(root, None).unwrap();
+    }
+}
+
+/// A fixture whose remote holds `rel` = `base`, a second device `b` whose
+/// edit `theirs` is pushed, and graph A holding the local edit `ours`,
+/// fetched but not merged.
+fn text_conflict_fixture(rel: &str, base: &str, ours: &str, theirs: &str) -> Fixture {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    commit_file(root_a, rel, base, true);
+    let root_b = second_device(&fixture);
+    commit_file(&root_b, rel, theirs, true);
+    commit_file(root_a, rel, ours, false);
+    fetch(root_a, None).unwrap();
+    fixture
+}
+
+#[test]
+fn a_json_conflict_keeps_both_copies() {
+    let fixture = text_conflict_fixture(
+        "assets/data.json",
+        "{\n  \"x\": 0,\n  \"y\": 0\n}\n",
+        "{\n  \"x\": 1,\n  \"y\": 0\n}\n",
+        "{\n  \"x\": 2,\n  \"y\": 0\n}\n",
+    );
+    let root_a = &fixture.graph_a;
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
+
+    let copy = copy_in(&merged.review_paths, "assets/data (conflict ");
+    let name = copy.strip_prefix("assets/data (conflict ").unwrap();
+    let (stamp_hash, ext) = name.split_once(").").unwrap();
+    assert_eq!(ext, "json");
+    assert_eq!(stamp_hash.len(), "2026-10-16 08-05-31 a1b2c3d4".len());
+    assert!(read(root_a, "assets/data.json").contains("\"x\": 1"));
+    assert!(read(root_a, &copy).contains("\"x\": 2"));
+    assert!(head_tree_paths(root_a).contains(&copy));
+}
+
+#[test]
+fn a_text_conflict_that_diff3_merges_takes_the_merge() {
+    let base = "one\ntwo\nthree\nfour\nfive\nsix\nseven\n";
+    let fixture = text_conflict_fixture(
+        "assets/log.txt",
+        base,
+        &base.replace("one", "ONE"),
+        &base.replace("seven", "SEVEN"),
+    );
+    let root_a = &fixture.graph_a;
+    let merged = merge_remote(root_a).unwrap();
+    assert!(merged.review_paths.is_empty(), "{merged:?}");
+    assert_eq!(
+        read(root_a, "assets/log.txt"),
+        "ONE\ntwo\nthree\nfour\nfive\nsix\nSEVEN\n"
+    );
+    assert!(head_tree_paths(root_a)
+        .iter()
+        .all(|path| !path.contains("(conflict")));
+}
+
+#[test]
+fn a_md_conflict_never_gets_a_copy() {
+    let fixture = text_conflict_fixture(
+        "notes/n.md",
+        "# N\n\nshared line\n",
+        "# N\n\nshared line from a\n",
+        "# N\n\nshared line from b\n",
+    );
+    let root_a = &fixture.graph_a;
+    let merged = merge_remote(root_a).unwrap();
+    assert!(merged.review_paths.is_empty(), "{merged:?}");
+    assert!(head_tree_paths(root_a)
+        .iter()
+        .all(|path| !path.contains("(conflict")));
+}
+
+#[test]
+fn two_devices_name_the_same_copy() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    let rel = "assets/data.json";
+    commit_file(root_a, rel, "{\"v\": 0}\n", true);
+    let root_b = second_device(&fixture);
+    let root_c = fixture._dir.path().join("graph-c");
+    Repository::clone(&fixture.remote_url, &root_c).unwrap();
+    commit_file(&root_c, rel, "{\"v\": 3}\n", true);
+    commit_file(root_a, rel, "{\"v\": 1}\n", false);
+    commit_file(&root_b, rel, "{\"v\": 1}\n", false);
+
+    fetch(root_a, None).unwrap();
+    fetch(&root_b, None).unwrap();
+    let merged_a = merge_remote(root_a).unwrap();
+    let merged_b = merge_remote(&root_b).unwrap();
+    let copy = copy_in(&merged_a.review_paths, "assets/data (conflict ");
+    assert_eq!(merged_b.review_paths, vec![copy.clone()]);
+    assert_eq!(read(root_a, &copy), read(&root_b, &copy));
+
+    push(root_a, None).unwrap();
+    fetch(&root_b, None).unwrap();
+    let synced = merge_remote(&root_b).unwrap();
+    assert!(synced.review_paths.is_empty(), "{synced:?}");
+    assert_eq!(read(&root_b, &copy), "{\"v\": 3}\n");
+    assert_eq!(read(&root_b, rel), "{\"v\": 1}\n");
+}
+
 #[test]
 fn edit_vs_delete_keeps_the_edit() {
     let fixture = fixture();
@@ -784,13 +902,12 @@ fn binary_conflict_keeps_both_copies() {
         fs::read(root_a.join("assets/img.bin")).unwrap(),
         b"\x00from-a\x01"
     );
-    assert_eq!(
-        fs::read(root_a.join("assets/img (conflict).bin")).unwrap(),
-        b"\x00from-b\x01"
-    );
+    let copy = copy_in(&merged.review_paths, "assets/img (conflict ");
+    assert!(copy.ends_with(").bin"), "{copy}");
+    assert_eq!(fs::read(root_a.join(&copy)).unwrap(), b"\x00from-b\x01");
     let paths = head_tree_paths(root_a);
     assert!(paths.contains(&"assets/img.bin".to_string()));
-    assert!(paths.contains(&"assets/img (conflict).bin".to_string()));
+    assert!(paths.contains(&copy));
 }
 
 #[test]
@@ -1499,20 +1616,12 @@ fn a_directory_file_conflict_keeps_the_file_as_a_conflict_copy() {
     fetch(root_a, None).unwrap();
     let merged = merge_remote(root_a).unwrap();
 
-    assert!(
-        merged
-            .review_paths
-            .contains(&"notes/x (conflict)".to_string()),
-        "{merged:?}"
-    );
+    let copy = copy_in(&merged.review_paths, "notes/x (conflict ");
     assert_eq!(read(root_a, "notes/x/y.md"), "# Y\n");
-    assert_eq!(read(root_a, "notes/x (conflict)"), "file on a\n");
+    assert_eq!(read(root_a, &copy), "file on a\n");
     assert_next_cycle_converges(
         &fixture,
-        &[
-            ("notes/x/y.md", "# Y\n"),
-            ("notes/x (conflict)", "file on a\n"),
-        ],
+        &[("notes/x/y.md", "# Y\n"), (copy.as_str(), "file on a\n")],
     );
 }
 
@@ -1544,8 +1653,9 @@ fn a_symlink_conflict_keeps_both_sides() {
         fs::read_link(root_a.join("assets/link")).unwrap(),
         Path::new("a-target")
     );
+    let copy = copy_in(&merged.review_paths, "assets/link (conflict ");
     assert_eq!(
-        fs::read_link(root_a.join("assets/link (conflict)")).unwrap(),
+        fs::read_link(root_a.join(&copy)).unwrap(),
         Path::new("b-target")
     );
 }
@@ -1710,23 +1820,22 @@ fn a_conflict_copy_never_overwrites_an_existing_file() {
 
     fs::write(root_a.join("assets/img.bin"), b"\x00from-a\x01").unwrap();
     commit_all(root_a, "a image", MAX_FILE_BYTES).unwrap();
-    fs::write(root_a.join("assets/img (conflict).bin"), b"keep me").unwrap();
     fetch(root_a, None).unwrap();
+    let first = merge_remote(root_a).unwrap();
+    let taken = copy_in(&first.review_paths, "assets/img (conflict ");
+
+    // Reset to the same state with an untracked file on the first name.
+    let repo = Repository::open(root_a).unwrap();
+    let head = repo.head().unwrap().peel_to_commit().unwrap();
+    let parent = head.parent(0).unwrap();
+    repo.reset(parent.as_object(), git2::ResetType::Hard, None)
+        .unwrap();
+    fs::write(root_a.join(&taken), b"keep me").unwrap();
     let merged = merge_remote(root_a).unwrap();
-    assert!(
-        merged
-            .review_paths
-            .contains(&"assets/img (conflict 2).bin".to_string()),
-        "{merged:?}"
-    );
-    assert_eq!(
-        fs::read(root_a.join("assets/img (conflict).bin")).unwrap(),
-        b"keep me"
-    );
-    assert_eq!(
-        fs::read(root_a.join("assets/img (conflict 2).bin")).unwrap(),
-        b"\x00from-b\x01"
-    );
+    let copy = copy_in(&merged.review_paths, "assets/img (conflict ");
+    assert!(copy.ends_with(" 2).bin"), "{copy}");
+    assert_eq!(fs::read(root_a.join(&taken)).unwrap(), b"keep me");
+    assert_eq!(fs::read(root_a.join(&copy)).unwrap(), b"\x00from-b\x01");
 }
 
 #[test]
