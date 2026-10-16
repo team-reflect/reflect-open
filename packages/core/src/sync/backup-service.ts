@@ -11,9 +11,10 @@ import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { ICloudNativeService } from '../ipc/icloud-native-service.ts'
+import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { isICloudRoot } from './icloud-sync-service.ts'
 import { isSyncError, type SyncEngine, type SyncEngineFactory, type SyncStatus } from './engine.ts'
-import type { ChangedFile, GitRepositoryService } from './git-repository-service.ts'
+import type { ChangedFile, GitCredential, GitRepositoryService } from './git-repository-service.ts'
 import { githubCredential, type GithubAuthService } from './github-auth-service.ts'
 import {
   githubRemoteUrl,
@@ -62,6 +63,18 @@ const MOBILE_IDLE_MS = 10_000
 const COEXIST_QUIET_MS = 5 * 60_000
 
 /**
+ * How often a visible desktop window asks the remote for its branch tip.
+ */
+const REMOTE_PROBE_MS = 90_000
+
+/**
+ * The interval of a full cycle in place of the probe, after
+ * {@link PROBE_FAILURES_BEFORE_FALLBACK} failed probes in a row.
+ */
+const FALLBACK_FULL_MS = 5 * 60_000
+const PROBE_FAILURES_BEFORE_FALLBACK = 3
+
+/**
  * The (graph, index session) pair one {@link BackupService} backs up.
  */
 export interface BackupServiceOptions {
@@ -93,6 +106,7 @@ export interface BackupServiceDeps {
    */
   readonly indexLifecycle: IndexLifecycleService
   readonly progress: ProgressPort
+  readonly clock: ClockService
   readonly activity: ActivityPort
   readonly platform: PlatformFacts
   readonly persistenceFlush: PersistenceFlushService
@@ -176,6 +190,8 @@ class BackupServiceImpl implements BackupService {
   #engine: SyncEngine | null = null
   #unlisten: Unlisten | null = null
   #unregisterBackupFlusher: (() => void) | null = null
+  #probeTimer: TimerHandle | null = null
+  #probeFailures = 0
   /**
    * Serializes direct index writes without delaying synchronous file-change fanout.
    */
@@ -194,7 +210,8 @@ class BackupServiceImpl implements BackupService {
   }
 
   async start(): Promise<void> {
-    const { git, syncEngines, githubAuth, progress, activity, logger, icloudNative } = this.#deps
+    const { git, syncEngines, githubAuth, progress, activity, logger, icloudNative, platform } =
+      this.#deps
     this.#teardown()
     if (this.#disposed) {
       return
@@ -251,6 +268,15 @@ class BackupServiceImpl implements BackupService {
         await this.#startLocalHistory(status.initialized)
         return
       }
+      // The managed sign-in is for github.com only; SSH and path remotes get
+      // none and Rust resolves them locally.
+      const getCredential =
+        repo !== null
+          ? async () => {
+              const token = await githubAuth.getToken()
+              return token === null ? null : githubCredential(token)
+            }
+          : async () => null
       const root = this.#root
       const coexisting = isICloudRoot(root)
       const next = syncEngines.create({
@@ -268,15 +294,7 @@ class BackupServiceImpl implements BackupService {
         // The background flusher's protected local commit bypasses this
         // engine deliberately.
         canStartCycle: () => !this.#mobile || !activity.isHidden(),
-        // The managed sign-in is for github.com only; SSH and path remotes
-        // get none and Rust resolves them locally.
-        getCredential:
-          repo !== null
-            ? async () => {
-                const token = await githubAuth.getToken()
-                return token === null ? null : githubCredential(token)
-              }
-            : async () => null,
+        getCredential,
         onStatus: (engineStatus) => {
           this.#setState({ phase: 'connected', remoteUrl, repo, status: engineStatus })
           if (repo !== null && isForbidden(engineStatus)) {
@@ -294,6 +312,9 @@ class BackupServiceImpl implements BackupService {
       this.#adoptEngine(next)
 
       this.#resumeDisposers.push(activity.subscribeResume(() => void next.syncNow()))
+      if (!coexisting && !this.#mobile && platform.isNativeShell) {
+        this.#armProbe(next, getCredential, REMOTE_PROBE_MS)
+      }
 
       void next.syncNow() // launch pull: pick up other devices' changes
     } catch (error) {
@@ -387,6 +408,7 @@ class BackupServiceImpl implements BackupService {
    */
   #teardown(): void {
     this.#remoteIndexEpoch += 1
+    this.#clearProbe()
     this.#engine?.stop()
     this.#engine = null
     this.#unlisten?.()
@@ -396,6 +418,71 @@ class BackupServiceImpl implements BackupService {
     }
     this.#unregisterBackupFlusher?.()
     this.#unregisterBackupFlusher = null
+  }
+
+  #clearProbe(): void {
+    if (this.#probeTimer !== null) {
+      this.#deps.clock.clearTimeout(this.#probeTimer)
+      this.#probeTimer = null
+    }
+    this.#probeFailures = 0
+  }
+
+  #armProbe(
+    engine: SyncEngine,
+    getCredential: () => Promise<GitCredential | null>,
+    delayMs: number,
+  ): void {
+    this.#probeTimer = this.#deps.clock.setTimeout(() => {
+      this.#probeTimer = null
+      void this.#probe(engine, getCredential)
+    }, delayMs)
+  }
+
+  /**
+   * One probe tick: ask the remote for its branch tip and pull when it moved.
+   * After repeated failures, run a full cycle each tick at a slower pace
+   * until a probe succeeds again.
+   */
+  async #probe(
+    engine: SyncEngine,
+    getCredential: () => Promise<GitCredential | null>,
+  ): Promise<void> {
+    const { git, activity, logger } = this.#deps
+    if (!activity.isHidden() && !this.#hasError()) {
+      try {
+        const tip = await git.remoteHead(await getCredential(), this.#generation)
+        if (this.#engine !== engine) {
+          return
+        }
+        this.#probeFailures = 0
+        if (tip.remoteOid !== null && tip.remoteOid !== tip.trackingOid) {
+          void engine.syncNow()
+        }
+      } catch (error) {
+        if (this.#engine !== engine) {
+          return
+        }
+        this.#probeFailures += 1
+        logger.info('remote probe failed:', errorMessage(error))
+        if (this.#probeFailures >= PROBE_FAILURES_BEFORE_FALLBACK) {
+          void engine.syncNow()
+        }
+      }
+    }
+    if (this.#engine === engine) {
+      this.#armProbe(engine, getCredential, this.#probeDelay())
+    }
+  }
+
+  #probeDelay(): number {
+    return this.#probeFailures >= PROBE_FAILURES_BEFORE_FALLBACK
+      ? FALLBACK_FULL_MS
+      : REMOTE_PROBE_MS
+  }
+
+  #hasError(): boolean {
+    return this.#state.phase === 'connected' && this.#state.status.state === 'error'
   }
 
   #onRemoteChanges(changes: ChangedFile[]): void | Promise<void> {

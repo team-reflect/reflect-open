@@ -65,6 +65,7 @@ function sessionDeps(app: TestCoreServices) {
       fileChanges,
       indexLifecycle,
       progress: app.progress,
+      clock,
       activity,
       platform: app.platform,
       persistenceFlush: app.persistenceFlush,

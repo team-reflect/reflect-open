@@ -18,6 +18,7 @@ import {
   createTestGitRepositoryService,
   createTestGithubAuthService,
   createTestICloudNativeService,
+  type TestGitRepositoryService,
   type TestICloudNativeService,
 } from '../testing/sync.ts'
 import { createSyncEngineFactory } from './engine.ts'
@@ -264,6 +265,7 @@ function fakeServices(options: FakeOptions = {}) {
     fileChanges,
     indexLifecycle,
     progress: createTestProgressPort(),
+    clock,
     activity,
     platform: createTestPlatformService({ surface: { mobileApp: options.mobile ?? false } }),
     persistenceFlush,
@@ -271,6 +273,7 @@ function fakeServices(options: FakeOptions = {}) {
     icloudNative,
   }
   return {
+    git,
     calls,
     invocations,
     secrets: secretStore,
@@ -355,6 +358,178 @@ describe('createBackupService', () => {
     expect(backup.getState()).toMatchObject({ status: { state: 'idle' } })
     expect(icloudNative.calls()).toEqual([])
     backup.dispose()
+  })
+
+  describe('remote probe', () => {
+    const MOVED = { remoteOid: 'b', trackingOid: 'a' }
+
+    async function startSettled(options: Parameters<typeof fakeServices>[0], root?: string) {
+      const services = fakeServices(options)
+      const backup = createBackup({ indexGeneration: 1, ...(root === undefined ? {} : { root }) })
+      await backup.start()
+      await vi.waitFor(() => {
+        expect(backup.getState()).toMatchObject({
+          status: { state: expect.stringMatching(/idle|waiting/) },
+        })
+      })
+      return { ...services, backup }
+    }
+
+    it('probes the remote while visible and pulls when it moved', async () => {
+      const { git, calls, backup } = await startSettled({})
+      try {
+        const probes: Array<unknown> = []
+        let tip: { remoteOid: string | null; trackingOid: string | null } = {
+          remoteOid: 'a',
+          trackingOid: 'a',
+        }
+        git.onRemoteHead((credential, generation) => {
+          probes.push([credential, generation])
+          return tip
+        })
+        const fetches = calls.filter((command) => command === 'fetch').length
+
+        await advance(90_000)
+        expect(probes).toHaveLength(1)
+        expect(probes[0]).toEqual([{ username: 'x-access-token', secret: 'ghp_abc' }, GENERATION])
+        expect(calls.filter((command) => command === 'fetch')).toHaveLength(fetches)
+
+        tip = { remoteOid: null, trackingOid: 'a' } // the remote branch is gone
+        await advance(90_000)
+        expect(calls.filter((command) => command === 'fetch')).toHaveLength(fetches)
+
+        tip = MOVED
+        await advance(90_000)
+        expect(probes).toHaveLength(3)
+        await vi.waitFor(() => {
+          expect(calls.filter((command) => command === 'fetch')).toHaveLength(fetches + 1)
+        })
+      } finally {
+        backup.dispose()
+      }
+    })
+
+    it('does not probe iCloud-hosted graphs, mobile, hidden windows, or while in error', async () => {
+      let probes = 0
+      const probed = (): number => probes
+      const watch = (git: TestGitRepositoryService): void => {
+        git.onRemoteHead(() => {
+          probes += 1
+          return MOVED
+        })
+      }
+
+      const icloud = await startSettled({}, ICLOUD_ROOT)
+      watch(icloud.git)
+      await advance(5 * 60_000)
+      icloud.backup.dispose()
+      expect(probed()).toBe(0)
+
+      const mobile = await startSettled({ mobile: true })
+      watch(mobile.git)
+      await advance(5 * 60_000)
+      mobile.backup.dispose()
+      expect(probed()).toBe(0)
+
+      const hidden = await startSettled({})
+      watch(hidden.git)
+      activity.setHidden(true)
+      await advance(5 * 60_000)
+      expect(probed()).toBe(0)
+      activity.setHidden(false)
+      await advance(90_000)
+      expect(probed()).toBe(1)
+      hidden.backup.dispose()
+
+      const failing = await startSettled({})
+      watch(failing.git)
+      failing.git.onPush(() => {
+        throw new ReflectError('auth', 'bad token')
+      })
+      failing.git.onCommitAll(() => ({
+        committed: true,
+        sha: 'c',
+        ahead: 1,
+        skippedLargeFiles: [],
+      }))
+      void failing.backup.backUpNow()
+      await vi.waitFor(() => {
+        expect(failing.backup.getState()).toMatchObject({ status: { state: 'error' } })
+      })
+      const before = probed()
+      await advance(5 * 60_000)
+      expect(probed()).toBe(before)
+      failing.backup.dispose()
+    })
+
+    it('falls back to a periodic full cycle after three failed probes and recovers after a success', async () => {
+      const { git, calls, backup } = await startSettled({})
+      try {
+        let probes = 0
+        let failing = true
+        git.onRemoteHead(() => {
+          probes += 1
+          if (failing) {
+            throw new ReflectError('network', 'unreachable')
+          }
+          return { remoteOid: 'a', trackingOid: 'a' }
+        })
+        const fetches = (): number => calls.filter((command) => command === 'fetch').length
+        const base = fetches()
+
+        await advance(90_000)
+        await advance(90_000)
+        expect(fetches()).toBe(base) // two failures: silent
+        await advance(90_000)
+        expect(probes).toBe(3)
+        await vi.waitFor(() => {
+          expect(fetches()).toBe(base + 1) // third failure: full cycle
+        })
+
+        await advance(90_000) // the interval is now five minutes
+        expect(probes).toBe(3)
+        await advance(3 * 60_000 + 30_000)
+        expect(probes).toBe(4)
+        await vi.waitFor(() => {
+          expect(fetches()).toBe(base + 2)
+        })
+
+        failing = false
+        await advance(5 * 60_000)
+        expect(probes).toBe(5)
+        expect(fetches()).toBe(base + 2) // success and nothing moved
+        await advance(90_000)
+        expect(probes).toBe(6) // back on the short interval
+        expect(logger.getInfos().length).toBeGreaterThan(0)
+      } finally {
+        backup.dispose()
+      }
+    })
+  })
+
+  it('hidden after commit still pushes', async () => {
+    const { git, calls } = fakeServices({ mobile: true })
+    const backup = createBackup({ indexGeneration: 1 })
+    try {
+      await backup.start()
+      await vi.waitFor(() => {
+        expect(backup.getState()).toMatchObject({ status: { state: 'idle' } })
+      })
+      git.onCommitAll(() => {
+        activity.setHidden(true)
+        return { committed: true, sha: 'c', ahead: 1, skippedLargeFiles: [] }
+      })
+      fileChanges.emit({
+        changes: [{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }],
+        source: 'external',
+      })
+      await advance(10_000)
+      await vi.waitFor(() => {
+        expect(calls.filter((command) => command === 'push')).toHaveLength(1)
+      })
+    } finally {
+      backup.dispose()
+    }
   })
 
   it('reports disconnected when no credential is stored — but keeps local history', async () => {

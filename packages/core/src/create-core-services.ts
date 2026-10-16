@@ -1124,6 +1124,7 @@ export function composeCoreServices(
     fileChanges,
     indexLifecycle,
     progress,
+    clock,
     activity,
     platform,
     persistenceFlush,

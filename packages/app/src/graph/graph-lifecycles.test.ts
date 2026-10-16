@@ -26,6 +26,7 @@ function graphDeps(core: TestCoreServices): GraphServicesDeps {
       fileChanges,
       indexLifecycle,
       progress: core.progress,
+      clock,
       activity,
       platform: core.platform,
       persistenceFlush: core.persistenceFlush,
