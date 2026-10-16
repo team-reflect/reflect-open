@@ -20,6 +20,7 @@
     "check": "pnpm typecheck && pnpm lint",
     "tauri": "pnpm --filter @reflect/desktop tauri",
     "release:ios": "pnpm --filter @reflect/desktop release:ios",
+    "release:linux": "pnpm --filter @reflect/desktop release:linux",
     "release:macos": "pnpm --filter @reflect/desktop release:macos",
     "release:manifest": "pnpm --filter @reflect/desktop release:manifest",
     "release:windows": "pnpm --filter @reflect/desktop release:windows",

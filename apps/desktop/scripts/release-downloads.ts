@@ -10,7 +10,7 @@
 //   --tag    release tag, `v` followed by the version
 //   --asset  asset name prefix: the product name with spaces as dots
 //
-// A beta release with macOS and Windows installers:
+// A beta release with macOS, Windows, and Linux installers:
 //
 //   node apps/desktop/scripts/release-downloads.ts \
 //     --repo=team-reflect/reflect-open \
@@ -19,6 +19,14 @@
 //     latest.json \
 //     Reflect.Beta_0.15.0-beta.5_aarch64.app.tar.gz \
 //     Reflect.Beta_0.15.0-beta.5_aarch64.app.tar.gz.sig \
+//     Reflect.Beta_0.15.0-beta.5_aarch64.AppImage \
+//     Reflect.Beta_0.15.0-beta.5_aarch64.AppImage.sig \
+//     Reflect.Beta_0.15.0-beta.5_amd64.AppImage \
+//     Reflect.Beta_0.15.0-beta.5_amd64.AppImage.sig \
+//     Reflect.Beta_0.15.0-beta.5_amd64.deb \
+//     Reflect.Beta_0.15.0-beta.5_amd64.deb.sig \
+//     Reflect.Beta_0.15.0-beta.5_arm64.deb \
+//     Reflect.Beta_0.15.0-beta.5_arm64.deb.sig \
 //     Reflect.Beta_0.15.0-beta.5_arm64-setup.exe \
 //     Reflect.Beta_0.15.0-beta.5_arm64-setup.exe.sig \
 //     Reflect.Beta_0.15.0-beta.5_x64-setup.exe \
@@ -28,8 +36,8 @@
 //     Reflect.Beta_aarch64.dmg \
 //     Reflect.Beta_universal.dmg
 //
-// A stable release with macOS installers only. The output has no Windows
-// heading:
+// A stable release with macOS installers only. The output has no Windows or
+// Linux heading:
 //
 //   node apps/desktop/scripts/release-downloads.ts \
 //     --repo=team-reflect/reflect-open \
@@ -74,19 +82,38 @@ const INSTALLERS = [
   { os: 'macOS', chip: 'Universal', color: 'D97706', file: `${asset}_universal.dmg` },
   { os: 'Windows', chip: 'x64', color: '2563EB', file: `${asset}_${version}_x64-setup.exe` },
   { os: 'Windows', chip: 'ARM64', color: '7C3AED', file: `${asset}_${version}_arm64-setup.exe` },
+  {
+    os: 'Linux',
+    chip: 'x64 AppImage',
+    color: '2563EB',
+    file: `${asset}_${version}_amd64.AppImage`,
+  },
+  { os: 'Linux', chip: 'x64 .deb', color: '0891B2', file: `${asset}_${version}_amd64.deb` },
+  {
+    os: 'Linux',
+    chip: 'ARM64 AppImage',
+    color: '7C3AED',
+    file: `${asset}_${version}_aarch64.AppImage`,
+  },
+  { os: 'Linux', chip: 'ARM64 .deb', color: 'C026D3', file: `${asset}_${version}_arm64.deb` },
+]
+
+const PLATFORMS = [
+  { os: 'macOS', heading: 'macOS', icon: 'apple' },
+  { os: 'Windows', heading: 'Windows', icon: 'windows' },
+  { os: 'Linux', heading: 'Linux (Experimental)', icon: 'linux' },
 ]
 
 let markdown = '## Download\n'
-for (const os of ['macOS', 'Windows']) {
+for (const { os, heading, icon } of PLATFORMS) {
   const badges = INSTALLERS.filter((item) => item.os === os && assetNames.includes(item.file)).map(
     ({ chip, color, file }) => {
-      const icon = os === 'macOS' ? 'apple' : 'windows'
       const image = `https://badgen.net/badge/${os}/${encodeURIComponent(chip)}/${color}?icon=${icon}`
       return `[![${os} ${chip}](${image})](https://github.com/${repo}/releases/download/${tag}/${file})`
     },
   )
   if (badges.length > 0) {
-    markdown += `\n### ${os}\n\n${badges.join(' ')}\n`
+    markdown += `\n### ${heading}\n\n${badges.join(' ')}\n`
   }
 }
 if (!markdown.includes('###')) {

@@ -93,7 +93,7 @@ pnpm release:macos --artifact-dir=<dir>  # also copy the release assets to <dir>
 ```
 
 CI runs `--target=<triple> --artifact-dir=<dir>` once per macOS build and uploads the
-assets into the draft release. After the macOS and Windows builds finish,
+assets into the draft release. After the macOS, Windows, and Linux builds finish,
 `publish-finalize.yml` writes `latest.json`, publishes the release, and refreshes the
 moving beta downloads. It can be run again by hand for one tag without rebuilding.
 
@@ -217,11 +217,12 @@ for stable) because the release tag already identifies the version. That keeps
 `releases/latest/download/<asset>` stable across releases. Updater archives remain
 versioned because each manifest points at an immutable release payload.
 
-`publish-finalize.yml` runs once the macOS and Windows builds have finished. Only the
-macOS build has to succeed. It runs `pnpm release:manifest --tag=<tag>`
+`publish-finalize.yml` runs once the macOS, Windows, and Linux builds have finished.
+The macOS and Windows builds have to succeed; a Linux failure does not block it. It runs `pnpm release:manifest --tag=<tag>`
 (`apps/desktop/scripts/release-manifest.ts`), which downloads the `.sig` files from the
 release, writes `latest.json` with one entry per platform (`darwin-aarch64`,
-`darwin-x86_64`, plus `windows-x86_64` and `windows-aarch64` when their signatures
+`darwin-x86_64`, plus `windows-x86_64`, `windows-aarch64`, `linux-x86_64`,
+`linux-aarch64`, `linux-x86_64-deb`, and `linux-aarch64-deb` when their signatures
 exist), and uploads it. `darwin-x86_64` points at the universal archive. The updater
 picks its entry from the architecture it runs as, so a universal app on Apple Silicon
 reads `darwin-aarch64` and moves to the smaller Apple Silicon app at its first update.

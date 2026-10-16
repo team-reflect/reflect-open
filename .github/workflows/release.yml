@@ -155,11 +155,37 @@ jobs:
       commit: ${{ needs.release-please.outputs.beta_commit }}
     secrets: inherit
 
+  # The experimental Linux build rides every release too: x64 and arm64
+  # AppImages and `.deb` packages plus their updater signatures go into the
+  # draft release. The packages are not code-signed; the secrets are only for
+  # the updater signature.
+  publish-linux-stable:
+    name: Build the Linux packages (stable)
+    needs: release-please
+    if: needs.release-please.outputs.stable_created == 'true'
+    uses: ./.github/workflows/publish-linux.yml
+    with:
+      tag: ${{ needs.release-please.outputs.stable_tag }}
+      commit: ${{ needs.release-please.outputs.stable_commit }}
+    secrets: inherit
+
+  publish-linux-beta:
+    name: Build the Linux packages (beta)
+    needs: release-please
+    if: needs.release-please.outputs.beta_created == 'true'
+    uses: ./.github/workflows/publish-linux.yml
+    with:
+      tag: ${{ needs.release-please.outputs.beta_tag }}
+      commit: ${{ needs.release-please.outputs.beta_commit }}
+    secrets: inherit
+
   # The builds only fill the draft release. Publishing waits for both macOS
-  # and Windows to succeed.
+  # and Windows to succeed. It also waits for Linux to finish, but a Linux
+  # failure does not block it: the release then ships without the missing
+  # Linux packages.
   publish-finalize-stable:
     name: Finalize the stable release
-    needs: [release-please, publish-macos-stable, publish-windows-stable]
+    needs: [release-please, publish-macos-stable, publish-windows-stable, publish-linux-stable]
     if: ${{ !cancelled() && needs.publish-macos-stable.result == 'success' && needs.publish-windows-stable.result == 'success' }}
     uses: ./.github/workflows/publish-finalize.yml
     with:
@@ -167,7 +193,7 @@ jobs:
 
   publish-finalize-beta:
     name: Finalize the beta release
-    needs: [release-please, publish-macos-beta, publish-windows-beta]
+    needs: [release-please, publish-macos-beta, publish-windows-beta, publish-linux-beta]
     if: ${{ !cancelled() && needs.publish-macos-beta.result == 'success' && needs.publish-windows-beta.result == 'success' }}
     uses: ./.github/workflows/publish-finalize.yml
     with:
