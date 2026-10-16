@@ -5,7 +5,7 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * The time left until `until` (epoch ms) in words, such as `2 minutes`. It
- * re-renders only when the words change.
+ * re-renders only when the words change. // FIXME: rename BackupCountdown to a more generic name, like CountdownText or something. It is not specific to backup at all.
  */
 export function BackupCountdown({ until }: { until: number }): ReactElement {
   return <>{useBackupCountdown(until)}</>
