@@ -1,6 +1,6 @@
 import type { IdService } from '../../ports/id-service.ts'
 import type { ImageCodecService } from '../../ports/image-codec-service.ts'
-import { bytesToBase64 } from '../../lib/base64.ts'
+import { bytesToBase64 } from '@reflect/utils'
 import type { ChatAttachment } from './transcript.ts'
 
 /**

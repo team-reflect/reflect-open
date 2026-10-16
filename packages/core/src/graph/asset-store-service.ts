@@ -2,8 +2,7 @@ import { z } from 'zod'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
-import { base64ToBytes, bytesToBase64 } from '../lib/base64.ts'
-import { blobChunks } from '../lib/blob.ts'
+import { base64ToBytes, blobChunks, bytesToBase64 } from '@reflect/utils'
 
 /**
 

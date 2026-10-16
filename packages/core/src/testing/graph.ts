@@ -18,7 +18,7 @@ import {
   createWikiResolverService,
   type WikiResolverService,
 } from '../indexing/wiki-resolver-service.ts'
-import { bytesToBase64, base64ToBytes } from '../lib/base64.ts'
+import { bytesToBase64, base64ToBytes } from '@reflect/utils'
 import { createTestDatabaseService } from './database.ts'
 import { createTestIdService } from './id.ts'
 

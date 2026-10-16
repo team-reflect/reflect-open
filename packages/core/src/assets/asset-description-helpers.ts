@@ -105,13 +105,3 @@ export function buildDescriptionSource(meta: AssetDescriptionMeta, body: string)
     generatedAt: meta.generatedAt,
   })
 }
-
-/** Decoded byte length of a base64 payload, without materializing the bytes. */
-export function base64ByteLength(base64: string): number {
-  const length = base64.length
-  if (length === 0) {
-    return 0
-  }
-  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
-  return Math.floor((length * 3) / 4) - padding
-}
