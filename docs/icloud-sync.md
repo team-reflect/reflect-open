@@ -33,8 +33,8 @@ itself where that is safe, in this order (deterministic — both devices
 resolving the same conflict produce identical bytes and converge):
 
 1. **Same content** (or only whitespace differs): nothing to do.
-2. **One side is marked** with conflict markers from an older version: the
-   clean side is kept whole.
+2. **One side carries conflict markers** from an older version: the newer
+   side is kept whole, even when it is the marked one.
 3. **A merge keeps coming back**: when the same two merge results collide
    again, the loop breaker keeps the newer side.
 4. **Different parts of the note**: merged three-ways over the note's last
@@ -46,14 +46,14 @@ resolving the same conflict produce identical bytes and converge):
    Two devices creating the same day's note offline (iCloud leaves a
    `2026-07-04 2.md` behind) fold back into one file the same way.
 7. **Anything else**: a word-level merge keeps the words both sides added.
-   It always produces text, so Reflect never writes conflict markers.
+   It always produces text, so iCloud sync never writes conflict markers.
 
 Only the loop breaker and the word-level merge can drop or interleave a
 side's text. After one of them, Reflect archives each side under
 `.reflect/conflict-archive/<note-path>/` before it writes the result. It
 archives only content that Git history does not already hold (kept ~90 days /
-20 versions per note). The archived versions show under **Earlier versions**
-in the note sidebar. Binary assets never text-merge: the other device's copy
+20 versions per note). A later change will show the archived versions under
+**Earlier versions** in the note sidebar. Binary assets never text-merge: the other device's copy
 lands alongside as `name (conflict).ext`.
 
 ## Building with iCloud

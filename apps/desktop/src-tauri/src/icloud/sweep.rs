@@ -192,7 +192,10 @@ fn run_sweep(
         if skip.contains(rel.as_str()) {
             continue;
         }
-        locked(root, || advance_base_if_clean(root, rel, &shadow, false));
+        let clean = no_unresolved_versions(root, rel);
+        locked(root, || {
+            advance_base_if_clean(root, rel, &shadow, false, clean)
+        });
     }
 
     let files = crate::fs::note_files(root);
@@ -207,8 +210,9 @@ fn run_sweep(
                 // Overwriting an existing base here would advance it past
                 // unsynced local edits — exactly what the advance rule forbids
                 // — so a baseline pass is safe to repeat on every start.
+                let clean = no_unresolved_versions(root, &file.path);
                 locked(root, || {
-                    advance_base_if_clean(root, &file.path, &shadow, true)
+                    advance_base_if_clean(root, &file.path, &shadow, true, clean)
                 });
             }
         }
@@ -297,30 +301,36 @@ fn run_sweep(
     Ok(outcome)
 }
 
+/// Whether `rel` carries no unresolved provider versions. The lookup is a
+/// synchronous provider round trip, so callers run it outside the graph lock.
+/// Traversal-shaped paths answer `false` without touching the filesystem.
+fn no_unresolved_versions(root: &Path, rel: &str) -> bool {
+    crate::fs::ensure_relative(rel).is_ok() && unresolved_versions(&root.join(rel)).none()
+}
+
 /// A clean external ingest (or adoption snapshot): the note's disk content is
-/// now what both sides derive from — record it as the base. Skips notes that
-/// currently carry unresolved versions (mid-conflict content is nobody's
-/// ancestor), notes whose content carries conflict markers (a marked file is
-/// an unresolved review state, never a synced ancestor — and the sweep's own
-/// marker writes echo back through the file watcher as ordinary external
-/// upserts, so the guard must live here, not in the caller), and
-/// non-UTF-8/missing files. `fill_only` restricts the write to notes without
-/// a base (the adoption case).
-fn advance_base_if_clean(root: &Path, rel: &str, shadow: &ShadowStore, fill_only: bool) {
-    // `ingested_paths` arrive over IPC — refuse traversal shapes before any
-    // filesystem access, like every other IPC-supplied graph path. (The
-    // shadow store would reject the *write*, but the read must not happen
-    // either.)
-    if crate::fs::ensure_relative(rel).is_err() {
+/// now what both sides derive from, so record it as the base. Skips notes
+/// that carry unresolved versions (`no_versions` is false; mid-conflict
+/// content is nobody's ancestor), notes whose content carries conflict
+/// markers (a marked file is never a synced ancestor), and non-UTF-8 or
+/// missing files. `fill_only` restricts the write to notes without a base
+/// (the adoption case).
+fn advance_base_if_clean(
+    root: &Path,
+    rel: &str,
+    shadow: &ShadowStore,
+    fill_only: bool,
+    no_versions: bool,
+) {
+    // `ingested_paths` arrive over IPC: refuse traversal shapes before any
+    // filesystem access, like every other IPC-supplied graph path.
+    if !no_versions || crate::fs::ensure_relative(rel).is_err() {
         return;
     }
     if fill_only && shadow.has_base(rel) {
         return;
     }
     let abs = root.join(rel);
-    if !unresolved_versions(&abs).none() {
-        return;
-    }
     let Ok(content) = fs::read_to_string(&abs) else {
         return;
     };
@@ -337,6 +347,10 @@ struct FileResolution {
     final_content: String,
     changed: bool,
     reconciled: bool,
+    /// Content-hash pairs to record as auto-merged once the write lands.
+    merge_pairs: Vec<(String, String)>,
+    /// Clear the merge-pair record once the write lands (the loop breaker ran).
+    clear_merge_pair: bool,
 }
 
 /// One version of a note with the device that saved it (`None` for the
@@ -369,6 +383,8 @@ fn resolve_file(
         .ok_or_else(|| AppError::io(format!("no versions to fold for {rel}")))?;
 
     let mut reconciled = false;
+    let mut merge_pairs = Vec::new();
+    let mut clear_merge_pair = false;
     for side in folded {
         let current_hash = content_hash(&current.content)?;
         let side_hash = content_hash(&side.content)?;
@@ -386,15 +402,15 @@ fn resolve_file(
                     // A genuinely synthesized merge: remember the pair so a
                     // cross-device re-conflict of two merge results is
                     // recognized and broken deterministically.
-                    let _ = shadow.record_merge_pair(rel, &current_hash, &side_hash);
+                    merge_pairs.push((current_hash, side_hash));
                 }
                 current.content = content;
             }
             Resolution::Reconciled { content } => {
                 if merge_loop_detected {
-                    shadow.clear_merge_pair(rel);
+                    clear_merge_pair = true;
                 } else if content != current.content {
-                    let _ = shadow.record_merge_pair(rel, &current_hash, &side_hash);
+                    merge_pairs.push((current_hash, side_hash));
                 }
                 current.content = content;
                 reconciled = true;
@@ -419,6 +435,8 @@ fn resolve_file(
         changed: current.content != original,
         final_content: current.content,
         reconciled,
+        merge_pairs,
+        clear_merge_pair,
     })
 }
 
@@ -487,6 +505,12 @@ fn apply_file_resolution(
         });
     }
     mark_resolved(&abs);
+    if resolution.clear_merge_pair {
+        shadow.clear_merge_pair(rel);
+    }
+    for (first, second) in &resolution.merge_pairs {
+        let _ = shadow.record_merge_pair(rel, first, second);
+    }
     if resolution.reconciled {
         outcome.reconciled.push(rel.to_string());
     }
@@ -520,6 +544,13 @@ fn fold_collision_duplicates(
             outcome.deferred.push(file.path.clone());
             continue;
         }
+        // Edit conflicts resolve first; the fold retries next sweep.
+        let blocked = !no_unresolved_versions(root, &canonical_rel)
+            || !no_unresolved_versions(root, &file.path);
+        if blocked {
+            outcome.deferred.push(file.path.clone());
+            continue;
+        }
         locked(root, || {
             fold_duplicate(root, file, &canonical_rel, shadow, outcome)
         });
@@ -529,8 +560,10 @@ fn fold_collision_duplicates(
 /// Fold one duplicate into its canonical note: adopt a genuinely free
 /// canonical name outright, otherwise merge the pair through the ladder
 /// (archiving both sides first when the result is reconciled) and remove the
-/// duplicate. Every early return leaves
-/// the duplicate in place for the next sweep to retry.
+/// duplicate. Every early return leaves the duplicate in place for the next
+/// sweep to retry. The caller has checked that neither file carries unresolved
+/// provider versions: folding first would advance the canonical's shadow base
+/// with content the other device has not seen.
 fn fold_duplicate(
     root: &Path,
     file: &crate::fs::FileMeta,
@@ -540,16 +573,6 @@ fn fold_duplicate(
 ) {
     let dup_abs = root.join(&file.path);
     let canonical_abs = root.join(canonical_rel);
-    // Both conflict shapes can coincide: the canonical (or the duplicate)
-    // may carry unresolved NSFileVersion conflicts at the same time as the
-    // name collision. Folding first would rewrite the canonical and advance
-    // its shadow base *before* the version pass archives anything — breaking
-    // archive-first, and poisoning the base with content the other device
-    // hasn't seen. Edit conflicts resolve first; the fold retries next sweep.
-    if !unresolved_versions(&canonical_abs).none() || !unresolved_versions(&dup_abs).none() {
-        outcome.deferred.push(file.path.clone());
-        return;
-    }
     let Ok(dup_content) = fs::read_to_string(&dup_abs) else {
         return;
     };
@@ -570,7 +593,7 @@ fn fold_duplicate(
         // one when the rename syncs over (external ingest), but this
         // device's own sweep writes echo back as own-writes — without the
         // record here it alone would stay baseless, and a later concurrent
-        // edit would diff3 on one device and fall to markers on the other.
+        // edit would diff3 on one device and not on the other.
         // Marker content stays unrecorded on every device alike.
         if !markers::contains_conflict_markers(&dup_content) {
             if let Err(err) = shadow.record(canonical_rel, &dup_content) {
@@ -625,14 +648,18 @@ fn fold_duplicate(
     };
     if reconciled {
         let sides = [
-            (canonical_rel, canonical_ms, &canonical_content),
-            (file.path.as_str(), dup_ms, &dup_content),
+            (None, canonical_ms, &canonical_content),
+            (Some(file.path.as_str()), dup_ms, &dup_content),
         ];
-        for (rel, modified_ms, content) in sides {
-            if let Err(err) =
-                archive::archive_unless_in_history(root, rel, None, modified_ms, content.as_bytes())
-            {
-                tracing::warn!(path = %rel, ?err, "failed to archive collision side");
+        for (device, modified_ms, content) in sides {
+            if let Err(err) = archive::archive_unless_in_history(
+                root,
+                canonical_rel,
+                device,
+                modified_ms,
+                content.as_bytes(),
+            ) {
+                tracing::warn!(path = %canonical_rel, ?err, "failed to archive collision side");
                 return; // nothing written yet; next sweep retries
             }
         }
@@ -1289,7 +1316,13 @@ mod tests {
         // version is archived.
         let root = graph();
         let repo = git2::Repository::init(root.path()).unwrap();
-        repo.blob(b"shared line mac\n").unwrap();
+        let mut index = repo.index().unwrap();
+        write(root.path(), "notes/a.md", "shared line mac\n");
+        index.add_path(Path::new("notes/a.md")).unwrap();
+        let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+        let sig = git2::Signature::now("t", "t@example.com").unwrap();
+        repo.commit(Some("HEAD"), &sig, &sig, "c", &tree, &[])
+            .unwrap();
         overlapping_fold(root.path());
         assert_eq!(
             archive_names(root.path(), "notes/a.md"),
@@ -1341,12 +1374,20 @@ mod tests {
         let version = fake_version(root.path(), "v1.md", "shared line phone\n", 2_000, "iPhone");
         let first = resolve_file(root.path(), "notes/a.md", 1_000, vec![version], &shadow).unwrap();
         assert!(first.reconciled);
+        // Nothing is recorded until the write lands.
+        assert!(!shadow.is_repeated_merge("notes/a.md", &mac_hash, &phone_hash));
+        let mut outcome = SweepOutcome::default();
+        apply_file_resolution(root.path(), "notes/a.md", first, &shadow, &mut outcome);
+        assert!(shadow.is_repeated_merge("notes/a.md", &mac_hash, &phone_hash));
+        // The other device's merge result is replaced by the same two sides.
+        write(root.path(), "notes/a.md", "shared line mac\n");
         assert!(shadow.is_repeated_merge("notes/a.md", &mac_hash, &phone_hash));
 
         let version = fake_version(root.path(), "v2.md", "shared line phone\n", 2_000, "iPhone");
         let second =
             resolve_file(root.path(), "notes/a.md", 1_000, vec![version], &shadow).unwrap();
         assert_eq!(second.final_content, "shared line phone\n");
+        apply_file_resolution(root.path(), "notes/a.md", second, &shadow, &mut outcome);
         assert!(!shadow.is_repeated_merge("notes/a.md", &mac_hash, &phone_hash));
     }
 }
