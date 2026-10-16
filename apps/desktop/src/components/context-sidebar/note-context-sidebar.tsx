@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { NoteActionsSection } from './note-actions-section.tsx'
+import { NoteVersionsAction } from './note-versions-action.tsx'
 import { PublishedUrlSection } from './published-url-section.tsx'
 import { SimilarNotesSection } from './similar-notes-section.tsx'
 
@@ -19,6 +20,7 @@ export function NoteContextSidebar({ path }: NoteContextSidebarProps): ReactElem
     <div className="flex flex-col py-2 text-text">
       <div className="my-4 space-y-4 pb-4">
         <NoteActionsSection path={path} showTrash />
+        <NoteVersionsAction path={path} />
         <PublishedUrlSection path={path} />
         <SimilarNotesSection path={path} />
       </div>

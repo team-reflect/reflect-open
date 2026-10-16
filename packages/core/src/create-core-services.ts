@@ -95,6 +95,10 @@ import {
   createConflictResolutionService,
   type ConflictResolutionService,
 } from './sync/conflict-resolution-service.ts'
+import {
+  createConflictArchiveService,
+  type ConflictArchiveService,
+} from './sync/conflict-archive-service.ts'
 import type { ICloudDownloadServiceDeps } from './sync/icloud-download-service.ts'
 import {
   createICloudMigrationService,
@@ -359,6 +363,7 @@ export interface CoreServices {
    * Resolves the sync conflict markers of one note as raw-text surgery.
    */
   readonly conflictResolution: ConflictResolutionService
+  readonly conflictArchive: ConflictArchiveService
   /**
    * The embedded media of the editor's cards: X posts and YouTube videos.
    */
@@ -672,6 +677,7 @@ export const coreServiceFactories = {
   gistPublish: createGistPublishService,
   icloudMigration: createICloudMigrationService,
   conflictResolution: createConflictResolutionService,
+  conflictArchive: createConflictArchiveService,
   embedMedia: createEmbedMediaService,
   linkPreview: createLinkPreviewService,
   noteSessions: createNoteSessionService,
@@ -1199,6 +1205,7 @@ export function composeCoreServices(
       fileChanges,
       graphSession,
     }),
+    conflictArchive: create.conflictArchive({ ipc, noteFile, graphSession }),
     embedMedia: create.embedMedia({
       xArchive,
       webFetch,
