@@ -859,7 +859,7 @@ fn edit_vs_delete_keeps_the_edit() {
     fetch(root_a, None).unwrap();
     let merged = merge_remote(root_a).unwrap();
     assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
-    assert!(!merged.review_paths.is_empty(), "{merged:?}");
+    assert!(merged.review_paths.is_empty(), "{merged:?}");
 
     let content = read(root_a, "notes/keep.md");
     assert!(content.contains("edited on b"), "{content}");
@@ -962,7 +962,7 @@ fn rename_rename_conflict_keeps_both_names_and_confirms_the_removal() {
     // tree could not be written at all.
     let merged = merge_remote(root_a).unwrap();
     assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
-    assert!(!merged.review_paths.is_empty(), "{merged:?}");
+    assert!(merged.review_paths.is_empty(), "{merged:?}");
 
     let paths = head_tree_paths(root_a);
     assert!(
@@ -2247,4 +2247,42 @@ fn an_untracked_oversized_file_does_not_delete_the_remote_file() {
     assert!(committed.committed, "{committed:?}");
     assert_eq!(head_blob(&root_b, "assets/x.bin"), "small");
     assert_eq!(read(&root_b, "assets/x.bin"), big);
+}
+
+#[test]
+fn a_crash_before_the_ref_move_does_not_duplicate_the_copy() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    fs::write(root_a.join("assets/img.bin"), b"\x00base\x01").unwrap();
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    fs::write(root_b.join("assets/img.bin"), b"\x00from-b\x01").unwrap();
+    commit_all(&root_b, "b image", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    fs::write(root_a.join("assets/img.bin"), b"\x00from-a\x01").unwrap();
+    commit_all(root_a, "a image", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    fault::arm(FaultPoint::BeforeMergeRefMove, Fault::Fail);
+    assert!(merge_remote(root_a).is_err());
+    assert!(
+        commit_all(root_a, "Update notes", MAX_FILE_BYTES)
+            .unwrap()
+            .committed
+    );
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
+
+    let copy = copy_in(&merged.review_paths, "assets/img (conflict ");
+    assert_eq!(merged.review_paths, vec![copy.clone()]);
+    assert!(!copy.ends_with(" 2).bin"), "{copy}");
+    let copies: Vec<_> = fs::read_dir(root_a.join("assets"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with("img (conflict "))
+        .collect();
+    assert_eq!(copies.len(), 1, "{copies:?}");
+    assert_eq!(fs::read(root_a.join(&copy)).unwrap(), b"\x00from-b\x01");
 }
