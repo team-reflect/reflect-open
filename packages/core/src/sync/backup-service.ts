@@ -385,7 +385,7 @@ class BackupServiceImpl implements BackupService {
   }
 
   #setState(next: BackupState): void {
-    if (this.#disposed) {
+    if (this.#disposed || sameState(this.#state, next)) {
       return
     }
     this.#state = next
@@ -658,4 +658,18 @@ export function createBackupService(
  */
 function isForbidden(status: SyncStatus): boolean {
   return isSyncError(status) && status.errorKind === 'auth' && status.message.includes('403')
+}
+
+function sameState(a: BackupState, b: BackupState): boolean {
+  if (a.phase !== 'connected' || b.phase !== 'connected') {
+    return a.phase === b.phase
+  }
+  return a.remoteUrl === b.remoteUrl && a.repo === b.repo && sameStatus(a.status, b.status)
+}
+
+function sameStatus(a: SyncStatus, b: SyncStatus): boolean {
+  const left: Record<string, unknown> = a
+  const right: Record<string, unknown> = b
+  const keys = Object.keys(left)
+  return keys.length === Object.keys(right).length && keys.every((key) => left[key] === right[key])
 }

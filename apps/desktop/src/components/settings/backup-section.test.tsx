@@ -45,7 +45,7 @@ async function renderSection(state: BackupState, graph?: TestOpenGraph): Promise
   await renderInApp(<BackupSettingsField />, {
     app,
     appServices: { opener },
-    ...(graph === undefined ? {} : { graph }),
+    graph,
   })
   return app
 }

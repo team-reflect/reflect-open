@@ -314,7 +314,10 @@ function fakeServices(options: FakeOptions = {}) {
 /**
  * A backup service of the last {@link fakeServices} call, at graph generation 3.
  */
-function createBackup(options: { indexGeneration: number | null; root?: string }): BackupService {
+function createBackup(options: {
+  indexGeneration: number | null
+  root?: string | undefined
+}): BackupService {
   return createBackupService(backupDeps, {
     root: options.root ?? '/graph',
     generation: GENERATION,
@@ -376,6 +379,24 @@ describe('createBackupService', () => {
     backup.dispose()
   })
 
+  it('an unchanged state does not notify listeners', async () => {
+    fakeServices()
+    const backup = createBackup({ indexGeneration: 1 })
+    await backup.start()
+    await vi.waitFor(() => {
+      expect(backup.getState()).toMatchObject({ status: { state: 'idle' } })
+    })
+    const states = trackStates(backup)
+    await backup.backUpNow()
+    await flush()
+    expect(states.length).toBeGreaterThan(0)
+    for (let i = 1; i < states.length; i++) {
+      expect(states[i]).not.toEqual(states[i - 1])
+    }
+    expect(states.at(-1)).toMatchObject({ status: { state: 'idle' } })
+    backup.dispose()
+  })
+
   it('a folder graph never enters quiet mode', async () => {
     const { calls } = fakeServices()
     const backup = createBackup({ indexGeneration: 1 })
@@ -393,7 +414,7 @@ describe('createBackupService', () => {
 
     async function startSettled(options: Parameters<typeof fakeServices>[0], root?: string) {
       const services = fakeServices(options)
-      const backup = createBackup({ indexGeneration: 1, ...(root === undefined ? {} : { root }) })
+      const backup = createBackup({ indexGeneration: 1, root })
       await backup.start()
       await vi.waitFor(() => {
         expect(backup.getState()).toMatchObject({

@@ -49,7 +49,7 @@ export interface RenderInAppOptions {
    * the graph `test` at `/graphs/test` is open with both generations 1. `null`
    * is the graph chooser: no graph, and no graph services.
    */
-  graph?: TestOpenGraph | null
+  graph?: TestOpenGraph | null | undefined
   /**
    * Reported over the graph state, e.g. `{ indexing: true }`, `{ error }`, `{ recents }`.
    */
