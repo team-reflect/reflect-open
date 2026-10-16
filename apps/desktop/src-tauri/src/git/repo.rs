@@ -36,8 +36,10 @@ pub(super) fn open_existing(root: &Path) -> AppResult<Repository> {
     Ok(Repository::open(root)?)
 }
 
-/// Refuse to operate on a repository mid-operation (a rebase/merge the user
-/// started with the git CLI). Guessing here could destroy their state.
+/// Refuse to operate on a repository mid-operation (a rebase, cherry-pick,
+/// revert, or merge the user started with the git CLI): guessing there could
+/// destroy their state. The one such state this app produces itself, a pull
+/// that died mid-merge, is finished first by `merge::finish_interrupted`.
 pub(super) fn ensure_clean_state(repo: &Repository) -> AppResult<()> {
     if repo.state() != git2::RepositoryState::Clean {
         return Err(AppError::io(format!(
