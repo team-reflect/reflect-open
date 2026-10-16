@@ -8,8 +8,8 @@ use crate::error::{AppError, AppResult};
 
 use super::ConflictSide;
 
-/// Merge `first`/`second` over `base`. `None` when hunks overlap. The caller
-/// passes the sides already in deterministic order; libgit2 requires labels.
+/// Merge `first`/`second` over `base`. `None` when hunks overlap. The result
+/// depends on the order of the sides; libgit2 requires labels.
 pub(super) fn diff3(
     base: &str,
     first: &ConflictSide,

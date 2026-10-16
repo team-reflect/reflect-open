@@ -47,7 +47,7 @@ export interface ContactSuggestionService {
    * plus every email and phone, appended as their own block. Routes through
    * the live session when the note is open — the card sits above an open
    * editor, so unsaved edits must survive — and refuses rather than clobber
-   * when the session can't take it (loading, protected, or a parked conflict).
+   * when the session can't take it (loading, protected, or disposed).
    * A closed note is patched on disk. Retry-safe: a body that already carries
    * the details is left alone. Throws when the title no longer matches
    * `contact`, or when no graph is open.

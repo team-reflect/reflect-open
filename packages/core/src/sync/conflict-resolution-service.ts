@@ -51,7 +51,8 @@ export interface ConflictResolutionServiceDeps {
 }
 
 /**
- * Resolution of sync conflict markers for one note, as raw-text surgery:
+ * Resolution of conflict markers for one note, as raw-text surgery. It serves
+ * notes that an older version left with markers. Steps:
  * read the file, splice the kept side(s) (`resolveConflictMarkers` — markers
  * don't survive the editor round-trip, so the editor can't do this), write it
  * back, reindex, and notify open sessions. The conflict flag is a projection
@@ -67,8 +68,7 @@ export interface ConflictResolutionService {
   resolve(path: string, keep: ConflictResolution): Promise<ConflictResolutionOutcome>
   /**
    * The conflict markers of the note's file on disk, never of an open
-   * session's buffer: a dirty session parks an external change without
-   * loading it. Rejects when no graph is open.
+   * session's buffer. Rejects when no graph is open.
    */
   conflictMarkers(path: string): Promise<ConflictMarkers>
 }

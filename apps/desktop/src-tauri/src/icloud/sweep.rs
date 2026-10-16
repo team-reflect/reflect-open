@@ -57,14 +57,9 @@ pub struct SweepChange {
 pub struct SweepOutcome {
     /// Every file the sweep changed on disk — reindex these directly.
     pub changed: Vec<SweepChange>,
-    /// Always empty: the ladder never leaves conflict markers.
-    pub needs_review: Vec<String>,
     /// Graph-relative paths whose resolution went through the loop breaker
     /// or the word-level merge.
     pub reconciled: Vec<String>,
-    /// Conflicted paths skipped because the caller holds a dirty editor
-    /// session for them; retried on the next sweep after the flush.
-    pub deferred: Vec<String>,
     /// Conflicts resolved without user interaction.
     pub auto_resolved: u32,
 }
@@ -140,7 +135,6 @@ pub async fn icloud_conflicts_scan(
         tracing::info!(
             changed = outcome.changed.len(),
             reconciled = outcome.reconciled.len(),
-            deferred = outcome.deferred.len(),
             auto_resolved = outcome.auto_resolved,
             record_baseline,
             scope = ?scope,
@@ -236,12 +230,10 @@ fn run_sweep(
         }
         if !scan.complete {
             // A version with no readable store path can't be archived, and
-            // mark_resolved would purge it — defer the whole file instead.
-            outcome.deferred.push(file.path.clone());
+            // mark_resolved would purge it — skip the whole file instead.
             continue;
         }
         if skip.contains(file.path.as_str()) {
-            outcome.deferred.push(file.path.clone());
             continue;
         }
         // Order the working copy by the version store's date for it — the
@@ -302,7 +294,7 @@ fn run_sweep(
 }
 
 /// Whether `rel` carries no unresolved provider versions. The lookup is a
-/// synchronous provider round trip, so callers run it outside the graph lock.
+/// synchronous provider round trip, so it must run outside the graph lock.
 /// Traversal-shaped paths answer `false` without touching the filesystem.
 fn no_unresolved_versions(root: &Path, rel: &str) -> bool {
     crate::fs::ensure_relative(rel).is_ok() && unresolved_versions(&root.join(rel)).none()
@@ -366,7 +358,7 @@ struct ReadSide {
 /// Fold the working file and its unresolved versions through the ladder,
 /// oldest first. When the fold is reconciled, archive every side that Git
 /// history does not hold before returning. Does not touch the provider's
-/// version state: the caller does, after the resolved write lands.
+/// version state, which changes only after the resolved write lands.
 fn resolve_file(
     root: &Path,
     rel: &str,
@@ -444,7 +436,7 @@ fn resolve_file(
 }
 
 /// Read the working file and the provider's conflict versions, sorted oldest
-/// first, ready for the ladder. Reads only: archiving is the caller's job.
+/// first, ready for the ladder. Reads only: it archives nothing.
 fn read_sides(
     rel: &str,
     original: &str,
@@ -545,14 +537,12 @@ fn fold_collision_duplicates(
             continue;
         };
         if skip.contains(file.path.as_str()) || skip.contains(canonical_rel.as_str()) {
-            outcome.deferred.push(file.path.clone());
             continue;
         }
         // Edit conflicts resolve first; the fold retries next sweep.
         let blocked = !no_unresolved_versions(root, &canonical_rel)
             || !no_unresolved_versions(root, &file.path);
         if blocked {
-            outcome.deferred.push(file.path.clone());
             continue;
         }
         locked(root, || {
@@ -565,8 +555,8 @@ fn fold_collision_duplicates(
 /// canonical name outright, otherwise merge the pair through the ladder
 /// (archiving both sides first when the result is reconciled) and remove the
 /// duplicate. Every early return leaves the duplicate in place for the next
-/// sweep to retry. The caller has checked that neither file carries unresolved
-/// provider versions: folding first would advance the canonical's shadow base
+/// sweep to retry. Both files must carry no unresolved provider versions:
+/// folding first would advance the canonical's shadow base
 /// with content the other device has not seen.
 fn fold_duplicate(
     root: &Path,
@@ -814,7 +804,6 @@ mod tests {
         let outcome = run_sweep(root.path(), &[], &[], false, None).unwrap();
 
         assert_eq!(outcome.auto_resolved, 1);
-        assert!(outcome.needs_review.is_empty());
         assert!(!root.path().join("daily/2026-07-04 2.md").exists());
         assert_eq!(
             fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap(),
@@ -855,11 +844,10 @@ mod tests {
             .record("daily/2026-07-04.md", "- old lineage\n")
             .unwrap();
 
-        let outcome = run_sweep(root.path(), &[], &[], false, None).unwrap();
+        run_sweep(root.path(), &[], &[], false, None).unwrap();
 
         assert!(root.path().join("daily/2026-07-04.md").exists());
         assert!(!root.path().join("daily/2026-07-04 2.md").exists());
-        assert!(outcome.needs_review.is_empty());
         // The dead lineage's ancestor is gone — the adopted content is the
         // base now, matching what peers record when the rename syncs over.
         assert_eq!(
@@ -943,7 +931,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(outcome.deferred, vec!["daily/2026-07-04 2.md".to_string()]);
+        assert!(outcome.changed.is_empty());
         assert!(root.path().join("daily/2026-07-04 2.md").exists());
     }
 
@@ -1386,7 +1374,6 @@ mod tests {
         apply_file_resolution(root.path(), "notes/a.md", resolution, &shadow, &mut outcome);
 
         assert_eq!(outcome.reconciled, vec!["notes/a.md".to_string()]);
-        assert!(outcome.needs_review.is_empty());
         assert_eq!(outcome.auto_resolved, 1);
         assert_eq!(outcome.changed.len(), 1);
     }

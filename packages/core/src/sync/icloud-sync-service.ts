@@ -115,8 +115,8 @@ export interface ICloudSyncServiceDeps {
  *
  * Dirty open sessions are deferred (their paths ride `skipPaths`) as a
  * courtesy, not a safety net — even without it, a sweep write lands on disk
- * and the session's own external-change reconciliation parks it as a
- * conflict, the same as any external edit.
+ * and the session's own external-change handling saves and merges it, the
+ * same as any external edit.
  */
 export interface ICloudSyncService {
   start(): Promise<void>
