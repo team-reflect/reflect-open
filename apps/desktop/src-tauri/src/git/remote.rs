@@ -8,7 +8,9 @@
 use std::cell::RefCell;
 use std::path::Path;
 
-use git2::{Cred, CredentialType, FetchOptions, PushOptions, RemoteCallbacks, Repository};
+use git2::{
+    Cred, CredentialType, Direction, FetchOptions, PushOptions, RemoteCallbacks, Repository,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
@@ -32,6 +34,15 @@ pub struct GitCredential {
 pub struct RemoteDelta {
     pub ahead: usize,
     pub behind: usize,
+}
+
+/// Where `origin` says the current branch is, next to the last-fetched
+/// tracking ref. `remote_oid` is `None` when the remote has no such branch.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteTip {
+    pub remote_oid: Option<String>,
+    pub tracking_oid: Option<String>,
 }
 
 /// Result of a push attempt. `pushed: false` with `non_fast_forward: true` is
@@ -152,6 +163,36 @@ pub(super) fn fetch(root: &Path, credential: Option<GitCredential>) -> AppResult
         remote.fetch(&[] as &[&str], Some(&mut opts), None)?;
     }
     local_delta(&repo)
+}
+
+/// Read the current branch's tip from the remote ref advertisement, without
+/// downloading objects or touching the working tree.
+pub(super) fn remote_head(root: &Path, credential: Option<GitCredential>) -> AppResult<RemoteTip> {
+    #[cfg(test)]
+    super::fault::trip(super::fault::FaultPoint::BeforeFetch)?;
+    let repo = open_existing(root)?;
+    let branch = current_branch(&repo)?;
+    let ref_name = format!("refs/heads/{branch}");
+    let mut remote = origin(&repo)?;
+    remote.connect_auth(
+        Direction::Fetch,
+        Some(callbacks_with_credentials(credential)),
+        None,
+    )?;
+    let remote_oid = remote
+        .list()?
+        .iter()
+        .find(|head| head.name() == ref_name)
+        .map(|head| head.oid().to_string());
+    remote.disconnect()?;
+    let tracking_oid = repo
+        .refname_to_id(&format!("refs/remotes/origin/{branch}"))
+        .ok()
+        .map(|oid| oid.to_string());
+    Ok(RemoteTip {
+        remote_oid,
+        tracking_oid,
+    })
 }
 
 /// Ahead/behind vs the already-fetched `origin/<branch>`; tolerates the unborn

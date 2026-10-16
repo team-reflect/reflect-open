@@ -11,7 +11,7 @@ use tempfile::tempdir;
 use super::commit::commit_all;
 use super::fault::{self, Fault, FaultPoint};
 use super::merge::{merge_remote, MergeKind};
-use super::remote::{fetch, push};
+use super::remote::{fetch, push, remote_head};
 use super::test_support::{
     fixture, head_blob, head_message, head_tree_paths, read, remote_blob, scaffold_graph,
     second_device, write, Fixture,
@@ -1789,4 +1789,35 @@ fn a_relative_lock_path_in_the_message_is_ignored() {
         0
     );
     assert!(stale.exists());
+}
+
+#[test]
+fn remote_head_reports_the_bare_repo_tip() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n");
+    commit_all(root, "first", MAX_FILE_BYTES).unwrap();
+    assert!(push(root, None).unwrap().pushed);
+
+    let other = second_device(&fixture);
+    write(&other, "notes/b.md", "# B\n");
+    commit_all(&other, "second", MAX_FILE_BYTES).unwrap();
+    assert!(push(&other, None).unwrap().pushed);
+
+    let tip = remote_head(root, None).unwrap();
+    assert!(tip.remote_oid.is_some());
+    assert!(tip.tracking_oid.is_some());
+    assert_ne!(tip.remote_oid, tip.tracking_oid);
+
+    fetch(root, None).unwrap();
+    let tip = remote_head(root, None).unwrap();
+    assert_eq!(tip.remote_oid, tip.tracking_oid);
+}
+
+#[test]
+fn remote_head_on_an_unborn_remote_is_none() {
+    let fixture = fixture();
+    let tip = remote_head(&fixture.graph_a, None).unwrap();
+    assert_eq!(tip.remote_oid, None);
+    assert_eq!(tip.tracking_oid, None);
 }
