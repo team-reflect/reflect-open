@@ -182,7 +182,7 @@ Keyboard-native is desktop identity; mobile translates it rather than imports it
 - **Touch-native, capture-first.** Thumb-reachable core actions; search as a visible surface, not a chord; the keyboard never occludes the caret. Full shortcut surfaces (⌘K palette) are explicitly out of v1 — hardware-keyboard iPad users fall back to visible affordances for now.
 - **Minimal UI applies double.** Six screens, a tab/stack shell, a sync-status pill. No settings sprawl: storage, switch graph, GitHub connect/disconnect, and version.
 - **Same visual language.** Design-system tokens, safe-area-aware layout (`viewport-fit=cover`), 16px minimum input font (blocks iOS auto-zoom), dark mode. iPad ships as "a big phone" in v1; a desktop-class iPad layout is an explicit later decision.
-- **Plain-language sync.** "Backed up / Syncing / Offline" — never commits, branches, or merges.
+- **Plain-language sync.** "Backed up / Syncing / Offline", never commits, branches, or merges.
 
 ---
 

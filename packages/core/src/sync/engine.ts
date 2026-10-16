@@ -136,7 +136,7 @@ export interface SyncEngine {
    */
   noteChanged(): void
   /**
-   * Full cycle now — fetch, pull (commit and merge), push. For launch/focus/manual.
+   * Full cycle now: fetch, pull (commit and merge), push. For launch/focus/manual.
    */
   syncNow(): Promise<void>
   /**

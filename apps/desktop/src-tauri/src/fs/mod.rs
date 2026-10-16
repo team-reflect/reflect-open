@@ -638,7 +638,7 @@ pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>
     with_graph_lock(&root, || {
         root_for_generation(&state, generation)?;
         let abs = resolve(&root, &path)?;
-        // An iCloud-evicted segment exists only as its `.name.icloud` stub —
+        // An iCloud-evicted segment exists only as its `.name.icloud` stub,
         // mirror `note_delete` so a cancelled session's evicted parts still
         // delete (Plan 21).
         let target = if abs.exists() {

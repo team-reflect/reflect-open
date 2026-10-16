@@ -117,7 +117,7 @@ export function IcloudSettingsField(): ReactElement | null {
         legend="iCloud Drive"
         description={
           hosted
-            ? 'This graph lives in iCloud Drive — edits sync to your other devices, and the app merges concurrent edits where possible.'
+            ? 'This graph lives in iCloud Drive. Edits sync to your other devices, and the app merges concurrent edits where possible.'
             : status?.available === true
               ? 'Copy this graph into iCloud Drive to sync it with your other devices.'
               : 'iCloud Drive isn’t reachable from this app — sign in to iCloud, or use a build with iCloud enabled.'

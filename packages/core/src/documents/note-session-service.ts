@@ -236,7 +236,7 @@ class NoteSessionImpl implements NoteSession {
   #save(): void {
     // A discarded session never writes: its file is being deleted, so any
     // save — including a teardown `flush()` (the pane unmounts via flush →
-    // dispose) or an already-queued step — would recreate it.
+    // dispose) or an already-queued step, would recreate it.
     if (
       this.#discarded ||
       this.#deleting ||

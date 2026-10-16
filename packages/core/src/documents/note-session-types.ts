@@ -62,7 +62,7 @@ export interface NoteSessionOptions {
    * Receives the full document (frontmatter + body) whenever it transitions
    * to a known-on-disk state: the initial load, an adopted external change
    * (including a save that merged with a newer disk text), or a landed save.
-   * `saved` is the only user-driven origin — the title-rename tracker
+   * `saved` is the only user-driven origin: the title-rename tracker
    * (Plan 07b) keys off it.
    */
   onContent?: ((content: string, origin: NoteContentOrigin) => void) | undefined
@@ -107,7 +107,7 @@ export interface NoteSession {
   readonly path: string
   /**
    * Rebind the session to a renamed path (Plan 17). The *file* moved; the
-   * document didn't — buffer, header, and dirtiness are all
+   * document didn't: buffer, header, and dirtiness are all
    * untouched, and every subsequent read/write uses `to`. Call after flushing,
    * right before the file move lands, so a racing save can never resurrect
    * the old path.

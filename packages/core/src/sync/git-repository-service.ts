@@ -33,7 +33,7 @@ export const skippedFileSchema = z.object({
 export type SkippedFile = z.infer<typeof skippedFileSchema>
 
 /**
- * A file a merge rewrote on disk — same shape as the watcher's FileChange.
+ * A file a merge rewrote on disk, same shape as the watcher's FileChange.
  */
 export const changedFileSchema = z.object({
   path: z.string(),

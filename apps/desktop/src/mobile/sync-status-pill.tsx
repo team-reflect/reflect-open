@@ -5,7 +5,7 @@ import { useMobileSyncStatus } from '@/mobile/use-sync-status.ts'
 
 /**
  * The sync-status pill (Plan 19, step 10): a small chip that appears only
- * while sync has something to say — `Syncing` during a cycle, `Offline`/`Needs attention` after
+ * while sync has something to say: `Syncing` during a cycle, `Offline`/`Needs attention` after
  * a failed cycle. The quiet `Backed up` state renders nothing (detail lives
  * in the settings sheet) and it never intercepts touches. Positioning above
  * the tab bar belongs to {@link MobileStatusLayer}; the keyboard check here

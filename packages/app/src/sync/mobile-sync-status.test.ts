@@ -4,7 +4,7 @@ import { mobileSyncStatus, type MobileSyncStatus } from './mobile-sync-status.ts
 
 /**
  * The plain-language mapping (Plan 19, step 10): engine product states
- * become the words mobile shows — never git terms.
+ * become the words mobile shows, never git terms.
  */
 
 function connected(status: Extract<BackupState, { phase: 'connected' }>['status']): BackupState {
