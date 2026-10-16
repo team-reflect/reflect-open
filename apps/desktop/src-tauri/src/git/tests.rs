@@ -1718,6 +1718,8 @@ fn a_lock_path_outside_the_repository_is_never_removed() {
     assert!(stale.exists());
 }
 
+// The `../` walk up to `/` only reaches the root on Unix.
+#[cfg(unix)]
 #[test]
 fn a_relative_lock_path_in_the_message_is_ignored() {
     let fixture = fixture();
