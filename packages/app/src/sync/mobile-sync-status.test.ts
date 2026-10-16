@@ -17,7 +17,7 @@ function connected(status: Extract<BackupState, { phase: 'connected' }>['status'
 }
 
 function statusFor(backup: BackupState): MobileSyncStatus | null {
-  return mobileSyncStatus({ backup, now: 0 })
+  return mobileSyncStatus({ backup })
 }
 
 describe('engine state', () => {
@@ -31,15 +31,12 @@ describe('engine state', () => {
     expect(status).toEqual({ label: 'Backed up', tone: 'ok', detail: null })
   })
 
-  it('maps a waiting window to Backed up with the time left', () => {
+  it('maps a waiting window to Backed up with the time the backup is due', () => {
     expect(statusFor(connected({ state: 'waiting', until: 2 * 60_000 + 1 }))).toEqual({
       label: 'Backed up',
       tone: 'ok',
-      detail: 'Backs up in 2 minutes',
+      detail: { kind: 'countdown', until: 2 * 60_000 + 1 },
     })
-    expect(statusFor(connected({ state: 'waiting', until: 30_000 }))?.detail).toBe(
-      'Backs up in 30 seconds',
-    )
   })
 
   it('shows Syncing while a cycle runs', () => {
@@ -53,7 +50,7 @@ describe('engine state', () => {
       connected({ state: 'error', errorKind: 'auth', message: 'Sign in again' }),
     )
     expect(status?.label).toBe('Needs attention')
-    expect(status?.detail).toBe('Sign in again')
+    expect(status?.detail).toEqual({ kind: 'message', text: 'Sign in again' })
   })
 
   it('surfaces offline plainly — changes are safe locally', () => {
@@ -62,18 +59,21 @@ describe('engine state', () => {
     )
     expect(status?.label).toBe('Offline')
     expect(status?.tone).toBe('attention')
-    expect(status?.detail).toMatch(/saved locally/)
+    expect(status?.detail).toEqual({
+      kind: 'message',
+      text: 'Offline — changes are saved locally',
+    })
   })
 })
 
 describe('mobileSyncStatus', () => {
   it('has nothing to say without a backup lifecycle', () => {
-    expect(mobileSyncStatus({ backup: null, now: 0 })).toBeNull()
+    expect(mobileSyncStatus({ backup: null })).toBeNull()
   })
 
   it('reports engine states', () => {
     expect(
-      mobileSyncStatus({ backup: connected({ state: 'offline', message: 'Offline' }), now: 0 }),
-    ).toEqual({ label: 'Offline', tone: 'attention', detail: 'Offline' })
+      mobileSyncStatus({ backup: connected({ state: 'offline', message: 'Offline' }) }),
+    ).toEqual({ label: 'Offline', tone: 'attention', detail: { kind: 'message', text: 'Offline' } })
   })
 })

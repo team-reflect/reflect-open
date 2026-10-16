@@ -1,7 +1,7 @@
-import { useRef, useState, type ReactElement } from 'react'
+import { useRef, useState, type ReactElement, type ReactNode } from 'react'
 import type { GraphInfo } from '@reflect/core'
-import prettyMs from 'pretty-ms'
 import { FolderOpen, GraduationCap, LocateFixed, PanelsTopLeft, Settings } from 'lucide-react'
+import { BackupCountdown } from '@/components/backup-countdown.tsx'
 import { GraphSwatch } from '@/components/graph-swatch.tsx'
 import { ReflectAppsDialog } from '@/components/reflect-apps-dialog.tsx'
 import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/dropdown-menu.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { useGraphColors } from '@/hooks/use-graph-colors.ts'
-import { useNow } from '@/hooks/use-now.ts'
 import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { cn } from '@/lib/utils.ts'
@@ -40,8 +39,7 @@ function graphSwitchBindingFor(index: number): string | null {
  */
 function backupDot(
   backup: BackupState,
-  now: number,
-): { className: string; label: string; detail?: string | undefined } | null {
+): { className: string; label: string; detail?: ReactNode | undefined } | null {
   if (backup.phase !== 'connected' || backup.status.state === 'idle') {
     return null
   }
@@ -52,7 +50,11 @@ function backupDot(
       return {
         className: 'bg-text-muted',
         label: 'Backup scheduled',
-        detail: `Backs up in ${prettyMs(Math.max(0, backup.status.until - now), { compact: true, verbose: true })}`,
+        detail: (
+          <>
+            Backs up in <BackupCountdown until={backup.status.until} />
+          </>
+        ),
       }
     case 'offline':
       return { className: 'bg-amber-500', label: 'Backup waiting for a connection' }
@@ -77,13 +79,12 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
   const [appsOpen, setAppsOpen] = useState(false)
   const graphTriggerRef = useRef<HTMLButtonElement>(null)
   const { logger } = useCoreServices()
-  const now = useNow(30_000)
   const { opener, window: appWindow } = useAppServices()
   const { recents, indexing, openRecent, chooseGraph } = useGraph()
   const { colorFor } = useGraphColors()
   const { backup } = useSync()
   const { route } = useRouter()
-  const dot = backupDot(backup, now)
+  const dot = backupDot(backup)
   const settingsActive = route.kind === 'settings'
 
   return (

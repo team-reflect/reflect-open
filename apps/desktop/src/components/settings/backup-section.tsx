@@ -1,15 +1,14 @@
-import { useRef, useState, type ReactElement } from 'react'
+import { useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
 import { isICloudRoot, suggestRepoName } from '@reflect/core'
-import prettyMs from 'pretty-ms'
+import { BackupCountdown } from '@/components/backup-countdown.tsx'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog.tsx'
 import { SettingsField } from '@/components/settings/field.tsx'
 import { GithubSignOutRow } from '@/components/settings/github-sign-out-row.tsx'
 import { SyncForkNotice } from '@/components/settings/sync-fork-notice.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
-import { useNow } from '@/hooks/use-now.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
 import { createDuplicateNoteIdsQueryOptions } from '@/lib/query-options.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
@@ -17,12 +16,16 @@ import { useSync, type BackupState } from '@/providers/sync-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 /** A short, plain-language line for each backup state — never Git jargon. */
-function statusLine(backup: Extract<BackupState, { phase: 'connected' }>, now: number): string {
+function statusLine(backup: Extract<BackupState, { phase: 'connected' }>): ReactNode {
   switch (backup.status.state) {
     case 'idle':
       return 'Backed up'
     case 'waiting':
-      return `Backs up in ${prettyMs(Math.max(0, backup.status.until - now), { compact: true, verbose: true })}`
+      return (
+        <>
+          Backs up in <BackupCountdown until={backup.status.until} />
+        </>
+      )
     case 'syncing':
       return 'Backing up…'
     case 'offline':
@@ -50,7 +53,6 @@ export function BackupSettingsField(): ReactElement {
   const { backup, disconnectGraph, signOut, backUpNow } = useSync()
   const { graph } = useGraph()
   const { indexQuery } = useCoreServices()
-  const now = useNow(30_000)
   const { opener } = useAppServices()
   const githubConnected = useGithubConnected()
   const [connectOpen, setConnectOpen] = useState(false)
@@ -141,7 +143,7 @@ export function BackupSettingsField(): ReactElement {
             <>
               <p className="text-sm text-text">
                 <span className="font-medium">{repoLabel}</span>
-                <span className="ml-2 text-xs text-text-muted">{statusLine(backup, now)}</span>
+                <span className="ml-2 text-xs text-text-muted">{statusLine(backup)}</span>
               </p>
               <SyncForkNotice groups={forkGroups} />
               <div className="flex flex-wrap gap-2">
