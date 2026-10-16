@@ -107,7 +107,7 @@ function setup(options: { mobile?: boolean } = {}) {
      */
     drains: vi.spyOn(captureInbox, 'list'),
     /**
-     * One call per enrichment phase, plus one for the launch link repair sweep.
+     * Two calls per pass: the enrichment phase and the link repair sweep.
      */
     enrichments: vi.spyOn(noteFile, 'listNotes'),
     relays: vi.spyOn(captureInbox, 'relaySharedInbox'),
@@ -338,48 +338,37 @@ describe('CaptureService (triggers)', () => {
       )
     }
 
-    it('repairs existing placeholder links on launch, once', async () => {
+    it('repairs existing placeholder links on launch', async () => {
       const kit = setup()
       kit.noteFile.set(identity.notePath, await finishedCapture())
       kit.noteFile.set(DAILY, placeholderDaily)
 
       const session = kit.capture.openSession({ generation: 3 })
       session.start()
+
       await vi.waitFor(() => {
         expect(kit.noteFile.files().get(DAILY)).toBe(titledDaily)
       })
-
-      kit.noteFile.set(DAILY, placeholderDaily)
-      kit.activity.emitWake()
-      // Launch listed notes twice (enrichment and sweep); the wake pass only enriches.
-      await vi.waitFor(() => {
-        expect(kit.enrichments).toHaveBeenCalledTimes(3)
-      })
-      await flush()
-      expect(kit.drains).toHaveBeenCalledTimes(2)
-      expect(kit.noteFile.files().get(DAILY)).toBe(placeholderDaily)
       session.dispose()
     })
 
-    it('repairs a changed daily without draining or enriching', async () => {
+    it('repairs on the next pass when the daily arrived before the finished capture', async () => {
       const kit = setup()
-      kit.noteFile.set(identity.notePath, await finishedCapture())
+      kit.noteFile.set(DAILY, placeholderDaily)
       const session = kit.capture.openSession({ generation: 3 })
       session.start()
-      await flush()
-      expect(kit.drains).toHaveBeenCalledTimes(1)
-      const listings = kit.enrichments.mock.calls.length
-
-      kit.noteFile.set(DAILY, placeholderDaily)
-      kit.fileChanges.emit({
-        changes: [{ path: DAILY, kind: 'upsert', modifiedMs: 1 }],
-        source: 'external',
+      await vi.waitFor(() => {
+        expect(kit.enrichments).toHaveBeenCalledTimes(2)
       })
+      await flush()
+      expect(kit.noteFile.files().get(DAILY)).toBe(placeholderDaily)
+
+      kit.noteFile.set(identity.notePath, await finishedCapture())
+      kit.activity.emitWake()
+
       await vi.waitFor(() => {
         expect(kit.noteFile.files().get(DAILY)).toBe(titledDaily)
       })
-      expect(kit.drains).toHaveBeenCalledTimes(1)
-      expect(kit.enrichments).toHaveBeenCalledTimes(listings)
       session.dispose()
     })
   })

@@ -1,12 +1,12 @@
-import { captureFromPath, type CaptureIdentity } from './capture-identity.ts'
+import { captureFromPath, captureLocalDate, type CaptureIdentity } from './capture-identity.ts'
 import { captureNoteMeta, displayTitle, notePrivate, noteSource } from './capture-note.ts'
 import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
 import { isAppError } from '../errors.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
-import { dailyPath, notePath } from '../graph/paths.ts'
+import { dailyPath } from '../graph/paths.ts'
 import { isWikiLinkSafeText } from '../indexing/suggest.ts'
 import { parseNote } from '../markdown/extract.ts'
-import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter.ts'
+import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 
 /**
@@ -27,10 +27,16 @@ export interface CaptureLinkRepair {
  * Rewrite every wiki link `[[base|placeholder]]` to `[[base|title]]`, keyed by
  * capture base. Text that only looks like a link (code) stays as it is.
  */
-export function withRepairedCaptureLinks(
+export function repairCaptureLinks(
   source: string,
   repairs: ReadonlyMap<string, CaptureLinkRepair>,
 ): string {
+  const mentioned = [...repairs].some(([base, { placeholder }]) =>
+    source.includes(`[[${base}|${placeholder}`),
+  )
+  if (!mentioned) {
+    return source
+  }
   let next = source
   const links = parseNote({ path: '', source }).wikiLinks
   for (let i = links.length - 1; i >= 0; i--) {
@@ -48,8 +54,8 @@ export function withRepairedCaptureLinks(
  * `null` when the capture does not qualify. Pending captures and private
  * notes are left to enrichment; skipped captures are left alone.
  */
-function captureRepair(source: string, identity: CaptureIdentity): CaptureLinkRepair | null {
-  const frontmatter = parseFrontmatter(splitFrontmatter(source).raw).data
+function findCaptureRepair(source: string, identity: CaptureIdentity): CaptureLinkRepair | null {
+  const { frontmatter, title } = parseNote({ path: identity.notePath, source })
   const meta = captureNoteMeta(frontmatter)
   if (
     meta === null ||
@@ -60,16 +66,22 @@ function captureRepair(source: string, identity: CaptureIdentity): CaptureLinkRe
     return null
   }
   const placeholder = displayTitle({ title: '', url: meta.captureUrl })
-  const title = parseNote({ path: identity.notePath, source }).title
   if (title === placeholder || !isWikiLinkSafeText(title)) {
     return null
   }
   return { placeholder, title }
 }
 
+/**
+ * How far back the sweep looks. Sync races happen soon after a capture, and
+ * the bound keeps the per-pass cost independent of the graph's history.
+ */
+export const CAPTURE_LINK_REPAIR_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+
 export interface CaptureLinkRepairServiceDeps {
   readonly noteFile: NoteFileService
   readonly openDocuments: OpenDocumentsService
+  readonly clock: ClockService
   readonly logger: LoggerService
 }
 
@@ -81,13 +93,10 @@ export interface CaptureLinkRepairServiceDeps {
  */
 export interface CaptureLinkRepairService {
   /**
-   * Repair the placeholder capture links in each Daily. Never throws.
+   * Repair the placeholder links of captures from the last
+   * {@link CAPTURE_LINK_REPAIR_WINDOW_MS} in their Daily notes. Never throws.
    */
-  repair(dailyPaths: readonly string[], generation: number): Promise<void>
-  /**
-   * The Dailies of finished captures that have a title other than their placeholder.
-   */
-  candidateDailies(generation: number): Promise<string[]>
+  sweep(generation: number): Promise<void>
 }
 
 class CaptureLinkRepairServiceImpl implements CaptureLinkRepairService {
@@ -97,61 +106,72 @@ class CaptureLinkRepairServiceImpl implements CaptureLinkRepairService {
     this.#deps = deps
   }
 
-  async repair(dailyPaths: readonly string[], generation: number): Promise<void> {
-    for (const path of dailyPaths) {
+  async sweep(generation: number): Promise<void> {
+    const { logger } = this.#deps
+    let repairsByDailyPath: Map<string, Map<string, CaptureLinkRepair>>
+    try {
+      repairsByDailyPath = await this.#collectRecentRepairs(generation)
+    } catch (cause) {
+      logger.warn('capture link repair sweep failed:', cause)
+      return
+    }
+    for (const [path, repairs] of repairsByDailyPath) {
       try {
-        await this.#repairDaily(path, generation)
+        await this.#repairDaily(path, repairs, generation)
       } catch (cause) {
-        this.#deps.logger.warn(`capture link repair failed for ${path}:`, cause)
+        logger.warn(`capture link repair failed for ${path}:`, cause)
       }
     }
   }
 
-  async candidateDailies(generation: number): Promise<string[]> {
-    const { noteFile } = this.#deps
-    const dailies = new Set<string>()
+  /**
+   * Repairs for recent finished captures, grouped by the Daily that links them.
+   */
+  async #collectRecentRepairs(
+    generation: number,
+  ): Promise<Map<string, Map<string, CaptureLinkRepair>>> {
+    const { noteFile, clock } = this.#deps
+    const cutoff = captureLocalDate(new Date(clock.now() - CAPTURE_LINK_REPAIR_WINDOW_MS))
+    const repairsByDailyPath = new Map<string, Map<string, CaptureLinkRepair>>()
     for (const file of await noteFile.listNotes(generation)) {
       const identity = captureFromPath(file.path)
-      if (identity === null || dailies.has(dailyPath(identity.date))) {
+      // ISO dates compare in calendar order as strings.
+      if (identity === null || identity.date < cutoff) {
         continue
       }
       const source = await this.#readCapture(identity, generation)
-      if (source !== null && captureRepair(source, identity) !== null) {
-        dailies.add(dailyPath(identity.date))
+      const repair = source === null ? null : findCaptureRepair(source, identity)
+      if (repair === null) {
+        continue
       }
+      const path = dailyPath(identity.date)
+      const repairs = repairsByDailyPath.get(path) ?? new Map<string, CaptureLinkRepair>()
+      repairs.set(identity.base, repair)
+      repairsByDailyPath.set(path, repairs)
     }
-    return [...dailies]
+    return repairsByDailyPath
   }
 
-  async #repairDaily(path: string, generation: number): Promise<void> {
+  async #repairDaily(
+    path: string,
+    repairs: ReadonlyMap<string, CaptureLinkRepair>,
+    generation: number,
+  ): Promise<void> {
     const { noteFile, openDocuments } = this.#deps
     const source = await noteSource(noteFile, path, generation)
     if (source === '' || notePrivate(source)) {
       return
     }
-    const repairs = new Map<string, CaptureLinkRepair>()
-    for (const link of parseNote({ path, source }).wikiLinks) {
-      const identity = captureFromPath(notePath(link.target))
-      if (identity === null || link.alias === undefined || repairs.has(identity.base)) {
-        continue
-      }
-      const captureSource = await this.#readCapture(identity, generation)
-      const repair = captureSource === null ? null : captureRepair(captureSource, identity)
-      if (repair !== null && link.alias === repair.placeholder) {
-        repairs.set(identity.base, repair)
-      }
-    }
-    if (repairs.size === 0) {
-      return
-    }
-    const next = withRepairedCaptureLinks(source, repairs)
+    const next = repairCaptureLinks(source, repairs)
     if (next === source) {
       return
     }
     const session = openDocuments.sessionFor(path)
     if (session !== null) {
-      // Edit the live buffer so unsaved typing survives; a busy session retries later.
-      await session.commitSourceEdit((current) => withRepairedCaptureLinks(current, repairs))
+      // Edit the live buffer so unsaved typing survives; a busy session retries next pass.
+      await session.commitSourceEdit((current) =>
+        current === source ? next : repairCaptureLinks(current, repairs),
+      )
       return
     }
     await noteFile.write(path, next, generation, source)
