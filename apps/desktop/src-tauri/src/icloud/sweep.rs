@@ -360,7 +360,7 @@ fn resolve_file(
         .map_err(|err| AppError::io(format!("unreadable conflicted note {rel}: {err}")))?;
     let sides = read_sides(rel, &original, file_modified_ms, versions)?;
     let base = shadow.base(rel);
-    fold_sides(rel, base.as_deref(), &original, sides, shadow)
+    fold_sides(rel, base.as_deref(), &original, sides, shadow, true)
 }
 
 /// Fold the sides through the ladder in `(modified_ms, content)` order. The
@@ -374,6 +374,7 @@ fn fold_sides(
     on_disk: &str,
     mut sides: Vec<ConflictSide>,
     shadow: &ShadowStore,
+    detect_loops: bool,
 ) -> AppResult<FileResolution> {
     sides.sort_by(|a, b| (a.modified_ms, &a.content).cmp(&(b.modified_ms, &b.content)));
     let mut folded = sides.into_iter();
@@ -387,7 +388,8 @@ fn fold_sides(
         let current_hash = content_hash(&current.content)?;
         let side_hash = content_hash(&side.content)?;
         let modified_ms = side.modified_ms;
-        let merge_loop_detected = shadow.is_repeated_merge(rel, &current_hash, &side_hash);
+        let merge_loop_detected =
+            detect_loops && shadow.is_repeated_merge(rel, &current_hash, &side_hash);
         let input = ConflictInput {
             base,
             sides: (current.clone(), side),
@@ -653,7 +655,14 @@ fn fold_duplicate(
             modified_ms: dup_ms,
         },
     ];
-    let resolution = match fold_sides(canonical_rel, None, &canonical_content, sides, shadow) {
+    let resolution = match fold_sides(
+        canonical_rel,
+        None,
+        &canonical_content,
+        sides,
+        shadow,
+        false,
+    ) {
         Ok(resolution) => resolution,
         Err(err) => {
             tracing::warn!(path = %file.path, ?err, "collision merge failed");
@@ -806,6 +815,32 @@ mod tests {
             Some("# Day\n\n- from mac\n- from phone\n".to_string())
         );
         assert_eq!(shadow.base("daily/2026-07-04 2.md"), None);
+    }
+
+    #[test]
+    fn a_collision_fold_ignores_a_recorded_merge_pair() {
+        let root = graph();
+        write(root.path(), "daily/2026-07-04.md", "# Day\n\n- from mac\n");
+        write(
+            root.path(),
+            "daily/2026-07-04 2.md",
+            "# Day\n\n- from phone\n",
+        );
+        ShadowStore::new(root.path())
+            .record_merge_pair(
+                "daily/2026-07-04.md",
+                &content_hash("# Day\n\n- from mac\n").unwrap(),
+                &content_hash("# Day\n\n- from phone\n").unwrap(),
+            )
+            .unwrap();
+
+        run_sweep(root.path(), &[], &[], false, None).unwrap();
+
+        assert!(!root.path().join("daily/2026-07-04 2.md").exists());
+        assert_eq!(
+            fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap(),
+            "# Day\n\n- from mac\n- from phone\n"
+        );
     }
 
     #[test]
