@@ -306,16 +306,38 @@ pub fn asset_import(
 /// and a source that is already gone means an earlier ingest moved it (or a
 /// cancelled session swept it away while this capture sat in the queue).
 /// Neither is a failure worth parking the capture queue behind.
+#[cfg(test)]
 fn import_exact(source: &Path, staging: &Path, target: &Path) -> AppResult<()> {
+    match stage_import(source, staging, target)? {
+        Some(temp) => persist_import(temp, target),
+        None => Ok(()),
+    }
+}
+
+/// Copy `source` into `staging`. Returns `None` when there is nothing to
+/// persist: the target is already taken or the source is gone.
+fn stage_import(
+    source: &Path,
+    staging: &Path,
+    target: &Path,
+) -> AppResult<Option<tempfile::NamedTempFile>> {
     if super::file_occupied(target) {
-        return Ok(());
+        return Ok(None);
     }
     if !source.is_file() {
         tracing::warn!(?source, "audio memo import source is gone");
-        return Ok(());
+        return Ok(None);
     }
     let mut temp = tempfile::NamedTempFile::new_in(staging)?;
     std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
+    Ok(Some(temp))
+}
+
+/// Persist a staged copy unless a concurrent import took the target first.
+fn persist_import(temp: tempfile::NamedTempFile, target: &Path) -> AppResult<()> {
+    if super::file_occupied(target) {
+        return Ok(());
+    }
     persist_exact(temp, target)
 }
 
@@ -338,10 +360,14 @@ pub fn audio_memo_import(
         )));
     }
     let root = root_for_generation(&state, generation)?;
-    with_graph_lock(&root, || {
-        let target = resolve(&root, &path)?;
-        import_exact(Path::new(&source_path), &staging_dir(&root)?, &target)
-    })?;
+    let staged = stage_import(
+        Path::new(&source_path),
+        &staging_dir(&root)?,
+        &resolve(&root, &path)?,
+    )?;
+    if let Some(temp) = staged {
+        with_graph_lock(&root, || persist_import(temp, &resolve(&root, &path)?))?;
+    }
     super::invalidate_file_catalog(&state, &root);
     Ok(())
 }
