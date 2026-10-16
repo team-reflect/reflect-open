@@ -3,13 +3,14 @@
 //! so the caller reindexes directly (never waiting on the watcher — the same
 //! contract as the Git merge path).
 //!
-//! Per conflicted note: archive **every** involved version first (resolution
-//! must never be the only copy-holder), fold the conflict versions through
-//! [`crate::conflict::ladder`], write the result atomically, then — and only
-//! then — mark the provider versions resolved. Creation-collision duplicates
+//! Per conflicted note: fold the conflict versions through
+//! [`crate::conflict::ladder`]. When the fold is reconciled (it may have
+//! dropped or interleaved a side's text), archive each side that Git history
+//! does not already hold. Then write the result atomically and, only then,
+//! mark the provider versions resolved. Creation-collision duplicates
 //! (`2026-07-04 2.md`, iCloud's rename when two devices create the same
 //! filename apart) are folded back into their canonical file by the same
-//! ladder with the union rule enabled.
+//! ladder.
 //!
 //! Shadow-base bookkeeping rides the sweep: bases advance on resolutions and
 //! on the clean external ingests the frontend reports (`ingested_paths`),
@@ -36,8 +37,6 @@ use super::versions::{
 /// The label for the side that lives in this device's working file. Device
 /// names for the *other* side come from the provider's version metadata;
 /// there is no equally reliable local twin, so the fallback label stands in.
-/// (Marker output containing it differs between two devices racing the same
-/// conflict; the marked-side rule converges them one round later.)
 const LOCAL_LABEL: &str = "this device";
 
 /// One file the sweep rewrote or removed, in the watcher's change shape.
@@ -58,8 +57,11 @@ pub struct SweepChange {
 pub struct SweepOutcome {
     /// Every file the sweep changed on disk — reindex these directly.
     pub changed: Vec<SweepChange>,
-    /// Paths now carrying conflict markers ("Needs review").
+    /// Always empty: the ladder never leaves conflict markers.
     pub needs_review: Vec<String>,
+    /// Graph-relative paths whose resolution went through the loop breaker
+    /// or the word-level merge.
+    pub reconciled: Vec<String>,
     /// Conflicted paths skipped because the caller holds a dirty editor
     /// session for them; retried on the next sweep after the flush.
     pub deferred: Vec<String>,
@@ -137,7 +139,7 @@ pub async fn icloud_conflicts_scan(
     if let Ok(outcome) = &outcome {
         tracing::info!(
             changed = outcome.changed.len(),
-            needs_review = outcome.needs_review.len(),
+            reconciled = outcome.reconciled.len(),
             deferred = outcome.deferred.len(),
             auto_resolved = outcome.auto_resolved,
             record_baseline,
@@ -334,13 +336,20 @@ fn advance_base_if_clean(root: &Path, rel: &str, shadow: &ShadowStore, fill_only
 struct FileResolution {
     final_content: String,
     changed: bool,
-    marked: bool,
+    reconciled: bool,
 }
 
-/// Fold a note's unresolved versions through the ladder, oldest first.
-/// Archives every side before anything else ([`archived_sides`]). Does not
-/// touch the provider's version state — the caller does, after the resolved
-/// write lands.
+/// One version of a note with the device that saved it (`None` for the
+/// working file).
+struct ReadSide {
+    side: ConflictSide,
+    device: Option<String>,
+}
+
+/// Fold the working file and its unresolved versions through the ladder,
+/// oldest first. When the fold is reconciled, archive every side that Git
+/// history does not hold before returning. Does not touch the provider's
+/// version state: the caller does, after the resolved write lands.
 fn resolve_file(
     root: &Path,
     rel: &str,
@@ -351,23 +360,24 @@ fn resolve_file(
     let abs = root.join(rel);
     let original = fs::read_to_string(&abs)
         .map_err(|err| AppError::io(format!("unreadable conflicted note {rel}: {err}")))?;
-    let sides = archived_sides(root, rel, &original, file_modified_ms, versions)?;
+    let sides = read_sides(rel, &original, file_modified_ms, versions)?;
 
     let base = shadow.base(rel);
-    let mut current = ConflictSide {
-        content: original.clone(),
-        label: LOCAL_LABEL.to_string(),
-        modified_ms: file_modified_ms,
-    };
+    let mut folded = sides.iter().map(|read| read.side.clone());
+    let mut current = folded
+        .next()
+        .ok_or_else(|| AppError::io(format!("no versions to fold for {rel}")))?;
 
-    let mut marked = false;
-    for side in sides {
+    let mut reconciled = false;
+    for side in folded {
         let current_hash = content_hash(&current.content)?;
         let side_hash = content_hash(&side.content)?;
+        let modified_ms = side.modified_ms;
+        let merge_loop_detected = shadow.is_repeated_merge(rel, &current_hash, &side_hash);
         let input = ConflictInput {
             base: base.as_deref(),
             sides: (current.clone(), side),
-            merge_loop_detected: shadow.is_repeated_merge(rel, &current_hash, &side_hash),
+            merge_loop_detected,
         };
         match ladder::resolve(input)? {
             Resolution::AlreadyResolved => {}
@@ -381,58 +391,75 @@ fn resolve_file(
                 current.content = content;
             }
             Resolution::Reconciled { content } => {
+                if merge_loop_detected {
+                    shadow.clear_merge_pair(rel);
+                } else if content != current.content {
+                    let _ = shadow.record_merge_pair(rel, &current_hash, &side_hash);
+                }
                 current.content = content;
-                marked = true;
+                reconciled = true;
             }
+        }
+        current.modified_ms = modified_ms;
+    }
+
+    if reconciled {
+        for read in &sides {
+            archive::archive_unless_in_history(
+                root,
+                rel,
+                read.device.as_deref(),
+                read.side.modified_ms,
+                read.side.content.as_bytes(),
+            )?;
         }
     }
 
     Ok(FileResolution {
         changed: current.content != original,
         final_content: current.content,
-        marked,
+        reconciled,
     })
 }
 
-/// Read and archive **every** involved version — the current file, then the
-/// provider's conflict versions — and return the version sides sorted oldest
-/// first, ready for the ladder. The archive-before-anything invariant lives
-/// here: a resolution must never become the only copy-holder of content it
-/// consumed.
-fn archived_sides(
-    root: &Path,
+/// Read the working file and the provider's conflict versions, sorted oldest
+/// first, ready for the ladder. Reads only: archiving is the caller's job.
+fn read_sides(
     rel: &str,
     original: &str,
     file_modified_ms: u64,
     versions: Vec<VersionRef>,
-) -> AppResult<Vec<ConflictSide>> {
-    archive::archive_version(root, rel, None, file_modified_ms, original.as_bytes())?;
-    let mut sides: Vec<ConflictSide> = Vec::new();
-    for version in &versions {
+) -> AppResult<Vec<ReadSide>> {
+    let mut sides = vec![ReadSide {
+        side: ConflictSide {
+            content: original.to_string(),
+            label: LOCAL_LABEL.to_string(),
+            modified_ms: file_modified_ms,
+        },
+        device: None,
+    }];
+    for version in versions {
         let content = fs::read_to_string(&version.store_path)
             .map_err(|err| AppError::io(format!("unreadable conflict version for {rel}: {err}")))?;
-        archive::archive_version(
-            root,
-            rel,
-            version.device.as_deref(),
-            version.modified_ms,
-            content.as_bytes(),
-        )?;
-        sides.push(ConflictSide {
-            content,
-            label: version
-                .device
-                .clone()
-                .unwrap_or_else(|| "other device".to_string()),
-            modified_ms: version.modified_ms,
+        sides.push(ReadSide {
+            side: ConflictSide {
+                content,
+                label: version
+                    .device
+                    .clone()
+                    .unwrap_or_else(|| "other device".to_string()),
+                modified_ms: version.modified_ms,
+            },
+            device: version.device,
         });
     }
     // The ladder's ordering rule, applied to the *fold sequence* too: a
     // timestamp tie must not fall back to platform listing order, or two
     // devices folding the same versions could interleave them differently
-    // and write different bytes forever. Contents are read above, so the
-    // tiebreak has something to compare.
-    sides.sort_by(|a, b| (a.modified_ms, &a.content).cmp(&(b.modified_ms, &b.content)));
+    // and write different bytes forever.
+    sides.sort_by(|a, b| {
+        (a.side.modified_ms, &a.side.content).cmp(&(b.side.modified_ms, &b.side.content))
+    });
     Ok(sides)
 }
 
@@ -453,12 +480,6 @@ fn apply_file_resolution(
             tracing::warn!(path = rel, ?err, "failed to write conflict resolution");
             return; // versions stay unresolved; next sweep retries
         }
-    }
-    if resolution.changed || resolution.marked {
-        // Marked-but-unchanged is defensive (the ladder's marker rules make
-        // it near-unreachable today): if it ever happens, the controller
-        // must still reindex so `has_conflict` and the notice reflect the
-        // markers — content-hash gating makes a redundant reindex free.
         outcome.changed.push(SweepChange {
             path: rel.to_string(),
             kind: "upsert".to_string(),
@@ -466,18 +487,14 @@ fn apply_file_resolution(
         });
     }
     mark_resolved(&abs);
-    if resolution.marked {
-        // The user hasn't resolved anything yet: the base must not advance,
-        // and a stale merge-pair record would mask the next real conflict.
-        shadow.clear_merge_pair(rel);
-        outcome.needs_review.push(rel.to_string());
-    } else {
-        // Both devices converge on the resolved content — it is the new base.
-        if let Err(err) = shadow.record(rel, &resolution.final_content) {
-            tracing::warn!(path = rel, ?err, "failed to advance shadow base");
-        }
-        outcome.auto_resolved += 1;
+    if resolution.reconciled {
+        outcome.reconciled.push(rel.to_string());
     }
+    // Both devices converge on the resolved content: it is the new base.
+    if let Err(err) = shadow.record(rel, &resolution.final_content) {
+        tracing::warn!(path = rel, ?err, "failed to advance shadow base");
+    }
+    outcome.auto_resolved += 1;
 }
 
 /// Fold creation-collision duplicates back into their canonical note. iCloud
@@ -510,8 +527,9 @@ fn fold_collision_duplicates(
 }
 
 /// Fold one duplicate into its canonical note: adopt a genuinely free
-/// canonical name outright, otherwise archive the duplicate, merge the pair
-/// through the ladder, and remove the duplicate. Every early return leaves
+/// canonical name outright, otherwise merge the pair through the ladder
+/// (archiving both sides first when the result is reconciled) and remove the
+/// duplicate. Every early return leaves
 /// the duplicate in place for the next sweep to retry.
 fn fold_duplicate(
     root: &Path,
@@ -570,16 +588,10 @@ fn fold_duplicate(
     let Ok(canonical_content) = fs::read_to_string(&canonical_abs) else {
         return; // occupied but unreadable (evicted): retry once downloaded
     };
-    if let Err(err) = archive::archive_version(
-        root,
-        &file.path,
-        None,
-        file.modified_ms,
-        dup_content.as_bytes(),
-    ) {
-        tracing::warn!(path = %file.path, ?err, "failed to archive collision duplicate");
-        return;
-    }
+    let canonical_ms = current_version_modified_ms(&canonical_abs)
+        .or_else(|| modified_ms_of(&canonical_abs))
+        .unwrap_or(0);
+    let dup_ms = current_version_modified_ms(&dup_abs).unwrap_or(file.modified_ms);
     let input = ConflictInput {
         base: None, // independent creations share no ancestor
         // Version-store dates, not filesystem mtimes, for the same reason as
@@ -589,14 +601,12 @@ fn fold_duplicate(
             ConflictSide {
                 content: canonical_content.clone(),
                 label: canonical_rel.to_string(),
-                modified_ms: current_version_modified_ms(&canonical_abs)
-                    .or_else(|| modified_ms_of(&canonical_abs))
-                    .unwrap_or(0),
+                modified_ms: canonical_ms,
             },
             ConflictSide {
-                content: dup_content,
+                content: dup_content.clone(),
                 label: file.path.clone(),
-                modified_ms: current_version_modified_ms(&dup_abs).unwrap_or(file.modified_ms),
+                modified_ms: dup_ms,
             },
         ),
         merge_loop_detected: false,
@@ -608,11 +618,25 @@ fn fold_duplicate(
             return;
         }
     };
-    let (merged, is_marked) = match resolution {
+    let (merged, reconciled) = match resolution {
         Resolution::AlreadyResolved => (canonical_content.clone(), false),
         Resolution::Merged { content } => (content, false),
         Resolution::Reconciled { content } => (content, true),
     };
+    if reconciled {
+        let sides = [
+            (canonical_rel, canonical_ms, &canonical_content),
+            (file.path.as_str(), dup_ms, &dup_content),
+        ];
+        for (rel, modified_ms, content) in sides {
+            if let Err(err) =
+                archive::archive_unless_in_history(root, rel, None, modified_ms, content.as_bytes())
+            {
+                tracing::warn!(path = %rel, ?err, "failed to archive collision side");
+                return; // nothing written yet; next sweep retries
+            }
+        }
+    }
     if merged != canonical_content {
         if crate::fs::atomic_write_bytes(root, &canonical_abs, merged.as_bytes()).is_err() {
             return; // duplicate stays; next sweep retries
@@ -633,14 +657,19 @@ fn fold_duplicate(
     } else {
         tracing::warn!(path = %file.path, "failed to remove folded collision duplicate");
     }
-    if is_marked {
-        outcome.needs_review.push(canonical_rel.to_string());
-        shadow.clear_merge_pair(canonical_rel);
-    } else {
-        outcome.auto_resolved += 1;
-        if let Err(err) = shadow.record(canonical_rel, &merged) {
-            tracing::warn!(path = %canonical_rel, ?err, "failed to advance shadow base");
+    if merged != canonical_content {
+        if let (Ok(canonical_hash), Ok(dup_hash)) =
+            (content_hash(&canonical_content), content_hash(&dup_content))
+        {
+            let _ = shadow.record_merge_pair(canonical_rel, &canonical_hash, &dup_hash);
         }
+    }
+    if reconciled {
+        outcome.reconciled.push(canonical_rel.to_string());
+    }
+    outcome.auto_resolved += 1;
+    if let Err(err) = shadow.record(canonical_rel, &merged) {
+        tracing::warn!(path = %canonical_rel, ?err, "failed to advance shadow base");
     }
 }
 
@@ -759,11 +788,9 @@ mod tests {
             fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap(),
             "# Day\n\n- from mac\n- from phone\n"
         );
-        // The duplicate's content is archived, not just deleted.
-        let archive_dir = root
-            .path()
-            .join(".reflect/conflict-archive/daily/2026-07-04 2.md");
-        assert_eq!(fs::read_dir(archive_dir).unwrap().count(), 1);
+        // An exact union loses nothing, so nothing is archived.
+        assert!(!root.path().join(".reflect/conflict-archive").exists());
+        assert!(outcome.reconciled.is_empty());
         // Changes report the remove + the rewrite for direct reindexing.
         let kinds: Vec<(&str, &str)> = outcome
             .changed
@@ -800,7 +827,7 @@ mod tests {
 
         assert!(root.path().join("daily/2026-07-04.md").exists());
         assert!(!root.path().join("daily/2026-07-04 2.md").exists());
-        assert_eq!(outcome.needs_review.len(), 0);
+        assert!(outcome.needs_review.is_empty());
         // The dead lineage's ancestor is gone — the adopted content is the
         // base now, matching what peers record when the rename syncs over.
         assert_eq!(
@@ -845,10 +872,7 @@ mod tests {
 
         let outcome = run_sweep(root.path(), &[], &[], false, None).unwrap();
 
-        assert_eq!(
-            outcome.needs_review,
-            vec!["daily/2026-07-04.md".to_string()]
-        );
+        assert_eq!(outcome.reconciled, vec!["daily/2026-07-04.md".to_string()]);
         let merged = fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap();
         assert!(!markers::contains_conflict_markers(&merged));
         assert!(merged.contains("mac wording") && merged.contains("phone wording"));
@@ -1044,18 +1068,15 @@ mod tests {
         .unwrap();
 
         assert!(resolution.changed);
-        assert!(!resolution.marked);
+        assert!(!resolution.reconciled);
         // Union order is by version timestamp: the phone side (1000) is older
         // than the file (2000), so its line lands first.
         assert_eq!(
             resolution.final_content,
             "- seed\n- phone line\n- mac line\n"
         );
-        // Both originals are archived before anything is written.
-        let archived = root
-            .path()
-            .join(".reflect/conflict-archive/daily/2026-07-04.md");
-        assert_eq!(fs::read_dir(archived).unwrap().count(), 2);
+        // An exact merge archives nothing.
+        assert!(!root.path().join(".reflect/conflict-archive").exists());
     }
 
     #[test]
@@ -1080,7 +1101,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(resolution.marked);
+        assert!(resolution.reconciled);
         assert!(!markers::contains_conflict_markers(
             &resolution.final_content
         ));
@@ -1107,7 +1128,7 @@ mod tests {
     #[test]
     fn multi_version_clean_folds_keep_every_side() {
         // Three devices appended apart: both fold steps stay clean, all
-        // three tails land, and nothing is marked.
+        // three tails land, and nothing is reconciled.
         let root = graph();
         write(root.path(), "daily/2026-07-04.md", "- seed\n- mac line\n");
         let shadow = ShadowStore::new(root.path());
@@ -1137,7 +1158,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!resolution.marked);
+        assert!(!resolution.reconciled);
         for line in ["- mac line", "- phone line", "- ipad line"] {
             assert!(
                 resolution.final_content.contains(line),
@@ -1174,7 +1195,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(resolution.marked);
+        assert!(resolution.reconciled);
         assert!(!markers::contains_conflict_markers(
             &resolution.final_content
         ));
@@ -1234,6 +1255,98 @@ mod tests {
         .unwrap();
 
         assert_eq!(resolution.final_content, "current clean\nnewest clean\n");
-        assert!(!resolution.marked);
+        assert!(!resolution.reconciled);
+    }
+
+    fn archive_names(root: &Path, rel: &str) -> Vec<String> {
+        archive::list(root, rel)
+            .unwrap()
+            .into_iter()
+            .map(|version| version.name)
+            .collect()
+    }
+
+    fn overlapping_fold(root: &Path) -> FileResolution {
+        write(root, "notes/a.md", "shared line mac\n");
+        let shadow = ShadowStore::new(root);
+        shadow.record("notes/a.md", "shared line\n").unwrap();
+        let version = fake_version(root, "v1.md", "shared line phone\n", 2_000, "iPhone");
+        resolve_file(root, "notes/a.md", 1_000, vec![version], &shadow).unwrap()
+    }
+
+    #[test]
+    fn a_reconciled_result_archives_the_sides_missing_from_history() {
+        // No repository: both sides are archived.
+        let root = graph();
+        let resolution = overlapping_fold(root.path());
+        assert!(resolution.reconciled);
+        assert_eq!(
+            archive_names(root.path(), "notes/a.md"),
+            vec!["2000-iPhone.md", "1000-unknown.md"]
+        );
+
+        // The working file's bytes are already in history: only the iCloud
+        // version is archived.
+        let root = graph();
+        let repo = git2::Repository::init(root.path()).unwrap();
+        repo.blob(b"shared line mac\n").unwrap();
+        overlapping_fold(root.path());
+        assert_eq!(
+            archive_names(root.path(), "notes/a.md"),
+            vec!["2000-iPhone.md"]
+        );
+
+        // An exact merge archives nothing.
+        let root = graph();
+        write(root.path(), "daily/2026-07-04.md", "- seed\n- mac\n");
+        let shadow = ShadowStore::new(root.path());
+        shadow.record("daily/2026-07-04.md", "- seed\n").unwrap();
+        let version = fake_version(root.path(), "v1.md", "- seed\n- phone\n", 1_000, "iPhone");
+        let resolution = resolve_file(
+            root.path(),
+            "daily/2026-07-04.md",
+            2_000,
+            vec![version],
+            &shadow,
+        )
+        .unwrap();
+        assert!(!resolution.reconciled);
+        assert!(archive_names(root.path(), "daily/2026-07-04.md").is_empty());
+    }
+
+    #[test]
+    fn a_reconciled_path_is_reported_in_the_outcome() {
+        let root = graph();
+        let resolution = overlapping_fold(root.path());
+        let shadow = ShadowStore::new(root.path());
+        let mut outcome = SweepOutcome::default();
+
+        apply_file_resolution(root.path(), "notes/a.md", resolution, &shadow, &mut outcome);
+
+        assert_eq!(outcome.reconciled, vec!["notes/a.md".to_string()]);
+        assert!(outcome.needs_review.is_empty());
+        assert_eq!(outcome.auto_resolved, 1);
+        assert_eq!(outcome.changed.len(), 1);
+    }
+
+    #[test]
+    fn a_word_level_merge_records_the_pair_so_a_repeat_breaks_the_loop() {
+        let root = graph();
+        write(root.path(), "notes/a.md", "shared line mac\n");
+        let shadow = ShadowStore::new(root.path());
+        shadow.record("notes/a.md", "shared line\n").unwrap();
+        let mac_hash = content_hash("shared line mac\n").unwrap();
+        let phone_hash = content_hash("shared line phone\n").unwrap();
+
+        let version = fake_version(root.path(), "v1.md", "shared line phone\n", 2_000, "iPhone");
+        let first = resolve_file(root.path(), "notes/a.md", 1_000, vec![version], &shadow).unwrap();
+        assert!(first.reconciled);
+        assert!(shadow.is_repeated_merge("notes/a.md", &mac_hash, &phone_hash));
+
+        let version = fake_version(root.path(), "v2.md", "shared line phone\n", 2_000, "iPhone");
+        let second =
+            resolve_file(root.path(), "notes/a.md", 1_000, vec![version], &shadow).unwrap();
+        assert_eq!(second.final_content, "shared line phone\n");
+        assert!(!shadow.is_repeated_merge("notes/a.md", &mac_hash, &phone_hash));
     }
 }
