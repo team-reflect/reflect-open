@@ -26,6 +26,36 @@ pub mod shadow;
 mod total;
 mod union;
 
+use tauri::State;
+
+use crate::error::AppResult;
+use crate::fs::GraphState;
+
+use self::archive::ArchivedVersion;
+
+/// Command: the archived earlier versions of a note, newest first.
+#[tauri::command]
+pub async fn conflict_archive_list(
+    path: String,
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<Vec<ArchivedVersion>> {
+    let root = crate::fs::root_for_generation(&state, generation)?;
+    crate::blocking::run_blocking(move || archive::list(&root, &path)).await
+}
+
+/// Command: the text of one archived version, named as the list returned it.
+#[tauri::command]
+pub async fn conflict_archive_read(
+    path: String,
+    name: String,
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<String> {
+    let root = crate::fs::root_for_generation(&state, generation)?;
+    crate::blocking::run_blocking(move || archive::read(&root, &path, &name)).await
+}
+
 /// One side of a two-way note conflict: full markdown plus the provenance
 /// that drives ordering and diagnostics.
 #[derive(Debug, Clone)]

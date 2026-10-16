@@ -32,24 +32,29 @@ When both devices change the same note while apart, Reflect resolves it
 itself where that is safe, in this order (deterministic — both devices
 resolving the same conflict produce identical bytes and converge):
 
-1. **Same content** (or only whitespace differs) — nothing to do.
-2. **Different parts of the note** — merged three-ways over the note's last
+1. **Same content** (or only whitespace differs): nothing to do.
+2. **One side is marked** with conflict markers from an older version: the
+   clean side is kept whole.
+3. **A merge keeps coming back**: when the same two merge results collide
+   again, the loop breaker keeps the newer side.
+4. **Different parts of the note**: merged three-ways over the note's last
    synced state.
-3. **Only metadata differs** (pinned on the Mac, marked private on the
-   phone) — merged key-by-key.
-4. **Both devices appended** — the daily-note case, and the most common one:
-   both tails are kept, oldest first. Two devices creating the same day's
-   note offline (iCloud leaves a `2026-07-04 2.md` behind) fold back into one
-   file the same way.
-5. **Genuinely overlapping edits** — the note keeps *both* versions between
-   labeled conflict markers, opens protected, and shows a **Needs review**
-   banner whose buttons name the devices ("Keep 'Alex's MacBook Pro'").
-   Nothing is ever discarded silently.
+5. **Only metadata differs** (pinned on the Mac, marked private on the
+   phone): merged key by key.
+6. **Both devices only appended**: both tails are kept, oldest first. This
+   applies to any note. It is the daily-note case, and the most common one.
+   Two devices creating the same day's note offline (iCloud leaves a
+   `2026-07-04 2.md` behind) fold back into one file the same way.
+7. **Anything else**: a word-level merge keeps the words both sides added.
+   It always produces text, so Reflect never writes conflict markers.
 
-Before any resolution is written, every involved version is archived under
-`.reflect/conflict-archive/<note-path>/` (kept ~90 days / 20 versions per
-note), so even a bad merge is recoverable. Binary assets never text-merge:
-the other device's copy lands alongside as `name (conflict).ext`.
+Only the loop breaker and the word-level merge can drop or interleave a
+side's text. After one of them, Reflect archives each side under
+`.reflect/conflict-archive/<note-path>/` before it writes the result. It
+archives only content that Git history does not already hold (kept ~90 days /
+20 versions per note). The archived versions show under **Earlier versions**
+in the note sidebar. Binary assets never text-merge: the other device's copy
+lands alongside as `name (conflict).ext`.
 
 ## Building with iCloud
 

@@ -8,6 +8,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use serde::Serialize;
+
 use crate::error::{AppError, AppResult};
 
 const ARCHIVE_DIR: &str = "conflict-archive";
@@ -41,6 +43,102 @@ pub fn archive_version(
     }
     crate::fs::atomic_write_bytes(root, &target, bytes)?;
     Ok(())
+}
+
+/// Archive one version unless the repository's object database already holds
+/// its exact bytes. Returns whether a copy was written.
+pub fn archive_unless_in_history(
+    root: &Path,
+    rel: &str,
+    device: Option<&str>,
+    modified_ms: u64,
+    bytes: &[u8],
+) -> AppResult<bool> {
+    let oid = git2::Oid::hash_object(git2::ObjectType::Blob, bytes)?;
+    if let Ok(repo) = git2::Repository::open(root) {
+        if repo.odb()?.exists(oid) {
+            return Ok(false);
+        }
+    }
+    archive_version(root, rel, device, modified_ms, bytes)?;
+    Ok(true)
+}
+
+/// One archived version of a note.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchivedVersion {
+    pub name: String,
+    pub modified_ms: u64,
+    pub device: String,
+    pub size: u64,
+}
+
+/// The archived versions of a note, newest first. Empty when the note has no
+/// archive.
+pub fn list(root: &Path, rel: &str) -> AppResult<Vec<ArchivedVersion>> {
+    let dir = note_archive_dir(root, rel)
+        .ok_or_else(|| AppError::io(format!("invalid archive path: {rel}")))?;
+    let Ok(entries) = fs::read_dir(&dir) else {
+        return Ok(Vec::new());
+    };
+    let mut versions: Vec<ArchivedVersion> = Vec::new();
+    for entry in entries.flatten() {
+        let Some(name) = entry.file_name().to_str().map(str::to_string) else {
+            continue;
+        };
+        let Some((modified_ms, device)) = parse_archive_name(&name) else {
+            continue;
+        };
+        let Ok(meta) = entry.metadata() else {
+            continue;
+        };
+        if !meta.is_file() {
+            continue;
+        }
+        versions.push(ArchivedVersion {
+            name,
+            modified_ms,
+            device,
+            size: meta.len(),
+        });
+    }
+    versions.sort_by(|a, b| {
+        b.modified_ms
+            .cmp(&a.modified_ms)
+            .then_with(|| b.name.cmp(&a.name))
+    });
+    Ok(versions)
+}
+
+/// The text of one archived version, named as [`list`] returns it.
+pub fn read(root: &Path, rel: &str, name: &str) -> AppResult<String> {
+    if parse_archive_name(name).is_none() {
+        return Err(AppError::io("invalid archive name"));
+    }
+    let dir = note_archive_dir(root, rel)
+        .ok_or_else(|| AppError::io(format!("invalid archive path: {rel}")))?;
+    Ok(fs::read_to_string(dir.join(name))?)
+}
+
+/// `<ms>-<device>[-n].<ext>` → `(ms, device)`. Names must match
+/// `^[0-9]+-[A-Za-z0-9-]+\.[A-Za-z0-9]+$`.
+fn parse_archive_name(name: &str) -> Option<(u64, String)> {
+    let (stem, ext) = name.rsplit_once('.')?;
+    if ext.is_empty() || !ext.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
+        return None;
+    }
+    let (stamp, rest) = stem.split_once('-')?;
+    if stamp.is_empty()
+        || !stamp.bytes().all(|byte| byte.is_ascii_digit())
+        || rest.is_empty()
+        || !rest
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    {
+        return None;
+    }
+    Some((stamp.parse().ok()?, rest.to_string()))
 }
 
 /// Prune the archive: per note, keep the newest [`MAX_PER_NOTE`] versions and
@@ -162,5 +260,75 @@ mod tests {
     fn traversal_shapes_are_refused() {
         let root = tempdir().unwrap();
         assert!(archive_version(root.path(), "../escape.md", None, 1, b"x").is_err());
+    }
+
+    fn graph_with_git(bytes: &[u8]) -> tempfile::TempDir {
+        let root = tempdir().unwrap();
+        fs::create_dir_all(root.path().join(".reflect")).unwrap();
+        let repo = git2::Repository::init(root.path()).unwrap();
+        repo.blob(bytes).unwrap();
+        root
+    }
+
+    #[test]
+    fn content_in_the_git_odb_is_not_archived() {
+        let root = graph_with_git(b"in history");
+        let skipped =
+            archive_unless_in_history(root.path(), "notes/a.md", None, 1, b"in history").unwrap();
+        assert!(!skipped);
+        assert!(list(root.path(), "notes/a.md").unwrap().is_empty());
+
+        let written =
+            archive_unless_in_history(root.path(), "notes/a.md", None, 2, b"new text").unwrap();
+        assert!(written);
+        assert_eq!(list(root.path(), "notes/a.md").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn without_a_repository_everything_is_archived() {
+        let root = tempdir().unwrap();
+        fs::create_dir_all(root.path().join(".reflect")).unwrap();
+        assert!(archive_unless_in_history(root.path(), "notes/a.md", None, 1, b"x").unwrap());
+    }
+
+    #[test]
+    fn list_returns_newest_first_and_ignores_foreign_names() {
+        let root = tempdir().unwrap();
+        fs::create_dir_all(root.path().join(".reflect")).unwrap();
+        assert!(list(root.path(), "notes/a.md").unwrap().is_empty());
+        archive_version(root.path(), "notes/a.md", Some("iPhone"), 100, b"old").unwrap();
+        archive_version(root.path(), "notes/a.md", Some("Mac"), 300, b"newest").unwrap();
+        archive_version(root.path(), "notes/a.md", Some("Mac"), 300, b"dup").unwrap();
+        let dir = root.path().join(".reflect/conflict-archive/notes/a.md");
+        fs::write(dir.join("stray.txt"), "x").unwrap();
+
+        let versions = list(root.path(), "notes/a.md").unwrap();
+        let names: Vec<&str> = versions.iter().map(|v| v.name.as_str()).collect();
+        assert_eq!(names, vec!["300-Mac.md", "300-Mac-1.md", "100-iPhone.md"]);
+        assert_eq!(versions[2].modified_ms, 100);
+        assert_eq!(versions[2].device, "iPhone");
+        assert_eq!(versions[2].size, 3);
+    }
+
+    #[test]
+    fn read_returns_text_and_refuses_unlisted_shapes() {
+        let root = tempdir().unwrap();
+        fs::create_dir_all(root.path().join(".reflect")).unwrap();
+        archive_version(root.path(), "notes/a.md", Some("Mac"), 5, b"hello").unwrap();
+        assert_eq!(
+            read(root.path(), "notes/a.md", "5-Mac.md").unwrap(),
+            "hello"
+        );
+        for name in [
+            "../5-Mac.md",
+            "a/5-Mac.md",
+            "5-Mac",
+            "x-Mac.md",
+            "5-.md",
+            "",
+        ] {
+            assert!(read(root.path(), "notes/a.md", name).is_err(), "{name}");
+        }
+        assert!(read(root.path(), "../a.md", "5-Mac.md").is_err());
     }
 }
