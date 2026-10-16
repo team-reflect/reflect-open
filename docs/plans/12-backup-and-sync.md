@@ -51,12 +51,9 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
    device's side, the other's, or both. Hand-merging stays possible in any external
    editor. Future: a meowdown conflict node unlocks in-editor resolution.
 
-   > **2026-10 revision:** a pull no longer commits markers. Note conflicts resolve
-   > through the ladder of [Plan 21](21-icloud-drive-sync.md), and other files keep a
-   > conflict copy. There is no conflict archive. Conflict markers are plain
-   > text to Reflect: the app neither writes nor interprets them, and the marker
-   > projection, the protected-by-markers open and the resolution notice described
-   > below no longer exist. See [git-backup-safety.md](../git-backup-safety.md) S7 and S9.
+   > **Current state:** the marker design below is historical. A pull writes no
+   > markers. Notes resolve through the ladder of [Plan 21](21-icloud-drive-sync.md)
+   > and other files keep a conflict copy. See [git-backup-safety.md](../git-backup-safety.md) S7 and S9.
 5. **Full loop in the first wave** — debounced commit→push *and* pull/merge, plus
    restore-from-GitHub in the graph chooser. Backup-only was rejected: a second device
    needs pull-before-push anyway, so deferral bought little.
@@ -101,8 +98,7 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
 1. **Rust git primitives** (`src-tauri/src/git/`): `git_status`, `git_setup` (init or
    adopt-existing + `origin` + align the local branch with the remote's default),
    `git_commit_all(message)` (stage everything, no-op when clean, large-file
-   guardrail), `git_fetch`, `git_pull` (2026-10: replaces the old merge command, which wrote
-   marker files; the pull commits and merges under one lock and writes no markers),
+   guardrail), `git_fetch`, `git_pull` (commits and merges under one lock, writes no markers),
    `git_push` (rejections returned as data). Health checks: refuse foreign states —
    detached HEAD, in-progress rebase — with a typed error, never guess. Remote-agnostic;
    credentials via callback from the keychain. `.reflect/` stays gitignored (Plan 02);
@@ -126,16 +122,13 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
    watcher subscription, focus/online listeners, quit-commit hook, connect/disconnect —
    with a single teardown path; the React provider is a `useSyncExternalStore` shim.
    (Every early review finding hit the React-effect/engine seam; this is the structural
-   fix.) *(2026-10 revision: the marker projection was removed; markers are plain text.)*
+   fix.)
 
 4. **Conflict policy** (the load-bearing step):
    - **Content conflicts** → marker blocks with readable labels (`<<<<<<< this device` /
-     `>>>>>>> other device`); merge committed + pushed; *(2026-10
-     revision: no flag; markers are plain text.)*
-   - **Resolution UX (spike-settled, removed in 2026-10):** markers were lossy in the
-     editor, so conflicted notes opened **protected** and a notice resolved them on the
-     raw text. The app no longer reads markers. Every version stays recoverable in
-     history.
+     `>>>>>>> other device`); merge committed + pushed.
+   - **Resolution UX (historical):** markers were lossy in the editor, so conflicted
+     notes opened **protected** and a notice resolved them on the raw text.
    - **Edit vs delete** → keep the edited version (never silently delete); record it.
    - **Binary/asset conflicts** → keep both (suffix the incoming copy); newest wins links.
    - Merges return their **changed files** (with real mtimes); the controller reindexes
@@ -188,15 +181,14 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
 ## Key decisions / contracts
 
 - **Safety invariants** (2026-10): [`docs/git-backup-safety.md`](../git-backup-safety.md)
-  lists the rules S1 to S8 that every sync change must keep, each with the
+  lists the rules S1 to S9 that every sync change must keep, each with the
   test that enforces it.
 - **libgit2 (`git2`) is the engine**; the Rust surface is remote-agnostic, GitHub
   specifics live only in `packages/core/src/sync/`.
 - **GitHub is the only supported remote in the UX**; file-sync providers (iCloud/
   Dropbox/Drive) remain unsupported by design (no safe conflict semantics).
 - **GitHub App device flow + keychain; PAT fallback; token never on disk.**
-- **Conflicts never wedge sync.** *(Originally: committed as raw Git markers. 2026-10
-  revision: the ladder always produces text, and markers are plain text to Reflect.)*
+- **Conflicts never wedge sync.** The ladder always produces text.
 - **Disconnect is per-graph; sign-out is per-machine** — never conflated.
 - **Checkpoint = commit** (shared recovery primitive with Plan 10); quit commits
   locally, never pushes.
@@ -208,8 +200,7 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
 
 - Editing a note passes through `Backing up` → `Backed up` within the debounce window;
   the commit is visible on GitHub.
-- Two devices editing the same note converge on one merged note (2026-10 revision;
-  this originally read: labeled conflict markers with a review state).
+- Two devices editing the same note converge on one merged note.
 - A conflict never blocks other notes from backing up.
 - Going offline shows `Offline`; reconnecting (the `online` event, focus, or the next
   edit) pushes without user action.
@@ -235,7 +226,7 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
   round-trip guard (Plan 05b) protects them, and a regression test pins the
   classification — if meowdown ever learns to round-trip markers, that test failing is
   the signal to build the in-editor widget.
-- **Markers confuse non-developers.** Mitigated since 2026-10 by never writing them.
+- **Markers confuse non-developers.** Mitigated by never writing them.
 - **libgit2 v2.0 breaking bump** — absorbed behind the Rust module.
 - **Auth feeling developer-oriented.** Device flow mitigates; PAT is the escape hatch.
 - **History privacy** (deleted notes persist on GitHub) — onboarding honesty now;

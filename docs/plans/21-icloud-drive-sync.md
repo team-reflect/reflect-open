@@ -5,9 +5,8 @@ the app's iCloud container, files flow between macOS and iOS with no Reflect
 infrastructure, and **conflicts never surface as mystery duplicates**. Reflect resolves
 what it can safely resolve itself (identical content, non-overlapping edits via
 three-way merge, append-union for daily notes, key-wise frontmatter); anything it
-can't, it materialized **inside the note as the same labeled conflict markers Git sync
-used** (2026-10 revision: the ladder now always returns text; markers are plain text to
-Reflect, and the marker projection and review UI were removed).
+can't, it merges at the word level. The ladder always returns text, and the same
+ladder resolves git pulls and editor saves.
 
 **Depends on:** Plan 12 (the Git merge machinery), Plan 19 (iOS target), Plan 02/04 (storage + index). **Supersedes:** the
 "file-sync providers are unsupported for sync by design" decision in Plan 12 and the
@@ -50,17 +49,13 @@ iOS Phase 1 leg); on-device verification is the release gate. What exists:
 
 **Explicitly not in scope:** AI-assisted conflict resolution (deferred enhancement —
 the ladder below is designed to hand it a ready-made `base/local/remote`, see
-*Deferred*); a rich side-by-side diff viewer (a V1 non-goal); Dropbox/Google Drive adapters; Windows/Android; CloudKit record sync;
+*Deferred*); a rich side-by-side diff viewer; Dropbox/Google Drive adapters; Windows/Android; CloudKit record sync;
 collaboration/shared graphs.
 
 ## Where we stand
 
 **What already exists (and is reused unchanged):**
 
-- **The whole downstream conflict pipeline.** *(Historical; removed in 2026-10.)* The
-  Git merge materialized conflicts into the note as standard markers with product
-  labels, the indexer projected a conflict flag, conflicted notes opened protected,
-  and a notice resolved them. iCloud plugged into the *front* of this.
 - **`.reflect/` is already local-only on macOS.** `fs/io.rs::bootstrap` sets
   `NSURLUbiquitousItemIsExcludedFromSyncKey` + `NSURLIsExcludedFromBackupKey` and
   provider-ignore xattrs on `.reflect/`. The SQLite-in-a-synced-folder hazard is
@@ -112,27 +107,23 @@ All unresolved conflicts become in-note marker blocks in the exact Plan 12 gramm
 (`<<<<<<< <label>` / `=======` / `>>>>>>> <label>`), so detection, protection, and
 resolution reuse verbatim. Two iCloud-specific refinements:
 
-> **2026-10 revision:** the ladder no longer ends in markers. Its last rung is a
-> word-level merge that always returns text, and the same ladder now resolves git
-> pulls and editor saves too, for notes only. The conflict archive and the sidebar version list
-> were removed in 2026-10 (v2): nothing is archived, and other files keep a conflict copy. The marker grammar below is historical: Reflect no longer reads markers, so notes an older
-> version left marked are plain text. See [icloud-sync.md](../icloud-sync.md) and
+> **Current state:** the marker grammar below is historical. The ladder ends in a
+> word-level merge that returns text. See [icloud-sync.md](../icloud-sync.md) and
 > [git-backup-safety.md](../git-backup-safety.md) S9.
 
 - **Truthful labels.** Labels are the versions' device names from
   `NSFileVersion.localizedNameOfSavingComputer` (fallback: `this device` /
-  `other device` when unavailable). *(Historical: the review notice parsed these labels. It was removed in 2026-10.)*
+  `other device` when unavailable).
 - **Deterministic side order.** Both devices may resolve the same conflict
   concurrently (each sees itself as current — a documented iCloud behavior). Sides
   are ordered by `(modificationDate, contentHash)`, **not** by local/remote, so two
   devices independently produce byte-identical output and the conflict converges
-  instead of ping-ponging. 
+  instead of ping-ponging.
 
 ### 3. The resolution ladder
 
 Runs in Rust, per conflicted note, first match wins. Steps 1–4 auto-resolve
-silently; step 5 (historical) flagged for review. **No archive before resolution (2026-10 v2).** `.md` notes
-never drop a word, and other files keep a conflict copy beside them.
+silently. `.md` notes never drop a word, and other files keep a conflict copy beside them.
 
 1. **Identical / whitespace-only** → keep current, mark versions resolved.
 2. **Three-way merge with the shadow base** (contract 4) → clean merge auto-applies.
@@ -150,9 +141,8 @@ never drop a word, and other files keep a conflict copy beside them.
      template/bullet, so the common-prefix shape holds), archive, delete the
      duplicate.
 4. **Binary assets** → keep-both using `name (conflict <UTC time> <hash8>).ext`
-   from `conflict/copy.rs` (2026-10 v2).
-5. **Overlapping text edits** → marker block (contract 2). *(2026-10 revision: this rung is
-   now a word-level merge that returns text; there is no review state.)* This is the floor: *never* silent last-writer-wins, *never* a
+   from `conflict/copy.rs`
+5. **Overlapping text edits** → marker block (contract 2). *(Now a word-level merge that returns text.)* This is the floor: *never* silent last-writer-wins, *never* a
    `note 2.md` left behind.
 
 Only after the resolved content is durably written: set `resolved = true` on the
@@ -192,10 +182,9 @@ rename seam; a miss is again just a degraded merge.
   disconnects a configured Git remote (with an explanatory prompt); local
   checkpoint commits remain allowed and useful for recovery.
 
-  2026-10 revision: a graph may hold both. One sync method per graph stays the
-  recommendation, but the engine now runs in quiet mode on an iCloud graph with
-  a remote: it commits locally, and fetches and pushes only after five quiet
-  minutes with no pending iCloud downloads (see `docs/icloud-sync.md`).
+  A graph may hold both. The engine then commits locally, and fetches and
+  pushes only after five quiet minutes with no pending iCloud downloads (see
+  `docs/icloud-sync.md`).
 - **`.reflect/` exclusion goes cross-platform.** `mark_reflect_dir_local_only`
   widens from `cfg(target_os = "macos")` to Apple targets; the
   `ubiquitousItemIsExcludedFromSync` resource key exists on iOS. Verified inside
