@@ -88,9 +88,9 @@ function insertProjection(database: DatabaseSync, indexed: IndexedNote): void {
     .prepare(
       `INSERT INTO notes(
         path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned,
-        pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at,
+        pinned_order, gist_url, gist_stale, file_hash, mtime, updated_at,
         preview, has_content
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       indexed.path,
@@ -103,7 +103,6 @@ function insertProjection(database: DatabaseSync, indexed: IndexedNote): void {
       Number(indexed.isPrivate),
       Number(indexed.isPinned),
       indexed.pinnedOrder,
-      Number(indexed.hasConflict),
       indexed.gistUrl,
       Number(indexed.gistStale),
       indexed.fileHash,

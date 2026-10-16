@@ -124,8 +124,8 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
       removeNote(db, note.path)
       run(
         db,
-        `INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview, has_content)
-         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, gist_url, gist_stale, file_hash, mtime, updated_at, preview, has_content)
+         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           note.path,
           note.id,
@@ -137,7 +137,6 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
           note.isPrivate,
           note.isPinned,
           note.pinnedOrder,
-          note.hasConflict,
           note.gistUrl,
           note.gistStale,
           note.fileHash,

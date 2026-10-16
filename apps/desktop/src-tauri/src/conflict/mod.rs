@@ -18,7 +18,6 @@
 pub mod archive;
 mod frontmatter;
 pub mod ladder;
-pub mod markers;
 mod merge3;
 pub mod shadow;
 mod total;

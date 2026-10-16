@@ -482,8 +482,6 @@ pub enum MergedKind {
     Exact,
     /// A merge that may have changed text; both inputs are archived.
     Reconciled,
-    /// The file was kept as it is; `contents` is archived.
-    KeptTheirs,
 }
 
 /// Write a note. A checked write with an expected revision merges `contents`
@@ -558,7 +556,6 @@ fn merge_into_moved_note(
 ) -> AppResult<NoteWriteOutcome> {
     use crate::conflict::archive::archive_unless_in_history;
     use crate::conflict::ladder::{self, ConflictInput};
-    use crate::conflict::markers::contains_conflict_markers;
     use crate::conflict::{ConflictSide, Resolution, OTHER_DEVICE, THIS_DEVICE};
 
     let disk_ms = fs::metadata(target).ok().as_ref().and_then(modified_ms);
@@ -574,17 +571,6 @@ fn merge_into_moved_note(
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_millis() as u64)
         .max(disk_ms_value + 1);
-    let keep_theirs = |current: String| -> AppResult<NoteWriteOutcome> {
-        archive_unless_in_history(root, rel, Some(THIS_DEVICE), now_ms, contents.as_bytes())?;
-        Ok(unchanged(Some(MergedWrite {
-            content: current,
-            kind: MergedKind::KeptTheirs,
-        })))
-    };
-    // A marked file carries both originals in its hunks: it stays whole.
-    if contains_conflict_markers(&current) {
-        return keep_theirs(current);
-    }
     let resolution = ladder::resolve(ConflictInput {
         base: Some(base),
         sides: (
@@ -604,7 +590,6 @@ fn merge_into_moved_note(
     let (content, kind) = match resolution {
         Resolution::AlreadyResolved => return Ok(unchanged(None)),
         Resolution::Merged { content } => (content, MergedKind::Exact),
-        Resolution::Reconciled { content } if content == current => return keep_theirs(current),
         Resolution::Reconciled { content } => {
             archive_unless_in_history(root, rel, Some(THIS_DEVICE), now_ms, contents.as_bytes())?;
             archive_unless_in_history(
@@ -1591,9 +1576,6 @@ mod note_revision_tests {
         .unwrap();
         let merged = outcome.merged.unwrap();
         assert_eq!(merged.kind, MergedKind::Reconciled);
-        assert!(!crate::conflict::markers::contains_conflict_markers(
-            &merged.content
-        ));
         assert!(merged.content.contains("blue") && merged.content.contains("green"));
         assert_eq!(fs::read_to_string(&target).unwrap(), merged.content);
 
@@ -1609,55 +1591,28 @@ mod note_revision_tests {
     }
 
     #[test]
-    fn a_marked_disk_file_keeps_theirs_and_archives_ours() {
+    fn a_disk_file_with_marker_text_merges_as_plain_text() {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path();
         let target = root.join("note.md");
-        let marked = "<<<<<<< mac\nx mac\n=======\nx phone\n>>>>>>> phone\n";
-        fs::write(&target, marked).unwrap();
+        let base = "intro\n\nmiddle\n\noutro\n";
+        let disk =
+            "intro\n\n<<<<<<< mac\nmiddle mac\n=======\nmiddle phone\n>>>>>>> phone\n\noutro\n";
+        fs::write(&target, disk).unwrap();
+        let mine = "INTRO\n\nmiddle\n\noutro\n";
         let outcome =
-            write_note_revision(root, "note.md", "x mine\n", true, Some("x\n"), || Ok(())).unwrap();
-        assert_eq!(
-            outcome.merged,
-            Some(MergedWrite {
-                content: marked.to_string(),
-                kind: MergedKind::KeptTheirs,
-            })
+            write_note_revision(root, "note.md", mine, true, Some(base), || Ok(())).unwrap();
+        let merged = outcome.merged.unwrap();
+        assert_eq!(merged.kind, MergedKind::Exact);
+        assert!(merged.content.starts_with("INTRO\n"), "{}", merged.content);
+        assert!(
+            merged
+                .content
+                .contains("<<<<<<< mac\nmiddle mac\n=======\nmiddle phone\n>>>>>>> phone\n"),
+            "{}",
+            merged.content
         );
-        assert_eq!(fs::read_to_string(&target).unwrap(), marked);
-        let versions = crate::conflict::archive::list(root, "note.md").unwrap();
-        assert_eq!(versions.len(), 1);
-        assert_eq!(versions[0].device, "this-device");
-        assert_eq!(
-            crate::conflict::archive::read(root, "note.md", &versions[0].name).unwrap(),
-            "x mine\n"
-        );
-    }
-
-    #[test]
-    fn a_buffer_with_markers_wins_over_a_clean_disk_file() {
-        let directory = tempfile::tempdir().unwrap();
-        let root = directory.path();
-        let target = root.join("note.md");
-        fs::write(&target, "x theirs\n").unwrap();
-        let documented = "```\n<<<<<<< mac\nx mac\n=======\nx phone\n>>>>>>> phone\n```\n";
-        let outcome =
-            write_note_revision(root, "note.md", documented, true, Some("x\n"), || Ok(())).unwrap();
-        assert_eq!(
-            outcome.merged,
-            Some(MergedWrite {
-                content: documented.to_string(),
-                kind: MergedKind::Reconciled,
-            })
-        );
-        assert_eq!(fs::read_to_string(&target).unwrap(), documented);
-        let mut archived: Vec<String> = crate::conflict::archive::list(root, "note.md")
-            .unwrap()
-            .iter()
-            .map(|version| crate::conflict::archive::read(root, "note.md", &version.name).unwrap())
-            .collect();
-        archived.sort();
-        assert_eq!(archived, [documented, "x theirs\n"]);
+        assert_eq!(fs::read_to_string(&target).unwrap(), merged.content);
     }
 
     #[test]
@@ -1700,13 +1655,13 @@ mod note_revision_tests {
                 modified_ms: None,
                 merged: Some(MergedWrite {
                     content: "x".to_string(),
-                    kind: MergedKind::KeptTheirs,
+                    kind: MergedKind::Reconciled,
                 }),
             })
             .unwrap(),
             serde_json::json!({
                 "modifiedMs": null,
-                "merged": { "content": "x", "kind": "keptTheirs" },
+                "merged": { "content": "x", "kind": "reconciled" },
             })
         );
     }
