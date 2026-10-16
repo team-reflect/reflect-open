@@ -11,6 +11,7 @@ import {
 import { isAppError } from '../errors.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { dailyPath } from '../graph/paths.ts'
+import type { ClockService } from '../ports/clock-service.ts'
 import { parseNote } from '../markdown/extract.ts'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
 import type { AiProviderConfig } from '../settings/schema.ts'
@@ -20,7 +21,25 @@ import type { AiProviderConfig } from '../settings/schema.ts'
  */
 export interface CaptureWriteContext {
   noteFile: NoteFileService
+  clock: ClockService
 }
+
+/**
+ * How long a Daily retitle waits for the capture's link to reach the Daily
+ * (a sync can deliver the note before the Daily), counted from `capturedAt`.
+ */
+export const DAILY_LINK_WAIT_MS = 7 * 24 * 60 * 60 * 1000
+
+/**
+ * How {@link finishCaptureWrite} left a prepared retitle.
+ *
+ * - `committed`: the capture status is committed.
+ * - `deferred`: the Daily does not link the capture yet, so the transaction
+ *   stays in the note for a later pass.
+ */
+export type CaptureWriteFinish =
+  | { kind: 'committed'; status: Exclude<CaptureStatus, 'skipped'> }
+  | { kind: 'deferred'; status: Exclude<CaptureStatus, 'skipped'> }
 
 export interface PendingCaptureSnapshot {
   /** Full source, including frontmatter, used to preserve unrelated keys. */
@@ -47,6 +66,15 @@ interface PersistCaptureEnrichmentInput {
   provider: AiProviderConfig | null
   screenshot?: string | undefined
   generation: number
+}
+
+/**
+ * A persisted checkpoint. `deferred` means its Daily retitle still waits for
+ * the capture's link, so the capture stays `pending`.
+ */
+export interface PersistedCapture {
+  captureHash: string
+  deferred: boolean
 }
 
 interface CaptureWriteTransaction {
@@ -100,16 +128,23 @@ export function hasCaptureWriteTransaction(meta: CaptureNoteMeta): boolean {
   return captureWriteTransaction(meta) !== null
 }
 
+function dailyLinkWaitExpired(meta: CaptureNoteMeta, now: number): boolean {
+  const capturedAt = meta.capturedAt === undefined ? NaN : Date.parse(meta.capturedAt)
+  return Number.isNaN(capturedAt) || now - capturedAt > DAILY_LINK_WAIT_MS
+}
+
 /**
  * Finish the Daily half of a prepared capture retitle, then commit the capture
  * status. The prepared note keeps enough state for this to resume after either
  * write fails without re-scraping or guessing whether Daily text was user-made.
+ * A Daily that does not link the capture yet defers the commit until
+ * {@link DAILY_LINK_WAIT_MS} has passed.
  */
 export async function finishCaptureWrite(
   ctx: CaptureWriteContext,
   identity: CaptureIdentity,
   generation: number,
-): Promise<Exclude<CaptureStatus, 'skipped'> | null> {
+): Promise<CaptureWriteFinish | null> {
   let snapshot = await readPendingCaptureSnapshot(ctx, identity, generation)
   if (snapshot === null) {
     return null
@@ -128,14 +163,17 @@ export async function finishCaptureWrite(
   ) {
     return null
   }
-  const retitled = retitleDailyEntry(
+  const retitle = retitleDailyEntry(
     dailySource,
     identity.base,
     transaction.fromTitle,
     snapshot.title,
   )
-  if (retitled !== dailySource) {
-    await ctx.noteFile.write(dailyNotePath, retitled, generation)
+  if (retitle.kind === 'missing' && !dailyLinkWaitExpired(snapshot.meta, ctx.clock.now())) {
+    return { kind: 'deferred', status: transaction.status }
+  }
+  if (retitle.kind === 'retitled') {
+    await ctx.noteFile.write(dailyNotePath, retitle.source, generation)
   }
 
   snapshot = await readPendingCaptureSnapshot(ctx, identity, generation)
@@ -161,18 +199,20 @@ export async function finishCaptureWrite(
     }),
     generation,
   )
-  return transaction.status
+  return { kind: 'committed', status: transaction.status }
 }
 
 /**
  * Persist a metadata or AI checkpoint. Title changes are prepared in the note
  * first and committed only after the Daily alias is updated, making the
- * two-file change recoverable on the next pass.
+ * two-file change recoverable on the next pass. A retitle still waiting for
+ * its Daily link carries over: the transaction keeps the oldest `fromTitle`,
+ * because that is the text the Daily link will hold when it arrives.
  */
 export async function persistCaptureEnrichment(
   ctx: CaptureWriteContext,
   input: PersistCaptureEnrichmentInput,
-): Promise<string | null> {
+): Promise<PersistedCapture | null> {
   const captureHash = await sha256Hex(input.body)
   const snapshot = await readPendingCaptureSnapshot(ctx, input.identity, input.generation)
   const dailySource = await noteSource(
@@ -190,23 +230,29 @@ export async function persistCaptureEnrichment(
     return null
   }
   const reassembled = snapshot.source.slice(0, snapshot.bodyOffset) + input.body
-  const titleChanged = input.toTitle !== input.fromTitle
+  const carried = captureWriteTransaction(snapshot.meta)
+  const fromTitle = carried?.fromTitle ?? input.fromTitle
+  const needsDaily = carried !== null || input.toTitle !== input.fromTitle
   await ctx.noteFile.write(
     input.identity.notePath,
     upsertFrontmatter(reassembled, {
-      captureStatus: titleChanged ? 'pending' : input.status,
+      captureStatus: needsDaily ? 'pending' : input.status,
       captureMetadataStatus: 'done',
       captureHash,
       captureProvider: input.provider?.provider,
       captureModel: input.provider?.model,
       ...(input.screenshot === undefined ? {} : { captureScreenshot: input.screenshot }),
-      captureDailyFromTitle: titleChanged ? input.fromTitle : undefined,
-      captureFinalizeStatus: titleChanged ? input.status : undefined,
+      captureDailyFromTitle: needsDaily ? fromTitle : undefined,
+      captureFinalizeStatus: needsDaily ? input.status : undefined,
     }),
     input.generation,
   )
-  if (titleChanged && (await finishCaptureWrite(ctx, input.identity, input.generation)) === null) {
+  if (!needsDaily) {
+    return { captureHash, deferred: false }
+  }
+  const finish = await finishCaptureWrite(ctx, input.identity, input.generation)
+  if (finish === null) {
     return null
   }
-  return captureHash
+  return { captureHash, deferred: finish.kind === 'deferred' }
 }

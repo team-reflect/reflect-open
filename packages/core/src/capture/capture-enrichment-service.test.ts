@@ -6,6 +6,7 @@ import { ReflectError } from '../errors.ts'
 import {
   API_KEY_SECRET,
   CAPTURE_URL,
+  CAPTURED_AT,
   createCaptureTestKit,
   DAILY,
   envelope,
@@ -41,7 +42,13 @@ describe('CaptureEnrichmentService', () => {
 
     const outcome = await kit.reconcile({ providers: NO_PROVIDERS })
 
-    expect(outcome).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(outcome).toEqual({
+      pending: 1,
+      enriched: 1,
+      skipped: 0,
+      deferredDates: [],
+      stopped: null,
+    })
     expect(kit.linkPreviewMock).toHaveBeenCalledWith(CAPTURE_URL)
     expect(kit.writeAssetMock).toHaveBeenCalledWith(IDENTITY.assetPath, btoa('preview-jpeg'), 3)
     const note = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
@@ -137,7 +144,13 @@ describe('CaptureEnrichmentService', () => {
 
     const outcome = await kit.reconcile()
 
-    expect(outcome).toEqual({ pending: 1, enriched: 0, skipped: 1, stopped: null })
+    expect(outcome).toEqual({
+      pending: 1,
+      enriched: 0,
+      skipped: 1,
+      deferredDates: [],
+      stopped: null,
+    })
     expect(kit.noteFile.files().get(IDENTITY.notePath)).toContain('captureStatus: skipped')
     expect(kit.writeAssetMock).not.toHaveBeenCalled()
     expect(kit.describeMock).not.toHaveBeenCalled()
@@ -165,7 +178,13 @@ describe('CaptureEnrichmentService', () => {
 
     const outcome = await kit.reconcile()
 
-    expect(outcome).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(outcome).toEqual({
+      pending: 1,
+      enriched: 1,
+      skipped: 0,
+      deferredDates: [],
+      stopped: null,
+    })
     const note = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
     expect(note).toContain(
       '- Type: #link\n- Description: An AI description of the page.\n\n## Selection',
@@ -256,7 +275,13 @@ describe('CaptureEnrichmentService', () => {
 
     const outcome = await kit.reconcile({ providers: NO_PROVIDERS })
 
-    expect(outcome).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(outcome).toEqual({
+      pending: 1,
+      enriched: 1,
+      skipped: 0,
+      deferredDates: [],
+      stopped: null,
+    })
     const note = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
     expect(note).toContain('# An article from its metadata')
     expect(note).toContain('- Description: A scraped description.')
@@ -337,7 +362,13 @@ describe('CaptureEnrichmentService', () => {
       throw new Error('provider did not start')
     }
     finishProvider()
-    expect(await running).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(await running).toEqual({
+      pending: 1,
+      enriched: 1,
+      skipped: 0,
+      deferredDates: [],
+      stopped: null,
+    })
     const enrichedNote = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
     expect(enrichedNote).toContain('# A title from AI')
     expect(enrichedNote).toContain('- Description: A description from AI.')
@@ -382,6 +413,7 @@ describe('CaptureEnrichmentService', () => {
       pending: 1,
       enriched: 0,
       skipped: 0,
+      deferredDates: [],
       stopped: expect.objectContaining({ reason: 'config' }),
     })
     expect(kit.scrapeMock).not.toHaveBeenCalled()
@@ -390,7 +422,7 @@ describe('CaptureEnrichmentService', () => {
     kit.installSecrets({ [API_KEY_SECRET]: 'sk-live-key' })
     const retry = await kit.reconcile()
 
-    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, deferredDates: [], stopped: null })
     const enrichedNote = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
     expect(enrichedNote).toContain('# First Chair on Instagram')
     expect(enrichedNote).toContain('- Description: An AI description of the page.')
@@ -480,7 +512,13 @@ describe('CaptureEnrichmentService', () => {
 
     const outcome = await kit.reconcile({ providers: NO_PROVIDERS })
 
-    expect(outcome).toEqual({ pending: 1, enriched: 0, skipped: 1, stopped: null })
+    expect(outcome).toEqual({
+      pending: 1,
+      enriched: 0,
+      skipped: 1,
+      deferredDates: [],
+      stopped: null,
+    })
     const note = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
     expect(note).toContain('# My edited title')
     expect(note).not.toContain('A scraped description.')
@@ -501,7 +539,13 @@ describe('CaptureEnrichmentService', () => {
 
     const outcome = await kit.reconcile()
 
-    expect(outcome).toEqual({ pending: 1, enriched: 0, skipped: 1, stopped: null })
+    expect(outcome).toEqual({
+      pending: 1,
+      enriched: 0,
+      skipped: 1,
+      deferredDates: [],
+      stopped: null,
+    })
     expect(kit.noteFile.files().get(IDENTITY.notePath)).toContain('captureStatus: skipped')
     expect(kit.describeMock).not.toHaveBeenCalled()
     expect(kit.readAssetMock).not.toHaveBeenCalled()
@@ -516,7 +560,13 @@ describe('CaptureEnrichmentService', () => {
 
     const outcome = await kit.reconcile()
 
-    expect(outcome).toEqual({ pending: 1, enriched: 0, skipped: 1, stopped: null })
+    expect(outcome).toEqual({
+      pending: 1,
+      enriched: 0,
+      skipped: 1,
+      deferredDates: [],
+      stopped: null,
+    })
     expect(kit.noteFile.files().get(IDENTITY.notePath)).toContain('captureStatus: skipped')
     expect(kit.readAssetMock).toHaveBeenCalledTimes(1)
     expect(kit.describeMock).not.toHaveBeenCalled()
@@ -535,7 +585,13 @@ describe('CaptureEnrichmentService', () => {
 
     const outcome = await kit.reconcile()
 
-    expect(outcome).toEqual({ pending: 1, enriched: 0, skipped: 0, stopped: null })
+    expect(outcome).toEqual({
+      pending: 1,
+      enriched: 0,
+      skipped: 0,
+      deferredDates: [],
+      stopped: null,
+    })
     expect(kit.noteFile.files().has(IDENTITY.notePath)).toBe(false)
     expect(kit.describeMock).not.toHaveBeenCalled()
   })
@@ -581,6 +637,7 @@ describe('CaptureEnrichmentService', () => {
       pending: 2,
       enriched: 1,
       skipped: 0,
+      deferredDates: [],
       stopped: expect.objectContaining({ reason: 'network' }),
     })
     expect(kit.noteFile.files().get(IDENTITY.notePath)).toContain('captureStatus: pending')
@@ -596,7 +653,7 @@ describe('CaptureEnrichmentService', () => {
     })
     const retry = await kit.reconcile({ providers: NO_PROVIDERS })
 
-    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, deferredDates: [], stopped: null })
     expect(kit.noteFile.files().get(IDENTITY.notePath)).toContain('# First Chair on Instagram')
     expect(kit.noteFile.files().get(IDENTITY.notePath)).toContain('captureStatus: done')
   })
@@ -664,6 +721,7 @@ describe('CaptureEnrichmentService', () => {
       pending: 2,
       enriched: 1,
       skipped: 0,
+      deferredDates: [],
       stopped: expect.objectContaining({ reason: 'network' }),
     })
     expect(kit.noteFile.files().get(IDENTITY.notePath)).toContain('captureStatus: pending')
@@ -763,7 +821,7 @@ describe('CaptureEnrichmentService', () => {
     })
     const retry = await kit.reconcile()
 
-    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, deferredDates: [], stopped: null })
     expect(kit.scrapeMock).not.toHaveBeenCalled()
     expect(kit.describeMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -787,7 +845,13 @@ describe('CaptureEnrichmentService', () => {
 
     const outcome = await kit.reconcile()
 
-    expect(outcome).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(outcome).toEqual({
+      pending: 1,
+      enriched: 1,
+      skipped: 0,
+      deferredDates: [],
+      stopped: null,
+    })
     const note = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
     expect(note).toContain('# A Cleaned Up Article')
     expect(note).not.toContain('# An article')
@@ -874,7 +938,7 @@ describe('CaptureEnrichmentService', () => {
 
     const retry = await kit.reconcile({ providers: NO_PROVIDERS })
 
-    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, deferredDates: [], stopped: null })
     expect(kit.noteFile.files().get(DAILY)).toContain('|A title from metadata]]')
     expect(kit.noteFile.files().get(IDENTITY.notePath)).toContain('# A title from metadata')
     expect(kit.noteFile.files().get(IDENTITY.notePath)).not.toContain('A different title on retry')
@@ -911,6 +975,7 @@ describe('CaptureEnrichmentService', () => {
       pending: 1,
       enriched: 0,
       skipped: 0,
+      deferredDates: [],
       stopped: expect.objectContaining({ reason: 'config' }),
     })
     expect(kit.scrapeMock).not.toHaveBeenCalled()
@@ -926,7 +991,7 @@ describe('CaptureEnrichmentService', () => {
     })
     const retry = await kit.reconcile()
 
-    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, deferredDates: [], stopped: null })
     expect(kit.scrapeMock).not.toHaveBeenCalled()
     expect(kit.describeMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -965,7 +1030,13 @@ describe('CaptureEnrichmentService', () => {
 
     const outcome = await kit.reconcile({ providers: NO_PROVIDERS })
 
-    expect(outcome).toEqual({ pending: 1, enriched: 0, skipped: 1, stopped: null })
+    expect(outcome).toEqual({
+      pending: 1,
+      enriched: 0,
+      skipped: 1,
+      deferredDates: [],
+      stopped: null,
+    })
     const note = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
     expect(note).toContain('private: true')
     expect(note).toContain('# A title from metadata')
@@ -990,7 +1061,13 @@ describe('CaptureEnrichmentService', () => {
 
     const outcome = await kit.reconcile()
 
-    expect(outcome).toEqual({ pending: 1, enriched: 0, skipped: 1, stopped: null })
+    expect(outcome).toEqual({
+      pending: 1,
+      enriched: 0,
+      skipped: 1,
+      deferredDates: [],
+      stopped: null,
+    })
     const note = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
     expect(note).toContain('# My edited title')
     expect(note).toContain('- Description: A scraped description.')
@@ -1014,6 +1091,159 @@ describe('CaptureEnrichmentService', () => {
     expect(outcome.enriched).toBe(1)
     expect(kit.noteFile.files().get(IDENTITY.notePath)).toContain('# A Cleaned Up Article')
     expect(kit.noteFile.files().get(DAILY)).toContain('|my own link text]]')
+  })
+
+  describe('when the daily does not link the capture yet', () => {
+    const LINK_ENTRY = `[[${IDENTITY.base}|An article]]`
+    const STALE_DAILY = '# Today\n\n- typed on another device\n'
+
+    beforeEach(() => {
+      kit.clock.setNow(CAPTURED_AT.getTime() + 60_000)
+      kit.describeMock.mockResolvedValue({
+        title: 'A Cleaned Up Article',
+        description: 'An AI description of the page.',
+      })
+    })
+
+    async function drainThenStaleDaily(overrides: Partial<CaptureEnvelope> = {}): Promise<string> {
+      await drainOne(overrides)
+      const synced = kit.noteFile.files().get(DAILY) ?? ''
+      kit.noteFile.set(DAILY, STALE_DAILY)
+      return synced
+    }
+
+    it('retitles the note but keeps the daily retitle pending', async () => {
+      const synced = await drainThenStaleDaily()
+      expect(synced).toContain(LINK_ENTRY)
+
+      const outcome = await kit.reconcile()
+
+      expect(outcome).toEqual({
+        pending: 1,
+        enriched: 0,
+        skipped: 0,
+        deferredDates: ['2026-06-11'],
+        stopped: null,
+      })
+      const note = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
+      expect(note).toContain('# A Cleaned Up Article')
+      expect(note).toContain('captureStatus: pending')
+      expect(note).toContain('captureDailyFromTitle: An article')
+      expect(note).toContain('captureFinalizeStatus: done')
+      expect(kit.noteFile.files().get(DAILY)).toBe(STALE_DAILY)
+    })
+
+    it('finishes the retitle once the link reaches the daily', async () => {
+      const synced = await drainThenStaleDaily()
+      await kit.reconcile()
+      kit.noteFile.set(DAILY, synced)
+
+      const outcome = await kit.reconcile()
+
+      expect(outcome).toEqual({
+        pending: 1,
+        enriched: 1,
+        skipped: 0,
+        deferredDates: [],
+        stopped: null,
+      })
+      expect(kit.describeMock).toHaveBeenCalledTimes(1)
+      expect(kit.noteFile.files().get(DAILY)).toContain(`[[${IDENTITY.base}|A Cleaned Up Article]]`)
+      const note = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
+      expect(note).toContain('captureStatus: done')
+      expect(note).not.toContain('captureDailyFromTitle')
+    })
+
+    it('commits without the daily once the wait has expired', async () => {
+      await drainThenStaleDaily()
+      await kit.reconcile()
+      kit.clock.setNow(CAPTURED_AT.getTime() + 8 * 24 * 60 * 60 * 1000)
+
+      const outcome = await kit.reconcile()
+
+      expect(outcome.enriched).toBe(1)
+      expect(outcome.deferredDates).toEqual([])
+      expect(kit.noteFile.files().get(IDENTITY.notePath)).toContain('captureStatus: done')
+      expect(kit.noteFile.files().get(DAILY)).toBe(STALE_DAILY)
+    })
+
+    it('commits without rewriting a daily another device already retitled', async () => {
+      await drainThenStaleDaily()
+      await kit.reconcile()
+      const retitled = `- [[${IDENTITY.base}|A Cleaned Up Article]]\n`
+      kit.noteFile.set(DAILY, retitled)
+      kit.writeNoteMock.mockClear()
+
+      const outcome = await kit.reconcile()
+
+      expect(outcome.enriched).toBe(1)
+      expect(kit.noteFile.files().get(IDENTITY.notePath)).toContain('captureStatus: done')
+      expect(kit.writeNoteMock).not.toHaveBeenCalledWith(DAILY, expect.anything(), 3)
+      expect(kit.noteFile.files().get(DAILY)).toBe(retitled)
+    })
+
+    it('reports a metadata retitle that waits for the daily while the key is missing', async () => {
+      kit.installSecrets()
+      const synced = await drainThenStaleDaily({ source: 'ios-share', title: '' })
+      kit.scrapeMock.mockResolvedValue({
+        title: 'A title from metadata',
+        description: null,
+        siteName: null,
+      })
+
+      const outcome = await kit.reconcile()
+
+      expect(outcome.deferredDates).toEqual(['2026-06-11'])
+      expect(outcome.stopped?.reason).toBe('config')
+
+      kit.noteFile.set(DAILY, synced)
+      const retry = await kit.reconcile()
+
+      expect(retry.deferredDates).toEqual([])
+      expect(kit.noteFile.files().get(DAILY)).toContain(
+        `[[${IDENTITY.base}|A title from metadata]]`,
+      )
+      expect(kit.describeMock).not.toHaveBeenCalled()
+    })
+
+    it('reports a metadata retitle that waits for the daily when the provider fails', async () => {
+      await drainThenStaleDaily({ source: 'ios-share', title: '' })
+      kit.scrapeMock.mockResolvedValue({
+        title: 'A title from metadata',
+        description: null,
+        siteName: null,
+      })
+      kit.describeMock.mockRejectedValue(new ReflectError('network', 'provider unavailable'))
+
+      const outcome = await kit.reconcile()
+
+      expect(outcome.deferredDates).toEqual(['2026-06-11'])
+      expect(outcome.stopped?.reason).toBe('network')
+    })
+
+    it('keeps the oldest link text across a metadata and an AI retitle', async () => {
+      const synced = await drainThenStaleDaily({ source: 'ios-share', title: '' })
+      expect(synced).toContain(`[[${IDENTITY.base}|example.com]]`)
+      kit.scrapeMock.mockResolvedValue({
+        title: 'A title from metadata',
+        description: null,
+        siteName: null,
+      })
+
+      const outcome = await kit.reconcile()
+
+      expect(outcome.deferredDates).toEqual(['2026-06-11'])
+      expect(kit.describeMock).toHaveBeenCalledTimes(1)
+      const note = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
+      expect(note).toContain('# A Cleaned Up Article')
+      expect(note).toContain('captureDailyFromTitle: example.com')
+
+      kit.noteFile.set(DAILY, synced)
+      await kit.reconcile()
+
+      expect(kit.noteFile.files().get(DAILY)).toContain(`[[${IDENTITY.base}|A Cleaned Up Article]]`)
+      expect(kit.noteFile.files().get(IDENTITY.notePath)).toContain('captureStatus: done')
+    })
   })
 
   it('an AI title with a blank description retitles, stamps provenance, and keeps the scraped description', async () => {
@@ -1041,6 +1271,12 @@ describe('CaptureEnrichmentService', () => {
 
     const outcome = await kit.reconcile()
 
-    expect(outcome).toEqual({ pending: 0, enriched: 0, skipped: 0, stopped: null })
+    expect(outcome).toEqual({
+      pending: 0,
+      enriched: 0,
+      skipped: 0,
+      deferredDates: [],
+      stopped: null,
+    })
   })
 })

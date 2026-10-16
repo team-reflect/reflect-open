@@ -26,6 +26,7 @@ import type { ReconcileStop } from '../reconcile/reconcile.ts'
 import type { WebFetchService } from '../link-preview/web-fetch-service.ts'
 import { errorMessage, isAppError, toAppError } from '../errors.ts'
 import type { AssetStoreService } from '../graph/asset-store-service.ts'
+import type { ClockService } from '../ports/clock-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { dailyPath } from '../graph/paths.ts'
 import type { PageMeta } from '../link-preview/metadata.ts'
@@ -39,6 +40,7 @@ import {
   persistCaptureEnrichment,
   readPendingCaptureSnapshot,
   type CaptureWriteContext,
+  type PersistedCapture,
   type PendingCaptureSnapshot,
 } from './capture-enrichment-write.ts'
 import type { PageMetaService } from './page-meta-service.ts'
@@ -71,6 +73,11 @@ export interface ReconcileCaptureEnrichmentOutcome {
    * Captures marked skipped (made private, or edited since the raw save).
    */
   skipped: number
+  /**
+   * Capture days (`YYYY-MM-DD`, no repeats) whose retitle waits for the
+   * capture's link to reach the Daily.
+   */
+  deferredDates: string[]
   /**
    * Why captures remain pending, or `null` when the pass drained.
    */
@@ -105,6 +112,7 @@ export interface CaptureEnrichmentServiceDeps {
   readonly aiProviderConfig: AiProviderConfigService
   readonly aiCredentials: AiCredentialService
   readonly privacy: PrivacyService
+  readonly clock: ClockService
 }
 
 /**
@@ -132,7 +140,7 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
 
   constructor(deps: CaptureEnrichmentServiceDeps) {
     this.#deps = deps
-    this.#writes = { noteFile: deps.noteFile }
+    this.#writes = { noteFile: deps.noteFile, clock: deps.clock }
   }
 
   async listPending(generation: number): Promise<CaptureIdentity[]> {
@@ -175,12 +183,13 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
         pending: 0,
         enriched: 0,
         skipped: 0,
+        deferredDates: [],
         stopped: { reason: toAppError(cause).kind, message: errorMessage(cause) },
       }
     }
     input.onPending?.(pending.length)
     if (pending.length === 0) {
-      return { pending: 0, enriched: 0, skipped: 0, stopped: null }
+      return { pending: 0, enriched: 0, skipped: 0, deferredDates: [], stopped: null }
     }
 
     const config = aiProviderConfig.defaultProvider()
@@ -203,6 +212,8 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
 
     let enriched = 0
     let skipped = 0
+    // Capture base -> capture day, for every retitle still waiting for its Daily link.
+    const deferredCaptures = new Map<string, string>()
     let waitingForKey = false
     let transientStop: ReconcileStop | null = null
     const stale = (): boolean => input.isStale?.() === true
@@ -210,9 +221,24 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
       pending: pending.length,
       enriched,
       skipped,
+      deferredDates: [...new Set(deferredCaptures.values())],
       stopped,
     })
+    const trackDeferral = (identity: CaptureIdentity, deferred: boolean): void => {
+      if (deferred) {
+        deferredCaptures.set(identity.base, identity.date)
+      } else {
+        deferredCaptures.delete(identity.base)
+      }
+    }
+    const finished = (identity: CaptureIdentity, persisted: PersistedCapture): void => {
+      trackDeferral(identity, persisted.deferred)
+      if (!persisted.deferred) {
+        enriched += 1
+      }
+    }
     const markSkipped = async (source: string, identity: CaptureIdentity): Promise<void> => {
+      trackDeferral(identity, false)
       await noteFile.write(
         identity.notePath,
         upsertFrontmatter(source, {
@@ -266,7 +292,11 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
             await skipPending(identity)
             continue
           }
-          if (finalized === 'done') {
+          trackDeferral(identity, finalized.kind === 'deferred')
+          if (finalized.kind === 'deferred' && finalized.status === 'done') {
+            continue
+          }
+          if (finalized.status === 'done') {
             enriched += 1
             continue
           }
@@ -281,7 +311,7 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
             waitingForKey = true
             continue
           }
-          const captureHash = await persistCaptureEnrichment(writes, {
+          const persisted = await persistCaptureEnrichment(writes, {
             identity,
             expectedHash: snapshot.meta.captureHash,
             body: snapshot.body,
@@ -291,11 +321,11 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
             provider: null,
             generation: input.generation,
           })
-          if (captureHash === null) {
+          if (persisted === null) {
             await skipPending(identity)
             continue
           }
-          enriched += 1
+          finished(identity, persisted)
           continue
         }
 
@@ -389,7 +419,7 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
           // an interrupted Daily write resumes as `pending`, letting a provider
           // configured between passes still run AI on this capture. Only after
           // the retitle fully lands does the second persist stamp `done`.
-          const captureHash = await persistCaptureEnrichment(writes, {
+          let persisted = await persistCaptureEnrichment(writes, {
             identity,
             expectedHash: snapshot.meta.captureHash,
             body: metadataBody,
@@ -400,14 +430,14 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
             screenshot: previewScreenshot ?? undefined,
             generation: input.generation,
           })
-          if (captureHash === null) {
+          if (persisted === null) {
             await skipPending(identity)
             continue
           }
           if (titleChanged) {
-            const finalizedHash = await persistCaptureEnrichment(writes, {
+            persisted = await persistCaptureEnrichment(writes, {
               identity,
-              expectedHash: captureHash,
+              expectedHash: persisted.captureHash,
               body: metadataBody,
               fromTitle: metadataDisplayTitle,
               toTitle: metadataDisplayTitle,
@@ -415,18 +445,18 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
               provider: null,
               generation: input.generation,
             })
-            if (finalizedHash === null) {
+            if (persisted === null) {
               await skipPending(identity)
               continue
             }
           }
-          enriched += 1
+          finished(identity, persisted)
           continue
         }
 
         let metadataHash = snapshot.meta.captureHash
         if (!metadataComplete) {
-          const persistedHash = await persistCaptureEnrichment(writes, {
+          const persisted = await persistCaptureEnrichment(writes, {
             identity,
             expectedHash: snapshot.meta.captureHash,
             body: metadataBody,
@@ -437,11 +467,12 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
             screenshot: previewScreenshot ?? undefined,
             generation: input.generation,
           })
-          if (persistedHash === null) {
+          if (persisted === null) {
             await skipPending(identity)
             continue
           }
-          metadataHash = persistedHash
+          trackDeferral(identity, persisted.deferred)
+          metadataHash = persisted.captureHash
         }
         if (stale()) {
           return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
@@ -492,7 +523,7 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
         if (aiTitle !== null) {
           newBody = withTitle(newBody, aiTitle)
         }
-        const captureHash = await persistCaptureEnrichment(writes, {
+        const persisted = await persistCaptureEnrichment(writes, {
           identity,
           expectedHash: metadataHash,
           body: newBody,
@@ -502,11 +533,11 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
           provider: usedAi ? config : null,
           generation: input.generation,
         })
-        if (captureHash === null) {
+        if (persisted === null) {
           await skipPending(identity)
           continue
         }
-        enriched += 1
+        finished(identity, persisted)
       } catch (cause) {
         const error = toAppError(cause)
         // A transient failure — offline, a rate-limited page, an unavailable

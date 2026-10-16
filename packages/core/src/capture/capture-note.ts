@@ -22,6 +22,8 @@ export type CaptureStatus = 'pending' | 'done' | 'skipped'
 
 const captureNoteMetaSchema = z.object({
   captureUrl: z.string(),
+  /** ISO capture time; bounds how long a Daily retitle waits for its link. */
+  capturedAt: z.string().optional().catch(undefined),
   captureStatus: z.enum(['pending', 'done', 'skipped']),
   /** The metadata attempt completed, including a permanently unsuitable page. */
   captureMetadataStatus: z.literal('done').optional(),
@@ -213,28 +215,41 @@ export function withScreenshot(body: string, title: string, assetPath: string): 
 }
 
 /**
+ * How {@link retitleDailyEntry} found the capture's daily entry.
+ *
+ * - `retitled`: the entry still read `from`; `source` holds the rewrite.
+ * - `current`: the entry already reads `to`, or the title did not change.
+ * - `userEdited`: the daily links the capture with other text; that text wins.
+ * - `missing`: the daily does not link the capture at all.
+ */
+export type DailyEntryRetitle =
+  | { kind: 'retitled'; source: string }
+  | { kind: 'current' }
+  | { kind: 'userEdited' }
+  | { kind: 'missing' }
+
+/**
  * Rewrite a daily entry's wiki-link display text after its capture note was
  * retitled. Both writers (the drain's dedup refresh and the enrichment
  * retitle) keep the invariant "daily link text mirrors the note's H1", so the
- * rewrite fires only when the entry still reads `from` verbatim — a mismatch
- * means the user edited the daily and their text wins. The link target (the
- * stable capture id) never changes.
+ * rewrite fires only when the entry still reads `from` verbatim. The link
+ * target (the stable capture id) never changes.
  */
 export function retitleDailyEntry(
   dailySource: string,
   base: string,
   from: string,
   to: string,
-): string {
-  if (from === to) {
-    return dailySource
+): DailyEntryRetitle {
+  if (from === to || dailySource.includes(`[[${base}|${to}]]`)) {
+    return { kind: 'current' }
   }
   const entry = `[[${base}|${from}]]`
-  if (!dailySource.includes(entry)) {
-    return dailySource
+  if (dailySource.includes(entry)) {
+    // Function replacer: `$` sequences in titles must stay literal.
+    return { kind: 'retitled', source: dailySource.replace(entry, () => `[[${base}|${to}]]`) }
   }
-  // Function replacer: `$` sequences in titles must stay literal.
-  return dailySource.replace(entry, () => `[[${base}|${to}]]`)
+  return dailySource.includes(`[[${base}`) ? { kind: 'userEdited' } : { kind: 'missing' }
 }
 
 /**

@@ -252,6 +252,7 @@ class CaptureTestKitImpl implements CaptureTestKit {
         noteFile: this.noteFile,
         graphSession: createTestGraphSessionService({ graph: { generation: 1 } }),
       }),
+      clock: this.clock,
     })
     return await enrichment.reconcile({ generation: 3, ...input })
   }

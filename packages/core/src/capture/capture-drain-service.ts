@@ -270,7 +270,10 @@ class CaptureDrainServiceImpl implements CaptureDrainService {
         if (existing !== null) {
           // The refresh reset the note's H1 to the fresh tab title; keep the
           // daily's link text in step.
-          updatedDaily = retitleDailyEntry(updatedDaily, identity.base, existing.title, freshTitle)
+          const retitle = retitleDailyEntry(updatedDaily, identity.base, existing.title, freshTitle)
+          if (retitle.kind === 'retitled') {
+            updatedDaily = retitle.source
+          }
         }
         const section: SectionTarget = { titles: [linksNoteTitle, LINKS_NOTE_TITLE], linked: true }
         updatedDaily = linkSectionHeading(updatedDaily, section)

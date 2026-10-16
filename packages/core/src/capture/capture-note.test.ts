@@ -6,26 +6,48 @@ const BASE = 'capture-2026-06-11-153022-845-7c9e'
 describe('retitleDailyEntry', () => {
   it('rewrites the entry when the link text still mirrors the old title', () => {
     const daily = `## Links\n\n- [[${BASE}|Old Title]]\n`
-    expect(retitleDailyEntry(daily, BASE, 'Old Title', 'New Title')).toBe(
-      `## Links\n\n- [[${BASE}|New Title]]\n`,
-    )
+    expect(retitleDailyEntry(daily, BASE, 'Old Title', 'New Title')).toEqual({
+      kind: 'retitled',
+      source: `## Links\n\n- [[${BASE}|New Title]]\n`,
+    })
   })
 
   it('leaves an edited link text alone — the user’s text wins', () => {
     const daily = `## Links\n\n- [[${BASE}|my own words]]\n`
-    expect(retitleDailyEntry(daily, BASE, 'Old Title', 'New Title')).toBe(daily)
+    expect(retitleDailyEntry(daily, BASE, 'Old Title', 'New Title')).toEqual({
+      kind: 'userEdited',
+    })
   })
 
-  it('is a no-op when the title did not change', () => {
+  it('treats a link without display text as a user edit', () => {
+    const daily = `## Links\n\n- [[${BASE}]]\n`
+    expect(retitleDailyEntry(daily, BASE, 'Old Title', 'New Title')).toEqual({
+      kind: 'userEdited',
+    })
+  })
+
+  it('reports a daily that does not link the capture', () => {
+    const daily = '## Links\n\n- [[capture-2026-06-11-090000-000-0000|Old Title]]\n'
+    expect(retitleDailyEntry(daily, BASE, 'Old Title', 'New Title')).toEqual({ kind: 'missing' })
+    expect(retitleDailyEntry('', BASE, 'Old Title', 'New Title')).toEqual({ kind: 'missing' })
+  })
+
+  it('is current when the entry already reads the new title', () => {
+    const daily = `## Links\n\n- [[${BASE}|New Title]]\n`
+    expect(retitleDailyEntry(daily, BASE, 'Old Title', 'New Title')).toEqual({ kind: 'current' })
+  })
+
+  it('is current when the title did not change', () => {
     const daily = `## Links\n\n- [[${BASE}|Same]]\n`
-    expect(retitleDailyEntry(daily, BASE, 'Same', 'Same')).toBe(daily)
+    expect(retitleDailyEntry(daily, BASE, 'Same', 'Same')).toEqual({ kind: 'current' })
   })
 
   it('keeps `$` sequences in titles literal', () => {
     const daily = `## Links\n\n- [[${BASE}|Old Title]]\n`
-    expect(retitleDailyEntry(daily, BASE, 'Old Title', 'Costs $& more')).toBe(
-      `## Links\n\n- [[${BASE}|Costs $& more]]\n`,
-    )
+    expect(retitleDailyEntry(daily, BASE, 'Old Title', 'Costs $& more')).toEqual({
+      kind: 'retitled',
+      source: `## Links\n\n- [[${BASE}|Costs $& more]]\n`,
+    })
   })
 })
 
