@@ -24,8 +24,8 @@ It complements [Reflect V2 Product Vision](./reflect-v2-product-vision.md).
 >   Git remote (one method per graph is recommended). The AI-assisted resolution below remains
 >   deferred.
 > - **AI-assisted conflict resolution did not ship.** Text conflicts merge through
->   one ladder on every path (git pull, iCloud sweep, editor save), and a result
->   that drops or interleaves a side is archived under Earlier versions. Current
+>   one ladder on every note path (git pull, iCloud sweep, editor save). Other files
+>   keep a conflict copy beside the original. Current
 >   sync never writes conflict markers. Conflict markers are plain text to Reflect:
 >   the app neither writes nor interprets them.
 > - Plain-language product states (Backed up / Backing up / Offline /

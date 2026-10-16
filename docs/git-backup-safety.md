@@ -13,19 +13,18 @@ implemented.
 ## S1. A pull never overwrites uncommitted local changes
 
 A note saved after the cycle's commit (during the fetch, for example) is
-not clobbered by the checkout that applies the pull. The checked write
-merges inside the graph lock, and the pull's checkout also runs inside
-that lock, so a save can never fall between them. The pull reads every
-uncommitted local edit before the checkout and writes it back after it.
-When both sides changed a text file, the conflict ladder resolves it with
-the incoming version. Otherwise the edit is kept beside a conflict copy.
-The result stays uncommitted for the next commit. Local edits captured
-before a checkout are saved in `refs/reflect/edits` until they are written
-back, so a failure or a stop in the write-back cannot lose them.
+not clobbered by the checkout that applies the pull. Each cycle runs fetch,
+then `git_pull`, then push. `git_pull` commits the local changes and merges
+the remote under one graph lock. Every writer to a tracked file waits for
+that lock, so no save can land between the commit and the checkout. At
+checkout the working tree equals HEAD. `.reflect/` and files withheld for
+size stay out of the checkout, so their local bytes stay as they are. A note
+saved during the fetch is committed before the merge. S7 resolves any
+conflict with the remote.
 
-- Test: `git::tests::a_save_between_commit_and_merge_survives_the_merge`,
-  `git::tests::a_save_between_commit_and_fast_forward_survives`,
-  `git::tests::edits_after_a_crash_before_checkout_keep_the_merged_changes`.
+- Test: `git::tests::pull_all_holds_one_lock_for_commit_and_merge`,
+  `git::tests::pull_all_commits_before_it_merges`,
+  `git::tests::an_oversized_edit_survives_the_pull`.
 
 ## S2. The branch ref moves only after the working tree matches it
 
@@ -44,7 +43,7 @@ the ref moves last.
 ## S3. After any failed git command, the next cycle loses nothing
 
 Whatever step fails (lock file, disk, network, crash), running the normal
-cycle again (commit, fetch, merge, push) converges on a tree that contains
+cycle again (fetch, pull, push) converges on a tree that contains
 every local and every remote change. In particular it never pushes a commit
 that reverts a pull.
 
@@ -65,22 +64,24 @@ queue, never straight to `git_commit_all`.
 ## S5. The repository is never left in app-made merge state
 
 A pull computes the merge in memory and never calls `repo.merge()`, so no
-stop can leave `MERGE_HEAD` behind. Until the branch ref moves, the merge
-commit is recorded in `refs/reflect/merge`, and the next commit or pull
-checks it out and moves the ref to it instead of merging again. Foreign
-state (a merge or rebase the user started with the git CLI) is still
-refused.
+stop can leave `MERGE_HEAD` behind. The app keeps no merge commit outside the
+branch. If the user starts a merge, a rebase, or a detached HEAD with the git
+CLI, the app clears the leftover state and sync continues. A detached HEAD
+is reattached to the backup branch, and the working tree does not change.
+Sync never stops with a message that asks the user to run git.
 
-Reserved refs: `refs/reflect/merge` holds a merge commit written before its
-checkout, and the next cycle adopts it. `refs/reflect/edits` holds local
-edits captured before a checkout, and the next cycle replays them if the
-write-back did not finish.
+The stop points of a pull, and what the next cycle does:
+
+| Stop point | Next cycle |
+| --- | --- |
+| Before the merge commit is written | Nothing is on disk. The pull runs again. |
+| After the merge commit, before checkout | The working tree still equals HEAD, so nothing is committed. The merge runs again and makes the same bytes. The only cost is one unreferenced commit. |
+| After checkout, before the branch ref moves | The working tree equals the merge tree. The next commit records it as a child of HEAD, and the merge with the remote runs again. Clean merges agree on both sides. A `.md` note that the ladder already resolved runs through the ladder again. The word-level merge can repeat a phrase, but it writes no marker and loses no word. |
 
 - Test: `git::tests::merge_interrupted_before_commit_converges_next_cycle`,
   `git::tests::merge_never_leaves_merge_head`,
-  `git::tests::edits_after_a_merge_crash_survive_the_next_cycle`,
-  `git::tests::edits_after_a_crash_before_checkout_keep_the_merged_changes`,
-  `git::tests::a_recorded_merge_from_a_foreign_head_is_dropped`.
+  `git::tests::a_leftover_cli_merge_state_is_cleared_not_refused`,
+  `git::tests::a_detached_head_is_reattached_to_the_backup_branch`.
 
 ## S6. `.reflect/` never enters a commit
 
@@ -94,23 +95,40 @@ tracked.
 
 ## S7. Merged content is committed and pushed, never left pending
 
-A text file both devices changed is resolved by the conflict ladder
-(`conflict::ladder`), committed with both parents, and pushed. The ladder
-orders the sides by commit time and content, so both devices produce the
-same bytes. A binary file keeps both copies and an edit kept against a
-deletion stays, and only those land in `reviewPaths`. Other notes keep
+Each file that both devices changed resolves by one row of this table. The
+app commits the result with both parents and pushes it. Other notes keep
 syncing.
+
+| Case | Result |
+| --- | --- |
+| One side changed the file, the other side deleted it | Keep the changed side. |
+| Both sides changed it, and the three-way merge is clean | Use the merged result. |
+| Both sides changed a `.md` note, and the merge is not clean | Run the conflict ladder (`conflict::ladder`). It always returns text. |
+| Both sides changed another file, and the merge is not clean or the file is binary | Keep the local file at its path. Write the remote version beside it as `<stem> (conflict <UTC time> <hash8>).<ext>`. |
+
+Other text files try a three-way merge (`conflict/merge3.rs`) before the last
+row applies. The UTC time is the commit time of the remote side. `hash8` is
+the first 8 hex digits of the blob hash of the remote version. If that name
+is taken, a counter is added before the extension, for example
+`(conflict 2026-10-16 08-05-31 a1b2c3d4 2)`. Symlinks and submodules keep both
+sides. The ladder orders the sides by commit time and content, so both devices
+produce the same bytes.
 
 - Test: `git::tests::conflicting_edits_merge_without_markers`,
   `git::tests::daily_append_on_two_devices_merges_by_union`,
   `git::tests::frontmatter_only_conflict_merges_keywise`,
   `git::tests::both_devices_resolve_the_same_pair_to_the_same_bytes`,
   `git::tests::a_deletion_beside_an_append_is_reconciled_not_resurrected`,
-  `git::tests::a_dirty_save_against_an_overlapping_pull_merges_through_the_ladder`,
+  `git::tests::a_text_conflict_that_diff3_merges_takes_the_merge`,
   `git::tests::edit_vs_delete_keeps_the_edit`,
+  `git::tests::a_json_conflict_keeps_both_copies`,
+  `git::tests::a_md_conflict_never_gets_a_copy`,
   `git::tests::binary_conflict_keeps_both_copies`,
+  `git::tests::two_devices_name_the_same_copy`,
+  `git::tests::a_conflict_copy_never_overwrites_an_existing_file`,
   `git::tests::a_directory_file_conflict_keeps_the_file_as_a_conflict_copy`,
-  `git::tests::a_symlink_conflict_keeps_both_sides`.
+  `git::tests::a_symlink_conflict_keeps_both_sides`,
+  `backup-service.test.ts` "a hint lists every copy by its graph path".
 
 ## S8. Edits in an open note are never silently discarded
 
@@ -123,11 +141,10 @@ protected. There is no parked state, so every
 exit path only has to finish the write.
 
 - Test: `fs::tests::a_checked_write_against_a_moved_file_merges_under_the_lock`,
-  `fs::tests::a_reconciled_write_archives_the_buffer`;
+  `fs::tests::a_reconciled_write_keeps_both_words`;
   `note-session-service.test.ts` "a dirty buffer saves at once when an
   external change arrives", "an exact merge adopts the merged text and the
-  session is clean", "a reconciled merge adopts the merged text and stays
-  saveable", "a lossy merged result opens protected", "a merged title change is
+  session is clean", "a lossy merged result opens protected", "a merged title change is
   reported as external before saved", "keystrokes during a merging write
   stay dirty and merge on the next write", "dispose after flush still
   completes a merging write".
@@ -135,13 +152,10 @@ exit path only has to finish the write.
 ## S9. Merges never write conflict markers
 
 No merge path writes `<<<<<<<` lines into a note: not the git pull, not
-the iCloud sweep, not the editor save. All three resolve a text conflict
-through the same ladder. A result that drops or interleaves a side is
-handled by where each side lives. A Git pull keeps both sides in the
-parents of the merge commit, so it archives nothing. An iCloud sweep or an
-editor save archives a result that drops or interleaves a side under
-Earlier versions. Conflict markers are plain text to Reflect: the app
-neither writes nor interprets them.
+the iCloud sweep, not the editor save. A `.md` note resolves through the
+conflict ladder on all three paths. Other files keep a conflict copy when
+they do not merge cleanly (S7). Conflict markers are plain text to Reflect:
+the app neither writes nor interprets them.
 
 - Test: `git::tests::conflicting_edits_merge_without_markers`,
   `conflict::ladder::tests::overlapping_edits_reconcile_without_markers`,

@@ -54,17 +54,24 @@ resolving the same conflict produce identical bytes and converge):
    file that already holds markers is plain text: the ladder merges it like
    any other text.
 
-The same ladder runs on every path: a Git pull, the iCloud sweep, and an
+The same ladder runs on every note path: a Git pull, the iCloud sweep, and an
 editor save that meets a newer file on disk. The path does not change the
-result.
+result. Only notes (`.md` files) go through the ladder.
 
-A result that drops or interleaves a side's text (a marked side, the loop
-breaker, the word-level merge) is archived first: Reflect archives each side
-under `.reflect/conflict-archive/<note-path>/` before it writes the result. It
-archives only content that Git history does not already hold (kept ~90 days /
-20 versions per note). The archived versions show under **Earlier versions**
-in the note sidebar. Binary assets never text-merge: the other device's copy
-lands alongside as `name (conflict).ext`.
+Other files (JSON, text, PDF, audio, images, and so on) never merge as text on
+the iCloud path. The file on the device stays at its path. Each other version
+lands beside it as `name (conflict <YYYY-MM-DD HH-MM-SS> <hash8>).ext`. The
+time is the UTC modification time of that version. `hash8` is the first 8 hex
+digits of its content hash, so both devices write the same name. A version
+equal to the current file writes no copy. The app lists every copy by its
+graph path in the status hint.
+
+The sweep checks attachments only on a full sweep (resume and adoption), and
+only for extensions on the attachment whitelist. Files with other extensions
+get no copy, and their conflict versions stay in iCloud.
+
+There is no conflict archive and no version list in the note sidebar. A result is
+never archived before it is written.
 
 ## Building with iCloud
 

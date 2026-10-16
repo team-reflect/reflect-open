@@ -114,8 +114,8 @@ resolution reuse verbatim. Two iCloud-specific refinements:
 
 > **2026-10 revision:** the ladder no longer ends in markers. Its last rung is a
 > word-level merge that always returns text, and the same ladder now resolves git
-> pulls and editor saves too. A result that drops or interleaves a side is archived
-> under Earlier versions. The marker grammar below is historical: Reflect no longer reads markers, so notes an older
+> pulls and editor saves too, for notes only. The conflict archive and the sidebar version list
+> were removed in 2026-10 (v2): nothing is archived, and other files keep a conflict copy. The marker grammar below is historical: Reflect no longer reads markers, so notes an older
 > version left marked are plain text. See [icloud-sync.md](../icloud-sync.md) and
 > [git-backup-safety.md](../git-backup-safety.md) S9.
 
@@ -131,9 +131,8 @@ resolution reuse verbatim. Two iCloud-specific refinements:
 ### 3. The resolution ladder
 
 Runs in Rust, per conflicted note, first match wins. Steps 1–4 auto-resolve
-silently; step 5 (historical) flagged for review. **Before any resolution write, every losing
-version's full content is archived** to `.reflect/conflict-archive/<path>/<timestamp>-<device>.md`
-(local-only, pruned by age/count) — resolution must never be the only copy-holder.
+silently; step 5 (historical) flagged for review. **No archive before resolution (2026-10 v2).** `.md` notes
+never drop a word, and other files keep a conflict copy beside them.
 
 1. **Identical / whitespace-only** → keep current, mark versions resolved.
 2. **Three-way merge with the shadow base** (contract 4) → clean merge auto-applies.
@@ -150,8 +149,8 @@ version's full content is archived** to `.reflect/conflict-archive/<path>/<times
      `2026-07-04 2.md` into the canonical file (union; both seeded from the same
      template/bullet, so the common-prefix shape holds), archive, delete the
      duplicate.
-4. **Binary assets** → keep-both using the existing `name (conflict).ext`
-   convention from `git/merge.rs::conflict_copy_path`.
+4. **Binary assets** → keep-both using `name (conflict <UTC time> <hash8>).ext`
+   from `conflict/copy.rs` (2026-10 v2).
 5. **Overlapping text edits** → marker block (contract 2). *(2026-10 revision: this rung is
    now a word-level merge that returns text; there is no review state.)* This is the floor: *never* silent last-writer-wins, *never* a
    `note 2.md` left behind.

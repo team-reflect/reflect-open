@@ -10,10 +10,10 @@ plain Markdown files, so any tool can read and write them.
 - **Edit while Reflect is open.** If your edit overlaps an edit made in Reflect,
   Reflect merges the two word by word. It never writes conflict markers into the
   note.
-- **Both versions are kept.** For a note synced through Git, the previous
-  versions are in the Git history. For iCloud graphs, and for edits typed in
-  the app, a merge that drops or interleaves a side archives the versions.
-  Find them under **Earlier versions** in the note sidebar.
+- **Both versions are kept.** A Git graph keeps earlier versions in the Git
+  history. A note that both sides changed merges word by word, so no word is
+  lost. Any other file that both sides changed keeps a copy beside it, named
+  `name (conflict <YYYY-MM-DD HH-MM-SS> <hash8>).ext`.
 - **Folding a bullet does not cause a conflict.** You can fold a bullet in Reflect
   while a script appends to the same note. Reflect keeps both changes and shows no
   conflict notice.
@@ -23,10 +23,14 @@ plain Markdown files, so any tool can read and write them.
 ## What Reflect does not sync
 
 - **`.reflect/` is never synced.** Git ignores it and iCloud keeps it local-only.
-  The index, the merge bases and the archive of earlier versions live there. Do not
-  write notes inside it.
-- **Binary assets do not text-merge.** If two devices change the same asset, the
-  other copy lands beside it as `name (conflict).ext`.
+    The index and the merge bases live there. Do not write notes inside it.
+- **Files other than notes do not text-merge.** If two devices change the same
+  file, the other copy lands beside it as
+  `name (conflict <YYYY-MM-DD HH-MM-SS> <hash8>).ext`.
+- **A Git merge or rebase started with the git CLI is cleared.** Reflect cleans up
+  an unfinished merge or rebase in a Git graph, and reattaches a detached HEAD to
+  the backup branch. Then sync continues. Conflict markers that the CLI left in a
+  file are committed as plain text.
 
 ## Notes that already hold markers
 
