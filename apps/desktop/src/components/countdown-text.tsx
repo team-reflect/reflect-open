@@ -5,26 +5,13 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * The time left until `until` (epoch ms) in words, such as `2 minutes`. It
- * re-renders only when the words change. // FIXME: rename BackupCountdown to a more generic name, like CountdownText or something. It is not specific to backup at all.
+ * re-renders only when the words change.
  */
-export function BackupCountdown({ until }: { until: number }): ReactElement {
-  return <>{useBackupCountdown(until)}</>
-}
-
-/**
- * {@link BackupCountdown} as a string, for surfaces that take text. `null`
- * when `until` is `null`.
- */
-export function useBackupCountdown(until: number | null): string | null {
+export function CountdownText({ until }: { until: number }): ReactElement {
   const { clock } = useCoreServices()
-  const [text, setText] = useState(() =>
-    until === null ? '' : formatRemaining(until - clock.now()),
-  )
+  const [text, setText] = useState(() => formatRemaining(until - clock.now()))
 
   useEffect(() => {
-    if (until === null) {
-      return
-    }
     let handle: TimerHandle | undefined
     const tick = (): void => {
       const remaining = until - clock.now()
@@ -41,7 +28,7 @@ export function useBackupCountdown(until: number | null): string | null {
     }
   }, [clock, until])
 
-  return until === null ? null : text
+  return <>{text}</>
 }
 
 function formatRemaining(ms: number): string {

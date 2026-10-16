@@ -2,13 +2,13 @@ import { page } from 'vitest/browser'
 import { describe, expect, it } from 'vitest'
 import { actAsync } from '@/test-utils/act.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { BackupCountdown } from './backup-countdown.tsx'
+import { CountdownText } from './countdown-text.tsx'
 
-describe('BackupCountdown', () => {
+describe('CountdownText', () => {
   it('counts down by minutes, then by seconds, and stops at zero', async () => {
     const { app } = await renderInApp(
       <span data-testid="countdown">
-        <BackupCountdown until={2 * 60_000} />
+        <CountdownText until={2 * 60_000} />
       </span>,
     )
     const countdown = page.getByTestId('countdown')

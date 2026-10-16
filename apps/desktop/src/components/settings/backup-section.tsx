@@ -2,7 +2,7 @@ import { useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
 import { isICloudRoot, suggestRepoName } from '@reflect/core'
-import { BackupCountdown } from '@/components/backup-countdown.tsx'
+import { CountdownText } from '@/components/countdown-text.tsx'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog.tsx'
 import { SettingsField } from '@/components/settings/field.tsx'
 import { GithubSignOutRow } from '@/components/settings/github-sign-out-row.tsx'
@@ -27,7 +27,7 @@ function BackupStatusLine({
     case 'waiting':
       return (
         <>
-          Backs up in <BackupCountdown until={backup.status.until} />
+          Backs up in <CountdownText until={backup.status.until} />
         </>
       )
     case 'syncing':

@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
 import { FolderOpen, GraduationCap, LocateFixed, PanelsTopLeft, Settings } from 'lucide-react'
-import { BackupCountdown } from '@/components/backup-countdown.tsx'
+import { CountdownText } from '@/components/countdown-text.tsx'
 import { GraphSwatch } from '@/components/graph-swatch.tsx'
 import { ReflectAppsDialog } from '@/components/reflect-apps-dialog.tsx'
 import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
@@ -52,7 +52,7 @@ function BackupDot({ backup }: { backup: BackupState }): ReactElement | null {
       </span>
       {status.state === 'waiting' ? (
         <span className="sr-only">
-          Backs up in <BackupCountdown until={status.until} />
+          Backs up in <CountdownText until={status.until} />
         </span>
       ) : null}
     </>

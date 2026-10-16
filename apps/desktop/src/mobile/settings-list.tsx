@@ -22,7 +22,7 @@ interface SettingsGroupProps {
   /** Small muted caption above the card (iOS section header). */
   header?: string
   /** Explanatory text below the card (iOS section footer). */
-  footer?: string | null
+  footer?: ReactNode
   /** Optional id for associating the footer with a control in the group. */
   footerId?: string
   children: ReactNode

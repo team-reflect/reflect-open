@@ -1,4 +1,5 @@
-import { useId, useState, type ReactElement } from 'react'
+import { useId, useState, type ReactElement, type ReactNode } from 'react'
+import { mobileSyncStatus, type MobileSyncDetail } from '@reflect/app'
 import { useQuery } from '@tanstack/react-query'
 import {
   aiProvider,
@@ -47,12 +48,12 @@ import {
   useClassicAccess,
   useClassicSignOut,
 } from '@/mobile/use-classic-access.ts'
-import { useMobileSyncStatus } from '@/mobile/use-sync-status.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useMobileAppServices } from '@/mobile/mobile-services.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
 import { formatFullDate } from '@/lib/dates.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
+import { CountdownText } from '@/components/countdown-text.tsx'
 import { useSyncContext } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 
@@ -88,6 +89,17 @@ const TIME_FORMAT_OPTIONS: readonly SegmentedOption<TimeFormat>[] = [
   { value: '12h', label: '12-hour' },
   { value: '24h', label: '24-hour' },
 ]
+
+function SyncDetail({ detail }: { detail: MobileSyncDetail }): ReactNode {
+  if (detail.kind === 'message') {
+    return detail.text
+  }
+  return (
+    <>
+      Backs up in <CountdownText until={detail.until} />
+    </>
+  )
+}
 
 /**
  * The mobile Settings screen — a pushed card (route kind `settings`) in the
@@ -145,7 +157,6 @@ export function MobileSettings(): ReactElement {
   const crashTest = useCrashTest()
   const environment = useAppStoreEnvironment()
   const sync = useSyncContext()
-  const status = useMobileSyncStatus()
   const [disconnecting, setDisconnecting] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)
   const { providers, defaultProvider, addProvider, removeProvider, makeDefault, setDefaultModel } =
@@ -171,6 +182,7 @@ export function MobileSettings(): ReactElement {
   })
 
   const backup = sync?.backup ?? null
+  const status = mobileSyncStatus({ backup })
   const repo = backup !== null && backup.phase === 'connected' ? backup.repo : null
   // The connect entry point is local-graph-only (iCloud sync and a Git remote
   // are mutually exclusive per graph, Plan 21) and waits out the controller's
@@ -366,9 +378,11 @@ export function MobileSettings(): ReactElement {
             <SettingsGroup
               header="Backup"
               footer={
-                canConnect
-                  ? 'Sync notes with Reflect on your other devices.'
-                  : (status?.detail ?? null)
+                canConnect ? (
+                  'Sync notes with Reflect on your other devices.'
+                ) : status === null || status.detail === null ? null : (
+                  <SyncDetail detail={status.detail} />
+                )
               }
             >
               {repo !== null ? (
