@@ -1,20 +1,14 @@
 //! Pull-side merge: fast-forward when possible, otherwise a true merge.
 //!
-//! The merge is computed in memory (`merge_commits`), its conflicts are
-//! resolved in that index, and the result is committed with both parents.
-//! Only then is the merged tree checked out, and the branch ref moves last.
-//! The repository never enters libgit2's merge state. A stop before the ref
-//! moves leaves the working tree equal to HEAD or to the merge tree; the next
-//! commit and merge converge from either.
-//! The caller holds the graph lock and has committed the working tree.
-//! A note conflict is resolved by the conflict ladder ([`ladder::resolve`]),
-//! so pulls never write conflict markers. Other files that cannot merge keep
-//! both versions as conflict copies. An edit wins over a delete.
+//! The merge is computed, resolved and committed in memory, then checked out;
+//! the branch ref moves last, so a stop at any step leaves a state the next
+//! pull converges from. The repository never enters libgit2's merge state.
+//! Pulls never write conflict markers.
 
 use std::path::Path;
 
 use git2::build::CheckoutBuilder;
-use git2::{Index, IndexEntry, IndexTime, MergeOptions, Repository};
+use git2::{Index, IndexEntry, MergeOptions, Repository};
 use reflect_graph_paths::to_slash_lossy;
 use serde::Serialize;
 
@@ -26,7 +20,7 @@ use crate::error::{AppError, AppResult};
 
 use super::repo::{
     branch_tip_ahead_of_detached_head, clear_foreign_state, current_branch, open_existing,
-    reattach_head, signature,
+    reattach_head, signature, stage0_entry,
 };
 
 #[derive(Debug, Serialize)]
@@ -175,13 +169,10 @@ fn merge_into_head(
     }
 
     if analysis.is_unborn() || analysis.is_fast_forward() {
-        // Capture the outgoing tree before anything moves (None on unborn).
         let old_oid = repo.head().ok().and_then(|head| head.target());
         let old_tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
         let new_tree = repo.find_commit(theirs_oid)?.tree()?;
         let mut changed_files = changed_between(repo, old_tree.as_ref(), &new_tree)?;
-        // Files first, ref last: a failure in between leaves the branch where
-        // it was, so the next cycle retries the pull.
         #[cfg(test)]
         super::fault::trip(super::fault::FaultPoint::BeforeFastForwardCheckout)?;
         checkout_target(repo, &new_tree, skipped)?;
@@ -274,13 +265,7 @@ fn commit_ms(commit: &git2::Commit<'_>) -> u64 {
     commit.time().seconds().max(0) as u64 * 1000
 }
 
-/// Whether `rel` is under the runtime directory, which a pull never touches.
-fn is_runtime_path(rel: &str) -> bool {
-    rel.starts_with(".reflect/")
-}
-
-/// Diff two trees into the watcher's change shape: what the merge wrote or
-/// removed on disk relative to the previous local HEAD.
+/// Diff two trees into the watcher's change shape.
 fn changed_between(
     repo: &Repository,
     old: Option<&git2::Tree>,
@@ -297,7 +282,7 @@ fn changed_between(
         };
         if let Some(path) = file.path() {
             let path = to_slash_lossy(path);
-            if is_runtime_path(&path) {
+            if path.starts_with(".reflect/") {
                 continue;
             }
             out.push(ChangedFile {
@@ -307,14 +292,14 @@ fn changed_between(
                 } else {
                     ChangeKind::Upsert
                 },
-                modified_ms: None, // stamped once the working tree is final
+                modified_ms: None,
             });
         }
     }
     Ok(out)
 }
 
-/// Fill `modified_ms` for upserts from the (now final) working-tree files.
+/// Fill `modified_ms` for upserts from the working-tree files.
 fn stamp_modified_times(root: &Path, changes: &mut [ChangedFile]) {
     for change in changes {
         if matches!(change.kind, ChangeKind::Remove) {
@@ -333,8 +318,7 @@ fn stamp_modified_times(root: &Path, changes: &mut [ChangedFile]) {
     }
 }
 
-/// Resolve every conflict of an in-memory merge index, so its tree can be
-/// written:
+/// Resolve every conflict of an in-memory merge index:
 ///
 /// - **edit vs delete**: keep the edited version, never silently delete;
 /// - **deleted on both**: confirm the removal;
@@ -436,13 +420,12 @@ fn resolve_index_conflicts(
                         &stamp,
                         &their.id.to_string()[..8],
                         |path| match index.get_path(Path::new(path), 0) {
-                            // The same content is already there (a copy a crashed merge
-                            // committed), so staging it again changes nothing.
+                            // A crashed merge may have committed this copy already.
                             Some(entry) => entry.id != their.id,
                             None => index_or_worktree_has(index, root, path),
                         },
                     );
-                    add_resolved(
+                    let staged = stage_resolved(
                         index,
                         root,
                         &stamp,
@@ -451,6 +434,7 @@ fn resolve_index_conflicts(
                         their.mode,
                         &mut review,
                     )?;
+                    review.push(staged);
                 }
             }
             (Some(edited), None) | (None, Some(edited)) => {
@@ -476,23 +460,6 @@ fn resolve_index_conflicts(
 
 const GITLINK_MODE: u32 = 0o160000;
 const SYMLINK_MODE: u32 = 0o120000;
-
-/// Stage a resolved conflict copy and record it for review. A file that collides with
-/// a directory (a path under it, or a file at one of its parent paths) moves
-/// to its conflict copy path.
-fn add_resolved(
-    index: &mut Index,
-    root: &Path,
-    stamp: &str,
-    path: &str,
-    id: git2::Oid,
-    mode: u32,
-    review: &mut Vec<String>,
-) -> AppResult<()> {
-    let staged = stage_resolved(index, root, stamp, path, id, mode, review)?;
-    review.push(staged);
-    Ok(())
-}
 
 /// Stage a resolved entry without recording it for review, unless it had to
 /// move to its conflict copy path.
@@ -559,24 +526,6 @@ fn entry_path(entry: &IndexEntry) -> String {
 
 fn is_text(blob: &git2::Blob<'_>) -> bool {
     !blob.is_binary() && std::str::from_utf8(blob.content()).is_ok()
-}
-
-/// A stage-0 index entry for `path` with zeroed stat data.
-fn stage0_entry(path: &str, id: git2::Oid, mode: u32) -> IndexEntry {
-    IndexEntry {
-        ctime: IndexTime::new(0, 0),
-        mtime: IndexTime::new(0, 0),
-        dev: 0,
-        ino: 0,
-        mode,
-        uid: 0,
-        gid: 0,
-        file_size: 0,
-        id,
-        flags: path.len().min(0x0FFF) as u16,
-        flags_extended: 0,
-        path: path.as_bytes().to_vec(),
-    }
 }
 
 /// Whether `rel` is taken in the merge index (as a file or a directory) or on
