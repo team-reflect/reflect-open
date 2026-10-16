@@ -1,7 +1,7 @@
 //! The merge that always has an answer. Any `(base, first, second)` in, one
 //! text out with no markers of its own, by `reconcile-text`'s word-level
 //! operational merge. Overlapping edits come out interleaved rather than
-//! marked; disjoint edits merge the way a three-way merge would.
+//! marked.
 
 use reconcile_text::{reconcile, BuiltinTokenizer};
 
@@ -25,10 +25,8 @@ mod tests {
     use proptest::prelude::*;
     use std::collections::HashMap;
 
-    /// The probe cases behind the design: the first group is the same change
-    /// arriving twice (a stale base), the second is two genuinely different
-    /// edits. Outputs are pinned byte for byte, imperfect ones included, so an
-    /// upgrade of the library shows exactly what it changed.
+    /// Outputs are pinned byte for byte, imperfect ones included, so a
+    /// library upgrade shows what it changed.
     #[test]
     fn fixed_cases_are_pinned() {
         let cases: &[(&str, &str, &str, &str, &str)] = &[
@@ -138,7 +136,6 @@ mod tests {
         }
     }
 
-    /// Occurrences of each whitespace-separated word.
     fn words(text: &str) -> HashMap<&str, usize> {
         let mut counts = HashMap::new();
         for word in text.split_whitespace() {
@@ -147,10 +144,6 @@ mod tests {
         counts
     }
 
-    /// Random notes: a few lines over a small vocabulary (Markdown syntax,
-    /// accents, and CJK included), then one to three edits per side: append
-    /// a word to a line, replace a line's first word, insert a line, or drop
-    /// a line (down to an empty note).
     fn note() -> impl Strategy<Value = Vec<String>> {
         let line = prop::collection::vec(
             prop::sample::select(vec![

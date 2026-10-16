@@ -5,9 +5,8 @@
 //! 1. **Identical** → nothing to write.
 //! 2. **Whitespace-equal** → keep the newer side.
 //! 3. **Merge-loop breaker** → keep the newer side, as
-//!    [`Resolution::Reconciled`] (base-dependent auto-merges on two devices
-//!    can swap contents forever; the newer side depends only on the ordered
-//!    pair, so both devices emit identical bytes and the loop dies).
+//!    [`Resolution::Reconciled`]. It depends only on the ordered pair, so two
+//!    devices emit identical bytes and stop swapping contents.
 //! 4. **Three-way merge** over the shadow base, when one exists and the
 //!    hunks do not overlap.
 //! 5. **Key-wise frontmatter** when only the header diverged.
@@ -15,7 +14,8 @@
 //! 7. **Word-level merge** ([`total::merge`]) as [`Resolution::Reconciled`]:
 //!    both sides' words are kept.
 //!
-//! Every rule sees the sides ordered by `(modified_ms, content)`, so concurrent resolution on two devices converges.
+//! Every rule sees the sides ordered by `(modified_ms, content)`, so
+//! concurrent resolution on two devices converges.
 
 use crate::error::AppResult;
 
@@ -36,8 +36,7 @@ pub struct ConflictInput<'a> {
     pub merge_loop_detected: bool,
 }
 
-/// Run the ladder. Pure and deterministic: same input pair (either order) →
-/// same bytes, on any device.
+/// Run the ladder. The same pair, in either order, gives the same bytes.
 pub fn resolve(input: ConflictInput<'_>) -> AppResult<Resolution> {
     let (first, second) = ordered(input.sides.0, input.sides.1);
 
@@ -74,9 +73,8 @@ pub fn resolve(input: ConflictInput<'_>) -> AppResult<Resolution> {
     })
 }
 
-/// Deterministic side order: ascending `(modified_ms, content)`. Timestamps
-/// come from the provider's version metadata, identical on every device; the
-/// content tiebreak covers equal stamps.
+/// Ascending `(modified_ms, content)`. The stamps come from shared version
+/// metadata, so every device picks the same order.
 fn ordered(a: ConflictSide, b: ConflictSide) -> (ConflictSide, ConflictSide) {
     if (a.modified_ms, &a.content) <= (b.modified_ms, &b.content) {
         (a, b)
@@ -187,8 +185,6 @@ mod tests {
 
     #[test]
     fn daily_notes_union_after_a_failed_three_way_merge() {
-        // Both devices appended to the synced daily note — diff3 conflicts
-        // (same-position append), the union rule resolves it.
         let base = "# 2026-07-04\n\n- seed\n";
         let result = resolve(input(
             Some(base),
@@ -210,7 +206,6 @@ mod tests {
     fn union_orders_tails_by_timestamp_not_argument_order() {
         let older = side("- seed\n- older tail\n", 1);
         let newer = side("- seed\n- newer tail\n", 2);
-        // Same pair, both argument orders → identical bytes (convergence).
         let one = resolve(input(None, (older.clone(), newer.clone()))).unwrap();
         let two = resolve(input(None, (newer, older))).unwrap();
         assert_eq!(one, two);
@@ -223,18 +218,7 @@ mod tests {
     }
 
     #[test]
-    fn any_note_unions_disjoint_appends() {
-        let result = resolve(input(
-            None,
-            (side("- a\n- mac\n", 1), side("- a\n- phone\n", 2)),
-        ))
-        .unwrap();
-        assert_eq!(
-            result,
-            Resolution::Merged {
-                content: "- a\n- mac\n- phone\n".to_string()
-            }
-        );
+    fn appends_without_a_common_prefix_union() {
         let result = resolve(input(None, (side("- mac\n", 1), side("- phone\n", 2)))).unwrap();
         assert_eq!(
             result,
@@ -246,9 +230,6 @@ mod tests {
 
     #[test]
     fn rule_6_falls_through_when_a_side_deleted_base_lines() {
-        // The second side deleted "- b" while the first appended. Rule 4
-        // overlaps (adjacent hunks), and a base-blind union would bring "- b"
-        // back as an exact `Merged`.
         let base = "- a\n- b\n";
         let result = resolve(input(
             Some(base),

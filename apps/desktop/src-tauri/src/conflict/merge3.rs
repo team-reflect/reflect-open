@@ -74,8 +74,6 @@ mod tests {
 
     #[test]
     fn both_appending_at_the_end_returns_none_rather_than_reordering() {
-        // The daily-note shape: diff3 alone cannot union same-position
-        // appends.
         let base = "# 2026-07-04\n\n- seed\n";
         let first = side("# 2026-07-04\n\n- seed\n- from mac\n");
         let second = side("# 2026-07-04\n\n- seed\n- from phone\n");
