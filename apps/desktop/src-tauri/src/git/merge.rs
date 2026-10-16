@@ -6,9 +6,9 @@
 //! The repository never enters libgit2's merge state. A stop before the ref
 //! moves leaves the working tree equal to HEAD or to the merge tree; the next
 //! commit and merge converge from either.
-//! The caller holds the graph lock and has committed the working tree, so the
-//! checkout never overwrites an unsaved edit. Files a commit withheld stay as
-//! they are on disk.
+//! The caller holds the graph lock and has committed the working tree. The
+//! checkout is safe, so a write by a tool outside the lock is never overwritten.
+//! Files a commit withheld stay as they are on disk.
 //! A note conflict is resolved by the conflict ladder ([`ladder::resolve`]),
 //! so pulls never write conflict markers. Other files that cannot merge keep
 //! both versions as conflict copies.
@@ -86,11 +86,13 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
 }
 
 /// Check out `tree` over a working tree that equals HEAD, leaving the runtime
-/// directory and the `skipped` dirty files alone.
+/// directory and the `skipped` dirty files alone. The checkout is safe: a file
+/// changed on disk since HEAD (by a tool that does not take the graph lock)
+/// makes it fail before it writes anything, and the next commit records it.
 fn checkout_target(repo: &Repository, tree: &git2::Tree<'_>, skipped: &[String]) -> AppResult<()> {
     // The first matching pathspec wins, so the exclusions come before `*`.
     let mut checkout = CheckoutBuilder::new();
-    checkout.force().path("!.reflect");
+    checkout.safe().path("!.reflect");
     for path in skipped {
         checkout.path(format!("!{path}"));
     }

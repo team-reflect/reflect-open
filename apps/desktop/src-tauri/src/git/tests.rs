@@ -912,6 +912,7 @@ fn merging_into_an_unborn_repo_adopts_the_remote_history() {
     let root = fixture._dir.path().join("fresh");
     scaffold_graph(&root);
     setup(&root, Some(fixture.remote_url.clone()), None).unwrap();
+    fs::remove_file(root.join(".gitignore")).unwrap();
     fetch(&root, None).unwrap();
 
     let merged = merge_remote(&root).unwrap();
@@ -2152,4 +2153,41 @@ fn a_detached_head_is_reattached_to_the_backup_branch() {
     let head = repo.head().unwrap().peel_to_commit().unwrap();
     assert_eq!(head.parent_id(0).unwrap(), oid);
     assert_eq!(head_blob(root, "notes/b.md"), "# B\n");
+}
+
+#[test]
+fn a_write_during_the_merge_survives_the_checkout() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/ext.md", "# Ext\n\noriginal\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/from-b.md", "# B\n");
+    commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, "notes/local.md", "# Local\n");
+    fetch(root_a, None).unwrap();
+    let external = root_a.join("notes/ext.md");
+    fault::arm(
+        FaultPoint::AfterMergeCommitBeforeCheckout,
+        Fault::hook({
+            let external = external.clone();
+            move || fs::write(external, "# Ext\n\nwritten by iCloud\n").unwrap()
+        }),
+    );
+    let first = pull_all(root_a, "Update notes", MAX_FILE_BYTES);
+    assert_eq!(read(root_a, "notes/ext.md"), "# Ext\n\nwritten by iCloud\n");
+    drop(first);
+
+    let next = pull_all(root_a, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert!(next.committed, "{next:?}");
+    assert!(push(root_a, None).unwrap().pushed);
+    for rel in ["notes/ext.md", "notes/from-b.md", "notes/local.md"] {
+        assert_eq!(head_blob(root_a, rel), read(root_a, rel), "{rel}");
+        assert_eq!(remote_blob(&fixture, rel), read(root_a, rel), "{rel}");
+    }
+    assert_eq!(read(root_a, "notes/ext.md"), "# Ext\n\nwritten by iCloud\n");
 }
