@@ -438,6 +438,55 @@ describe('external changes and saves', () => {
     expect(renames).toEqual([{ from: 'Old title', to: 'New title', previousAutoAlias: null }])
   })
 
+  it('a body-only merge after a pending rename is reported as saved and keeps the rename', async () => {
+    const h = harness({ disk: '# Old title\n\nbody\n' })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# New title\n\nbody\n')
+    await settled()
+    h.session.editorChanged('# New title\n\nbody mine\n')
+    h.setDisk('# New title\n\nbody theirs\n')
+    h.mergeNextWrite('# New title\n\nbody mine theirs\n')
+    h.session.externalChanged()
+    await settled()
+
+    expect(h.contents.map((c) => c.origin)).toEqual(['load', 'saved', 'saved'])
+    const renames: TitleRename[] = []
+    const tracker = createTitleRenameTracker({
+      path: PATH,
+      clock,
+      onRename: (rename) => {
+        renames.push(rename)
+      },
+    })
+    for (const { content, origin } of h.contents) {
+      if (origin === 'saved') {
+        tracker.saved(content)
+      } else {
+        tracker.baseline(content)
+      }
+    }
+    tracker.settle()
+    expect(renames).toEqual([{ from: 'Old title', to: 'New title', previousAutoAlias: null }])
+  })
+
+  it('a merge that changes the title after a local rename is reported as external', async () => {
+    const h = harness({ disk: '# Old title\n\nbody\n' })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# New title\n\nbody\n')
+    await settled()
+    h.session.editorChanged('# New title\n\nbody mine\n')
+    h.setDisk('# Their title\n\nbody\n')
+    h.mergeNextWrite('# Their title\n\nbody mine\n')
+    h.session.externalChanged()
+    await settled()
+
+    expect(h.contents.map((c) => c.origin)).toEqual(['load', 'saved', 'external'])
+  })
+
   it('keystrokes during a merging write stay dirty and merge on the next write', async () => {
     const started = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
