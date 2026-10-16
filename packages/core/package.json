@@ -30,7 +30,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@ai-sdk/provider": "^4.0.21",
+    "@ai-sdk/provider": "^4.0.29",
     "@ocavue/tsconfig": "^0.7.1",
     "jsdom": "^30.1.2",
     "sqlite-vec": "^0.1.9",
