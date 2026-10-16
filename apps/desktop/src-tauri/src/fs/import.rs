@@ -1458,7 +1458,7 @@ mod tests {
         );
 
         match result.unwrap_err() {
-            AppError::Io { message } => assert!(message.contains("conflicting entries")),
+            AppError::Io { message, .. } => assert!(message.contains("conflicting entries")),
             other => panic!("expected a duplicate-entry IO error, got {other:?}"),
         }
         assert!(!root.path().join("notes/a.md").exists());
@@ -1732,7 +1732,7 @@ mod tests {
         ));
 
         match result.err() {
-            Some(AppError::Io { message }) => assert!(message.contains("cancelled")),
+            Some(AppError::Io { message, .. }) => assert!(message.contains("cancelled")),
             other => panic!("expected a cancellation error, got {other:?}"),
         }
         assert!(!root.path().join("daily/2026-07-04.md").exists());
