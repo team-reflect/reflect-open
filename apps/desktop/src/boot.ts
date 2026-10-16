@@ -3,6 +3,7 @@ import { createDesktopAdapters, createDesktopHost } from '@/services/create-desk
 import { createDeferredIpcTransport } from '@/services/deferred-ipc.ts'
 import { detectPlatformFacts } from '@/services/detect-platform.ts'
 import { createTauriIpcTransport } from '@/services/tauri-ipc.ts'
+import { createTauriLogger } from '@/services/tauri-logger.ts'
 import { createAppGraphServices, createAppServices } from '@reflect/app'
 import {
   createConsoleLogger,
@@ -22,7 +23,9 @@ const facts = detectPlatformFacts(isTauri())
  */
 export const pendingDevIpc = facts.isNativeShell ? null : createDeferredIpcTransport()
 
-const logger = createConsoleLogger()
+const logger = facts.isNativeShell
+  ? createTauriLogger(createConsoleLogger())
+  : createConsoleLogger()
 const clock = createSystemClock()
 const ipc = createIpcBridgeService({
   transport: pendingDevIpc?.transport ?? createTauriIpcTransport(),
