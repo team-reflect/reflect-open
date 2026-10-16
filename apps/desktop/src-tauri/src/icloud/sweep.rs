@@ -1286,7 +1286,7 @@ mod tests {
     #[test]
     fn multi_version_with_a_marked_side_drops_it_and_unions_the_clean_sides() {
         // A side already carrying markers loses to the newer clean side at
-        // its fold step; the clean sides then union.
+        // its fold step and is archived; the clean sides then union.
         let root = graph();
         let marked = "<<<<<<< Mac\nmine\n=======\ntheirs\n>>>>>>> iPhone\n";
         write(root.path(), "notes/a.md", "current clean\n");
@@ -1305,7 +1305,13 @@ mod tests {
         .unwrap();
 
         assert_eq!(resolution.final_content, "current clean\nnewest clean\n");
-        assert!(!resolution.reconciled);
+        assert!(resolution.reconciled);
+        let archived: Vec<String> = archive::list(root.path(), "notes/a.md")
+            .unwrap()
+            .into_iter()
+            .map(|version| archive::read(root.path(), "notes/a.md", &version.name).unwrap())
+            .collect();
+        assert!(archived.contains(&marked.to_string()), "{archived:?}");
     }
 
     fn archive_names(root: &Path, rel: &str) -> Vec<String> {

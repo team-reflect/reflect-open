@@ -81,8 +81,8 @@ pub enum Resolution {
     AlreadyResolved,
     /// Auto-merged (or a deterministic winner was chosen) without losing text.
     Merged { content: String },
-    /// Auto-merged, but the result may have dropped one side's text (the
-    /// merge-loop breaker) or interleaved both sides' words (the last-resort
-    /// merge).
+    /// Auto-merged, but the result may have dropped one side's text (a marked
+    /// side, the merge-loop breaker) or interleaved both sides' words (the
+    /// last-resort merge).
     Reconciled { content: String },
 }

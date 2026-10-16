@@ -4,7 +4,8 @@
 //!
 //! 1. **Identical** → nothing to write.
 //! 2. **Whitespace-equal** → keep the newer side.
-//! 3. **A side already carries markers** → keep the newer side whole. The
+//! 3. **A side already carries markers** → keep the newer side whole, as
+//!    [`Resolution::Reconciled`] so the dropped side is archived. The
 //!    marked file holds both originals in its hunks and the clean one is
 //!    either the user's resolution of it (newer) or stale pre-conflict
 //!    content (older) — and nesting new markers around old ones would corrupt
@@ -59,7 +60,7 @@ pub fn resolve(input: ConflictInput<'_>) -> AppResult<Resolution> {
     if markers::contains_conflict_markers(&first.content)
         || markers::contains_conflict_markers(&second.content)
     {
-        return Ok(Resolution::Merged {
+        return Ok(Resolution::Reconciled {
             content: second.content,
         });
     }
@@ -333,7 +334,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             result,
-            Resolution::Merged {
+            Resolution::Reconciled {
                 content: clean.to_string()
             }
         );
@@ -345,7 +346,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             result,
-            Resolution::Merged {
+            Resolution::Reconciled {
                 content: marked.to_string()
             }
         );
