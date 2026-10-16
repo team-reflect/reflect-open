@@ -9,6 +9,8 @@
   },
   "workspaces": {
     ".": { "entry": ["fixtures/*.mjs"] },
+    "packages/app": { "includeEntryExports": true } ,
+    "packages/core": { "includeEntryExports": true } ,
     "apps/desktop": { "ignoreDependencies": ["@sentry/cli"] }
   }
 }
