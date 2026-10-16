@@ -260,8 +260,7 @@ class NoteSessionImpl implements NoteSession {
         const content = this.#header + this.#buffer
         this.#inFlightWrite = content
         try {
-          const base = this.#writeBase
-          const result = await write(this.path, content, this.#missing ? null : base)
+          const result = await write(this.path, content, this.#missing ? null : this.#writeBase)
           this.#missing = false // the landed write created the file if it was missing
           this.#error = null // a previous save failure is resolved by this success
           this.#retriedFailedSave = false
@@ -283,7 +282,7 @@ class NoteSessionImpl implements NoteSession {
         this.#error = errorMessage(cause)
         const retry = !this.#retriedFailedSave
         this.#retriedFailedSave = true
-        await this.#reconcileFromDisk({ saveIfDirty: retry })
+        await this.#reconcileFromDisk(retry)
         this.#emit()
       })
   }
@@ -425,7 +424,7 @@ class NoteSessionImpl implements NoteSession {
    * Re-read the note and reconcile the buffer with what's on disk (the
    * external-change path).
    */
-  async #reconcileFromDisk(options?: { saveIfDirty?: boolean }): Promise<void> {
+  async #reconcileFromDisk(saveIfDirty: boolean): Promise<void> {
     let content: string
     try {
       content = await this.#io.read(this.path)
@@ -457,7 +456,7 @@ class NoteSessionImpl implements NoteSession {
         this.#missing = false
         this.#emit()
       }
-      if (options?.saveIfDirty ?? true) {
+      if (saveIfDirty) {
         this.#cancelScheduledSave()
         this.#save()
       }
@@ -526,7 +525,7 @@ class NoteSessionImpl implements NoteSession {
           // replay it now against the committed state.
           if (this.#missedChange) {
             this.#missedChange = false
-            void this.#reconcileFromDisk()
+            void this.#reconcileFromDisk(true)
           }
         }
       }
@@ -542,7 +541,7 @@ class NoteSessionImpl implements NoteSession {
       this.#missedChange = true // deferred; replayed when the load commits
       return
     }
-    void this.#reconcileFromDisk()
+    void this.#reconcileFromDisk(true)
   }
 
   updateFrontmatter(patch: FrontmatterPatch): boolean {

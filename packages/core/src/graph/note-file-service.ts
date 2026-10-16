@@ -46,10 +46,6 @@ const noteWriteOutcomeSchema = z.object({
  */
 export interface NoteWriteResult {
   /**
-   * The on-disk mtime, or the clock's time when the platform reports none.
-   */
-  modifiedMs: number
-  /**
    * The full text now on disk when the write merged with a newer disk text, else `null`.
    */
   merged: string | null
@@ -152,7 +148,7 @@ class NoteFileServiceImpl implements NoteFileService {
     )
     const modifiedMs = outcome.modifiedMs ?? clock.now()
     fileChanges.reportOwnWrite([{ path, kind: 'upsert', modifiedMs }])
-    return { modifiedMs, merged: outcome.merged }
+    return { merged: outcome.merged }
   }
 
   async create(path: string, contents: string, generation: number): Promise<NoteCreateOutcome> {

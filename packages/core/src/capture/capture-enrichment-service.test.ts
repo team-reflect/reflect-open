@@ -851,7 +851,7 @@ describe('CaptureEnrichmentService', () => {
     kit.writeNoteMock
       .mockImplementationOnce(async (path, contents) => {
         kit.noteFile.set(path, contents)
-        return { modifiedMs: 0, merged: null }
+        return { merged: null }
       })
       .mockRejectedValueOnce({ kind: 'io', message: 'disk full' })
 
@@ -894,7 +894,7 @@ describe('CaptureEnrichmentService', () => {
     kit.writeNoteMock
       .mockImplementationOnce(async (path, contents) => {
         kit.noteFile.set(path, contents)
-        return { modifiedMs: 0, merged: null }
+        return { merged: null }
       })
       .mockRejectedValueOnce(new ReflectError('io', 'disk full'))
 
@@ -954,13 +954,13 @@ describe('CaptureEnrichmentService', () => {
     kit.writeNoteMock
       .mockImplementationOnce(async (path, contents) => {
         kit.noteFile.set(path, contents)
-        return { modifiedMs: 0, merged: null }
+        return { merged: null }
       })
       .mockImplementationOnce(async (path, contents) => {
         kit.noteFile.set(path, contents)
         const prepared = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
         kit.noteFile.set(IDENTITY.notePath, prepared.replace('---\n', '---\nprivate: true\n'))
-        return { modifiedMs: 0, merged: null }
+        return { merged: null }
       })
 
     const outcome = await kit.reconcile({ providers: NO_PROVIDERS })

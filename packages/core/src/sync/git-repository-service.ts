@@ -89,11 +89,7 @@ export const pullOutcomeSchema = z.object({
   skippedLargeFiles: z.array(skippedFileSchema),
   /** Graph-relative paths of the conflict copies the merge wrote. */
   reviewPaths: z.array(z.string()),
-  /**
-   * Every file the merge changed. The caller reindexes these directly —
-   * pulls must not depend on the file watcher being up (on launch it may
-   * not be yet) to keep the index in step with the notes.
-   */
+  /** Every file the merge changed on disk. */
   changedFiles: z.array(changedFileSchema),
 })
 export type PullOutcome = z.infer<typeof pullOutcomeSchema>

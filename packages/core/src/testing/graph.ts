@@ -149,19 +149,20 @@ class TestNoteFileServiceImpl implements TestNoteFileService {
     const merged = this.#merges.get(path)
     if (merged !== undefined) {
       this.#merges.delete(path)
-      return { modifiedMs: this.#store(path, merged, pinned), merged }
+      this.#store(path, merged, pinned)
+      return { merged }
     }
     if (expectedContents !== undefined) {
       const current = this.#files.get(path)?.contents ?? null
       if (current !== expectedContents && current !== contents) {
         throw new ReflectError('io', 'Note changed on disk; reload before retrying')
       }
-      const existing = this.#files.get(path)
-      if (existing !== undefined && existing.contents === contents) {
-        return { modifiedMs: existing.modifiedMs, merged: null }
+      if (current === contents) {
+        return { merged: null }
       }
     }
-    return { modifiedMs: this.#store(path, contents, pinned), merged: null }
+    this.#store(path, contents, pinned)
+    return { merged: null }
   }
 
   async create(path: string, contents: string, pinned: number): Promise<NoteCreateOutcome> {
