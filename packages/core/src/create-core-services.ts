@@ -91,10 +91,6 @@ import { createGithubAuthService, type GithubAuthService } from './sync/github-a
 import { createGithubRepoService, type GithubRepoService } from './sync/github-repo-service.ts'
 import { createSyncEngineFactory, type SyncEngineFactory } from './sync/engine.ts'
 import type { BackupServiceDeps } from './sync/backup-service.ts'
-import {
-  createConflictArchiveService,
-  type ConflictArchiveService,
-} from './sync/conflict-archive-service.ts'
 import type { ICloudDownloadServiceDeps } from './sync/icloud-download-service.ts'
 import {
   createICloudMigrationService,
@@ -355,7 +351,6 @@ export interface CoreServices {
    * Moves a local graph into the iCloud Drive container.
    */
   readonly icloudMigration: ICloudMigrationService
-  readonly conflictArchive: ConflictArchiveService
   /**
    * The embedded media of the editor's cards: X posts and YouTube videos.
    */
@@ -668,7 +663,6 @@ export const coreServiceFactories = {
   agentSkill: createAgentSkillService,
   gistPublish: createGistPublishService,
   icloudMigration: createICloudMigrationService,
-  conflictArchive: createConflictArchiveService,
   embedMedia: createEmbedMediaService,
   linkPreview: createLinkPreviewService,
   noteSessions: createNoteSessionService,
@@ -1193,7 +1187,6 @@ export function composeCoreServices(
     }),
     icloudNative,
     icloudMigration: create.icloudMigration({ icloudNative, graphSession }),
-    conflictArchive: create.conflictArchive({ ipc, clock, fileChanges, graphSession }),
     embedMedia: create.embedMedia({
       xArchive,
       webFetch,

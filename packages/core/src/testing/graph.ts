@@ -9,7 +9,6 @@ import {
 import type {
   LocalNoteRead,
   NoteFileService,
-  NoteWriteMerge,
   NoteWriteResult,
   VaultScanStats,
 } from '../graph/note-file-service.ts'
@@ -83,12 +82,12 @@ export interface TestNoteFileService extends NoteFileService {
    */
   evict(path: string): void
   /**
-   * Make the next `write` of `path` return `merge`, ignoring its `expectedContents`.
+   * Make the next `write` of `path` return `content` as merged, ignoring its `expectedContents`.
    * Without one, a checked write against a file that holds neither
    * `expectedContents` nor the new contents rejects.
-   * `merge.content` becomes the file.
+   * `content` becomes the file.
    */
-  mergeNextWrite(path: string, merge: NoteWriteMerge): void
+  mergeNextWrite(path: string, content: string): void
   /**
    * The current files by graph-relative path.
    */
@@ -117,7 +116,7 @@ class TestNoteFileServiceImpl implements TestNoteFileService {
   readonly #writeLog: NoteFileWrite[] = []
   readonly #readLog: NoteFileRead[] = []
   readonly #trashLog: string[] = []
-  readonly #merges = new Map<string, NoteWriteMerge>()
+  readonly #merges = new Map<string, string>()
   readonly #generation: number | undefined
   #tick = 0
 
@@ -148,10 +147,10 @@ class TestNoteFileServiceImpl implements TestNoteFileService {
     expectedContents?: string | null,
   ): Promise<NoteWriteResult> {
     checkGeneration(this.#generation, pinned)
-    const merge = this.#merges.get(path)
-    if (merge !== undefined) {
+    const merged = this.#merges.get(path)
+    if (merged !== undefined) {
       this.#merges.delete(path)
-      return { modifiedMs: this.#store(path, merge.content, pinned), merged: { ...merge } }
+      return { modifiedMs: this.#store(path, merged, pinned), merged }
     }
     if (expectedContents !== undefined) {
       const current = this.#files.get(path)?.contents ?? null
@@ -215,8 +214,8 @@ class TestNoteFileServiceImpl implements TestNoteFileService {
     this.#evicted.add(path)
   }
 
-  mergeNextWrite(path: string, merge: NoteWriteMerge): void {
-    this.#merges.set(path, { ...merge })
+  mergeNextWrite(path: string, content: string): void {
+    this.#merges.set(path, content)
   }
 
   files(): ReadonlyMap<string, string> {

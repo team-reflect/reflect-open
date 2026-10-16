@@ -37,13 +37,13 @@ const icloudSweepChangeSchema = z.object({
 
 const icloudSweepOutcomeSchema = z.object({
   changed: z.array(icloudSweepChangeSchema),
-  reconciled: z.array(z.string()),
+  copies: z.array(z.string()),
   autoResolved: z.number().int().nonnegative(),
 })
 
 /**
  * What one iCloud conflict sweep did (Plan 21): the files it rewrote or
- * removed (reindex these directly), the paths a merge reconciled, and how
+ * removed (reindex these directly), the graph-relative paths of the conflict copies it wrote, and how
  * many conflicts auto-resolved.
  */
 export type IcloudSweepOutcome = z.infer<typeof icloudSweepOutcomeSchema>

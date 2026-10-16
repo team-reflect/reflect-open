@@ -8,6 +8,7 @@ import type { FileChange, FileChangeService } from '../indexing/file-change-serv
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
 import type { ICloudNativeService, IcloudSweepScope } from '../ipc/icloud-native-service.ts'
 import type { Unlisten } from '../unlisten.ts'
+import { describeConflictCopies } from './conflict-copies.ts'
 
 /**
  * Whether a graph root lives under iCloud Drive: the app's container and the
@@ -353,14 +354,8 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
       if (!this.#disposed && outcome.changed.length > 0) {
         this.#applySweepChanges(outcome.changed)
       }
-      const merged = outcome.reconciled.length
-      if (!this.#disposed && merged > 0) {
-        progress.fail(
-          'Syncing',
-          merged === 1
-            ? 'Merged overlapping edits in 1 note; earlier versions are kept'
-            : `Merged overlapping edits in ${merged} notes; earlier versions are kept`,
-        )
+      if (!this.#disposed && outcome.copies.length > 0) {
+        progress.fail('Syncing', describeConflictCopies(outcome.copies))
       }
     } catch (err) {
       // A failed sweep leaves versions unresolved; the next signal retries.

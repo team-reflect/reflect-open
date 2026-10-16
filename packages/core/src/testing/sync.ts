@@ -243,7 +243,7 @@ class TestICloudNativeServiceImpl implements TestICloudNativeService {
   #scan: (scanOptions: IcloudScanOptions) => IcloudSweepOutcome | Promise<IcloudSweepOutcome> =
     () => ({
       changed: [],
-      reconciled: [],
+      copies: [],
       autoResolved: 0,
     })
   readonly #log: ICloudNativeCall[] = []

@@ -276,14 +276,7 @@ class NoteSessionImpl implements NoteSession {
             this.#emit()
             this.#onContent?.(content, 'saved')
           } else {
-            this.#adoptMergedWrite(base, content, result.merged.content)
-            if (result.merged.kind !== 'exact') {
-              // The write archived a version, so the note's earlier versions changed.
-              this.#deps.fileChanges.emit({
-                changes: [{ path: this.path, kind: 'upsert', modifiedMs: result.modifiedMs }],
-                source: 'own-write',
-              })
-            }
+            this.#adoptMergedWrite(base, content, result.merged)
           }
         } finally {
           this.#inFlightWrite = null
