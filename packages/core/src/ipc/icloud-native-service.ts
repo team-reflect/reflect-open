@@ -43,8 +43,8 @@ const icloudSweepOutcomeSchema = z.object({
 
 /**
  * What one iCloud conflict sweep did (Plan 21): the files it rewrote or
- * removed (reindex these directly), the graph-relative paths of the conflict copies it wrote, and how
- * many conflicts auto-resolved.
+ * removed (reindex these directly), the graph-relative paths of the conflict
+ * copies it wrote, and how many conflicts auto-resolved.
  */
 export type IcloudSweepOutcome = z.infer<typeof icloudSweepOutcomeSchema>
 
