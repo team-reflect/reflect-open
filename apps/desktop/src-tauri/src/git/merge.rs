@@ -77,17 +77,23 @@ pub struct MergeOutcome {
     pub changed_files: Vec<ChangedFile>,
 }
 
-/// Merge the fetched `origin/<branch>` into the local branch. Pre-condition
-/// (the sync engine guarantees it): local changes are already committed.
+/// Merge the fetched `origin/<branch>` into the local branch. Local edits not
+/// yet committed are kept on disk and stay uncommitted.
 pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
     crate::fs::with_graph_lock(root, || merge_remote_locked(root))
 }
 
 fn merge_remote_locked(root: &Path) -> AppResult<MergeOutcome> {
     let repo = open_existing(root)?;
-    adopt_recorded_merge(&repo, root)?;
-    ensure_clean_state(&repo)?;
-    let branch = current_branch(&repo)?;
+    let adopted = adopt_recorded_merge(&repo, root)?;
+    let mut outcome = pull(&repo, root)?;
+    fold_changes(&mut outcome.changed_files, adopted);
+    Ok(outcome)
+}
+
+fn pull(repo: &Repository, root: &Path) -> AppResult<MergeOutcome> {
+    ensure_clean_state(repo)?;
+    let branch = current_branch(repo)?;
     let Ok(remote_oid) = repo.refname_to_id(&format!("refs/remotes/origin/{branch}")) else {
         // A brand-new (empty) backup repo has no remote branch until the
         // first push creates it. Nothing to merge is success, not an error —
@@ -115,15 +121,16 @@ fn merge_remote_locked(root: &Path) -> AppResult<MergeOutcome> {
         let old_oid = repo.head().ok().and_then(|head| head.target());
         let old_tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
         let new_tree = repo.find_commit(remote_oid)?.tree()?;
-        let mut changed_files = changed_between(&repo, old_tree.as_ref(), &new_tree)?;
+        let mut changed_files = changed_between(repo, old_tree.as_ref(), &new_tree)?;
         // Files first, ref last: a failure in between leaves the branch where
         // it was, so the next cycle retries the pull instead of committing
-        // the stale tree as a revert of it (#1405). Force is safe here: the
-        // pre-merge invariant is a committed working tree, so there is
-        // nothing uncommitted to clobber.
+        // the stale tree as a revert of it (#1405).
         #[cfg(test)]
         super::fault::trip(super::fault::FaultPoint::BeforeFastForwardCheckout)?;
-        repo.checkout_tree(new_tree.as_object(), Some(CheckoutBuilder::new().force()))?;
+        let (written, review) =
+            checkout_keeping_local_edits(repo, root, old_tree.as_ref(), &new_tree)?;
+        stamp_modified_times(root, &mut changed_files);
+        fold_changes(&mut changed_files, written);
         #[cfg(test)]
         super::fault::trip(super::fault::FaultPoint::BeforeFastForwardRefMove)?;
         let refname = format!("refs/heads/{branch}");
@@ -137,11 +144,9 @@ fn merge_remote_locked(root: &Path) -> AppResult<MergeOutcome> {
         };
         // HEAD already points at the branch (`current_branch` checked), so no
         // `set_head`: it only added a `HEAD.lock` dependency to every pull.
-        // Stamp mtimes only now — the checkout above is what wrote the files.
-        stamp_modified_times(root, &mut changed_files);
         return Ok(MergeOutcome {
             kind: MergeKind::FastForward,
-            conflicted_paths: Vec::new(),
+            conflicted_paths: review,
             changed_files,
         });
     }
@@ -150,12 +155,12 @@ fn merge_remote_locked(root: &Path) -> AppResult<MergeOutcome> {
     let head_oid = ours.id();
     let theirs = repo.find_commit(remote_oid)?;
     let mut index = repo.merge_commits(&ours, &theirs, Some(&MergeOptions::new()))?;
-    let conflicted_paths = resolve_index_conflicts(&repo, &mut index)?;
+    let conflicted_paths = resolve_index_conflicts(repo, &mut index)?;
     #[cfg(test)]
     super::fault::trip(super::fault::FaultPoint::BeforeMergeCommit)?;
 
-    let tree = repo.find_tree(index.write_tree_to(&repo)?)?;
-    let sig = signature(&repo)?;
+    let tree = repo.find_tree(index.write_tree_to(repo)?)?;
+    let sig = signature(repo)?;
     let message = if conflicted_paths.is_empty() {
         "Merge changes from other devices"
     } else {
@@ -163,13 +168,18 @@ fn merge_remote_locked(root: &Path) -> AppResult<MergeOutcome> {
     };
     let merge_oid = repo.commit(None, &sig, &sig, message, &tree, &[&ours, &theirs])?;
     repo.reference(RECORDED_MERGE_REF, merge_oid, true, "merge in progress")?;
-    let mut changed_files = changed_between(&repo, Some(&ours.tree()?), &tree)?;
+    let ours_tree = ours.tree()?;
+    let mut changed_files = changed_between(repo, Some(&ours_tree), &tree)?;
 
     // Same order as the fast-forward: tree first, ref last. A stop in between
     // leaves the merge recorded for `adopt_recorded_merge`.
     #[cfg(test)]
     super::fault::trip(super::fault::FaultPoint::AfterMergeCommitBeforeCheckout)?;
-    repo.checkout_tree(tree.as_object(), Some(CheckoutBuilder::new().force()))?;
+    let (written, review) = checkout_keeping_local_edits(repo, root, Some(&ours_tree), &tree)?;
+    stamp_modified_times(root, &mut changed_files);
+    fold_changes(&mut changed_files, written);
+    let mut conflicted_paths = conflicted_paths;
+    conflicted_paths.extend(review);
     #[cfg(test)]
     super::fault::trip(super::fault::FaultPoint::BeforeMergeRefMove)?;
     repo.reference_matching(
@@ -179,8 +189,7 @@ fn merge_remote_locked(root: &Path) -> AppResult<MergeOutcome> {
         head_oid,
         message,
     )?;
-    drop_recorded_merge(&repo)?;
-    stamp_modified_times(root, &mut changed_files);
+    drop_recorded_merge(repo)?;
 
     let kind = if conflicted_paths.is_empty() {
         MergeKind::Merged
@@ -200,24 +209,26 @@ const RECORDED_MERGE_REF: &str = "refs/reflect/merge";
 /// Finish a merge that stopped between its commit and the branch move.
 ///
 /// When `HEAD` is still the recorded merge's first parent, the merged tree is
-/// checked out in safe mode (a file changed since the stop is left as it is)
-/// and the branch moves to the merge. Any other recorded merge is dropped.
-pub(super) fn adopt_recorded_merge(repo: &Repository, root: &Path) -> AppResult<()> {
+/// checked out (edits made since the stop are merged back in) and the branch
+/// moves to the merge. Any other recorded merge is dropped. Returns the files
+/// the adoption changed on disk.
+pub(super) fn adopt_recorded_merge(repo: &Repository, root: &Path) -> AppResult<Vec<ChangedFile>> {
     let Ok(merge_oid) = repo.refname_to_id(RECORDED_MERGE_REF) else {
-        return Ok(());
+        return Ok(Vec::new());
     };
     let head_oid = repo.head().ok().and_then(|head| head.target());
     let merge = repo.find_commit(merge_oid)?;
+    let mut changed_files = Vec::new();
     match head_oid {
         Some(head_oid) if merge.parent_id(0).ok() == Some(head_oid) => {
             let branch = current_branch(repo)?;
-            let merge_tree = merge.tree()?;
-            repo.checkout_tree(
-                merge_tree.as_object(),
-                Some(CheckoutBuilder::new().safe().allow_conflicts(true)),
-            )?;
             let head_tree = repo.find_commit(head_oid)?.tree()?;
-            merge_files_changed_since(repo, root, &head_tree, &merge_tree)?;
+            let merge_tree = merge.tree()?;
+            changed_files = changed_between(repo, Some(&head_tree), &merge_tree)?;
+            let (written, _) =
+                checkout_keeping_local_edits(repo, root, Some(&head_tree), &merge_tree)?;
+            stamp_modified_times(root, &mut changed_files);
+            fold_changes(&mut changed_files, written);
             repo.reference_matching(
                 &format!("refs/heads/{branch}"),
                 merge_oid,
@@ -225,6 +236,11 @@ pub(super) fn adopt_recorded_merge(repo: &Repository, root: &Path) -> AppResult<
                 head_oid,
                 "reflect sync: adopt recorded merge",
             )?;
+        }
+        Some(head_oid)
+            if head_oid == merge_oid || repo.graph_descendant_of(head_oid, merge_oid)? =>
+        {
+            tracing::debug!(merge = %merge_oid, "dropping a recorded merge HEAD already contains");
         }
         _ => {
             tracing::warn!(
@@ -234,54 +250,200 @@ pub(super) fn adopt_recorded_merge(repo: &Repository, root: &Path) -> AppResult<
             );
         }
     }
-    drop_recorded_merge(repo)
+    drop_recorded_merge(repo)?;
+    Ok(changed_files)
 }
 
-/// The safe checkout leaves a file the user changed after the stop. Where the
-/// merge also changed that file, fold the merge's change into it with a
-/// three-way text merge whose base is the pre-merge version.
-fn merge_files_changed_since(
+/// One working-tree path whose content differs from `HEAD`; `None` when the
+/// file was deleted.
+struct LocalEdit {
+    path: String,
+    bytes: Option<Vec<u8>>,
+}
+
+/// What a tree holds at a path.
+enum TreeSide<'r> {
+    Absent,
+    File(git2::Blob<'r>),
+    /// A directory, symlink, or submodule.
+    Other(git2::Oid),
+}
+
+impl TreeSide<'_> {
+    fn id(&self) -> Option<git2::Oid> {
+        match self {
+            TreeSide::Absent => None,
+            TreeSide::File(blob) => Some(blob.id()),
+            TreeSide::Other(id) => Some(*id),
+        }
+    }
+}
+
+fn tree_side<'r>(
+    repo: &'r Repository,
+    tree: Option<&git2::Tree<'_>>,
+    path: &str,
+) -> AppResult<TreeSide<'r>> {
+    let Some(entry) = tree.and_then(|tree| tree.get_path(Path::new(path)).ok()) else {
+        return Ok(TreeSide::Absent);
+    };
+    if matches!(entry.filemode(), 0o100644 | 0o100755) {
+        Ok(TreeSide::File(repo.find_blob(entry.id())?))
+    } else {
+        Ok(TreeSide::Other(entry.id()))
+    }
+}
+
+/// Check out `target` over a working tree whose committed state is `base`,
+/// keeping every local edit made since that commit.
+///
+/// The edits are read before the forced checkout and written back after it:
+/// unchanged by `target`, an edit is restored as it was; changed by both, a
+/// text file gets a three-way merge (base, local edit, target), and any other
+/// file keeps the local bytes with the target's version written beside it as a
+/// conflict copy. Returns the files written back and the conflict copies.
+fn checkout_keeping_local_edits(
     repo: &Repository,
     root: &Path,
-    head_tree: &git2::Tree<'_>,
-    merge_tree: &git2::Tree<'_>,
-) -> AppResult<()> {
-    let diff = repo.diff_tree_to_workdir(Some(merge_tree), None)?;
-    for delta in diff.deltas() {
-        if delta.status() != git2::Delta::Modified {
-            continue;
-        }
-        let Some(path) = delta.new_file().path() else {
+    base: Option<&git2::Tree<'_>>,
+    target: &git2::Tree<'_>,
+) -> AppResult<(Vec<ChangedFile>, Vec<String>)> {
+    let edits = local_edits(repo, root, base)?;
+    repo.checkout_tree(target.as_object(), Some(CheckoutBuilder::new().force()))?;
+
+    let mut written = Vec::new();
+    let mut review = Vec::new();
+    for edit in edits {
+        let base_side = tree_side(repo, base, &edit.path)?;
+        let target_side = tree_side(repo, Some(target), &edit.path)?;
+        let Some(ours) = edit.bytes else {
+            if base_side.id() == target_side.id() {
+                let target_path = root.join(&edit.path);
+                if target_path.symlink_metadata().is_ok() {
+                    std::fs::remove_file(&target_path)?;
+                    written.push(ChangedFile {
+                        path: edit.path,
+                        kind: ChangeKind::Remove,
+                        modified_ms: None,
+                    });
+                }
+            }
             continue;
         };
-        let merged = repo.find_blob(merge_tree.get_path(path)?.id())?;
-        let base = match head_tree.get_path(path) {
-            Ok(entry) if entry.id() == merged.id() => continue,
-            Ok(entry) => Some(repo.find_blob(entry.id())?),
-            Err(_) => None,
+        let content = match (&base_side, &target_side) {
+            _ if base_side.id() == target_side.id() => ours,
+            (_, TreeSide::Absent) => ours,
+            (TreeSide::Absent | TreeSide::File(_), TreeSide::File(theirs))
+                if is_text_bytes(&ours)
+                    && is_text_bytes(theirs.content())
+                    && match &base_side {
+                        TreeSide::File(blob) => is_text_bytes(blob.content()),
+                        _ => true,
+                    } =>
+            {
+                let base_content = match &base_side {
+                    TreeSide::File(blob) => blob.content(),
+                    _ => b"",
+                };
+                merge_text(base_content, &ours, theirs.content())?
+            }
+            (_, TreeSide::File(theirs)) => {
+                let copy = conflict_copy_path(&edit.path);
+                written.push(write_file(root, &copy, theirs.content())?);
+                review.push(copy);
+                ours
+            }
+            (_, TreeSide::Other(_)) => {
+                // The target holds a directory, symlink, or submodule here.
+                let copy = conflict_copy_path(&edit.path);
+                written.push(write_file(root, &copy, &ours)?);
+                review.push(copy);
+                continue;
+            }
         };
-        let on_disk = std::fs::read(root.join(path))?;
-        let base_content = base.as_ref().map_or(&b""[..], |blob| blob.content());
-        let all_text = [base_content, &on_disk, merged.content()]
-            .iter()
-            .all(|bytes| std::str::from_utf8(bytes).is_ok() && !bytes.contains(&0));
-        if !all_text {
-            continue;
-        }
-        let mut base_input = git2::MergeFileInput::new();
-        base_input.content(base_content);
-        let mut ours_input = git2::MergeFileInput::new();
-        ours_input.content(&on_disk);
-        let mut theirs_input = git2::MergeFileInput::new();
-        theirs_input.content(merged.content());
-        let mut opts = MergeFileOptions::new();
-        opts.our_label(OUR_LABEL)
-            .their_label(THEIR_LABEL)
-            .style_standard(true);
-        let result = git2::merge_file(&base_input, &ours_input, &theirs_input, Some(&mut opts))?;
-        std::fs::write(root.join(path), result.content())?;
+        written.push(write_file(root, &edit.path, &content)?);
     }
-    Ok(())
+    Ok((written, review))
+}
+
+/// Every regular file in the working tree that differs from `base`, including
+/// untracked files and deletions. Ignored files are left out.
+fn local_edits(
+    repo: &Repository,
+    root: &Path,
+    base: Option<&git2::Tree<'_>>,
+) -> AppResult<Vec<LocalEdit>> {
+    let mut opts = git2::DiffOptions::new();
+    opts.include_untracked(true).recurse_untracked_dirs(true);
+    let diff = repo.diff_tree_to_workdir(base, Some(&mut opts))?;
+    let mut edits = Vec::new();
+    for delta in diff.deltas() {
+        let deleted = delta.status() == git2::Delta::Deleted;
+        let file = if deleted {
+            delta.old_file()
+        } else {
+            delta.new_file()
+        };
+        let Some(path) = file.path() else {
+            continue;
+        };
+        let rel = to_slash_lossy(path);
+        if deleted {
+            edits.push(LocalEdit {
+                path: rel,
+                bytes: None,
+            });
+            continue;
+        }
+        let full = root.join(path);
+        let is_file = full
+            .symlink_metadata()
+            .map(|meta| meta.is_file())
+            .unwrap_or(false);
+        if is_file {
+            edits.push(LocalEdit {
+                path: rel,
+                bytes: Some(std::fs::read(&full)?),
+            });
+        }
+    }
+    Ok(edits)
+}
+
+fn merge_text(base: &[u8], ours: &[u8], theirs: &[u8]) -> AppResult<Vec<u8>> {
+    let mut base_input = git2::MergeFileInput::new();
+    base_input.content(base);
+    let mut ours_input = git2::MergeFileInput::new();
+    ours_input.content(ours);
+    let mut theirs_input = git2::MergeFileInput::new();
+    theirs_input.content(theirs);
+    let mut opts = MergeFileOptions::new();
+    opts.our_label(OUR_LABEL)
+        .their_label(THEIR_LABEL)
+        .style_standard(true);
+    let result = git2::merge_file(&base_input, &ours_input, &theirs_input, Some(&mut opts))?;
+    Ok(result.content().to_vec())
+}
+
+fn write_file(root: &Path, rel: &str, bytes: &[u8]) -> AppResult<ChangedFile> {
+    let modified_ms = crate::fs::atomic_write_bytes(root, &root.join(rel), bytes)?;
+    Ok(ChangedFile {
+        path: rel.to_string(),
+        kind: ChangeKind::Upsert,
+        modified_ms,
+    })
+}
+
+/// Add `extra` to `changes`; an entry for the same path replaces the old one.
+fn fold_changes(changes: &mut Vec<ChangedFile>, extra: Vec<ChangedFile>) {
+    for change in extra {
+        changes.retain(|existing| existing.path != change.path);
+        changes.push(change);
+    }
+}
+
+fn is_text_bytes(bytes: &[u8]) -> bool {
+    !bytes.contains(&0) && std::str::from_utf8(bytes).is_ok()
 }
 
 fn drop_recorded_merge(repo: &Repository) -> AppResult<()> {
@@ -343,8 +505,9 @@ fn stamp_modified_times(root: &Path, changes: &mut [ChangedFile]) {
 ///
 /// - **text vs text**: the labeled marker text of the three-way merge;
 /// - **edit vs delete**: keep the edited version, never silently delete;
-/// - **binary vs binary**: keep ours at the path and the other device's
+/// - **binary or symlink**: keep ours at the path and the other device's
 ///   version alongside (`name (conflict).ext`);
+/// - **submodule**: keep ours;
 /// - **deleted on both**: confirm the removal.
 ///
 /// Returns the paths the user should review.
@@ -377,10 +540,15 @@ fn resolve_index_conflicts(repo: &Repository, index: &mut Index) -> AppResult<Ve
         }
         match (conflict.our, conflict.their) {
             (Some(our), Some(their)) => {
+                let path = entry_path(&our);
+                if our.mode == GITLINK_MODE || their.mode == GITLINK_MODE {
+                    add_resolved(index, &path, our.id, our.mode, &mut review)?;
+                    continue;
+                }
+                let plain = our.mode != SYMLINK_MODE && their.mode != SYMLINK_MODE;
                 let our_blob = repo.find_blob(our.id)?;
                 let their_blob = repo.find_blob(their.id)?;
-                let path = entry_path(&our);
-                if is_text(&our_blob) && is_text(&their_blob) {
+                if plain && is_text(&our_blob) && is_text(&their_blob) {
                     let ancestor = match conflict.ancestor {
                         Some(ancestor) => ancestor,
                         None => stage0_entry(&path, repo.blob(b"")?, our.mode),
@@ -392,20 +560,16 @@ fn resolve_index_conflicts(repo: &Repository, index: &mut Index) -> AppResult<Ve
                     let merged =
                         repo.merge_file_from_index(&ancestor, &our, &their, Some(&mut opts))?;
                     let id = repo.blob(merged.content())?;
-                    index.add(&stage0_entry(&path, id, our.mode))?;
-                    review.push(path);
+                    add_resolved(index, &path, id, our.mode, &mut review)?;
                 } else {
                     let copy = conflict_copy_path(&entry_path(&their));
-                    index.add(&stage0_entry(&path, our.id, our.mode))?;
-                    index.add(&stage0_entry(&copy, their.id, their.mode))?;
-                    review.push(path);
-                    review.push(copy);
+                    add_resolved(index, &path, our.id, our.mode, &mut review)?;
+                    add_resolved(index, &copy, their.id, their.mode, &mut review)?;
                 }
             }
             (Some(edited), None) | (None, Some(edited)) => {
                 let path = entry_path(&edited);
-                index.add(&stage0_entry(&path, edited.id, edited.mode))?;
-                review.push(path);
+                add_resolved(index, &path, edited.id, edited.mode, &mut review)?;
             }
             (None, None) => {}
         }
@@ -414,6 +578,43 @@ fn resolve_index_conflicts(repo: &Repository, index: &mut Index) -> AppResult<Ve
         return Err(AppError::io("the merge left unresolved conflicts"));
     }
     Ok(review)
+}
+
+const GITLINK_MODE: u32 = 0o160000;
+const SYMLINK_MODE: u32 = 0o120000;
+
+/// Stage a resolved entry and record it for review. A file that collides with
+/// a directory (a path under it, or a file at one of its parent paths) moves
+/// to its conflict copy path, so neither side is dropped from the tree.
+fn add_resolved(
+    index: &mut Index,
+    path: &str,
+    id: git2::Oid,
+    mode: u32,
+    review: &mut Vec<String>,
+) -> AppResult<()> {
+    let dir_prefix = format!("{path}/");
+    let is_dir = index
+        .iter()
+        .any(|entry| entry.path.starts_with(dir_prefix.as_bytes()));
+    let path = if is_dir {
+        conflict_copy_path(path)
+    } else {
+        path.to_string()
+    };
+    let mut parent = path.as_str();
+    while let Some((dir, _)) = parent.rsplit_once('/') {
+        if let Some(file) = index.get_path(Path::new(dir), 0) {
+            let copy = conflict_copy_path(dir);
+            index.remove_path(Path::new(dir))?;
+            index.add(&stage0_entry(&copy, file.id, file.mode))?;
+            review.push(copy);
+        }
+        parent = dir;
+    }
+    index.add(&stage0_entry(&path, id, mode))?;
+    review.push(path);
+    Ok(())
 }
 
 /// One conflict lifted out of the index, so the borrow ends before the index

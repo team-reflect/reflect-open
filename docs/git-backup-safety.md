@@ -14,12 +14,17 @@ the fix that turns it green is named in its ignore reason.
 ## S1. A pull never overwrites uncommitted local changes
 
 A note saved after the cycle's commit (during the fetch, for example) is
-not clobbered by the checkout that applies the pull. The pull defers that
-file and the app merges it afterwards.
+not clobbered by the checkout that applies the pull. The pull reads every
+uncommitted local edit before the checkout and writes it back after it:
+merged three-way with the incoming version when both changed a text file,
+or kept beside a conflict copy otherwise. The result stays uncommitted for
+the next commit.
 
-- Test: pending (`merge.rs` safe checkout).
+- Test: `git::tests::a_save_between_commit_and_merge_survives_the_merge`,
+  `git::tests::a_save_between_commit_and_fast_forward_survives`,
+  `git::tests::edits_after_a_crash_before_checkout_keep_the_merged_changes`.
 
-Status (2026-10-16): implemented in phase 4 of the sync rework.
+Status (2026-10-16): implemented in phase 1 of the sync rework.
 
 ## S2. The branch ref moves only after the working tree matches it
 
@@ -68,8 +73,9 @@ Status (2026-10-16): implemented in phase 1 of the sync rework.
 A pull computes the merge in memory and never calls `repo.merge()`, so no
 stop can leave `MERGE_HEAD` behind. Until the branch ref moves, the merge
 commit is recorded in `refs/reflect/merge`, and the next commit or pull
-checks it out and moves the ref to it instead of merging again. Foreign state (a merge or rebase the user
-started with the git CLI) is still refused.
+checks it out and moves the ref to it instead of merging again. Foreign
+state (a merge or rebase the user started with the git CLI) is still
+refused.
 
 - Test: `git::tests::merge_interrupted_before_commit_converges_next_cycle`,
   `git::tests::merge_never_leaves_merge_head`,
@@ -99,9 +105,11 @@ the same marked-up file.
 
 - Test: `git::tests::conflicting_edits_are_committed_with_labeled_markers`,
   `git::tests::edit_vs_delete_keeps_the_edit`,
-  `git::tests::binary_conflict_keeps_both_copies`.
+  `git::tests::binary_conflict_keeps_both_copies`,
+  `git::tests::a_directory_file_conflict_keeps_the_file_as_a_conflict_copy`,
+  `git::tests::a_symlink_conflict_keeps_both_sides`.
 
-Status (2026-10-16): implemented in phase 3 of the sync rework.
+Status (2026-10-16): planned for phase 3 of the sync rework.
 
 ## S8. Edits in an open note are never silently discarded
 
@@ -112,4 +120,4 @@ with a parked conflict archives the buffer instead of dropping it.
 - Test: `note-session.test.ts` "keepMine rewrites the file even when the
   conflict content equals the buffer"; archive-on-dispose pending.
 
-Status (2026-10-16): implemented in phase 4 of the sync rework.
+Status (2026-10-16): planned for phase 4 of the sync rework.
