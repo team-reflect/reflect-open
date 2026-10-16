@@ -2,7 +2,8 @@ import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { describe, expect, it, vi } from 'vitest'
 import type { XPostEnvelope } from './bookmark-envelope.ts'
 import type { TextCaptureEnvelope } from './capture-envelope.ts'
-import { captureLocalDate } from './capture-identity.ts'
+import { captureIdentity, captureLocalDate } from './capture-identity.ts'
+import { captureNoteSource } from './capture-note.ts'
 import { createBackgroundReconcilerFactory } from '../reconcile/background-reconciler.ts'
 import { ReflectError } from '../errors.ts'
 import { createAiCredentialService } from '../ai/ai-credential-service.ts'
@@ -106,7 +107,7 @@ function setup(options: { mobile?: boolean } = {}) {
      */
     drains: vi.spyOn(captureInbox, 'list'),
     /**
-     * One call per enrichment phase.
+     * One call per enrichment phase, plus one for the launch link repair sweep.
      */
     enrichments: vi.spyOn(noteFile, 'listNotes'),
     relays: vi.spyOn(captureInbox, 'relaySharedInbox'),
@@ -240,7 +241,7 @@ describe('CaptureService (shared-inbox relay)', () => {
 
     expect(kit.relays).not.toHaveBeenCalled()
     expect(kit.drains).toHaveBeenCalledTimes(1)
-    expect(kit.enrichments).toHaveBeenCalledTimes(1)
+    expect(kit.enrichments).toHaveBeenCalledTimes(2)
     expect(kit.progress.getAll()).toEqual([])
     session.dispose()
   })
@@ -315,6 +316,72 @@ describe('CaptureService (triggers)', () => {
 
     session.dispose()
     expect(kit.fileChanges.listenerCount().changes).toBe(0)
+  })
+
+  describe('placeholder capture links', () => {
+    const identity = captureIdentity(CAPTURED_AT, '7c9e6679-7425-40de-944b-e07fc1f90ae7')
+    const placeholderDaily = `## [[Links]]\n\n- [[${identity.base}|example.com]]\n`
+    const titledDaily = `## [[Links]]\n\n- [[${identity.base}|A Cleaned Up Article]]\n`
+
+    async function finishedCapture(): Promise<string> {
+      return await captureNoteSource(
+        {
+          version: 1,
+          id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+          url: 'https://example.com/article',
+          title: 'A Cleaned Up Article',
+          capturedAt: CAPTURED_AT.toISOString(),
+          source: 'ios-share',
+        },
+        identity,
+        { hasScreenshot: false, status: 'done' },
+      )
+    }
+
+    it('repairs existing placeholder links on launch, once', async () => {
+      const kit = setup()
+      kit.noteFile.set(identity.notePath, await finishedCapture())
+      kit.noteFile.set(DAILY, placeholderDaily)
+
+      const session = kit.capture.openSession({ generation: 3 })
+      session.start()
+      await vi.waitFor(() => {
+        expect(kit.noteFile.files().get(DAILY)).toBe(titledDaily)
+      })
+
+      kit.noteFile.set(DAILY, placeholderDaily)
+      kit.activity.emitWake()
+      // Launch listed notes twice (enrichment and sweep); the wake pass only enriches.
+      await vi.waitFor(() => {
+        expect(kit.enrichments).toHaveBeenCalledTimes(3)
+      })
+      await flush()
+      expect(kit.drains).toHaveBeenCalledTimes(2)
+      expect(kit.noteFile.files().get(DAILY)).toBe(placeholderDaily)
+      session.dispose()
+    })
+
+    it('repairs a changed daily without draining or enriching', async () => {
+      const kit = setup()
+      kit.noteFile.set(identity.notePath, await finishedCapture())
+      const session = kit.capture.openSession({ generation: 3 })
+      session.start()
+      await flush()
+      expect(kit.drains).toHaveBeenCalledTimes(1)
+      const listings = kit.enrichments.mock.calls.length
+
+      kit.noteFile.set(DAILY, placeholderDaily)
+      kit.fileChanges.emit({
+        changes: [{ path: DAILY, kind: 'upsert', modifiedMs: 1 }],
+        source: 'external',
+      })
+      await vi.waitFor(() => {
+        expect(kit.noteFile.files().get(DAILY)).toBe(titledDaily)
+      })
+      expect(kit.drains).toHaveBeenCalledTimes(1)
+      expect(kit.enrichments).toHaveBeenCalledTimes(listings)
+      session.dispose()
+    })
   })
 
   it('retries on wake', async () => {

@@ -1,6 +1,11 @@
 import { appendXPost } from './bookmark-capture.ts'
 import type { XPostEnvelope } from './bookmark-envelope.ts'
 import { isCaptureSpoolPath } from './capture-identity.ts'
+import {
+  createCaptureLinkRepairService,
+  type CaptureLinkRepairService,
+} from './capture-link-repair-service.ts'
+import { isDaily } from '../graph/paths.ts'
 import type { AiCredentialService } from '../ai/ai-credential-service.ts'
 import type { AiProviderConfigService } from '../ai/ai-provider-config-service.ts'
 import type { PageDescriberService } from '../ai/page-describer-service.ts'
@@ -36,11 +41,12 @@ import { createPageMetaService } from './page-meta-service.ts'
  * descriptions): the single-flight loop, focus/online retries, and teardown live
  * there; this supplies the capture-specific pass and triggers.
  *
- * Every pass runs the two capture phases in order: **drain** the spool inbox
+ * A full pass runs the two capture phases in order: **drain** the spool inbox
  * (the durable raw save — works without any AI configured), then **enrich**
  * pending captures (meta scrape + BYOK description). The launch pass is the
  * headline behavior: captures spooled while the app was closed land the
- * moment a graph opens.
+ * moment a graph opens. Every pass then rewrites placeholder capture link
+ * text in the Dailies that changed; a Daily change alone runs only that step.
  */
 export interface CaptureSession {
   /**
@@ -113,6 +119,7 @@ interface CaptureSessionDeps {
   readonly captureInbox: CaptureInboxService
   readonly drain: CaptureDrainService
   readonly enrichment: CaptureEnrichmentService
+  readonly linkRepair: CaptureLinkRepairService
   readonly reconcilers: BackgroundReconcilerFactory
   readonly activity: ActivityPort
   readonly fileChanges: FileChangeService
@@ -136,6 +143,19 @@ class CaptureSessionImpl implements CaptureSession {
    */
   readonly #surfacedStops = new Map<string, string>()
   readonly #loop: ReturnType<BackgroundReconcilerFactory['create']>
+  /**
+   * Whether the next pass drains and enriches. Without it, a pass only
+   * repairs the changed Dailies, so a Daily save stays cheap.
+   */
+  #fullPassRequested = false
+  /**
+   * Dailies changed since the last pass, to check for placeholder capture links.
+   */
+  readonly #repairDailies = new Set<string>()
+  /**
+   * The first pass also checks the Daily of every finished capture.
+   */
+  #repairSweepPending = true
 
   constructor(deps: CaptureSessionDeps, options: CaptureSessionOptions) {
     this.#deps = deps
@@ -167,6 +187,11 @@ class CaptureSessionImpl implements CaptureSession {
   }
 
   schedule(): void {
+    this.#requestFullPass()
+  }
+
+  #requestFullPass(): void {
+    this.#fullPassRequested = true
     this.#loop.schedule()
   }
 
@@ -180,23 +205,33 @@ class CaptureSessionImpl implements CaptureSession {
     if (loop.isStale()) {
       return
     }
-    loop.schedule() // the launch pass: captures spooled while the app was closed
-    loop.retryOnWake() // the network's natural retry signals (enrichment)
+    this.#requestFullPass() // the launch pass: captures spooled while the app was closed
+    // The network's natural retry signals (enrichment).
+    loop.onDispose(
+      activity.subscribeWake(() => {
+        this.#requestFullPass()
+      }),
+    )
     if (this.#mobile) {
       // Mobile resume: `focus` alone is unreliable in the iOS webview (the
       // iCloud refresh hook listens to both for the same reason).
       loop.onDispose(
         activity.subscribeVisible(() => {
-          loop.schedule()
+          this.#requestFullPass()
         }),
       )
     }
     loop.onDispose(
       fileChanges.subscribe(({ changes }) => {
-        const hasNewCapture = changes.some(
-          (change) => change.kind === 'upsert' && isCaptureSpoolPath(change.path),
-        )
-        if (hasNewCapture) {
+        const upserts = changes.filter((change) => change.kind === 'upsert')
+        for (const change of upserts) {
+          if (isDaily(change.path)) {
+            this.#repairDailies.add(change.path)
+          }
+        }
+        if (upserts.some((change) => isCaptureSpoolPath(change.path))) {
+          this.#requestFullPass()
+        } else if (this.#repairDailies.size > 0) {
           loop.schedule()
         }
       }),
@@ -219,9 +254,42 @@ class CaptureSessionImpl implements CaptureSession {
   }
 
   /**
-   * One pass: drain the spool inbox (no AI needed), then enrich pending captures.
+   * One pass: drain and enrich when requested, then repair placeholder capture
+   * links in the changed Dailies.
    */
   async #reconcile(isStale: () => boolean): Promise<void> {
+    const fullPass = this.#fullPassRequested
+    this.#fullPassRequested = false
+    if (fullPass) {
+      await this.#drainAndEnrich(isStale)
+    }
+    if (isStale()) {
+      return
+    }
+    await this.#repairLinks()
+  }
+
+  async #repairLinks(): Promise<void> {
+    const { linkRepair, logger } = this.#deps
+    const dailies = new Set(this.#repairDailies)
+    this.#repairDailies.clear()
+    if (this.#repairSweepPending) {
+      this.#repairSweepPending = false
+      try {
+        for (const path of await linkRepair.candidateDailies(this.#generation)) {
+          dailies.add(path)
+        }
+      } catch (cause) {
+        logger.warn('capture link repair sweep failed:', cause)
+      }
+    }
+    await linkRepair.repair([...dailies], this.#generation)
+  }
+
+  /**
+   * Drain the spool inbox (no AI needed), then enrich pending captures.
+   */
+  async #drainAndEnrich(isStale: () => boolean): Promise<void> {
     const { captureInbox, drain, enrichment, commitXPost, notifyXPostsWritten } = this.#deps
     const generation = this.#generation
     if (this.#mobile) {
@@ -265,6 +333,7 @@ class CaptureServiceImpl implements CaptureService {
   readonly #deps: CaptureServiceDeps
   readonly #drain: CaptureDrainService
   readonly #enrichment: CaptureEnrichmentService
+  readonly #linkRepair: CaptureLinkRepairService
   readonly #xPostListeners = new Set<() => void>()
 
   constructor(deps: CaptureServiceDeps) {
@@ -288,6 +357,11 @@ class CaptureServiceImpl implements CaptureService {
       aiCredentials: deps.aiCredentials,
       privacy: deps.privacy,
     })
+    this.#linkRepair = createCaptureLinkRepairService({
+      noteFile,
+      openDocuments: deps.openDocuments,
+      logger: deps.logger,
+    })
   }
 
   openSession(options: CaptureSessionOptions): CaptureSession {
@@ -298,6 +372,7 @@ class CaptureServiceImpl implements CaptureService {
         captureInbox,
         drain: this.#drain,
         enrichment: this.#enrichment,
+        linkRepair: this.#linkRepair,
         reconcilers,
         activity,
         fileChanges,
