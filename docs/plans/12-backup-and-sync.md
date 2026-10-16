@@ -51,9 +51,9 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
    device's side, the other's, or both. Hand-merging stays possible in any external
    editor. Future: a meowdown conflict node unlocks in-editor resolution.
 
-   > **2026-10 revision:** a pull no longer commits markers. Text conflicts resolve
-   > through the ladder of [Plan 21](21-icloud-drive-sync.md), and a result that drops or
-   > interleaves a side is archived under Earlier versions. Conflict markers are plain
+   > **2026-10 revision:** a pull no longer commits markers. Note conflicts resolve
+   > through the ladder of [Plan 21](21-icloud-drive-sync.md), and other files keep a
+   > conflict copy. There is no conflict archive. Conflict markers are plain
    > text to Reflect: the app neither writes nor interprets them, and the marker
    > projection, the protected-by-markers open and the resolution notice described
    > below no longer exist. See [git-backup-safety.md](../git-backup-safety.md) S7 and S9.
@@ -101,8 +101,8 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
 1. **Rust git primitives** (`src-tauri/src/git/`): `git_status`, `git_setup` (init or
    adopt-existing + `origin` + align the local branch with the remote's default),
    `git_commit_all(message)` (stage everything, no-op when clean, large-file
-   guardrail), `git_fetch`, `git_merge_remote` (fast-forward or merge; writes marker
-   files with labeled sides, commits conflicts, reports changed files for reindexing),
+   guardrail), `git_fetch`, `git_pull` (2026-10: replaces the old merge command, which wrote
+   marker files; the pull commits and merges under one lock and writes no markers),
    `git_push` (rejections returned as data). Health checks: refuse foreign states —
    detached HEAD, in-progress rebase — with a typed error, never guess. Remote-agnostic;
    credentials via callback from the keychain. `.reflect/` stays gitignored (Plan 02);
