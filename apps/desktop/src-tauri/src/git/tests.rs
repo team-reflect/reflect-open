@@ -740,48 +740,6 @@ fn rename_rename_conflict_keeps_both_names_and_confirms_the_removal() {
     assert_eq!(repo.state(), git2::RepositoryState::Clean);
 }
 
-#[cfg(unix)]
-#[test]
-fn failed_merge_completion_still_clears_the_merge_state() {
-    use std::os::unix::fs::PermissionsExt;
-
-    let fixture = fixture();
-    let root_a = &fixture.graph_a;
-    write(root_a, "notes/keep.md", "# Keep\n\noriginal\n");
-    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
-    push(root_a, None).unwrap();
-
-    let root_b = second_device(&fixture);
-    write(&root_b, "notes/keep.md", "# Keep\n\nedited on b\n");
-    commit_all(&root_b, "b edit", MAX_FILE_BYTES).unwrap();
-    push(&root_b, None).unwrap();
-
-    fs::remove_file(root_a.join("notes/keep.md")).unwrap();
-    commit_all(root_a, "a delete", MAX_FILE_BYTES).unwrap();
-    fetch(root_a, None).unwrap();
-
-    // Make restoring the surviving edit fail mid-completion: the notes
-    // directory refuses new files, so write_blob cannot recreate keep.md.
-    let notes_dir = root_a.join("notes");
-    fs::set_permissions(&notes_dir, fs::Permissions::from_mode(0o555)).unwrap();
-    let result = merge_remote(root_a);
-    fs::set_permissions(&notes_dir, fs::Permissions::from_mode(0o755)).unwrap();
-    assert!(result.is_err(), "{result:?}");
-
-    // The contract: a failed merge never wedges the repo mid-merge…
-    let repo = Repository::open(root_a).unwrap();
-    assert_eq!(repo.state(), git2::RepositoryState::Clean);
-    drop(repo);
-
-    // …and the next cycle recovers on its own.
-    let merged = merge_remote(root_a).unwrap();
-    assert!(
-        matches!(merged.kind, MergeKind::MergedWithConflicts),
-        "{merged:?}"
-    );
-    assert_eq!(read(root_a, "notes/keep.md"), "# Keep\n\nedited on b\n");
-}
-
 #[test]
 fn fetch_without_remote_is_a_typed_error() {
     let dir = tempdir().unwrap();
@@ -954,9 +912,7 @@ fn diverging_renames_keep_both_files_and_never_wedge() {
 
 // ---- Sync safety regressions (Phase 0 of the sync rework) -------------------
 //
-// These pin the data-loss paths in `docs/git-backup-safety.md`. The ignored
-// ones are red on purpose until the Phase 1 fixes land; run them with
-// `cargo test -p reflect-open git::tests -- --ignored`.
+// These pin the data-loss paths in `docs/git-backup-safety.md`.
 
 /// The phone pushed a new note and linked it from the daily note; the Mac
 /// still has the old tree checked out and has fetched the phone's commit.
@@ -1050,7 +1006,6 @@ fn stale_head_lock_fast_forward_never_reverts_pulled_notes() {
 }
 
 #[test]
-#[ignore = "red until the merge rewrite takes the graph lock"]
 fn commit_during_fast_forward_never_reverts_pulled_notes() {
     // The quit-time flush commits outside the engine's queue, so it can land
     // while a pull is between the ref move and the checkout.
@@ -1109,7 +1064,6 @@ fn commit_during_fast_forward_never_reverts_pulled_notes() {
 }
 
 #[test]
-#[ignore = "red until phase 1: a merge interrupted before its commit must not wedge the repository"]
 fn merge_interrupted_before_commit_converges_next_cycle() {
     let fixture = fixture();
     let root_a = &fixture.graph_a;
@@ -1126,7 +1080,7 @@ fn merge_interrupted_before_commit_converges_next_cycle() {
     commit_all(root_a, "a2", MAX_FILE_BYTES).unwrap();
     fetch(root_a, None).unwrap();
 
-    // The process dies after libgit2 entered merge state.
+    // The process dies after the merge is resolved in memory.
     fault::arm(FaultPoint::BeforeMergeCommit, Fault::Panic);
     let crashed = std::panic::catch_unwind(AssertUnwindSafe(|| merge_remote(root_a)));
     assert!(crashed.is_err(), "the injected crash must unwind");
@@ -1146,6 +1100,252 @@ fn merge_interrupted_before_commit_converges_next_cycle() {
         assert_eq!(read(root_a, rel), expected, "{rel} on disk");
         assert_eq!(head_blob(root_a, rel), expected, "{rel} in HEAD");
         assert_eq!(remote_blob(&fixture, rel), expected, "{rel} on the remote");
+    }
+}
+
+/// Device A and device B each committed a different note on top of a shared
+/// base, and A has fetched B's commit, so the next pull is a true merge.
+fn diverged_fixture() -> Fixture {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/a.md", "# A\n");
+    write(root_a, "notes/shared.md", SHARED_BASE);
+    commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/b.md", "# B\n");
+    write(&root_b, "notes/shared.md", SHARED_FROM_B);
+    commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, "notes/a2.md", "# A2\n");
+    commit_all(root_a, "a2", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    fixture
+}
+
+const SHARED_BASE: &str = "# Shared\n\ntop\n\nmiddle\n\nbottom\n";
+const SHARED_FROM_B: &str = "# Shared\n\ntop\n\nmiddle\n\nbottom edited on b\n";
+
+/// Run the normal cycle and assert that every expected file is on disk, in
+/// `HEAD`, and on the remote, and that the repository is not mid-operation.
+fn assert_next_cycle_converges(fixture: &Fixture, expected: &[(&str, &str)]) {
+    let root_a = &fixture.graph_a;
+    commit_all(root_a, "Update notes", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    merge_remote(root_a).unwrap();
+    assert!(push(root_a, None).unwrap().pushed);
+    let repo = Repository::open(root_a).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Clean);
+    assert!(!root_a.join(".git/MERGE_HEAD").exists());
+    for (rel, expected) in expected {
+        assert_eq!(read(root_a, rel), *expected, "{rel} on disk");
+        assert_eq!(head_blob(root_a, rel), *expected, "{rel} in HEAD");
+        assert_eq!(remote_blob(fixture, rel), *expected, "{rel} on the remote");
+    }
+}
+
+const DIVERGED_RESULT: &[(&str, &str)] = &[
+    ("notes/a.md", "# A\n"),
+    ("notes/a2.md", "# A2\n"),
+    ("notes/b.md", "# B\n"),
+    ("notes/shared.md", SHARED_FROM_B),
+];
+
+/// Like [`diverged_fixture`], but both devices also edited the same line of
+/// `notes/conflict.md`, so the merge commits a marker block.
+fn conflicting_fixture() -> Fixture {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/a.md", "# A\n");
+    write(root_a, "notes/conflict.md", "# Conflict\n\noriginal line\n");
+    commit_all(root_a, "a", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/b.md", "# B\n");
+    write(&root_b, "notes/conflict.md", "# Conflict\n\nedited on b\n");
+    commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, "notes/conflict.md", "# Conflict\n\nedited on a\n");
+    commit_all(root_a, "a edit", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    fixture
+}
+
+const CONFLICT_MERGED: &str =
+    "# Conflict\n\n<<<<<<< this device\nedited on a\n=======\nedited on b\n>>>>>>> other device\n";
+
+const CONFLICTING_RESULT: &[(&str, &str)] = &[
+    ("notes/a.md", "# A\n"),
+    ("notes/b.md", "# B\n"),
+    ("notes/conflict.md", CONFLICT_MERGED),
+];
+
+fn recorded_merge(root: &Path) -> Option<git2::Oid> {
+    Repository::open(root)
+        .unwrap()
+        .refname_to_id("refs/reflect/merge")
+        .ok()
+}
+
+/// `HEAD` is the recorded merge or descends from it.
+fn assert_head_contains(root: &Path, merge: git2::Oid) {
+    let repo = Repository::open(root).unwrap();
+    let head = repo.head().unwrap().target().unwrap();
+    assert!(
+        head == merge || repo.graph_descendant_of(head, merge).unwrap(),
+        "HEAD {head} does not contain the recorded merge {merge}"
+    );
+}
+
+#[test]
+fn merge_crash_before_checkout_converges_next_cycle() {
+    let fixture = diverged_fixture();
+    fault::arm(FaultPoint::AfterMergeCommitBeforeCheckout, Fault::Fail);
+    assert!(merge_remote(&fixture.graph_a).is_err());
+    assert!(!fixture.graph_a.join("notes/b.md").exists());
+    assert_next_cycle_converges(&fixture, DIVERGED_RESULT);
+    assert_eq!(recorded_merge(&fixture.graph_a), None);
+
+    let fixture = conflicting_fixture();
+    let root_a = &fixture.graph_a;
+    fault::arm(FaultPoint::AfterMergeCommitBeforeCheckout, Fault::Fail);
+    assert!(merge_remote(root_a).is_err());
+    let merge = recorded_merge(root_a).expect("the merge commit is recorded");
+    assert_eq!(
+        read(root_a, "notes/conflict.md"),
+        "# Conflict\n\nedited on a\n"
+    );
+    assert_next_cycle_converges(&fixture, CONFLICTING_RESULT);
+    assert_head_contains(root_a, merge);
+    assert_eq!(recorded_merge(root_a), None);
+}
+
+#[test]
+fn merge_crash_after_checkout_before_ref_move_converges_next_cycle() {
+    let fixture = diverged_fixture();
+    fault::arm(FaultPoint::BeforeMergeRefMove, Fault::Fail);
+    assert!(merge_remote(&fixture.graph_a).is_err());
+    // The merged files are on disk while the branch still points at A's commit.
+    assert_eq!(read(&fixture.graph_a, "notes/b.md"), "# B\n");
+    assert!(!head_tree_paths(&fixture.graph_a).contains(&"notes/b.md".to_string()));
+    assert_next_cycle_converges(&fixture, DIVERGED_RESULT);
+    assert_eq!(recorded_merge(&fixture.graph_a), None);
+
+    // A conflict that was already written as markers is adopted, not merged
+    // again, so the markers never nest.
+    let fixture = conflicting_fixture();
+    let root_a = &fixture.graph_a;
+    fault::arm(FaultPoint::BeforeMergeRefMove, Fault::Fail);
+    assert!(merge_remote(root_a).is_err());
+    let merge = recorded_merge(root_a).expect("the merge commit is recorded");
+    assert_eq!(read(root_a, "notes/conflict.md"), CONFLICT_MERGED);
+    assert_next_cycle_converges(&fixture, CONFLICTING_RESULT);
+    assert_eq!(
+        read(root_a, "notes/conflict.md").matches("<<<<<<<").count(),
+        1
+    );
+    assert_head_contains(root_a, merge);
+    assert_eq!(recorded_merge(root_a), None);
+}
+
+#[test]
+fn a_recorded_merge_from_a_foreign_head_is_dropped() {
+    let fixture = diverged_fixture();
+    let root_a = &fixture.graph_a;
+    {
+        let repo = Repository::open(root_a).unwrap();
+        let remote = repo
+            .find_commit(repo.refname_to_id("refs/remotes/origin/main").unwrap())
+            .unwrap();
+        let sig = git2::Signature::now("t", "t@example.com").unwrap();
+        let foreign = repo
+            .commit(
+                None,
+                &sig,
+                &sig,
+                "foreign",
+                &remote.tree().unwrap(),
+                &[&remote],
+            )
+            .unwrap();
+        repo.reference("refs/reflect/merge", foreign, true, "test")
+            .unwrap();
+    }
+    assert_next_cycle_converges(&fixture, DIVERGED_RESULT);
+    assert_eq!(recorded_merge(root_a), None);
+}
+
+#[test]
+fn edits_after_a_merge_crash_survive_the_next_cycle() {
+    let fixture = diverged_fixture();
+    let root_a = &fixture.graph_a;
+    fault::arm(FaultPoint::BeforeMergeRefMove, Fault::Fail);
+    assert!(merge_remote(root_a).is_err());
+    assert_eq!(read(root_a, "notes/shared.md"), SHARED_FROM_B);
+
+    // The user edits the note the merge just rewrote, before the next cycle.
+    let typed = "# Shared\n\ntop typed after the crash\n\nmiddle\n\nbottom edited on b\n";
+    write(root_a, "notes/shared.md", typed);
+
+    assert_next_cycle_converges(
+        &fixture,
+        &[
+            ("notes/a.md", "# A\n"),
+            ("notes/a2.md", "# A2\n"),
+            ("notes/b.md", "# B\n"),
+            ("notes/shared.md", typed),
+        ],
+    );
+    assert_eq!(recorded_merge(root_a), None);
+}
+
+#[test]
+fn edits_after_a_crash_before_checkout_keep_the_merged_changes() {
+    let fixture = diverged_fixture();
+    let root_a = &fixture.graph_a;
+    fault::arm(FaultPoint::AfterMergeCommitBeforeCheckout, Fault::Fail);
+    assert!(merge_remote(root_a).is_err());
+    assert_eq!(read(root_a, "notes/shared.md"), SHARED_BASE);
+
+    // The user edits the pre-merge version of a note the merge changed.
+    write(
+        root_a,
+        "notes/shared.md",
+        "# Shared\n\ntop typed after the crash\n\nmiddle\n\nbottom\n",
+    );
+
+    assert_next_cycle_converges(
+        &fixture,
+        &[
+            ("notes/a.md", "# A\n"),
+            ("notes/b.md", "# B\n"),
+            (
+                "notes/shared.md",
+                "# Shared\n\ntop typed after the crash\n\nmiddle\n\nbottom edited on b\n",
+            ),
+        ],
+    );
+    assert_eq!(recorded_merge(root_a), None);
+}
+
+#[test]
+fn merge_never_leaves_merge_head() {
+    for point in [
+        FaultPoint::BeforeMergeCommit,
+        FaultPoint::AfterMergeCommitBeforeCheckout,
+        FaultPoint::BeforeMergeRefMove,
+    ] {
+        let fixture = diverged_fixture();
+        let root_a = &fixture.graph_a;
+        fault::arm(point, Fault::Fail);
+        assert!(merge_remote(root_a).is_err(), "{point:?}");
+        assert!(!root_a.join(".git/MERGE_HEAD").exists(), "{point:?}");
+        let repo = Repository::open(root_a).unwrap();
+        assert_eq!(repo.state(), git2::RepositoryState::Clean, "{point:?}");
     }
 }
 

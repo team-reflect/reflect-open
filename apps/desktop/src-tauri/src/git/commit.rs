@@ -59,6 +59,7 @@ fn commit_locked(
     max_file_bytes: u64,
 ) -> AppResult<CommitOutcome> {
     let repo = open_existing(root)?;
+    super::merge::adopt_recorded_merge(&repo, root)?;
     ensure_clean_state(&repo)?;
     // In-memory hard guarantee, independent of any on-disk ignore file: the
     // runtime directory must never enter a backup commit (Plan 21 — a synced

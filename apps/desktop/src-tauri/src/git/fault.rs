@@ -1,10 +1,11 @@
 //! Test-only fault injection for the git primitives.
 //!
 //! The sync safety tests (`docs/git-backup-safety.md`) need to stop a pull
-//! at a precise point: between the branch move and the checkout, or after
-//! libgit2 entered merge state but before the merge commit. A real process
-//! dies anywhere; these hooks make "anywhere" reproducible. The call sites
-//! in `merge.rs` are `#[cfg(test)]`, so release builds carry nothing.
+//! at a precise point: between the checkout and the branch move, or between
+//! the steps of an in-memory merge (resolved, committed, checked out). A
+//! real process dies anywhere; these hooks make "anywhere" reproducible.
+//! The call sites in `merge.rs` are `#[cfg(test)]`, so release builds carry
+//! nothing.
 //!
 //! Faults are thread-local and one-shot: a test arms a point on the thread
 //! that will run the git command, and the first `trip` of that point
@@ -25,10 +26,8 @@ pub(super) enum FaultPoint {
     /// Merge: after the merge result is staged, before the merge commit is written.
     BeforeMergeCommit,
     /// Merge: after the merge commit is written, before the working tree is checked out.
-    #[allow(dead_code)]
     AfterMergeCommitBeforeCheckout,
     /// Merge: after the working tree is written, before the branch ref moves to the merge commit.
-    #[allow(dead_code)]
     BeforeMergeRefMove,
     /// Fetch: on entry, before the remote is contacted.
     BeforeFetch,
