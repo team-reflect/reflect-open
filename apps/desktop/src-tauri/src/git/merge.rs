@@ -24,7 +24,10 @@ use crate::conflict::merge3;
 use crate::conflict::{ConflictSide, Resolution};
 use crate::error::{AppError, AppResult};
 
-use super::repo::{clear_foreign_state, current_branch, open_existing, signature};
+use super::repo::{
+    branch_tip_ahead_of_detached_head, clear_foreign_state, current_branch, open_existing,
+    reattach_head, signature,
+};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,11 +66,55 @@ pub struct MergeOutcome {
     pub changed_files: Vec<ChangedFile>,
 }
 
+impl MergeOutcome {
+    fn up_to_date() -> Self {
+        MergeOutcome {
+            kind: MergeKind::UpToDate,
+            review_paths: Vec::new(),
+            changed_files: Vec::new(),
+        }
+    }
+
+    /// This outcome followed by `next`, in the order the files changed.
+    fn then(mut self, next: MergeOutcome) -> Self {
+        self.review_paths.extend(next.review_paths);
+        self.changed_files.extend(next.changed_files);
+        if !matches!(next.kind, MergeKind::UpToDate) {
+            self.kind = next.kind;
+        }
+        self
+    }
+}
+
 /// Merge the fetched `origin/<branch>` into the local branch. The caller
 /// holds the graph lock; `skipped` lists the dirty files a commit withheld.
 pub(super) fn merge_locked(root: &Path, skipped: &[String]) -> AppResult<MergeOutcome> {
     let repo = open_existing(root)?;
-    pull(&repo, root, skipped)
+    clear_foreign_state(&repo)?;
+    let local = merge_branch_into_detached_head(&repo, root, skipped)?;
+    let remote = pull(&repo, root, skipped)?;
+    Ok(local.then(remote))
+}
+
+/// Merge the backup branch into a detached HEAD that is behind it, then
+/// attach HEAD to the branch, so the branch only ever moves forward.
+fn merge_branch_into_detached_head(
+    repo: &Repository,
+    root: &Path,
+    skipped: &[String],
+) -> AppResult<MergeOutcome> {
+    let outcome = match branch_tip_ahead_of_detached_head(repo)? {
+        Some(tip) => merge_into_head(
+            repo,
+            root,
+            skipped,
+            tip,
+            "Merge the backup branch into the checked-out commit",
+        )?,
+        None => MergeOutcome::up_to_date(),
+    };
+    reattach_head(repo)?;
+    Ok(outcome)
 }
 
 #[cfg(test)]
@@ -91,32 +138,47 @@ fn checkout_target(repo: &Repository, tree: &git2::Tree<'_>, skipped: &[String])
 }
 
 fn pull(repo: &Repository, root: &Path, skipped: &[String]) -> AppResult<MergeOutcome> {
-    clear_foreign_state(repo)?;
     let branch = current_branch(repo)?;
     let Ok(remote_oid) = repo.refname_to_id(&format!("refs/remotes/origin/{branch}")) else {
         // A new backup repo has no remote branch until the first push.
-        return Ok(MergeOutcome {
-            kind: MergeKind::UpToDate,
-            review_paths: Vec::new(),
-            changed_files: Vec::new(),
-        });
+        return Ok(MergeOutcome::up_to_date());
     };
-    let annotated = repo.find_annotated_commit(remote_oid)?;
+    merge_into_head(
+        repo,
+        root,
+        skipped,
+        remote_oid,
+        "Merge changes from other devices",
+    )
+}
+
+/// Merge `theirs_oid` into HEAD: fast-forward when possible, otherwise an
+/// in-memory three-way merge. The ref HEAD names moves last; a detached HEAD
+/// moves itself.
+fn merge_into_head(
+    repo: &Repository,
+    root: &Path,
+    skipped: &[String],
+    theirs_oid: git2::Oid,
+    message: &str,
+) -> AppResult<MergeOutcome> {
+    let refname = repo
+        .find_reference("HEAD")?
+        .symbolic_target()?
+        .unwrap_or("HEAD")
+        .to_string();
+    let annotated = repo.find_annotated_commit(theirs_oid)?;
     let (analysis, _) = repo.merge_analysis(&[&annotated])?;
 
     if analysis.is_up_to_date() {
-        return Ok(MergeOutcome {
-            kind: MergeKind::UpToDate,
-            review_paths: Vec::new(),
-            changed_files: Vec::new(),
-        });
+        return Ok(MergeOutcome::up_to_date());
     }
 
     if analysis.is_unborn() || analysis.is_fast_forward() {
         // Capture the outgoing tree before anything moves (None on unborn).
         let old_oid = repo.head().ok().and_then(|head| head.target());
         let old_tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
-        let new_tree = repo.find_commit(remote_oid)?.tree()?;
+        let new_tree = repo.find_commit(theirs_oid)?.tree()?;
         let mut changed_files = changed_between(repo, old_tree.as_ref(), &new_tree)?;
         // Files first, ref last: a failure in between leaves the branch where
         // it was, so the next cycle retries the pull.
@@ -126,14 +188,13 @@ fn pull(repo: &Repository, root: &Path, skipped: &[String]) -> AppResult<MergeOu
         stamp_modified_times(root, &mut changed_files);
         #[cfg(test)]
         super::fault::trip(super::fault::FaultPoint::BeforeFastForwardRefMove)?;
-        let refname = format!("refs/heads/{branch}");
         let message = "reflect sync: fast-forward";
         match old_oid {
             // Guarded: the branch must still be where this pull started.
             Some(old_oid) => {
-                repo.reference_matching(&refname, remote_oid, true, old_oid, message)?
+                repo.reference_matching(&refname, theirs_oid, true, old_oid, message)?
             }
-            None => repo.reference(&refname, remote_oid, true, message)?,
+            None => repo.reference(&refname, theirs_oid, true, message)?,
         };
         // No `set_head`: a stale `HEAD.lock` must not fail a pull.
         return Ok(MergeOutcome {
@@ -145,7 +206,7 @@ fn pull(repo: &Repository, root: &Path, skipped: &[String]) -> AppResult<MergeOu
 
     let ours = repo.head()?.peel_to_commit()?;
     let head_oid = ours.id();
-    let theirs = repo.find_commit(remote_oid)?;
+    let theirs = repo.find_commit(theirs_oid)?;
     let mut index = repo.merge_commits(&ours, &theirs, Some(&MergeOptions::new()))?;
     let review_paths = resolve_index_conflicts(repo, root, &mut index, &ours, &theirs)?;
     #[cfg(test)]
@@ -154,11 +215,11 @@ fn pull(repo: &Repository, root: &Path, skipped: &[String]) -> AppResult<MergeOu
     let tree = repo.find_tree(index.write_tree_to(repo)?)?;
     let sig = signature(repo)?;
     let message = if review_paths.is_empty() {
-        "Merge changes from other devices"
+        message.to_string()
     } else {
-        "Merge changes from other devices (files to review)"
+        format!("{message} (files to review)")
     };
-    let merge_oid = repo.commit(None, &sig, &sig, message, &tree, &[&ours, &theirs])?;
+    let merge_oid = repo.commit(None, &sig, &sig, &message, &tree, &[&ours, &theirs])?;
     let ours_tree = ours.tree()?;
     let mut changed_files = changed_between(repo, Some(&ours_tree), &tree)?;
 
@@ -168,13 +229,7 @@ fn pull(repo: &Repository, root: &Path, skipped: &[String]) -> AppResult<MergeOu
     stamp_modified_times(root, &mut changed_files);
     #[cfg(test)]
     super::fault::trip(super::fault::FaultPoint::BeforeMergeRefMove)?;
-    repo.reference_matching(
-        &format!("refs/heads/{branch}"),
-        merge_oid,
-        true,
-        head_oid,
-        message,
-    )?;
+    repo.reference_matching(&refname, merge_oid, true, head_oid, &message)?;
 
     Ok(MergeOutcome {
         kind: MergeKind::Merged,

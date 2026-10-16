@@ -2191,14 +2191,90 @@ fn a_detached_head_behind_the_branch_does_not_rewind_it() {
     };
 
     write(root, "notes/d.md", "# D\n");
-    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    pull_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
     let repo = Repository::open(root).unwrap();
     assert!(!repo.head_detached().unwrap());
     assert_eq!(repo.head().unwrap().name().unwrap(), "refs/heads/main");
     let head = repo.head().unwrap().peel_to_commit().unwrap();
-    assert_eq!(head.parent_id(0).unwrap(), tip);
+    assert!(repo.graph_descendant_of(head.id(), tip).unwrap());
     assert!(repo.graph_descendant_of(head.id(), older).unwrap());
     assert!(repo.find_commit(tip).is_ok());
+}
+
+/// Commit `a.md`, then `b.md`, push, and check out the first commit the way
+/// `git checkout <older>` does. Returns the older commit and the branch tip.
+fn detached_behind_fixture() -> (Fixture, git2::Oid, git2::Oid) {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n");
+    commit_all(root, "first", MAX_FILE_BYTES).unwrap();
+    let older = Repository::open(root)
+        .unwrap()
+        .head()
+        .unwrap()
+        .target()
+        .unwrap();
+    write(root, "notes/b.md", "# B\n");
+    commit_all(root, "second", MAX_FILE_BYTES).unwrap();
+    push(root, None).unwrap();
+    let repo = Repository::open(root).unwrap();
+    let tip = repo.head().unwrap().target().unwrap();
+    let commit = repo.find_commit(older).unwrap();
+    let mut checkout = git2::build::CheckoutBuilder::new();
+    checkout.force();
+    repo.checkout_tree(commit.as_object(), Some(&mut checkout))
+        .unwrap();
+    repo.set_head_detached(older).unwrap();
+    assert!(!root.join("notes/b.md").exists());
+    (fixture, older, tip)
+}
+
+fn assert_attached_to_main(root: &Path) -> Repository {
+    let repo = Repository::open(root).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Clean);
+    assert!(!repo.head_detached().unwrap());
+    assert_eq!(repo.head().unwrap().name().unwrap(), "refs/heads/main");
+    repo
+}
+
+#[test]
+fn a_detached_head_behind_the_tip_fast_forwards_instead_of_rolling_back() {
+    let (fixture, _older, tip) = detached_behind_fixture();
+    let root = &fixture.graph_a;
+
+    let pulled = pull_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert!(!pulled.committed, "{pulled:?}");
+    assert!(matches!(pulled.kind, MergeKind::FastForward), "{pulled:?}");
+    let repo = assert_attached_to_main(root);
+    let head = repo.head().unwrap().target().unwrap();
+    assert!(head == tip || repo.graph_descendant_of(head, tip).unwrap());
+    assert_eq!(read(root, "notes/b.md"), "# B\n");
+    assert_eq!(head_blob(root, "notes/b.md"), "# B\n");
+}
+
+#[test]
+fn edits_made_on_a_detached_head_are_merged_into_the_branch() {
+    let (fixture, older, tip) = detached_behind_fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n\nedited\n");
+
+    let pulled = pull_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert!(pulled.committed, "{pulled:?}");
+    assert!(matches!(pulled.kind, MergeKind::Merged), "{pulled:?}");
+    let repo = assert_attached_to_main(root);
+    let head = repo.head().unwrap().peel_to_commit().unwrap();
+    assert_eq!(repo.refname_to_id("refs/heads/main").unwrap(), head.id());
+    assert!(repo.graph_descendant_of(head.id(), tip).unwrap());
+    assert_eq!(
+        repo.find_commit(head.parent_id(0).unwrap())
+            .unwrap()
+            .parent_id(0)
+            .unwrap(),
+        older
+    );
+    assert_eq!(head_blob(root, "notes/a.md"), "# A\n\nedited\n");
+    assert_eq!(head_blob(root, "notes/b.md"), "# B\n");
+    assert_eq!(read(root, "notes/b.md"), "# B\n");
 }
 
 #[test]
