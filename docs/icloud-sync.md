@@ -48,9 +48,9 @@ resolving the same conflict produce identical bytes and converge):
 7. **Anything else**: a word-level merge keeps the words both sides added.
    It always produces text, so iCloud sync never writes conflict markers.
 
-Only the loop breaker and the word-level merge can drop or interleave a
-side's text. After one of them, Reflect archives each side under
-`.reflect/conflict-archive/<note-path>/` before it writes the result. It
+A result that drops or interleaves a side's text (a marked side, the loop
+breaker, the word-level merge) is archived first: Reflect archives each side
+under `.reflect/conflict-archive/<note-path>/` before it writes the result. It
 archives only content that Git history does not already hold (kept ~90 days /
 20 versions per note). A later change will show the archived versions under
 **Earlier versions** in the note sidebar. Binary assets never text-merge: the other device's copy

@@ -131,14 +131,28 @@ pub fn list(root: &Path, rel: &str) -> AppResult<Vec<ArchivedVersion>> {
     Ok(versions.into_iter().map(|(_, version)| version).collect())
 }
 
-/// The text of one archived version, named as [`list`] returns it.
+/// The text of one archived version, named as [`list`] returns it. The
+/// entry must be a regular file reached through real directories only.
 pub fn read(root: &Path, rel: &str, name: &str) -> AppResult<String> {
     if parse_archive_name(name).is_none() {
         return Err(AppError::io("invalid archive name"));
     }
-    let dir = note_archive_dir(root, rel)
-        .ok_or_else(|| AppError::io(format!("invalid archive path: {rel}")))?;
-    Ok(fs::read_to_string(dir.join(name))?)
+    let rel_path = crate::fs::ensure_relative(rel)?;
+    let mut dir = root.to_path_buf();
+    for component in [Path::new(".reflect"), Path::new(ARCHIVE_DIR)]
+        .into_iter()
+        .chain(rel_path.iter().map(Path::new))
+    {
+        dir.push(component);
+        if !fs::symlink_metadata(&dir)?.is_dir() {
+            return Err(AppError::io("the archive path is not a directory"));
+        }
+    }
+    let entry = dir.join(name);
+    if !fs::symlink_metadata(&entry)?.is_file() {
+        return Err(AppError::io("the archived version is not a regular file"));
+    }
+    Ok(fs::read_to_string(entry)?)
 }
 
 /// `<ms>-<device>[~n].<ext>` → `(ms, device, n)`. Names must match
@@ -439,5 +453,39 @@ mod tests {
             assert!(read(root.path(), "notes/a.md", name).is_err(), "{name}");
         }
         assert!(read(root.path(), "../a.md", "5-Mac.md").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_symlinked_archive_entry_is_refused() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempdir().unwrap();
+        let outside = tempdir().unwrap();
+        fs::write(outside.path().join("secret.md"), "secret").unwrap();
+        archive_version(root.path(), "notes/a.md", None, 1000, b"kept").unwrap();
+        assert_eq!(
+            read(root.path(), "notes/a.md", "1000-unknown.md").unwrap(),
+            "kept"
+        );
+
+        // A symlinked entry.
+        let dir = root.path().join(".reflect/conflict-archive/notes/a.md");
+        symlink(
+            outside.path().join("secret.md"),
+            dir.join("2000-unknown.md"),
+        )
+        .unwrap();
+        assert!(read(root.path(), "notes/a.md", "2000-unknown.md").is_err());
+
+        // A symlinked directory component.
+        fs::create_dir_all(outside.path().join("b.md")).unwrap();
+        fs::write(outside.path().join("b.md/3000-unknown.md"), "secret").unwrap();
+        symlink(
+            outside.path().join("b.md"),
+            root.path().join(".reflect/conflict-archive/notes/b.md"),
+        )
+        .unwrap();
+        assert!(read(root.path(), "notes/b.md", "3000-unknown.md").is_err());
     }
 }

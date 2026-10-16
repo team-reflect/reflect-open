@@ -1821,3 +1821,204 @@ fn remote_head_on_an_unborn_remote_is_none() {
     assert_eq!(tip.remote_oid, None);
     assert_eq!(tip.tracking_oid, None);
 }
+
+#[test]
+fn a_conflict_copy_never_overwrites_an_existing_file() {
+    // In the merge index: an untracked file already holds the first name.
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    fs::write(root_a.join("assets/img.bin"), b"\x00base\x01").unwrap();
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    fs::write(root_b.join("assets/img.bin"), b"\x00from-b\x01").unwrap();
+    commit_all(&root_b, "b image", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    fs::write(root_a.join("assets/img.bin"), b"\x00from-a\x01").unwrap();
+    commit_all(root_a, "a image", MAX_FILE_BYTES).unwrap();
+    fs::write(root_a.join("assets/img (conflict).bin"), b"keep me").unwrap();
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert!(
+        merged
+            .review_paths
+            .contains(&"assets/img (conflict 2).bin".to_string()),
+        "{merged:?}"
+    );
+    assert_eq!(
+        fs::read(root_a.join("assets/img (conflict).bin")).unwrap(),
+        b"keep me"
+    );
+    assert_eq!(
+        fs::read(root_a.join("assets/img (conflict 2).bin")).unwrap(),
+        b"\x00from-b\x01"
+    );
+
+    // On checkout: the incoming tree already holds the first name.
+    let fixture = fixture_with_pic();
+    let root_a = &fixture.graph_a;
+    let root_b = second_device(&fixture);
+    fs::write(root_b.join("assets/pic.bin"), b"\x00from-b\x01").unwrap();
+    fs::write(root_b.join("assets/pic (conflict).bin"), b"\x00tracked\x01").unwrap();
+    commit_all(&root_b, "b pic", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    fs::write(root_a.join("assets/pic.bin"), b"\x00from-a\x01").unwrap();
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::FastForward), "{merged:?}");
+    assert_eq!(
+        merged.review_paths,
+        vec!["assets/pic (conflict 2).bin".to_string()]
+    );
+    assert_eq!(
+        fs::read(root_a.join("assets/pic.bin")).unwrap(),
+        b"\x00from-a\x01"
+    );
+    assert_eq!(
+        fs::read(root_a.join("assets/pic (conflict).bin")).unwrap(),
+        b"\x00tracked\x01"
+    );
+    assert_eq!(
+        fs::read(root_a.join("assets/pic (conflict 2).bin")).unwrap(),
+        b"\x00from-b\x01"
+    );
+}
+
+/// A graph with `assets/pic.bin` committed and pushed.
+fn fixture_with_pic() -> Fixture {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    fs::write(root_a.join("assets/pic.bin"), b"\x00base\x01").unwrap();
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+    fixture
+}
+
+#[cfg(unix)]
+#[test]
+fn a_locally_changed_symlink_survives_the_pull() {
+    use std::os::unix::fs::symlink;
+
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    symlink("base-target", root_a.join("assets/kept")).unwrap();
+    symlink("base-target", root_a.join("assets/both")).unwrap();
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/b.md", "# B\n");
+    fs::remove_file(root_b.join("assets/both")).unwrap();
+    symlink("b-target", root_b.join("assets/both")).unwrap();
+    commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    for name in ["kept", "both"] {
+        fs::remove_file(root_a.join("assets").join(name)).unwrap();
+        symlink("a-target", root_a.join("assets").join(name)).unwrap();
+    }
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::FastForward), "{merged:?}");
+
+    assert_eq!(read(root_a, "notes/b.md"), "# B\n");
+    for name in ["kept", "both"] {
+        assert_eq!(
+            fs::read_link(root_a.join("assets").join(name)).unwrap(),
+            Path::new("a-target"),
+            "{name}"
+        );
+    }
+    assert_eq!(
+        fs::read_link(root_a.join("assets/both (conflict)")).unwrap(),
+        Path::new("b-target")
+    );
+    assert_eq!(
+        merged.review_paths,
+        vec!["assets/both (conflict)".to_string()]
+    );
+}
+
+#[test]
+fn untracked_files_are_left_alone_by_the_pull() {
+    let fixture = pulled_note_fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/scratch.md", "# Scratch\n");
+    let before = fs::metadata(root_a.join("notes/scratch.md"))
+        .unwrap()
+        .modified()
+        .unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::FastForward), "{merged:?}");
+
+    assert!(
+        !merged
+            .changed_files
+            .iter()
+            .any(|change| change.path == "notes/scratch.md"),
+        "{merged:?}"
+    );
+    assert_eq!(read(root_a, "notes/scratch.md"), "# Scratch\n");
+    let after = fs::metadata(root_a.join("notes/scratch.md"))
+        .unwrap()
+        .modified()
+        .unwrap();
+    assert_eq!(before, after);
+}
+
+#[test]
+fn reflect_runtime_files_never_enter_a_merge() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/a.md", "# A\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    // Another tool on the other device commits the runtime directory.
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/b.md", "# B\n");
+    write(&root_b, ".reflect/index.sqlite", "from b");
+    {
+        let repo = Repository::open(&root_b).unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(Path::new("notes/b.md")).unwrap();
+        index.add_path(Path::new(".reflect/index.sqlite")).unwrap();
+        index.write().unwrap();
+        let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+        let parent = repo.head().unwrap().peel_to_commit().unwrap();
+        let sig = git2::Signature::now("t", "t@t").unwrap();
+        repo.commit(Some("HEAD"), &sig, &sig, "foreign", &tree, &[&parent])
+            .unwrap();
+    }
+    push(&root_b, None).unwrap();
+
+    write(root_a, ".reflect/index.sqlite", "local runtime");
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::FastForward), "{merged:?}");
+
+    assert_eq!(read(root_a, "notes/b.md"), "# B\n");
+    assert_eq!(read(root_a, ".reflect/index.sqlite"), "local runtime");
+    assert!(
+        !merged
+            .changed_files
+            .iter()
+            .any(|change| change.path.starts_with(".reflect/")),
+        "{merged:?}"
+    );
+}
+
+#[test]
+fn a_local_delete_of_an_incoming_change_is_reported_for_review() {
+    let fixture = pulled_note_fixture();
+    let root_a = &fixture.graph_a;
+    fs::remove_file(root_a.join("daily/2026-10-01.md")).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::FastForward), "{merged:?}");
+
+    assert_eq!(read(root_a, "daily/2026-10-01.md"), PHONE_DAILY);
+    assert_eq!(merged.review_paths, vec!["daily/2026-10-01.md".to_string()]);
+}
