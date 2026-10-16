@@ -1,9 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreIssues": {
-    "apps/desktop/src/components/ui/**": ["exports", "types"],
-    "packages/db/src/schema.gen.ts": ["types"]
-  },
   "rules": { "exports": "off", "types": "off" },
   "workspaces": {
     ".": { "entry": ["fixtures/*.mjs"] },
