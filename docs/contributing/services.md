@@ -133,7 +133,7 @@ factory takes only `deps`. A per-session factory adds a second `options`
 parameter for what identifies the session (§10).
 
 - Put in it every collaborator: `ipc` for native commands, `logger` instead of
-  `console.*`, `clock` instead of `Date.now()` and `setTimeout`, `id` instead
+  `console.*` ([logging](logging.md)), `clock` instead of `Date.now()` and `setTimeout`, `id` instead
   of `crypto.randomUUID()`, `http` instead of `fetch`. A test controls them.
 - Declare each dependency as the full service type (`LoggerService`, not
   `Pick<LoggerService, 'error'>`). List only the services the class uses.
