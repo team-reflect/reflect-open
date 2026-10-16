@@ -102,8 +102,8 @@ fn conflict_candidates(scope: SweepScope, ingested_paths: &[String]) -> Option<H
 
 /// Command: run a conflict sweep over the generation-pinned graph.
 ///
-/// `skip_paths` — notes with dirty open sessions (the session's own conflict
-/// parking covers them until flushed). `ingested_paths` — external changes
+/// `skip_paths` — notes with dirty open sessions (a dirty open session saves
+/// and merges on its own). `ingested_paths` — external changes
 /// the frontend just applied cleanly; their content becomes the new shadow
 /// base. `record_baseline` — snapshot every conflict-free note as its own
 /// base (iCloud adoption). `scope` — how much of the graph the version
