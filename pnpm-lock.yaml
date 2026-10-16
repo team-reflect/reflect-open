@@ -141,6 +141,9 @@ importers:
       lucide-react:
         specifier: ^1.45.0
         version: 1.51.0(@types/react@19.3.0)(react@19.3.0)
+      ms:
+        specifier: 3.0.0-canary.202508261828
+        version: 3.0.0-canary.202508261828
       react:
         specifier: ^19.3.0
         version: 19.3.0
@@ -313,6 +316,9 @@ importers:
       date-fns:
         specifier: ^4.4.0
         version: 4.4.0
+      ms:
+        specifier: 3.0.0-canary.202508261828
+        version: 3.0.0-canary.202508261828
       zod:
         specifier: ^4.6.5
         version: 4.6.5
@@ -4868,6 +4874,10 @@ packages:
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
+
+  ms@3.0.0-canary.202508261828:
+    resolution: {integrity: sha512-NotsCoUCIUkojWCzQff4ttdCfIPoA1UGZsyQbi7KmqkNRfKCrvga8JJi2PknHymHOuor0cJSn/ylj52Cbt2IrQ==}
+    engines: {node: '>=18'}
 
   nano-staged@1.0.2:
     resolution: {integrity: sha512-Fytar3zHLY99nlMfqPPbraxZodqQAHPpdPRyYaplL+lB9DCR6pUrafxbG+Btz4+7fO5Rm/+DO4ZeDO/nLSUMhw==}
@@ -11313,6 +11323,8 @@ snapshots:
   mrmime@2.0.1: {}
 
   ms@2.1.3: {}
+
+  ms@3.0.0-canary.202508261828: {}
 
   nano-staged@1.0.2: {}
 

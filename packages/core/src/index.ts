@@ -369,7 +369,6 @@ export { parseLinkPreviewMeta } from './link-preview/metadata.ts'
 export { cloudSafeLinkHref, notePrivate } from './privacy/checkers.ts'
 export {
   isDeviceFlowConfigured,
-  minutesUntil,
   suggestRepoName,
   type GithubAuth,
   type GithubUser,

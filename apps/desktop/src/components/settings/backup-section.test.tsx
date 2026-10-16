@@ -93,7 +93,7 @@ describe('BackupSettingsField', () => {
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'waiting', until: 2 * 60_000 + 1 },
     })
-    await expect.element(page.getByText('Backs up in 3 min')).toBeVisible()
+    await expect.element(page.getByText('Backs up in 2 minutes')).toBeVisible()
   })
 
   it('counts the waiting countdown down as time passes', async () => {
@@ -103,9 +103,9 @@ describe('BackupSettingsField', () => {
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'waiting', until: 3 * 60_000 },
     })
-    await expect.element(page.getByText('Backs up in 3 min')).toBeVisible()
+    await expect.element(page.getByText('Backs up in 3 minutes')).toBeVisible()
     await app.clock.advance(60_000)
-    await expect.element(page.getByText('Backs up in 2 min')).toBeVisible()
+    await expect.element(page.getByText('Backs up in 2 minutes')).toBeVisible()
   })
 
   it('names no host for an iCloud graph with a generic remote', async () => {

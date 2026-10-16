@@ -1,4 +1,5 @@
-import { minutesUntil, type BackupState } from '@reflect/core'
+import type { BackupState } from '@reflect/core'
+import { format } from 'ms'
 
 /**
  * The plain-language sync status mobile shows (Plan 19, step 10). The phone
@@ -47,7 +48,7 @@ function statusForBackup(backup: BackupState, now: number): MobileSyncStatus | n
     return {
       label: 'Backed up',
       tone: 'ok',
-      detail: `Backs up in ${minutesUntil(status.until, now)} min`,
+      detail: `Backs up in ${format(status.until - now, { long: true })}`,
     }
   }
   return { label: 'Backed up', tone: 'ok', detail: null }

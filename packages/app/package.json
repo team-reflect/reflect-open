@@ -16,6 +16,7 @@
     "@reflect/core": "workspace:*",
     "@reflect/utils": "workspace:*",
     "date-fns": "^4.4.0",
+    "ms": "3.0.0-canary.202508261828",
     "zod": "^4.6.5"
   },
   "devDependencies": {

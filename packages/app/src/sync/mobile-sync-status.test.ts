@@ -31,13 +31,13 @@ describe('engine state', () => {
     expect(status).toEqual({ label: 'Backed up', tone: 'ok', detail: null })
   })
 
-  it('maps a waiting window to Backed up with the minutes left', () => {
+  it('maps a waiting window to Backed up with the time left', () => {
     expect(statusFor(connected({ state: 'waiting', until: 2 * 60_000 + 1 }))).toEqual({
       label: 'Backed up',
       tone: 'ok',
-      detail: 'Backs up in 3 min',
+      detail: 'Backs up in 2 minutes',
     })
-    expect(statusFor(connected({ state: 'waiting', until: 5 }))?.detail).toBe('Backs up in 1 min')
+    expect(statusFor(connected({ state: 'waiting', until: 30_000 }))?.detail).toBe('Backs up in 30 seconds')
   })
 
   it('shows Syncing while a cycle runs', () => {
