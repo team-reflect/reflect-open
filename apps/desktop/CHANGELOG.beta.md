@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.2...v0.16.0-beta.3) (2026-10-16)
+
+
+### Bug Fixes
+
+* trigger a new release ([#1547](https://github.com/team-reflect/reflect-open/issues/1547)) ([b741d6d](https://github.com/team-reflect/reflect-open/commit/b741d6d073a85d3871c8f12801e71534d4b5f4a0))
+* trigger a release ([#1549](https://github.com/team-reflect/reflect-open/issues/1549)) ([b4237d2](https://github.com/team-reflect/reflect-open/commit/b4237d22c33e2b97b1da4142f65dce9329176625))
+
 ## [0.16.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.15.0...v0.16.0-beta) (2026-10-13)
 
 
