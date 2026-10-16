@@ -275,7 +275,7 @@ contract, overview/guardrail updates, Plan 12/16 pointers, `libraries.md`).
 | Both devices resolve the same conflict concurrently | Deterministic ladder → byte-identical result on both; iCloud sees agreement (or a trivially-identical conflict → step 1). |
 | Conflict arrives while the note is open + dirty | Session parks it (existing `note-session` behavior); ladder skips and retries after flush. |
 | Both devices online, simultaneous save | Each sees its own version current + the other as a conflict version; ladder runs on each; determinism converges them. |
-| Merge ladder itself crashes mid-resolution | Archive was written first; versions still unresolved → retried next cycle. Worst case: user sees the conflict version notice later, loses nothing. |
+| Merge ladder itself crashes mid-resolution | The provider versions stay unresolved and the next sweep retries them. Nothing is lost. |
 | Evicted note opened / indexed | Download-on-demand + explicit loading state; timeout → error state, never a blank overwrite. |
 | iCloud signed out / container missing | Blocking "iCloud unavailable" state with the local-copy escape hatch; no writes routed anywhere surprising. |
 | Shadow base missing/stale | Degrades to two-way (markers) / slightly more conflicts — never data loss. |
