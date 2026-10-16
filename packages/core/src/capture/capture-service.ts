@@ -1,6 +1,10 @@
 import { appendXPost } from './bookmark-capture.ts'
 import type { XPostEnvelope } from './bookmark-envelope.ts'
 import { isCaptureSpoolPath } from './capture-identity.ts'
+import {
+  createCaptureLinkRepairService,
+  type CaptureLinkRepairService,
+} from './capture-link-repair-service.ts'
 import type { AiCredentialService } from '../ai/ai-credential-service.ts'
 import type { AiProviderConfigService } from '../ai/ai-provider-config-service.ts'
 import type { PageDescriberService } from '../ai/page-describer-service.ts'
@@ -40,7 +44,8 @@ import { createPageMetaService } from './page-meta-service.ts'
  * (the durable raw save — works without any AI configured), then **enrich**
  * pending captures (meta scrape + BYOK description). The launch pass is the
  * headline behavior: captures spooled while the app was closed land the
- * moment a graph opens.
+ * moment a graph opens. Each pass then repairs placeholder link text that
+ * sync brought back into the Daily notes of recent captures.
  */
 export interface CaptureSession {
   /**
@@ -113,6 +118,7 @@ interface CaptureSessionDeps {
   readonly captureInbox: CaptureInboxService
   readonly drain: CaptureDrainService
   readonly enrichment: CaptureEnrichmentService
+  readonly linkRepair: CaptureLinkRepairService
   readonly reconcilers: BackgroundReconcilerFactory
   readonly activity: ActivityPort
   readonly fileChanges: FileChangeService
@@ -219,10 +225,12 @@ class CaptureSessionImpl implements CaptureSession {
   }
 
   /**
-   * One pass: drain the spool inbox (no AI needed), then enrich pending captures.
+   * One pass: drain the spool inbox (no AI needed), enrich pending captures,
+   * then repair placeholder capture links.
    */
   async #reconcile(isStale: () => boolean): Promise<void> {
-    const { captureInbox, drain, enrichment, commitXPost, notifyXPostsWritten } = this.#deps
+    const { captureInbox, drain, enrichment, linkRepair, commitXPost, notifyXPostsWritten } =
+      this.#deps
     const generation = this.#generation
     if (this.#mobile) {
       let relayStop: ReconcileStop | null = null
@@ -258,6 +266,10 @@ class CaptureSessionImpl implements CaptureSession {
     // the very next pass.
     const enriched = await enrichment.reconcile({ generation, isStale })
     this.#surfaceStop('Enriching link capture', enriched.stopped)
+    if (isStale()) {
+      return
+    }
+    await linkRepair.sweep(generation)
   }
 }
 
@@ -265,6 +277,7 @@ class CaptureServiceImpl implements CaptureService {
   readonly #deps: CaptureServiceDeps
   readonly #drain: CaptureDrainService
   readonly #enrichment: CaptureEnrichmentService
+  readonly #linkRepair: CaptureLinkRepairService
   readonly #xPostListeners = new Set<() => void>()
 
   constructor(deps: CaptureServiceDeps) {
@@ -288,6 +301,12 @@ class CaptureServiceImpl implements CaptureService {
       aiCredentials: deps.aiCredentials,
       privacy: deps.privacy,
     })
+    this.#linkRepair = createCaptureLinkRepairService({
+      noteFile,
+      openDocuments: deps.openDocuments,
+      clock: deps.clock,
+      logger: deps.logger,
+    })
   }
 
   openSession(options: CaptureSessionOptions): CaptureSession {
@@ -298,6 +317,7 @@ class CaptureServiceImpl implements CaptureService {
         captureInbox,
         drain: this.#drain,
         enrichment: this.#enrichment,
+        linkRepair: this.#linkRepair,
         reconcilers,
         activity,
         fileChanges,

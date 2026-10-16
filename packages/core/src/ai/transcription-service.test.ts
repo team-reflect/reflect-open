@@ -8,7 +8,6 @@ import {
   type TranscriptionRequest,
 } from './transcription-service.ts'
 import { APP_REVIEW_STUB_KEY } from './app-review-demo.ts'
-import { bytesToBase64 } from '../lib/base64.ts'
 import { isTranscriptionOversize, isTranscriptionRejected } from './transcribe-http.ts'
 
 interface RecordedCall {
@@ -326,17 +325,6 @@ describe('TranscriptionService (google)', () => {
     await expect(transcribe(fetchFn, request({ provider: 'google' }))).rejects.toMatchObject({
       kind: 'auth',
     })
-  })
-})
-
-describe('bytesToBase64', () => {
-  it('matches btoa on small payloads', () => {
-    expect(bytesToBase64(new TextEncoder().encode('abc'))).toBe(btoa('abc'))
-  })
-
-  it('survives payloads beyond one chunk', () => {
-    const bytes = new Uint8Array(0x8000 * 2 + 7).fill(65)
-    expect(bytesToBase64(bytes)).toBe(btoa('A'.repeat(bytes.length)))
   })
 })
 

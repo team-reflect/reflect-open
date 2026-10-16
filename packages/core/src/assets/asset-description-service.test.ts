@@ -30,7 +30,6 @@ import { createAiProviderConfigService } from '../ai/ai-provider-config-service.
 import { createAssetPrivacyService } from './asset-privacy-service.ts'
 import {
   assetTypeFor,
-  base64ByteLength,
   buildDescriptionSource,
   isEligibleAssetPath,
   readManagedDescription,
@@ -239,12 +238,6 @@ describe('pure helpers', () => {
     expect(isEligibleAssetPath('assets/a.png')).toBe(true)
     expect(isEligibleAssetPath('assets/a.png.reflect.md')).toBe(false)
     expect(descriptionPathFor('assets/a.png')).toBe('assets/a.png.reflect.md')
-  })
-
-  it('base64ByteLength matches the decoded size', () => {
-    expect(base64ByteLength('aGVsbG8=')).toBe(5) // "hello"
-    expect(base64ByteLength('')).toBe(0)
-    expect(base64ByteLength('YWJjZA==')).toBe(4) // "abcd"
   })
 
   it('readManagedDescription recognizes managed files and rejects user-authored ones', async () => {

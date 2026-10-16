@@ -2,7 +2,8 @@ import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { describe, expect, it, vi } from 'vitest'
 import type { XPostEnvelope } from './bookmark-envelope.ts'
 import type { TextCaptureEnvelope } from './capture-envelope.ts'
-import { captureLocalDate } from './capture-identity.ts'
+import { captureIdentity, captureLocalDate } from './capture-identity.ts'
+import { captureNoteSource } from './capture-note.ts'
 import { createBackgroundReconcilerFactory } from '../reconcile/background-reconciler.ts'
 import { ReflectError } from '../errors.ts'
 import { createAiCredentialService } from '../ai/ai-credential-service.ts'
@@ -106,7 +107,7 @@ function setup(options: { mobile?: boolean } = {}) {
      */
     drains: vi.spyOn(captureInbox, 'list'),
     /**
-     * One call per enrichment phase.
+     * Two calls per pass: the enrichment phase and the link repair sweep.
      */
     enrichments: vi.spyOn(noteFile, 'listNotes'),
     relays: vi.spyOn(captureInbox, 'relaySharedInbox'),
@@ -240,7 +241,7 @@ describe('CaptureService (shared-inbox relay)', () => {
 
     expect(kit.relays).not.toHaveBeenCalled()
     expect(kit.drains).toHaveBeenCalledTimes(1)
-    expect(kit.enrichments).toHaveBeenCalledTimes(1)
+    expect(kit.enrichments).toHaveBeenCalledTimes(2)
     expect(kit.progress.getAll()).toEqual([])
     session.dispose()
   })
@@ -315,6 +316,61 @@ describe('CaptureService (triggers)', () => {
 
     session.dispose()
     expect(kit.fileChanges.listenerCount().changes).toBe(0)
+  })
+
+  describe('placeholder capture links', () => {
+    const identity = captureIdentity(CAPTURED_AT, '7c9e6679-7425-40de-944b-e07fc1f90ae7')
+    const placeholderDaily = `## [[Links]]\n\n- [[${identity.base}|example.com]]\n`
+    const titledDaily = `## [[Links]]\n\n- [[${identity.base}|A Cleaned Up Article]]\n`
+
+    async function finishedCapture(): Promise<string> {
+      return await captureNoteSource(
+        {
+          version: 1,
+          id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+          url: 'https://example.com/article',
+          title: 'A Cleaned Up Article',
+          capturedAt: CAPTURED_AT.toISOString(),
+          source: 'ios-share',
+        },
+        identity,
+        { hasScreenshot: false, status: 'done' },
+      )
+    }
+
+    it('repairs existing placeholder links on launch', async () => {
+      const kit = setup()
+      kit.noteFile.set(identity.notePath, await finishedCapture())
+      kit.noteFile.set(DAILY, placeholderDaily)
+
+      const session = kit.capture.openSession({ generation: 3 })
+      session.start()
+
+      await vi.waitFor(() => {
+        expect(kit.noteFile.files().get(DAILY)).toBe(titledDaily)
+      })
+      session.dispose()
+    })
+
+    it('repairs on the next pass when the daily arrived before the finished capture', async () => {
+      const kit = setup()
+      kit.noteFile.set(DAILY, placeholderDaily)
+      const session = kit.capture.openSession({ generation: 3 })
+      session.start()
+      await vi.waitFor(() => {
+        expect(kit.enrichments).toHaveBeenCalledTimes(2)
+      })
+      await flush()
+      expect(kit.noteFile.files().get(DAILY)).toBe(placeholderDaily)
+
+      kit.noteFile.set(identity.notePath, await finishedCapture())
+      kit.activity.emitWake()
+
+      await vi.waitFor(() => {
+        expect(kit.noteFile.files().get(DAILY)).toBe(titledDaily)
+      })
+      session.dispose()
+    })
   })
 
   it('retries on wake', async () => {

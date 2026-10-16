@@ -1,5 +1,5 @@
 import type { AiCredentialService } from '../ai/ai-credential-service.ts'
-import { sha256Hex } from '@reflect/utils'
+import { base64ByteLength, base64ToUtf8, sha256Hex } from '@reflect/utils'
 import type { AiProviderConfigService } from '../ai/ai-provider-config-service.ts'
 import {
   isAssetDescriptionRejected,
@@ -21,12 +21,10 @@ import { ASSETS_DIR, descriptionPathFor, isNotePath } from '../graph/paths.ts'
 import type { FileMeta } from '../graph/schemas.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
 import type { Unlisten } from '../unlisten.ts'
-import { base64ToBytes } from '../lib/base64.ts'
 import { parseNote } from '../markdown/extract.ts'
 import type { AiProviderConfig } from '../settings/schema.ts'
 import {
   assetTypeFor,
-  base64ByteLength,
   buildDescriptionSource,
   isEligibleAssetPath,
   readManagedDescription,
@@ -174,10 +172,6 @@ const STALE: ReconcileStop = { reason: 'stale', message: 'the graph session ende
 
 function basename(path: string): string {
   return path.split('/').pop() ?? path
-}
-
-function utf8FromBase64(base64: string): string {
-  return new TextDecoder().decode(base64ToBytes(base64))
 }
 
 interface AssetCandidates {
@@ -736,7 +730,7 @@ class AssetDescriptionServiceImpl implements AssetDescriptionService {
         apiKey: ctx.apiKey,
         kind: assetType.kind,
         mediaType: assetType.mediaType,
-        data: assetType.kind === 'svg' ? utf8FromBase64(base64) : base64,
+        data: assetType.kind === 'svg' ? base64ToUtf8(base64) : base64,
         filename: basename(assetPath),
       })
     } catch (cause) {
