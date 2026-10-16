@@ -31,7 +31,7 @@ export function IndexProgressPill(): ReactElement | null {
     indexLifecycle.subscribeFileProgress,
     indexLifecycle.fileProgress,
   )
-  const keyboardVisible = useKeyboardVisible()
+  const keyboardVisible = useKeyboardVisible() // FIXME: is this keyboardVisible check necessary? MobileStatusLayer already checks for keyboardVisible and hides the entire layer, so this check may be redundant.
 
   if (
     progress === null ||
