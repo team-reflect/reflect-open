@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreWorkspaces": ["design-system"],
+  "ignore": ["apps/desktop/src-tauri/gen/**"],
+  "ignoreUnresolved": ["#imports"],
+  "ignoreIssues": {
+    "apps/desktop/src/components/ui/**": ["exports", "types"],
+    "packages/db/src/schema.gen.ts": ["types"]
+  },
+  "workspaces": {
+    ".": { "entry": ["fixtures/*.mjs"] },
+    "apps/desktop": { "ignoreDependencies": ["@sentry/cli"] }
+  }
+}
