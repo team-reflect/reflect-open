@@ -6,7 +6,7 @@
   "draft-pull-request": true,
   "force-tag-creation": true,
   "always-update": true,
-  "bootstrap-sha": "11ffb9d8f627a6f42d04a4aefa83c1cb92908c79",
+  "bootstrap-sha": "23e2f664c27908699181850697bb3fdc05bdee19",
   "label": "autorelease: pending-extension",
   "release-label": "autorelease: tagged-extension",
   "pull-request-title-pattern": "chore(extension): release browser extension ${version}",

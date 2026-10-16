@@ -7,6 +7,7 @@
   "draft-pull-request": true,
   "force-tag-creation": true,
   "always-update": true,
+  "bootstrap-sha": "23e2f664c27908699181850697bb3fdc05bdee19",
   "label": "autorelease: pending-stable",
   "release-label": "autorelease: tagged-stable",
   "pull-request-title-pattern": "chore: release ${version}",

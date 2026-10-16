@@ -1,8 +1,8 @@
-import { useEffect, type ReactElement } from 'react'
 import { GraphChooser } from '@/components/graph-chooser.tsx'
 import { GraphWorkspace } from '@/components/graph-workspace.tsx'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
+import { useEffect, type ReactElement } from 'react'
 
 /**
  * Root component — the Plan 02 loading gate. Routes between the graph chooser
@@ -11,7 +11,8 @@ import { useAppServices } from '@/services/services-provider.tsx'
  */
 export function App(): ReactElement {
   const { quitPolicy, window } = useAppServices()
-  const { status, graph, error } = useGraph()
+  const { error, status, graph } = useGraph()
+
   // Quit-time persistence: flush dirty note buffers when exiting, awaiting
   // persistence before destruction but hiding the macOS main window first.
   // Unmount effects don't run on those paths.
