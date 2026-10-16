@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@meowdown/markdown": "^0.77.0",
-    "@ocavue/utils": "^1.8.0",
+    "@ocavue/utils": "^1.9.0",
     "@post-embed/exporter": "^0.5.0",
     "@post-embed/schema": "^0.5.2",
     "@post-embed/types": "^0.5.0",
@@ -27,7 +27,7 @@
     "pkce-challenge": "^6.0.0",
     "ulidx": "^2.4.1",
     "yaml": "^2.9.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@ai-sdk/provider": "^4.0.21",

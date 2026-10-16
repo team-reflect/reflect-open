@@ -12,11 +12,11 @@
     "test": "vitest run --config ../../vitest.config.ts --project app"
   },
   "dependencies": {
-    "@ocavue/utils": "^1.8.0",
+    "@ocavue/utils": "^1.9.0",
     "@reflect/core": "workspace:*",
     "@reflect/utils": "workspace:*",
     "date-fns": "^4.4.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@ocavue/tsconfig": "^0.7.1",
