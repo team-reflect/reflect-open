@@ -507,7 +507,7 @@ fn copy_conflict_versions(
         if crate::fs::file_occupied(&target) {
             continue; // identical bytes are already saved
         }
-        if let Err(err) = write_copy(&version.store_path, &target) {
+        if let Err(err) = write_copy(root, &version.store_path, &target) {
             tracing::warn!(path = rel, copy = %copy_rel, ?err, "failed to write conflict copy");
             return false;
         }
@@ -521,13 +521,12 @@ fn copy_conflict_versions(
     true
 }
 
-/// Stream `source` into a temp file beside `target`, then move it into place
-/// without overwriting.
-fn write_copy(source: &Path, target: &Path) -> AppResult<()> {
-    let parent = target
-        .parent()
-        .ok_or_else(|| AppError::io("conflict copy has no parent directory"))?;
-    let mut temp = tempfile::NamedTempFile::new_in(parent)?;
+/// Stream `source` into a temp file under `.reflect/tmp/` (unsynced, same
+/// volume), then move it to `target` without overwriting.
+fn write_copy(root: &Path, source: &Path, target: &Path) -> AppResult<()> {
+    let staging = root.join(".reflect").join("tmp");
+    fs::create_dir_all(&staging)?;
+    let mut temp = tempfile::NamedTempFile::new_in(&staging)?;
     std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
     temp.as_file().sync_all()?;
     temp.persist_noclobber(target)
@@ -1382,6 +1381,21 @@ mod tests {
             fs::read(root.path().join(&first)).unwrap(),
             b"{\"a\":\"edited\"}"
         );
+    }
+
+    #[test]
+    fn a_conflict_copy_stages_outside_the_synced_folder() {
+        let root = json_graph();
+        let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
+        let target = root.path().join("assets/copy.json");
+
+        write_copy(root.path(), &v.store_path, &target).unwrap();
+        let err = write_copy(root.path(), &v.store_path, &target);
+
+        assert!(err.is_err(), "the move never overwrites");
+        assert_eq!(fs::read(&target).unwrap(), b"{\"a\":2}");
+        assert!(root.path().join(".reflect/tmp").is_dir());
+        assert_eq!(fs::read_dir(root.path().join("assets")).unwrap().count(), 2);
     }
 
     #[test]
