@@ -303,7 +303,11 @@ importers:
         specifier: ^0.21.4
         version: 0.21.4(esbuild@0.27.7)(eslint@10.12.0)(oxc-parser@0.153.0)(rolldown@1.2.6)(typescript@6.0.3)(vite@8.3.0)
 
-  design-system: {}
+  design-system:
+    devDependencies:
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.4)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(jsdom@30.1.2)(vite@8.3.0)
 
   packages/app:
     dependencies:
@@ -455,6 +459,9 @@ importers:
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@24.13.4)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(jsdom@30.1.2)(vite@8.3.0)
 
   packages/utils:
     devDependencies:

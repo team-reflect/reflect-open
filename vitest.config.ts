@@ -8,11 +8,9 @@ export default defineConfig({
     isolate: false,
     projects: [
       './apps/desktop/vitest.*.config.ts',
-      './apps/extension',
-      './packages/app/vitest.*.config.ts',
-      './packages/core/vitest.*.config.ts',
-      './packages/db',
-      './packages/utils',
+      './apps/extension/vitest.config.ts',
+      './design-system/vitest.config.ts',
+      './packages/*/vitest.config.ts',
     ],
   },
 })

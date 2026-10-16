@@ -9,19 +9,19 @@ The root `vitest.config.ts` collects every app and package into one workspace.
 
 | Project | Config | Files | Environment |
 | --- | --- | --- | --- |
-| `core-node` | `packages/core/vitest.node.config.ts` | `src/**/*.test.ts` | node |
-| `app-node` | `packages/app/vitest.node.config.ts` | `src/**/*.test.ts` | node |
-| `node` | `apps/desktop/vitest.node.config.ts` | `src/**/*.test.ts` | node |
-| `browser` | `apps/desktop/vitest.browser.config.ts` | `src/**/*.test.tsx` | Playwright browser |
+| `core` | `packages/core/vitest.config.ts` | `src/**/*.test.ts` | node |
+| `app` | `packages/app/vitest.config.ts` | `src/**/*.test.ts` | node |
+| `desktop-node` | `apps/desktop/vitest.node.config.ts` | `src/**/*.test.ts` | node |
+| `desktop-browser` | `apps/desktop/vitest.browser.config.ts` | `src/**/*.test.tsx` | Playwright browser |
 
-`apps/extension`, `packages/db` and `packages/utils` are their own node projects.
+Every other app and package has its own `vitest.config.ts`, a node project named after the directory.
 
 The file extension decides the environment: `.test.ts` runs in node,
 `.test.tsx` runs in a real browser. There is no jsdom. A test that needs a DOM
 therefore lives in `apps/desktop`, never in `packages/core` or `packages/app`.
 
-Browser test files run one at a time (`fileParallelism: false`), because
-keyboard focus is a per-page global. CI runs the browser project on Chromium
+Browser test files run in parallel. Each Vitest worker has its own Playwright
+page, and Playwright emulates focus per page. CI runs the browser project on Chromium
 and on WebKit, because the Tauri webview is WebKit.
 `pnpm --filter @reflect/desktop test:install` downloads both browsers.
 `REFLECT_TEST_BROWSER=webkit` selects WebKit, and `DEBUG=1` opens a headed browser.

@@ -7,5 +7,5 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext"
   },
-  "include": ["src", "./scripts/**/*.mjs"]
+  "include": ["src", "./scripts/**/*.mjs", "./*.ts"]
 }

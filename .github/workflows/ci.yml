@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 jobs:
-  node-lint:
+  lint-node:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -83,12 +83,29 @@ jobs:
       - name: Install Playwright
         run: pnpm --filter @reflect/desktop exec playwright install webkit
 
-      - name: Test
-        run: pnpm run test
+      # WebKit keeps the memory of every finished test file, so each shard
+      # runs in its own Vitest process to restart the browser.
+      - name: Test browser (shard 1/3)
+        run: pnpm exec vitest run --project '*browser*' --shard=1/3
         env:
           REFLECT_TEST_BROWSER: webkit
 
-  rust-lint:
+      - name: Test browser (shard 2/3)
+        run: pnpm exec vitest run --project '*browser*' --shard=2/3
+        env:
+          REFLECT_TEST_BROWSER: webkit
+
+      - name: Test browser (shard 3/3)
+        run: pnpm exec vitest run --project '*browser*' --shard=3/3
+        env:
+          REFLECT_TEST_BROWSER: webkit
+
+      - name: Test others
+        run: pnpm exec vitest run --project '!*browser*'
+        env:
+          REFLECT_TEST_BROWSER: webkit
+
+  lint-rust:
     if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     steps:
@@ -113,7 +130,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-  rust-test:
+  test-rust:
     if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     steps:
@@ -140,7 +157,7 @@ jobs:
     timeout-minutes: 10
 
     if: always()
-    needs: [node-lint, test-chromium, rust-lint, rust-test]
+    needs: [lint-node, test-chromium, lint-rust, test-rust]
 
     steps:
       - name: Verify that all jobs succeeded

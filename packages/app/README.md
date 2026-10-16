@@ -43,7 +43,7 @@ graph lifecycles run in this window.
 
 `@reflect/app/testing` holds the app doubles, `createTestAppHost(overrides)`,
 and `createTestAppServices(core, overrides)`, which builds `AppServices` over
-`createTestCoreServices()` by default. Tests run in the `app-node` project
+`createTestCoreServices()` by default. Tests run in the `app` project
 (node, `src/**/*.test.ts`). A test that needs a DOM belongs in `apps/desktop`.
 
 ## Lint boundary

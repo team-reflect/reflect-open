@@ -2,7 +2,7 @@ import { defineDesktopProject } from './vitest.shared.ts'
 
 export default defineDesktopProject({
   test: {
-    name: 'node',
+    name: { label: 'desktop-node', color: 'magenta' },
     environment: 'node',
     fsModuleCache: true,
     isolate: false,

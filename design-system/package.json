@@ -3,9 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "description": "Reflect design tokens, fonts, and UI primitives.",
+  "type": "module",
   "exports": {
     "./styles.css": "./styles.css",
     "./tokens/*": "./tokens/*",
     "./assets/*": "./assets/*"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.3"
   }
 }

@@ -11,7 +11,7 @@
     "./testing": "./src/testing/index.ts"
   },
   "scripts": {
-    "test": "vitest run --config ../../vitest.config.ts --project core-node"
+    "test": "vitest run --config ../../vitest.config.ts --project core"
   },
   "dependencies": {
     "@meowdown/markdown": "^0.77.0",
