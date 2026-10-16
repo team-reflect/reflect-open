@@ -1050,7 +1050,7 @@ fn stale_head_lock_fast_forward_never_reverts_pulled_notes() {
 }
 
 #[test]
-#[ignore = "red until P1.2: a concurrent commit must wait for the running pull"]
+#[ignore = "red until the merge rewrite takes the graph lock"]
 fn commit_during_fast_forward_never_reverts_pulled_notes() {
     // The quit-time flush commits outside the engine's queue, so it can land
     // while a pull is between the ref move and the checkout.
