@@ -2221,3 +2221,30 @@ fn a_detached_head_behind_the_branch_does_not_rewind_it() {
     assert!(repo.graph_descendant_of(head.id(), older).unwrap());
     assert!(repo.find_commit(tip).is_ok());
 }
+
+#[test]
+fn an_untracked_oversized_file_does_not_delete_the_remote_file() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/a.md", "# A\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(root_a, "assets/x.bin", "small");
+    commit_all(root_a, "a asset", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let big = "b".repeat(100);
+    write(&root_b, "assets/x.bin", &big);
+    fetch(&root_b, None).unwrap();
+    let pulled = pull_all(&root_b, "Update notes", 64).unwrap();
+    assert_eq!(pulled.skipped_large_files.len(), 1, "{pulled:?}");
+    assert_eq!(head_blob(&root_b, "assets/x.bin"), "small");
+
+    write(&root_b, "notes/b.md", "# B\n");
+    let committed = commit_all(&root_b, "Update notes", 64).unwrap();
+    assert!(committed.committed, "{committed:?}");
+    assert_eq!(head_blob(&root_b, "assets/x.bin"), "small");
+    assert_eq!(read(&root_b, "assets/x.bin"), big);
+}
