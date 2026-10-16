@@ -67,8 +67,8 @@ importers:
         specifier: ^0.77.0
         version: 0.77.0(typescript@6.0.3)
       '@meowdown/react':
-        specifier: ^0.80.2
-        version: 0.80.2(@lezer/common@1.5.3)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.2)(prosemirror-view@1.42.6)(react-dom@19.3.1)(react@19.3.1)(supports-color@7.2.0)(typescript@6.0.3)
+        specifier: ^0.80.3
+        version: 0.80.3(@lezer/common@1.5.3)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.2)(prosemirror-view@1.42.6)(react-dom@19.3.1)(react@19.3.1)(supports-color@7.2.0)(typescript@6.0.3)
       '@ocavue/utils':
         specifier: ^1.9.0
         version: 1.9.0
@@ -1297,8 +1297,8 @@ packages:
   '@meowdown/markdown@0.77.0':
     resolution: {integrity: sha512-7cAUtquIXhYKz3XwKW0Y4RwxvLoDy2PCTciorMy85AJOFgRXant2w06SM/7G2OX51TaJe1quGynIYUB32GtsNA==}
 
-  '@meowdown/react@0.80.2':
-    resolution: {integrity: sha512-f2f57sPUeZO979M82XnTBiRCoHmsfkJ26wz1tiXyp1Z5+B2pBmsDMvfP9ijZDo23z3zVmHkZpCU31TnrRCpSeQ==}
+  '@meowdown/react@0.80.3':
+    resolution: {integrity: sha512-H17e+Z3bGKxMFLxYNDdGvfxcwsNLFrLArqV3Oag5HNedo42ILw0WwXS6rEUbQsFkUUn/jwSNgCLZGcYPHowkqQ==}
     peerDependencies:
       react: ^19.3.0
       react-dom: ^19.3.0
@@ -2944,20 +2944,20 @@ packages:
     engines: {node: '>=14.6'}
     deprecated: this version has critical issues, please update to the latest version
 
-  '@zag-js/dismissable@1.45.0':
-    resolution: {integrity: sha512-GblGg5CXomPu8t+aE+vvXHG/Mdl1LAcE83NwJqVnDtOxFcXUrkizq2dCtiIUQOkk0GfKnh14AZN3wf5QXqxblA==}
+  '@zag-js/dismissable@1.46.0':
+    resolution: {integrity: sha512-HramN58RwrpuSEdrN7XecL7g5wvwck3HJE81s7zli2qP/kIaVLodE5qbzR/PW4715daM1rO+Ptsd96dkeBzICQ==}
 
-  '@zag-js/dom-query@1.45.0':
-    resolution: {integrity: sha512-rJIESTiyzS6sfplDZxlO5WO0fTeHwL8RFylPDetpAtxhbADIV3kcP6qAd7pEMyXM5rdh7qTXOFm0PJOU2selyA==}
+  '@zag-js/dom-query@1.46.0':
+    resolution: {integrity: sha512-ibkO0VkQ2rLaclrO/O7kunvvwK8ZiW2L78arxsPYOEWmTqdNM6eQh721l9jGREUggh8nGsydNaoJH7lP3z1DUg==}
 
-  '@zag-js/interact-outside@1.45.0':
-    resolution: {integrity: sha512-QKV/Vluw5jB2nz0/a2GvsiNINaOb11im4FTPogLtb9IRM1NmHQpDjAEpz5V6NE+awpqwI6Gnxg9eNUd/V79pFw==}
+  '@zag-js/interact-outside@1.46.0':
+    resolution: {integrity: sha512-gzOj8zNvZzrF8l7ikYcYmdOlhLXEBGm7Qsp++hE/in47Nhi1uHWlamW21orqYdNF8Y250qrK24vIr0ZW4xTPcw==}
 
-  '@zag-js/types@1.45.0':
-    resolution: {integrity: sha512-92xETOwIVWksA+wqZ/Dex/obbC5cgCCRCF7HQ7Cf8Wgv0jBKqUphccZRzmHic1qOthoW7ZAK2xkUtyXFmd2/SQ==}
+  '@zag-js/types@1.46.0':
+    resolution: {integrity: sha512-HwIvuXCGx/wgCNNXYvKyCJ62e/QmIi02v9GsA0icFxDKxv6i7J2mZmAQ/vF5Nmh3q80Nj5CZ1DdQ7bXYt/Yzww==}
 
-  '@zag-js/utils@1.45.0':
-    resolution: {integrity: sha512-LyeGfTEojjhDcajCCGxvjrgFuPoMia1HKefdP6KqvJpC78+1awahBoZpYYZlbab2WPawgCaprcDevBJFlOe6Ag==}
+  '@zag-js/utils@1.46.0':
+    resolution: {integrity: sha512-SOKa832hWCoXaYB2Pcdb0c+ZcyNSuAAPpL5YRnVHskuc0BEsHPWOhxSIxuGF1gvz4RsfBKiAHrDoFDl8JLSOEg==}
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -6545,7 +6545,7 @@ snapshots:
   '@aria-ui/core@0.2.1':
     dependencies:
       '@ocavue/utils': 1.9.0
-      '@zag-js/dom-query': 1.45.0
+      '@zag-js/dom-query': 1.46.0
       alien-signals: 3.2.1
       server-dom-shim: 1.1.0
 
@@ -6554,13 +6554,13 @@ snapshots:
       '@aria-ui/core': 0.2.1
       '@aria-ui/utils': 0.1.7
       '@floating-ui/dom': 1.8.0
-      '@zag-js/dismissable': 1.45.0
-      '@zag-js/dom-query': 1.45.0
+      '@zag-js/dismissable': 1.46.0
+      '@zag-js/dom-query': 1.46.0
 
   '@aria-ui/utils@0.1.7':
     dependencies:
       '@aria-ui/core': 0.2.1
-      '@zag-js/dom-query': 1.45.0
+      '@zag-js/dom-query': 1.46.0
 
   '@asamuzakjp/css-color@7.1.5':
     dependencies:
@@ -7610,7 +7610,7 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@meowdown/react@0.80.2(@lezer/common@1.5.3)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.2)(prosemirror-view@1.42.6)(react-dom@19.3.1)(react@19.3.1)(supports-color@7.2.0)(typescript@6.0.3)':
+  '@meowdown/react@0.80.3(@lezer/common@1.5.3)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.2)(prosemirror-view@1.42.6)(react-dom@19.3.1)(react@19.3.1)(supports-color@7.2.0)(typescript@6.0.3)':
     dependencies:
       '@base-ui/react': 1.9.0(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.1)(react@19.3.1)
       '@meowdown/core': 0.81.1(@lezer/common@1.5.3)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.2)(prosemirror-view@1.42.6)(supports-color@7.2.0)(typescript@6.0.3)
@@ -9156,26 +9156,26 @@ snapshots:
 
   '@xmldom/xmldom@0.9.11': {}
 
-  '@zag-js/dismissable@1.45.0':
+  '@zag-js/dismissable@1.46.0':
     dependencies:
-      '@zag-js/dom-query': 1.45.0
-      '@zag-js/interact-outside': 1.45.0
-      '@zag-js/utils': 1.45.0
+      '@zag-js/dom-query': 1.46.0
+      '@zag-js/interact-outside': 1.46.0
+      '@zag-js/utils': 1.46.0
 
-  '@zag-js/dom-query@1.45.0':
+  '@zag-js/dom-query@1.46.0':
     dependencies:
-      '@zag-js/types': 1.45.0
+      '@zag-js/types': 1.46.0
 
-  '@zag-js/interact-outside@1.45.0':
+  '@zag-js/interact-outside@1.46.0':
     dependencies:
-      '@zag-js/dom-query': 1.45.0
-      '@zag-js/utils': 1.45.0
+      '@zag-js/dom-query': 1.46.0
+      '@zag-js/utils': 1.46.0
 
-  '@zag-js/types@1.45.0':
+  '@zag-js/types@1.46.0':
     dependencies:
       csstype: 3.2.3
 
-  '@zag-js/utils@1.45.0': {}
+  '@zag-js/utils@1.46.0': {}
 
   accepts@2.0.0:
     dependencies:
