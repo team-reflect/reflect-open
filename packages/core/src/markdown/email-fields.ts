@@ -39,8 +39,7 @@ export function canonicalEmail(email: string): string {
   return address.toLowerCase()
 }
 
-/** The established indexing name for {@link canonicalEmail}. */
-export const foldEmail = canonicalEmail
+export { canonicalEmail as foldEmail }
 
 /** Canonicalize, remove blanks, and deduplicate email identities in order. */
 export function canonicalEmails(values: readonly string[]): string[] {
