@@ -1,10 +1,8 @@
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { writeGenerationFor, type GraphSessionSource } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
-import type { ProgressPort } from '../ports/progress-port.ts'
 import { errorMessage, isAppError, ReflectError } from '../errors.ts'
 import type { NoteFileService, NoteWriteResult } from '../graph/note-file-service.ts'
-import type { FileChangeService } from '../indexing/file-change-service.ts'
 import { appendBlock } from '../markdown/append-section.ts'
 import { hasAuthoredTitle, parseNote } from '../markdown/extract.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
@@ -47,11 +45,9 @@ const DEFAULT_SAVE_DEBOUNCE_MS = 800
 
 export interface NoteSessionServiceDeps {
   readonly noteFile: NoteFileService
-  readonly fileChanges: FileChangeService
   readonly clock: ClockService
   readonly logger: LoggerService
   readonly graphSession: GraphSessionSource
-  readonly progress: ProgressPort
 }
 
 class NoteSessionServiceImpl implements NoteSessionService {
@@ -276,7 +272,7 @@ class NoteSessionImpl implements NoteSession {
             this.#emit()
             this.#onContent?.(content, 'saved')
           } else {
-            this.#adoptMergedWrite(base, content, result.merged)
+            this.#adoptMergedWrite(content, result.merged)
           }
         } finally {
           this.#inFlightWrite = null
@@ -293,16 +289,14 @@ class NoteSessionImpl implements NoteSession {
   }
 
   /**
-   * Take the text a write merged into the file. `base` and `sent` are the
-   * expected and given contents of that write.
+   * Take the text a write merged into the file. `sent` is the content given to that write.
    */
-  #adoptMergedWrite(base: string, sent: string, merged: string): void {
+  #adoptMergedWrite(sent: string, merged: string): void {
     this.#inFlightWrite = null
-    // A title the user changed and the merge kept is a local save for the
-    // rename tracker; any other merged title is ground truth from elsewhere.
-    const sentTitle = this.#titleOf(sent)
-    const ownTitle = sentTitle !== this.#titleOf(base) && sentTitle === this.#titleOf(merged)
-    this.#onContent?.(merged, ownTitle ? 'saved' : 'external')
+    // A merge that kept the title we sent is a local save for the rename tracker
+    // (it may still hold a pending rename); any other title comes from elsewhere.
+    const keptTitle = this.#titleOf(merged) === this.#titleOf(sent)
+    this.#onContent?.(merged, keptTitle ? 'saved' : 'external')
     if (this.#header + this.#buffer !== sent) {
       // Keystrokes arrived during the write. They were typed on `sent`, so the
       // next save names it as the base and merges them with the file again.

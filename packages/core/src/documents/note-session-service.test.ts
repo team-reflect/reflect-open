@@ -3,14 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { applyTaskEdits, projectTasks, TaskStaleError } from '../markdown/task-ast.ts'
 import type { TaskLocator } from '../markdown/task-model.ts'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
-import { createTestFileChangeService, type TestFileChangeService } from '../testing/file-change.ts'
 import { createTestNoteFileService, overrideNoteFileService } from '../testing/graph.ts'
 import {
   createTestGraphSessionService,
   type TestGraphSessionService,
 } from '../testing/graph-session.ts'
 import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
-import { createTestProgressPort, type TestProgressPort } from '../testing/ports.ts'
 import {
   createNoteSessionService,
   type NoteSession,
@@ -65,8 +63,6 @@ interface Harness {
    * The note's bytes on disk, `undefined` when missing.
    */
   disk: () => string | undefined
-  progress: TestProgressPort
-  fileChanges: TestFileChangeService
   session: NoteSession
   /**
    * The graph open when the session was created.
@@ -128,15 +124,11 @@ function harness(options?: {
     },
   })
   const graph = createTestGraphSessionService({ graph: { generation: 1 } })
-  const progress = createTestProgressPort()
-  const fileChanges = createTestFileChangeService()
   const session = createNoteSessionService({
     noteFile,
-    fileChanges,
     clock,
     logger,
     graphSession: graph,
-    progress,
   }).create({
     path: PATH,
     readOnly: options?.write === false,
@@ -176,8 +168,6 @@ function harness(options?: {
       files.mergeNextWrite(PATH, content)
     },
     disk: () => files.files().get(PATH),
-    progress,
-    fileChanges,
     session,
     graph,
     generations: () => files.writes().map((write) => write.generation),
@@ -353,7 +343,6 @@ describe('external changes and saves', () => {
     expect(h.applied).toEqual(['# Hello\n\nmine\n\ntheirs\n'])
     expect(h.session.content()).toBe('# Hello\n\nmine\n\ntheirs\n')
     expect(h.snapshots.at(-1)).toMatchObject({ dirty: false, protected: false, error: null })
-    expect(h.progress.snapshot()).toEqual([])
 
     // The next edit is a plain checked write against the merged text.
     h.session.editorChanged('# Hello\n\nmine\n\ntheirs\n\nmore\n')
@@ -436,6 +425,55 @@ describe('external changes and saves', () => {
     }
     tracker.settle()
     expect(renames).toEqual([{ from: 'Old title', to: 'New title', previousAutoAlias: null }])
+  })
+
+  it('a body-only merge after a pending rename is reported as saved and keeps the rename', async () => {
+    const h = harness({ disk: '# Old title\n\nbody\n' })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# New title\n\nbody\n')
+    await settled()
+    h.session.editorChanged('# New title\n\nbody mine\n')
+    h.setDisk('# New title\n\nbody theirs\n')
+    h.mergeNextWrite('# New title\n\nbody mine theirs\n')
+    h.session.externalChanged()
+    await settled()
+
+    expect(h.contents.map((c) => c.origin)).toEqual(['load', 'saved', 'saved'])
+    const renames: TitleRename[] = []
+    const tracker = createTitleRenameTracker({
+      path: PATH,
+      clock,
+      onRename: (rename) => {
+        renames.push(rename)
+      },
+    })
+    for (const { content, origin } of h.contents) {
+      if (origin === 'saved') {
+        tracker.saved(content)
+      } else {
+        tracker.baseline(content)
+      }
+    }
+    tracker.settle()
+    expect(renames).toEqual([{ from: 'Old title', to: 'New title', previousAutoAlias: null }])
+  })
+
+  it('a merge that changes the title after a local rename is reported as external', async () => {
+    const h = harness({ disk: '# Old title\n\nbody\n' })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# New title\n\nbody\n')
+    await settled()
+    h.session.editorChanged('# New title\n\nbody mine\n')
+    h.setDisk('# Their title\n\nbody\n')
+    h.mergeNextWrite('# Their title\n\nbody mine\n')
+    h.session.externalChanged()
+    await settled()
+
+    expect(h.contents.map((c) => c.origin)).toEqual(['load', 'saved', 'external'])
   })
 
   it('keystrokes during a merging write stay dirty and merge on the next write', async () => {

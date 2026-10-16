@@ -585,11 +585,9 @@ function lazySession(
   })
   const session = createNoteSessionService({
     noteFile,
-    fileChanges: createTestFileChangeService(),
     clock: createTestClockService(),
     logger: createTestLoggerService(),
     graphSession: createTestGraph(),
-    progress: createTestProgressPort(),
   }).create({
     path: 'notes/new.md',
     classify: () => 'exact',
