@@ -19,6 +19,8 @@ file and the app merges it afterwards.
 
 - Test: pending (`merge.rs` safe checkout).
 
+Status (2026-10-16): implemented in phase 4 of the sync rework.
+
 ## S2. The branch ref moves only after the working tree matches it
 
 On a fast-forward, files are written first and the branch pointer moves
@@ -29,6 +31,8 @@ retries the pull instead of committing the stale tree.
   `git::tests::stale_head_lock_fast_forward_never_reverts_pulled_notes`,
   `git::tests::fast_forward_with_a_stale_head_lock_succeeds`.
 
+Status (2026-10-16): already implemented (#1468).
+
 ## S3. After any failed git command, the next cycle loses nothing
 
 Whatever step fails (lock file, disk, network, crash), running the normal
@@ -38,6 +42,8 @@ that reverts a pull.
 
 - Test: `git::tests::fast_forward_failure_before_the_ref_moves_converges_next_cycle`
   (green), plus every S2 and S5 test.
+
+Status (2026-10-16): already implemented.
 
 ## S4. One git command at a time per graph
 
@@ -50,6 +56,8 @@ queue, never straight to `git_commit_all`.
   in-flight pull before committing", `engine.test.ts` "commitNow joins the
   single-flight queue and never touches the network".
 
+Status (2026-10-16): implemented in phase 1 of the sync rework.
+
 ## S5. The repository is never left in app-made merge state
 
 A pull that dies between `repo.merge()` and the merge commit must not leave
@@ -60,15 +68,19 @@ git CLI) is still refused.
 - Test: `git::tests::merge_interrupted_before_commit_converges_next_cycle`
   (`#[ignore]`).
 
+Status (2026-10-16): implemented in phase 1 of the sync rework.
+
 ## S6. `.reflect/` never enters a commit
 
 The runtime directory is excluded by `.gitignore`, by an in-memory ignore
-rule, and (pending) by removing entries an older repository already
+rule, and by removing entries an older repository already
 tracked.
 
 - Test: `git::tests::commit_excludes_reflect_and_skips_when_clean` (untracked
   files), `git::tests::tracked_reflect_entries_are_dropped_from_the_next_commit`
   (entries an adopted repository already tracked).
+
+Status (2026-10-16): already implemented.
 
 ## S7. Conflicts are committed and pushed, never left pending
 
@@ -80,6 +92,8 @@ the same marked-up file.
   `git::tests::edit_vs_delete_keeps_the_edit`,
   `git::tests::binary_conflict_keeps_both_copies`.
 
+Status (2026-10-16): implemented in phase 3 of the sync rework.
+
 ## S8. Edits in an open note are never silently discarded
 
 When external content arrives while the buffer has unsaved edits, the
@@ -88,3 +102,5 @@ with a parked conflict archives the buffer instead of dropping it.
 
 - Test: `note-session.test.ts` "keepMine rewrites the file even when the
   conflict content equals the buffer"; archive-on-dispose pending.
+
+Status (2026-10-16): implemented in phase 4 of the sync rework.

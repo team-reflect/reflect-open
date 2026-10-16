@@ -1050,7 +1050,7 @@ fn stale_head_lock_fast_forward_never_reverts_pulled_notes() {
 }
 
 #[test]
-#[ignore = "red until P1.2: a concurrent commit must wait for the running pull"]
+#[ignore = "red until phase 1: a concurrent commit must wait for the running pull"]
 fn commit_during_fast_forward_never_reverts_pulled_notes() {
     // The quit-time flush commits outside the engine's queue, so it can land
     // while a pull is between the ref move and the checkout.
@@ -1109,7 +1109,7 @@ fn commit_during_fast_forward_never_reverts_pulled_notes() {
 }
 
 #[test]
-#[ignore = "red until P1.3: a merge interrupted before its commit must not wedge the repository"]
+#[ignore = "red until phase 1: a merge interrupted before its commit must not wedge the repository"]
 fn merge_interrupted_before_commit_converges_next_cycle() {
     let fixture = fixture();
     let root_a = &fixture.graph_a;
@@ -1127,7 +1127,7 @@ fn merge_interrupted_before_commit_converges_next_cycle() {
     fetch(root_a, None).unwrap();
 
     // The process dies after libgit2 entered merge state.
-    fault::arm(FaultPoint::AfterMergeBeforeCommit, Fault::Panic);
+    fault::arm(FaultPoint::BeforeMergeCommit, Fault::Panic);
     let crashed = std::panic::catch_unwind(AssertUnwindSafe(|| merge_remote(root_a)));
     assert!(crashed.is_err(), "the injected crash must unwind");
 

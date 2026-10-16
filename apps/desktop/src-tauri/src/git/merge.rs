@@ -200,7 +200,7 @@ fn complete_merge(
     remote_oid: git2::Oid,
 ) -> AppResult<(Vec<String>, Vec<ChangedFile>)> {
     #[cfg(test)]
-    super::fault::trip(super::fault::FaultPoint::AfterMergeBeforeCommit)?;
+    super::fault::trip(super::fault::FaultPoint::BeforeMergeCommit)?;
     let mut index = repo.index()?;
     let conflicted_paths = resolve_conflicts(repo, root, &mut index)?;
     index.write()?;
