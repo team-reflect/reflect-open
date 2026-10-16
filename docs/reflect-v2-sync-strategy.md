@@ -21,12 +21,10 @@ It complements [Reflect V2 Product Vision](./reflect-v2-product-vision.md).
 >   deterministic on-device resolution ladder over per-device shadow bases
 >   whose last rung is a word-level merge, see
 >   [icloud-sync.md](./icloud-sync.md)). A graph syncs via iCloud *or* a
->   Git remote (one method per graph is recommended). The AI-assisted resolution below remains
->   deferred.
-> - **AI-assisted conflict resolution did not ship.** Text conflicts merge through
->   one ladder on every note path (git pull, iCloud sweep, editor save). Other files
->   keep a conflict copy beside the original. Conflict
->   markers are plain text to Reflect: the app neither writes nor interprets them.
+>   Git remote (one method per graph is recommended). The AI-assisted
+>   resolution below remains deferred.
+> - **AI-assisted conflict resolution did not ship.** Conflicts resolve on-device,
+>   see [git-backup-safety.md](./git-backup-safety.md) S7 and S9.
 > - Plain-language product states (Backed up / Backing up / Offline /
 >   Backup failed) shipped as described below.
 

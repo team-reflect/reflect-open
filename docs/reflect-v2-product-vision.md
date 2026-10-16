@@ -445,8 +445,8 @@ Windows and Android should remain possible. The implementation should avoid choi
 > device-flow auth, plus generic git remotes over SSH/path. File-sync folder providers
 > (iCloud Drive/Dropbox/Drive) are **unsupported for sync by design** in the first wave
 > (see Plan 12); the adapter list below is the long-term direction. AI-assisted conflict
-> resolution did not ship: text notes merge through one ladder, and other files
-> keep a conflict copy beside the original. Current sync never writes conflict markers.
+> resolution did not ship: notes merge through one ladder, and other files keep a
+> conflict copy.
 >
 > **Update (2026-07-04):** [Plan 21](./plans/21-icloud-drive-sync.md) shipped
 > **iCloud Drive as the primary consumer sync path** — the app's own container,

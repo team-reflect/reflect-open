@@ -145,7 +145,6 @@ export function MobileSettings(): ReactElement {
   const crashTest = useCrashTest()
   const environment = useAppStoreEnvironment()
   const sync = useSyncContext()
-  // Shared with the status pill (one hook).
   const status = useMobileSyncStatus()
   const [disconnecting, setDisconnecting] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)

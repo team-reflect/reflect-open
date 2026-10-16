@@ -55,11 +55,8 @@ link UX (create-from-unresolved largely subsumes the failure case).
   Two recorded edges: a note with an explicit frontmatter `title:` cannot be
   renamed from the editor yet (the heading isn't its title — `title:` is
   authoritative and the editor doesn't edit frontmatter; a title field editor
-  is a later surface), and rename tracking follows merge-on-write
-  (`#adoptMergedWrite` in `note-session-service.ts`): a merge that keeps the sent
-  title counts as `saved` and keeps a pending rename, and any other title counts as
-  `external` and cancels it, so the graph is never rewritten for a title that came
-  from elsewhere.
+  is a later surface), and a merged write that changes the title cancels a
+  pending rename (`#adoptMergedWrite` in `note-session-service.ts`).
 
 ## Steps
 

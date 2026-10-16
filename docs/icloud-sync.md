@@ -24,14 +24,9 @@ edit the same note while apart.
   other, and a `.git` directory must never ride a file-sync provider
   (object-store corruption). Moving a graph to iCloud disconnects its GitHub
   backup first, and `.git`/`.reflect` are always marked local-only as a
-  belt-and-braces guard. A graph that holds both anyway (for example a
-  Git-backed graph that lives in iCloud Drive) still works: Reflect commits
-  locally as you type, and touches the network only after five quiet minutes
-  with no pending iCloud downloads. The GitHub history is noisy, because
-  every device commits what iCloud delivered, and the backup trails your
-  edits by about five minutes. For a Git-only graph, the desktop app probes
-  the remote every 90 seconds while the window is visible and sync is not in
-  error, and pulls when it moved.
+  belt-and-braces guard. A graph that has both still works: Reflect commits
+  locally as you type, and pushes only after five quiet minutes with no
+  pending iCloud downloads.
 
 ## What happens on a conflict
 
@@ -51,12 +46,11 @@ resolving the same conflict produce identical bytes and converge):
    Two devices creating the same day's note offline (iCloud leaves a
    `2026-07-04 2.md` behind) fold back into one file the same way.
 6. **Anything else**: a word-level merge keeps the words both sides added.
-   It always produces text, so Reflect never writes conflict markers. A
-   file that already holds markers is plain text.
+   Reflect never writes conflict markers.
 
 The same ladder runs on every note path: a Git pull, the iCloud sweep, and an
-editor save that meets a newer file on disk. The path does not change the
-result. Only notes (`.md` files) go through the ladder.
+editor save that meets a newer file on disk. Only notes (`.md` files) go
+through the ladder.
 
 Other files (JSON, text, PDF, audio, images, and so on) never merge as text on
 the iCloud path. The file on the device stays at its path. Each other version

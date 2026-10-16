@@ -15,11 +15,10 @@ import { checkRoundTrip } from './roundtrip.ts'
  * React adapter over the `@reflect/core` document state machine
  * (`NoteSessionService`): one session per open path, wired to
  * the watcher event stream (through `OpenDocumentsService`) and the editor's
- * imperative handle. All
- * save/merge/protection semantics live in core's `note-session-service.ts`, and the
- * create/adopt/teardown/hand-off lifecycle (a rename retargets the live
- * session and the route follows, Plan 17) lives in core's
- * `document-binding.ts` — this hook only adapts both to React.
+ * imperative handle. All save/merge/protection semantics live in core's
+ * `note-session-service.ts`, and the create/adopt/teardown/hand-off lifecycle
+ * (a rename retargets the live session and the route follows, Plan 17) lives
+ * in core's `document-binding.ts` — this hook only adapts both to React.
  */
 
 export interface NoteDocument extends NoteSessionSnapshot {
