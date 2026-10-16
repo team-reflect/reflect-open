@@ -348,26 +348,13 @@ fn resolve_file(
         modified_ms: file_modified_ms,
     };
 
-    // With MULTIPLE versions, the pairwise loop below is unsound: an
-    // intermediate step's marker output would meet the ladder's marked-side
-    // rule on the next step, which keeps the newest raw side whole — the
-    // earlier versions' content would survive only in the archive, not the
-    // note. Multi-version folds therefore auto-merge only while every step
-    // stays clean, and the first overlap abandons the fold for one flat
-    // marker file carrying every side.
-    if sides.len() >= 2 {
-        return resolve_many(rel, base.as_deref(), current, sides, shadow, &original);
-    }
-
     let mut marked = false;
     for side in sides {
         let current_hash = content_hash(&current.content)?;
         let side_hash = content_hash(&side.content)?;
         let input = ConflictInput {
-            path: rel,
             base: base.as_deref(),
             sides: (current.clone(), side),
-            creation_collision: false,
             merge_loop_detected: shadow.is_repeated_merge(rel, &current_hash, &side_hash),
         };
         match ladder::resolve(input)? {
@@ -381,7 +368,7 @@ fn resolve_file(
                 }
                 current.content = content;
             }
-            Resolution::Marked { content } => {
+            Resolution::Reconciled { content } => {
                 current.content = content;
                 marked = true;
             }
@@ -392,78 +379,6 @@ fn resolve_file(
         changed: current.content != original,
         final_content: current.content,
         marked,
-    })
-}
-
-/// The three-plus-way fold (two or more conflict versions — three or more
-/// devices edited apart). Auto-merges pairwise only while every step stays
-/// clean; any overlap yields **flat stacked markers over every side**
-/// ([`markers::stacked_whole_note_markers`]) so no resolution choice can
-/// lose a side. A side that already carries markers can't be stacked
-/// (nesting corrupts the grammar) — the two-way marked-side rule extends to
-/// n sides: the deterministically newest survives whole, the rest stay in
-/// the archive.
-fn resolve_many(
-    rel: &str,
-    base: Option<&str>,
-    current: ConflictSide,
-    sides: Vec<ConflictSide>,
-    shadow: &ShadowStore,
-    original: &str,
-) -> AppResult<FileResolution> {
-    let all = || std::iter::once(&current).chain(sides.iter());
-    if all().any(|side| markers::contains_conflict_markers(&side.content)) {
-        let newest = all()
-            .max_by(|a, b| (a.modified_ms, &a.content).cmp(&(b.modified_ms, &b.content)))
-            .expect("the current side always exists");
-        return Ok(FileResolution {
-            changed: newest.content != original,
-            marked: markers::contains_conflict_markers(&newest.content),
-            final_content: newest.content.clone(),
-        });
-    }
-
-    let mut folded = current.clone();
-    let mut clean = true;
-    for side in &sides {
-        let folded_hash = content_hash(&folded.content)?;
-        let side_hash = content_hash(&side.content)?;
-        let input = ConflictInput {
-            path: rel,
-            base,
-            sides: (folded.clone(), side.clone()),
-            creation_collision: false,
-            merge_loop_detected: shadow.is_repeated_merge(rel, &folded_hash, &side_hash),
-        };
-        match ladder::resolve(input)? {
-            Resolution::AlreadyResolved => {}
-            Resolution::Merged { content } => {
-                if content != folded.content {
-                    let _ = shadow.record_merge_pair(rel, &folded_hash, &side_hash);
-                }
-                folded.content = content;
-            }
-            Resolution::Marked { .. } => {
-                clean = false;
-                break;
-            }
-        }
-    }
-    if clean {
-        return Ok(FileResolution {
-            changed: folded.content != original,
-            final_content: folded.content,
-            marked: false,
-        });
-    }
-
-    let mut ordered: Vec<ConflictSide> = std::iter::once(current).chain(sides).collect();
-    ordered.sort_by(|a, b| (a.modified_ms, &a.content).cmp(&(b.modified_ms, &b.content)));
-    let content = markers::stacked_whole_note_markers(&ordered);
-    Ok(FileResolution {
-        changed: content != original,
-        final_content: content,
-        marked: true,
     })
 }
 
@@ -652,7 +567,6 @@ fn fold_duplicate(
         return;
     }
     let input = ConflictInput {
-        path: canonical_rel,
         base: None, // independent creations share no ancestor
         // Version-store dates, not filesystem mtimes, for the same reason as
         // the edit-conflict pass: both devices fold this same pair, and the
@@ -671,7 +585,6 @@ fn fold_duplicate(
                 modified_ms: current_version_modified_ms(&dup_abs).unwrap_or(file.modified_ms),
             },
         ),
-        creation_collision: true,
         merge_loop_detected: false,
     };
     let resolution = match ladder::resolve(input) {
@@ -684,7 +597,7 @@ fn fold_duplicate(
     let (merged, is_marked) = match resolution {
         Resolution::AlreadyResolved => (canonical_content.clone(), false),
         Resolution::Merged { content } => (content, false),
-        Resolution::Marked { content } => (content, true),
+        Resolution::Reconciled { content } => (content, true),
     };
     if merged != canonical_content {
         if crate::fs::atomic_write_bytes(root, &canonical_abs, merged.as_bytes()).is_err() {
@@ -900,11 +813,11 @@ mod tests {
     }
 
     #[test]
-    fn overlapping_collision_bodies_mark_the_canonical_for_review() {
+    fn overlapping_collision_bodies_reconcile_into_the_canonical() {
         let root = graph();
         // The tails overlap ("- common tail" follows both divergent lines) —
-        // the union guard refuses, so the canonical file ends up marked, and
-        // the labels are the two filenames the content came from.
+        // the union guard refuses, so the word-level merge keeps both
+        // wordings.
         write(
             root.path(),
             "daily/2026-07-04.md",
@@ -923,8 +836,9 @@ mod tests {
             vec!["daily/2026-07-04.md".to_string()]
         );
         let merged = fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap();
-        assert!(markers::contains_conflict_markers(&merged));
-        assert!(merged.contains("daily/2026-07-04.md") && merged.contains("daily/2026-07-04 2.md"));
+        assert!(!markers::contains_conflict_markers(&merged));
+        assert!(merged.contains("mac wording") && merged.contains("phone wording"));
+        assert!(merged.contains("common tail"));
     }
 
     #[test]
@@ -1131,7 +1045,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_file_marks_overlapping_edits_and_labels_the_device() {
+    fn resolve_file_reconciles_overlapping_edits_without_markers() {
         let root = graph();
         write(root.path(), "notes/a.md", "shared line mac\n");
         let store = root.path().join(".reflect/fake-store.md");
@@ -1153,11 +1067,11 @@ mod tests {
         .unwrap();
 
         assert!(resolution.marked);
-        assert!(markers::contains_conflict_markers(
+        assert!(!markers::contains_conflict_markers(
             &resolution.final_content
         ));
-        assert!(resolution.final_content.contains("Alex's iPhone"));
-        assert!(resolution.final_content.contains(LOCAL_LABEL));
+        assert!(resolution.final_content.contains("mac"));
+        assert!(resolution.final_content.contains("phone"));
     }
 
     fn fake_version(
@@ -1220,11 +1134,9 @@ mod tests {
     }
 
     #[test]
-    fn multi_version_overlap_stacks_every_side_instead_of_dropping_one() {
-        // Overlapping edits across three devices: the fold must not let an
-        // intermediate marker result meet the marked-side rule (which would
-        // keep only the newest raw side) — every side stays in the note, as
-        // stacked blocks the existing splice grammar can resolve.
+    fn multi_version_overlap_keeps_every_side_as_substrings() {
+        // Overlapping edits across three devices fold pairwise through the
+        // ladder; every side's words stay in the note.
         let root = graph();
         write(root.path(), "notes/a.md", "wording from mac\n");
         let shadow = ShadowStore::new(root.path());
@@ -1249,22 +1161,16 @@ mod tests {
         .unwrap();
 
         assert!(resolution.marked);
-        assert!(markers::contains_conflict_markers(
+        assert!(!markers::contains_conflict_markers(
             &resolution.final_content
         ));
-        for wording in [
-            "wording from mac",
-            "wording from phone",
-            "wording from ipad",
-        ] {
+        for wording in ["mac", "phone", "ipad"] {
             assert!(
                 resolution.final_content.contains(wording),
                 "lost {wording} in: {}",
                 resolution.final_content
             );
         }
-        // Two stacked blocks for three sides — flat, never nested.
-        assert_eq!(resolution.final_content.matches("<<<<<<< ").count(), 2);
     }
 
     #[test]
@@ -1293,9 +1199,9 @@ mod tests {
     }
 
     #[test]
-    fn multi_version_with_a_marked_side_keeps_the_deterministic_newest() {
-        // A side already carrying markers can't be stacked (nesting corrupts
-        // the grammar): the two-way marked-side rule extends to n sides.
+    fn multi_version_with_a_marked_side_drops_it_and_unions_the_clean_sides() {
+        // A side already carrying markers loses to the newer clean side at
+        // its fold step; the clean sides then union.
         let root = graph();
         let marked = "<<<<<<< Mac\nmine\n=======\ntheirs\n>>>>>>> iPhone\n";
         write(root.path(), "notes/a.md", "current clean\n");
@@ -1313,7 +1219,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(resolution.final_content, "newest clean\n");
+        assert_eq!(resolution.final_content, "current clean\nnewest clean\n");
         assert!(!resolution.marked);
     }
 }
