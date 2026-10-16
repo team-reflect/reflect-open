@@ -6,14 +6,14 @@
 //! The repository never enters libgit2's merge state. A stop before the ref
 //! moves leaves the working tree equal to HEAD or to the merge tree; the next
 //! commit and merge converge from either.
-//! The caller holds the graph lock and has committed the working tree, so the
-//! checkout never overwrites an unsaved edit. Files a commit withheld stay as
-//! they are on disk.
+//! The caller holds the graph lock and has committed the working tree. The
+//! checkout is safe, so a write by a tool outside the lock is never overwritten.
+//! Files a commit withheld stay as they are on disk.
 //! A note conflict is resolved by the conflict ladder ([`ladder::resolve`]),
 //! so pulls never write conflict markers. Other files that cannot merge keep
 //! both versions as conflict copies.
 //! A local deletion of a file the incoming side changed keeps the incoming
-//! version (an edit wins over a delete) and reports the path for review.
+//! version (an edit wins over a delete).
 
 use std::path::Path;
 
@@ -62,8 +62,7 @@ pub struct ChangedFile {
 #[serde(rename_all = "camelCase")]
 pub struct MergeOutcome {
     pub kind: MergeKind,
-    /// Graph-relative paths the user should review: a binary conflict copy or
-    /// an edit kept against a deletion.
+    /// Graph-relative paths of the conflict copies this merge wrote.
     pub review_paths: Vec<String>,
     /// Every file this merge changed on disk. The sync layer reindexes these
     /// directly — pulls must not depend on the file watcher being up (on
@@ -86,11 +85,13 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
 }
 
 /// Check out `tree` over a working tree that equals HEAD, leaving the runtime
-/// directory and the `skipped` dirty files alone.
+/// directory and the `skipped` dirty files alone. The checkout is safe: a file
+/// changed on disk since HEAD (by a tool that does not take the graph lock)
+/// makes it fail before it writes anything, and the next commit records it.
 fn checkout_target(repo: &Repository, tree: &git2::Tree<'_>, skipped: &[String]) -> AppResult<()> {
     // The first matching pathspec wins, so the exclusions come before `*`.
     let mut checkout = CheckoutBuilder::new();
-    checkout.force().path("!.reflect");
+    checkout.safe().path("!.reflect");
     for path in skipped {
         checkout.path(format!("!{path}"));
     }
@@ -305,7 +306,7 @@ fn stamp_modified_times(root: &Path, changes: &mut [ChangedFile]) {
 ///   `name (conflict <stamp> <hash8>).ext`;
 /// - **submodule**: keep ours.
 ///
-/// Returns the paths the user should review.
+/// Returns the conflict copy paths.
 fn resolve_index_conflicts(
     repo: &Repository,
     root: &Path,
@@ -344,7 +345,15 @@ fn resolve_index_conflicts(
             (Some(our), Some(their)) => {
                 let path = entry_path(&our);
                 if our.mode == GITLINK_MODE || their.mode == GITLINK_MODE {
-                    add_resolved(index, root, &stamp, &path, our.id, our.mode, &mut review)?;
+                    add_resolved_unreviewed(
+                        index,
+                        root,
+                        &stamp,
+                        &path,
+                        our.id,
+                        our.mode,
+                        &mut review,
+                    )?;
                     continue;
                 }
                 let plain = our.mode != SYMLINK_MODE && their.mode != SYMLINK_MODE;
@@ -396,7 +405,12 @@ fn resolve_index_conflicts(
                         &path,
                         &stamp,
                         &their.id.to_string()[..8],
-                        |path| index_or_worktree_has(index, root, path),
+                        |path| match index.get_path(Path::new(path), 0) {
+                            // The same content is already there (a copy a crashed merge
+                            // committed), so staging it again changes nothing.
+                            Some(entry) => entry.id != their.id,
+                            None => index_or_worktree_has(index, root, path),
+                        },
                     );
                     add_resolved(
                         index,
@@ -411,7 +425,7 @@ fn resolve_index_conflicts(
             }
             (Some(edited), None) | (None, Some(edited)) => {
                 let path = entry_path(&edited);
-                add_resolved(
+                add_resolved_unreviewed(
                     index,
                     root,
                     &stamp,
@@ -433,7 +447,7 @@ fn resolve_index_conflicts(
 const GITLINK_MODE: u32 = 0o160000;
 const SYMLINK_MODE: u32 = 0o120000;
 
-/// Stage a resolved entry and record it for review. A file that collides with
+/// Stage a resolved conflict copy and record it for review. A file that collides with
 /// a directory (a path under it, or a file at one of its parent paths) moves
 /// to its conflict copy path, so neither side is dropped from the tree.
 fn add_resolved(

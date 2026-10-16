@@ -58,8 +58,9 @@ pub(super) fn current_branch(repo: &Repository) -> AppResult<String> {
     }
 }
 
-/// The local branch a detached HEAD belongs to: one that tracks `origin`,
-/// else `main`, else any local branch.
+/// The local branch a detached HEAD belongs to: one whose tip is the HEAD
+/// commit or an ancestor of it, else one that tracks `origin`, else `main`,
+/// else any local branch.
 fn backup_branch(repo: &Repository) -> String {
     let names: Vec<String> = repo
         .branches(Some(git2::BranchType::Local))
@@ -68,21 +69,34 @@ fn backup_branch(repo: &Repository) -> String {
         .flatten()
         .filter_map(|(branch, _)| branch.name().ok().flatten().map(str::to_string))
         .collect();
+    let head = repo.head().ok().and_then(|head| head.target());
+    let behind_head = |name: &&String| {
+        let tip = repo.refname_to_id(&format!("refs/heads/{name}")).ok();
+        match (head, tip) {
+            (Some(head), Some(tip)) => {
+                head == tip || repo.graph_descendant_of(head, tip).unwrap_or(false)
+            }
+            _ => false,
+        }
+    };
     let tracked = |name: &&String| {
         repo.find_reference(&format!("refs/remotes/origin/{name}"))
             .is_ok()
     };
     names
         .iter()
-        .find(tracked)
+        .find(behind_head)
+        .or_else(|| names.iter().find(tracked))
         .or_else(|| names.iter().find(|name| *name == DEFAULT_BRANCH))
         .or(names.first())
         .cloned()
         .unwrap_or_else(|| DEFAULT_BRANCH.to_string())
 }
 
-/// Point the backup branch at a detached HEAD's commit and attach HEAD to it.
-/// The working tree is not touched.
+/// Attach a detached HEAD to the backup branch. The branch moves to the HEAD
+/// commit only when it does not exist or its tip is HEAD or an ancestor of
+/// it; otherwise it stays where it is, so no commit leaves the branch. The
+/// working tree is not touched.
 pub(super) fn reattach_head(repo: &Repository) -> AppResult<()> {
     let head = repo.find_reference("HEAD")?;
     if head.symbolic_target()?.is_some() {
@@ -91,7 +105,13 @@ pub(super) fn reattach_head(repo: &Repository) -> AppResult<()> {
     let commit = repo.head()?.peel_to_commit()?;
     let name = backup_branch(repo);
     tracing::warn!(%name, "reattaching a detached HEAD to the backup branch");
-    repo.branch(&name, &commit, true)?;
+    let tip = repo.refname_to_id(&format!("refs/heads/{name}")).ok();
+    let forward = tip.is_none_or(|tip| {
+        tip == commit.id() || repo.graph_descendant_of(commit.id(), tip).unwrap_or(false)
+    });
+    if forward {
+        repo.branch(&name, &commit, true)?;
+    }
     repo.set_head(&format!("refs/heads/{name}"))?;
     Ok(())
 }

@@ -17,14 +17,19 @@ not clobbered by the checkout that applies the pull. Each cycle runs fetch,
 then `git_pull`, then push. `git_pull` commits the local changes and merges
 the remote under one graph lock. Every writer to a tracked file waits for
 that lock, so no save can land between the commit and the checkout. At
-checkout the working tree equals HEAD. `.reflect/` and files withheld for
-size stay out of the checkout, so their local bytes stay as they are. A note
+checkout the working tree equals HEAD. The checkout is safe, not forced: a
+write by a tool outside the lock (an editor, iCloud) between the commit and
+the checkout makes it fail before it writes anything. The pull returns an
+error, the write stays on disk, and the next cycle commits it. `.reflect/`
+and files withheld for size stay out of the checkout, so their local bytes
+stay as they are. A note
 saved during the fetch is committed before the merge. S7 resolves any
 conflict with the remote.
 
 - Test: `git::tests::pull_all_holds_one_lock_for_commit_and_merge`,
   `git::tests::pull_all_commits_before_it_merges`,
-  `git::tests::an_oversized_edit_survives_the_pull`.
+  `git::tests::an_oversized_edit_survives_the_pull`,
+  `git::tests::a_write_during_the_merge_survives_the_checkout`.
 
 ## S2. The branch ref moves only after the working tree matches it
 

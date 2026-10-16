@@ -94,7 +94,7 @@ export const pullOutcomeSchema = z.object({
    */
   ahead: z.number(),
   skippedLargeFiles: z.array(skippedFileSchema),
-  /** Paths to review: a conflict copy or an edit kept against a deletion. */
+  /** Graph-relative paths of the conflict copies the merge wrote. */
   reviewPaths: z.array(z.string()),
   /**
    * Every file the merge changed. The caller reindexes these directly —

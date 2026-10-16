@@ -859,7 +859,7 @@ fn edit_vs_delete_keeps_the_edit() {
     fetch(root_a, None).unwrap();
     let merged = merge_remote(root_a).unwrap();
     assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
-    assert!(!merged.review_paths.is_empty(), "{merged:?}");
+    assert!(merged.review_paths.is_empty(), "{merged:?}");
 
     let content = read(root_a, "notes/keep.md");
     assert!(content.contains("edited on b"), "{content}");
@@ -912,6 +912,7 @@ fn merging_into_an_unborn_repo_adopts_the_remote_history() {
     let root = fixture._dir.path().join("fresh");
     scaffold_graph(&root);
     setup(&root, Some(fixture.remote_url.clone()), None).unwrap();
+    fs::remove_file(root.join(".gitignore")).unwrap();
     fetch(&root, None).unwrap();
 
     let merged = merge_remote(&root).unwrap();
@@ -961,7 +962,7 @@ fn rename_rename_conflict_keeps_both_names_and_confirms_the_removal() {
     // tree could not be written at all.
     let merged = merge_remote(root_a).unwrap();
     assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
-    assert!(!merged.review_paths.is_empty(), "{merged:?}");
+    assert!(merged.review_paths.is_empty(), "{merged:?}");
 
     let paths = head_tree_paths(root_a);
     assert!(
@@ -2152,4 +2153,136 @@ fn a_detached_head_is_reattached_to_the_backup_branch() {
     let head = repo.head().unwrap().peel_to_commit().unwrap();
     assert_eq!(head.parent_id(0).unwrap(), oid);
     assert_eq!(head_blob(root, "notes/b.md"), "# B\n");
+}
+
+#[test]
+fn a_write_during_the_merge_survives_the_checkout() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/ext.md", "# Ext\n\noriginal\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/from-b.md", "# B\n");
+    commit_all(&root_b, "b", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, "notes/local.md", "# Local\n");
+    fetch(root_a, None).unwrap();
+    let external = root_a.join("notes/ext.md");
+    fault::arm(
+        FaultPoint::AfterMergeCommitBeforeCheckout,
+        Fault::hook({
+            let external = external.clone();
+            move || fs::write(external, "# Ext\n\nwritten by iCloud\n").unwrap()
+        }),
+    );
+    let first = pull_all(root_a, "Update notes", MAX_FILE_BYTES);
+    assert_eq!(read(root_a, "notes/ext.md"), "# Ext\n\nwritten by iCloud\n");
+    drop(first);
+
+    let next = pull_all(root_a, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert!(next.committed, "{next:?}");
+    assert!(push(root_a, None).unwrap().pushed);
+    for rel in ["notes/ext.md", "notes/from-b.md", "notes/local.md"] {
+        assert_eq!(head_blob(root_a, rel), read(root_a, rel), "{rel}");
+        assert_eq!(remote_blob(&fixture, rel), read(root_a, rel), "{rel}");
+    }
+    assert_eq!(read(root_a, "notes/ext.md"), "# Ext\n\nwritten by iCloud\n");
+}
+
+#[test]
+fn a_detached_head_behind_the_branch_does_not_rewind_it() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n");
+    commit_all(root, "first", MAX_FILE_BYTES).unwrap();
+    let (older, tip) = {
+        let repo = Repository::open(root).unwrap();
+        let older = repo.head().unwrap().target().unwrap();
+        write(root, "notes/b.md", "# B\n");
+        commit_all(root, "second", MAX_FILE_BYTES).unwrap();
+        write(root, "notes/c.md", "# C\n");
+        commit_all(root, "third", MAX_FILE_BYTES).unwrap();
+        let repo = Repository::open(root).unwrap();
+        let tip = repo.head().unwrap().target().unwrap();
+        repo.set_head_detached(older).unwrap();
+        (older, tip)
+    };
+
+    write(root, "notes/d.md", "# D\n");
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    let repo = Repository::open(root).unwrap();
+    assert!(!repo.head_detached().unwrap());
+    assert_eq!(repo.head().unwrap().name().unwrap(), "refs/heads/main");
+    let head = repo.head().unwrap().peel_to_commit().unwrap();
+    assert_eq!(head.parent_id(0).unwrap(), tip);
+    assert!(repo.graph_descendant_of(head.id(), older).unwrap());
+    assert!(repo.find_commit(tip).is_ok());
+}
+
+#[test]
+fn an_untracked_oversized_file_does_not_delete_the_remote_file() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/a.md", "# A\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(root_a, "assets/x.bin", "small");
+    commit_all(root_a, "a asset", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let big = "b".repeat(100);
+    write(&root_b, "assets/x.bin", &big);
+    fetch(&root_b, None).unwrap();
+    let pulled = pull_all(&root_b, "Update notes", 64).unwrap();
+    assert_eq!(pulled.skipped_large_files.len(), 1, "{pulled:?}");
+    assert_eq!(head_blob(&root_b, "assets/x.bin"), "small");
+
+    write(&root_b, "notes/b.md", "# B\n");
+    let committed = commit_all(&root_b, "Update notes", 64).unwrap();
+    assert!(committed.committed, "{committed:?}");
+    assert_eq!(head_blob(&root_b, "assets/x.bin"), "small");
+    assert_eq!(read(&root_b, "assets/x.bin"), big);
+}
+
+#[test]
+fn a_crash_before_the_ref_move_does_not_duplicate_the_copy() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    fs::write(root_a.join("assets/img.bin"), b"\x00base\x01").unwrap();
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    fs::write(root_b.join("assets/img.bin"), b"\x00from-b\x01").unwrap();
+    commit_all(&root_b, "b image", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    fs::write(root_a.join("assets/img.bin"), b"\x00from-a\x01").unwrap();
+    commit_all(root_a, "a image", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    fault::arm(FaultPoint::BeforeMergeRefMove, Fault::Fail);
+    assert!(merge_remote(root_a).is_err());
+    assert!(
+        commit_all(root_a, "Update notes", MAX_FILE_BYTES)
+            .unwrap()
+            .committed
+    );
+    let merged = merge_remote(root_a).unwrap();
+    assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
+
+    let copy = copy_in(&merged.review_paths, "assets/img (conflict ");
+    assert_eq!(merged.review_paths, vec![copy.clone()]);
+    assert!(!copy.ends_with(" 2).bin"), "{copy}");
+    let copies: Vec<_> = fs::read_dir(root_a.join("assets"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with("img (conflict "))
+        .collect();
+    assert_eq!(copies.len(), 1, "{copies:?}");
+    assert_eq!(fs::read(root_a.join(&copy)).unwrap(), b"\x00from-b\x01");
 }

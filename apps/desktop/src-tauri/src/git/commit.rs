@@ -75,6 +75,7 @@ pub(super) fn commit_locked(
     // Likewise a file staged before it grew (or by another tool) is already
     // in the index: the add-time guard never saw it. Withhold it here.
     withhold_oversized_entries(&repo, &mut index, root, max_file_bytes, &mut skipped)?;
+    keep_head_entries_of_skipped(&repo, &mut index, &skipped)?;
     index.write()?;
 
     let parent = repo.head().ok().and_then(|head| head.peel_to_commit().ok());
@@ -227,6 +228,44 @@ fn withhold_oversized_entries(
         if !skipped.iter().any(|file| file.path == rel) {
             skipped.push(SkippedFile { path: rel, size });
         }
+    }
+    Ok(())
+}
+
+/// A withheld file that is not in the index (it is untracked here) but that
+/// `HEAD` tracks, for example a small file a pull brought in at the same
+/// path, keeps the committed blob. Otherwise the commit would record a
+/// deletion of the other device's file.
+fn keep_head_entries_of_skipped(
+    repo: &git2::Repository,
+    index: &mut Index,
+    skipped: &[SkippedFile],
+) -> AppResult<()> {
+    let Some(head_tree) = repo.head().ok().and_then(|head| head.peel_to_tree().ok()) else {
+        return Ok(());
+    };
+    for file in skipped {
+        let path = Path::new(&file.path);
+        if index.get_path(path, 0).is_some() {
+            continue;
+        }
+        let Ok(committed) = head_tree.get_path(path) else {
+            continue;
+        };
+        index.add(&IndexEntry {
+            ctime: git2::IndexTime::new(0, 0),
+            mtime: git2::IndexTime::new(0, 0),
+            dev: 0,
+            ino: 0,
+            mode: committed.filemode() as u32,
+            uid: 0,
+            gid: 0,
+            file_size: 0,
+            id: committed.id(),
+            flags: file.path.len().min(0x0FFF) as u16,
+            flags_extended: 0,
+            path: file.path.as_bytes().to_vec(),
+        })?;
     }
     Ok(())
 }
