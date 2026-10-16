@@ -13,7 +13,7 @@ export interface PinnedNote {
   path: string
   title: string
   dailyDate: string | null
-  pinnedOrder?: number | null
+  pinnedOrder?: number | null | undefined
 }
 
 /**

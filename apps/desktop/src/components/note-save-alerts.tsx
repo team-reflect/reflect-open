@@ -6,7 +6,7 @@ import type { NoteDocument } from '@/editor/use-note-document.ts'
 interface NoteSaveAlertsProps {
   document: NoteDocument
   /** A pasted image or dropped file that could not be saved. */
-  assetSaveError?: AssetSaveError | null
+  assetSaveError?: AssetSaveError | null | undefined
 }
 
 /** What went wrong saving a ready document. */

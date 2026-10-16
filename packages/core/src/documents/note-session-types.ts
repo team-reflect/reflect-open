@@ -51,7 +51,7 @@ export interface NoteSessionOptions {
    * the generation of the graph open at creation, read at write time so a
    * reopen of that graph carries over.
    */
-  readOnly?: boolean
+  readOnly?: boolean | undefined
   /**
    * Round-trip fidelity check gating editability (meowdown's `checkRoundTrip`).
    */
@@ -65,7 +65,7 @@ export interface NoteSessionOptions {
    * `saved` is the only user-driven origin — the title-rename tracker
    * (Plan 07b) keys off it.
    */
-  onContent?: ((content: string, origin: NoteContentOrigin) => void) | undefined
+  onContent?: (((content: string, origin: NoteContentOrigin) => void)) | undefined
   /**
    * Push content into the live editor (external reload or merged save). The
    * editor's change handler may fire synchronously during this call; the
@@ -79,7 +79,7 @@ export interface NoteSessionOptions {
    * before returning. A normalized but unchanged snapshot must not be emitted
    * as an edit.
    */
-  reconcilePendingEditorInput?: (() => void) | undefined
+  reconcilePendingEditorInput?: ((() => void)) | undefined
   /**
    * Treat a missing file as an empty note on load instead of an error; the
    * file is then created by the first save — Plan 06's lazy daily-note
@@ -97,7 +97,7 @@ export interface NoteSessionOptions {
    * authored title stays a birth, not a rename.
    */
   missingSeed?: string | undefined
-  saveDebounceMs?: number
+  saveDebounceMs?: number | undefined
 }
 /**
  * One open note's document lifecycle. Create via {@link NoteSessionService.create}.

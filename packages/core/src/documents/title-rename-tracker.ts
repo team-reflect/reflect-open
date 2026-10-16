@@ -47,7 +47,7 @@ export interface TitleRenameTrackerOptions {
    */
   path: string
   onRename: (rename: TitleRename) => void
-  quietMs?: number
+  quietMs?: number | undefined
   /**
    * Runs the quiet timer.
    */

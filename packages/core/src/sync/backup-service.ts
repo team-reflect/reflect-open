@@ -149,7 +149,7 @@ export interface BackupService {
    */
   connectExistingRepo(
     ref: GithubRepoRef,
-    options?: { allowPublic?: boolean },
+    options?: { allowPublic?: boolean | undefined },
   ): Promise<ConnectExistingResult>
   /**
    * Stop backing **this graph** up (drops its remote; history and the
@@ -274,13 +274,11 @@ class BackupServiceImpl implements BackupService {
       const coexisting = isICloudRoot(root)
       const next = syncEngines.create({
         generation: this.#generation,
-        ...(this.#mobile ? { idleMs: MOBILE_IDLE_MS } : {}),
-        ...(coexisting
-          ? {
-              quietMs: COEXIST_QUIET_MS,
-              networkReady: async () => (await icloudNative.pendingCount(root, 'notes')) === 0,
-            }
-          : {}),
+        idleMs: this.#mobile ? MOBILE_IDLE_MS : undefined,
+        quietMs: coexisting ? COEXIST_QUIET_MS : undefined,
+        networkReady: coexisting
+          ? async () => (await icloudNative.pendingCount(root, 'notes')) === 0
+          : undefined,
         // iOS can suspend us at any await. Do not begin a launch, online, or
         // debounced Git cycle after the document is hidden; the existing
         // visible/focus trigger below replays a full cycle on foreground.

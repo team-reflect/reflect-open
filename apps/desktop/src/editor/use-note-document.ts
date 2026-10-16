@@ -46,14 +46,14 @@ export interface NoteDocumentOptions {
    * created by the first save — Plan 06's lazy daily-note contract: opening a
    * day never litters the graph; writing does.
    */
-  createIfMissing?: boolean
+  createIfMissing?: boolean | undefined
   /**
    * Maintain inbound `[[links]]` when this note's settled title changes. The
    * coordinator separately requires a direct `notes/*.md` path with valid
    * Reflect ULID frontmatter before moving a file onto its title's slug, so
    * adopted and stable-path notes keep their filenames.
    */
-  trackRenames?: boolean
+  trackRenames?: boolean | undefined
   /**
    * Markdown to seed a missing note's buffer with (the new-note title
    * template). Requires `createIfMissing`; see `NoteSessionOptions.missingSeed`

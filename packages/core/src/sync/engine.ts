@@ -76,11 +76,11 @@ export interface SyncEngineOptions {
    * Observes every product-state transition. Called synchronously; never
    * called again after `stop()`.
    */
-  onStatus?: (status: SyncStatus) => void
+  onStatus?: ((status: SyncStatus) => void) | undefined
   /**
    * Surfaced when the size guardrail withholds files from backup.
    */
-  onLargeFilesSkipped?: (files: SkippedFile[]) => void
+  onLargeFilesSkipped?: ((files: SkippedFile[]) => void) | undefined
   /**
    * Files a pull's merge changed on disk. The caller reindexes them directly:
    * pull-applied writes must reach the index even when the file watcher isn't
@@ -91,20 +91,20 @@ export interface SyncEngineOptions {
    * throw or rejection surfaces as an `error` only after that Git work has had
    * its chance to make the Markdown source of truth durable.
    */
-  onRemoteChanges?: (changes: ChangedFile[]) => void | Promise<void>
+  onRemoteChanges?: ((changes: ChangedFile[]) => void | Promise<void>) | undefined
   /**
    * Paths a pull kept for review beside their notes. Called
    * synchronously at the boundary where the outcome arrives.
    */
-  onReview?: (paths: string[]) => void
+  onReview?: ((paths: string[]) => void) | undefined
   /**
    * Quiet period after the last edit before a backup commit.
    */
-  idleMs?: number
+  idleMs?: number | undefined
   /**
    * Ceiling on deferral while the user keeps typing.
    */
-  maxWaitMs?: number
+  maxWaitMs?: number | undefined
   /**
    * Checked before a new cycle and again after every awaited command boundary.
    * Returning false at admission drops the trigger without issuing Git work;
@@ -115,25 +115,25 @@ export interface SyncEngineOptions {
    * commit and is stopped before its pull commits once. The lifecycle owner must
    * replay a full cycle when work is allowed again.
    */
-  canStartCycle?: () => boolean
+  canStartCycle?: (() => boolean) | undefined
   /**
    * Commit-only mode, for a graph with no remote (local history): every
    * cycle ends after the commit — no credential resolved, no fetch/pull,
    * no push. Edits still land in Git history and stay revertable.
    */
-  localOnly?: boolean
+  localOnly?: boolean | undefined
   /**
    * Quiet mode: edits and manual syncs only commit locally. The network pass
    * (fetch, pull, push) runs once this many ms pass with no edit and no
    * pulled change, and only when {@link networkReady} agrees. A manual sync
    * opens a window only when none is open.
    */
-  quietMs?: number
+  quietMs?: number | undefined
   /**
    * Asked when the quiet window ends. False postpones the network pass with
    * a growing delay, up to five minutes.
    */
-  networkReady?: () => Promise<boolean>
+  networkReady?: (() => Promise<boolean>) | undefined
 }
 
 export interface SyncEngine {

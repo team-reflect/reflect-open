@@ -39,24 +39,24 @@ interface NotePaneProps {
    * Request lazy creation. The pane permits it only for daily notes and the
    * explicit new-note ULID route; arbitrary missing paths fail closed.
    */
-  lazy?: boolean
+  lazy?: boolean | undefined
   /** Focus the editor when it mounts (the navigated-to day/note). */
-  autoFocus?: boolean
+  autoFocus?: boolean | undefined
   /**
    * Where the caret lands when {@link autoFocus} applies: the document start
    * (default — a seeded new note's empty H1, so typing names the note) or the
    * end of the note's content (append-style capture, e.g. the mobile daily
    * double-tap).
    */
-  autoFocusSelection?: 'start' | 'end'
+  autoFocusSelection?: 'start' | 'end' | undefined
   /** Called once the autofocus actually happened (the editor mounted). */
-  onAutoFocused?: () => void
+  onAutoFocused?: (() => void) | undefined
   /**
    * Extra classes for the pane root in every state (loading, error,
    * protected, editing). The note route uses this to make the pane a
    * stretching flex column so the editor can fill the viewport.
    */
-  className?: string
+  className?: string | undefined
   /**
    * Extra classes for the editable area (e.g. the daily stream's per-day
    * `min-h-*`). Applied to the contenteditable root, so the reserved space
@@ -64,7 +64,7 @@ interface NotePaneProps {
    * holds the same space in every state instead of collapsing and re-expanding
    * around the stream's scroll anchor while its note arrives.
    */
-  editorClassName?: string
+  editorClassName?: string | undefined
   /**
    * Horizontal gutter applied *inside* the pane's pieces — the contenteditable
    * itself plus the chrome around it (alerts, backlinks, loading/error text) —
@@ -72,13 +72,13 @@ interface NotePaneProps {
    * spans the pane's full width (dividers run edge to edge) while the gutter
    * stays part of the editor's click-to-focus area.
    */
-  gutterClassName?: string
+  gutterClassName?: string | undefined
   /**
    * Render the built-in desktop backlinks panel below the note (default).
    * The mobile surfaces pass `false` and mount their own touch-chrome
    * `IncomingBacklinks` section over the same data layer.
    */
-  showBacklinks?: boolean
+  showBacklinks?: boolean | undefined
   /**
    * The daily stream's day key for this pane (omitted by non-daily callers).
    * Required for {@link registerHandle} and {@link onExitBoundary} to identify
@@ -90,13 +90,13 @@ interface NotePaneProps {
    * daily stream, so it can move the caret here from an adjacent day. Keyed by
    * {@link dailyDate}.
    */
-  registerHandle?: (date: string, handle: NoteEditorHandle | null) => void
+  registerHandle?: ((date: string, handle: NoteEditorHandle | null) => void) | undefined
   /**
    * The caret tried to leave this pane's top (`'up'`) / bottom (`'down'`) edge.
    * The daily stream moves focus to the adjacent day; returns `true` when it
    * did, so the editor consumes the key.
    */
-  onExitBoundary?: (date: string, direction: 'up' | 'down') => boolean
+  onExitBoundary?: ((date: string, direction: 'up' | 'down') => boolean) | undefined
 }
 
 /**
@@ -153,7 +153,7 @@ export function NotePaneComponent({
     // caret lands in, ghosted "Untitled" by the title placeholder — only
     // reaches disk if the user edits, and typing names the note. Daily
     // notes stay unseeded — the date is their identity.
-    ...(needsSeed ? { missingSeed: seed.seed } : {}),
+    missingSeed: needsSeed ? seed.seed : undefined,
   })
   const {
     resolveImageUrl,
@@ -320,7 +320,9 @@ export function NotePaneComponent({
         onWikiLinkClick={onWikiLinkClick}
         onLinkClick={onLinkClick}
         resolveLinkPreview={resolveLinkPreview}
-        {...(graph !== null && !platform.surface.touchEditor ? { renderWikilinkHoverCard } : {})}
+        renderWikilinkHoverCard={
+          graph !== null && !platform.surface.touchEditor ? renderWikilinkHoverCard : undefined
+        }
         onTagClick={onTagClick}
         onWikilinkSearch={onWikilinkSearch}
         onTagSearch={onTagSearch}

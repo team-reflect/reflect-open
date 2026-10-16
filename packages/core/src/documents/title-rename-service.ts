@@ -181,7 +181,7 @@ class RenameCoordinatorImpl implements RenameCoordinator {
   async #runMove(
     title: string,
     gen: number,
-    options?: { rewriteInboundPathLinks?: boolean },
+    options?: { rewriteInboundPathLinks?: boolean | undefined },
   ): Promise<void> {
     const { noteFile, wikiResolver, notePath, noteMove, logger } = this.#deps
     const target = await notePath.slugPathForTitle(this.#currentPath, title)

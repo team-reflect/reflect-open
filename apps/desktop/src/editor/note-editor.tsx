@@ -175,7 +175,7 @@ interface NoteEditorProps {
    * destination, or null to decline. meowdown inserts `![](dest)` for images
    * and `[name](dest)` for everything else.
    */
-  saveFile?: ((file: File) => Promise<string | null>) | undefined
+  saveFile?: (((file: File) => Promise<string | null>)) | undefined
   /**
    * Claim a `[label](url)` link as a file attachment, rendered as an inline
    * file pill instead of a plain link. Clicking a pill routes through the
@@ -204,7 +204,7 @@ interface NoteEditorProps {
    * renders no card. Must be a stable function: a new identity re-runs the
    * resolution for the currently hovered link.
    */
-  renderWikilinkHoverCard?: WikilinkHoverRenderer
+  renderWikilinkHoverCard?: WikilinkHoverRenderer | undefined
   /** Click on an inline `#tag`. The tag name arrives without the leading `#`. */
   onTagClick?: (tag: string) => void
   /** Search notes for the `[[` autocomplete menu. */

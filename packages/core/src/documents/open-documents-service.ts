@@ -7,11 +7,11 @@ export interface OpenDocument {
   /**
    * Fire pending settle-time work (title renames) now.
    */
-  settle?: () => void
+  settle?: (() => void) | undefined
   /**
    * Resolves once fired settle-time work has landed.
    */
-  settled?: () => Promise<void>
+  settled?: (() => Promise<void>) | undefined
 }
 
 /**

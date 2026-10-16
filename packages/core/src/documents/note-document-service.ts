@@ -77,7 +77,7 @@ export interface CommitSourceEditOptions {
   /**
    * Treat a missing note as empty: the edit creates it (today's daily).
    */
-  readonly createIfMissing?: boolean
+  readonly createIfMissing?: boolean | undefined
 }
 
 /**

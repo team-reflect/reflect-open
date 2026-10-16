@@ -560,19 +560,19 @@ export interface CoreAdapters {
   /**
    * Defaults to the system `IdService`.
    */
-  readonly id?: IdService
+  readonly id?: IdService | undefined
   /**
    * Defaults to a codec that cannot decode.
    */
-  readonly imageCodec?: ImageCodecService
+  readonly imageCodec?: ImageCodecService | undefined
   /**
    * Defaults to the URL shape of Apple webviews.
    */
-  readonly convertFileSrc?: FileSrcConverter
+  readonly convertFileSrc?: FileSrcConverter | undefined
   /**
    * The system's `reflect://` delivery; without one, no URL arrives.
    */
-  readonly deepLink?: DeepLinkSource
+  readonly deepLink?: DeepLinkSource | undefined
   /**
    * Builds the graph-scoped services of a session that just opened, over
    * `deps`. They must dispose themselves when `session.signal` aborts.
@@ -835,7 +835,7 @@ export function composeCoreServices(
     /**
      * Builds the mobile services on every platform, so a test can reach them.
      */
-    readonly alwaysBuildMobile?: boolean
+    readonly alwaysBuildMobile?: boolean | undefined
   },
 ): { services: CoreServices; internal: CoreInternalServices } {
   const create: ServiceFactories = { ...coreServiceFactories, ...factories }
