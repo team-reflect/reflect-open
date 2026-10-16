@@ -262,20 +262,24 @@ describe('createSyncEngineFactory', () => {
     })
     const engine = createSyncEngine({ generation: 1, getCredential: async () => CRED })
 
-    const full = engine.syncNow()
-    await vi.waitFor(() => expect(methodsOf(git)).toContain('pull'))
-    const flushed = engine.commitNow()
-    await Promise.resolve()
-    // The pull is mid-merge: the flush commit waits instead of interleaving.
-    expect(methodsOf(git)).not.toContain('commitAll')
+    try {
+      const full = engine.syncNow()
+      await vi.waitFor(() => expect(methodsOf(git)).toContain('pull'))
+      const flushed = engine.commitNow()
+      await Promise.resolve()
+      // The pull is mid-merge: the flush commit waits instead of interleaving.
+      expect(methodsOf(git)).not.toContain('commitAll')
 
-    gate.release()
-    await full
-    await flushed
-    const commands = methodsOf(git)
-    expect(commands.filter((method) => method === 'commitAll')).toHaveLength(1)
-    expect(commands.lastIndexOf('commitAll')).toBeGreaterThan(commands.indexOf('push'))
-    engine.stop()
+      gate.release()
+      await full
+      await flushed
+      const commands = methodsOf(git)
+      expect(commands.filter((method) => method === 'commitAll')).toHaveLength(1)
+      expect(commands.lastIndexOf('commitAll')).toBeGreaterThan(commands.indexOf('push'))
+    } finally {
+      gate.release()
+      engine.stop()
+    }
   })
 
   it('a push-only cycle hidden after its commit still pushes', async () => {
