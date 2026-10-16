@@ -23,8 +23,8 @@ ssh -T git@gitlab.com   # confirms key auth works and records the host key
 
 Then open (or refocus) the graph in Reflect. Settings → Backup shows the
 remote, edits back up automatically a few moments after you stop typing, and
-pulls/merges run on launch and focus — conflict handling included, same as
-GitHub.
+pulls/merges run on launch and focus. Conflicts merge through the same
+ladder as GitHub, and the desktop app probes the remote every 90 seconds.
 
 A bare repo on another disk needs no credentials at all:
 

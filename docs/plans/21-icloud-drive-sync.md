@@ -119,6 +119,13 @@ All unresolved conflicts become in-note marker blocks in the exact Plan 12 gramm
 (`<<<<<<< <label>` / `=======` / `>>>>>>> <label>`), so detection, protection, and
 resolution reuse verbatim. Two iCloud-specific refinements:
 
+> **2026-10 revision:** the ladder no longer ends in markers. Its last rung is a
+> word-level merge that always returns text, and the same ladder now resolves git
+> pulls and editor saves too. A result that drops or interleaves a side is archived
+> under Earlier versions. The marker grammar below stays only so that notes an older
+> version left marked remain resolvable. See [icloud-sync.md](../icloud-sync.md) and
+> [git-backup-safety.md](../git-backup-safety.md) S9.
+
 - **Truthful labels.** Labels are the versions' device names from
   `NSFileVersion.localizedNameOfSavingComputer` (fallback: `this device` /
   `other device` when unavailable). `detectConflictMarkers` already accepts any

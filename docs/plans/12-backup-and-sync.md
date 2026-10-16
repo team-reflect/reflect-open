@@ -12,7 +12,7 @@ reconciliation for open notes — load-bearing for conflicts), Plan 10 (keychain
 **Unlocks:** multi-device durability; AI-assisted conflict resolution (deferred).
 
 **Architecture:** Git is a Rust primitive (`git2`/libgit2); sync orchestration, cadence,
-GitHub specifics, and conflict policy live in `@reflect/core` (`actions/sync`). See
+GitHub specifics, and conflict policy live in `@reflect/core` (`packages/core/src/sync/*-service.ts`). See
 [Architecture & Conventions](architecture-conventions.md).
 
 **Libraries:** `git2` (libgit2), `keyring` — Rust. (`diff`/jsdiff returns for the
@@ -32,7 +32,7 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
    v2.0/SHA-256 upcoming — expect one breaking bump, isolated behind the Rust module).
 2. **GitHub-only surface, generic core.** The Rust layer speaks `remote URL + credential
    callback` — nothing GitHub-specific. GitHub specifics (device flow, repo creation,
-   error taxonomy) are isolated in `actions/sync/github.ts`. "Custom Git remote
+   error taxonomy) are isolated in `packages/core/src/sync/github-*-service.ts`. "Custom Git remote
    (advanced)" stays a future UX toggle, not an engineering project.
 3. **Auth: GitHub App device flow.** Fine-grained, per-repo permission ("Reflect can
    touch one repo, nothing else"); 8-hour user tokens + 6-month refresh tokens; device
@@ -50,6 +50,12 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
    the conflict notice as a raw-text splice (`resolveConflictMarkers`): keep this
    device's side, the other's, or both. Hand-merging stays possible in any external
    editor. Future: a meowdown conflict node unlocks in-editor resolution.
+
+   > **2026-10 revision:** a pull no longer commits markers. Text conflicts resolve
+   > through the ladder of [Plan 21](21-icloud-drive-sync.md), a result that drops or
+   > interleaves a side is archived under Earlier versions, and the markers path
+   > below survives only for notes an older version left marked. See
+   > [git-backup-safety.md](../git-backup-safety.md) S7 and S9.
 5. **Full loop in the first wave** — debounced commit→push *and* pull/merge, plus
    restore-from-GitHub in the graph chooser. Backup-only was rejected: a second device
    needs pull-before-push anyway, so deferral bought little.

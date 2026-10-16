@@ -86,13 +86,13 @@ section is the mapping, not a proposal:
   on pause** protects the save-debounce window even if iOS kills the app
   (Plan 19 decision 6 and its acceptance criterion: kill the app
   mid-debounce, the edit is on disk).
-- **Conflicts become visible instead of merged.** V1's CRDT silently
-  merged concurrent edits; git does not. Mobile v1 contains conflicts in a
-  protected note view and offers the same raw-marker mine/theirs/both
-  resolution actions as desktop. Conflicts never block sync of other notes.
-  The canonical case is phone + Mac both appending to today's daily note; the
-  daily-note append/append merge driver (Plan 12 future work) is the lever if
-  it hurts in practice.
+- **Conflicts merge on the device.** V1's CRDT silently merged concurrent
+  edits. Reflect v2 does the same through one ladder (Plan 21), and a result
+  that drops or interleaves a side is archived under Earlier versions. Notes
+  that an older version left with markers open in a protected note view with
+  the same mine/theirs/both resolution actions as desktop. Conflicts never
+  block sync of other notes. The canonical case is phone + Mac both appending
+  to today's daily note; the append-union rung merges it.
 - **Contract 5 maps to first clone**: cloning a years-old graph over
   cellular, foregrounded, with progress UI; shallow/partial clone is the
   noted follow-up.
