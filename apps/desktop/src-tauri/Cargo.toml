@@ -63,8 +63,6 @@ git2 = { version = "0.21.0", default-features = false, features = [
   "vendored-libgit2",
   "vendored-openssl",
 ] }
-# UTC stamps in conflict copy names (same crate as apps/cli). No tz database:
-# the stamp is always UTC. # FIXME: delete this comment
 jiff = { version = "0.2.37", default-features = false, features = ["std"] }
 # unsafe-headers lets provider-fetch.ts pass an explicit empty Origin, which
 # the plugin treats as "send no Origin header" (see providerFetch's doc).
