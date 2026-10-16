@@ -38,6 +38,14 @@ jobs:
           - name: windows
             os: windows-latest
             command: pnpm release:windows
+          # The oldest supported Ubuntu, because the binaries need the glibc
+          # of the build machine or newer.
+          - name: linux-x64
+            os: ubuntu-22.04
+            command: pnpm release:linux
+          - name: linux-arm64
+            os: ubuntu-22.04-arm
+            command: pnpm release:linux
 
     name: build-${{ matrix.name }}
     runs-on: ${{ matrix.os }}

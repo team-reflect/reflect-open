@@ -10,6 +10,7 @@
     "sidecar": "node scripts/build-sidecar.ts",
     "postinstall": "node src-tauri/xcode-scripts/generate-xcode-env.mjs",
     "release:ios": "node scripts/release-ios.ts",
+    "release:linux": "node scripts/release-linux.ts",
     "release:macos": "node scripts/release-macos.ts",
     "release:manifest": "node scripts/release-manifest.ts",
     "release:windows": "node scripts/release-windows.ts",
