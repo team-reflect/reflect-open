@@ -6,10 +6,8 @@
   },
   "workspaces": {
     ".": { "entry": ["fixtures/*.mjs"] },
-    "packages/app": { "includeEntryExports": true } ,
-    "packages/core": { "includeEntryExports": true } ,
-    "apps/desktop": { "ignoreDependencies": ["@sentry/cli"], "ignore": "src-tauri/gen/**" },
-    "apps/extension": {  "ignoreUnresolved": ["#imports"] },
-    "design-system": {"ignore": "./**/*"}
+    "design-system": {"ignore": "./**/*"},
+    "apps/desktop": { "ignoreDependencies": ["@sentry/cli"], "ignore": "src-tauri/gen/**" , "ignoreFiles": ["src/components/icons/help-icon.tsx"]},
+    "apps/extension": {  "ignoreUnresolved": ["#imports"] }
   }
 }
