@@ -96,7 +96,7 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
     }),
     fetch: (): RemoteDelta => ({ ahead: 0, behind: 0 }),
     push: (): PushOutcome => ({ pushed: true, nonFastForward: false, rejectionMessage: null }),
-    mergeRemote: (): MergeOutcome => ({ kind: 'upToDate', conflictedPaths: [], changedFiles: [] }),
+    mergeRemote: (): MergeOutcome => ({ kind: 'upToDate', reviewPaths: [], changedFiles: [] }),
   }
 
   constructor(initialStatus?: Partial<GitStatus>) {

@@ -217,8 +217,8 @@ pub async fn git_fetch(
     .await
 }
 
-/// Merge the fetched remote branch; conflicts are committed into the notes as
-/// labeled markers (see [`merge`]). The repo is never left mid-merge.
+/// Merge the fetched remote branch; text conflicts are committed as merged
+/// text (see [`merge`]). The repo is never left mid-merge.
 #[tauri::command]
 pub async fn git_merge_remote(
     generation: u64,

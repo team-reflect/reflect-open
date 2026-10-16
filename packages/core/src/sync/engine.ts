@@ -13,8 +13,8 @@ import type {
  * reach the UI — only {@link SyncStatus}.
  *
  * Invariants:
- * - **Never wedged.** Merges commit their conflicts (markers in the note), so
- *   a conflict pauses nothing; the indexer surfaces `Needs review` per note.
+ * - **Never wedged.** Merges commit merged text, and a binary conflict leaves
+ *   a review copy beside the file, so a conflict pauses nothing.
  * - **No write loops, no idle network.** Pull-applied file changes re-enter
  *   `noteChanged` via the watcher, but the next cycle finds nothing committed
  *   and nothing ahead and ends without touching the network.

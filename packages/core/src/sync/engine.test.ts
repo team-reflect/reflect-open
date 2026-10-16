@@ -65,7 +65,7 @@ const NON_FAST_FORWARD: PushOutcome = {
   nonFastForward: true,
   rejectionMessage: 'fetch first',
 }
-const MERGED: MergeOutcome = { kind: 'merged', conflictedPaths: [], changedFiles: [] }
+const MERGED: MergeOutcome = { kind: 'merged', reviewPaths: [], changedFiles: [] }
 const DELTA = { ahead: 1, behind: 0 }
 
 /**
@@ -509,7 +509,7 @@ describe('createSyncEngineFactory', () => {
     const git = fakeGit()
     git.onMergeRemote(() => ({
       kind: 'merged',
-      conflictedPaths: [],
+      reviewPaths: [],
       changedFiles: [
         { path: 'notes/from-b.md', kind: 'upsert' },
         { path: 'notes/gone.md', kind: 'remove' },
@@ -539,7 +539,7 @@ describe('createSyncEngineFactory', () => {
     const git = fakeGit()
     git.onMergeRemote(() => ({
       kind: 'merged',
-      conflictedPaths: [],
+      reviewPaths: [],
       changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
     }))
     const remoteChangesGate = Promise.withResolvers<void>()
@@ -576,7 +576,7 @@ describe('createSyncEngineFactory', () => {
       mergeCount += 1
       return {
         kind: 'merged',
-        conflictedPaths: [],
+        reviewPaths: [],
         changedFiles: [{ path: `notes/remote-${mergeCount}.md`, kind: 'upsert' }],
       }
     })
@@ -629,7 +629,7 @@ describe('createSyncEngineFactory', () => {
     const git = fakeGit()
     git.onMergeRemote(() => ({
       kind: 'merged',
-      conflictedPaths: [],
+      reviewPaths: [],
       changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
     }))
     const remoteChangesGate = Promise.withResolvers<void>()
@@ -665,7 +665,7 @@ describe('createSyncEngineFactory', () => {
     git.onMergeRemote(() => {
       return {
         kind: 'merged',
-        conflictedPaths: [],
+        reviewPaths: [],
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
       }
     })
@@ -727,7 +727,7 @@ describe('createSyncEngineFactory', () => {
     engine.stop()
     mergeGate.resolve({
       kind: 'merged',
-      conflictedPaths: [],
+      reviewPaths: [],
       changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
     })
     await syncing
@@ -741,7 +741,7 @@ describe('createSyncEngineFactory', () => {
     const git = fakeGit()
     git.onMergeRemote(() => ({
       kind: 'merged',
-      conflictedPaths: [],
+      reviewPaths: [],
       changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
     }))
     const remoteChangesGate = Promise.withResolvers<void>()
@@ -773,7 +773,7 @@ describe('createSyncEngineFactory', () => {
     const git = fakeGit()
     git.onMergeRemote(() => ({
       kind: 'merged',
-      conflictedPaths: [],
+      reviewPaths: [],
       changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
     }))
     const statuses: SyncStatus[] = []
@@ -880,7 +880,7 @@ describe('createSyncEngineFactory', () => {
       return { ahead: 0, behind: 0 }
     })
     git.onMergeRemote(() => {
-      return { kind: 'upToDate', conflictedPaths: [], changedFiles: [] }
+      return { kind: 'upToDate', reviewPaths: [], changedFiles: [] }
     })
     const engine = createSyncEngine({ generation: 1, getCredential: async () => CRED })
 
