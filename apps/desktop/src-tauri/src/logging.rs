@@ -1,16 +1,8 @@
-//! Where log lines go. `tauri-plugin-log` owns the sinks: stderr (the OS log
-//! on mobile) and a size-rotated `reflect.log` under the OS log directory, so
-//! a user can send the log folder instead of relaunching from a terminal.
-//!
-//! Rust code keeps calling `tracing::*`: with no `tracing` subscriber
-//! installed, the crate's `log` feature turns every event into a `log`
-//! record (fields rendered as `key=value` after the message). The webview
-//! reaches the same logger through the plugin's own `plugin:log|log` command,
-//! so TypeScript and Rust lines sort together in one file.
-//!
-//! Lines carry paths, counts, and durations, never note text: the log
-//! directory is outside the graph and is not covered by the `private: true`
-//! guard, so content must not reach it.
+//! Log sinks: stderr and a size-rotated `reflect.log` in the OS log
+//! directory, both owned by `tauri-plugin-log`. With no `tracing` subscriber
+//! installed, the `tracing` crate's `log` feature turns every event into a
+//! `log` record. The webview logs through the plugin's `plugin:log|log`
+//! command.
 
 use log::LevelFilter;
 use tauri::plugin::TauriPlugin;
