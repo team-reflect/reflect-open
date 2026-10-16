@@ -560,6 +560,40 @@ describe('createBackupService', () => {
     backup.dispose()
   })
 
+  it('a pull batch does not tick the commit debounce', async () => {
+    const { calls } = fakeServices({ auth: null, remoteUrl: null })
+    const backup = createBackup({ indexGeneration: 1 })
+    await backup.start()
+    await vi.waitFor(() => {
+      expect(commitCount(calls)).toBe(1)
+    })
+
+    fileChanges.emit({
+      changes: [{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }],
+      source: 'pull',
+    })
+    await advance(30_000)
+    expect(commitCount(calls)).toBe(1)
+    backup.dispose()
+  })
+
+  it('an icloud-sweep batch does not tick the commit debounce', async () => {
+    const { calls } = fakeServices({ auth: null, remoteUrl: null })
+    const backup = createBackup({ indexGeneration: 1 })
+    await backup.start()
+    await vi.waitFor(() => {
+      expect(commitCount(calls)).toBe(1)
+    })
+
+    fileChanges.emit({
+      changes: [{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }],
+      source: 'icloud-sweep',
+    })
+    await advance(30_000)
+    expect(commitCount(calls)).toBe(1)
+    backup.dispose()
+  })
+
   it('never starts local history on mobile', async () => {
     const { calls } = fakeServices({
       auth: null,

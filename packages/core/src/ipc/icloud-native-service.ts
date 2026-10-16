@@ -38,6 +38,7 @@ const icloudSweepChangeSchema = z.object({
 const icloudSweepOutcomeSchema = z.object({
   changed: z.array(icloudSweepChangeSchema),
   needsReview: z.array(z.string()),
+  reconciled: z.array(z.string()),
   deferred: z.array(z.string()),
   autoResolved: z.number().int().nonnegative(),
 })

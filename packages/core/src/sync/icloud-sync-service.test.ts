@@ -5,6 +5,7 @@ import type { IcloudScanOptions, IcloudSweepOutcome } from '../ipc/icloud-native
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
 import { createTestFileChangeService, type TestFileChangeService } from '../testing/file-change.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
+import { createTestProgressPort, type TestProgressPort } from '../testing/ports.ts'
 import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
 import { createTestActivityPort, type TestActivityPort } from '../testing/shell.ts'
 import { createTestICloudNativeService, type TestICloudNativeService } from '../testing/sync.ts'
@@ -30,6 +31,7 @@ const INDEX_GENERATION = 3
 const EMPTY_OUTCOME: IcloudSweepOutcome = {
   changed: [],
   needsReview: [],
+  reconciled: [],
   deferred: [],
   autoResolved: 0,
 }
@@ -37,6 +39,7 @@ const EMPTY_OUTCOME: IcloudSweepOutcome = {
 let clock: TestClockService
 let activity: TestActivityPort
 let logger: TestLoggerService
+let progress: TestProgressPort
 let fileChanges: TestFileChangeService
 let icloud: TestICloudNativeService
 /**
@@ -52,6 +55,7 @@ beforeEach(() => {
   clock = createTestClockService({ now: Date.UTC(2026, 6, 4) })
   activity = createTestActivityPort()
   logger = createTestLoggerService()
+  progress = createTestProgressPort()
   fileChanges = createTestFileChangeService()
   icloud = createTestICloudNativeService()
   scanResults = []
@@ -107,6 +111,7 @@ function service(overrides: { watch?: boolean } = {}) {
       activity,
       clock,
       logger,
+      progress,
     },
     {
       root: ROOT,
@@ -195,16 +200,15 @@ describe('createICloudSyncService', () => {
     expect(scanCalls()).toHaveLength(2) // baseline + resume: the sweeps still run
   })
 
-  it('external upserts become base ingests; this device’s own writes never do', async () => {
+  it('an external batch is ingested', async () => {
     const sync = service()
     await sync.start()
     await settleScan() // baseline out of the way
 
-    fileChanges.reportOwnWrite([{ path: 'notes/own.md', kind: 'upsert' }])
     emitExternal(
-      { path: 'notes/own.md' },
       { path: 'notes/external.md' },
       { path: 'notes/gone.md', kind: 'remove' },
+      { path: 'assets/picture.png' },
     )
     await settleScan(INGEST_SETTLE_MS) // arrival-driven: debounce + minimum spacing
 
@@ -213,17 +217,46 @@ describe('createICloudSyncService', () => {
     expect(scanCalls()[1]?.recordBaseline).toBe(false)
   })
 
-  it('an own write counts as external again once its echo window has passed', async () => {
+  it('an own-write batch is not ingested', async () => {
     const sync = service()
     await sync.start()
-    await settleScan() // baseline out of the way
+    await settleScan()
 
-    fileChanges.reportOwnWrite([{ path: 'notes/own.md', kind: 'upsert' }])
-    await clock.advance(5_001)
-    emitExternal({ path: 'notes/own.md' })
+    fileChanges.emit({
+      changes: [{ path: 'notes/own.md', kind: 'upsert', modifiedMs: 1 }],
+      source: 'own-write',
+    })
     await settleScan(INGEST_SETTLE_MS)
 
-    expect(scanCalls()[1]?.ingestedPaths).toEqual(['notes/own.md'])
+    expect(scanCalls()).toHaveLength(1)
+  })
+
+  it('a pull batch is not ingested', async () => {
+    const sync = service()
+    await sync.start()
+    await settleScan()
+
+    fileChanges.emit({
+      changes: [{ path: 'notes/pulled.md', kind: 'upsert', modifiedMs: 1 }],
+      source: 'pull',
+    })
+    await settleScan(INGEST_SETTLE_MS)
+
+    expect(scanCalls()).toHaveLength(1)
+  })
+
+  it('a sweep that reconciled notes reports once through progress', async () => {
+    scanResults.push({ ...EMPTY_OUTCOME, reconciled: ['notes/a.md', 'notes/b.md'] })
+    const sync = service()
+    await sync.start()
+    await settleScan()
+
+    expect(progress.snapshot()).toMatchObject([
+      {
+        label: 'Syncing',
+        message: 'Merged overlapping edits in 2 notes; earlier versions are kept',
+      },
+    ])
   })
 
   it('sweep rewrites fan out to subscribers and reindex, without re-ingesting', async () => {
@@ -233,6 +266,7 @@ describe('createICloudSyncService', () => {
         { path: 'assets/picture.png', kind: 'upsert', modifiedMs: 5 },
       ],
       needsReview: ['notes/merged.md'],
+      reconciled: [],
       deferred: [],
       autoResolved: 0,
     })
@@ -254,12 +288,9 @@ describe('createICloudSyncService', () => {
     expect(indexApplies).toEqual([
       { paths: ['notes/merged.md'], generation: INDEX_GENERATION, canApply: true },
     ])
-    // Neither the service's own synchronous fan-out nor the file watcher's
-    // later echo of the sweep's write may come back as an ingest — only the
-    // genuinely external change does.
-    emitExternal({ path: 'notes/merged.md' }, { path: 'notes/other.md' })
-    await settleScan(INGEST_SETTLE_MS) // arrival-driven: debounce + minimum spacing
-    expect(scanCalls()[1]?.ingestedPaths).toEqual(['notes/other.md'])
+    // The sweep batch itself is never an ingest.
+    await settleScan(INGEST_SETTLE_MS)
+    expect(scanCalls()).toHaveLength(1)
   })
 
   it('gates the direct reindex on visibility for mobile only', async () => {

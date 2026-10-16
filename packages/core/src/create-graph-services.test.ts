@@ -78,6 +78,7 @@ function sessionDeps(app: TestCoreServices) {
       activity,
       clock,
       logger,
+      progress: app.progress,
     },
     icloudDownload: { icloudNative, activity, clock, logger },
   }

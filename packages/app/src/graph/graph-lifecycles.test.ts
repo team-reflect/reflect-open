@@ -39,6 +39,7 @@ function graphDeps(core: TestCoreServices): GraphServicesDeps {
       activity,
       clock,
       logger,
+      progress: core.progress,
     },
     icloudDownload: { icloudNative, activity, clock, logger },
     capture: core.capture,
