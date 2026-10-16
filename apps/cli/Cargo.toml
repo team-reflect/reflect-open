@@ -14,11 +14,11 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 reflect-index-schema = { path = "../../crates/index-schema", default-features = false }
 reflect-graph-paths = { workspace = true }
-clap = { version = "4.6.6", features = ["derive"] }
-jiff = "0.2.37"
+clap = { version = "4.6.7", features = ["derive"] }
+jiff = "0.2.38"
 sha2 = { workspace = true }
 pulldown-cmark = "0.13.4"
-saphyr = "0.0.12"
+saphyr = "0.2.2"
 unicode-normalization = "0.1.25"
 
 [dev-dependencies]

@@ -24,7 +24,7 @@ tauri-build = { version = "2.7.1", features = [] }
 
 [dependencies]
 infer = "0.22.0"
-http-range-header = "0.4"
+http-range-header = "0.4.2"
 
 # `devtools` compiles the web inspector into release builds too (it is otherwise
 # debug-only), so a shipped app stays debuggable — see `src/devtools.rs`.
@@ -35,7 +35,7 @@ tauri-plugin-opener = "2.7.0"
 percent-encoding = "2.3.2"
 # `time` backs the bounded wait in `windows::close_note_windows` (tauri
 # already runs on tokio; this only makes the sleep primitive addressable).
-tokio = { version = "1.53.1", features = ["time", "sync", "fs", "io-util"] }
+tokio = { version = "1.53.3", features = ["time", "sync", "fs", "io-util"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 # `hooks` adds the authorizer API used to lock the read-only `db_query` bridge
@@ -52,9 +52,9 @@ base64 = "0.23.1"
 # `tracing` has no subscriber here: its `log` feature forwards every event to
 # the `log` crate, where `tauri-plugin-log` owns the sinks (see `logging.rs`).
 tracing = { version = "0.1.44", features = ["log"] }
-log = "0.4.29"
+log = "0.4.34"
 tauri-plugin-log = "2.10.1"
-keyring-core = "1.0.0"
+keyring-core = "1.0.1"
 # Git backup/sync primitives (Plan 12) + SSH transport for generic remotes
 # (Plan 16 V1: agent auth only). Everything is vendored/static — libssh2 and
 # openssl must never link against homebrew dylibs the distributed app won't
@@ -66,7 +66,7 @@ git2 = { version = "0.21.0", default-features = false, features = [
   "vendored-libgit2",
   "vendored-openssl",
 ] }
-jiff = { version = "0.2.37", default-features = false, features = ["std"] }
+jiff = { version = "0.2.38", default-features = false, features = ["std"] }
 # unsafe-headers lets provider-fetch.ts pass an explicit empty Origin, which
 # the plugin treats as "send no Origin header" (see providerFetch's doc).
 tauri-plugin-http = { version = "2.8.1", features = ["unsafe-headers"] }
@@ -82,7 +82,7 @@ image = { version = "0.25.10", default-features = false, features = [
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
 # Reflect V1 exports are zip archives of the graph-folder layout. Keep the
 # reader lean: stored entries plus the usual deflate method are enough here.
-zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+zip = { version = "9.0.3", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 xattr = "1.6.1"
@@ -91,7 +91,7 @@ apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }
 # objc2 bindings, trimmed to the classes the modules touch. objc2-app-kit
 # backs EKCalendar's NSColor → hex conversion and the Edit menu's Paste and
 # Match Style item (`src/menu.rs`).
-objc2 = "0.6.4"
+objc2 = "0.6.5"
 block2 = "0.6.2"
 objc2-foundation = { version = "0.3.2", default-features = false, features = [
   "std",
@@ -139,7 +139,7 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 core-foundation = "0.10.1"
 dispatch2 = "0.3.1"
-objc2 = "0.6.4"
+objc2 = "0.6.5"
 objc2-foundation = "0.3.2"
 objc2-contacts = "0.3.2"
 objc2-link-presentation = { version = "0.3.2", default-features = false, features = [
@@ -172,7 +172,7 @@ apple-native-keyring-store = { version = "1.0.2", features = ["protected"] }
 tauri-plugin-updater = "2.13.2"
 tauri-plugin-process = "2.4.0"
 tauri-plugin-window-state = "2.5.0"
-trash = "5.2.8"
+trash = "5.2.9"
 notify = "8.2.0"
 notify-debouncer-full = "0.7.0"
 # The watcher's pruned file-ID cache (rename stitching without the full-tree
