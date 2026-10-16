@@ -227,6 +227,7 @@ class TestICloudNativeServiceImpl implements TestICloudNativeService {
     () => ({
       changed: [],
       needsReview: [],
+      reconciled: [],
       deferred: [],
       autoResolved: 0,
     })

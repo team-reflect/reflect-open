@@ -423,7 +423,10 @@ class BackupServiceImpl implements BackupService {
     // Spooled capture envelopes (`.reflect/inbox/`) are git-ignored and
     // drained within seconds — they must not tick the commit debounce. The
     // drain's own note writes arrive as ordinary changes right after.
-    this.#unlisten = fileChanges.subscribe(({ changes }) => {
+    this.#unlisten = fileChanges.subscribe(({ changes, source }) => {
+      if (source === 'pull' || source === 'icloud-sweep') {
+        return
+      }
       if (changes.some((change) => !isCaptureSpoolPath(change.path))) {
         next.noteChanged()
       }

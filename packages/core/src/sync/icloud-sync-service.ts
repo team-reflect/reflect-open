@@ -1,6 +1,7 @@
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
+import type { ProgressPort } from '../ports/progress-port.ts'
 import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
 import { isNotePath } from '../graph/paths.ts'
 import type { FileChange, FileChangeService } from '../indexing/file-change-service.ts'
@@ -16,11 +17,6 @@ import type { Unlisten } from '../unlisten.ts'
 export function isICloudRoot(root: string): boolean {
   return root.includes('/Mobile Documents/')
 }
-
-/**
- * How long after a save a watcher event still counts as our own write.
- */
-const OWN_WRITE_TTL_MS = 5_000
 
 /**
  * Debounce between a change signal and the sweep it triggers.
@@ -88,6 +84,7 @@ export interface ICloudSyncServiceDeps {
   readonly activity: ActivityPort
   readonly clock: ClockService
   readonly logger: LoggerService
+  readonly progress: ProgressPort
 }
 
 /**
@@ -98,8 +95,8 @@ export interface ICloudSyncServiceDeps {
  *
  * - Debounces external file-change batches into conflict sweeps
  *   (`icloud_conflicts_scan`), scoped to the arrivals themselves.
- * - Classifies external arrivals (not this device's own writes — tracked via
- *   the own-write echo — and not the sweep's own output) as clean ingests,
+ * - Classifies external arrivals (`external` batches only: not this device's
+ *   own writes, pulls, or the sweep's own output) as clean ingests,
  *   which advance the notes' shadow merge bases.
  * - Fans a sweep's rewrites to every file-change subscriber and reindexes
  *   them directly, exactly like the backup service's pull path.
@@ -133,7 +130,6 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
   readonly #deps: ICloudSyncServiceDeps
   readonly #options: ICloudSyncServiceOptions
   readonly #disposers: Unlisten[] = []
-  readonly #ownWrites = new Map<string, number>()
   /**
    * The narrow scope for arrival-driven sweeps: the watch's candidate set
    * where a watch runs, else the arrivals themselves. Everything that is
@@ -144,7 +140,6 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
   #disposed = false
   #baselinePending = true
   #pendingIngest = new Set<string>()
-  #applyingSweepResult = false
   #scanTimer: TimerHandle | null = null
   #scanTimerDue = 0
   #scanRunning = false
@@ -182,7 +177,7 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
   }
 
   async start(): Promise<void> {
-    const { icloudNative, fileChanges, activity, clock, logger } = this.#deps
+    const { icloudNative, fileChanges, activity, logger } = this.#deps
     const { root, metadataWatch } = this.#options
     if (this.#disposed) {
       return
@@ -195,33 +190,19 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
         // Sweeps still run off file-change batches; carry on.
       }
     }
-    this.#disposers.push(
-      fileChanges.subscribeOwnWrites((paths) => {
-        const now = clock.now()
-        for (const path of paths) {
-          this.#ownWrites.set(path, now)
-        }
-        this.#pruneOwnWrites(now)
-      }),
-    )
     // Subscriptions are defensive like the watch above: a failed listen must
     // not reject start() (an unhandled rejection at the provider's call site)
     // or skip the initial sweep below — resume triggers and the baseline scan
     // keep conflict handling alive without them.
     try {
       this.#disposers.push(
-        fileChanges.subscribe(({ changes }) => {
-          if (this.#disposed || this.#applyingSweepResult) {
+        fileChanges.subscribe(({ changes, source }) => {
+          if (this.#disposed || source !== 'external') {
             return
           }
-          const now = clock.now()
-          this.#pruneOwnWrites(now)
           for (const change of changes) {
             if (change.kind !== 'upsert' || !isNotePath(change.path)) {
               continue
-            }
-            if (this.#ownWrites.has(change.path)) {
-              continue // our own save landing — never advances the base
             }
             this.#pendingIngest.add(change.path)
           }
@@ -343,7 +324,7 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
   }
 
   async #runScan(): Promise<void> {
-    const { icloudNative, openDocuments, clock, logger } = this.#deps
+    const { icloudNative, openDocuments, clock, logger, progress } = this.#deps
     const { generation } = this.#options
     if (this.#disposed || this.#scanSuspended()) {
       return
@@ -371,6 +352,15 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
       })
       if (!this.#disposed && outcome.changed.length > 0) {
         this.#applySweepChanges(outcome.changed)
+      }
+      const merged = outcome.reconciled.length
+      if (!this.#disposed && merged > 0) {
+        progress.fail(
+          'Syncing',
+          merged === 1
+            ? 'Merged overlapping edits in 1 note; earlier versions are kept'
+            : `Merged overlapping edits in ${merged} notes; earlier versions are kept`,
+        )
       }
     } catch (err) {
       // A failed sweep leaves versions unresolved; the next signal retries.
@@ -404,25 +394,9 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
    * wait on the watcher to notice its own writes.
    */
   #applySweepChanges(changes: FileChange[]): void {
-    const { fileChanges, indexLifecycle, activity, clock } = this.#deps
+    const { fileChanges, indexLifecycle, activity } = this.#deps
     const { generation, indexGeneration, metadataWatch } = this.#options
-    // Sweep rewrites ARE this device's writes, but they don't route through
-    // the note file service, so no own-write echo fires — and
-    // `applyingSweepResult` below can't cover the *debounced* watcher echo
-    // that follows. Mark them so that echo never classifies as an external
-    // base ingest. (The Rust side independently refuses marker-bearing
-    // content as a base; this also keeps clean-merge echoes from scheduling
-    // useless rescans.)
-    const now = clock.now()
-    for (const change of changes) {
-      this.#ownWrites.set(change.path, now)
-    }
-    this.#applyingSweepResult = true
-    try {
-      fileChanges.emit({ changes, source: 'icloud-sweep' })
-    } finally {
-      this.#applyingSweepResult = false
-    }
+    fileChanges.emit({ changes, source: 'icloud-sweep' })
     const indexable = changes.filter((change) => isNotePath(change.path))
     if (indexGeneration !== null && indexable.length > 0) {
       void indexLifecycle.applyChanges(
@@ -431,14 +405,6 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
         generation,
         () => !metadataWatch || !activity.isHidden(),
       )
-    }
-  }
-
-  #pruneOwnWrites(now: number): void {
-    for (const [path, stamp] of this.#ownWrites) {
-      if (now - stamp > OWN_WRITE_TTL_MS) {
-        this.#ownWrites.delete(path)
-      }
     }
   }
 

@@ -1137,6 +1137,7 @@ export function composeCoreServices(
     activity,
     clock,
     logger,
+    progress,
   }
   const icloudDownloadDeps: ICloudDownloadServiceDeps = { icloudNative, activity, clock, logger }
   const services: CoreServices = {
