@@ -99,14 +99,6 @@ class TestNoteSessionImpl implements TestNoteSession {
     this.#record('flush')
   }
 
-  keepMine(): void {
-    this.#record('keepMine')
-  }
-
-  loadTheirs(): void {
-    this.#record('loadTheirs')
-  }
-
   content(): string {
     return this.#content
   }

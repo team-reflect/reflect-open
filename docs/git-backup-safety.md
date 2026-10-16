@@ -123,10 +123,25 @@ Status (2026-10-16): implemented in phase 3 of the sync rework.
 ## S8. Edits in an open note are never silently discarded
 
 When external content arrives while the buffer has unsaved edits, the
-session merges, or parks the conflict and keeps both sides. Leaving the note
-with a parked conflict archives the buffer instead of dropping it.
+session saves at once. The save is a checked write against the disk text
+the buffer was typed on, and `note_write` merges it with the newer disk
+text under the graph lock (merge-on-write). The session adopts the merged
+text; a result the editor cannot round-trip opens the note protected. When
+the disk file already holds conflict markers, nothing is written: the
+buffer goes to the note's earlier versions, the disk text is adopted, and
+a notice says where the edits went. There is no parked state, so every
+exit path only has to finish the write.
 
-- Test: `note-session.test.ts` "keepMine rewrites the file even when the
-  conflict content equals the buffer"; archive-on-dispose pending.
+- Test: `fs::tests::a_checked_write_against_a_moved_file_merges_under_the_lock`,
+  `fs::tests::a_reconciled_write_archives_the_buffer`,
+  `fs::tests::a_marked_disk_file_keeps_theirs_and_archives_ours`;
+  `note-session-service.test.ts` "a dirty buffer saves at once when an
+  external change arrives", "an exact merge adopts the merged text and the
+  session is clean", "a reconciled merge adopts the merged text and stays
+  saveable", "a keptTheirs result notifies and adopts the disk content",
+  "a lossy merged result opens protected", "a merged title change is
+  reported as external before saved", "keystrokes during a merging write
+  stay dirty and merge on the next write", "dispose after flush still
+  completes a merging write".
 
-Status (2026-10-16): planned for phase 4 of the sync rework.
+Status (2026-10-16): implemented in phase 4 of the sync rework.

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createTestClockService } from '../testing/clock.ts'
 import { createTitleRenameTracker, type TitleRename } from './title-rename-tracker.ts'
 
-function tracked(options?: { canFire?: () => boolean }) {
+function tracked() {
   const renames: TitleRename[] = []
   const clock = createTestClockService()
   const tracker = createTitleRenameTracker({
@@ -11,7 +11,6 @@ function tracked(options?: { canFire?: () => boolean }) {
     onRename: (rename) => {
       renames.push(rename)
     },
-    canFire: options?.canFire,
     clock,
   })
   return { tracker, renames, clock }
@@ -99,21 +98,6 @@ describe('createTitleRenameTracker', () => {
     tracker.saved('---\ntitle: Renamed\n---\n# Heading\n')
     tracker.settle()
     expect(renames[0]).toMatchObject({ from: 'Real Title', to: 'Renamed' })
-  })
-
-  it('a blocked fire keeps the rename pending until the gate opens', async () => {
-    let conflictParked = true
-    const { tracker, renames, clock } = tracked({ canFire: () => !conflictParked })
-    tracker.baseline('# A\n')
-    tracker.saved('# B\n')
-    tracker.settle() // blocked: conflict parked
-    await clock.advance(10_000)
-    expect(renames).toEqual([])
-
-    conflictParked = false
-    tracker.saved('# B\n') // "keep mine" re-saves the same title → re-arms
-    await clock.advance(5000)
-    expect(renames).toEqual([{ from: 'A', to: 'B', previousAutoAlias: null }])
   })
 
   it('an H1 edit under an explicit frontmatter title is not a rename', async () => {
