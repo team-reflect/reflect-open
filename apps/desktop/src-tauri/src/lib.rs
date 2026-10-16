@@ -383,7 +383,7 @@ pub fn run() {
             git::git_commit_all,
             git::git_fetch,
             git::git_remote_head,
-            git::git_merge_remote,
+            git::git_pull,
             git::git_push,
             quit::quit_confirm,
             windows::open_note_window,

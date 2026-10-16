@@ -29,7 +29,7 @@ mod test_support;
 #[cfg(test)]
 mod tests;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use tauri::State;
@@ -39,8 +39,8 @@ use crate::blocking::run_blocking;
 use crate::error::AppResult;
 use crate::fs::GraphState;
 
-use self::commit::CommitOutcome;
-use self::merge::MergeOutcome;
+use self::commit::{CommitOutcome, SkippedFile};
+use self::merge::{ChangedFile, MergeKind};
 use self::remote::{GitCredential, PushOutcome, RemoteDelta, RemoteTip};
 
 /// GitHub rejects files over 100 MB, failing the whole push; stop just under.
@@ -58,10 +58,6 @@ pub struct GitStatus {
     /// Commits ahead/behind the last-fetched remote branch (no network).
     pub ahead: usize,
     pub behind: usize,
-    /// The repository state is not `Clean` — a merge/rebase the user started
-    /// outside Reflect (e.g. via the git CLI) is in progress. Sync refuses to
-    /// run until it is finished or aborted.
-    pub in_progress: bool,
 }
 
 fn status(root: &Path) -> AppResult<GitStatus> {
@@ -72,7 +68,6 @@ fn status(root: &Path) -> AppResult<GitStatus> {
             remote_url: None,
             ahead: 0,
             behind: 0,
-            in_progress: false,
         });
     }
     let repo = repo::open_existing(root)?;
@@ -91,7 +86,6 @@ fn status(root: &Path) -> AppResult<GitStatus> {
         remote_url,
         ahead: delta.ahead,
         behind: delta.behind,
-        in_progress: repo.state() != git2::RepositoryState::Clean,
     })
 }
 
@@ -124,11 +118,21 @@ fn setup(root: &Path, remote_url: Option<String>, branch: Option<String>) -> App
     status(root)
 }
 
+/// Run a git operation on a blocking thread, retrying once after clearing a
+/// stale `.lock` file.
+async fn run_git<T, F>(root: PathBuf, operation: F) -> AppResult<T>
+where
+    T: Send + 'static,
+    F: Fn(&Path) -> AppResult<T> + Send + 'static,
+{
+    run_blocking(move || locks::retry_after_stale_lock(&root, || operation(&root))).await
+}
+
 /// Snapshot the backup repository (cheap, no network).
 #[tauri::command]
 pub async fn git_status(generation: u64, state: State<'_, GraphState>) -> AppResult<GitStatus> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || crate::fs::with_graph_lock(&root, || status(&root))).await
+    run_blocking(move || status(&root)).await
 }
 
 /// Initialize (or adopt) the graph's repository, optionally point `origin` at
@@ -144,10 +148,8 @@ pub async fn git_setup(
     state: State<'_, GraphState>,
 ) -> AppResult<GitStatus> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || {
-        locks::retry_after_stale_lock(&root, || {
-            crate::fs::with_graph_lock(&root, || setup(&root, remote_url.clone(), branch.clone()))
-        })
+    run_git(root, move |root| {
+        crate::fs::with_graph_lock(root, || setup(root, remote_url.clone(), branch.clone()))
     })
     .await
 }
@@ -157,10 +159,8 @@ pub async fn git_setup(
 #[tauri::command]
 pub async fn git_disconnect(generation: u64, state: State<'_, GraphState>) -> AppResult<GitStatus> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || {
-        locks::retry_after_stale_lock(&root, || {
-            crate::fs::with_graph_lock(&root, || disconnect(&root))
-        })
+    run_git(root, |root| {
+        crate::fs::with_graph_lock(root, || disconnect(root))
     })
     .await
 }
@@ -186,10 +186,8 @@ pub async fn git_commit_all(
 ) -> AppResult<CommitOutcome> {
     let root = crate::fs::root_for_generation(&state, generation)?;
     let started = std::time::Instant::now();
-    let outcome = run_blocking(move || {
-        locks::retry_after_stale_lock(&root, || {
-            commit::commit_all(&root, &message, MAX_FILE_BYTES)
-        })
+    let outcome = run_git(root, move |root| {
+        commit::commit_all(root, &message, MAX_FILE_BYTES)
     })
     .await;
     if let Ok(outcome) = &outcome {
@@ -211,10 +209,7 @@ pub async fn git_fetch(
     state: State<'_, GraphState>,
 ) -> AppResult<RemoteDelta> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || {
-        locks::retry_after_stale_lock(&root, || remote::fetch(&root, credential.clone()))
-    })
-    .await
+    run_git(root, move |root| remote::fetch(root, credential.clone())).await
 }
 
 /// Read the remote tip of the current branch without fetching.
@@ -225,24 +220,66 @@ pub async fn git_remote_head(
     state: State<'_, GraphState>,
 ) -> AppResult<RemoteTip> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || {
-        locks::retry_after_stale_lock(&root, || remote::remote_head(&root, credential.clone()))
-    })
-    .await
+    run_blocking(move || remote::remote_head(&root, credential)).await
 }
 
-/// Merge the fetched remote branch; text conflicts are committed as merged
-/// text (see [`merge`]). The repo is never left mid-merge.
+/// What one pull did: the commit of local changes, then the merge of the
+/// fetched remote branch.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PullOutcome {
+    /// Whether local changes were committed before the merge.
+    pub committed: bool,
+    /// Commits the local branch is ahead of the last-fetched remote after the
+    /// merge (no network).
+    pub ahead: usize,
+    pub skipped_large_files: Vec<SkippedFile>,
+    pub kind: MergeKind,
+    /// Graph-relative paths of conflict copies and edits kept against a
+    /// deletion.
+    pub review_paths: Vec<String>,
+    /// Every file the merge changed on disk.
+    pub changed_files: Vec<ChangedFile>,
+}
+
+/// Commit local changes and merge the fetched remote branch under one graph
+/// lock, so no write lands between the commit and the checkout. Text
+/// conflicts are committed as merged text (see [`merge`]). The repo is never
+/// left mid-merge.
+fn pull_all(root: &Path, message: &str, max_file_bytes: u64) -> AppResult<PullOutcome> {
+    crate::fs::with_graph_lock(root, || {
+        #[cfg(test)]
+        fault::trip(fault::FaultPoint::BeforeCommit)?;
+        let commit = commit::commit_locked(root, message, max_file_bytes)?;
+        let skipped: Vec<String> = commit
+            .skipped_large_files
+            .iter()
+            .map(|file| file.path.clone())
+            .collect();
+        let merge = merge::merge_locked(root, &skipped)?;
+        let ahead = commit::ahead_of_remote(&repo::open_existing(root)?);
+        Ok(PullOutcome {
+            committed: commit.committed,
+            ahead,
+            skipped_large_files: commit.skipped_large_files,
+            kind: merge.kind,
+            review_paths: merge.review_paths,
+            changed_files: merge.changed_files,
+        })
+    })
+}
+
+/// Commit local changes, then merge the fetched remote branch. See
+/// [`pull_all`].
 #[tauri::command]
-pub async fn git_merge_remote(
+pub async fn git_pull(
+    message: String,
     generation: u64,
     state: State<'_, GraphState>,
-) -> AppResult<MergeOutcome> {
+) -> AppResult<PullOutcome> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    let outcome =
-        run_blocking(move || locks::retry_after_stale_lock(&root, || merge::merge_remote(&root)))
-            .await;
-    // Invalidate on both arms: a failed merge can still have moved the tree
+    let outcome = run_git(root, move |root| pull_all(root, &message, MAX_FILE_BYTES)).await;
+    // Invalidate on both arms: a failed pull can still have moved the tree
     // partway through checkout, and a stale catalog would pin the old view.
     let root = crate::fs::root_for_generation(&state, generation)?;
     crate::fs::invalidate_file_catalog(&state, &root);
@@ -258,8 +295,5 @@ pub async fn git_push(
     state: State<'_, GraphState>,
 ) -> AppResult<PushOutcome> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || {
-        locks::retry_after_stale_lock(&root, || remote::push(&root, credential.clone()))
-    })
-    .await
+    run_git(root, move |root| remote::push(root, credential.clone())).await
 }

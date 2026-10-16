@@ -36,28 +36,64 @@ pub(super) fn open_existing(root: &Path) -> AppResult<Repository> {
     Ok(Repository::open(root)?)
 }
 
-/// Refuse to operate on a repository mid-operation (a rebase/merge the user
-/// started with the git CLI). Guessing here could destroy their state.
-pub(super) fn ensure_clean_state(repo: &Repository) -> AppResult<()> {
-    if repo.state() != git2::RepositoryState::Clean {
-        return Err(AppError::io(format!(
-            "the backup repository has a {:?} in progress that this app did not start; finish or abort it with git first",
-            repo.state()
-        )));
+/// Clear a merge or rebase state this app did not start (a git CLI left it).
+/// The working tree is untouched: its content commits like any other edit.
+pub(super) fn clear_foreign_state(repo: &Repository) -> AppResult<()> {
+    let state = repo.state();
+    if state != git2::RepositoryState::Clean {
+        tracing::warn!(?state, "clearing a repository state this app did not start");
+        repo.cleanup_state()?;
     }
     Ok(())
 }
 
 /// The branch HEAD points at. Works on an unborn HEAD (where `repo.head()`
-/// errors); a detached HEAD is a foreign state we refuse to sync from.
+/// errors). A detached HEAD reports the backup branch that
+/// [`reattach_head`] would reattach.
 pub(super) fn current_branch(repo: &Repository) -> AppResult<String> {
     let head = repo.find_reference("HEAD")?;
     match head.symbolic_target()? {
         Some(target) => Ok(target.trim_start_matches("refs/heads/").to_string()),
-        None => Err(AppError::io(
-            "the backup repository is on a detached HEAD; check out a branch with git first",
-        )),
+        None => Ok(backup_branch(repo)),
     }
+}
+
+/// The local branch a detached HEAD belongs to: one that tracks `origin`,
+/// else `main`, else any local branch.
+fn backup_branch(repo: &Repository) -> String {
+    let names: Vec<String> = repo
+        .branches(Some(git2::BranchType::Local))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|(branch, _)| branch.name().ok().flatten().map(str::to_string))
+        .collect();
+    let tracked = |name: &&String| {
+        repo.find_reference(&format!("refs/remotes/origin/{name}"))
+            .is_ok()
+    };
+    names
+        .iter()
+        .find(tracked)
+        .or_else(|| names.iter().find(|name| *name == DEFAULT_BRANCH))
+        .or(names.first())
+        .cloned()
+        .unwrap_or_else(|| DEFAULT_BRANCH.to_string())
+}
+
+/// Point the backup branch at a detached HEAD's commit and attach HEAD to it.
+/// The working tree is not touched.
+pub(super) fn reattach_head(repo: &Repository) -> AppResult<()> {
+    let head = repo.find_reference("HEAD")?;
+    if head.symbolic_target()?.is_some() {
+        return Ok(());
+    }
+    let commit = repo.head()?.peel_to_commit()?;
+    let name = backup_branch(repo);
+    tracing::warn!(%name, "reattaching a detached HEAD to the backup branch");
+    repo.branch(&name, &commit, true)?;
+    repo.set_head(&format!("refs/heads/{name}"))?;
+    Ok(())
 }
 
 /// Rename the local branch to `name` so fetch/merge/push target the branch

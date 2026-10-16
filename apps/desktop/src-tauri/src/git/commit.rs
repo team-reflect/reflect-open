@@ -10,8 +10,7 @@ use serde::Serialize;
 use crate::error::AppResult;
 
 use super::commit_message::message_for_commit;
-use super::merge::ChangedFile;
-use super::repo::{ensure_clean_state, open_existing, signature};
+use super::repo::{clear_foreign_state, open_existing, reattach_head, signature};
 
 /// A file whose *changes* were withheld from staging because it is at/above
 /// the size guardrail. Oversized-but-unchanged files are not reported — their
@@ -36,10 +35,6 @@ pub struct CommitOutcome {
     /// events would otherwise buy a pointless network negotiation each time.
     pub ahead: usize,
     pub skipped_large_files: Vec<SkippedFile>,
-    /// Files that finishing an interrupted pull changed on disk.
-    pub changed_files: Vec<ChangedFile>,
-    /// Paths that finishing an interrupted pull reported for review.
-    pub review_paths: Vec<String>,
 }
 
 /// Stage every change under the graph and commit. Returns `committed: false`
@@ -58,14 +53,14 @@ pub(super) fn commit_all(
     })
 }
 
-fn commit_locked(
+pub(super) fn commit_locked(
     root: &Path,
     fallback_message: &str,
     max_file_bytes: u64,
 ) -> AppResult<CommitOutcome> {
     let repo = open_existing(root)?;
-    let recovered = super::merge::recover_interrupted_pull(&repo, root)?;
-    ensure_clean_state(&repo)?;
+    clear_foreign_state(&repo)?;
+    reattach_head(&repo)?;
     // In-memory hard guarantee, independent of any on-disk ignore file: the
     // runtime directory must never enter a backup commit (Plan 21 — a synced
     // `.reflect/` is index corruption on every other device).
@@ -89,8 +84,6 @@ fn commit_locked(
             sha: None,
             ahead: ahead_of_remote(&repo),
             skipped_large_files: skipped,
-            changed_files: recovered.changed_files,
-            review_paths: recovered.review_paths,
         });
     }
 
@@ -102,8 +95,6 @@ fn commit_locked(
                 sha: None,
                 ahead: ahead_of_remote(&repo),
                 skipped_large_files: skipped,
-                changed_files: recovered.changed_files,
-                review_paths: recovered.review_paths,
             });
         }
     }
@@ -118,8 +109,6 @@ fn commit_locked(
         sha: Some(oid.to_string()),
         ahead: ahead_of_remote(&repo),
         skipped_large_files: skipped,
-        changed_files: recovered.changed_files,
-        review_paths: recovered.review_paths,
     })
 }
 
@@ -244,7 +233,7 @@ fn withhold_oversized_entries(
 
 /// Ahead-count vs the last-fetched remote branch. When it can't be computed
 /// it reports `1` so the engine errs toward pushing, never toward skipping.
-fn ahead_of_remote(repo: &git2::Repository) -> usize {
+pub(super) fn ahead_of_remote(repo: &git2::Repository) -> usize {
     super::remote::local_delta(repo)
         .map(|delta| delta.ahead)
         .unwrap_or(1)
