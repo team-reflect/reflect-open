@@ -108,7 +108,6 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      # The sidecar script imports npm packages.
       - uses: ./.github/actions/setup-node
 
       # tauri-build requires the sidecars before the desktop crate compiles.
@@ -131,7 +130,6 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
-      # The sidecar script imports npm packages.
       - uses: ./.github/actions/setup-node
 
       # tauri-build requires the sidecars before the desktop crate compiles.
