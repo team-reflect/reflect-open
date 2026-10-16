@@ -20,6 +20,7 @@ import type {
   MergeOutcome,
   PushOutcome,
   RemoteDelta,
+  RemoteTip,
 } from '../sync/git-repository-service.ts'
 import {
   createGithubAuthService,
@@ -60,6 +61,7 @@ export interface TestGitRepositoryService extends GitRepositoryService {
   onDisconnect(handler: GitRepositoryHandler<'disconnect'>): void
   onCommitAll(handler: GitRepositoryHandler<'commitAll'>): void
   onFetch(handler: GitRepositoryHandler<'fetch'>): void
+  onRemoteHead(handler: GitRepositoryHandler<'remoteHead'>): void
   onPush(handler: GitRepositoryHandler<'push'>): void
   onMergeRemote(handler: GitRepositoryHandler<'mergeRemote'>): void
 }
@@ -95,6 +97,7 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
       skippedLargeFiles: [],
     }),
     fetch: (): RemoteDelta => ({ ahead: 0, behind: 0 }),
+    remoteHead: (): RemoteTip => ({ remoteOid: null, trackingOid: null }),
     push: (): PushOutcome => ({ pushed: true, nonFastForward: false, rejectionMessage: null }),
     mergeRemote: (): MergeOutcome => ({ kind: 'upToDate', reviewPaths: [], changedFiles: [] }),
   }
@@ -140,6 +143,11 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
     return await this.#handlers.fetch(credential, generation)
   }
 
+  async remoteHead(credential: GitCredential | null, generation: number): Promise<RemoteTip> {
+    this.#log.push({ method: 'remoteHead', args: [credential, generation] })
+    return await this.#handlers.remoteHead(credential, generation)
+  }
+
   async push(credential: GitCredential | null, generation: number): Promise<PushOutcome> {
     this.#log.push({ method: 'push', args: [credential, generation] })
     return await this.#handlers.push(credential, generation)
@@ -172,6 +180,10 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
 
   onFetch(handler: GitRepositoryHandler<'fetch'>): void {
     this.#handlers.fetch = handler
+  }
+
+  onRemoteHead(handler: GitRepositoryHandler<'remoteHead'>): void {
+    this.#handlers.remoteHead = handler
   }
 
   onPush(handler: GitRepositoryHandler<'push'>): void {

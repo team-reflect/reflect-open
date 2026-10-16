@@ -62,6 +62,16 @@ export const remoteDeltaSchema = z.object({
 export type RemoteDelta = z.infer<typeof remoteDeltaSchema>
 
 /**
+ * Where `origin` says the current branch is (`remoteOid`, `null` when the
+ * remote has no such branch) next to the last-fetched tracking ref.
+ */
+export const remoteTipSchema = z.object({
+  remoteOid: z.string().nullable(),
+  trackingOid: z.string().nullable(),
+})
+export type RemoteTip = z.infer<typeof remoteTipSchema>
+
+/**
  * A file a merge rewrote on disk — same shape as the watcher's FileChange.
  */
 export const changedFileSchema = z.object({
@@ -128,6 +138,10 @@ export interface GitRepositoryService {
    */
   fetch(credential: GitCredential | null, generation: number): Promise<RemoteDelta>
   /**
+   * Ask `origin` for the current branch tip without fetching.
+   */
+  remoteHead(credential: GitCredential | null, generation: number): Promise<RemoteTip>
+  /**
    * Push to `origin`; rejections come back as data, not thrown errors.
    */
   push(credential: GitCredential | null, generation: number): Promise<PushOutcome>
@@ -172,6 +186,10 @@ class GitRepositoryServiceImpl implements GitRepositoryService {
 
   fetch(credential: GitCredential | null, generation: number): Promise<RemoteDelta> {
     return this.#deps.ipc.call('git_fetch', { credential, generation }, remoteDeltaSchema)
+  }
+
+  remoteHead(credential: GitCredential | null, generation: number): Promise<RemoteTip> {
+    return this.#deps.ipc.call('git_remote_head', { credential, generation }, remoteTipSchema)
   }
 
   push(credential: GitCredential | null, generation: number): Promise<PushOutcome> {

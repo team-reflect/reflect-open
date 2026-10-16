@@ -41,7 +41,7 @@ use crate::fs::GraphState;
 
 use self::commit::CommitOutcome;
 use self::merge::MergeOutcome;
-use self::remote::{GitCredential, PushOutcome, RemoteDelta};
+use self::remote::{GitCredential, PushOutcome, RemoteDelta, RemoteTip};
 
 /// GitHub rejects files over 100 MB, failing the whole push; stop just under.
 const MAX_FILE_BYTES: u64 = 95 * 1024 * 1024;
@@ -213,6 +213,20 @@ pub async fn git_fetch(
     let root = crate::fs::root_for_generation(&state, generation)?;
     run_blocking(move || {
         locks::retry_after_stale_lock(&root, || remote::fetch(&root, credential.clone()))
+    })
+    .await
+}
+
+/// Read the remote tip of the current branch without fetching.
+#[tauri::command]
+pub async fn git_remote_head(
+    credential: Option<GitCredential>,
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<RemoteTip> {
+    let root = crate::fs::root_for_generation(&state, generation)?;
+    run_blocking(move || {
+        locks::retry_after_stale_lock(&root, || remote::remote_head(&root, credential.clone()))
     })
     .await
 }
