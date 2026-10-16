@@ -3,7 +3,7 @@
 //! change that arrived from elsewhere.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
@@ -12,7 +12,10 @@ const MAX_ENTRIES: usize = 4096;
 /// Size an over-full record is cut back to, so pruning runs once per batch.
 const PRUNED_SIZE: usize = MAX_ENTRIES * 3 / 4;
 
-type Entries = HashMap<String, (String, Instant)>;
+/// The graph root as its native path (no lossy slash form, so distinct roots
+/// never collide) and the forward-slashed graph-relative path.
+type Key = (PathBuf, String);
+type Entries = HashMap<Key, (String, Instant)>;
 
 static RECENT: LazyLock<Mutex<Entries>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -39,12 +42,8 @@ pub fn is_own(root: &Path, rel: &str, bytes: &[u8]) -> bool {
     holds(&entries, &key(root, rel), &hash, Instant::now())
 }
 
-fn key(root: &Path, rel: &str) -> String {
-    format!(
-        "{}\0{}",
-        reflect_graph_paths::to_slash_lossy(root),
-        reflect_graph_paths::to_slash(rel)
-    )
+fn key(root: &Path, rel: &str) -> Key {
+    (root.to_path_buf(), reflect_graph_paths::to_slash(rel))
 }
 
 fn blob_hash(bytes: &[u8]) -> Option<String> {
@@ -53,14 +52,14 @@ fn blob_hash(bytes: &[u8]) -> Option<String> {
         .map(|oid| oid.to_string())
 }
 
-fn record_at(entries: &mut Entries, rel: String, hash: String, now: Instant) {
-    entries.insert(rel, (hash, now));
+fn record_at(entries: &mut Entries, key: Key, hash: String, now: Instant) {
+    entries.insert(key, (hash, now));
     prune(entries, now);
 }
 
-fn holds(entries: &Entries, rel: &str, hash: &str, now: Instant) -> bool {
+fn holds(entries: &Entries, key: &Key, hash: &str, now: Instant) -> bool {
     entries
-        .get(rel)
+        .get(key)
         .is_some_and(|(recorded, at)| recorded == hash && now.duration_since(*at) < TTL)
 }
 
@@ -69,14 +68,14 @@ fn prune(entries: &mut Entries, now: Instant) {
     if entries.len() <= MAX_ENTRIES {
         return;
     }
-    let mut ages: Vec<(Instant, String)> = entries
+    let mut ages: Vec<(Instant, Key)> = entries
         .iter()
-        .map(|(rel, (_, at))| (*at, rel.clone()))
+        .map(|(key, (_, at))| (*at, key.clone()))
         .collect();
     ages.sort();
     let excess = entries.len() - PRUNED_SIZE;
-    for (_, rel) in ages.into_iter().take(excess) {
-        entries.remove(&rel);
+    for (_, key) in ages.into_iter().take(excess) {
+        entries.remove(&key);
     }
 }
 
@@ -92,26 +91,35 @@ mod tests {
         assert!(!is_own(root, "notes/a.md", b"theirs\n"));
         assert!(!is_own(root, "notes/b.md", b"mine\n"));
         assert!(!is_own(Path::new("/graphs/other"), "notes/a.md", b"mine\n"));
+        // A backslash is a filename byte on Unix: a different root, not `/`.
+        if cfg!(unix) {
+            let sibling = Path::new("/graphs\\own-writes-probe");
+            assert!(!is_own(sibling, "notes/a.md", b"mine\n"));
+        }
         record(root, "notes/a.md", b"newer\n");
         assert!(!is_own(root, "notes/a.md", b"mine\n"));
         assert!(is_own(root, "notes/a.md", b"newer\n"));
+    }
+
+    fn k(rel: &str) -> Key {
+        key(Path::new("/graphs/g"), rel)
     }
 
     #[test]
     fn entries_expire_after_the_ttl() {
         let mut entries = Entries::new();
         let start = Instant::now();
-        record_at(&mut entries, "a.md".into(), "h".into(), start);
+        record_at(&mut entries, k("a.md"), "h".into(), start);
         assert!(holds(
             &entries,
-            "a.md",
+            &k("a.md"),
             "h",
             start + TTL - Duration::from_secs(1)
         ));
-        assert!(!holds(&entries, "a.md", "h", start + TTL));
-        record_at(&mut entries, "b.md".into(), "h".into(), start + TTL);
-        assert!(!entries.contains_key("a.md"));
-        assert!(entries.contains_key("b.md"));
+        assert!(!holds(&entries, &k("a.md"), "h", start + TTL));
+        record_at(&mut entries, k("b.md"), "h".into(), start + TTL);
+        assert!(!entries.contains_key(&k("a.md")));
+        assert!(entries.contains_key(&k("b.md")));
     }
 
     #[test]
@@ -120,12 +128,12 @@ mod tests {
         let start = Instant::now();
         for index in 0..MAX_ENTRIES + 3 {
             let at = start + Duration::from_millis(index as u64);
-            record_at(&mut entries, format!("{index}.md"), "h".into(), at);
+            record_at(&mut entries, k(&format!("{index}.md")), "h".into(), at);
         }
         assert!(entries.len() <= MAX_ENTRIES);
         for index in 0..MAX_ENTRIES / 4 {
-            assert!(!entries.contains_key(&format!("{index}.md")));
+            assert!(!entries.contains_key(&k(&format!("{index}.md"))));
         }
-        assert!(entries.contains_key(&format!("{}.md", MAX_ENTRIES + 2)));
+        assert!(entries.contains_key(&k(&format!("{}.md", MAX_ENTRIES + 2))));
     }
 }

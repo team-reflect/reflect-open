@@ -3,7 +3,7 @@
 //!
 //! Per conflicted note: fold the conflict versions through
 //! [`crate::conflict::ladder`]. Then write the result atomically and, only
-//! then, mark the provider versions resolved. Per conflicted attachment
+//! then, mark the folded provider versions resolved. Per conflicted attachment
 //! (any other file type, seen by `Full` sweeps only): keep the working file
 //! and write each differing version beside it as a conflict copy. Creation
 //! collision duplicates (`2026-07-04 2.md`) fold into their canonical file
@@ -16,7 +16,7 @@
 
 use std::collections::{BTreeSet, HashSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -193,10 +193,8 @@ fn run_sweep(
         if file.placeholder {
             continue;
         }
-        if let Some(candidates) = &conflict_candidates {
-            if !candidates.contains(&file.path) {
-                continue; // the provider says no conflict lives here
-            }
+        if !checks_versions(&file.path, conflict_candidates.as_ref()) {
+            continue;
         }
         let abs = root.join(&file.path);
         let scan = unresolved_versions(&abs);
@@ -204,8 +202,7 @@ fn run_sweep(
             continue;
         }
         if !scan.complete {
-            // mark_resolved would purge a version with no readable store path.
-            continue;
+            continue; // a version with no readable store path cannot fold
         }
         if skip.contains(file.path.as_str()) {
             continue;
@@ -213,10 +210,15 @@ fn run_sweep(
         // Order by the version store's date, never the filesystem mtime,
         // which iCloud does not propagate bit-exactly.
         let current_ms = current_version_modified_ms(&abs).unwrap_or(file.modified_ms);
+        let handled: Vec<PathBuf> = scan
+            .versions
+            .iter()
+            .map(|version| version.store_path.clone())
+            .collect();
         if !reflect_graph_paths::is_note(&file.path) {
             locked(root, || {
                 if copy_conflict_versions(root, &file.path, scan.versions, &mut outcome) {
-                    mark_resolved(&abs);
+                    mark_resolved(&abs, &handled);
                     outcome.auto_resolved += 1;
                 }
             });
@@ -225,7 +227,14 @@ fn run_sweep(
         locked(root, || {
             match resolve_file(root, &file.path, current_ms, scan.versions, &shadow) {
                 Ok(resolved) => {
-                    apply_file_resolution(root, &file.path, resolved, &shadow, true, &mut outcome);
+                    apply_file_resolution(
+                        root,
+                        &file.path,
+                        resolved,
+                        &shadow,
+                        Some(&handled),
+                        &mut outcome,
+                    );
                 }
                 Err(err) => {
                     // One bad note must not stop the sweep; versions stay
@@ -259,6 +268,13 @@ fn run_sweep(
         shadow.prune_orphans(&live);
     }
     Ok(outcome)
+}
+
+/// Whether the version pass checks `rel`: a scoped sweep checks only its
+/// candidate notes, and attachments wait for a `Full` sweep.
+fn checks_versions(rel: &str, candidates: Option<&HashSet<String>>) -> bool {
+    candidates
+        .is_none_or(|candidates| reflect_graph_paths::is_note(rel) && candidates.contains(rel))
 }
 
 /// Whether `rel` carries no unresolved provider versions. The lookup is a
@@ -408,15 +424,16 @@ fn read_sides(
     Ok(sides)
 }
 
-/// Write a resolution to disk, settle the provider's version state when
-/// `mark_versions` is set, and do the shadow bookkeeping. Returns `false`
-/// when the write failed and nothing else happened.
+/// Write a resolution to disk, mark the folded provider versions
+/// (`handled_versions`, by store path) resolved, and do the shadow
+/// bookkeeping. Returns `false` when the write failed and nothing else
+/// happened.
 fn apply_file_resolution(
     root: &Path,
     rel: &str,
     resolution: FileResolution,
     shadow: &ShadowStore,
-    mark_versions: bool,
+    handled_versions: Option<&[PathBuf]>,
     outcome: &mut SweepOutcome,
 ) -> bool {
     let abs = root.join(rel);
@@ -434,8 +451,8 @@ fn apply_file_resolution(
             modified_ms: modified_ms_of(&abs),
         });
     }
-    if mark_versions {
-        mark_resolved(&abs);
+    if let Some(handled) = handled_versions {
+        mark_resolved(&abs, handled);
     }
     if resolution.clear_merge_pair {
         shadow.clear_merge_pair(rel);
@@ -490,7 +507,7 @@ fn copy_conflict_versions(
         if crate::fs::file_occupied(&target) {
             continue; // identical bytes are already saved
         }
-        if let Err(err) = write_copy(&version.store_path, &target) {
+        if let Err(err) = write_copy(root, &version.store_path, &target) {
             tracing::warn!(path = rel, copy = %copy_rel, ?err, "failed to write conflict copy");
             return false;
         }
@@ -504,13 +521,12 @@ fn copy_conflict_versions(
     true
 }
 
-/// Stream `source` into a temp file beside `target`, then move it into place
-/// without overwriting.
-fn write_copy(source: &Path, target: &Path) -> AppResult<()> {
-    let parent = target
-        .parent()
-        .ok_or_else(|| AppError::io("conflict copy has no parent directory"))?;
-    let mut temp = tempfile::NamedTempFile::new_in(parent)?;
+/// Stream `source` into a temp file under `.reflect/tmp/` (unsynced, same
+/// volume), then move it to `target` without overwriting.
+fn write_copy(root: &Path, source: &Path, target: &Path) -> AppResult<()> {
+    let staging = root.join(".reflect").join("tmp");
+    fs::create_dir_all(&staging)?;
+    let mut temp = tempfile::NamedTempFile::new_in(&staging)?;
     std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
     temp.as_file().sync_all()?;
     temp.persist_noclobber(target)
@@ -617,7 +633,7 @@ fn fold_duplicate(
             return;
         }
     };
-    if !apply_file_resolution(root, canonical_rel, resolution, shadow, false, outcome) {
+    if !apply_file_resolution(root, canonical_rel, resolution, shadow, None, outcome) {
         return; // duplicate stays; next sweep retries
     }
     // Report the remove only when it happened: a phantom `remove` would drop
@@ -1186,7 +1202,7 @@ mod tests {
             "notes/a.md",
             first,
             &shadow,
-            true,
+            Some(&[]),
             &mut outcome,
         );
         assert!(shadow.is_repeated_merge("notes/a.md", &mac_hash, &phone_hash));
@@ -1203,7 +1219,7 @@ mod tests {
             "notes/a.md",
             second,
             &shadow,
-            true,
+            Some(&[]),
             &mut outcome,
         );
         assert!(!shadow.is_repeated_merge("notes/a.md", &mac_hash, &phone_hash));
@@ -1368,6 +1384,21 @@ mod tests {
     }
 
     #[test]
+    fn a_conflict_copy_stages_outside_the_synced_folder() {
+        let root = json_graph();
+        let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
+        let target = root.path().join("assets/copy.json");
+
+        write_copy(root.path(), &v.store_path, &target).unwrap();
+        let err = write_copy(root.path(), &v.store_path, &target);
+
+        assert!(err.is_err(), "the move never overwrites");
+        assert_eq!(fs::read(&target).unwrap(), b"{\"a\":2}");
+        assert!(root.path().join(".reflect/tmp").is_dir());
+        assert_eq!(fs::read_dir(root.path().join("assets")).unwrap().count(), 2);
+    }
+
+    #[test]
     fn an_identical_conflict_copy_counts_as_done() {
         let root = json_graph();
         let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
@@ -1385,6 +1416,15 @@ mod tests {
 
         assert!(outcome.copies.is_empty());
         assert_eq!(fs::read_dir(root.path().join("assets")).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn only_full_sweeps_check_attachments() {
+        let candidates = HashSet::from(["notes/a.md".to_string(), "assets/data.json".to_string()]);
+        assert!(checks_versions("assets/data.json", None));
+        assert!(checks_versions("notes/a.md", Some(&candidates)));
+        assert!(!checks_versions("notes/b.md", Some(&candidates)));
+        assert!(!checks_versions("assets/data.json", Some(&candidates)));
     }
 
     #[test]

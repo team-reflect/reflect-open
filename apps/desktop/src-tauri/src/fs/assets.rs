@@ -276,22 +276,27 @@ pub fn asset_upload_abort(id: String, uploads: State<AssetUploads>) -> AppResult
 /// Copy a file the OS gave us a real path for (file picker) into `assets/`
 /// under `desired_name`, with the same collision policy as uploads. The bytes
 /// never cross the IPC. Returns the final graph-relative `assets/…` path.
-#[tauri::command(async)]
-pub fn asset_import(
+#[tauri::command]
+pub async fn asset_import(
     source_path: String,
     desired_name: String,
     generation: u64,
-    state: State<GraphState>,
+    state: State<'_, GraphState>,
 ) -> AppResult<String> {
-    let source = Path::new(&source_path);
-    if !source.is_file() {
+    if !Path::new(&source_path).is_file() {
         return Err(AppError::not_found(format!(
             "import source is not a file: {source_path}"
         )));
     }
     let root = root_for_generation(&state, generation)?;
-    let mut temp = tempfile::NamedTempFile::new_in(staging_dir(&root)?)?;
-    std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
+    let staging = staging_dir(&root)?;
+    let temp = crate::blocking::run_blocking(move || {
+        let mut temp = tempfile::NamedTempFile::new_in(staging)?;
+        std::io::copy(&mut fs::File::open(&source_path)?, temp.as_file_mut())?;
+        temp.as_file().sync_all()?; // the persist's own fsync is then cheap
+        Ok(temp)
+    })
+    .await?;
     let final_name = with_graph_lock(&root, || {
         root_for_generation(&state, generation)?;
         let assets_dir = assets_dir_for(&root, &desired_name)?;
@@ -333,6 +338,7 @@ fn stage_import(
     }
     let mut temp = tempfile::NamedTempFile::new_in(staging)?;
     std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
+    temp.as_file().sync_all()?; // the persist's own fsync is then cheap
     Ok(Some(temp))
 }
 
@@ -350,12 +356,12 @@ fn persist_import(temp: tempfile::NamedTempFile, target: &Path) -> AppResult<()>
 /// affordable on a phone. The destination is fenced to `audio-memos/` like
 /// `audio_memo_delete`, and the path *is* the memo's identity, so the
 /// `assets/` collision renaming of [`asset_import`] would corrupt it.
-#[tauri::command(async)]
-pub fn audio_memo_import(
+#[tauri::command]
+pub async fn audio_memo_import(
     source_path: String,
     path: String,
     generation: u64,
-    state: State<GraphState>,
+    state: State<'_, GraphState>,
 ) -> AppResult<()> {
     if !path.starts_with("audio-memos/") {
         return Err(AppError::traversal(format!(
@@ -363,11 +369,12 @@ pub fn audio_memo_import(
         )));
     }
     let root = root_for_generation(&state, generation)?;
-    let staged = stage_import(
-        Path::new(&source_path),
-        &staging_dir(&root)?,
-        &resolve(&root, &path)?,
-    )?;
+    let staging = staging_dir(&root)?;
+    let target = resolve(&root, &path)?;
+    let staged = crate::blocking::run_blocking(move || {
+        stage_import(Path::new(&source_path), &staging, &target)
+    })
+    .await?;
     if let Some(temp) = staged {
         with_graph_lock(&root, || {
             root_for_generation(&state, generation)?;
