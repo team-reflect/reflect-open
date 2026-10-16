@@ -52,7 +52,7 @@ jobs:
       # less free space than this threshold; an unreachable threshold makes
       # it collect every time (about 60 ms per file).
       # Vitest reads this variable: https://github.com/vitest-dev/vitest/blob/v5.0.4/packages/vitest/src/node/pools/browser.ts#L773
-      VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB: "100000"
+      VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB: '100000'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
