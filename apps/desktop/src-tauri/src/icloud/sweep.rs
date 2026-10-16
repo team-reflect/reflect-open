@@ -845,9 +845,6 @@ mod tests {
     #[test]
     fn overlapping_collision_bodies_reconcile_into_the_canonical() {
         let root = graph();
-        // The tails overlap ("- common tail" follows both divergent lines) —
-        // the union guard refuses, so the word-level merge keeps both
-        // wordings.
         write(
             root.path(),
             "daily/2026-07-04.md",
@@ -1100,8 +1097,6 @@ mod tests {
 
     #[test]
     fn multi_version_clean_folds_keep_every_side() {
-        // Three devices appended apart: both fold steps stay clean, all
-        // three tails land, and none is lost.
         let root = graph();
         write(root.path(), "daily/2026-07-04.md", "- seed\n- mac line\n");
         let shadow = ShadowStore::new(root.path());
@@ -1130,8 +1125,6 @@ mod tests {
 
     #[test]
     fn multi_version_overlap_keeps_every_side_as_substrings() {
-        // Overlapping edits across three devices fold pairwise through the
-        // ladder; every side's words stay in the note.
         let root = graph();
         write(root.path(), "notes/a.md", "wording from mac\n");
         let shadow = ShadowStore::new(root.path());
@@ -1273,7 +1266,6 @@ mod tests {
     #[test]
     fn a_binary_conflict_version_is_marked_resolved_after_the_copy() {
         let root = graph();
-        write(root.path(), "notes/clip.bin", "x");
         fs::write(root.path().join("notes/clip.bin"), [0u8, 1, 2]).unwrap();
         let first = version(root.path(), "v1", &[0u8, 9, 9], VERSION_MS);
         let missing = VersionRef {

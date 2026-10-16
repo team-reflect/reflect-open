@@ -3,8 +3,9 @@
 //!
 //! When two devices edit apart, iCloud keeps one content as the current file
 //! and stashes the others as conflict versions — full content in the local
-//! version store, plus its modification date. The sweep reads them through this module, resolves, then marks the versions
-//! handled so iCloud stops reporting the conflict.
+//! version store, plus its modification date. The sweep reads them through
+//! this module, resolves, then marks the versions handled so iCloud stops
+//! reporting the conflict.
 
 use std::path::PathBuf;
 
@@ -84,16 +85,13 @@ mod platform {
     /// Mark the conflict versions of `abs` whose store paths are in
     /// `handled` resolved, then drop the stale copies from the version store
     /// unless a version the sweep never saw is still unresolved. Call
-    /// strictly **after** the resolved write has landed, and only when the
-    /// version scan was complete. Best-effort: a failure leaves the versions
-    /// unresolved and the next sweep retries.
+    /// strictly **after** the resolved write has landed. Best-effort: the next
+    /// sweep retries what is left.
     pub fn mark_resolved(abs: &Path, handled: &[PathBuf]) {
         let url = file_url(abs);
         let Some(listed) = NSFileVersion::unresolvedConflictVersionsOfItemAtURL(&url) else {
             return;
         };
-        // A version that arrived after the scan, or has no store path, stays
-        // unresolved and keeps the version store for the next sweep.
         let mut all_handled = true;
         for version in listed.iter() {
             if store_path(&version).is_some_and(|path| handled.contains(&path)) {

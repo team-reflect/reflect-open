@@ -26,7 +26,8 @@ fn lock_key(root: &Path) -> PathBuf {
 }
 
 /// Run `f` while holding the lock of the graph at `root`. The function is
-/// synchronous: never call it across an `.await`.
+/// synchronous: never call it across an `.await`. The lock is not reentrant:
+/// `f` must not take it again for the same root.
 pub fn with_graph_lock<T>(root: &Path, f: impl FnOnce() -> AppResult<T>) -> AppResult<T> {
     let mutex = {
         let mut locks = LOCKS.lock().unwrap_or_else(PoisonError::into_inner);

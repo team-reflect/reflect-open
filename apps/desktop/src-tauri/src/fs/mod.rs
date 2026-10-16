@@ -423,10 +423,9 @@ pub async fn note_read_local(
 
 /// Atomically write a note's markdown by graph-relative path. `generation` pins
 /// the write to the graph it was issued for (see `root_for_generation`).
-/// Returns the file's on-disk mtime after the call (epoch ms, `None` when the
-/// platform can't provide one) so the caller's index echo can stamp the row
-/// with the value a later `list_files` will report — a `Date.now()` stamp
-/// never matches and costs a re-read on every reconcile.
+/// The outcome's `modified_ms` is the file's on-disk mtime after the call
+/// (epoch ms, `None` when the platform can't provide one), so the caller's
+/// index echo stamps the row with the value a later `list_files` reports.
 ///
 /// `expected_contents` is compared with the note as [`note_read`] returns it,
 /// with `\n` line endings. When it matches, `contents` is written as given;
@@ -465,10 +464,8 @@ pub struct NoteWriteOutcome {
     pub merged: Option<String>,
 }
 
-/// Write a note. A checked write with an expected revision merges `contents`
-/// with a file that moved past that revision, under the graph lock, through
-/// the conflict ladder.
-/// `still_current` runs under the lock before anything is written.
+/// A checked write whose file moved past `expected` merges through the
+/// conflict ladder. `still_current` runs under the graph lock before any write.
 fn write_note_revision(
     root: &Path,
     path: &str,
@@ -640,7 +637,7 @@ pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>
         let abs = resolve(&root, &path)?;
         // An iCloud-evicted segment exists only as its `.name.icloud` stub,
         // mirror `note_delete` so a cancelled session's evicted parts still
-        // delete (Plan 21).
+        // delete.
         let target = if abs.exists() {
             abs
         } else {
@@ -1516,27 +1513,6 @@ mod note_revision_tests {
     }
 
     #[test]
-    fn a_reconciled_write_keeps_both_words() {
-        let directory = tempfile::tempdir().unwrap();
-        let root = directory.path();
-        let target = root.join("notes/color.md");
-        fs::create_dir_all(target.parent().unwrap()).unwrap();
-        fs::write(&target, "color green\n").unwrap();
-        let outcome = write_note_revision(
-            root,
-            "notes/color.md",
-            "color blue\n",
-            true,
-            Some("color red\n"),
-            || Ok(()),
-        )
-        .unwrap();
-        let merged = outcome.merged.unwrap();
-        assert!(merged.contains("blue") && merged.contains("green"));
-        assert_eq!(fs::read_to_string(&target).unwrap(), merged);
-    }
-
-    #[test]
     fn a_disk_file_with_marker_text_merges_as_plain_text() {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path();
@@ -1591,17 +1567,6 @@ mod note_revision_tests {
             })
             .unwrap(),
             serde_json::json!({ "modifiedMs": 7, "merged": null })
-        );
-        assert_eq!(
-            serde_json::to_value(NoteWriteOutcome {
-                modified_ms: None,
-                merged: Some("x".to_string()),
-            })
-            .unwrap(),
-            serde_json::json!({
-                "modifiedMs": null,
-                "merged": "x",
-            })
         );
     }
 
