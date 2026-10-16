@@ -15,8 +15,12 @@ import { useGraph } from '@/providers/graph-provider.tsx'
 import { useSync, type BackupState } from '@/providers/sync-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
-/** A short, plain-language line for each backup state — never Git jargon. */
-function statusLine(backup: Extract<BackupState, { phase: 'connected' }>): ReactNode {
+/** A short, plain-language line for each backup state, never Git jargon. */
+function BackupStatusLine({
+  backup,
+}: {
+  backup: Extract<BackupState, { phase: 'connected' }>
+}): ReactNode {
   switch (backup.status.state) {
     case 'idle':
       return 'Backed up'
@@ -143,7 +147,9 @@ export function BackupSettingsField(): ReactElement {
             <>
               <p className="text-sm text-text">
                 <span className="font-medium">{repoLabel}</span>
-                <span className="ml-2 text-xs text-text-muted">{statusLine(backup)}</span>
+                <span className="ml-2 text-xs text-text-muted">
+                  <BackupStatusLine backup={backup} />
+                </span>
               </p>
               <SyncForkNotice groups={forkGroups} />
               <div className="flex flex-wrap gap-2">
