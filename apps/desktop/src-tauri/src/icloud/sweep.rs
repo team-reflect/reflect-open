@@ -1,11 +1,13 @@
 //! The conflict sweep (Plan 21 Phase 2): walk the graph, resolve every
-//! iCloud conflict through the deterministic ladder, and report what changed
-//! so the caller reindexes directly (never waiting on the watcher — the same
-//! contract as the Git merge path).
+//! iCloud conflict, and report what changed so the caller reindexes directly
+//! (never waiting on the watcher — the same contract as the Git merge path).
 //!
 //! Per conflicted note: fold the conflict versions through
 //! [`crate::conflict::ladder`]. Then write the result atomically and, only
-//! then, mark the provider versions resolved. Creation-collision duplicates
+//! then, mark the provider versions resolved. Per conflicted attachment
+//! (any other file type, checked on `Full` sweeps only): keep the working
+//! file and write each differing version beside it as a conflict copy, then
+//! mark the versions resolved. Creation-collision duplicates
 //! (`2026-07-04 2.md`, iCloud's rename when two devices create the same
 //! filename apart) are folded back into their canonical file by the same
 //! ladder.
@@ -22,8 +24,9 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
+use crate::conflict::copy::copy_path;
 use crate::conflict::ladder::{self, ConflictInput};
-use crate::conflict::shadow::{content_hash, ShadowStore};
+use crate::conflict::shadow::{blob_hash8_of_file, content_hash, ShadowStore};
 use crate::conflict::{ConflictSide, Resolution};
 use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
@@ -184,7 +187,7 @@ fn run_sweep(
         });
     }
 
-    let files = crate::fs::note_files(root);
+    let (files, attachments) = crate::fs::note_and_attachment_files(root);
 
     if record_baseline {
         for file in &files {
@@ -206,7 +209,7 @@ fn run_sweep(
 
     fold_collision_duplicates(root, &files, &shadow, &skip, &mut outcome);
 
-    for file in &files {
+    for file in files.iter().chain(attachments.iter()) {
         if file.placeholder {
             continue;
         }
@@ -234,6 +237,15 @@ fn run_sweep(
         // not propagate bit-exactly. Mixed keys would let two devices order
         // the same content pair differently and emit different merged bytes.
         let current_ms = current_version_modified_ms(&abs).unwrap_or(file.modified_ms);
+        if !reflect_graph_paths::is_note(&file.path) {
+            locked(root, || {
+                if copy_conflict_versions(root, &file.path, scan.versions, &mut outcome) {
+                    mark_resolved(&abs);
+                    outcome.auto_resolved += 1;
+                }
+            });
+            continue;
+        }
         locked(root, || {
             match resolve_file(root, &file.path, current_ms, scan.versions, &shadow) {
                 Ok(resolved) => {
@@ -476,6 +488,67 @@ fn apply_file_resolution(
     }
     outcome.auto_resolved += 1;
     true
+}
+
+/// Write every version of a non-note file that differs from the working file
+/// as a conflict copy beside it. A copy that already exists counts as done.
+/// Returns `true` when every version is handled, so the caller may mark them
+/// resolved; a failure leaves the rest for the next sweep.
+fn copy_conflict_versions(
+    root: &Path,
+    rel: &str,
+    versions: Vec<VersionRef>,
+    outcome: &mut SweepOutcome,
+) -> bool {
+    let current_hash = match blob_hash8_of_file(&root.join(rel)) {
+        Ok(hash) => hash,
+        Err(err) => {
+            tracing::warn!(path = rel, ?err, "unreadable conflicted file");
+            return false;
+        }
+    };
+    for version in versions {
+        let hash8 = match blob_hash8_of_file(&version.store_path) {
+            Ok(hash) => hash,
+            Err(err) => {
+                tracing::warn!(path = rel, ?err, "unreadable conflict version");
+                return false;
+            }
+        };
+        if hash8 == current_hash {
+            continue;
+        }
+        let copy_rel = copy_path(rel, version.modified_ms, &hash8);
+        let target = root.join(&copy_rel);
+        if crate::fs::file_occupied(&target) {
+            continue;
+        }
+        if let Err(err) = write_copy(&version.store_path, &target) {
+            tracing::warn!(path = rel, copy = %copy_rel, ?err, "failed to write conflict copy");
+            return false;
+        }
+        outcome.changed.push(SweepChange {
+            path: copy_rel.clone(),
+            kind: "upsert".to_string(),
+            modified_ms: modified_ms_of(&target),
+        });
+        outcome.copies.push(copy_rel);
+    }
+    true
+}
+
+/// Stream `source` into a temp file beside `target`, then move it into place
+/// without overwriting.
+fn write_copy(source: &Path, target: &Path) -> AppResult<()> {
+    let parent = target
+        .parent()
+        .ok_or_else(|| AppError::io("conflict copy has no parent directory"))?;
+    let mut temp = tempfile::NamedTempFile::new_in(parent)?;
+    std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
+    temp.as_file().sync_all()?;
+    temp.persist_noclobber(target)
+        .map_err(|err| AppError::io(err.to_string()))?;
+    Ok(())
 }
 
 /// Fold creation-collision duplicates back into their canonical note. iCloud
@@ -1157,5 +1230,150 @@ mod tests {
             &mut outcome,
         );
         assert!(!shadow.is_repeated_merge("notes/a.md", &mac_hash, &phone_hash));
+    }
+
+    const VERSION_MS: u64 = 1_792_119_845_000;
+
+    fn version(root: &Path, name: &str, bytes: &[u8], modified_ms: u64) -> VersionRef {
+        let store_path = root.join(".reflect").join(name);
+        fs::write(&store_path, bytes).unwrap();
+        VersionRef {
+            store_path,
+            modified_ms,
+        }
+    }
+
+    fn json_graph() -> tempfile::TempDir {
+        let root = graph();
+        fs::create_dir_all(root.path().join("assets")).unwrap();
+        write(root.path(), "assets/data.json", "{\"a\":1}");
+        root
+    }
+
+    #[test]
+    fn a_json_conflict_version_becomes_a_sibling_copy() {
+        let root = json_graph();
+        let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
+        let hash8 = blob_hash8_of_file(&v.store_path).unwrap();
+        let mut outcome = SweepOutcome::default();
+
+        assert!(copy_conflict_versions(
+            root.path(),
+            "assets/data.json",
+            vec![v],
+            &mut outcome
+        ));
+
+        let copy = format!("assets/data (conflict 2026-10-16 03-04-05 {hash8}).json");
+        assert_eq!(fs::read(root.path().join(&copy)).unwrap(), b"{\"a\":2}");
+        assert_eq!(outcome.copies, vec![copy.clone()]);
+        assert!(outcome
+            .changed
+            .iter()
+            .any(|change| change.path == copy && change.kind == "upsert"));
+        assert_eq!(
+            fs::read_to_string(root.path().join("assets/data.json")).unwrap(),
+            "{\"a\":1}"
+        );
+    }
+
+    #[test]
+    fn a_binary_conflict_version_is_marked_resolved_after_the_copy() {
+        let root = graph();
+        write(root.path(), "notes/clip.bin", "x");
+        fs::write(root.path().join("notes/clip.bin"), [0u8, 1, 2]).unwrap();
+        let first = version(root.path(), "v1", &[0u8, 9, 9], VERSION_MS);
+        let missing = VersionRef {
+            store_path: root.path().join(".reflect/missing"),
+            modified_ms: VERSION_MS + 1000,
+        };
+        let mut outcome = SweepOutcome::default();
+
+        let done = copy_conflict_versions(
+            root.path(),
+            "notes/clip.bin",
+            vec![first, missing],
+            &mut outcome,
+        );
+
+        assert!(!done);
+        assert_eq!(outcome.copies.len(), 1);
+        assert_eq!(
+            fs::read(root.path().join(&outcome.copies[0])).unwrap(),
+            [0u8, 9, 9]
+        );
+
+        let ok = version(root.path(), "v2", &[0u8, 9, 9], VERSION_MS);
+        let mut again = SweepOutcome::default();
+        assert!(copy_conflict_versions(
+            root.path(),
+            "notes/clip.bin",
+            vec![ok],
+            &mut again
+        ));
+        assert!(again.copies.is_empty());
+    }
+
+    #[test]
+    fn two_devices_name_the_same_icloud_copy() {
+        let names: Vec<String> = (0..2)
+            .map(|_| {
+                let root = json_graph();
+                let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
+                let mut outcome = SweepOutcome::default();
+                copy_conflict_versions(root.path(), "assets/data.json", vec![v], &mut outcome);
+                outcome.copies[0].clone()
+            })
+            .collect();
+        assert_eq!(names[0], names[1]);
+    }
+
+    #[test]
+    fn a_version_equal_to_the_current_file_writes_no_copy() {
+        let root = json_graph();
+        let v = version(root.path(), "v1", b"{\"a\":1}", VERSION_MS);
+        let mut outcome = SweepOutcome::default();
+
+        assert!(copy_conflict_versions(
+            root.path(),
+            "assets/data.json",
+            vec![v],
+            &mut outcome
+        ));
+
+        assert!(outcome.copies.is_empty());
+        assert!(outcome.changed.is_empty());
+    }
+
+    #[test]
+    fn a_repeated_sweep_keeps_one_copy() {
+        let root = json_graph();
+        let mut total = 0;
+        for _ in 0..2 {
+            let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
+            let mut outcome = SweepOutcome::default();
+            assert!(copy_conflict_versions(
+                root.path(),
+                "assets/data.json",
+                vec![v],
+                &mut outcome
+            ));
+            total += outcome.copies.len();
+        }
+        assert_eq!(total, 1);
+        let count = fs::read_dir(root.path().join("assets")).unwrap().count();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn the_sweep_checks_attachments_not_only_notes() {
+        let root = json_graph();
+        write(root.path(), "notes/a.md", "# A\n");
+        let (notes, attachments) = crate::fs::note_and_attachment_files(root.path());
+        let paths = |files: &[crate::fs::FileMeta]| -> Vec<String> {
+            files.iter().map(|file| file.path.clone()).collect()
+        };
+        assert_eq!(paths(&notes), vec!["notes/a.md"]);
+        assert_eq!(paths(&attachments), vec!["assets/data.json"]);
     }
 }

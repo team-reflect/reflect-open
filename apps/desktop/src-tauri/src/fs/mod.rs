@@ -1115,6 +1115,12 @@ pub(crate) fn note_files(root: &Path) -> Vec<FileMeta> {
     io::collect_note_files(root)
 }
 
+/// Notes and supported attachments from one fresh walk of the disk.
+pub(crate) fn note_and_attachment_files(root: &Path) -> (Vec<FileMeta>, Vec<FileMeta>) {
+    let catalog = io::collect_file_catalog(root);
+    (catalog.notes, catalog.attachments)
+}
+
 /// Cached catalog for the current graph. The scan runs without the graph
 /// lock; the result is always returned to the caller (fresh as of its own
 /// start), and is published into the cache only when generation, root, and

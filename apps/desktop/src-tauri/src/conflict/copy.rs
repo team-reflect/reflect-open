@@ -65,7 +65,6 @@ pub fn free_conflict_copy_path(
 
 /// The conflict copy path of `rel` for a version modified at `time_ms`. The
 /// name holds the content hash, so it needs no counter.
-#[cfg_attr(not(test), allow(dead_code))]
 pub fn copy_path(rel: &str, time_ms: u64, hash8: &str) -> String {
     conflict_copy_path(rel, &utc_stamp((time_ms / 1000) as i64), hash8, 1)
 }

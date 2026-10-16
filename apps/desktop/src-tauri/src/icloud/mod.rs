@@ -6,9 +6,10 @@
 //! - [`versions`] — the `NSFileVersion` surface: list a file's unresolved
 //!   conflict versions, and mark them resolved once handled.
 //! - [`sweep`] — the conflict sweep: run every conflicted note through the
-//!   deterministic resolution ladder ([`crate::conflict`]), archive the
-//!   losing versions, fold creation-collision duplicates (`name 2.md`) back
-//!   into their canonical file, and keep the shadow base advancing.
+//!   deterministic resolution ladder ([`crate::conflict`]), write conflict
+//!   copies for other file types, fold creation-collision duplicates
+//!   (`name 2.md`) back into their canonical file, and keep the shadow base
+//!   advancing.
 //! - [`watch`] — an `NSMetadataQuery` over the graph: the sole external
 //!   change source on iOS (there is no file watcher there), and the conflict
 //!   signal on both Apple platforms (a conflict version appearing does not
