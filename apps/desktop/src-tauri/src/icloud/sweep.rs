@@ -373,10 +373,11 @@ fn resolve_file(
         let current_hash = content_hash(&current.content)?;
         let side_hash = content_hash(&side.content)?;
         let modified_ms = side.modified_ms;
+        let merge_loop_detected = shadow.is_repeated_merge(rel, &current_hash, &side_hash);
         let input = ConflictInput {
             base: base.as_deref(),
             sides: (current.clone(), side),
-            merge_loop_detected: shadow.is_repeated_merge(rel, &current_hash, &side_hash),
+            merge_loop_detected,
         };
         match ladder::resolve(input)? {
             Resolution::AlreadyResolved => {}
@@ -390,6 +391,11 @@ fn resolve_file(
                 current.content = content;
             }
             Resolution::Reconciled { content } => {
+                if merge_loop_detected {
+                    shadow.clear_merge_pair(rel);
+                } else if content != current.content {
+                    let _ = shadow.record_merge_pair(rel, &current_hash, &side_hash);
+                }
                 current.content = content;
                 reconciled = true;
             }
@@ -482,8 +488,6 @@ fn apply_file_resolution(
     }
     mark_resolved(&abs);
     if resolution.reconciled {
-        // A stale merge-pair record would mask the next real conflict.
-        shadow.clear_merge_pair(rel);
         outcome.reconciled.push(rel.to_string());
     }
     // Both devices converge on the resolved content: it is the new base.
@@ -653,8 +657,14 @@ fn fold_duplicate(
     } else {
         tracing::warn!(path = %file.path, "failed to remove folded collision duplicate");
     }
+    if merged != canonical_content {
+        if let (Ok(canonical_hash), Ok(dup_hash)) =
+            (content_hash(&canonical_content), content_hash(&dup_content))
+        {
+            let _ = shadow.record_merge_pair(canonical_rel, &canonical_hash, &dup_hash);
+        }
+    }
     if reconciled {
-        shadow.clear_merge_pair(canonical_rel);
         outcome.reconciled.push(canonical_rel.to_string());
     }
     outcome.auto_resolved += 1;
@@ -1317,5 +1327,26 @@ mod tests {
         assert!(outcome.needs_review.is_empty());
         assert_eq!(outcome.auto_resolved, 1);
         assert_eq!(outcome.changed.len(), 1);
+    }
+
+    #[test]
+    fn a_word_level_merge_records_the_pair_so_a_repeat_breaks_the_loop() {
+        let root = graph();
+        write(root.path(), "notes/a.md", "shared line mac\n");
+        let shadow = ShadowStore::new(root.path());
+        shadow.record("notes/a.md", "shared line\n").unwrap();
+        let mac_hash = content_hash("shared line mac\n").unwrap();
+        let phone_hash = content_hash("shared line phone\n").unwrap();
+
+        let version = fake_version(root.path(), "v1.md", "shared line phone\n", 2_000, "iPhone");
+        let first = resolve_file(root.path(), "notes/a.md", 1_000, vec![version], &shadow).unwrap();
+        assert!(first.reconciled);
+        assert!(shadow.is_repeated_merge("notes/a.md", &mac_hash, &phone_hash));
+
+        let version = fake_version(root.path(), "v2.md", "shared line phone\n", 2_000, "iPhone");
+        let second =
+            resolve_file(root.path(), "notes/a.md", 1_000, vec![version], &shadow).unwrap();
+        assert_eq!(second.final_content, "shared line phone\n");
+        assert!(!shadow.is_repeated_merge("notes/a.md", &mac_hash, &phone_hash));
     }
 }
