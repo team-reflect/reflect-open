@@ -174,7 +174,7 @@ Safety rules for the sync path: [docs/git-backup-safety.md](docs/git-backup-safe
 - **Own writes.** `fs/own_writes.rs` records the note bytes this process wrote, so a later read can tell its own content from a change that arrived from elsewhere.
 - **Pull commits and merges under one lock.** The engine fetches first, then `git_pull` (`pull_all` in `git/mod.rs`) commits and merges under one graph lock, then it pushes. The working tree equals HEAD at checkout. A pull never calls `repo.merge()`.
 - **Cadence.** Desktop probes the remote every 90 s while visible and pulls when it moved. A graph that holds both Git and iCloud waits five quiet minutes before it uses the network. One sync method per graph is recommended.
-- **`.reflect/` never syncs.** Git ignores it and iCloud marks it local-only. External tools: [docs/external-tools.md](docs/external-tools.md).
+- **`.reflect/` never syncs.** Git ignores it and iCloud marks it local-only. Other tools may write notes at any time: [docs/git-backup-safety.md](docs/git-backup-safety.md) lists the rules the sync path keeps for them.
 
 ### Related repos
 

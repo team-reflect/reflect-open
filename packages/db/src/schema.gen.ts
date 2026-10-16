@@ -98,6 +98,7 @@ export interface Notes {
   fileHash: string;
   gistStale: Generated<number>;
   gistUrl: string | null;
+  hasConflict: Generated<number>;
   hasContent: Generated<number>;
   id: string | null;
   isPinned: Generated<number>;
