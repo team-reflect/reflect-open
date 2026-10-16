@@ -5,7 +5,6 @@ import type { TaskLocator } from '../markdown/task-model.ts'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
 import { createTestFileChangeService, type TestFileChangeService } from '../testing/file-change.ts'
 import { createTestNoteFileService, overrideNoteFileService } from '../testing/graph.ts'
-import type { NoteWriteMerge } from '../graph/note-file-service.ts'
 import {
   createTestGraphSessionService,
   type TestGraphSessionService,
@@ -59,9 +58,9 @@ interface Harness {
   /** While set, writes reject with this message (the save-failure seam). */
   failWrites: (message: string | null) => void
   /**
-   * The next write merges with the disk and returns `merge` (the merge-on-write seam).
+   * The next write merges with the disk and returns `content` as merged (the merge-on-write seam).
    */
-  mergeNextWrite: (merge: NoteWriteMerge) => void
+  mergeNextWrite: (content: string) => void
   /**
    * The note's bytes on disk, `undefined` when missing.
    */
@@ -173,8 +172,8 @@ function harness(options?: {
     failWrites: (message) => {
       writeFailure = message
     },
-    mergeNextWrite: (merge) => {
-      files.mergeNextWrite(PATH, merge)
+    mergeNextWrite: (content) => {
+      files.mergeNextWrite(PATH, content)
     },
     disk: () => files.files().get(PATH),
     progress,
@@ -331,7 +330,7 @@ describe('external changes and saves', () => {
 
     h.session.editorChanged('# Hello\n\nmine\n')
     h.setDisk('# Hello\n\ntheirs\n')
-    h.mergeNextWrite({ content: '# Hello\n\nmine\n\ntheirs\n', kind: 'exact' })
+    h.mergeNextWrite('# Hello\n\nmine\n\ntheirs\n')
     h.session.externalChanged()
     await clock.advance(0) // well inside the save debounce
 
@@ -346,7 +345,7 @@ describe('external changes and saves', () => {
 
     h.session.editorChanged('# Hello\n\nmine\n')
     h.setDisk('# Hello\n\ntheirs\n')
-    h.mergeNextWrite({ content: '# Hello\n\nmine\n\ntheirs\n', kind: 'exact' })
+    h.mergeNextWrite('# Hello\n\nmine\n\ntheirs\n')
     h.session.externalChanged()
     await settled()
 
@@ -355,26 +354,12 @@ describe('external changes and saves', () => {
     expect(h.session.content()).toBe('# Hello\n\nmine\n\ntheirs\n')
     expect(h.snapshots.at(-1)).toMatchObject({ dirty: false, protected: false, error: null })
     expect(h.progress.snapshot()).toEqual([])
-  })
-
-  it('a reconciled merge adopts the merged text and stays saveable', async () => {
-    const h = harness()
-    h.session.load()
-    await settled()
-
-    h.session.editorChanged('# Hello mine\n')
-    h.setDisk('# Hello theirs\n')
-    h.mergeNextWrite({ content: '# Hello mine theirs\n', kind: 'reconciled' })
-    h.session.externalChanged()
-    await settled()
-    expect(h.applied).toEqual(['# Hello mine theirs\n'])
-    expect(h.snapshots.at(-1)).toMatchObject({ dirty: false, protected: false })
 
     // The next edit is a plain checked write against the merged text.
-    h.session.editorChanged('# Hello mine theirs\n\nmore\n')
+    h.session.editorChanged('# Hello\n\nmine\n\ntheirs\n\nmore\n')
     await settled()
-    expect(h.expectedContents.at(-1)).toBe('# Hello mine theirs\n')
-    expect(h.disk()).toBe('# Hello mine theirs\n\nmore\n')
+    expect(h.expectedContents.at(-1)).toBe('# Hello\n\nmine\n\ntheirs\n')
+    expect(h.disk()).toBe('# Hello\n\nmine\n\ntheirs\n\nmore\n')
   })
 
   it('a lossy merged result opens protected', async () => {
@@ -386,7 +371,7 @@ describe('external changes and saves', () => {
 
     h.session.editorChanged('# Hello\n\nmine\n')
     h.setDisk('# Hello\n\n+ [ ] theirs\n')
-    h.mergeNextWrite({ content: '# Hello\n\nmine\n\n+ [ ] theirs\n', kind: 'exact' })
+    h.mergeNextWrite('# Hello\n\nmine\n\n+ [ ] theirs\n')
     h.session.externalChanged()
     await settled()
 
@@ -409,7 +394,7 @@ describe('external changes and saves', () => {
 
     h.session.editorChanged('# Old title\n\nbody mine\n')
     h.setDisk('# Their title\n\nbody\n')
-    h.mergeNextWrite({ content: '# Their title\n\nbody mine\n', kind: 'exact' })
+    h.mergeNextWrite('# Their title\n\nbody mine\n')
     h.session.externalChanged()
     await settled()
     h.session.editorChanged('# Their title\n\nbody mine more\n')
@@ -429,7 +414,7 @@ describe('external changes and saves', () => {
 
     h.session.editorChanged('# New title\n\nbody\n')
     h.setDisk('# Old title\n\nbody theirs\n')
-    h.mergeNextWrite({ content: '# New title\n\nbody theirs\n', kind: 'exact' })
+    h.mergeNextWrite('# New title\n\nbody theirs\n')
     h.session.externalChanged()
     await settled()
 
@@ -453,28 +438,6 @@ describe('external changes and saves', () => {
     expect(renames).toEqual([{ from: 'Old title', to: 'New title', previousAutoAlias: null }])
   })
 
-  it('a reconciled write reports the note on the change stream', async () => {
-    const h = harness()
-    h.session.load()
-    await settled()
-
-    h.session.editorChanged('# Hello mine\n')
-    h.setDisk('# Hello theirs\n')
-    h.mergeNextWrite({ content: '# Hello mine theirs\n', kind: 'reconciled' })
-    h.session.externalChanged()
-    await settled()
-    expect(h.fileChanges.batches()).toEqual([
-      {
-        changes: [{ path: PATH, kind: 'upsert', modifiedMs: expect.any(Number) }],
-        source: 'own-write',
-      },
-    ])
-
-    h.session.editorChanged('# Hello mine theirs\n\nmore\n')
-    await settled()
-    expect(h.fileChanges.batches()).toHaveLength(1) // a plain write archives nothing
-  })
-
   it('keystrokes during a merging write stay dirty and merge on the next write', async () => {
     const started = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
@@ -489,7 +452,7 @@ describe('external changes and saves', () => {
 
     h.session.editorChanged('# Hello\n\nmine\n')
     h.setDisk('# Hello\n\ntheirs\n')
-    h.mergeNextWrite({ content: '# Hello\n\nmine\n\ntheirs\n', kind: 'exact' })
+    h.mergeNextWrite('# Hello\n\nmine\n\ntheirs\n')
     h.session.externalChanged()
     await started.promise
     h.session.editorChanged('# Hello\n\nmine typed on\n')
@@ -500,7 +463,7 @@ describe('external changes and saves', () => {
     expect(h.session.content()).toBe('# Hello\n\nmine typed on\n')
     expect(h.snapshots.at(-1)?.dirty).toBe(true)
 
-    h.mergeNextWrite({ content: '# Hello\n\nmine typed on\n\ntheirs\n', kind: 'exact' })
+    h.mergeNextWrite('# Hello\n\nmine typed on\n\ntheirs\n')
     await h.session.flush()
     // The second write names the text the keystrokes were typed on, which the
     // first write already merged into the file.
@@ -523,7 +486,7 @@ describe('external changes and saves', () => {
 
     h.session.editorChanged('# Hello\n\nmine\n')
     h.setDisk('# Hello\n\ntheirs\n')
-    h.mergeNextWrite({ content: '# Hello\n\nmine\n\ntheirs\n', kind: 'exact' })
+    h.mergeNextWrite('# Hello\n\nmine\n\ntheirs\n')
     const flushed = h.session.flush()
     h.session.dispose()
     await started.promise
@@ -822,7 +785,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
     h.session.load()
     await settled()
     h.setDisk('# Hello\n\ntheirs\n')
-    h.mergeNextWrite({ content: '---\npinned: true\n---\n\n# Hello\n\ntheirs\n', kind: 'exact' })
+    h.mergeNextWrite('---\npinned: true\n---\n\n# Hello\n\ntheirs\n')
 
     await expect(h.session.commitFrontmatter({ pinned: true })).resolves.toBe(true)
     expect(h.session.content()).toBe('---\npinned: true\n---\n\n# Hello\n\ntheirs\n')
@@ -976,7 +939,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
     h.session.editorChanged('# Mine\n')
     h.setDisk('# Created elsewhere\n')
-    h.mergeNextWrite({ content: '# Mine\n\nCreated elsewhere\n', kind: 'reconciled' })
+    h.mergeNextWrite('# Mine\n\nCreated elsewhere\n')
     h.session.externalChanged()
     await settled()
 
@@ -1330,7 +1293,7 @@ it('a checked autosave against a moved file adopts the merge instead of failing'
     await settled()
     h.session.editorChanged('# My unsaved text\n')
     h.setDisk('# Capture wrote here\n')
-    h.mergeNextWrite({ content: '# My unsaved text\n\nCapture wrote here\n', kind: 'reconciled' })
+    h.mergeNextWrite('# My unsaved text\n\nCapture wrote here\n')
     await h.session.flush()
     expect(h.expectedContents).toEqual(['# Hello\n'])
     expect(h.session.content()).toBe('# My unsaved text\n\nCapture wrote here\n')

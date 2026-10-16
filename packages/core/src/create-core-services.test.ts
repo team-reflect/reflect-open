@@ -98,7 +98,7 @@ describe('createCoreServices', () => {
 
   it('reports note writes to the composed file-change service', async () => {
     const ipc = createTestIpcBridgeService({
-      commands: { note_write: () => ({ modifiedMs: null }) },
+      commands: { note_write: () => ({ modifiedMs: null, merged: null }) },
     })
     const { services, internal } = composeCoreServices({
       ...requiredAdapters(),

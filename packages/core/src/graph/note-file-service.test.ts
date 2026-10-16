@@ -39,7 +39,7 @@ describe('createNoteFileService', () => {
 
   it('reports a write as an own write stamped with the disk mtime', async () => {
     const { ipc, fileChanges, noteFile } = setup()
-    ipc.onCommand('note_write', () => ({ modifiedMs: 1_234 }))
+    ipc.onCommand('note_write', () => ({ modifiedMs: 1_234, merged: null }))
 
     await expect(noteFile.write('notes/a.md', 'new', 7)).resolves.toEqual({
       modifiedMs: 1_234,
@@ -54,7 +54,7 @@ describe('createNoteFileService', () => {
 
   it('falls back to the clock when the platform reports no mtime', async () => {
     const { ipc, noteFile } = setup()
-    ipc.onCommand('note_write', () => ({ modifiedMs: null }))
+    ipc.onCommand('note_write', () => ({ modifiedMs: null, merged: null }))
 
     await expect(noteFile.write('notes/a.md', 'new', 7)).resolves.toEqual({
       modifiedMs: 9_000,
@@ -66,12 +66,12 @@ describe('createNoteFileService', () => {
     const { ipc, noteFile } = setup()
     ipc.onCommand('note_write', () => ({
       modifiedMs: 1_234,
-      merged: { content: 'a\nB\nc', kind: 'exact' },
+      merged: 'a\nB\nc',
     }))
 
     await expect(noteFile.write('notes/a.md', 'a\nB', 7, 'a\nb')).resolves.toEqual({
       modifiedMs: 1_234,
-      merged: { content: 'a\nB\nc', kind: 'exact' },
+      merged: 'a\nB\nc',
     })
   })
 
@@ -218,7 +218,7 @@ describe('createTestNoteFileService', () => {
 function installEcho(
   echoOwnWrites: boolean,
   invoke: (command: string) => unknown = (command) =>
-    command === 'note_write' ? { modifiedMs: null } : null,
+    command === 'note_write' ? { modifiedMs: null, merged: null } : null,
 ) {
   const ipc = createTestIpcBridgeService()
   for (const command of ['note_write', 'note_delete']) {
@@ -262,7 +262,7 @@ describe('local write echo (Plan 19, decision 5)', () => {
     // The reconcile's read-free skip compares the stored row's mtime against
     // the file listing — only the write's own on-disk stamp can ever match.
     const { noteFile, fileChanges } = installEcho(true, (command) =>
-      command === 'note_write' ? { modifiedMs: 1_234 } : null,
+      command === 'note_write' ? { modifiedMs: 1_234, merged: null } : null,
     )
     const seen: FileChange[][] = []
     const unlisten = fileChanges.subscribe(({ changes }) => {

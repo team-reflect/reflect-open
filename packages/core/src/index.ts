@@ -33,10 +33,6 @@ export {
   type ConnectExistingResult,
 } from './sync/backup-service.ts'
 export { isICloudRoot } from './sync/icloud-sync-service.ts'
-export {
-  type ArchivedVersion,
-  type ConflictArchiveService,
-} from './sync/conflict-archive-service.ts'
 export { type GistPublishService } from './sync/gist-publish-service.ts'
 export { isMobilePlatform, type AppPlatform } from './ports/platform-facts.ts'
 export { createSystemClock, type ClockService, type TimerHandle } from './ports/clock-service.ts'

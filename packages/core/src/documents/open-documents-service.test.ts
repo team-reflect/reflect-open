@@ -262,10 +262,7 @@ describe('reloadAll with live sessions', () => {
       session.editorChanged('# Old\nmy unsaved line\n')
 
       noteFile.set(PATH, '# New from the Mac\n')
-      noteFile.mergeNextWrite(PATH, {
-        content: '# New from the Mac\nmy unsaved line\n',
-        kind: 'exact',
-      })
+      noteFile.mergeNextWrite(PATH, '# New from the Mac\nmy unsaved line\n')
       openDocuments.reloadAll()
 
       await vi.waitFor(() => expect(snapshots.at(-1)?.dirty).toBe(false))

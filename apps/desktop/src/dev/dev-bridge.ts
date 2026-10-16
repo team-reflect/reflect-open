@@ -173,7 +173,7 @@ class DevBridgeImpl implements IpcBridge {
       }
       case 'note_write': {
         const { path, contents } = writeArgsSchema.parse(args)
-        return { modifiedMs: files.write(path, contents) }
+        return { modifiedMs: files.write(path, contents), merged: null }
       }
       case 'note_create': {
         const { path, contents, generation } = createArgsSchema.parse(args)
@@ -321,12 +321,6 @@ class DevBridgeImpl implements IpcBridge {
         index.deleteChatConversation(chatDeleteArgsSchema.parse(args).id)
         return null
       }
-
-      case 'conflict_archive_list':
-        return []
-      case 'conflict_archive_read':
-      case 'conflict_archive_restore':
-        throw new ReflectError('notFound', 'dev bridge: the archive is empty')
 
       default:
         console.error(`[dev-bridge] unimplemented command "${command}"`, args)

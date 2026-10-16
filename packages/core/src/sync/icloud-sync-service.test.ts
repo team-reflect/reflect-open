@@ -30,7 +30,7 @@ const INDEX_GENERATION = 3
 
 const EMPTY_OUTCOME: IcloudSweepOutcome = {
   changed: [],
-  reconciled: [],
+  copies: [],
   autoResolved: 0,
 }
 
@@ -243,8 +243,14 @@ describe('createICloudSyncService', () => {
     expect(scanCalls()).toHaveLength(1)
   })
 
-  it('a sweep that reconciled notes reports once through progress', async () => {
-    scanResults.push({ ...EMPTY_OUTCOME, reconciled: ['notes/a.md', 'notes/b.md'] })
+  it('a sweep that wrote conflict copies lists every copy once through progress', async () => {
+    scanResults.push({
+      ...EMPTY_OUTCOME,
+      copies: [
+        'assets/data (conflict 2026-10-16 08-05-31 a1b2c3d4).json',
+        'media/talk (conflict 2026-10-16 08-05-32 b2c3d4e5).mp3',
+      ],
+    })
     const sync = service()
     await sync.start()
     await settleScan()
@@ -252,7 +258,8 @@ describe('createICloudSyncService', () => {
     expect(progress.snapshot()).toMatchObject([
       {
         label: 'Syncing',
-        message: 'Merged overlapping edits in 2 notes; earlier versions are kept',
+        message:
+          'Kept 2 conflict copies: assets/data (conflict 2026-10-16 08-05-31 a1b2c3d4).json, media/talk (conflict 2026-10-16 08-05-32 b2c3d4e5).mp3',
       },
     ])
   })
@@ -263,7 +270,7 @@ describe('createICloudSyncService', () => {
         { path: 'notes/merged.md', kind: 'upsert', modifiedMs: 5 },
         { path: 'assets/picture.png', kind: 'upsert', modifiedMs: 5 },
       ],
-      reconciled: [],
+      copies: [],
       autoResolved: 0,
     })
     const sync = service()

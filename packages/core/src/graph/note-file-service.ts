@@ -38,24 +38,8 @@ export type VaultScanStats = z.infer<typeof vaultScanStatsSchema>
 
 const noteWriteOutcomeSchema = z.object({
   modifiedMs: z.number().nullable(),
-  merged: z
-    .object({
-      content: z.string(),
-      kind: z.enum(['exact', 'reconciled']),
-    })
-    .optional(),
+  merged: z.string().nullable(),
 })
-
-/**
- * How a checked write against a note that moved on disk was merged.
- * `content` is the full text now on disk. `exact` took every line from one
- * side (a diff3, union, or whitespace merge), `reconciled` merged word by word
- * and archived both inputs.
- */
-export interface NoteWriteMerge {
-  content: string
-  kind: 'exact' | 'reconciled'
-}
 
 /**
  * The outcome of {@link NoteFileService.write}.
@@ -66,9 +50,9 @@ export interface NoteWriteResult {
    */
   modifiedMs: number
   /**
-   * Set when the write merged with a newer disk text instead of writing the given contents.
+   * The full text now on disk when the write merged with a newer disk text, else `null`.
    */
-  merged: NoteWriteMerge | null
+  merged: string | null
 }
 
 /**
@@ -168,7 +152,7 @@ class NoteFileServiceImpl implements NoteFileService {
     )
     const modifiedMs = outcome.modifiedMs ?? clock.now()
     fileChanges.reportOwnWrite([{ path, kind: 'upsert', modifiedMs }])
-    return { modifiedMs, merged: outcome.merged ?? null }
+    return { modifiedMs, merged: outcome.merged }
   }
 
   async create(path: string, contents: string, generation: number): Promise<NoteCreateOutcome> {

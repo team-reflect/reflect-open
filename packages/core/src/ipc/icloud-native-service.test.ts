@@ -10,7 +10,7 @@ function serviceOver(commands?: Record<string, (args: Record<string, unknown>) =
   return { icloud, ipc, logger }
 }
 
-const SWEEP = { changed: [], reconciled: [], autoResolved: 0 }
+const SWEEP = { changed: [], copies: [], autoResolved: 0 }
 
 describe('createICloudNativeService', () => {
   it('sends each command with its arguments', async () => {
