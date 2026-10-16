@@ -41,6 +41,14 @@ pub fn content_hash(content: &str) -> AppResult<String> {
         .map_err(|err| AppError::io(format!("content hash failed: {err}")))
 }
 
+/// The first 8 hex digits of the file's blob hash, read as a stream so a large
+/// attachment never sits in memory.
+pub fn blob_hash8_of_file(path: &Path) -> AppResult<String> {
+    let oid = git2::Oid::hash_file(git2::ObjectType::Blob, path)
+        .map_err(|err| AppError::io(format!("file hash failed for {}: {err}", path.display())))?;
+    Ok(oid.to_string()[..8].to_string())
+}
+
 /// The per-graph shadow base store.
 pub struct ShadowStore {
     root: PathBuf,
