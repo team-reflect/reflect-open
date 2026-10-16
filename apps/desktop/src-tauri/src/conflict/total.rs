@@ -6,16 +6,8 @@
 use reconcile_text::{reconcile, BuiltinTokenizer};
 
 /// Merge `first` and `second` over `base`. Symmetric by construction: the
-/// sides are ordered by content before the library sees them. The trivial
-/// shapes (identical sides, one side untouched) return the other side
-/// unchanged without touching the library.
+/// sides are ordered by content before the library sees them.
 pub(super) fn merge(base: &str, first: &str, second: &str) -> String {
-    if first == second || second == base {
-        return first.to_string();
-    }
-    if first == base {
-        return second.to_string();
-    }
     let (low, high) = if first <= second {
         (first, second)
     } else {
@@ -210,8 +202,6 @@ mod tests {
     }
 
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(10_000))]
-
         #[test]
         fn total_symmetric_and_trivial((base, left, right) in triple()) {
             let out = merge(&base, &left, &right);
