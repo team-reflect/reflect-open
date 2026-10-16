@@ -48,6 +48,7 @@ export {
 export type { PublishedGist, GistFile } from './gist-service.ts'
 export {
   isSyncError,
+  minutesUntil,
   type SyncEngine,
   type SyncEngineOptions,
   type SyncErrorKind,

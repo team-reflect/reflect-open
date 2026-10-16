@@ -14,7 +14,12 @@ import {
 import { createTestPlatformService } from '../testing/platform.ts'
 import { createTestSecretStoreService } from '../testing/secrets.ts'
 import { createTestActivityPort, type TestActivityPort } from '../testing/shell.ts'
-import { createTestGitRepositoryService, createTestGithubAuthService } from '../testing/sync.ts'
+import {
+  createTestGitRepositoryService,
+  createTestGithubAuthService,
+  createTestICloudNativeService,
+  type TestICloudNativeService,
+} from '../testing/sync.ts'
 import { createSyncEngineFactory } from './engine.ts'
 import { createGithubRepoService } from './github-repo-service.ts'
 import {
@@ -37,6 +42,7 @@ let logger: TestLoggerService
 let fileChanges: TestFileChangeService
 let persistenceFlush: TestPersistenceFlushService
 let backupDeps: BackupServiceDeps
+let icloudNative: TestICloudNativeService
 
 beforeEach(() => {
   http = createTestHttpService()
@@ -45,6 +51,7 @@ beforeEach(() => {
   logger = createTestLoggerService()
   fileChanges = createTestFileChangeService()
   persistenceFlush = createTestPersistenceFlushService()
+  icloudNative = createTestICloudNativeService()
 })
 
 const USER_URL = 'https://api.github.com/user'
@@ -261,6 +268,7 @@ function fakeServices(options: FakeOptions = {}) {
     platform: createTestPlatformService({ surface: { mobileApp: options.mobile ?? false } }),
     persistenceFlush,
     logger,
+    icloudNative,
   }
   return {
     calls,
@@ -278,8 +286,9 @@ function fakeServices(options: FakeOptions = {}) {
 /**
  * A backup service of the last {@link fakeServices} call, at graph generation 3.
  */
-function createBackup(options: { indexGeneration: number | null }): BackupService {
+function createBackup(options: { indexGeneration: number | null; root?: string }): BackupService {
   return createBackupService(backupDeps, {
+    root: options.root ?? '/graph',
     generation: GENERATION,
     indexGeneration: options.indexGeneration,
   })
@@ -312,7 +321,42 @@ function trackStates(backup: BackupService): BackupState[] {
   return states
 }
 
+const ICLOUD_ROOT = '/Users/a/Library/Mobile Documents/iCloud~app/Documents/Notes'
+
 describe('createBackupService', () => {
+  it('an iCloud graph with a remote waits for quiet before fetching', async () => {
+    const { calls } = fakeServices()
+    const backup = createBackup({ indexGeneration: 1, root: ICLOUD_ROOT })
+    await backup.start()
+    await vi.waitFor(() => {
+      expect(backup.getState()).toMatchObject({
+        phase: 'connected',
+        status: { state: 'waiting', until: 5 * 60_000 },
+      })
+    })
+    expect(calls).toContain('commitAll')
+    expect(calls).not.toContain('fetch')
+
+    await advance(5 * 60_000)
+    await vi.waitFor(() => {
+      expect(calls).toContain('fetch')
+    })
+    expect(icloudNative.calls()).toEqual([{ method: 'pendingCount', args: [ICLOUD_ROOT, 'notes'] }])
+    backup.dispose()
+  })
+
+  it('a folder graph never enters quiet mode', async () => {
+    const { calls } = fakeServices()
+    const backup = createBackup({ indexGeneration: 1 })
+    await backup.start()
+    await vi.waitFor(() => {
+      expect(calls).toContain('fetch')
+    })
+    expect(backup.getState()).toMatchObject({ status: { state: 'idle' } })
+    expect(icloudNative.calls()).toEqual([])
+    backup.dispose()
+  })
+
   it('reports disconnected when no credential is stored — but keeps local history', async () => {
     // Signing out of GitHub (or a lapsed credential) stops the *backup*, not
     // the note history: the graph already has a repo, so the commit-only loop

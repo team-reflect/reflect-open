@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
-import { suggestRepoName } from '@reflect/core'
+import { isICloudRoot, minutesUntil, suggestRepoName } from '@reflect/core'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog.tsx'
 import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links.tsx'
 import { SettingsField } from '@/components/settings/field.tsx'
@@ -19,10 +19,12 @@ import { useSync, type BackupState } from '@/providers/sync-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 /** A short, plain-language line for each backup state — never Git jargon. */
-function statusLine(backup: Extract<BackupState, { phase: 'connected' }>): string {
+function statusLine(backup: Extract<BackupState, { phase: 'connected' }>, now: number): string {
   switch (backup.status.state) {
     case 'idle':
       return 'Backed up'
+    case 'waiting':
+      return `Backs up in ${minutesUntil(backup.status.until, now)} min`
     case 'syncing':
       return 'Backing up…'
     case 'offline':
@@ -51,7 +53,7 @@ function githubRepoBrowserUrl(
 export function BackupSettingsField(): ReactElement {
   const { backup, disconnectGraph, signOut, backUpNow } = useSync()
   const { graph } = useGraph()
-  const { indexQuery } = useCoreServices()
+  const { indexQuery, clock } = useCoreServices()
   const { opener } = useAppServices()
   const githubConnected = useGithubConnected()
   const [connectOpen, setConnectOpen] = useState(false)
@@ -82,6 +84,7 @@ export function BackupSettingsField(): ReactElement {
       : null
   // A hand-wired non-GitHub remote (Plan 16) renders the section host-neutral.
   const genericRemote = backup.phase === 'connected' && backup.repo === null
+  const hosted = graph !== null && isICloudRoot(graph.root)
 
   function openGithubRepo(): void {
     if (backup.phase !== 'connected' || backup.repo === null) {
@@ -110,9 +113,11 @@ export function BackupSettingsField(): ReactElement {
       <SettingsField
         legend={genericRemote ? 'Backup' : 'GitHub sync'}
         description={
-          genericRemote
-            ? 'This graph backs up to its own git remote. Edits back up automatically a few moments after you stop typing.'
-            : 'Back up this graph to a GitHub repository. Edits back up automatically a few moments after you stop typing.'
+          hosted && backup.phase === 'connected'
+            ? 'Backs up to GitHub five minutes after iCloud and your edits go quiet. Back up now commits locally.'
+            : genericRemote
+              ? 'This graph backs up to its own git remote. Edits back up automatically a few moments after you stop typing.'
+              : 'Back up this graph to a GitHub repository. Edits back up automatically a few moments after you stop typing.'
         }
       >
         <div className="mt-3 flex flex-col gap-2">
@@ -127,6 +132,12 @@ export function BackupSettingsField(): ReactElement {
                   Connect GitHub…
                 </Button>
               </div>
+              {hosted ? (
+                <p className="text-xs text-text-muted">
+                  This graph already syncs through iCloud Drive. One sync method per graph is
+                  simplest; a GitHub backup here pushes only after five quiet minutes.
+                </p>
+              ) : null}
               {githubConnected ? (
                 <GithubSignOutRow
                   signOut={signOut}
@@ -140,7 +151,9 @@ export function BackupSettingsField(): ReactElement {
             <>
               <p className="text-sm text-text">
                 <span className="font-medium">{repoLabel}</span>
-                <span className="ml-2 text-xs text-text-muted">{statusLine(backup)}</span>
+                <span className="ml-2 text-xs text-text-muted">
+                  {statusLine(backup, clock.now())}
+                </span>
               </p>
               {conflictCount > 0 ? (
                 <div className="text-xs text-amber-700 dark:text-amber-300">
