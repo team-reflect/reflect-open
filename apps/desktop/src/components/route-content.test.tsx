@@ -241,21 +241,6 @@ describe('RouteContent', () => {
     await view.unmount()
   })
 
-  it('opens a note the editor cannot round-trip as read-only, never editable', async () => {
-    // Git conflict markers are a known meowdown converter gap (see roundtrip.ts),
-    // and get their own view: both sides shown, labeled by the marker names.
-    files['notes/conflict.md'] =
-      '# Shared\n\n<<<<<<< this device\nedited on a\n=======\nedited on b\n>>>>>>> other device\n'
-    const view = await renderRoute({ kind: 'note', path: 'notes/conflict.md' })
-
-    await expect.element(page.getByText(/edited on a/)).toBeVisible()
-    await expect.element(page.getByTestId('fake-editor')).not.toBeInTheDocument()
-    await expect.element(page.getByText('this device')).toBeVisible()
-    await expect.element(page.getByText('other device')).toBeVisible()
-    await expect.element(page.getByText(/edited on b/)).toBeVisible()
-    await view.unmount()
-  })
-
   it('renders the settings screen for the settings route', async () => {
     const view = await renderRoute({ kind: 'settings' })
     await expect.element(page.getByTestId('settings-screen')).toBeInTheDocument()

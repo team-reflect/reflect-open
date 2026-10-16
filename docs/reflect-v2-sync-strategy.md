@@ -26,10 +26,9 @@ It complements [Reflect V2 Product Vision](./reflect-v2-product-vision.md).
 > - **AI-assisted conflict resolution did not ship.** Text conflicts merge through
 >   one ladder on every path (git pull, iCloud sweep, editor save), and a result
 >   that drops or interleaves a side is archived under Earlier versions. Current
->   sync never writes conflict markers. Notes that an older version left with
->   markers open protected, with a mine/theirs/both resolution flow and a
->   `has_conflict` "Needs review" projection.
-> - Plain-language product states (Backed up / Backing up / Offline / Needs review /
+>   sync never writes conflict markers. Conflict markers are plain text to Reflect:
+>   the app neither writes nor interprets them.
+> - Plain-language product states (Backed up / Backing up / Offline /
 >   Backup failed) shipped as described below.
 
 ## Strategy
@@ -182,7 +181,7 @@ The product should not require the user to understand Git. Suggested user-facing
 
 - `Backed up`
 - `Syncing`
-- `Needs review`
+- `Needs attention`
 - `Resolved`
 - `Backup failed`
 

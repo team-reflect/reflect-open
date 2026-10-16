@@ -6,7 +6,6 @@ import { errorMessage, isAppError, ReflectError } from '../errors.ts'
 import type { NoteFileService, NoteWriteResult } from '../graph/note-file-service.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import { appendBlock } from '../markdown/append-section.ts'
-import { detectConflictMarkers } from '../markdown/conflict-markers.ts'
 import { hasAuthoredTitle, parseNote } from '../markdown/extract.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { splitDoc } from './note-session-doc.ts'
@@ -45,9 +44,6 @@ interface NoteSessionIo {
 }
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 800
-
-const KEPT_THEIRS_MESSAGE =
-  'Your edits were kept under Earlier versions because the note on disk holds conflict markers'
 
 export interface NoteSessionServiceDeps {
   readonly noteFile: NoteFileService
@@ -157,10 +153,6 @@ class NoteSessionImpl implements NoteSession {
   // deleted, so rewriting it would recreate it).
   #discarded = false
 
-  /**
-   * Counts writes whose contents went to the note's earlier versions instead of the file.
-   */
-  #keptTheirsCount = 0
   /**
    * True after a failed save retried once from its reconciliation; a landed write clears it.
    */
@@ -284,7 +276,7 @@ class NoteSessionImpl implements NoteSession {
             this.#emit()
             this.#onContent?.(content, 'saved')
           } else {
-            this.#adoptMergedWrite(base, content, result.merged.content, result.merged.kind)
+            this.#adoptMergedWrite(base, content, result.merged.content)
             if (result.merged.kind !== 'exact') {
               // The write archived a version, so the note's earlier versions changed.
               this.#deps.fileChanges.emit({
@@ -311,22 +303,13 @@ class NoteSessionImpl implements NoteSession {
    * Take the text a write merged into the file. `base` and `sent` are the
    * expected and given contents of that write.
    */
-  #adoptMergedWrite(
-    base: string,
-    sent: string,
-    merged: string,
-    kind: NonNullable<NoteWriteResult['merged']>['kind'],
-  ): void {
+  #adoptMergedWrite(base: string, sent: string, merged: string): void {
     this.#inFlightWrite = null
     // A title the user changed and the merge kept is a local save for the
     // rename tracker; any other merged title is ground truth from elsewhere.
     const sentTitle = this.#titleOf(sent)
     const ownTitle = sentTitle !== this.#titleOf(base) && sentTitle === this.#titleOf(merged)
     this.#onContent?.(merged, ownTitle ? 'saved' : 'external')
-    if (kind === 'keptTheirs') {
-      this.#keptTheirsCount += 1
-      this.#deps.progress.fail('Saving note', KEPT_THEIRS_MESSAGE)
-    }
     if (this.#header + this.#buffer !== sent) {
       // Keystrokes arrived during the write. They were typed on `sent`, so the
       // next save names it as the base and merges them with the file again.
@@ -430,7 +413,7 @@ class NoteSessionImpl implements NoteSession {
     // Re-gate: the content may have introduced (or removed) syntax the editor
     // can't round-trip. When protection flips the pane remounts via
     // initialContent; otherwise reload the live editor in place.
-    const unsafe = detectConflictMarkers(content) || this.#classify(doc.body) === 'lossy'
+    const unsafe = this.#classify(doc.body) === 'lossy'
     const flipped = unsafe !== this.#isProtected
     this.#isProtected = unsafe
     this.#initialContent = unsafe ? content : doc.body
@@ -526,9 +509,7 @@ class NoteSessionImpl implements NoteSession {
         this.#dirty = false
         this.#missing = fileMissing
         // The data-loss gate: a note the editor can't reproduce opens read-only.
-        // Conflict markers need their own check: the round trip mangles them
-        // but still classifies `normalizing` (meowdown 0.65.3).
-        this.#isProtected = detectConflictMarkers(adopted) || this.#classify(doc.body) === 'lossy'
+        this.#isProtected = this.#classify(doc.body) === 'lossy'
         this.#initialContent = this.#isProtected ? adopted : doc.body
         this.#status = 'ready'
         this.#emit()
@@ -598,13 +579,9 @@ class NoteSessionImpl implements NoteSession {
     const attemptedHeader = this.#header
     try {
       const shouldPersist = this.#dirty
-      const keptTheirsBefore = this.#keptTheirsCount
       await this.flush()
       if (shouldPersist && this.#error !== null) {
         throw new Error(this.#error)
-      }
-      if (this.#keptTheirsCount !== keptTheirsBefore) {
-        throw new Error(KEPT_THEIRS_MESSAGE)
       }
       return true
     } catch (cause) {
@@ -664,12 +641,8 @@ class NoteSessionImpl implements NoteSession {
     // A no-op edit (transform changed nothing) writes nothing, so a *prior*
     // surfaced save error must not be mistaken for this edit's failure.
     const shouldPersist = this.#dirty
-    const keptTheirsBefore = this.#keptTheirsCount
     this.#emit()
     await this.flush()
-    if (this.#keptTheirsCount !== keptTheirsBefore) {
-      throw new Error(KEPT_THEIRS_MESSAGE)
-    }
     // `flush()` resolves even when the write failed (captured in `error`, not
     // thrown). Revert and surface the failure: it persists, or nothing changes.
     if (shouldPersist && this.#error !== null) {

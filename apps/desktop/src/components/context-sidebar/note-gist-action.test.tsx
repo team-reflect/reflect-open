@@ -24,7 +24,6 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
     title: 'A',
     dailyDate: null,
     isPrivate: false,
-    hasConflict: false,
     gistUrl: null,
     gistStale: false,
     ...overrides,

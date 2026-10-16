@@ -39,20 +39,20 @@ itself where that is safe, in this order (deterministic — both devices
 resolving the same conflict produce identical bytes and converge):
 
 1. **Same content** (or only whitespace differs): nothing to do.
-2. **One side carries conflict markers** from an older version: the newer
-   side is kept whole, even when it is the marked one.
-3. **A merge keeps coming back**: when the same two merge results collide
+2. **A merge keeps coming back**: when the same two merge results collide
    again, the loop breaker keeps the newer side.
-4. **Different parts of the note**: merged three-ways over the note's last
+3. **Different parts of the note**: merged three-ways over the note's last
    synced state.
-5. **Only metadata differs** (pinned on the Mac, marked private on the
+4. **Only metadata differs** (pinned on the Mac, marked private on the
    phone): merged key by key.
-6. **Both devices only appended**: both tails are kept, oldest first. This
+5. **Both devices only appended**: both tails are kept, oldest first. This
    applies to any note. It is the daily-note case, and the most common one.
    Two devices creating the same day's note offline (iCloud leaves a
    `2026-07-04 2.md` behind) fold back into one file the same way.
-7. **Anything else**: a word-level merge keeps the words both sides added.
-   It always produces text, so Reflect never writes conflict markers.
+6. **Anything else**: a word-level merge keeps the words both sides added.
+   It always produces text, so Reflect never writes conflict markers. A
+   file that already holds markers is plain text: the ladder merges it like
+   any other text.
 
 The same ladder runs on every path: a Git pull, the iCloud sweep, and an
 editor save that meets a newer file on disk. The path does not change the
@@ -148,5 +148,4 @@ entirely.
 - **AI-assisted resolution** — the ladder already produces the
   base/local/remote triple a BYOK provider would consume; see the plan's
   *Deferred* section. `private: true` notes will be hard-blocked from it.
-- A richer diff view in the protected view of a note that an older version left with markers.
 - Upload/download progress in the sync status line.

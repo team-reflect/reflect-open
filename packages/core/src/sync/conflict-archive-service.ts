@@ -18,7 +18,7 @@ const restoreOutcomeSchema = z.object({
   merged: z
     .object({
       content: z.string(),
-      kind: z.enum(['exact', 'reconciled', 'keptTheirs']),
+      kind: z.enum(['exact', 'reconciled']),
     })
     .optional(),
 })

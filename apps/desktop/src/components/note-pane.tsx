@@ -1,14 +1,12 @@
 import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from 'react'
 import type { ExitBoundaryHandler, SearchStatus } from '@meowdown/core'
-import { deferredCreationPolicy, detectConflictMarkers, isDaily } from '@reflect/core'
+import { deferredCreationPolicy, isDaily } from '@reflect/core'
 import { BacklinksPanel } from '@/components/backlinks-panel.tsx'
-import { ConflictNoteView } from '@/components/conflict-note-view.tsx'
 import { NoteLoading } from '@/components/note-loading.tsx'
 import { NoteOpenError } from '@/components/note-open-error.tsx'
 import { NoteSaveAlerts } from '@/components/note-save-alerts.tsx'
 import { ProtectedNoteView } from '@/components/protected-note-view.tsx'
 import { SuggestedContactCard } from '@/components/suggested-contact-card.tsx'
-import { SyncConflictNotice } from '@/components/sync-conflict-notice.tsx'
 import { EditorAiKeymap } from '@/editor/ai-menu/editor-ai-keymap.tsx'
 import { useEditorAiMenu } from '@/editor/ai-menu/use-editor-ai-menu.tsx'
 import { editorBodyWithDefaultBullet } from '@/editor/default-bullet.ts'
@@ -263,20 +261,9 @@ export function NotePaneComponent({
   }
 
   if (document.protected) {
-    // Sync-conflicted notes land here (the session gates on the markers), so the
-    // conflict notice — with its raw-text resolution actions — leads the
-    // view, and the file renders with each block's sides color-coded instead
-    // of the generic read-only dump (whose converter-gap alert would only
-    // double up on the conflict explanation).
-    const conflicted = detectConflictMarkers(document.initialContent)
     return (
       <div className={cn(gutterClassName, className)}>
-        <SyncConflictNotice path={path} className="mb-4" />
-        {conflicted ? (
-          <ConflictNoteView content={document.initialContent} />
-        ) : (
-          <ProtectedNoteView content={document.initialContent} />
-        )}
+        <ProtectedNoteView content={document.initialContent} />
         {showBacklinks ? <BacklinksPanel path={path} /> : null}
       </div>
     )
@@ -295,8 +282,6 @@ export function NotePaneComponent({
     <div className={cn('relative', className)} aria-label={`Editing ${path}`}>
       <div className={gutterClassName}>
         <NoteSaveAlerts document={document} assetSaveError={saveError} />
-
-        <SyncConflictNotice path={path} className="mb-4" />
 
         {/* Daily notes are date-titled, so a contact can never match one —
             the hook gates on it, and skipping the mount keeps the stream lean.

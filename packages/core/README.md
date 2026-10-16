@@ -67,7 +67,7 @@ shares it with the app layer. Code never calls the transport directly.
 | `privacy/` | The `private: true` gate: `PrivacyService` and the `CloudSafe<T>` brand. |
 | `capture/`, `assets/`, `audio/` | The background pipelines of an open graph: link capture, asset descriptions, audio memos. |
 | `embeddings/` | Local semantic search: `EmbeddingIndexService`, `RetrievalService`, `SemanticSearchService`. |
-| `sync/` | Git backup (`BackupService`, the sync engine, the GitHub services) and iCloud (`ICloudSyncService`, `ICloudDownloadService`, `ConflictResolutionService`). |
+| `sync/` | Git backup (`BackupService`, the sync engine, the GitHub services) and iCloud (`ICloudSyncService`, `ICloudDownloadService`). |
 | `calendar/` | `CalendarService` (live EventKit reads) and the display policy of the events panel. |
 | `contacts/` | `ContactsService`, `PersonNoteService`, `MeetingService`, `ContactSuggestionService`, and the matching rules. |
 | `settings/` | The settings schema and `SettingsService`. |

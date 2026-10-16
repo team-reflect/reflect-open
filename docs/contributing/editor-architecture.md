@@ -64,8 +64,7 @@ Invariants the loop maintains:
 - **External changes never clobber a dirty buffer.** A clean buffer reloads
   imperatively. A dirty one saves at once. The write merges with the newer
   disk text under the graph lock, through the conflict ladder, and the session
-  adopts the merged text. If the disk file holds conflict markers, the session
-  keeps the disk text and the edits go to Earlier versions.
+  adopts the merged text. Conflict markers in the disk file are plain text.
 - **Writes are generation-pinned.** Every write carries the generation of the
   graph the session was opened on, read at write time so a reopen of that
   graph carries over. Rust rejects stale ones, so a flush racing a graph

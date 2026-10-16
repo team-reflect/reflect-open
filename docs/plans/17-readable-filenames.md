@@ -100,7 +100,7 @@ later surface), daily notes (untouched in every respect — `daily/YYYY-MM-DD.md
    lazy-create seed gains the same `id:` frontmatter. The parser→indexer→`notes.id`
    pipeline already exists and runs; this step starts feeding it. Add a
    non-unique index on `notes.id`, **duplicate-id detection** (two paths
-   claiming one id = a sync fork; surfaced beside `Needs review` in the
+   claiming one id = a sync fork; surfaced in the
    backup section, repair deferred), and — the payoff — **id-based move
    healing**: the open-time reconcile and the live watcher pair a vanished
    row with an appeared file carrying the same id and *move* the rows

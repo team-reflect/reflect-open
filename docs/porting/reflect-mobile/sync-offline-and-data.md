@@ -88,9 +88,8 @@ section is the mapping, not a proposal:
   mid-debounce, the edit is on disk).
 - **Conflicts merge on the device.** V1's CRDT silently merged concurrent
   edits. Reflect v2 does the same through one ladder (Plan 21), and a result
-  that drops or interleaves a side is archived under Earlier versions. Notes
-  that an older version left with markers open in a protected note view with
-  the same mine/theirs/both resolution actions as desktop. Conflicts never
+  that drops or interleaves a side is archived under Earlier versions. Conflict
+  markers are plain text to Reflect. Conflicts never
   block sync of other notes. The canonical case is phone + Mac both appending
   to today's daily note; the append-union rung merges it.
 - **Contract 5 maps to first clone**: cloning a years-old graph over

@@ -6,7 +6,6 @@ import {
   ReflectError,
   type BackupService,
   type BackupState,
-  type ConflictedNote,
   type DuplicateIdGroup,
   type GraphSessionService,
   type IcloudStatus,
@@ -20,7 +19,6 @@ import {
   type TestPlatformOptions,
   type TestBackupService,
 } from '@reflect/core/testing'
-import { deepLinkForRoute } from '@/lib/deep-links/format.ts'
 import { useRouter } from '@/routing/router.tsx'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -40,7 +38,6 @@ let icloud: {
    */
   copyFails: boolean
 }
-let conflictedNotes: ConflictedNote[]
 let duplicateIds: DuplicateIdGroup[]
 let graph: TestOpenGraph
 let platform: TestPlatformOptions
@@ -69,7 +66,6 @@ async function renderSection(): Promise<void> {
     backup,
     platform: createTestPlatformService(platform),
   })
-  vi.spyOn(app.indexQuery, 'getConflictedNotes').mockImplementation(async () => conflictedNotes)
   vi.spyOn(app.indexQuery, 'getDuplicateNoteIds').mockImplementation(async () => duplicateIds)
   openRecent = vi.spyOn(app.graphSession, 'openRecent').mockImplementation(async () => reopens)
   await renderInApp(
@@ -107,7 +103,6 @@ beforeEach(() => {
     pendingNotes: 0,
     copyFails: false,
   }
-  conflictedNotes = []
   duplicateIds = []
   backupState = { phase: 'disconnected' }
   reopens = true
@@ -137,17 +132,16 @@ describe('SyncSection', () => {
     const section = page.getByRole('region', { name: 'Sync' })
     await expect.element(legend(section, 'iCloud Drive')).toBeInTheDocument()
     await expect.element(section.getByText('All note files are downloaded.')).toBeInTheDocument()
-    await expect.element(section.getByText('No notes need review.')).toBeInTheDocument()
+    await expect.element(section.getByText('No sync forks.')).toBeInTheDocument()
     await expect.element(legend(section, 'GitHub sync')).toBeInTheDocument()
     await expect
       .element(section.getByRole('button', { name: /connect github/i }))
       .toBeInTheDocument()
   })
 
-  it('surfaces iCloud download and review counts', async () => {
+  it('surfaces iCloud download and fork counts', async () => {
     graph = ICLOUD_GRAPH
     icloud.pendingNotes = 2
-    conflictedNotes = [{ path: 'notes/a.md', title: 'A' }]
     duplicateIds = [{ id: 'note-1', paths: ['notes/a.md', 'notes/a 2.md'] }]
 
     await renderSection()
@@ -156,54 +150,7 @@ describe('SyncSection', () => {
     await expect
       .element(section.getByText('2 notes are still downloading from iCloud.'))
       .toBeInTheDocument()
-    await expect.element(section.getByText('1 note needs review, 1 sync fork')).toBeInTheDocument()
-    await expect
-      .element(section.getByRole('button', { name: /A.*notes\/a\.md/ }))
-      .toBeInTheDocument()
-  })
-
-  it('opens the conflicted note listed under GitHub sync', async () => {
-    conflictedNotes = [{ path: 'notes/conflicted.md', title: 'Conflicted note' }]
-    backupState = {
-      phase: 'connected',
-      remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
-      status: { state: 'idle' },
-    }
-
-    await renderSection()
-
-    const section = page.getByRole('region', { name: 'Sync' })
-    await section.getByRole('button', { name: /Conflicted note.*notes\/conflicted\.md/ }).click()
-
-    await expect.element(page.getByTestId('route')).toMatchTextContent('notes/conflicted.md')
-  })
-
-  it('opens a ⌘-clicked conflicted note in a new window', async () => {
-    conflictedNotes = [{ path: 'notes/conflicted.md', title: 'Conflicted note' }]
-    backupState = {
-      phase: 'connected',
-      remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
-      status: { state: 'idle' },
-    }
-
-    await renderSection()
-
-    const section = page.getByRole('region', { name: 'Sync' })
-    await section
-      .getByRole('button', { name: /Conflicted note.*notes\/conflicted\.md/ })
-      .click({ modifiers: ['ControlOrMeta'] })
-
-    await vi.waitFor(() =>
-      expect(openNoteWindow).toHaveBeenCalledWith(
-        deepLinkForRoute({
-          kind: 'note',
-          path: 'notes/conflicted.md',
-        }),
-      ),
-    )
-    expect(page.getByTestId('route').element().textContent).toBe('settings')
+    await expect.element(section.getByText('1 sync fork')).toBeInTheDocument()
   })
 })
 

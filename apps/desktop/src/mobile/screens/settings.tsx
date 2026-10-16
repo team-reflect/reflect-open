@@ -145,9 +145,7 @@ export function MobileSettings(): ReactElement {
   const crashTest = useCrashTest()
   const environment = useAppStoreEnvironment()
   const sync = useSyncContext()
-  // Shared with the status pill (one hook, one query cache entry) — and null
-  // until the conflict count is known, so the row never claims `Backed up`
-  // over conflict markers already on disk and then flips.
+  // Shared with the status pill (one hook).
   const status = useMobileSyncStatus()
   const [disconnecting, setDisconnecting] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)

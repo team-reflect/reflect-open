@@ -107,7 +107,6 @@ function noteRow(path: string, isPrivate: boolean, title = 'Meeting'): NoteRow {
     title,
     dailyDate: null,
     isPrivate,
-    hasConflict: false,
     gistUrl: null,
     gistStale: false,
   }

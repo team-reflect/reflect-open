@@ -45,7 +45,6 @@ describe('getNote', () => {
       title: 'Secret',
       dailyDate: null,
       isPrivate: true,
-      hasConflict: false,
       gistUrl: null,
       gistStale: false,
     })

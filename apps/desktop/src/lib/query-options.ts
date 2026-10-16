@@ -2,17 +2,6 @@ import { queryOptions } from '@tanstack/react-query'
 import type { CoreServices, DailyNoteService, IndexQueryService } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
 
-/** Conflicted-note rows shared by every sync status and settings surface. */
-export function createConflictedNotesQueryOptions(
-  indexQuery: IndexQueryService,
-  root: string | undefined,
-) {
-  return queryOptions({
-    queryKey: queryKeys.index.conflictedNotes(root),
-    queryFn: () => indexQuery.getConflictedNotes(),
-  })
-}
-
 /** Duplicate note IDs shared by the Git and iCloud settings surfaces. */
 export function createDuplicateNoteIdsQueryOptions(
   indexQuery: IndexQueryService,

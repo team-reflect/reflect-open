@@ -296,23 +296,6 @@ describe('useNoteDocument', () => {
     expect(result.current.dirty).toBe(false)
   })
 
-  it('opens a note the editor would corrupt in protected mode and never saves it', async () => {
-    // meowdown's converter mangles git conflict markers, so the guard must catch it.
-    noteFile.set(
-      'notes/tasks.md',
-      '# Shared\n\n<<<<<<< this device\nedited on a\n=======\nedited on b\n>>>>>>> other device\n',
-    )
-    const hook = await mount(() => useNoteDocument('notes/tasks.md'))
-    await hook.act(() => clock.advance(0))
-    expect(hook.result.current.status).toBe('ready')
-    expect(hook.result.current.protected).toBe(true)
-
-    // Even if an edit somehow reaches the pipeline, nothing is written.
-    await hook.act(() => hook.result.current.onEditorChange('mangled'))
-    await hook.act(() => clock.advance(2000))
-    expect(writes()).toEqual([])
-  })
-
   it('flushes the previous note when the path switches (final-flush snapshot)', async () => {
     noteFile.set('notes/b.md', '# Hello\n')
 

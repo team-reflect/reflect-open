@@ -31,10 +31,6 @@ export interface NoteRow {
    */
   isPrivate: boolean
   /**
-   * The file carries sync conflict markers (Plan 12) — surface `Needs review`.
-   */
-  hasConflict: boolean
-  /**
    * The published gist's html url, or null when the note has none.
    */
   gistUrl: string | null
@@ -42,14 +38,6 @@ export interface NoteRow {
    * The body changed since it was last published — the "Republish" nudge.
    */
   gistStale: boolean
-}
-
-/**
- * A note flagged `Needs review`: its file carries sync conflict markers.
- */
-export interface ConflictedNote {
-  path: string
-  title: string
 }
 
 /**
@@ -109,13 +97,9 @@ export interface IndexQueryService {
    */
   getPinnedNotes(): Promise<PinnedNote[]>
   /**
-   * Every note whose file carries sync conflict markers, ordered by path.
-   */
-  getConflictedNotes(): Promise<ConflictedNote[]>
-  /**
    * Frontmatter `id`s claimed by more than one note. Two files claiming one
    * identity means a sync fork (e.g. rename/rename divergence) — surfaced for
-   * review like conflicts; repair is deliberately not automatic.
+   * review; repair is deliberately not automatic.
    */
   getDuplicateNoteIds(): Promise<DuplicateIdGroup[]>
   /**
@@ -178,13 +162,12 @@ class IndexQueryServiceImpl implements IndexQueryService {
     const row = await db
       .selectFrom('notes')
       .where('path', '=', path)
-      .select(['path', 'title', 'dailyDate', 'isPrivate', 'hasConflict', 'gistUrl', 'gistStale'])
+      .select(['path', 'title', 'dailyDate', 'isPrivate', 'gistUrl', 'gistStale'])
       .executeTakeFirst()
     return row
       ? {
           ...row,
           isPrivate: row.isPrivate !== 0,
-          hasConflict: row.hasConflict !== 0,
           gistStale: row.gistStale !== 0,
         }
       : undefined
@@ -200,16 +183,6 @@ class IndexQueryServiceImpl implements IndexQueryService {
       .orderBy(sql`pinned_order IS NULL`)
       .orderBy('pinnedOrder')
       .orderBy('titleKey')
-      .orderBy('path')
-      .execute()
-  }
-
-  async getConflictedNotes(): Promise<ConflictedNote[]> {
-    const { db } = this.#deps.database
-    return await db
-      .selectFrom('notes')
-      .where('hasConflict', '=', 1)
-      .select(['path', 'title'])
       .orderBy('path')
       .execute()
   }
