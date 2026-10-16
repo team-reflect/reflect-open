@@ -85,5 +85,5 @@ export function mobileSyncStatus({ backup }: SyncStatusInput): MobileSyncStatus 
   if (backup === null) {
     return null
   }
-  return statusForBackup(backup)
+  return statusForBackup(backup) // FIXME: 1 merge statusForBackup and mobileSyncStatus into one function. // FIXME 2: rename mobileSyncStatus to something more descriptive, like getMobileSyncStatus.
 }
