@@ -26,8 +26,6 @@ export interface NoteSessionSnapshot {
    * note exists only as this buffer until the first save lands.
    */
   missing: boolean
-  /** External content waiting on the user's choice (set only when dirty). */
-  conflict: string | null
   error: string | null
 }
 
@@ -38,7 +36,6 @@ export const INITIAL_NOTE_SNAPSHOT: NoteSessionSnapshot = {
   protected: false,
   dirty: false,
   missing: false,
-  conflict: null,
   error: null,
 }
 
@@ -64,12 +61,13 @@ export interface NoteSessionOptions {
   /**
    * Receives the full document (frontmatter + body) whenever it transitions
    * to a known-on-disk state: the initial load, an adopted external change
-   * (including "load theirs"), or a landed save. `saved` is the only
-   * user-driven origin — the title-rename tracker (Plan 07b) keys off it.
+   * (including a save that merged with a newer disk text), or a landed save.
+   * `saved` is the only user-driven origin — the title-rename tracker
+   * (Plan 07b) keys off it.
    */
   onContent?: ((content: string, origin: NoteContentOrigin) => void) | undefined
   /**
-   * Push content into the live editor (external reload / "load theirs"). The
+   * Push content into the live editor (external reload or merged save). The
    * editor's change handler may fire synchronously during this call; the
    * session recognizes the re-entry and won't treat it as a user edit.
    */
@@ -109,7 +107,7 @@ export interface NoteSession {
   readonly path: string
   /**
    * Rebind the session to a renamed path (Plan 17). The *file* moved; the
-   * document didn't — buffer, header, dirtiness, and conflict state are all
+   * document didn't — buffer, header, and dirtiness are all
    * untouched, and every subsequent read/write uses `to`. Call after flushing,
    * right before the file move lands, so a racing save can never resurrect
    * the old path.
@@ -127,10 +125,6 @@ export interface NoteSession {
    * can't die before the bytes land.
    */
   flush(): Promise<void>
-  /** Resolve a conflict by keeping the buffer (rewrites the file). */
-  keepMine(): void
-  /** Resolve a conflict by loading the external content (discards the buffer). */
-  loadTheirs(): void
   /** The full current document (frontmatter + buffer), as a save would write it. */
   content(): string
   /**
@@ -177,13 +171,9 @@ export interface NoteSession {
   updateFrontmatter(patch: FrontmatterPatch): boolean
   /**
    * {@link NoteSession.updateFrontmatter}, but the patch **lands on disk now**
-   * regardless of session state. Normally that's a flush; under a parked
-   * conflict — where saves are paused and a flush is a deliberate no-op — the
-   * contested content is patched and written through too, so the index sees
-   * the change immediately and *both* resolutions keep it ("keep mine" writes
-   * the patched header, "load theirs" adopts the patched park). Same gating
-   * and false-return as `updateFrontmatter`. For patches that should ride the
-   * resolution instead (the rename alias), use `updateFrontmatter`.
+   * through a flush. Same gating and false-return as `updateFrontmatter`.
+   * Rejects when the write failed, or when the note already held conflict
+   * markers and the edit went to its earlier versions instead.
    */
   commitFrontmatter(patch: FrontmatterPatch): Promise<boolean>
   /**
@@ -202,10 +192,11 @@ export interface NoteSession {
    * synchronously, so there is no read/write race with the editor. A session
    * still loading waits for the load, then applies the edit to the loaded
    * buffer. Returns false when the session can't take it (failed to load,
-   * protected, disposed, or a parked conflict) so the caller refuses rather
-   * than clobber the buffer; an
-   * error thrown by `transform` (a stale task locator) propagates untouched,
-   * and a failed flush reverts the in-memory edit before rethrowing.
+   * protected, or disposed) so the caller refuses rather than clobber the
+   * buffer; an error thrown by `transform` (a stale task locator) propagates
+   * untouched, and a failed flush reverts the in-memory edit before
+   * rethrowing. Rejects as well when the note already held conflict markers
+   * and the edit went to its earlier versions instead.
    */
   commitSourceEdit(transform: (source: string) => string): Promise<boolean>
   /** Flush pending edits and detach: no further snapshots are emitted. */

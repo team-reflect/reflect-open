@@ -293,7 +293,6 @@ describe('useNoteDocument', () => {
     noteFile.set('notes/a.md', '# Changed outside\n')
     await act(() => emitChange([{ path: 'notes/a.md', kind: 'upsert' }]))
     await vi.waitFor(() => expect(editor.applied).toEqual(['# Changed outside\n']))
-    expect(result.current.conflict).toBeNull()
     expect(result.current.dirty).toBe(false)
   })
 

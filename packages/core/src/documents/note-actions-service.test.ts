@@ -589,6 +589,7 @@ function lazySession(
     clock: createTestClockService(),
     logger: createTestLoggerService(),
     graphSession: createTestGraph(),
+    progress: createTestProgressPort(),
   }).create({
     path: 'notes/new.md',
     classify: () => 'exact',

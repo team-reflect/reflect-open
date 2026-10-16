@@ -47,13 +47,6 @@ export interface TitleRenameTrackerOptions {
    */
   path: string
   onRename: (rename: TitleRename) => void
-  /**
-   * Gate checked at fire time (e.g. "no conflict is parked"). When false the
-   * pending rename is kept, not dropped: a post-resolution save re-arms it
-   * ("keep mine"), while adopted external content clears it via `baseline`
-   * ("load theirs") — exactly the two ways a conflict can end.
-   */
-  canFire?: (() => boolean) | undefined
   quietMs?: number
   /**
    * Runs the quiet timer.
@@ -82,7 +75,6 @@ const DEFAULT_QUIET_MS = 5000
 class TitleRenameTrackerImpl implements TitleRenameTracker {
   readonly #path: string
   readonly #onRename: (rename: TitleRename) => void
-  readonly #canFire: (() => boolean) | undefined
   readonly #clock: ClockService
   readonly #quietMs: number
   #baselineTitle: string | null = null
@@ -94,7 +86,6 @@ class TitleRenameTrackerImpl implements TitleRenameTracker {
   constructor(options: TitleRenameTrackerOptions) {
     this.#path = options.path
     this.#onRename = options.onRename
-    this.#canFire = options.canFire
     this.#clock = options.clock
     this.#quietMs = options.quietMs ?? DEFAULT_QUIET_MS
   }
@@ -180,9 +171,6 @@ class TitleRenameTrackerImpl implements TitleRenameTracker {
     this.#cancelTimer()
     if (this.#disposed || this.#pending === null) {
       return
-    }
-    if (this.#canFire !== undefined && !this.#canFire()) {
-      return // blocked (conflict parked): keep pending, mutate nothing
     }
     const rename: TitleRename = {
       from: this.#baselineTitle,

@@ -36,6 +36,42 @@ const vaultScanStatsSchema = z.object({
 
 export type VaultScanStats = z.infer<typeof vaultScanStatsSchema>
 
+const noteWriteOutcomeSchema = z.object({
+  modifiedMs: z.number().nullable(),
+  merged: z
+    .object({
+      content: z.string(),
+      kind: z.enum(['exact', 'reconciled', 'keptTheirs']),
+    })
+    .optional(),
+})
+
+/**
+ * How a checked write against a note that moved on disk was merged.
+ * `content` is the full text now on disk. `exact` merged every line from one
+ * side, `reconciled` merged word by word and archived both inputs, and
+ * `keptTheirs` wrote nothing because the disk file holds conflict markers
+ * (the given contents went to the note's earlier versions).
+ */
+export interface NoteWriteMerge {
+  content: string
+  kind: 'exact' | 'reconciled' | 'keptTheirs'
+}
+
+/**
+ * The outcome of {@link NoteFileService.write}.
+ */
+export interface NoteWriteResult {
+  /**
+   * The on-disk mtime, or the clock's time when the platform reports none.
+   */
+  modifiedMs: number
+  /**
+   * Set when the write merged with a newer disk text instead of writing the given contents.
+   */
+  merged: NoteWriteMerge | null
+}
+
 /**
  * Markdown notes by graph-relative path. Every write, create and delete is
  * reported to {@link FileChangeService.reportOwnWrite} after it lands.
@@ -52,17 +88,17 @@ export interface NoteFileService {
    */
   readLocal(path: string, generation: number): Promise<LocalNoteRead>
   /**
-   * Write a note atomically, pinned to `generation`. `expectedContents`
-   * rejects a stale source revision (`null` requires a missing file);
-   * omitting it writes unconditionally. Resolves with the on-disk mtime,
-   * or the clock's time when the platform reports none.
+   * Write a note atomically, pinned to `generation`. With `expectedContents`
+   * the write is checked: `null` requires a missing file, and a note whose
+   * disk text moved past `expectedContents` is merged with it (see
+   * {@link NoteWriteResult.merged}). Omitting it writes unconditionally.
    */
   write(
     path: string,
     contents: string,
     generation: number,
     expectedContents?: string | null,
-  ): Promise<number>
+  ): Promise<NoteWriteResult>
   /**
    * Create a note only when `path` is free. A collision is returned, never overwritten.
    */
@@ -119,9 +155,9 @@ class NoteFileServiceImpl implements NoteFileService {
     contents: string,
     generation: number,
     expectedContents?: string | null,
-  ): Promise<number> {
+  ): Promise<NoteWriteResult> {
     const { ipc, clock, fileChanges } = this.#deps
-    const diskMs = await ipc.call(
+    const outcome = await ipc.call(
       'note_write',
       {
         path,
@@ -129,11 +165,11 @@ class NoteFileServiceImpl implements NoteFileService {
         generation,
         ...(expectedContents === undefined ? {} : { checkContents: true, expectedContents }),
       },
-      z.number().nullable(),
+      noteWriteOutcomeSchema,
     )
-    const modifiedMs = diskMs ?? clock.now()
+    const modifiedMs = outcome.modifiedMs ?? clock.now()
     fileChanges.reportOwnWrite([{ path, kind: 'upsert', modifiedMs }])
-    return modifiedMs
+    return { modifiedMs, merged: outcome.merged ?? null }
   }
 
   async create(path: string, contents: string, generation: number): Promise<NoteCreateOutcome> {

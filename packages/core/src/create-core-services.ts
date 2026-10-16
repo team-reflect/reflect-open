@@ -1225,7 +1225,7 @@ export function composeCoreServices(
     classicAccess,
     fileChanges,
     attachments,
-    noteSessions: create.noteSessions({ noteFile, clock, logger, graphSession }),
+    noteSessions: create.noteSessions({ noteFile, clock, logger, graphSession, progress }),
     openDocuments,
     noteMove,
     titleRename: create.titleRename({

@@ -103,8 +103,8 @@ interface NotePaneProps {
 
 /**
  * One open note: the editor bound to its on-disk document via the Plan 05 save
- * pipeline (debounced atomic writes, watcher-driven external reload, and a
- * non-destructive conflict prompt when an external change races unsaved edits).
+ * pipeline (debounced atomic writes, and watcher-driven external reload that
+ * merges an external change into unsaved edits on the next write).
  * Notes the editor can't faithfully round-trip open **protected** (read-only)
  * so a converter gap can never silently rewrite a file. Plan 06 mounts one of
  * these per day in the daily stream.

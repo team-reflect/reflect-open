@@ -1,8 +1,9 @@
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { writeGenerationFor, type GraphSessionSource } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
+import type { ProgressPort } from '../ports/progress-port.ts'
 import { errorMessage, isAppError, ReflectError } from '../errors.ts'
-import type { NoteFileService } from '../graph/note-file-service.ts'
+import type { NoteFileService, NoteWriteResult } from '../graph/note-file-service.ts'
 import { appendBlock } from '../markdown/append-section.ts'
 import { detectConflictMarkers } from '../markdown/conflict-markers.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
@@ -33,17 +34,25 @@ export {
 interface NoteSessionIo {
   readonly read: (path: string) => Promise<string>
   readonly write:
-    | ((path: string, contents: string, expectedContents?: string | null) => Promise<void>)
+    | ((
+        path: string,
+        contents: string,
+        expectedContents?: string | null,
+      ) => Promise<NoteWriteResult>)
     | null
 }
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 800
+
+const KEPT_THEIRS_MESSAGE =
+  'The note already holds conflict markers; the edit was kept under Earlier versions'
 
 export interface NoteSessionServiceDeps {
   readonly noteFile: NoteFileService
   readonly clock: ClockService
   readonly logger: LoggerService
   readonly graphSession: GraphSessionSource
+  readonly progress: ProgressPort
 }
 
 class NoteSessionServiceImpl implements NoteSessionService {
@@ -88,7 +97,6 @@ class NoteSessionImpl implements NoteSession {
   #isProtected = false
   #dirty = false
   #missing = false
-  #conflict: string | null = null
   #error: string | null = null
 
   // Pipeline state (never surfaces).
@@ -141,6 +149,15 @@ class NoteSessionImpl implements NoteSession {
   // deleted, so rewriting it would recreate it).
   #discarded = false
 
+  /**
+   * Counts writes whose contents went to the note's earlier versions instead of the file.
+   */
+  #keptTheirsCount = 0
+  /**
+   * True after a failed save retried once from its reconciliation; a landed write clears it.
+   */
+  #retriedFailedSave = false
+
   #lastEmitted: NoteSessionSnapshot | null = null
 
   constructor(deps: NoteSessionServiceDeps, options: NoteSessionOptions) {
@@ -164,7 +181,7 @@ class NoteSessionImpl implements NoteSession {
           ? null
           : async (forPath, contents, expectedContents) => {
               const generation = writeGenerationFor(graphSession, graph)
-              await noteFile.write(forPath, contents, generation, expectedContents)
+              return await noteFile.write(forPath, contents, generation, expectedContents)
             },
     }
     this.path = options.path
@@ -203,7 +220,6 @@ class NoteSessionImpl implements NoteSession {
       protected: this.#isProtected,
       dirty: this.#dirty,
       missing: this.#missing,
-      conflict: this.#conflict,
       error: this.#error,
     }
     if (
@@ -213,7 +229,6 @@ class NoteSessionImpl implements NoteSession {
       this.#lastEmitted.protected === next.protected &&
       this.#lastEmitted.dirty === next.dirty &&
       this.#lastEmitted.missing === next.missing &&
-      this.#lastEmitted.conflict === next.conflict &&
       this.#lastEmitted.error === next.error
     ) {
       return
@@ -225,17 +240,13 @@ class NoteSessionImpl implements NoteSession {
   #save(): void {
     // A discarded session never writes: its file is being deleted, so any
     // save — including a teardown `flush()` (the pane unmounts via flush →
-    // dispose) or an already-queued step — would recreate it. A parked
-    // conflict likewise pauses all saves: writing the buffer before the user
-    // chooses Keep mine / Load theirs would clobber the external change and
-    // defeat the non-destructive flow.
+    // dispose) or an already-queued step — would recreate it.
     if (
       this.#discarded ||
       this.#deleting ||
       this.#io.write === null ||
       !this.#dirty ||
-      this.#isProtected ||
-      this.#conflict !== null
+      this.#isProtected
     ) {
       return
     }
@@ -247,25 +258,24 @@ class NoteSessionImpl implements NoteSession {
         // have reverted or kept typing, or the session may have been discarded
         // for a delete. (After dispose the buffer is frozen, so this same step
         // doubles as the final flush.)
-        if (
-          this.#discarded ||
-          this.#deleting ||
-          !this.#dirty ||
-          this.#isProtected ||
-          this.#conflict !== null
-        ) {
+        if (this.#discarded || this.#deleting || !this.#dirty || this.#isProtected) {
           return
         }
         const content = this.#header + this.#buffer
         this.#inFlightWrite = content
         try {
-          await write(this.path, content, this.#missing ? null : this.#disk)
-          this.#disk = content
-          this.#dirty = this.#header + this.#buffer !== content
+          const result = await write(this.path, content, this.#missing ? null : this.#disk)
           this.#missing = false // the landed write created the file if it was missing
           this.#error = null // a previous save failure is resolved by this success
-          this.#emit()
-          this.#onContent?.(content, 'saved')
+          this.#retriedFailedSave = false
+          if (result.merged === null) {
+            this.#disk = content
+            this.#dirty = this.#header + this.#buffer !== content
+            this.#emit()
+            this.#onContent?.(content, 'saved')
+          } else {
+            this.#adoptMergedWrite(content, result.merged.content, result.merged.kind)
+          }
         } finally {
           this.#inFlightWrite = null
         }
@@ -273,9 +283,41 @@ class NoteSessionImpl implements NoteSession {
       .catch(async (cause) => {
         this.#deps.logger.error('failed to save note:', cause)
         this.#error = errorMessage(cause)
-        await this.#reconcileFromDisk()
+        const retry = !this.#retriedFailedSave
+        this.#retriedFailedSave = true
+        await this.#reconcileFromDisk({ saveIfDirty: retry })
         this.#emit()
       })
+  }
+
+  /**
+   * Take the text a write merged into the file. `sent` is the content the
+   * write was given.
+   */
+  #adoptMergedWrite(
+    sent: string,
+    merged: string,
+    kind: NonNullable<NoteWriteResult['merged']>['kind'],
+  ): void {
+    this.#inFlightWrite = null
+    // Another device may have changed the title, so the merged text is
+    // ground truth for the rename tracker, never a local save.
+    this.#onContent?.(merged, 'external')
+    if (kind === 'keptTheirs') {
+      this.#keptTheirsCount += 1
+      this.#deps.progress.fail(
+        'Saving note',
+        'Your edits were kept under Earlier versions because the note already holds conflict markers',
+      )
+    }
+    if (this.#header + this.#buffer !== sent) {
+      // Keystrokes arrived during the write. Keep them dirty against the base
+      // they were typed on, so the next save merges them with the file again.
+      this.#dirty = true
+      this.#emit()
+      return
+    }
+    this.#adoptCleanContent(merged)
   }
 
   #scheduleSave(): void {
@@ -367,17 +409,16 @@ class NoteSessionImpl implements NoteSession {
     this.#emit()
     // While protected there is no live editor mounted (the pane shows the
     // read-only view), and unsafe content must never enter one regardless.
-    if (!flipped && !unsafe) {
+    if (!flipped && !unsafe && !this.#disposed) {
       this.#applyToEditor(doc.body)
     }
-    this.#onContent?.(content, 'external')
   }
 
   /**
    * Re-read the note and reconcile the buffer with what's on disk (the
    * external-change path).
    */
-  async #reconcileFromDisk(): Promise<void> {
+  async #reconcileFromDisk(options?: { saveIfDirty?: boolean }): Promise<void> {
     let content: string
     try {
       content = await this.#io.read(this.path)
@@ -403,15 +444,20 @@ class NoteSessionImpl implements NoteSession {
       return
     }
     if (this.#dirty) {
-      // Never clobber unsaved edits — park the external content and pause the
-      // save pipeline (cancel any pending debounce) until the user chooses; a
-      // save landing now would overwrite "theirs" first.
-      this.#cancelScheduledSave()
-      this.#conflict = content
-      this.#emit()
+      // The file exists now, so the save is a checked write against the base
+      // the buffer was typed on, and the write merges it with this content.
+      if (this.#missing) {
+        this.#missing = false
+        this.#emit()
+      }
+      if (options?.saveIfDirty ?? true) {
+        this.#cancelScheduledSave()
+        this.#save()
+      }
       return
     }
     this.#adoptCleanContent(content)
+    this.#onContent?.(content, 'external')
   }
 
   /**
@@ -432,7 +478,6 @@ class NoteSessionImpl implements NoteSession {
     this.#loading = true
     this.#missedChange = false
     this.#status = 'loading'
-    this.#conflict = null
     this.#error = null
     this.#emit()
     this.#loadPromise = (async () => {
@@ -494,28 +539,6 @@ class NoteSessionImpl implements NoteSession {
     void this.#reconcileFromDisk()
   }
 
-  keepMine(): void {
-    if (this.#conflict !== null) {
-      this.#disk = this.#conflict
-      this.#missing = false
-    }
-    this.#conflict = null
-    this.#dirty = true // force the rewrite even if content drifted equal
-    this.#emit()
-    this.#save()
-  }
-
-  loadTheirs(): void {
-    if (this.#conflict === null) {
-      return
-    }
-    const content = this.#conflict
-    this.#conflict = null
-    // Same re-gating as the clean-reload path: never load lossy content into a
-    // live editor whose next save would drop what it can't model.
-    this.#adoptCleanContent(content)
-  }
-
   updateFrontmatter(patch: FrontmatterPatch): boolean {
     if (this.#disposed || this.#isProtected || this.#status !== 'ready') {
       return false
@@ -545,21 +568,14 @@ class NoteSessionImpl implements NoteSession {
     }
     const attemptedHeader = this.#header
     try {
-      if (this.#conflict === null) {
-        const shouldPersist = this.#dirty
-        await this.flush()
-        if (shouldPersist && this.#error !== null) {
-          throw new Error(this.#error)
-        }
-      } else {
-        // Keep both conflict resolutions consistent with the persisted flag.
-        const patched = upsertFrontmatter(this.#conflict, frontmatterPatchToYaml(patch))
-        if (patched !== this.#conflict) {
-          await this.#io.write(this.path, patched)
-          this.#conflict = patched
-          this.#disk = patched
-          this.#emit()
-        }
+      const shouldPersist = this.#dirty
+      const keptTheirsBefore = this.#keptTheirsCount
+      await this.flush()
+      if (shouldPersist && this.#error !== null) {
+        throw new Error(this.#error)
+      }
+      if (this.#keptTheirsCount !== keptTheirsBefore) {
+        throw new Error(KEPT_THEIRS_MESSAGE)
       }
       return true
     } catch (cause) {
@@ -582,8 +598,8 @@ class NoteSessionImpl implements NoteSession {
    * navigating to a note (⌘D to today) opens its session in the same tick the
    * Tasks view's unmount flush writes to it, and the pending read is a moment,
    * not a reason to refuse. Returns false when the session can't safely take a
-   * body edit (no write channel, disposed, protected/read-only, failed to load,
-   * or a parked conflict) so the caller refuses rather than clobber the buffer
+   * body edit (no write channel, disposed, protected/read-only, or failed to
+   * load) so the caller refuses rather than clobber the buffer
    * via disk. `transform` runs before any mutation, so a `TaskStaleError` (the
    * marker can't be located) propagates with nothing changed. And the write is
    * all-or-nothing: a failed flush reverts the in-memory edit so the editor and
@@ -601,12 +617,7 @@ class NoteSessionImpl implements NoteSession {
       await this.#loadPromise
     }
     // Protection is decided by the load, so this gate runs after the wait.
-    if (
-      this.#disposed ||
-      this.#isProtected ||
-      this.#status !== 'ready' ||
-      this.#conflict !== null
-    ) {
+    if (this.#disposed || this.#isProtected || this.#status !== 'ready') {
       return false
     }
     this.#reconcilePendingEditorInput?.()
@@ -624,8 +635,12 @@ class NoteSessionImpl implements NoteSession {
     // A no-op edit (transform changed nothing) writes nothing, so a *prior*
     // surfaced save error must not be mistaken for this edit's failure.
     const shouldPersist = this.#dirty
+    const keptTheirsBefore = this.#keptTheirsCount
     this.#emit()
     await this.flush()
+    if (this.#keptTheirsCount !== keptTheirsBefore) {
+      throw new Error(KEPT_THEIRS_MESSAGE)
+    }
     // `flush()` resolves even when the write failed (captured in `error`, not
     // thrown). Revert and surface the failure: it persists, or nothing changes.
     if (shouldPersist && this.#error !== null) {

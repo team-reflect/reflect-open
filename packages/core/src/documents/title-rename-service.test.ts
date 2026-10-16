@@ -71,7 +71,6 @@ interface SetupOptions {
    * The graph open when the coordinator is created; defaults to generation 7, `null` for none.
    */
   graph?: TestOpenGraph | null
-  canFire?: () => boolean
   /**
    * Make every title resolution reject, so the link rewrite fails.
    */
@@ -173,10 +172,7 @@ function setup(options?: SetupOptions) {
     logger,
     graphSession: graph,
   })
-  const coordinator = titleRename.createCoordinator({
-    path,
-    canFire: options?.canFire ?? (() => true),
-  })
+  const coordinator = titleRename.createCoordinator({ path })
 
   /**
    * The operations started so far, each with its outcome.
@@ -419,24 +415,6 @@ describe('rename coordinator', () => {
         cause: undefined,
       },
     ])
-  })
-
-  it('a blocked settle keeps the rename pending; the next settle fires it', async () => {
-    let armed = false
-    const { coordinator, started } = setup({
-      files: { [PATH]: managed('# New Title\n') },
-      canFire: () => armed,
-    })
-    coordinator.content(managed('# Old Title\n'), 'load')
-    coordinator.content(managed('# New Title\n'), 'saved')
-    coordinator.settle() // conflict parked: must not fire
-    await coordinator.settled()
-    expect(started()).toEqual([])
-
-    armed = true // "keep mine" resolved the conflict
-    coordinator.settle()
-    await coordinator.settled()
-    expect(started()).toEqual(['Renaming "Old Title" → "New Title"'])
   })
 
   it('external content re-baselines: no rewrite for titles the user did not author', async () => {
