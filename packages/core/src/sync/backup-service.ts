@@ -270,7 +270,7 @@ class BackupServiceImpl implements BackupService {
               const token = await githubAuth.getToken()
               return token === null ? null : githubCredential(token)
             }
-          : () => (null)
+          : () => null
       const coexisting = isICloudRoot(this.#root)
       const next = syncEngines.create({
         generation: this.#generation,
