@@ -109,8 +109,6 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
     }
     const [wikiLinks, contactResolutions] = await Promise.all([
       suggestions.suggestWikiLinkTargets(query, 8, dateContext),
-      // A contacts hiccup (permission revoked mid-session, store error)
-      // must cost only its own rows, never the note suggestions.
       contactsInMenu
         ? this.#suggestContacts(query)
         : Promise.resolve<PersonContactResolution[]>([]),
@@ -204,9 +202,10 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
   }
 
   /**
-   * The one user-visible refusal for an `ambiguous` title resolution: several
-   * notes may claim the title's exact or fallback key, or an unavailable
-   * collision prevents proving uniqueness. Creation may not guess then.
+   * The contact rows of the `[[` menu, each resolved against its person note.
+   * A contacts hiccup (permission revoked mid-session, store error) costs
+   * only these rows, never the note suggestions, so a failure is logged and
+   * answers no contacts.
    */
   async #suggestContacts(query: string): Promise<PersonContactResolution[]> {
     const { contacts, personNotes, logger } = this.#deps
@@ -241,6 +240,11 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
     }
   }
 
+  /**
+   * The one user-visible refusal for an `ambiguous` title resolution: several
+   * notes may claim the title's exact or fallback key, or an unavailable
+   * collision prevents proving uniqueness. Creation may not guess then.
+   */
   #reportAmbiguousNoteTitle(title: string): void {
     this.#deps.operations.fail('Creating note', ambiguousNoteTitleMessage(title))
   }

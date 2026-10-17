@@ -444,8 +444,6 @@ class MeetingServiceImpl implements MeetingService {
     const { suggestions } = this.#deps
     const [notes, matches] = await Promise.all([
       suggestions.suggestWikiTargets(query, limit),
-      // A contacts hiccup must cost only its own rows, never the note
-      // suggestions (the same containment as the editor's `[[` menu).
       lookupContacts ? this.#suggestContacts(query) : Promise.resolve([]),
     ])
     return {
@@ -523,7 +521,9 @@ class MeetingServiceImpl implements MeetingService {
   }
 
   /**
-   * A note's source at `generation`, where "no note yet" reads as empty.
+   * The contact rows of the attendee menu. A contacts hiccup costs only these
+   * rows, never the note suggestions (the same containment as the editor's
+   * `[[` menu), so a failure is logged and answers no contacts.
    */
   async #suggestContacts(query: string): Promise<ContactMatch[]> {
     const { contacts, logger } = this.#deps
@@ -535,6 +535,9 @@ class MeetingServiceImpl implements MeetingService {
     }
   }
 
+  /**
+   * A note's source at `generation`, where "no note yet" reads as empty.
+   */
   async #noteSource(path: string, generation: number): Promise<string> {
     try {
       return await this.#deps.noteFile.read(path, generation)
