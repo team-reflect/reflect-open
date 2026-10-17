@@ -1,5 +1,5 @@
 import { error, info, warn } from '@tauri-apps/plugin-log'
-import type { LoggerService } from '@reflect/core'
+import { AppError, type LoggerService } from '@reflect/core'
 
 /**
  * A rendered cause longer than this is cut, so one oversized payload cannot
@@ -8,6 +8,9 @@ import type { LoggerService } from '@reflect/core'
 const MAX_CAUSE_LENGTH = 2000
 
 function renderCause(cause: unknown): string {
+  if (cause instanceof AppError) {
+    return `${cause.name} (${cause.kind}): ${cause.message}`
+  }
   if (cause instanceof Error) {
     return String(cause)
   }

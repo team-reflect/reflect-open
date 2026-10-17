@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { IcloudScanOptions, IcloudSweepOutcome } from '../ipc/icloud-native-service.ts'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
 import { createTestFileChangeService, type TestFileChangeService } from '../testing/file-change.ts'
@@ -356,7 +356,7 @@ describe('createICloudSyncService', () => {
   })
 
   it('a watch that fails to start is logged and the baseline sweep still runs', async () => {
-    vi.spyOn(icloud, 'watchStart').mockRejectedValue(new ReflectError('io', 'no container'))
+    vi.spyOn(icloud, 'watchStart').mockRejectedValue(new AppError('io', 'no container'))
     const sync = service({ watch: true })
     await sync.start()
     await settleScan()
@@ -369,7 +369,7 @@ describe('createICloudSyncService', () => {
 
   it('a failed change subscription is logged and the baseline sweep still runs', async () => {
     vi.spyOn(fileChanges, 'subscribe').mockImplementation(() => {
-      throw new ReflectError('io', 'watcher unavailable')
+      throw new AppError('io', 'watcher unavailable')
     })
     const sync = service()
     await sync.start()

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import { createEmbedMediaService } from './embed-media-service.ts'
 import {
   createTestClockService,
@@ -140,8 +141,7 @@ describe('EmbedMediaService.loadXPost', () => {
         requests += 1
         if (failures > 0) {
           failures -= 1
-          // eslint-disable-next-line @typescript-eslint/only-throw-error -- the bridge rejects with a plain `AppError`
-          throw { kind: 'network', message: 'offline' }
+          throw new AppError('network', 'offline')
         }
         return await fake.fetchSyndication(postId)
       },
@@ -208,18 +208,17 @@ describe('EmbedMediaService.resolveYouTubeVideo', () => {
     'https://www.youtube.com/oembed?url=' + encodeURIComponent(URL) + '&format=json'
 
   /**
-   * A service whose oEmbed endpoint gives each of `answers` in turn; an `Error` or a plain object rejects.
+   * A service whose oEmbed endpoint gives each of `answers` in turn; an `Error` rejects.
    */
-  function setup(...answers: unknown[]) {
+  function setup(...answers: (string | Error)[]) {
     const requests: string[] = []
     const logger = createTestLoggerService()
     const clock = createTestClockService()
     const webFetch = createTestWebFetchService()
     vi.spyOn(webFetch, 'fetchOembed').mockImplementation(async (url) => {
       requests.push(url)
-      const answer = answers.shift()
-      if (typeof answer !== 'string') {
-        // eslint-disable-next-line @typescript-eslint/only-throw-error -- the bridge rejects with a plain `AppError`
+      const answer = answers.shift() ?? new Error('no oEmbed answer left')
+      if (answer instanceof Error) {
         throw answer
       }
       return answer
@@ -280,7 +279,7 @@ describe('EmbedMediaService.resolveYouTubeVideo', () => {
   })
 
   it('logs a failed fetch and asks again', async () => {
-    const cause = { kind: 'io', message: 'answered 404' }
+    const cause = new AppError('io', 'answered 404')
     const { embedMedia, logger } = setup(cause, JSON.stringify(ANSWER))
     expect(await embedMedia.resolveYouTubeVideo(URL)).toBeUndefined()
     expect(logger.getErrors()).toEqual([{ message: `YouTube video fetch failed: ${URL}`, cause }])

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { MobileStorageInfo, Settings } from '@reflect/core'
+import { AppError } from '@reflect/core'
 import {
   createTestActivityPort,
   createTestClockService,
@@ -51,7 +52,7 @@ function setup(options?: SetupOptions) {
       recent_graphs: () => [],
       graph_open: (args) => {
         if (failures.open) {
-          throw { kind: 'io', message: 'cannot open graph' }
+          throw new AppError('io', 'cannot open graph')
         }
         const root = String(args['path'])
         opened.push(root)

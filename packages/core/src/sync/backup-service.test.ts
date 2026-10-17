@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { FileChange } from '../indexing/file-change-service.ts'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
 import { createTestFileChangeService, type TestFileChangeService } from '../testing/file-change.ts'
@@ -139,7 +139,7 @@ interface FakeOptions {
   /**
    * Make every `push` throw this error (transport-level failures).
    */
-  pushError?: unknown
+  pushError?: Error | undefined
   /**
    * The graph's origin (defaults to a GitHub HTTPS remote; null = none).
    */
@@ -191,7 +191,7 @@ function fakeServices(options: FakeOptions = {}) {
   }
   const secretStore = createTestSecretStoreService(initialSecrets)
   if (options.failSecretGet === true) {
-    vi.spyOn(secretStore, 'get').mockRejectedValue(new ReflectError('io', 'keychain unavailable'))
+    vi.spyOn(secretStore, 'get').mockRejectedValue(new AppError('io', 'keychain unavailable'))
   }
 
   const git = createTestGitRepositoryService()
@@ -202,7 +202,7 @@ function fakeServices(options: FakeOptions = {}) {
       await statusGate.promise
     }
     if (options.failStatus === true) {
-      throw new ReflectError('io', 'broken repo')
+      throw new AppError('io', 'broken repo')
     }
     return { ...status }
   })
@@ -258,7 +258,7 @@ function fakeServices(options: FakeOptions = {}) {
 
   if (options.failListen === true) {
     vi.spyOn(fileChanges, 'subscribe').mockImplementation(() => {
-      throw new ReflectError('io', 'watcher unavailable')
+      throw new AppError('io', 'watcher unavailable')
     })
   }
 
@@ -271,7 +271,7 @@ function fakeServices(options: FakeOptions = {}) {
       record('applyChanges', { paths: changes.map((change) => change.path), generation })
       indexApplyCount += 1
       if (options.failIndexApply === true) {
-        throw new ReflectError('io', 'index write failed')
+        throw new AppError('io', 'index write failed')
       }
       if (options.gateIndexApply === true && indexApplyCount === 1) {
         await indexApplyGate.promise
@@ -493,7 +493,7 @@ describe('createBackupService', () => {
       const failing = await startSettled({})
       watch(failing.git)
       failing.git.onPush(() => {
-        throw new ReflectError('auth', 'bad token')
+        throw new AppError('auth', 'bad token')
       })
       failing.git.onPull(() => ({ ...PULLED, committed: true, ahead: 1 }))
       void failing.backup.backUpNow()
@@ -947,7 +947,7 @@ describe('createBackupService', () => {
   // libgit2 reports every 403 as an auth failure, but GitHub also answers
   // 403 for a token without access to the repo and for rate limiting; the
   // backup asks GitHub whether the token is good before blaming it.
-  const FORBIDDEN = { kind: 'auth', message: 'request failed with status code: 403' }
+  const FORBIDDEN = new AppError('auth', 'request failed with status code: 403')
   const MERGED: PullOutcome = { ...PULLED, ahead: 1 }
 
   it('a 403 with a valid token reports a refused sync, not a bad credential', async () => {

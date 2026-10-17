@@ -7,6 +7,7 @@ import {
   type AiProviderConfig,
   type AudioRecorderFinalSegment,
   type GraphInfo,
+  AppError,
 } from '@reflect/core'
 import {
   createTestCoreServices,
@@ -165,10 +166,7 @@ describe('AudioMemoProvider', () => {
 
   it('a capture failure while the sidebar is collapsed surfaces through operations', async () => {
     const { result, app } = await setup()
-    vi.spyOn(app.assetStore, 'uploadToPath').mockRejectedValue({
-      kind: 'io',
-      message: 'disk full',
-    })
+    vi.spyOn(app.assetStore, 'uploadToPath').mockRejectedValue(new AppError('io', 'disk full'))
 
     await act(async () => {
       result.current.memo.toggle()

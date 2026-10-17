@@ -1,5 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type {
   ICloudNativeService,
@@ -266,7 +266,7 @@ class TestICloudNativeServiceImpl implements TestICloudNativeService {
   async adoptGraph(generation: number): Promise<string> {
     this.#log.push({ method: 'adoptGraph', args: [generation] })
     if (!this.#status.available || this.#status.documentsRoot === null) {
-      throw new ReflectError('io', 'test iCloud: the container is unavailable')
+      throw new AppError('io', 'test iCloud: the container is unavailable')
     }
     return `${this.#status.documentsRoot}/Notes`
   }

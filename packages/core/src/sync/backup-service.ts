@@ -6,7 +6,7 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import type { PersistenceFlushService } from '../graph/persistence-flush-service.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { isMobilePlatform } from '../ports/platform-facts.ts'
-import { errorMessage, ReflectError } from '../errors.ts'
+import { errorMessage, AppError } from '../errors.ts'
 import { isNotePath } from '../graph/paths.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
@@ -338,7 +338,7 @@ class BackupServiceImpl implements BackupService {
     }
     const [owner, repoName, ...rest] = repo.fullName.split('/')
     if (owner === undefined || repoName === undefined || rest.length > 0) {
-      throw new ReflectError('parse', `unexpected repository name from GitHub: ${repo.fullName}`)
+      throw new AppError('parse', `unexpected repository name from GitHub: ${repo.fullName}`)
     }
     // Align with the account's default branch for new repos so the first
     // push creates the branch GitHub already considers the default.
@@ -617,7 +617,7 @@ class BackupServiceImpl implements BackupService {
       // else (GitHub throttling, a fetch that never reached it, an unparsable
       // reply) says nothing about the credential, so it must not keep asking
       // for a reconnect either.
-      if (cause instanceof ReflectError && cause.kind === 'auth') {
+      if (cause instanceof AppError && cause.kind === 'auth') {
         return
       }
       next = {
@@ -635,7 +635,7 @@ class BackupServiceImpl implements BackupService {
     const { githubAuth } = this.#deps
     const token = await githubAuth.getToken()
     if (token === null) {
-      throw new ReflectError('auth', 'Connect GitHub first (no credential stored)')
+      throw new AppError('auth', 'Connect GitHub first (no credential stored)')
     }
     return token
   }

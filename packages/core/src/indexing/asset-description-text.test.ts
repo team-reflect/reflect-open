@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { AppError } from '../errors.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { createTestNoteFileService, type TestNoteFileService } from '../testing/index.ts'
 import {
@@ -71,7 +72,7 @@ describe('AssetDescriptionText.gatherText', () => {
   })
 
   it('propagates a non-notFound read error', async () => {
-    readNoteMock.mockRejectedValueOnce({ kind: 'io', message: 'disk error' })
+    readNoteMock.mockRejectedValueOnce(new AppError('io', 'disk error'))
     await expect(assetText.gatherText(['assets/a.png'], 1)).rejects.toMatchObject({ kind: 'io' })
   })
 })

@@ -1,6 +1,6 @@
 import type { MaybePromise } from '@reflect/utils'
 import { describe, expect, it, vi } from 'vitest'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { AssetStoreService } from '../graph/asset-store-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import type { FileMeta } from '../graph/schemas.ts'
@@ -72,7 +72,7 @@ function assetUrl(generation: number, path: string): string {
 
 function failing(message: string): () => Promise<never> {
   return async () => {
-    throw new ReflectError('io', message)
+    throw new AppError('io', message)
   }
 }
 
@@ -150,7 +150,7 @@ describe('createSaveScope', () => {
     const uploadBlob = assetStore.uploadBlob.bind(assetStore)
     vi.spyOn(assetStore, 'uploadBlob').mockImplementation(async (name, contents, generation) => {
       if (failure !== null) {
-        throw new ReflectError('io', failure)
+        throw new AppError('io', failure)
       }
       return await uploadBlob(name, contents, generation)
     })
@@ -183,7 +183,7 @@ describe('createSaveScope', () => {
 
     const saving = scope.saveFile(fileOf('slow.pdf', 'application/pdf'))
     scope.reset()
-    upload.reject(new ReflectError('io', 'late failure'))
+    upload.reject(new AppError('io', 'late failure'))
 
     await expect(saving).resolves.toBeNull()
     expect(scope.error()).toBeNull()

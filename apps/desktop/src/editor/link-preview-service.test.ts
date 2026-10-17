@@ -6,6 +6,7 @@ import {
   type NoteDocumentService,
   type parseLinkPreviewMeta,
   type WebFetchService,
+  AppError,
 } from '@reflect/core'
 import { createTestCoreServices, createTestGraphSessionService } from '@reflect/core/testing'
 
@@ -168,7 +169,7 @@ describe('createNoteLinkPreviewResolver', () => {
   it('retries transient page-fetch failures', async () => {
     const fetchHtml = vi
       .fn()
-      .mockRejectedValueOnce({ kind: 'network', message: 'offline' })
+      .mockRejectedValueOnce(new AppError('network', 'offline'))
       .mockResolvedValue(page)
     const deps = dependencies({ fetchHtml })
     const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
@@ -183,7 +184,7 @@ describe('createNoteLinkPreviewResolver', () => {
   it('shows metadata but retries after a transient favicon failure', async () => {
     const fetchIcon = vi
       .fn()
-      .mockRejectedValueOnce({ kind: 'network', message: 'offline' })
+      .mockRejectedValueOnce(new AppError('network', 'offline'))
       .mockResolvedValue('data:image/png;base64,aGVsbG8=')
     const deps = dependencies({ fetchIcon })
     const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
@@ -215,7 +216,7 @@ describe('createNoteLinkPreviewResolver', () => {
   it('fails closed for private, missing, and unreadable notes', async () => {
     for (const readSource of [
       vi.fn().mockResolvedValue(privateSource),
-      vi.fn().mockRejectedValue({ kind: 'notFound' }),
+      vi.fn().mockRejectedValue(new AppError('notFound', 'no such note')),
       vi.fn().mockRejectedValue(new Error('unreadable')),
     ]) {
       const deps = dependencies({ readSource })

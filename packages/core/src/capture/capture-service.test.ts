@@ -5,7 +5,7 @@ import type { TextCaptureEnvelope } from './capture-envelope.ts'
 import { captureIdentity, captureLocalDate } from './capture-identity.ts'
 import { captureNoteSource } from './capture-note.ts'
 import { createBackgroundReconcilerFactory } from '../reconcile/background-reconciler.ts'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import { createAiCredentialService } from '../ai/ai-credential-service.ts'
 import { createAiProviderConfigService } from '../ai/ai-provider-config-service.ts'
 import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
@@ -404,9 +404,7 @@ describe('CaptureService (triggers)', () => {
   it('surfaces a drain failure once, then lands the capture when the failure clears', async () => {
     const kit = setup()
     kit.captureInbox.add(`${TEXT.id}.json`, TEXT)
-    const write = vi
-      .spyOn(kit.noteFile, 'write')
-      .mockRejectedValue(new ReflectError('io', 'disk full'))
+    const write = vi.spyOn(kit.noteFile, 'write').mockRejectedValue(new AppError('io', 'disk full'))
 
     const session = kit.capture.openSession({ generation: 3 })
     session.start()
@@ -448,7 +446,7 @@ describe('CaptureService (X posts)', () => {
   it('reports X post writes after a pass stops partway', async () => {
     const kit = setup()
     kit.captureInbox.add(`${TEXT.id}.json`, TEXT)
-    vi.spyOn(kit.noteFile, 'write').mockRejectedValue(new ReflectError('io', 'disk full'))
+    vi.spyOn(kit.noteFile, 'write').mockRejectedValue(new AppError('io', 'disk full'))
     const written = vi.fn()
     kit.capture.onXPostsWritten(written)
 

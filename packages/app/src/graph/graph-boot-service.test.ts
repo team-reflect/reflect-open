@@ -4,6 +4,7 @@ import {
   createPosixPathTransport,
   type RecentGraph,
   type WindowBootstrap,
+  AppError,
 } from '@reflect/core'
 import {
   createTestDeepLinkIntakeService,
@@ -55,7 +56,7 @@ function setup(options?: SetupOptions) {
     commands: {
       recent_graphs: () => {
         if (failures.recents) {
-          throw { kind: 'io', message: 'recents are corrupt' }
+          throw new AppError('io', 'recents are corrupt')
         }
         return recents
       },

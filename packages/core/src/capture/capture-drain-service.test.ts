@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import fixtures from './bookmark-envelope.fixtures.json' with { type: 'json' }
 import type { TextCaptureEnvelope } from './capture-envelope.ts'
 import {
@@ -239,7 +240,7 @@ describe('CaptureDrainService', () => {
 
   it('keeps the spool retryable when the Links note cannot be ensured', async () => {
     kit.addSpool(envelope())
-    kit.ensureBacklinkTargetMock.mockRejectedValue({ kind: 'io', message: 'disk full' })
+    kit.ensureBacklinkTargetMock.mockRejectedValue(new AppError('io', 'disk full'))
 
     const outcome = await kit.drain()
 
@@ -440,7 +441,7 @@ describe('CaptureDrainService', () => {
 
   it('saves a capture whose screenshot cannot decode, without wedging the pass', async () => {
     kit.addSpool(envelope())
-    kit.promoteMock.mockRejectedValue({ kind: 'parse', message: 'screenshot does not decode' })
+    kit.promoteMock.mockRejectedValue(new AppError('parse', 'screenshot does not decode'))
 
     const outcome = await kit.drain()
 
@@ -486,7 +487,7 @@ describe('CaptureDrainService', () => {
 
   it('a write failure stops the pass with the error kind', async () => {
     kit.addSpool(envelope())
-    kit.writeNoteMock.mockRejectedValue({ kind: 'io', message: 'disk full' })
+    kit.writeNoteMock.mockRejectedValue(new AppError('io', 'disk full'))
 
     const outcome = await kit.drain()
 

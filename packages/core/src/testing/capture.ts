@@ -6,7 +6,7 @@ import type {
   CaptureSession,
   CaptureSessionOptions,
 } from '../capture/capture-service.ts'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { CaptureInboxService } from '../graph/capture-inbox-service.ts'
 import type { FileMeta } from '../graph/schemas.ts'
 import type { Unlisten } from '../unlisten.ts'
@@ -18,8 +18,8 @@ import type {
 
 const INBOX_DIR = '.reflect/inbox'
 
-function notFound(what: string): ReflectError {
-  return new ReflectError('notFound', `${what} not found`)
+function notFound(what: string): AppError {
+  return new AppError('notFound', `${what} not found`)
 }
 
 function encodeContents(contents: unknown): string {

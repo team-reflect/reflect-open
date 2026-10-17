@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ReflectError, type ConnectExistingResult, type GithubAuth } from '@reflect/core'
+import { AppError, type ConnectExistingResult, type GithubAuth } from '@reflect/core'
 import {
   createTestBackupService,
   createTestClockService,
@@ -224,7 +224,7 @@ describe('createConnectGithubWizardService', () => {
   })
 
   it('surfaces the URL to visit by hand when the browser cannot open', async () => {
-    opener.failWith(new ReflectError('io', 'no handler'))
+    opener.failWith(new AppError('io', 'no handler'))
     const wizard = createWizard()
     wizard.openInstallPage()
     await flush()
@@ -330,7 +330,7 @@ describe('createConnectGithubWizardService', () => {
 
   it('captures a failed connect as a display message', async () => {
     backup.onConnectExistingRepo(async () => {
-      throw new ReflectError('auth', 'Connect GitHub first (no credential stored)')
+      throw new AppError('auth', 'Connect GitHub first (no credential stored)')
     })
     const wizard = createWizard()
     await signIn(wizard)
@@ -389,7 +389,7 @@ describe('createConnectGithubWizardService', () => {
     it('a failing tick keeps the loop alive', async () => {
       const wizard = await parkOnCreateGuide()
       backup.onConnectExistingRepo(async () => {
-        throw new ReflectError('network', 'offline')
+        throw new AppError('network', 'offline')
       })
       const detach = wizard.attach()
 

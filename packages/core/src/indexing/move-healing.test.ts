@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import { createTestDatabaseService, seedNotes } from '../testing/database.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import { createIndexQueryService } from './index-query-service.ts'
@@ -57,7 +58,7 @@ describe('MoveHealing.detectExternalMoves', () => {
   it('skips an unreadable arrival: no pair, no content, no throw', async () => {
     const { healing } = setup({
       read: () => {
-        throw { kind: 'io', message: 'locked' }
+        throw new AppError('io', 'locked')
       },
     })
 

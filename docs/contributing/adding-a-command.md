@@ -55,8 +55,9 @@ pub fn note_stat(path: String, state: tauri::State<GraphState>) -> AppResult<Not
 Conventions that matter here:
 
 - **Errors are the shared contract.** Return `AppError` (`error.rs`); it
-  serializes as `{ kind, message }` and the frontend branches on `kind`
-  through the matching zod union in `packages/core/src/errors.ts`. Never
+  serializes as `{ kind, message }`, `IpcBridgeService` turns it into the
+  `AppError` class in `packages/core/src/errors.ts`, and the frontend branches
+  on `kind` with `isAppError`. Never
   return bare strings. `std::io::Error` and `rusqlite::Error` already convert
   via `From` (`?` just works); NotFound is mapped for you.
 - **Paths must not escape the graph.** Anything taking a graph-relative path
@@ -133,7 +134,7 @@ export function createNoteFileService(deps: {
 - `IpcBridgeService.call` (`ipc/ipc-service.ts`) is the single boundary where
   the untyped IPC response becomes a typed value: it validates with your
   schema (a mismatch throws a `parse` `AppError` naming the command) and
-  coerces any rejection into an `AppError`. Your method adds no error
+  coerces any rejection into an `AppError` instance. Your method adds no error
   handling of its own.
 - Commands returning `()` from Rust serialize as `null`: validate with
   `z.null()` (see the `voidSchema` convention in `settings/settings-service.ts`).

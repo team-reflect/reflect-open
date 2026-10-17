@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import { audioMemoIdentity, audioMemoPartPath } from './audio-memo.ts'
 import { APP_REVIEW_STUB_KEY } from '../ai/app-review-demo.ts'
 import { TranscriptionRejectedError } from '../ai/transcribe-http.ts'
@@ -201,7 +202,7 @@ describe('AudioMemoTranscriptionService.reconcile', () => {
     kit.addRecording(MEMO.audioPath)
     const writeMock = vi
       .spyOn(kit.noteFile, 'write')
-      .mockRejectedValue({ kind: 'io', message: 'disk full' })
+      .mockRejectedValue(new AppError('io', 'disk full'))
 
     const outcome = await kit.reconcile()
 
@@ -269,7 +270,7 @@ describe('AudioMemoTranscriptionService.reconcile', () => {
   it('stops before writing the transcript when the category note cannot be ensured', async () => {
     const kit = await createAudioMemoTestKit()
     kit.addRecording(MEMO.audioPath)
-    kit.ensureBacklinkTargetMock.mockRejectedValue({ kind: 'io', message: 'disk full' })
+    kit.ensureBacklinkTargetMock.mockRejectedValue(new AppError('io', 'disk full'))
 
     const outcome = await kit.reconcile()
 
@@ -348,7 +349,7 @@ describe('AudioMemoTranscriptionService.reconcile', () => {
     const earlier = audioMemoIdentity(new Date(2026, 5, 10, 9, 0, 0, 0), 'audio/mp4')
     kit.addRecording(earlier.audioPath)
     kit.addRecording(MEMO.audioPath)
-    kit.transcription.setResult(() => Promise.reject({ kind: 'network', message: 'provider down' }))
+    kit.transcription.setResult(() => Promise.reject(new AppError('network', 'provider down')))
 
     const outcome = await kit.reconcile({ formatTranscript: true })
 
@@ -365,7 +366,7 @@ describe('AudioMemoTranscriptionService.reconcile', () => {
   it('a memo that failed to transcribe drains on the next pass — e.g. the next app launch', async () => {
     const kit = await createAudioMemoTestKit()
     kit.addRecording(MEMO.audioPath)
-    kit.transcription.setResult(() => Promise.reject({ kind: 'network', message: 'offline' }))
+    kit.transcription.setResult(() => Promise.reject(new AppError('network', 'offline')))
 
     const offline = await kit.reconcile()
 
@@ -496,10 +497,7 @@ describe('AudioMemoTranscriptionService.reconcile', () => {
 
   it('a listing failure is reported, never thrown — reconcile runs unattended', async () => {
     const kit = await createAudioMemoTestKit()
-    vi.spyOn(kit.noteFile, 'listDir').mockRejectedValue({
-      kind: 'noGraph',
-      message: 'no graph open',
-    })
+    vi.spyOn(kit.noteFile, 'listDir').mockRejectedValue(new AppError('noGraph', 'no graph open'))
 
     expect(await kit.reconcile()).toEqual({
       pending: 0,
@@ -512,7 +510,7 @@ describe('AudioMemoTranscriptionService.reconcile', () => {
   it('rethrows daily-note read failures other than notFound — never writes blind', async () => {
     const kit = await createAudioMemoTestKit()
     kit.addRecording(MEMO.audioPath)
-    vi.spyOn(kit.noteFile, 'read').mockRejectedValue({ kind: 'io', message: 'disk gone' })
+    vi.spyOn(kit.noteFile, 'read').mockRejectedValue(new AppError('io', 'disk gone'))
 
     const outcome = await kit.reconcile()
 

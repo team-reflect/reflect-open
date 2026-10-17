@@ -113,8 +113,9 @@ responses, IPC responses crossing from Rust (`IpcBridgeService.call` takes the s
 Do **not** `zod.parse` every row of our own SQLite projection (it's our schema,
 Rust-serialized); trust the Kysely types there.
 
-**Errors.** Services throw the shared discriminated-union `AppError`
-(`packages/core/src/errors.ts`), the same contract Rust serializes.
+**Errors.** Services throw the shared `AppError` class
+(`packages/core/src/errors.ts`). Its `kind` is the same contract Rust
+serializes; `IpcBridgeService` turns a Rust rejection into an instance.
 
 **Privacy guards.** The `private: true` hard-block is a type, not a convention:
 a `CloudSafe<T>` value (`privacy/cloud-safe.ts`) is minted only by the gate in

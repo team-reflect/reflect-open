@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import type {
   ExistingWikiTargetResolution,
@@ -169,7 +169,7 @@ describe('previewWikiTarget', () => {
     const failingRead = notePreviewOver({
       noteLinkResolver: resolverWith(async () => ({ kind: 'resolved', path: 'notes/alpha.md' })),
       noteDocuments: documentsWith(async () => {
-        throw new ReflectError('notFound', 'gone')
+        throw new AppError('notFound', 'gone')
       }),
     })
     await expect(failingRead.previewWikiTarget('Alpha')).resolves.toBeNull()

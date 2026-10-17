@@ -1,7 +1,7 @@
 import type { MaybePromise } from '@reflect/utils'
 import type { ZodType } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
-import { toAppError, type AppError } from '../errors.ts'
+import { AppError, toAppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 
 /**
@@ -163,11 +163,7 @@ class IpcBridgeServiceImpl implements IpcBridgeService {
   ): Promise<TOutput> {
     const { transport } = this.#deps
     if (transport.invokeBinary === undefined) {
-      const appError: AppError = {
-        kind: 'io',
-        message: `the installed IPC bridge has no binary transport for "${command}"`,
-      }
-      throw appError
+      throw new AppError('io', `the installed IPC bridge has no binary transport for "${command}"`)
     }
     let raw: unknown
     try {
@@ -254,20 +250,19 @@ function parseResponse<TOutput>(
 ): TOutput {
   const result = schema.safeParse(raw)
   if (!result.success) {
-    const appError: AppError = {
-      kind: 'parse',
-      message: `unexpected response shape from "${command}": ${result.error.message}`,
-    }
-    throw appError
+    throw new AppError(
+      'parse',
+      `unexpected response shape from "${command}": ${result.error.message}`,
+    )
   }
   return result.data
 }
 
 function noPluginEvents(plugin: string, event: string): AppError {
-  return {
-    kind: 'io',
-    message: `the installed IPC bridge has no plugin events for "${plugin}:${event}"`,
-  }
+  return new AppError(
+    'io',
+    `the installed IPC bridge has no plugin events for "${plugin}:${event}"`,
+  )
 }
 
 export function createIpcBridgeService(deps: IpcBridgeServiceDeps): IpcBridgeService {

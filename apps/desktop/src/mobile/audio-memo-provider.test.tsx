@@ -6,6 +6,7 @@ import {
   type AiProviderConfig,
   type AudioRecorderFinalSegment,
   type GraphInfo,
+  AppError,
 } from '@reflect/core'
 import {
   createTestCoreServices,
@@ -165,10 +166,7 @@ describe('MobileAudioMemoProvider', () => {
 
   it('a capture failure shows in the drawer with retry and discard', async () => {
     const { result, assetStore, audioRecorder } = await setup()
-    vi.spyOn(assetStore, 'importAudioMemo').mockRejectedValueOnce({
-      kind: 'io',
-      message: 'disk full',
-    })
+    vi.spyOn(assetStore, 'importAudioMemo').mockRejectedValueOnce(new AppError('io', 'disk full'))
 
     await act(async () => {
       result.current.toggle()

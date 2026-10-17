@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import type { GraphRole } from '../graph/graph-session.ts'
 import { audioMemoIdentity, audioMemoPartPath } from './audio-memo.ts'
 import type { AiProvidersState } from '../ai/provider-config.ts'
@@ -251,7 +252,7 @@ describe('AudioMemoService.openPipeline', () => {
 
   it('discarding a parked capture runs its discard cleanup', async () => {
     const { service, assetStore } = await setup()
-    vi.spyOn(assetStore, 'uploadToPath').mockRejectedValue({ kind: 'io', message: 'disk full' })
+    vi.spyOn(assetStore, 'uploadToPath').mockRejectedValue(new AppError('io', 'disk full'))
     const pipeline = service.openPipeline({ isErrorSurfaceVisible: () => true })
     const onDiscarded = vi.fn()
 
@@ -361,7 +362,7 @@ describe('AudioMemoService.openSession', () => {
     const { session, phase, assetStore } = await openSession()
     const uploadMock = vi
       .spyOn(assetStore, 'uploadToPath')
-      .mockRejectedValueOnce({ kind: 'io', message: 'disk full' })
+      .mockRejectedValueOnce(new AppError('io', 'disk full'))
 
     session.toggle()
     await flush()
@@ -556,7 +557,7 @@ describe('AudioMemoService.openSession', () => {
     session.toggle()
     await flush()
 
-    pendingFirst.reject({ kind: 'io', message: 'disk full' })
+    pendingFirst.reject(new AppError('io', 'disk full'))
     await flush()
     expect(phase()).toBe('error')
     // The second memo holds behind the failure — retrying later must not
@@ -590,7 +591,7 @@ describe('AudioMemoService.openSession', () => {
     session.toggle()
     await flush()
 
-    pendingFirst.reject({ kind: 'io', message: 'disk full' })
+    pendingFirst.reject(new AppError('io', 'disk full'))
     await flush()
     expect(phase()).toBe('error')
 
@@ -668,7 +669,7 @@ describe('AudioMemoService.openSession', () => {
 
   it('a capture failure while the recording UI is hidden surfaces through operations', async () => {
     const { session, assetStore, progress } = await openSession()
-    vi.spyOn(assetStore, 'uploadToPath').mockRejectedValue({ kind: 'io', message: 'disk full' })
+    vi.spyOn(assetStore, 'uploadToPath').mockRejectedValue(new AppError('io', 'disk full'))
 
     session.toggle()
     await flush()
@@ -683,7 +684,7 @@ describe('AudioMemoService.openSession', () => {
 
   it('a capture failure while the recording UI is visible stays off the operations list', async () => {
     const { session, phase, assetStore, progress } = await openSession()
-    vi.spyOn(assetStore, 'uploadToPath').mockRejectedValue({ kind: 'io', message: 'disk full' })
+    vi.spyOn(assetStore, 'uploadToPath').mockRejectedValue(new AppError('io', 'disk full'))
 
     session.toggle()
     await flush()
@@ -696,7 +697,7 @@ describe('AudioMemoService.openSession', () => {
 
   it('a parked error never invisibly blocks recording: toggle surfaces, then clears it', async () => {
     const { session, phase, assetStore, surface } = await openSession()
-    vi.spyOn(assetStore, 'uploadToPath').mockRejectedValue({ kind: 'io', message: 'disk full' })
+    vi.spyOn(assetStore, 'uploadToPath').mockRejectedValue(new AppError('io', 'disk full'))
 
     // Fail a capture, then hide — the error popover unmounts with the mic.
     session.toggle()

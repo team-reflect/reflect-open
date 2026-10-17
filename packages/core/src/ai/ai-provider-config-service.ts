@@ -1,5 +1,5 @@
 import type { IdService } from '../ports/id-service.ts'
-import type { AppError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from '../lib/http-url.ts'
 import type { AiProviderConfig, AiProviderId, ChatModelSelection } from '../settings/schema.ts'
@@ -167,12 +167,10 @@ class AiProviderConfigServiceImpl implements AiProviderConfigService {
     // Awaiting the outcome (rather than reading a flag) also covers an add
     // racing the in-flight load that then fails.
     if ((await settings.whenLoaded()) === 'failed') {
-      const error: AppError = {
-        kind: 'io',
-        message:
-          'Settings could not be loaded, so new AI providers cannot be saved. The API key was not stored.',
-      }
-      throw error
+      throw new AppError(
+        'io',
+        'Settings could not be loaded, so new AI providers cannot be saved. The API key was not stored.',
+      )
     }
     const id = idService.uuid()
     const apiKey = draft.apiKey.trim()

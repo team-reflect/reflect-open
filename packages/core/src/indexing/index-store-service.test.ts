@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { AppError } from '../errors.ts'
 import { parseNote } from '../markdown/index.ts'
 import { createTestDatabaseService } from '../testing/database.ts'
 import { createTestIndexStoreService } from '../testing/index-store.ts'
@@ -141,7 +142,7 @@ describe('createApplyBatch', () => {
           const paths = (args['notes'] as IndexedNote[]).map((indexed) => indexed.path)
           batches.push(paths)
           if (paths.includes('notes/bad.md')) {
-            throw { kind: 'parse', message: 'bad projection' }
+            throw new AppError('parse', 'bad projection')
           }
           return null
         },
@@ -173,7 +174,7 @@ describe('createApplyBatch', () => {
     const ipc = createTestIpcBridgeService({
       commands: {
         index_apply_batch: () => {
-          throw { kind: 'parse', message: 'refused' }
+          throw new AppError('parse', 'refused')
         },
       },
     })

@@ -1,5 +1,5 @@
 import type { IdService } from '../ports/id-service.ts'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { AssetStoreService } from '../graph/asset-store-service.ts'
 import {
   createNoteCreationService,
@@ -27,8 +27,8 @@ import { bytesToBase64, base64ToBytes } from '@reflect/utils'
 import { createTestDatabaseService } from './database.ts'
 import { createTestIdService } from './id.ts'
 
-function notFound(what: string): ReflectError {
-  return new ReflectError('notFound', `${what} not found`)
+function notFound(what: string): AppError {
+  return new AppError('notFound', `${what} not found`)
 }
 
 function byteSize(contents: string): number {
@@ -42,7 +42,7 @@ function byteSize(contents: string): number {
  */
 function checkGeneration(current: number | undefined, generation: number | undefined): void {
   if (current !== undefined && generation !== undefined && generation !== current) {
-    throw new ReflectError('io', 'the graph changed since this command was issued; dropping it')
+    throw new AppError('io', 'the graph changed since this command was issued; dropping it')
   }
 }
 
@@ -155,7 +155,7 @@ class TestNoteFileServiceImpl implements TestNoteFileService {
     if (expectedContents !== undefined) {
       const current = this.#files.get(path)?.contents ?? null
       if (current !== expectedContents && current !== contents) {
-        throw new ReflectError('io', 'Note changed on disk; reload before retrying')
+        throw new AppError('io', 'Note changed on disk; reload before retrying')
       }
       if (current === contents) {
         return { merged: null }
@@ -490,7 +490,7 @@ class TestAssetStoreServiceImpl implements TestAssetStoreService {
   async deleteAudioMemo(path: string, pinned: number): Promise<void> {
     checkGeneration(this.#generation, pinned)
     if (!path.startsWith(`${AUDIO_MEMOS_DIR}/`)) {
-      throw new ReflectError('io', `not an audio memo: ${path}`)
+      throw new AppError('io', `not an audio memo: ${path}`)
     }
     this.#files.delete(path)
   }

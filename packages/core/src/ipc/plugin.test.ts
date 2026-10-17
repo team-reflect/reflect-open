@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { isAppError } from '../errors.ts'
+import { AppError, isAppError } from '../errors.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createIpcBridgeService, type IpcBridge } from './ipc-service.ts'
 import { definePluginCommand, definePluginEvent, ignoredResult } from './plugin.ts'
@@ -51,13 +51,14 @@ describe('definePluginCommand', () => {
   it('coerces a rejection into an AppError like call()', async () => {
     const ipc = serviceOver({
       invoke: async () => {
-        throw 'microphone access denied'
+        const rejection: unknown = 'microphone access denied'
+        throw rejection
       },
       listen: async () => () => {},
     })
 
     const error = await fireAndForget(ipc, {}).catch((caught: unknown) => caught)
-    expect(error).toEqual({ kind: 'unknown', message: 'microphone access denied' })
+    expect(error).toEqual(new AppError('unknown', 'microphone access denied'))
   })
 })
 

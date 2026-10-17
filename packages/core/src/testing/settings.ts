@@ -1,5 +1,5 @@
 import type { ProgressPort } from '../ports/progress-port.ts'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { Settings } from '../settings/schema.ts'
 import {
@@ -53,14 +53,14 @@ class TestSettingsServiceImpl implements TestSettingsService {
         settings_load: () => {
           this.#loadStarted = true
           if (this.#loadFails) {
-            throw new ReflectError('io', 'test settings: load failed')
+            throw new AppError('io', 'test settings: load failed')
           }
           return this.#saved.at(-1) ?? { ...this.#stored }
         },
         settings_save: (args) => {
           if (this.#failSave) {
             this.#failSave = false
-            throw new ReflectError('io', 'test settings: save failed')
+            throw new AppError('io', 'test settings: save failed')
           }
           this.#saved.push(args['settings'] as Settings)
           return null

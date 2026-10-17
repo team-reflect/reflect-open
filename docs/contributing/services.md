@@ -123,7 +123,9 @@ Rules:
 - Containers (`CoreServices`, `CoreInternalServices`, `MobileServices`,
   `GraphServices`, `AppServices`, `AppHost`) are not services. They stay plain
   interfaces and object literals.
-- Throw `AppError` for failures a caller handles. Validate IPC responses and
+- Throw `new AppError(kind, message)` for failures a caller handles, never a
+  plain `{ kind, message }` object: `isAppError` is an `instanceof` check.
+  Test doubles throw `AppError` too. Validate IPC responses and
   event payloads with zod (`noteMovedSchema`).
 
 ## 2. `deps`

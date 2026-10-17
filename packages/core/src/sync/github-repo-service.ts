@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { HttpService } from '../ports/http-service.ts'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import { apiHeaders, readJson } from './github-api.ts'
 
 export interface GithubRepoRef {
@@ -158,14 +158,14 @@ class GithubRepoServiceImpl implements GithubRepoService {
       if (body.includes('not accessible')) {
         return null
       }
-      throw new ReflectError('auth', 'GitHub rejected the token (403)')
+      throw new AppError('auth', 'GitHub rejected the token (403)')
     }
     if (response.status === 401) {
-      throw new ReflectError('auth', 'GitHub rejected the token (401)')
+      throw new AppError('auth', 'GitHub rejected the token (401)')
     }
     if (!response.ok) {
       const body = await response.text()
-      throw new ReflectError('io', `creating the repo failed (${response.status}): ${body}`)
+      throw new AppError('io', `creating the repo failed (${response.status}): ${body}`)
     }
     return toRepo(await readJson(response, repoResponseSchema, 'repo creation'))
   }
@@ -179,10 +179,10 @@ class GithubRepoServiceImpl implements GithubRepoService {
       return null
     }
     if (response.status === 401 || response.status === 403) {
-      throw new ReflectError('auth', `GitHub rejected the token (${response.status})`)
+      throw new AppError('auth', `GitHub rejected the token (${response.status})`)
     }
     if (!response.ok) {
-      throw new ReflectError('io', `looking up the repo failed (${response.status})`)
+      throw new AppError('io', `looking up the repo failed (${response.status})`)
     }
     return toRepo(await readJson(response, repoResponseSchema, 'repo lookup'))
   }

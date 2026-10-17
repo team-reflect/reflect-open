@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { AppError } from '../errors.ts'
 import { createTestIpcBridgeService } from '../testing/index.ts'
 import { createDatabaseService } from './database-service.ts'
 describe('createDatabaseService', () => {
@@ -34,16 +35,15 @@ describe('createDatabaseService', () => {
     const ipc = createTestIpcBridgeService({
       commands: {
         db_query: () => {
-          throw { kind: 'io', message: 'index locked' }
+          throw new AppError('io', 'index locked')
         },
       },
     })
     const database = createDatabaseService({ ipc })
 
-    await expect(database.runQuery('select 1', [])).rejects.toEqual({
-      kind: 'io',
-      message: 'index locked',
-    })
+    await expect(database.runQuery('select 1', [])).rejects.toEqual(
+      new AppError('io', 'index locked'),
+    )
   })
 
   it('rejects transactions', async () => {

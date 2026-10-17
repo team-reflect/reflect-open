@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { HttpService } from '../ports/http-service.ts'
 import { bytesToBase64 } from '@reflect/utils'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from './app-review-demo.ts'
 import type { TranscriptionProvider } from './provider-config.ts'
 import {
@@ -74,7 +74,7 @@ export interface TranscriptionServiceDeps {
 export interface TranscriptionService {
   /**
    * Transcribe one recording, returning the trimmed transcript (empty when the
-   * provider heard nothing). Throws {@link ReflectError}: `auth` when the key is
+   * provider heard nothing). Throws {@link AppError}: `auth` when the key is
    * rejected, `network` when the call can't complete, `parse` when the response
    * shape is unrecognizable.
    */
@@ -187,10 +187,7 @@ async function transcribeWithOpenAi(
 
   const parsed = openAiResponseSchema.safeParse(safeJson(body))
   if (!parsed.success) {
-    throw new ReflectError(
-      'parse',
-      `unrecognized openai transcription response: ${body.slice(0, 200)}`,
-    )
+    throw new AppError('parse', `unrecognized openai transcription response: ${body.slice(0, 200)}`)
   }
   return parsed.data.text.trim()
 }
@@ -269,7 +266,7 @@ async function transcribeWithGemini(
 
   const parsed = geminiResponseSchema.safeParse(safeJson(body))
   if (!parsed.success) {
-    throw new ReflectError('parse', `unrecognized gemini response: ${body.slice(0, 200)}`)
+    throw new AppError('parse', `unrecognized gemini response: ${body.slice(0, 200)}`)
   }
   const candidate = parsed.data.candidates?.[0]
   const finishReason = candidate?.finishReason

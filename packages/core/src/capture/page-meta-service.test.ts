@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { WebFetchService } from '../link-preview/web-fetch-service.ts'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { CloudSafe } from '../privacy/cloud-safe.ts'
 import { createTestWebFetchService } from '../testing/index.ts'
 import { createPageMetaService, type PageMetaService } from './page-meta-service.ts'
@@ -49,8 +49,8 @@ describe('PageMetaService', () => {
   })
 
   it('falls back to the HTML scrape when the endpoint refuses the id', async () => {
-    oembedFetchMock.mockRejectedValue(new ReflectError('io', 'answered 400'))
-    metaFetchMock.mockRejectedValue(new ReflectError('parse', 'fallback reached'))
+    oembedFetchMock.mockRejectedValue(new AppError('io', 'answered 400'))
+    metaFetchMock.mockRejectedValue(new AppError('parse', 'fallback reached'))
 
     await expect(scrape(VIDEO_URL)).rejects.toMatchObject({
       message: 'fallback reached',
@@ -59,7 +59,7 @@ describe('PageMetaService', () => {
 
   it('falls back to the HTML scrape when the answer does not parse', async () => {
     oembedFetchMock.mockResolvedValue('not json')
-    metaFetchMock.mockRejectedValue(new ReflectError('parse', 'fallback reached'))
+    metaFetchMock.mockRejectedValue(new AppError('parse', 'fallback reached'))
 
     await expect(scrape(VIDEO_URL)).rejects.toMatchObject({
       message: 'fallback reached',
@@ -68,7 +68,7 @@ describe('PageMetaService', () => {
 
   it('falls back to the HTML scrape when the answer has a blank title', async () => {
     oembedFetchMock.mockResolvedValue('{"title":"   "}')
-    metaFetchMock.mockRejectedValue(new ReflectError('parse', 'fallback reached'))
+    metaFetchMock.mockRejectedValue(new AppError('parse', 'fallback reached'))
 
     await expect(scrape(VIDEO_URL)).rejects.toMatchObject({
       message: 'fallback reached',
@@ -76,14 +76,14 @@ describe('PageMetaService', () => {
   })
 
   it('propagates a transient oEmbed failure for retry', async () => {
-    oembedFetchMock.mockRejectedValue(new ReflectError('network', 'offline'))
+    oembedFetchMock.mockRejectedValue(new AppError('network', 'offline'))
 
     await expect(scrape(VIDEO_URL)).rejects.toMatchObject({ kind: 'network' })
     expect(metaFetchMock).not.toHaveBeenCalled()
   })
 
   it('sends unclaimed URLs straight to the HTML fetch', async () => {
-    metaFetchMock.mockRejectedValue(new ReflectError('parse', 'fallback reached'))
+    metaFetchMock.mockRejectedValue(new AppError('parse', 'fallback reached'))
 
     await expect(scrape('https://example.com/article')).rejects.toMatchObject({
       message: 'fallback reached',

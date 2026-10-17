@@ -1,6 +1,6 @@
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { expect } from 'vitest'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import { createNoteFileService } from '../graph/note-file-service.ts'
 import { normalizeWikiTarget, parseNote } from '../markdown/index.ts'
 import { createTestClockService } from '../testing/clock.ts'
@@ -35,7 +35,7 @@ export function connectIndex(database: TestDatabaseService) {
   // The projections exist only in the index. Disk probes see an empty
   // graph, so the writable resolvers exercise their indexed tiers.
   const notOnDisk = (): never => {
-    throw new ReflectError('notFound', 'not on disk')
+    throw new AppError('notFound', 'not on disk')
   }
   const ipc = createTestIpcBridgeService({
     commands: { list_files: () => [], note_read: notOnDisk, note_read_local: notOnDisk },

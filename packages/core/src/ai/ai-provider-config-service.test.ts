@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { HostedAiProviderConfig, Settings } from '../settings/schema.ts'
 import {
   createTestAiKeyValidationService,
@@ -164,7 +164,7 @@ describe('AiProviderConfigService', () => {
   it('adds nothing when the keychain write fails', async () => {
     const settings = createTestSettingsService()
     const credentials = createAiCredentialService({ secretStore: createTestSecretStoreService() })
-    vi.spyOn(credentials, 'store').mockRejectedValue(new ReflectError('io', 'keychain locked'))
+    vi.spyOn(credentials, 'store').mockRejectedValue(new AppError('io', 'keychain locked'))
     const service = createAiProviderConfigService({
       settings,
       credentials,

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ReflectError, type BackupService, type BackupState } from '@reflect/core'
+import { AppError, type BackupService, type BackupState } from '@reflect/core'
 import { useMaybeGraphServices } from '@/services/services-provider.tsx'
 import { useServiceState } from '@/services/use-service-state.ts'
 
@@ -32,7 +32,7 @@ export function useSync(): SyncContextValue {
   return useMemo<SyncContextValue>(() => {
     const require = (): BackupService => {
       if (controller === null) {
-        throw new ReflectError('io', 'backup is still initializing')
+        throw new AppError('io', 'backup is still initializing')
       }
       return controller
     }

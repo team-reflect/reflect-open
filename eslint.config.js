@@ -345,8 +345,6 @@ export default defineESLintConfig(
       '@typescript-eslint/no-base-to-string': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
-      '@typescript-eslint/only-throw-error': 'off',
-      '@typescript-eslint/prefer-promise-reject-errors': 'off',
       '@typescript-eslint/require-await': 'off',
       'no-var': 'off',
       'react-hooks/exhaustive-deps': 'off',
@@ -359,6 +357,14 @@ export default defineESLintConfig(
     files: [`**/*.${SOURCE_EXTENSIONS}`],
     plugins: { architecture: architecturePlugin },
     rules: { 'architecture/maybe-promise': 'error' },
+  },
+  {
+    // A `catch` that rejects with the caught `unknown` passes the original
+    // error on, so `instanceof` checks downstream still see it.
+    files: [`**/*.${SOURCE_EXTENSIONS}`],
+    rules: {
+      '@typescript-eslint/prefer-promise-reject-errors': ['error', { allowThrowingUnknown: true }],
+    },
   },
   {
     // Vitest types its asymmetric matchers (`expect.any`, `expect.objectContaining`, ...)

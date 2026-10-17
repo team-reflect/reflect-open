@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import { createGraphSession, type GraphRole, type GraphSession } from './graph-session.ts'
 import { createNoteRowService } from '../documents/note-row-service.ts'
 import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
@@ -51,20 +52,20 @@ function setup(options?: SetupOptions) {
     commands: {
       recent_graphs: () => {
         if (failures.recents) {
-          throw { kind: 'io', message: 'recents are corrupt' }
+          throw new AppError('io', 'recents are corrupt')
         }
         return recents
       },
       forget_recent: (args) => {
         if (failures.forget) {
-          throw { kind: 'io', message: 'cannot forget' }
+          throw new AppError('io', 'cannot forget')
         }
         recents = recents.filter((recent) => recent.root !== args['root'])
         return null
       },
       graph_open: async (args) => {
         if (failures.open) {
-          throw { kind: 'io', message: 'cannot open graph' }
+          throw new AppError('io', 'cannot open graph')
         }
         const root = String(args['path'])
         if (options?.holdOpens ?? false) {
@@ -77,7 +78,7 @@ function setup(options?: SetupOptions) {
       },
       graph_delete: () => {
         if (failures.delete) {
-          throw { kind: 'io', message: 'cannot trash' }
+          throw new AppError('io', 'cannot trash')
         }
         return null
       },

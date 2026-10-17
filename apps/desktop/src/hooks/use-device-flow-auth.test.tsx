@@ -1,6 +1,6 @@
 import { act } from '@/test-utils/act.ts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ReflectError, type GithubAuth, type GithubAuthService } from '@reflect/core'
+import { AppError, type GithubAuth, type GithubAuthService } from '@reflect/core'
 import { createTestCoreServices } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { useDeviceFlowAuth } from './use-device-flow-auth.ts'
@@ -49,7 +49,7 @@ describe('useDeviceFlowAuth', () => {
   it('returns to the idle view with a message when the flow fails', async () => {
     mockFlow.mockImplementation(async (options) => {
       options.onCode({ userCode: 'ABCD-1234', verificationUri: 'https://github.com/login/device' })
-      throw new ReflectError('auth', 'GitHub sign-in was denied.')
+      throw new AppError('auth', 'GitHub sign-in was denied.')
     })
     const { result } = await mount()
 

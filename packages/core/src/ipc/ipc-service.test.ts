@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { isAppError } from '../errors.ts'
+import { AppError, isAppError } from '../errors.ts'
 import { createIpcBridgeService, listenNow, type IpcBridge } from './ipc-service.ts'
 
 function createLogger() {
@@ -32,7 +32,8 @@ describe('call', () => {
   it('passes a well-formed Rust error through as an AppError', async () => {
     const { ipc } = serviceOver({
       invoke: async () => {
-        throw { kind: 'notFound', message: 'missing' }
+        const rustError: unknown = { kind: 'notFound', message: 'missing' }
+        throw rustError
       },
       listen: async () => () => {},
     })
@@ -41,7 +42,7 @@ describe('call', () => {
       .call('note_read', { path: 'x' }, z.string())
       .catch((caught: unknown) => caught)
     expect(isAppError(error)).toBe(true)
-    expect(error).toEqual({ kind: 'notFound', message: 'missing' })
+    expect(error).toEqual(new AppError('notFound', 'missing'))
   })
 
   it('coerces a foreign rejection into an unknown AppError', async () => {
@@ -55,7 +56,7 @@ describe('call', () => {
     const error = await ipc
       .call('note_read', { path: 'x' }, z.string())
       .catch((caught: unknown) => caught)
-    expect(error).toEqual({ kind: 'unknown', message: 'socket closed' })
+    expect(error).toEqual(new AppError('unknown', 'socket closed'))
   })
 
   it('turns a response that fails validation into a parse error naming the command', async () => {

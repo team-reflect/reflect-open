@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi, type MockInstance } from 'vitest'
+import { AppError } from '../errors.ts'
 import { appendXPost } from './bookmark-capture.ts'
 import type { XPostEnvelope } from './bookmark-envelope.ts'
 import type { XArchiveService } from '../embeds/x-archive-service.ts'
@@ -37,7 +38,7 @@ it('replays after a crash between note commit and spool cleanup without duplicat
     expect(path).toMatch(/^daily\/2026-09-0[89]\.md$/)
     source = appendXPost(source, capture)
   })
-  kit.inboxRemoveMock.mockRejectedValueOnce({ kind: 'io', message: 'cleanup failed' })
+  kit.inboxRemoveMock.mockRejectedValueOnce(new AppError('io', 'cleanup failed'))
   expect((await drainCaptureInbox({ writeXPost })).stopped?.reason).toBe('io')
   const committed = source
   expect((await drainCaptureInbox({ writeXPost })).drained).toBe(1)
@@ -73,7 +74,7 @@ it('saves the archive before writing Markdown and removes the spool last', async
 })
 
 it('retains the inbox and never inserts Markdown when archive persistence fails', async () => {
-  saveArchivedPost.mockRejectedValue({ kind: 'io', message: 'disk full' })
+  saveArchivedPost.mockRejectedValue(new AppError('io', 'disk full'))
   const writeXPost = vi.fn(async () => {})
   expect((await drainCaptureInbox({ writeXPost })).drained).toBe(0)
   expect(writeXPost).not.toHaveBeenCalled()
@@ -104,7 +105,7 @@ it('drains a like to its capture day and replays after cleanup failure', async (
     expect(path).toMatch(/^daily\/2026-09-0[89]\.md$/)
     source = appendXPost(source, capture)
   })
-  kit.inboxRemoveMock.mockRejectedValueOnce({ kind: 'io', message: 'cleanup failed' })
+  kit.inboxRemoveMock.mockRejectedValueOnce(new AppError('io', 'cleanup failed'))
   expect((await drainCaptureInbox({ writeXPost })).drained).toBe(0)
   const committed = source
   expect((await drainCaptureInbox({ writeXPost })).drained).toBe(1)

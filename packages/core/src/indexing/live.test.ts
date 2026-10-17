@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import { createTestXArchiveService } from '../testing/capture.ts'
 import { createTestClockService } from '../testing/clock.ts'
 import { createTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
@@ -101,7 +102,7 @@ describe('LiveIndex.apply', () => {
       files: { 'notes/bad.md': '# bad', 'notes/good.md': '# ok' },
       read: async (path) => {
         if (path === 'notes/bad.md') {
-          throw { kind: 'io', message: 'unreadable' }
+          throw new AppError('io', 'unreadable')
         }
       },
     })

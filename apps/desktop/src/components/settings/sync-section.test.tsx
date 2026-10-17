@@ -1,7 +1,7 @@
 import { page, type Locator } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import {
-  ReflectError,
+  AppError,
   type BackupService,
   type BackupState,
   type DuplicateIdGroup,
@@ -52,7 +52,7 @@ async function renderSection(): Promise<void> {
   })
   if (icloud.copyFails) {
     vi.spyOn(icloudNative, 'adoptGraph').mockRejectedValue(
-      new ReflectError('io', 'test iCloud: the container is unavailable'),
+      new AppError('io', 'test iCloud: the container is unavailable'),
     )
   }
   backup.setState(backupState)
@@ -176,7 +176,7 @@ describe('moving a graph to iCloud', () => {
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
     }
-    disconnectGraph.mockRejectedValueOnce(new ReflectError('io', 'remote locked'))
+    disconnectGraph.mockRejectedValueOnce(new AppError('io', 'remote locked'))
     reopens = false
 
     const section = await confirmMove()

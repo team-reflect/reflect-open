@@ -6,7 +6,7 @@ import type { IdService } from '../ports/id-service.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { WebAuthService } from '../ipc/web-auth-service.ts'
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
@@ -231,7 +231,7 @@ class ClassicAccessServiceImpl implements ClassicAccessService {
     const result = new URL(callback).searchParams
     const code = result.get('code')
     if (result.get('state') !== oauthState || code === null) {
-      throw new ReflectError('auth', 'Reflect Classic returned an invalid sign-in callback')
+      throw new AppError('auth', 'Reflect Classic returned an invalid sign-in callback')
     }
     const token = await this.#exchangeCode(code, verifier)
     const now = clock.now()
@@ -293,7 +293,7 @@ class ClassicAccessServiceImpl implements ClassicAccessService {
     try {
       return await this.#deps.http.fetch(`${CLASSIC_ORIGIN}${path}`, init)
     } catch (error) {
-      throw new ReflectError('network', `Could not reach Reflect Classic (${path})`, {
+      throw new AppError('network', `Could not reach Reflect Classic (${path})`, {
         cause: error,
       })
     }
@@ -313,25 +313,21 @@ class ClassicAccessServiceImpl implements ClassicAccessService {
     const { logger } = this.#deps
     if (!response.ok) {
       logger.warn(`Reflect Classic answered ${response.status} (${path})`)
-      throw new ReflectError(failure, `Reflect Classic answered ${response.status} (${path})`)
+      throw new AppError(failure, `Reflect Classic answered ${response.status} (${path})`)
     }
     let json: unknown
     try {
       json = await response.json()
     } catch (error) {
       logger.warn(`Reflect Classic returned a body that is not JSON (${path})`, error)
-      throw new ReflectError(
-        'parse',
-        `Reflect Classic returned a body that is not JSON (${path})`,
-        {
-          cause: error,
-        },
-      )
+      throw new AppError('parse', `Reflect Classic returned a body that is not JSON (${path})`, {
+        cause: error,
+      })
     }
     const body = schema.safeParse(json)
     if (!body.success) {
       logger.warn(`Reflect Classic returned an unexpected body (${path})`, body.error)
-      throw new ReflectError('parse', `Reflect Classic returned an unexpected body (${path})`, {
+      throw new AppError('parse', `Reflect Classic returned an unexpected body (${path})`, {
         cause: body.error,
       })
     }
@@ -353,7 +349,7 @@ class ClassicAccessServiceImpl implements ClassicAccessService {
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
     })
     if (response.status === 401) {
-      throw new ReflectError('auth', `Reflect Classic rejected the stored token (${path})`)
+      throw new AppError('auth', `Reflect Classic rejected the stored token (${path})`)
     }
     return await this.#readResponse(response, path, schema, 'network')
   }
@@ -405,7 +401,7 @@ class ClassicAccessServiceImpl implements ClassicAccessService {
       await this.#saveAccess(next)
       return next
     } catch (error: unknown) {
-      if (error instanceof ReflectError && error.kind === 'auth') {
+      if (error instanceof AppError && error.kind === 'auth') {
         logger.warn('Reflect Classic rejected the stored token; keeping the current expiry', error)
         const next = { ...stored, token: null }
         await this.#saveAccess(next)

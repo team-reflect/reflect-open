@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { HttpService } from '../ports/http-service.ts'
-import { isAppError, ReflectError } from '../errors.ts'
+import { isAppError, AppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
 import type { GitCredential } from './git-repository-service.ts'
@@ -217,7 +217,7 @@ export interface GithubAuthService {
    * Drive the whole device flow: start it, surface the user code, poll at
    * GitHub's pace (honoring `slow_down`) until it authorizes — the credential
    * is persisted to the keychain and returned — or fails. Denial and expiry
-   * throw a ReflectError('auth'); an abort resolves `null`.
+   * throw a AppError('auth'); an abort resolves `null`.
    */
   runDeviceFlow(options: RunDeviceFlowOptions): Promise<GithubAuth | null>
   /**
@@ -317,7 +317,7 @@ class GithubAuthServiceImpl implements GithubAuthService {
   async deviceFlowStart(clientId: string = GITHUB_APP_CLIENT_ID): Promise<DeviceFlowStart> {
     const { http } = this.#deps
     if (clientId.length === 0) {
-      throw new ReflectError('auth', 'GitHub device flow is not configured (no app client id)')
+      throw new AppError('auth', 'GitHub device flow is not configured (no app client id)')
     }
     const response = await http.fetch('https://github.com/login/device/code', {
       method: 'POST',
@@ -325,7 +325,7 @@ class GithubAuthServiceImpl implements GithubAuthService {
       body: JSON.stringify({ client_id: clientId }),
     })
     if (!response.ok) {
-      throw new ReflectError('network', `GitHub device flow start failed (${response.status})`)
+      throw new AppError('network', `GitHub device flow start failed (${response.status})`)
     }
     const parsed = await readJson(response, deviceStartResponseSchema, 'device flow start')
     return {
@@ -352,7 +352,7 @@ class GithubAuthServiceImpl implements GithubAuthService {
       }),
     })
     if (!response.ok) {
-      throw new ReflectError('network', `GitHub device flow poll failed (${response.status})`)
+      throw new AppError('network', `GitHub device flow poll failed (${response.status})`)
     }
     const parsed = await readJson(response, tokenResponseSchema, 'device flow poll')
     switch (parsed.error) {
@@ -367,10 +367,10 @@ class GithubAuthServiceImpl implements GithubAuthService {
       case undefined:
         break
       default:
-        throw new ReflectError('auth', `GitHub device flow failed (${parsed.error})`)
+        throw new AppError('auth', `GitHub device flow failed (${parsed.error})`)
     }
     if (parsed.access_token === undefined) {
-      throw new ReflectError('parse', 'GitHub device flow returned neither a token nor an error')
+      throw new AppError('parse', 'GitHub device flow returned neither a token nor an error')
     }
     return {
       status: 'authorized',
@@ -403,12 +403,12 @@ class GithubAuthServiceImpl implements GithubAuthService {
           await this.save(result.auth)
           return result.auth
         case 'denied':
-          throw new ReflectError('auth', 'GitHub sign-in was denied.')
+          throw new AppError('auth', 'GitHub sign-in was denied.')
         case 'expired':
-          throw new ReflectError('auth', 'The sign-in code expired — try again.')
+          throw new AppError('auth', 'The sign-in code expired — try again.')
       }
     }
-    throw new ReflectError('auth', 'The sign-in code expired — try again.')
+    throw new AppError('auth', 'The sign-in code expired — try again.')
   }
 
   async getAuthenticatedUser(token: string): Promise<GithubUser> {
@@ -417,20 +417,20 @@ class GithubAuthServiceImpl implements GithubAuthService {
       headers: apiHeaders(token),
     })
     if (response.status === 401) {
-      throw new ReflectError('auth', 'GitHub rejected the token (401)')
+      throw new AppError('auth', 'GitHub rejected the token (401)')
     }
     if (response.status === 403) {
       const body = (await response.text()).toLowerCase()
       if (body.includes('bad credentials')) {
-        throw new ReflectError('auth', 'GitHub rejected the token (403)')
+        throw new AppError('auth', 'GitHub rejected the token (403)')
       }
-      throw new ReflectError(
+      throw new AppError(
         'network',
         'GitHub temporarily refused the signed-in user lookup (403, likely rate limiting)',
       )
     }
     if (!response.ok) {
-      throw new ReflectError('network', `looking up the signed-in user failed (${response.status})`)
+      throw new AppError('network', `looking up the signed-in user failed (${response.status})`)
     }
     const parsed = await readJson(response, userResponseSchema, 'signed-in user lookup')
     return { login: parsed.login, avatarUrl: parsed.avatar_url ?? null }
@@ -502,10 +502,7 @@ class GithubAuthServiceImpl implements GithubAuthService {
       }),
     })
     if (!response.ok) {
-      throw new ReflectError(
-        'network',
-        `GitHub token refresh failed (${response.status}); will retry`,
-      )
+      throw new AppError('network', `GitHub token refresh failed (${response.status}); will retry`)
     }
     const parsed = await readJson(response, tokenResponseSchema, 'token refresh')
     if (parsed.access_token !== undefined) {
@@ -514,7 +511,7 @@ class GithubAuthServiceImpl implements GithubAuthService {
     if (parsed.error === 'bad_refresh_token') {
       return null
     }
-    throw new ReflectError(
+    throw new AppError(
       'auth',
       `GitHub token refresh failed${parsed.error === undefined ? '' : ` (${parsed.error})`}`,
     )

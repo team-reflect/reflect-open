@@ -1,4 +1,4 @@
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { AppStoreService } from '../ipc/app-store-service.ts'
 import type { IapProduct, IapService } from '../ipc/iap-service.ts'
@@ -24,7 +24,7 @@ class TestHapticsServiceImpl implements TestHapticsService {
   impactLight(): Promise<void> {
     this.#count += 1
     if (this.#fail) {
-      return Promise.reject(new ReflectError('io', 'test haptics: no haptic engine'))
+      return Promise.reject(new AppError('io', 'test haptics: no haptic engine'))
     }
     return Promise.resolve()
   }

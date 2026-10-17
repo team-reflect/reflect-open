@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
 import { createTestGitRepositoryService, type TestGitRepositoryService } from '../testing/sync.ts'
 import {
@@ -178,8 +179,7 @@ describe('createSyncEngineFactory', () => {
     engine.stop()
   })
 
-  it('maps a thrown ReflectError from token refresh to offline / auth states', async () => {
-    const { ReflectError } = await import('../errors.ts')
+  it('maps a thrown AppError from token refresh to offline / auth states', async () => {
     for (const [kind, expected] of [
       ['network', { state: 'offline' }],
       ['auth', { state: 'error', errorKind: 'auth' }],
@@ -189,7 +189,7 @@ describe('createSyncEngineFactory', () => {
       const engine = createSyncEngine({
         generation: 1,
         getCredential: async () => {
-          throw new ReflectError(kind, 'refresh failed')
+          throw new AppError(kind, 'refresh failed')
         },
         onStatus: (status) => {
           statuses.push(status)
@@ -206,7 +206,7 @@ describe('createSyncEngineFactory', () => {
   it('maps a network failure to the offline state', async () => {
     const git = fakeGit()
     git.onPush(() => {
-      throw { kind: 'network', message: 'could not resolve github.com' }
+      throw new AppError('network', 'could not resolve github.com')
     })
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
@@ -228,7 +228,7 @@ describe('createSyncEngineFactory', () => {
   it('maps an auth failure to an auth error state', async () => {
     const git = fakeGit()
     git.onPush(() => {
-      throw { kind: 'auth', message: 'token rejected' }
+      throw new AppError('auth', 'token rejected')
     })
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
@@ -372,7 +372,7 @@ describe('createSyncEngineFactory', () => {
   it('a failed fetch commits local changes', async () => {
     const git = fakeGit()
     git.onFetch(() => {
-      throw { kind: 'network', message: 'could not resolve github.com' }
+      throw new AppError('network', 'could not resolve github.com')
     })
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
@@ -437,7 +437,7 @@ describe('createSyncEngineFactory', () => {
     const git = fakeGit()
     git.onPush(() => {
       pushes += 1
-      throw { kind: 'auth', message: 'token rejected' }
+      throw new AppError('auth', 'token rejected')
     })
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
@@ -937,7 +937,7 @@ describe('createSyncEngineFactory', () => {
   it('passes a missing credential through as null (Rust owns the failure)', async () => {
     const git = fakeGit()
     git.onPush(() => {
-      throw { kind: 'auth', message: 'authentication required' }
+      throw new AppError('auth', 'authentication required')
     })
     const statuses: SyncStatus[] = []
     const engine = createSyncEngine({
@@ -1156,7 +1156,7 @@ describe('quiet mode', () => {
     const git = fakeGit()
     git.onPush(() => {
       pushes += 1
-      throw { kind: 'auth', message: 'token rejected' }
+      throw new AppError('auth', 'token rejected')
     })
     const engine = quietEngine()
 

@@ -1,3 +1,4 @@
+import { AppError } from '@reflect/core'
 import { act } from '@/test-utils/act.ts'
 import { describe, expect, it } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
@@ -27,7 +28,7 @@ describe('useAsyncAction', () => {
 
     await act(async () => {
       await result.current.run(async () => {
-        throw { kind: 'auth', message: 'token rejected' }
+        throw new AppError('auth', 'token rejected')
       })
     })
     expect(result.current.error).toBe('token rejected')

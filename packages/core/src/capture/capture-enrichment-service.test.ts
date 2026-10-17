@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CaptureEnvelope } from './capture-envelope.ts'
 import { captureIdentity } from './capture-identity.ts'
 import { DescriptionRejectedError } from '../ai/page-describer-service.ts'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import {
   API_KEY_SECRET,
   CAPTURE_URL,
@@ -95,7 +95,7 @@ describe('CaptureEnrichmentService', () => {
     kit.addSpool(envelope({ source: 'ios-share' }), { screenshot: false })
     expect((await kit.drain()).stopped).toBeNull()
     kit.writeNoteMock.mockClear()
-    kit.linkPreviewMock.mockRejectedValue(new ReflectError('network', 'preview unavailable'))
+    kit.linkPreviewMock.mockRejectedValue(new AppError('network', 'preview unavailable'))
 
     const outcome = await kit.reconcile({ providers: NO_PROVIDERS })
 
@@ -413,7 +413,7 @@ describe('CaptureEnrichmentService', () => {
       description: 'A description available without the keychain.',
       siteName: null,
     })
-    kit.installFailingSecrets(new ReflectError('io', 'keychain is unavailable'))
+    kit.installFailingSecrets(new AppError('io', 'keychain is unavailable'))
 
     const outcome = await kit.reconcile()
 
@@ -542,7 +542,7 @@ describe('CaptureEnrichmentService', () => {
 
   it('a transient scrape failure leaves the capture pending; the next pass retries', async () => {
     await drainOne()
-    kit.scrapeMock.mockRejectedValueOnce(new ReflectError('network', 'offline'))
+    kit.scrapeMock.mockRejectedValueOnce(new AppError('network', 'offline'))
 
     const first = await kit.reconcile()
     expect(first.stopped?.reason).toBe('network')
@@ -570,7 +570,7 @@ describe('CaptureEnrichmentService', () => {
     kit.writeNoteMock.mockClear()
     kit.scrapeMock.mockImplementation(async (url) => {
       if (url.includes('instagram')) {
-        throw new ReflectError('network', 'https://www.instagram.com answered 429')
+        throw new AppError('network', 'https://www.instagram.com answered 429')
       }
       return { title: 'An article', description: 'A scraped description.', siteName: null }
     })
@@ -617,11 +617,11 @@ describe('CaptureEnrichmentService', () => {
     kit.writeNoteMock.mockClear()
     kit.scrapeMock.mockImplementation(async (url) => {
       if (url.includes('instagram')) {
-        throw new ReflectError('network', 'https://www.instagram.com answered 429')
+        throw new AppError('network', 'https://www.instagram.com answered 429')
       }
       return { title: 'An article', description: 'A scraped description.', siteName: null }
     })
-    kit.installFailingSecrets(new ReflectError('io', 'keychain is unavailable'))
+    kit.installFailingSecrets(new AppError('io', 'keychain is unavailable'))
 
     const outcome = await kit.reconcile()
 
@@ -653,7 +653,7 @@ describe('CaptureEnrichmentService', () => {
     kit.writeNoteMock.mockClear()
     kit.describeMock.mockImplementation(async (request) => {
       if (request.url.endsWith('/first')) {
-        throw new ReflectError('network', 'the provider is unavailable (429)')
+        throw new AppError('network', 'the provider is unavailable (429)')
       }
       return { title: null, description: 'An AI description of the page.' }
     })
@@ -676,7 +676,7 @@ describe('CaptureEnrichmentService', () => {
 
   it('a permanent scrape failure enriches without meta tags', async () => {
     await drainOne()
-    kit.scrapeMock.mockRejectedValue(new ReflectError('parse', 'not an HTML page'))
+    kit.scrapeMock.mockRejectedValue(new AppError('parse', 'not an HTML page'))
 
     const outcome = await kit.reconcile()
 
@@ -743,7 +743,7 @@ describe('CaptureEnrichmentService', () => {
       description: 'A description available without AI.',
       siteName: null,
     })
-    kit.describeMock.mockRejectedValue(new ReflectError('auth', 'key rejected'))
+    kit.describeMock.mockRejectedValue(new AppError('auth', 'key rejected'))
 
     const outcome = await kit.reconcile()
 
@@ -756,7 +756,7 @@ describe('CaptureEnrichmentService', () => {
     expect(kit.noteFile.files().get(DAILY)).toContain('|A title available without AI]]')
 
     kit.scrapeMock.mockClear()
-    kit.scrapeMock.mockRejectedValue(new ReflectError('network', 'offline'))
+    kit.scrapeMock.mockRejectedValue(new AppError('network', 'offline'))
     kit.describeMock.mockResolvedValue({
       title: null,
       description: 'A description from the retry.',
@@ -853,7 +853,7 @@ describe('CaptureEnrichmentService', () => {
         kit.noteFile.set(path, contents)
         return { merged: null }
       })
-      .mockRejectedValueOnce({ kind: 'io', message: 'disk full' })
+      .mockRejectedValueOnce(new AppError('io', 'disk full'))
 
     const first = await kit.reconcile({ providers: NO_PROVIDERS })
 
@@ -896,7 +896,7 @@ describe('CaptureEnrichmentService', () => {
         kit.noteFile.set(path, contents)
         return { merged: null }
       })
-      .mockRejectedValueOnce(new ReflectError('io', 'disk full'))
+      .mockRejectedValueOnce(new AppError('io', 'disk full'))
 
     const first = await kit.reconcile({ providers: NO_PROVIDERS })
 

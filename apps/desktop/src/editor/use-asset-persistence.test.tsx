@@ -1,6 +1,6 @@
 import { act } from '@/test-utils/act.ts'
 import { afterEach, describe, expect, it } from 'vitest'
-import { ReflectError, createAttachmentService, type AttachmentService } from '@reflect/core'
+import { AppError, createAttachmentService, type AttachmentService } from '@reflect/core'
 import {
   createTestCoreServices,
   createTestAssetStoreService,
@@ -158,7 +158,7 @@ describe('useAssetPersistence', () => {
     // The user moves on; the save then fails for the note they left.
     await view.rerender({ path: 'notes/b.md' })
     await act(async () => {
-      upload.reject(new ReflectError('io', 'late failure'))
+      upload.reject(new AppError('io', 'late failure'))
       await savePromise
     })
 

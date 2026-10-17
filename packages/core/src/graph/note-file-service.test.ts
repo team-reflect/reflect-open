@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import {
   createTestClockService,
   createTestFileChangeService,
@@ -64,7 +65,7 @@ describe('createNoteFileService', () => {
   it('sends `expectedContents` for a checked write and does not report a rejected one', async () => {
     const { ipc, fileChanges, noteFile } = setup()
     ipc.onCommand('note_write', () => {
-      throw { kind: 'io', message: 'Note changed on disk; reload before retrying' }
+      throw new AppError('io', 'Note changed on disk; reload before retrying')
     })
 
     await expect(noteFile.write('notes/a.md', 'new', 7, null)).rejects.toMatchObject({
@@ -112,7 +113,7 @@ describe('createNoteFileService', () => {
   it('propagates a create rejection without reporting a write', async () => {
     const { ipc, fileChanges, noteFile } = setup()
     ipc.onCommand('note_create', () => {
-      throw { kind: 'io', message: 'the graph changed since this command was issued; dropping it' }
+      throw new AppError('io', 'the graph changed since this command was issued; dropping it')
     })
 
     await expect(noteFile.create('notes/ideas.md', '# Ideas\n', 6)).rejects.toMatchObject({

@@ -1,6 +1,6 @@
 import type { LoggerService } from '../ports/logger-service.ts'
 import { createTestLoggerService } from './logger.ts'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { ZodType } from 'zod'
 import {
   createIpcBridgeService,
@@ -66,7 +66,7 @@ class TestIpcTransport implements IpcBridge {
         this.#log.push({ command, args: { headers } })
         const handler = this.#binaryCommands.get(command)
         if (handler === undefined) {
-          throw new ReflectError('unknown', `test bridge: unimplemented command "${command}"`)
+          throw new AppError('unknown', `test bridge: unimplemented command "${command}"`)
         }
         return await handler(body, headers)
       }
@@ -82,7 +82,7 @@ class TestIpcTransport implements IpcBridge {
     this.#log.push({ command, args })
     const handler = this.#commands.get(command)
     if (handler === undefined) {
-      throw new ReflectError('unknown', `test bridge: unimplemented command "${command}"`)
+      throw new AppError('unknown', `test bridge: unimplemented command "${command}"`)
     }
     return await handler(args)
   }

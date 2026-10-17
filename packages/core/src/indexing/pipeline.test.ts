@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sha256Hex } from '@reflect/utils'
+import { AppError } from '../errors.ts'
 import { parseNote } from '../markdown/index.ts'
 import { createTestXArchiveService } from '../testing/capture.ts'
 import { createTestClockService } from '../testing/clock.ts'
@@ -221,7 +222,7 @@ describe('reindexNotesReferencing', () => {
       ],
       read: (path) => {
         if (path === 'notes/b.md') {
-          throw { kind: 'io', message: 'disk error' }
+          throw new AppError('io', 'disk error')
         }
       },
     })
@@ -329,7 +330,7 @@ describe('rebuild', () => {
       store: {
         fail: (call) =>
           call.method === 'applyBatch'
-            ? { kind: 'parse', message: 'unexpected end of hex escape' }
+            ? new AppError('parse', 'unexpected end of hex escape')
             : undefined,
       },
     })

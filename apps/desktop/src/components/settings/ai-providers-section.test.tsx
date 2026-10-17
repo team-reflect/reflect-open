@@ -1,11 +1,6 @@
 import { page, userEvent, type Locator } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  ReflectError,
-  settingsSchema,
-  type HostedAiProviderConfig,
-  type Settings,
-} from '@reflect/core'
+import { AppError, settingsSchema, type HostedAiProviderConfig, type Settings } from '@reflect/core'
 import {
   createTestCoreServices,
   createTestSecretStoreService,
@@ -85,7 +80,7 @@ beforeEach(() => {
   const set = secrets.set.bind(secrets)
   vi.spyOn(secrets, 'set').mockImplementation(async (name, value) => {
     if (failSecretSet) {
-      throw new ReflectError('io', 'keychain locked')
+      throw new AppError('io', 'keychain locked')
     }
     await set(name, value)
   })

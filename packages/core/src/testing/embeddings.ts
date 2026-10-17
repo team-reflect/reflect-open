@@ -27,7 +27,7 @@ import {
   type SemanticSearchGraphSource,
   type SemanticSearchService,
 } from '../embeddings/semantic-search-service.ts'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
@@ -95,7 +95,7 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
         },
         embed_texts: (args) => {
           if (this.#status.status !== 'ready') {
-            throw new ReflectError('unknown', `embedding model is ${this.#status.status}`)
+            throw new AppError('unknown', `embedding model is ${this.#status.status}`)
           }
           const texts = Array.isArray(args['texts']) ? args['texts'].map(String) : []
           this.#embedded.push(texts)
@@ -273,10 +273,10 @@ export interface TestEmbeddingIndexServiceOptions {
    */
   backfill?: (options: EmbeddingBackfillOptions) => Promise<EmbeddingBackfillResult>
   /**
-   * Called before a chunk set is written. A returned value other than
-   * `undefined` rejects the write with that value, unrecorded.
+   * Called before a chunk set is written. A returned `Error`
+   * rejects the write with it, unrecorded.
    */
-  failApply?: (apply: TestEmbeddingApply) => unknown
+  failApply?: (apply: TestEmbeddingApply) => Error | undefined
 }
 
 export interface TestEmbeddingIndexService extends EmbeddingIndexService {
@@ -328,10 +328,7 @@ async function storeChunks(
       const at = existing.findIndex((row) => row.content_hash === chunk.contentHash)
       const row = existing[at]
       if (row === undefined) {
-        throw new ReflectError(
-          'parse',
-          `unchanged chunk has no stored row (hash ${chunk.contentHash})`,
-        )
+        throw new AppError('parse', `unchanged chunk has no stored row (hash ${chunk.contentHash})`)
       }
       existing.splice(at, 1)
       await database.runQuery(

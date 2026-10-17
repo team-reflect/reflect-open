@@ -1,7 +1,7 @@
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { writeGenerationFor, type GraphSessionSource } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
-import { errorMessage, isAppError, ReflectError } from '../errors.ts'
+import { errorMessage, isAppError, AppError } from '../errors.ts'
 import type { NoteFileService, NoteWriteResult } from '../graph/note-file-service.ts'
 import { appendBlock } from '../markdown/append-section.ts'
 import { hasAuthoredTitle, parseNote } from '../markdown/extract.ts'
@@ -168,7 +168,7 @@ class NoteSessionImpl implements NoteSession {
     this.#io = {
       read: async (forPath) => {
         if (graph === null) {
-          throw new ReflectError('noGraph', 'No graph is open.')
+          throw new AppError('noGraph', 'No graph is open.')
         }
         return await noteFile.read(forPath, writeGenerationFor(graphSession, graph))
       },

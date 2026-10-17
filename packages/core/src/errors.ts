@@ -1,55 +1,61 @@
 import { z } from 'zod'
 
 /**
- * The shared error contract for everything crossing the Rust↔TS boundary.
- *
- * Rust commands return `Result<T, AppError>`; the serialized error is validated
- * here so the UI can branch on `kind` with a type guard instead of inspecting
- * opaque strings. Kinds mirror the Rust `AppError` enum (camelCase via serde).
+ * Every `kind` an {@link AppError} can carry. Kinds mirror the Rust `AppError`
+ * enum (camelCase via serde).
  */
-export const appErrorSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('io'), message: z.string() }),
-  z.object({ kind: z.literal('notFound'), message: z.string() }),
-  z.object({ kind: z.literal('traversal'), message: z.string() }),
-  z.object({ kind: z.literal('noGraph'), message: z.string() }),
-  z.object({ kind: z.literal('parse'), message: z.string() }),
-  z.object({ kind: z.literal('auth'), message: z.string() }),
-  z.object({ kind: z.literal('network'), message: z.string() }),
-  z.object({ kind: z.literal('unknown'), message: z.string() }),
-])
+const appErrorKinds = [
+  'io',
+  'notFound',
+  'traversal',
+  'noGraph',
+  'parse',
+  'auth',
+  'network',
+  'unknown',
+] as const
 
-export type AppError = z.infer<typeof appErrorSchema>
+export type AppErrorKind = (typeof appErrorKinds)[number]
 
 /**
- * The throwable form of {@link AppError} for TypeScript code that *originates*
- * app errors (GitHub module, providers): a real `Error` subclass — stack
- * traces survive — whose `kind`/`message` own-properties still satisfy
- * {@link isAppError}, so `catch` sites branch on it exactly like a
- * Rust-originated error.
+ * The serialized Rust `AppError`: Rust commands return `Result<T, AppError>`
+ * and reject with `{ kind, message }`. {@link toAppError} turns it into an
+ * {@link AppError} at the IPC boundary.
  */
-export class ReflectError extends Error {
-  readonly kind: AppError['kind']
+const appErrorWireSchema = z.object({ kind: z.enum(appErrorKinds), message: z.string() })
 
-  constructor(kind: AppError['kind'], message: string, options?: ErrorOptions) {
+/**
+ * The shared error contract. Rust-originated errors become instances at the
+ * IPC boundary ({@link toAppError}); TypeScript code throws them directly, so
+ * `catch` sites branch on `kind` with {@link isAppError} either way.
+ */
+export class AppError extends Error {
+  readonly kind: AppErrorKind
+
+  constructor(kind: AppErrorKind, message: string, options?: ErrorOptions) {
     super(message, options)
-    this.name = 'ReflectError'
+    this.name = 'AppError'
     this.kind = kind
   }
 }
 
-/** Type guard: is this value a well-formed {@link AppError}? */
+/** Type guard: is this value an {@link AppError}? */
 export function isAppError(value: unknown): value is AppError {
-  return appErrorSchema.safeParse(value).success
+  return value instanceof AppError
 }
 
 /**
- * Coerce any thrown/rejected value into an {@link AppError}. A well-formed
- * command error passes through; anything else becomes `unknown`.
+ * Coerce any thrown/rejected value into an {@link AppError}. An `AppError`
+ * passes through unchanged, a serialized Rust error keeps its `kind`, and
+ * anything else becomes `unknown`.
  */
 export function toAppError(value: unknown): AppError {
-  const parsed = appErrorSchema.safeParse(value)
+  if (value instanceof AppError) {
+    return value
+  }
+  const parsed = appErrorWireSchema.safeParse(value)
   if (parsed.success) {
-    return parsed.data
+    return new AppError(parsed.data.kind, parsed.data.message)
   }
   let message: string
   if (value instanceof Error) {
@@ -65,7 +71,7 @@ export function toAppError(value: unknown): AppError {
       message = String(value)
     }
   }
-  return { kind: 'unknown', message }
+  return new AppError('unknown', message, { cause: value })
 }
 
 /**

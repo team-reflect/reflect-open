@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { AppError } from '../errors.ts'
 import { createTestIpcBridgeService } from '../testing/index.ts'
 
 import { createSecretStoreService } from './secret-store-service.ts'
@@ -40,13 +41,12 @@ describe('createSecretStoreService', () => {
     const ipc = createTestIpcBridgeService({
       commands: {
         secret_set: () => {
-          throw { kind: 'io', message: 'keychain locked' }
+          throw new AppError('io', 'keychain locked')
         },
       },
     })
-    await expect(createSecretStoreService({ ipc }).set('a', 'b')).rejects.toEqual({
-      kind: 'io',
-      message: 'keychain locked',
-    })
+    await expect(createSecretStoreService({ ipc }).set('a', 'b')).rejects.toEqual(
+      new AppError('io', 'keychain locked'),
+    )
   })
 })

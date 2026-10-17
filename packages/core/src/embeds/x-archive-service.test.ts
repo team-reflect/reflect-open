@@ -1,5 +1,6 @@
 import type { XPost } from '@post-embed/types'
 import { expect, it } from 'vitest'
+import { AppError } from '../errors.ts'
 import { createTestIpcBridgeService, createTestXArchiveService } from '../testing/index.ts'
 import { syndicationPost20 as tweet } from '../testing/syndication-20.ts'
 import {
@@ -118,8 +119,7 @@ it('returns null for a post with another id', async () => {
 it('rejects when the request fails', async () => {
   const ipc = createTestIpcBridgeService({
     commands: {
-      x_syndication_fetch: async () =>
-        await Promise.reject({ kind: 'network', message: 'offline' }),
+      x_syndication_fetch: async () => await Promise.reject(new AppError('network', 'offline')),
     },
   })
   await expect(createXArchiveService({ ipc }).fetchSyndication('20')).rejects.toMatchObject({

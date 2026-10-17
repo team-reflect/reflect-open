@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { createTestClockService } from '../testing/clock.ts'
 import { createPathService, createPosixPathTransport } from '../ports/path-service.ts'
@@ -331,7 +332,7 @@ describe('togglePinned', () => {
         overrideNoteFileService(inner, {
           read: async (...args) => {
             if (fail) {
-              throw { kind: 'io', message: 'disk on fire' }
+              throw new AppError('io', 'disk on fire')
             }
             return await inner.read(...args)
           },

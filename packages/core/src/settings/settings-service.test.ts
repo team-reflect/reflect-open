@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestProgressPort } from '../testing/ports.ts'
 import { createTestSettingsService } from '../testing/settings.ts'
@@ -23,7 +24,7 @@ function setup(stored: Record<string, unknown> = {}) {
   ipc.onCommand('settings_load', async () => {
     disk.loadCalls += 1
     if (disk.failLoad) {
-      throw { kind: 'io', message: 'corrupt store' }
+      throw new AppError('io', 'corrupt store')
     }
     if (disk.gateLoad) {
       await new Promise<void>((resolve) => {
@@ -42,7 +43,7 @@ function setup(stored: Record<string, unknown> = {}) {
       await pending.promise
     }
     if (shouldFail) {
-      throw { kind: 'io', message: 'disk full' }
+      throw new AppError('io', 'disk full')
     }
     disk.saved.push(document)
     return null

@@ -1,6 +1,6 @@
 import { createTestGraphSessionService } from '../../testing/graph-session.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { ReflectError } from '../../errors.ts'
+import { AppError } from '../../errors.ts'
 import type { ToolExecutionOptions } from '@reflect/modules/ai'
 import type { RetrievalHit, RetrieveOptions } from '../../embeddings/retrieve.ts'
 import type { DailyNoteRow, DailyNotesRange } from '../../daily/daily-note-service.ts'
@@ -56,7 +56,7 @@ function buildNoteTools(effects: ToolEffects = {}): NoteTools {
   const noteFile = createTestNoteFileService()
   vi.spyOn(noteFile, 'read').mockImplementation(async (path: string): Promise<string> => {
     if (effects.readNoteFn === undefined) {
-      throw new ReflectError('notFound', `${path} not found`)
+      throw new AppError('notFound', `${path} not found`)
     }
     return await effects.readNoteFn(path)
   })
@@ -292,7 +292,7 @@ describe('search_notes', () => {
     const tools = buildNoteTools({
       retrieveFn: async () => [hit({ path: PRIVATE_PATH, title: PRIVATE_TITLE })],
       readNoteFn: async () => {
-        throw { kind: 'io', message: 'disk error' }
+        throw new AppError('io', 'disk error')
       },
     })
     const output = await runSearch(tools, { query: 'diary' })
@@ -322,7 +322,7 @@ describe('read_notes', () => {
       readNoteFn: async (path) => {
         const body = bodies[path]
         if (body === undefined) {
-          throw { kind: 'notFound', message: 'no such note' }
+          throw new AppError('notFound', 'no such note')
         }
         return body
       },
@@ -362,7 +362,7 @@ describe('read_notes', () => {
   it('reports a missing note instead of throwing', async () => {
     const tools = buildNoteTools({
       readNoteFn: async () => {
-        throw { kind: 'notFound', message: 'no such note' }
+        throw new AppError('notFound', 'no such note')
       },
     })
     const output = await runRead(tools, 'notes/gone.md')
@@ -397,7 +397,7 @@ describe('read_assets', () => {
       readNoteFn: async (path) => {
         const source = files[path]
         if (source === undefined) {
-          throw { kind: 'notFound', message: 'no such file' }
+          throw new AppError('notFound', 'no such file')
         }
         return source
       },
@@ -434,7 +434,7 @@ describe('read_assets', () => {
       readNoteFn: async (path) => {
         const source = files[path]
         if (source === undefined) {
-          throw { kind: 'notFound', message: 'no such file' }
+          throw new AppError('notFound', 'no such file')
         }
         return source
       },
@@ -529,7 +529,7 @@ describe('read_assets', () => {
         if (path === SIDECAR) {
           return `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`
         }
-        throw { kind: 'io', message: 'disk error' }
+        throw new AppError('io', 'disk error')
       },
       assetReferencingNotePathsFn: async () => ['notes/deck.md'],
     })
@@ -545,7 +545,7 @@ describe('read_assets', () => {
     const tools = buildNoteTools({
       readNoteFn: async (path) => {
         reads.push(path)
-        throw { kind: 'notFound', message: 'no such file' }
+        throw new AppError('notFound', 'no such file')
       },
       assetReferencingNotePathsFn: async () => [],
     })
@@ -712,7 +712,7 @@ describe('list_recent_notes', () => {
     const tools = buildNoteTools({
       listRecentNotesFn: async () => [recentRow({})],
       readNoteFn: async () => {
-        throw { kind: 'io', message: 'disk error' }
+        throw new AppError('io', 'disk error')
       },
     })
     const output = await runRecents(tools, {})

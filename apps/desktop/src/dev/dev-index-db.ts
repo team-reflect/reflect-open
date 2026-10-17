@@ -6,7 +6,7 @@ import {
   foldGraphPath,
   isCalendarDate,
   noteBasenameKey,
-  ReflectError,
+  AppError,
   type IndexedNote,
 } from '@reflect/core'
 
@@ -221,7 +221,7 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
     moveNote: (from, to) => {
       const occupied = db.selectValue('SELECT 1 FROM notes WHERE path = ?', [to])
       if (occupied !== undefined) {
-        throw new ReflectError('io', `cannot move note: ${to} is already indexed`)
+        throw new AppError('io', `cannot move note: ${to} is already indexed`)
       }
       // Mirrors the Rust caller: the child tables reference `notes(path)`, so
       // the parent-key update needs deferred FK checks — which only apply

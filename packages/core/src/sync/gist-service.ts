@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { HttpService } from '../ports/http-service.ts'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import { apiHeaders, readJson } from './github-api.ts'
 
 /**
@@ -34,7 +34,7 @@ export interface GistFile {
 /**
  * The GitHub Gists REST surface behind "Publish to gist": create a secret
  * gist, update it in place on republish. Same conventions as the repo service
- * — zod-validated responses, `ReflectError` kinds.
+ * — zod-validated responses, `AppError` kinds.
  *
  * Gists need the GitHub App's **Gists** user permission (or a PAT with gist
  * access); GitHub deliberately answers **404** — not 403 — when a token lacks
@@ -96,17 +96,14 @@ class GistServiceImpl implements GistService {
       }),
     })
     if (response.status === 404) {
-      throw new ReflectError(
-        'auth',
-        'GitHub refused gist access (404) — reconnect GitHub to grant it',
-      )
+      throw new AppError('auth', 'GitHub refused gist access (404) — reconnect GitHub to grant it')
     }
     if (response.status === 401 || response.status === 403) {
-      throw new ReflectError('auth', `GitHub rejected the token (${response.status})`)
+      throw new AppError('auth', `GitHub rejected the token (${response.status})`)
     }
     if (!response.ok) {
       const body = await response.text()
-      throw new ReflectError('io', `creating the gist failed (${response.status}): ${body}`)
+      throw new AppError('io', `creating the gist failed (${response.status}): ${body}`)
     }
     return toPublished(await readJson(response, gistResponseSchema, 'gist creation'))
   }
@@ -129,11 +126,11 @@ class GistServiceImpl implements GistService {
       return null
     }
     if (response.status === 401 || response.status === 403) {
-      throw new ReflectError('auth', `GitHub rejected the token (${response.status})`)
+      throw new AppError('auth', `GitHub rejected the token (${response.status})`)
     }
     if (!response.ok) {
       const body = await response.text()
-      throw new ReflectError('io', `updating the gist failed (${response.status}): ${body}`)
+      throw new AppError('io', `updating the gist failed (${response.status}): ${body}`)
     }
     return toPublished(await readJson(response, gistResponseSchema, 'gist update'))
   }
@@ -148,9 +145,9 @@ class GistServiceImpl implements GistService {
       return
     }
     if (response.status === 401 || response.status === 403) {
-      throw new ReflectError('auth', `GitHub rejected the token (${response.status})`)
+      throw new AppError('auth', `GitHub rejected the token (${response.status})`)
     }
-    throw new ReflectError('io', `deleting the gist failed (${response.status})`)
+    throw new AppError('io', `deleting the gist failed (${response.status})`)
   }
 }
 

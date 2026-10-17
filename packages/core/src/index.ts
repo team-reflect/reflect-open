@@ -180,7 +180,7 @@ export {
   type RetrieveOptions,
 } from './embeddings/retrieval-service.ts'
 export { type SemanticSearchService } from './embeddings/semantic-search-service.ts'
-export { errorMessage, toAppError, ReflectError } from './errors.ts'
+export { errorMessage, toAppError, AppError } from './errors.ts'
 export {
   dailyPath,
   notePath,

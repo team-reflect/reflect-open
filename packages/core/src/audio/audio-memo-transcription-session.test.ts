@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import { audioMemoIdentity } from './audio-memo.ts'
 import type { FileMeta } from '../graph/schemas.ts'
 import { AUDIO_MEMOS_DIR } from '../graph/paths.ts'
@@ -191,7 +192,7 @@ describe('AudioMemoTranscriptionService.openSession', () => {
     const { kit, subject } = await open()
     kit.addRecording(MEMO.audioPath)
     kit.transcription.setResult(() =>
-      Promise.reject({ kind: 'auth', message: 'openai rejected the API key (401)' }),
+      Promise.reject(new AppError('auth', 'openai rejected the API key (401)')),
     )
     subject.start()
     await flush()
@@ -209,7 +210,7 @@ describe('AudioMemoTranscriptionService.openSession', () => {
   it('keeps expected stops silent — offline heals on the next trigger', async () => {
     const { kit, subject } = await open()
     kit.addRecording(MEMO.audioPath)
-    kit.transcription.setResult(() => Promise.reject({ kind: 'network', message: 'provider down' }))
+    kit.transcription.setResult(() => Promise.reject(new AppError('network', 'provider down')))
     subject.start()
     await flush()
 

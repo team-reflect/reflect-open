@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createTestICloudNativeService } from '../testing/sync.ts'
 import { createICloudMigrationService } from './icloud-migration-service.ts'
@@ -67,7 +67,7 @@ describe('createICloudMigrationService', () => {
     await expect(
       migration.moveGraph({
         disconnectBackup: async () => {
-          throw new ReflectError('io', 'remote locked')
+          throw new AppError('io', 'remote locked')
         },
         openGraph,
         onCopied,
@@ -84,7 +84,7 @@ describe('createICloudMigrationService', () => {
     await expect(
       migration.moveGraph({
         disconnectBackup: async () => {
-          throw new ReflectError('io', 'remote locked')
+          throw new AppError('io', 'remote locked')
         },
         openGraph: () => false,
         onCopied,
@@ -112,10 +112,10 @@ describe('createICloudMigrationService', () => {
     await expect(
       migration.moveGraph({
         disconnectBackup: async () => {
-          throw new ReflectError('io', 'remote locked')
+          throw new AppError('io', 'remote locked')
         },
         openGraph: async () => {
-          throw new ReflectError('io', 'graph vanished')
+          throw new AppError('io', 'graph vanished')
         },
       }),
     ).resolves.toBe('graph vanished')

@@ -2,7 +2,7 @@ import { sha256Hex } from '@reflect/utils'
 import { describe, expect, it, vi } from 'vitest'
 import { AssetDescriptionRejectedError } from '../ai/asset-describer-service.ts'
 import { createBackgroundReconcilerFactory } from '../reconcile/background-reconciler.ts'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import { descriptionPathFor } from '../graph/paths.ts'
 import type { FileChange } from '../indexing/file-change-service.ts'
 import type { IndexAppliedEvent } from '../indexing/index-lifecycle-service.ts'
@@ -118,7 +118,7 @@ function setup(options?: { provider?: AiProviderConfig | null; secretStore?: Sec
     /**
      * When set, the next re-index rejects with it.
      */
-    reindexError: null as unknown,
+    reindexError: null as Error | null,
     listenerCount: () => appliedListeners.size,
     emit(changes: FileChange[], generation: number = INDEX_GENERATION): void {
       for (const listener of appliedListeners) {
@@ -456,7 +456,7 @@ describe('AssetDescriptionService.reconcile', () => {
     files.set('notes/pub.md', publicNote('assets/a.png'))
     refs.set('assets/a.png', ['notes/pub.md'])
     describer.setResult(() => {
-      throw new ReflectError('network', 'offline')
+      throw new AppError('network', 'offline')
     })
 
     const outcome = await reconcile()
@@ -583,7 +583,7 @@ describe('AssetDescriptionService.openSession', () => {
 
   it('still reports the descriptions as indexed when the re-index fails, and logs it', async () => {
     const { session, index, logger, indexedEvents } = await describable()
-    const failure = new ReflectError('io', 'index closed')
+    const failure = new AppError('io', 'index closed')
     index.reindexError = failure
     session.start()
     index.emit([upsert('assets/a.png')])
@@ -652,7 +652,7 @@ describe('AssetDescriptionService.openSession', () => {
   it('keeps an asset dirty after a transient stop and retries it on wake', async () => {
     const { session, index, describer, activity, logger, files } = await describable()
     describer.setResult(() => {
-      throw new ReflectError('network', 'offline')
+      throw new AppError('network', 'offline')
     })
     session.start()
 
@@ -673,7 +673,7 @@ describe('AssetDescriptionService.openSession', () => {
   it('logs an unexpected stop once, not on every retry', async () => {
     const { session, index, describer, activity, logger } = await describable()
     describer.setResult(() => {
-      throw new ReflectError('io', 'index not ready')
+      throw new AppError('io', 'index not ready')
     })
     session.start()
 
@@ -835,7 +835,7 @@ describe('AssetDescriptionService.backfillVisibly', () => {
     refs.set('assets/a.png', ['notes/pub.md'])
 
     describer.setResult(() => {
-      throw new ReflectError('network', 'offline')
+      throw new AppError('network', 'offline')
     })
     await service.backfillVisibly()
     expect(operations.findByLabel('Describing assets')).toMatchObject({
@@ -844,7 +844,7 @@ describe('AssetDescriptionService.backfillVisibly', () => {
     })
 
     describer.setResult(() => {
-      throw new ReflectError('io', 'disk error')
+      throw new AppError('io', 'disk error')
     })
     await service.backfillVisibly()
     expect(operations.findByLabel('Describing assets')).toMatchObject({

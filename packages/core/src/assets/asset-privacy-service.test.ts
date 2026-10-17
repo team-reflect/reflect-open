@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import { createTestAssetReferences } from '../testing/assets.ts'
 import { createTestXArchiveService } from '../testing/capture.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
@@ -195,7 +195,7 @@ describe('classifyAsset (privacy gate)', () => {
 
   it('fails closed when a referer cannot be read', async () => {
     const noteFile = createTestNoteFileService()
-    vi.spyOn(noteFile, 'read').mockRejectedValue(new ReflectError('io', 'disk error'))
+    vi.spyOn(noteFile, 'read').mockRejectedValue(new AppError('io', 'disk error'))
     const service = createPrivacy({
       noteFile,
       assetReferences: createTestAssetReferences({ 'assets/a.png': ['notes/pub.md'] }),

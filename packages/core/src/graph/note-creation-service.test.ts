@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import { createWikiResolverService } from '../indexing/wiki-resolver-service.ts'
 import { createTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
@@ -44,7 +44,7 @@ function setup({ indexed = [], files = {}, placeholders = [], readErrors = [] }:
   const readFile = noteFile.read.bind(noteFile)
   const read = vi.spyOn(noteFile, 'read').mockImplementation(async (path, generation) => {
     if (readErrors.includes(path)) {
-      throw new ReflectError('io', `${path} is temporarily unreadable`)
+      throw new AppError('io', `${path} is temporarily unreadable`)
     }
     return await readFile(path, generation)
   })

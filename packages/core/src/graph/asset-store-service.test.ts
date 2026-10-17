@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { AppError } from '../errors.ts'
 import {
   createTestClockService,
   createTestFileChangeService,
@@ -56,7 +57,7 @@ describe('uploadBlob', () => {
     ipc.onCommand('asset_upload_begin', () => 'upload-9')
     ipc.onCommand('asset_upload_abort', () => null)
     ipc.onBinaryCommand('asset_upload_append', () => {
-      throw { kind: 'io', message: 'disk full' }
+      throw new AppError('io', 'disk full')
     })
 
     await expect(assetStore.uploadBlob('big.zip', bytesOf(16, 1), 2)).rejects.toMatchObject({

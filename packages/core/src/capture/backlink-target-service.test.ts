@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import type { NoteCreationService } from '../graph/note-creation-service.ts'
 import {
   createTestNoteCreationService,
@@ -78,7 +79,7 @@ describe('BacklinkTargetService', () => {
     })
     const readNoteMock = vi
       .spyOn(noteFile, 'read')
-      .mockRejectedValue({ kind: 'io', message: 'not downloaded' })
+      .mockRejectedValue(new AppError('io', 'not downloaded'))
 
     await expect(backlinkTarget.ensure('Links', 3)).rejects.toMatchObject({
       kind: 'io',

@@ -7,6 +7,7 @@ import {
   type NoteActionsService,
   type NoteDocumentService,
   type NoteRow,
+  AppError,
 } from '@reflect/core'
 import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -224,7 +225,7 @@ describe('NoteActionsMenu', () => {
   })
 
   it('rolls back stale optimistic privacy state and surfaces failures for retry', async () => {
-    commitNoteFrontmatter.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
+    commitNoteFrontmatter.mockRejectedValueOnce(new AppError('io', 'disk on fire'))
     const { view } = await mount()
 
     await openActions()

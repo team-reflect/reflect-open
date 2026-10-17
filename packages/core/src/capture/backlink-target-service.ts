@@ -1,5 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { NoteCreationService } from '../graph/note-creation-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { wikiLinkSafe } from '../markdown/edit.ts'
@@ -42,7 +42,7 @@ class BacklinkTargetServiceImpl implements BacklinkTargetService {
     }
     const path = outcome.kind === 'ambiguous' ? [...outcome.paths].sort().at(0) : outcome.path
     if (path === undefined) {
-      throw new ReflectError('unknown', `The [[${title}]] backlink target could not be resolved.`)
+      throw new AppError('unknown', `The [[${title}]] backlink target could not be resolved.`)
     }
     const source = await noteFile.read(path, generation)
     const currentTitle = parseNote({ path, source }).title

@@ -8,7 +8,7 @@ import {
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import { NoteBusyError, type NoteDocumentService } from '../documents/note-document-service.ts'
-import { errorMessage, ReflectError } from '../errors.ts'
+import { errorMessage, AppError } from '../errors.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
 import { INDEX_WRITTEN_EVENT, listenNow, type IpcBridgeService } from '../ipc/ipc-service.ts'
@@ -1124,7 +1124,7 @@ class TaskServiceImpl implements TaskService {
     for (let task = pending[0]; task !== undefined; task = pending[0]) {
       // After the batch's graph closes or switches, a write would land in the next graph.
       if (signal.aborted) {
-        throw new ReflectError('noGraph', 'No graph is open.')
+        throw new AppError('noGraph', 'No graph is open.')
       }
       const result = await this.writeTask(task, actionsFor(task))
       this.#relocate(session, task.notePath, result.moved)

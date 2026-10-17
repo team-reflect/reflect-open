@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
 import { audioMemoIdentity, audioMemoPartPath } from './audio-memo.ts'
 import type { AiProvidersState } from '../ai/provider-config.ts'
 import { AUDIO_MEMOS_DIR } from '../graph/paths.ts'
@@ -309,10 +310,7 @@ describe('MobileAudioMemoService.openSession', () => {
 
   it('a capture failure keeps the staged file; discard deletes it', async () => {
     const kit = await setup()
-    vi.spyOn(kit.assetStore, 'importAudioMemo').mockRejectedValue({
-      kind: 'io',
-      message: 'disk full',
-    })
+    vi.spyOn(kit.assetStore, 'importAudioMemo').mockRejectedValue(new AppError('io', 'disk full'))
     const session = await kit.open()
 
     session.toggle()
@@ -336,7 +334,7 @@ describe('MobileAudioMemoService.openSession', () => {
     const kit = await setup()
     const importMock = vi
       .spyOn(kit.assetStore, 'importAudioMemo')
-      .mockRejectedValueOnce({ kind: 'io', message: 'disk full' })
+      .mockRejectedValueOnce(new AppError('io', 'disk full'))
     const session = await kit.open()
 
     session.toggle()
@@ -497,10 +495,7 @@ describe('MobileAudioMemoService.openSession', () => {
 
   it('a parked error reopens the drawer from the audio action instead of blocking silently', async () => {
     const kit = await setup()
-    vi.spyOn(kit.assetStore, 'importAudioMemo').mockRejectedValue({
-      kind: 'io',
-      message: 'disk full',
-    })
+    vi.spyOn(kit.assetStore, 'importAudioMemo').mockRejectedValue(new AppError('io', 'disk full'))
     const session = await kit.open()
 
     session.toggle()

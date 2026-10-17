@@ -8,6 +8,7 @@ import {
   type NoteActionsService,
   type NoteDocumentService,
   type NoteRow,
+  AppError,
 } from '@reflect/core'
 import { createTestCoreServices, createTestPlatformService } from '@reflect/core/testing'
 import { createTestOperationsService, type TestOperationsService } from '@reflect/app/testing'
@@ -219,7 +220,7 @@ describe('NoteActionsSection private toggle', () => {
   })
 
   it('restores the private label when a write fails', async () => {
-    commitNoteFrontmatter.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
+    commitNoteFrontmatter.mockRejectedValueOnce(new AppError('io', 'disk on fire'))
     const view = await renderSection('notes/a.md')
     await userEvent.click(view.getByRole('button', { name: /Lock note/ }))
     await expect.element(view.getByText('Lock note', { exact: true })).toBeInTheDocument()

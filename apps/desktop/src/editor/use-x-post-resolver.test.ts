@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { EmbedMediaService, ResolvedArchivedPost } from '@reflect/core'
+import { AppError } from '@reflect/core'
 import {
   createTestCoreServices,
   createTestPlatformService,
@@ -156,7 +157,7 @@ it('asks X once for a post that does not exist', async () => {
 it('asks X again after a failed request', async () => {
   const fetchSyndication = vi
     .spyOn(xArchive, 'fetchSyndication')
-    .mockRejectedValueOnce({ kind: 'network', message: 'offline' })
+    .mockRejectedValueOnce(new AppError('network', 'offline'))
   const resolve = createXPostResolver(ctx, ROOT)
   await expect(resolve(URL)).rejects.toMatchObject({ kind: 'network' })
   await resolve(URL)

@@ -1,4 +1,4 @@
-import { IAP_PRODUCT_IDS, indexedNoteSchema, ReflectError, type IpcBridge } from '@reflect/core'
+import { IAP_PRODUCT_IDS, indexedNoteSchema, AppError, type IpcBridge } from '@reflect/core'
 import { z } from 'zod'
 import type { DevFileStore } from '@/dev/dev-file-store.ts'
 import type { DevIndexDb } from '@/dev/dev-index-db.ts'
@@ -113,7 +113,7 @@ class DevBridgeImpl implements IpcBridge {
       case 'plugin:iap|purchase': {
         const { payload } = iapProductArgsSchema.parse(args)
         if (!iapProducts.some((product) => product.productId === payload.productId)) {
-          throw new ReflectError('notFound', `unknown preview product: ${payload.productId}`)
+          throw new AppError('notFound', `unknown preview product: ${payload.productId}`)
         }
         this.#ownedProductId = payload.productId
         return null
@@ -163,7 +163,7 @@ class DevBridgeImpl implements IpcBridge {
         const { path } = pathArgsSchema.parse(args)
         const contents = files.read(path)
         if (contents === null) {
-          throw new ReflectError('notFound', `no such note: ${path}`)
+          throw new AppError('notFound', `no such note: ${path}`)
         }
         return contents
       }
@@ -172,7 +172,7 @@ class DevBridgeImpl implements IpcBridge {
         const { path } = pathArgsSchema.parse(args)
         const contents = files.read(path)
         if (contents === null) {
-          throw new ReflectError('notFound', `no such note: ${path}`)
+          throw new AppError('notFound', `no such note: ${path}`)
         }
         return { kind: 'content', content: contents }
       }
@@ -181,7 +181,7 @@ class DevBridgeImpl implements IpcBridge {
         if (checkContents === true) {
           const current = files.read(path)
           if (current !== (expectedContents ?? null) && current !== contents) {
-            throw new ReflectError('io', 'Note changed on disk; reload before retrying')
+            throw new AppError('io', 'Note changed on disk; reload before retrying')
           }
         }
         return { modifiedMs: files.write(path, contents), merged: null }
@@ -189,10 +189,7 @@ class DevBridgeImpl implements IpcBridge {
       case 'note_create': {
         const { path, contents, generation } = createArgsSchema.parse(args)
         if (generation !== this.#graphInfo.generation) {
-          throw new ReflectError(
-            'io',
-            'the graph changed since this command was issued; dropping it',
-          )
+          throw new AppError('io', 'the graph changed since this command was issued; dropping it')
         }
         return files.create(path, contents)
       }
@@ -211,10 +208,10 @@ class DevBridgeImpl implements IpcBridge {
           request: { from, to },
         } = moveRequestArgsSchema.parse(args)
         if (!files.exists(from)) {
-          throw new ReflectError('notFound', `cannot move note: ${from} does not exist`)
+          throw new AppError('notFound', `cannot move note: ${from} does not exist`)
         }
         if (files.exists(to)) {
-          throw new ReflectError('io', `cannot move note: ${to} already exists`)
+          throw new AppError('io', `cannot move note: ${to} already exists`)
         }
         // Index first: it can refuse (occupied path), and a refused move must
         // leave the file untouched — the in-memory stand-in for Rust's
@@ -235,7 +232,7 @@ class DevBridgeImpl implements IpcBridge {
         const { path } = pathArgsSchema.parse(args)
         const contents = this.#assets.get(path)
         if (contents === undefined) {
-          throw new ReflectError('notFound', `asset not found: ${path}`)
+          throw new AppError('notFound', `asset not found: ${path}`)
         }
         return contents
       }
@@ -335,7 +332,7 @@ class DevBridgeImpl implements IpcBridge {
 
       default:
         console.error(`[dev-bridge] unimplemented command "${command}"`, args)
-        throw new ReflectError('unknown', `dev bridge: unimplemented command "${command}"`)
+        throw new AppError('unknown', `dev bridge: unimplemented command "${command}"`)
     }
   }
 

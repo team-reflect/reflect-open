@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ReflectError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import { createWikiResolverService } from '../indexing/wiki-resolver-service.ts'
 import { createTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
@@ -34,10 +34,10 @@ function setup({ indexed = [], files = {}, placeholders = [], readErrors = [] }:
   const readFile = noteFile.read.bind(noteFile)
   const read = vi.spyOn(noteFile, 'read').mockImplementation(async (path, generation) => {
     if (placeholders.includes(path)) {
-      throw new ReflectError('notFound', `${path} not found`)
+      throw new AppError('notFound', `${path} not found`)
     }
     if (readErrors.includes(path)) {
-      throw new ReflectError('io', `${path} is unavailable`)
+      throw new AppError('io', `${path} is unavailable`)
     }
     return await readFile(path, generation)
   })
@@ -168,7 +168,7 @@ describe('resolveWikiTarget', () => {
     const graph = setup({
       indexed: [{ path: 'notes/date-title.md', markdown: '# 2026-06-09\n' }],
     })
-    graph.read.mockRejectedValue(new ReflectError('io', 'evicted'))
+    graph.read.mockRejectedValue(new AppError('io', 'evicted'))
 
     await expect(graph.resolver.resolveWikiTarget('2026-06-09', 7)).resolves.toEqual({
       kind: 'unavailable',
@@ -230,7 +230,7 @@ describe('resolveWikiTarget', () => {
 
   it('keeps a listed-then-deleted slug-family candidate unavailable', async () => {
     const graph = setup({ files: { 'notes/business-ideas.md': '# Business ideas\n' } })
-    graph.read.mockRejectedValue(new ReflectError('notFound', 'vanished after listing'))
+    graph.read.mockRejectedValue(new AppError('notFound', 'vanished after listing'))
 
     await expect(graph.resolver.resolveWikiTarget('Business ideas', 7)).resolves.toEqual({
       kind: 'unavailable',
@@ -273,11 +273,11 @@ describe('resolveWikiTarget', () => {
     let dailyReads = 0
     graph.read.mockImplementation(async (path) => {
       if (path !== 'daily/2026-06-09.md') {
-        throw new ReflectError('notFound', 'missing')
+        throw new AppError('notFound', 'missing')
       }
       dailyReads += 1
       if (dailyReads === 1) {
-        throw new ReflectError('notFound', 'not synced yet')
+        throw new AppError('notFound', 'not synced yet')
       }
       return 'Arrived during resolution\n'
     })
