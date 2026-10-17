@@ -22,6 +22,17 @@ on:
         required: false
         type: string
         default: app-store-connect
+    secrets:
+      APPLE_API_KEY:
+        required: false
+      APPLE_API_ISSUER:
+        required: false
+      APPLE_API_KEY_CONTENT:
+        required: false
+      SENTRY_AUTH_TOKEN:
+        required: false
+      SENTRY_DSN:
+        required: false
 
 concurrency:
   group: publish-testflight
@@ -32,7 +43,7 @@ permissions:
 
 jobs:
   testflight:
-    name: Build and upload iOS
+    name: Build iOS
     if: github.repository == 'team-reflect/reflect-open'
     runs-on: macos-26
     timeout-minutes: 120
@@ -66,6 +77,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           targets: aarch64-apple-ios
+          cache-key: aarch64-apple-ios
 
       - name: Resolve build number
         id: build_number

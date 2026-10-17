@@ -16,6 +16,33 @@ on:
         description: Immutable commit targeted by the release tag
         type: string
         required: true
+    secrets:
+      APPLE_SIGNING_IDENTITY:
+        required: false
+      APPLE_CERTIFICATE:
+        required: false
+      APPLE_CERTIFICATE_PASSWORD:
+        required: false
+      APPLE_API_KEY:
+        required: false
+      APPLE_API_ISSUER:
+        required: false
+      APPLE_API_KEY_CONTENT:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_PASSWORD:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+      SENTRY_AUTH_TOKEN:
+        required: false
+      SENTRY_DSN:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
   workflow_dispatch:
     inputs:
       tag:
@@ -37,7 +64,20 @@ jobs:
     with:
       tag: ${{ inputs.tag }}
       commit: ${{ inputs.commit }}
-    secrets: inherit
+    secrets:
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   windows:
     name: Build the Windows installer
@@ -45,7 +85,9 @@ jobs:
     with:
       tag: ${{ inputs.tag }}
       commit: ${{ inputs.commit }}
-    secrets: inherit
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   linux:
     name: Build the Linux packages
@@ -53,7 +95,9 @@ jobs:
     with:
       tag: ${{ inputs.tag }}
       commit: ${{ inputs.commit }}
-    secrets: inherit
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   # Every release also ships to TestFlight. iOS needs no version bump of its
   # own: the marketing version follows apps/desktop/package.json with the
@@ -64,7 +108,12 @@ jobs:
     uses: ./.github/workflows/publish-testflight.yml
     with:
       commit: ${{ inputs.commit }}
-    secrets: inherit
+    secrets:
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
 
   # The builds only fill the draft release. Publishing waits for the macOS,
   # Windows, and Linux builds to succeed.
@@ -76,6 +125,7 @@ jobs:
   finalize:
     name: Finalize the release
     needs: [macos, windows, linux]
+    if: github.repository == 'team-reflect/reflect-open'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     concurrency:
