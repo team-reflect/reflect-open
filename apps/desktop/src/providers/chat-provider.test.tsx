@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ReactElement } from 'react'
+import { createRef, useLayoutEffect, type ReactElement, type RefObject } from 'react'
 import { aiKeySecretName, type AiProviderConfig, type ChatTurn, type Settings } from '@reflect/core'
 import {
   createTestCoreServices,
@@ -10,7 +10,7 @@ import {
   type TestChatConversation,
   type TestOpenGraph,
 } from '@reflect/core/testing'
-import { useChatSession } from '@/providers/chat-provider.tsx'
+import { useChatSession, type ChatContextValue } from '@/providers/chat-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 
 /**
@@ -33,10 +33,18 @@ const RESTORED_TURN: ChatTurn = {
   status: 'done',
 }
 
-let session: ReturnType<typeof useChatSession> | null = null
+const sessionRef: RefObject<ChatContextValue | null> = createRef()
 
 function SessionProbe(): ReactElement | null {
-  session = useChatSession()
+  const session = useChatSession()
+
+  useLayoutEffect(() => {
+    sessionRef.current = session
+    return () => {
+      sessionRef.current = null
+    }
+  }, [session])
+
   return null
 }
 
@@ -44,7 +52,7 @@ async function renderProvider(options?: {
   conversations?: readonly TestChatConversation[]
   settings?: Partial<Settings>
 }) {
-  session = null
+  sessionRef.current = null
   const settings = createTestSettingsService({
     aiProviders: [MODEL],
     defaultAiProviderId: 'm1',
@@ -84,47 +92,49 @@ describe('useChatSession', () => {
       ],
     })
 
-    await vi.waitFor(() => expect(session?.turns).toEqual([RESTORED_TURN]))
-    expect(session?.activeConversationId).toBe('conv-1')
+    await vi.waitFor(() => expect(sessionRef.current?.turns).toEqual([RESTORED_TURN]))
+    expect(sessionRef.current?.activeConversationId).toBe('conv-1')
   })
 
   it('publishes a sent turn and saves it under the index generation', async () => {
     const { chatHistory, chatEngine } = await renderProvider()
 
-    await session?.send('hello there')
+    await sessionRef.current?.send('hello there')
 
-    await vi.waitFor(() => expect(session?.turns.at(-1)?.status).toBe('done'))
-    expect(session?.turns.at(-1)).toMatchObject({
+    await vi.waitFor(() => expect(sessionRef.current?.turns.at(-1)?.status).toBe('done'))
+    expect(sessionRef.current?.turns.at(-1)).toMatchObject({
       userText: 'hello there',
       parts: [{ kind: 'text', text: 'Hi.' }],
     })
-    expect(session?.status).toBe('idle')
+    expect(sessionRef.current?.status).toBe('idle')
     expect(chatEngine.calls()).toHaveLength(1)
     await vi.waitFor(() => expect(chatHistory.getSaves()).toHaveLength(2))
     expect(chatHistory.getSaves()[0]).toMatchObject({
       generation: 7,
-      conversation: { id: session?.activeConversationId, title: 'hello there' },
+      conversation: { id: sessionRef.current?.activeConversationId, title: 'hello there' },
     })
   })
 
   it('holds the composer draft and clears it when a send goes through', async () => {
     await renderProvider()
 
-    session?.setDraft('half-typed question')
-    await vi.waitFor(() => expect(session?.draft).toBe('half-typed question'))
+    sessionRef.current?.setDraft('half-typed question')
+    await vi.waitFor(() => expect(sessionRef.current?.draft).toBe('half-typed question'))
 
-    await session?.send('half-typed question')
-    await vi.waitFor(() => expect(session?.draft).toBe(''))
-    expect(session?.turns.at(-1)?.userText).toBe('half-typed question')
+    await sessionRef.current?.send('half-typed question')
+    await vi.waitFor(() => expect(sessionRef.current?.draft).toBe(''))
+    expect(sessionRef.current?.turns.at(-1)?.userText).toBe('half-typed question')
   })
 
   it('persists a picked model and applies it to the session', async () => {
     const { app } = await renderProvider()
-    expect(session?.activeModel).toEqual(MODEL)
+    expect(sessionRef.current?.activeModel).toEqual(MODEL)
 
-    session?.selectModel({ configId: 'm1', modelId: 'gpt-5.5' })
+    sessionRef.current?.selectModel({ configId: 'm1', modelId: 'gpt-5.5' })
 
-    await vi.waitFor(() => expect(session?.activeModel).toEqual({ ...MODEL, model: 'gpt-5.5' }))
+    await vi.waitFor(() =>
+      expect(sessionRef.current?.activeModel).toEqual({ ...MODEL, model: 'gpt-5.5' }),
+    )
     expect(app.settings.get().chatModelSelection).toEqual({ configId: 'm1', modelId: 'gpt-5.5' })
   })
 
@@ -138,7 +148,7 @@ describe('useChatSession', () => {
       await new Promise<never>(() => {})
     })
 
-    void session?.send('hey')
+    void sessionRef.current?.send('hey')
     await vi.waitFor(() => expect(signal).toBeDefined())
     expect(signal?.aborted).toBe(false)
 

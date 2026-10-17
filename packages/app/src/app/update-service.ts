@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import {
   isMobilePlatform,
   type ClockService,
@@ -52,7 +53,7 @@ export interface UpdaterAdapter {
    * The newer release, or `null` when the app is current.
    */
   check(): Promise<AvailableUpdate | null>
-  relaunch(): Promise<void>
+  relaunch(): MaybePromise<void>
 }
 
 /**
@@ -73,19 +74,19 @@ export interface UpdateService {
   /**
    * User-initiated check: surfaces "up to date" and failures, unlike auto.
    */
-  checkNow(): Promise<void>
+  checkNow(): MaybePromise<void>
   /**
    * Download and install the found update; progress lands in the state.
    */
-  install(): Promise<void>
+  install(): MaybePromise<void>
   /**
    * Relaunch into the installed update.
    */
-  restart(): Promise<void>
+  restart(): MaybePromise<void>
   /**
    * Retry what failed: an install after a failed install, otherwise a check.
    */
-  retryAction(): Promise<void>
+  retryAction(): MaybePromise<void>
   /**
    * Stop auto-checking.
    */
@@ -116,7 +117,7 @@ function errorMessage(error: unknown): string {
 /**
  * Runs the retry that matches the failure in `service`'s state.
  */
-export function retryUpdate(service: UpdateService): Promise<void> {
+export function retryUpdate(service: UpdateService): MaybePromise<void> {
   const state = service.getState()
   return state.phase === 'error' && state.during === 'install'
     ? service.install()
@@ -206,11 +207,11 @@ class UpdateServiceImpl implements UpdateService {
     }
   }
 
-  restart(): Promise<void> {
+  restart(): MaybePromise<void> {
     return this.#deps.updater.relaunch()
   }
 
-  retryAction(): Promise<void> {
+  retryAction(): MaybePromise<void> {
     return retryUpdate(this)
   }
 

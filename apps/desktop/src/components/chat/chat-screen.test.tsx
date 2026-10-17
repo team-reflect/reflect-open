@@ -1,7 +1,7 @@
 import { createTestWindowService, type TestWindowService } from '@reflect/app/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
-import type { ReactElement } from 'react'
+import { createRef, useLayoutEffect, type ReactElement, type RefObject } from 'react'
 import {
   aiKeySecretName,
   aiProvider,
@@ -20,7 +20,8 @@ import {
   type TestChatGraphContextService,
   type TestOpenGraph,
 } from '@reflect/core/testing'
-import { useChatSession } from '@/providers/chat-provider.tsx'
+import { useChatSession, type ChatContextValue } from '@/providers/chat-provider.tsx'
+import type { Route } from '@/routing/route.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { ChatScreen } from './chat-screen.tsx'
@@ -95,25 +96,46 @@ function dropFiles(target: Element, files: File[]): boolean {
   )
 }
 
-let probedSend: ((text: string) => Promise<void>) | null = null
-let probedNewChat: (() => void) | null = null
-let probedRoute: unknown = null
+const probedSendRef: RefObject<ChatContextValue['send'] | null> = createRef()
+const probedNewChatRef: RefObject<ChatContextValue['newChat'] | null> = createRef()
+const probedRouteRef: RefObject<Route | null> = createRef()
 
 function SendProbe(): ReactElement | null {
-  const session = useChatSession()
-  probedSend = session.send
-  probedNewChat = session.newChat
+  const { send, newChat } = useChatSession()
+
+  useLayoutEffect(() => {
+    probedSendRef.current = send
+    return () => {
+      probedSendRef.current = null
+    }
+  }, [send])
+
+  useLayoutEffect(() => {
+    probedNewChatRef.current = newChat
+    return () => {
+      probedNewChatRef.current = null
+    }
+  }, [newChat])
+
   return null
 }
 
 function RouteProbe(): ReactElement | null {
-  probedRoute = useRouter().route
+  const { route } = useRouter()
+
+  useLayoutEffect(() => {
+    probedRouteRef.current = route
+    return () => {
+      probedRouteRef.current = null
+    }
+  }, [route])
+
   return null
 }
 
 async function renderChat() {
-  probedSend = null
-  probedRoute = null
+  probedSendRef.current = null
+  probedRouteRef.current = null
   const app = createTestCoreServices({
     secretStore: createTestSecretStoreService(
       settingsState.apiKey === null ? {} : { [aiKeySecretName(MODEL.id)]: settingsState.apiKey },
@@ -179,7 +201,7 @@ describe('ChatScreen', () => {
     await expect.element(view.getByText(/Searched “atlas” · 1 note/)).toBeInTheDocument()
     await expect.element(view.getByText('It ships in June.')).toBeInTheDocument()
     await view.getByRole('button', { name: 'Atlas', exact: true }).click()
-    expect(probedRoute).toEqual({ kind: 'note', path: 'notes/atlas.md' })
+    expect(probedRouteRef.current).toEqual({ kind: 'note', path: 'notes/atlas.md' })
 
     // The turn went out with the keychain key and the full derived history.
     const options = chatEngine.calls().at(-1)
@@ -272,7 +294,7 @@ describe('ChatScreen', () => {
         deepLinkForRoute({ kind: 'note', path: 'notes/brief.md' }),
       ]),
     )
-    expect(probedRoute).toEqual({ kind: 'today' })
+    expect(probedRouteRef.current).toEqual({ kind: 'today' })
   })
 
   it('opens cited wiki links from settled chat markdown', async () => {
@@ -289,7 +311,9 @@ describe('ChatScreen', () => {
     await userEvent.type(view.getByLabelText('Chat message'), 'what should I open?{Enter}')
     await view.getByTestId('wikilink').click()
 
-    await vi.waitFor(() => expect(probedRoute).toEqual({ kind: 'note', path: 'notes/atlas.md' }))
+    await vi.waitFor(() =>
+      expect(probedRouteRef.current).toEqual({ kind: 'note', path: 'notes/atlas.md' }),
+    )
   })
 
   it('opens ⌘-clicked cited wiki links in a new window', async () => {
@@ -314,7 +338,7 @@ describe('ChatScreen', () => {
         }),
       ),
     )
-    expect(probedRoute).toEqual({ kind: 'today' })
+    expect(probedRouteRef.current).toEqual({ kind: 'today' })
   })
 
   it('offers the provider catalog in the picker, keeping a custom model selectable', async () => {
@@ -448,16 +472,16 @@ describe('ChatScreen', () => {
     await userEvent.type(view.getByLabelText('Chat message'), 'what have I been reading?{Enter}')
 
     await view.getByRole('button', { name: '#book' }).click()
-    expect(probedRoute).toEqual({ kind: 'allNotes', tag: 'book' })
+    expect(probedRouteRef.current).toEqual({ kind: 'allNotes', tag: 'book' })
     await view.getByRole('button', { name: 'Atlas', exact: true }).click()
-    expect(probedRoute).toEqual({ kind: 'note', path: 'notes/atlas.md' })
+    expect(probedRouteRef.current).toEqual({ kind: 'note', path: 'notes/atlas.md' })
     // A refused listing shows the refusal, not a misleading count.
     await expect.element(view.getByText(/Listed #\* notes — Not a tag/)).toBeInTheDocument()
     await expect
       .element(view.getByText(/Listed daily notes 6\/1\/2026 – 6\/11\/2026 · 2 days/))
       .toBeInTheDocument()
     await view.getByRole('button', { name: 'Wed, June 10th, 2026' }).click()
-    expect(probedRoute).toEqual({ kind: 'daily', date: '2026-06-10' })
+    expect(probedRouteRef.current).toEqual({ kind: 'daily', date: '2026-06-10' })
   })
 
   it('renders an attachment chip: filenames, with per-asset refusals inline', async () => {
@@ -550,10 +574,10 @@ describe('ChatScreen', () => {
       { type: 'complete', messages: [{ role: 'assistant', content: 'One.' }] },
     ])
     const view = await renderChat()
-    if (!probedSend) {
+    if (!probedSendRef.current) {
       expect.unreachable('probe did not capture send')
     }
-    const send = probedSend
+    const send = probedSendRef.current
 
     // Two sends in one tick — rendered state (and refs synced to it) still
     // says idle for both, so the guard must be synchronous.
@@ -633,7 +657,7 @@ describe('ChatScreen', () => {
     })
     dropFiles(view.getByLabelText('Chat message').element(), [file])
 
-    probedNewChat?.()
+    probedNewChatRef.current?.()
     pendingRead.resolve(new Uint8Array([0x89]).buffer)
     await new Promise((resolve) => setTimeout(resolve, 100))
 

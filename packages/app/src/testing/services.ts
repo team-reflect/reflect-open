@@ -51,7 +51,7 @@ export function createTestAppHost(overrides: Partial<AppHost> = {}): AppHost {
     lifecycle: createTestLifecycleService(),
     operations: createTestOperationsService(),
     clipboard: createTestClipboardService(),
-    opener: { openUrl: async () => {}, revealItemInDir: async () => {} },
+    opener: { openUrl: () => {}, revealItemInDir: () => {} },
     ...overrides,
   }
 }

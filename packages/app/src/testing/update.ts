@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { Unlisten } from '@reflect/core'
 import {
   retryUpdate,
@@ -103,7 +104,7 @@ class TestUpdaterAdapterImpl implements TestUpdaterAdapter {
     return this.#options.available ? this.#offer(this.#options.available.version) : null
   }
 
-  async relaunch(): Promise<void> {
+  relaunch(): void {
     this.calls.push('relaunch')
   }
 
@@ -217,19 +218,19 @@ class TestUpdateServiceImpl implements TestUpdateService {
     this.calls.push('start')
   }
 
-  async checkNow(): Promise<void> {
+  checkNow(): void {
     this.calls.push('checkNow')
   }
 
-  async install(): Promise<void> {
+  install(): void {
     this.calls.push('install')
   }
 
-  async restart(): Promise<void> {
+  restart(): void {
     this.calls.push('restart')
   }
 
-  retryAction(): Promise<void> {
+  retryAction(): MaybePromise<void> {
     this.calls.push('retryAction')
     return retryUpdate(this)
   }
