@@ -213,7 +213,7 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
     }
   }
 
-  async #requestDownloads(paths: readonly string[]): Promise<void> {
+  readonly #requestDownloads = async (paths: readonly string[]): Promise<void> => {
     try {
       await this.#deps.icloudNative.requestDownloads(paths)
     } catch (err: unknown) {
@@ -547,7 +547,7 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
       // iCloud-evicted notes whose content the index lacks: request exactly
       // those downloads; the materialized files index via ordinary watcher
       // upserts. Rust resolves against the active root itself.
-      this.#deps.indexLifecycle.onStalePlaceholders((paths) => void this.#requestDownloads(paths)),
+      this.#deps.indexLifecycle.onStalePlaceholders(this.#requestDownloads),
       this.#deps.indexLifecycle.followActivity(),
     ]
     return () => {
