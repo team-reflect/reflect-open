@@ -5080,8 +5080,6 @@ dependencies = [
  "hf-hub",
  "http-range-header",
  "image",
- "infer",
- "jiff",
  "keyring-core",
  "log",
  "notify",
@@ -5095,7 +5093,6 @@ dependencies = [
  "objc2-ui-kit",
  "percent-encoding",
  "proptest",
- "reconcile-text",
  "reflect-graph-io",
  "reflect-graph-paths",
  "reflect-index",
@@ -5129,7 +5126,6 @@ dependencies = [
  "walkdir",
  "windows-native-keyring-store",
  "xattr",
- "zip 9.0.4",
 ]
 
 [[package]]
