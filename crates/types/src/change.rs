@@ -5,12 +5,6 @@
 
 use serde::Serialize;
 
-/// The event carrying batched [`FileChange`]s to the frontend.
-pub(crate) const CHANGE_EVENT: &str = "index:changed";
-
-/// The event asking the frontend for one full reconcile pass.
-pub(crate) const RECONCILE_EVENT: &str = "index:reconcile";
-
 /// What happened to a graph file. Serializes as `"upsert"` or `"remove"`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
