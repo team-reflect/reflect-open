@@ -133,19 +133,19 @@ class TestAppStoreServiceImpl implements TestAppStoreService {
     this.#environment = options?.environment ?? 'Production'
   }
 
-  environment(): Promise<string> {
+  environment(): string {
     this.#log.push('environment')
-    return Promise.resolve(this.#environment)
+    return this.#environment
   }
 
-  sync(): Promise<void> {
+  sync(): void {
     this.#log.push('sync')
-    return Promise.resolve()
+    return
   }
 
-  presentOfferCodeRedeemSheet(): Promise<void> {
+  presentOfferCodeRedeemSheet(): void {
     this.#log.push('presentOfferCodeRedeemSheet')
-    return Promise.resolve()
+    return
   }
 
   calls(): readonly AppStoreCall[] {

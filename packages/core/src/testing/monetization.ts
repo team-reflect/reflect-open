@@ -72,14 +72,14 @@ class TestClassicAccessServiceImpl implements TestClassicAccessService {
 
   readonly subscribe = this.#listeners.subscribe
 
-  read(): Promise<ClassicAccess | null> {
+  read(): ClassicAccess | null {
     this.#log.push('read')
-    return Promise.resolve(this.#current.access)
+    return this.#current.access
   }
 
-  load(): Promise<ClassicAccess | null> {
+  load(): ClassicAccess | null {
     this.#log.push('load')
-    return Promise.resolve(this.#current.access)
+    return this.#current.access
   }
 
   async signIn(options: ClassicSignInOptions): Promise<ClassicSignInResult> {
@@ -88,10 +88,10 @@ class TestClassicAccessServiceImpl implements TestClassicAccessService {
     return await this.#signIn(options)
   }
 
-  signOut(): Promise<void> {
+  signOut(): void {
     this.#log.push('signOut')
     this.setState({ access: null, active: false })
-    return Promise.resolve()
+    return
   }
 
   start(): Unlisten {

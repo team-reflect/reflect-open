@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { IpcBridgeService } from './ipc-service.ts'
 import { definePluginCommand, ignoredResult } from './plugin.ts'
@@ -38,19 +39,19 @@ export interface AppStoreService {
    * StoreKit-configuration run). Rejects when the probe cannot answer, so an
    * unanswered probe stays distinguishable from a named channel.
    */
-  environment(): Promise<string>
+  environment(): MaybePromise<string>
   /**
    * Force StoreKit to refetch transactions from the App Store
    * (`AppStore.sync()`). Apple may show a sign-in prompt, so call it only
    * from an explicit user action such as Restore Purchases.
    */
-  sync(): Promise<void>
+  sync(): MaybePromise<void>
   /**
    * Show Apple's in-app offer-code redemption sheet. A redeemed code arrives
    * through the iap plugin's `purchaseUpdated` event, not through this call's
    * result, which resolves as soon as the sheet is presented.
    */
-  presentOfferCodeRedeemSheet(): Promise<void>
+  presentOfferCodeRedeemSheet(): MaybePromise<void>
 }
 
 export interface AppStoreServiceDeps {

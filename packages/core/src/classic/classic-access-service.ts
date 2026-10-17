@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import pkceChallenge from 'pkce-challenge'
 import { z } from 'zod'
 import type { ClockService } from '../ports/clock-service.ts'
@@ -101,13 +102,13 @@ export interface ClassicAccessService {
   /**
    * This device's stored access, without contacting Reflect Classic.
    */
-  read(): Promise<ClassicAccess | null>
+  read(): MaybePromise<ClassicAccess | null>
   /**
    * This device's stored access, rechecked with Reflect Classic when the last
    * successful check is more than a day old. A failed recheck keeps the stored
    * answer, so being offline never locks the app early.
    */
-  load(): Promise<ClassicAccess | null>
+  load(): MaybePromise<ClassicAccess | null>
   /**
    * Signs in to Reflect Classic and stores the access it grants. The state
    * changes on the next `read` or `load`, so a caller can show the result
@@ -117,7 +118,7 @@ export interface ClassicAccessService {
   /**
    * Forgets this device's access.
    */
-  signOut(): Promise<void>
+  signOut(): MaybePromise<void>
   /**
    * On iOS, reads the stored access now and, while it holds a token, rechecks
    * it now and whenever the page turns visible. Elsewhere it does nothing.

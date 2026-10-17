@@ -99,9 +99,11 @@ export function ClassicSignInProgress({ signIn }: { signIn: ClassicSignIn }): Re
   const { mutation } = signIn
 
   const done = async () => {
-    await classic.read().catch((error: unknown) => {
+    try {
+      await classic.read()
+    } catch (error: unknown) {
       logger.error('Reading the Reflect Classic access failed', error)
-    })
+    }
     mutation.reset()
   }
 
