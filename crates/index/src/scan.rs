@@ -13,8 +13,8 @@ use std::collections::{HashMap, HashSet};
 use rusqlite::Connection;
 use serde::Serialize;
 
-use crate::error::AppResult;
-use crate::fs::FileMeta;
+use reflect_types::AppResult;
+use reflect_types::FileMeta;
 
 /// Mirrors `MTIME_TRUST_AGE_MS` in `packages/core/src/indexing/hash.ts`: an
 /// mtime match may only skip the read once the file has settled — local write

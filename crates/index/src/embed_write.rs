@@ -6,7 +6,7 @@
 use rusqlite::{params, Connection};
 use serde::Deserialize;
 
-use crate::error::{AppError, AppResult};
+use reflect_types::{AppError, AppResult};
 
 /// One chunk of a note, built in TS (`@reflect/core` chunker). `vector` is
 /// present only for new/changed chunks — `None` means "this chunk's hash

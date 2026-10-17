@@ -9,7 +9,7 @@
 use rusqlite::{params, Connection};
 use serde::Deserialize;
 
-use crate::error::AppResult;
+use reflect_types::AppResult;
 
 /// A conversation's metadata, sent with every message save so the row can be
 /// created lazily on the first message. Mirrors the zod contract in
