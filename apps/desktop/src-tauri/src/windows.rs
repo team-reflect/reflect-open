@@ -243,9 +243,7 @@ fn open_new_window_in_browser<R: tauri::Runtime>(
     }
 }
 
-fn lock_registry<'a>(
-    state: &'a State<'_, WindowInit>,
-) -> AppResult<MutexGuard<'a, WindowRegistry>> {
+fn lock_registry<'a>(state: &'a WindowInit) -> AppResult<MutexGuard<'a, WindowRegistry>> {
     state.registry.lock().map_err(|err| {
         tracing::error!(?err, "window registry lock poisoned by an earlier panic");
         AppError::io("window registry lock poisoned")

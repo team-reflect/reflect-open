@@ -29,21 +29,12 @@ use reflect_graph_paths::{
     classify, evicted_logical_path, eviction_placeholder, has_pruned_component, is_pruned_dir_name,
     to_slash_lossy, wire_path, GraphPathKind,
 };
-use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use walkdir::WalkDir;
 
+use crate::change::{FileChange, CHANGE_EVENT, RECONCILE_EVENT};
 use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
-
-/// The Tauri event name carrying batched {@link FileChange}s to the frontend.
-const CHANGE_EVENT: &str = "index:changed";
-
-/// The coarse dirty signal: a visible directory was created, renamed, or
-/// removed (or the platform demanded a rescan), and its descendants were
-/// never enumerated per file. Carries no payload — the frontend answers with
-/// one full reconcile pass.
-pub(crate) const RECONCILE_EVENT: &str = "index:reconcile";
 
 /// Holds the active debouncer; dropping it stops the background watch thread.
 #[derive(Default)]
@@ -133,22 +124,6 @@ impl FileIdCache for PrunedFileIdMap {
     fn remove_path(&mut self, path: &Path) {
         self.paths.retain(|cached, _| !cached.starts_with(path));
     }
-}
-
-/// A debounced change to a tracked file, sent to the frontend.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FileChange {
-    /// Graph-relative path, forward-slashed.
-    pub path: String,
-    /// `"upsert"` (created/modified) or `"remove"` (deleted).
-    pub kind: String,
-    /// Last-modified time in epoch milliseconds, set for upserts. The frontend
-    /// stamps `notes.mtime` from this — without it, watcher-indexed rows would
-    /// carry no real timestamp (and reconcile would never repair them, since it
-    /// is content-hash gated).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub modified_ms: Option<u64>,
 }
 
 /// What one debounced batch amounts to: precise per-file changes, and/or the

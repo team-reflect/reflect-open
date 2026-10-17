@@ -49,7 +49,7 @@ struct Upload {
 pub struct AssetUploads(Mutex<HashMap<String, Upload>>);
 
 fn lock_uploads<'locked>(
-    uploads: &'locked State<'_, AssetUploads>,
+    uploads: &'locked AssetUploads,
 ) -> AppResult<std::sync::MutexGuard<'locked, HashMap<String, Upload>>> {
     uploads.0.lock().map_err(|err| {
         tracing::error!(?err, "asset upload state lock poisoned by an earlier panic");
