@@ -2104,15 +2104,14 @@ fn a_single_connection_host_queries_on_the_writer() {
     assert_eq!(note_count(&session), Value::from(1));
 }
 
-/// The reconcile scan lists the root its generation was opened for, never a
-/// root the caller swapped in later: `root_for_generation` answers `None` for
-/// a stale generation and the scan itself re-checks under the lock.
+/// The root the shell walks for a reconcile scan comes from the session, not
+/// from the caller: `root_for_generation` answers the root the generation was
+/// opened for, `None` once the session moved on, and `reconcile_scan` itself
+/// re-checks the generation under the lock.
 #[test]
-fn reconcile_scan_is_pinned_to_the_sessions_root_and_generation() {
+fn root_for_generation_and_reconcile_scan_follow_the_sessions_generation() {
     let graph_a = tempfile::tempdir().expect("tempdir");
     let graph_b = tempfile::tempdir().expect("tempdir");
-    std::fs::write(graph_a.path().join("one.md"), "# one\n").unwrap();
-    std::fs::write(graph_b.path().join("two.md"), "# two\n").unwrap();
 
     let (session, generation) = file_session(graph_a.path());
     assert_eq!(
@@ -2131,8 +2130,8 @@ fn reconcile_scan_is_pinned_to_the_sessions_root_and_generation() {
     assert_eq!(scan.total, 1);
 
     // The switch's second half: a new generation opened for graph B. The
-    // scan queued for the old generation walked nothing and gets the empty
-    // delta, never graph B's rows.
+    // old generation now resolves to no root, and a scan queued for it gets
+    // the empty delta, never graph B's rows.
     session
         .open(graph_b.path(), &FileIndexConnections)
         .expect("open b");
@@ -2141,4 +2140,34 @@ fn reconcile_scan_is_pinned_to_the_sessions_root_and_generation() {
         .reconcile_scan(generation, &[listed("one.md")], 10_000)
         .expect("stale scan");
     assert_eq!(scan.total, 0);
+}
+
+/// A reader that fails to open must not leave a half-open session behind: the
+/// writer is dropped too, so every later call reports `no_graph`.
+#[test]
+fn a_failed_reader_open_unbinds_the_writer() {
+    struct ReaderFails;
+    impl IndexConnections for ReaderFails {
+        fn open_writer(&self, _root: &std::path::Path) -> reflect_types::AppResult<Connection> {
+            Ok(migrated())
+        }
+        fn open_reader(
+            &self,
+            _root: &std::path::Path,
+        ) -> reflect_types::AppResult<Option<Connection>> {
+            Err(reflect_types::AppError::io("reader refused"))
+        }
+    }
+    let session = IndexSession::new();
+    let err = session
+        .open(std::path::Path::new("/unused"), &ReaderFails)
+        .expect_err("open fails");
+    assert_eq!(err.message(), "reader refused");
+    assert_eq!(session.current_generation().unwrap(), None);
+    // The first open bumped the writer to generation 1; a write for it must
+    // report no graph rather than land in the unbound index.
+    let err = session
+        .apply(1, &[note("notes/a.md", "A", vec![])])
+        .expect_err("no index");
+    assert_eq!(err.message(), "No graph is open");
 }
