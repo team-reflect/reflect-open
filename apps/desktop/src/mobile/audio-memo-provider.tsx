@@ -19,7 +19,7 @@ import { useServiceState } from '@/services/use-service-state.ts'
  * it is a bottom drawer plus the mic action in the Daily capture menu.
  */
 
-type MobileAudioMemoContextValue = MobileAudioMemoSessionState &
+export type MobileAudioMemoContextValue = MobileAudioMemoSessionState &
   Pick<
     MobileAudioMemoSession,
     'toggle' | 'stopAndSave' | 'cancelRecording' | 'retry' | 'discard'

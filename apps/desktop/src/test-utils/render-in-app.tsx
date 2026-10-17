@@ -144,7 +144,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
       : { platform: createTestPlatformService(options.platform) }),
     ...(backup === null ? {} : { backup }),
   }
-  const app: CoreServices = options?.app ?? (createTestCoreServices(overrides)  )
+  const app: CoreServices = options?.app ?? createTestCoreServices(overrides)
   const servicesOnly = options?.servicesOnly ?? false
   if (
     servicesOnly &&

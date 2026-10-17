@@ -44,7 +44,7 @@ class FakeResizeObserver {
    */
   resize(): void {
     if (!this.disconnected) {
-      this.#callback([], this )
+      this.#callback([], this)
     }
   }
 }

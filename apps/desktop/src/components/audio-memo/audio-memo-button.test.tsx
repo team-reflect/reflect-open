@@ -3,14 +3,15 @@ import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import type { AudioMemoContextValue } from '@/providers/audio-memo-provider.tsx'
+import type { Mutable } from '@reflect/utils'
 
-const memo = vi.hoisted(() : AudioMemoContextValue => ({
+const memo = vi.hoisted((): Mutable<AudioMemoContextValue> => ({
   phase: 'idle',
   elapsedMs: 0,
   stream: null,
   available: true,
-  unavailableReason: null ,
-  error: null  ,
+  unavailableReason: null,
+  error: null,
   canRetry: false,
   toggle: vi.fn(),
   cancel: vi.fn(),

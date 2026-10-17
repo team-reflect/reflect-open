@@ -4,15 +4,17 @@ import { userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import type { MobileAudioMemoContextValue } from '@/mobile/audio-memo-provider.tsx'
+import type { Mutable } from '@reflect/utils'
 
-const memo = vi.hoisted(() => ({
-  phase: 'recording' as 'idle' | 'requesting' | 'recording' | 'transcribing' | 'error',
+const memo = vi.hoisted((): Mutable<MobileAudioMemoContextValue> => ({
+  phase: 'recording',
   elapsedMs: 65_000,
   level: 0.4,
   pendingCount: 0,
   available: true,
   hasTranscriptionConfig: true,
-  error: null as string | null,
+  error: null,
   canRetry: false,
   drawerOpen: true,
   toggle: vi.fn(),

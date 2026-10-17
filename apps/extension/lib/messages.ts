@@ -9,10 +9,7 @@ export interface FlushRequest {
 
 export function isFlushRequest(message: unknown): message is FlushRequest {
   return (
-    typeof message === 'object' &&
-    message !== null &&
-    'type' in message &&
-    (message  ).type === 'flush'
+    typeof message === 'object' && message !== null && 'type' in message && message.type === 'flush'
   )
 }
 
