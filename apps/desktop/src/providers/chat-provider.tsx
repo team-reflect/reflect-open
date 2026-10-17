@@ -12,7 +12,8 @@ import { useServiceState } from '@/services/use-service-state.ts'
 
 export type { ChatStatus } from '@reflect/core'
 
-type ChatContextValue = ChatSessionState & Omit<ChatSession, 'getState' | 'subscribe' | 'attach'>
+export type ChatContextValue = ChatSessionState &
+  Omit<ChatSession, 'getState' | 'subscribe' | 'attach'>
 
 const NO_CHAT = {
   subscribe: () => () => {},
