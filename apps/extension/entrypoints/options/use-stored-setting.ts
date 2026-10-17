@@ -23,7 +23,7 @@ export function useStoredSetting<T>(key: string, read: () => Promise<T>): T | nu
       )
     }
     const onChanged = (changes: Record<string, unknown>, area: string): void => {
-      if (area === 'local' && key in changes) refresh()
+      if (area === 'local' && Object.hasOwn(changes, key)) refresh()
     }
     browser.storage.onChanged.addListener(onChanged)
     refresh()

@@ -140,7 +140,7 @@ function dailyRow(date: string, overrides: Partial<DailyNoteRow> = {}): DailyNot
 }
 
 function isAsyncIterable(value: object): value is AsyncIterable<unknown> {
-  return Symbol.asyncIterator in value
+  return typeof Reflect.get(value, Symbol.asyncIterator) === 'function'
 }
 
 /** Execute `search_notes` directly, asserting a non-streaming output. */
