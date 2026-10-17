@@ -271,6 +271,16 @@ describe('listenNow', () => {
     expect(unlisten).toHaveBeenCalledOnce()
   })
 
+  it('accepts a registration that returns its teardown synchronously', async () => {
+    const unlisten = vi.fn()
+    const teardown = listenNow(() => unlisten, vi.fn())
+    await Promise.resolve()
+
+    teardown()
+
+    expect(unlisten).toHaveBeenCalledOnce()
+  })
+
   it('reports synchronous and asynchronous registration failures', async () => {
     const onError = vi.fn()
     listenNow(() => {

@@ -176,14 +176,14 @@ describe('createWindowService', () => {
     const hide = vi.fn(async () => {})
     const { window } = setup({
       host: {
-        focusedWindowLabel: async () => 'note-2',
+        focusedWindowLabel: () => 'note-2',
         emitTo,
         hide,
-        listen: async (event, handler): Promise<Unlisten> => {
+        listen: (event, handler): Unlisten => {
           handlers.set(event, handler)
           return removed
         },
-        onCloseRequested: async (handler) => {
+        onCloseRequested: (handler) => {
           closeHandler = handler
           return removed
         },
@@ -200,7 +200,7 @@ describe('createWindowService', () => {
     unlistenEvent()
     unlistenClose()
 
-    await expect(window.focusedWindowLabel()).resolves.toBe('note-2')
+    expect(await window.focusedWindowLabel()).toBe('note-2')
     expect(received).toHaveBeenCalledWith('note.find')
     expect(emitTo).toHaveBeenCalledWith('note-2', 'menu', 'note.find')
     expect(hide).toHaveBeenCalledOnce()

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { ZodType } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { toAppError, type AppError } from '../errors.ts'
@@ -340,14 +341,14 @@ export function createFanOut<T>(start?: (emit: (value: T) => void) => Unlisten):
  * registration goes to `onError`.
  */
 export function listenNow(
-  register: () => Promise<Unlisten>,
+  register: () => MaybePromise<Unlisten>,
   onError: (cause: unknown) => void,
 ): Unlisten {
   let disposed = false
   let unlisten: Unlisten | null = null
   let pending: Promise<Unlisten>
   try {
-    pending = register()
+    pending = Promise.resolve(register())
   } catch (error) {
     pending = Promise.reject(error)
   }
