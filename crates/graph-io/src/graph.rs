@@ -164,9 +164,8 @@ pub fn ensure_readable_attachment_path(path: &str) -> AppResult<()> {
     )))
 }
 
-// ---- commands --------------------------------------------------------------
-
-/// How a [`note_read_local`] request found the note on disk.
+/// How a local note read (the desktop `note_read_local` command) found the
+/// note on disk.
 #[derive(Debug, Serialize)]
 #[serde(
     rename_all = "camelCase",
@@ -225,7 +224,9 @@ pub fn write_note_revision(
     })
 }
 
-/// Write a note without a revision check. The caller holds the graph lock.
+/// Write a note without a revision check, for tests that stage a file. The
+/// caller holds the graph lock.
+#[cfg(any(test, feature = "test-support"))]
 pub fn write_unchecked(root: &Path, rel: &str, contents: &str) -> AppResult<NoteWriteOutcome> {
     write_own(root, rel, &resolve(root, rel)?, contents)
 }
@@ -426,7 +427,7 @@ pub struct VaultScanStats {
     pub skipped: u32,
 }
 
-/// The same note listing as [`list_files`], callable with a plain root — the
+/// The same note listing as the desktop `list_files` command, callable with a plain root — the
 /// iCloud conflict sweep and the index reconcile walk the disk fresh, outside
 /// the cache: reconcile's whole job is to re-verify what is actually there.
 pub fn note_files(root: &Path) -> Vec<FileMeta> {
