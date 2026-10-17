@@ -25,7 +25,7 @@ const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 const logger = createTestLoggerService()
 
 // TODO: remove lastHandler and navigate
-let lastHandler: (WikiLinkNavigation) | null = null
+let lastHandler: WikiLinkNavigation | null = null
 let navigate: RouterNavigate | null = null
 
 const lastHandlerRef: RefObject<WikiLinkNavigation | null> = createRef()
@@ -40,14 +40,14 @@ function Host({ readOnly = false }: { readOnly?: boolean }): ReactNode {
     return () => {
       lastHandlerRef.current = null
     }
-  }, [lastHandler,  ])
+  }, [lastHandler])
 
   useLayoutEffect(() => {
     navigateRef.current = navigate
     return () => {
       navigateRef.current = null
     }
-  }, [navigate,  ])
+  }, [navigate])
 
   return null
 }
