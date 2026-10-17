@@ -24,7 +24,7 @@ import { useChatSession } from '@/providers/chat-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { ChatScreen } from './chat-screen.tsx'
-import { deepLinkForRoute } from '@/lib/deep-links/format.ts'
+import { deepLinkForRoute } from '@reflect/app'
 
 /**
  * The chat view over a faked engine: the provider stack, the chat session and

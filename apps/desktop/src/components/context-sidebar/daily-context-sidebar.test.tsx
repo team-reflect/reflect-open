@@ -14,7 +14,7 @@ import {
   type TestStorageService,
 } from '@reflect/core/testing'
 import { formatDayLabel } from '@/lib/dates.ts'
-import { deepLinkForRoute } from '@/lib/deep-links/format.ts'
+import { deepLinkForRoute } from '@reflect/app'
 import { monthLabel, monthOf } from '@/lib/month-grid.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'

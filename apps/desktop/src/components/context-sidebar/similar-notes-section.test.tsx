@@ -9,7 +9,7 @@ import {
   createTestRetrievalService,
 } from '@reflect/core/testing'
 import type { ReactNode } from 'react'
-import { deepLinkForRoute } from '@/lib/deep-links/format.ts'
+import { deepLinkForRoute } from '@reflect/app'
 import { useRouter } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { SimilarNotesSection } from './similar-notes-section.tsx'

@@ -7,8 +7,7 @@ import { isWikiNodeName, wikiBracketStart } from '../markdown/wiki-nodes.ts'
 
 /**
  * Block-level context extraction for the backlinks panel, ported from old
- * Reflect's `getBacklinkContextHtml`. Where {@link lineAt} returns only the
- * physical line around a link, this walks the parsed block structure and
+ * Reflect's `getBacklinkContextHtml`. This walks the parsed block structure and
  * returns the whole unit of meaning the mention sits in:
  *
  * - **Paragraph** — the whole paragraph (which may wrap across lines).

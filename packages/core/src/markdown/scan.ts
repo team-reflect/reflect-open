@@ -23,41 +23,6 @@ export interface InlineWikiLink {
   displayTo: number
 }
 
-/** One `![alt](src)` image occurrence within a scanned text. */
-export interface InlineImage {
-  /** Span of the whole `![…](…)`, offsets relative to the scanned text. */
-  from: number
-  to: number
-  alt: string
-  src: string
-}
-
-/**
- * Find every inline image in a block's text content. Offsets are relative to
- * the input string; the caller maps them into document positions. Source
- * decomposition is shared with the indexer (`link-syntax.ts`), so the editor
- * renders exactly what the index records.
- */
-export function scanInlineImages(text: string): InlineImage[] {
-  if (!text.includes('![')) {
-    return []
-  }
-  const images: InlineImage[] = []
-  parseBody(text).iterate({
-    enter: (node) => {
-      if (node.name !== 'Image') {
-        return true
-      }
-      const parsed = parseInlineLink(text.slice(node.from, node.to))
-      if (parsed?.isImage) {
-        images.push({ from: node.from, to: node.to, alt: parsed.text, src: parsed.href })
-      }
-      return false
-    },
-  })
-  return images
-}
-
 /**
  * An ordered piece of inline content: literal text, a `[[wiki]]` link, or a
  * markdown/autolink link. {@link scanInlineSegments} returns these in document

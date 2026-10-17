@@ -1,5 +1,6 @@
 import type { ShareService } from '@reflect/app'
 import {
+  frontmatterPatchToYaml,
   isOstensiblyEmptyNoteSource,
   upsertFrontmatter,
   type IndexQueryService,
@@ -8,7 +9,6 @@ import {
   type NoteRow,
 } from '@reflect/core'
 import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
-import { frontmatterPatchToYaml } from '@/editor/note-session.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import type { ReactElement, ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
