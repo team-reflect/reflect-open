@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { listenNow, type IpcBridgeService } from '../ipc/ipc-service.ts'
@@ -98,23 +99,23 @@ export interface CalendarService {
   /**
    * The current calendar permission state. Never prompts.
    */
-  authorizationStatus(): Promise<CalendarAuthorizationStatus>
+  authorizationStatus(): MaybePromise<CalendarAuthorizationStatus>
   /**
    * Trigger the OS calendar permission prompt and resolve with whether full
    * access was granted. The OS prompts once; after a denial this resolves
    * `false` at once and the user must change the switch in System Settings.
    */
-  requestAccess(): Promise<boolean>
+  requestAccess(): MaybePromise<boolean>
   /**
    * Every event calendar, across all accounts.
    */
-  listCalendars(): Promise<CalendarInfo[]>
+  listCalendars(): MaybePromise<CalendarInfo[]>
   /**
    * Events from `calendarIds` overlapping `range`, unfiltered (display
    * policy is `displayEvents`). Unknown calendar identifiers are skipped,
    * so a removed account degrades to fewer events.
    */
-  listEvents(range: CalendarRange, calendarIds: readonly string[]): Promise<CalendarEvent[]>
+  listEvents(range: CalendarRange, calendarIds: readonly string[]): MaybePromise<CalendarEvent[]>
   /**
    * Call `listener` whenever anything in the calendar database changes. The
    * notification carries nothing; re-query for the new state.

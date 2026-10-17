@@ -166,12 +166,12 @@ class CalendarEventsServiceImpl implements CalendarEventsService {
     return this.#deps.platform.isMacosDesktop
   }
 
-  listCalendars(): Promise<CalendarInfo[]> {
-    return this.#deps.calendar.listCalendars()
+  async listCalendars(): Promise<CalendarInfo[]> {
+    return await this.#deps.calendar.listCalendars()
   }
 
-  listDayEvents(date: string, calendarIds: readonly string[]): Promise<CalendarEvent[]> {
-    return this.#deps.calendar.listEvents(dayRange(date), calendarIds)
+  async listDayEvents(date: string, calendarIds: readonly string[]): Promise<CalendarEvent[]> {
+    return await this.#deps.calendar.listEvents(dayRange(date), calendarIds)
   }
 
   subscribeChanged(listener: () => void): Unlisten {

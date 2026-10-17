@@ -49,11 +49,11 @@ class TestCalendarServiceImpl implements TestCalendarService {
     this.#grantAccess = options?.grantAccess ?? true
   }
 
-  async authorizationStatus(): Promise<CalendarAuthorizationStatus> {
+  authorizationStatus(): CalendarAuthorizationStatus {
     return this.#status
   }
 
-  async requestAccess(): Promise<boolean> {
+  requestAccess(): boolean {
     this.#requests++
     if (this.#status === 'notDetermined') {
       this.#status = this.#grantAccess ? 'fullAccess' : 'denied'
@@ -61,7 +61,7 @@ class TestCalendarServiceImpl implements TestCalendarService {
     return this.#status === 'fullAccess'
   }
 
-  async listCalendars(): Promise<CalendarInfo[]> {
+  listCalendars(): CalendarInfo[] {
     return [...this.#calendars]
   }
 
