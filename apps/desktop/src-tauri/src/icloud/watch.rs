@@ -238,7 +238,8 @@ mod platform {
     static NUDGED: LazyLock<Mutex<HashMap<String, Option<u64>>>> =
         LazyLock::new(|| Mutex::new(HashMap::new()));
 
-    use crate::change::{ChangeKind, FileChange, CHANGE_EVENT};
+    use reflect_types::events::INDEX_CHANGED;
+    use reflect_types::{ChangeKind, FileChange};
 
     /// Lifecycle epoch: every `start`/`stop` bumps it, and a queued install
     /// only proceeds when its epoch is still current. Commands run off the
@@ -654,7 +655,7 @@ mod platform {
                 crate::fs::invalidate_file_catalog(&state, root);
             }
             if is_update {
-                let _ = app.emit(CHANGE_EVENT, round.changes);
+                let _ = app.emit(INDEX_CHANGED, round.changes);
             }
         }
         if !is_update {
@@ -669,7 +670,7 @@ mod platform {
             // to it — a deletion leaves the empty-snapshot diff empty, and
             // placeholders never appear as changes at all — so an empty
             // gather proves nothing about that window.
-            let _ = app.emit(crate::change::RECONCILE_EVENT, ());
+            let _ = app.emit(reflect_types::events::INDEX_RECONCILE, ());
         }
         if !round.conflicts.is_empty() {
             let mut conflicts = round.conflicts;

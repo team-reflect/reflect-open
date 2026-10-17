@@ -18,7 +18,6 @@ mod background_task;
 mod blocking;
 mod calendar;
 mod capture;
-mod change;
 mod conflict;
 mod contacts;
 mod db;

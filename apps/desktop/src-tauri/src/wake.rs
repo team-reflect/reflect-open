@@ -37,7 +37,7 @@ pub fn install(app: &tauri::AppHandle) {
         // Delivered on the main thread (workspace notifications post there;
         // no delivery queue is requested). `emit` is thread-safe and cheap —
         // the reconcile itself runs in the frontend's index lifecycle.
-        let _ = app.emit(crate::change::RECONCILE_EVENT, ());
+        let _ = app.emit(reflect_types::events::INDEX_RECONCILE, ());
     });
     let workspace = NSWorkspace::sharedWorkspace();
     let center = workspace.notificationCenter();

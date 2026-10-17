@@ -5061,6 +5061,7 @@ dependencies = [
  "reconcile-text",
  "reflect-graph-paths",
  "reflect-index-schema",
+ "reflect-types",
  "reqwest 0.12.28",
  "rusqlite",
  "serde",
@@ -5091,6 +5092,16 @@ dependencies = [
  "windows-native-keyring-store",
  "xattr",
  "zip 9.0.4",
+]
+
+[[package]]
+name = "reflect-types"
+version = "0.0.0"
+dependencies = [
+ "git2",
+ "rusqlite",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

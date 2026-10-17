@@ -1,0 +1,19 @@
+[package]
+name = "reflect-types"
+version = "0.0.0"
+edition = "2021"
+description = "The wire types every Rust crate and the TypeScript frontend share: the error contract, file metadata, file-change batches, and event names."
+
+[dependencies]
+serde = { workspace = true }
+# Error conversions for the crates that own these dependencies. Each stays
+# optional so a host without libgit2 or SQLite (a wasm build) never links them.
+git2 = { version = "0.21.0", default-features = false, optional = true }
+rusqlite = { workspace = true, optional = true }
+
+[features]
+git2 = ["dep:git2"]
+rusqlite = ["dep:rusqlite"]
+
+[dev-dependencies]
+serde_json = { workspace = true }
