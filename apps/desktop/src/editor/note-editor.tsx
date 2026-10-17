@@ -409,7 +409,7 @@ export function NoteEditor({
         openLightbox({ type: 'image', src: displayUrl, alt }, element)
       })
     },
-    [openLightbox],
+    [logger, openLightbox],
   )
 
   const handleXPostMediaClick: XPostMediaClickHandler = useCallback(
