@@ -13,7 +13,7 @@
 /// With a `base`, both sides must still start with every non-blank line of
 /// it, in order: a side that deleted base lines is an edit, and the union
 /// would bring the deleted lines back.
-pub(super) fn append_union(base: Option<&str>, first: &str, second: &str) -> Option<String> {
+pub fn append_union(base: Option<&str>, first: &str, second: &str) -> Option<String> {
     if let Some(base) = base {
         if !starts_with_base_lines(base, first) || !starts_with_base_lines(base, second) {
             return None;

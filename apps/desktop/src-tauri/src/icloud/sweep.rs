@@ -2,7 +2,7 @@
 //! report what changed so the caller reindexes directly.
 //!
 //! Per conflicted note: fold the conflict versions through
-//! [`crate::conflict::ladder`]. Then write the result atomically and, only
+//! [`reflect_graph_io::conflict::ladder`]. Then write the result atomically and, only
 //! then, mark the folded provider versions resolved. Per conflicted attachment
 //! (any other file type, seen by `Full` sweeps only): keep the working file
 //! and write each differing version beside it as a conflict copy. Creation
@@ -12,7 +12,7 @@
 //! Shadow bases advance on resolutions and on the clean external ingests the
 //! frontend reports (`ingested_paths`). `record_baseline` snapshots a graph
 //! on iCloud adoption. Local saves never touch them (see
-//! [`crate::conflict::shadow`]).
+//! [`reflect_graph_io::conflict::shadow`]).
 
 use std::collections::{BTreeSet, HashSet};
 use std::fs;
@@ -21,12 +21,12 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::conflict::copy::{free_conflict_copy_path, utc_stamp};
-use crate::conflict::ladder::{self, ConflictInput};
-use crate::conflict::shadow::{blob_hash8_of_file, content_hash, ShadowStore};
-use crate::conflict::{ConflictSide, Resolution};
 use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
+use reflect_graph_io::conflict::copy::{free_conflict_copy_path, utc_stamp};
+use reflect_graph_io::conflict::ladder::{self, ConflictInput};
+use reflect_graph_io::conflict::shadow::{blob_hash8_of_file, content_hash, ShadowStore};
+use reflect_graph_io::conflict::{ConflictSide, Resolution};
 use reflect_types::{ChangeKind, FileChange};
 
 use super::versions::{

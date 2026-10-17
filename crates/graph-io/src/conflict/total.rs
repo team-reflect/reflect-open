@@ -7,7 +7,7 @@ use reconcile_text::{reconcile, BuiltinTokenizer};
 
 /// Merge `first` and `second` over `base`. Symmetric by construction: the
 /// sides are ordered by content before the library sees them.
-pub(super) fn merge(base: &str, first: &str, second: &str) -> String {
+pub fn merge(base: &str, first: &str, second: &str) -> String {
     let (low, high) = if first <= second {
         (first, second)
     } else {

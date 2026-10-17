@@ -1,6 +1,6 @@
-use super::x_archive_store as archive;
 use super::GraphState;
 use crate::error::{AppError, AppResult};
+use reflect_graph_io::x_archive_store as archive;
 use reflect_types::events::INDEX_CHANGED;
 use reflect_types::FileChange;
 use serde_json::{json, Value};
@@ -103,7 +103,7 @@ pub async fn x_archive_owners(
         if !asset_path.starts_with("assets/x/") {
             return Ok(vec![]);
         }
-        let directory = super::resolve::resolve(&root, "assets/x")?;
+        let directory = super::resolve(&root, "assets/x")?;
         let mut owners = Vec::new();
         if !directory.is_dir() {
             return Ok(owners);

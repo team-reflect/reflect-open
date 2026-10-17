@@ -17,7 +17,7 @@
 //! Every rule sees the sides ordered by `(modified_ms, content)`, so
 //! concurrent resolution on two devices converges.
 
-use crate::error::AppResult;
+use reflect_types::AppResult;
 
 use super::frontmatter;
 use super::merge3::diff3;

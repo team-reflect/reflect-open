@@ -17,14 +17,14 @@ use reflect_graph_paths::{
     evicted_logical_path, eviction_placeholder, is_dataless, normalize_line_endings, to_slash_lossy,
 };
 
-use crate::error::{AppError, AppResult};
 use crate::graph_gitignore;
+use reflect_types::{AppError, AppResult};
 
-use super::FileMeta;
+use reflect_types::FileMeta;
 
 /// One walk's worth of notes and attachments, in desktop `FileMeta` form.
 #[derive(Clone, Default)]
-pub(super) struct FileCatalog {
+pub struct FileCatalog {
     pub notes: Vec<FileMeta>,
     pub attachments: Vec<FileMeta>,
     /// Entries the walk refused or failed to list (unreadable directories,
@@ -32,9 +32,9 @@ pub(super) struct FileCatalog {
     pub skipped: u32,
 }
 
-pub(super) use reflect_index_schema::REFLECT_DIR;
+pub use reflect_index_schema::REFLECT_DIR;
 const META_SCHEMA_VERSION: u32 = 1;
-pub(super) const TOP_LEVEL_DIRS: [&str; 3] = ["daily", "notes", "assets"];
+pub const TOP_LEVEL_DIRS: [&str; 3] = ["daily", "notes", "assets"];
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 const APPLE_EXCLUSION_KEYS: [&str; 2] = [
     "NSURLUbiquitousItemIsExcludedFromSyncKey",
@@ -46,7 +46,7 @@ const LOCAL_ONLY_XATTRS: [(&str, &[u8]); 2] = [
     ("com.dropbox.ignored", b"1"),
 ];
 /// Create the standard graph layout + ignore/meta files (idempotent).
-pub(super) fn bootstrap(root: &Path) -> AppResult<()> {
+pub fn bootstrap(root: &Path) -> AppResult<()> {
     for dir in TOP_LEVEL_DIRS {
         fs::create_dir_all(root.join(dir))?;
     }
@@ -61,7 +61,7 @@ pub(super) fn bootstrap(root: &Path) -> AppResult<()> {
 /// Initialize only Reflect's rebuildable runtime state for an existing vault.
 /// Existing Markdown folders are opened in place; user-facing directories and
 /// the root `.gitignore` remain byte-for-byte untouched.
-pub(super) fn initialize_runtime(root: &Path) -> AppResult<()> {
+pub fn initialize_runtime(root: &Path) -> AppResult<()> {
     ensure_runtime_directory(root)?;
     sweep_upload_staging(root);
     mark_dir_local_only(&root.join(REFLECT_DIR));
@@ -155,7 +155,7 @@ const O_NOFOLLOW_ANY: i32 = 0x2000_0000;
 /// polices only the components below it. Off Apple targets it falls back to
 /// a plain read (the lexical resolve guard still applies). The returned text
 /// uses `\n` line endings.
-pub(super) fn read_note_no_follow(root: &Path, abs: &Path) -> std::io::Result<String> {
+pub fn read_note_no_follow(root: &Path, abs: &Path) -> std::io::Result<String> {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
         use std::io::Read;
@@ -203,10 +203,10 @@ fn sweep_upload_staging(root: &Path) {
 /// provider-ignore xattrs that third-party sync clients (Dropbox, File
 /// Provider extensions) honor for graphs kept in such folders.
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-pub(crate) fn mark_dir_local_only(_dir: &Path) {}
+pub fn mark_dir_local_only(_dir: &Path) {}
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
-pub(crate) fn mark_dir_local_only(dir: &Path) {
+pub fn mark_dir_local_only(dir: &Path) {
     for err in set_apple_sync_exclusions(dir) {
         tracing::warn!(
             path = %dir.display(),
@@ -271,13 +271,13 @@ fn set_local_only_xattrs(dir: &Path) -> Vec<String> {
 
 /// Atomically write `contents` to `target` inside the graph at `root`.
 /// Returns the persisted file's mtime (see [`atomic_write_bytes`]).
-pub(super) fn atomic_write(root: &Path, target: &Path, contents: &str) -> AppResult<Option<u64>> {
+pub fn atomic_write(root: &Path, target: &Path, contents: &str) -> AppResult<Option<u64>> {
     atomic_write_bytes(root, target, contents.as_bytes())
 }
 
 /// Result of an atomic create-if-absent attempt.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) enum AtomicCreateOutcome {
+pub enum AtomicCreateOutcome {
     Created(Option<u64>),
     Collision,
 }
@@ -286,11 +286,7 @@ pub(super) enum AtomicCreateOutcome {
 /// path. This is the filesystem claim for note creation: the caller may probe
 /// beforehand for policy, but only `persist_noclobber` closes the race with a
 /// concurrent sync checkout or another creator.
-pub(super) fn atomic_create(
-    root: &Path,
-    target: &Path,
-    contents: &str,
-) -> AppResult<AtomicCreateOutcome> {
+pub fn atomic_create(root: &Path, target: &Path, contents: &str) -> AppResult<AtomicCreateOutcome> {
     // An evicted iCloud note occupies its logical path through the placeholder
     // alone. `persist_noclobber(target)` cannot see that sibling stub, so keep
     // the shared occupancy check in front of the atomic real-file claim.
@@ -320,11 +316,7 @@ pub(super) fn atomic_create(
 /// Plan 21), and a temp created there is synced and, after a crash, stranded
 /// on every device. `.reflect/` is excluded from sync and swept on graph open,
 /// and it shares `target`'s volume, so the final rename stays atomic.
-pub(crate) fn atomic_write_bytes(
-    root: &Path,
-    target: &Path,
-    contents: &[u8],
-) -> AppResult<Option<u64>> {
+pub fn atomic_write_bytes(root: &Path, target: &Path, contents: &[u8]) -> AppResult<Option<u64>> {
     let tmp = stage_bytes(root, target, contents)?;
     let file = tmp
         .persist(target)
@@ -349,7 +341,7 @@ fn stage_bytes(root: &Path, target: &Path, contents: &[u8]) -> AppResult<tempfil
 /// Last-modified time in epoch milliseconds, or `None` when the platform
 /// can't provide one. Shared by `list_files` and the watcher so every index
 /// path derives mtimes the same way.
-pub(crate) fn modified_ms(meta: &fs::Metadata) -> Option<u64> {
+pub fn modified_ms(meta: &fs::Metadata) -> Option<u64> {
     meta.modified()
         .ok()
         .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
@@ -385,7 +377,7 @@ extern "C" {
 /// reuses threads, and a leaked `OFF` would make every later command on the
 /// thread refuse materialization.
 #[cfg(any(target_os = "macos", target_os = "ios"))]
-pub(crate) struct NoMaterialize {
+pub struct NoMaterialize {
     previous: c_int,
 }
 
@@ -394,7 +386,7 @@ impl NoMaterialize {
     /// Engage the thread-scoped policy; `None` (and no policy change) when
     /// the kernel refuses. Callers proceed unguarded then: the stat check
     /// still catches settled evictions, only the race window reopens.
-    pub(crate) fn engage() -> Option<Self> {
+    pub fn engage() -> Option<Self> {
         let previous = unsafe {
             getiopolicy_np(
                 IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
@@ -430,11 +422,11 @@ impl Drop for NoMaterialize {
 
 /// No dataless files off Apple platforms; the guard is a no-op.
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-pub(crate) struct NoMaterialize;
+pub struct NoMaterialize;
 
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
 impl NoMaterialize {
-    pub(crate) fn engage() -> Option<Self> {
+    pub fn engage() -> Option<Self> {
         Some(Self)
     }
 }
@@ -445,7 +437,7 @@ impl NoMaterialize {
 /// destination check) must use this — an evicted note looks vacant to
 /// `is_file()` but comes back the moment iCloud re-downloads it, and anything
 /// created in its place becomes a conflict.
-pub(crate) fn file_occupied(abs: &Path) -> bool {
+pub fn file_occupied(abs: &Path) -> bool {
     abs.is_file() || eviction_placeholder(abs).is_some_and(|stub| stub.exists())
 }
 
@@ -454,7 +446,7 @@ pub(crate) fn file_occupied(abs: &Path) -> bool {
 /// regular file (assets). An iCloud eviction placeholder lists as its
 /// *logical* file (same extension rules) with `placeholder: true`, so an
 /// evicted note stays present to reconcile instead of looking deleted.
-pub(super) fn collect_files(
+pub fn collect_files(
     root: &Path,
     dir: &str,
     extension: Option<&str>,
@@ -520,12 +512,12 @@ pub(super) fn collect_files(
 
 /// Recursively list every eligible Markdown note from the graph root, via the
 /// shared vault walk (`reflect_graph_paths::walk_catalog`).
-pub(super) fn collect_note_files(root: &Path) -> Vec<FileMeta> {
+pub fn collect_note_files(root: &Path) -> Vec<FileMeta> {
     collect_file_catalog(root).notes
 }
 
 /// Build one snapshot of every eligible note and supported attachment.
-pub(super) fn collect_file_catalog(root: &Path) -> FileCatalog {
+pub fn collect_file_catalog(root: &Path) -> FileCatalog {
     let catalog = reflect_graph_paths::walk_catalog(root);
     FileCatalog {
         notes: catalog.notes.into_iter().map(file_meta_from).collect(),
@@ -545,6 +537,16 @@ fn file_meta_from(entry: reflect_graph_paths::FileEntry) -> FileMeta {
         modified_ms: entry.modified_ms,
         placeholder: entry.placeholder,
     }
+}
+
+/// The staging directory for in-flight uploads (and the V1 import's asset
+/// downloads): inside the graph (so the commit rename stays on one
+/// filesystem) but under `.reflect/` (so the watcher, indexer, and sync never
+/// see a partial file).
+pub fn staging_dir(root: &Path) -> AppResult<std::path::PathBuf> {
+    let dir = root.join(".reflect").join("tmp");
+    fs::create_dir_all(&dir)?;
+    Ok(dir)
 }
 
 #[cfg(test)]

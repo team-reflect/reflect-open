@@ -8,6 +8,7 @@ members = [
   "apps/cli",
   "apps/desktop/src-tauri",
   "apps/native-host",
+  "crates/graph-io",
   "crates/graph-paths",
   "crates/index",
   "crates/index-schema",
@@ -30,6 +31,7 @@ tempfile = "3.27.0"
 reflect-graph-paths = { path = "crates/graph-paths" }
 reflect-types = { path = "crates/types" }
 reflect-index = { path = "crates/index" }
+reflect-graph-io = { path = "crates/graph-io" }
 tauri = "2.12.1"
 tauri-plugin = { version = "2.7.1", features = ["build"] }
 thiserror = "2.0.21"

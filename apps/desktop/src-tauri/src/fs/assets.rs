@@ -29,8 +29,9 @@ use tauri::ipc::{InvokeBody, Request};
 use tauri::State;
 
 use crate::error::{AppError, AppResult};
+use reflect_graph_io::io::staging_dir;
 
-use super::resolve::resolve;
+use super::resolve;
 use super::{root_for_generation, with_graph_lock, GraphState};
 
 /// Header carrying the upload id on `asset_upload_append` calls — raw-body
@@ -113,16 +114,6 @@ fn persist_unique(
     Err(AppError::io(format!(
         "no free asset name after {MAX_NAME_PROBES} probes for {desired}"
     )))
-}
-
-/// The staging directory for in-flight uploads (and the V1 import's asset
-/// downloads): inside the graph (so the commit rename stays on one
-/// filesystem) but under `.reflect/` (so the watcher, indexer, and sync never
-/// see a partial file).
-pub(super) fn staging_dir(root: &Path) -> AppResult<std::path::PathBuf> {
-    let dir = root.join(".reflect").join("tmp");
-    fs::create_dir_all(&dir)?;
-    Ok(dir)
 }
 
 /// Resolved `assets/` directory for a commit/import destination, traversal-
@@ -388,7 +379,7 @@ pub async fn audio_memo_import(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs::io::bootstrap;
+    use reflect_graph_io::io::bootstrap;
     use tempfile::tempdir;
 
     fn temp_in(dir: &Path, contents: &[u8]) -> tempfile::NamedTempFile {
