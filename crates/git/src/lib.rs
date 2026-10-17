@@ -159,7 +159,7 @@ pub fn pull_all(root: &Path, message: &str, max_file_bytes: u64) -> AppResult<Pu
 }
 
 /// Run a git operation against `root`, retrying once after clearing a stale
-/// `.lock` file (see [`locks`]).
+/// `.lock` file (see `locks`).
 pub fn run_with_lock_retry<T>(
     root: &Path,
     operation: impl Fn(&Path) -> AppResult<T>,
@@ -187,7 +187,7 @@ pub fn push(root: &Path, credential: Option<GitCredential>) -> AppResult<PushOut
     remote::push(root, credential)
 }
 
-/// Commit every pending change (no-op when clean). See [`commit::commit_all`].
+/// Commit every pending change (no-op when clean). See `commit_all` in `commit.rs`.
 pub fn commit_all(root: &Path, message: &str, max_file_bytes: u64) -> AppResult<CommitOutcome> {
     commit::commit_all(root, message, max_file_bytes)
 }
