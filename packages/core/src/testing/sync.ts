@@ -263,12 +263,12 @@ class TestICloudNativeServiceImpl implements TestICloudNativeService {
     return { ...this.#status, existingGraphRoots: [...this.#status.existingGraphRoots] }
   }
 
-  async adoptGraph(generation: number): Promise<string> {
+  adoptGraph(generation: number): Promise<string> {
     this.#log.push({ method: 'adoptGraph', args: [generation] })
     if (!this.#status.available || this.#status.documentsRoot === null) {
-      throw new AppError('io', 'test iCloud: the container is unavailable')
+      return Promise.reject(new AppError('io', 'test iCloud: the container is unavailable'))
     }
-    return `${this.#status.documentsRoot}/Notes`
+    return Promise.resolve(`${this.#status.documentsRoot}/Notes`)
   }
 
   async conflictsScan(scanOptions: IcloudScanOptions): Promise<IcloudSweepOutcome> {
@@ -494,9 +494,9 @@ class TestBackupServiceImpl implements TestBackupService {
   #state: BackupState
   readonly #listeners = new Set<() => void>()
   readonly #log: BackupCall[] = []
-  #connectNew: BackupService['connectNewRepo'] = async () => 'connected'
-  #connectExisting: BackupService['connectExistingRepo'] =
-    async (): Promise<ConnectExistingResult> => 'connected'
+  #connectNew: BackupService['connectNewRepo'] = () => Promise.resolve('connected')
+  #connectExisting: BackupService['connectExistingRepo'] = (): Promise<ConnectExistingResult> =>
+    Promise.resolve('connected')
 
   constructor(options?: { state?: BackupState }) {
     this.#state = options?.state ?? { phase: 'loading' }

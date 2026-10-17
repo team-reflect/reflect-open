@@ -160,13 +160,14 @@ function setup(options?: { provider?: AiProviderConfig | null; secretStore?: Sec
     }
   })
   vi.spyOn(indexLifecycle, 'reindexNotesReferencing').mockImplementation(
-    async (assetPaths, generations) => {
+    (assetPaths, generations) => {
       reindexed.push([assetPaths, generations])
       if (index.reindexError !== null) {
         const error = index.reindexError
         index.reindexError = null
-        throw error
+        return Promise.reject(error)
       }
+      return Promise.resolve()
     },
   )
   const service = createAssetDescriptionService({
@@ -240,7 +241,7 @@ describe('pure helpers', () => {
     expect(descriptionPathFor('assets/a.png')).toBe('assets/a.png.reflect.md')
   })
 
-  it('readManagedDescription recognizes managed files and rejects user-authored ones', async () => {
+  it('readManagedDescription recognizes managed files and rejects user-authored ones', () => {
     const built = buildDescriptionSource(
       {
         source: 'assets/a.png',

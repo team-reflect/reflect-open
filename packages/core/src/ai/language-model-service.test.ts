@@ -62,104 +62,112 @@ const OPENAI_COMPATIBLE_CONFIG: AiProviderConfig = {
 }
 
 function recordingAnthropicFetch(calls: RecordedCall[]): typeof fetch {
-  return async (input, init) => {
+  return (input, init) => {
     calls.push({
       url: String(input),
       headers: new Headers(init?.headers),
       body: typeof init?.body === 'string' ? init.body : null,
     })
-    return new Response(
-      JSON.stringify({
-        id: 'msg_123',
-        type: 'message',
-        role: 'assistant',
-        model: ANTHROPIC_CONFIG.model,
-        content: [{ type: 'text', text: 'ok' }],
-        stop_reason: 'end_turn',
-        stop_sequence: null,
-        usage: { input_tokens: 1, output_tokens: 1 },
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          id: 'msg_123',
+          type: 'message',
+          role: 'assistant',
+          model: ANTHROPIC_CONFIG.model,
+          content: [{ type: 'text', text: 'ok' }],
+          stop_reason: 'end_turn',
+          stop_sequence: null,
+          usage: { input_tokens: 1, output_tokens: 1 },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
     )
   }
 }
 
 function recordingOpenAiFetch(calls: RecordedCall[]): typeof fetch {
-  return async (input, init) => {
+  return (input, init) => {
     calls.push({
       url: String(input),
       headers: new Headers(init?.headers),
       body: typeof init?.body === 'string' ? init.body : null,
     })
-    return new Response(
-      JSON.stringify({
-        id: 'resp_123',
-        created_at: 0,
-        model: OPENAI_CONFIG.model,
-        output: [
-          {
-            type: 'message',
-            role: 'assistant',
-            id: 'msg_123',
-            content: [{ type: 'output_text', text: 'ok', annotations: [] }],
-          },
-        ],
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          id: 'resp_123',
+          created_at: 0,
+          model: OPENAI_CONFIG.model,
+          output: [
+            {
+              type: 'message',
+              role: 'assistant',
+              id: 'msg_123',
+              content: [{ type: 'output_text', text: 'ok', annotations: [] }],
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
     )
   }
 }
 
 function recordingOpenRouterFetch(calls: RecordedCall[]): typeof fetch {
-  return async (input, init) => {
+  return (input, init) => {
     calls.push({
       url: String(input),
       headers: new Headers(init?.headers),
       body: typeof init?.body === 'string' ? init.body : null,
     })
-    return new Response(
-      JSON.stringify({
-        id: 'chatcmpl_123',
-        object: 'chat.completion',
-        created: 0,
-        model: OPENROUTER_CONFIG.model,
-        choices: [
-          {
-            index: 0,
-            message: { role: 'assistant', content: 'ok' },
-            finish_reason: 'stop',
-          },
-        ],
-        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          id: 'chatcmpl_123',
+          object: 'chat.completion',
+          created: 0,
+          model: OPENROUTER_CONFIG.model,
+          choices: [
+            {
+              index: 0,
+              message: { role: 'assistant', content: 'ok' },
+              finish_reason: 'stop',
+            },
+          ],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
     )
   }
 }
 
 function recordingOpenAICompatibleFetch(calls: RecordedCall[]): typeof fetch {
-  return async (input, init) => {
+  return (input, init) => {
     calls.push({
       url: String(input),
       headers: new Headers(init?.headers),
       body: typeof init?.body === 'string' ? init.body : null,
     })
-    return new Response(
-      JSON.stringify({
-        id: 'chatcmpl_local',
-        object: 'chat.completion',
-        created: 0,
-        model: OPENAI_COMPATIBLE_CONFIG.model,
-        choices: [
-          {
-            index: 0,
-            message: { role: 'assistant', content: 'ok' },
-            finish_reason: 'stop',
-          },
-        ],
-        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          id: 'chatcmpl_local',
+          object: 'chat.completion',
+          created: 0,
+          model: OPENAI_COMPATIBLE_CONFIG.model,
+          choices: [
+            {
+              index: 0,
+              message: { role: 'assistant', content: 'ok' },
+              finish_reason: 'stop',
+            },
+          ],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
     )
   }
 }

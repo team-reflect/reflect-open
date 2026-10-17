@@ -33,14 +33,14 @@ describe('availableTemplatePath', () => {
   it('probes under templates/ with the same collision suffix', async () => {
     const occupied = new Set(['templates/journal.md'])
     await expect(
-      paths.availableTemplatePath('journal', async (path) => occupied.has(path)),
+      paths.availableTemplatePath('journal', (path) => Promise.resolve(occupied.has(path))),
     ).resolves.toBe('templates/journal-2.md')
   })
 })
 
 describe('templateSlugPathForTitle', () => {
   it('returns the template’s own path unchanged when the name already matches', async () => {
-    const probe = vi.fn(async () => true)
+    const probe = vi.fn(() => Promise.resolve(true))
     await expect(
       paths.templateSlugPathForTitle('templates/journal.md', 'Journal', probe),
     ).resolves.toBe('templates/journal.md')
@@ -51,15 +51,15 @@ describe('templateSlugPathForTitle', () => {
   it('suffixes around occupied candidates', async () => {
     const occupied = new Set(['templates/log.md'])
     await expect(
-      paths.templateSlugPathForTitle('templates/journal.md', 'Log', async (path) =>
-        occupied.has(path),
+      paths.templateSlugPathForTitle('templates/journal.md', 'Log', (path) =>
+        Promise.resolve(occupied.has(path)),
       ),
     ).resolves.toBe('templates/log-2.md')
   })
 })
 
 describe('slugPathForTitle', () => {
-  const taken = (occupied: string[]) => async (path: string) => occupied.includes(path)
+  const taken = (occupied: string[]) => (path: string) => Promise.resolve(occupied.includes(path))
 
   it('returns the slug path when free', async () => {
     await expect(
@@ -96,7 +96,7 @@ describe('slugPathForTitle', () => {
 
   it('fails loud instead of spinning when nothing is ever free', async () => {
     await expect(
-      paths.slugPathForTitle('notes/01abc.md', 'Meeting', async () => true),
+      paths.slugPathForTitle('notes/01abc.md', 'Meeting', () => Promise.resolve(true)),
     ).rejects.toThrow(/no available note path/)
   })
 })

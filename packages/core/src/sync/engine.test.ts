@@ -188,9 +188,7 @@ describe('createSyncEngineFactory', () => {
       const statuses: SyncStatus[] = []
       const engine = createSyncEngine({
         generation: 1,
-        getCredential: async () => {
-          throw new AppError(kind, 'refresh failed')
-        },
+        getCredential: () => Promise.reject(new AppError(kind, 'refresh failed')),
         onStatus: (status) => {
           statuses.push(status)
         },
@@ -704,9 +702,7 @@ describe('createSyncEngineFactory', () => {
       onStatus: (status) => {
         statuses.push(status)
       },
-      onRemoteChanges: async () => {
-        throw new Error('remote index failed')
-      },
+      onRemoteChanges: () => Promise.reject(new Error('remote index failed')),
     })
 
     const syncing = engine.syncNow()
@@ -1195,7 +1191,7 @@ describe('quiet mode', () => {
     const git = fakeGit()
     const asks: number[] = []
     const engine = quietEngine({
-      networkReady: async () => {
+      networkReady: () => {
         asks.push(clock.now())
         return false
       },
@@ -1216,7 +1212,7 @@ describe('quiet mode', () => {
     const asks: number[] = []
     let ready = false
     const engine = quietEngine({
-      networkReady: async () => {
+      networkReady: () => {
         asks.push(clock.now())
         return ready
       },

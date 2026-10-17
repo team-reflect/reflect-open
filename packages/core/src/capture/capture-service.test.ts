@@ -185,13 +185,13 @@ describe('CaptureService (shared-inbox relay)', () => {
   it('relays the shared inbox BEFORE the drain, every pass', async () => {
     const kit = setup({ mobile: true })
     const order: string[] = []
-    kit.relays.mockImplementation(async () => {
+    kit.relays.mockImplementation(() => {
       order.push('relay')
-      return 1
+      return Promise.resolve(1)
     })
-    kit.drains.mockImplementation(async () => {
+    kit.drains.mockImplementation(() => {
       order.push('drain')
-      return []
+      return Promise.resolve([])
     })
 
     const session = kit.capture.openSession({ generation: 7 })

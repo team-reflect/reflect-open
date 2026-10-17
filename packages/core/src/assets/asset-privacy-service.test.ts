@@ -34,12 +34,12 @@ beforeEach(() => {
   ownerCalls = []
   ownersError = null
   const xArchive = createTestXArchiveService()
-  vi.spyOn(xArchive, 'owners').mockImplementation(async (assetPath, generation) => {
+  vi.spyOn(xArchive, 'owners').mockImplementation((assetPath, generation) => {
     ownerCalls.push([assetPath, generation])
     if (ownersError !== null) {
-      throw ownersError
+      return Promise.reject(ownersError)
     }
-    return ['assets/x/post-123.json']
+    return Promise.resolve(['assets/x/post-123.json'])
   })
   privacy = createPrivacy({
     xArchive,
@@ -52,8 +52,8 @@ it('keeps private tweet references when the same media has a public direct refer
     ['private.md', '---\nprivate: true\n---\n![](https://x.com/jack/status/123)'],
   ])
   expect(
-    await privacy.classifyAssetFromNotes(asset, [...sources.keys()], async (path) =>
-      sources.get(path)!,
+    await privacy.classifyAssetFromNotes(asset, [...sources.keys()], (path) =>
+      Promise.resolve(sources.get(path)!),
     ),
   ).toBe('skip-private')
 })
@@ -64,18 +64,16 @@ it('checks live ownership instead of treating every private candidate as a refer
     ['private.md', '---\nprivate: true\n---\n![](https://x.com/jack/status/456)'],
   ])
   expect(
-    await privacy.classifyAssetFromNotes(asset, [...sources.keys()], async (path) =>
-      sources.get(path)!,
+    await privacy.classifyAssetFromNotes(asset, [...sources.keys()], (path) =>
+      Promise.resolve(sources.get(path)!),
     ),
   ).toBe('send')
 })
 
 it('recognizes a public tweet reference without a direct media link', async () => {
   expect(
-    await privacy.classifyAssetFromNotes(
-      asset,
-      ['public.md'],
-      async () => '![](https://x.com/jack/status/123)',
+    await privacy.classifyAssetFromNotes(asset, ['public.md'], () =>
+      Promise.resolve('![](https://x.com/jack/status/123)'),
     ),
   ).toBe('send')
 })
@@ -83,7 +81,9 @@ it('recognizes a public tweet reference without a direct media link', async () =
 it('does not return a send verdict when archive ownership cannot be read', async () => {
   ownersError = new Error('unreadable archive')
   await expect(
-    privacy.classifyAssetFromNotes(asset, ['public.md'], async () => `![Image](${asset})`),
+    privacy.classifyAssetFromNotes(asset, ['public.md'], () =>
+      Promise.resolve(`![Image](${asset})`),
+    ),
   ).rejects.toThrow('unreadable archive')
 })
 
@@ -91,30 +91,24 @@ describe('classifyAssetFromNotes: vault-wide references', () => {
   it('blocks an asset a private note embeds by bare filename', async () => {
     // The index stored `photo.png`; the file is `Media/photo.png`.
     await expect(
-      privacy.classifyAssetFromNotes(
-        'Media/photo.png',
-        ['private.md'],
-        async () => '---\nprivate: true\n---\n\n![[photo.png]]\n',
+      privacy.classifyAssetFromNotes('Media/photo.png', ['private.md'], () =>
+        Promise.resolve('---\nprivate: true\n---\n\n![[photo.png]]\n'),
       ),
     ).resolves.toBe('skip-private')
   })
 
   it('authorizes an asset a public note embeds by bare filename', async () => {
     await expect(
-      privacy.classifyAssetFromNotes(
-        'Media/photo.png',
-        ['public.md'],
-        async () => '![[photo.png]]\n',
+      privacy.classifyAssetFromNotes('Media/photo.png', ['public.md'], () =>
+        Promise.resolve('![[photo.png]]\n'),
       ),
     ).resolves.toBe('send')
   })
 
   it('still blocks an asset a private note references by an old vault-root href', async () => {
     await expect(
-      privacy.classifyAssetFromNotes(
-        'assets/a.png',
-        ['notes/private.md'],
-        async () => '---\nprivate: true\n---\n\n![](assets/a.png)\n',
+      privacy.classifyAssetFromNotes('assets/a.png', ['notes/private.md'], () =>
+        Promise.resolve('---\nprivate: true\n---\n\n![](assets/a.png)\n'),
       ),
     ).resolves.toBe('skip-private')
   })
@@ -125,7 +119,7 @@ it('reuses supplied ownership during live private-note validation', async () => 
     await privacy.classifyAssetFromNotes(
       asset,
       ['private.md'],
-      async () => '---\nprivate: true\n---\n![](https://x.com/jack/status/123)',
+      () => Promise.resolve('---\nprivate: true\n---\n![](https://x.com/jack/status/123)'),
       ['assets/x/post-123.json'],
     ),
   ).toBe('skip-private')

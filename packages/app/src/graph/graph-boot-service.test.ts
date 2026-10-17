@@ -394,9 +394,7 @@ describe('GraphBootService folder picker', () => {
 
   it('surfaces a picker failure without leaving the open graph', async () => {
     const context = await bootDesktop({ recents: [{ root: '/known', name: 'known', openedMs: 1 }] })
-    context.dialog.pickFolder = async () => {
-      throw new Error('picker crashed')
-    }
+    context.dialog.pickFolder = () => Promise.reject(new Error('picker crashed'))
     await context.boot.pickAndOpen()
     expect(context.session.getState()).toMatchObject({ status: 'ready', error: 'picker crashed' })
   })

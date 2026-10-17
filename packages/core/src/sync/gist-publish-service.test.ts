@@ -83,9 +83,9 @@ function setup(options?: SetupOptions) {
   const noteRows = createNoteRowService({ graphSession: graph })
   const progress = createTestProgressPort()
   const githubAuth = createTestGithubAuthService()
-  vi.spyOn(githubAuth, 'getToken').mockImplementation(async () => {
+  vi.spyOn(githubAuth, 'getToken').mockImplementation(() => {
     tokenReads.count += 1
-    return token
+    return Promise.resolve(token)
   })
   const service = createGistPublishService({
     gists: createGistService({ http }),

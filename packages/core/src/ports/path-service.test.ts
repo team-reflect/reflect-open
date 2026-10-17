@@ -12,14 +12,14 @@ describe('createPathService', () => {
 })
 
 describe('createPosixPathTransport', () => {
-  it('joins with POSIX syntax', async () => {
+  it('joins with POSIX syntax', () => {
     const transport = createPosixPathTransport('/')
     const join = (...parts: string[]) => transport.join(...parts)
-    await expect(join('/g', 'notes/a.md')).resolves.toBe('/g/notes/a.md')
-    await expect(join('/g/', '/notes/', './a.md')).resolves.toBe('/g/notes/a.md')
-    await expect(join('/g', '../h', 'a.md')).resolves.toBe('/h/a.md')
-    await expect(join('/', '..')).resolves.toBe('/')
-    await expect(join('a', '..', '..', 'b')).resolves.toBe('../b')
-    await expect(join('')).resolves.toBe('.')
+    expect(join('/g', 'notes/a.md')).toBe('/g/notes/a.md')
+    expect(join('/g/', '/notes/', './a.md')).toBe('/g/notes/a.md')
+    expect(join('/g', '../h', 'a.md')).toBe('/h/a.md')
+    expect(join('/', '..')).toBe('/')
+    expect(join('a', '..', '..', 'b')).toBe('../b')
+    expect(join('')).toBe('.')
   })
 })

@@ -55,12 +55,13 @@ beforeEach(() => {
 function modelAnswering(text: string): void {
   languageModelService.setModel(
     new MockLanguageModelV3({
-      doGenerate: async () => ({
-        content: [{ type: 'text', text: JSON.stringify({ title: text }) }],
-        finishReason: { unified: 'stop' as const, raw: undefined },
-        usage: USAGE,
-        warnings: [],
-      }),
+      doGenerate: () =>
+        Promise.resolve({
+          content: [{ type: 'text', text: JSON.stringify({ title: text }) }],
+          finishReason: { unified: 'stop' as const, raw: undefined },
+          usage: USAGE,
+          warnings: [],
+        }),
     }),
   )
 }
@@ -68,9 +69,10 @@ function modelAnswering(text: string): void {
 function modelThrowing(error: unknown): void {
   languageModelService.setModel(
     new MockLanguageModelV3({
-      doGenerate: async () => {
-        throw error
-      },
+      doGenerate: () =>
+        Promise.try(() => {
+          throw error
+        }),
     }),
   )
 }
@@ -185,14 +187,14 @@ describe('TranscriptEnrichmentService.enrich', () => {
     const calls: LanguageModelV3CallOptions[] = []
     languageModelService.setModel(
       new MockLanguageModelV3({
-        doGenerate: async (options) => {
+        doGenerate: (options) => {
           calls.push(options)
-          return {
+          return Promise.resolve({
             content: [{ type: 'text', text: JSON.stringify(output) }],
             finishReason: { unified: 'stop' as const, raw: undefined },
             usage: USAGE,
             warnings: [],
-          }
+          })
         },
       }),
     )

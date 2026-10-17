@@ -32,7 +32,7 @@ function statusPayload(): AgentSkillStatus {
 }
 
 const agentSkill: AgentSkillService = {
-  status: async () => statusPayload(),
+  status: () => statusPayload(),
   install: async () => {
     installs += 1
     return await installResult()
@@ -58,13 +58,13 @@ beforeEach(() => {
   installState = 'missing'
   installs = 0
   uninstalls = 0
-  installResult = async () => {
+  installResult = () => {
     installState = 'current'
-    return statusPayload()
+    return Promise.resolve(statusPayload())
   }
-  uninstallResult = async () => {
+  uninstallResult = () => {
     installState = 'missing'
-    return statusPayload()
+    return Promise.resolve(statusPayload())
   }
 })
 
@@ -110,12 +110,12 @@ describe('AgentsSection', () => {
 
   it('shows mutation errors and clears them when retrying', async () => {
     let shouldFail = true
-    installResult = async () => {
+    installResult = () => {
       if (shouldFail) {
-        throw new Error('Installing failed')
+        return Promise.reject(new Error('Installing failed'))
       }
       installState = 'current'
-      return statusPayload()
+      return Promise.resolve(statusPayload())
     }
     await renderSection()
 

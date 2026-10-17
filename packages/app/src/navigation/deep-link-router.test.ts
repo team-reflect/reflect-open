@@ -132,7 +132,7 @@ describe('DeepLinkRouter.serve', () => {
     return { ...context, probes, stop }
   }
 
-  it('acts on dispatched URLs until stopped, then buffers for the next session', async () => {
+  it('acts on dispatched URLs until stopped, then buffers for the next session', () => {
     const { service, intake, navigate, stop } = serveSession()
 
     service.dispatch('reflect://today')

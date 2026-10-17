@@ -16,17 +16,18 @@ export async function createWasmTestDatabaseService(): Promise<TestDatabaseServi
   let closed = false
   const queries: TestDatabaseQuery[] = []
 
-  const runQuery = async (sql: string, params: readonly unknown[]): Promise<unknown> => {
-    queries.push({ sql, params: [...params] })
-    try {
-      if (closed) {
-        throw new Error('the test database is closed')
+  const runQuery = (sql: string, params: readonly unknown[]): Promise<unknown> =>
+    Promise.try(() => {
+      queries.push({ sql, params: [...params] })
+      try {
+        if (closed) {
+          throw new Error('the test database is closed')
+        }
+        return index.query(sql, params)
+      } catch (error) {
+        throw toAppError(error)
       }
-      return index.query(sql, params)
-    } catch (error) {
-      throw toAppError(error)
-    }
-  }
+    })
 
   return {
     db: createDb(runQuery),

@@ -23,7 +23,7 @@ function serviceOver(transport: IpcBridge) {
 describe('definePluginCommand', () => {
   it('composes the plugin command name and validates the response', async () => {
     const invoke = vi.fn().mockResolvedValue({ doubled: 4 })
-    const ipc = serviceOver({ invoke, listen: async () => () => {} })
+    const ipc = serviceOver({ invoke, listen: () => Promise.resolve(() => {}) })
 
     await expect(doThing(ipc, { request: { value: 2 } })).resolves.toEqual({ doubled: 4 })
     expect(invoke).toHaveBeenCalledWith('plugin:demo|do_thing', { request: { value: 2 } })
@@ -31,14 +31,17 @@ describe('definePluginCommand', () => {
 
   it('passes any fire-and-forget acknowledgement through unvalidated', async () => {
     const invoke = vi.fn().mockResolvedValue(true)
-    const ipc = serviceOver({ invoke, listen: async () => () => {} })
+    const ipc = serviceOver({ invoke, listen: () => Promise.resolve(() => {}) })
 
     await expect(fireAndForget(ipc, {})).resolves.toBe(true)
     expect(invoke).toHaveBeenCalledWith('plugin:demo|fire_and_forget', {})
   })
 
   it('turns a mismatched response into a parse AppError naming the command', async () => {
-    const ipc = serviceOver({ invoke: async () => ({ wrong: true }), listen: async () => () => {} })
+    const ipc = serviceOver({
+      invoke: () => Promise.resolve({ wrong: true }),
+      listen: () => Promise.resolve(() => {}),
+    })
 
     const error = await doThing(ipc, { request: { value: 2 } }).catch((caught: unknown) => caught)
     expect(isAppError(error)).toBe(true)
@@ -50,11 +53,12 @@ describe('definePluginCommand', () => {
 
   it('coerces a rejection into an AppError like call()', async () => {
     const ipc = serviceOver({
-      invoke: async () => {
-        const rejection: unknown = 'microphone access denied'
-        throw rejection
-      },
-      listen: async () => () => {},
+      invoke: () =>
+        Promise.try(() => {
+          const rejection: unknown = 'microphone access denied'
+          throw rejection
+        }),
+      listen: () => Promise.resolve(() => {}),
     })
 
     const error = await fireAndForget(ipc, {}).catch((caught: unknown) => caught)
@@ -68,10 +72,11 @@ describe('definePluginEvent', () => {
   it('subscribes through the given service with the declared schema', async () => {
     const handlers = new Map<string, (payload: unknown) => void>()
     const ipc = serviceOver({
-      invoke: async () => null,
-      listen: async () => () => {},
-      listenPlugin: async (plugin, event, handler) => {
+      invoke: () => Promise.resolve(null),
+      listen: () => Promise.resolve(() => {}),
+      listenPlugin: (plugin, event, handler) => {
         handlers.set(`${plugin}:${event}`, handler)
+        return Promise.resolve()
       },
     })
     const seen: number[] = []

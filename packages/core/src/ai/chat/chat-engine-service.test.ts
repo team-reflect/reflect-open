@@ -68,7 +68,7 @@ function createNoteTools(effects?: {
     vi.spyOn(retrieval, 'retrieve').mockImplementation(effects.retrieveFn)
   }
   const xArchive = createTestXArchiveService()
-  const assetReferences = { notePaths: async () => [] }
+  const assetReferences = { notePaths: () => [] }
   return createNoteToolsService({
     retrieval,
     noteFile,
@@ -123,13 +123,15 @@ function sequence(
   results: LanguageModelV3StreamResult[],
 ): () => Promise<LanguageModelV3StreamResult> {
   let index = 0
-  return async () => {
+  return () => {
     const next = results[index]
     index += 1
     if (next === undefined) {
-      throw new Error(`mock model called ${index} times but only ${results.length} turns staged`)
+      return Promise.reject(
+        new Error(`mock model called ${index} times but only ${results.length} turns staged`),
+      )
     }
-    return next
+    return Promise.resolve(next)
   }
 }
 
@@ -278,8 +280,8 @@ describe('streamChatTurn', () => {
         customSystemPrompt: '',
         context: null,
         tools: tools({
-          retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT],
-          readNoteFn: async () => 'launch plan\n',
+          retrieveFn: () => Promise.resolve([PUBLIC_HIT, PRIVATE_HIT]),
+          readNoteFn: () => Promise.resolve('launch plan\n'),
         }),
       }),
     )
@@ -321,8 +323,8 @@ describe('streamChatTurn', () => {
         customSystemPrompt: '',
         context: null,
         tools: tools({
-          retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT],
-          readNoteFn: async () => 'launch plan\n',
+          retrieveFn: () => Promise.resolve([PUBLIC_HIT, PRIVATE_HIT]),
+          readNoteFn: () => Promise.resolve('launch plan\n'),
         }),
       }),
     )
@@ -410,8 +412,8 @@ describe('streamChatTurn', () => {
         customSystemPrompt: '',
         context: null,
         tools: tools({
-          retrieveFn: async () => [PUBLIC_HIT],
-          readNoteFn: async () => 'launch plan\n',
+          retrieveFn: () => Promise.resolve([PUBLIC_HIT]),
+          readNoteFn: () => Promise.resolve('launch plan\n'),
         }),
       }),
     )
@@ -455,8 +457,8 @@ describe('streamChatTurn', () => {
         customSystemPrompt: '',
         context: null,
         tools: tools({
-          retrieveFn: async () => [PUBLIC_HIT],
-          readNoteFn: async () => 'launch plan\n',
+          retrieveFn: () => Promise.resolve([PUBLIC_HIT]),
+          readNoteFn: () => Promise.resolve('launch plan\n'),
         }),
       }),
     )
@@ -494,7 +496,10 @@ describe('streamChatTurn', () => {
         semanticSearchEnabled: true,
         customSystemPrompt: '',
         context: null,
-        tools: tools({ retrieveFn: async () => [PUBLIC_HIT], readNoteFn: async () => 'body\n' }),
+        tools: tools({
+          retrieveFn: () => Promise.resolve([PUBLIC_HIT]),
+          readNoteFn: () => Promise.resolve('body\n'),
+        }),
       }),
     )
 

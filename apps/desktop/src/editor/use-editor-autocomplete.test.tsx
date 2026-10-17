@@ -46,12 +46,14 @@ async function setup(options?: SetupOptions) {
   )
   const created: { title: string; generation: number }[] = []
   const noteCreation = {
-    resolveOrCreateNoteWithTitle: async (
+    resolveOrCreateNoteWithTitle: (
       title: string,
       generation: number,
     ): Promise<ResolveOrCreateNoteResult> => {
       created.push({ title, generation })
-      return options?.createOutcome ?? { kind: 'created', path: 'notes/created.md' }
+      return Promise.resolve(
+        options?.createOutcome ?? { kind: 'created', path: 'notes/created.md' },
+      )
     },
   }
   const contacts = createTestContactsService({

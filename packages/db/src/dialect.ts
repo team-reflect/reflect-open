@@ -41,9 +41,14 @@ class IpcConnection implements DatabaseConnection {
     return { rows: rows as R[] }
   }
 
-  // eslint-disable-next-line require-yield
-  async *streamQuery<R>(): AsyncIterableIterator<QueryResult<R>> {
-    throw new Error('streaming is not supported over the IPC SQLite bridge')
+  streamQuery<R>(): AsyncIterableIterator<QueryResult<R>> {
+    return {
+      next: () =>
+        Promise.reject(new Error('streaming is not supported over the IPC SQLite bridge')),
+      [Symbol.asyncIterator]() {
+        return this
+      },
+    }
   }
 }
 
@@ -52,20 +57,20 @@ class IpcDriver implements Driver {
 
   async init(): Promise<void> {}
 
-  async acquireConnection(): Promise<DatabaseConnection> {
-    return this.connection
+  acquireConnection(): Promise<DatabaseConnection> {
+    return Promise.resolve(this.connection)
   }
 
-  async beginTransaction(): Promise<void> {
-    throw new Error('transactions run in Rust (index_* commands), not via Kysely')
+  beginTransaction(): Promise<void> {
+    return Promise.reject(new Error('transactions run in Rust (index_* commands), not via Kysely'))
   }
 
-  async commitTransaction(): Promise<void> {
-    throw new Error('transactions run in Rust (index_* commands), not via Kysely')
+  commitTransaction(): Promise<void> {
+    return Promise.reject(new Error('transactions run in Rust (index_* commands), not via Kysely'))
   }
 
-  async rollbackTransaction(): Promise<void> {
-    throw new Error('transactions run in Rust (index_* commands), not via Kysely')
+  rollbackTransaction(): Promise<void> {
+    return Promise.reject(new Error('transactions run in Rust (index_* commands), not via Kysely'))
   }
 
   async releaseConnection(): Promise<void> {}

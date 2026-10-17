@@ -345,7 +345,6 @@ export default defineESLintConfig(
       '@typescript-eslint/no-base-to-string': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
-      '@typescript-eslint/require-await': 'off',
       'no-var': 'off',
       'react-hooks/exhaustive-deps': 'off',
       'regexp/no-super-linear-backtracking': 'off',

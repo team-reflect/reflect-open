@@ -135,7 +135,7 @@ describe('SubscriptionService', () => {
     expect(storage.local.get(ACTIVE_SUBSCRIPTION_STORAGE_KEY)).toBeNull()
   })
 
-  it('shares the pending native lookups with a second refetch', async () => {
+  it('shares the pending native lookups with a second refetch', () => {
     owned = never
     const subscription = service()
     void subscription.refetch()

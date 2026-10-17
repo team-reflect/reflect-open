@@ -20,24 +20,26 @@ function fakeIo(
 ) {
   const writes: Record<string, string> = {}
   const io = {
-    sources: async () => options?.sources ?? Object.keys(files).sort(),
+    sources: () => options?.sources ?? Object.keys(files).sort(),
     backlinks: () => options?.backlinks ?? [],
-    read: async (path) => {
+    read: (path) => {
       const content = files[path]
       if (content === undefined) {
-        throw new Error(`unreadable: ${path}`)
+        return Promise.reject(new Error(`unreadable: ${path}`))
       }
-      return content
+      return Promise.resolve(content)
     },
     write: (path, content) => {
       writes[path] = content
     },
-    resolve: async (target) => {
+    resolve: (target) => {
       const mapped = options?.resolveByTarget?.[target]
       if (mapped !== undefined) {
-        return resolved(mapped)
+        return Promise.resolve(resolved(mapped))
       }
-      return options?.resolveTo !== undefined ? resolved(options.resolveTo) : unresolved('x')
+      return Promise.resolve(
+        options?.resolveTo !== undefined ? resolved(options.resolveTo) : unresolved('x'),
+      )
     },
   } satisfies RenameIo & {
     backlinks: () => MaybePromise<
@@ -128,7 +130,7 @@ describe('rewriteLinksForTitleChange', () => {
     const files: Record<string, string> = { 'notes/ok.md': '[[Old]] here\n' }
     const { io, writes } = fakeIo(files)
     const sources = ['notes/gone.md', 'notes/ok.md'] // gone.md read throws
-    io.sources = async () => sources
+    io.sources = () => sources
     const progress: Array<[number, number]> = []
     const result = await rewriteLinksForTitleChange({
       path: 'notes/target.md',
@@ -452,11 +454,12 @@ describe('rewriteLinksForTitleChange write failures', () => {
       'notes/ok.md': '[[Old]]\n',
     })
     const write = io.write
-    io.write = async (path, content) => {
+    io.write = (path, content) => {
       if (path === 'notes/fail.md') {
-        throw new Error('write failed')
+        return Promise.reject(new Error('write failed'))
       }
       write(path, content)
+      return Promise.resolve()
     }
     const result = await rewriteLinksForTitleChange({
       path: 'notes/target.md',
@@ -699,15 +702,15 @@ describe('rewritePathLinksForMove', () => {
     return {
       writes,
       io: {
-        pathLinkSources: async () => sources,
-        read: async (path: string) => {
+        pathLinkSources: () => sources,
+        read: (path: string) => {
           const content = files[path]
           if (content === undefined) {
-            throw new Error(`unreadable: ${path}`)
+            return Promise.reject(new Error(`unreadable: ${path}`))
           }
-          return content
+          return Promise.resolve(content)
         },
-        write: async (path: string, content: string) => {
+        write: (path: string, content: string) => {
           writes[path] = content
         },
       },

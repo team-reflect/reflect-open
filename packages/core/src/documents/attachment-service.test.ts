@@ -71,9 +71,7 @@ function assetUrl(generation: number, path: string): string {
 }
 
 function failing(message: string): () => Promise<never> {
-  return async () => {
-    throw new AppError('io', message)
-  }
+  return () => Promise.reject(new AppError('io', message))
 }
 
 describe('saveFile', () => {

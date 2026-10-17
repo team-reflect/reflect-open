@@ -82,10 +82,12 @@ beforeEach(() => {
   getPinnedNotes.mockReset().mockResolvedValue([])
   getNote.mockReset().mockResolvedValue(noteRow('notes/a.md', false))
   noteSource = '# A\n'
-  readNoteSource.mockReset().mockImplementation(async () => noteSource)
-  commitNoteFrontmatter.mockReset().mockImplementation(async (_path, patch) => {
-    noteSource = upsertFrontmatter(noteSource, frontmatterPatchToYaml(patch))
-  })
+  readNoteSource.mockReset().mockImplementation(() => Promise.resolve(noteSource))
+  commitNoteFrontmatter.mockReset().mockImplementation((_path, patch) =>
+    Promise.try(() => {
+      noteSource = upsertFrontmatter(noteSource, frontmatterPatchToYaml(patch))
+    }),
+  )
 })
 
 function noteRow(path: string, isPrivate: boolean, title = 'A'): NoteRow {

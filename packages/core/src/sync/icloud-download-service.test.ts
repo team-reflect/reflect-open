@@ -214,9 +214,9 @@ describe('createICloudDownloadService', () => {
   it('a failed nudge never starts the bulk download', async () => {
     // `pending` defaulting to 0 on error must not read as "notes are in".
     const requested: string[] = []
-    vi.spyOn(icloud, 'downloadPending').mockImplementation(async (_root, scope) => {
+    vi.spyOn(icloud, 'downloadPending').mockImplementation((_root, scope) => {
       requested.push(scope)
-      throw new AppError('io', 'container hiccup')
+      return Promise.reject(new AppError('io', 'container hiccup'))
     })
     start()
     await flush()

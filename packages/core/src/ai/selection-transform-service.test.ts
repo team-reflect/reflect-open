@@ -69,7 +69,7 @@ async function collect(
 describe('streamTransformTurn', () => {
   it('streams deltas and terminates with complete carrying the full text', async () => {
     const model = new MockLanguageModelV3({
-      doStream: async () => textStream(['good', 'bye']),
+      doStream: () => Promise.resolve(textStream(['good', 'bye'])),
     })
     const events = await collect(
       streamTransformTurn({ logger: createTestLoggerService() }, model, {
@@ -86,7 +86,7 @@ describe('streamTransformTurn', () => {
 
   it('sends the rendered prompt and the transform system prompt', async () => {
     const model = new MockLanguageModelV3({
-      doStream: async () => textStream(['ok']),
+      doStream: () => Promise.resolve(textStream(['ok'])),
     })
     await collect(
       streamTransformTurn({ logger: createTestLoggerService() }, model, {
@@ -102,9 +102,7 @@ describe('streamTransformTurn', () => {
 
   it('terminates with a single error event when the provider fails', async () => {
     const model = new MockLanguageModelV3({
-      doStream: async () => {
-        throw new Error('provider exploded')
-      },
+      doStream: () => Promise.reject(new Error('provider exploded')),
     })
     const logger = createTestLoggerService()
     const events = await collect(streamTransformTurn({ logger }, model, { prompt: 'x' }))
@@ -119,7 +117,7 @@ describe('streamTransformTurn', () => {
     const controller = new AbortController()
     controller.abort()
     const model = new MockLanguageModelV3({
-      doStream: async () => textStream(['never']),
+      doStream: () => Promise.resolve(textStream(['never'])),
     })
     const events = await collect(
       streamTransformTurn({ logger: createTestLoggerService() }, model, {
@@ -166,7 +164,8 @@ async function createService(
   providerConfig.list()
   await settings.whenLoaded()
   const languageModel = createTestLanguageModelService(
-    options.model ?? new MockLanguageModelV3({ doStream: async () => textStream(['good', 'bye']) }),
+    options.model ??
+      new MockLanguageModelV3({ doStream: () => Promise.resolve(textStream(['good', 'bye'])) }),
   )
   const service = createSelectionTransformService({
     logger: createTestLoggerService(),
@@ -193,7 +192,9 @@ function request(overrides: Partial<SelectionTransformRequest> = {}): SelectionT
 
 describe('SelectionTransformService', () => {
   it('streams the transform from the default entry with its key', async () => {
-    const model = new MockLanguageModelV3({ doStream: async () => textStream(['good', 'bye']) })
+    const model = new MockLanguageModelV3({
+      doStream: () => Promise.resolve(textStream(['good', 'bye'])),
+    })
     const { service, languageModel } = await createService({ model })
 
     const events = await collect(service.transform(request()))

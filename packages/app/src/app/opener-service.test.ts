@@ -30,9 +30,7 @@ describe('createOpenerService', () => {
 
   it('logs instead of rejecting when a fire-and-forget open fails', async () => {
     const { opener, logger } = serviceOver({
-      openUrl: async () => {
-        throw new Error('no handler')
-      },
+      openUrl: () => Promise.reject(new Error('no handler')),
     })
 
     expect(() => opener.openUrlSync('https://example.com')).not.toThrow()

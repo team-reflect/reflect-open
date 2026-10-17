@@ -72,8 +72,9 @@ class TestIpcTransport implements IpcBridge {
       }
     }
     if (options?.pluginEvents ?? true) {
-      this.listenPlugin = async (plugin, event, handler) => {
+      this.listenPlugin = (plugin, event, handler) => {
         this.#addHandler(this.#pluginHandlers, `${plugin}:${event}`, handler)
+        return Promise.resolve()
       }
     }
   }
@@ -87,8 +88,8 @@ class TestIpcTransport implements IpcBridge {
     return await handler(args)
   }
 
-  async listen(event: string, handler: (payload: unknown) => void): Promise<Unlisten> {
-    return this.#addHandler(this.#eventHandlers, event, handler)
+  listen(event: string, handler: (payload: unknown) => void): Promise<Unlisten> {
+    return Promise.resolve(this.#addHandler(this.#eventHandlers, event, handler))
   }
 
   onCommand(command: string, handler: CommandHandler): void {

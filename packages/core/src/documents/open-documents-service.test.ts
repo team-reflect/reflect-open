@@ -20,8 +20,9 @@ function fakeSession(path: string, log: string[]): NoteSession {
     externalChanged: () => {
       log.push(`externalChanged:${path}`)
     },
-    flush: async () => {
+    flush: () => {
       log.push(`flush:${path}`)
+      return Promise.resolve()
     },
   })
 }
@@ -89,9 +90,7 @@ describe('open documents', () => {
   it('one failing document does not block the others, and nothing rejects', async () => {
     const log: string[] = []
     const failing = fakeSession('notes/bad.md', log)
-    failing.flush = async () => {
-      throw new Error('disk full')
-    }
+    failing.flush = () => Promise.reject(new Error('disk full'))
     const unregisterBad = openDocuments.register({ session: failing })
     const unregisterGood = openDocuments.register({ session: fakeSession('notes/good.md', log) })
     try {
@@ -105,7 +104,7 @@ describe('open documents', () => {
 })
 
 describe('retarget (Plan 17)', () => {
-  it('re-keys the entry; the original unregister still finds it by identity', async () => {
+  it('re-keys the entry; the original unregister still finds it by identity', () => {
     const session = fakeSession('notes/a.md', [])
     const unregister = openDocuments.register({ session })
 
@@ -117,7 +116,7 @@ describe('retarget (Plan 17)', () => {
     expect(openDocuments.sessionFor('notes/renamed.md')).toBeNull()
   })
 
-  it('re-keying a path with no entry is a no-op', async () => {
+  it('re-keying a path with no entry is a no-op', () => {
     openDocuments.retarget(
       'notes/ghost.md',
       'notes/elsewhere.md',
@@ -126,7 +125,7 @@ describe('retarget (Plan 17)', () => {
     expect(openDocuments.sessionFor('notes/elsewhere.md')).toBeNull()
   })
 
-  it("never re-keys a different pane's document at the same path", async () => {
+  it("never re-keys a different pane's document at the same path", () => {
     // The failed-move compensation re-keys (to → from); when the entry at
     // `to` belongs to another pane, it must stay exactly where it is.
     const foreign = fakeSession('notes/taken.md', [])

@@ -89,9 +89,7 @@ describe('attachOperationToasts', () => {
 
   it('consumes rejected action promises', async () => {
     const error = new Error('network down')
-    const run = vi.fn(async () => {
-      throw error
-    })
+    const run = vi.fn(() => Promise.reject(error))
     operations.start('Update available', { action: { label: 'Install', run } })
 
     const options = toast.add.mock.lastCall?.[0]

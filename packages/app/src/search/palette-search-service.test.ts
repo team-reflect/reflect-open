@@ -64,9 +64,9 @@ function setup() {
   const service = createPaletteSearchService({
     suggestions: createSuggestionService({ database: createTestDatabaseService() }),
     search: {
-      searchWithFilters: async (parsed) => {
+      searchWithFilters: (parsed) => {
         searches.push(parsed)
-        return [lexicalHit('notes/lexical.md', 'Lexical')]
+        return Promise.resolve([lexicalHit('notes/lexical.md', 'Lexical')])
       },
     },
     retrieval,

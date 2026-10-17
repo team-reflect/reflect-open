@@ -43,13 +43,15 @@ describe('createTauriWindowHost', () => {
   it('finds the focused window and skips one that closes during the check', async () => {
     getAllWebviewWindows.mockResolvedValue([
       { label: 'closing', isFocused: vi.fn(async () => await Promise.reject(new Error('closed'))) },
-      { label: 'main', isFocused: vi.fn(async () => false) },
-      { label: 'note-2', isFocused: vi.fn(async () => true) },
+      { label: 'main', isFocused: vi.fn(() => Promise.resolve(false)) },
+      { label: 'note-2', isFocused: vi.fn(() => Promise.resolve(true)) },
     ])
     const host = createTauriWindowHost({ multiWindow: true, logger: createTestLoggerService() })
     await expect(host.focusedWindowLabel()).resolves.toBe('note-2')
 
-    getAllWebviewWindows.mockResolvedValue([{ label: 'main', isFocused: vi.fn(async () => false) }])
+    getAllWebviewWindows.mockResolvedValue([
+      { label: 'main', isFocused: vi.fn(() => Promise.resolve(false)) },
+    ])
     await expect(host.focusedWindowLabel()).resolves.toBeNull()
   })
 

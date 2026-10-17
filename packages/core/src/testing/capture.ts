@@ -66,54 +66,64 @@ class TestCaptureInboxServiceImpl implements TestCaptureInboxService {
     }
   }
 
-  async registerHost(): Promise<void> {
+  registerHost(): Promise<void> {
     this.#registrations += 1
+    return Promise.resolve()
   }
 
-  async list(): Promise<FileMeta[]> {
-    return [...this.#inbox].map(([name, entry]) => ({
-      path: `${INBOX_DIR}/${name}`,
-      size: entry.contents.length,
-      modifiedMs: entry.modifiedMs,
-    }))
+  list(): Promise<FileMeta[]> {
+    return Promise.resolve(
+      [...this.#inbox].map(([name, entry]) => ({
+        path: `${INBOX_DIR}/${name}`,
+        size: entry.contents.length,
+        modifiedMs: entry.modifiedMs,
+      })),
+    )
   }
 
-  async read(name: string): Promise<string> {
+  read(name: string): Promise<string> {
     const entry = this.#inbox.get(name)
     if (entry === undefined) {
-      throw notFound(`${INBOX_DIR}/${name}`)
+      return Promise.reject(notFound(`${INBOX_DIR}/${name}`))
     }
-    return entry.contents
+    return Promise.resolve(entry.contents)
   }
 
-  async spool(name: string, json: string, generation: number): Promise<void> {
-    this.#spoolLog.push({ name, json, generation })
-    this.add(name, json)
+  spool(name: string, json: string, generation: number): Promise<void> {
+    return Promise.try(() => {
+      this.#spoolLog.push({ name, json, generation })
+      this.add(name, json)
+    })
   }
 
-  async remove(name: string): Promise<void> {
+  remove(name: string): Promise<void> {
     this.#removeLog.push(name)
     this.#inbox.delete(name)
+    return Promise.resolve()
   }
 
-  async reject(name: string): Promise<void> {
+  reject(name: string): Promise<void> {
     this.#rejectLog.push(name)
     this.#inbox.delete(name)
+    return Promise.resolve()
   }
 
-  async relaySharedInbox(): Promise<number> {
-    const moved = this.#shared.size
-    for (const [name, contents] of this.#shared) {
-      this.add(name, contents)
-    }
-    this.#shared.clear()
-    return moved
+  relaySharedInbox(): Promise<number> {
+    return Promise.try(() => {
+      const moved = this.#shared.size
+      for (const [name, contents] of this.#shared) {
+        this.add(name, contents)
+      }
+      this.#shared.clear()
+      return moved
+    })
   }
 
-  async promoteScreenshot(spoolName: string): Promise<void> {
+  promoteScreenshot(spoolName: string): Promise<void> {
     if (!this.#inbox.has(spoolName)) {
-      throw notFound(`${INBOX_DIR}/${spoolName}`)
+      return Promise.reject(notFound(`${INBOX_DIR}/${spoolName}`))
     }
+    return Promise.resolve()
   }
 
   add(name: string, contents: unknown, options?: { modifiedMs?: number }): void {
@@ -183,12 +193,12 @@ class TestWebFetchServiceImpl implements TestWebFetchService {
     this.#options = options
   }
 
-  async fetchMeta(url: CloudSafe<string>): Promise<string> {
-    return this.#answer('meta', this.#options?.html, url)
+  fetchMeta(url: CloudSafe<string>): Promise<string> {
+    return Promise.try(() => this.#answer('meta', this.#options?.html, url))
   }
 
-  async fetchOembed(url: CloudSafe<string>): Promise<string> {
-    return this.#answer('oembed', this.#options?.oembed, url)
+  fetchOembed(url: CloudSafe<string>): Promise<string> {
+    return Promise.try(() => this.#answer('oembed', this.#options?.oembed, url))
   }
 
   fetchLinkPreviewImage(url: CloudSafe<string>): string | null {
@@ -196,12 +206,15 @@ class TestWebFetchServiceImpl implements TestWebFetchService {
     return this.#options?.image?.[url] ?? null
   }
 
-  async fetchLinkPreviewHtml(url: CloudSafe<string>): Promise<LinkPreviewHtml> {
-    return { html: this.#answer('html', this.#options?.html, url), finalUrl: url }
+  fetchLinkPreviewHtml(url: CloudSafe<string>): Promise<LinkPreviewHtml> {
+    return Promise.try(() => ({
+      html: this.#answer('html', this.#options?.html, url),
+      finalUrl: url,
+    }))
   }
 
-  async fetchLinkPreviewIcon(url: CloudSafe<string>): Promise<string> {
-    return this.#answer('icon', this.#options?.icon, url)
+  fetchLinkPreviewIcon(url: CloudSafe<string>): Promise<string> {
+    return Promise.try(() => this.#answer('icon', this.#options?.icon, url))
   }
 
   requests(): readonly { kind: WebFetchKind; url: string }[] {
@@ -269,23 +282,29 @@ class TestXArchiveServiceImpl implements TestXArchiveService {
     this.#syndication = new Map(Object.entries(options?.syndication ?? {}))
   }
 
-  async resolve(generation: number, postId: string): Promise<ResolvedArchivedPost | null> {
-    this.#resolveLog.push({ generation, postId })
-    return structuredClone(this.#posts.get(postId) ?? null)
+  resolve(generation: number, postId: string): Promise<ResolvedArchivedPost | null> {
+    return Promise.try(() => {
+      this.#resolveLog.push({ generation, postId })
+      return structuredClone(this.#posts.get(postId) ?? null)
+    })
   }
 
-  async owners(assetPath: string): Promise<string[]> {
-    return [...(this.#owners?.[assetPath] ?? [])]
+  owners(assetPath: string): Promise<string[]> {
+    return Promise.resolve([...(this.#owners?.[assetPath] ?? [])])
   }
 
-  async write(generation: number, post: ArchivedXPost): Promise<void> {
-    this.#writeLog.push({ generation, post })
-    this.#posts.set(post.data.id, { archive: { ...structuredClone(post) }, resources: [] })
+  write(generation: number, post: ArchivedXPost): Promise<void> {
+    return Promise.try(() => {
+      this.#writeLog.push({ generation, post })
+      this.#posts.set(post.data.id, { archive: { ...structuredClone(post) }, resources: [] })
+    })
   }
 
-  async fetchSyndication(postId: string): Promise<XPost | null> {
-    this.#syndicationLog.push(postId)
-    return structuredClone(this.#syndication.get(postId) ?? null)
+  fetchSyndication(postId: string): Promise<XPost | null> {
+    return Promise.try(() => {
+      this.#syndicationLog.push(postId)
+      return structuredClone(this.#syndication.get(postId) ?? null)
+    })
   }
 
   setPost(postId: string, post: ResolvedArchivedPost | null): void {

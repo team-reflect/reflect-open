@@ -15,12 +15,10 @@ async function validateApiKey(
 }
 
 function fetchReturning(status: number): typeof fetch {
-  return async () => new Response(null, { status })
+  return () => Promise.resolve(new Response(null, { status }))
 }
 
-const fetchThrowing: typeof fetch = async () => {
-  throw new TypeError('network down')
-}
+const fetchThrowing: typeof fetch = () => Promise.reject(new TypeError('network down'))
 
 describe('AiKeyValidationService', () => {
   it('sends the provider-specific auth headers to the model-listing endpoint', async () => {

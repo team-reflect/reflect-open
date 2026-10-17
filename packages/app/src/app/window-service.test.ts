@@ -45,9 +45,7 @@ describe('createWindowService', () => {
   })
 
   it('logs a failed title change', async () => {
-    const setTitle = vi.fn(async () => {
-      throw new Error('gone')
-    })
+    const setTitle = vi.fn(() => Promise.reject(new Error('gone')))
     const { window, logger } = setup({ host: { setTitle } })
     await window.setTitle('Note A')
     expect(setTitle).toHaveBeenCalledWith('Note A')
@@ -157,9 +155,7 @@ describe('createWindowService', () => {
 
   it('logs a failed event registration', async () => {
     const ipc = createTestIpcBridgeService()
-    ipc.transport.listen = async () => {
-      throw new Error('denied')
-    }
+    ipc.transport.listen = () => Promise.reject(new Error('denied'))
     const { window, logger } = setup({ ipc })
 
     window.subscribeIndexWritten(() => {})

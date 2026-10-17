@@ -1050,12 +1050,13 @@ describe('missing-note seed (new ordinary notes)', () => {
   it('flush also waits for the retry of a failed save', async () => {
     let attempts = 0
     const h: Harness = harness({
-      beforeWrite: async () => {
+      beforeWrite: () => {
         attempts += 1
         if (attempts === 1) {
           h.setDisk('# Other\n') // the checked write lost a race with another writer
-          throw new Error('Note changed on disk; reload before retrying')
+          return Promise.reject(new Error('Note changed on disk; reload before retrying'))
         }
+        return Promise.resolve()
       },
     })
     h.session.load()

@@ -287,16 +287,17 @@ class NodeTestDatabaseServiceImpl implements TestDatabaseService {
     this.db = createDb(this.runQuery)
   }
 
-  readonly runQuery = async (sql: string, params: readonly unknown[]): Promise<unknown> => {
-    this.#queries.push({ sql, params: [...params] })
-    try {
-      return this.#open()
-        .prepare(sql)
-        .all(...params.map(sqliteParameter))
-    } catch (error) {
-      throw toAppError(error)
-    }
-  }
+  readonly runQuery = (sql: string, params: readonly unknown[]): Promise<unknown> =>
+    Promise.try(() => {
+      this.#queries.push({ sql, params: [...params] })
+      try {
+        return this.#open()
+          .prepare(sql)
+          .all(...params.map(sqliteParameter))
+      } catch (error) {
+        throw toAppError(error)
+      }
+    })
 
   applyProjection(note: IndexedNote): void {
     insertProjection(this.#open(), note)

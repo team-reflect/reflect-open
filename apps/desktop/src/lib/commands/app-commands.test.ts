@@ -26,7 +26,7 @@ function createApp() {
     status: { status: 'uninitialized' },
   })
   const embeddingIndex: TestEmbeddingIndexService = createTestEmbeddingIndexService({
-    backfill: async () => 'completed',
+    backfill: () => Promise.resolve('completed'),
   })
   return createTestCoreServices({ embeddingRuntime, embeddingIndex })
 }

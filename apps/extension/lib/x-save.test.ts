@@ -58,7 +58,7 @@ it('still refuses incognito capture', async () => {
 
 it.each([true, false])('preserves the like kind with snapshot available=%s', async (available) => {
   if (!available) sendMessage.mockRejectedValue(new Error('No receiver'))
-  const shouldAdmit = vi.fn(async () => true)
+  const shouldAdmit = vi.fn(() => Promise.resolve(true))
   await saveXPost(1, '123', '2026-09-14T00:00:00Z', { kind: 'x-like', shouldAdmit })
   expect(enqueueCapture).toHaveBeenCalledWith(
     {

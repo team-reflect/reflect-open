@@ -177,12 +177,14 @@ function setup(options?: SetupOptions) {
   /**
    * The operations started so far, each with its outcome.
    */
-  async function operationOutcomes(): Promise<RecordedOperation[]> {
-    return progress.started().map(({ label, status, message, ended }) => ({
-      label,
-      outcome: status === 'failed' ? 'failed' : ended ? 'done' : 'running',
-      message,
-    }))
+  function operationOutcomes(): Promise<RecordedOperation[]> {
+    return Promise.resolve(
+      progress.started().map(({ label, status, message, ended }) => ({
+        label,
+        outcome: status === 'failed' ? 'failed' : ended ? 'done' : 'running',
+        message,
+      })),
+    )
   }
 
   return {

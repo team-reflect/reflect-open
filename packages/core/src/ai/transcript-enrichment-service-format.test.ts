@@ -32,12 +32,13 @@ beforeEach(() => {
 
 function modelAnswering(output: { title: string; body: string }): MockLanguageModelV3 {
   const model = new MockLanguageModelV3({
-    doGenerate: async () => ({
-      content: [{ type: 'text', text: JSON.stringify(output) }],
-      finishReason: { unified: 'stop' as const, raw: undefined },
-      usage: USAGE,
-      warnings: [],
-    }),
+    doGenerate: () =>
+      Promise.resolve({
+        content: [{ type: 'text', text: JSON.stringify(output) }],
+        finishReason: { unified: 'stop' as const, raw: undefined },
+        usage: USAGE,
+        warnings: [],
+      }),
   })
   languageModelService.setModel(model)
   return model
@@ -87,9 +88,7 @@ describe('TranscriptEnrichmentService.formatTranscript', () => {
   it('falls back to the untouched transcript and a local title when the call fails', async () => {
     languageModelService.setModel(
       new MockLanguageModelV3({
-        doGenerate: async () => {
-          throw new Error('model unavailable')
-        },
+        doGenerate: () => Promise.reject(new Error('model unavailable')),
       }),
     )
 

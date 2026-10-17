@@ -40,7 +40,7 @@ describe('IpcDialect (Kysely → injected runner bridge)', () => {
   it('rejects transactions — writes go through the index_* commands', async () => {
     runQuery.mockResolvedValue([])
     const db = createDb(runQuery)
-    await expect(db.transaction().execute(async () => undefined)).rejects.toThrow(
+    await expect(db.transaction().execute(() => Promise.resolve())).rejects.toThrow(
       /transactions run in Rust/,
     )
   })

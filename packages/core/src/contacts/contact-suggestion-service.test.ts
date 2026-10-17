@@ -343,9 +343,7 @@ describe('the enable flow', () => {
         lookupPeople: (query) => contacts.lookupPeople(query),
         lookupByEmail: (email) => contacts.lookupByEmail(email),
         lookupByName: (name) => contacts.lookupByName(name),
-        requestAccess: async () => {
-          throw new Error('prompt timed out')
-        },
+        requestAccess: () => Promise.reject(new Error('prompt timed out')),
       },
     })
 

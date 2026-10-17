@@ -73,17 +73,21 @@ class TestContactsServiceImpl implements TestContactsService {
     }
   }
 
-  async refresh(): Promise<void> {
-    this.#adoptStatus()
+  refresh(): Promise<void> {
+    return Promise.try(() => {
+      this.#adoptStatus()
+    })
   }
 
-  async requestAccess(): Promise<boolean> {
-    this.#requests++
-    if (this.#status === 'notDetermined') {
-      this.#status = this.#grantAccess ? 'authorized' : 'denied'
-    }
-    this.#adoptStatus()
-    return this.#status === 'authorized' || this.#status === 'limited'
+  requestAccess(): Promise<boolean> {
+    return Promise.try(() => {
+      this.#requests++
+      if (this.#status === 'notDetermined') {
+        this.#status = this.#grantAccess ? 'authorized' : 'denied'
+      }
+      this.#adoptStatus()
+      return this.#status === 'authorized' || this.#status === 'limited'
+    })
   }
 
   canLookup(settings: Pick<Settings, 'contactsEnabled'>): boolean {
@@ -94,21 +98,27 @@ class TestContactsServiceImpl implements TestContactsService {
     return lookupContactPeople(query, (name) => this.lookupByName(name))
   }
 
-  async lookupByEmail(email: string): Promise<ContactMatch[]> {
+  lookupByEmail(email: string): Promise<ContactMatch[]> {
     this.#log.push({ kind: 'email', email })
     const wanted = email.toLowerCase()
-    return this.#contacts.filter((contact) =>
-      contact.emails.some((address) => address.toLowerCase() === wanted),
+    return Promise.resolve(
+      this.#contacts.filter((contact) =>
+        contact.emails.some((address) => address.toLowerCase() === wanted),
+      ),
     )
   }
 
-  async lookupByName(name: string): Promise<ContactMatch[]> {
+  lookupByName(name: string): Promise<ContactMatch[]> {
     this.#log.push({ kind: 'name', name })
     const query = words(name)
-    return this.#contacts.filter((contact) => {
-      const names = words(`${contact.fullName} ${contact.givenName} ${contact.familyName}`)
-      return query.length > 0 && query.every((part) => names.some((word) => word.startsWith(part)))
-    })
+    return Promise.resolve(
+      this.#contacts.filter((contact) => {
+        const names = words(`${contact.fullName} ${contact.givenName} ${contact.familyName}`)
+        return (
+          query.length > 0 && query.every((part) => names.some((word) => word.startsWith(part)))
+        )
+      }),
+    )
   }
 
   setStatus(next: ContactsAuthorization): void {

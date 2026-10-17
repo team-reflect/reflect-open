@@ -20,15 +20,16 @@ function recordingFetch(
   calls: RecordedCall[],
   respond: (call: RecordedCall, index: number) => Response,
 ): typeof fetch {
-  return async (input, init) => {
-    const call: RecordedCall = {
-      url: String(input),
-      headers: (init?.headers ?? {}) as Record<string, string>,
-      body: init?.body ?? null,
-    }
-    calls.push(call)
-    return respond(call, calls.length - 1)
-  }
+  return (input, init) =>
+    Promise.try(() => {
+      const call: RecordedCall = {
+        url: String(input),
+        headers: (init?.headers ?? {}) as Record<string, string>,
+        body: init?.body ?? null,
+      }
+      calls.push(call)
+      return respond(call, calls.length - 1)
+    })
 }
 
 function jsonResponse(status: number, payload: unknown): Response {
@@ -170,9 +171,7 @@ describe('TranscriptionService (openai)', () => {
   })
 
   it('reports a thrown fetch as a network error', async () => {
-    const fetchFn: typeof fetch = async () => {
-      throw new TypeError('offline')
-    }
+    const fetchFn: typeof fetch = () => Promise.reject(new TypeError('offline'))
 
     await expect(transcribe(fetchFn, request())).rejects.toMatchObject({
       kind: 'network',
@@ -182,9 +181,9 @@ describe('TranscriptionService (openai)', () => {
 
   it('bounds every request with a timeout signal', async () => {
     const signals: (AbortSignal | null | undefined)[] = []
-    const fetchFn: typeof fetch = async (_input, init) => {
+    const fetchFn: typeof fetch = (_input, init) => {
       signals.push(init?.signal)
-      return jsonResponse(200, { text: 'ok' })
+      return Promise.resolve(jsonResponse(200, { text: 'ok' }))
     }
 
     await transcribe(fetchFn, request())
@@ -193,9 +192,8 @@ describe('TranscriptionService (openai)', () => {
   })
 
   it('maps a stalled connection to a settled network error', async () => {
-    const fetchFn: typeof fetch = async () => {
-      throw new DOMException('The operation timed out.', 'TimeoutError')
-    }
+    const fetchFn: typeof fetch = () =>
+      Promise.reject(new DOMException('The operation timed out.', 'TimeoutError'))
 
     await expect(transcribe(fetchFn, request())).rejects.toMatchObject({
       kind: 'network',

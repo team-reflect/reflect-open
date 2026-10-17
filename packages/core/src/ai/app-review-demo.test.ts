@@ -55,7 +55,7 @@ describe('createDemoModel', () => {
     const http = createTestHttpService()
     const noteFile = createTestNoteFileService()
     const xArchive = createTestXArchiveService()
-    const assetReferences = { notePaths: async () => [] }
+    const assetReferences = { notePaths: () => [] }
     const engine = createChatEngineService({
       logger: createTestLoggerService(),
       languageModel: createLanguageModelService({ http, sdk: createLazyAiSdkLoader() }),

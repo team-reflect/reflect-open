@@ -329,10 +329,12 @@ describe('resolveOrCreateNoteWithTitle', () => {
 
   it('re-resolves after the disk scan before creating', async () => {
     const graph = setup()
-    graph.listNotes.mockImplementationOnce(async () => {
-      seedNotes(graph.database, [{ path: 'notes/synced.md', markdown: '# Synced\n' }])
-      return []
-    })
+    graph.listNotes.mockImplementationOnce(() =>
+      Promise.try(() => {
+        seedNotes(graph.database, [{ path: 'notes/synced.md', markdown: '# Synced\n' }])
+        return []
+      }),
+    )
 
     await expect(graph.creation.resolveOrCreateNoteWithTitle('Synced', 7)).resolves.toEqual({
       kind: 'resolved',

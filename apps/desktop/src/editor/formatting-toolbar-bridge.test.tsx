@@ -33,7 +33,7 @@ async function setupEditor(
   const editor = (
     <NoteEditor
       initialContent={initialContent}
-      onWikilinkSearch={async () => []}
+      onWikilinkSearch={() => []}
       saveFile={saveFile}
       handleRef={(handle) => {
         grabbed.current = handle
@@ -163,7 +163,7 @@ describe('FormattingToolbarBridge', () => {
   })
 
   it('persists attached files and inserts their markdown', async () => {
-    const saveFile = vi.fn(async (file: File) => `assets/${file.name}`)
+    const saveFile = vi.fn((file: File) => Promise.resolve(`assets/${file.name}`))
     const { handle } = await setupEditor('alpha', true, saveFile)
 
     await pmRoot.getByText('alpha').click()
@@ -186,7 +186,7 @@ describe('FormattingToolbarBridge', () => {
   })
 
   it('inserts nothing when the save declines the file', async () => {
-    const saveFile = vi.fn(async () => null)
+    const saveFile = vi.fn(() => Promise.resolve(null))
     const { handle } = await setupEditor('alpha', true, saveFile)
 
     await pmRoot.getByText('alpha').click()

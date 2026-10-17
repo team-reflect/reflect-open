@@ -46,8 +46,9 @@ function recordingIndexLifecycle(
   log: { path: string; generation: number }[],
 ): IndexLifecycleService {
   const indexLifecycle = createTestIndexLifecycleService()
-  vi.spyOn(indexLifecycle, 'indexNote').mockImplementation(async (path, indexOptions) => {
+  vi.spyOn(indexLifecycle, 'indexNote').mockImplementation((path, indexOptions) => {
     log.push({ path, generation: indexOptions.generation })
+    return Promise.resolve()
   })
   return indexLifecycle
 }
@@ -127,9 +128,11 @@ function setup(options?: {
   const pinned = options?.pinned ?? []
   const indexQuery = createIndexQueryService({ database: createTestDatabaseService() })
   vi.spyOn(indexQuery, 'getPinnedNotes').mockImplementation(
-    typeof pinned === 'function' ? pinned : async () => [...pinned],
+    typeof pinned === 'function' ? pinned : () => Promise.resolve([...pinned]),
   )
-  vi.spyOn(indexQuery, 'getNote').mockImplementation(async (path) => options?.rows?.[path])
+  vi.spyOn(indexQuery, 'getNote').mockImplementation((path) =>
+    Promise.resolve(options?.rows?.[path]),
+  )
   const { actions, openDocuments } = createNoteActions({
     noteFile: options?.wrapNoteFile?.(files) ?? files,
     sessions: session === null ? [] : [session],
@@ -163,9 +166,10 @@ function indexRow(path: string, overrides: Partial<NoteRow> = {}): NoteRow {
 function failing(method: 'read' | 'write' | 'delete', error: unknown) {
   return (files: NoteFileService): NoteFileService =>
     overrideNoteFileService(files, {
-      [method]: async () => {
-        throw error
-      },
+      [method]: () =>
+        Promise.try(() => {
+          throw error
+        }),
     })
 }
 
@@ -191,9 +195,7 @@ describe('togglePinned', () => {
   it('writes a bare `pinned: true` when the shelf cannot be read', async () => {
     const { actions, files, noteRows } = setup({
       files: { 'notes/a.md': '# A\n' },
-      pinned: async () => {
-        throw new Error('index closed')
-      },
+      pinned: () => Promise.reject(new Error('index closed')),
     })
 
     await expect(actions.togglePinned('notes/a.md')).resolves.toEqual({
@@ -276,9 +278,7 @@ describe('togglePinned', () => {
     // as empty, and the pin write is what creates it.
     const { actions, files } = setup({
       session: { path: 'daily/2026-06-10.md', loaded: false, accepts: false },
-      pinned: async () => {
-        throw new Error('index closed')
-      },
+      pinned: () => Promise.reject(new Error('index closed')),
     })
 
     await actions.togglePinned('daily/2026-06-10.md')
@@ -889,9 +889,7 @@ describe('deepLinkFor', () => {
   it('still returns the link when the immediate reindex fails', async () => {
     const { actions } = setup({
       files: { 'notes/a.md': '# A\n' },
-      indexNote: async () => {
-        throw new Error('index busy')
-      },
+      indexNote: () => Promise.reject(new Error('index busy')),
     })
 
     const url = await actions.deepLinkFor('notes/a.md')

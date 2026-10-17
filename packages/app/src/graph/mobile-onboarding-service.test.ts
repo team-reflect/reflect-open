@@ -145,9 +145,7 @@ describe('MobileOnboardingService warm', () => {
 
   it('does not surface an unhandled rejection when the warm fails untaken', async () => {
     const context = setup({
-      resolve: async () => {
-        throw new Error('no container')
-      },
+      resolve: () => Promise.reject(new Error('no container')),
     })
     context.service.warm()
     // Settle the rejection with no taker attached; the service's internal
@@ -211,9 +209,7 @@ describe('MobileOnboardingService boot', () => {
 
   it('retries a failed container resolve after 2 and 8 seconds, then gives up', async () => {
     const context = setup({
-      resolve: async () => {
-        throw new Error('no container')
-      },
+      resolve: () => Promise.reject(new Error('no container')),
     })
     context.service.boot()
     await expect.poll(() => context.logger.getErrors()).toHaveLength(1)
@@ -241,9 +237,7 @@ describe('MobileOnboardingService boot', () => {
 
   it('drops the pending retry once the boot is stopped', async () => {
     const context = setup({
-      resolve: async () => {
-        throw new Error('no container')
-      },
+      resolve: () => Promise.reject(new Error('no container')),
     })
     const stop = context.service.boot()
     await expect.poll(() => context.clock.pendingTimers()).toBe(1)
@@ -291,11 +285,11 @@ describe('MobileOnboardingService boot', () => {
   it('retries the head-start resolve once before opening an iCloud graph', async () => {
     const context = setup({
       settings: { mobileOnboarded: true, mobileStorage: 'icloud' },
-      resolve: async (call) => {
+      resolve: (call) => {
         if (call === 1) {
-          throw new Error('transient')
+          return Promise.reject(new Error('transient'))
         }
-        return { ...STORAGE, icloudGraphRoots: [ICLOUD_GRAPH] }
+        return Promise.resolve({ ...STORAGE, icloudGraphRoots: [ICLOUD_GRAPH] })
       },
     })
     context.service.warm()

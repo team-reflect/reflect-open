@@ -34,10 +34,12 @@ beforeEach(() => {
 
 it('replays after a crash between note commit and spool cleanup without duplicating', async () => {
   let source = 'My journal\n'
-  const writeXPost = vi.fn(async (capture: XPostEnvelope, path: string) => {
-    expect(path).toMatch(/^daily\/2026-09-0[89]\.md$/)
-    source = appendXPost(source, capture)
-  })
+  const writeXPost = vi.fn((capture: XPostEnvelope, path: string) =>
+    Promise.try(() => {
+      expect(path).toMatch(/^daily\/2026-09-0[89]\.md$/)
+      source = appendXPost(source, capture)
+    }),
+  )
   kit.inboxRemoveMock.mockRejectedValueOnce(new AppError('io', 'cleanup failed'))
   expect((await drainCaptureInbox({ writeXPost })).stopped?.reason).toBe('io')
   const committed = source
@@ -47,9 +49,7 @@ it('replays after a crash between note commit and spool cleanup without duplicat
 })
 
 it('keeps the spool when the document is busy or the bookmark writer is unavailable', async () => {
-  const writeXPost = vi.fn(async () => {
-    throw new Error('Busy daily note')
-  })
+  const writeXPost = vi.fn(() => Promise.reject(new Error('Busy daily note')))
   expect((await drainCaptureInbox({ writeXPost })).drained).toBe(0)
   expect((await drainCaptureInbox()).drained).toBe(0)
   expect(kit.inboxRemoveMock).not.toHaveBeenCalled()
@@ -58,16 +58,20 @@ it('keeps the spool when the document is busy or the bookmark writer is unavaila
 
 it('saves the archive before writing Markdown and removes the spool last', async () => {
   const steps: string[] = []
-  saveArchivedPost.mockImplementation(async (generation, archive) => {
-    expect(generation).toBe(1)
-    expect(archive.data).toMatchObject(envelope.data)
-    steps.push('archive')
-  })
-  const writeXPost = vi.fn(async () => {
+  saveArchivedPost.mockImplementation((generation, archive) =>
+    Promise.try(() => {
+      expect(generation).toBe(1)
+      expect(archive.data).toMatchObject(envelope.data)
+      steps.push('archive')
+    }),
+  )
+  const writeXPost = vi.fn(() => {
     steps.push('markdown')
+    return Promise.resolve()
   })
-  kit.inboxRemoveMock.mockImplementation(async () => {
+  kit.inboxRemoveMock.mockImplementation(() => {
     steps.push('remove')
+    return Promise.resolve()
   })
   expect((await drainCaptureInbox({ writeXPost })).drained).toBe(1)
   expect(steps).toEqual(['archive', 'markdown', 'remove'])
@@ -85,9 +89,10 @@ it('writes and deduplicates URL-only bookmarks without touching an archive', asy
   const fallback = { ...envelope, data: undefined, postId: '20' }
   spoolEnvelope(fallback)
   let source = ''
-  const writeXPost = async (capture: XPostEnvelope) => {
-    source = appendXPost(source, capture)
-  }
+  const writeXPost = (capture: XPostEnvelope) =>
+    Promise.try(() => {
+      source = appendXPost(source, capture)
+    })
   expect((await drainCaptureInbox({ writeXPost })).drained).toBe(1)
   spoolEnvelope(fallback) // the same bookmark captured again
   expect((await drainCaptureInbox({ writeXPost })).drained).toBe(1)
@@ -100,11 +105,13 @@ it('drains a like to its capture day and replays after cleanup failure', async (
   const like: XPostEnvelope = { ...envelope, kind: 'x-like' }
   spoolEnvelope(like)
   let source = 'Draft prose\n'
-  const writeXPost = vi.fn(async (capture: XPostEnvelope, path: string) => {
-    expect(capture.kind).toBe('x-like')
-    expect(path).toMatch(/^daily\/2026-09-0[89]\.md$/)
-    source = appendXPost(source, capture)
-  })
+  const writeXPost = vi.fn((capture: XPostEnvelope, path: string) =>
+    Promise.try(() => {
+      expect(capture.kind).toBe('x-like')
+      expect(path).toMatch(/^daily\/2026-09-0[89]\.md$/)
+      source = appendXPost(source, capture)
+    }),
+  )
   kit.inboxRemoveMock.mockRejectedValueOnce(new AppError('io', 'cleanup failed'))
   expect((await drainCaptureInbox({ writeXPost })).drained).toBe(0)
   const committed = source

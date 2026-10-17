@@ -65,12 +65,14 @@ class TestCalendarServiceImpl implements TestCalendarService {
     return [...this.#calendars]
   }
 
-  async listEvents(range: CalendarRange, calendarIds: readonly string[]): Promise<CalendarEvent[]> {
-    return this.#events.filter(
-      (event) =>
-        calendarIds.includes(event.calendarId) &&
-        event.startsAt <= range.end &&
-        event.endsAt >= range.start,
+  listEvents(range: CalendarRange, calendarIds: readonly string[]): Promise<CalendarEvent[]> {
+    return Promise.resolve(
+      this.#events.filter(
+        (event) =>
+          calendarIds.includes(event.calendarId) &&
+          event.startsAt <= range.end &&
+          event.endsAt >= range.start,
+      ),
     )
   }
 

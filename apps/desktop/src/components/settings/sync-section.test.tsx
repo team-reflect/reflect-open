@@ -61,8 +61,12 @@ async function renderSection(): Promise<void> {
     backup,
     platform: createTestPlatformService(platform),
   })
-  vi.spyOn(app.indexQuery, 'getDuplicateNoteIds').mockImplementation(async () => duplicateIds)
-  openRecent = vi.spyOn(app.graphSession, 'openRecent').mockImplementation(async () => reopens)
+  vi.spyOn(app.indexQuery, 'getDuplicateNoteIds').mockImplementation(() =>
+    Promise.resolve(duplicateIds),
+  )
+  openRecent = vi
+    .spyOn(app.graphSession, 'openRecent')
+    .mockImplementation(() => Promise.resolve(reopens))
   await renderInApp(<SyncSection />, { app, graph, route: { kind: 'settings' } })
 }
 

@@ -61,13 +61,15 @@ function buildNoteTools(effects: ToolEffects = {}): NoteTools {
     return await effects.readNoteFn(path)
   })
   const retrieval = createTestRetrievalService()
-  vi.spyOn(retrieval, 'retrieve').mockImplementation(effects.retrieveFn ?? (async () => []))
+  vi.spyOn(retrieval, 'retrieve').mockImplementation(
+    effects.retrieveFn ?? (() => Promise.resolve([])),
+  )
   const noteList = createNoteListService({ database: createTestDatabaseService() })
   vi.spyOn(noteList, 'listRecentNotes').mockImplementation(
-    effects.listRecentNotesFn ?? (async () => []),
+    effects.listRecentNotesFn ?? (() => Promise.resolve([])),
   )
   const assetReferences = {
-    notePaths: effects.assetReferencingNotePathsFn ?? (async () => []),
+    notePaths: effects.assetReferencingNotePathsFn ?? (() => Promise.resolve([])),
   }
   const xArchive = createTestXArchiveService(
     effects.xArchiveOwners === undefined ? {} : { owners: effects.xArchiveOwners },
@@ -76,7 +78,7 @@ function buildNoteTools(effects: ToolEffects = {}): NoteTools {
     retrieval,
     noteFile,
     noteList,
-    dailyNotes: { listDailyNotes: effects.listDailyNotesFn ?? (async () => []) },
+    dailyNotes: { listDailyNotes: effects.listDailyNotesFn ?? (() => []) },
     assetReferences,
     assetPrivacy: createAssetPrivacyService({ noteFile, xArchive, assetReferences }),
     xArchive,
@@ -237,9 +239,9 @@ describe('search_notes', () => {
   it('always retrieves with excludePrivateContent', async () => {
     const seen: Array<RetrieveOptions | undefined> = []
     const tools = buildNoteTools({
-      retrieveFn: async (_query, options) => {
+      retrieveFn: (_query, options) => {
         seen.push(options)
-        return []
+        return Promise.resolve([])
       },
     })
     await runSearch(tools, { query: 'atlas' })
@@ -250,9 +252,9 @@ describe('search_notes', () => {
     const seen: Array<RetrieveOptions | undefined> = []
     const tools = buildNoteTools({
       semanticSearchEnabled: false,
-      retrieveFn: async (_query, options) => {
+      retrieveFn: (_query, options) => {
         seen.push(options)
-        return []
+        return Promise.resolve([])
       },
     })
     await runSearch(tools, { query: 'atlas' })
@@ -261,11 +263,12 @@ describe('search_notes', () => {
 
   it('drops private hits entirely — not even the title goes out', async () => {
     const tools = buildNoteTools({
-      retrieveFn: async () => [
-        hit({}),
-        hit({ path: PRIVATE_PATH, title: PRIVATE_TITLE, snippet: '', isPrivate: true }),
-      ],
-      readNoteFn: async () => 'a public body\n',
+      retrieveFn: () =>
+        Promise.resolve([
+          hit({}),
+          hit({ path: PRIVATE_PATH, title: PRIVATE_TITLE, snippet: '', isPrivate: true }),
+        ]),
+      readNoteFn: () => Promise.resolve('a public body\n'),
     })
     const output = await runSearch(tools, { query: 'diary' })
     const payload = JSON.stringify(output)
@@ -279,9 +282,9 @@ describe('search_notes', () => {
   it('drops a hit whose live frontmatter turned private before reindex (TOCTOU)', async () => {
     const tools = buildNoteTools({
       // The stale index still says public…
-      retrieveFn: async () => [hit({ path: PRIVATE_PATH, title: PRIVATE_TITLE })],
+      retrieveFn: () => Promise.resolve([hit({ path: PRIVATE_PATH, title: PRIVATE_TITLE })]),
       // …but the note on disk was just marked private.
-      readNoteFn: async () => '---\nprivate: true\n---\n# Diary\n',
+      readNoteFn: () => Promise.resolve('---\nprivate: true\n---\n# Diary\n'),
     })
     const output = await runSearch(tools, { query: 'diary' })
     expect(output.hits).toEqual([])
@@ -290,10 +293,8 @@ describe('search_notes', () => {
 
   it('fails closed: an unreadable hit is dropped, not sent', async () => {
     const tools = buildNoteTools({
-      retrieveFn: async () => [hit({ path: PRIVATE_PATH, title: PRIVATE_TITLE })],
-      readNoteFn: async () => {
-        throw new AppError('io', 'disk error')
-      },
+      retrieveFn: () => Promise.resolve([hit({ path: PRIVATE_PATH, title: PRIVATE_TITLE })]),
+      readNoteFn: () => Promise.reject(new AppError('io', 'disk error')),
     })
     const output = await runSearch(tools, { query: 'diary' })
     expect(output.hits).toEqual([])
@@ -302,9 +303,9 @@ describe('search_notes', () => {
   it('passes the requested limit through', async () => {
     const seen: Array<RetrieveOptions | undefined> = []
     const tools = buildNoteTools({
-      retrieveFn: async (_query, options) => {
+      retrieveFn: (_query, options) => {
         seen.push(options)
-        return []
+        return Promise.resolve([])
       },
     })
     await runSearch(tools, { query: 'atlas', limit: 3 })
@@ -319,12 +320,12 @@ describe('read_notes', () => {
       'notes/b.md': '# B\n\nBeta.\n',
     }
     const tools = buildNoteTools({
-      readNoteFn: async (path) => {
+      readNoteFn: (path) => {
         const body = bodies[path]
         if (body === undefined) {
-          throw new AppError('notFound', 'no such note')
+          return Promise.reject(new AppError('notFound', 'no such note'))
         }
-        return body
+        return Promise.resolve(body)
       },
     })
     const output = await runReadNotes(tools, ['notes/a.md', 'notes/gone.md', 'notes/b.md'])
@@ -336,7 +337,8 @@ describe('read_notes', () => {
 
   it('returns the body without frontmatter, titled from the note', async () => {
     const tools = buildNoteTools({
-      readNoteFn: async () => '---\npinned: true\n---\n# Project Atlas\n\nLaunch plan.\n',
+      readNoteFn: () =>
+        Promise.resolve('---\npinned: true\n---\n# Project Atlas\n\nLaunch plan.\n'),
     })
     const output = await runRead(tools, 'notes/atlas.md')
     if (!output.ok) {
@@ -349,7 +351,7 @@ describe('read_notes', () => {
 
   it('refuses a private note from its live frontmatter', async () => {
     const tools = buildNoteTools({
-      readNoteFn: async () => `---\nprivate: true\n---\n# Diary\n\n${PRIVATE_BODY}\n`,
+      readNoteFn: () => Promise.resolve(`---\nprivate: true\n---\n# Diary\n\n${PRIVATE_BODY}\n`),
     })
     const output = await runRead(tools, PRIVATE_PATH)
     if (output.ok) {
@@ -361,9 +363,7 @@ describe('read_notes', () => {
 
   it('reports a missing note instead of throwing', async () => {
     const tools = buildNoteTools({
-      readNoteFn: async () => {
-        throw new AppError('notFound', 'no such note')
-      },
+      readNoteFn: () => Promise.reject(new AppError('notFound', 'no such note')),
     })
     const output = await runRead(tools, 'notes/gone.md')
     if (output.ok) {
@@ -374,7 +374,7 @@ describe('read_notes', () => {
 
   it('caps oversized notes and flags the cut', async () => {
     const body = 'x'.repeat(MAX_NOTE_CONTENT_CHARS + 10)
-    const tools = buildNoteTools({ readNoteFn: async () => body })
+    const tools = buildNoteTools({ readNoteFn: () => Promise.resolve(body) })
     const output = await runRead(tools, 'notes/big.md')
     if (!output.ok) {
       expect.unreachable('expected a successful read')
@@ -394,14 +394,14 @@ describe('read_assets', () => {
   /** Tools over an in-memory file map + a fixed referencing-notes answer. */
   function assetTools(files: Record<string, string>, refs: string[]): NoteTools {
     return buildNoteTools({
-      readNoteFn: async (path) => {
+      readNoteFn: (path) => {
         const source = files[path]
         if (source === undefined) {
-          throw new AppError('notFound', 'no such file')
+          return Promise.reject(new AppError('notFound', 'no such file'))
         }
-        return source
+        return Promise.resolve(source)
       },
-      assetReferencingNotePathsFn: async () => refs,
+      assetReferencingNotePathsFn: () => Promise.resolve(refs),
     })
   }
 
@@ -431,16 +431,16 @@ describe('read_assets', () => {
       'notes/post.md': `# Post\n\n![post](${archive})\n`,
     }
     const tools = buildNoteTools({
-      readNoteFn: async (path) => {
+      readNoteFn: (path) => {
         const source = files[path]
         if (source === undefined) {
-          throw new AppError('notFound', 'no such file')
+          return Promise.reject(new AppError('notFound', 'no such file'))
         }
-        return source
+        return Promise.resolve(source)
       },
-      assetReferencingNotePathsFn: async (_assetPath, owners) => {
+      assetReferencingNotePathsFn: (_assetPath, owners) => {
         seenOwners.push(owners)
-        return ['notes/post.md']
+        return Promise.resolve(['notes/post.md'])
       },
       xArchiveOwners: { [media]: [archive] },
     })
@@ -525,13 +525,13 @@ describe('read_assets', () => {
 
   it('fails closed when a referencing note cannot be read', async () => {
     const tools = buildNoteTools({
-      readNoteFn: async (path) => {
+      readNoteFn: (path) => {
         if (path === SIDECAR) {
-          return `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`
+          return Promise.resolve(`---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`)
         }
-        throw new AppError('io', 'disk error')
+        return Promise.reject(new AppError('io', 'disk error'))
       },
-      assetReferencingNotePathsFn: async () => ['notes/deck.md'],
+      assetReferencingNotePathsFn: () => Promise.resolve(['notes/deck.md']),
     })
     const output = await runReadAsset(tools, ASSET)
     if (output.ok) {
@@ -543,11 +543,11 @@ describe('read_assets', () => {
   it('rejects a non-asset path without touching the filesystem', async () => {
     const reads: string[] = []
     const tools = buildNoteTools({
-      readNoteFn: async (path) => {
+      readNoteFn: (path) => {
         reads.push(path)
-        throw new AppError('notFound', 'no such file')
+        return Promise.reject(new AppError('notFound', 'no such file'))
       },
-      assetReferencingNotePathsFn: async () => [],
+      assetReferencingNotePathsFn: () => Promise.resolve([]),
     })
     for (const path of ['notes/secret.md', 'assets/chart.png.reflect.md']) {
       const output = await runReadAsset(tools, path)
@@ -604,9 +604,9 @@ describe('list_recent_notes', () => {
   it('queries with the default limit and no tag', async () => {
     const seen: RecentNotesOptions[] = []
     const tools = buildNoteTools({
-      listRecentNotesFn: async (options) => {
+      listRecentNotesFn: (options) => {
         seen.push(options)
-        return []
+        return Promise.resolve([])
       },
     })
     await runRecents(tools, {})
@@ -616,9 +616,9 @@ describe('list_recent_notes', () => {
   it('passes an explicit limit and tag through', async () => {
     const seen: RecentNotesOptions[] = []
     const tools = buildNoteTools({
-      listRecentNotesFn: async (options) => {
+      listRecentNotesFn: (options) => {
         seen.push(options)
-        return []
+        return Promise.resolve([])
       },
     })
     await runRecents(tools, { limit: 3, tag: 'book' })
@@ -628,9 +628,9 @@ describe('list_recent_notes', () => {
   it('treats an explicit null tag as no filter', async () => {
     const seen: RecentNotesOptions[] = []
     const tools = buildNoteTools({
-      listRecentNotesFn: async (options) => {
+      listRecentNotesFn: (options) => {
         seen.push(options)
-        return []
+        return Promise.resolve([])
       },
     })
     await runRecents(tools, { tag: null })
@@ -640,9 +640,9 @@ describe('list_recent_notes', () => {
   it('refuses a non-tag filter without querying, pointing at the no-tag call', async () => {
     const seen: RecentNotesOptions[] = []
     const tools = buildNoteTools({
-      listRecentNotesFn: async (options) => {
+      listRecentNotesFn: (options) => {
         seen.push(options)
-        return []
+        return Promise.resolve([])
       },
     })
     for (const tag of ['*', ' ', '#book', ']INVALIDNOFILTER[']) {
@@ -659,8 +659,8 @@ describe('list_recent_notes', () => {
   it('maps rows onto listings: preview as snippet, ISO modifiedAt, no daily date', async () => {
     const mtime = 1_750_000_000_000
     const tools = buildNoteTools({
-      listRecentNotesFn: async () => [recentRow({ mtime })],
-      readNoteFn: async () => 'a public body\n',
+      listRecentNotesFn: () => Promise.resolve([recentRow({ mtime })]),
+      readNoteFn: () => Promise.resolve('a public body\n'),
     })
     const output = await runRecents(tools, {})
     if (!output.ok) {
@@ -679,11 +679,12 @@ describe('list_recent_notes', () => {
 
   it('drops an indexed-private row entirely — not even the title goes out', async () => {
     const tools = buildNoteTools({
-      listRecentNotesFn: async () => [
-        recentRow({}),
-        recentRow({ path: PRIVATE_PATH, title: PRIVATE_TITLE, isPrivate: true }),
-      ],
-      readNoteFn: async () => 'a public body\n',
+      listRecentNotesFn: () =>
+        Promise.resolve([
+          recentRow({}),
+          recentRow({ path: PRIVATE_PATH, title: PRIVATE_TITLE, isPrivate: true }),
+        ]),
+      readNoteFn: () => Promise.resolve('a public body\n'),
     })
     const output = await runRecents(tools, {})
     const payload = JSON.stringify(output)
@@ -697,8 +698,9 @@ describe('list_recent_notes', () => {
 
   it('drops a row whose live frontmatter turned private before reindex (TOCTOU)', async () => {
     const tools = buildNoteTools({
-      listRecentNotesFn: async () => [recentRow({ path: PRIVATE_PATH, title: PRIVATE_TITLE })],
-      readNoteFn: async () => '---\nprivate: true\n---\n# Diary\n',
+      listRecentNotesFn: () =>
+        Promise.resolve([recentRow({ path: PRIVATE_PATH, title: PRIVATE_TITLE })]),
+      readNoteFn: () => Promise.resolve('---\nprivate: true\n---\n# Diary\n'),
     })
     const output = await runRecents(tools, {})
     if (!output.ok) {
@@ -710,10 +712,8 @@ describe('list_recent_notes', () => {
 
   it('fails closed: an unreadable row is dropped, not sent', async () => {
     const tools = buildNoteTools({
-      listRecentNotesFn: async () => [recentRow({})],
-      readNoteFn: async () => {
-        throw new AppError('io', 'disk error')
-      },
+      listRecentNotesFn: () => Promise.resolve([recentRow({})]),
+      readNoteFn: () => Promise.reject(new AppError('io', 'disk error')),
     })
     const output = await runRecents(tools, {})
     if (!output.ok) {
@@ -727,9 +727,9 @@ describe('list_daily_notes', () => {
   it('queries the inclusive range with one row past the day cap', async () => {
     const seen: DailyNotesRange[] = []
     const tools = buildNoteTools({
-      listDailyNotesFn: async (range) => {
+      listDailyNotesFn: (range) => {
         seen.push(range)
-        return []
+        return Promise.resolve([])
       },
     })
     await runDailies(tools, { start: '2026-06-01', end: '2026-06-30' })
@@ -740,8 +740,8 @@ describe('list_daily_notes', () => {
 
   it('maps days with their dates and stays untruncated within the cap', async () => {
     const tools = buildNoteTools({
-      listDailyNotesFn: async () => [dailyRow('2026-06-10'), dailyRow('2026-06-09')],
-      readNoteFn: async () => 'a public body\n',
+      listDailyNotesFn: () => Promise.resolve([dailyRow('2026-06-10'), dailyRow('2026-06-09')]),
+      readNoteFn: () => Promise.resolve('a public body\n'),
     })
     const output = await runDailies(tools, { start: '2026-06-01', end: '2026-06-30' })
     expect(output.truncated).toBe(false)
@@ -754,8 +754,8 @@ describe('list_daily_notes', () => {
       dailyRow(`2026-05-${String(index + 1).padStart(2, '0')}`),
     )
     const tools = buildNoteTools({
-      listDailyNotesFn: async () => days,
-      readNoteFn: async () => 'a public body\n',
+      listDailyNotesFn: () => Promise.resolve(days),
+      readNoteFn: () => Promise.resolve('a public body\n'),
     })
     const output = await runDailies(tools, { start: '2026-05-01', end: '2026-06-30' })
     expect(output.truncated).toBe(true)
@@ -764,10 +764,9 @@ describe('list_daily_notes', () => {
 
   it('drops a daily whose live frontmatter turned private before reindex (TOCTOU)', async () => {
     const tools = buildNoteTools({
-      listDailyNotesFn: async () => [
-        dailyRow('2026-06-10', { path: PRIVATE_PATH, title: PRIVATE_TITLE }),
-      ],
-      readNoteFn: async () => '---\nprivate: true\n---\n# Diary\n',
+      listDailyNotesFn: () =>
+        Promise.resolve([dailyRow('2026-06-10', { path: PRIVATE_PATH, title: PRIVATE_TITLE })]),
+      readNoteFn: () => Promise.resolve('---\nprivate: true\n---\n# Diary\n'),
     })
     const output = await runDailies(tools, { start: '2026-06-01', end: '2026-06-30' })
     expect(output.days).toEqual([])

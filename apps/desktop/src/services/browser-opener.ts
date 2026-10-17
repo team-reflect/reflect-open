@@ -5,11 +5,10 @@ import type { OpenerTransport } from '@reflect/app'
  */
 export function createBrowserOpenerTransport(): OpenerTransport {
   return {
-    openUrl: async (url) => {
+    openUrl: (url) => {
       window.open(url, '_blank', 'noopener')
     },
-    revealItemInDir: async (path) => {
-      throw new Error(`cannot reveal ${path}: the browser has no file manager`)
-    },
+    revealItemInDir: (path) =>
+      Promise.reject(new Error(`cannot reveal ${path}: the browser has no file manager`)),
   }
 }

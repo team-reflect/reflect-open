@@ -54,7 +54,9 @@ function createApp(storage: TestStorageService = createTestStorageService()) {
     retrieval: createTestRetrievalService({ relatedNotes }),
   })
   vi.spyOn(app.dailyNotes, 'dailyDatesInRange').mockImplementation(dailyDatesInRange)
-  vi.spyOn(app.indexQuery, 'getNote').mockImplementation(async () => noteRowAnswer ?? undefined)
+  vi.spyOn(app.indexQuery, 'getNote').mockImplementation(() =>
+    Promise.resolve(noteRowAnswer ?? undefined),
+  )
   return app
 }
 
@@ -138,7 +140,7 @@ describe('DailyContextSidebar calendar', () => {
     await vi.waitFor(() => expect(openNoteWindow).toHaveBeenCalledTimes(1))
     await view.rerender(sidebar('2026-06-10'))
 
-    await act(async () => {
+    await act(() => {
       pendingOpen.resolve(false)
     })
 

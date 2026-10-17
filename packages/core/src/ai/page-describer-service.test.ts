@@ -36,14 +36,14 @@ function modelAnswering(text: string): LanguageModelV3CallOptions[] {
   const calls: LanguageModelV3CallOptions[] = []
   languageModelService.setModel(
     new MockLanguageModelV3({
-      doGenerate: async (options) => {
+      doGenerate: (options) => {
         calls.push(options)
-        return {
+        return Promise.resolve({
           content: [{ type: 'text', text }],
           finishReason: { unified: 'stop' as const, raw: undefined },
           usage: USAGE,
           warnings: [],
-        }
+        })
       },
     }),
   )
@@ -58,9 +58,10 @@ function modelAnsweringObject(title: string, description: string): LanguageModel
 function modelThrowing(error: unknown): void {
   languageModelService.setModel(
     new MockLanguageModelV3({
-      doGenerate: async () => {
-        throw error
-      },
+      doGenerate: () =>
+        Promise.try(() => {
+          throw error
+        }),
     }),
   )
 }

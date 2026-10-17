@@ -93,11 +93,11 @@ class TestWindowServiceImpl implements TestWindowService {
     this.#closeCalls += 1
   }
 
-  async bootstrap(): Promise<WindowBootstrap> {
+  bootstrap(): Promise<WindowBootstrap> {
     if (this.#options?.bootstrap === undefined) {
-      throw new Error('test window: no bootstrap configured')
+      return Promise.reject(new Error('test window: no bootstrap configured'))
     }
-    return this.#options.bootstrap
+    return Promise.resolve(this.#options.bootstrap)
   }
 
   subscribeNavigate(listener: (url: string) => void): Unlisten {

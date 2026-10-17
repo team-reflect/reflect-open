@@ -255,10 +255,14 @@ describe('resolveWikiTarget', () => {
 
   it('rechecks the index after a disk miss to close the indexing race', async () => {
     const graph = setup()
-    graph.listNotes.mockImplementationOnce(async () => {
-      seedNotes(graph.database, [{ path: 'notes/newly-indexed.md', markdown: '# Newly indexed\n' }])
-      return []
-    })
+    graph.listNotes.mockImplementationOnce(() =>
+      Promise.try(() => {
+        seedNotes(graph.database, [
+          { path: 'notes/newly-indexed.md', markdown: '# Newly indexed\n' },
+        ])
+        return []
+      }),
+    )
 
     await expect(graph.resolver.resolveWikiTarget('Newly indexed', 7)).resolves.toEqual({
       kind: 'resolved',
@@ -271,15 +275,15 @@ describe('resolveWikiTarget', () => {
   it('repeats the daily-path probe after a disk miss', async () => {
     const graph = setup()
     let dailyReads = 0
-    graph.read.mockImplementation(async (path) => {
+    graph.read.mockImplementation((path) => {
       if (path !== 'daily/2026-06-09.md') {
-        throw new AppError('notFound', 'missing')
+        return Promise.reject(new AppError('notFound', 'missing'))
       }
       dailyReads += 1
       if (dailyReads === 1) {
-        throw new AppError('notFound', 'not synced yet')
+        return Promise.reject(new AppError('notFound', 'not synced yet'))
       }
-      return 'Arrived during resolution\n'
+      return Promise.resolve('Arrived during resolution\n')
     })
 
     await expect(graph.resolver.resolveWikiTarget('2026-06-09', 7)).resolves.toEqual({

@@ -16,11 +16,11 @@ function setup(options?: { available?: boolean }) {
   const graphSession = createTestGraphSessionService({ graph: { generation: 4 } })
   const migration = createICloudMigrationService({ icloudNative, graphSession })
   const steps: string[] = []
-  const openGraph = vi.fn(async (root: string) => {
+  const openGraph = vi.fn((root: string) => {
     steps.push(`open ${root}`)
     return true
   })
-  const disconnectBackup = vi.fn(async () => {
+  const disconnectBackup = vi.fn(() => {
     steps.push('disconnect')
   })
   const onCopied = vi.fn((failure: string | null) => {
@@ -66,9 +66,7 @@ describe('createICloudMigrationService', () => {
 
     await expect(
       migration.moveGraph({
-        disconnectBackup: async () => {
-          throw new AppError('io', 'remote locked')
-        },
+        disconnectBackup: () => Promise.reject(new AppError('io', 'remote locked')),
         openGraph,
         onCopied,
       }),
@@ -83,9 +81,7 @@ describe('createICloudMigrationService', () => {
 
     await expect(
       migration.moveGraph({
-        disconnectBackup: async () => {
-          throw new AppError('io', 'remote locked')
-        },
+        disconnectBackup: () => Promise.reject(new AppError('io', 'remote locked')),
         openGraph: () => false,
         onCopied,
       }),
@@ -111,12 +107,8 @@ describe('createICloudMigrationService', () => {
 
     await expect(
       migration.moveGraph({
-        disconnectBackup: async () => {
-          throw new AppError('io', 'remote locked')
-        },
-        openGraph: async () => {
-          throw new AppError('io', 'graph vanished')
-        },
+        disconnectBackup: () => Promise.reject(new AppError('io', 'remote locked')),
+        openGraph: () => Promise.reject(new AppError('io', 'graph vanished')),
       }),
     ).resolves.toBe('graph vanished')
   })

@@ -147,10 +147,10 @@ describe('previewWikiTarget', () => {
     let reads = 0
     for (const resolution of resolutions) {
       const notePreview = notePreviewOver({
-        noteLinkResolver: resolverWith(async () => resolution),
-        noteDocuments: documentsWith(async () => {
+        noteLinkResolver: resolverWith(() => Promise.resolve(resolution)),
+        noteDocuments: documentsWith(() => {
           reads += 1
-          return ''
+          return Promise.resolve('')
         }),
       })
       await expect(notePreview.previewWikiTarget('Target')).resolves.toBeNull()
@@ -160,17 +160,15 @@ describe('previewWikiTarget', () => {
 
   it('resolves null instead of rejecting when resolution or the read fails', async () => {
     const failingResolution = notePreviewOver({
-      noteLinkResolver: resolverWith(async () => {
-        throw new Error('index gone')
-      }),
+      noteLinkResolver: resolverWith(() => Promise.reject(new Error('index gone'))),
     })
     await expect(failingResolution.previewWikiTarget('Alpha')).resolves.toBeNull()
 
     const failingRead = notePreviewOver({
-      noteLinkResolver: resolverWith(async () => ({ kind: 'resolved', path: 'notes/alpha.md' })),
-      noteDocuments: documentsWith(async () => {
-        throw new AppError('notFound', 'gone')
-      }),
+      noteLinkResolver: resolverWith(() =>
+        Promise.resolve({ kind: 'resolved', path: 'notes/alpha.md' }),
+      ),
+      noteDocuments: documentsWith(() => Promise.reject(new AppError('notFound', 'gone'))),
     })
     await expect(failingRead.previewWikiTarget('Alpha')).resolves.toBeNull()
   })
@@ -179,7 +177,7 @@ describe('previewWikiTarget', () => {
     const noteFile = createTestNoteFileService({ files: { 'notes/alpha.md': '# Alpha' } })
     const notePreview = notePreviewOver({
       noteFile,
-      attachments: attachmentsOver(async () => []),
+      attachments: attachmentsOver(() => Promise.resolve([])),
     })
 
     const preview = await notePreview.previewWikiTarget('Alpha')
@@ -194,12 +192,14 @@ describe('previewWikiTarget', () => {
 
   it("resolves the target note's images and embeds from its own folder", async () => {
     const notePreview = createNotePreviewService({
-      noteLinkResolver: resolverWith(async () => ({
-        kind: 'resolved',
-        path: 'Projects/Garden redesign.md',
-      })),
-      noteDocuments: documentsWith(async () => '![[garden-budget.png]]'),
-      attachments: attachmentsOver(async () => []),
+      noteLinkResolver: resolverWith(() =>
+        Promise.resolve({
+          kind: 'resolved',
+          path: 'Projects/Garden redesign.md',
+        }),
+      ),
+      noteDocuments: documentsWith(() => Promise.resolve('![[garden-budget.png]]')),
+      attachments: attachmentsOver(() => Promise.resolve([])),
       graphSession: openGraph(),
     })
 

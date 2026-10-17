@@ -127,87 +127,105 @@ class TestNoteFileServiceImpl implements TestNoteFileService {
     }
   }
 
-  async read(path: string, pinned: number): Promise<string> {
-    this.#readLog.push({ path, generation: pinned })
-    checkGeneration(this.#generation, pinned)
-    return this.#contentsOf(path)
+  read(path: string, pinned: number): Promise<string> {
+    return Promise.try(() => {
+      this.#readLog.push({ path, generation: pinned })
+      checkGeneration(this.#generation, pinned)
+      return this.#contentsOf(path)
+    })
   }
 
-  async readLocal(path: string, pinned: number): Promise<LocalNoteRead> {
-    checkGeneration(this.#generation, pinned)
-    const content = this.#contentsOf(path)
-    return this.#evicted.has(path) ? { kind: 'evicted' } : { kind: 'content', content }
+  readLocal(path: string, pinned: number): Promise<LocalNoteRead> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      const content = this.#contentsOf(path)
+      return this.#evicted.has(path) ? { kind: 'evicted' } : { kind: 'content', content }
+    })
   }
 
-  async write(
+  write(
     path: string,
     contents: string,
     pinned: number,
     expectedContents?: string | null,
   ): Promise<NoteWriteResult> {
-    checkGeneration(this.#generation, pinned)
-    const merged = this.#merges.get(path)
-    if (merged !== undefined) {
-      this.#merges.delete(path)
-      this.#store(path, merged, pinned)
-      return { merged }
-    }
-    if (expectedContents !== undefined) {
-      const current = this.#files.get(path)?.contents ?? null
-      if (current !== expectedContents && current !== contents) {
-        throw new AppError('io', 'Note changed on disk; reload before retrying')
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      const merged = this.#merges.get(path)
+      if (merged !== undefined) {
+        this.#merges.delete(path)
+        this.#store(path, merged, pinned)
+        return { merged }
       }
-      if (current === contents) {
-        return { merged: null }
+      if (expectedContents !== undefined) {
+        const current = this.#files.get(path)?.contents ?? null
+        if (current !== expectedContents && current !== contents) {
+          throw new AppError('io', 'Note changed on disk; reload before retrying')
+        }
+        if (current === contents) {
+          return { merged: null }
+        }
       }
-    }
-    this.#store(path, contents, pinned)
-    return { merged: null }
+      this.#store(path, contents, pinned)
+      return { merged: null }
+    })
   }
 
-  async create(path: string, contents: string, pinned: number): Promise<NoteCreateOutcome> {
-    checkGeneration(this.#generation, pinned)
-    if (this.#files.has(path)) {
-      return { kind: 'collision' }
-    }
-    return { kind: 'created', modifiedMs: this.#store(path, contents, pinned) }
+  create(path: string, contents: string, pinned: number): Promise<NoteCreateOutcome> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      if (this.#files.has(path)) {
+        return { kind: 'collision' }
+      }
+      return { kind: 'created', modifiedMs: this.#store(path, contents, pinned) }
+    })
   }
 
-  async exists(path: string): Promise<boolean> {
-    return this.#files.has(path)
+  exists(path: string): Promise<boolean> {
+    return Promise.resolve(this.#files.has(path))
   }
 
-  async delete(path: string, pinned: number): Promise<void> {
-    checkGeneration(this.#generation, pinned)
-    if (this.#files.delete(path)) {
-      this.#evicted.delete(path)
-      this.#trashLog.push(path)
-    }
+  delete(path: string, pinned: number): Promise<void> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      if (this.#files.delete(path)) {
+        this.#evicted.delete(path)
+        this.#trashLog.push(path)
+      }
+    })
   }
 
-  async listNotes(pinned: number): Promise<FileMeta[]> {
-    checkGeneration(this.#generation, pinned)
-    return this.#list(isNotePath)
+  listNotes(pinned: number): Promise<FileMeta[]> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      return this.#list(isNotePath)
+    })
   }
 
-  async listAttachments(pinned: number): Promise<FileMeta[]> {
-    checkGeneration(this.#generation, pinned)
-    return this.#list(isAttachmentPath)
+  listAttachments(pinned: number): Promise<FileMeta[]> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      return this.#list(isAttachmentPath)
+    })
   }
 
-  async listDir(dir: string, pinned: number): Promise<FileMeta[]> {
-    checkGeneration(this.#generation, pinned)
-    const prefix = dir.endsWith('/') ? dir : `${dir}/`
-    return this.#list((path) => path.startsWith(prefix))
+  listDir(dir: string, pinned: number): Promise<FileMeta[]> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      const prefix = dir.endsWith('/') ? dir : `${dir}/`
+      return this.#list((path) => path.startsWith(prefix))
+    })
   }
 
-  async vaultScanStats(pinned: number): Promise<VaultScanStats> {
-    checkGeneration(this.#generation, pinned)
-    return {
-      notes: this.#list(isNotePath).length,
-      attachments: this.#list(isAttachmentPath).length,
-      skipped: 0,
-    }
+  vaultScanStats(pinned: number): Promise<VaultScanStats> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      return {
+        notes: this.#list(isNotePath).length,
+        attachments: this.#list(isAttachmentPath).length,
+        skipped: 0,
+      }
+    })
   }
 
   set(path: string, contents: string, setOptions?: { modifiedMs?: number }): void {
@@ -454,67 +472,87 @@ class TestAssetStoreServiceImpl implements TestAssetStoreService {
     this.#store('path', path, await blobBytes(contents), pinned)
   }
 
-  async importFile(sourcePath: string, desiredName: string, pinned: number): Promise<string> {
-    checkGeneration(this.#generation, pinned)
-    const bytes = this.#bytesOf(sourcePath, this.#sources)
-    const path = this.#freePath(desiredName)
-    this.#store('import', path, bytes, pinned)
-    return path
+  importFile(sourcePath: string, desiredName: string, pinned: number): Promise<string> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      const bytes = this.#bytesOf(sourcePath, this.#sources)
+      const path = this.#freePath(desiredName)
+      this.#store('import', path, bytes, pinned)
+      return path
+    })
   }
 
-  async writeBase64(path: string, contentsBase64: string, pinned: number): Promise<void> {
-    checkGeneration(this.#generation, pinned)
-    this.#store('base64', path, base64ToBytes(contentsBase64), pinned)
+  writeBase64(path: string, contentsBase64: string, pinned: number): Promise<void> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      this.#store('base64', path, base64ToBytes(contentsBase64), pinned)
+    })
   }
 
-  async readBase64(path: string, pinned: number): Promise<string> {
-    checkGeneration(this.#generation, pinned)
-    return bytesToBase64(this.#bytesOf(path, this.#files))
+  readBase64(path: string, pinned: number): Promise<string> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      return bytesToBase64(this.#bytesOf(path, this.#files))
+    })
   }
 
-  async readBytes(path: string, pinned: number): Promise<Uint8Array<ArrayBuffer>> {
-    checkGeneration(this.#generation, pinned)
-    return toBytes(this.#bytesOf(path, this.#files))
+  readBytes(path: string, pinned: number): Promise<Uint8Array<ArrayBuffer>> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      return toBytes(this.#bytesOf(path, this.#files))
+    })
   }
 
-  async open(path: string, pinned: number): Promise<void> {
-    checkGeneration(this.#generation, pinned)
-    this.#openLog.push(path)
+  open(path: string, pinned: number): Promise<void> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      this.#openLog.push(path)
+    })
   }
 
-  async reveal(path: string, pinned: number): Promise<void> {
-    checkGeneration(this.#generation, pinned)
-    this.#revealLog.push(path)
+  reveal(path: string, pinned: number): Promise<void> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      this.#revealLog.push(path)
+    })
   }
 
-  async deleteAudioMemo(path: string, pinned: number): Promise<void> {
-    checkGeneration(this.#generation, pinned)
-    if (!path.startsWith(`${AUDIO_MEMOS_DIR}/`)) {
-      throw new AppError('io', `not an audio memo: ${path}`)
-    }
-    this.#files.delete(path)
+  deleteAudioMemo(path: string, pinned: number): Promise<void> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      if (!path.startsWith(`${AUDIO_MEMOS_DIR}/`)) {
+        throw new AppError('io', `not an audio memo: ${path}`)
+      }
+      this.#files.delete(path)
+    })
   }
 
-  async importAudioMemo(sourcePath: string, path: string, pinned: number): Promise<void> {
-    checkGeneration(this.#generation, pinned)
-    if (this.#files.has(path)) {
-      return
-    }
-    this.#store('audio-memo', path, this.#bytesOf(sourcePath, this.#sources), pinned)
+  importAudioMemo(sourcePath: string, path: string, pinned: number): Promise<void> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      if (this.#files.has(path)) {
+        return
+      }
+      this.#store('audio-memo', path, this.#bytesOf(sourcePath, this.#sources), pinned)
+    })
   }
 
-  async readTranscriptCache(name: string, pinned: number): Promise<string> {
-    checkGeneration(this.#generation, pinned)
-    const contents = this.#transcripts.get(name)
-    if (contents === undefined) {
-      throw notFound(name)
-    }
-    return contents
+  readTranscriptCache(name: string, pinned: number): Promise<string> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      const contents = this.#transcripts.get(name)
+      if (contents === undefined) {
+        throw notFound(name)
+      }
+      return contents
+    })
   }
 
-  async writeTranscriptCache(name: string, contents: string, pinned: number): Promise<void> {
-    checkGeneration(this.#generation, pinned)
-    this.#transcripts.set(name, contents)
+  writeTranscriptCache(name: string, contents: string, pinned: number): Promise<void> {
+    return Promise.try(() => {
+      checkGeneration(this.#generation, pinned)
+      this.#transcripts.set(name, contents)
+    })
   }
 
   assets(): ReadonlyMap<string, Uint8Array> {

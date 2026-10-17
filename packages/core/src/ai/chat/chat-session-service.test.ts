@@ -491,9 +491,7 @@ describe('ChatSession persistence', () => {
     const { session, logger } = await setup({
       history: (history) =>
         overrideHistory(history, {
-          saveTurn: async () => {
-            throw new Error('disk full')
-          },
+          saveTurn: () => Promise.reject(new Error('disk full')),
         }),
     })
 

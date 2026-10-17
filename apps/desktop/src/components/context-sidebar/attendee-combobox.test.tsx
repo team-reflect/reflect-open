@@ -15,7 +15,7 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { AttendeeCombobox } from './attendee-combobox.tsx'
 
 // The note suggestions are the seam: one case needs a fetch that never settles.
-const suggestWikiTargets = vi.fn<SuggestionService['suggestWikiTargets']>(async () => [])
+const suggestWikiTargets = vi.fn<SuggestionService['suggestWikiTargets']>(() => [])
 
 let contacts: TestContactsService
 

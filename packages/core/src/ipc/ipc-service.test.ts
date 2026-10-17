@@ -19,7 +19,7 @@ function serviceOver(transport: IpcBridge) {
 describe('call', () => {
   it('returns the schema-validated response', async () => {
     const invoke = vi.fn().mockResolvedValue({ root: '/g', generation: 1 })
-    const { ipc } = serviceOver({ invoke, listen: async () => () => {} })
+    const { ipc } = serviceOver({ invoke, listen: () => Promise.resolve(() => {}) })
 
     const schema = z.object({ root: z.string(), generation: z.number() })
     await expect(ipc.call('graph_open', { path: '/g' }, schema)).resolves.toEqual({
@@ -31,11 +31,12 @@ describe('call', () => {
 
   it('passes a well-formed Rust error through as an AppError', async () => {
     const { ipc } = serviceOver({
-      invoke: async () => {
-        const rustError: unknown = { kind: 'notFound', message: 'missing' }
-        throw rustError
-      },
-      listen: async () => () => {},
+      invoke: () =>
+        Promise.try(() => {
+          const rustError: unknown = { kind: 'notFound', message: 'missing' }
+          throw rustError
+        }),
+      listen: () => Promise.resolve(() => {}),
     })
 
     const error = await ipc
@@ -47,10 +48,8 @@ describe('call', () => {
 
   it('coerces a foreign rejection into an unknown AppError', async () => {
     const { ipc } = serviceOver({
-      invoke: async () => {
-        throw new Error('socket closed')
-      },
-      listen: async () => () => {},
+      invoke: () => Promise.reject(new Error('socket closed')),
+      listen: () => Promise.resolve(() => {}),
     })
 
     const error = await ipc
@@ -61,8 +60,8 @@ describe('call', () => {
 
   it('turns a response that fails validation into a parse error naming the command', async () => {
     const { ipc } = serviceOver({
-      invoke: async () => ({ wrong: true }),
-      listen: async () => () => {},
+      invoke: () => Promise.resolve({ wrong: true }),
+      listen: () => Promise.resolve(() => {}),
     })
 
     const error = await ipc.call('graph_open', {}, z.string()).catch((caught: unknown) => caught)
@@ -78,8 +77,8 @@ describe('callBinary', () => {
   it('sends the raw body and headers and validates the response', async () => {
     const invokeBinary = vi.fn().mockResolvedValue({ written: 3 })
     const { ipc } = serviceOver({
-      invoke: async () => null,
-      listen: async () => () => {},
+      invoke: () => Promise.resolve(null),
+      listen: () => Promise.resolve(() => {}),
       invokeBinary,
     })
 
@@ -92,7 +91,10 @@ describe('callBinary', () => {
   })
 
   it('rejects with an io AppError when the transport has no binary path', async () => {
-    const { ipc } = serviceOver({ invoke: async () => null, listen: async () => () => {} })
+    const { ipc } = serviceOver({
+      invoke: () => Promise.resolve(null),
+      listen: () => Promise.resolve(() => {}),
+    })
 
     expect(ipc.hasBinaryTransport).toBe(false)
     await expect(
@@ -105,7 +107,7 @@ describe('listen', () => {
   it('forwards to the transport', async () => {
     const unlisten = vi.fn()
     const listen = vi.fn().mockResolvedValue(unlisten)
-    const { ipc } = serviceOver({ invoke: async () => null, listen })
+    const { ipc } = serviceOver({ invoke: () => Promise.resolve(null), listen })
     const handler = (): void => {}
 
     await expect(ipc.listen('fs:changed', handler)).resolves.toBe(unlisten)
@@ -115,7 +117,10 @@ describe('listen', () => {
 
 describe('listenPlugin', () => {
   it('rejects with an io AppError when the transport has no plugin events', async () => {
-    const { ipc } = serviceOver({ invoke: async () => null, listen: async () => () => {} })
+    const { ipc } = serviceOver({
+      invoke: () => Promise.resolve(null),
+      listen: () => Promise.resolve(() => {}),
+    })
 
     await expect(ipc.listenPlugin('demo', 'demoEvent', () => {})).rejects.toMatchObject({
       kind: 'io',
@@ -129,13 +134,14 @@ describe('subscribePlugin', () => {
   function serviceWithPluginEvents() {
     const handlers = new Map<string, (payload: unknown) => void>()
     const listenPlugin = vi.fn(
-      async (plugin: string, event: string, handler: (payload: unknown) => void) => {
+      (plugin: string, event: string, handler: (payload: unknown) => void) => {
         handlers.set(`${plugin}:${event}`, handler)
+        return Promise.resolve()
       },
     )
     const { ipc, logger } = serviceOver({
-      invoke: async () => null,
-      listen: async () => () => {},
+      invoke: () => Promise.resolve(null),
+      listen: () => Promise.resolve(() => {}),
       listenPlugin,
     })
     return { ipc, logger, handlers, listenPlugin }
@@ -190,8 +196,8 @@ describe('subscribePlugin', () => {
     const gate = Promise.withResolvers<void>()
     const handlers = new Map<string, (payload: unknown) => void>()
     const { ipc } = serviceOver({
-      invoke: async () => null,
-      listen: async () => () => {},
+      invoke: () => Promise.resolve(null),
+      listen: () => Promise.resolve(() => {}),
       listenPlugin: async (plugin, event, handler) => {
         await gate.promise
         handlers.set(`${plugin}:${event}`, handler)
@@ -212,13 +218,14 @@ describe('subscribePlugin', () => {
   it('a failed registration is retried by the next subscriber', async () => {
     const handlers = new Map<string, (payload: unknown) => void>()
     const listenPlugin = vi
-      .fn(async (plugin: string, event: string, handler: (payload: unknown) => void) => {
+      .fn((plugin: string, event: string, handler: (payload: unknown) => void) => {
         handlers.set(`${plugin}:${event}`, handler)
+        return Promise.resolve()
       })
       .mockRejectedValueOnce(new Error('webview teardown'))
     const { ipc } = serviceOver({
-      invoke: async () => null,
-      listen: async () => () => {},
+      invoke: () => Promise.resolve(null),
+      listen: () => Promise.resolve(() => {}),
       listenPlugin,
     })
 
@@ -237,7 +244,10 @@ describe('subscribePlugin', () => {
   })
 
   it('ready rejects loudly when the transport has no plugin events', async () => {
-    const { ipc } = serviceOver({ invoke: async () => null, listen: async () => () => {} })
+    const { ipc } = serviceOver({
+      invoke: () => Promise.resolve(null),
+      listen: () => Promise.resolve(() => {}),
+    })
 
     const subscription = ipc.subscribePlugin('demo', 'demoEvent', schema, () => {})
     await expect(subscription.ready).rejects.toMatchObject({ kind: 'io' })
@@ -262,7 +272,7 @@ describe('listenNow', () => {
 
   it('tears down a landed registration', async () => {
     const unlisten = vi.fn()
-    const teardown = listenNow(async () => unlisten, vi.fn())
+    const teardown = listenNow(() => unlisten, vi.fn())
     await Promise.resolve()
     await Promise.resolve()
 
@@ -287,9 +297,7 @@ describe('listenNow', () => {
     listenNow(() => {
       throw new Error('no bridge')
     }, onError)
-    listenNow(async () => {
-      throw new Error('denied')
-    }, onError)
+    listenNow(() => Promise.reject(new Error('denied')), onError)
     await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(2))
     expect(onError).toHaveBeenCalledWith(new AppError('unknown', 'no bridge'))
     expect(onError).toHaveBeenCalledWith(new AppError('unknown', 'denied'))

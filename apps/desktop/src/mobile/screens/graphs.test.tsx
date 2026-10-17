@@ -127,9 +127,7 @@ describe('MobileGraphs', () => {
   })
 
   it('surfaces a failed switch and stays on the list', async () => {
-    completeOnboardingResult = async () => {
-      throw new Error('clone failed')
-    }
+    completeOnboardingResult = () => Promise.reject(new Error('clone failed'))
     await mount()
 
     await userEvent.click(page.getByRole('button', { name: 'Work' }))

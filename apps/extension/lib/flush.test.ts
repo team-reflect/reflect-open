@@ -227,7 +227,7 @@ it('retains a held like and still delivers a supported page capture', async () =
 })
 
 it('checks automatic admission policy inside the serialized queue operation', async () => {
-  const policy = vi.fn(async () => false)
+  const policy = vi.fn(() => Promise.resolve(false))
   await enqueueCapture(wire(FIRST), policy)
   expect(policy).toHaveBeenCalledTimes(1)
   expect(await readQueue()).toEqual([])

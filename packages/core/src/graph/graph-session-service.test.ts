@@ -475,9 +475,7 @@ describe('GraphSessionService create', () => {
 
   it('surfaces a failed create without opening', async () => {
     const context = await start()
-    context.mobileStorage.createGraph = async () => {
-      throw new Error('cannot create')
-    }
+    context.mobileStorage.createGraph = () => Promise.reject(new Error('cannot create'))
 
     await expect(context.session.createGraphAt('/new')).resolves.toBe(false)
 
@@ -520,9 +518,7 @@ describe('GraphSessionService welcome seeding', () => {
 
   it('logs a failed seed and still syncs the index', async () => {
     const context = await start()
-    context.noteFile.vaultScanStats = async () => {
-      throw new Error('scan failed')
-    }
+    context.noteFile.vaultScanStats = () => Promise.reject(new Error('scan failed'))
 
     await context.session.openRecent('/fresh')
     await expect.poll(() => context.indexCalls()).toContain('clear')
@@ -647,7 +643,7 @@ describe('GraphSessionService index reactions', () => {
     expect(context.reloads).toHaveLength(1)
   })
 
-  it('follows healed moves and requests downloads for stale placeholders', async () => {
+  it('follows healed moves and requests downloads for stale placeholders', () => {
     const context = setup()
     const onMoved = vi.spyOn(context.indexLifecycle, 'onMoved')
     const onStale = vi.spyOn(context.indexLifecycle, 'onStalePlaceholders')

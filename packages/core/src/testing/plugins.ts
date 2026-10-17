@@ -68,10 +68,12 @@ class TestIapServiceImpl implements TestIapService {
     this.#owned = new Set(options?.owned ?? [])
   }
 
-  async getProducts(productIds: string[]): Promise<IapProduct[]> {
-    return this.#products
-      .filter((product) => productIds.includes(product.productId))
-      .map((product) => ({ ...product }))
+  getProducts(productIds: string[]): Promise<IapProduct[]> {
+    return Promise.resolve(
+      this.#products
+        .filter((product) => productIds.includes(product.productId))
+        .map((product) => ({ ...product })),
+    )
   }
 
   purchase(productId: string): Promise<void> {
@@ -80,8 +82,8 @@ class TestIapServiceImpl implements TestIapService {
     return Promise.resolve()
   }
 
-  async isOwned(productId: string): Promise<boolean> {
-    return this.#owned.has(productId)
+  isOwned(productId: string): Promise<boolean> {
+    return Promise.resolve(this.#owned.has(productId))
   }
 
   subscribePurchaseUpdated(listener: () => void): Unlisten {

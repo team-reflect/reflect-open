@@ -65,7 +65,7 @@ describe('ConnectGithubDrawer', () => {
     const onOpenChange = vi.fn()
     const { backup } = await mount(
       <ConnectGithubDrawer open onOpenChange={onOpenChange} pollIntervalMs={15} />,
-      (scripted) => scripted.onConnectExistingRepo(async () => 'notFound'),
+      (scripted) => scripted.onConnectExistingRepo(() => Promise.resolve('notFound')),
     )
 
     // The local graph's display name is the sandbox folder ("Documents") —

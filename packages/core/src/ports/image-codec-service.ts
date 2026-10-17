@@ -45,7 +45,7 @@ export interface ImageCodecService {
 }
 
 class UnavailableImageCodecImpl implements ImageCodecService {
-  async decode(_file: Blob): Promise<DecodedImage | null> {
+  decode(_file: Blob): DecodedImage | null {
     return null
   }
 }

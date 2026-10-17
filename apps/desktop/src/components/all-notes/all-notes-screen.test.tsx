@@ -579,10 +579,11 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     // health trashes; tokyo fails. The index still lists health until the
     // watcher reindexes, so a refetch here would wrongly bring it back.
     const view = await renderScreen()
-    deleteNote.mockImplementation(async (path) => {
+    deleteNote.mockImplementation((path) => {
       if (path === 'notes/tokyo.md') {
-        throw new Error('locked')
+        return Promise.reject(new Error('locked'))
       }
+      return Promise.resolve()
     })
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 

@@ -118,8 +118,9 @@ describe('createBackgroundReconcilerFactory', () => {
     const activity = createTestActivityPort()
     let calls = 0
     const reconciler = createBackgroundReconcilerFactory({ activity }).create({
-      pass: async () => {
+      pass: () => {
         calls += 1
+        return Promise.resolve()
       },
     })
     reconciler.retryOnWake()

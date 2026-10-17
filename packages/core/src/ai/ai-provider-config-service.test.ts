@@ -356,7 +356,7 @@ describe('AiProviderConfigService', () => {
 
     expect(service.transcriptionConfig()).toEqual(B)
     expect(await service.resolveTranscriptionTarget()).toEqual({ config: B, apiKey: 'sk-b' })
-    expect(await service.resolveTranscriptionTarget(async () => null)).toBe('no-key')
+    expect(await service.resolveTranscriptionTarget(() => Promise.resolve(null))).toBe('no-key')
   })
 
   it('reports no transcription provider when none is capable', async () => {

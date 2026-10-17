@@ -86,7 +86,7 @@ beforeEach(() => {
 })
 
 async function shortcutsHook() {
-  const readSource = async (): Promise<string> => '# A\n'
+  const readSource = (): Promise<string> => Promise.resolve('# A\n')
   const services = createTestCoreServices({
     platform: createTestPlatformService(platform),
     noteDocuments: {

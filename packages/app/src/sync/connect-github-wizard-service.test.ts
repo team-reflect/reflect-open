@@ -43,10 +43,10 @@ beforeEach(() => {
  */
 function scriptExisting(...results: ConnectExistingResult[]): void {
   let call = 0
-  backup.onConnectExistingRepo(async () => {
+  backup.onConnectExistingRepo(() => {
     const result = results[Math.min(call, results.length - 1)] ?? 'connected'
     call += 1
-    return result
+    return Promise.resolve(result)
   })
 }
 
@@ -181,7 +181,7 @@ describe('createConnectGithubWizardService', () => {
 
   it('hands off to github.com/new and connects by polling — no button to click', async () => {
     scriptExisting('notFound', 'notFound', 'connected')
-    backup.onConnectNewRepo(async () => 'manualCreateNeeded')
+    backup.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
     const wizard = createWizard()
     const detach = wizard.attach()
     await signIn(wizard)
@@ -295,7 +295,7 @@ describe('createConnectGithubWizardService', () => {
 
   it('a poll that finds a public repo stops for consent', async () => {
     scriptExisting('notFound', 'needsPublicConfirm')
-    backup.onConnectNewRepo(async () => 'manualCreateNeeded')
+    backup.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
     const wizard = createWizard()
     const detach = wizard.attach()
     await signIn(wizard)
@@ -311,7 +311,7 @@ describe('createConnectGithubWizardService', () => {
 
   it('back to the repo step clears every parked handoff', async () => {
     scriptExisting('notFound')
-    backup.onConnectNewRepo(async () => 'manualCreateNeeded')
+    backup.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
     const wizard = createWizard()
     const detach = wizard.attach()
     await signIn(wizard)
@@ -329,9 +329,9 @@ describe('createConnectGithubWizardService', () => {
   })
 
   it('captures a failed connect as a display message', async () => {
-    backup.onConnectExistingRepo(async () => {
-      throw new AppError('auth', 'Connect GitHub first (no credential stored)')
-    })
+    backup.onConnectExistingRepo(() =>
+      Promise.reject(new AppError('auth', 'Connect GitHub first (no credential stored)')),
+    )
     const wizard = createWizard()
     await signIn(wizard)
 
@@ -346,7 +346,7 @@ describe('createConnectGithubWizardService', () => {
   describe('the repo-existence poll', () => {
     async function parkOnCreateGuide(): Promise<ConnectGithubWizardService> {
       scriptExisting('notFound')
-      backup.onConnectNewRepo(async () => 'manualCreateNeeded')
+      backup.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
       const wizard = createWizard()
       await signIn(wizard)
       expect(wizard.getState().finishView).toMatchObject({ kind: 'createGuide' })
@@ -388,9 +388,7 @@ describe('createConnectGithubWizardService', () => {
 
     it('a failing tick keeps the loop alive', async () => {
       const wizard = await parkOnCreateGuide()
-      backup.onConnectExistingRepo(async () => {
-        throw new AppError('network', 'offline')
-      })
+      backup.onConnectExistingRepo(() => Promise.reject(new AppError('network', 'offline')))
       const detach = wizard.attach()
 
       await advance(POLL_MS)

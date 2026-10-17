@@ -109,7 +109,7 @@ describe('DailyStream', () => {
     await act(async () => {
       await clock.advance(2 * 60 * 1000)
     })
-    await act(async () => {
+    await act(() => {
       navigateToday()
     })
 
@@ -142,10 +142,10 @@ describe('DailyStream', () => {
 
     // Simulated sleep: the wall clock jumps but no timer fires (DOM timers
     // run on a monotonic clock that pauses while the machine sleeps).
-    await act(async () => {
+    await act(() => {
       clock.setNow(new Date(2026, 5, 28, 9, 0, 0).getTime())
     })
-    await act(async () => {
+    await act(() => {
       navigateToday()
     })
 

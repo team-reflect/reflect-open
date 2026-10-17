@@ -21,7 +21,7 @@ const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
  * Render `ui` in the graph `/g` with reduced motion, so a swipe settles at once.
  */
 function mount(ui: ReactNode): Promise<InAppRenderResult<CoreServices>> {
-  const readSource = async (): Promise<string> => '# A\n'
+  const readSource = (): Promise<string> => Promise.resolve('# A\n')
   const app = createTestCoreServices({
     platform: createTestPlatformService({ reducedMotion: true }),
     noteDocuments: {
@@ -78,7 +78,7 @@ const mobileKey = queryKeys.index.mobileAllNotesWithSearch('/g', { text: '' })
 function CachedNoteList(): ReactElement {
   const { data } = useQuery<FilteredSearchHit[]>({
     queryKey: mobileKey,
-    queryFn: async () => [],
+    queryFn: () => [],
     enabled: false,
   })
   const hits = useNoteRows(data) ?? []

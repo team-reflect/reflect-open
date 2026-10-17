@@ -649,9 +649,7 @@ it('isolates a failed bookmark write from later page captures', async () => {
   const name = `${bookmark.id}.json`
   kit.captureInbox.add(name, JSON.stringify(bookmark), { modifiedMs: -1 })
   kit.addSpool(envelope())
-  const writeXPost = vi.fn(async () => {
-    throw new Error('Daily note busy')
-  })
+  const writeXPost = vi.fn(() => Promise.reject(new Error('Daily note busy')))
   const outcome = await kit.drain({ writeXPost })
   expect(outcome.drained).toBe(1)
   expect(outcome.invalid).toBe(0)

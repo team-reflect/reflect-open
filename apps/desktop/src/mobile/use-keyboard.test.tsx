@@ -13,7 +13,7 @@ import { useKeyboardHeightVar, useKeyboardVisible } from './use-keyboard.ts'
  * subscribe through {@link useKeyboardVisible}.
  */
 describe('keyboard height', () => {
-  it('starts closed and reflects the last published height', async () => {
+  it('starts closed and reflects the last published height', () => {
     const { keyboard } = createTestAppServices()
     expect(keyboard.getHeight()).toBe(0)
     keyboard.publish(316)

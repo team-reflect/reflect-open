@@ -12,11 +12,13 @@ class TestClipboardServiceImpl implements TestClipboardService {
   readonly #written: string[] = []
   #failure: { error: unknown } | null = null
 
-  async writeText(text: string): Promise<void> {
-    if (this.#failure !== null) {
-      throw this.#failure.error
-    }
-    this.#written.push(text)
+  writeText(text: string): Promise<void> {
+    return Promise.try(() => {
+      if (this.#failure !== null) {
+        throw this.#failure.error
+      }
+      this.#written.push(text)
+    })
   }
 
   writes(): readonly string[] {

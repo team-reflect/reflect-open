@@ -64,7 +64,7 @@ function refetches(): number {
 }
 
 beforeEach(() => {
-  getProducts = async () => PRODUCTS
+  getProducts = () => Promise.resolve(PRODUCTS)
   purchase = async () => {}
   sync = async () => {}
   redeem = async () => {}
@@ -113,7 +113,7 @@ beforeEach(() => {
 
 describe('PaywallScreen products', () => {
   it('shows the existing failure UI when a required product is missing', async () => {
-    getProducts = async () => [YEARLY_PRODUCT]
+    getProducts = () => Promise.resolve([YEARLY_PRODUCT])
     const view = await mount()
 
     await expect.element(view.getByText(/Could not load subscription options/)).toBeVisible()
@@ -397,7 +397,7 @@ describe('PaywallScreen Reflect Classic verification', () => {
 
   it('offers a different account in a private session when not eligible', async () => {
     classicAccess.setSignIn(
-      afterSheet(async () => ({ kind: 'not-eligible', email: 'a@example.com' })),
+      afterSheet(() => Promise.resolve({ kind: 'not-eligible', email: 'a@example.com' })),
     )
     const view = await openSignIn()
 

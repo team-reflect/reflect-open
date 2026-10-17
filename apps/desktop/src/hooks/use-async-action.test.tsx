@@ -27,9 +27,7 @@ describe('useAsyncAction', () => {
     const { result } = await renderHook(() => useAsyncAction())
 
     await act(async () => {
-      await result.current.run(async () => {
-        throw new AppError('auth', 'token rejected')
-      })
+      await result.current.run(() => Promise.reject(new AppError('auth', 'token rejected')))
     })
     expect(result.current.error).toBe('token rejected')
     expect(result.current.pending).toBe(false)

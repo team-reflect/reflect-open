@@ -75,10 +75,8 @@ describe('createFileChangeService', () => {
     const logger = createTestLoggerService()
     const ipc = createIpcBridgeService({
       transport: {
-        invoke: async () => null,
-        listen: async () => {
-          throw new Error('no transport')
-        },
+        invoke: () => Promise.resolve(null),
+        listen: () => Promise.reject(new Error('no transport')),
       },
       logger,
     })
@@ -210,7 +208,7 @@ describe('createFileChangeService', () => {
 })
 
 describe('FileChangeService.subscribe', () => {
-  it('delivers locally emitted batches (sync merges) like watcher events', async () => {
+  it('delivers locally emitted batches (sync merges) like watcher events', () => {
     const { fileChanges } = setup()
     const received: FileChange[][] = []
     const unlisten = fileChanges.subscribe(({ changes }) => {
@@ -227,7 +225,7 @@ describe('FileChangeService.subscribe', () => {
     unlisten()
   })
 
-  it('stops local delivery after unlisten', async () => {
+  it('stops local delivery after unlisten', () => {
     const { fileChanges } = setup()
     const received: FileChange[][] = []
     const unlisten = fileChanges.subscribe(({ changes }) => {

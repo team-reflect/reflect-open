@@ -18,11 +18,13 @@ function paths(database: TestDatabaseService): Promise<readonly string[]> {
 
 function setup() {
   const backends: TestDatabaseService[] = []
-  const database = createLazyTestDatabaseService(async () => {
-    const backend = createTestDatabaseService()
-    backends.push(backend)
-    return backend
-  })
+  const database = createLazyTestDatabaseService(() =>
+    Promise.try(() => {
+      const backend = createTestDatabaseService()
+      backends.push(backend)
+      return backend
+    }),
+  )
   return { database, backends }
 }
 
@@ -81,7 +83,7 @@ describe('setTestDatabaseOpener', () => {
   it('backs `createTestDatabaseService` with the installed opener until it is removed', async () => {
     const backend = createTestDatabaseService()
     seedNotes(backend, [{ path: 'notes/backend.md', markdown: '# Backend\n' }])
-    setTestDatabaseOpener(async () => backend)
+    setTestDatabaseOpener(() => Promise.resolve(backend))
 
     await expect(paths(createTestDatabaseService())).resolves.toEqual(['notes/backend.md'])
 

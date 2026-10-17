@@ -164,10 +164,12 @@ describe('NoteEditor wiki-link chips', () => {
 
 describe('NoteEditor link preview', () => {
   it('forwards host-resolved metadata to the link popup', async () => {
-    const resolveLinkPreview = vi.fn(async () => ({
-      title: 'Example Domain',
-      description: 'An example description.',
-    }))
+    const resolveLinkPreview = vi.fn(() =>
+      Promise.resolve({
+        title: 'Example Domain',
+        description: 'An example description.',
+      }),
+    )
     // Park the mouse first, for the same reason as the wiki-link hover card.
     await unhover()
     await render(
@@ -583,7 +585,7 @@ describe('NoteEditor file pills', () => {
 describe('NoteEditor file paste', () => {
   it('persists a pasted file through saveFile and inserts its destination', async () => {
     const handleRef = createRef<NoteEditorHandle>()
-    const saveFile = vi.fn(async () => 'assets/report.pdf')
+    const saveFile = vi.fn(() => Promise.resolve('assets/report.pdf'))
     await render(
       <NoteEditor
         initialContent=""
@@ -604,7 +606,7 @@ describe('NoteEditor file paste', () => {
 
   it('declines the paste when saveFile returns null', async () => {
     const handleRef = createRef<NoteEditorHandle>()
-    const saveFile = vi.fn(async () => null)
+    const saveFile = vi.fn(() => Promise.resolve(null))
     await render(<NoteEditor initialContent="" handleRef={handleRef} saveFile={saveFile} />)
     await expect.element(pmRoot).toBeInTheDocument()
 

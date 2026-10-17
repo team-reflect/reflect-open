@@ -215,13 +215,13 @@ describe('EmbedMediaService.resolveYouTubeVideo', () => {
     const logger = createTestLoggerService()
     const clock = createTestClockService()
     const webFetch = createTestWebFetchService()
-    vi.spyOn(webFetch, 'fetchOembed').mockImplementation(async (url) => {
+    vi.spyOn(webFetch, 'fetchOembed').mockImplementation((url) => {
       requests.push(url)
       const answer = answers.shift() ?? new Error('no oEmbed answer left')
       if (answer instanceof Error) {
-        throw answer
+        return Promise.reject(answer)
       }
-      return answer
+      return Promise.resolve(answer)
     })
     const embedMedia = createTestEmbedMedia({
       webFetch,

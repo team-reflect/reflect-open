@@ -116,9 +116,11 @@ class TestAttachmentServiceImpl implements TestAttachmentService {
     return this.#openGeneration() === null ? null : this.#catalog
   }
 
-  async loadCatalog(): Promise<AttachmentCatalog> {
-    requireGraphSession(this.#graphSession)
-    return this.#catalog
+  loadCatalog(): Promise<AttachmentCatalog> {
+    return Promise.try(() => {
+      requireGraphSession(this.#graphSession)
+      return this.#catalog
+    })
   }
 
   watchCatalog(): Unlisten {
@@ -157,17 +159,19 @@ class TestAttachmentServiceImpl implements TestAttachmentService {
     return this.#resolveImageUrl(notePath, source, this.#openGeneration())
   }
 
-  async resolvePreviewImageUrl(
+  resolvePreviewImageUrl(
     notePath: string,
     source: string,
     generation: number,
   ): Promise<string | undefined> {
-    const path = this.#resolveAttachmentPath(notePath, source, generation)
-    if (path === null || path.toLowerCase().endsWith('.svg')) {
-      return
-    }
-    const url = this.#resolveImageUrl(notePath, source, generation)
-    return url === undefined ? undefined : `${url}?reflect-preview=raster`
+    return Promise.try(() => {
+      const path = this.#resolveAttachmentPath(notePath, source, generation)
+      if (path === null || path.toLowerCase().endsWith('.svg')) {
+        return
+      }
+      const url = this.#resolveImageUrl(notePath, source, generation)
+      return url === undefined ? undefined : `${url}?reflect-preview=raster`
+    })
   }
 
   resolveWikiEmbed(target: string): WikiEmbedDisplay | undefined {
@@ -178,44 +182,50 @@ class TestAttachmentServiceImpl implements TestAttachmentService {
     return isManagedAssetPath(href) || resolveAttachmentLink(notePath, href, null) !== null
   }
 
-  async resolveFileInfo(notePath: string, href: string): Promise<{ size: number } | undefined> {
-    const path = this.#resolveAttachmentPath(notePath, href, this.#openGeneration())
-    const size = path === null ? undefined : this.#catalog.size(path)
-    return size === undefined ? undefined : { size }
+  resolveFileInfo(notePath: string, href: string): Promise<{ size: number } | undefined> {
+    return Promise.try(() => {
+      const path = this.#resolveAttachmentPath(notePath, href, this.#openGeneration())
+      const size = path === null ? undefined : this.#catalog.size(path)
+      return size === undefined ? undefined : { size }
+    })
   }
 
-  async saveFile(file: File): Promise<AssetSaveResult | null> {
-    const generation = this.#openGeneration()
-    if (generation === null) {
-      return null
-    }
-    if (this.#saveFailure !== null) {
-      return { ok: false, error: this.#saveFailure }
-    }
-    const path = `assets/${assetFileName(file.name)}`
-    this.#saveLog.push({ name: file.name, type: file.type, size: file.size, generation, path })
-    return { ok: true, path }
+  saveFile(file: File): Promise<AssetSaveResult | null> {
+    return Promise.try(() => {
+      const generation = this.#openGeneration()
+      if (generation === null) {
+        return null
+      }
+      if (this.#saveFailure !== null) {
+        return { ok: false, error: this.#saveFailure }
+      }
+      const path = `assets/${assetFileName(file.name)}`
+      this.#saveLog.push({ name: file.name, type: file.type, size: file.size, generation, path })
+      return { ok: true, path }
+    })
   }
 
   createSaveScope(): AttachmentSaveScope {
     return createAttachmentSaveScope({ save: (file) => this.saveFile(file) })
   }
 
-  async attachFilesToNote(request: AttachFilesRequest): Promise<void> {
+  attachFilesToNote(request: AttachFilesRequest): Promise<void> {
     if (this.#openGeneration() !== null) {
       this.#attachLog.push(request)
     }
+    return Promise.resolve()
   }
 
-  async openOrReveal(path: string): Promise<void> {
+  openOrReveal(path: string): Promise<void> {
     if (this.#openGeneration() === null) {
-      return
+      return Promise.resolve()
     }
     if (this.#options?.refuseOpen === true) {
       this.#revealLog.push(path)
     } else {
       this.#openLog.push(path)
     }
+    return Promise.resolve()
   }
 
   setCatalog(entries: readonly TestAttachmentEntry[]): void {
