@@ -104,13 +104,7 @@ class NativeActionServiceImpl implements NativeActionService {
         // Confirmation is about delivery, not success — a mic-denied start
         // still confirms, or the queue would re-surface the same failure
         // every launch.
-        confirmTimer = clock.setTimeout(async () => {
-          try {
-            await audioRecorder.actionPerformed()
-          } catch (cause: unknown) {
-            logger.warn('confirming a native action failed:', cause)
-          }
-        }, ACTION_CONFIRM_DELAY_MS)
+        confirmTimer = clock.setTimeout(this.#confirmNativeAction, ACTION_CONFIRM_DELAY_MS)
       })
       try {
         await audioRecorder.actionsReady({ signal: stopped.signal })
@@ -125,6 +119,15 @@ class NativeActionServiceImpl implements NativeActionService {
         clock.clearTimeout(confirmTimer)
       }
       unlisten?.()
+    }
+  }
+
+  readonly #confirmNativeAction = async (): Promise<void> => {
+    const { audioRecorder, logger } = this.#deps
+    try {
+      await audioRecorder.actionPerformed()
+    } catch (cause: unknown) {
+      logger.warn('confirming a native action failed:', cause)
     }
   }
 }

@@ -58,14 +58,7 @@ class OpenerServiceImpl implements OpenerService {
   }
 
   openUrlSync(url: string): void {
-    const { transport, logger } = this.#deps
-    void (async () => {
-      try {
-        await transport.openUrl(url)
-      } catch (cause: unknown) {
-        logger.error(`failed to open ${url}:`, errorMessage(cause))
-      }
-    })()
+    void this.#tryOpenUrl(url)
   }
 
   async revealInFileManager(path: string): Promise<void> {
@@ -74,6 +67,15 @@ class OpenerServiceImpl implements OpenerService {
 
   openSystemSettings(pane: SystemSettingsPane): void {
     this.openUrlSync(SYSTEM_SETTINGS_URLS[pane])
+  }
+
+  async #tryOpenUrl(url: string): Promise<void> {
+    const { transport, logger } = this.#deps
+    try {
+      await transport.openUrl(url)
+    } catch (cause: unknown) {
+      logger.error(`failed to open ${url}:`, errorMessage(cause))
+    }
   }
 }
 

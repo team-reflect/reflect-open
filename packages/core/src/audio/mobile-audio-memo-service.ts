@@ -347,15 +347,6 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
     }
   }
 
-  /** Cancels a recording that is still requesting permission; a failure is logged. */
-  async #cancelRecorder(): Promise<void> {
-    try {
-      await this.#deps.audioRecorder.cancel()
-    } catch (cause: unknown) {
-      this.#deps.logger.warn('cancelling a recording that was still starting failed:', cause)
-    }
-  }
-
   setDrawerOpen(open: boolean): void {
     const { audioRecorder } = this.#deps
     if (open) {
@@ -521,6 +512,15 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
       this.#hapticImpactLight()
     } catch (cause) {
       this.#pipeline.reportError(isMicDeniedError(cause) ? MIC_DENIED_REASON : errorMessage(cause))
+    }
+  }
+
+  /** Cancels a recording that is still requesting permission; a failure is logged. */
+  async #cancelRecorder(): Promise<void> {
+    try {
+      await this.#deps.audioRecorder.cancel()
+    } catch (cause: unknown) {
+      this.#deps.logger.warn('cancelling a recording that was still starting failed:', cause)
     }
   }
 

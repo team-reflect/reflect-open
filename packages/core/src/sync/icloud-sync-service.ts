@@ -252,7 +252,7 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
   }
 
   dispose(): void {
-    const { icloudNative, clock } = this.#deps
+    const { clock } = this.#deps
     const { metadataWatch } = this.#options
     this.#disposed = true
     if (this.#scanTimer !== null) {
@@ -263,9 +263,17 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
       disposeOne()
     }
     if (metadataWatch) {
-      void icloudNative.watchStop().catch(() => {
-        // Shutdown/switch race — the next start replaces the watch anyway.
-      })
+      void this.#stopWatch()
+    }
+  }
+
+  async #stopWatch(): Promise<void> {
+    const { icloudNative, logger } = this.#deps
+    try {
+      await icloudNative.watchStop()
+    } catch (err: unknown) {
+      // Shutdown/switch race: the next start replaces the watch anyway.
+      logger.warn('stopping the iCloud metadata watch failed:', err)
     }
   }
 
