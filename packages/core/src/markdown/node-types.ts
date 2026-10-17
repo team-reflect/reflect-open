@@ -34,23 +34,3 @@ interface TypedNode {
 export function headingLevelOf(node: TypedNode): number | null {
   return HEADING_LEVEL_BY_ID.get(node.type.id) ?? null
 }
-
-/** Is this an unordered (`-`/`+`/`*`) list? */
-export function isBulletList(node: TypedNode): boolean {
-  return node.type.id === LEZER_NODE_IDS.BulletList
-}
-
-/** Is this a list item — the direct child of a bullet or ordered list? */
-export function isListItem(node: TypedNode): boolean {
-  return node.type.id === LEZER_NODE_IDS.ListItem
-}
-
-/** Is this the `-`/`+`/`*`/`1.` marker that opens a list item? */
-export function isListMark(node: TypedNode): boolean {
-  return node.type.id === LEZER_NODE_IDS.ListMark
-}
-
-/** Is this a fenced (``` / ~~~) or an indented code block? */
-export function isCodeBlock(node: TypedNode): boolean {
-  return node.type.id === LEZER_NODE_IDS.FencedCode || node.type.id === LEZER_NODE_IDS.CodeBlock
-}

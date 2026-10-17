@@ -1,11 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import {
-  normalizeWikiTarget,
-  resolveWikiLink,
-  resolveWikiLinkAsync,
-  type AsyncWikiLookup,
-  type WikiLookup,
-} from './resolve.ts'
+import { describe, expect, it } from 'vitest'
+import { normalizeWikiTarget } from './resolve.ts'
 
 describe('normalizeWikiTarget', () => {
   it('trims and case-folds, flagging daily-date targets', () => {
@@ -29,86 +23,5 @@ describe('normalizeWikiTarget', () => {
     expect(normalizeWikiTarget('2026-13-01').date).toBeUndefined()
     expect(normalizeWikiTarget('2023-02-29').date).toBeUndefined() // not a leap year
     expect(normalizeWikiTarget('2026-00-10').date).toBeUndefined()
-  })
-})
-
-describe('resolveWikiLink', () => {
-  const lookup: WikiLookup = {
-    byDate: (date) => (date === '2026-06-09' ? 'daily/2026-06-09.md' : undefined),
-    byTitle: (key) => (key === 'project x' ? 'notes/project-x.md' : undefined),
-    byAlias: (key) => (key === 'pjx' ? 'notes/project-x.md' : undefined),
-  }
-
-  it('resolves by date, title, then alias', () => {
-    expect(resolveWikiLink('2026-06-09', lookup)).toEqual({
-      kind: 'resolved',
-      ref: 'daily/2026-06-09.md',
-    })
-    expect(resolveWikiLink('Project X', lookup)).toEqual({
-      kind: 'resolved',
-      ref: 'notes/project-x.md',
-    })
-    expect(resolveWikiLink('pjx', lookup)).toEqual({ kind: 'resolved', ref: 'notes/project-x.md' })
-  })
-
-  it('returns the original text when unresolved', () => {
-    expect(resolveWikiLink('Unknown Page', lookup)).toEqual({
-      kind: 'unresolved',
-      text: 'Unknown Page',
-    })
-  })
-})
-
-describe('resolveWikiLinkAsync', () => {
-  it('applies the same date → title → alias precedence', async () => {
-    const lookup: AsyncWikiLookup = {
-      byDate: async (date) => (date === '2026-06-09' ? 'daily/2026-06-09.md' : undefined),
-      byTitle: async (key) => (key === 'project x' ? 'notes/project-x.md' : undefined),
-      byAlias: async (key) => (key === 'pjx' ? 'notes/project-x.md' : undefined),
-    }
-    expect(await resolveWikiLinkAsync('2026-06-09', lookup)).toEqual({
-      kind: 'resolved',
-      ref: 'daily/2026-06-09.md',
-    })
-    expect(await resolveWikiLinkAsync('Project X', lookup)).toEqual({
-      kind: 'resolved',
-      ref: 'notes/project-x.md',
-    })
-    expect(await resolveWikiLinkAsync('pjx', lookup)).toEqual({
-      kind: 'resolved',
-      ref: 'notes/project-x.md',
-    })
-    expect(await resolveWikiLinkAsync('Unknown', lookup)).toEqual({
-      kind: 'unresolved',
-      text: 'Unknown',
-    })
-  })
-
-  it('short-circuits: a title hit never queries the alias lookup', async () => {
-    const byAlias = vi.fn(async () => undefined)
-    const lookup: AsyncWikiLookup = {
-      byDate: async () => undefined,
-      byTitle: async () => 'notes/hit.md',
-      byAlias,
-    }
-    expect(await resolveWikiLinkAsync('Anything', lookup)).toEqual({
-      kind: 'resolved',
-      ref: 'notes/hit.md',
-    })
-    expect(byAlias).not.toHaveBeenCalled()
-  })
-
-  it('skips the date lookup for a non-date target', async () => {
-    const byDate = vi.fn(async () => 'daily/should-not-be-used.md')
-    const lookup: AsyncWikiLookup = {
-      byDate,
-      byTitle: async () => undefined,
-      byAlias: async () => 'notes/alias.md',
-    }
-    expect(await resolveWikiLinkAsync('Some Title', lookup)).toEqual({
-      kind: 'resolved',
-      ref: 'notes/alias.md',
-    })
-    expect(byDate).not.toHaveBeenCalled()
   })
 })

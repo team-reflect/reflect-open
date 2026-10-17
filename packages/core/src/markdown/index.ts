@@ -29,10 +29,8 @@ export { parseBody } from './grammar.ts'
 export { parseNote, isTagName, hasAuthoredTitle } from './extract.ts'
 export {
   scanInlineWikiLinks,
-  scanInlineImages,
   scanInlineSegments,
   type InlineWikiLink,
-  type InlineImage,
   type InlineSegment,
 } from './scan.ts'
 export { appendBlock, wikiLinkSafe, setTaskDueDate, clearTaskDueDate } from './edit.ts'
@@ -46,13 +44,9 @@ export { subjectAliases } from './subject-aliases.ts'
 export {
   normalizeWikiTarget,
   resolved,
-  resolveWikiLink,
-  resolveWikiLinkAsync,
   unresolved,
   type NormalizedTarget,
   type Resolution,
-  type WikiLookup,
-  type AsyncWikiLookup,
 } from './resolve.ts'
 export { renderInlineText } from './inline-text.ts'
 export { compareTaskPaths, decodeTaskPath, encodeTaskPath, isSameTaskPath } from './task-path.ts'

@@ -1,10 +1,6 @@
 /**
  * Wiki-link resolution model (Plan 03) — the **rules**, not the data. This layer
- * is pure: callers that do not have the index's canonical `note_keys` mapping
- * can inject their own title/alias/date lookups without depending on a database.
- *
- * Note identity in the first wave is the file path; an injected lookup may
- * return whatever stable ref its caller uses.
+ * is pure and does not depend on a database.
  */
 
 import { isCalendarDate } from '@reflect/utils'
@@ -47,55 +43,4 @@ export function resolved(ref: string): Resolution {
 
 export function unresolved(text: string): Resolution {
   return { kind: 'unresolved', text }
-}
-
-/**
- * Injected lookup the index (Plan 04) implements. Each returns a note `ref`
- * (id-or-path) or `undefined`. Keys are the case-folded {@link NormalizedTarget.key};
- * `byDate` takes a `YYYY-MM-DD` string.
- */
-export interface WikiLookup {
-  byDate(date: string): string | undefined
-  byTitle(key: string): string | undefined
-  byAlias(key: string): string | undefined
-}
-
-/**
- * Resolve a `[[target]]` to a note ref, preferring an explicit daily-date, then
- * a title match, then an alias match. Pure — see {@link WikiLookup}.
- */
-export function resolveWikiLink(target: string, lookup: WikiLookup): Resolution {
-  const normalized = normalizeWikiTarget(target)
-  const ref =
-    (normalized.date ? lookup.byDate(normalized.date) : undefined) ??
-    lookup.byTitle(normalized.key) ??
-    lookup.byAlias(normalized.key)
-  return ref ? resolved(ref) : unresolved(normalized.raw)
-}
-
-/**
- * Async counterpart of {@link WikiLookup} for callers whose injected lookups
- * require I/O; the resolution rules are otherwise identical.
- */
-export interface AsyncWikiLookup {
-  byDate(date: string): Promise<string | undefined>
-  byTitle(key: string): Promise<string | undefined>
-  byAlias(key: string): Promise<string | undefined>
-}
-
-/**
- * Resolve a `[[target]]` against an async lookup, with the same precedence as
- * {@link resolveWikiLink}: explicit daily-date, then title, then alias. The `??`
- * chain short-circuits, so a title hit means the alias lookup is never queried.
- */
-export async function resolveWikiLinkAsync(
-  target: string,
-  lookup: AsyncWikiLookup,
-): Promise<Resolution> {
-  const normalized = normalizeWikiTarget(target)
-  const ref =
-    (normalized.date ? await lookup.byDate(normalized.date) : undefined) ??
-    (await lookup.byTitle(normalized.key)) ??
-    (await lookup.byAlias(normalized.key))
-  return ref ? resolved(ref) : unresolved(normalized.raw)
 }

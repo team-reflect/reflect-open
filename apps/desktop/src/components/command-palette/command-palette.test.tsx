@@ -1,5 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
-import { formatBinding } from '@reflect/app'
+import { deepLinkForRoute, formatBinding } from '@reflect/app'
 import { createTestAppServices, createTestWindowService } from '@reflect/app/testing'
 import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,7 +17,6 @@ import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { CommandPalette } from './command-palette.tsx'
 import { PaletteProvider, usePalette } from './palette-provider.tsx'
-import { deepLinkForRoute } from '@/lib/deep-links/format.ts'
 
 // The palette runs on the real `PaletteSearchService` of the test app
 // services; each test scripts the index reads below it.

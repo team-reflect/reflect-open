@@ -24,7 +24,7 @@ import type { Route } from '@/routing/route.ts'
 import { UpdateProvider } from '@/providers/update-provider.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { deepLinkForRoute } from '@/lib/deep-links/format.ts'
+import { deepLinkForRoute } from '@reflect/app'
 import { Sidebar } from './sidebar.tsx'
 
 const openNativeContextMenu = vi.fn(async (options: NativeContextMenuOptions) => {

@@ -13,7 +13,7 @@ import { useRouter } from '@/routing/router.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { BacklinksPanel } from './backlinks-panel.tsx'
-import { deepLinkForRoute } from '@/lib/deep-links/format.ts'
+import { deepLinkForRoute } from '@reflect/app'
 
 // What the app's fakes answer; each test sets them before `renderPanel`.
 const getBacklinksWithContext = vi.fn()

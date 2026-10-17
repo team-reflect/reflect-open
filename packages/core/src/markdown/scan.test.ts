@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { scanInlineImages, scanInlineSegments, scanInlineWikiLinks } from './scan.ts'
+import { scanInlineSegments, scanInlineWikiLinks } from './scan.ts'
 
 describe('scanInlineWikiLinks', () => {
   it('finds plain and aliased links with display spans', () => {
@@ -34,23 +34,6 @@ describe('scanInlineWikiLinks', () => {
 
   it('returns [] quickly for text without brackets', () => {
     expect(scanInlineWikiLinks('no links here')).toEqual([])
-  })
-})
-
-describe('scanInlineImages', () => {
-  it('finds images with alt and src spans', () => {
-    const text = 'A pic ![screenshot](assets/shot.png) and ![](https://x.com/i.jpg "t").'
-    const images = scanInlineImages(text)
-    expect(images).toHaveLength(2)
-    expect(images[0]).toMatchObject({ alt: 'screenshot', src: 'assets/shot.png' })
-    expect(text.slice(images[0]!.from, images[0]!.to)).toBe('![screenshot](assets/shot.png)')
-    expect(images[1]).toMatchObject({ alt: '', src: 'https://x.com/i.jpg' })
-  })
-
-  it('respects code contexts and plain links', () => {
-    expect(scanInlineImages('code `![x](y.png)` stays literal')).toEqual([])
-    expect(scanInlineImages('a [link](not-an-image.png) only')).toEqual([])
-    expect(scanInlineImages('no images')).toEqual([])
   })
 })
 

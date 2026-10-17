@@ -52,7 +52,7 @@ export {
 export type { DateSuggestion, DateSuggestionContext } from './date-suggestion-types.ts'
 export { generateDateSuggestions } from './date-suggestions.ts'
 export { parseHighlights, HIGHLIGHT_START, HIGHLIGHT_END, type HighlightSegment } from './search.ts'
-export { lineAt, lineSnippet, previewSnippet } from './snippet.ts'
+export { previewSnippet } from './snippet.ts'
 export {
   blockContextAt,
   blockContextLinesAt,

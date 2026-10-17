@@ -15,7 +15,7 @@ import { MOD_KEY } from '@/test-utils/mod-key.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { TasksScreen } from './tasks-screen.tsx'
-import { deepLinkForRoute } from '@/lib/deep-links/format.ts'
+import { deepLinkForRoute } from '@reflect/app'
 
 vi.mock('@/editor/markdown-preview.tsx', () => ({
   MarkdownPreview: ({ content, className }: { content: string; className?: string }) => {

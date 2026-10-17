@@ -1,6 +1,7 @@
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import {
+  frontmatterPatchToYaml,
   isOstensiblyEmptyNoteSource,
   upsertFrontmatter,
   type IndexQueryService,
@@ -10,7 +11,6 @@ import {
 } from '@reflect/core'
 import { createTestCoreServices, createTestPlatformService } from '@reflect/core/testing'
 import { createTestOperationsService, type TestOperationsService } from '@reflect/app/testing'
-import { frontmatterPatchToYaml } from '@/editor/note-session.ts'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { NoteActionsSection } from './note-actions-section.tsx'
