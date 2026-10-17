@@ -13,6 +13,10 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: publish-linux
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -69,7 +73,7 @@ jobs:
           # The AppImage and the `.deb` are already compressed; zipping them
           # again wastes minutes for nothing.
           compression-level: 0
-          retention-days: 90
+          retention-days: 30
 
       # Uploads clobber, so a failed run can be retried.
       - name: Upload the assets to the draft release

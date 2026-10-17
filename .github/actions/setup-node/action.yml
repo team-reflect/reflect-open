@@ -1,4 +1,5 @@
 name: Set up Node.js and pnpm
+description: Installs Node.js, pnpm, and dependencies.
 
 runs:
   using: composite

@@ -2,7 +2,8 @@ name: Publish desktop release
 
 # Builds, uploads, and publishes one desktop release (macOS, Windows, Linux,
 # and TestFlight) for a tag created by release-please. Called once per channel
-# by release.yml.
+# by release.yml. Run it by hand to retry a release, or to publish a draft
+# release created without a Release PR.
 
 on:
   workflow_call:
@@ -13,6 +14,16 @@ on:
         required: true
       commit:
         description: Immutable commit targeted by the release tag
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The tag (v<version>) of the draft release to build and publish
+        type: string
+        required: true
+      commit:
+        description: Full SHA of the commit the release targets
         type: string
         required: true
 
@@ -65,8 +76,8 @@ jobs:
   finalize:
     name: Finalize the release
     needs: [macos, windows, linux]
-    if: github.repository == 'team-reflect/reflect-open'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     concurrency:
       group: publish-finalize
       cancel-in-progress: false
@@ -76,7 +87,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.commit }}
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node

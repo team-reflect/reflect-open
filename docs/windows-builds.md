@@ -21,7 +21,7 @@ To test a build that is not a release, use GitHub Actions:
 3. Download the `reflect-windows-x64` or `reflect-windows-arm64` artifact and
    unzip it. It contains the NSIS installer (`*-setup.exe`).
 
-Artifacts expire after 90 days.
+Artifacts expire after 30 days.
 
 ## What to expect
 

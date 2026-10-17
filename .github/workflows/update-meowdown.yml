@@ -27,6 +27,7 @@ jobs:
       - name: Update @meowdown/*
         run: |
           for i in $(seq 1 10); do
+            echo "Attempt $i of 10"
             pnpm up -r --latest '@meowdown/*'
             pnpm dedupe
             if ! git diff --quiet; then exit 0; fi

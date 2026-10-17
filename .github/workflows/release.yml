@@ -13,9 +13,9 @@ on:
   push:
     branches: [master]
 
-permissions:
-  contents: write
-  pull-requests: write
+# Each job grants only what it needs. The publish jobs must grant
+# `contents: write` explicitly: a called workflow cannot exceed its caller.
+permissions: {}
 
 concurrency:
   group: release
@@ -26,6 +26,10 @@ jobs:
     name: Maintain the Release PRs
     if: github.repository == 'team-reflect/reflect-open'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
     # The desktop package lives at the repo root ("."), so its outputs have
     # no path prefix. The channels never release from the same push:
     # a push merges at most one Release PR, and the two passes only create
@@ -75,6 +79,8 @@ jobs:
     name: Submit the Chrome extension
     needs: release-please
     if: needs.release-please.outputs.extension_created == 'true'
+    permissions:
+      contents: write
     uses: ./.github/workflows/publish-browser-extension.yml
     with:
       tag: ${{ needs.release-please.outputs.extension_tag }}
@@ -92,6 +98,8 @@ jobs:
     name: Publish the stable desktop release
     needs: release-please
     if: needs.release-please.outputs.stable_created == 'true'
+    permissions:
+      contents: write
     uses: ./.github/workflows/publish-desktop.yml
     with:
       tag: ${{ needs.release-please.outputs.stable_tag }}
@@ -102,6 +110,8 @@ jobs:
     name: Publish the beta desktop release
     needs: release-please
     if: needs.release-please.outputs.beta_created == 'true'
+    permissions:
+      contents: write
     uses: ./.github/workflows/publish-desktop.yml
     with:
       tag: ${{ needs.release-please.outputs.beta_tag }}

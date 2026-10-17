@@ -13,6 +13,10 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: publish-windows
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -67,7 +71,7 @@ jobs:
           # The NSIS installer is already lzma-compressed; zipping it again
           # wastes minutes for nothing.
           compression-level: 0
-          retention-days: 90
+          retention-days: 30
 
       # Uploads clobber, so a failed run can be retried.
       - name: Upload the assets to the draft release

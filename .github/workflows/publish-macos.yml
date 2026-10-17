@@ -45,22 +45,6 @@ jobs:
           ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
 
-      # The release is tagged v<version> from apps/desktop/package.json (the
-      # single version source; tauri.conf.json points at it). When called from
-      # release.yml, the tag it created must match the checked-out
-      # commit's version, or the assets would publish under the wrong name.
-      - name: Verify the release tag matches apps/desktop/package.json
-        env:
-          INPUT_TAG: ${{ inputs.tag }}
-        run: |
-          version="$(jq -r .version apps/desktop/package.json)"
-          tag="${INPUT_TAG:-v${version}}"
-          if [ "$tag" != "v${version}" ]; then
-            echo "::error::release tag ${tag} but apps/desktop/package.json says ${version} — run this workflow on the release commit"
-            exit 1
-          fi
-          echo "TAG=$tag" >> "$GITHUB_ENV"
-
       # Without the certificate, signing only fails at codesign time — after
       # the whole Rust build. Check every required secret up front instead.
       # docs/macos-distribution.md describes how to produce each one.
@@ -118,8 +102,23 @@ jobs:
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: pnpm release:macos --target=${{ matrix.target }} --artifact-dir="$RUNNER_TEMP/release-artifacts"
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reflect-macos-${{ matrix.target }}
+          path: ${{ runner.temp }}/release-artifacts/*
+          if-no-files-found: error
+          # The DMG and the updater archive are already compressed; zipping
+          # them again wastes minutes for nothing.
+          compression-level: 0
+          retention-days: 30
+
       # Uploads clobber, so a failed run can be retried.
       - name: Upload the assets to the draft release
+        if: inputs.tag != ''
+        working-directory: ${{ runner.temp }}/release-artifacts
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" "$RUNNER_TEMP/release-artifacts"/* --clobber
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" ./* --clobber

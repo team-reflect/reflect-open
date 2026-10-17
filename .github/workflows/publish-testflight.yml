@@ -108,7 +108,7 @@ jobs:
           name: reflect-ios-ipa-${{ steps.build_number.outputs.value }}
           path: apps/desktop/src-tauri/gen/apple/build/arm64/*.ipa
           if-no-files-found: ignore
-          retention-days: 90
+          retention-days: 30
 
       - name: Upload Xcode archive artifact
         if: always()
@@ -117,5 +117,5 @@ jobs:
           name: reflect-ios-xcarchive-${{ steps.build_number.outputs.value }}
           path: ${{ runner.temp }}/reflect-ios-xcarchive-${{ steps.build_number.outputs.value }}.zip
           if-no-files-found: ignore
-          retention-days: 90
+          retention-days: 30
           compression-level: 0

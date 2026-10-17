@@ -69,7 +69,7 @@ jobs:
   # Not part of `all-green`: a WebKit failure does not block merging.
   test-webkit:
     if: github.event_name != 'merge_group'
-    runs-on: macos-latest
+    runs-on: macos-26
     env:
       REFLECT_TEST_BROWSER: webkit
     steps:
