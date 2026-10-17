@@ -270,7 +270,7 @@ class BackupServiceImpl implements BackupService {
               const token = await githubAuth.getToken()
               return token === null ? null : githubCredential(token)
             }
-          : () => Promise.resolve(null)
+          : () => (null)
       const coexisting = isICloudRoot(this.#root)
       const next = syncEngines.create({
         generation: this.#generation,
@@ -419,7 +419,7 @@ class BackupServiceImpl implements BackupService {
     }
   }
 
-  #armProbe(engine: SyncEngine, getCredential: () => Promise<GitCredential | null>): void {
+  #armProbe(engine: SyncEngine, getCredential: () => MaybePromise<GitCredential | null>): void {
     this.#probeTimer = this.#deps.clock.setTimeout(() => {
       this.#probeTimer = null
       void this.#probe(engine, getCredential)
@@ -432,13 +432,14 @@ class BackupServiceImpl implements BackupService {
    */
   async #probe(
     engine: SyncEngine,
-    getCredential: () => Promise<GitCredential | null>,
+    getCredential: () => MaybePromise<GitCredential | null>,
   ): Promise<void> {
     const { git, activity, logger } = this.#deps
     const failed = this.#state.phase === 'connected' && this.#state.status.state === 'error'
     if (!activity.isHidden() && !failed) {
       try {
-        const tip = await git.remoteHead(await getCredential(), this.#generation)
+        const credential: GitCredential | null = await getCredential()
+        const tip = await git.remoteHead(credential, this.#generation)
         if (this.#engine !== engine) {
           return
         }
