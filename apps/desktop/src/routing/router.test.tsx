@@ -151,7 +151,7 @@ describe('router', () => {
     it('a move settling after the workspace unmounts is harmless', async () => {
       const { result, act, unmount, app } = await routerHook()
       await act(() => result.current.navigate({ kind: 'note', path: 'notes/01abc.md' }))
-      unmount()
+      await unmount()
 
       app.noteMove.followHealedMove('notes/01abc.md', 'notes/meeting-notes.md')
     })
