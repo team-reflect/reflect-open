@@ -223,7 +223,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
       }
       return false
     })
-    const toEmbed = chunks.filter((_, i) => !skip[i])
+    const toEmbed = chunks.filter((_, i) => skip[i] !== true)
     const vectors =
       toEmbed.length > 0
         ? await embeddingRuntime.embedTexts(toEmbed.map((chunk) => chunk.text))
@@ -239,7 +239,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
       modelId,
       // A non-skipped chunk always has a freshly-embedded vector: `vectors` is
       // exactly as long as the non-skipped chunks, consumed in order here.
-      vector: skip[i] ? null : vectors[vectorAt++]!,
+      vector: skip[i] === true ? null : vectors[vectorAt++]!,
     }))
     await this.#applyChunks(path, payload, generation)
     return toEmbed.length

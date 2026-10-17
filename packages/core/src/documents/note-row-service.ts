@@ -185,7 +185,7 @@ function mergeOverlay<Row extends object>(row: Row, overlay: NoteRowOverlay): Ro
   let merged: Row | null = null
   for (const key of ROW_KEYS) {
     const value = overlay[key]
-    if (value !== undefined && key in row && Reflect.get(row, key) !== value) {
+    if (value !== undefined && Object.hasOwn(row, key) && Reflect.get(row, key) !== value) {
       merged ??= { ...row }
       Reflect.set(merged, key, value)
     }
