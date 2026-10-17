@@ -12,13 +12,27 @@ on:
         description: Immutable commit targeted by the release tag.
         required: true
         type: string
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
+
+concurrency:
+  group: publish-linux
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   linux:
     name: Build Linux ${{ matrix.name }}
+    if: github.repository == 'team-reflect/reflect-open'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     strategy:
@@ -47,14 +61,7 @@ jobs:
         with:
           cache-key: ${{ matrix.target }}
 
-      # The updater key signs the packages for the in-app updater (minisign);
-      # it is not a code-signing certificate. Without the key (a PR from a
-      # fork) the build writes no signature. No Sentry secrets on purpose:
-      # without SENTRY_AUTH_TOKEN the Sentry vite plugin skips source-map
-      # upload, and without VITE_SENTRY_DSN the experimental build carries no
-      # telemetry.
       - name: Build Linux packages
-        shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -69,12 +76,11 @@ jobs:
           # The AppImage and the `.deb` are already compressed; zipping them
           # again wastes minutes for nothing.
           compression-level: 0
-          retention-days: 90
+          retention-days: 30
 
       # Uploads clobber, so a failed run can be retried.
       - name: Upload the assets to the draft release
         if: inputs.tag != ''
-        shell: bash
         working-directory: ${{ runner.temp }}/linux-artifacts
         env:
           GH_TOKEN: ${{ github.token }}

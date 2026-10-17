@@ -12,6 +12,33 @@ on:
         description: Immutable commit targeted by the release tag
         type: string
         required: true
+    secrets:
+      APPLE_SIGNING_IDENTITY:
+        required: true
+      APPLE_CERTIFICATE:
+        required: true
+      APPLE_CERTIFICATE_PASSWORD:
+        required: true
+      APPLE_API_KEY:
+        required: false
+      APPLE_API_ISSUER:
+        required: false
+      APPLE_API_KEY_CONTENT:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_PASSWORD:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+      SENTRY_AUTH_TOKEN:
+        required: true
+      SENTRY_DSN:
+        required: true
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: true
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
 
 concurrency:
   group: publish-macos
@@ -20,8 +47,13 @@ concurrency:
 permissions:
   contents: write
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   macos:
+    name: Build macOS ${{ matrix.name }}
     if: github.repository == 'team-reflect/reflect-open'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
@@ -29,11 +61,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Apple Silicon
+          - name: arm64
             runner: macos-26
             target: aarch64-apple-darwin
             rust-targets: aarch64-apple-darwin
-          - name: Universal
+          - name: universal
             runner: macos-26
             target: universal-apple-darwin
             rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
@@ -44,22 +76,6 @@ jobs:
           # older than the release. Build the verified immutable tag commit.
           ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
-
-      # The release is tagged v<version> from apps/desktop/package.json (the
-      # single version source; tauri.conf.json points at it). When called from
-      # release.yml, the tag it created must match the checked-out
-      # commit's version, or the assets would publish under the wrong name.
-      - name: Verify the release tag matches apps/desktop/package.json
-        env:
-          INPUT_TAG: ${{ inputs.tag }}
-        run: |
-          version="$(jq -r .version apps/desktop/package.json)"
-          tag="${INPUT_TAG:-v${version}}"
-          if [ "$tag" != "v${version}" ]; then
-            echo "::error::release tag ${tag} but apps/desktop/package.json says ${version} — run this workflow on the release commit"
-            exit 1
-          fi
-          echo "TAG=$tag" >> "$GITHUB_ENV"
 
       # Without the certificate, signing only fails at codesign time — after
       # the whole Rust build. Check every required secret up front instead.
@@ -96,7 +112,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           targets: ${{ matrix.rust-targets }}
-          cache-key: ${{ matrix.runner }}-${{ matrix.target }}
+          cache-key: ${{ matrix.target }}
 
       # Tauri signs the .app; the script then repairs sidecar signatures,
       # notarizes + staples the app and DMG, signs the updater archive, and
@@ -116,10 +132,25 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-        run: pnpm release:macos --target=${{ matrix.target }} --artifact-dir="$RUNNER_TEMP/release-artifacts"
+        run: pnpm release:macos --target=${{ matrix.target }} --artifact-dir="$RUNNER_TEMP/macos-artifacts"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reflect-macos-${{ matrix.name }}
+          path: ${{ runner.temp }}/macos-artifacts/*
+          if-no-files-found: error
+          # The DMG and the updater archive are already compressed; zipping
+          # them again wastes minutes for nothing.
+          compression-level: 0
+          retention-days: 30
 
       # Uploads clobber, so a failed run can be retried.
       - name: Upload the assets to the draft release
+        if: inputs.tag != ''
+        working-directory: ${{ runner.temp }}/macos-artifacts
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" "$RUNNER_TEMP/release-artifacts"/* --clobber
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" ./* --clobber

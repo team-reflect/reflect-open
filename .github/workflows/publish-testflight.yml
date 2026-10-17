@@ -22,6 +22,17 @@ on:
         required: false
         type: string
         default: app-store-connect
+    secrets:
+      APPLE_API_KEY:
+        required: true
+      APPLE_API_ISSUER:
+        required: true
+      APPLE_API_KEY_CONTENT:
+        required: true
+      SENTRY_AUTH_TOKEN:
+        required: true
+      SENTRY_DSN:
+        required: true
 
 concurrency:
   group: publish-testflight
@@ -32,7 +43,7 @@ permissions:
 
 jobs:
   testflight:
-    name: Build and upload iOS
+    name: Build iOS
     if: github.repository == 'team-reflect/reflect-open'
     runs-on: macos-26
     timeout-minutes: 120
@@ -66,6 +77,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           targets: aarch64-apple-ios
+          cache-key: aarch64-apple-ios
 
       - name: Resolve build number
         id: build_number
@@ -108,7 +120,7 @@ jobs:
           name: reflect-ios-ipa-${{ steps.build_number.outputs.value }}
           path: apps/desktop/src-tauri/gen/apple/build/arm64/*.ipa
           if-no-files-found: ignore
-          retention-days: 90
+          retention-days: 30
 
       - name: Upload Xcode archive artifact
         if: always()
@@ -117,5 +129,5 @@ jobs:
           name: reflect-ios-xcarchive-${{ steps.build_number.outputs.value }}
           path: ${{ runner.temp }}/reflect-ios-xcarchive-${{ steps.build_number.outputs.value }}.zip
           if-no-files-found: ignore
-          retention-days: 90
+          retention-days: 30
           compression-level: 0

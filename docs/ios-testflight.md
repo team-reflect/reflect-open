@@ -87,7 +87,7 @@ the upload flow.
 Use **Actions -> TestFlight -> Run workflow**. The workflow builds on
 `macos-26`, uploads the IPA to App Store Connect, and serializes runs so two
 uploads do not race each other. It keeps both the exported IPA and a
-metadata-preserving ZIP of the exact `.xcarchive` for 90 days. The archive holds
+metadata-preserving ZIP of the exact `.xcarchive` for 30 days. The archive holds
 the matching binaries and dSYMs needed to symbolicate an Apple `.ips` report
 that arrives later; the archive is packaged even when the run failed, so the
 evidence survives a release blocker.

@@ -9,7 +9,7 @@ pnpm release:macos                 # signed + notarized build for this Mac's arc
 
 The helper lives at `apps/desktop/scripts/release-macos.ts` and is exposed as
 `pnpm release:macos` from the repo root. It only builds. `publish-macos.yml` uploads the
-assets into the draft release, and `publish-finalize.yml` publishes it.
+assets into the draft release, and the finalize job in `publish-desktop.yml` publishes it.
 
 ## What you need
 
@@ -94,8 +94,8 @@ pnpm release:macos --artifact-dir=<dir>  # also copy the release assets to <dir>
 
 CI runs `--target=<triple> --artifact-dir=<dir>` once per macOS build and uploads the
 assets into the draft release. After the macOS, Windows, and Linux builds finish,
-`publish-finalize.yml` writes `latest.json`, publishes the release, and refreshes the
-moving beta downloads. It can be run again by hand for one tag without rebuilding.
+the finalize job in `publish-desktop.yml` writes `latest.json`, publishes the release,
+and refreshes the moving beta downloads. Re-running that job retries it without rebuilding.
 
 ## Cutting a release (Release PRs)
 
@@ -197,8 +197,8 @@ a new cycle is tagged without a number (`v0.6.0-beta`, then `-beta.1`, `-beta.2`
 
 For this exceptional recovery path, merge a PR that sets `version` in
 `apps/desktop/package.json` and create a draft release tagged `v<version>` at that
-commit. Run **Actions → Publish macOS → Run workflow** on that commit to build and upload
-the assets, then **Actions → Finalize release → Run workflow** with the tag. Afterwards,
+commit. Run **Actions → Publish desktop → Run workflow** with the tag and the full
+commit SHA to build every platform, upload the assets, and publish the release. Afterwards,
 sync that channel's manifest file with a follow-up PR so release-please continues from
 the right version.
 
@@ -217,8 +217,8 @@ for stable) because the release tag already identifies the version. That keeps
 `releases/latest/download/<asset>` stable across releases. Updater archives remain
 versioned because each manifest points at an immutable release payload.
 
-`publish-finalize.yml` runs once the macOS, Windows, and Linux builds have finished.
-The macOS and Windows builds have to succeed; a Linux failure does not block it. It runs `pnpm release:manifest --tag=<tag>`
+The finalize job in `publish-desktop.yml` runs once the macOS, Windows, and Linux builds have succeeded.
+All three builds have to succeed. It runs `pnpm release:manifest --tag=<tag>`
 (`apps/desktop/scripts/release-manifest.ts`), which downloads the `.sig` files from the
 release, writes `latest.json` with one entry per platform (`darwin-aarch64`,
 `darwin-x86_64`, plus `windows-x86_64`, `windows-aarch64`, `linux-x86_64-appimage`,
@@ -226,28 +226,28 @@ release, writes `latest.json` with one entry per platform (`darwin-aarch64`,
 exist), and uploads it. `darwin-x86_64` points at the universal archive. The updater
 picks its entry from the architecture it runs as, so a universal app on Apple Silicon
 reads `darwin-aarch64` and moves to the smaller Apple Silicon app at its first update.
-The workflow then appends the Mac download guide to the release notes, sets the
+The job then appends the Mac download guide to the release notes, sets the
 pre-release and latest flags, and undrafts the release as its last step on the tagged
 release. Nothing is visible to users, and `releases/latest` does not move, until then.
 Stable installs poll `releases/latest/download/latest.json`; beta installs poll
 `releases/download/updater-beta/latest.json`, a moving feed release that points at the
 newest published beta. A release without the manifest would stop existing installs
-from seeing any future updates, so a missing macOS signature fails the workflow.
+from seeing any future updates, so a missing macOS signature fails the job.
 
 ## Beta releases
 
 Between stable releases, `version` in `apps/desktop/package.json` carries a
-prerelease suffix (e.g. `0.7.0-beta.3`), and `publish-finalize.yml` turns that suffix
+prerelease suffix (e.g. `0.7.0-beta.3`), and the finalize job turns that suffix
 into a GitHub **pre-release** automatically. `releases/latest` ignores pre-releases, so
 stable installs never see a beta.
 
 Beta builds use the dedicated `updater-beta` release instead. After it publishes a beta,
-`publish-finalize.yml` replaces the `latest.json`, `Reflect.Beta_aarch64.dmg`, and
+the finalize job replaces the `latest.json`, `Reflect.Beta_aarch64.dmg`, and
 `Reflect.Beta_universal.dmg` assets of `updater-beta` with `--clobber`. The fixed DMG names
 give the README permanent fresh-install links, while the manifest still points installed
 apps at the immutable versioned updater archives. The DMGs are replaced before
-`latest.json`; if that step fails, run **Actions → Finalize release → Run workflow** with
-the tag to recover from the tagged release. The sync compares its source with the
+`latest.json`; if that step fails, re-run the finalize job from the Release workflow run
+to recover from the tagged release. The sync compares its source with the
 published beta releases: a same-version retry repairs partial uploads, while a retry for
 an older release becomes a no-op rather than rolling the channel back.
 
@@ -314,13 +314,13 @@ parallel:
 
 Each build job runs the same DMG notarization, Gatekeeper checks, and updater artifact
 signing as a local release, then uploads its assets into the draft release.
-`.github/workflows/publish-finalize.yml` then writes the combined `latest.json`, keeps
+The finalize job in `.github/workflows/publish-desktop.yml` then writes the combined `latest.json`, keeps
 the changelog body, appends the Mac download chooser that maps Apple Silicon to
 `Reflect_aarch64.dmg` and Universal to `Reflect_universal.dmg` (with `Reflect.Beta` names for
 beta releases), and undrafts the release. For a beta it then copies the DMGs and the
-manifest from the tagged release to `updater-beta`. Both workflows normally run via
-`workflow_call` from `.github/workflows/release.yml` when a Release PR merges, and both
-can be started by hand to retry.
+manifest from the tagged release to `updater-beta`. Both run inside
+`.github/workflows/publish-desktop.yml`, which `.github/workflows/release.yml` calls when a
+Release PR merges. Re-run the failed jobs from that run to retry.
 
 The script reads all signing material from environment variables (exporting them
 works for local releases too); the workflow wires them from repository Actions secrets of the same names. Create these

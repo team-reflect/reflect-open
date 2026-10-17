@@ -1,43 +1,143 @@
-name: Finalize release
+name: Publish desktop
 
-# Runs after every platform has uploaded its assets into the draft release:
-# writes latest.json, completes the release notes, and publishes the release.
-# Nothing is visible to users, and releases/latest does not move, until this
-# workflow undrafts the release as its last step on the tagged release.
+# Builds, uploads, and publishes one desktop release (macOS, Windows, Linux,
+# and TestFlight) for a tag created by release-please. Called once per channel
+# by release.yml. Run it by hand to retry a release, or to publish a draft
+# release created without a Release PR.
 
 on:
   workflow_call:
     inputs:
       tag:
-        description: The release tag (v<version>) to finalize
+        description: The release tag (v<version>) created by release-please
         type: string
         required: true
-  # Manual retry path, and the last step of a manual release.
+      commit:
+        description: Immutable commit targeted by the release tag
+        type: string
+        required: true
+    secrets:
+      APPLE_SIGNING_IDENTITY:
+        required: true
+      APPLE_CERTIFICATE:
+        required: true
+      APPLE_CERTIFICATE_PASSWORD:
+        required: true
+      APPLE_API_KEY:
+        required: true
+      APPLE_API_ISSUER:
+        required: true
+      APPLE_API_KEY_CONTENT:
+        required: true
+      APPLE_ID:
+        required: false
+      APPLE_PASSWORD:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+      SENTRY_AUTH_TOKEN:
+        required: true
+      SENTRY_DSN:
+        required: true
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: true
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
   workflow_dispatch:
     inputs:
       tag:
-        description: The release tag (v<version>) to finalize
+        description: The tag (v<version>) of the draft release to build and publish
         type: string
         required: true
-
-concurrency:
-  group: publish-finalize
-  cancel-in-progress: false
+      commit:
+        description: Full SHA of the commit the release targets
+        type: string
+        required: true
 
 permissions:
   contents: write
 
 jobs:
+  macos:
+    name: Build the macOS release
+    uses: ./.github/workflows/publish-macos.yml
+    with:
+      tag: ${{ inputs.tag }}
+      commit: ${{ inputs.commit }}
+    secrets:
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  windows:
+    name: Build the Windows installer
+    uses: ./.github/workflows/publish-windows.yml
+    with:
+      tag: ${{ inputs.tag }}
+      commit: ${{ inputs.commit }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  linux:
+    name: Build the Linux packages
+    uses: ./.github/workflows/publish-linux.yml
+    with:
+      tag: ${{ inputs.tag }}
+      commit: ${{ inputs.commit }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  # Every release also ships to TestFlight. iOS needs no version bump of its
+  # own: the marketing version follows apps/desktop/package.json with the
+  # prerelease suffix stripped, so beta and stable builds stack under the same
+  # version, told apart by the UTC-timestamp build number.
+  testflight:
+    name: Upload the release to TestFlight
+    uses: ./.github/workflows/publish-testflight.yml
+    with:
+      commit: ${{ inputs.commit }}
+    secrets:
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+
+  # The builds only fill the draft release. Publishing waits for the macOS,
+  # Windows, and Linux builds to succeed.
+  #
+  # This job writes latest.json, completes the release notes, and publishes
+  # the release. Nothing is visible to users, and releases/latest does not
+  # move, until it undrafts the release as its last step on the tagged
+  # release. To retry, re-run this job from the workflow run.
   finalize:
+    name: Finalize the release
+    needs: [macos, windows, linux]
     if: github.repository == 'team-reflect/reflect-open'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: publish-finalize
+      cancel-in-progress: false
     env:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ inputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.commit }}
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node
@@ -105,8 +205,8 @@ jobs:
           gh release edit "$TAG" "${flags[@]}"
 
       # Beta apps and the README download links read from the moving
-      # updater-beta release. A failed sync can be retried by running this
-      # workflow again: every step above gives the same result on a rerun.
+      # updater-beta release. A failed sync can be retried by re-running this
+      # job: every step above gives the same result on a rerun.
       - name: Sync beta downloads and updater feed
         if: steps.release.outputs.prerelease == 'true'
         working-directory: ${{ runner.temp }}

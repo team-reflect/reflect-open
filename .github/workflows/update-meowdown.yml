@@ -16,7 +16,7 @@ concurrency:
 jobs:
   update:
     if: github.repository == 'team-reflect/reflect-open'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,6 +27,7 @@ jobs:
       - name: Update @meowdown/*
         run: |
           for i in $(seq 1 10); do
+            echo "Attempt $i of 10"
             pnpm up -r --latest '@meowdown/*'
             pnpm dedupe
             if ! git diff --quiet; then exit 0; fi

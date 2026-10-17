@@ -12,13 +12,27 @@ on:
         description: Immutable commit targeted by the release tag.
         required: true
         type: string
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
+
+concurrency:
+  group: publish-windows
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   windows:
     name: Build Windows ${{ matrix.name }}
+    if: github.repository == 'team-reflect/reflect-open'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     strategy:
@@ -28,7 +42,7 @@ jobs:
         # target and no cross-compilation.
         include:
           - name: x64
-            runner: windows-latest
+            runner: windows-2025
             target: x86_64-pc-windows-msvc
           - name: arm64
             runner: windows-11-arm
@@ -45,14 +59,7 @@ jobs:
         with:
           cache-key: ${{ matrix.target }}
 
-      # The updater key signs the installer for the in-app updater (minisign);
-      # it is not a code-signing certificate. Without the key (a PR from a
-      # fork) the build writes no signature. No Sentry secrets on purpose:
-      # without SENTRY_AUTH_TOKEN the Sentry vite plugin skips source-map
-      # upload, and without VITE_SENTRY_DSN the experimental build carries no
-      # telemetry.
       - name: Build Windows installer
-        shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -67,12 +74,11 @@ jobs:
           # The NSIS installer is already lzma-compressed; zipping it again
           # wastes minutes for nothing.
           compression-level: 0
-          retention-days: 90
+          retention-days: 30
 
       # Uploads clobber, so a failed run can be retried.
       - name: Upload the assets to the draft release
         if: inputs.tag != ''
-        shell: bash
         working-directory: ${{ runner.temp }}/windows-artifacts
         env:
           GH_TOKEN: ${{ github.token }}
