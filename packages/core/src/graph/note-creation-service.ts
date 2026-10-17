@@ -8,6 +8,7 @@ import type {
 } from './note-link-resolver-service.ts'
 import { wikiNoteReference } from './note-reference.ts'
 import { isDaily, isTemplatePath, notePath } from './paths.ts'
+import { returnsNull, type MaybePromise } from '@reflect/utils'
 
 /**
  * The outcome of resolving an existing wiki target or safely creating it.
@@ -146,7 +147,7 @@ class NoteCreationServiceImpl implements NoteCreationService {
       slugForTitle(title),
       this.#newNoteSource(title, body),
       generation,
-      () => Promise.resolve(null),
+      () => null
     )
     return claimed.path
   }
@@ -207,7 +208,7 @@ class NoteCreationServiceImpl implements NoteCreationService {
     slug: string,
     source: string,
     generation: number,
-    onCollision: () => Promise<Resolution | null>,
+    onCollision: () => MaybePromise<Resolution | null>,
   ): Promise<{ kind: 'created'; path: string } | Resolution> {
     for (let ordinal = 1; ordinal <= MAX_CREATE_ATTEMPTS; ordinal += 1) {
       const path = notePath(ordinal === 1 ? slug : `${slug}-${ordinal}`)
