@@ -73,10 +73,10 @@ jobs:
     env:
       REFLECT_TEST_BROWSER: webkit
       # Suspected workaround, root cause unknown: WebContent sometimes
-      # segfaults in JavaScriptCore JIT code ("The webkit page crashed"),
-      # in Playwright WebKit builds 2359, 2370 and 2378. Turning off the JIT
-      # stopped the crashes in our runs. The `__XPC_` prefix passes the
-      # variable to the WebContent XPC service.
+      # segfaults in JavaScriptCore JIT code ("The webkit page crashed") in
+      # Playwright WebKit builds 2359, 2370 and 2378. Full browser test runs
+      # crashed about 1 in 8 times with the JIT and 0 in 15 without it. The
+      # `__XPC_` prefix passes the variable to the WebContent XPC service.
       __XPC_JSC_useJIT: '0'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
