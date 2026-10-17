@@ -157,11 +157,13 @@ describe('MediaLightbox mobile drag-to-dismiss', () => {
     })
     expect(backdrop!.style.opacity).toBe('0')
     expect(onClose).not.toHaveBeenCalled()
+    let transformOnClose: string | undefined
     onClose.mockImplementation(() => {
-      expect(image.style.transform).toBe('')
+      transformOnClose = image.style.transform
     })
 
     await vi.waitFor(() => expect(onClose).toHaveBeenCalledTimes(1), { timeout: 5_000 })
+    expect(transformOnClose).toBe('')
   })
 
   it('dismisses horizontally past the distance threshold', async () => {
