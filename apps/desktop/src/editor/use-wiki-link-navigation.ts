@@ -2,6 +2,8 @@ import { useCallback } from 'react'
 import { useLinkNavigationHost } from '@/hooks/use-link-navigation-host.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
 
+export type WikiLinkNavigation = (options: { target: string; openInNewWindow: boolean }) => void
+
 /**
  * Navigation for a clicked `[[wiki link]]`. Calendar-valid ISO dates preserve
  * ordinary resolution precedence, then open their lazy daily route on a miss.
@@ -24,15 +26,13 @@ import { useAppServices } from '@/services/services-provider.tsx'
  *
  * @returns a stable click handler for the editor's wiki-link extension.
  */
-export function useWikiLinkNavigation(options?: {
-  readOnly?: boolean
-}): (options: { target: string; openInNewWindow: boolean }) => void {
+export function useWikiLinkNavigation(options?: { readOnly?: boolean }): WikiLinkNavigation {
   const { linkNavigation } = useAppServices()
   const host = useLinkNavigationHost()
   const readOnly = options?.readOnly ?? false
 
   return useCallback(
-    ({ target, openInNewWindow }: { target: string; openInNewWindow: boolean }) => {
+    ({ target, openInNewWindow }) => {
       linkNavigation.followWikiLink({ target, openInNewWindow, readOnly }, host)
     },
     [host, linkNavigation, readOnly],

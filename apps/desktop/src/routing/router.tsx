@@ -14,6 +14,8 @@ import type { NavigateOptions } from '@reflect/app'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import type { Route } from './route.ts'
 
+export type RouterNavigate = (route: Route, options?: NavigateOptions) => void
+
 /**
  * The app router (Plan 06): the React face of core's `NavigationService`, a
  * history stack over typed {@link Route}s — no URL, no dependency. Mount it
@@ -42,7 +44,7 @@ interface RouterValue {
    * moves clear it, so it can never leak onto a later, unrelated arrival.
    */
   arrivalFocusEditor: boolean
-  navigate: (route: Route, options?: NavigateOptions) => void
+  navigate: RouterNavigate
   back: () => void
   forward: () => void
   canBack: boolean

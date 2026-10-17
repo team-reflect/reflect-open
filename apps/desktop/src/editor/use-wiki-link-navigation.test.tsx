@@ -1,4 +1,5 @@
-import type { MaybePromise } from '@reflect/utils'
+import { useRouter, type RouterNavigate } from '@/routing/router.tsx'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import {
   createTestAppServices,
   createTestOperationsService,
@@ -11,11 +12,10 @@ import {
   createTestLoggerService,
   type TestOpenGraph,
 } from '@reflect/core/testing'
+import type { MaybePromise } from '@reflect/utils'
+import { createRef, useLayoutEffect, type ReactNode, type RefObject } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ReactNode } from 'react'
-import { useRouter } from '@/routing/router.tsx'
-import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { useWikiLinkNavigation } from './use-wiki-link-navigation.ts'
+import { useWikiLinkNavigation, type WikiLinkNavigation } from './use-wiki-link-navigation.ts'
 
 const resolveWikiTarget = vi.fn()
 const resolveExistingWikiTarget = vi.fn()
@@ -24,12 +24,31 @@ const resolveOrCreateNoteWithTitle = vi.fn()
 const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 const logger = createTestLoggerService()
 
-let lastHandler: ((options: { target: string; openInNewWindow: boolean }) => void) | null = null
-let navigate: ReturnType<typeof useRouter>['navigate'] | null = null
+// TODO: remove lastHandler and navigate
+let lastHandler: (WikiLinkNavigation) | null = null
+let navigate: RouterNavigate | null = null
+
+const lastHandlerRef: RefObject<WikiLinkNavigation | null> = createRef()
+const navigateRef: RefObject<RouterNavigate | null> = createRef()
 
 function Host({ readOnly = false }: { readOnly?: boolean }): ReactNode {
-  lastHandler = useWikiLinkNavigation({ readOnly })
-  navigate = useRouter().navigate
+  const lastHandler = useWikiLinkNavigation({ readOnly })
+  const navigate = useRouter().navigate
+
+  useLayoutEffect(() => {
+    lastHandlerRef.current = lastHandler
+    return () => {
+      lastHandlerRef.current = null
+    }
+  }, [lastHandler,  ])
+
+  useLayoutEffect(() => {
+    navigateRef.current = navigate
+    return () => {
+      navigateRef.current = null
+    }
+  }, [navigate,  ])
+
   return null
 }
 
@@ -66,7 +85,8 @@ function renderWithLinkNavigation(ui: ReactNode, graph?: TestOpenGraph | null) {
   return renderInApp(ui, {
     app,
     appServices: { linkNavigation },
-    ...(graph === undefined ? {} : { graph }),
+    // TODO: 1. remove this TODO comment; 2. find all unnessary `...(xxxxProp === undefined ? {} : { xxxxProp })` and resolve them;
+    graph,
   })
 }
 
@@ -94,6 +114,8 @@ beforeEach(() => {
   resolveOrCreateNoteWithTitle.mockReset()
   lastHandler = null
   navigate = null
+  lastHandlerRef.current = null
+  navigateRef.current = null
 })
 
 describe('useWikiLinkNavigation', () => {
