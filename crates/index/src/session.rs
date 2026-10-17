@@ -140,8 +140,9 @@ impl IndexSession {
             Ok(conn) => conn,
             Err(err) => {
                 // A half-open session (writer bound, no reader) must not
-                // survive: drop the writer too so every later call reports
-                // `no_graph` instead of writing to an index nobody can read.
+                // survive: drop the writer too, so `current_generation` answers
+                // `None` and a write for the bumped generation reports
+                // `no_graph` instead of landing in an index nobody can read.
                 writer.conn = None;
                 return Err(err);
             }
