@@ -141,9 +141,7 @@ describe('extractEmailFields', () => {
     const spaces = ' '.repeat(50_000)
     expect(extractEmailFields(`- Email${spaces}x`)).toEqual([])
     expect(extractEmailFields(`- Email:${spaces}ada@example.com`)).toEqual(['ada@example.com'])
-    expect(extractEmailFields(`- Email:\n  -${spaces}ada@example.com`)).toEqual([
-      'ada@example.com',
-    ])
+    expect(extractEmailFields(`- Email:\n  -${spaces}ada@example.com`)).toEqual(['ada@example.com'])
   })
 
   it('yields nothing for a bullet with no parseable address', () => {
