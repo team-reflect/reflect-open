@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { UpdateService, UpdateState } from '@reflect/app'
 import type { LoggerService } from '@reflect/core'
 import { toast } from '@/components/ui/toast.tsx'
@@ -11,10 +12,15 @@ const NON_DISMISSIBLE_UPDATE_OPTIONS = {
   data: { dismissible: false },
 }
 
-function runToastAction(action: () => Promise<void>, logger: LoggerService): void {
-  void action().catch((error: unknown) => {
+async function runToastAction(
+  action: () => MaybePromise<void>,
+  logger: LoggerService,
+): Promise<void> {
+  try {
+    await action()
+  } catch (error: unknown) {
     logger.error('update toast action failed:', error)
-  })
+  }
 }
 
 function showUpdateToast(state: UpdateState, update: UpdateService, logger: LoggerService): void {
@@ -30,7 +36,7 @@ function showUpdateToast(state: UpdateState, update: UpdateService, logger: Logg
         ...NON_DISMISSIBLE_UPDATE_OPTIONS,
         actionProps: {
           children: 'Install',
-          onClick: () => runToastAction(() => update.install(), logger),
+          onClick: () => void runToastAction(() => update.install(), logger),
         },
       })
       break
@@ -57,7 +63,7 @@ function showUpdateToast(state: UpdateState, update: UpdateService, logger: Logg
         ...NON_DISMISSIBLE_UPDATE_OPTIONS,
         actionProps: {
           children: 'Restart',
-          onClick: () => runToastAction(() => update.restart(), logger),
+          onClick: () => void runToastAction(() => update.restart(), logger),
         },
       })
       break
@@ -71,7 +77,7 @@ function showUpdateToast(state: UpdateState, update: UpdateService, logger: Logg
           ...NON_DISMISSIBLE_UPDATE_OPTIONS,
           actionProps: {
             children: 'Retry install',
-            onClick: () => runToastAction(() => update.retryAction(), logger),
+            onClick: () => void runToastAction(() => update.retryAction(), logger),
           },
         })
       } else {
