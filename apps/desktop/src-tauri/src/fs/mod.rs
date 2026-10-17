@@ -675,3 +675,70 @@ mod asset_url_tests {
         assert!(url.as_str().contains("Reflect%20Cat%20Photo.png"));
     }
 }
+
+#[cfg(test)]
+mod graph_delete_race_tests {
+    use super::{note_write, GraphState};
+    use reflect_graph_io::{graph_lock_holders, invalidate_for_delete, with_graph_lock};
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+    use tauri::Manager;
+
+    /// The command-level half of the race: `note_write` must re-check its
+    /// generation under the graph lock, so a write that waited behind a graph
+    /// delete fails instead of recreating directories under the trashed root.
+    #[test]
+    fn a_note_write_queued_behind_graph_delete_fails_its_generation_check() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("graph");
+        std::fs::create_dir_all(root.join("notes")).unwrap();
+        let state = GraphState::default();
+        {
+            let mut inner = state.0.lock().unwrap();
+            inner.generation = 1;
+            inner.root = Some(root.clone());
+        }
+        let app = tauri::test::mock_builder()
+            .manage(state)
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock app");
+        let graph = app.state::<GraphState>().inner();
+        let handle = app.handle().clone();
+
+        std::thread::scope(|scope| {
+            let (locked_tx, locked_rx) = mpsc::channel();
+            let (release_tx, release_rx) = mpsc::channel::<()>();
+            let root = &root;
+            let deleter = scope.spawn(move || {
+                with_graph_lock(root, || {
+                    locked_tx.send(()).unwrap();
+                    release_rx.recv().unwrap();
+                    invalidate_for_delete(graph, 1)?;
+                    std::fs::remove_dir_all(root)?;
+                    Ok(())
+                })
+            });
+            locked_rx.recv().unwrap();
+            let writer = scope.spawn(move || {
+                note_write(
+                    "notes/late.md".to_string(),
+                    "# Late\n".to_string(),
+                    1,
+                    None,
+                    None,
+                    handle.state::<GraphState>(),
+                )
+            });
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while graph_lock_holders(root) < 2 {
+                assert!(Instant::now() < deadline, "the write never queued");
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            release_tx.send(()).unwrap();
+            deleter.join().unwrap().unwrap();
+            let error = writer.join().unwrap().unwrap_err();
+            assert!(error.message().contains("graph changed"), "{error:?}");
+        });
+        assert!(!root.exists());
+    }
+}

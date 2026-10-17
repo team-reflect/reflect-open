@@ -16,5 +16,7 @@ mod resolve;
 pub mod x_archive_store;
 
 pub use graph::*;
+#[cfg(any(test, feature = "test-support"))]
+pub use graph_lock::holders as graph_lock_holders;
 pub use graph_lock::with_graph_lock;
 pub use resolve::{ensure_relative, resolve};
