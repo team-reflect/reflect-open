@@ -1,5 +1,10 @@
 import type { MaybePromise } from '@reflect/utils'
-import type { Tool, TypedToolCall, TypedToolResult } from '@reflect/modules/ai'
+import type {
+  Tool,
+  ToolExecutionOptions,
+  TypedToolCall,
+  TypedToolResult,
+} from '@reflect/modules/ai'
 import { z } from 'zod'
 import type { RetrievalService, RetrieveOptions } from '../../embeddings/retrieval-service.ts'
 import type { AssetPrivacyService } from '../../assets/asset-privacy-service.ts'
@@ -304,16 +309,24 @@ function searchNotesDescription(semanticSearchEnabled: boolean): string {
 }
 
 /**
+ * A {@link Tool} whose `execute` always returns a promise, never a stream.
+ * The narrow signature comes first, so a call resolves to it.
+ */
+type PromiseTool<I, O> = {
+  execute: (input: I, options: ToolExecutionOptions<unknown>) => Promise<O>
+} & Tool<I, O>
+
+/**
  * The tool set type, for typed stream parts in the chat engine. Written out
  * (rather than inferred from {@link NoteToolsService.build}) so the declaration the
  * composite build emits only names types this package can import.
  */
 export type NoteTools = {
-  search_notes: Tool<z.infer<typeof searchNotesInput>, SearchNotesOutput>
-  list_recent_notes: Tool<z.infer<typeof listRecentNotesInput>, ListRecentNotesOutput>
-  list_daily_notes: Tool<z.infer<typeof listDailyNotesInput>, ListDailyNotesOutput>
-  read_notes: Tool<z.infer<typeof readNotesInput>, ReadNotesOutput>
-  read_assets: Tool<z.infer<typeof readAssetsInput>, ReadAssetsOutput>
+  search_notes: PromiseTool<z.infer<typeof searchNotesInput>, SearchNotesOutput>
+  list_recent_notes: PromiseTool<z.infer<typeof listRecentNotesInput>, ListRecentNotesOutput>
+  list_daily_notes: PromiseTool<z.infer<typeof listDailyNotesInput>, ListDailyNotesOutput>
+  read_notes: PromiseTool<z.infer<typeof readNotesInput>, ReadNotesOutput>
+  read_assets: PromiseTool<z.infer<typeof readAssetsInput>, ReadAssetsOutput>
 }
 
 /**
