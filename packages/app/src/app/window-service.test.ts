@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { Unlisten } from '@reflect/core'
+import { AppError, type Unlisten } from '@reflect/core'
 import {
   createTestIpcBridgeService,
   createTestLoggerService,
@@ -166,7 +166,7 @@ describe('createWindowService', () => {
     await settle()
 
     expect(logger.getErrors()).toEqual([
-      { message: 'index:written listener failed:', cause: new Error('denied') },
+      { message: 'index:written listener failed:', cause: new AppError('unknown', 'denied') },
     ])
   })
 

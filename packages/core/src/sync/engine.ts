@@ -1,6 +1,6 @@
 import type { MaybePromise } from '@reflect/utils'
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
-import { AppError, isAppError } from '../errors.ts'
+import { isAppError, toAppError } from '../errors.ts'
 import type {
   ChangedFile,
   GitCredential,
@@ -399,7 +399,7 @@ class SyncEngineImpl implements SyncEngine {
     try {
       await this.#options.onRemoteChanges?.(changes)
     } catch (error) {
-      throw new AppError("TODO_TYPE", "TODO_MESSAGE", { cause: error }) // FIXME
+      throw toAppError(error)
     }
   }
 
@@ -481,7 +481,10 @@ class SyncEngineImpl implements SyncEngine {
       }
       try {
         await this.#cycle(request, quiet, owesCommit, (changes) => {
-          remoteChangeTasks.push(this.#startRemoteChanges(changes))
+          const task = this.#startRemoteChanges(changes)
+          // Attach a handler now so an early rejection is never unhandled.
+          void task.catch(() => {})
+          remoteChangeTasks.push(task)
         })
         await this.#settleRemoteChanges(remoteChangeTasks)
         if (!quiet) {

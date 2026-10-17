@@ -333,11 +333,11 @@ export function createFanOut<T>(start?: (emit: (value: T) => void) => Unlisten):
 /**
  * Run an asynchronous subscription and return its teardown at once. The
  * teardown also cancels a registration that lands later; a failed
- * registration goes to `onError`.
+ * registration goes to `onError` as an {@link AppError}.
  */
 export function listenNow(
   register: () => MaybePromise<Unlisten>,
-  onError: (cause: unknown) => void,
+  onError: (cause: AppError) => void,
 ): Unlisten {
   let disposed = false
   let unlisten: Unlisten | null = null
@@ -357,7 +357,7 @@ export function listenNow(
     },
     (error: unknown) => {
       if (!disposed) {
-        onError(error)
+        onError(toAppError(error))
       }
     },
   )
