@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
-import { isDeviceFlowConfigured, type GithubUser } from '@reflect/core'
+import type { GithubUser } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
@@ -26,8 +26,8 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
 
 /**
  * The shared "sign in to GitHub" step (desktop's connect dialog and the
- * mobile connect drawer): the guided device flow when the GitHub App is
- * registered, fine-grained-PAT entry otherwise. Every path ends in a `GET /user` round-trip
+ * mobile connect drawer): the guided device flow, with fine-grained-PAT entry
+ * as the alternative. Every path ends in a `GET /user` round-trip
  * (`GithubAuthService.getSignedInUser`), so the step only completes with a credential
  * GitHub actually accepts — and the caller learns *who* signed in, which the
  * wizard uses to connect `owner/name` without ever asking for the owner.
@@ -38,9 +38,9 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
   const deviceFlow = useDeviceFlowAuth()
   const pat = useAsyncAction()
   const [patValue, setPatValue] = useState('')
-  // The device flow leads when the app is registered; the PAT path stays one
-  // click away (some users prefer a scoped token; GHES needs it).
-  const [usePat, setUsePat] = useState(!isDeviceFlowConfigured())
+  // The device flow leads; the PAT path stays one click away (some users
+  // prefer a scoped token; GHES needs it).
+  const [usePat, setUsePat] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   /** Opening the browser failed — show the URL, the only way left to get there. */
   const [openFailed, setOpenFailed] = useState(false)
@@ -188,15 +188,13 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
             <Button onClick={() => void savePat()} disabled={pat.pending} size="sm">
               {pat.pending ? 'Checking…' : 'Save token'}
             </Button>
-            {isDeviceFlowConfigured() ? (
-              <button
-                type="button"
-                className="text-left text-xs text-text-muted underline"
-                onClick={() => setUsePat(false)}
-              >
-                Sign in with GitHub instead
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className="text-left text-xs text-text-muted underline"
+              onClick={() => setUsePat(false)}
+            >
+              Sign in with GitHub instead
+            </button>
           </>
         )
       ) : (

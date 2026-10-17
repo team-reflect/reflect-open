@@ -32,13 +32,6 @@ export function githubAppInstallUrl(): string {
 }
 
 /**
- * Whether the guided device flow is available (a GitHub App is registered).
- */
-export function isDeviceFlowConfigured(): boolean {
-  return GITHUB_APP_CLIENT_ID.length > 0
-}
-
-/**
  * The keychain entry holding the GitHub credential (one per machine).
  */
 export const GITHUB_AUTH_SECRET = 'github-auth'

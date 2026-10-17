@@ -21,8 +21,8 @@ import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { GithubAuthStep } from './github-auth-step.tsx'
 
-// The Reflect GitHub App is registered, so the device flow leads and the PAT
-// path sits behind a "use a personal access token instead" toggle. The
+// The device flow leads and the PAT path sits behind a "use a personal access
+// token instead" toggle. The
 // keychain is the in-memory secret store; GET /user (instant token validation) goes
 // through the fake HTTP service. The device-flow tests script the app's
 // GithubAuthService's runDeviceFlow (polling policy is unit-tested in core)

@@ -367,12 +367,7 @@ export {
 } from './link-preview/link-preview-service.ts'
 export { parseLinkPreviewMeta } from './link-preview/metadata.ts'
 export { cloudSafeLinkHref, notePrivate } from './privacy/checkers.ts'
-export {
-  isDeviceFlowConfigured,
-  suggestRepoName,
-  type GithubAuth,
-  type GithubUser,
-} from './sync/index.ts'
+export { suggestRepoName, type GithubAuth, type GithubUser } from './sync/index.ts'
 export {
   isPinned,
   pinnedOrder,

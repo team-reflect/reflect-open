@@ -25,7 +25,6 @@ export {
   GITHUB_APP_SLUG,
   GITHUB_AUTH_SECRET,
   githubAppInstallUrl,
-  isDeviceFlowConfigured,
   githubAuthSchema,
   githubCredential,
   type GithubAuth,
