@@ -342,7 +342,6 @@ export default defineESLintConfig(
       '@eslint-react/set-state-in-effect': 'off',
       '@eslint-react/use-state': 'off',
       '@typescript-eslint/no-base-to-string': 'off',
-      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       'no-var': 'off',
       'react-hooks/exhaustive-deps': 'off',
