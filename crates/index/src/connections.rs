@@ -5,6 +5,8 @@
 //! A host that cannot open files itself implements [`IndexConnections`] over
 //! whatever connection it owns.
 
+#![cfg(any(feature = "native", test))]
+
 use std::path::Path;
 
 use rusqlite::Connection;
@@ -13,18 +15,15 @@ use reflect_types::{AppError, AppResult};
 
 use crate::session::IndexConnections;
 
-#[cfg(any(feature = "native", test))]
 fn map_err(err: reflect_index_schema::SchemaError) -> AppError {
     AppError::io(err.to_string())
 }
 
 /// The file-backed connections: a migrated writer under WAL plus a second,
 /// read-only connection for queries.
-#[cfg(feature = "native")]
 #[derive(Debug, Default)]
 pub struct FileIndexConnections;
 
-#[cfg(feature = "native")]
 impl IndexConnections for FileIndexConnections {
     fn open_writer(&self, root: &Path) -> AppResult<Connection> {
         reflect_index_schema::open_index_at(root).map_err(map_err)
