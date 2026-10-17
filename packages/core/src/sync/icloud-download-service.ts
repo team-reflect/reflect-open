@@ -161,7 +161,7 @@ class ICloudDownloadServiceImpl implements ICloudDownloadService {
       return
     }
     const delayMs = Math.min(PENDING_POLL_MS * 2 ** attempt, PENDING_POLL_MAX_MS)
-    this.#retryTimer = clock.setTimeout(() => {
+    this.#retryTimer = clock.setTimeout(async () => {
       this.#retryTimer = null
       if (this.#disposed) {
         return
@@ -175,36 +175,34 @@ class ICloudDownloadServiceImpl implements ICloudDownloadService {
         this.#lastRefreshAt = 0
         return
       }
-      void (async () => {
-        let pending: number
-        try {
-          pending = await icloudNative.pendingCount(root, 'notes')
-        } catch (err: unknown) {
-          logger.error('iCloud pending poll failed:', errorMessage(err))
-          if (!this.#disposed) {
-            refreshIndex()
-          }
-          return
-        }
-        if (this.#disposed) {
-          return
-        }
-        if (pending === 0) {
-          // The notes landed — one reconcile picks the batch up
-          // together, and the deferred bulk (assets) may start.
+      let pending: number
+      try {
+        pending = await icloudNative.pendingCount(root, 'notes')
+      } catch (err: unknown) {
+        logger.error('iCloud pending poll failed:', errorMessage(err))
+        if (!this.#disposed) {
           refreshIndex()
-          void this.#requestRemainingDownloads()
-          return
         }
-        if (clock.now() - startedAt >= PENDING_POLL_LIMIT_MS) {
-          // Done waiting (a slow link): index what landed. The asset
-          // request stays deferred — it would compete with the notes
-          // still downloading; the next resume retries the sequence.
-          refreshIndex()
-          return
-        }
-        this.#pollPending(startedAt, attempt + 1)
-      })()
+        return
+      }
+      if (this.#disposed) {
+        return
+      }
+      if (pending === 0) {
+        // The notes landed — one reconcile picks the batch up
+        // together, and the deferred bulk (assets) may start.
+        refreshIndex()
+        await this.#requestRemainingDownloads()
+        return
+      }
+      if (clock.now() - startedAt >= PENDING_POLL_LIMIT_MS) {
+        // Done waiting (a slow link): index what landed. The asset
+        // request stays deferred — it would compete with the notes
+        // still downloading; the next resume retries the sequence.
+        refreshIndex()
+        return
+      }
+      this.#pollPending(startedAt, attempt + 1)
     }, delayMs)
   }
 
@@ -232,7 +230,7 @@ class ICloudDownloadServiceImpl implements ICloudDownloadService {
       // A confirmed-empty note count — never a failed nudge, which would
       // start the bulk while notes may still be pending. The next resume
       // retries the whole sequence.
-      void this.#requestRemainingDownloads()
+      await this.#requestRemainingDownloads()
     }
   }
 }
