@@ -34,7 +34,7 @@ import { useServiceState } from '@/services/use-service-state.ts'
 
 export type { AudioMemoPhase }
 
-type AudioMemoContextValue = AudioMemoSessionState &
+export type AudioMemoContextValue = AudioMemoSessionState &
   Pick<AudioMemoSession, 'cancel' | 'retry' | 'discard'> & {
     /**
      * Idle → start recording (expanding a collapsed sidebar); recording → stop & save.

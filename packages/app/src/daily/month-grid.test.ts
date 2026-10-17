@@ -100,7 +100,7 @@ describe('buildMonthGrid', () => {
     const DAY_MILLIS = 86_400_000
     const utcMillis = (date: string): number => {
       const [year, monthPart, day] = date.split('-').map(Number)
-      return Date.UTC(year!, monthPart! - 1, day!)
+      return Date.UTC(year!, monthPart! - 1, day)
     }
 
     for (const { month, lastDay } of [

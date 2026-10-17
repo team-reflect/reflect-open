@@ -173,7 +173,7 @@ function definedFields(patch: NoteRowOverlayPatch): MutableNoteRowOverlay {
       result[key] = patch[key]
     }
   }
-  return result as MutableNoteRowOverlay
+  return result
 }
 
 /**

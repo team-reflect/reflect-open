@@ -12,7 +12,7 @@ export function isFlushRequest(message: unknown): message is FlushRequest {
     typeof message === 'object' &&
     message !== null &&
     'type' in message &&
-    (message as { type: unknown }).type === 'flush'
+    (message  ).type === 'flush'
   )
 }
 

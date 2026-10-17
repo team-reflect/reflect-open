@@ -8,7 +8,7 @@ function config(overrides: Partial<HostedAiProviderConfig>): HostedAiProviderCon
   return {
     id: 'id',
     provider,
-    model: aiProvider(provider).models[0]!.id,
+    model: aiProvider(provider).models[0].id,
     keyHint: 'hint1',
     ...overrides,
   }

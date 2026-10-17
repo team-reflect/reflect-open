@@ -4,6 +4,7 @@ import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.
 import { DailyCaptureMenu } from './daily-capture-menu.tsx'
 
 const memo = vi.hoisted(() => ({
+  {/*FIXME: use the same method as   audio-memo-button.test.tsx */}
   phase: 'idle' as 'idle' | 'requesting' | 'recording' | 'transcribing' | 'error',
   elapsedMs: 0,
   level: 0,
