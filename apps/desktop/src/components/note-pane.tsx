@@ -190,25 +190,28 @@ export function NotePaneComponent({
   )
   // The registry entry this pane made, so unmount removes exactly it (a
   // remount of the same path may already have re-registered).
-  const registeredHandle = useRef<{ path: string; handle: NoteEditorHandle } | null>(null)
+  const registeredHandleRef = useRef<{ path: string; handle: NoteEditorHandle } | null>(null)
   // The `/` menu's template rows insert into this pane's own editor, read
   // through the registry ref at select time (a late resolve after the pane
   // unmounted must insert nowhere rather than somewhere stale).
   const onSlashMenuSearch = useTemplateSlashItems(
-    useCallback(() => registeredHandle.current?.handle ?? null, []),
+    useCallback(() => registeredHandleRef.current?.handle ?? null, []),
   )
   const handleRef = useCallback(
     (handle: NoteEditorHandle | null) => {
       bindEditor(handle)
       aiEditorRef.current = handle
       if (handle === null) {
-        if (registeredHandle.current !== null) {
-          unregisterNoteEditorHandle(registeredHandle.current.path, registeredHandle.current.handle)
-          registeredHandle.current = null
+        if (registeredHandleRef.current !== null) {
+          unregisterNoteEditorHandle(
+            registeredHandleRef.current.path,
+            registeredHandleRef.current.handle,
+          )
+          registeredHandleRef.current = null
         }
       } else {
         registerNoteEditorHandle(path, handle)
-        registeredHandle.current = { path, handle }
+        registeredHandleRef.current = { path, handle }
       }
       if (dailyDate !== undefined) {
         registerHandle?.(dailyDate, handle)

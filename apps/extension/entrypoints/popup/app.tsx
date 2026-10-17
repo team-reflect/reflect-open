@@ -46,7 +46,7 @@ export function CapturePopup(): ReactElement {
   const postId = captured.status === 'ready' ? parseXPostId(captured.page.url) : undefined
   const [note, setNote] = useState('')
   const [includePageText, setIncludePageText] = useState(false)
-  const includePageTextTouched = useRef(false)
+  const includePageTextTouchedRef = useRef(false)
   const [includePageTextPreferenceLoaded, setIncludePageTextPreferenceLoaded] = useState(false)
   const [save, setSave] = useState<SaveState>({ phase: 'idle' })
   const [heldCount, setHeldCount] = useState(0)
@@ -59,7 +59,7 @@ export function CapturePopup(): ReactElement {
     let cancelled = false
     void readIncludePageTextPreference().then(
       (preference) => {
-        if (!cancelled && !includePageTextTouched.current) {
+        if (!cancelled && !includePageTextTouchedRef.current) {
           setIncludePageText(preference)
         }
         if (!cancelled) {
@@ -155,7 +155,7 @@ export function CapturePopup(): ReactElement {
   const busy = save.phase === 'saving' || (!postId && !includePageTextPreferenceLoaded)
 
   function onIncludePageTextChange(checked: boolean): void {
-    includePageTextTouched.current = true
+    includePageTextTouchedRef.current = true
     setIncludePageTextPreferenceLoaded(true)
     setIncludePageText(checked)
     void writeIncludePageTextPreference(checked).catch((cause) => {

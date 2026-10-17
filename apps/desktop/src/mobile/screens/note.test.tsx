@@ -51,10 +51,10 @@ function Arrival({
   options?: NavigateOptions | undefined
 }): ReactElement | null {
   const { route, navigate } = useRouter()
-  const navigated = useRef(false)
+  const navigatedRef = useRef(false)
   useEffect(() => {
-    if (!navigated.current) {
-      navigated.current = true
+    if (!navigatedRef.current) {
+      navigatedRef.current = true
       navigate({ kind: 'note', path }, options)
     }
   })

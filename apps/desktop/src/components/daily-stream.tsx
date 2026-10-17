@@ -87,9 +87,9 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   // The slot is consumed when the editor actually mounts and focuses (not at
   // render time), so a virtualizer re-render before the lazy load completes
   // can't drop the focus.
-  const focusPending = useRef<{ date: string; selection: 'start' | 'end' } | null>(null)
+  const focusPendingRef = useRef<{ date: string; selection: 'start' | 'end' } | null>(null)
   const consumeFocus = useCallback(() => {
-    focusPending.current = null
+    focusPendingRef.current = null
   }, [])
 
   // Report the day the user is editing to the context sidebar: the route stays
@@ -102,7 +102,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   // is virtualized, so the neighbor day's editor may not be mounted: we keep a
   // registry of mounted day handles plus a single pending-focus slot that
   // carries the target caret position, applied when the neighbor row mounts and
-  // registers. This is independent of the `⌘D` autofocus path (`focusPending`).
+  // registers. This is independent of the `⌘D` autofocus path (`focusPendingRef`).
   const dayHandlesRef = useRef(new Map<string, NoteEditorHandle>())
   const pendingFocusRef = useRef<{ date: string; position: 'start' | 'end' } | null>(null)
 
@@ -193,14 +193,14 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
       // navigation the user backed out of before that day's editor mounted (both
       // the ⌘D autofocus and a queued cross-note boundary focus). The day would
       // otherwise steal focus when its row scrolls into view.
-      focusPending.current = null
+      focusPendingRef.current = null
       pendingFocusRef.current = null
       virtualizerRef.current?.scrollTo(restored)
       return
     }
     const target = targetDateRef.current
     pendingFocusRef.current = null
-    focusPending.current = {
+    focusPendingRef.current = {
       date: target,
       selection: arrivalFocusEditorRef.current ? 'end' : 'start',
     }
@@ -234,7 +234,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
       // caret later. Typing is deliberately not a cancel: ⌘D-then-type should
       // still land focus in today once its editor mounts.
       onPointerDownCapture={() => {
-        focusPending.current = null
+        focusPendingRef.current = null
         pendingFocusRef.current = null
       }}
     >
@@ -254,7 +254,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
           // collapses to a short row), while today and future days reserve
           // most of a viewport of writing room. ISO dates compare lexically.
           const isPast = date < today
-          const pendingFocus = focusPending.current
+          const pendingFocus = focusPendingRef.current
           const focusSelection =
             pendingFocus !== null && pendingFocus.date === date ? pendingFocus.selection : null
           const autoFocus = focusSelection !== null

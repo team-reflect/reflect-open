@@ -100,12 +100,12 @@ export function CalendarStrip({
 
   // An explicit re-arrival doesn't change `date`, so the follow effect won't
   // move a browsed-away strip — re-center it here.
-  const lastResetSeq = useRef(resetSeq)
+  const lastResetSeqRef = useRef(resetSeq)
   useEffect(() => {
-    if (resetSeq === lastResetSeq.current) {
+    if (resetSeq === lastResetSeqRef.current) {
       return
     }
-    lastResetSeq.current = resetSeq
+    lastResetSeqRef.current = resetSeq
     showWeekOf(date)
   }, [resetSeq, date, showWeekOf])
 

@@ -98,13 +98,13 @@ export function RouterProvider({
   /**
    * The state on screen, readable from scroll handlers without re-rendering.
    */
-  const rendered = useRef(state)
+  const renderedRef = useRef(state)
   // Written during render, not in an effect: descendant scroll-restoration
   // effects read this (through saveScrollState/savedScroll) on the same
   // commit, and React runs effects child-before-parent — so updating it in an
   // effect here would lag a frame and restore or save the wrong entry's offset.
   // eslint-disable-next-line react-hooks/refs
-  rendered.current = state
+  renderedRef.current = state
 
   useEffect(() => {
     const sync = (): void => setState(navigation.getState())
@@ -137,14 +137,14 @@ export function RouterProvider({
   )
 
   const saveScrollState = useCallback(
-    (offset: number) => navigation.saveScrollState(offset, rendered.current),
+    (offset: number) => navigation.saveScrollState(offset, renderedRef.current),
     [navigation],
   )
   const clearScrollState = useCallback(
-    () => navigation.clearScrollState(rendered.current),
+    () => navigation.clearScrollState(renderedRef.current),
     [navigation],
   )
-  const savedScroll = useCallback(() => navigation.savedScroll(rendered.current), [navigation])
+  const savedScroll = useCallback(() => navigation.savedScroll(renderedRef.current), [navigation])
 
   const value = useMemo<RouterValue>(
     () => ({

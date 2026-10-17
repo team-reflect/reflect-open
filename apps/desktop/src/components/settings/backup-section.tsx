@@ -60,7 +60,7 @@ export function BackupSettingsField(): ReactElement {
   const { opener } = useAppServices()
   const githubConnected = useGithubConnected()
   const [connectOpen, setConnectOpen] = useState(false)
-  const openRepoAttempt = useRef(0)
+  const openRepoAttemptRef = useRef(0)
   const action = useAsyncAction()
 
   // A sync fork (Plan 17): two files claiming one frontmatter id — the same
@@ -87,18 +87,18 @@ export function BackupSettingsField(): ReactElement {
       return
     }
     const url = githubRepoBrowserUrl(backup.repo)
-    const attempt = openRepoAttempt.current + 1
-    openRepoAttempt.current = attempt
+    const attempt = openRepoAttemptRef.current + 1
+    openRepoAttemptRef.current = attempt
     action.setError(null)
     void opener
       .openUrl(url)
       .then(() => {
-        if (openRepoAttempt.current === attempt) {
+        if (openRepoAttemptRef.current === attempt) {
           action.setError(null)
         }
       })
       .catch(() => {
-        if (openRepoAttempt.current === attempt) {
+        if (openRepoAttemptRef.current === attempt) {
           action.setError(`Couldn’t open the browser — visit ${url} yourself.`)
         }
       })

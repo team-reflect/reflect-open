@@ -43,10 +43,10 @@ export function MobileShell(): ReactElement {
 
   // A `search` history entry seeds the live query — once per entry, so the
   // user can keep typing without the effect snapping the text back.
-  const seededEntry = useRef<number | null>(null)
+  const seededEntryRef = useRef<number | null>(null)
   useEffect(() => {
-    if (route.kind === 'search' && seededEntry.current !== entryId) {
-      seededEntry.current = entryId
+    if (route.kind === 'search' && seededEntryRef.current !== entryId) {
+      seededEntryRef.current = entryId
       setAllQuery(route.query)
     }
   }, [route, entryId])

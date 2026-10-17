@@ -78,12 +78,12 @@ export function DaySlide({
     onFocusConsumed()
   }, [cancelRestore, onFocusConsumed])
 
-  const lastResetSeq = useRef(scrollResetSeq)
+  const lastResetSeqRef = useRef(scrollResetSeq)
   useEffect(() => {
-    if (scrollResetSeq === lastResetSeq.current) {
+    if (scrollResetSeq === lastResetSeqRef.current) {
       return
     }
-    lastResetSeq.current = scrollResetSeq
+    lastResetSeqRef.current = scrollResetSeq
     if (!selected) {
       return
     }

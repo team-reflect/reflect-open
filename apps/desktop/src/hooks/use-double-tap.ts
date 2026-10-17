@@ -18,18 +18,18 @@ export function useDoubleTap<Key>(
   activeKey: Key | null,
   windowMs: number = DOUBLE_TAP_MS,
 ): (key: Key) => boolean {
-  const lastTap = useRef<{ key: Key; at: number } | null>(null)
+  const lastTapRef = useRef<{ key: Key; at: number } | null>(null)
 
   useLayoutEffect(() => {
-    if (lastTap.current !== null && lastTap.current.key !== activeKey) {
-      lastTap.current = null
+    if (lastTapRef.current !== null && lastTapRef.current.key !== activeKey) {
+      lastTapRef.current = null
     }
   }, [activeKey])
 
   return (key: Key): boolean => {
-    const previous = lastTap.current
+    const previous = lastTapRef.current
     const now = Date.now()
-    lastTap.current = { key, at: now }
+    lastTapRef.current = { key, at: now }
     return previous !== null && previous.key === key && now - previous.at <= windowMs
   }
 }

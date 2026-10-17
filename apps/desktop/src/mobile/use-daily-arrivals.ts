@@ -46,11 +46,11 @@ export function useDailyArrivals({
   // The mounting arrival seeds the state directly — it never re-anchors
   // (there is no previously-shown day), but its focus request counts.
   const [focusDate, setFocusDate] = useState<string | null>(arrivalFocusEditor ? date : null)
-  const lastArrival = useRef({ seq: arrivalSeq, date })
+  const lastArrivalRef = useRef({ seq: arrivalSeq, date })
   useEffect(() => {
-    const last = lastArrival.current
-    lastArrival.current = { seq: arrivalSeq, date }
-    const intent = dailyArrivalIntent(last, lastArrival.current, arrivalFocusEditor)
+    const last = lastArrivalRef.current
+    lastArrivalRef.current = { seq: arrivalSeq, date }
+    const intent = dailyArrivalIntent(last, lastArrivalRef.current, arrivalFocusEditor)
     if (intent.focus === 'request') {
       setFocusDate(date)
     } else if (intent.focus === 'clear') {

@@ -339,7 +339,6 @@ export default defineESLintConfig(
     rules: {
       '@eslint-react/dom-no-flush-sync': 'off',
       '@eslint-react/exhaustive-deps': 'off',
-      '@eslint-react/naming-convention-ref-name': 'off',
       '@eslint-react/set-state-in-effect': 'off',
       '@eslint-react/use-state': 'off',
       '@eslint-react/web-api-no-leaked-event-listener': 'off',

@@ -79,19 +79,19 @@ function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
 
 function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactElement {
   const [discardArmed, setDiscardArmed] = useState(false)
-  const discardResetTimer = useRef<number | null>(null)
+  const discardResetTimerRef = useRef<number | null>(null)
 
   const clearDiscardReset = (): void => {
-    if (discardResetTimer.current !== null) {
-      window.clearTimeout(discardResetTimer.current)
-      discardResetTimer.current = null
+    if (discardResetTimerRef.current !== null) {
+      window.clearTimeout(discardResetTimerRef.current)
+      discardResetTimerRef.current = null
     }
   }
 
   useEffect(
     () => () => {
-      if (discardResetTimer.current !== null) {
-        window.clearTimeout(discardResetTimer.current)
+      if (discardResetTimerRef.current !== null) {
+        window.clearTimeout(discardResetTimerRef.current)
       }
     },
     [],
@@ -101,9 +101,9 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
     if (!discardArmed) {
       setDiscardArmed(true)
       clearDiscardReset()
-      discardResetTimer.current = window.setTimeout(() => {
+      discardResetTimerRef.current = window.setTimeout(() => {
         setDiscardArmed(false)
-        discardResetTimer.current = null
+        discardResetTimerRef.current = null
       }, 3000)
       return
     }

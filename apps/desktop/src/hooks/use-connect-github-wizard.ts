@@ -82,25 +82,25 @@ export function useConnectGithubWizard({
   const { opener, lifecycle } = useAppServices()
   // The wizard lives as long as the surface; it always calls the latest
   // actions and `onClose` without being rebuilt every render.
-  const latest = useRef({ sync, onClose })
+  const latestRef = useRef({ sync, onClose })
   useEffect(() => {
-    latest.current = { sync, onClose }
+    latestRef.current = { sync, onClose }
   })
 
   const [wizard] = useState(() =>
     createConnectGithubWizardService(
       {
         backup: {
-          connectNewRepo: (name) => latest.current.sync.connectNewRepo(name),
+          connectNewRepo: (name) => latestRef.current.sync.connectNewRepo(name),
           connectExistingRepo: (ref, options) =>
-            latest.current.sync.connectExistingRepo(ref, options),
+            latestRef.current.sync.connectExistingRepo(ref, options),
         },
         githubAuth,
         opener,
         lifecycle,
         clock,
       },
-      { suggestedRepoName, onClose: () => latest.current.onClose(), pollIntervalMs },
+      { suggestedRepoName, onClose: () => latestRef.current.onClose(), pollIntervalMs },
     ),
   )
 
