@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::change::FileChange;
+use crate::change::{ChangeKind, FileChange};
 use crate::conflict::copy::{free_conflict_copy_path, utc_stamp};
 use crate::conflict::ladder::{self, ConflictInput};
 use crate::conflict::shadow::{blob_hash8_of_file, content_hash, ShadowStore};
@@ -238,16 +238,16 @@ fn run_sweep(
     // from sweep start, plus paths this sweep wrote, minus paths it removed.
     let mut live: BTreeSet<&str> = files.iter().map(|file| file.path.as_str()).collect();
     for change in &outcome.changed {
-        if change.kind == "upsert" {
+        if change.kind == ChangeKind::Upsert {
             live.insert(change.path.as_str());
         }
     }
     for change in &outcome.changed {
-        if change.kind == "remove"
+        if change.kind == ChangeKind::Remove
             && !outcome
                 .changed
                 .iter()
-                .any(|other| other.kind == "upsert" && other.path == change.path)
+                .any(|other| other.kind == ChangeKind::Upsert && other.path == change.path)
         {
             live.remove(change.path.as_str());
         }
@@ -436,7 +436,7 @@ fn apply_file_resolution(
         crate::fs::own_writes::record(root, rel, resolution.final_content.as_bytes());
         outcome.changed.push(FileChange {
             path: rel.to_string(),
-            kind: "upsert".to_string(),
+            kind: ChangeKind::Upsert,
             modified_ms: modified_ms_of(&abs),
         });
     }
@@ -502,7 +502,7 @@ fn copy_conflict_versions(
         }
         outcome.changed.push(FileChange {
             path: copy_rel.clone(),
-            kind: "upsert".to_string(),
+            kind: ChangeKind::Upsert,
             modified_ms: modified_ms_of(&target),
         });
         outcome.copies.push(copy_rel);
@@ -585,7 +585,7 @@ fn fold_duplicate(
         outcome.changed.push(FileChange::remove(&file.path));
         outcome.changed.push(FileChange {
             path: canonical_rel.to_string(),
-            kind: "upsert".to_string(),
+            kind: ChangeKind::Upsert,
             modified_ms: modified_ms_of(&canonical_abs),
         });
         return;
@@ -737,13 +737,13 @@ mod tests {
             "# Day\n\n- from mac\n- from phone\n"
         );
         // Changes report the remove + the rewrite for direct reindexing.
-        let kinds: Vec<(&str, &str)> = outcome
+        let kinds: Vec<(String, String)> = outcome
             .changed
             .iter()
-            .map(|change| (change.path.as_str(), change.kind.as_str()))
+            .map(|change| (change.path.clone(), change.kind.to_string()))
             .collect();
-        assert!(kinds.contains(&("daily/2026-07-04 2.md", "remove")));
-        assert!(kinds.contains(&("daily/2026-07-04.md", "upsert")));
+        assert!(kinds.contains(&("daily/2026-07-04 2.md".into(), "remove".into())));
+        assert!(kinds.contains(&("daily/2026-07-04.md".into(), "upsert".into())));
         // The base the fold just recorded survives the same pass's orphan
         // pruning (the keep-set includes this sweep's own upserts) — while
         // the removed duplicate's base is pruned in the same pass, not left
@@ -1237,7 +1237,7 @@ mod tests {
         assert!(outcome
             .changed
             .iter()
-            .any(|change| change.path == copy && change.kind == "upsert"));
+            .any(|change| change.path == copy && change.kind == ChangeKind::Upsert));
         assert_eq!(
             fs::read_to_string(root.path().join("assets/data.json")).unwrap(),
             "{\"a\":1}"

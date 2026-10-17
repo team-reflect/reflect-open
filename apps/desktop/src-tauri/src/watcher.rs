@@ -32,7 +32,7 @@ use reflect_graph_paths::{
 use tauri::{AppHandle, Emitter, Manager, State};
 use walkdir::WalkDir;
 
-use crate::change::{FileChange, CHANGE_EVENT, RECONCILE_EVENT};
+use crate::change::{ChangeKind, FileChange, CHANGE_EVENT, RECONCILE_EVENT};
 use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
 
@@ -192,7 +192,7 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> BatchEffects {
                 // one must leave the index rather than be read through.
                 Ok(meta) if meta.file_type().is_symlink() => FileChange {
                     path: rel.clone(),
-                    kind: "remove".to_string(),
+                    kind: ChangeKind::Remove,
                     modified_ms: None,
                 },
                 // A directory took a tracked file's name: membership changed
@@ -209,7 +209,7 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> BatchEffects {
                 Ok(meta) if crate::fs::is_dataless(&meta) => continue,
                 Ok(meta) => FileChange {
                     path: rel.clone(),
-                    kind: "upsert".to_string(),
+                    kind: ChangeKind::Upsert,
                     modified_ms: crate::fs::modified_ms(&meta),
                 },
                 Err(_) => {
@@ -224,7 +224,7 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> BatchEffects {
                     }
                     FileChange {
                         path: rel.clone(),
-                        kind: "remove".to_string(),
+                        kind: ChangeKind::Remove,
                         modified_ms: None,
                     }
                 }
@@ -465,7 +465,7 @@ mod tests {
             effects.changes,
             vec![FileChange {
                 path: "notes/a.md".to_string(),
-                kind: "remove".to_string(),
+                kind: ChangeKind::Remove,
                 modified_ms: None,
             }]
         );
@@ -483,7 +483,7 @@ mod tests {
         let effects = collect_changes(&[note], root);
         assert_eq!(effects.changes.len(), 1);
         assert_eq!(effects.changes[0].path, "notes/a.md");
-        assert_eq!(effects.changes[0].kind, "upsert");
+        assert_eq!(effects.changes[0].kind, ChangeKind::Upsert);
         // A real timestamp, not epoch zero — All Notes sorts and labels by it.
         assert!(effects.changes[0].modified_ms.is_some_and(|ms| ms > 0));
         assert!(!effects.reconcile);
@@ -563,7 +563,7 @@ mod tests {
 
         let effects = collect_changes(&[root.join("notes/a.md")], root);
         assert_eq!(effects.changes.len(), 1);
-        assert_eq!(effects.changes[0].kind, "remove");
+        assert_eq!(effects.changes[0].kind, ChangeKind::Remove);
     }
 
     #[test]
@@ -619,7 +619,7 @@ mod tests {
 
         let effects = collect_changes(&[root.join("notes/a.md")], root);
         assert_eq!(effects.changes.len(), 1);
-        assert_eq!(effects.changes[0].kind, "remove");
+        assert_eq!(effects.changes[0].kind, ChangeKind::Remove);
     }
 
     #[test]
@@ -635,7 +635,7 @@ mod tests {
         let effects = collect_changes(&[root.join("notes/.a.md.icloud")], root);
         assert_eq!(effects.changes.len(), 1);
         assert_eq!(effects.changes[0].path, "notes/a.md");
-        assert_eq!(effects.changes[0].kind, "upsert");
+        assert_eq!(effects.changes[0].kind, ChangeKind::Upsert);
     }
 
     #[test]

@@ -238,7 +238,7 @@ mod platform {
     static NUDGED: LazyLock<Mutex<HashMap<String, Option<u64>>>> =
         LazyLock::new(|| Mutex::new(HashMap::new()));
 
-    use crate::change::{FileChange, CHANGE_EVENT};
+    use crate::change::{ChangeKind, FileChange, CHANGE_EVENT};
 
     /// Lifecycle epoch: every `start`/`stop` bumps it, and a queued install
     /// only proceeds when its epoch is still current. Commands run off the
@@ -821,7 +821,7 @@ mod platform {
             if previous != Some(TrackedState::Local(mtime)) {
                 changes.push(FileChange {
                     path: item.rel.clone(),
-                    kind: "upsert".to_string(),
+                    kind: ChangeKind::Upsert,
                     modified_ms: Some(mtime),
                 });
             }
@@ -830,7 +830,7 @@ mod platform {
             if snapshot.remove(rel).is_some() {
                 changes.push(FileChange {
                     path: rel.clone(),
-                    kind: "remove".to_string(),
+                    kind: ChangeKind::Remove,
                     modified_ms: None,
                 });
             }
@@ -912,7 +912,13 @@ mod platform {
         fn shapes(changes: &[super::FileChange]) -> Vec<(String, String, Option<u64>)> {
             let mut shapes: Vec<_> = changes
                 .iter()
-                .map(|change| (change.path.clone(), change.kind.clone(), change.modified_ms))
+                .map(|change| {
+                    (
+                        change.path.clone(),
+                        change.kind.to_string(),
+                        change.modified_ms,
+                    )
+                })
                 .collect();
             shapes.sort();
             shapes
