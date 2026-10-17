@@ -49,10 +49,10 @@ beforeEach(() => {
   root = document.createElement('div')
   document.body.appendChild(root)
 })
-afterEach(() => {
+afterEach(async () => {
   // Unmount each hook so its document keydown listener is removed — otherwise a
   // prior test's handler runs first, preventDefaults, and the next bails on it.
-  cleanup()
+  await cleanup()
   root.remove()
 })
 

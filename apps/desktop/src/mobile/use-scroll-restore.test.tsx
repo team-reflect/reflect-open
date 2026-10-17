@@ -122,8 +122,8 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', FakeResizeObserver)
 })
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
   vi.unstubAllGlobals()
   vi.useRealTimers()
 })

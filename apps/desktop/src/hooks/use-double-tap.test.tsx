@@ -9,8 +9,8 @@ async function mountTaps(activeKey: string | null = 'a') {
   })
 }
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
 })
 
 /** Pin Date.now so tap spacing is exact (the gesture-test convention). */

@@ -17,8 +17,8 @@ async function mountArrivals(initial: DailyArrivalsOptions) {
   })
 }
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
 })
 
 describe('useDailyArrivals', () => {

@@ -12,8 +12,8 @@ async function mountFocus(initial: Omit<ArrivalFocusOptions, 'target'>) {
   return { hook, focus }
 }
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
 })
 
 describe('useArrivalFocus', () => {

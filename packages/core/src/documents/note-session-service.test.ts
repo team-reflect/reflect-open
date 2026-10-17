@@ -185,7 +185,7 @@ describe('createNoteSession', () => {
     await settled()
 
     session.editorChanged('# Edited\n')
-    session.flush()
+    await session.flush()
     await settled()
 
     expect(writes).toEqual([])

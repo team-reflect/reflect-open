@@ -68,8 +68,8 @@ vi.mock('embla-carousel-react', () => ({
   default: () => [() => {}, embla.api],
 }))
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
   embla.reset()
 })
 

@@ -23,8 +23,8 @@ async function mountSwipeTarget(navigationKey: string) {
   )
 }
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
 })
 
 describe('useSwipeTarget', () => {
