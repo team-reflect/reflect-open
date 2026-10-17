@@ -32,7 +32,7 @@ jobs:
         # target and no cross-compilation.
         include:
           - name: x64
-            runner: windows-latest
+            runner: windows-2025
             target: x86_64-pc-windows-msvc
           - name: arm64
             runner: windows-11-arm

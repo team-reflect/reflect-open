@@ -36,7 +36,7 @@ jobs:
             target: aarch64-apple-ios
             command: pnpm release:ios --build-number=1 --no-sign
           - name: windows
-            os: windows-latest
+            os: windows-2025
             command: pnpm release:windows
           # The oldest Ubuntu that can link the prebuilt ONNX Runtime, which
           # needs glibc 2.38 and the libstdc++ of GCC 14.
