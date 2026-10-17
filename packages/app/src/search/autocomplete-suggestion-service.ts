@@ -120,17 +120,7 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
       // A contacts hiccup (permission revoked mid-session, store error)
       // must cost only its own rows, never the note suggestions.
       contactsInMenu
-        ? (async (): Promise<PersonContactResolution[]> => {
-            try {
-              const matches = await contacts.lookupPeople(query)
-              return await Promise.all(
-                matches.map(async (contact) => await personNotes.resolvePersonContact(contact)),
-              )
-            } catch (error: unknown) {
-              logger.error('contact link suggestions failed:', error)
-              return []
-            }
-          })()
+        ? this.#suggestContacts(query)
         : Promise.resolve<PersonContactResolution[]>([]),
     ])
     const contactCandidates = contactResolutions
@@ -243,6 +233,19 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
    * notes may claim the title's exact or fallback key, or an unavailable
    * collision prevents proving uniqueness. Creation may not guess then.
    */
+  async #suggestContacts(query: string): Promise<PersonContactResolution[]> {
+    const { contacts, personNotes, logger } = this.#deps
+    try {
+      const matches = await contacts.lookupPeople(query)
+      return await Promise.all(
+        matches.map(async (contact) => await personNotes.resolvePersonContact(contact)),
+      )
+    } catch (error: unknown) {
+      logger.error('contact link suggestions failed:', error)
+      return []
+    }
+  }
+
   #reportAmbiguousNoteTitle(title: string): void {
     this.#deps.operations.fail('Creating note', ambiguousNoteTitleMessage(title))
   }
