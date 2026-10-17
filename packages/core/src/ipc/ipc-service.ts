@@ -345,7 +345,7 @@ export function listenNow(
   try {
     pending = Promise.resolve(register())
   } catch (error) {
-    pending = Promise.reject(error)
+    pending = Promise.reject(toAppError(error))
   }
   void pending.then(
     (registered) => {

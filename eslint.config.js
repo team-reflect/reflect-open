@@ -359,14 +359,6 @@ export default defineESLintConfig(
     rules: { 'architecture/maybe-promise': 'error' },
   },
   {
-    // A `catch` that rejects with the caught `unknown` passes the original
-    // error on, so `instanceof` checks downstream still see it.
-    files: [`**/*.${SOURCE_EXTENSIONS}`],
-    rules: {
-      '@typescript-eslint/prefer-promise-reject-errors': ['error', { allowThrowingUnknown: true }],
-    },
-  },
-  {
     // Vitest types its asymmetric matchers (`expect.any`, `expect.objectContaining`, ...)
     // as `any`, so a matcher used as a property value in `toEqual` or
     // `toHaveBeenCalledWith` is an unsafe assignment.

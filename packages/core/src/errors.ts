@@ -55,7 +55,7 @@ export function toAppError(value: unknown): AppError {
   }
   const parsed = appErrorWireSchema.safeParse(value)
   if (parsed.success) {
-    return new AppError(parsed.data.kind, parsed.data.message)
+    return new AppError(parsed.data.kind, parsed.data.message, { cause: value })
   }
   let message: string
   if (value instanceof Error) {

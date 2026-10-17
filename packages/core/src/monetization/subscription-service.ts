@@ -5,6 +5,7 @@ import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { getJson, setJson, type StorageService } from '../ports/storage-service.ts'
 import { IAP_PRODUCT_IDS, type IapService } from '../ipc/iap-service.ts'
 import type { Unlisten } from '../unlisten.ts'
+import { toAppError } from '../errors.ts'
 
 const activeSubscriptionSchema = z.enum(['yearly', 'monthly']).nullable()
 
@@ -88,7 +89,7 @@ function resolveActiveSubscription(
         return
       }
       if (errors.length > 0) {
-        reject(errors[0])
+        reject(errors[0])// FIXME: use AggregateError
       } else {
         resolve(null)
       }
@@ -230,7 +231,7 @@ class SubscriptionServiceImpl implements SubscriptionService {
         },
         (error: unknown) => {
           clock.clearTimeout(timeout)
-          reject(error)
+          reject(toAppError(error))
         },
       )
     })

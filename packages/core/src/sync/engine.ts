@@ -1,6 +1,6 @@
 import type { MaybePromise } from '@reflect/utils'
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
-import { isAppError } from '../errors.ts'
+import { AppError, isAppError } from '../errors.ts'
 import type {
   ChangedFile,
   GitCredential,
@@ -395,16 +395,12 @@ class SyncEngineImpl implements SyncEngine {
   }
 
   /** Start one merge notification now, without making later Git commands wait. */
-  #startRemoteChanges(changes: ChangedFile[]): Promise<void> {
-    let task: Promise<void>
+  async #startRemoteChanges(changes: ChangedFile[]): Promise<void> {
     try {
-      task = Promise.resolve(this.#options.onRemoteChanges?.(changes))
+      await this.#options.onRemoteChanges?.(changes)
     } catch (error) {
-      task = Promise.reject(error)
+      throw new AppError("TODO_TYPE", "TODO_MESSAGE", { cause: error }) // FIXME
     }
-    // Attach a handler now so an early rejection is never unhandled.
-    void task.catch(() => {})
-    return task
   }
 
   /** Join this cycle's observer tasks and rethrow the first error. */
