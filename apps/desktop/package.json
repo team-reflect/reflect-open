@@ -57,7 +57,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.4.0",
     "embla-carousel-react": "^8.6.0",
-    "lucide-react": "^1.45.0",
+    "lucide-react": "^1.0.0",
     "pretty-ms": "^10.0.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
