@@ -42,6 +42,7 @@ reflect-graph-paths = { workspace = true }
 reflect-types = { workspace = true, features = ["git2", "rusqlite"] }
 reflect-index = { workspace = true }
 reflect-graph-io = { workspace = true }
+reflect-git = { workspace = true }
 tempfile = { workspace = true }
 sha2 = { workspace = true }
 dirs = "7.0.0"

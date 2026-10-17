@@ -7,7 +7,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use crate::error::{AppError, AppResult};
+use reflect_types::{AppError, AppResult};
 
 /// Where a git command can be interrupted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

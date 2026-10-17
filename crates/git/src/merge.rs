@@ -12,11 +12,11 @@ use git2::{Index, IndexEntry, MergeOptions, Repository};
 use reflect_graph_paths::to_slash_lossy;
 use serde::Serialize;
 
-use crate::error::{AppError, AppResult};
 use reflect_graph_io::conflict::copy::{free_conflict_copy_path, utc_stamp};
 use reflect_graph_io::conflict::ladder::{self, ConflictInput};
 use reflect_graph_io::conflict::merge3;
 use reflect_graph_io::conflict::{ConflictSide, Resolution};
+use reflect_types::{AppError, AppResult};
 
 use super::repo::{
     branch_tip_ahead_of_detached_head, clear_foreign_state, current_branch, open_existing,
@@ -113,7 +113,7 @@ fn merge_branch_into_detached_head(
 
 #[cfg(test)]
 pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
-    crate::fs::with_graph_lock(root, || merge_locked(root, &[]))
+    reflect_graph_io::with_graph_lock(root, || merge_locked(root, &[]))
 }
 
 /// Check out `tree` over a working tree that equals HEAD, leaving the runtime
@@ -307,7 +307,7 @@ fn stamp_modified_times(root: &Path, changes: &mut [ChangedFile]) {
         }
         let abs = root.join(&change.path);
         if let Ok(bytes) = std::fs::read(&abs) {
-            crate::fs::own_writes::record(root, &change.path, &bytes);
+            reflect_graph_io::own_writes::record(root, &change.path, &bytes);
         }
         change.modified_ms = abs
             .metadata()
