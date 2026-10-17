@@ -34,6 +34,11 @@ describe('formatBinding', () => {
     // (nonsensical but parseable) must not render as a dangling modifier.
     expect(formatBinding('shift', true)).toEqual(['shift'])
   })
+
+  it('does not read Object.prototype keys as modifiers or key symbols', () => {
+    expect(formatBinding('Mod-constructor', true)).toEqual(['⌘', 'constructor'])
+    expect(formatBinding('toString-a', false)).toEqual(['toString', 'A'])
+  })
 })
 
 describe('normalizeBinding', () => {

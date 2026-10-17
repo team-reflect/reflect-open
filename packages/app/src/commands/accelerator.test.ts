@@ -23,4 +23,9 @@ describe('bindingToAccelerator', () => {
   it('passes named keys through for muda to parse', () => {
     expect(bindingToAccelerator('Mod-Enter')).toBe('CmdOrCtrl+Enter')
   })
+
+  it('does not read Object.prototype keys as modifiers', () => {
+    expect(bindingToAccelerator('constructor-a')).toBe('constructor+A')
+    expect(bindingToAccelerator('toString-a')).toBe('toString+A')
+  })
 })

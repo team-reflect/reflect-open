@@ -26,7 +26,7 @@ export function bindingToAccelerator(binding: string): string {
   return parts
     .map((part, index) => {
       const lower = part.toLowerCase()
-      if (index < parts.length - 1 && lower in ACCELERATOR_MODIFIERS) {
+      if (index < parts.length - 1 && Object.hasOwn(ACCELERATOR_MODIFIERS, lower)) {
         return ACCELERATOR_MODIFIERS[lower]
       }
       return part.length === 1 ? part.toUpperCase() : part
