@@ -297,7 +297,6 @@ export default defineESLintConfig(
       '@typescript-eslint/no-base-to-string': 'off',
       '@typescript-eslint/no-floating-promises': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
-      '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/only-throw-error': 'off',
       '@typescript-eslint/prefer-promise-reject-errors': 'off',
@@ -309,6 +308,15 @@ export default defineESLintConfig(
       'unicorn/no-computed-property-existence-check': 'off',
       'unicorn/no-optional-chaining-on-undeclared-variable': 'off',
       'unicorn/no-unnecessary-splice': 'off',
+    },
+  },
+  {
+    // Vitest types its asymmetric matchers (`expect.any`, `expect.objectContaining`, ...)
+    // as `any`, so a matcher used as a property value in `toEqual` or
+    // `toHaveBeenCalledWith` is an unsafe assignment.
+    files: [`**/*.test.${SOURCE_EXTENSIONS}`],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
     },
   },
   // Rule: core is platform-agnostic. It imports no Tauri, React, TanStack or app code.
