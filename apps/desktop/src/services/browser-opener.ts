@@ -8,7 +8,8 @@ export function createBrowserOpenerTransport(): OpenerTransport {
     openUrl: (url) => {
       window.open(url, '_blank', 'noopener')
     },
-    revealItemInDir: (path) =>
-     { throw new Error(`cannot reveal ${path}: the browser has no file manager`)},
+    revealItemInDir: (path) => {
+      throw new Error(`cannot reveal ${path}: the browser has no file manager`)
+    },
   }
 }
