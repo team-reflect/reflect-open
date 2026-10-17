@@ -160,18 +160,19 @@ export function FormattingToolbarBridge({
         }
       }
 
-      dom.addEventListener('focusin', handleFocusIn)
-      dom.addEventListener('focusout', handleFocusOut)
-      document.addEventListener('selectionchange', handleSelectionChange)
+      const listeners = new AbortController()
+      dom.addEventListener('focusin', handleFocusIn, { signal: listeners.signal })
+      dom.addEventListener('focusout', handleFocusOut, { signal: listeners.signal })
+      document.addEventListener('selectionchange', handleSelectionChange, {
+        signal: listeners.signal,
+      })
       // autoFocus can land before these listeners attach (the arrival-intent
       // focus fires on editor mount) — an already-focused editor publishes now.
       if (editor.focused) {
         publish()
       }
       teardown = () => {
-        dom.removeEventListener('focusin', handleFocusIn)
-        dom.removeEventListener('focusout', handleFocusOut)
-        document.removeEventListener('selectionchange', handleSelectionChange)
+        listeners.abort()
         if (publishTimer !== undefined) {
           clearTimeout(publishTimer)
         }

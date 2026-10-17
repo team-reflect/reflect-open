@@ -341,7 +341,6 @@ export default defineESLintConfig(
       '@eslint-react/exhaustive-deps': 'off',
       '@eslint-react/set-state-in-effect': 'off',
       '@eslint-react/use-state': 'off',
-      '@eslint-react/web-api-no-leaked-event-listener': 'off',
       '@typescript-eslint/no-base-to-string': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
