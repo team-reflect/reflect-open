@@ -156,7 +156,7 @@ describe('MobileAudioMemoProvider', () => {
       result.current.toggle()
     })
     await act(async () => {
-      result.current.cancelRecording()
+      await result.current.cancelRecording()
     })
 
     expect(result.current.drawerOpen).toBe(false)

@@ -108,7 +108,7 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
       return
     }
     clearDiscardReset()
-    memo.cancelRecording()
+    void memo.cancelRecording()
   }
 
   return (

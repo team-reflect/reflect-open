@@ -280,7 +280,7 @@ describe('MobileAudioMemoService.openSession', () => {
     await flush()
     expect(kit.captured()).toEqual([landed])
 
-    session.cancelRecording()
+    await session.cancelRecording()
     await flush()
 
     expect(deleteMock).toHaveBeenCalledWith(landed, 3)
@@ -293,7 +293,7 @@ describe('MobileAudioMemoService.openSession', () => {
 
     session.toggle()
     await flush()
-    session.cancelRecording()
+    await session.cancelRecording()
     await flush()
 
     // A staged segment the native discard failed to delete, handed back later.
@@ -415,7 +415,7 @@ describe('MobileAudioMemoService.openSession', () => {
     kit.recorder.emitLevel({ level: 0.5, elapsedMs: 1200 })
     expect(session.getState()).toMatchObject({ level: 0.5, elapsedMs: 1200 })
 
-    session.cancelRecording()
+    await session.cancelRecording()
     await flush()
     expect(session.getState()).toMatchObject({ phase: 'idle', level: 0, elapsedMs: 0 })
   })
@@ -469,7 +469,7 @@ describe('MobileAudioMemoService.openSession', () => {
 
     session.toggle()
     await flush()
-    session.cancelRecording()
+    await session.cancelRecording()
     await flush()
 
     expect(session.getState().drawerOpen).toBe(false)

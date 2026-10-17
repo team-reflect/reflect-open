@@ -164,27 +164,27 @@ class TestAudioRecorderServiceImpl implements TestAudioRecorderService {
     return result
   }
 
-  cancel(): Promise<void> {
+  cancel(): void {
     this.#log.push({ method: 'cancel' })
     this.#cancelHeldStart?.()
     this.#setState('idle')
-    return Promise.resolve()
+    return
   }
 
-  status(): Promise<RecordingStatus> {
+  status(): RecordingStatus {
     this.#log.push({ method: 'status' })
-    return Promise.resolve({ recording: this.#state === 'recording', elapsedMs: 0 })
+    return { recording: this.#state === 'recording', elapsedMs: 0 }
   }
 
-  listStaged(): Promise<StagedRecordingFile[]> {
+  listStaged(): StagedRecordingFile[] {
     this.#log.push({ method: 'listStaged' })
-    return Promise.resolve(this.#staged.map((file) => ({ ...file })))
+    return this.#staged.map((file) => ({ ...file }))
   }
 
-  deleteStaged(path: string): Promise<void> {
+  deleteStaged(path: string): void {
     this.#log.push({ method: 'deleteStaged', path })
     this.#staged = this.#staged.filter((file) => file.path !== path)
-    return Promise.resolve()
+    return
   }
 
   claimStaged(path: string): void {
@@ -199,14 +199,14 @@ class TestAudioRecorderServiceImpl implements TestAudioRecorderService {
     return this.#claimed.has(path)
   }
 
-  actionsReady(_options?: { signal?: AbortSignal }): Promise<void> {
+  actionsReady(_options?: { signal?: AbortSignal }): void {
     this.#log.push({ method: 'actionsReady' })
-    return Promise.resolve()
+    return
   }
 
-  actionPerformed(): Promise<void> {
+  actionPerformed(): void {
     this.#log.push({ method: 'actionPerformed' })
-    return Promise.resolve()
+    return
   }
 
   subscribeLevel(listener: (event: RecordingLevelEvent) => void): Unlisten {

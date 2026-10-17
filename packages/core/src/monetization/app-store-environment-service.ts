@@ -162,9 +162,13 @@ class AppStoreEnvironmentServiceImpl implements AppStoreEnvironmentService {
     this.#probing = true
     this.#publish()
     try {
-      const parsed = appStoreEnvironmentSchema.safeParse(
-        await this.#deps.appStore.environment().catch(() => this.#deps.appStore.environment()),
-      )
+      let raw: string
+      try {
+        raw = await this.#deps.appStore.environment()
+      } catch {
+        raw = await this.#deps.appStore.environment()
+      }
+      const parsed = appStoreEnvironmentSchema.safeParse(raw)
       this.#value = parsed.success ? parsed.data : null
       this.#answered = true
       this.#failed = false

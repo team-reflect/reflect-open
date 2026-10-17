@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { Unlisten } from '../unlisten.ts'
 import type {
   RecordingLevelEvent,
@@ -117,19 +118,19 @@ export interface AudioRecorderService {
   /**
    * Stop and discard the session.
    */
-  cancel(): Promise<void>
+  cancel(): MaybePromise<void>
   /**
    * Whether a session is live in the recorder itself, which can outlive the webview.
    */
-  status(): Promise<RecordingStatus>
+  status(): MaybePromise<RecordingStatus>
   /**
    * Finished recordings still in staging.
    */
-  listStaged(): Promise<StagedRecordingFile[]>
+  listStaged(): MaybePromise<StagedRecordingFile[]>
   /**
    * Remove a staged recording once its bytes are durable.
    */
-  deleteStaged(path: string): Promise<void>
+  deleteStaged(path: string): MaybePromise<void>
   claimStaged(path: string): void
   releaseStaged(path: string): void
   isStagedClaimed(path: string): boolean
@@ -137,11 +138,11 @@ export interface AudioRecorderService {
    * The action surface is mounted: deliver any queued native action. An
    * aborted `signal` skips the handshake.
    */
-  actionsReady(options?: { signal?: AbortSignal }): Promise<void>
+  actionsReady(options?: { signal?: AbortSignal }): MaybePromise<void>
   /**
    * Retire the delivered native action so it does not fire again on the next launch.
    */
-  actionPerformed(): Promise<void>
+  actionPerformed(): MaybePromise<void>
   /**
    * Input level and elapsed time while recording.
    */

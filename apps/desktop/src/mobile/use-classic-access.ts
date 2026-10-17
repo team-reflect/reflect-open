@@ -59,7 +59,9 @@ export function useClassicSignOut() {
   const { classicAccess: classic } = useCoreServices()
   return useMutation({
     mutationKey: mutationKeys.classic.signOut,
-    mutationFn: () => classic.signOut(),
+    mutationFn: async () => {
+      await classic.signOut()
+    },
   })
 }
 
