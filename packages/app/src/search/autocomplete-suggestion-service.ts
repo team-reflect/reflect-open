@@ -7,6 +7,7 @@ import {
   formatDayLabel,
   localIsoDate,
   type ClockService,
+  type ContactMatch,
   type ContactsService,
   type GraphSessionService,
   type LoggerService,
@@ -90,16 +91,7 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
   }
 
   async suggestLinks(query: string): Promise<WikiLinkMenuItem[]> {
-    const {
-      suggestions,
-      contacts,
-      personNotes,
-      settings,
-      clock,
-      operations,
-      logger,
-      graphSession,
-    } = this.#deps
+    const { suggestions, contacts, settings, clock, operations, logger, graphSession } = this.#deps
     const session = graphSession.getState().session
     if (session === null) {
       return []
@@ -175,24 +167,7 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
           target: entry.target,
           label: contact.fullName,
           detail: contact.emails[0] ?? contact.phones[0] ?? 'Contact',
-          onSelect: async () => {
-            try {
-              const outcome = await personNotes.ensurePersonNote({
-                title: contact.fullName,
-                emails: contact.emails,
-                body: contactDetailsMarkdown(contact),
-                generation,
-              })
-              if (outcome.kind === 'ambiguous') {
-                this.#reportAmbiguousNoteTitle(contact.fullName)
-              } else if (outcome.kind === 'unavailable') {
-                this.#reportUnavailableNoteTitle(contact.fullName)
-              }
-            } catch (error: unknown) {
-              logger.error('create-person-note failed:', error)
-              operations.fail('Creating note', errorMessage(error))
-            }
-          },
+          onSelect: () => void this.#createPersonNote(contact, generation),
         }
       }
       const { title, date, path, generated, insertText: target } = entry.suggestion
@@ -243,6 +218,26 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
     } catch (error: unknown) {
       logger.error('contact link suggestions failed:', error)
       return []
+    }
+  }
+
+  async #createPersonNote(contact: ContactMatch, generation: number): Promise<void> {
+    const { personNotes, logger, operations } = this.#deps
+    try {
+      const outcome = await personNotes.ensurePersonNote({
+        title: contact.fullName,
+        emails: contact.emails,
+        body: contactDetailsMarkdown(contact),
+        generation,
+      })
+      if (outcome.kind === 'ambiguous') {
+        this.#reportAmbiguousNoteTitle(contact.fullName)
+      } else if (outcome.kind === 'unavailable') {
+        this.#reportUnavailableNoteTitle(contact.fullName)
+      }
+    } catch (error: unknown) {
+      logger.error('create-person-note failed:', error)
+      operations.fail('Creating note', errorMessage(error))
     }
   }
 

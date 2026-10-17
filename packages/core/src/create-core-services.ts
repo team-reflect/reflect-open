@@ -1146,6 +1146,7 @@ export function composeCoreServices(
       noteFile,
       settings,
       graphSession,
+      logger,
     }),
     meetings: create.meetings({
       noteFile,

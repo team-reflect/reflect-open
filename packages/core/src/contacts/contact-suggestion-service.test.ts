@@ -3,6 +3,7 @@ import {
   createTestContactsService,
   createTestFileChangeService,
   createTestGraphSessionService,
+  createTestLoggerService,
   createTestNoteFileService,
   createTestNoteSession,
   createTestSettingsService,
@@ -73,6 +74,7 @@ function contactSuggestionsOver(deps?: {
     noteFile,
     settings: deps?.settings ?? createTestSettingsService(),
     graphSession: deps?.graphSession ?? createTestGraphSessionService({ graph: { generation: 3 } }),
+    logger: createTestLoggerService(),
   })
 }
 
