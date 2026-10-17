@@ -1,5 +1,5 @@
 use super::resolve::resolve;
-use crate::error::{AppError, AppResult as Result};
+use reflect_types::{AppError, AppResult as Result};
 use serde::Deserialize;
 use serde_json::Value;
 use std::fs::{self, File};

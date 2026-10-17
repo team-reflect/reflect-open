@@ -1,0 +1,49 @@
+[package]
+name = "reflect-graph-io"
+version = "0.0.0"
+edition = "2021"
+description = "Graph file IO with no Tauri in it: the open graph session, atomic note writes, the traversal guard, the per-graph lock, the Reflect V1 import, the X archive store and the conflict ladder."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tempfile = { workspace = true }
+tracing = "0.1.44"
+infer = "0.22.0"
+reconcile-text = "0.13.2"
+jiff = { version = "0.2.38", default-features = false, features = ["std"] }
+# The own-writes record and the conflict shadow store hash content as git
+# blobs; the merge ladder's diff3 is libgit2's. Vendored and static, like the
+# desktop crate (libssh2 and openssl must never link against homebrew dylibs).
+git2 = { version = "0.21.0", default-features = false, features = [
+  "https",
+  "ssh",
+  "vendored-libgit2",
+  "vendored-openssl",
+] }
+# Reflect V1 exports are zip archives of the graph-folder layout; their
+# remote assets are downloaded with reqwest on tokio.
+zip = { version = "9.0.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
+tokio = { version = "1.53.3", features = ["rt", "sync", "fs", "io-util"] }
+reflect-graph-paths = { workspace = true }
+reflect-types = { workspace = true, features = ["git2"] }
+reflect-index-schema = { path = "../index-schema", default-features = false }
+
+# Sync-exclusion marking on `.reflect/` and `.git/` (iCloud and backup resource
+# keys, plus the file-provider and Dropbox ignore xattrs on macOS), and the
+# dataless-materialization policy around note reads.
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+core-foundation = "0.10.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+xattr = "1.6.1"
+
+[features]
+# Test-only helpers that bypass the revision check and the graph lock.
+test-support = []
+
+[dev-dependencies]
+proptest = "1.11.0"
+tokio = { version = "1.53.3", features = ["rt", "macros"] }

@@ -6,7 +6,7 @@ use std::path::Path;
 use git2::{IndexEntry, IndexTime, Oid, Repository, RepositoryInitOptions, Signature};
 
 use crate::error::{AppError, AppResult};
-use crate::graph_gitignore;
+use reflect_graph_io::graph_gitignore;
 
 /// The branch Reflect creates for new backup repos. Adopted repos keep
 /// whatever branch their HEAD already points at — nothing below hardcodes it.

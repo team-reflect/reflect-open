@@ -93,7 +93,7 @@ async fn serve<R: Runtime>(
     let count = end - start + 1;
     let name = receipt.name.clone();
     let body = tauri::async_runtime::spawn_blocking(move || -> crate::error::AppResult<Vec<u8>> {
-        let path = super::resolve::resolve(&root, &format!("assets/x/{name}"))?;
+        let path = super::resolve(&root, &format!("assets/x/{name}"))?;
         let mut file = File::open(path)?;
         if file.metadata()?.len() != receipt.bytes {
             return Err(crate::error::AppError::io("file-changed"));

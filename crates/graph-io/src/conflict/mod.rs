@@ -18,7 +18,7 @@
 pub mod copy;
 mod frontmatter;
 pub mod ladder;
-pub(crate) mod merge3;
+pub mod merge3;
 pub mod shadow;
 mod total;
 mod union;

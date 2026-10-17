@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 
 use reflect_graph_paths::to_slash_lossy;
 
-use crate::error::{AppError, AppResult};
+use reflect_types::{AppError, AppResult};
 
 /// Content identity for merge-pair tracking, via the vendored libgit2
 /// (no extra hashing dependency). A hashing failure is an error, not a
@@ -100,7 +100,7 @@ impl ShadowStore {
         let path = self
             .entry_path(rel, "")
             .ok_or_else(|| AppError::io(format!("invalid shadow path: {rel}")))?;
-        crate::fs::atomic_write_bytes(&self.root, &path, content.as_bytes())?;
+        crate::io::atomic_write_bytes(&self.root, &path, content.as_bytes())?;
         Ok(())
     }
 
@@ -148,7 +148,7 @@ impl ShadowStore {
             .entry_path(rel, ".pair")
             .ok_or_else(|| AppError::io(format!("invalid shadow path: {rel}")))?;
         let (low, high) = if a <= b { (a, b) } else { (b, a) };
-        crate::fs::atomic_write_bytes(&self.root, &path, format!("{low}\n{high}\n").as_bytes())?;
+        crate::io::atomic_write_bytes(&self.root, &path, format!("{low}\n{high}\n").as_bytes())?;
         Ok(())
     }
 
@@ -178,10 +178,10 @@ impl ShadowStore {
     }
 
     /// Map a graph-relative note path into the store, refusing anything the
-    /// shared traversal guard would ([`crate::fs::ensure_relative`]). Store
+    /// shared traversal guard would ([`crate::ensure_relative`]). Store
     /// paths mirror note paths one-to-one.
     fn entry_path(&self, rel: &str, suffix: &str) -> Option<PathBuf> {
-        crate::fs::ensure_relative(rel).ok()?;
+        crate::ensure_relative(rel).ok()?;
         Some(self.dir.join(format!("{rel}{suffix}")))
     }
 }

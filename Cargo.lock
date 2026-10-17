@@ -5008,6 +5008,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "reflect-graph-io"
+version = "0.0.0"
+dependencies = [
+ "core-foundation 0.10.1",
+ "git2",
+ "infer",
+ "jiff",
+ "proptest",
+ "reconcile-text",
+ "reflect-graph-paths",
+ "reflect-index-schema",
+ "reflect-types",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "xattr",
+ "zip 9.0.4",
+]
+
+[[package]]
 name = "reflect-graph-paths"
 version = "0.1.0"
 dependencies = [
@@ -5056,8 +5080,6 @@ dependencies = [
  "hf-hub",
  "http-range-header",
  "image",
- "infer",
- "jiff",
  "keyring-core",
  "log",
  "notify",
@@ -5071,7 +5093,7 @@ dependencies = [
  "objc2-ui-kit",
  "percent-encoding",
  "proptest",
- "reconcile-text",
+ "reflect-graph-io",
  "reflect-graph-paths",
  "reflect-index",
  "reflect-index-schema",
@@ -5104,7 +5126,6 @@ dependencies = [
  "walkdir",
  "windows-native-keyring-store",
  "xattr",
- "zip 9.0.4",
 ]
 
 [[package]]
