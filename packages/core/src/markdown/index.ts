@@ -8,7 +8,6 @@ export {
   gistFrontmatterSchema,
   isPinned,
   pinnedOrder,
-  PARSED_NOTE_VERSION,
   type Frontmatter,
   type GistFrontmatter,
   type Span,

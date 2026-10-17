@@ -168,15 +168,6 @@ export interface AssetRef extends Span {
   path: string
 }
 
-/** Version of the extraction contract; bump on breaking shape changes.
- * 1 — Plan 03 baseline · 2 — `tasks: ParsedTask[]` (with `dueDate`) added (Plan 18) ·
- * 3 — tasks limited to round Meowdown `+ [ ]` / `+ [x]` syntax; square checklist
- * checkboxes are excluded.
- * 4 — task rows carry parent outline/list breadcrumbs.
- * 5 — tasks are projected from the block AST (`ParsedTask`): addressed by AST
- * path, round tasks inside blockquotes included, text kept as Markdown. */
-export const PARSED_NOTE_VERSION = 5
-
 /** The full parse of one note — the stable contract downstream plans depend on. */
 export interface ParsedNote {
   /** Graph-relative path; the note's identity in the first wave. */
