@@ -438,7 +438,7 @@ class BackupServiceImpl implements BackupService {
     const failed = this.#state.phase === 'connected' && this.#state.status.state === 'error'
     if (!activity.isHidden() && !failed) {
       try {
-        const credential: GitCredential | null = await getCredential()
+        const credential = await getCredential()
         const tip = await git.remoteHead(credential, this.#generation)
         if (this.#engine !== engine) {
           return
