@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { isAppError } from '../errors.ts'
 import { CLAIM_TIER, projectNoteAliases } from '../indexing/indexed-note.ts'
 import type { WikiResolverService, WikiTargetMatch } from '../indexing/wiki-resolver-service.ts'
@@ -35,7 +36,7 @@ export interface NoteLinkResolverService {
     target: string,
     generation: number,
     sourcePath?: string,
-  ): Promise<ExistingWikiTargetResolution>
+  ): MaybePromise<ExistingWikiTargetResolution>
   /**
    * Resolve a standard Markdown note href from the note that contains it.
    */
@@ -43,7 +44,7 @@ export interface NoteLinkResolverService {
     sourcePath: string,
     href: string,
     generation: number,
-  ): Promise<ExistingWikiTargetResolution>
+  ): MaybePromise<ExistingWikiTargetResolution>
 }
 
 type ExistingMatchResolution = Exclude<ExistingWikiTargetResolution, { kind: 'missing' }>

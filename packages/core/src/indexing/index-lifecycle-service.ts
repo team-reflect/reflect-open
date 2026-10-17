@@ -483,7 +483,11 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     this.#liveUnlisten = null
     this.#suspended = false
     this.#emitProgress('idle')
-    await this.#deps.fileChanges.stopWatcher().catch(() => {})
+    try {
+      await this.#deps.fileChanges.stopWatcher()
+    } catch {
+      // Stopping is best effort: the watcher may already be gone.
+    }
   }
 
   suspend(): void {

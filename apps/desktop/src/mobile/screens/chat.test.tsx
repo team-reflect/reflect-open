@@ -1,6 +1,13 @@
 import { page } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useState, type ReactElement, type ReactNode } from 'react'
+import {
+  createRef,
+  useLayoutEffect,
+  useState,
+  type ReactElement,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { aiKeySecretName, type AiProviderConfig, type ChatStreamEvent } from '@reflect/core'
 import {
   createTestCoreServices,
@@ -8,6 +15,7 @@ import {
   createTestSecretStoreService,
   type TestChatEngineService,
 } from '@reflect/core/testing'
+import type { Route } from '@/routing/route.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -56,10 +64,18 @@ function scriptTurn(events: ChatStreamEvent[]) {
   chatEngine.setScript(events)
 }
 
-let probedRoute: unknown = null
+const probedRouteRef: RefObject<Route | null> = createRef()
 
 function RouteProbe(): null {
-  probedRoute = useRouter().route
+  const { route } = useRouter()
+
+  useLayoutEffect(() => {
+    probedRouteRef.current = route
+    return () => {
+      probedRouteRef.current = null
+    }
+  }, [route])
+
   return null
 }
 
@@ -108,7 +124,7 @@ describe('MobileChat', () => {
 
     await page.getByRole('button', { name: 'Add an AI provider' }).click()
 
-    expect(probedRoute).toEqual({ kind: 'settings' })
+    expect(probedRouteRef.current).toEqual({ kind: 'settings' })
   })
 
   it('sends the draft from the composer and renders the streamed turn', async () => {

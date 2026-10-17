@@ -130,7 +130,7 @@ export interface AttachmentService {
   /**
    * The open graph's catalog, waiting for its first listing. Rejects when no graph is open.
    */
-  loadCatalog(): Promise<AttachmentCatalog>
+  loadCatalog(): MaybePromise<AttachmentCatalog>
   /**
    * Load the catalog of `generation` and keep it fresh: re-list when a batch
    * names an attachment path, or on a reconcile request.
@@ -166,7 +166,7 @@ export interface AttachmentService {
     notePath: string,
     source: string,
     generation: number,
-  ): Promise<string | undefined>
+  ): MaybePromise<string | undefined>
   /**
    * An attachment embed renders as an image or a file pill, a note as a link
    * chip to it, and an unsafe path stays literal (undefined).
@@ -181,7 +181,7 @@ export interface AttachmentService {
    * session first, then the catalog. Undefined for anything else, a file the
    * catalog doesn't list, or a failed listing.
    */
-  resolveFileInfo(notePath: string, href: string): Promise<{ size: number } | undefined>
+  resolveFileInfo(notePath: string, href: string): MaybePromise<{ size: number } | undefined>
   /**
    * Stream a pasted or dropped file into `assets/`. Known image types get
    * `pasted-<now>.<ext>` names; everything else keeps its sanitized original
@@ -189,7 +189,7 @@ export interface AttachmentService {
    * get a status-line warning after they land. Resolves `null`, saving
    * nothing, when no graph is open.
    */
-  saveFile(file: File): Promise<AssetSaveResult | null>
+  saveFile(file: File): MaybePromise<AssetSaveResult | null>
   createSaveScope(): AttachmentSaveScope
   /**
    * The Attach file… command: each picked source copied into
@@ -197,13 +197,13 @@ export interface AttachmentService {
    * note's editor. Copy failures and a closed editor are reported as one
    * failed operation. Does nothing when no graph is open.
    */
-  attachFilesToNote(request: AttachFilesRequest): Promise<void>
+  attachFilesToNote(request: AttachFilesRequest): MaybePromise<void>
   /**
    * Open an attachment in its default app. A refused open falls back to
    * revealing the file; failures surface as operations, never a rejection.
    * Does nothing when no graph is open.
    */
-  openOrReveal(path: string): Promise<void>
+  openOrReveal(path: string): MaybePromise<void>
 }
 
 /**
@@ -266,7 +266,7 @@ export function wikiEmbedDisplay(target: string): WikiEmbedDisplay | undefined {
 }
 
 export interface AttachmentSaveScopeDeps {
-  readonly save: (file: File) => Promise<AssetSaveResult | null>
+  readonly save: (file: File) => MaybePromise<AssetSaveResult | null>
 }
 
 class AttachmentSaveScopeImpl implements AttachmentSaveScope {

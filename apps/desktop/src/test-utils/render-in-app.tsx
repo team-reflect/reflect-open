@@ -209,9 +209,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
                 {route === null ? (
                   wrapped
                 ) : (
-                  <RouterProvider {...(route === undefined ? {} : { initialRoute: route })}>
-                    {wrapped}
-                  </RouterProvider>
+                  <RouterProvider initialRoute={route}>{wrapped}</RouterProvider>
                 )}
               </TooltipProvider>
             </GraphProvider>

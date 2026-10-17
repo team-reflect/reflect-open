@@ -1,6 +1,13 @@
 import { page } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
-import { useEffect, type ReactElement, type ReactNode } from 'react'
+import {
+  createRef,
+  useEffect,
+  useLayoutEffect,
+  type ReactElement,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { act } from '@/test-utils/act.ts'
 import { createSystemClock, type ClockService } from '@reflect/core'
 import { createTestCoreServices, createTestClockService } from '@reflect/core/testing'
@@ -171,9 +178,17 @@ describe('DailyStream', () => {
   it('reports the focused day so the sidebar can follow it within the stream', async () => {
     const today = todayIso()
     const dayWindow = createDayWindow(today)
-    let focused: string | null = 'unset'
+    const focusedRef: RefObject<string | null> = createRef()
     function FocusProbe(): null {
-      focused = useFocusedDailyDate()
+      const focused = useFocusedDailyDate()
+
+      useLayoutEffect(() => {
+        focusedRef.current = focused
+        return () => {
+          focusedRef.current = null
+        }
+      }, [focused])
+
       return null
     }
     const view = await renderStream(
@@ -197,7 +212,7 @@ describe('DailyStream', () => {
       fireEvent.focusIn(row)
     })
 
-    expect(focused).toBe(date)
+    expect(focusedRef.current).toBe(date)
     await view.unmount()
   })
 
