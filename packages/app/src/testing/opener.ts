@@ -34,13 +34,12 @@ class TestOpenerServiceImpl implements TestOpenerService {
             }
             this.#opened.push(url)
           }),
-        revealItemInDir: (path) =>
-          Promise.try(() => {
+        revealItemInDir: (path) => {
             if (this.#failure !== null) {
               throw this.#failure.error
             }
             this.#revealed.push(path)
-          }),
+          }
       },
       logger,
     })

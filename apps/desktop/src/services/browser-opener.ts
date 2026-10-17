@@ -9,6 +9,6 @@ export function createBrowserOpenerTransport(): OpenerTransport {
       window.open(url, '_blank', 'noopener')
     },
     revealItemInDir: (path) =>
-      Promise.reject(new Error(`cannot reveal ${path}: the browser has no file manager`)),
+     { throw new Error(`cannot reveal ${path}: the browser has no file manager`)},
   }
 }
