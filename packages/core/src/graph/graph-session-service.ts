@@ -540,9 +540,13 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
       // those downloads; the materialized files index via ordinary watcher
       // upserts. Rust resolves against the active root itself.
       this.#deps.indexLifecycle.onStalePlaceholders((paths) => {
-        this.#deps.icloudNative.requestDownloads(paths).catch((err: unknown) => {
-          this.#deps.logger.error('iCloud download request failed:', errorMessage(err))
-        })
+        void (async () => {
+          try {
+            await this.#deps.icloudNative.requestDownloads(paths)
+          } catch (err: unknown) {
+            this.#deps.logger.error('iCloud download request failed:', errorMessage(err))
+          }
+        })()
       }),
       this.#deps.indexLifecycle.followActivity(),
     ]

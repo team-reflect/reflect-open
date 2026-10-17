@@ -258,7 +258,7 @@ class TestICloudNativeServiceImpl implements TestICloudNativeService {
     this.#pending = options?.pendingCount ?? 0
   }
 
-  async status(): Promise<IcloudStatus> {
+  status(): IcloudStatus {
     this.#log.push({ method: 'status', args: [] })
     return { ...this.#status, existingGraphRoots: [...this.#status.existingGraphRoots] }
   }
@@ -276,25 +276,25 @@ class TestICloudNativeServiceImpl implements TestICloudNativeService {
     return await this.#scan(scanOptions)
   }
 
-  async watchStart(root: string): Promise<void> {
+  watchStart(root: string): void {
     this.#log.push({ method: 'watchStart', args: [root] })
   }
 
-  async watchStop(): Promise<void> {
+  watchStop(): void {
     this.#log.push({ method: 'watchStop', args: [] })
   }
 
-  async downloadPending(root: string, scope: IcloudDownloadScope): Promise<number> {
+  downloadPending(root: string, scope: IcloudDownloadScope): number {
     this.#log.push({ method: 'downloadPending', args: [root, scope] })
     return this.#pending
   }
 
-  async pendingCount(root: string, scope: IcloudDownloadScope): Promise<number> {
+  pendingCount(root: string, scope: IcloudDownloadScope): number {
     this.#log.push({ method: 'pendingCount', args: [root, scope] })
     return this.#pending
   }
 
-  async requestDownloads(paths: string[]): Promise<number> {
+  requestDownloads(paths: string[]): number {
     this.#log.push({ method: 'requestDownloads', args: [paths] })
     return paths.length
   }

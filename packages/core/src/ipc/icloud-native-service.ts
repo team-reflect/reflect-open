@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { listenNow, type IpcBridgeService } from './ipc-service.ts'
@@ -106,18 +107,18 @@ export interface ICloudNativeService {
   /**
    * Resolve iCloud container availability.
    */
-  status(): Promise<IcloudStatus>
+  status(): MaybePromise<IcloudStatus>
   /**
    * Copy the open graph into the iCloud container and return the new root
    * (Plan 21 Phase 1 move-in). The copy is count+byte verified; the original
    * graph stays untouched at its old path as the recovery copy. The caller
    * re-opens the graph at the returned root and runs a baseline conflict scan.
    */
-  adoptGraph(generation: number): Promise<string>
+  adoptGraph(generation: number): MaybePromise<string>
   /**
    * Run an iCloud conflict sweep over the open graph (Plan 21 Phase 2).
    */
-  conflictsScan(options: IcloudScanOptions): Promise<IcloudSweepOutcome>
+  conflictsScan(options: IcloudScanOptions): MaybePromise<IcloudSweepOutcome>
   /**
    * Start the iCloud metadata-query watch over `root` (Plan 21 Phase 2): its
    * snapshot diffs emit as `index:changed` batches and conflict paths reach
@@ -125,25 +126,25 @@ export interface ICloudNativeService {
    * already reports iCloud writes, and the query's container-wide gather is
    * what pinned `fileproviderd` there (issue #1180).
    */
-  watchStart(root: string): Promise<void>
+  watchStart(root: string): MaybePromise<void>
   /**
    * Stop the active iCloud watch (graph switch). Idempotent.
    */
-  watchStop(): Promise<void>
+  watchStop(): MaybePromise<void>
   /**
    * Asks iCloud to download every not-yet-local file in `scope` under `root`,
    * returning how many placeholders were found. iOS does not pull container
    * files down eagerly; call this once per open/resume for iCloud graphs, then
    * poll {@link pendingCount} while the count stays above zero.
    */
-  downloadPending(root: string, scope: IcloudDownloadScope): Promise<number>
+  downloadPending(root: string, scope: IcloudDownloadScope): MaybePromise<number>
   /**
    * Counts the not-yet-local placeholders in `scope` under `root` without
    * requesting anything — the poll half of {@link downloadPending}:
    * re-requesting thousands of in-flight downloads every tick is wasted
    * traffic.
    */
-  pendingCount(root: string, scope: IcloudDownloadScope): Promise<number>
+  pendingCount(root: string, scope: IcloudDownloadScope): MaybePromise<number>
   /**
    * Requests iCloud downloads for specific graph-relative paths in the active
    * graph — the reconcile's targeted follow-up for evicted notes whose index
@@ -152,7 +153,7 @@ export interface ICloudNativeService {
    * re-downloaded wholesale. Returns how many requests were issued; a no-op
    * for an empty list.
    */
-  requestDownloads(paths: readonly string[]): Promise<number>
+  requestDownloads(paths: readonly string[]): MaybePromise<number>
   /**
    * Subscribe to the iCloud watch's conflict signal: graph-relative paths the
    * metadata query currently reports as carrying unresolved conflict versions.

@@ -263,9 +263,13 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
       disposeOne()
     }
     if (metadataWatch) {
-      void icloudNative.watchStop().catch(() => {
-        // Shutdown/switch race — the next start replaces the watch anyway.
-      })
+      void (async () => {
+        try {
+          await icloudNative.watchStop()
+        } catch {
+          // Shutdown/switch race — the next start replaces the watch anyway.
+        }
+      })()
     }
   }
 
