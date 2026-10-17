@@ -9,6 +9,7 @@ members = [
   "apps/desktop/src-tauri",
   "apps/native-host",
   "crates/graph-paths",
+  "crates/index",
   "crates/index-schema",
   "crates/types",
   "plugins/tauri-plugin-app-store",
@@ -28,6 +29,7 @@ sha2 = "0.11.1"
 tempfile = "3.27.0"
 reflect-graph-paths = { path = "crates/graph-paths" }
 reflect-types = { path = "crates/types" }
+reflect-index = { path = "crates/index" }
 tauri = "2.12.1"
 tauri-plugin = { version = "2.7.1", features = ["build"] }
 thiserror = "2.0.21"

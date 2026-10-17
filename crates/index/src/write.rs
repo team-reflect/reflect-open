@@ -7,7 +7,7 @@
 use rusqlite::{params, Connection};
 use serde::Deserialize;
 
-use crate::error::AppResult;
+use reflect_types::{AppError, AppResult};
 
 /// A note's extracted projection, built in TS (Plan 03) and applied as one
 /// row-set. Mirrors the `indexedNoteSchema` zod contract in
@@ -224,9 +224,8 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
             "INSERT INTO tasks(note_path, ast_path, markdown, breadcrumbs, checked, due_date) VALUES(?1, ?2, ?3, ?4, ?5, ?6)",
         )?;
         for task in &note.tasks {
-            let breadcrumbs = serde_json::to_string(&task.breadcrumbs).map_err(|err| {
-                crate::error::AppError::io(format!("serialize task breadcrumbs: {err}"))
-            })?;
+            let breadcrumbs = serde_json::to_string(&task.breadcrumbs)
+                .map_err(|err| AppError::io(format!("serialize task breadcrumbs: {err}")))?;
             stmt.execute(params![
                 note.path,
                 task.ast_path,
@@ -288,7 +287,7 @@ pub(super) fn move_note(
         .prepare_cached("SELECT 1 FROM notes WHERE path = ?1")?
         .exists(params![to])?;
     if occupied {
-        return Err(crate::error::AppError::io(format!(
+        return Err(AppError::io(format!(
             "cannot move note: {to} is already indexed"
         )));
     }

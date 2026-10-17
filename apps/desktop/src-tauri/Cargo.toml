@@ -38,13 +38,11 @@ percent-encoding = "2.3.2"
 tokio = { version = "1.53.3", features = ["time", "sync", "fs", "io-util"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-# `hooks` adds the authorizer API used to lock the read-only `db_query` bridge
-# down to pure reads (deny ATTACH/DETACH/PRAGMA); see `db/query.rs`.
-rusqlite = { workspace = true, features = ["hooks"] }
 reconcile-text = "0.13.2"
 reflect-index-schema = { path = "../../../crates/index-schema" }
 reflect-graph-paths = { workspace = true }
 reflect-types = { workspace = true, features = ["git2", "rusqlite"] }
+reflect-index = { workspace = true }
 tempfile = { workspace = true }
 sha2 = { workspace = true }
 dirs = "7.0.0"

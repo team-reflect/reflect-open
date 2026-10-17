@@ -9,7 +9,7 @@ use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
 use rusqlite::{params_from_iter, Connection};
 use serde_json::{Map, Value};
 
-use crate::error::{AppError, AppResult};
+use reflect_types::{AppError, AppResult};
 
 /// Authorize only pure reads of our own projection. `Statement::readonly()`
 /// (checked in [`run_query`]) already rejects writes, but SQLite still considers

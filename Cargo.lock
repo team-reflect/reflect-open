@@ -5018,6 +5018,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "reflect-index"
+version = "0.0.0"
+dependencies = [
+ "reflect-index-schema",
+ "reflect-types",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
 name = "reflect-index-schema"
 version = "0.1.0"
 dependencies = [
@@ -5060,10 +5073,10 @@ dependencies = [
  "proptest",
  "reconcile-text",
  "reflect-graph-paths",
+ "reflect-index",
  "reflect-index-schema",
  "reflect-types",
  "reqwest 0.12.28",
- "rusqlite",
  "serde",
  "serde_json",
  "sha2 0.11.1",
