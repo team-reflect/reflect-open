@@ -919,7 +919,8 @@ mod note_revision_tests {
 #[cfg(test)]
 mod graph_delete_race_tests {
     use super::{
-        root_for_generation, with_graph_lock, write_note_revision, GraphInner, GraphState,
+        invalidate_for_delete, root_for_generation, with_graph_lock, write_note_revision,
+        GraphInner, GraphState,
     };
     use crate::graph_lock;
     use std::sync::{mpsc, Mutex};
@@ -950,10 +951,7 @@ mod graph_delete_race_tests {
                 with_graph_lock(root, || {
                     locked_tx.send(()).unwrap();
                     release_rx.recv().unwrap();
-                    let mut inner = graph.0.lock().unwrap();
-                    inner.root = None;
-                    inner.generation += 1;
-                    drop(inner);
+                    invalidate_for_delete(graph, 1)?;
                     std::fs::remove_dir_all(root)?;
                     Ok(())
                 })
