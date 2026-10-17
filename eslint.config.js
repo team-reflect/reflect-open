@@ -59,7 +59,9 @@ const viMockAllowlistRule = {
 
 /**
  * `MaybePromise<T>` from `@reflect/utils`, not a hand-written `T | Promise<T>`.
- * The rule compares the source text of the union members.
+ * The rule compares the source text of the union members. It skips the
+ * definition itself: a generic type alias whose whole body is `P | Promise<P>`
+ * for one of its type parameters `P`.
  */
 const maybePromiseRule = {
   meta: {
@@ -71,6 +73,10 @@ const maybePromiseRule = {
   },
   create(context) {
     const text = (node) => context.sourceCode.getText(node)
+    const isDefinition = (union, value) =>
+      union.parent.type === 'TSTypeAliasDeclaration' &&
+      union.types.length === 2 &&
+      union.parent.typeParameters?.params.some((param) => param.name.name === text(value))
     return {
       TSUnionType(node) {
         const members = new Set(node.types.map(text))
@@ -85,6 +91,9 @@ const maybePromiseRule = {
             continue
           }
           const values = args[0].type === 'TSUnionType' ? args[0].types : args
+          if (isDefinition(node, args[0])) {
+            return
+          }
           if (values.every((value) => members.has(text(value)))) {
             context.report({ node, messageId: 'useMaybePromise' })
             return
@@ -352,8 +361,6 @@ export default defineESLintConfig(
   },
   {
     files: [`**/*.${SOURCE_EXTENSIONS}`],
-    // The definition of `MaybePromise`.
-    ignores: ['packages/utils/src/types.ts'],
     plugins: { architecture: architecturePlugin },
     rules: { 'architecture/maybe-promise': 'error' },
   },
