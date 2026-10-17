@@ -350,7 +350,6 @@ export default defineESLintConfig(
       '@typescript-eslint/require-await': 'off',
       'no-var': 'off',
       'react-hooks/exhaustive-deps': 'off',
-      'react-hooks/globals': 'off',
       'regexp/no-super-linear-backtracking': 'off',
       'unicorn/no-computed-property-existence-check': 'off',
       'unicorn/no-unnecessary-splice': 'off',
