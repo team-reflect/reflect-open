@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { errorMessage, type LoggerService } from '@reflect/core'
 
 /**
@@ -31,8 +32,8 @@ export interface OpenerService {
  * The native operations behind an {@link OpenerService}.
  */
 export interface OpenerTransport {
-  openUrl(url: string): Promise<void>
-  revealItemInDir(path: string): Promise<void>
+  openUrl(url: string): MaybePromise<void>
+  revealItemInDir(path: string): MaybePromise<void>
 }
 
 const SYSTEM_SETTINGS_URLS: Record<SystemSettingsPane, string> = {
@@ -52,19 +53,23 @@ class OpenerServiceImpl implements OpenerService {
     this.#deps = deps
   }
 
-  openUrl(url: string): Promise<void> {
-    return this.#deps.transport.openUrl(url)
+  async openUrl(url: string): Promise<void> {
+    await this.#deps.transport.openUrl(url)
   }
 
   openUrlSync(url: string): void {
     const { transport, logger } = this.#deps
-    void transport.openUrl(url).catch((cause: unknown) => {
-      logger.error(`failed to open ${url}:`, errorMessage(cause))
-    })
+    void (async () => {
+      try {
+        await transport.openUrl(url)
+      } catch (cause: unknown) {
+        logger.error(`failed to open ${url}:`, errorMessage(cause))
+      }
+    })()
   }
 
-  revealInFileManager(path: string): Promise<void> {
-    return this.#deps.transport.revealItemInDir(path)
+  async revealInFileManager(path: string): Promise<void> {
+    await this.#deps.transport.revealItemInDir(path)
   }
 
   openSystemSettings(pane: SystemSettingsPane): void {

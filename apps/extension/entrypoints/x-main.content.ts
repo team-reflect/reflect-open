@@ -9,12 +9,27 @@ declare global {
   }
 }
 
+function getDispose(): VoidFunction | undefined {
+  if (typeof window === 'undefined') return
+  return window.__reflectXCaptureDispose
+}
+
+function setDispose(dispose: VoidFunction): void {
+  if (typeof window === 'undefined') return
+  window.__reflectXCaptureDispose = dispose
+}
+
+function clearDispose(): void {
+  if (typeof window === 'undefined') return
+  delete window.__reflectXCaptureDispose
+}
+
 export default defineContentScript({
   matches: ['https://x.com/*'],
   runAt: 'document_start',
   world: 'MAIN',
   main() {
-    window.__reflectXCaptureDispose?.()
+    getDispose()?.()
     const observer = observeXTweets({ capacity: 200, keepRaw: false })
     const closeBridge = exposeXTweets(observer, {
       channel: X_CAPTURE_CHANNEL,
@@ -24,13 +39,13 @@ export default defineContentScript({
       closeBridge()
       observer.dispose()
       window.removeEventListener('pagehide', onPageHide)
-      if (window.__reflectXCaptureDispose === dispose) delete window.__reflectXCaptureDispose
+      if (getDispose() === dispose) clearDispose()
     }
     function onPageHide(event: PageTransitionEvent): void {
       // A bfcache restore keeps the same document and must retain its observer.
       if (!event.persisted) dispose()
     }
-    window.__reflectXCaptureDispose = dispose
+    setDispose(dispose)
     window.addEventListener('pagehide', onPageHide)
   },
 })

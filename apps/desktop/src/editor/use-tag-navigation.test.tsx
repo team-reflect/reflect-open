@@ -1,13 +1,21 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ReactNode } from 'react'
+import { createRef, useLayoutEffect, type ReactNode, type RefObject } from 'react'
 import { useRouter } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { useTagNavigation } from './use-tag-navigation.ts'
+import { useTagNavigation, type TagNavigation } from './use-tag-navigation.ts'
 
-let lastHandler: ((tag: string) => void) | null = null
+const lastHandlerRef: RefObject<TagNavigation | null> = createRef()
 
 function Host(): ReactNode {
-  lastHandler = useTagNavigation()
+  const lastHandler = useTagNavigation()
+
+  useLayoutEffect(() => {
+    lastHandlerRef.current = lastHandler
+    return () => {
+      lastHandlerRef.current = null
+    }
+  }, [lastHandler])
+
   return null
 }
 
@@ -32,7 +40,7 @@ function currentRoute(view: Awaited<ReturnType<typeof renderHost>>): string {
 describe('useTagNavigation', () => {
   it('opens All Notes filtered by the clicked tag', async () => {
     const view = await renderHost()
-    lastHandler?.('book')
+    lastHandlerRef.current?.('book')
     await vi.waitFor(() => {
       expect(JSON.parse(currentRoute(view))).toEqual({ kind: 'allNotes', tag: 'book' })
     })
