@@ -15,10 +15,10 @@
  * and an optional inline value. A missing colon is accepted only when the
  * label occupies the whole list item.
  */
-const EMAIL_FIELD_PATTERN = /^([ \t]*)[-+*][ \t]+emails?[ \t]*(?::[ \t]*(.*))?$/i
+const EMAIL_FIELD_PATTERN = /^([ \t]*)[-+*][ \t]+emails?[ \t]*(?::(.*))?$/i
 
 /** A nested unordered-list item, capturing indentation and value. */
-const LIST_ITEM_PATTERN = /^([ \t]*)[-+*][ \t]+(.*)$/
+const LIST_ITEM_PATTERN = /^([ \t]*)[-+*][ \t](.*)$/
 const LEADING_WHITESPACE_PATTERN = /^[ \t]*/
 const MARKDOWN_TAB_WIDTH = 4
 
@@ -34,8 +34,8 @@ const EMAIL_PATTERN = /[^\s@<>(),;:[\]]+@[^\s@<>(),;:[\]]+\.[^\s@<>(),;:[\]]+/g
  */
 export function canonicalEmail(email: string): string {
   const trimmed = email.trim()
-  const wrapped = trimmed.match(/^[^<>]*<\s*([^<>]+)>$/)
-  const address = (wrapped?.[1] ?? trimmed).replace(/^mailto:/i, '').trim()
+  const wrapped = trimmed.match(/^[^<>]*<([^<>]+)>$/)
+  const address = (wrapped?.[1]?.trimStart() ?? trimmed).replace(/^mailto:/i, '').trim()
   return address.toLowerCase()
 }
 

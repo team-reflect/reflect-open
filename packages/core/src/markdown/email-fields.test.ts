@@ -10,6 +10,13 @@ describe('canonicalEmail', () => {
     expect(canonicalEmail('<Ada@Example.COM>')).toBe('ada@example.com')
     expect(canonicalEmail('Ada Lovelace <Ada@Example.COM>')).toBe('ada@example.com')
     expect(canonicalEmail('<mailto:Ada@Example.COM>')).toBe('ada@example.com')
+    expect(canonicalEmail('Ada < mailto:Ada@Example.com>')).toBe('ada@example.com')
+  })
+
+  it('handles long whitespace runs', () => {
+    const spaces = ' '.repeat(50_000)
+    expect(canonicalEmail(`<${spaces}x`)).toBe(`<${spaces}x`)
+    expect(canonicalEmail(`<${spaces}ada@example.com>`)).toBe('ada@example.com')
   })
 
   it('preserves provider-significant dots and plus tags', () => {
@@ -128,6 +135,15 @@ describe('extractEmailFields', () => {
       '- Phone: +1 555-0100',
     ].join('\n')
     expect(extractEmailFields(body)).toEqual([])
+  })
+
+  it('handles long whitespace runs', () => {
+    const spaces = ' '.repeat(50_000)
+    expect(extractEmailFields(`- Email${spaces}x`)).toEqual([])
+    expect(extractEmailFields(`- Email:${spaces}ada@example.com`)).toEqual(['ada@example.com'])
+    expect(extractEmailFields(`- Email:\n  -${spaces}ada@example.com`)).toEqual([
+      'ada@example.com',
+    ])
   })
 
   it('yields nothing for a bullet with no parseable address', () => {
