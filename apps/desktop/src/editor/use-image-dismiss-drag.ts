@@ -223,6 +223,9 @@ export function useImageDismissDrag({
       return
     }
     if (current.action === 'close') {
+      // The drag's inline styles must be gone before `onClose` starts the
+      // view transition, or the transition snapshots the dragged image.
+      // eslint-disable-next-line @eslint-react/dom-no-flush-sync
       flushSync(() => commit(IDLE))
       onClose()
       return
