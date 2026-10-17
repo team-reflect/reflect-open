@@ -1,0 +1,25 @@
+[package]
+name = "reflect-index"
+version = "0.0.0"
+edition = "2021"
+description = "The SQLite index of a graph: the note projection writer, the read-only query bridge, the reconcile scan, chat history and embedding rows, behind one generation-gated session."
+
+[dependencies]
+# `hooks` adds the authorizer API that locks the read-only `db_query` bridge
+# down to pure reads (deny ATTACH/DETACH/PRAGMA); see `query.rs`.
+rusqlite = { workspace = true, features = ["hooks"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = "0.1.44"
+reflect-types = { workspace = true, features = ["rusqlite"] }
+# The file-backed connections (`FileIndexConnections`) need the schema crate's
+# openers; a host that owns its own connection can turn the feature off.
+reflect-index-schema = { path = "../index-schema", optional = true }
+
+[features]
+default = ["native"]
+native = ["dep:reflect-index-schema"]
+
+[dev-dependencies]
+tempfile = { workspace = true }
+reflect-index-schema = { path = "../index-schema" }
