@@ -8,7 +8,7 @@ import type {
 } from './note-link-resolver-service.ts'
 import { wikiNoteReference } from './note-reference.ts'
 import { isDaily, isTemplatePath, notePath } from './paths.ts'
-import { returnsNull, type MaybePromise } from '@reflect/utils'
+import type { MaybePromise } from '@reflect/utils'
 
 /**
  * The outcome of resolving an existing wiki target or safely creating it.
