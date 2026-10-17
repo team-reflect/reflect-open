@@ -103,17 +103,19 @@ impl IndexSession {
     }
 
     fn lock_writer(&self) -> AppResult<MutexGuard<'_, WriterInner>> {
-        self.writer.lock().map_err(|_| {
+        self.writer.lock().map_err(|err| {
             // A poisoned lock means a caller panicked while holding it; the
             // panic itself is the bug, this names the blast radius.
+            tracing::error!(?err, "index state lock poisoned by an earlier panic");
             AppError::io("index state lock poisoned")
         })
     }
 
     fn lock_reader(&self) -> AppResult<MutexGuard<'_, ReaderInner>> {
-        self.reader
-            .lock()
-            .map_err(|_| AppError::io("index read lock poisoned"))
+        self.reader.lock().map_err(|err| {
+            tracing::error!(?err, "index read lock poisoned by an earlier panic");
+            AppError::io("index read lock poisoned")
+        })
     }
 
     /// Open and migrate the index under `root`. Returns the new generation,
@@ -134,7 +136,16 @@ impl IndexSession {
         }
         writer.conn = Some(connections.open_writer(root)?);
         let mut reader = self.lock_reader()?;
-        let read_conn = connections.open_reader(root)?;
+        let read_conn = match connections.open_reader(root) {
+            Ok(conn) => conn,
+            Err(err) => {
+                // A half-open session (writer bound, no reader) must not
+                // survive: drop the writer too so every later call reports
+                // `no_graph` instead of writing to an index nobody can read.
+                writer.conn = None;
+                return Err(err);
+            }
+        };
         reader.on_writer = read_conn.is_none();
         reader.conn = read_conn;
         reader.generation = writer.generation;
