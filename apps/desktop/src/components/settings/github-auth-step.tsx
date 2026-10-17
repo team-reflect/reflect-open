@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useEffectEvent, useRef, useState, type ReactElement } from 'react'
 import type { GithubUser } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
@@ -56,6 +56,7 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
     authedRef.current = true
     onAuthed(user)
   }
+  const reportStoredUser = useEffectEvent(reportAuthed)
 
   // Already signed in with a working credential (e.g. connecting a second
   // graph) → skip the step. A stored-but-rejected credential is cleared by
@@ -66,7 +67,7 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
       .getSignedInUser()
       .then((user) => {
         if (!cancelled && user !== null) {
-          reportAuthed(user)
+          reportStoredUser(user)
         }
       })
       .catch(() => {
@@ -75,9 +76,7 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
     return () => {
       cancelled = true
     }
-    // onAuthed is a parent callback; subscribing once on mount is intended.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [githubAuth])
 
   async function verifyAndFinish(): Promise<void> {
     const user = await githubAuth.getSignedInUser()

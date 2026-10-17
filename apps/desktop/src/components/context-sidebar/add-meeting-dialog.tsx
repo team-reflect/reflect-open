@@ -75,7 +75,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
     return () => {
       cancelled = true
     }
-  }, [event, meetings, settings.contactsEnabled])
+  }, [event, logger, meetings, settings.contactsEnabled])
 
   const addAttendee = (attendee: MeetingAttendee): void => {
     setAttendees((current) => withAttendee(current, attendee))
