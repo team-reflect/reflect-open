@@ -25,10 +25,10 @@ describe('useDoubleTap', () => {
   it('pairs two taps of the same key within the window', async () => {
     const hook = await mountTaps()
     atTimes(1000, 1400)
-    act(() => {
+    await act(() => {
       expect(hook.result.current('a')).toBe(false)
     })
-    act(() => {
+    await act(() => {
       expect(hook.result.current('a')).toBe(true)
     })
   })
@@ -36,10 +36,10 @@ describe('useDoubleTap', () => {
   it('does not pair taps spaced past the window', async () => {
     const hook = await mountTaps()
     atTimes(1000, 1500)
-    act(() => {
+    await act(() => {
       expect(hook.result.current('a')).toBe(false)
     })
-    act(() => {
+    await act(() => {
       expect(hook.result.current('a')).toBe(false)
     })
   })
@@ -47,13 +47,13 @@ describe('useDoubleTap', () => {
   it('a tap of another key starts a fresh pairing', async () => {
     const hook = await mountTaps()
     atTimes(1000, 1100, 1200)
-    act(() => {
+    await act(() => {
       expect(hook.result.current('a')).toBe(false)
     })
-    act(() => {
+    await act(() => {
       expect(hook.result.current('b')).toBe(false)
     })
-    act(() => {
+    await act(() => {
       expect(hook.result.current('b')).toBe(true)
     })
   })
@@ -63,11 +63,11 @@ describe('useDoubleTap', () => {
     // the All root before the second tap — the pending tap must still pair.
     const hook = await mountTaps('a')
     atTimes(1000, 1100)
-    act(() => {
+    await act(() => {
       expect(hook.result.current('b')).toBe(false)
     })
     await hook.rerender('b')
-    act(() => {
+    await act(() => {
       expect(hook.result.current('b')).toBe(true)
     })
   })
@@ -77,12 +77,12 @@ describe('useDoubleTap', () => {
     // link, an opened note): the second tap is a return, not a double-tap.
     const hook = await mountTaps('a')
     atTimes(1000, 1100)
-    act(() => {
+    await act(() => {
       expect(hook.result.current('a')).toBe(false)
     })
     await hook.rerender(null)
     await hook.rerender('a')
-    act(() => {
+    await act(() => {
       expect(hook.result.current('a')).toBe(false)
     })
   })
@@ -90,10 +90,10 @@ describe('useDoubleTap', () => {
   it('honors a custom window', async () => {
     const hook = await renderHook(() => useDoubleTap<string>('a', 100))
     atTimes(1000, 1150)
-    act(() => {
+    await act(() => {
       expect(hook.result.current('a')).toBe(false)
     })
-    act(() => {
+    await act(() => {
       expect(hook.result.current('a')).toBe(false)
     })
   })

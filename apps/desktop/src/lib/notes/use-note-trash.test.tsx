@@ -1,4 +1,4 @@
-import { actAsync } from '@/test-utils/act.ts'
+import { act } from '@/test-utils/act.ts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createTestCoreServices,
@@ -45,7 +45,7 @@ describe('useNoteTrash', () => {
     const { result } = await mount()
 
     let trashed = false
-    await actAsync(async () => {
+    await act(async () => {
       trashed = await result.current.trash(['notes/a.md', 'notes/b.md'])
     })
 
@@ -65,7 +65,7 @@ describe('useNoteTrash', () => {
     const { result } = await mount()
 
     let trashed = true
-    await actAsync(async () => {
+    await act(async () => {
       trashed = await result.current.trash(['notes/a.md', 'notes/b.md', 'notes/c.md'])
     })
 

@@ -27,10 +27,10 @@ describe('keyboard height', () => {
     const { keyboard } = view.appServices
     expect(view.result.current).toBe(false)
 
-    act(() => keyboard.publish(316))
+    await act(() => keyboard.publish(316))
     expect(view.result.current).toBe(true)
 
-    act(() => keyboard.publish(0))
+    await act(() => keyboard.publish(0))
     expect(view.result.current).toBe(false)
     await view.unmount()
   })
@@ -42,7 +42,7 @@ describe('keyboard height', () => {
     const first = await renderHookInApp(() => useKeyboardVisible(), { app, appServices })
     const second = await renderHookInApp(() => useKeyboardVisible(), { app, appServices })
     await first.unmount()
-    act(() => keyboard.publish(280))
+    await act(() => keyboard.publish(280))
     expect(second.result.current).toBe(true)
     await second.unmount()
   })
@@ -82,14 +82,14 @@ describe('useKeyboardHeightVar', () => {
     const { keyboard } = view.appServices
 
     viewport.height = 464
-    act(() => {
+    await act(() => {
       viewport.dispatchEvent(new Event('resize'))
     })
     expect(keyboard.getHeight()).toBe(336)
     expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('336px')
 
     viewport.height = 800
-    act(() => {
+    await act(() => {
       viewport.dispatchEvent(new Event('resize'))
     })
     expect(keyboard.getHeight()).toBe(0)
@@ -102,7 +102,7 @@ describe('useKeyboardHeightVar', () => {
     const { keyboard } = view.appServices
 
     viewport.height = 745
-    act(() => {
+    await act(() => {
       viewport.dispatchEvent(new Event('resize'))
     })
     expect(keyboard.getHeight()).toBe(0)
@@ -115,17 +115,17 @@ describe('useKeyboardHeightVar', () => {
     const { keyboard } = view.appServices
 
     viewport.height = 464
-    act(() => {
+    await act(() => {
       viewport.dispatchEvent(new Event('resize'))
     })
     expect(keyboard.getHeight()).toBe(336)
 
     // iOS 26.0: the keyboard closed, but the viewport still reports 464.
     vi.useFakeTimers()
-    act(() => {
+    await act(() => {
       document.dispatchEvent(new Event('focusout'))
     })
-    act(() => {
+    await act(() => {
       vi.advanceTimersByTime(1750)
     })
     expect(keyboard.getHeight()).toBe(0)

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { actAsync } from '@/test-utils/act.ts'
+import { act } from '@/test-utils/act.ts'
 import { createThemeService, THEME_PREFERENCE_CACHE_KEY, type ThemeService } from '@reflect/app'
 import type { CoreServices, Settings } from '@reflect/core'
 import {
@@ -62,7 +62,7 @@ async function renderTheme() {
   return {
     result,
     act: async (callback: () => unknown): Promise<void> => {
-      await actAsync(async () => {
+      await act(async () => {
         await callback()
       })
     },

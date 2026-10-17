@@ -46,7 +46,7 @@ describe('useServiceState', () => {
     const screen = await render(<Counter store={store} label="count" />)
     await expect.element(screen.getByText('count 1')).toBeVisible()
 
-    act(() => {
+    await act(() => {
       store.setState(2)
     })
 

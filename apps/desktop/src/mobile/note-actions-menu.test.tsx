@@ -327,7 +327,7 @@ describe('NoteActionsMenu', () => {
     const dialog = page.getByRole('dialog')
     // The real trash reports the missing graph.
     trash.mockRestore()
-    act(() => app.graphSession.setGraph(null))
+    await act(() => app.graphSession.setGraph(null))
     await dialog.getByRole('button', { name: 'Delete' }).click()
 
     await expect.element(dialog.getByText('No graph is open.')).toBeInTheDocument()

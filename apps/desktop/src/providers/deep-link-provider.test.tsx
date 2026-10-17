@@ -113,7 +113,7 @@ describe('DeepLinkProvider', () => {
     await render(tree())
     const pending = dispatchPendingNote('x')
 
-    act(() => app.graphSession.setGraph({ ...GRAPH, generation: 8 }))
+    await act(() => app.graphSession.setGraph({ ...GRAPH, generation: 8 }))
     await pending.resolve()
 
     expect(navigated()).toEqual([])
@@ -123,7 +123,7 @@ describe('DeepLinkProvider', () => {
     const { app, deepLinkIntake, captureInbox, tree, render } = setup()
     await render(tree())
 
-    act(() => app.graphSession.setGraph({ ...GRAPH, generation: 8 }))
+    await act(() => app.graphSession.setGraph({ ...GRAPH, generation: 8 }))
     deepLinkIntake.dispatch('reflect://append?text=x')
 
     await vi.waitFor(() => expect(captureInbox.spooled()).toHaveLength(1))

@@ -1,6 +1,6 @@
 import { page } from 'vitest/browser'
 import { describe, expect, it } from 'vitest'
-import { actAsync } from '@/test-utils/act.ts'
+import { act } from '@/test-utils/act.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { CountdownText } from './countdown-text.tsx'
 
@@ -14,16 +14,16 @@ describe('CountdownText', () => {
     const countdown = page.getByTestId('countdown')
     await expect.element(countdown).toHaveTextContent('2 minutes')
 
-    await actAsync(() => app.clock.advance(1))
+    await act(() => app.clock.advance(1))
     await expect.element(countdown).toHaveTextContent('1 minute')
 
-    await actAsync(() => app.clock.advance(60_000))
+    await act(() => app.clock.advance(60_000))
     await expect.element(countdown).toHaveTextContent('59 seconds')
 
-    await actAsync(() => app.clock.advance(58_999))
+    await act(() => app.clock.advance(58_999))
     await expect.element(countdown).toHaveTextContent('1 second')
 
-    await actAsync(() => app.clock.advance(1_001))
+    await act(() => app.clock.advance(1_001))
     await expect.element(countdown).toHaveTextContent('0 seconds')
     expect(app.clock.pendingTimers()).toBe(0)
   })

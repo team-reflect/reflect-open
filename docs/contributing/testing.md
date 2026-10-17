@@ -35,8 +35,8 @@ in the core, app and desktop projects.
   without a measured reason in that file.
 - Code logs through `LoggerService`. A test of an error path passes
   `createTestLoggerService()` and asserts `logger.getErrors()`.
-- In desktop tests, import `act` or `actAsync` (awaited) from
-  `@/test-utils/act.ts`, not from `react`, so no act warning prints.
+- In desktop tests, import `act` from `@/test-utils/act.ts`, not from `react`,
+  and always await it, so no act warning prints.
 
 ## Testing a service
 

@@ -35,13 +35,13 @@ describe('useSwipeTarget', () => {
 
   it('follows a target announced by the current arrival', async () => {
     const hook = await mountSwipeTarget(ARRIVAL)
-    act(() => hook.result.current.followSwipeTarget('2026-07-07', ARRIVAL))
+    await act(() => hook.result.current.followSwipeTarget('2026-07-07', ARRIVAL))
     expect(hook.result.current.targetDate).toBe('2026-07-07')
   })
 
   it('clears the target on any new arrival', async () => {
     const hook = await mountSwipeTarget(ARRIVAL)
-    act(() => hook.result.current.followSwipeTarget('2026-07-07', ARRIVAL))
+    await act(() => hook.result.current.followSwipeTarget('2026-07-07', ARRIVAL))
 
     // A date-preserving Today tap: only the arrival identity moves.
     await hook.rerender({ navigationKey: NEXT_ARRIVAL })
@@ -54,18 +54,18 @@ describe('useSwipeTarget', () => {
     await hook.rerender({ navigationKey: NEXT_ARRIVAL })
 
     // The old swipe's deferred pointer-up work lands after Today has won.
-    act(() => hook.result.current.followSwipeTarget('2026-07-07', ARRIVAL))
+    await act(() => hook.result.current.followSwipeTarget('2026-07-07', ARRIVAL))
 
     expect(hook.result.current.targetDate).toBeNull()
   })
 
   it('keeps following the arrival that owns the gesture', async () => {
     const hook = await mountSwipeTarget(ARRIVAL)
-    act(() => hook.result.current.followSwipeTarget('2026-07-07', ARRIVAL))
+    await act(() => hook.result.current.followSwipeTarget('2026-07-07', ARRIVAL))
     await hook.rerender({ navigationKey: NEXT_ARRIVAL })
 
     // A fresh swipe under the new arrival is followed again.
-    act(() => hook.result.current.followSwipeTarget('2026-07-05', NEXT_ARRIVAL))
+    await act(() => hook.result.current.followSwipeTarget('2026-07-05', NEXT_ARRIVAL))
 
     expect(hook.result.current.targetDate).toBe('2026-07-05')
   })

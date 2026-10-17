@@ -53,7 +53,7 @@ describe('MobileFormattingToolbar', () => {
   it('renders V1 item order plus the dismiss button, with canExec-driven enablement', async () => {
     const toolbar = makeToolbar({ canDedent: false, canMoveUp: false })
     await renderInApp(<MobileFormattingToolbar />)
-    act(() => publishFormattingToolbar(owner, toolbar))
+    await act(() => publishFormattingToolbar(owner, toolbar))
 
     const buttons = page.getByRole('button').elements()
     expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
@@ -76,7 +76,7 @@ describe('MobileFormattingToolbar', () => {
 
   it('never lets a tap move focus out of the editor', async () => {
     await renderInApp(<MobileFormattingToolbar />)
-    act(() => publishFormattingToolbar(owner, makeToolbar()))
+    await act(() => publishFormattingToolbar(owner, makeToolbar()))
 
     const bullet = page.getByRole('button', { name: 'Cycle list style' })
     // fireEvent returns false when a handler called preventDefault — the
@@ -88,7 +88,7 @@ describe('MobileFormattingToolbar', () => {
   it('routes taps to the published commands', async () => {
     const toolbar = makeToolbar()
     await renderInApp(<MobileFormattingToolbar />)
-    act(() => publishFormattingToolbar(owner, toolbar))
+    await act(() => publishFormattingToolbar(owner, toolbar))
 
     fireEvent.click(page.getByRole('button', { name: 'Cycle list style' }))
     expect(toolbar.commands.cycleBulletOrderedList).toHaveBeenCalledOnce()
@@ -111,7 +111,7 @@ describe('MobileFormattingToolbar', () => {
 
   it('hides the image button for an editor that cannot persist files', async () => {
     await renderInApp(<MobileFormattingToolbar />)
-    act(() => publishFormattingToolbar(owner, makeToolbar({ canAttachFiles: false })))
+    await act(() => publishFormattingToolbar(owner, makeToolbar({ canAttachFiles: false })))
 
     expect(page.getByRole('button', { name: 'Insert image' }).query()).toBeNull()
   })
@@ -131,7 +131,7 @@ describe('MobileFormattingToolbar', () => {
     })
     const toolbar = makeToolbar()
     await renderInApp(<MobileFormattingToolbar />)
-    act(() => publishFormattingToolbar(owner, toolbar))
+    await act(() => publishFormattingToolbar(owner, toolbar))
 
     fireEvent.click(page.getByRole('button', { name: 'Insert image' }))
 

@@ -1,13 +1,13 @@
 import { act } from '@/test-utils/act.ts'
 
 /** Dispatch one primary-touch pointer event on `node`. */
-export function pointer(
+export async function pointer(
   node: Element,
   type: 'pointerdown' | 'pointermove' | 'pointerup',
   clientX: number,
   clientY: number,
-): void {
-  act(() => {
+): Promise<void> {
+  await act(() => {
     node.dispatchEvent(
       new PointerEvent(type, {
         bubbles: true,
@@ -23,14 +23,14 @@ export function pointer(
 }
 
 /** One touch swipe: down, move, up, then the click a real touch adds. */
-export function swipe(
+export async function swipe(
   surface: Element,
   from: { x: number; y: number },
   to: { x: number; y: number },
-): void {
-  pointer(surface, 'pointerdown', from.x, from.y)
-  pointer(surface, 'pointermove', to.x, to.y)
-  pointer(surface, 'pointerup', to.x, to.y)
+): Promise<void> {
+  await pointer(surface, 'pointerdown', from.x, from.y)
+  await pointer(surface, 'pointermove', to.x, to.y)
+  await pointer(surface, 'pointerup', to.x, to.y)
   // A real touch sequence synthesizes a click after pointerup; dispatchEvent
   // does not, so mirror it to exercise the row's drag-click suppression.
   const touchSurface = surface as HTMLElement

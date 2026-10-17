@@ -112,7 +112,7 @@ describe('useDailyArrivals', () => {
       arrivalFocusEditor: true,
       date: '2026-07-06',
     })
-    act(() => {
+    await act(() => {
       hook.result.current.consumeFocus()
     })
     expect(hook.result.current.focusDate).toBeNull()

@@ -94,7 +94,7 @@ describe('useWeekStrip', () => {
   it('rebuilds the window when a swipe settles near an edge and reinits onto the anchor', async () => {
     const { result } = await mountStrip()
 
-    act(() => embla.settleAt(1))
+    await act(() => embla.settleAt(1))
 
     const browsedWeek = weekAtIndex(initialWindow, 1)
     const rebuilt = createWeekWindow(browsedWeek, WEEK_START)
@@ -110,7 +110,7 @@ describe('useWeekStrip', () => {
   it('leaves a mid-window settle alone', async () => {
     const { result } = await mountStrip()
 
-    act(() => embla.settleAt(28))
+    await act(() => embla.settleAt(28))
 
     expect(result.current.weekWindow).toEqual(initialWindow)
     expect(result.current.displayedWeekStart).toBe(weekAtIndex(initialWindow, 28))
@@ -122,7 +122,7 @@ describe('useWeekStrip', () => {
 
     // Browse two weeks ahead of the selection: the echo guard must keep the
     // re-render from scrolling the strip back to the (unchanged) date's week.
-    act(() => embla.settleAt(28))
+    await act(() => embla.settleAt(28))
     expect(embla.api.scrollTo).not.toHaveBeenCalled()
 
     // A real date change is followed with a plain scroll — no rebuild.
@@ -136,7 +136,7 @@ describe('useWeekStrip', () => {
   it('showWeekOf scrolls to an in-window target', async () => {
     const { result } = await mountStrip()
 
-    act(() => result.current.showWeekOf('2026-06-19'))
+    await act(() => result.current.showWeekOf('2026-06-19'))
 
     expect(embla.api.scrollTo).toHaveBeenCalledWith(27)
     expect(result.current.displayedWeekStart).toBe(weekAtIndex(initialWindow, 27))
@@ -148,7 +148,7 @@ describe('useWeekStrip', () => {
     const target = '2027-06-12'
     expect(weekIndexOf(initialWindow, target, WEEK_START)).toBe(-1)
 
-    act(() => result.current.showWeekOf(target))
+    await act(() => result.current.showWeekOf(target))
 
     const rebuilt = createWeekWindow(target, WEEK_START)
     expect(result.current.weekWindow).toEqual(rebuilt)

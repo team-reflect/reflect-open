@@ -39,19 +39,23 @@ describe('useNoteRowOverlay', () => {
     const other = await mount('notes/b.md')
     expect(result.current).toBeNull()
 
-    act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
+    await act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
     expect(result.current?.gistUrl).toBe(URL)
     expect(other.result.current).toBeNull()
   })
 
   it('retires overlay fields independently as the index catches up', async () => {
     const { result } = await mount('notes/a.md')
-    act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL, gistStale: false }))
+    await act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL, gistStale: false }))
 
-    act(() => app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: true })))
+    await act(() =>
+      app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: true })),
+    )
     expect(result.current).toEqual({ gistStale: false })
 
-    act(() => app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: false })))
+    await act(() =>
+      app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: false })),
+    )
     expect(result.current).toBeNull()
   })
 })
@@ -59,19 +63,19 @@ describe('useNoteRowOverlay', () => {
 describe('reconcileNoteRowOverlay', () => {
   it('holds the overlay while the index still lags, retires it once they agree', async () => {
     const { result } = await mount('notes/a.md')
-    act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
+    await act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
 
-    act(() => app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: null })))
+    await act(() => app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: null })))
     expect(result.current?.gistUrl).toBe(URL) // index hasn't caught up
 
-    act(() => app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL })))
+    await act(() => app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL })))
     expect(result.current).toBeNull() // index agrees → retired
   })
 
   it('holds the overlay against a null row (nothing to compare yet)', async () => {
     const { result } = await mount('notes/a.md')
-    act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
-    act(() => app.noteRows.reconcile('notes/a.md', null))
+    await act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
+    await act(() => app.noteRows.reconcile('notes/a.md', null))
     expect(result.current?.gistUrl).toBe(URL)
   })
 })
@@ -79,18 +83,18 @@ describe('reconcileNoteRowOverlay', () => {
 describe('resetNoteRowOverlays', () => {
   it('drops every overlay (e.g. on a graph switch)', async () => {
     const { result } = await mount('notes/a.md')
-    act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
+    await act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
     expect(result.current?.gistUrl).toBe(URL)
 
-    act(() => app.noteRows.reset())
+    await act(() => app.noteRows.reset())
     expect(result.current).toBeNull()
   })
 
   it('hides the overlays of a graph once another graph opens', async () => {
     const { result } = await mount('notes/a.md')
-    act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
+    await act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
 
-    act(() => app.graphSession.setGraph({ root: '/graphs/other', generation: GEN + 1 }))
+    await act(() => app.graphSession.setGraph({ root: '/graphs/other', generation: GEN + 1 }))
     expect(result.current).toBeNull()
   })
 })

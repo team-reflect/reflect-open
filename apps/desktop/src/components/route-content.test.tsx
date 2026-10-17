@@ -1,7 +1,7 @@
 import { page } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
-import { act, actAsync } from '@/test-utils/act.ts'
+import { act } from '@/test-utils/act.ts'
 import { upsertFrontmatter } from '@reflect/core'
 import {
   createTestCoreServices,
@@ -171,8 +171,8 @@ describe('RouteContent', () => {
     const view = await renderRoute({ kind: 'note', path })
     await expect.element(page.getByLabelText(`Editing ${path}`)).toBeVisible()
 
-    act(() => editorProbe.onChange?.('# New Title\n'))
-    await actAsync(() => view.app.openDocuments.flushAll())
+    await act(() => editorProbe.onChange?.('# New Title\n'))
+    await act(() => view.app.openDocuments.flushAll())
 
     expect(noteFile.files().get(path)).toBe(
       upsertFrontmatter('# New Title\n', {
@@ -205,7 +205,7 @@ describe('RouteContent', () => {
     await vi.waitFor(() => expect(editorProbe.focusCalls).toContain('focus'))
 
     // Opening never litters the graph — even a forced flush writes nothing.
-    await actAsync(() => view.app.openDocuments.flushAll())
+    await act(() => view.app.openDocuments.flushAll())
     expect(noteFile.writes()).toEqual([])
     expect(noteFile.files().get(NEW_NOTE_PATH)).toBeUndefined()
     await view.unmount()
@@ -215,8 +215,8 @@ describe('RouteContent', () => {
     const view = await renderRoute({ kind: 'note', path: NEW_NOTE_PATH })
     await expect.element(page.getByLabelText(`Editing ${NEW_NOTE_PATH}`)).toBeVisible()
 
-    act(() => editorProbe.onChange?.('# Manifesto\n'))
-    await actAsync(() => view.app.openDocuments.flushAll())
+    await act(() => editorProbe.onChange?.('# Manifesto\n'))
+    await act(() => view.app.openDocuments.flushAll())
 
     // The seed's header rides along: the file is born with its identity
     // (`id:` frontmatter, Plan 17) plus exactly what the user typed.
@@ -235,7 +235,7 @@ describe('RouteContent', () => {
       )
       .toBeVisible()
     await expect.element(page.getByTestId('fake-editor')).not.toBeInTheDocument()
-    await actAsync(() => view.app.openDocuments.flushAll())
+    await act(() => view.app.openDocuments.flushAll())
     expect(noteFile.writes()).toEqual([])
     expect(noteFile.files().get('Projects/missing.md')).toBeUndefined()
     await view.unmount()

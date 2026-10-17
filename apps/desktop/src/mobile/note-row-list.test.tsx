@@ -119,7 +119,7 @@ describe('NoteRowList', () => {
       .toBeInTheDocument()
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
     const rect = surface.getBoundingClientRect()
-    swipe(
+    await swipe(
       surface,
       { x: rect.right - 20, y: rect.top + 32 },
       { x: rect.right - 120, y: rect.top + 32 },
@@ -161,7 +161,7 @@ describe('NoteRowList', () => {
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
     const rect = surface.getBoundingClientRect()
 
-    swipe(
+    await swipe(
       surface,
       { x: rect.right - 20, y: rect.top + 32 },
       { x: rect.right - 120, y: rect.top + 32 },
@@ -178,7 +178,7 @@ describe('NoteRowList', () => {
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
     const rect = surface.getBoundingClientRect()
 
-    swipe(
+    await swipe(
       surface,
       { x: rect.right - 20, y: rect.top + 12 },
       { x: rect.right - 22, y: rect.top + 52 },
@@ -193,7 +193,7 @@ describe('NoteRowList', () => {
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
     const rect = surface.getBoundingClientRect()
 
-    swipe(
+    await swipe(
       surface,
       { x: rect.right - 20, y: rect.top + 32 },
       { x: rect.right - 120, y: rect.top + 32 },
@@ -210,7 +210,7 @@ describe('NoteRowList', () => {
     const view = await mount(<SwipeHarness />)
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
     const rect = surface.getBoundingClientRect()
-    swipe(
+    await swipe(
       surface,
       { x: rect.right - 20, y: rect.top + 32 },
       { x: rect.right - 120, y: rect.top + 32 },
@@ -228,7 +228,7 @@ describe('NoteRowList', () => {
     )
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
     const rect = surface.getBoundingClientRect()
-    swipe(
+    await swipe(
       surface,
       { x: rect.right - 20, y: rect.top + 32 },
       { x: rect.right - 90, y: rect.top + 32 },
@@ -244,8 +244,8 @@ describe('NoteRowList', () => {
     const rect = surface.getBoundingClientRect()
 
     // No move/up reaches the row for this first armed touch.
-    pointer(surface, 'pointerdown', rect.right - 20, rect.top + 32)
-    swipe(
+    await pointer(surface, 'pointerdown', rect.right - 20, rect.top + 32)
+    await swipe(
       surface,
       { x: rect.right - 20, y: rect.top + 32 },
       { x: rect.right - 120, y: rect.top + 32 },

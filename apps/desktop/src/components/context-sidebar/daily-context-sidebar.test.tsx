@@ -2,7 +2,7 @@ import { createTestWindowService } from '@reflect/app/testing'
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import { actAsync } from '@/test-utils/act.ts'
+import { act } from '@/test-utils/act.ts'
 import type { DailyNoteService, NoteRow, RetrievalService } from '@reflect/core'
 import {
   createTestCoreServices,
@@ -137,7 +137,7 @@ describe('DailyContextSidebar calendar', () => {
     await vi.waitFor(() => expect(openNoteWindow).toHaveBeenCalledTimes(1))
     await view.rerender(sidebar('2026-06-10'))
 
-    await actAsync(async () => {
+    await act(async () => {
       pendingOpen.resolve(false)
     })
 

@@ -259,7 +259,7 @@ describe('MobileSettings', () => {
     const view = await mount()
     await user.click(page.getByRole('button', { name: /System prompt.*Default/ }))
 
-    act(() => {
+    await act(() => {
       view.app.settings.update({ chatSystemPrompt: 'Persisted instructions loaded from disk.' })
     })
     view.updateSettings.mockClear()

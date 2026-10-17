@@ -767,14 +767,14 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     // ⌘-click adds the row without clearing the rest (modifier set explicitly —
     // userEvent's held modifiers don't reach its synthetic click).
-    act(() => {
+    await act(() => {
       fireEvent.click(view.getByRole('button', { name: 'third' }), MOD_KEY)
     })
     expect([pressed('first'), pressed('second'), pressed('third')]).toEqual([true, false, true])
     expect(noteWindows.openedNoteWindows()).toEqual([])
 
     // Shift-click from the anchor (third) back to first selects the whole range.
-    act(() => {
+    await act(() => {
       fireEvent.click(view.getByRole('button', { name: 'first' }), { shiftKey: true })
     })
     expect([pressed('first'), pressed('second'), pressed('third')]).toEqual([true, true, true])
@@ -1038,7 +1038,7 @@ describe('TasksScreen', () => {
 
     await view.findByText('keep')
     await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}') // select both
-    act(() => {
+    await act(() => {
       fireEvent.keyDown(view.getByLabelText('Tasks', { exact: true }), { key: 'Backspace' })
     })
     // V1 refuses a multi-row ⌫ (which row would survive is unclear).

@@ -11,55 +11,55 @@ describe('useListSelection', () => {
   it('selects exclusively, toggles with ⌘, and ranges with shift', async () => {
     const { result } = await renderHook(() => useListSelection(KEYS))
 
-    act(() => result.current.clickSelect('b', noMods))
+    await act(() => result.current.clickSelect('b', noMods))
     expect([...result.current.selected]).toEqual(['b'])
 
-    act(() => result.current.clickSelect('d', { ...noMods, ...MOD_KEY }))
+    await act(() => result.current.clickSelect('d', { ...noMods, ...MOD_KEY }))
     expect([...result.current.selected].sort()).toEqual(['b', 'd'])
-    act(() => result.current.clickSelect('b', { ...noMods, ...MOD_KEY }))
+    await act(() => result.current.clickSelect('b', { ...noMods, ...MOD_KEY }))
     expect([...result.current.selected]).toEqual(['d'])
 
     // Shift extends from the anchor (the last ⌘-click left it at 'b').
-    act(() => result.current.clickSelect('a', noMods)) // anchor 'a'
-    act(() => result.current.clickSelect('c', { ...noMods, shiftKey: true }))
+    await act(() => result.current.clickSelect('a', noMods)) // anchor 'a'
+    await act(() => result.current.clickSelect('c', { ...noMods, shiftKey: true }))
     expect([...result.current.selected]).toEqual(['a', 'b', 'c'])
   })
 
   it('moves and extends with the arrows, clamping at the ends', async () => {
     const { result } = await renderHook(() => useListSelection(KEYS))
 
-    act(() => result.current.clickSelect('b', noMods))
-    act(() => result.current.move(1))
+    await act(() => result.current.clickSelect('b', noMods))
+    await act(() => result.current.move(1))
     expect([...result.current.selected]).toEqual(['c'])
 
-    act(() => result.current.extend(1))
+    await act(() => result.current.extend(1))
     expect([...result.current.selected]).toEqual(['c', 'd'])
-    act(() => result.current.extend(1)) // already at the bottom
+    await act(() => result.current.extend(1)) // already at the bottom
     expect([...result.current.selected]).toEqual(['c', 'd'])
   })
 
   it('selects all, clears, and tracks the active pivot', async () => {
     const { result } = await renderHook(() => useListSelection(KEYS))
 
-    act(() => result.current.selectAll())
+    await act(() => result.current.selectAll())
     expect(result.current.selectedCount).toBe(4)
 
-    act(() => result.current.clear())
+    await act(() => result.current.clear())
     expect(result.current.selectedCount).toBe(0)
     expect(result.current.activeKey()).toBeNull()
 
-    act(() => result.current.clickSelect('c', noMods))
+    await act(() => result.current.clickSelect('c', noMods))
     expect(result.current.activeKey()).toBe('c')
   })
 
   it('programmatically selects visible keys in render order', async () => {
     const { result } = await renderHook(() => useListSelection(KEYS))
 
-    act(() => result.current.select(['d', 'missing', 'b']))
+    await act(() => result.current.select(['d', 'missing', 'b']))
     expect([...result.current.selected]).toEqual(['b', 'd'])
     expect(result.current.activeKey()).toBe('d')
 
-    act(() => result.current.select([]))
+    await act(() => result.current.select([]))
     expect(result.current.selectedCount).toBe(0)
     expect(result.current.activeKey()).toBeNull()
   })
@@ -70,7 +70,7 @@ describe('useListSelection', () => {
       { initialProps: { keys: KEYS } },
     )
 
-    act(() => result.current.selectAll())
+    await act(() => result.current.selectAll())
     await rerender({ keys: ['a', 'c'] })
     expect([...result.current.selected]).toEqual(['a', 'c'])
 
