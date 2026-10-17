@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { createRef, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
@@ -81,7 +82,7 @@ const YOUTUBE_NOTE = `![](https://www.youtube.com/watch?v=aqz-KE-bpKQ)<!-- ${JSO
 const IMAGE_NOTE = 'A photo\n\n![Cat](assets/cat.png)'
 
 function renderEditor(
-  openAsset: (path: string) => Promise<void> | void = vi.fn(async () => {}),
+  openAsset: (path: string) => MaybePromise<void> = vi.fn(async () => {}),
   platform?: TestPlatformOptions,
 ): ReturnType<typeof render> {
   return render(

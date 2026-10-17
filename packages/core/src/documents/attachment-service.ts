@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { ClockService } from '../ports/clock-service.ts'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
@@ -155,10 +156,7 @@ export interface AttachmentService {
    * as a generation-pinned `reflect-asset://` URL. Answers synchronously once
    * the catalog is loaded and waits for it before that.
    */
-  resolveImageUrl(
-    notePath: string,
-    source: string,
-  ): string | undefined | Promise<string | undefined>
+  resolveImageUrl(notePath: string, source: string): MaybePromise<string | undefined>
   /**
    * The image URL for a passive preview in graph session `generation`: local
    * bitmaps only, served with a raster-only query. Remote images and SVGs
@@ -424,10 +422,7 @@ class AttachmentServiceImpl implements AttachmentService {
       : assetOpenPath(source, this.#resolveAttachmentPath(notePath, source, generation))
   }
 
-  resolveImageUrl(
-    notePath: string,
-    source: string,
-  ): string | undefined | Promise<string | undefined> {
+  resolveImageUrl(notePath: string, source: string): MaybePromise<string | undefined> {
     return this.#resolveImageUrl(notePath, source, this.#openGeneration())
   }
 
@@ -681,7 +676,7 @@ class AttachmentServiceImpl implements AttachmentService {
     notePath: string,
     source: string,
     generation: number | null,
-  ): string | undefined | Promise<string | undefined> {
+  ): MaybePromise<string | undefined> {
     if (/^https?:\/\//i.test(source)) {
       return source
     }

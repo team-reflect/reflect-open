@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { LoggerService, PlatformFacts } from '@reflect/core'
 import { normalizeBinding } from './keybindings.ts'
 
@@ -24,7 +25,7 @@ export interface Command<Context = unknown> {
    * Keymap-registry binding (app scope), e.g. `Mod-d`.
    */
   keybinding?: string
-  run: (context: Context) => void | Promise<void>
+  run: (context: Context) => MaybePromise<void>
 }
 
 /**

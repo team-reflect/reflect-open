@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { isCaptureSpoolPath } from '../capture/capture-identity.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
@@ -456,7 +457,7 @@ class BackupServiceImpl implements BackupService {
     }
   }
 
-  #onRemoteChanges(changes: ChangedFile[]): void | Promise<void> {
+  #onRemoteChanges(changes: ChangedFile[]): MaybePromise<void> {
     const { fileChanges, indexLifecycle, activity, logger } = this.#deps
     if (changes.length === 0) {
       return

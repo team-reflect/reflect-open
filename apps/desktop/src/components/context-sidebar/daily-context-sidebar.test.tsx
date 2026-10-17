@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { createTestWindowService } from '@reflect/app/testing'
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,7 +25,7 @@ import { DailyContextSidebar } from './daily-context-sidebar.tsx'
 // What the app's fakes answer; each test sets them before `renderSidebar`.
 const dailyDatesInRange = vi.fn<DailyNoteService['dailyDatesInRange']>()
 const relatedNotes = vi.fn<RetrievalService['relatedNotes']>()
-const openNoteWindow = vi.fn<(deepLink: string) => boolean | Promise<boolean>>()
+const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 let noteRowAnswer: NoteRow | null
 let dailySource: string
 

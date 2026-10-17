@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type {
   ChatEngineService,
   ChatStreamEvent,
@@ -170,7 +171,7 @@ export function createTestChatEngineService(
  */
 export type TestChatGraphContextSource =
   | CloudGraphContext
-  | ((graphName: string) => CloudGraphContext | Promise<CloudGraphContext>)
+  | ((graphName: string) => MaybePromise<CloudGraphContext>)
 
 export interface TestChatGraphContextService extends ChatGraphContextService {
   /**

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { isModEvent } from '@meowdown/core'
@@ -8,7 +9,7 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { useNoteLinkNavigation } from './use-note-link-navigation.ts'
 
 // Receives the `reflect://` link of every note window a test opens.
-const openNoteWindow = vi.fn<(deepLink: string) => boolean | Promise<boolean>>()
+const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 
 beforeEach(() => {
   openNoteWindow.mockReset().mockResolvedValue(true)

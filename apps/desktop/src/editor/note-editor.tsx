@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { EditorInputTraits } from '@/editor/editor-input-traits.tsx'
 import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge.tsx'
 import { MediaLightbox } from '@/editor/media-lightbox.tsx'
@@ -47,7 +48,7 @@ import {
   type Ref,
 } from 'react'
 
-type WikilinkHoverRenderer = (hit: WikilinkHoverHit) => ReactNode | Promise<ReactNode>
+type WikilinkHoverRenderer = (hit: WikilinkHoverHit) => MaybePromise<ReactNode>
 
 // See apps/youtube-relay/README.md.
 const YOUTUBE_RELAY_URL = 'https://youtube-relay-reflect.vercel.app/'
@@ -169,7 +170,7 @@ interface NoteEditorProps {
    */
   resolveAssetOpenPath?: (src: string) => string | null
   /** Open a vetted graph-relative asset path in the OS default application. */
-  openAsset?: (path: string) => Promise<void> | void
+  openAsset?: (path: string) => MaybePromise<void>
   /**
    * Persist a pasted/dropped file (any kind) and return its markdown
    * destination, or null to decline. meowdown inserts `![](dest)` for images

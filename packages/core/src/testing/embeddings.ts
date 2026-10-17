@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
@@ -166,11 +167,11 @@ export interface TestRetrievalServiceOptions {
   /**
    * Answers `retrieve`. Defaults to no hits.
    */
-  retrieve?: (query: string, options?: RetrieveOptions) => RetrievalHit[] | Promise<RetrievalHit[]>
+  retrieve?: (query: string, options?: RetrieveOptions) => MaybePromise<RetrievalHit[]>
   /**
    * Answers `relatedNotes`. Defaults to no neighbors.
    */
-  relatedNotes?: (path: string, limit?: number) => RetrievalHit[] | Promise<RetrievalHit[]>
+  relatedNotes?: (path: string, limit?: number) => MaybePromise<RetrievalHit[]>
 }
 
 export interface TestRetrievalService extends RetrievalService {

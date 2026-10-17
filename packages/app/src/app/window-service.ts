@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import {
   errorMessage,
   INDEX_WRITTEN_EVENT,
@@ -30,7 +31,7 @@ export interface CloseRequestedEvent {
   preventDefault(): void
 }
 
-export type CloseRequestedHandler = (event: CloseRequestedEvent) => void | Promise<void>
+export type CloseRequestedHandler = (event: CloseRequestedEvent) => MaybePromise<void>
 
 /**
  * The native window operations behind a {@link WindowService}.

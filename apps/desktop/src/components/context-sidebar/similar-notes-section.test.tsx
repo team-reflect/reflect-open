@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { createTestWindowService } from '@reflect/app/testing'
 import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -14,7 +15,7 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { SimilarNotesSection } from './similar-notes-section.tsx'
 
 const relatedNotes = vi.fn<RetrievalService['relatedNotes']>()
-const openNoteWindow = vi.fn<(deepLink: string) => boolean | Promise<boolean>>()
+const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 let semanticSearchEnabled: boolean
 
 function RouteProbe(): ReactNode {

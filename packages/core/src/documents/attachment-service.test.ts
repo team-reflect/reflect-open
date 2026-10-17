@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { describe, expect, it, vi } from 'vitest'
 import { ReflectError } from '../errors.ts'
 import type { AssetStoreService } from '../graph/asset-store-service.ts'
@@ -27,7 +28,7 @@ interface Listing {
  * A note file service listing `listing()` once `gate` settles, counting calls.
  */
 function listingNoteFile(
-  listing: () => readonly Listing[] | Promise<readonly Listing[]>,
+  listing: () => MaybePromise<readonly Listing[]>,
 ): NoteFileService & { listings: () => number } {
   let calls = 0
   return Object.assign(createTestNoteFileService(), {

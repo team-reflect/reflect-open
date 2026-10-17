@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,7 +23,7 @@ import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 const dispatchDeepLink = vi.fn<(url: string) => void>()
 const resolveMarkdownHref = vi.fn()
 // Receives the `reflect://` link of every note window a test opens.
-const openNoteWindow = vi.fn<(deepLink: string) => boolean | Promise<boolean>>()
+const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 
 function RouteProbe(): ReactNode {
   const { route } = useRouter()

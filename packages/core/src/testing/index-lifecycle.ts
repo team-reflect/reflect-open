@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { GraphRole, GraphSession } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -160,7 +161,7 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
     return this.#inner.applyChanges(changes, generation, fileGeneration, canApply)
   }
 
-  onReconciled(listener: (event: IndexReconciledEvent) => void | Promise<void>): Unlisten {
+  onReconciled(listener: (event: IndexReconciledEvent) => MaybePromise<void>): Unlisten {
     return this.#inner.onReconciled(listener)
   }
 

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { describe, expect, it, vi } from 'vitest'
 import {
   type NoteCreationService,
@@ -44,7 +45,7 @@ function setup(options?: {
   files?: Readonly<Record<string, string>>
   evicted?: readonly string[]
   platform?: TestPlatformOptions
-  openNoteWindow?: (deepLink: string) => boolean | Promise<boolean>
+  openNoteWindow?: (deepLink: string) => MaybePromise<boolean>
   noteLinkResolver?: NoteLinkResolverService
   resolveOrCreateNoteWithTitle?: NoteCreationService['resolveOrCreateNoteWithTitle']
   resolveWikiTarget?: WikiResolverService['resolveWikiTarget']

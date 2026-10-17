@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { createTestWindowService } from '@reflect/app/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -18,7 +19,7 @@ import { deepLinkForRoute } from '@/lib/deep-links/format.ts'
 const getBacklinksWithContext = vi.fn()
 const resolveOrCreateNoteWithTitle = vi.fn<NoteCreationService['resolveOrCreateNoteWithTitle']>()
 const resolveMarkdownHref = vi.fn<NoteLinkResolverService['resolveMarkdownHref']>()
-const openNoteWindow = vi.fn<(deepLink: string) => boolean | Promise<boolean>>()
+const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 
 const getBacklinksPage: BacklinkService['getBacklinksWithContext'] = async (path, options) => {
   const result: unknown = await getBacklinksWithContext(path, options)

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createOpenDocumentsService,
@@ -87,7 +88,7 @@ let clock: TestClockService
 let logger: TestLoggerService
 let tasks: TaskService
 let appliedListeners: Set<(event: IndexAppliedEvent) => void>
-let reconciledListeners: Set<(event: IndexReconciledEvent) => void | Promise<void>>
+let reconciledListeners: Set<(event: IndexReconciledEvent) => MaybePromise<void>>
 
 const openGraph = createGraphSession({ root: '/g', name: 'g', generation: 7, indexGeneration: 1 })
 

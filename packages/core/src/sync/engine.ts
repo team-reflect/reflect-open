@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { isAppError } from '../errors.ts'
 import type {
@@ -88,7 +89,7 @@ export interface SyncEngineOptions {
    * waits for it before reporting idle, and a failure surfaces as `error`
    * after that Git work.
    */
-  onRemoteChanges?: ((changes: ChangedFile[]) => void | Promise<void>) | undefined
+  onRemoteChanges?: ((changes: ChangedFile[]) => MaybePromise<void>) | undefined
   /**
    * Paths a pull kept for review beside their notes. Called synchronously.
    */

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { GraphRole, GraphSession, GraphSessionSource } from '../graph/graph-session.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { isMobilePlatform } from '../ports/platform-facts.ts'
@@ -203,7 +204,7 @@ export interface IndexLifecycleService {
    * until every listener's returned promise settles, so the work a listener
    * starts (re-embedding) is part of the same coalesced request.
    */
-  onReconciled(listener: (event: IndexReconciledEvent) => void | Promise<void>): Unlisten
+  onReconciled(listener: (event: IndexReconciledEvent) => MaybePromise<void>): Unlisten
   /**
    * Listen for id-based heals that relocate a note's rows (Plan 17): an
    * external rename observed by the reconcile or a watcher batch. The app
@@ -294,7 +295,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   readonly #deps: IndexLifecycleDeps
   readonly #progressListeners = new Set<(progress: IndexLifecycleProgress) => void>()
   readonly #appliedListeners = new Set<(event: IndexAppliedEvent) => void>()
-  readonly #reconciledListeners = new Set<(event: IndexReconciledEvent) => void | Promise<void>>()
+  readonly #reconciledListeners = new Set<(event: IndexReconciledEvent) => MaybePromise<void>>()
   readonly #movedListeners = new Set<(from: string, to: string) => void>()
   readonly #fileProgressListeners = new Set<(done: number, total: number, worked: number) => void>()
   readonly #stalePlaceholderListeners = new Set<(paths: readonly string[]) => void>()
@@ -581,7 +582,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     return mutations
   }
 
-  onReconciled(listener: (event: IndexReconciledEvent) => void | Promise<void>): Unlisten {
+  onReconciled(listener: (event: IndexReconciledEvent) => MaybePromise<void>): Unlisten {
     return attach(this.#reconciledListeners, listener)
   }
 

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { act as reactAct } from 'react'
 
 declare global {
@@ -16,7 +17,7 @@ let outerEnvironment: boolean | undefined
  *
  * Tests import this instead of `act` from `react`.
  */
-export async function act<T>(callback: () => T | Promise<T>): Promise<T> {
+export async function act<T>(callback: () => MaybePromise<T>): Promise<T> {
   if (activeActs === 0) {
     outerEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT
   }

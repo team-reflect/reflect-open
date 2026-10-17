@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { addPluginListener, invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
@@ -52,7 +53,7 @@ export function createTauriIpcTransport(): IpcBridge {
         // owner has already unmounted hit this (`listenNow` in core). The
         // teardown is benign, so swallow the rejection instead of letting it surface
         // as an unhandled promise rejection.
-        void Promise.resolve(unlisten() as void | Promise<void>).catch(() => {})
+        void Promise.resolve(unlisten() as MaybePromise<void>).catch(() => {})
       }
     },
     listenPlugin: async (plugin, event, handler) => {

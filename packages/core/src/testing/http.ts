@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { HttpService } from '../ports/http-service.ts'
 
 /**
@@ -10,7 +11,7 @@ export interface TestHttpRequest {
   body: string | null
 }
 
-export type TestHttpHandler = (request: Request) => Response | Promise<Response>
+export type TestHttpHandler = (request: Request) => MaybePromise<Response>
 
 /**
  * A canned reply: a handler, a `Response`, or a JSON body with a status.

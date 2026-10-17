@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { ReactNode } from 'react'
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
@@ -52,7 +53,7 @@ const GRAPH = { root: '/notes', name: 'Notes', generation: 1 }
 // What the app's fakes answer; each test sets them before `renderSidebar`.
 const getPinnedNotes = vi.fn<() => Promise<PinnedNote[]>>()
 const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
-const openNoteWindow = vi.fn<(deepLink: string) => boolean | Promise<boolean>>()
+const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 
 // The services of the rendered app; set by `renderSidebar`.
 let opener: TestOpenerService

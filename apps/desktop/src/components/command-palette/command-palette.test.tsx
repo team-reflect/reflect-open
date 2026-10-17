@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { formatBinding } from '@reflect/app'
 import { createTestAppServices, createTestWindowService } from '@reflect/app/testing'
 import { userEvent } from 'vitest/browser'
@@ -26,7 +27,7 @@ const retrieve = vi.fn<RetrievalService['retrieve']>()
 /**
  * Receives the `reflect://` link of every note window a test opens.
  */
-const openNoteWindow = vi.fn<(deepLink: string) => boolean | Promise<boolean>>()
+const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 // The preview keeps the stub from the route-content tests: hosting the real
 // ProseMirror editor is out of scope here; the preview's data path stays real.
 vi.mock('@/editor/markdown-preview.tsx', () => ({

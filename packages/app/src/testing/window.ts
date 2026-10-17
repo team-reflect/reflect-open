@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { Unlisten, WindowBootstrap } from '@reflect/core'
 import {
   MAIN_WINDOW_LABEL,
@@ -50,7 +51,7 @@ export interface TestWindowService extends WindowService {
 export interface TestWindowServiceOptions {
   label?: string
   bootstrap?: WindowBootstrap
-  openNoteWindow?: (deepLink: string) => boolean | Promise<boolean>
+  openNoteWindow?: (deepLink: string) => MaybePromise<boolean>
 }
 
 class TestWindowServiceImpl implements TestWindowService {

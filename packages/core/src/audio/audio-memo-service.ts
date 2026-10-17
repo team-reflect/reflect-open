@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import {
   AUDIO_MEMO_REMINDER_MS,
   AUDIO_MEMO_SEGMENT_MS,
@@ -86,11 +87,11 @@ export interface PendingAudioCapture {
    * the audio is already safe, and the worst case (the staged copy
    * lingering) re-ingests idempotently by its stop time.
    */
-  onCaptured?: () => Promise<void> | void
+  onCaptured?: () => MaybePromise<void>
   /**
    * Runs when the user discards this capture after it failed to write.
    */
-  onDiscarded?: () => Promise<void> | void
+  onDiscarded?: () => MaybePromise<void>
 }
 
 /**

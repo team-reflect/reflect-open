@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement, ReactNode } from 'react'
 import { createTestAppServices, createTestWindowService } from '@reflect/app/testing'
@@ -9,7 +10,7 @@ import { type FollowDeepLink, useFollowDeepLink } from './use-follow-deep-link.t
 import { isModEvent } from '@meowdown/core'
 
 const dispatchDeepLink = vi.fn<(url: string) => void>()
-const openNoteWindow = vi.fn<(deepLink: string) => boolean | Promise<boolean>>()
+const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 
 /**
  * Render over a native shell whose note windows and deep-link intake are the spies above.

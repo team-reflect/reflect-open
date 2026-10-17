@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import {
   createTestAppServices,
   createTestOperationsService,
@@ -20,7 +21,7 @@ const resolveWikiTarget = vi.fn()
 const resolveExistingWikiTarget = vi.fn()
 const resolveOrCreateNoteWithTitle = vi.fn()
 // Receives the `reflect://` link of every note window a test opens.
-const openNoteWindow = vi.fn<(deepLink: string) => boolean | Promise<boolean>>()
+const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 const logger = createTestLoggerService()
 
 let lastHandler: ((options: { target: string; openInNewWindow: boolean }) => void) | null = null

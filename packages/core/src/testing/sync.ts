@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { ReflectError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type {
@@ -225,9 +226,7 @@ export interface TestICloudNativeService extends ICloudNativeService {
    * What `downloadPending` and `pendingCount` report from now on.
    */
   setPendingCount(count: number): void
-  onConflictsScan(
-    handler: (options: IcloudScanOptions) => IcloudSweepOutcome | Promise<IcloudSweepOutcome>,
-  ): void
+  onConflictsScan(handler: (options: IcloudScanOptions) => MaybePromise<IcloudSweepOutcome>): void
   emitConflicts(paths: string[]): void
   emitWatchFailed(): void
 }
@@ -240,12 +239,11 @@ export interface TestICloudNativeService extends ICloudNativeService {
 class TestICloudNativeServiceImpl implements TestICloudNativeService {
   #status: IcloudStatus
   #pending: number
-  #scan: (scanOptions: IcloudScanOptions) => IcloudSweepOutcome | Promise<IcloudSweepOutcome> =
-    () => ({
-      changed: [],
-      copies: [],
-      autoResolved: 0,
-    })
+  #scan: (scanOptions: IcloudScanOptions) => MaybePromise<IcloudSweepOutcome> = () => ({
+    changed: [],
+    copies: [],
+    autoResolved: 0,
+  })
   readonly #log: ICloudNativeCall[] = []
   readonly #conflictListeners = new Set<(paths: string[]) => void>()
   readonly #watchFailedListeners = new Set<() => void>()
@@ -334,9 +332,7 @@ class TestICloudNativeServiceImpl implements TestICloudNativeService {
     this.#pending = count
   }
 
-  onConflictsScan(
-    handler: (options: IcloudScanOptions) => IcloudSweepOutcome | Promise<IcloudSweepOutcome>,
-  ): void {
+  onConflictsScan(handler: (options: IcloudScanOptions) => MaybePromise<IcloudSweepOutcome>): void {
     this.#scan = handler
   }
 
