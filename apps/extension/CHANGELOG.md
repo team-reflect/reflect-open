@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/team-reflect/reflect-open/compare/extension-v0.4.0...extension-v0.4.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* update meowdown ([#1564](https://github.com/team-reflect/reflect-open/issues/1564)) ([58e2854](https://github.com/team-reflect/reflect-open/commit/58e2854118686c1d1d8588b37bbfcc1a35f225e4))
+
 ## [0.4.0](https://github.com/team-reflect/reflect-open/compare/extension-v0.3.0...extension-v0.4.0) (2026-09-21)
 
 
