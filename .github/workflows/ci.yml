@@ -70,6 +70,12 @@ jobs:
   test-webkit:
     if: github.event_name != 'merge_group'
     runs-on: macos-26
+    # DEBUG ONLY: page crash rate of WebKit 2359, and of 2370 without the JIT.
+    strategy:
+      fail-fast: false
+      matrix:
+        webkit: ['2359', '2370-jit-off']
+        repeat: [1, 2, 3, 4, 5]
     env:
       REFLECT_TEST_BROWSER: webkit
       # Suspected workaround, root cause unknown: WebContent sometimes
@@ -88,19 +94,75 @@ jobs:
       - name: Install Playwright
         run: pnpm --filter @reflect/desktop test:install:webkit
 
-      # WebKit keeps the memory of every finished test file, so each shard
-      # runs in its own Vitest process to restart the browser.
-      - name: Test browser (shard 1/3)
-        run: pnpm run test run --project '*browser*' --shard=1/3
+      # DEBUG ONLY: Playwright 1.64.1 runs whatever build is in webkit-2370.
+      - name: Turn off the JSC JIT
+        if: matrix.webkit == '2370-jit-off'
+        run: echo '__XPC_JSC_useJIT=0' >> "$GITHUB_ENV"
 
-      - name: Test browser (shard 2/3)
-        run: pnpm run test run --project '*browser*' --shard=2/3
+      - name: Use WebKit ${{ matrix.webkit }}
+        if: matrix.webkit == '2359'
+        run: |
+          dir=~/Library/Caches/ms-playwright/webkit-2370
+          curl -sfL -o "$RUNNER_TEMP/webkit.zip" \
+            "https://cdn.playwright.dev/dbazure/download/playwright/builds/webkit/${{ matrix.webkit }}/webkit-mac-26-arm64.zip"
+          rm -rf "$dir"
+          mkdir -p "$dir"
+          unzip -q "$RUNNER_TEMP/webkit.zip" -d "$dir"
+          touch "$dir/INSTALLATION_COMPLETE" "$dir/DEPENDENCIES_VALIDATED"
 
-      - name: Test browser (shard 3/3)
-        run: pnpm run test run --project '*browser*' --shard=3/3
+      - name: Show the WebKit version
+        run: plutil -p ~/Library/Caches/ms-playwright/webkit-2370/JavaScriptCore.framework/Versions/A/Resources/Info.plist | grep CFBundleVersion
 
-      - name: Test others
-        run: pnpm run test run --project '!*browser*'
+      - name: Start the memory sampler
+        run: |
+          dir="$RUNNER_TEMP/webkit-diagnostics"
+          mkdir -p "$dir"
+          touch "$dir/started"
+          nohup .github/scripts/sample-webkit-memory.sh > "$dir/memory.log" 2>&1 < /dev/null &
+
+      # DEBUG ONLY: run the browser tests 3 times and count page crashes.
+      - name: Test browser (3 rounds)
+        run: |
+          dir="$RUNNER_TEMP/webkit-diagnostics"
+          crashes=0
+          for round in 1 2 3; do
+            for shard in 1 2 3; do
+              log="$dir/round-$round-shard-$shard.log"
+              pnpm run test run --project '*browser*' --shard="$shard/3" --reporter=verbose > "$log" 2>&1 || true
+              echo "round $round shard $shard: $(grep -E '^ +Tests ' "$log" | tail -1)"
+              if grep -q VITEST_BROWSER_CONNECTION_CLOSED "$log"; then
+                crashes=$((crashes + 1))
+                echo "::warning::WebKit ${{ matrix.webkit }} page crash in round $round shard $shard"
+              fi
+            done
+          done
+          echo "$crashes" > "$dir/crashes.txt"
+          echo "crashes: $crashes"
+          [ "$crashes" = 0 ]
+
+      # The termination reason of each WebKit content process, memory kill and
+      # jetsam messages, and any crash report written during the job.
+      # "thresold" is the spelling in WebKit's log message.
+      - name: Collect WebKit diagnostics
+        if: ${{ !cancelled() }}
+        run: |
+          dir="$RUNNER_TEMP/webkit-diagnostics"
+          find ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports \
+            -type f -newer "$dir/started" -exec cp {} "$dir/" \; || true
+          log show --style compact \
+            --start "$(date -r "$dir/started" '+%Y-%m-%d %H:%M:%S')" \
+            --predicate '(process == "Playwright" AND category == "Process")
+              OR eventMessage CONTAINS "kill thresold"
+              OR eventMessage CONTAINS[c] "jetsam"' \
+            > "$dir/system.log" || true
+
+      - name: Upload WebKit diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: webkit-${{ matrix.webkit }}-${{ matrix.repeat }}
+          path: ${{ runner.temp }}/webkit-diagnostics/
+          retention-days: 14
 
   lint-rust:
     if: github.event_name != 'merge_group'
