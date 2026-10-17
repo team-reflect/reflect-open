@@ -47,6 +47,19 @@ describe('parseNote — headings & title', () => {
     ])
   })
 
+  it('strips the closing sequence of ATX headings', () => {
+    expect(parse('# Title ##').headings[0]?.text).toBe('Title')
+    expect(parse('# Title #   ').headings[0]?.text).toBe('Title')
+    expect(parse('# foo#').headings[0]?.text).toBe('foo')
+    expect(parse('#   ').headings[0]?.text).toBe('')
+    expect(parse('# ##').headings[0]?.text).toBe('')
+  })
+
+  it('handles a heading with a long run of spaces in linear time', () => {
+    const spaces = ' '.repeat(5_000)
+    expect(parse(`# a${spaces}b`).headings[0]?.text).toBe(`a${spaces}b`)
+  })
+
   it('renders markdown escapes in headings and derived titles', () => {
     const note = parse('# www\\.reddit.com/r/test\n\nbody')
     expect(note.title).toBe('www.reddit.com/r/test')

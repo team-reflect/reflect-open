@@ -23,6 +23,24 @@ export function unescapeMarkdownText(text: string): string {
   return text.replaceAll(MARKDOWN_ESCAPE_RE, '$1')
 }
 
+/**
+ * Strip an ATX heading's closing sequence: trailing spaces/tabs, then `#`s,
+ * then spaces/tabs. Same result as `/[ \t]*#*[ \t]*$/`, in linear time.
+ */
+export function stripHeadingClosingSequence(text: string): string {
+  let end = text.length
+  while (end > 0 && (text[end - 1] === ' ' || text[end - 1] === '\t')) {
+    end--
+  }
+  while (end > 0 && text[end - 1] === '#') {
+    end--
+  }
+  while (end > 0 && (text[end - 1] === ' ' || text[end - 1] === '\t')) {
+    end--
+  }
+  return text.slice(0, end)
+}
+
 function renderMarkdownText(text: string): string {
   return text
     .replaceAll(WIKI_INNER_RE, (_, inner: string) => inner.replaceAll('|', ' '))
