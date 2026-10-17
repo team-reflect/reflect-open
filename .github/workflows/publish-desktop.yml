@@ -1,4 +1,4 @@
-name: Publish desktop release
+name: Publish desktop
 
 # Builds, uploads, and publishes one desktop release (macOS, Windows, Linux,
 # and TestFlight) for a tag created by release-please. Called once per channel

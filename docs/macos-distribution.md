@@ -197,7 +197,7 @@ a new cycle is tagged without a number (`v0.6.0-beta`, then `-beta.1`, `-beta.2`
 
 For this exceptional recovery path, merge a PR that sets `version` in
 `apps/desktop/package.json` and create a draft release tagged `v<version>` at that
-commit. Run **Actions → Publish desktop release → Run workflow** with the tag and the full
+commit. Run **Actions → Publish desktop → Run workflow** with the tag and the full
 commit SHA to build every platform, upload the assets, and publish the release. Afterwards,
 sync that channel's manifest file with a follow-up PR so release-please continues from
 the right version.
