@@ -44,6 +44,7 @@ rusqlite = { workspace = true, features = ["hooks"] }
 reconcile-text = "0.13.2"
 reflect-index-schema = { path = "../../../crates/index-schema" }
 reflect-graph-paths = { workspace = true }
+reflect-types = { workspace = true, features = ["git2", "rusqlite"] }
 tempfile = { workspace = true }
 sha2 = { workspace = true }
 dirs = "7.0.0"

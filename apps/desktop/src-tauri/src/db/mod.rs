@@ -106,28 +106,15 @@ pub(crate) fn current_generation(index: &IndexState) -> AppResult<Option<u64>> {
     Ok(state.conn.is_some().then_some(state.generation))
 }
 
-/// Broadcast event fired after a note-projection write commits. Secondary
-/// note windows run no indexer of their own: they refetch their index-backed
-/// queries on this signal, while the main window (which did the writing)
-/// invalidates in-process via the `index-applied` module and never listens.
-const INDEX_WRITTEN_EVENT: &str = "index:written";
-
 fn emit_index_written<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     use tauri::Emitter;
-    let _ = app.emit(INDEX_WRITTEN_EVENT, ());
+    let _ = app.emit(reflect_types::events::INDEX_WRITTEN, ());
 }
-
-/// Broadcast event fired after a note's rows move to a new path (an in-app
-/// rename or an id-healed external one). The in-process `followHealedMove`
-/// hook only runs in the window that drove the move — a secondary note
-/// window with the note open must also retarget its session, or its next
-/// save would resurrect the dead file at the old path.
-const NOTE_MOVED_EVENT: &str = "note:moved";
 
 fn emit_note_moved<R: tauri::Runtime>(app: &tauri::AppHandle<R>, from: &str, to: &str) {
     use tauri::Emitter;
     let _ = app.emit(
-        NOTE_MOVED_EVENT,
+        reflect_types::events::NOTE_MOVED,
         serde_json::json!({ "from": from, "to": to }),
     );
 }

@@ -21,13 +21,13 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::change::{ChangeKind, FileChange};
 use crate::conflict::copy::{free_conflict_copy_path, utc_stamp};
 use crate::conflict::ladder::{self, ConflictInput};
 use crate::conflict::shadow::{blob_hash8_of_file, content_hash, ShadowStore};
 use crate::conflict::{ConflictSide, Resolution};
 use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
+use reflect_types::{ChangeKind, FileChange};
 
 use super::versions::{
     current_version_modified_ms, mark_resolved, unresolved_versions, VersionRef,

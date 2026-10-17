@@ -32,9 +32,10 @@ use reflect_graph_paths::{
 use tauri::{AppHandle, Emitter, Manager, State};
 use walkdir::WalkDir;
 
-use crate::change::{ChangeKind, FileChange, CHANGE_EVENT, RECONCILE_EVENT};
 use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
+use reflect_types::events::{INDEX_CHANGED, INDEX_RECONCILE};
+use reflect_types::{ChangeKind, FileChange};
 
 /// Holds the active debouncer; dropping it stops the background watch thread.
 #[derive(Default)]
@@ -306,10 +307,10 @@ pub fn watch_start(
                 crate::fs::invalidate_file_catalog(&app.state::<GraphState>(), &handler_root);
             }
             if !effects.changes.is_empty() {
-                let _ = app.emit(CHANGE_EVENT, &effects.changes);
+                let _ = app.emit(INDEX_CHANGED, &effects.changes);
             }
             if effects.reconcile {
-                let _ = app.emit(RECONCILE_EVENT, ());
+                let _ = app.emit(INDEX_RECONCILE, ());
             }
         },
         PrunedFileIdMap::new(root.clone()),
