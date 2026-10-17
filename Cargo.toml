@@ -26,6 +26,6 @@ serde_json = "1.0.154"
 sha2 = "0.11.1"
 tempfile = "3.27.0"
 reflect-graph-paths = { path = "crates/graph-paths" }
-tauri = "2.12.1"
-tauri-plugin = { version = "2.7.1", features = ["build"] }
+tauri = "2.12.4"
+tauri-plugin = { version = "2.7.2", features = ["build"] }
 thiserror = "2.0.21"
