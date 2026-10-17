@@ -485,8 +485,9 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     this.#emitProgress('idle')
     try {
       await this.#deps.fileChanges.stopWatcher()
-    } catch {
+    } catch (error: unknown) {
       // Stopping is best effort: the watcher may already be gone.
+      this.#deps.logger.warn('stopping the file watcher failed:', error)
     }
   }
 

@@ -58,14 +58,16 @@ class OpenerServiceImpl implements OpenerService {
   }
 
   openUrlSync(url: string): void {
+    void this.#tryOpenUrl(url)
+  }
+
+  async #tryOpenUrl(url: string): Promise<void> {
     const { transport, logger } = this.#deps
-    void (async () => {
-      try {
-        await transport.openUrl(url)
-      } catch (cause: unknown) {
-        logger.error(`failed to open ${url}:`, errorMessage(cause))
-      }
-    })()
+    try {
+      await transport.openUrl(url)
+    } catch (cause: unknown) {
+      logger.error(`failed to open ${url}:`, errorMessage(cause))
+    }
   }
 
   async revealInFileManager(path: string): Promise<void> {
