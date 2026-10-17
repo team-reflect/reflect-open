@@ -14,11 +14,11 @@ on:
         required: true
     secrets:
       APPLE_SIGNING_IDENTITY:
-        required: false
+        required: true
       APPLE_CERTIFICATE:
-        required: false
+        required: true
       APPLE_CERTIFICATE_PASSWORD:
-        required: false
+        required: true
       APPLE_API_KEY:
         required: false
       APPLE_API_ISSUER:
@@ -32,11 +32,11 @@ on:
       APPLE_TEAM_ID:
         required: false
       SENTRY_AUTH_TOKEN:
-        required: false
+        required: true
       SENTRY_DSN:
-        required: false
+        required: true
       TAURI_SIGNING_PRIVATE_KEY:
-        required: false
+        required: true
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
         required: false
 
