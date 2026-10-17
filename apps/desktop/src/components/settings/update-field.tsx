@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { ReactElement } from 'react'
 import { ArrowDownToLine, RefreshCw, RotateCw } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
@@ -14,7 +15,7 @@ export function UpdateField(): ReactElement {
   const action: {
     label: string
     icon: typeof RefreshCw
-    run?: (() => Promise<void>) | undefined
+    run?: (() => MaybePromise<void>) | undefined
     spinning?: boolean | undefined
   } = (() => {
     switch (state.phase) {

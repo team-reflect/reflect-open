@@ -374,11 +374,11 @@ describe('followWikiLink', () => {
   it('does not choose between ambiguous ISO-date targets', async () => {
     const { linkNavigation, host, noteCreation, operations } = setup({
       noteLinkResolver: {
-        resolveWikiTarget: async () => ({
+        resolveWikiTarget: () => ({
           kind: 'ambiguous',
           paths: ['daily/2026-06-09.md', 'daily/2026-06-09-2.md'],
         }),
-        resolveMarkdownHref: async () => ({ kind: 'missing' }),
+        resolveMarkdownHref: () => ({ kind: 'missing' }),
       },
     })
     linkNavigation.followWikiLink({ target: '2026-06-09', openInNewWindow: false }, host)
@@ -394,8 +394,8 @@ describe('followWikiLink', () => {
   it('does not turn an unavailable ISO-date target into a lazy daily route', async () => {
     const { linkNavigation, host, operations } = setup({
       noteLinkResolver: {
-        resolveWikiTarget: async () => ({ kind: 'unavailable', paths: ['daily/2026-06-09.md'] }),
-        resolveMarkdownHref: async () => ({ kind: 'missing' }),
+        resolveWikiTarget: () => ({ kind: 'unavailable', paths: ['daily/2026-06-09.md'] }),
+        resolveMarkdownHref: () => ({ kind: 'missing' }),
       },
     })
     linkNavigation.followWikiLink({ target: '2026-06-09', openInNewWindow: false }, host)
@@ -644,8 +644,8 @@ describe('followMarkdownNoteLink', () => {
   ])('refuses a target that resolves as $kind', async (resolution, message) => {
     const { linkNavigation, host, operations } = setup({
       noteLinkResolver: {
-        resolveWikiTarget: async () => ({ kind: 'missing' }),
-        resolveMarkdownHref: async () => resolution,
+        resolveWikiTarget: () => ({ kind: 'missing' }),
+        resolveMarkdownHref: () => resolution,
       },
     })
     linkNavigation.followMarkdownNoteLink(
@@ -661,7 +661,7 @@ describe('followMarkdownNoteLink', () => {
     const failure = new Error('index unavailable')
     const { linkNavigation, host, operations, logger } = setup({
       noteLinkResolver: {
-        resolveWikiTarget: async () => ({ kind: 'missing' }),
+        resolveWikiTarget: () => ({ kind: 'missing' }),
         resolveMarkdownHref: async () => {
           throw failure
         },
@@ -685,7 +685,7 @@ describe('followMarkdownNoteLink', () => {
     const pending = Promise.withResolvers<{ kind: 'resolved'; path: string }>()
     const { linkNavigation, host } = setup({
       noteLinkResolver: {
-        resolveWikiTarget: async () => ({ kind: 'missing' }),
+        resolveWikiTarget: () => ({ kind: 'missing' }),
         resolveMarkdownHref: () => pending.promise,
       },
     })

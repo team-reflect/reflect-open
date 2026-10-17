@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { createFanOut, listenNow, type FanOut, type IpcBridgeService } from '../ipc/ipc-service.ts'
@@ -88,11 +89,11 @@ export interface FileChangeService {
   /**
    * Start (or restart) the native watcher for the active graph.
    */
-  startWatcher(): Promise<void>
+  startWatcher(): MaybePromise<void>
   /**
    * Stop the native watcher.
    */
-  stopWatcher(): Promise<void>
+  stopWatcher(): MaybePromise<void>
 }
 
 export interface FileChangeServiceDeps {
