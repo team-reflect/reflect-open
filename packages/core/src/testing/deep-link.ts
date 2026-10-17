@@ -34,16 +34,16 @@ class TestDeepLinkSourceImpl implements TestDeepLinkSource {
     this.#current = options?.current ?? null
   }
 
-  onOpenUrl(listener: (urls: string[]) => void): Promise<Unlisten> {
+  onOpenUrl(listener: (urls: string[]) => void): Unlisten {
     this.#listeners.add(listener)
     const unlisten: Unlisten = () => {
       this.#listeners.delete(listener)
     }
-    return Promise.resolve(unlisten)
+    return unlisten
   }
 
-  getCurrent(): Promise<string[] | null> {
-    return Promise.resolve(this.#current)
+  getCurrent(): string[] | null {
+    return this.#current
   }
 
   deliver(urls: string[]): void {

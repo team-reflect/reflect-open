@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
@@ -40,7 +41,7 @@ export interface AgentSkillService {
   /**
    * The open graph's agent-skill install status. Read-only.
    */
-  status(): Promise<AgentSkillStatus>
+  status(): MaybePromise<AgentSkillStatus>
   /**
    * Write (or refresh) the open graph's `SKILL.md`. Pinned to the open
    * graph's generation like every mutating command; rejects `conflict` files

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { CloudSafe } from '../privacy/cloud-safe.ts'
@@ -40,23 +41,23 @@ export interface WebFetchService {
   /**
    * A captured page's HTML, for meta-tag scraping.
    */
-  fetchMeta(url: CloudSafe<string>): Promise<string>
+  fetchMeta(url: CloudSafe<string>): MaybePromise<string>
   /**
    * An oEmbed endpoint's JSON answer as text. Only `https` JSON answers without redirects.
    */
-  fetchOembed(url: CloudSafe<string>): Promise<string>
+  fetchOembed(url: CloudSafe<string>): MaybePromise<string>
   /**
    * One representative image for a captured URL as a base64 JPEG, or `null` when unavailable.
    */
-  fetchLinkPreviewImage(url: CloudSafe<string>): Promise<string | null>
+  fetchLinkPreviewImage(url: CloudSafe<string>): MaybePromise<string | null>
   /**
    * An HTTP(S) page for an editor link preview. Non-public destinations are refused.
    */
-  fetchLinkPreviewHtml(url: CloudSafe<string>): Promise<LinkPreviewHtml>
+  fetchLinkPreviewHtml(url: CloudSafe<string>): MaybePromise<LinkPreviewHtml>
   /**
    * A public raster favicon, normalized into a small PNG data URL.
    */
-  fetchLinkPreviewIcon(url: CloudSafe<string>): Promise<string>
+  fetchLinkPreviewIcon(url: CloudSafe<string>): MaybePromise<string>
 }
 
 export interface WebFetchServiceDeps {

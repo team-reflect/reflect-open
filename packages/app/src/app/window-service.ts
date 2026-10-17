@@ -78,11 +78,11 @@ export interface WindowService {
   /**
    * Close every note window and wait for their flushes. Never rejects.
    */
-  closeSecondaryWindows(): Promise<void>
+  closeSecondaryWindows(): MaybePromise<void>
   /**
    * Adopt the main window's open graph and index sessions in a note window.
    */
-  bootstrap(): Promise<WindowBootstrap>
+  bootstrap(): MaybePromise<WindowBootstrap>
   /**
    * Listen for shell requests to re-navigate this window.
    */
@@ -95,14 +95,14 @@ export interface WindowService {
    * Listen for an event that another window sent here with {@link emitTo}.
    */
   subscribeWindowEvent(event: string, listener: (payload: unknown) => void): Unlisten
-  focusedWindowLabel(): Promise<string | null>
-  emitTo(label: string, event: string, payload: unknown): Promise<void>
+  focusedWindowLabel(): MaybePromise<string | null>
+  emitTo(label: string, event: string, payload: unknown): MaybePromise<void>
   onCloseRequested(handler: CloseRequestedHandler): Unlisten
-  hide(): Promise<void>
+  hide(): MaybePromise<void>
   /**
    * Open or close the native web inspector of this window.
    */
-  toggleDevtools(): Promise<void>
+  toggleDevtools(): MaybePromise<void>
 }
 
 export interface WindowServiceDeps {

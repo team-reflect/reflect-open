@@ -89,7 +89,7 @@ class TestWindowServiceImpl implements TestWindowService {
     return (await this.#options?.openNoteWindow?.(deepLink)) ?? true
   }
 
-  async closeSecondaryWindows(): Promise<void> {
+  closeSecondaryWindows(): void {
     this.#closeCalls += 1
   }
 
@@ -117,11 +117,11 @@ class TestWindowServiceImpl implements TestWindowService {
     return listeners.add(listener)
   }
 
-  async focusedWindowLabel(): Promise<string | null> {
+  focusedWindowLabel(): string | null {
     return this.#focused
   }
 
-  async emitTo(target: string, event: string, payload: unknown): Promise<void> {
+  emitTo(target: string, event: string, payload: unknown): void {
     this.#emittedEvents.push({ label: target, event, payload })
   }
 
@@ -132,11 +132,11 @@ class TestWindowServiceImpl implements TestWindowService {
     }
   }
 
-  async hide(): Promise<void> {
+  hide(): void {
     this.#isHidden = true
   }
 
-  async toggleDevtools(): Promise<void> {
+  toggleDevtools(): void {
     this.#toggles += 1
   }
 

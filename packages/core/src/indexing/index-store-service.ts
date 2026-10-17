@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import { errorMessage } from '../errors.ts'
 import { noteBasenameKey } from '../graph/note-reference.ts'
@@ -137,7 +138,7 @@ export interface IndexStoreService {
   /**
    * Open and migrate the index for the active graph; resolves with the new index generation.
    */
-  open(): Promise<number>
+  open(): MaybePromise<number>
   /**
    * Apply one note's projection in a single Rust transaction.
    */
@@ -167,12 +168,12 @@ export interface IndexStoreService {
    * read (with their stored facts) and the rows whose files vanished. A stale
    * `generation` reports an empty scan.
    */
-  reconcileScan(generation: number): Promise<ReconcileScan>
+  reconcileScan(generation: number): MaybePromise<ReconcileScan>
   /**
    * Re-stamp stored mtimes for notes whose content already matches disk. One
    * Rust transaction per call; an empty batch never reaches the backend.
    */
-  touch(entries: readonly IndexedNoteTouch[], generation: number): Promise<void>
+  touch(entries: readonly IndexedNoteTouch[], generation: number): MaybePromise<void>
   /**
    * Wipe all derived tables (precedes a full rebuild); `chat_*` and `index_meta` stay.
    */

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { XPostEnvelope } from './bookmark-envelope.ts'
 import { sha256Hex } from '@reflect/utils'
 import {
@@ -63,7 +64,7 @@ export interface DrainCaptureInboxInput {
   /**
    * Appends an X post to the daily note at `path`, merging with a live editor when open.
    */
-  writeXPost?: (envelope: XPostEnvelope, path: string) => Promise<void>
+  writeXPost?: (envelope: XPostEnvelope, path: string) => MaybePromise<void>
   /**
    * Abort gate, checked between spool files (graph switch / unmount).
    */

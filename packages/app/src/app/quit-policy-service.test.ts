@@ -409,7 +409,7 @@ describe('installMobileBackgroundPolicy', () => {
         beginBackgroundTask: async () => {
           throw new Error('no native bridge')
         },
-        endBackgroundTask: async () => {
+        endBackgroundTask: () => {
           ends += 1
         },
       }),
@@ -428,8 +428,8 @@ describe('installMobileBackgroundPolicy', () => {
     let ends = 0
     const { service, lifecycle, documents, backup } = setup({
       lifecycle: () => ({
-        beginBackgroundTask: async () => null,
-        endBackgroundTask: async () => {
+        beginBackgroundTask: () => null,
+        endBackgroundTask: () => {
           ends += 1
         },
       }),

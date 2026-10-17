@@ -70,7 +70,7 @@ function setup(options: { mobile?: boolean } = {}) {
     noteFile,
     assetStore: createTestAssetStoreService(),
     openDocuments,
-    backlinkTarget: { ensure: async (title) => title },
+    backlinkTarget: { ensure: (title) => title },
     xArchive: createTestXArchiveService(),
     webFetch: createTestWebFetchService(),
     pageDescriber: createTestPageDescriberService(),

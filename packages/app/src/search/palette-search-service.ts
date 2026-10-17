@@ -94,8 +94,8 @@ class PaletteSearchServiceImpl<Context> implements PaletteSearchService<Context>
     return localIsoDate(new Date(this.#deps.clock.now()))
   }
 
-  suggestTitles(text: string, dateContext: DateSuggestionContext): Promise<WikiSuggestion[]> {
-    return this.#deps.suggestions.suggestWikiTargets(text, 8, dateContext)
+  async suggestTitles(text: string, dateContext: DateSuggestionContext): Promise<WikiSuggestion[]> {
+    return await this.#deps.suggestions.suggestWikiTargets(text, 8, dateContext)
   }
 
   async search(text: string, options: { hybrid: boolean }): Promise<PaletteHit[]> {

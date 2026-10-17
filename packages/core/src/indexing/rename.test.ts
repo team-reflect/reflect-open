@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { describe, expect, it } from 'vitest'
 import { resolved, unresolved } from '../markdown/index.ts'
 import {
@@ -20,7 +21,7 @@ function fakeIo(
   const writes: Record<string, string> = {}
   const io = {
     sources: async () => options?.sources ?? Object.keys(files).sort(),
-    backlinks: async () => options?.backlinks ?? [],
+    backlinks: () => options?.backlinks ?? [],
     read: async (path) => {
       const content = files[path]
       if (content === undefined) {
@@ -28,7 +29,7 @@ function fakeIo(
       }
       return content
     },
-    write: async (path, content) => {
+    write: (path, content) => {
       writes[path] = content
     },
     resolve: async (target) => {
@@ -39,7 +40,9 @@ function fakeIo(
       return options?.resolveTo !== undefined ? resolved(options.resolveTo) : unresolved('x')
     },
   } satisfies RenameIo & {
-    backlinks: () => Promise<Array<{ sourcePath: string; targetRaw: string; alias: string | null }>>
+    backlinks: () => MaybePromise<
+      Array<{ sourcePath: string; targetRaw: string; alias: string | null }>
+    >
   }
   return { io, writes }
 }
@@ -226,9 +229,9 @@ describe('rewriteLinksForTitleChange stable-target displays', () => {
     )
     const write = io.write
     let writeCount = 0
-    io.write = async (path, content) => {
+    io.write = (path, content) => {
       writeCount += 1
-      await write(path, content)
+      write(path, content)
     }
 
     await rewriteLinksForTitleChange({
@@ -453,7 +456,7 @@ describe('rewriteLinksForTitleChange write failures', () => {
       if (path === 'notes/fail.md') {
         throw new Error('write failed')
       }
-      await write(path, content)
+      write(path, content)
     }
     const result = await rewriteLinksForTitleChange({
       path: 'notes/target.md',

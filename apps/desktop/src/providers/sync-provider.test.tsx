@@ -8,11 +8,18 @@ import { useSync, useSyncContext } from './sync-provider.tsx'
 function Probe(): ReactElement {
   const sync = useSync()
   const context = useSyncContext()
+  async function backUpNow(): Promise<void> {
+    try {
+      await sync.backUpNow()
+    } catch {
+      // The probe only records the call.
+    }
+  }
   return (
     <button
       type="button"
       data-context={context === null ? 'none' : 'some'}
-      onClick={() => void sync.backUpNow().catch(() => {})}
+      onClick={() => void backUpNow()}
     >
       {sync.backup.phase}
     </button>

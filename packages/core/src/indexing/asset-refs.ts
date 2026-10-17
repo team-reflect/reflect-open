@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { XArchiveService } from '../embeds/x-archive-service.ts'
 import type { DatabaseService } from './database-service.ts'
 
@@ -34,7 +35,7 @@ export interface AssetReferences {
    * bare basename a wiki embed stores; {@link assetReferenceMatches}
    * re-applies the same rule to the candidate's live markdown.
    */
-  notePaths(assetPath: string, knownOwners?: readonly string[]): Promise<string[]>
+  notePaths(assetPath: string, knownOwners?: readonly string[]): MaybePromise<string[]>
 }
 
 class AssetReferencesImpl implements AssetReferences {

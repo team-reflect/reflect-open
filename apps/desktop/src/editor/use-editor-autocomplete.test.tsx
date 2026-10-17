@@ -74,9 +74,9 @@ async function setup(options?: SetupOptions) {
     graphSession,
     suggestions: {
       ...base.suggestions,
-      suggestWikiLinkTargets: async () =>
+      suggestWikiLinkTargets: () =>
         options?.wikiLinks ?? { suggestions: [], claimedTargetKeys: [], queryReadsAsDate: false },
-      suggestTags: async () => [
+      suggestTags: () => [
         { tag: 'work', count: 2 },
         { tag: 'home', count: 1 },
       ],

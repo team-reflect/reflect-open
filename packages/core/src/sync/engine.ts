@@ -72,7 +72,7 @@ export interface SyncEngineOptions {
    * Resolves the HTTPS sign-in for this cycle; `null` = none (the Rust layer
    * then resolves credentials locally, e.g. the SSH agent).
    */
-  getCredential: () => Promise<GitCredential | null>
+  getCredential: () => MaybePromise<GitCredential | null>
   /**
    * Observes every product-state transition. Called synchronously; never
    * called again after `stop()`.
@@ -128,7 +128,7 @@ export interface SyncEngineOptions {
    * Asked when the quiet window ends. False postpones the network pass,
    * with a growing delay up to five minutes.
    */
-  networkReady?: (() => Promise<boolean>) | undefined
+  networkReady?: (() => MaybePromise<boolean>) | undefined
 }
 
 export interface SyncEngine {
@@ -380,7 +380,7 @@ class SyncEngineImpl implements SyncEngine {
    * already-issued Git command cannot be recalled, but no later command starts.
    */
   async #step<T>(
-    promise: Promise<T>,
+    promise: MaybePromise<T>,
     { gated = true, onResult }: { gated?: boolean; onResult?: (result: T) => void } = {},
   ): Promise<T> {
     const result = await promise

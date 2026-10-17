@@ -1,6 +1,7 @@
+import type { MaybePromise } from '@reflect/utils'
 /**
  * The system clipboard.
  */
 export interface ClipboardService {
-  writeText(text: string): Promise<void>
+  writeText(text: string): MaybePromise<void>
 }

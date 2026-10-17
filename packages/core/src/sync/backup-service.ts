@@ -130,7 +130,7 @@ export interface BackupService {
   /**
    * Probe the graph and start the engine if fully connected. Idempotent.
    */
-  start(): Promise<void>
+  start(): MaybePromise<void>
   getState: () => BackupState
   /**
    * Subscribe to state changes; returns the unsubscribe.
@@ -156,16 +156,16 @@ export interface BackupService {
    * Stop backing **this graph** up (drops its remote; history and the
    * machine-level GitHub credential stay — other graphs keep syncing).
    */
-  disconnectGraph(): Promise<void>
+  disconnectGraph(): MaybePromise<void>
   /**
    * Sign this machine out of GitHub — every connected graph stops syncing.
    */
-  signOut(): Promise<void>
+  signOut(): MaybePromise<void>
   /**
    * Full cycle now: fetch, pull, push. On an iCloud-hosted graph with a remote
    * it commits, and opens a quiet window only when none is open.
    */
-  backUpNow(): Promise<void>
+  backUpNow(): MaybePromise<void>
   /**
    * Tear everything down; the service is unusable afterwards.
    */

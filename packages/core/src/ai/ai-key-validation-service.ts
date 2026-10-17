@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { AiProviderId, HostedAiProviderId } from '../settings/schema.ts'
 import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers.ts'
 import { APP_REVIEW_STUB_KEY } from './app-review-demo.ts'
@@ -88,7 +89,7 @@ export interface AiKeyValidationService {
   /**
    * Probe `input.provider` with `input.apiKey`. The App Review demo key is valid without a probe.
    */
-  validate(input: ApiKeyValidationInput): Promise<ApiKeyValidation>
+  validate(input: ApiKeyValidationInput): MaybePromise<ApiKeyValidation>
 }
 
 export interface AiKeyValidationServiceDeps {

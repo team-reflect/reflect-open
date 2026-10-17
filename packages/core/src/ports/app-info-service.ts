@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 
@@ -8,7 +9,7 @@ export interface AppInfoService {
   /**
    * The application version reported by the native shell.
    */
-  version(): Promise<string>
+  version(): MaybePromise<string>
 }
 
 const appVersionSchema = z.string()

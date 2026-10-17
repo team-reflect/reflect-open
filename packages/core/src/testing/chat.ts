@@ -77,7 +77,7 @@ class TestChatHistoryServiceImpl implements TestChatHistoryService {
     }
   }
 
-  async deleteConversation(id: string): Promise<void> {
+  deleteConversation(id: string): void {
     this.#deletes.push(id)
     this.#stored.delete(id)
   }

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 /**
  * Host filesystem path building, in the host platform's path syntax.
  */
@@ -17,8 +18,8 @@ export interface PathService {
  * The native operations behind a {@link PathService}.
  */
 export interface PathTransport {
-  join(...parts: string[]): Promise<string>
-  homeDir(): Promise<string>
+  join(...parts: string[]): MaybePromise<string>
+  homeDir(): MaybePromise<string>
 }
 
 const ICLOUD_DRIVE_SEGMENTS = ['Library', 'Mobile Documents', 'com~apple~CloudDocs'] as const
@@ -34,12 +35,12 @@ class PathServiceImpl implements PathService {
     this.#deps = deps
   }
 
-  join(...parts: string[]): Promise<string> {
-    return this.#deps.transport.join(...parts)
+  async join(...parts: string[]): Promise<string> {
+    return await this.#deps.transport.join(...parts)
   }
 
-  homeDir(): Promise<string> {
-    return this.#deps.transport.homeDir()
+  async homeDir(): Promise<string> {
+    return await this.#deps.transport.homeDir()
   }
 
   async icloudDriveRoot(): Promise<string> {

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 /**
  * A file type filter for {@link DialogService.pickFiles}.
  */
@@ -27,9 +28,9 @@ export interface DialogService {
   /**
    * Absolute paths of the picked files.
    */
-  pickFiles(options: PickFilesOptions): Promise<readonly string[] | null>
+  pickFiles(options: PickFilesOptions): MaybePromise<readonly string[] | null>
   /**
    * The absolute path of the picked folder.
    */
-  pickFolder(options: PickFolderOptions): Promise<string | null>
+  pickFolder(options: PickFolderOptions): MaybePromise<string | null>
 }

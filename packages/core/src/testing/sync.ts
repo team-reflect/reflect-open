@@ -502,7 +502,7 @@ class TestBackupServiceImpl implements TestBackupService {
     this.#state = options?.state ?? { phase: 'loading' }
   }
 
-  async start(): Promise<void> {
+  start(): void {
     this.#log.push({ method: 'start' })
   }
 
@@ -536,15 +536,15 @@ class TestBackupServiceImpl implements TestBackupService {
     return await this.#connectExisting(ref, connectOptions)
   }
 
-  async disconnectGraph(): Promise<void> {
+  disconnectGraph(): void {
     this.#log.push({ method: 'disconnectGraph' })
   }
 
-  async signOut(): Promise<void> {
+  signOut(): void {
     this.#log.push({ method: 'signOut' })
   }
 
-  async backUpNow(): Promise<void> {
+  backUpNow(): void {
     this.#log.push({ method: 'backUpNow' })
   }
 
@@ -589,7 +589,7 @@ export interface TestICloudSyncService extends ICloudSyncService {
 class TestICloudSyncServiceImpl implements TestICloudSyncService {
   readonly #log: ('start' | 'dispose')[] = []
 
-  async start(): Promise<void> {
+  start(): void {
     this.#log.push('start')
   }
 

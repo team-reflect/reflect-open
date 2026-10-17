@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { describe, expect, it, vi } from 'vitest'
 import { textCaptureEnvelopeSchema } from '../capture/capture-envelope.ts'
 import type { Unlisten } from '../unlisten.ts'
@@ -194,8 +195,8 @@ describe('DeepLinkIntakeService.resolve', () => {
  */
 function setupIntake() {
   const live = createTestDeepLinkSource()
-  const onOpenUrl = vi.fn<(listener: (urls: string[]) => void) => Promise<Unlisten>>((listener) =>
-    live.onOpenUrl(listener),
+  const onOpenUrl = vi.fn<(listener: (urls: string[]) => void) => MaybePromise<Unlisten>>(
+    (listener) => live.onOpenUrl(listener),
   )
   const getCurrent = vi.fn<() => Promise<string[] | null>>(() => Promise.resolve(null))
   const service = createTestDeepLinkIntakeService({ source: { onOpenUrl, getCurrent } })

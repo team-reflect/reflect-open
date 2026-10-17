@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { sql } from 'kysely'
 import type { DatabaseService } from './database-service.ts'
 import type { NoteTagFacet } from './note-list-service.ts'
@@ -62,7 +63,7 @@ export interface GraphStatsService {
   /**
    * Load {@link GraphStats} from the active graph's index.
    */
-  loadGraphStats(options: GraphStatsOptions): Promise<GraphStats>
+  loadGraphStats(options: GraphStatsOptions): MaybePromise<GraphStats>
 }
 
 class GraphStatsServiceImpl implements GraphStatsService {

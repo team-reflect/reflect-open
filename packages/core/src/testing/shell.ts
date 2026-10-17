@@ -81,7 +81,7 @@ class TestActivityPortImpl implements TestActivityPort {
     return this.#isHidden
   }
 
-  async beginBackgroundTask(): Promise<BackgroundTaskToken | null> {
+  beginBackgroundTask(): BackgroundTaskToken | null {
     if (!(this.#options?.backgroundTasks ?? false)) {
       return null
     }

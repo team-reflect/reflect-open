@@ -63,7 +63,7 @@ describe('createDemoModel', () => {
         retrieval: createTestRetrievalService(),
         noteFile,
         noteList: createNoteListService({ database: createTestDatabaseService() }),
-        dailyNotes: { listDailyNotes: async () => [] },
+        dailyNotes: { listDailyNotes: () => [] },
         assetReferences,
         assetPrivacy: createAssetPrivacyService({ noteFile, xArchive, assetReferences }),
         xArchive,

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 /**
  * Options for {@link DecodedImage.encode}.
  */
@@ -29,7 +30,7 @@ export interface DecodedImage {
   /**
    * Re-encode the image, scaled to the requested size; `null` when encoding fails.
    */
-  encode(options: ImageEncodeOptions): Promise<Blob | null>
+  encode(options: ImageEncodeOptions): MaybePromise<Blob | null>
   close(): void
 }
 
@@ -40,7 +41,7 @@ export interface ImageCodecService {
   /**
    * Decode `file`; `null` when this surface has no decoder or the file is undecodable.
    */
-  decode(file: Blob): Promise<DecodedImage | null>
+  decode(file: Blob): MaybePromise<DecodedImage | null>
 }
 
 class UnavailableImageCodecImpl implements ImageCodecService {

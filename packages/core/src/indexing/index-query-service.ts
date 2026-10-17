@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { isNotNullish } from '@ocavue/utils'
 import { isIsoDate } from '@reflect/utils'
 import { sql } from 'kysely'
@@ -108,7 +109,7 @@ export interface IndexQueryService {
    * `kind = 'template'`, which every note surface excludes — this listing is
    * the one query that *selects* them.
    */
-  listTemplates(): Promise<TemplateEntry[]>
+  listTemplates(): MaybePromise<TemplateEntry[]>
   /**
    * Stored `path → {fileHash, mtime}` facts for a specific path set, so
    * applying a large `index:changed` batch can skip already-indexed files

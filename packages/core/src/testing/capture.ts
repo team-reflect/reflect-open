@@ -191,7 +191,7 @@ class TestWebFetchServiceImpl implements TestWebFetchService {
     return this.#answer('oembed', this.#options?.oembed, url)
   }
 
-  async fetchLinkPreviewImage(url: CloudSafe<string>): Promise<string | null> {
+  fetchLinkPreviewImage(url: CloudSafe<string>): string | null {
     this.#log.push({ kind: 'image', url })
     return this.#options?.image?.[url] ?? null
   }

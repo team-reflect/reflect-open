@@ -92,12 +92,12 @@ async function renderPalette(query: string, context?: Partial<CommandContext>) {
   const app = createTestCoreServices({
     suggestions: {
       suggestWikiTargets,
-      suggestWikiLinkTargets: async () => ({
+      suggestWikiLinkTargets: () => ({
         suggestions: [],
         claimedTargetKeys: [],
         queryReadsAsDate: false,
       }),
-      suggestTags: async () => [],
+      suggestTags: () => [],
     },
     search: { searchWithFilters },
     retrieval: createTestRetrievalService({ retrieve }),
@@ -120,8 +120,8 @@ async function renderPalette(query: string, context?: Partial<CommandContext>) {
     back: vi.fn(),
     forward: vi.fn(),
     clearScrollState: vi.fn(),
-    togglePin: vi.fn(async () => {}),
-    togglePrivate: vi.fn(async () => {}),
+    togglePin: vi.fn(() => {}),
+    togglePrivate: vi.fn(() => {}),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),

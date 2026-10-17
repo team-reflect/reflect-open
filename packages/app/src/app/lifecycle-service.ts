@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import {
   listenNow,
   type ActivityPort,
@@ -55,7 +56,7 @@ export interface AppLifecycleService extends ActivityPort {
   /**
    * Confirm a deferred quit. The app exits inside this call, so the promise may never settle.
    */
-  confirmQuit(): Promise<void>
+  confirmQuit(): MaybePromise<void>
 }
 
 export interface LifecycleServiceDeps {

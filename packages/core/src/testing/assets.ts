@@ -15,7 +15,7 @@ class TestAssetReferencesImpl implements TestAssetReferences {
     this.#table = new Map(Object.entries(references ?? {}))
   }
 
-  async notePaths(assetPath: string): Promise<string[]> {
+  notePaths(assetPath: string): string[] {
     return [...(this.#table.get(assetPath) ?? [])]
   }
 

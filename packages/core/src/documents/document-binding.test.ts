@@ -29,7 +29,7 @@ function fakeCoordinator() {
   const dispose = vi.fn()
   const coordinator: DocumentCoordinator = {
     settle,
-    settled: async () => {},
+    settled: () => {},
     dispose,
   }
   return { coordinator, settle, dispose }

@@ -62,8 +62,8 @@ describe('v1 subject alias flow', () => {
         io: {
           sources: (targets) => index.wikiResolver.getLinkSources(targets),
           backlinks: (path) => index.backlinks.getBacklinks(path),
-          read: async () => source,
-          write: async (path, content) => {
+          read: () => source,
+          write: (path, content) => {
             writes[path] = content
           },
           resolve: (target) => index.wikiResolver.resolveWikiTarget(target),

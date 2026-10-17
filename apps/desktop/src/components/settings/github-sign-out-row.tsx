@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { useState, type ReactElement } from 'react'
 import { Button } from '@/components/ui/button.tsx'
 import {
@@ -14,7 +15,7 @@ import { useAsyncAction } from '@/hooks/use-async-action.ts'
 
 interface GithubSignOutRowProps {
   /** Remove the machine's GitHub credential (every connected graph stops syncing). */
-  signOut: () => Promise<void>
+  signOut: () => MaybePromise<void>
   /** The one-line explanation shown beside the button, tuned to the caller. */
   description: string
 }

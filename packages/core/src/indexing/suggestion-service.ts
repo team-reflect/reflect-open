@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { Database } from '@reflect/db'
 import { sql, type Kysely } from 'kysely'
 import { foldTag, normalizeWikiTarget } from '../markdown/index.ts'
@@ -60,7 +61,7 @@ export interface SuggestionService {
    * `#` autocomplete candidates for `query` (Plan 18): tags whose folded key
    * contains the query, most-used first, deduped on the stored `tag_key`.
    */
-  suggestTags(query: string, limit?: number): Promise<TagSuggestion[]>
+  suggestTags(query: string, limit?: number): MaybePromise<TagSuggestion[]>
   /**
    * `[[` autocomplete candidates for `query` (Plan 07): title and alias contains-
    * matches ranked by {@link rankWikiSuggestions}. With `dateGen`, fuzzy date
@@ -70,7 +71,7 @@ export interface SuggestionService {
     query: string,
     limit?: number,
     dateGen?: DateSuggestionContext,
-  ): Promise<WikiSuggestion[]>
+  ): MaybePromise<WikiSuggestion[]>
   /**
    * `[[` autocomplete candidates whose serialized target is safe and verified to
    * resolve to the selected path. Navigation-only surfaces should use
@@ -81,7 +82,7 @@ export interface SuggestionService {
     query: string,
     limit?: number,
     dateGen?: DateSuggestionContext,
-  ): Promise<WikiLinkSuggestionResult>
+  ): MaybePromise<WikiLinkSuggestionResult>
 }
 
 class SuggestionServiceImpl implements SuggestionService {

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { Unlisten } from '../unlisten.ts'
 
 /**
@@ -28,9 +29,9 @@ export interface ActivityPort {
   /**
    * Ask the shell to keep running after the OS backgrounds the app; `null` when unavailable.
    */
-  beginBackgroundTask(): Promise<BackgroundTaskToken | null>
+  beginBackgroundTask(): MaybePromise<BackgroundTaskToken | null>
   /**
    * Balance {@link beginBackgroundTask}. Expired or repeated tokens are no-ops.
    */
-  endBackgroundTask(token: BackgroundTaskToken): Promise<void>
+  endBackgroundTask(token: BackgroundTaskToken): MaybePromise<void>
 }

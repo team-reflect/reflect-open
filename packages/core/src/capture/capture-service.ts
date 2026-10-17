@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { appendXPost } from './bookmark-capture.ts'
 import type { XPostEnvelope } from './bookmark-envelope.ts'
 import { isCaptureSpoolPath } from './capture-identity.ts'
@@ -125,7 +126,11 @@ interface CaptureSessionDeps {
   readonly progress: ProgressPort
   readonly platform: PlatformFacts
   readonly logger: LoggerService
-  readonly commitXPost: (envelope: XPostEnvelope, path: string, generation: number) => Promise<void>
+  readonly commitXPost: (
+    envelope: XPostEnvelope,
+    path: string,
+    generation: number,
+  ) => MaybePromise<void>
   readonly notifyXPostsWritten: () => void
 }
 

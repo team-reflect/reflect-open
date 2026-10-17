@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { Tool, TypedToolCall, TypedToolResult } from '@reflect/modules/ai'
 import { z } from 'zod'
 import type { RetrievalService, RetrieveOptions } from '../../embeddings/retrieval-service.ts'
@@ -157,7 +158,7 @@ export interface NoteToolsService {
  * The daily-note range query of `DailyNoteService`.
  */
 export interface DailyNoteQueries {
-  listDailyNotes(range: DailyNotesRange): Promise<DailyNoteRow[]>
+  listDailyNotes(range: DailyNotesRange): MaybePromise<DailyNoteRow[]>
 }
 
 export interface NoteToolsServiceDeps {

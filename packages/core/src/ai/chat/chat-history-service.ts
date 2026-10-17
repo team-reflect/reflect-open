@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { ModelMessage } from '@reflect/modules/ai'
 import type { LoggerService } from '../../ports/logger-service.ts'
@@ -190,21 +191,21 @@ export interface ChatHistoryService {
    * {@link loadConversation} dropping unreadable rows), so a counter derived
    * from it could collide with a row it never saw.
    */
-  saveTurn(input: SaveChatTurnInput): Promise<void>
+  saveTurn(input: SaveChatTurnInput): MaybePromise<void>
   /**
    * Delete a conversation and its messages (for `generation`).
    */
-  deleteConversation(id: string, generation: number): Promise<void>
+  deleteConversation(id: string, generation: number): MaybePromise<void>
   /**
    * The most recently active conversations, newest first. Defaults to 50.
    */
-  listRecent(limit?: number): Promise<ChatConversation[]>
+  listRecent(limit?: number): MaybePromise<ChatConversation[]>
   /**
    * Load a conversation's turns in order. Restored turns are always `done`:
    * a row whose stream never settled (crash mid-turn) comes back with empty
    * `responseMessages`, which `buildHistory` already omits from the model view.
    */
-  loadConversation(conversationId: string): Promise<ChatTurn[]>
+  loadConversation(conversationId: string): MaybePromise<ChatTurn[]>
 }
 
 class ChatHistoryServiceImpl implements ChatHistoryService {

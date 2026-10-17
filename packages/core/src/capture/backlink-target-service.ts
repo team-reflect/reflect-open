@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { ReflectError } from '../errors.ts'
 import type { NoteCreationService } from '../graph/note-creation-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
@@ -23,7 +24,7 @@ export interface BacklinkTargetService {
    * link-safe current title so renames keep one section; an unsafe title falls
    * back to the requested spelling that just resolved as its alias.
    */
-  ensure(title: string, generation: number): Promise<string>
+  ensure(title: string, generation: number): MaybePromise<string>
 }
 
 class BacklinkTargetServiceImpl implements BacklinkTargetService {

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { GraphSessionSource } from '../graph/graph-session.ts'
 import { errorMessage } from '../errors.ts'
 import type { ICloudNativeService } from '../ipc/icloud-native-service.ts'
@@ -10,12 +11,12 @@ export interface MoveGraphToICloudOptions {
    * `BackupService.disconnectGraph` of the open graph when its backup is
    * connected, else `null`.
    */
-  disconnectBackup: (() => Promise<void>) | null
+  disconnectBackup: (() => MaybePromise<void>) | null
   /**
    * Reopen the graph at its new root (`GraphSessionService.openRecent`);
    * resolves `false` when it could not be opened.
    */
-  openGraph: (root: string) => Promise<boolean>
+  openGraph: (root: string) => MaybePromise<boolean>
   /**
    * Called once the copy landed and the backup step ran, right before the
    * graph reopens, with the failure text so far (`null` when there is none).

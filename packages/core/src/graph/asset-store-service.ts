@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
@@ -50,42 +51,42 @@ export interface AssetStoreService {
    * with the collision policy of {@link uploadBlob}. The bytes never enter
    * webview memory.
    */
-  importFile(sourcePath: string, desiredName: string, generation: number): Promise<string>
+  importFile(sourcePath: string, desiredName: string, generation: number): MaybePromise<string>
   /**
    * Write base64-encoded bytes to a graph-relative path.
    */
-  writeBase64(path: string, contentsBase64: string, generation: number): Promise<void>
+  writeBase64(path: string, contentsBase64: string, generation: number): MaybePromise<void>
   /**
    * A file's bytes, base64-encoded.
    */
-  readBase64(path: string, generation: number): Promise<string>
+  readBase64(path: string, generation: number): MaybePromise<string>
   /**
    * A file's bytes. Read as a raw binary response when the transport carries
    * binary bodies, otherwise through {@link readBase64}.
    */
-  readBytes(path: string, generation: number): Promise<Uint8Array<ArrayBuffer>>
+  readBytes(path: string, generation: number): MaybePromise<Uint8Array<ArrayBuffer>>
   /**
    * Open a file in the system default application.
    */
-  open(path: string, generation: number): Promise<void>
+  open(path: string, generation: number): MaybePromise<void>
   /**
    * Reveal a file in the OS file manager.
    */
-  reveal(path: string, generation: number): Promise<void>
+  reveal(path: string, generation: number): MaybePromise<void>
   /**
    * Delete one recording. Idempotent; Rust only deletes under `audio-memos/`.
    */
-  deleteAudioMemo(path: string, generation: number): Promise<void>
+  deleteAudioMemo(path: string, generation: number): MaybePromise<void>
   /**
    * Copy a recording from an OS path into `audio-memos/` at an exact path.
    * Idempotent: a segment that already landed is not copied again.
    */
-  importAudioMemo(sourcePath: string, path: string, generation: number): Promise<void>
+  importAudioMemo(sourcePath: string, path: string, generation: number): MaybePromise<void>
   /**
    * One cached segment transcript. Rejects with `notFound` while nothing is cached.
    */
-  readTranscriptCache(name: string, generation: number): Promise<string>
-  writeTranscriptCache(name: string, contents: string, generation: number): Promise<void>
+  readTranscriptCache(name: string, generation: number): MaybePromise<string>
+  writeTranscriptCache(name: string, contents: string, generation: number): MaybePromise<void>
 }
 
 export interface AssetStoreServiceDeps {

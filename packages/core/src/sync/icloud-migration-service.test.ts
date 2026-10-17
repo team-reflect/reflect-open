@@ -86,13 +86,13 @@ describe('createICloudMigrationService', () => {
         disconnectBackup: async () => {
           throw new ReflectError('io', 'remote locked')
         },
-        openGraph: async () => false,
+        openGraph: () => false,
         onCopied,
       }),
     ).resolves.toBe(`${DISCONNECT_FAILURE} ${OPEN_FAILURE}`)
 
     await expect(
-      migration.moveGraph({ disconnectBackup: null, openGraph: async () => false }),
+      migration.moveGraph({ disconnectBackup: null, openGraph: () => false }),
     ).resolves.toBe(OPEN_FAILURE)
   })
 

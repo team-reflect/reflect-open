@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -117,7 +118,7 @@ export interface ICloudSyncServiceDeps {
  * Dirty open sessions are deferred: their paths ride `skipPaths`.
  */
 export interface ICloudSyncService {
-  start(): Promise<void>
+  start(): MaybePromise<void>
   /**
    * Tear everything down; the service is unusable afterwards.
    */

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { textCaptureEnvelopeSchema } from '../capture/capture-envelope.ts'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { GraphSession, GraphSessionSource } from '../graph/graph-session.ts'
@@ -19,11 +20,11 @@ export interface DeepLinkSource {
   /**
    * Hear the URLs that arrive while the app runs.
    */
-  onOpenUrl(listener: (urls: string[]) => void): Promise<Unlisten>
+  onOpenUrl(listener: (urls: string[]) => void): MaybePromise<Unlisten>
   /**
    * The URLs the app was launched with, or `null`.
    */
-  getCurrent(): Promise<string[] | null>
+  getCurrent(): MaybePromise<string[] | null>
 }
 
 /**

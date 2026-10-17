@@ -10,7 +10,7 @@ describe('ChatGraphContextService', () => {
     const seen: GraphStatsOptions[] = []
     const service = createChatGraphContextService({
       graphStats: {
-        loadGraphStats: async (options) => {
+        loadGraphStats: (options) => {
           seen.push(options)
           return {
             noteCount: 7,

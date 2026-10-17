@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { FileChange, FileChangeService } from '../indexing/file-change-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { NoteSession } from './note-session-types.ts'
@@ -11,7 +12,7 @@ export interface OpenDocument {
   /**
    * Resolves once fired settle-time work has landed.
    */
-  settled?: (() => Promise<void>) | undefined
+  settled?: (() => MaybePromise<void>) | undefined
 }
 
 /**

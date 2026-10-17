@@ -48,7 +48,7 @@ class TestAppInfoServiceImpl implements AppInfoService {
     this.#version = version
   }
 
-  async version(): Promise<string> {
+  version(): string {
     return this.#version
   }
 }

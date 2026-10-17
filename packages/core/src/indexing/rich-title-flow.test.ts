@@ -98,8 +98,8 @@ describe('rich title flow', () => {
         io: {
           sources: (targets) => index.wikiResolver.getLinkSources(targets),
           backlinks: (path) => index.backlinks.getBacklinks(path),
-          read: async () => 'See [[Old Meeting]].\n',
-          write: async (path) => {
+          read: () => 'See [[Old Meeting]].\n',
+          write: (path) => {
             writes.push(path)
           },
           resolve: (target) => index.wikiResolver.resolveWikiTarget(target),

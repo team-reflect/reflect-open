@@ -22,7 +22,7 @@ function setup() {
     }),
     indexQuery: {
       ...base.indexQuery,
-      listTemplates: async () => [
+      listTemplates: () => [
         { path: 'templates/journal.md', title: 'Journal', mtime: 1 },
         { path: 'templates/person.md', title: 'Person', mtime: 2 },
       ],

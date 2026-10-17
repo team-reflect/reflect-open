@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { foldGraphPath } from '../graph/paths.ts'
 import { wikiLinkSafe } from '../markdown/edit.ts'
 import { foldKey } from '../markdown/keys.ts'
@@ -18,13 +19,13 @@ import { isWikiLinkSafeText, serializeWikiSuggestionAddress } from './suggest.ts
 
 export interface RenameIo {
   /** Distinct source paths of links whose folded target key matches. */
-  sources: (targetKey: string) => Promise<string[]>
+  sources: (targetKey: string) => MaybePromise<string[]>
   /** Links that currently resolve to the renamed note's subject path. */
-  backlinks: (path: string) => Promise<RenameBacklink[]>
-  read: (path: string) => Promise<string>
+  backlinks: (path: string) => MaybePromise<RenameBacklink[]>
+  read: (path: string) => MaybePromise<string>
   /** Write with the graph generation pre-bound (stale → loud rejection). */
-  write: (path: string, content: string) => Promise<void>
-  resolve: (target: string) => Promise<Resolution>
+  write: (path: string, content: string) => MaybePromise<void>
+  resolve: (target: string) => MaybePromise<Resolution>
 }
 
 /** Indexed fields needed to find title-mirroring displays for one subject. */
@@ -233,10 +234,10 @@ function aliasFamily(title: string): string[] {
 /** Data access for {@link rewritePathLinksForMove}, injected like {@link RenameIo}. */
 export interface PathLinkRewriteIo {
   /** Distinct source paths of links whose folded target path key matches. */
-  pathLinkSources: (targetPathKey: string) => Promise<string[]>
-  read: (path: string) => Promise<string>
+  pathLinkSources: (targetPathKey: string) => MaybePromise<string[]>
+  read: (path: string) => MaybePromise<string>
   /** Write with the graph generation pre-bound (stale → loud rejection). */
-  write: (path: string, content: string) => Promise<void>
+  write: (path: string, content: string) => MaybePromise<void>
 }
 
 /** What {@link rewritePathLinksForMove} touched, mirroring the title result. */

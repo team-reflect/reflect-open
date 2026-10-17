@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { BackgroundTaskToken, Unlisten } from '@reflect/core'
 import {
   createTestActivityPort,
@@ -89,15 +90,15 @@ class TestLifecycleServiceImpl implements TestLifecycleService {
     return this.#quitRequested.add(listener)
   }
 
-  async confirmQuit(): Promise<void> {
+  confirmQuit(): void {
     this.#confirmCalls += 1
   }
 
-  beginBackgroundTask(): Promise<BackgroundTaskToken | null> {
+  beginBackgroundTask(): MaybePromise<BackgroundTaskToken | null> {
     return this.#activity.beginBackgroundTask()
   }
 
-  endBackgroundTask(token: BackgroundTaskToken): Promise<void> {
+  endBackgroundTask(token: BackgroundTaskToken): MaybePromise<void> {
     return this.#activity.endBackgroundTask(token)
   }
 

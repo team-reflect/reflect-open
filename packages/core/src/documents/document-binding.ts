@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { NoteSession } from './note-session-types.ts'
 import type { OpenDocumentsService } from './open-documents-service.ts'
 
@@ -53,7 +54,7 @@ export interface DocumentCoordinator {
   /**
    * Resolves once fired settle-time work has landed.
    */
-  settled(): Promise<void>
+  settled(): MaybePromise<void>
   dispose(): void
 }
 

@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { IpcBridgeService, LoggerService, PlatformFacts, Unlisten } from '@reflect/core'
 import { MAIN_WINDOW_LABEL, type WindowService } from '../app/window-service.ts'
@@ -70,11 +71,11 @@ export interface NativeAppMenu {
   /**
    * Install the menu as the application menu, replacing the current one.
    */
-  setAsAppMenu(): Promise<void>
+  setAsAppMenu(): MaybePromise<void>
   /**
    * Give each submenu its `nsAppRole`. Call it after {@link setAsAppMenu}.
    */
-  assignNsAppRoles(): Promise<void>
+  assignNsAppRoles(): MaybePromise<void>
 }
 
 export interface NativeContextMenuItem {
@@ -99,11 +100,11 @@ export interface NativeContextMenuOptions {
  * The native menu operations behind a {@link NativeMenuService}.
  */
 export interface NativeMenuHost {
-  buildAppMenu(submenus: readonly NativeSubmenu[]): Promise<NativeAppMenu>
+  buildAppMenu(submenus: readonly NativeSubmenu[]): MaybePromise<NativeAppMenu>
   /**
    * Open a context menu at the pointer.
    */
-  popup(items: readonly NativeContextMenuItem[]): Promise<void>
+  popup(items: readonly NativeContextMenuItem[]): MaybePromise<void>
 }
 
 /**
