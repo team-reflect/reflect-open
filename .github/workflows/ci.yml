@@ -91,13 +91,13 @@ jobs:
       # WebKit keeps the memory of every finished test file, so each shard
       # runs in its own Vitest process to restart the browser.
       - name: Test browser (shard 1/3)
-        run: pnpm run test run --project '*browser*' --shard=1/3
+        run: .github/scripts/test-webkit-shard.sh 1/3
 
       - name: Test browser (shard 2/3)
-        run: pnpm run test run --project '*browser*' --shard=2/3
+        run: .github/scripts/test-webkit-shard.sh 2/3
 
       - name: Test browser (shard 3/3)
-        run: pnpm run test run --project '*browser*' --shard=3/3
+        run: .github/scripts/test-webkit-shard.sh 3/3
 
       - name: Test others
         run: pnpm run test run --project '!*browser*'
