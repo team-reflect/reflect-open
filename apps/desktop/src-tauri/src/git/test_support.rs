@@ -17,7 +17,7 @@ pub(super) fn scaffold_graph(root: &Path) {
     }
     fs::write(
         root.join(".gitignore"),
-        crate::graph_gitignore::default_contents(),
+        reflect_graph_io::graph_gitignore::default_contents(),
     )
     .unwrap();
     fs::write(root.join(".reflect/index.sqlite"), "not a real db").unwrap();

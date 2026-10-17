@@ -103,7 +103,7 @@ fn render_skill(skill_name: &str, graph_name: &str, graph_root: &str, cli_path: 
 }
 
 fn content_hash(content: &str) -> String {
-    crate::hash::sha256_hex(content.as_bytes())
+    reflect_graph_io::hash::sha256_hex(content.as_bytes())
 }
 
 /// Insert the managed marker after the YAML frontmatter (agent runtimes parse

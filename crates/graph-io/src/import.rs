@@ -34,7 +34,7 @@ use std::sync::Arc;
 use reflect_graph_paths::{to_slash, to_slash_lossy};
 use serde::Serialize;
 
-use crate::error::{AppError, AppResult};
+use reflect_types::{AppError, AppResult};
 
 use super::import_assets::{self, DownloadOutcome};
 use super::io::{atomic_write_bytes, file_occupied};
@@ -182,7 +182,7 @@ impl PreparedImport {
 
 /// Read and validate a user-selected Reflect V1 export zip against `root`,
 /// without writing anything.
-pub(super) fn prepare_zip_import(root: &Path, zip_path: &Path) -> AppResult<PreparedImport> {
+pub fn prepare_zip_import(root: &Path, zip_path: &Path) -> AppResult<PreparedImport> {
     prepare_zip_import_from(root, zip_path, import_assets::V1_ASSET_URL_PREFIXES)
 }
 
@@ -212,7 +212,7 @@ fn prepare_zip_import_from(
     }
     Ok(PreparedImport {
         entries,
-        staging: super::assets::staging_dir(root)?,
+        staging: crate::io::staging_dir(root)?,
         urls,
         prefixes: prefixes
             .iter()
@@ -259,7 +259,7 @@ fn ensure_has_notes(entries: &[ImportEntry]) -> AppResult<()> {
 /// `füße.md` and `füsse.md` to the same path), and a conflicting daily note
 /// has the imported body appended instead. `on_progress` receives
 /// `(processed, total)` per zip entry for the writing stage.
-pub(super) fn finalize_import(
+pub fn finalize_import(
     root: &Path,
     prepared: PreparedImport,
     mut outcomes: HashMap<String, DownloadOutcome>,
@@ -807,6 +807,14 @@ fn is_note_markdown(relative: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn block_on<F: std::future::Future>(future: F) -> F::Output {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(future)
+    }
     use std::io::{BufRead, BufReader, Write};
     use std::net::TcpListener;
     use std::sync::Mutex;
@@ -835,7 +843,7 @@ mod tests {
         ensure_has_notes(&entries)?;
         let prepared = PreparedImport {
             entries,
-            staging: super::super::assets::staging_dir(root)?,
+            staging: crate::io::staging_dir(root)?,
             urls: Vec::new(),
             prefixes: import_assets::V1_ASSET_URL_PREFIXES
                 .iter()
@@ -1503,11 +1511,8 @@ mod tests {
         prefix: &str,
     ) -> AppResult<ImportSummary> {
         let prepared = prepare_zip_import_from(root, zip_path, &[prefix])?;
-        let downloads = tauri::async_runtime::block_on(prepared.download_assets(
-            "Reflect/test",
-            no_cancel(),
-            no_progress(),
-        ))?;
+        let downloads =
+            block_on(prepared.download_assets("Reflect/test", no_cancel(), no_progress()))?;
         finalize_import(root, prepared, downloads, |_, _| {})
     }
 
@@ -1590,12 +1595,8 @@ mod tests {
         let Some(before) = open_fd_count() else {
             return;
         };
-        let downloads = tauri::async_runtime::block_on(prepared.download_assets(
-            "Reflect/test",
-            no_cancel(),
-            no_progress(),
-        ))
-        .unwrap();
+        let downloads =
+            block_on(prepared.download_assets("Reflect/test", no_cancel(), no_progress())).unwrap();
         let Some(after) = open_fd_count() else {
             return;
         };
@@ -1702,7 +1703,7 @@ mod tests {
         let seen = Arc::new(Mutex::new(Vec::new()));
         let record = Arc::clone(&seen);
 
-        tauri::async_runtime::block_on(prepared.download_assets(
+        block_on(prepared.download_assets(
             "Reflect/test",
             no_cancel(),
             Arc::new(move |done, total| record.lock().unwrap().push((done, total))),
@@ -1727,11 +1728,7 @@ mod tests {
         let prepared = prepare_zip_import_from(root.path(), &zip_path, &[&base]).unwrap();
         let cancelled = Arc::new(AtomicBool::new(true));
 
-        let result = tauri::async_runtime::block_on(prepared.download_assets(
-            "Reflect/test",
-            cancelled,
-            no_progress(),
-        ));
+        let result = block_on(prepared.download_assets("Reflect/test", cancelled, no_progress()));
 
         match result.err() {
             Some(AppError::Io { message, .. }) => assert!(message.contains("cancelled")),
@@ -1751,7 +1748,7 @@ mod tests {
         ]);
         let prepared = PreparedImport {
             entries: dedupe_entries(entries).unwrap(),
-            staging: super::super::assets::staging_dir(root.path()).unwrap(),
+            staging: crate::io::staging_dir(root.path()).unwrap(),
             urls: Vec::new(),
             prefixes: import_assets::V1_ASSET_URL_PREFIXES
                 .iter()

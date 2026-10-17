@@ -12,13 +12,13 @@ use std::collections::BTreeSet;
 
 /// A note split at its frontmatter fence. `header` excludes the `---` fences;
 /// `body` starts after the closing fence line.
-pub(super) struct SplitNote<'a> {
+pub struct SplitNote<'a> {
     pub header: Option<&'a str>,
     pub body: &'a str,
 }
 
 /// Split `source` into frontmatter and body. No frontmatter → header `None`.
-pub(super) fn split(source: &str) -> SplitNote<'_> {
+pub fn split(source: &str) -> SplitNote<'_> {
     let Some(rest) = source.strip_prefix("---\n") else {
         return SplitNote {
             header: None,
@@ -47,7 +47,7 @@ pub(super) fn split(source: &str) -> SplitNote<'_> {
 /// Merge two flat frontmatter headers key-wise against an optional base
 /// header. Returns the merged header (no fences), or `None` when the shape
 /// isn't flat or a key genuinely conflicts.
-pub(super) fn merge_headers(base: Option<&str>, first: &str, second: &str) -> Option<String> {
+pub fn merge_headers(base: Option<&str>, first: &str, second: &str) -> Option<String> {
     let base_pairs = match base {
         Some(header) => parse_flat(header)?,
         None => Vec::new(),

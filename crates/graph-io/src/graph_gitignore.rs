@@ -4,7 +4,7 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
-use crate::error::AppResult;
+use reflect_types::AppResult;
 
 const DEFAULT_GROUPS: &[(&str, &[&str])] = &[
     (
@@ -20,7 +20,7 @@ const DEFAULT_GROUPS: &[(&str, &[&str])] = &[
 ];
 
 /// The default `.gitignore` written for newly bootstrapped graphs.
-pub(crate) fn default_contents() -> String {
+pub fn default_contents() -> String {
     let mut contents = String::new();
     for &(heading, patterns) in DEFAULT_GROUPS {
         if !contents.is_empty() {
@@ -38,7 +38,7 @@ pub(crate) fn default_contents() -> String {
 }
 
 /// Ensure graph repositories ignore only local machine/cache noise.
-pub(crate) fn ensure_defaults(root: &Path) -> AppResult<()> {
+pub fn ensure_defaults(root: &Path) -> AppResult<()> {
     let path = root.join(".gitignore");
     let existing = fs::read_to_string(&path).unwrap_or_default();
     let mut missing_groups: Vec<(&str, Vec<&str>)> = Vec::new();

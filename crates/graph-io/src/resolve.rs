@@ -8,7 +8,7 @@
 
 use std::path::{Component, Path, PathBuf};
 
-use crate::error::{AppError, AppResult};
+use reflect_types::{AppError, AppResult};
 
 /// Reject a relative path that is absolute, contains `..`/root components, or is
 /// empty/dot-only (which would target the graph root itself). Requires at least
@@ -16,7 +16,7 @@ use crate::error::{AppError, AppResult};
 /// only applicable one for the conflict stores under `.reflect/` (shadow bases),
 /// whose directories don't exist until first write and so
 /// can't anchor the symlink-aware [`resolve`].
-pub(crate) fn ensure_relative(rel: &str) -> AppResult<PathBuf> {
+pub fn ensure_relative(rel: &str) -> AppResult<PathBuf> {
     let path = Path::new(rel);
     let mut has_segment = false;
     for component in path.components() {
@@ -56,7 +56,7 @@ fn existing_ancestor(path: &Path) -> PathBuf {
 /// the lexical guard, this canonicalizes the deepest existing ancestor and
 /// verifies it stays under the canonicalized root, so a symlink inside the graph
 /// can't redirect reads/writes outside it.
-pub(crate) fn resolve(root: &Path, rel: &str) -> AppResult<PathBuf> {
+pub fn resolve(root: &Path, rel: &str) -> AppResult<PathBuf> {
     let rel = ensure_relative(rel)?;
     let joined = root.join(&rel);
     let canonical_root = root.canonicalize()?;
@@ -72,7 +72,7 @@ pub(crate) fn resolve(root: &Path, rel: &str) -> AppResult<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs::io::bootstrap;
+    use crate::io::bootstrap;
     use tempfile::tempdir;
 
     #[test]

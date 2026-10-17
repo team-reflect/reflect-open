@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
-use crate::error::AppResult;
+use reflect_types::AppResult;
 
 type GraphMutex = Arc<Mutex<()>>;
 
@@ -39,7 +39,7 @@ pub fn with_graph_lock<T>(root: &Path, f: impl FnOnce() -> AppResult<T>) -> AppR
 
 /// How many threads hold or wait on the lock of `root`.
 #[cfg(test)]
-pub(crate) fn holders(root: &Path) -> usize {
+pub fn holders(root: &Path) -> usize {
     let locks = LOCKS.lock().unwrap_or_else(PoisonError::into_inner);
     locks
         .get(&lock_key(root))

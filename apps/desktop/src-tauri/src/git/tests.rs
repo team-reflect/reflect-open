@@ -691,17 +691,19 @@ fn a_deletion_beside_an_append_is_reconciled_not_resurrected() {
     let merged = merge_remote(root_a).unwrap();
     assert!(merged.review_paths.is_empty(), "{merged:?}");
 
-    let side = |content: &str, modified_ms| crate::conflict::ConflictSide {
+    let side = |content: &str, modified_ms| reflect_graph_io::conflict::ConflictSide {
         content: content.to_string(),
         modified_ms,
     };
-    let expected = crate::conflict::ladder::resolve(crate::conflict::ladder::ConflictInput {
-        base: Some(base),
-        sides: (side(deleted, 1), side(appended, 2)),
-        merge_loop_detected: false,
-    })
+    let expected = reflect_graph_io::conflict::ladder::resolve(
+        reflect_graph_io::conflict::ladder::ConflictInput {
+            base: Some(base),
+            sides: (side(deleted, 1), side(appended, 2)),
+            merge_loop_detected: false,
+        },
+    )
     .unwrap();
-    let crate::conflict::Resolution::Reconciled { content: expected } = expected else {
+    let reflect_graph_io::conflict::Resolution::Reconciled { content: expected } = expected else {
         panic!("the ladder must reconcile this pair, not merge it exactly: {expected:?}");
     };
     let content = read(root_a, rel);

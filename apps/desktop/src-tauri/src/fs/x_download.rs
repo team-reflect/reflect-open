@@ -1,5 +1,5 @@
-use super::x_archive_store as archive;
 use crate::error::{AppError, AppResult as Result};
+use reflect_graph_io::x_archive_store as archive;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -110,7 +110,7 @@ async fn download_once(root: PathBuf, url: String, hash: String) -> Result<archi
     if response.content_length().is_some_and(|bytes| bytes > limit) {
         return Err(AppError::parse("media-too-large"));
     }
-    let directory = super::resolve::resolve(&root, "assets/x")?;
+    let directory = super::resolve(&root, "assets/x")?;
     tokio::fs::create_dir_all(&directory).await?;
 
     let temporary = tempfile::Builder::new()
@@ -130,7 +130,7 @@ async fn download_once(root: PathBuf, url: String, hash: String) -> Result<archi
     tauri::async_runtime::spawn_blocking(move || {
         let (extension, mime, bytes) = archive::sniff(temporary.path())?;
         let name = format!("url_sha256_{hash}.{extension}");
-        let path = super::resolve::resolve(&root, &format!("assets/x/{name}"))?;
+        let path = super::resolve(&root, &format!("assets/x/{name}"))?;
         temporary.persist(path).map_err(|error| error.error)?;
         #[cfg(unix)]
         std::fs::File::open(directory)?.sync_all()?;

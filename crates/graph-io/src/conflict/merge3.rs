@@ -3,17 +3,13 @@
 
 use git2::{merge_file, MergeFileInput, MergeFileOptions};
 
-use crate::error::{AppError, AppResult};
+use reflect_types::{AppError, AppResult};
 
 use super::ConflictSide;
 
 /// Merge `first`/`second` over `base`. `None` when hunks overlap. The result
 /// depends on the order of the sides; libgit2 requires labels.
-pub(crate) fn diff3(
-    base: &str,
-    first: &ConflictSide,
-    second: &ConflictSide,
-) -> AppResult<Option<String>> {
+pub fn diff3(base: &str, first: &ConflictSide, second: &ConflictSide) -> AppResult<Option<String>> {
     // git2's Repository entry points run libgit2's guarded global init, but
     // the free `merge_file` function skips it and traps when it runs first
     // (tls/allocator state). `Buf::new` is the cheapest public call that

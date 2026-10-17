@@ -19,11 +19,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::error::{AppError, AppResult};
+use reflect_types::{AppError, AppResult};
 
 /// Only asset links on Reflect V1's storage hosts are localized; every other
 /// URL in the export is an ordinary link and imports untouched.
-pub(super) const V1_ASSET_URL_PREFIXES: &[&str] = &[
+pub const V1_ASSET_URL_PREFIXES: &[&str] = &[
     "https://firebasestorage.googleapis.com/",
     "https://reflect-assets.app/v1/users/",
 ];
@@ -37,7 +37,7 @@ const CONCURRENT_DOWNLOADS: usize = 6;
 const MAX_NAME_PROBES: u32 = 1000;
 
 /// One remote-asset URL occurrence inside a markdown file.
-pub(super) struct RemoteSpan {
+pub struct RemoteSpan {
     /// Byte offset of the first URL character in the markdown.
     pub start: usize,
     /// Byte offset one past the last URL character.
@@ -47,14 +47,14 @@ pub(super) struct RemoteSpan {
 }
 
 /// What a download attempt produced for one URL.
-pub(super) enum DownloadOutcome {
+pub enum DownloadOutcome {
     /// Bytes staged in `.reflect/tmp`, waiting for the import to persist them.
     Fetched(FetchedAsset),
     /// The remote answered a permanent 4xx; the note keeps the remote link.
     Gone,
 }
 
-pub(super) struct FetchedAsset {
+pub struct FetchedAsset {
     pub file: tempfile::TempPath,
     /// Sanitized filename the asset would like under `assets/` (collision
     /// suffixes are decided later, against the live graph).
@@ -68,7 +68,7 @@ pub(super) struct FetchedAsset {
 /// so the span keeps the escaped bytes (for splicing) while `url` holds the
 /// unescaped form (for fetching). A span ends at whitespace or any character
 /// that terminates a markdown link destination.
-pub(super) fn scan_remote_spans<P: AsRef<str>>(markdown: &str, prefixes: &[P]) -> Vec<RemoteSpan> {
+pub fn scan_remote_spans<P: AsRef<str>>(markdown: &str, prefixes: &[P]) -> Vec<RemoteSpan> {
     let mut spans = Vec::new();
     let mut from = 0;
     while let Some((start, prefix)) = prefixes
@@ -121,7 +121,7 @@ pub(super) fn scan_remote_spans<P: AsRef<str>>(markdown: &str, prefixes: &[P]) -
 /// Replace the remote spans of `markdown` whose URL has a localized path in
 /// `replacements` (URL → `assets/…`). URLs without a replacement (permanent
 /// download failures) keep their remote form.
-pub(super) fn rewrite_markdown<P: AsRef<str>>(
+pub fn rewrite_markdown<P: AsRef<str>>(
     markdown: &str,
     prefixes: &[P],
     replacements: &HashMap<String, String>,
@@ -140,10 +140,7 @@ pub(super) fn rewrite_markdown<P: AsRef<str>>(
 /// when a zip-borne asset lands under a suffixed name. Only spans opening a
 /// link destination count (preceded by `(`, `<`, a quote, whitespace, or the
 /// start of the text), and only exact whole-path matches are rewritten.
-pub(super) fn rewrite_asset_paths(
-    markdown: &str,
-    replacements: &HashMap<String, String>,
-) -> String {
+pub fn rewrite_asset_paths(markdown: &str, replacements: &HashMap<String, String>) -> String {
     if replacements.is_empty() {
         return markdown.to_string();
     }
@@ -171,7 +168,7 @@ pub(super) fn rewrite_asset_paths(
 /// `cancelled` stops the workers between fetches (also an error: a cancelled
 /// import must not proceed to writes); `on_progress` receives
 /// `(settled, total)` after each URL resolves.
-pub(super) async fn download_remote_assets(
+pub async fn download_remote_assets(
     staging: &Path,
     urls: Vec<String>,
     user_agent: &str,
@@ -201,7 +198,7 @@ pub(super) async fn download_remote_assets(
         let on_progress = Arc::clone(&on_progress);
         let client = client.clone();
         let staging = staging.to_path_buf();
-        handles.push(tauri::async_runtime::spawn(async move {
+        handles.push(tokio::spawn(async move {
             loop {
                 let Some(url) = next_url(&queue, &results, &cancelled) else {
                     return;
@@ -457,7 +454,7 @@ const MAX_EXTENSION_CHARS: usize = 12;
 /// (minus NFC normalization, which needs no dependency for the ASCII names
 /// Firebase serves): slugged lowercase stem, inner dots to dashes, extension
 /// kept but reduced to short lowercase alphanumerics.
-pub(super) fn sanitize_asset_file_name(original: &str) -> String {
+pub fn sanitize_asset_file_name(original: &str) -> String {
     let trimmed = original.trim();
     let (stem, extension) = match trimmed.rfind('.') {
         Some(index) if index > 0 && index < trimmed.len() - 1 => (
@@ -507,13 +504,13 @@ pub(super) fn sanitize_asset_file_name(original: &str) -> String {
 /// rewrite markdown and run its collision checks before any graph write.
 /// A candidate already holding identical bytes is reused instead of written —
 /// re-importing the same export must not duplicate every attachment.
-pub(super) struct PlannedAssetName {
+pub struct PlannedAssetName {
     pub name: String,
     /// True when `assets/<name>` already holds these exact bytes.
     pub reuse: bool,
 }
 
-pub(super) fn plan_asset_name(
+pub fn plan_asset_name(
     assets_dir: &Path,
     desired: &str,
     staged: &Path,
@@ -553,7 +550,7 @@ pub(super) fn plan_asset_name(
 
 /// Whether two files hold identical bytes (length check first, so comparing
 /// large attachments is cheap in the common differing case).
-pub(super) fn same_file_bytes(existing: &Path, staged: &Path) -> AppResult<bool> {
+pub fn same_file_bytes(existing: &Path, staged: &Path) -> AppResult<bool> {
     let existing_meta = std::fs::metadata(existing)?;
     let staged_meta = std::fs::metadata(staged)?;
     if existing_meta.len() != staged_meta.len() {
@@ -565,11 +562,7 @@ pub(super) fn same_file_bytes(existing: &Path, staged: &Path) -> AppResult<bool>
 /// Persist a staged download at its planned name. The plan already verified
 /// the name was free; `persist_noclobber` keeps a concurrent claim from
 /// silently clobbering — losing that race is a loud error, not a rename.
-pub(super) fn persist_planned(
-    fetched: FetchedAsset,
-    assets_dir: &Path,
-    name: &str,
-) -> AppResult<()> {
+pub fn persist_planned(fetched: FetchedAsset, assets_dir: &Path, name: &str) -> AppResult<()> {
     std::fs::create_dir_all(assets_dir)?;
     fetched
         .file
