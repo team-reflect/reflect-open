@@ -24,15 +24,15 @@ on:
         default: app-store-connect
     secrets:
       APPLE_API_KEY:
-        required: false
+        required: true
       APPLE_API_ISSUER:
-        required: false
+        required: true
       APPLE_API_KEY_CONTENT:
-        required: false
+        required: true
       SENTRY_AUTH_TOKEN:
-        required: false
+        required: true
       SENTRY_DSN:
-        required: false
+        required: true
 
 concurrency:
   group: publish-testflight
