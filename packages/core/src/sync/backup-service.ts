@@ -6,7 +6,7 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import type { PersistenceFlushService } from '../graph/persistence-flush-service.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { isMobilePlatform } from '../ports/platform-facts.ts'
-import { errorMessage, AppError } from '../errors.ts'
+import { AppError, errorMessage, isAppError } from '../errors.ts'
 import { isNotePath } from '../graph/paths.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
@@ -617,7 +617,7 @@ class BackupServiceImpl implements BackupService {
       // else (GitHub throttling, a fetch that never reached it, an unparsable
       // reply) says nothing about the credential, so it must not keep asking
       // for a reconnect either.
-      if (cause instanceof AppError && cause.kind === 'auth') {
+      if (isAppError(cause) && cause.kind === 'auth') {
         return
       }
       next = {

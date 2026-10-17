@@ -50,7 +50,7 @@ export function isAppError(value: unknown): value is AppError {
  * anything else becomes `unknown`.
  */
 export function toAppError(value: unknown): AppError {
-  if (value instanceof AppError) {
+  if (isAppError(value)) {
     return value
   }
   const parsed = appErrorWireSchema.safeParse(value)

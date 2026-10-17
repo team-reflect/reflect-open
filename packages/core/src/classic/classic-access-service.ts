@@ -7,7 +7,7 @@ import type { IdService } from '../ports/id-service.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
-import { AppError } from '../errors.ts'
+import { AppError, isAppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { WebAuthService } from '../ipc/web-auth-service.ts'
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
@@ -402,7 +402,7 @@ class ClassicAccessServiceImpl implements ClassicAccessService {
       await this.#saveAccess(next)
       return next
     } catch (error: unknown) {
-      if (error instanceof AppError && error.kind === 'auth') {
+      if (isAppError(error) && error.kind === 'auth') {
         logger.warn('Reflect Classic rejected the stored token; keeping the current expiry', error)
         const next = { ...stored, token: null }
         await this.#saveAccess(next)
