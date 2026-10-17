@@ -44,14 +44,16 @@ describe('createWindowService', () => {
     expect(note.isMainWindow()).toBe(false)
   })
 
-  it('swallows a failed title change', async () => {
+  it('logs a failed title change', async () => {
     const setTitle = vi.fn(async () => {
       throw new Error('gone')
     })
-    const { window } = setup({ host: { setTitle } })
-    expect(() => window.setTitle('Note A')).not.toThrow()
-    await settle()
+    const { window, logger } = setup({ host: { setTitle } })
+    await window.setTitle('Note A')
     expect(setTitle).toHaveBeenCalledWith('Note A')
+    expect(logger.getErrors()).toEqual([
+      { message: 'setting the window title failed:', cause: 'gone' },
+    ])
   })
 
   it('shares one open_note_window request between concurrent opens of one link', async () => {

@@ -66,9 +66,9 @@ export interface WindowService {
   readonly label: string
   isMainWindow(): boolean
   /**
-   * Set the OS window title. Best-effort: a failure is ignored.
+   * Set the OS window title.
    */
-  setTitle(title: string): void
+  setTitle(title: string): MaybePromise<void>
   /**
    * Open or focus a note window on a `reflect://` link. Concurrent calls for
    * one link share a request. False when the host has no secondary windows
@@ -126,14 +126,12 @@ class WindowServiceImpl implements WindowService {
     return this.#deps.host.label === MAIN_WINDOW_LABEL
   }
 
-  setTitle(title: string): void {
-    void (async () => {
-      try {
-        await this.#deps.host.setTitle(title)
-      } catch {
-        // A window that is closing cannot take a title.
-      }
-    })()
+  async setTitle(title: string): Promise<void> {
+    try {
+      await this.#deps.host.setTitle(title)
+    } catch (cause: unknown) {
+      this.#deps.logger.error('setting the window title failed:', errorMessage(cause))
+    }
   }
 
   async openNoteWindow(deepLink: string): Promise<boolean> {

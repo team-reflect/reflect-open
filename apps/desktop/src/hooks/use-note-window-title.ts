@@ -11,6 +11,6 @@ import { useAppServices } from '@/services/services-provider.tsx'
 export function useNoteWindowTitle(title: string | null): void {
   const { window: appWindow } = useAppServices()
   useEffect(() => {
-    appWindow.setTitle(title ?? 'Reflect')
+    void appWindow.setTitle(title ?? 'Reflect')
   }, [appWindow, title])
 }
