@@ -1,7 +1,7 @@
 import type { SyntaxNode, Tree } from '@meowdown/markdown'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter.ts'
 import { parseBody } from '../markdown/grammar.ts'
-import { stripHeadingClosingSequence, unescapeMarkdownText } from '../markdown/plain-text.ts'
+import { stripAtxHeadingMarks, unescapeMarkdownText } from '../markdown/plain-text.ts'
 import { normalizeWikiTarget } from '../markdown/resolve.ts'
 import { isWikiNodeName, wikiBracketStart } from '../markdown/wiki-nodes.ts'
 
@@ -183,7 +183,7 @@ function headingSectionEnd(heading: SyntaxNode): number {
 /** Does the heading's text line carry anything beyond ATX `#` marks? */
 function headingHasText(body: string, heading: SyntaxNode): boolean {
   const firstLine = body.slice(heading.from, lineEndAt(body, heading.from))
-  return stripHeadingClosingSequence(firstLine.replace(/^#{1,6}[ \t]*/, '')).trim() !== ''
+  return stripAtxHeadingMarks(firstLine) !== ''
 }
 
 /**
