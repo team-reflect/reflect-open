@@ -155,7 +155,7 @@ fn graph_info(root: &Path, generation: u64) -> GraphInfo {
 
 /// Set the active root (bumping the generation atomically), record it in
 /// recents, and return its info.
-fn activate(state: &State<GraphState>, root: &Path) -> AppResult<GraphInfo> {
+fn activate(state: &GraphState, root: &Path) -> AppResult<GraphInfo> {
     let generation = {
         let mut inner = lock_graph(state)?;
         inner.generation += 1;
@@ -183,7 +183,7 @@ fn lock_graph(state: &GraphState) -> AppResult<std::sync::MutexGuard<'_, GraphIn
     })
 }
 
-pub(crate) fn current_root(state: &State<GraphState>) -> AppResult<PathBuf> {
+pub(crate) fn current_root(state: &GraphState) -> AppResult<PathBuf> {
     lock_graph(state)?
         .root
         .clone()
@@ -194,7 +194,7 @@ pub(crate) fn current_root(state: &State<GraphState>) -> AppResult<PathBuf> {
 /// (`windows::window_bootstrap`) must *adopt* the session, never re-open it:
 /// a generation bump here would strand every command the main window has
 /// pinned to the current one.
-pub(crate) fn current_graph_info(state: &State<GraphState>) -> AppResult<GraphInfo> {
+pub(crate) fn current_graph_info(state: &GraphState) -> AppResult<GraphInfo> {
     let inner = lock_graph(state)?;
     let root = inner.root.clone().ok_or_else(AppError::no_graph)?;
     Ok(graph_info(&root, inner.generation))
@@ -204,10 +204,7 @@ pub(crate) fn current_graph_info(state: &State<GraphState>) -> AppResult<GraphIn
 /// issued for. A stale generation means the graph was switched after the
 /// command was enqueued — the mutation must be rejected (loudly), or it would
 /// land in the *new* graph's same-named file.
-pub(crate) fn root_for_generation(
-    state: &State<GraphState>,
-    generation: u64,
-) -> AppResult<PathBuf> {
+pub(crate) fn root_for_generation(state: &GraphState, generation: u64) -> AppResult<PathBuf> {
     let inner = lock_graph(state)?;
     if inner.generation != generation {
         return Err(AppError::io(
@@ -221,7 +218,7 @@ pub(crate) fn root_for_generation(
 /// command. Read commands take an optional pin: UI reads for the open graph
 /// omit it, background passes (audio-memo reconcile) that can span a graph
 /// switch must supply it so every step of a pass sees one graph.
-fn root_for(state: &State<GraphState>, generation: Option<u64>) -> AppResult<PathBuf> {
+fn root_for(state: &GraphState, generation: Option<u64>) -> AppResult<PathBuf> {
     match generation {
         Some(generation) => root_for_generation(state, generation),
         None => current_root(state),

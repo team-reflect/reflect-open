@@ -21,6 +21,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
+use crate::change::{ChangeKind, FileChange};
 use crate::conflict::copy::{free_conflict_copy_path, utc_stamp};
 use crate::conflict::ladder::{self, ConflictInput};
 use crate::conflict::shadow::{blob_hash8_of_file, content_hash, ShadowStore};
@@ -32,24 +33,12 @@ use super::versions::{
     current_version_modified_ms, mark_resolved, unresolved_versions, VersionRef,
 };
 
-/// One file the sweep rewrote or removed, in the watcher's change shape.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SweepChange {
-    /// Graph-relative path, forward-slashed.
-    pub path: String,
-    /// `"upsert"` or `"remove"` (removes are folded collision duplicates).
-    pub kind: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub modified_ms: Option<u64>,
-}
-
 /// What one sweep did.
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SweepOutcome {
     /// Every file the sweep changed on disk — reindex these directly.
-    pub changed: Vec<SweepChange>,
+    pub changed: Vec<FileChange>,
     /// Graph-relative paths of the conflict copies the sweep wrote.
     pub copies: Vec<String>,
     /// Conflicts resolved without user interaction.
@@ -249,16 +238,16 @@ fn run_sweep(
     // from sweep start, plus paths this sweep wrote, minus paths it removed.
     let mut live: BTreeSet<&str> = files.iter().map(|file| file.path.as_str()).collect();
     for change in &outcome.changed {
-        if change.kind == "upsert" {
+        if change.kind == ChangeKind::Upsert {
             live.insert(change.path.as_str());
         }
     }
     for change in &outcome.changed {
-        if change.kind == "remove"
+        if change.kind == ChangeKind::Remove
             && !outcome
                 .changed
                 .iter()
-                .any(|other| other.kind == "upsert" && other.path == change.path)
+                .any(|other| other.kind == ChangeKind::Upsert && other.path == change.path)
         {
             live.remove(change.path.as_str());
         }
@@ -445,9 +434,9 @@ fn apply_file_resolution(
             return false; // versions stay unresolved; next sweep retries
         }
         crate::fs::own_writes::record(root, rel, resolution.final_content.as_bytes());
-        outcome.changed.push(SweepChange {
+        outcome.changed.push(FileChange {
             path: rel.to_string(),
-            kind: "upsert".to_string(),
+            kind: ChangeKind::Upsert,
             modified_ms: modified_ms_of(&abs),
         });
     }
@@ -511,9 +500,9 @@ fn copy_conflict_versions(
             tracing::warn!(path = rel, copy = %copy_rel, ?err, "failed to write conflict copy");
             return false;
         }
-        outcome.changed.push(SweepChange {
+        outcome.changed.push(FileChange {
             path: copy_rel.clone(),
-            kind: "upsert".to_string(),
+            kind: ChangeKind::Upsert,
             modified_ms: modified_ms_of(&target),
         });
         outcome.copies.push(copy_rel);
@@ -593,10 +582,10 @@ fn fold_duplicate(
         if let Err(err) = shadow.record(canonical_rel, &dup_content) {
             tracing::warn!(path = %canonical_rel, ?err, "failed to record adopted collision base");
         }
-        outcome.changed.push(remove_change(&file.path));
-        outcome.changed.push(SweepChange {
+        outcome.changed.push(FileChange::remove(&file.path));
+        outcome.changed.push(FileChange {
             path: canonical_rel.to_string(),
-            kind: "upsert".to_string(),
+            kind: ChangeKind::Upsert,
             modified_ms: modified_ms_of(&canonical_abs),
         });
         return;
@@ -640,7 +629,7 @@ fn fold_duplicate(
     // the index row while the file remains. A retry is an `AlreadyResolved`
     // fold plus remove.
     if fs::remove_file(&dup_abs).is_ok() {
-        outcome.changed.push(remove_change(&file.path));
+        outcome.changed.push(FileChange::remove(&file.path));
     } else {
         tracing::warn!(path = %file.path, "failed to remove folded collision duplicate");
     }
@@ -675,14 +664,6 @@ fn is_daily_date_stem(stem: &str) -> bool {
         && [0, 1, 2, 3, 5, 6, 8, 9]
             .iter()
             .all(|&index| bytes[index].is_ascii_digit())
-}
-
-fn remove_change(rel: &str) -> SweepChange {
-    SweepChange {
-        path: rel.to_string(),
-        kind: "remove".to_string(),
-        modified_ms: None,
-    }
 }
 
 fn modified_ms_of(abs: &Path) -> Option<u64> {
@@ -756,13 +737,13 @@ mod tests {
             "# Day\n\n- from mac\n- from phone\n"
         );
         // Changes report the remove + the rewrite for direct reindexing.
-        let kinds: Vec<(&str, &str)> = outcome
+        let kinds: Vec<(String, String)> = outcome
             .changed
             .iter()
-            .map(|change| (change.path.as_str(), change.kind.as_str()))
+            .map(|change| (change.path.clone(), change.kind.to_string()))
             .collect();
-        assert!(kinds.contains(&("daily/2026-07-04 2.md", "remove")));
-        assert!(kinds.contains(&("daily/2026-07-04.md", "upsert")));
+        assert!(kinds.contains(&("daily/2026-07-04 2.md".into(), "remove".into())));
+        assert!(kinds.contains(&("daily/2026-07-04.md".into(), "upsert".into())));
         // The base the fold just recorded survives the same pass's orphan
         // pruning (the keep-set includes this sweep's own upserts) — while
         // the removed duplicate's base is pruned in the same pass, not left
@@ -1256,7 +1237,7 @@ mod tests {
         assert!(outcome
             .changed
             .iter()
-            .any(|change| change.path == copy && change.kind == "upsert"));
+            .any(|change| change.path == copy && change.kind == ChangeKind::Upsert));
         assert_eq!(
             fs::read_to_string(root.path().join("assets/data.json")).unwrap(),
             "{\"a\":1}"

@@ -7,6 +7,7 @@
 
 use keyring_core::{Entry, Error};
 
+use crate::blocking::run_blocking;
 use crate::error::{AppError, AppResult};
 
 /// The keychain service every Reflect secret is filed under.
@@ -57,19 +58,6 @@ fn delete_from(entry: &Entry) -> AppResult<()> {
         Ok(()) | Err(Error::NoEntry) => Ok(()),
         Err(err) => Err(AppError::io(err.to_string())),
     }
-}
-
-/// Keychain calls run on a blocking thread, never the main loop: macOS parks
-/// `get_password` on a user-facing password prompt whenever the binary's code
-/// signature doesn't match the item's ACL (every dev rebuild), and a sync
-/// command would freeze the whole app — no paint, no notes — until the user
-/// answers.
-async fn run_blocking<T: Send + 'static>(
-    task: impl FnOnce() -> AppResult<T> + Send + 'static,
-) -> AppResult<T> {
-    tauri::async_runtime::spawn_blocking(task)
-        .await
-        .map_err(|err| AppError::io(err.to_string()))?
 }
 
 /// Command: store `value` under `name`, replacing any prior value.

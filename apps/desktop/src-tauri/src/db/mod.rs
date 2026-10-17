@@ -81,7 +81,7 @@ pub struct IndexState {
     read: Mutex<ReadInner>,
 }
 
-fn lock_state<'a>(index: &'a State<IndexState>) -> AppResult<MutexGuard<'a, IndexInner>> {
+fn lock_state<'a>(index: &'a IndexState) -> AppResult<MutexGuard<'a, IndexInner>> {
     index.inner.lock().map_err(|err| {
         // A poisoned lock means a command panicked while holding it — the panic
         // itself is the bug; this context points at the blast radius.
@@ -90,7 +90,7 @@ fn lock_state<'a>(index: &'a State<IndexState>) -> AppResult<MutexGuard<'a, Inde
     })
 }
 
-fn lock_read<'a>(index: &'a State<IndexState>) -> AppResult<MutexGuard<'a, ReadInner>> {
+fn lock_read<'a>(index: &'a IndexState) -> AppResult<MutexGuard<'a, ReadInner>> {
     index.read.lock().map_err(|err| {
         tracing::error!(?err, "index read lock poisoned by an earlier panic");
         AppError::io("index read lock poisoned")
@@ -101,7 +101,7 @@ fn lock_read<'a>(index: &'a State<IndexState>) -> AppResult<MutexGuard<'a, ReadI
 /// index is open. The note-window bootstrap (`windows::window_bootstrap`)
 /// adopts the session through this — it must never rebind the connection or
 /// bump the generation the way `index_open` does.
-pub(crate) fn current_generation(index: &State<IndexState>) -> AppResult<Option<u64>> {
+pub(crate) fn current_generation(index: &IndexState) -> AppResult<Option<u64>> {
     let state = lock_state(index)?;
     Ok(state.conn.is_some().then_some(state.generation))
 }
@@ -183,8 +183,8 @@ pub fn index_open(
 /// keeps a full rebuild cheap; an empty batch commits a no-op transaction.
 /// Returns whether it committed, so callers only broadcast real writes.
 fn apply_in_txn(
-    index: &State<IndexState>,
-    background_tasks: &State<BackgroundTaskState>,
+    index: &IndexState,
+    background_tasks: &BackgroundTaskState,
     generation: u64,
     notes: &[IndexedNote],
 ) -> AppResult<bool> {
