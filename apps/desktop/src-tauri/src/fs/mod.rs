@@ -42,9 +42,6 @@ pub(crate) use reflect_graph_io::io::atomic_write_bytes;
 /// iCloud sweep's collision folding — an evicted canonical note must not be
 /// treated as a free slot (Plan 21).
 pub(crate) use reflect_graph_io::io::file_occupied;
-/// Sync-exclusion marking, shared with `git::repo` (a freshly initialized
-/// backup repo must never ride a file-sync provider — Plan 21).
-pub(crate) use reflect_graph_io::io::mark_dir_local_only;
 pub(crate) use reflect_graph_io::io::modified_ms;
 /// The full traversal guard, shared with sibling modules that address graph
 /// files (capture promotes screenshots into `assets/`).

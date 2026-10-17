@@ -1,0 +1,26 @@
+[package]
+name = "reflect-git"
+version = "0.0.0"
+edition = "2021"
+description = "Git backup and sync primitives over libgit2: init and adopt, commit, fetch, merge, push, with the merge decision table and the stale-lock recovery. No Tauri in it."
+
+[dependencies]
+serde = { workspace = true }
+tracing = "0.1.44"
+# Everything is vendored/static — libssh2 and openssl must never link against
+# homebrew dylibs the distributed app won't have (libssh2-sys only consults
+# pkg-config when LIBSSH2_SYS_USE_PKG_CONFIG is set, and vendored-openssl pins
+# the rest).
+git2 = { version = "0.21.0", default-features = false, features = [
+  "https",
+  "ssh",
+  "vendored-libgit2",
+  "vendored-openssl",
+] }
+reflect-graph-io = { workspace = true }
+reflect-graph-paths = { workspace = true }
+reflect-types = { workspace = true, features = ["git2"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+reflect-graph-io = { workspace = true, features = ["test-support"] }

@@ -7,7 +7,7 @@ use git2::{Index, IndexAddOption, IndexEntry};
 use reflect_graph_paths::to_slash_lossy;
 use serde::Serialize;
 
-use crate::error::AppResult;
+use reflect_types::AppResult;
 
 use super::commit_message::message_for_commit;
 use super::repo::{clear_foreign_state, open_existing, reattach_head, signature, stage0_entry};
@@ -43,7 +43,7 @@ pub(super) fn commit_all(
 ) -> AppResult<CommitOutcome> {
     #[cfg(test)]
     super::fault::trip(super::fault::FaultPoint::BeforeCommit)?;
-    crate::fs::with_graph_lock(root, || {
+    reflect_graph_io::with_graph_lock(root, || {
         commit_locked(root, fallback_message, max_file_bytes)
     })
 }

@@ -5008,6 +5008,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "reflect-git"
+version = "0.0.0"
+dependencies = [
+ "git2",
+ "reflect-graph-io",
+ "reflect-graph-paths",
+ "reflect-types",
+ "serde",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
 name = "reflect-graph-io"
 version = "0.0.0"
 dependencies = [
@@ -5093,6 +5106,7 @@ dependencies = [
  "objc2-ui-kit",
  "percent-encoding",
  "proptest",
+ "reflect-git",
  "reflect-graph-io",
  "reflect-graph-paths",
  "reflect-index",
