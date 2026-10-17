@@ -5,7 +5,7 @@ use std::path::Path;
 use git2::{Commit, Delta, DiffOptions, Repository, Tree};
 use reflect_graph_paths::to_slash_lossy;
 
-use crate::error::AppResult;
+use reflect_types::AppResult;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ChangeAction {

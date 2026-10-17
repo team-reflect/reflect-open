@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use crate::error::AppResult;
+use reflect_types::AppResult;
 
 const STALE_LOCK_MS: u64 = 5 * 60_000;
 const GIT_ELOCKED: i32 = -14;

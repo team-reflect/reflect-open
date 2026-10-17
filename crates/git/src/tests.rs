@@ -951,7 +951,7 @@ fn fetch_without_remote_is_a_typed_error() {
     scaffold_graph(&root);
     setup(&root, None, None).unwrap();
     let err = fetch(&root, None).unwrap_err();
-    assert!(matches!(err, crate::error::AppError::NotFound { .. }));
+    assert!(matches!(err, reflect_types::AppError::NotFound { .. }));
 }
 
 #[test]
@@ -1586,7 +1586,7 @@ fn age_file(path: &Path, minutes: u64) {
         .unwrap();
 }
 
-fn commit_with_lock_retry(root: &Path) -> crate::error::AppResult<super::commit::CommitOutcome> {
+fn commit_with_lock_retry(root: &Path) -> reflect_types::AppResult<super::commit::CommitOutcome> {
     super::locks::retry_after_stale_lock(root, || commit_all(root, "sync", MAX_FILE_BYTES))
 }
 
@@ -1976,8 +1976,8 @@ fn pull_all_holds_one_lock_for_commit_and_merge() {
     let save = thread::spawn({
         let root = root_a.clone();
         move || {
-            crate::fs::with_graph_lock(&root, || {
-                crate::fs::write_unchecked(&root, "notes/late.md", "# Late\n")?;
+            reflect_graph_io::with_graph_lock(&root, || {
+                reflect_graph_io::write_unchecked(&root, "notes/late.md", "# Late\n")?;
                 Ok(())
             })
             .unwrap();

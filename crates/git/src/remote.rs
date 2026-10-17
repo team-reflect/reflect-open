@@ -13,7 +13,7 @@ use git2::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::error::{AppError, AppResult};
+use reflect_types::{AppError, AppResult};
 
 use super::repo::{current_branch, open_existing};
 

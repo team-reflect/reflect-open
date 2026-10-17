@@ -5,8 +5,8 @@ use std::path::Path;
 
 use git2::{IndexEntry, IndexTime, Oid, Repository, RepositoryInitOptions, Signature};
 
-use crate::error::{AppError, AppResult};
 use reflect_graph_io::graph_gitignore;
+use reflect_types::{AppError, AppResult};
 
 /// The branch Reflect creates for new backup repos. Adopted repos keep
 /// whatever branch their HEAD already points at — nothing below hardcodes it.
@@ -22,7 +22,7 @@ pub(super) fn open_or_init(root: &Path) -> AppResult<Repository> {
     opts.initial_head(DEFAULT_BRANCH);
     let repo = Repository::init_opts(root, &opts)?;
     // Two devices syncing one object store through iCloud corrupts it.
-    crate::fs::mark_dir_local_only(&root.join(".git"));
+    reflect_graph_io::io::mark_dir_local_only(&root.join(".git"));
     Ok(repo)
 }
 
