@@ -447,10 +447,14 @@ class MeetingServiceImpl implements MeetingService {
       // A contacts hiccup must cost only its own rows, never the note
       // suggestions (the same containment as the editor's `[[` menu).
       lookupContacts
-        ? contacts.lookupPeople(query).catch((error: unknown) => {
-            logger.error('contact link suggestions failed:', error)
-            return []
-          })
+        ? (async () => {
+            try {
+              return await contacts.lookupPeople(query)
+            } catch (error: unknown) {
+              logger.error('contact link suggestions failed:', error)
+              return []
+            }
+          })()
         : Promise.resolve([]),
     ])
     return {

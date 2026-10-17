@@ -409,7 +409,7 @@ describe('AutocompleteSuggestionService.suggestLinks', () => {
     const { suggest, ensured } = await setup({
       settings: { contactsEnabled: true },
       contacts: [ADA],
-      personNotes: { resolvePersonContact: async () => existing },
+      personNotes: { resolvePersonContact: () => existing },
     })
 
     const items = await suggest('Ada', 'authorized')
@@ -435,7 +435,7 @@ describe('AutocompleteSuggestionService.suggestLinks', () => {
       settings: { contactsEnabled: true },
       contacts: [ADA],
       personNotes: {
-        resolvePersonContact: async (contact) => ({
+        resolvePersonContact: (contact) => ({
           kind: 'blocked',
           contact,
           reason: 'identity-conflict',

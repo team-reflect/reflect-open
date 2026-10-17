@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
@@ -63,12 +64,12 @@ export interface ContactsService {
    * Re-read the permission state. Never prompts and never rejects: a failed
    * read keeps the last state.
    */
-  refresh(): Promise<void>
+  refresh(): MaybePromise<void>
   /**
    * Trigger the OS contacts permission prompt (a no-op once the user has
    * decided), refresh the state, and report whether access is granted.
    */
-  requestAccess(): Promise<boolean>
+  requestAccess(): MaybePromise<boolean>
   /**
    * The contacts gate: the integration is enabled and the permission is readable.
    */
@@ -78,16 +79,16 @@ export interface ContactsService {
    * word-prefix name matches, ranked and capped. Queries shorter than two
    * characters answer empty, since one letter matches half the address book.
    */
-  lookupPeople(query: string): Promise<ContactMatch[]>
+  lookupPeople(query: string): MaybePromise<ContactMatch[]>
   /**
    * Unified contacts with an email address matching `email`.
    */
-  lookupByEmail(email: string): Promise<ContactMatch[]>
+  lookupByEmail(email: string): MaybePromise<ContactMatch[]>
   /**
    * Unified contacts matching `name` through the framework's own name
    * matching (case- and diacritic-insensitive, word-prefix based).
    */
-  lookupByName(name: string): Promise<ContactMatch[]>
+  lookupByName(name: string): MaybePromise<ContactMatch[]>
 }
 
 /**

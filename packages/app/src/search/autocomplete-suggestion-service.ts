@@ -120,15 +120,17 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
       // A contacts hiccup (permission revoked mid-session, store error)
       // must cost only its own rows, never the note suggestions.
       contactsInMenu
-        ? contacts
-            .lookupPeople(query)
-            .then((matches) =>
-              Promise.all(matches.map((contact) => personNotes.resolvePersonContact(contact))),
-            )
-            .catch((error: unknown): PersonContactResolution[] => {
+        ? (async (): Promise<PersonContactResolution[]> => {
+            try {
+              const matches = await contacts.lookupPeople(query)
+              return await Promise.all(
+                matches.map(async (contact) => await personNotes.resolvePersonContact(contact)),
+              )
+            } catch (error: unknown) {
               logger.error('contact link suggestions failed:', error)
               return []
-            })
+            }
+          })()
         : Promise.resolve<PersonContactResolution[]>([]),
     ])
     const contactCandidates = contactResolutions
@@ -184,24 +186,24 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
           label: contact.fullName,
           detail: contact.emails[0] ?? contact.phones[0] ?? 'Contact',
           onSelect: () => {
-            void personNotes
-              .ensurePersonNote({
-                title: contact.fullName,
-                emails: contact.emails,
-                body: contactDetailsMarkdown(contact),
-                generation,
-              })
-              .then((outcome) => {
+            void (async () => {
+              try {
+                const outcome = await personNotes.ensurePersonNote({
+                  title: contact.fullName,
+                  emails: contact.emails,
+                  body: contactDetailsMarkdown(contact),
+                  generation,
+                })
                 if (outcome.kind === 'ambiguous') {
                   this.#reportAmbiguousNoteTitle(contact.fullName)
                 } else if (outcome.kind === 'unavailable') {
                   this.#reportUnavailableNoteTitle(contact.fullName)
                 }
-              })
-              .catch((error: unknown) => {
+              } catch (error: unknown) {
                 logger.error('create-person-note failed:', error)
                 operations.fail('Creating note', errorMessage(error))
-              })
+              }
+            })()
           },
         }
       }

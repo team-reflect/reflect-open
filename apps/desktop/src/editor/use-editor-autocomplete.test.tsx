@@ -61,7 +61,7 @@ async function setup(options?: SetupOptions) {
   const base = createTestCoreServices()
   const personNotes: typeof base.personNotes = {
     ...base.personNotes,
-    resolvePersonContact: async (contact) => ({
+    resolvePersonContact: (contact) => ({
       kind: 'new',
       contact,
       insertText: contact.fullName,

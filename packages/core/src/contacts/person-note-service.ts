@@ -1,3 +1,4 @@
+import type { MaybePromise } from '@reflect/utils'
 import type {
   NoteCreationService,
   ResolveOrCreateNoteResult,
@@ -93,19 +94,19 @@ export interface PersonNoteService {
    * no ownership priority: zero unique owner paths is missing, one is reusable,
    * and more than one is a conflict.
    */
-  resolvePerson(values: readonly string[]): Promise<PersonResolution>
+  resolvePerson(values: readonly string[]): MaybePromise<PersonResolution>
   /**
    * Resolve one Apple Contact into a selectable new/existing wikilink target.
    * Unsafe new names and unsafe or conflicting owners remain blocked identities,
    * so callers cannot fall through to duplicate creation.
    */
-  resolvePersonContact(contact: ContactMatch): Promise<PersonContactResolution>
+  resolvePersonContact(contact: ContactMatch): MaybePromise<PersonContactResolution>
   /**
    * Recheck email ownership immediately before creating a person note. Existing
    * and blocked identities never create; only a current ownership miss reaches
    * the ordinary title resolver and atomic path claim.
    */
-  ensurePersonNote(input: EnsurePersonNoteInput): Promise<EnsurePersonNoteResult>
+  ensurePersonNote(input: EnsurePersonNoteInput): MaybePromise<EnsurePersonNoteResult>
 }
 
 export interface PersonNoteServiceDeps {

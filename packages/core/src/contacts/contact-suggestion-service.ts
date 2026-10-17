@@ -215,7 +215,11 @@ class ContactSuggestionServiceImpl implements ContactSuggestionService {
   }
 
   async requestAccess(): Promise<void> {
-    await this.#deps.contacts.requestAccess().catch(() => {})
+    try {
+      await this.#deps.contacts.requestAccess()
+    } catch {
+      // A failed request leaves the access status unchanged.
+    }
   }
 
   /**

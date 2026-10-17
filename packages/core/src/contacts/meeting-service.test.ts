@@ -631,7 +631,7 @@ describe('attendee identity outcomes', () => {
       personNotes: {
         resolvePerson: (values) => personNotes.resolvePerson(values),
         resolvePersonContact: (contact) => personNotes.resolvePersonContact(contact),
-        ensurePersonNote: async () => ({
+        ensurePersonNote: () => ({
           kind: 'blocked',
           emails: ['ada@example.com'],
           reason: 'identity-conflict',
