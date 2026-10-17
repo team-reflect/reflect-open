@@ -353,7 +353,6 @@ export default defineESLintConfig(
       'react-hooks/globals': 'off',
       'regexp/no-super-linear-backtracking': 'off',
       'unicorn/no-computed-property-existence-check': 'off',
-      'unicorn/no-optional-chaining-on-undeclared-variable': 'off',
       'unicorn/no-unnecessary-splice': 'off',
     },
   },

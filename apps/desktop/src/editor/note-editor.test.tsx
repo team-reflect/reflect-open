@@ -55,7 +55,8 @@ const MOBILE_APP: TestPlatformOptions = { surface: { mobileApp: true } }
  * a preparing transition.
  */
 async function settleViewTransition(): Promise<void> {
-  await document.activeViewTransition?.finished
+  const transition = document.activeViewTransition
+  await transition?.finished
 }
 
 const pmRoot = page.locate('.ProseMirror')
