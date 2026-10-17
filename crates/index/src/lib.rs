@@ -13,6 +13,7 @@
 //! the session only reports whether a write committed.
 
 mod chat_write;
+#[cfg(any(feature = "native", test))]
 mod connections;
 mod embed_write;
 mod query;
@@ -23,7 +24,7 @@ mod tests;
 mod write;
 
 pub use chat_write::{ChatConversation, ChatMessageRow};
-#[cfg(feature = "native")]
+#[cfg(any(feature = "native", test))]
 pub use connections::FileIndexConnections;
 pub use embed_write::EmbeddedChunk;
 pub use scan::{ReconcileScan, ScanCandidate, ScanOrphan};
