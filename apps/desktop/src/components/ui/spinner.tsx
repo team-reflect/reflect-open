@@ -12,8 +12,8 @@ export function Spinner({ className }: SpinnerProps): ReactElement {
   return (
     <LoaderCircle
       aria-hidden
-      data-slot="spinner"
-      className={cn('size-3 motion-safe:animate-spin', className)}
+      data-testid="spinner"
+      className={cn('size-3 animate-spin', className)}
     />
   )
 }

@@ -4,7 +4,6 @@ import { CSS } from '@dnd-kit/utilities'
 import { errorMessage } from '@reflect/core'
 import type { PinnedNote } from '@reflect/core'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
-import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 import { routeForPath, routesEqual } from '@/routing/route.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
@@ -27,13 +26,12 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
   const target = routeForPath(note.path)
   const active = routesEqual(route, target)
   const label = noteLabel(note)
-  const reducedMotion = usePrefersReducedMotion()
   const { isDragging, listeners, setNodeRef, transform, transition } = useSortable({
     id: note.path,
   })
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
-    transition: reducedMotion ? undefined : transition,
+    transition,
   }
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLButtonElement>): void => {

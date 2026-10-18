@@ -144,7 +144,7 @@ describe('PaywallScreen purchase mutation', () => {
       .element(view.getByRole('button', { name: /Already a Reflect member/ }))
       .toBeDisabled()
     await expect.element(view.getByRole('button', { name: 'Restore Purchases' })).toBeDisabled()
-    expect(view.container.querySelector('button [data-slot="spinner"]')).not.toBeNull()
+    await expect.element(trial.getByTestId('spinner')).toBeInTheDocument()
     expect(purchases).toEqual([IAP_PRODUCT_IDS.yearly])
     const activePurchase = queryClient
       .getMutationCache()
@@ -299,7 +299,9 @@ describe('PaywallScreen restore mutation', () => {
     await expect
       .element(view.getByRole('button', { name: 'Start 7-day free trial' }))
       .toBeDisabled()
-    expect(view.container.querySelector('button [data-slot="spinner"]')).toBeNull()
+    await expect
+      .element(view.getByRole('button', { name: 'Start 7-day free trial' }).getByTestId('spinner'))
+      .not.toBeInTheDocument()
     const activeRestore = queryClient
       .getMutationCache()
       .find({ exact: true, mutationKey: mutationKeys.iap.restore })

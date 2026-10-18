@@ -70,10 +70,7 @@ export function IncomingBacklinks({
         >
           <ChevronRight
             aria-hidden
-            className={cn(
-              'size-4 shrink-0 motion-safe:transition-transform',
-              expanded && 'rotate-90',
-            )}
+            className={cn('size-4 shrink-0 transition-transform', expanded && 'rotate-90')}
           />
           <span>
             Incoming backlink{count === 1 ? '' : 's'} ({count})

@@ -137,11 +137,8 @@ describe('DailyCaptureMenu', () => {
     await view.rerender(<DailyCaptureMenu />)
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await expect
-      .element(view.getByRole('button', { name: 'Record audio memo' }))
+      .element(view.getByRole('button', { name: 'Record audio memo' }).getByTestId('spinner'))
       .toBeInTheDocument()
-    expect(
-      view.container.querySelector('[data-slot="audio-memo-action"] [data-slot="spinner"]'),
-    ).not.toBeNull()
     await view.getByRole('button', { name: 'Hide capture actions' }).click()
 
     memo.phase = 'error'

@@ -197,7 +197,7 @@ function ToastIcon({ type }: { type: string | undefined }): ReactElement | null 
   }
 
   if (type === 'loading') {
-    icon = <Loader2Icon className="motion-safe:animate-spin" aria-hidden="true" />
+    icon = <Loader2Icon className="animate-spin" aria-hidden="true" />
   }
 
   if (!icon) {
