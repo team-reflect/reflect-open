@@ -21,7 +21,7 @@ jiff = "0.2.38"
 sha2 = { workspace = true }
 pulldown-cmark = "0.13.4"
 saphyr = "0.2.2"
-unicode-normalization = "0.1.25"
+unicode-normalization = "0.1.26"
 
 [dev-dependencies]
 tempfile = { workspace = true }
