@@ -26,6 +26,12 @@ jobs:
       - name: Install Rust toolchain
         run: rustup toolchain install --no-self-update
 
+      - name: Fix (TypeScript)
+        run: pnpm run fix
+
+      - name: Fix (Rust)
+        run: cargo fmt --all
+
       - name: Install cargo-about
         uses: taiki-e/install-action@861a07ce7084f55488e375df125cdc99bba60eb7 # v2.87.23
         with:
@@ -33,11 +39,5 @@ jobs:
 
       - name: Generate licenses
         run: pnpm gen:licenses
-
-      - name: Fix (TypeScript)
-        run: pnpm run fix
-
-      - name: Fix (Rust)
-        run: cargo fmt --all
 
       - uses: autofix-ci/action@c5b2d67aa2274e7b5a18224e8171550871fc7e4a # v1.3.4
