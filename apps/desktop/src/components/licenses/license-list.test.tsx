@@ -9,7 +9,6 @@ const LICENSES: Licenses = {
   entries: [
     {
       name: 'alpha',
-      version: '1.0.0',
       ecosystem: 'npm',
       license: 'MIT',
       url: 'https://alpha.example',
@@ -17,13 +16,12 @@ const LICENSES: Licenses = {
     },
     {
       name: 'beta',
-      version: '2.0.0',
       ecosystem: 'cargo',
       license: 'BSD-3-Clause AND MIT',
       url: 'https://beta.example',
       texts: [0, 1],
     },
-    { name: 'gamma', version: '3.0.0', ecosystem: 'npm', license: 'ISC', texts: [] },
+    { name: 'gamma', ecosystem: 'npm', license: 'ISC', texts: [] },
   ],
   texts: ['MIT License\n\nCopyright (c) Alpha', 'BSD 3-Clause License\n\nCopyright (c) Beta'],
 }
@@ -37,13 +35,13 @@ async function mount() {
 }
 
 describe('LicenseEntries', () => {
-  it('lists every entry with its version and license', async () => {
+  it('lists every entry with its license', async () => {
     await mount()
 
     const rows = page.getByRole('button', { expanded: false })
-    await expect.element(rows.nth(0)).toMatchTextContent('alpha1.0.0MIT')
-    await expect.element(rows.nth(1)).toMatchTextContent('beta2.0.0BSD-3-Clause AND MIT')
-    await expect.element(rows.nth(2)).toMatchTextContent('gamma3.0.0ISC')
+    await expect.element(rows.nth(0)).toMatchTextContent('alphaMIT')
+    await expect.element(rows.nth(1)).toMatchTextContent('betaBSD-3-Clause AND MIT')
+    await expect.element(rows.nth(2)).toMatchTextContent('gammaISC')
   })
 
   it('shows the license texts only while a row is expanded', async () => {

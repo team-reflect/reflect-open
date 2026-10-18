@@ -37,7 +37,7 @@ export function LicenseList({ className }: { className?: string | undefined }): 
 /**
  * One row per component, in file order. A row expands in place to show the
  * license text. The list is virtualized and only expanded rows render their
- * text, because the full set of texts is over a megabyte.
+ * text, because rendering every text puts over a megabyte of text in the DOM.
  */
 export function LicenseEntries({
   licenses,
@@ -80,9 +80,6 @@ export function LicenseEntries({
                   )}
                 />
                 <span className="min-w-0 flex-1 truncate text-text">{entry.name}</span>
-                <span className="shrink-0 text-xs text-text-muted tabular-nums">
-                  {entry.version}
-                </span>
                 <Badge variant="secondary" className="font-mono text-[11px]">
                   {entry.license}
                 </Badge>

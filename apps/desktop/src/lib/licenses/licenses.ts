@@ -2,7 +2,6 @@ import { z } from 'zod'
 
 const LicenseEntrySchema = z.object({
   name: z.string(),
-  version: z.string(),
   ecosystem: z.enum(['npm', 'cargo', 'other']),
   license: z.string(),
   url: z.string().optional(),
@@ -25,5 +24,5 @@ export async function loadLicenses(): Promise<Licenses> {
 }
 
 export function entryKey(entry: LicenseEntry): string {
-  return `${entry.ecosystem}:${entry.name}@${entry.version}`
+  return `${entry.ecosystem}:${entry.name}`
 }
