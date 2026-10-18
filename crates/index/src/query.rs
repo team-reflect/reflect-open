@@ -6,7 +6,7 @@
 //! [`super::write`].
 
 use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
-use rusqlite::{Connection, params_from_iter};
+use rusqlite::{params_from_iter, Connection};
 use serde_json::{Map, Value};
 
 use reflect_types::{AppError, AppResult};

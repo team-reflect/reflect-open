@@ -10,13 +10,13 @@ use tempfile::tempdir;
 
 use super::commit::commit_all;
 use super::fault::{self, Fault, FaultPoint};
-use super::merge::{MergeKind, merge_remote};
+use super::merge::{merge_remote, MergeKind};
 use super::remote::{fetch, push, remote_head};
 use super::test_support::{
-    Fixture, copy_note, fixture, head_blob, head_message, head_tree_paths, read, remote_blob,
-    scaffold_graph, second_device, write,
+    copy_note, fixture, head_blob, head_message, head_tree_paths, read, remote_blob,
+    scaffold_graph, second_device, write, Fixture,
 };
-use super::{MAX_FILE_BYTES, pull_all, setup, status};
+use super::{pull_all, setup, status, MAX_FILE_BYTES};
 
 #[test]
 fn setup_initializes_main_and_origin() {
@@ -531,11 +531,9 @@ fn conflicting_edits_merge_without_markers() {
     let content = read(root_a, "notes/shared.md");
     assert_merged_without_markers(&content, &["alpha", "bravo"]);
     assert_eq!(head_blob(root_a, "notes/shared.md"), content);
-    assert!(
-        head_tree_paths(root_a)
-            .iter()
-            .all(|path| !path.contains("(conflict"))
-    );
+    assert!(head_tree_paths(root_a)
+        .iter()
+        .all(|path| !path.contains("(conflict")));
 
     let repo = Repository::open(root_a).unwrap();
     assert_eq!(repo.state(), git2::RepositoryState::Clean);
@@ -781,11 +779,9 @@ fn a_text_conflict_that_diff3_merges_takes_the_merge() {
         read(root_a, "assets/log.txt"),
         "ONE\ntwo\nthree\nfour\nfive\nsix\nSEVEN\n"
     );
-    assert!(
-        head_tree_paths(root_a)
-            .iter()
-            .all(|path| !path.contains("(conflict"))
-    );
+    assert!(head_tree_paths(root_a)
+        .iter()
+        .all(|path| !path.contains("(conflict")));
 }
 
 #[test]

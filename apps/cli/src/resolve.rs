@@ -7,7 +7,7 @@
 
 use std::path::{Component, Path, PathBuf};
 
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 
 use crate::error::CliError;
 use crate::keys::fold_key;

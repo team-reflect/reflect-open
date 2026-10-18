@@ -555,7 +555,7 @@ mod transcript_cache_tests {
 
 #[cfg(test)]
 mod file_catalog_tests {
-    use super::{GraphInner, GraphState, file_catalog, file_catalog_with, invalidate_file_catalog};
+    use super::{file_catalog, file_catalog_with, invalidate_file_catalog, GraphInner, GraphState};
     use std::fs;
     use std::sync::Mutex;
 
@@ -904,17 +904,15 @@ mod note_revision_tests {
         let directory = tempfile::tempdir().unwrap();
         let target = directory.path().join("daily.md");
         write_note_revision(directory.path(), "daily.md", "first", true, None, || Ok(())).unwrap();
-        assert!(
-            write_note_revision(
-                directory.path(),
-                "daily.md",
-                "second",
-                true,
-                None,
-                || Ok(())
-            )
-            .is_err()
-        );
+        assert!(write_note_revision(
+            directory.path(),
+            "daily.md",
+            "second",
+            true,
+            None,
+            || Ok(())
+        )
+        .is_err());
         assert_eq!(fs::read_to_string(&target).unwrap(), "first");
     }
 }
@@ -922,11 +920,11 @@ mod note_revision_tests {
 #[cfg(test)]
 mod graph_delete_race_tests {
     use super::{
-        GraphInner, GraphState, invalidate_for_delete, root_for_generation, with_graph_lock,
-        write_note_revision,
+        invalidate_for_delete, root_for_generation, with_graph_lock, write_note_revision,
+        GraphInner, GraphState,
     };
     use crate::graph_lock;
-    use std::sync::{Mutex, mpsc};
+    use std::sync::{mpsc, Mutex};
     use std::time::{Duration, Instant};
 
     /// A write that waited on the graph lock behind a delete must fail its

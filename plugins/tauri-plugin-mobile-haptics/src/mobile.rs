@@ -1,7 +1,7 @@
 use serde::de::DeserializeOwned;
 use tauri::{
-    AppHandle, Runtime,
     plugin::{PluginApi, PluginHandle},
+    AppHandle, Runtime,
 };
 
 #[cfg(target_os = "ios")]

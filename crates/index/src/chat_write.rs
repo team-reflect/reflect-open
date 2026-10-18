@@ -6,7 +6,7 @@
 //! rows alone. Mutations are plain functions over a [`Connection`]; the
 //! command layer ([`super`]) owns transactions and generation gating.
 
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use serde::Deserialize;
 
 use reflect_types::AppResult;

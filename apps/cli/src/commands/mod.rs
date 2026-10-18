@@ -14,7 +14,7 @@ mod output;
 use std::fmt::Display;
 use std::path::Path;
 
-use crate::index::{IndexOpen, OpenIndex, open_read_only};
+use crate::index::{open_read_only, IndexOpen, OpenIndex};
 
 fn warn(message: impl Display) {
     eprintln!("reflect: warning: {message}");

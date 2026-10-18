@@ -1,6 +1,6 @@
 use tauri::{
-    Manager, Runtime,
     plugin::{Builder, TauriPlugin},
+    Manager, Runtime,
 };
 
 #[cfg(desktop)]

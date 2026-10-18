@@ -1,4 +1,4 @@
-use crate::{HostError, spool};
+use crate::{spool, HostError};
 use serde_json::Value;
 use std::path::Path;
 

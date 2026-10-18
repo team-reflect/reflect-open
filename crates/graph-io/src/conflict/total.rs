@@ -3,7 +3,7 @@
 //! operational merge. Overlapping edits come out interleaved rather than
 //! marked.
 
-use reconcile_text::{BuiltinTokenizer, reconcile};
+use reconcile_text::{reconcile, BuiltinTokenizer};
 
 /// Merge `first` and `second` over `base`. Symmetric by construction: the
 /// sides are ordered by content before the library sees them.

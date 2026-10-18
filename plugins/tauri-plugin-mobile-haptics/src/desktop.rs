@@ -1,5 +1,5 @@
 use serde::de::DeserializeOwned;
-use tauri::{AppHandle, Runtime, plugin::PluginApi};
+use tauri::{plugin::PluginApi, AppHandle, Runtime};
 
 pub fn init<R: Runtime, C: DeserializeOwned>(
     app: &AppHandle<R>,
