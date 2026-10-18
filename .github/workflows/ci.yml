@@ -36,7 +36,6 @@ jobs:
 
   lint-node:
     needs: classify
-    if: needs.classify.outputs.draft == 'false' && needs.classify.outputs.stack-middle == 'false'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -90,7 +89,6 @@ jobs:
 
   test-node:
     needs: classify
-    if: needs.classify.outputs.draft == 'false' && needs.classify.outputs.stack-middle == 'false'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -138,7 +136,6 @@ jobs:
 
   lint-rust:
     needs: classify
-    if: needs.classify.outputs.draft == 'false' && needs.classify.outputs.stack-middle == 'false'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
