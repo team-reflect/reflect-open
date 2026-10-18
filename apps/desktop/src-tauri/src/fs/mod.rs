@@ -22,7 +22,7 @@ use tauri_plugin_opener::OpenerExt;
 use crate::error::{AppError, AppResult};
 
 pub use reflect_graph_io::io;
-use reflect_graph_io::io::{atomic_create, bootstrap, initialize_runtime, AtomicCreateOutcome};
+use reflect_graph_io::io::{AtomicCreateOutcome, atomic_create, bootstrap, initialize_runtime};
 pub use reflect_graph_io::own_writes;
 pub use reflect_graph_io::x_archive_store;
 pub use reflect_graph_io::*;
@@ -675,7 +675,7 @@ mod asset_url_tests {
 
 #[cfg(test)]
 mod graph_delete_race_tests {
-    use super::{note_write, GraphState};
+    use super::{GraphState, note_write};
     use reflect_graph_io::{graph_lock_holders, invalidate_for_delete, with_graph_lock};
     use std::sync::mpsc;
     use std::time::{Duration, Instant};

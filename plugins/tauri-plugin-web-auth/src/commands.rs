@@ -1,8 +1,8 @@
-use tauri::{command, AppHandle, Runtime};
+use tauri::{AppHandle, Runtime, command};
 
-use crate::models::*;
 use crate::Result;
 use crate::WebAuthExt;
+use crate::models::*;
 
 /// Run the system sign-in; see `WebAuth::start`.
 #[command]

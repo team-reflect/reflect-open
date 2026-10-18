@@ -4,7 +4,7 @@
 //! plain functions over a [`Connection`] so the command layer ([`super`]) owns
 //! transactions and generation gating while these stay directly unit-testable.
 
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde::Deserialize;
 
 use reflect_types::{AppError, AppResult};

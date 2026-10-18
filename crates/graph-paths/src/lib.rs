@@ -13,8 +13,8 @@ use std::path::{Component, Path, PathBuf};
 mod walk;
 
 pub use walk::{
-    has_pruned_component, is_pruned_dir_name, walk_catalog, FileCatalog, FileEntry,
-    REFLECT_IGNORE_FILE,
+    FileCatalog, FileEntry, REFLECT_IGNORE_FILE, has_pruned_component, is_pruned_dir_name,
+    walk_catalog,
 };
 
 /// Root trees reserved for Reflect-managed attachments and recordings.
@@ -244,8 +244,8 @@ mod tests {
     use std::path::Path;
 
     use super::{
-        classify, evicted_logical_path, eviction_placeholder, is_safe_visible,
-        normalize_line_endings, to_slash, to_slash_lossy, wire_path, GraphPathKind,
+        GraphPathKind, classify, evicted_logical_path, eviction_placeholder, is_safe_visible,
+        normalize_line_endings, to_slash, to_slash_lossy, wire_path,
     };
     use serde::Deserialize;
 
@@ -337,7 +337,7 @@ mod tests {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     #[test]
     fn dataless_decodes_only_the_kernel_flag() {
-        use super::{dataless_flags, SF_DATALESS};
+        use super::{SF_DATALESS, dataless_flags};
         assert!(dataless_flags(SF_DATALESS));
         assert!(dataless_flags(SF_DATALESS | 0x1));
         assert!(!dataless_flags(0));

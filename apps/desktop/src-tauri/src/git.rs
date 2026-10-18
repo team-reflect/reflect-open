@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 use tauri::State;
 
 use reflect_git::{
-    CommitOutcome, GitCredential, GitStatus, PullOutcome, PushOutcome, RemoteDelta, RemoteTip,
-    MAX_FILE_BYTES,
+    CommitOutcome, GitCredential, GitStatus, MAX_FILE_BYTES, PullOutcome, PushOutcome, RemoteDelta,
+    RemoteTip,
 };
 
 use crate::blocking::run_blocking;

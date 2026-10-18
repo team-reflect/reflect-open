@@ -1,9 +1,9 @@
 use super::GraphState;
 use crate::error::{AppError, AppResult};
 use reflect_graph_io::x_archive_store as archive;
-use reflect_types::events::INDEX_CHANGED;
 use reflect_types::FileChange;
-use serde_json::{json, Value};
+use reflect_types::events::INDEX_CHANGED;
+use serde_json::{Value, json};
 use std::path::PathBuf;
 use tauri::{Emitter, Manager, State};
 

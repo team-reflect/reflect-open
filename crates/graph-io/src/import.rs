@@ -28,8 +28,8 @@ use std::ffi::OsString;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use reflect_graph_paths::{to_slash, to_slash_lossy};
 use serde::Serialize;
@@ -1553,12 +1553,16 @@ mod tests {
         assert_eq!(summary.imported_files, 1);
         assert_eq!(summary.downloaded_assets, 3);
         assert_eq!(summary.failed_asset_downloads, 0);
-        assert!(summary
-            .changed_paths
-            .contains(&"assets/trip-photo.webp".to_string()));
-        assert!(summary
-            .changed_paths
-            .contains(&"assets/memo.m4a".to_string()));
+        assert!(
+            summary
+                .changed_paths
+                .contains(&"assets/trip-photo.webp".to_string())
+        );
+        assert!(
+            summary
+                .changed_paths
+                .contains(&"assets/memo.m4a".to_string())
+        );
         assert_eq!(
             fs::read(root.path().join("assets/trip-photo.webp")).unwrap(),
             b"webp bytes"

@@ -304,7 +304,7 @@ fn classify_rejection(message: String, sideband: &str) -> PushOutcome {
 mod credential_tests {
     use git2::{Cred, CredentialType, ErrorCode};
 
-    use super::{resolve_credential, GitCredential, Tried};
+    use super::{GitCredential, Tried, resolve_credential};
 
     fn github() -> GitCredential {
         GitCredential {

@@ -1,3 +1,0 @@
-# TODO: switch to `style_edition = "2024"` (the default for edition 2024) in a
-# formatting-only PR.
-style_edition = "2021"

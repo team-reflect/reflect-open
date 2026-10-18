@@ -142,7 +142,7 @@ mod platform {
     use dispatch2::MainThreadBound;
     use objc2::rc::Retained;
     use objc2::runtime::AnyObject;
-    use objc2::{msg_send, MainThreadMarker};
+    use objc2::{MainThreadMarker, msg_send};
     use objc2_foundation::{
         NSArray, NSCopying, NSDate, NSMetadataItem, NSMetadataItemFSContentChangeDateKey,
         NSMetadataItemPathKey, NSMetadataQuery, NSMetadataQueryDidFinishGatheringNotification,
@@ -880,8 +880,8 @@ mod platform {
     #[cfg(test)]
     mod tests {
         use super::{
-            apply_conflict_delta, apply_update_delta, fold_conflicts_into_view, plan_nudges,
-            root_variants, tracked_note_relpath, ConflictView, ItemState, TrackedState,
+            ConflictView, ItemState, TrackedState, apply_conflict_delta, apply_update_delta,
+            fold_conflicts_into_view, plan_nudges, root_variants, tracked_note_relpath,
         };
         use std::collections::{HashMap, HashSet};
 

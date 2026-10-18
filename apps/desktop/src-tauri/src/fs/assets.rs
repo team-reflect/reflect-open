@@ -22,17 +22,17 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
-use tauri::ipc::{InvokeBody, Request};
 use tauri::State;
+use tauri::ipc::{InvokeBody, Request};
 
 use crate::error::{AppError, AppResult};
 use reflect_graph_io::io::staging_dir;
 
 use super::resolve;
-use super::{root_for_generation, with_graph_lock, GraphState};
+use super::{GraphState, root_for_generation, with_graph_lock};
 
 /// Header carrying the upload id on `asset_upload_append` calls — raw-body
 /// requests have no JSON args, so the id travels out-of-band.
