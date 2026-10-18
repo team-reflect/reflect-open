@@ -1,5 +1,8 @@
 // Regenerates `src/lib/licenses/licenses.gen.json`, the data behind
 // Settings → Open Source Licenses.
+//
+// Needs cargo-about on the PATH:
+// `cargo install --locked cargo-about@0.9.2 --features cli`
 
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
