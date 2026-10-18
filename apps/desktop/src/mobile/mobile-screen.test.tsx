@@ -471,8 +471,6 @@ describe('MobileShell', () => {
     await expect.element(view.getByText('No notes yet')).toMatchTextContent('No notes yet')
 
     await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
-    // The Daily screen remounts inside a transition. Without the JIT (CI
-    // WebKit) it can take until React's 5 s transition expiry to commit.
     await waitFor(
       () =>
         expect(
