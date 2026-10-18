@@ -7469,10 +7469,11 @@
     {
       "name": "unicode-normalization",
       "ecosystem": "cargo",
-      "license": "MIT",
+      "license": "MIT AND Unicode-3.0",
       "url": "https://github.com/unicode-rs/unicode-normalization",
       "texts": [
-        "033a9383ff21d1e4"
+        "033a9383ff21d1e4",
+        "361d7912957842f2"
       ]
     },
     {
