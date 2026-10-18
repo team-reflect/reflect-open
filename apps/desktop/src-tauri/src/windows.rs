@@ -235,9 +235,10 @@ fn open_new_window_in_browser<R: tauri::Runtime>(
     let app = app.clone();
     move |url, _features| {
         if matches!(url.scheme(), "http" | "https")
-            && let Err(err) = app.opener().open_url(url.as_str(), None::<&str>) {
-                tracing::warn!(error = %err, "failed to open a new-window URL in the browser");
-            }
+            && let Err(err) = app.opener().open_url(url.as_str(), None::<&str>)
+        {
+            tracing::warn!(error = %err, "failed to open a new-window URL in the browser");
+        }
         NewWindowResponse::Deny
     }
 }
@@ -280,14 +281,15 @@ impl WindowRegistry {
         live_labels: &HashSet<String>,
     ) -> WindowOpenPlan {
         if let Some(preferred_label) = self.preferred_destinations.get(deep_link).cloned()
-            && preferred_label != invoking_label {
-                if live_labels.contains(&preferred_label) {
-                    return WindowOpenPlan::Focus(preferred_label);
-                }
-                self.pending_bootstraps
-                    .insert(preferred_label.clone(), deep_link.to_owned());
-                return WindowOpenPlan::Create(preferred_label);
+            && preferred_label != invoking_label
+        {
+            if live_labels.contains(&preferred_label) {
+                return WindowOpenPlan::Focus(preferred_label);
             }
+            self.pending_bootstraps
+                .insert(preferred_label.clone(), deep_link.to_owned());
+            return WindowOpenPlan::Create(preferred_label);
+        }
 
         let base_label = note_window_label(deep_link);
         let label = (1_u64..)

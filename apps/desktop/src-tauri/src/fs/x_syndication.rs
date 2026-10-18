@@ -2,7 +2,7 @@
 
 use super::x_archive_store::valid_id;
 use crate::error::{AppError, AppResult};
-use crate::web_fetch::{classify_fetch_error, classify_fetch_status, USER_AGENT};
+use crate::web_fetch::{USER_AGENT, classify_fetch_error, classify_fetch_status};
 use reqwest::StatusCode;
 use serde_json::Value;
 use std::sync::OnceLock;

@@ -1,8 +1,8 @@
-use tauri::{command, AppHandle, Runtime};
+use tauri::{AppHandle, Runtime, command};
 
-use crate::models::*;
 use crate::RecordingExt;
 use crate::Result;
+use crate::models::*;
 
 /// Start recording into the plugin's staging directory. Prompts for the
 /// microphone on first use; rejects when access is denied.

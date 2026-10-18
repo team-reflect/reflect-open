@@ -618,10 +618,12 @@ fn search_json_shape() {
     assert_eq!(results.len(), 1);
     assert_eq!(results[0]["path"], "notes/a.md");
     assert_eq!(results[0]["title"], "Alpha");
-    assert!(results[0]["snippet"]
-        .as_str()
-        .unwrap()
-        .contains("searchable"));
+    assert!(
+        results[0]["snippet"]
+            .as_str()
+            .unwrap()
+            .contains("searchable")
+    );
     assert!(results[0]["score"].is_number());
 }
 

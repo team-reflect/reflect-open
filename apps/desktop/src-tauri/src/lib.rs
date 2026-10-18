@@ -98,9 +98,11 @@ mod capability_tests {
             .as_array()
             .expect("capability permissions");
 
-        assert!(permissions
-            .iter()
-            .any(|permission| permission.as_str() == Some("core:window:allow-hide")));
+        assert!(
+            permissions
+                .iter()
+                .any(|permission| permission.as_str() == Some("core:window:allow-hide"))
+        );
     }
 }
 

@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use crate::envelope::ValidatedCapture;
 use crate::HostError;
+use crate::envelope::ValidatedCapture;
 
 /// The pointer-file shape the desktop app writes. Versioned so a future
 /// layout change reads as a typed error here, never as a silent mis-spool.
@@ -40,7 +40,7 @@ pub(crate) fn read_pointer(pointer_path: &Path) -> Result<Pointer, HostError> {
     let raw = match std::fs::read(pointer_path) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Err(HostError::NoGraph)
+            return Err(HostError::NoGraph);
         }
         Err(error) => return Err(HostError::Io(format!("pointer file unreadable: {error}"))),
     };

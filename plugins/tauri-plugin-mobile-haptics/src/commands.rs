@@ -1,4 +1,4 @@
-use tauri::{command, AppHandle, Runtime};
+use tauri::{AppHandle, Runtime, command};
 
 use crate::HapticsExt;
 use crate::Result;

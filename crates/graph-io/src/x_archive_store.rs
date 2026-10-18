@@ -267,12 +267,14 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let post = json!({"data":{"id":"123", "author":{"avatar":"https://pbs.twimg.com/a.png"}}});
         atomic_json(root.path(), "assets/x/post-123.json", &post).unwrap();
-        assert!(resource_url(
-            root.path(),
-            "123",
-            &hash_url("https://pbs.twimg.com/b.png").unwrap()
-        )
-        .is_err());
+        assert!(
+            resource_url(
+                root.path(),
+                "123",
+                &hash_url("https://pbs.twimg.com/b.png").unwrap()
+            )
+            .is_err()
+        );
         assert!(read_post(root.path(), "../123").is_err());
         assert!(resolve(root.path(), "../outside").is_err());
         let file = std::fs::read_to_string(root.path().join("assets/x/post-123.json")).unwrap();

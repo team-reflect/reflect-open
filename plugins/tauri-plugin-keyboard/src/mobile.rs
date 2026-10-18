@@ -1,7 +1,7 @@
 use serde::de::DeserializeOwned;
 use tauri::{
-    plugin::{mobile::PluginInvokeError, PluginApi},
     AppHandle, Runtime,
+    plugin::{PluginApi, mobile::PluginInvokeError},
 };
 
 #[cfg(target_os = "ios")]

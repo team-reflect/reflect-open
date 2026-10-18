@@ -17,7 +17,7 @@ use tauri::State;
 
 use crate::capture::atomic_write_to;
 use crate::error::{AppError, AppResult};
-use crate::fs::{current_root, root_for_generation, GraphState};
+use crate::fs::{GraphState, current_root, root_for_generation};
 
 /// The bundled template; placeholders are `{{SKILL_NAME}}`, `{{GRAPH_NAME}}`,
 /// `{{GRAPH_ROOT}}`, and `{{CLI_PATH}}`.
@@ -111,11 +111,12 @@ fn content_hash(content: &str) -> String {
 fn insert_marker(source: &str, hash: &str) -> String {
     let marker = format!("{MANAGED_PREFIX}{hash}{MANAGED_SUFFIX}");
     if let Some(rest) = source.strip_prefix("---\n")
-        && let Some(index) = rest.find("\n---\n") {
-            let split = "---\n".len() + index + "\n---\n".len();
-            let (frontmatter, body) = source.split_at(split);
-            return format!("{frontmatter}{marker}\n{body}");
-        }
+        && let Some(index) = rest.find("\n---\n")
+    {
+        let split = "---\n".len() + index + "\n---\n".len();
+        let (frontmatter, body) = source.split_at(split);
+        return format!("{frontmatter}{marker}\n{body}");
+    }
     format!("{marker}\n{source}")
 }
 
@@ -337,12 +338,16 @@ mod tests {
         );
         assert!(context.managed_content.contains("name: reflect-personal"));
         assert!(context.managed_content.contains("/graphs/Personal"));
-        assert!(context
-            .managed_content
-            .contains("/Applications/Reflect.app/Contents/MacOS/reflect"));
-        assert!(context
-            .managed_content
-            .contains("git -C \"/graphs/Personal\""));
+        assert!(
+            context
+                .managed_content
+                .contains("/Applications/Reflect.app/Contents/MacOS/reflect")
+        );
+        assert!(
+            context
+                .managed_content
+                .contains("git -C \"/graphs/Personal\"")
+        );
         assert!(!context.managed_content.contains("{{"));
     }
 

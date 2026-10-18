@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use git2::{Repository, RepositoryInitOptions};
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 
 use super::setup;
 

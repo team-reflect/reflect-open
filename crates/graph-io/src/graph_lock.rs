@@ -18,9 +18,10 @@ fn lock_key(root: &Path) -> PathBuf {
         return canonical;
     }
     if let (Some(parent), Some(name)) = (root.parent(), root.file_name())
-        && let Ok(canonical) = parent.canonicalize() {
-            return canonical.join(name);
-        }
+        && let Ok(canonical) = parent.canonicalize()
+    {
+        return canonical.join(name);
+    }
     root.to_path_buf()
 }
 

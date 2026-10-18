@@ -10,9 +10,9 @@
 
 #[cfg(any(target_os = "ios", test))]
 use std::collections::HashMap;
+use std::sync::Arc;
 #[cfg(any(target_os = "ios", test))]
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 #[cfg(any(target_os = "ios", test))]
 use std::sync::{Mutex, MutexGuard};
 

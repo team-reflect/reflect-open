@@ -14,13 +14,13 @@ pub(crate) async fn fetch<R: tauri::Runtime>(
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 mod platform {
-    use std::sync::{mpsc, Arc};
+    use std::sync::{Arc, mpsc};
     use std::time::Duration;
 
     use block2::RcBlock;
     use dispatch2::MainThreadBound;
-    use objc2::rc::Retained;
     use objc2::MainThreadMarker;
+    use objc2::rc::Retained;
     use objc2_foundation::{NSData, NSError, NSString, NSURL};
     use objc2_link_presentation::{LPLinkMetadata, LPMetadataProvider};
 

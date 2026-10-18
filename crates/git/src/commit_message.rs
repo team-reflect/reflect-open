@@ -405,12 +405,12 @@ fn unquote_scalar(value: &str) -> String {
                 .bytes()
                 .position(|byte| byte == quote)
                 .map(|index| index + 1)
-            {
-                let trailing = trimmed[end + 1..].trim_start();
-                if trailing.is_empty() || trailing.starts_with('#') {
-                    return trimmed[1..end].to_string();
-                }
+        {
+            let trailing = trimmed[end + 1..].trim_start();
+            if trailing.is_empty() || trailing.starts_with('#') {
+                return trimmed[1..end].to_string();
             }
+        }
     }
     trimmed
         .split_once(" #")

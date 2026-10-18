@@ -29,9 +29,11 @@ pub(super) fn clear_stale_locks(root: &Path, message: &str) -> usize {
         return 0;
     };
     if let Some(path) = parse_lock_path(message)
-        && is_repository_lock(&repo, &path) && remove_if_stale(&path) {
-            return 1;
-        }
+        && is_repository_lock(&repo, &path)
+        && remove_if_stale(&path)
+    {
+        return 1;
+    }
     sweep(&repo)
 }
 

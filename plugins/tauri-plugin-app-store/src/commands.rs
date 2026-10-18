@@ -1,8 +1,8 @@
-use tauri::{command, AppHandle, Runtime};
+use tauri::{AppHandle, Runtime, command};
 
-use crate::models::*;
 use crate::AppStoreExt;
 use crate::Result;
+use crate::models::*;
 
 /// Which channel installed this build; see `AppStoreEnvironment`.
 #[command]

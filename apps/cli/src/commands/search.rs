@@ -7,14 +7,14 @@ use std::path::Path;
 
 use reflect_index_schema::{INDEX_FILE, REFLECT_DIR};
 
-use crate::commands::output::{print_json, HitJson, SearchJson};
+use crate::commands::output::{HitJson, SearchJson, print_json};
 use crate::commands::warn;
 use crate::error::CliError;
 use crate::graph::Graph;
-use crate::index::{detect_staleness, open_read_only, IndexOpen};
+use crate::index::{IndexOpen, detect_staleness, open_read_only};
 use crate::keys::fold_key;
 use crate::note_file::{read_note, subject_display_title};
-use crate::search::{build_fts_match, search_index, SearchHit};
+use crate::search::{SearchHit, build_fts_match, search_index};
 
 /// The privacy re-check: the index row said public, but the file's own
 /// frontmatter is the truth — a note flagged private after the last index run
@@ -30,7 +30,7 @@ pub fn run(graph: &Graph, json: bool, query: &str, limit: usize) -> Result<(), C
         IndexOpen::Missing => {
             return Err(CliError::NoIndex(format!(
                 "no search index at {REFLECT_DIR}/{INDEX_FILE} — open this graph in Reflect to build it"
-            )))
+            )));
         }
         IndexOpen::Unusable(message) => return Err(CliError::NoIndex(message)),
     };

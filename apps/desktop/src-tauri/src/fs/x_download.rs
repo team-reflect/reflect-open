@@ -243,9 +243,11 @@ mod tests {
                 root.path().to_owned(),
                 "https://pbs.twimg.com/waits-for-capacity.png".into(),
             );
-            assert!(tokio::time::timeout(Duration::from_millis(50), pending)
-                .await
-                .is_err());
+            assert!(
+                tokio::time::timeout(Duration::from_millis(50), pending)
+                    .await
+                    .is_err()
+            );
             let url = "https://pbs.twimg.com/cached.png";
             let hash = archive::hash_url(url).unwrap();
             let directory = root.path().join("assets/x");

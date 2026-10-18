@@ -1,7 +1,7 @@
 //! Three-way text merge over the vendored libgit2 (`git2::merge_file`), run
 //! buffer-level with no repository.
 
-use git2::{merge_file, MergeFileInput, MergeFileOptions};
+use git2::{MergeFileInput, MergeFileOptions, merge_file};
 
 use reflect_types::{AppError, AppResult};
 
