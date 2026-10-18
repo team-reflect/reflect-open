@@ -360,7 +360,7 @@ const IOPOL_SCOPE_THREAD: c_int = 1;
 const IOPOL_MATERIALIZE_DATALESS_FILES_OFF: c_int = 1;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
-extern "C" {
+unsafe extern "C" {
     fn getiopolicy_np(iotype: c_int, scope: c_int) -> c_int;
     fn setiopolicy_np(iotype: c_int, scope: c_int, policy: c_int) -> c_int;
 }

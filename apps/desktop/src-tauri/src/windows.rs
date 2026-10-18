@@ -231,7 +231,7 @@ pub(crate) fn build_main_window<R: tauri::Runtime>(
 /// inside a cross-origin iframe) gets its URL in the default browser instead.
 fn open_new_window_in_browser<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
-) -> impl Fn(tauri::Url, NewWindowFeatures) -> NewWindowResponse<R> + Send + 'static {
+) -> impl Fn(tauri::Url, NewWindowFeatures) -> NewWindowResponse<R> + Send + 'static + use<R> {
     let app = app.clone();
     move |url, _features| {
         if matches!(url.scheme(), "http" | "https") {
