@@ -53,10 +53,10 @@ pub fn resolve(flag: Option<&Path>) -> Result<Graph, CliError> {
     if let Some(path) = flag {
         return explicit_graph(path, "--graph");
     }
-    if let Some(env) = std::env::var_os("REFLECT_GRAPH") {
-        if !env.is_empty() {
-            return explicit_graph(Path::new(&env), "REFLECT_GRAPH");
-        }
+    if let Some(env) = std::env::var_os("REFLECT_GRAPH")
+        && !env.is_empty()
+    {
+        return explicit_graph(Path::new(&env), "REFLECT_GRAPH");
     }
     let cwd = std::env::current_dir()?;
     let mut current = cwd.as_path();

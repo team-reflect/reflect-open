@@ -2,14 +2,6 @@ name: Set up Rust
 description: Installs the Rust toolchain, the cargo build cache, and on Linux the Tauri system dependencies.
 
 inputs:
-  components:
-    description: Comma-separated rustup components to install alongside the toolchain.
-    required: false
-    default: ''
-  targets:
-    description: Comma-separated rustup targets to install alongside the host target.
-    required: false
-    default: ''
   cache-key:
     description: An extra key for the cargo build cache, for jobs that must not share one.
     required: false
@@ -50,10 +42,10 @@ runs:
         fi
 
     - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
-      with:
-        components: ${{ inputs.components }}
-        targets: ${{ inputs.targets }}
+      shell: bash
+      run: |
+        rustup toolchain install --no-self-update
+        rustc --version --verbose
 
     # Build scripts (ort-sys, swift-rs) write the path of Xcode's clang runtime
     # into their cached output, and cargo does not rerun them when Xcode

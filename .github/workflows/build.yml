@@ -29,11 +29,9 @@ jobs:
         include:
           - name: macos
             os: macos-26
-            target: x86_64-apple-darwin
             command: pnpm release:macos --target=universal-apple-darwin --no-sign
           - name: ios
             os: macos-26
-            target: aarch64-apple-ios
             command: pnpm release:ios --build-number=1 --no-sign
           - name: windows
             os: windows-2025
@@ -60,8 +58,12 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
         with:
-          targets: ${{ matrix.target }}
           cache-key: build-${{ matrix.name }}
+
+      # The universal build also compiles the x86_64 slice on this arm64 runner.
+      - name: Add the x86_64 macOS target
+        if: matrix.name == 'macos'
+        run: rustup target add x86_64-apple-darwin
 
       - name: Build
         shell: bash

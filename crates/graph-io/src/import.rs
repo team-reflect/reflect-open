@@ -751,10 +751,10 @@ fn sanitized_relative(raw: &str, prefix: Option<&str>) -> Option<String> {
     if parts.contains(&"..") {
         return None;
     }
-    if let Some(prefix) = prefix {
-        if parts.first() == Some(&prefix) {
-            parts.remove(0);
-        }
+    if let Some(prefix) = prefix
+        && parts.first() == Some(&prefix)
+    {
+        parts.remove(0);
     }
     if is_ignored_wrapper_noise(&parts) {
         return None;

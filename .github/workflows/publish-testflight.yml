@@ -76,7 +76,6 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
         with:
-          targets: aarch64-apple-ios
           cache-key: aarch64-apple-ios
 
       - name: Resolve build number

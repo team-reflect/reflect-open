@@ -156,7 +156,7 @@ mod tests {
         prop::collection::vec(line, 1..6)
     }
 
-    fn edited(base: &[String]) -> impl Strategy<Value = Vec<String>> {
+    fn edited(base: &[String]) -> impl Strategy<Value = Vec<String>> + use<> {
         let base = base.to_vec();
         prop::collection::vec((0..4u8, 0..8usize, 0..9u8), 1..4).prop_map(move |edits| {
             let mut out = base.clone();

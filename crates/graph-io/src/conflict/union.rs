@@ -14,10 +14,10 @@
 /// it, in order: a side that deleted base lines is an edit, and the union
 /// would bring the deleted lines back.
 pub fn append_union(base: Option<&str>, first: &str, second: &str) -> Option<String> {
-    if let Some(base) = base {
-        if !starts_with_base_lines(base, first) || !starts_with_base_lines(base, second) {
-            return None;
-        }
+    if let Some(base) = base
+        && (!starts_with_base_lines(base, first) || !starts_with_base_lines(base, second))
+    {
+        return None;
     }
     let first_lines: Vec<&str> = first.split('\n').collect();
     let second_lines: Vec<&str> = second.split('\n').collect();

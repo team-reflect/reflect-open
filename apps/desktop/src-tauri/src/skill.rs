@@ -110,12 +110,12 @@ fn content_hash(content: &str) -> String {
 /// the frontmatter block first, so the marker must not sit above it).
 fn insert_marker(source: &str, hash: &str) -> String {
     let marker = format!("{MANAGED_PREFIX}{hash}{MANAGED_SUFFIX}");
-    if let Some(rest) = source.strip_prefix("---\n") {
-        if let Some(index) = rest.find("\n---\n") {
-            let split = "---\n".len() + index + "\n---\n".len();
-            let (frontmatter, body) = source.split_at(split);
-            return format!("{frontmatter}{marker}\n{body}");
-        }
+    if let Some(rest) = source.strip_prefix("---\n")
+        && let Some(index) = rest.find("\n---\n")
+    {
+        let split = "---\n".len() + index + "\n---\n".len();
+        let (frontmatter, body) = source.split_at(split);
+        return format!("{frontmatter}{marker}\n{body}");
     }
     format!("{marker}\n{source}")
 }

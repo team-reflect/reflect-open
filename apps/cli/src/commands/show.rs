@@ -14,12 +14,12 @@ pub fn run(graph: &Graph, json: bool, note_arg: &str) -> Result<(), CliError> {
     let index = open_index_for_resolution(&graph.root);
     let resolved = resolve_note(note_arg, &graph.root, index.as_ref().map(|open| &open.conn))?;
 
-    if let ResolvedNote::Daily { date, rel_path } = &resolved {
-        if !graph.root.join(rel_path).is_file() {
-            return Err(CliError::NotFound(format!(
-                "no daily note for {date} ({rel_path})"
-            )));
-        }
+    if let ResolvedNote::Daily { date, rel_path } = &resolved
+        && !graph.root.join(rel_path).is_file()
+    {
+        return Err(CliError::NotFound(format!(
+            "no daily note for {date} ({rel_path})"
+        )));
     }
 
     let rel_path = resolved.rel_path();

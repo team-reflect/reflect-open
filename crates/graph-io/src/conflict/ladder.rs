@@ -54,10 +54,10 @@ pub fn resolve(input: ConflictInput<'_>) -> AppResult<Resolution> {
         });
     }
 
-    if let Some(base) = input.base {
-        if let Some(content) = diff3(base, &first, &second)? {
-            return Ok(Resolution::Merged { content });
-        }
+    if let Some(base) = input.base
+        && let Some(content) = diff3(base, &first, &second)?
+    {
+        return Ok(Resolution::Merged { content });
     }
 
     if let Some(content) = merge_frontmatter_only(input.base, &first, &second) {

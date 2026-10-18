@@ -3,7 +3,7 @@
 # pins one SQLite everywhere — the desktop writer and the CLI reader can
 # never skew.
 [workspace]
-resolver = "2"
+resolver = "3"
 members = [
   "apps/cli",
   "apps/desktop/src-tauri",
@@ -20,6 +20,11 @@ members = [
   "plugins/tauri-plugin-recording",
   "plugins/tauri-plugin-web-auth",
 ]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+publish = false
 
 [workspace.dependencies]
 rusqlite = { version = "0.40.2", features = ["bundled"] }

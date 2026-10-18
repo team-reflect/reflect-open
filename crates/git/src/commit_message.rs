@@ -400,16 +400,15 @@ fn unquote_scalar(value: &str) -> String {
     if trimmed.len() >= 2 {
         let bytes = trimmed.as_bytes();
         let quote = bytes[0];
-        if quote == b'"' || quote == b'\'' {
-            if let Some(end) = trimmed[1..]
+        if (quote == b'"' || quote == b'\'')
+            && let Some(end) = trimmed[1..]
                 .bytes()
                 .position(|byte| byte == quote)
                 .map(|index| index + 1)
-            {
-                let trailing = trimmed[end + 1..].trim_start();
-                if trailing.is_empty() || trailing.starts_with('#') {
-                    return trimmed[1..end].to_string();
-                }
+        {
+            let trailing = trimmed[end + 1..].trim_start();
+            if trailing.is_empty() || trailing.starts_with('#') {
+                return trimmed[1..end].to_string();
             }
         }
     }

@@ -143,8 +143,6 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-rust
-        with:
-          components: rustfmt, clippy
 
       - uses: ./.github/actions/setup-node
 

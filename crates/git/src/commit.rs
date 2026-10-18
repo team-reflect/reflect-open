@@ -78,15 +78,15 @@ pub(super) fn commit_locked(
     }
 
     let tree_id = index.write_tree()?;
-    if let Some(parent) = &parent {
-        if parent.tree_id() == tree_id {
-            return Ok(CommitOutcome {
-                committed: false,
-                sha: None,
-                ahead: ahead_of_remote(&repo),
-                skipped_large_files: skipped,
-            });
-        }
+    if let Some(parent) = &parent
+        && parent.tree_id() == tree_id
+    {
+        return Ok(CommitOutcome {
+            committed: false,
+            sha: None,
+            ahead: ahead_of_remote(&repo),
+            skipped_large_files: skipped,
+        });
     }
 
     let tree = repo.find_tree(tree_id)?;
