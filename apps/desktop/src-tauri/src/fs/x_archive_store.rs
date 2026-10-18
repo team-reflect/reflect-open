@@ -2,7 +2,6 @@ use super::resolve::resolve;
 use crate::error::{AppError, AppResult as Result};
 use serde::Deserialize;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -43,10 +42,7 @@ pub fn valid_hash(hash: &str) -> bool {
 }
 pub fn hash_url(source: &str) -> Result<String> {
     reqwest::Url::parse(source).map_err(|error| AppError::parse(error.to_string()))?;
-    Ok(Sha256::digest(source.as_bytes())
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect())
+    Ok(crate::hash::sha256_hex(source.as_bytes()))
 }
 
 pub fn get_candidate_names(hash: &str) -> Result<Vec<String>> {

@@ -153,7 +153,6 @@ mod platform {
         NSMetadataUbiquitousItemHasUnresolvedConflictsKey, NSNotification, NSNotificationCenter,
         NSNumber, NSOperationQueue, NSPredicate, NSString,
     };
-    use serde::Serialize;
     use tauri::{Emitter, Manager};
 
     use crate::error::{AppError, AppResult};
@@ -239,15 +238,7 @@ mod platform {
     static NUDGED: LazyLock<Mutex<HashMap<String, Option<u64>>>> =
         LazyLock::new(|| Mutex::new(HashMap::new()));
 
-    /// The watcher's change event, matching `watcher::FileChange`.
-    #[derive(Debug, Clone, Serialize)]
-    #[serde(rename_all = "camelCase")]
-    struct FileChange {
-        path: String,
-        kind: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        modified_ms: Option<u64>,
-    }
+    use crate::change::{ChangeKind, FileChange, CHANGE_EVENT};
 
     /// Lifecycle epoch: every `start`/`stop` bumps it, and a queued install
     /// only proceeds when its epoch is still current. Commands run off the
@@ -663,7 +654,7 @@ mod platform {
                 crate::fs::invalidate_file_catalog(&state, root);
             }
             if is_update {
-                let _ = app.emit("index:changed", round.changes);
+                let _ = app.emit(CHANGE_EVENT, round.changes);
             }
         }
         if !is_update {
@@ -678,7 +669,7 @@ mod platform {
             // to it — a deletion leaves the empty-snapshot diff empty, and
             // placeholders never appear as changes at all — so an empty
             // gather proves nothing about that window.
-            let _ = app.emit(crate::watcher::RECONCILE_EVENT, ());
+            let _ = app.emit(crate::change::RECONCILE_EVENT, ());
         }
         if !round.conflicts.is_empty() {
             let mut conflicts = round.conflicts;
@@ -830,7 +821,7 @@ mod platform {
             if previous != Some(TrackedState::Local(mtime)) {
                 changes.push(FileChange {
                     path: item.rel.clone(),
-                    kind: "upsert".to_string(),
+                    kind: ChangeKind::Upsert,
                     modified_ms: Some(mtime),
                 });
             }
@@ -839,7 +830,7 @@ mod platform {
             if snapshot.remove(rel).is_some() {
                 changes.push(FileChange {
                     path: rel.clone(),
-                    kind: "remove".to_string(),
+                    kind: ChangeKind::Remove,
                     modified_ms: None,
                 });
             }
@@ -921,7 +912,13 @@ mod platform {
         fn shapes(changes: &[super::FileChange]) -> Vec<(String, String, Option<u64>)> {
             let mut shapes: Vec<_> = changes
                 .iter()
-                .map(|change| (change.path.clone(), change.kind.clone(), change.modified_ms))
+                .map(|change| {
+                    (
+                        change.path.clone(),
+                        change.kind.to_string(),
+                        change.modified_ms,
+                    )
+                })
                 .collect();
             shapes.sort();
             shapes

@@ -12,7 +12,8 @@
 
 use serde::Serialize;
 
-use crate::error::{AppError, AppResult};
+use crate::blocking::run_blocking;
+use crate::error::AppResult;
 
 /// The Contacts permission state, as the settings UI consumes it.
 ///
@@ -50,17 +51,6 @@ pub struct ContactMatch {
     pub family_name: String,
     pub emails: Vec<String>,
     pub phones: Vec<String>,
-}
-
-/// Contacts calls run on a blocking thread, never the main loop: the first
-/// access parks on the TCC permission prompt until the user answers, and
-/// store fetches are synchronous framework work.
-async fn run_blocking<T: Send + 'static>(
-    task: impl FnOnce() -> AppResult<T> + Send + 'static,
-) -> AppResult<T> {
-    tauri::async_runtime::spawn_blocking(task)
-        .await
-        .map_err(|err| AppError::io(err.to_string()))?
 }
 
 /// Command: the current Contacts permission state. Never prompts.

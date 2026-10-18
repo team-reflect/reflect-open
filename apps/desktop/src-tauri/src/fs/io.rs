@@ -32,7 +32,7 @@ pub(super) struct FileCatalog {
     pub skipped: u32,
 }
 
-pub(super) const REFLECT_DIR: &str = ".reflect";
+pub(super) use reflect_index_schema::REFLECT_DIR;
 const META_SCHEMA_VERSION: u32 = 1;
 pub(super) const TOP_LEVEL_DIRS: [&str; 3] = ["daily", "notes", "assets"];
 #[cfg(any(target_os = "macos", target_os = "ios"))]

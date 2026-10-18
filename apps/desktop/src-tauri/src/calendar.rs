@@ -14,7 +14,8 @@
 
 use serde::Serialize;
 
-use crate::error::{AppError, AppResult};
+use crate::blocking::run_blocking;
+use crate::error::AppResult;
 
 /// A calendar known to macOS, across every account the user has added in
 /// System Settings → Internet Accounts.
@@ -104,18 +105,6 @@ pub async fn calendar_list_events(
 ) -> AppResult<Vec<CalendarEvent>> {
     platform::ensure_change_observer(&app);
     run_blocking(move || platform::list_events(start, end, &calendar_ids)).await
-}
-
-/// EventKit calls are cheap but not free, and the access request blocks on a
-/// user decision — run them all on the blocking pool, never the main thread.
-async fn run_blocking<T: Send + 'static>(
-    task: impl FnOnce() -> AppResult<T> + Send + 'static,
-) -> AppResult<T> {
-    tauri::async_runtime::spawn_blocking(task)
-        .await
-        .map_err(|err| AppError::Unknown {
-            message: format!("calendar task failed: {err}"),
-        })?
 }
 
 #[cfg(target_os = "macos")]
