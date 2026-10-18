@@ -2,7 +2,9 @@
 name = "reflect-graph-paths"
 version = "0.1.0"
 description = "Shared graph-relative path classification for Reflect"
-edition = "2021"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
 
 [dependencies]
 # ripgrep's directory walker: per-entry errors, no symlink following, and

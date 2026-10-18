@@ -3,8 +3,9 @@ name = "tauri-plugin-app-store"
 version = "0.1.0"
 authors = ["Reflect"]
 description = "Reports which channel installed the Reflect iOS app (App Store, TestFlight sandbox, or Xcode) via StoreKit 2's AppTransaction."
-edition = "2021"
-rust-version = "1.77.2"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
 links = "tauri-plugin-app-store"
 
 [dependencies]
