@@ -13,9 +13,36 @@ the base `tauri.conf.json` points its `bundle.icon` here. The `tauri.beta.conf.j
 and `tauri.dev.conf.json` overlays repoint `bundle.icon` at the sibling dirs.
 
 The beta/dev sets are the stable artwork run through `magick -modulate B,S,H`
-(B=lightness, S=saturation, 100=unchanged). The iOS asset catalog
-(`../gen/apple/Assets.xcassets/AppIcon.appiconset/`) uses the stable artwork; iOS is
-not flavored.
+(B=lightness, S=saturation, 100=unchanged).
+
+## Dark, Clear, and Tinted appearances
+
+iOS 26+ and macOS 26+ render app icons in Default, Dark, Clear, and Tinted
+appearances. Each dir holds an Icon Composer document for that flavor
+(`AppIcon.icon`, `AppIcon-Beta.icon`, `AppIcon-Dev.icon`): a gradient fill plus
+the gem as one transparent layer. The beta/dev documents are the stable one with
+the gem layer and the gradient colors run through the flavor's modulate.
+
+- **iOS** compiles `icons/AppIcon.icon` (release: TestFlight and App Store) and
+  `icons-dev/AppIcon-Dev.icon` (debug: `tauri ios dev`) straight from the Xcode
+  project; `ASSETCATALOG_COMPILER_APPICON_NAME` picks one. Xcode also generates
+  the flat icons for iOS 16 to 18. Do not run `tauri icon` for iOS: it writes an
+  `AppIcon.appiconset`, which the `.icon` would shadow.
+- **macOS** reads `Assets.car` from `bundle.icon`. `icon.icns` stays as the
+  fallback for macOS 15 and earlier. After editing a `.icon`, rebuild the three
+  `Assets.car` files with `pnpm --filter @reflect/desktop gen:icons` (Xcode 26+).
+  The script draws the layers 1024/824 times larger, because `icon.icns` crops
+  the iOS art to its center 824 px.
+  The `.car` files are committed because Tauri's Node CLI cannot compile a `.icon`
+  itself ([tauri-apps/tauri#15315](https://github.com/tauri-apps/tauri/issues/15315)).
+
+Preview any appearance without a simulator:
+
+```bash
+"$(xcode-select -p)/../Applications/Icon Composer.app/Contents/Executables/ictool" \
+  AppIcon.icon --export-image --output-file out.png --platform macOS \
+  --rendition TintedDark --width 512 --height 512 --scale 1
+```
 
 ## Regenerating a flavor set
 

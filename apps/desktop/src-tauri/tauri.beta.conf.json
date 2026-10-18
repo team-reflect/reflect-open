@@ -22,7 +22,8 @@
       "icons-beta/128x128.png",
       "icons-beta/128x128@2x.png",
       "icons-beta/icon.icns",
-      "icons-beta/icon.ico"
+      "icons-beta/icon.ico",
+      "icons-beta/Assets.car"
     ],
     "macOS": {
       "files": {

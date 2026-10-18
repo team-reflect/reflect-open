@@ -70,6 +70,9 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
+      # Icon Composer documents; ASSETCATALOG_COMPILER_APPICON_NAME picks one.
+      - path: ../../icons/AppIcon.icon
+      - path: ../../icons-dev/AppIcon-Dev.icon
       # Build artifacts (libapp.a) land here; without an explicit `none`,
       # regenerating after a build sweeps them into Copy Bundle Resources,
       # shipping the Rust static archive inside the app bundle.

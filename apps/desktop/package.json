@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "sidecar": "node scripts/build-sidecar.ts",
     "postinstall": "node src-tauri/xcode-scripts/generate-xcode-env.mjs",
+    "gen:icons": "node scripts/generate-icons.ts",
     "gen:licenses": "node scripts/generate-licenses.ts",
     "release:ios": "node scripts/release-ios.ts",
     "release:linux": "node scripts/release-linux.ts",

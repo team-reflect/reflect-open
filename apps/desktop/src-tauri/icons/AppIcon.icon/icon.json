@@ -1,0 +1,50 @@
+{
+  "fill": {
+    "linear-gradient": [
+      "srgb:0.56483,0.05661,0.83702,1.00000",
+      "srgb:0.00000,0.05124,0.35391,1.00000"
+    ],
+    "orientation": {
+      "start": {
+        "x": 0,
+        "y": 0
+      },
+      "stop": {
+        "x": 1,
+        "y": 1
+      }
+    }
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "glass": false,
+          "image-name": "gem.png",
+          "name": "gem",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
+      "watchOS"
+    ],
+    "squares": "shared"
+  }
+}
