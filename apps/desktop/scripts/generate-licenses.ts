@@ -162,7 +162,6 @@ async function main(): Promise<void> {
   const textIndex = new Map(texts.map((text, index) => [text, index]))
 
   const data = {
-    schemaVersion: 1,
     entries: entries.map((entry) => ({
       ...entry,
       texts: entry.texts.map((text) => textIndex.get(text)!),
