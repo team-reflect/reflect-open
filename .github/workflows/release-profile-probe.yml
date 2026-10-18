@@ -1,0 +1,167 @@
+name: Release profile probe
+
+# Temporary probe: measures how Cargo release-profile settings change the
+# macOS app size and the release build time. It uses no secrets and saves no
+# cargo cache, so every variant is a cold build.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/release-profile-probe.yml
+
+concurrency:
+  group: probe-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: baseline
+            lto: ''
+            cgu: ''
+            strip: ''
+          - name: thin_cgu1
+            lto: thin
+            cgu: '1'
+            strip: ''
+          - name: thin_cgu1_strip
+            lto: thin
+            cgu: '1'
+            strip: symbols
+          - name: strip
+            lto: ''
+            cgu: ''
+            strip: symbols
+          - name: fat_cgu1_strip
+            lto: fat
+            cgu: '1'
+            strip: symbols
+
+    name: probe-${{ matrix.name }}
+    runs-on: macos-26
+    timeout-minutes: 150
+    env:
+      CARGO_TERM_COLOR: never
+      CARGO_HTTP_MULTIPLEXING: 'false'
+      TARGET: aarch64-apple-darwin
+      VARIANT: ${{ matrix.name }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          targets: aarch64-apple-darwin
+
+      # Set the profile variables only when the variant sets them, so the
+      # baseline uses the pure Cargo defaults.
+      - name: Set the release profile
+        shell: bash
+        env:
+          LTO: ${{ matrix.lto }}
+          CGU: ${{ matrix.cgu }}
+          STRIP: ${{ matrix.strip }}
+        run: |
+          echo "ORT_CACHE_DIR=$RUNNER_TEMP/ort_cache" >> "$GITHUB_ENV"
+          if [ -n "$LTO" ]; then echo "CARGO_PROFILE_RELEASE_LTO=$LTO" >> "$GITHUB_ENV"; fi
+          if [ -n "$CGU" ]; then echo "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=$CGU" >> "$GITHUB_ENV"; fi
+          if [ -n "$STRIP" ]; then echo "CARGO_PROFILE_RELEASE_STRIP=$STRIP" >> "$GITHUB_ENV"; fi
+
+      # Shows the rustc flags that the profile gives a trivial crate.
+      - name: Show the toolchain and the effective profile flags
+        shell: bash
+        run: |
+          rustc -V
+          cargo -V
+          env | grep '^CARGO_PROFILE_' || echo "no CARGO_PROFILE_ variables"
+          cd "$RUNNER_TEMP"
+          cargo new -q flagprobe
+          cd flagprobe
+          cargo build --release -v 2>&1 | grep -o -E -- '-C (opt-level|strip|lto|codegen-units|panic|debuginfo)=[a-z0-9]+' | sort -u
+
+      - name: Build
+        shell: bash
+        run: |
+          set -o pipefail
+          start=$(date +%s)
+          pnpm release:macos --target="$TARGET" --no-sign 2>&1 | tee "$RUNNER_TEMP/build.log"
+          end=$(date +%s)
+          echo "BUILD_SECONDS=$((end - start))" >> "$GITHUB_ENV"
+
+      - name: Measure
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_dir="target/$TARGET/release/bundle"
+          ls -la "$bundle_dir" "$bundle_dir/macos"
+          app=$(find "$bundle_dir/macos" -maxdepth 1 -name '*.app' | head -n 1)
+          app_name=$(basename "$app")
+          exe=$(plutil -extract CFBundleExecutable raw "$app/Contents/Info.plist")
+          main="$app/Contents/MacOS/$exe"
+          out="$RUNNER_TEMP/out"
+          mkdir -p "$out"
+
+          # Same command as createUpdaterArchive in scripts/release-macos.ts.
+          tar -czf "$out/$app_name.tar.gz" -C "$(dirname "$app")" "$app_name"
+
+          # Same steps as createDmg in scripts/release-macos.ts, without codesign.
+          staging="$out/dmg"
+          mkdir -p "$staging"
+          ditto "$app" "$staging/$app_name"
+          ln -s /Applications "$staging/Applications"
+          used_kb=$(du -sk "$staging" | cut -f1)
+          size_mb=$(( (used_kb + 1023) / 1024 * 2 + 32 ))
+          hdiutil create -volname "${app_name%.app}" -srcfolder "$staging" -format UDRW -size "${size_mb}m" "$out/writable.dmg"
+          hdiutil convert "$out/writable.dmg" -format UDZO -imagekey zlib-level=9 -ov -o "$out/app.dmg"
+
+          cargo_finished=$(grep -E '^\s*Finished `release` profile' "$RUNNER_TEMP/build.log" | sed 's/^ *//' || true)
+
+          {
+            echo "## $VARIANT"
+            echo
+            echo '```'
+            echo "variant: $VARIANT"
+            echo "CARGO_PROFILE_RELEASE_LTO=${CARGO_PROFILE_RELEASE_LTO:-<unset>}"
+            echo "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=${CARGO_PROFILE_RELEASE_CODEGEN_UNITS:-<unset>}"
+            echo "CARGO_PROFILE_RELEASE_STRIP=${CARGO_PROFILE_RELEASE_STRIP:-<unset>}"
+            echo "build_step_seconds: $BUILD_SECONDS"
+            echo "cargo_finished_lines:"
+            echo "$cargo_finished"
+            echo "app: $app_name"
+            echo "main_binary: $exe $(stat -f%z "$main") bytes"
+            for f in "$app/Contents/MacOS/"*; do
+              echo "macos_dir_file: $(basename "$f") $(stat -f%z "$f") bytes"
+            done
+            echo "app_du_sk: $(du -sk "$app" | cut -f1) KiB"
+            echo "app_tar_gz: $(stat -f%z "$out/$app_name.tar.gz") bytes"
+            echo "dmg_udzo: $(stat -f%z "$out/app.dmg") bytes"
+            echo "main_nm_all_symbols: $(nm -a "$main" | wc -l | tr -d ' ')"
+            echo "main_nm_debug_map_entries: $(nm -a "$main" | grep -c ' - ' || true)"
+            echo "main_load_commands_dwarf: $(otool -l "$main" | grep -c __DWARF || true)"
+            echo "main_size_m:"
+            size -m "$main" | grep -E '^Segment' || true
+            echo '```'
+          } | tee "$out/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          cat "$out/summary.md"
+          grep -E '^\s*(Compiling|Finished|Built|Bundling|Info|Running)' "$RUNNER_TEMP/build.log" | grep -v Compiling > "$out/build-milestones.log" || true
+          grep -c Compiling "$RUNNER_TEMP/build.log" >> "$out/build-milestones.log" || true
+
+      - name: Upload the measurement text
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: probe-${{ matrix.name }}
+          path: |
+            ${{ runner.temp }}/out/summary.md
+            ${{ runner.temp }}/out/build-milestones.log
+          if-no-files-found: ignore
