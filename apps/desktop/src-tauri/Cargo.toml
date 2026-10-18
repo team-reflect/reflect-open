@@ -4,8 +4,8 @@ name = "reflect-open"
 # tauri.conf.json points at it. The crate is never published, so its version
 # has no consumer — freezing it keeps Cargo.lock out of every release diff.
 version = "0.0.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "The Reflect desktop and iOS app"
+authors = ["Reflect App, LLC"]
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
