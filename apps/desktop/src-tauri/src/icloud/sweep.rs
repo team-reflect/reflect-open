@@ -25,12 +25,12 @@ use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
 use reflect_graph_io::conflict::copy::{free_conflict_copy_path, utc_stamp};
 use reflect_graph_io::conflict::ladder::{self, ConflictInput};
-use reflect_graph_io::conflict::shadow::{blob_hash8_of_file, content_hash, ShadowStore};
+use reflect_graph_io::conflict::shadow::{ShadowStore, blob_hash8_of_file, content_hash};
 use reflect_graph_io::conflict::{ConflictSide, Resolution};
 use reflect_types::{ChangeKind, FileChange};
 
 use super::versions::{
-    current_version_modified_ms, mark_resolved, unresolved_versions, VersionRef,
+    VersionRef, current_version_modified_ms, mark_resolved, unresolved_versions,
 };
 
 /// What one sweep did.
@@ -1234,10 +1234,12 @@ mod tests {
         let copy = format!("assets/data (conflict 2026-10-16 03-04-05 {hash8}).json");
         assert_eq!(fs::read(root.path().join(&copy)).unwrap(), b"{\"a\":2}");
         assert_eq!(outcome.copies, vec![copy.clone()]);
-        assert!(outcome
-            .changed
-            .iter()
-            .any(|change| change.path == copy && change.kind == ChangeKind::Upsert));
+        assert!(
+            outcome
+                .changed
+                .iter()
+                .any(|change| change.path == copy && change.kind == ChangeKind::Upsert)
+        );
         assert_eq!(
             fs::read_to_string(root.path().join("assets/data.json")).unwrap(),
             "{\"a\":1}"

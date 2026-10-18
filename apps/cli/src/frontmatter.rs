@@ -210,9 +210,11 @@ mod tests {
     fn tolerant_parsing_degrades_gracefully() {
         assert_eq!(parse("---\naliases: [a, b]\n---\n").aliases, vec!["a", "b"]);
         assert!(parse("---\naliases: nope\n---\n").aliases.is_empty());
-        assert!(parse("---\naliases: [ok, [nested]]\n---\n")
-            .aliases
-            .is_empty());
+        assert!(
+            parse("---\naliases: [ok, [nested]]\n---\n")
+                .aliases
+                .is_empty()
+        );
         assert_eq!(parse("---\n[broken yaml\n---\n"), Frontmatter::default());
         assert_eq!(
             parse("---\n- a list\n- not a map\n---\n"),

@@ -22,12 +22,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use file_id::{get_file_id, FileId};
+use file_id::{FileId, get_file_id};
 use notify::{RecommendedWatcher, RecursiveMode};
-use notify_debouncer_full::{new_debouncer_opt, DebounceEventResult, Debouncer, FileIdCache};
+use notify_debouncer_full::{DebounceEventResult, Debouncer, FileIdCache, new_debouncer_opt};
 use reflect_graph_paths::{
-    classify, evicted_logical_path, eviction_placeholder, has_pruned_component, is_pruned_dir_name,
-    to_slash_lossy, wire_path, GraphPathKind,
+    GraphPathKind, classify, evicted_logical_path, eviction_placeholder, has_pruned_component,
+    is_pruned_dir_name, to_slash_lossy, wire_path,
 };
 use tauri::{AppHandle, Emitter, Manager, State};
 use walkdir::WalkDir;

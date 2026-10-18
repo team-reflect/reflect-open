@@ -3,7 +3,7 @@
 //! layer ([`super`]) owns transactions and generation gating, mirroring
 //! `write.rs`.
 
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde::Deserialize;
 
 use reflect_types::{AppError, AppResult};

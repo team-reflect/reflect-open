@@ -1,5 +1,5 @@
-use super::x_archive_store as archive;
 use super::GraphState;
+use super::x_archive_store as archive;
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -86,7 +86,7 @@ async fn serve<R: Runtime>(
                 .header("Content-Range", format!("bytes */{}", receipt.bytes))
                 .header("Cache-Control", "no-store")
                 .body(Cow::Borrowed(&[] as &[u8]))
-                .expect("valid response")
+                .expect("valid response");
         }
     };
     let (start, end) = selected.unwrap_or((0, receipt.bytes - 1));

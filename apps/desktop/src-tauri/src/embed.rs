@@ -8,9 +8,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use fastembed::{EmbeddingModel, TextEmbedding, TextInitOptions};
-use hf_hub::api::sync::ApiBuilder;
-use hf_hub::api::Progress;
 use hf_hub::Cache;
+use hf_hub::api::Progress;
+use hf_hub::api::sync::ApiBuilder;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 

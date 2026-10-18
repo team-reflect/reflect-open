@@ -10,7 +10,7 @@ use pulldown_cmark::{Event, HeadingLevel, Parser, Tag};
 use reflect_graph_paths::{eviction_placeholder, normalize_line_endings};
 
 use crate::error::CliError;
-use crate::frontmatter::{parse_frontmatter, split_frontmatter, Frontmatter};
+use crate::frontmatter::{Frontmatter, parse_frontmatter, split_frontmatter};
 use crate::keys::fold_key;
 use crate::paths::date_from_daily_path;
 
@@ -341,7 +341,7 @@ pub fn ensure_not_private(root: &Path, rel_path: &str) -> Result<(), CliError> {
         Err(_) if eviction_placeholder(&absolute).is_some_and(|path| path.is_file()) => {
             return Err(CliError::Runtime(format!(
                 "note is unavailable until iCloud downloads it: {rel_path}"
-            )))
+            )));
         }
         Err(_) => return Ok(()),
     };
@@ -367,14 +367,14 @@ pub(crate) fn checked_note_path(root: &Path, rel_path: &str) -> Result<PathBuf, 
             Ok(metadata) if metadata.file_type().is_symlink() => {
                 return Err(CliError::Runtime(format!(
                     "refusing symlinked note path: {rel_path}"
-                )))
+                )));
             }
             Ok(_) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => {
                 return Err(CliError::Runtime(format!(
                     "could not inspect {rel_path}: {error}"
-                )))
+                )));
             }
         }
     }

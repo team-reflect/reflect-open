@@ -7,7 +7,7 @@ use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
-use reqwest::{redirect, Client, StatusCode, Url};
+use reqwest::{Client, StatusCode, Url, redirect};
 
 use crate::error::{AppError, AppResult};
 

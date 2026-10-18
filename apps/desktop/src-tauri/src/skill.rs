@@ -17,7 +17,7 @@ use tauri::State;
 
 use crate::capture::atomic_write_to;
 use crate::error::{AppError, AppResult};
-use crate::fs::{current_root, root_for_generation, GraphState};
+use crate::fs::{GraphState, current_root, root_for_generation};
 
 /// The bundled template; placeholders are `{{SKILL_NAME}}`, `{{GRAPH_NAME}}`,
 /// `{{GRAPH_ROOT}}`, and `{{CLI_PATH}}`.
@@ -338,12 +338,16 @@ mod tests {
         );
         assert!(context.managed_content.contains("name: reflect-personal"));
         assert!(context.managed_content.contains("/graphs/Personal"));
-        assert!(context
-            .managed_content
-            .contains("/Applications/Reflect.app/Contents/MacOS/reflect"));
-        assert!(context
-            .managed_content
-            .contains("git -C \"/graphs/Personal\""));
+        assert!(
+            context
+                .managed_content
+                .contains("/Applications/Reflect.app/Contents/MacOS/reflect")
+        );
+        assert!(
+            context
+                .managed_content
+                .contains("git -C \"/graphs/Personal\"")
+        );
         assert!(!context.managed_content.contains("{{"));
     }
 

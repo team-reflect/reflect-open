@@ -14,7 +14,7 @@ use std::time::Duration;
 use tauri::State;
 
 use crate::error::{AppError, AppResult};
-use crate::fs::{current_root, modified_ms, root_for_generation, FileMeta, GraphState};
+use crate::fs::{FileMeta, GraphState, current_root, modified_ms, root_for_generation};
 #[cfg(test)]
 use crate::web_fetch::classify_fetch_status;
 use crate::web_fetch::{fetch_capture_html, fetch_capture_json};
@@ -776,11 +776,13 @@ mod tests {
 
         assert_eq!(relayed, 0);
         assert!(!shared_inbox.join("big.json").exists());
-        assert!(shared
-            .path()
-            .join(SHARED_REJECTED_DIR)
-            .join("big.json")
-            .is_file());
+        assert!(
+            shared
+                .path()
+                .join(SHARED_REJECTED_DIR)
+                .join("big.json")
+                .is_file()
+        );
         assert!(!graph.path().join(INBOX_DIR).join("big.json").exists());
     }
 

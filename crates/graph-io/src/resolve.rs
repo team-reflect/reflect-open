@@ -26,7 +26,7 @@ pub fn ensure_relative(rel: &str) -> AppResult<PathBuf> {
             _ => {
                 return Err(AppError::traversal(format!(
                     "path escapes the graph root: {rel}"
-                )))
+                )));
             }
         }
     }

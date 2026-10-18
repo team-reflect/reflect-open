@@ -53,7 +53,7 @@ use objc2::rc::Retained;
 #[cfg(target_os = "macos")]
 use objc2::runtime::Sel;
 #[cfg(target_os = "macos")]
-use objc2::{sel, MainThreadMarker};
+use objc2::{MainThreadMarker, sel};
 #[cfg(target_os = "macos")]
 use objc2_app_kit::{NSApplication, NSEventModifierFlags, NSMenu, NSMenuItem};
 #[cfg(target_os = "macos")]

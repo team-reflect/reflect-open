@@ -10,15 +10,15 @@
 
 use std::io::Read;
 use std::path::Path;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::UNIX_EPOCH;
 
 use ignore::WalkBuilder;
 
 use crate::{
-    classify, evicted_logical_path, icloud_placeholder_target, is_dataless, wire_path,
-    GraphPathKind,
+    GraphPathKind, classify, evicted_logical_path, icloud_placeholder_target, is_dataless,
+    wire_path,
 };
 
 /// Per-directory ignore file for user-configured exclusions, same syntax and
@@ -279,10 +279,12 @@ mod tests {
             attachments,
             vec!["Media/clip.MP4", "assets/photo.png", "notes/keep.txt"]
         );
-        assert!(catalog
-            .notes
-            .iter()
-            .all(|f| !f.placeholder && f.modified_ms > 0));
+        assert!(
+            catalog
+                .notes
+                .iter()
+                .all(|f| !f.placeholder && f.modified_ms > 0)
+        );
     }
 
     #[cfg(unix)]

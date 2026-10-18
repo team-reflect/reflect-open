@@ -15,8 +15,7 @@ pub struct Graph {
     pub root: PathBuf,
 }
 
-const NO_GRAPH_HELP: &str =
-    "no graph found — run inside a graph (a directory containing .reflect/), \
+const NO_GRAPH_HELP: &str = "no graph found — run inside a graph (a directory containing .reflect/), \
      pass --graph <path>, or set REFLECT_GRAPH";
 
 fn is_graph(path: &Path) -> bool {
