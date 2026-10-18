@@ -57,15 +57,13 @@ fn unescape_markdown_text(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut chars = text.chars();
     while let Some(ch) = chars.next() {
-        if ch == '\\' {
-            if let Some(next) = chars.clone().next() {
-                if next.is_ascii_punctuation() {
+        if ch == '\\'
+            && let Some(next) = chars.clone().next()
+                && next.is_ascii_punctuation() {
                     out.push(next);
                     chars.next();
                     continue;
                 }
-            }
-        }
         out.push(ch);
     }
     out
@@ -194,8 +192,8 @@ fn render_embedded_wiki_links(title: &str) -> Option<String> {
     let mut replaced = false;
     let mut index = 0;
     while index < bytes.len() {
-        if bytes[index] == b'[' && bytes.get(index + 1) == Some(&b'[') {
-            if let Some(inner_end) = find_wiki_inner_end(bytes, index + 2) {
+        if bytes[index] == b'[' && bytes.get(index + 1) == Some(&b'[')
+            && let Some(inner_end) = find_wiki_inner_end(bytes, index + 2) {
                 let inner = &title[index + 2..inner_end];
                 let (target, alias) = match inner.find('|') {
                     Some(pipe) => (inner[..pipe].trim(), inner[pipe + 1..].trim()),
@@ -208,7 +206,6 @@ fn render_embedded_wiki_links(title: &str) -> Option<String> {
                     continue;
                 }
             }
-        }
         let ch_len = title[index..].chars().next().map_or(1, char::len_utf8);
         rendered.push_str(&title[index..index + ch_len]);
         index += ch_len;

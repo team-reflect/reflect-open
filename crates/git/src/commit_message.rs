@@ -400,8 +400,8 @@ fn unquote_scalar(value: &str) -> String {
     if trimmed.len() >= 2 {
         let bytes = trimmed.as_bytes();
         let quote = bytes[0];
-        if quote == b'"' || quote == b'\'' {
-            if let Some(end) = trimmed[1..]
+        if (quote == b'"' || quote == b'\'')
+            && let Some(end) = trimmed[1..]
                 .bytes()
                 .position(|byte| byte == quote)
                 .map(|index| index + 1)
@@ -411,7 +411,6 @@ fn unquote_scalar(value: &str) -> String {
                     return trimmed[1..end].to_string();
                 }
             }
-        }
     }
     trimmed
         .split_once(" #")
