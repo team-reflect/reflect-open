@@ -123,7 +123,10 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
                   row?.gistStale === true && 'text-accent',
                 )}
               >
-                <RefreshCw aria-hidden className={cn('size-3.5', isUpdating && 'animate-spin')} />
+                <RefreshCw
+                  aria-hidden
+                  className={cn('size-3.5', isUpdating && 'motion-safe:animate-spin')}
+                />
               </Button>
             }
           />

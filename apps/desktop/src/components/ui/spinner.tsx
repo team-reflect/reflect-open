@@ -9,5 +9,11 @@ interface SpinnerProps {
 
 /** A spinning loading indicator. Pair with a visible text label and set `aria-hidden` is applied automatically. */
 export function Spinner({ className }: SpinnerProps): ReactElement {
-  return <LoaderCircle aria-hidden className={cn('size-3 animate-spin', className)} />
+  return (
+    <LoaderCircle
+      aria-hidden
+      data-slot="spinner"
+      className={cn('size-3 motion-safe:animate-spin', className)}
+    />
+  )
 }

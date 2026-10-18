@@ -38,7 +38,7 @@ export function ModelDownloadProgress({ progress }: ModelDownloadProgressProps):
       >
         {fraction !== null ? (
           <div
-            className="h-full rounded-full bg-accent transition-[width] duration-200"
+            className="h-full rounded-full bg-accent motion-safe:transition-[width] duration-200"
             style={{ width: `${fraction * 100}%` }}
           />
         ) : (

@@ -75,7 +75,7 @@ export const AllNotesRow = memo(function AllNotesRow({
         <span
           aria-hidden
           className={cn(
-            'size-2 rounded-full transition-transform duration-150 group-hover:scale-110',
+            'size-2 rounded-full motion-safe:transition-transform duration-150 group-hover:scale-110',
             selected ? 'bg-accent' : 'ring-1 ring-accent',
           )}
         />

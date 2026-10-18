@@ -80,7 +80,7 @@ export function LicenseEntries({
                   <ChevronRight
                     aria-hidden
                     className={cn(
-                      'size-3.5 shrink-0 text-text-muted transition-transform',
+                      'size-3.5 shrink-0 text-text-muted motion-safe:transition-transform',
                       expanded && 'rotate-90',
                     )}
                   />

@@ -584,20 +584,6 @@ html:root {
   color: var(--text-secondary);
 }
 
-/* Reduced motion is honored app-wide, not just in the editor: collapse every
-   transition and animation (palette/dialog zooms, sidebar washes, spinners).
-   Near-zero durations rather than `none` so animation-end events still fire. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
 /* Tags render via meowdown's `.md-tag` (an accent pill, our purple); the task
    checkbox border comes from meowdown's default (1px muted). The resting bullet
    dot is a lighter gray via `--meowdown-bullet` on `html:root` above; a collapsed

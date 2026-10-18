@@ -69,7 +69,7 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
         >
           <ChevronRight
             aria-hidden
-            className={`size-3 shrink-0 text-text-muted transition-transform ${
+            className={`size-3 shrink-0 text-text-muted motion-safe:transition-transform ${
               expanded ? 'rotate-90' : ''
             }`}
           />

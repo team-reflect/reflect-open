@@ -140,7 +140,7 @@ describe('DailyCaptureMenu', () => {
       .element(view.getByRole('button', { name: 'Record audio memo' }))
       .toBeInTheDocument()
     expect(
-      view.container.querySelector('[data-slot="audio-memo-action"] .animate-spin'),
+      view.container.querySelector('[data-slot="audio-memo-action"] [data-slot="spinner"]'),
     ).not.toBeNull()
     await view.getByRole('button', { name: 'Hide capture actions' }).click()
 

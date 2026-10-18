@@ -81,7 +81,7 @@ export function BacklinkSourceGroup({
           >
             <ChevronRight
               aria-hidden
-              className={`size-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
+              className={`size-3 motion-safe:transition-transform ${expanded ? 'rotate-90' : ''}`}
             />
           </button>
         ) : null}

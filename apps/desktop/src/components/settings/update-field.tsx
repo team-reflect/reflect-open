@@ -59,7 +59,7 @@ export function UpdateField(): ReactElement {
           <action.icon
             aria-hidden
             strokeWidth={1.75}
-            className={action.spinning ? 'animate-spin' : undefined}
+            className={action.spinning ? 'motion-safe:animate-spin' : undefined}
           />
           {action.label}
         </Button>

@@ -75,7 +75,7 @@ export function IncomingBacklinkGroup({
           >
             <ChevronRight
               aria-hidden
-              className={cn('size-4 transition-transform', expanded && 'rotate-90')}
+              className={cn('size-4 motion-safe:transition-transform', expanded && 'rotate-90')}
             />
           </button>
         ) : null}
