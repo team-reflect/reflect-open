@@ -11,7 +11,6 @@ const LicenseEntrySchema = z.object({
 })
 
 const LicensesSchema = z.object({
-  schemaVersion: z.literal(1),
   entries: z.array(LicenseEntrySchema),
   texts: z.array(z.string()),
 })

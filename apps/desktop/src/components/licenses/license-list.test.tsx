@@ -6,7 +6,6 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { LicenseEntries } from './license-list.tsx'
 
 const LICENSES: Licenses = {
-  schemaVersion: 1,
   entries: [
     {
       name: 'alpha',
