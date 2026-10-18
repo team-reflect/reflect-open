@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.16.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.6...v0.16.0-beta.7) (2026-10-18)
+
+
+### Features
+
+* show open source licenses in settings ([#1637](https://github.com/team-reflect/reflect-open/issues/1637)) ([7978f99](https://github.com/team-reflect/reflect-open/commit/7978f9945332d81fc44bd5c2897ab5a348ca3cae))
+
+
+### Bug Fixes
+
+* **core:** harden email field regexes ([#1617](https://github.com/team-reflect/reflect-open/issues/1617)) ([509b418](https://github.com/team-reflect/reflect-open/commit/509b418ac5e1541443e00699864f4cf31cf09c1e))
+* index headings with long runs of spaces without stalling ([#1580](https://github.com/team-reflect/reflect-open/issues/1580)) ([d6b39a1](https://github.com/team-reflect/reflect-open/commit/d6b39a12a0ed21f339e4ad1dbaecf299b92fa543))
+* show keyboard shortcut labels correctly when a key name matches a built-in object property ([#1573](https://github.com/team-reflect/reflect-open/issues/1573)) ([2412fd9](https://github.com/team-reflect/reflect-open/commit/2412fd9bda8576036164a241757765f1b1365bcc))
+
 ## [0.16.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.5...v0.16.0-beta.6) (2026-10-17)
 
 
