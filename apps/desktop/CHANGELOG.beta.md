@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.16.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.7...v0.16.0-beta.8) (2026-10-18)
+
+
+### Features
+
+* **desktop:** add Liquid Glass app icons for iOS and macOS ([#1647](https://github.com/team-reflect/reflect-open/issues/1647)) ([2e14657](https://github.com/team-reflect/reflect-open/commit/2e14657ac3fd9bce3bf987ebd4d91f9128331a07))
+
+
+### Bug Fixes
+
+* **desktop:** drop the global reduced-motion override ([#1644](https://github.com/team-reflect/reflect-open/issues/1644)) ([f0d1216](https://github.com/team-reflect/reflect-open/commit/f0d121644af9b2a4affc6157f24910856a2aca94))
+
 ## [0.16.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.6...v0.16.0-beta.7) (2026-10-18)
 
 
