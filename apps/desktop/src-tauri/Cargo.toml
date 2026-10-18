@@ -205,4 +205,4 @@ dbus-secret-service-keyring-store = { version = "1.0.1", features = ["crypto-rus
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }
 reflect-graph-io = { workspace = true, features = ["test-support"] }
-proptest = "1.11.0"
+proptest = "1.12.0"

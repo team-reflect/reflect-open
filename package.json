@@ -41,10 +41,10 @@
     "eslint": "^10.12.0",
     "knip": "^6.41.0",
     "nano-staged": "^1.0.2",
-    "oxfmt": "^0.71.0",
+    "oxfmt": "^0.73.0",
     "oxlint": "^1.88.0",
     "simple-git-hooks": "^2.14.0",
-    "turbo": "^2.11.4",
+    "turbo": "^2.11.9",
     "typescript": "~6.0.3",
     "vitest": "^5.0.5"
   },
@@ -54,5 +54,5 @@
   "nano-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern"
   },
-  "packageManager": "pnpm@11.28.4"
+  "packageManager": "pnpm@11.28.6"
 }
