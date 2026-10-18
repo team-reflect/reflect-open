@@ -1,0 +1,132 @@
+# Temporary probe: measures what `CARGO_PROFILE_DEV_DEBUG=line-tables-only`
+# does to the Rust test build. Not meant to be merged.
+name: Dev debug probe
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Record job start
+        run: echo "T_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: devdebug-probe-baseline
+
+      - name: Record setup-rust end
+        run: echo "T_RUST=$(date +%s)" >> "$GITHUB_ENV"
+
+      - uses: ./.github/actions/setup-node
+
+      - name: Stage desktop sidecars
+        run: node apps/desktop/scripts/build-sidecar.ts
+
+      - name: Measure target before build
+        run: |
+          echo "T_PREBUILD=$(date +%s)" >> "$GITHUB_ENV"
+          du -sh target 2>/dev/null || echo "target: missing"
+
+      - name: Build tests
+        run: |
+          start=$(date +%s)
+          cargo test --workspace --no-run
+          echo "COMPILE_S=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
+      - name: Run tests
+        run: |
+          start=$(date +%s)
+          cargo test --workspace
+          echo "TEST_S=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
+      - name: Measure target after build
+        run: |
+          now=$(date +%s)
+          {
+            echo "## baseline"
+            echo ""
+            echo '```'
+            echo "CARGO_PROFILE_DEV_DEBUG=${CARGO_PROFILE_DEV_DEBUG:-<unset>}"
+            echo "setup_rust_s=$(( T_RUST - T_START ))"
+            echo "setup_to_prebuild_s=$(( T_PREBUILD - T_START ))"
+            echo "compile_s=$COMPILE_S"
+            echo "test_s=$TEST_S"
+            echo "job_until_now_s=$(( now - T_START ))"
+            du -sh target
+            du -sh target/debug/deps target/debug/build target/debug/incremental 2>&1
+            du -s --block-size=1M target
+            echo "deps_files=$(find target/debug/deps -type f | wc -l)"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          df -h /
+
+  line_tables:
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - name: Record job start
+        run: echo "T_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: devdebug-probe-line-tables
+
+      - name: Record setup-rust end
+        run: echo "T_RUST=$(date +%s)" >> "$GITHUB_ENV"
+
+      - uses: ./.github/actions/setup-node
+
+      - name: Stage desktop sidecars
+        run: node apps/desktop/scripts/build-sidecar.ts
+
+      - name: Measure target before build
+        run: |
+          echo "T_PREBUILD=$(date +%s)" >> "$GITHUB_ENV"
+          du -sh target 2>/dev/null || echo "target: missing"
+
+      - name: Build tests
+        run: |
+          start=$(date +%s)
+          cargo test --workspace --no-run
+          echo "COMPILE_S=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
+      - name: Run tests
+        run: |
+          start=$(date +%s)
+          cargo test --workspace
+          echo "TEST_S=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
+      - name: Measure target after build
+        run: |
+          now=$(date +%s)
+          {
+            echo "## line_tables"
+            echo ""
+            echo '```'
+            echo "CARGO_PROFILE_DEV_DEBUG=${CARGO_PROFILE_DEV_DEBUG:-<unset>}"
+            echo "setup_rust_s=$(( T_RUST - T_START ))"
+            echo "setup_to_prebuild_s=$(( T_PREBUILD - T_START ))"
+            echo "compile_s=$COMPILE_S"
+            echo "test_s=$TEST_S"
+            echo "job_until_now_s=$(( now - T_START ))"
+            du -sh target
+            du -sh target/debug/deps target/debug/build target/debug/incremental 2>&1
+            du -s --block-size=1M target
+            echo "deps_files=$(find target/debug/deps -type f | wc -l)"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          df -h /
