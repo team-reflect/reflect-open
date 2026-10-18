@@ -13,6 +13,11 @@ describe('canonicalEmail', () => {
     expect(canonicalEmail('Ada < mailto:Ada@Example.com>')).toBe('ada@example.com')
   })
 
+  it('drops the query and fragment of a mailto value', () => {
+    expect(canonicalEmail('<mailto:Ada@Example.com?subject=Hi>')).toBe('ada@example.com')
+    expect(canonicalEmail('mailto:ada@example.com#top')).toBe('ada@example.com')
+  })
+
   it('handles long whitespace runs', () => {
     const spaces = ' '.repeat(50_000)
     expect(canonicalEmail(`<${spaces}x`)).toBe(`<${spaces}x`)
@@ -135,6 +140,68 @@ describe('extractEmailFields', () => {
       '- Phone: +1 555-0100',
     ].join('\n')
     expect(extractEmailFields(body)).toEqual([])
+  })
+
+  it('reads fields from CRLF line endings', () => {
+    expect(extractEmailFields('- Email: ada@example.com\r\n- Email: bob@example.com\r\n')).toEqual([
+      'ada@example.com',
+      'bob@example.com',
+    ])
+    expect(extractEmailFields('- Email:\r\n  - ada@example.com\r\n- Phone: 1')).toEqual([
+      'ada@example.com',
+    ])
+  })
+
+  it('excludes Markdown marks and quotes around an address', () => {
+    const body = [
+      '- Email: **ada@example.com**',
+      '- Email: `bob@example.com`',
+      '- Email: _cy@example.com_',
+      `- Email: "dee@example.com", 'eve@example.com'`,
+    ].join('\n')
+
+    expect(extractEmailFields(body)).toEqual([
+      'ada@example.com',
+      'bob@example.com',
+      'cy@example.com',
+      'dee@example.com',
+      'eve@example.com',
+    ])
+  })
+
+  it('splits addresses at CJK punctuation', () => {
+    expect(extractEmailFields('- Email: ada@example.com，bob@example.com。')).toEqual([
+      'ada@example.com',
+      'bob@example.com',
+    ])
+  })
+
+  it('ends an address at a query, a path, or trailing punctuation', () => {
+    const body = [
+      '- Email: [Ada](mailto:ada@example.com?subject=Hi)',
+      '- Email: bob@example.com/inbox',
+      '- Email: cy@example.com! dee@example.com-',
+    ].join('\n')
+
+    expect(extractEmailFields(body)).toEqual([
+      'ada@example.com',
+      'bob@example.com',
+      'cy@example.com',
+      'dee@example.com',
+    ])
+  })
+
+  it('accepts internationalized and punycode domains', () => {
+    expect(extractEmailFields('- Email: ada@例子.测试, bob@example.xn--p1ai')).toEqual([
+      'ada@例子.测试',
+      'bob@example.xn--p1ai',
+    ])
+  })
+
+  it('handles long tokens without an address', () => {
+    const run = 'a'.repeat(100_000)
+    expect(extractEmailFields(`- Email: ${run}`)).toEqual([])
+    expect(extractEmailFields(`- Email: ${run}@${run}`)).toEqual([])
   })
 
   it('handles long whitespace runs', () => {
