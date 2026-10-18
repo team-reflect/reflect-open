@@ -20,7 +20,7 @@
     "fix:oxlint": "oxlint --max-warnings 0 --fix apps packages",
     "fix:eslint": "eslint --cache --max-warnings 0 --fix",
     "check": "pnpm typecheck && pnpm lint",
-    "licenses:gen": "pnpm --filter @reflect/desktop licenses:gen",
+    "gen:licenses": "pnpm --filter @reflect/desktop gen:licenses",
     "tauri": "pnpm --filter @reflect/desktop tauri",
     "release:ios": "pnpm --filter @reflect/desktop release:ios",
     "release:linux": "pnpm --filter @reflect/desktop release:linux",

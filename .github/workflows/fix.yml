@@ -32,7 +32,7 @@ jobs:
           tool: cargo-about
 
       - name: Generate licenses
-        run: pnpm licenses:gen
+        run: pnpm gen:licenses
 
       - name: Fix (TypeScript)
         run: pnpm run fix
