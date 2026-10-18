@@ -1,5 +1,5 @@
 name: Set up Rust
-description: Installs the Rust toolchain and the cargo build cache, which also holds the ONNX Runtime binaries. On Linux it also installs the Tauri system dependencies.
+description: Installs the Rust toolchain, the cargo build cache, and on Linux the Tauri system dependencies.
 
 inputs:
   components:
@@ -70,7 +70,7 @@ runs:
     # rerun the build script when the directory is missing, so the binaries
     # must live in the same cache entry as target/, or a restored target/ fails
     # to link with "could not find native static library onnxruntime".
-    # ORT_CACHE_DIR is documented only in the v2.0.0-rc.11 release notes:
+    # ORT_CACHE_DIR is documented in the v2.0.0-rc.11 release notes:
     # https://github.com/pykeio/ort/releases/tag/v2.0.0-rc.11
     - name: Set the ONNX Runtime cache dir
       shell: bash
