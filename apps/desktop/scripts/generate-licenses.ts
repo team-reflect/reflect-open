@@ -4,6 +4,7 @@
 // Needs cargo-about on the PATH:
 // `cargo install --locked cargo-about@0.9.2 --features cli`
 
+import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { exec } from 'tinyexec'
@@ -125,8 +126,8 @@ function collectInter(): Entry {
  * One entry per package, without versions, so that upgrading a dependency
  * does not change the output unless its license changes. Several installed
  * versions merge into one entry, and so do the per-license entries
- * cargo-about reports for an `AND` expression. Licenses, texts, and URLs are
- * sorted, so the output does not depend on the tools' order.
+ * cargo-about reports for an `AND` expression. Licenses and URLs are sorted,
+ * so the output does not depend on the tools' order.
  */
 function mergeEntries(entries: Entry[]): Entry[] {
   const groups = new Map<string, Entry[]>()
@@ -141,7 +142,7 @@ function mergeEntries(entries: Entry[]): Entry[] {
       .filter((url) => url !== undefined)
       .toSorted()[0],
     license: [...new Set(group.map((entry) => entry.license))].toSorted().join(' AND '),
-    texts: [...new Set(group.flatMap((entry) => entry.texts))].toSorted(),
+    texts: [...new Set(group.flatMap((entry) => entry.texts))],
   }))
 }
 
@@ -152,18 +153,27 @@ function compareEntries(a: Entry, b: Entry): number {
   )
 }
 
+/** The key a license text is stored under: the first 16 hex digits of its SHA-256. */
+function hashText(text: string): string {
+  return createHash('sha256').update(text).digest('hex').slice(0, 16)
+}
+
 async function main(): Promise<void> {
   const collected = [...(await collectNpm()), ...(await collectCargo()), collectInter()]
   const entries = mergeEntries(collected).toSorted(compareEntries)
 
-  // Each distinct text is stored once; entries refer to texts by index.
-  const texts = [...new Set(entries.flatMap((entry) => entry.texts))].toSorted()
-  const textIndex = new Map(texts.map((text, index) => [text, index]))
+  // Each distinct text is stored once under its hash, and entries refer to
+  // texts by hash. Adding or removing a text changes no other key.
+  const texts = Object.fromEntries(
+    [...new Set(entries.flatMap((entry) => entry.texts))]
+      .map((text) => [hashText(text), text] as const)
+      .toSorted(([a], [b]) => a.localeCompare(b)),
+  )
 
   const data = {
     entries: entries.map((entry) => ({
       ...entry,
-      texts: entry.texts.map((text) => textIndex.get(text)!),
+      texts: entry.texts.map(hashText).toSorted(),
     })),
     texts,
   }
