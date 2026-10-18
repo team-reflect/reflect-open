@@ -15,7 +15,6 @@ const OUTPUT = join(APP_DIR, 'src', 'lib', 'licenses', 'licenses.gen.json')
 
 interface Entry {
   name: string
-  version: string
   ecosystem: 'npm' | 'cargo' | 'other'
   license: string
   url: string | undefined
@@ -28,7 +27,6 @@ const PnpmLicensesSchema = z.record(
   z.array(
     z.object({
       name: z.string(),
-      versions: z.array(z.string()),
       paths: z.array(z.string()),
       license: z.string(),
       homepage: z.string().optional(),
@@ -45,11 +43,10 @@ async function collectNpm(): Promise<Entry[]> {
   const entries: Entry[] = []
   for (const [license, packages] of Object.entries(PnpmLicensesSchema.parse(JSON.parse(stdout)))) {
     for (const pkg of packages) {
-      for (const [index, version] of pkg.versions.entries()) {
-        const dir = pkg.paths[index] ?? pkg.paths[0]!
+      // One path per installed version.
+      for (const dir of pkg.paths) {
         entries.push({
           name: pkg.name,
-          version,
           ecosystem: 'npm',
           license,
           url: pkg.homepage ?? `https://www.npmjs.com/package/${pkg.name}`,
@@ -82,7 +79,6 @@ const CargoAboutSchema = z.object({
         z.object({
           crate: z.object({
             name: z.string(),
-            version: z.string(),
             repository: z.string().nullish(),
           }),
         }),
@@ -101,7 +97,6 @@ async function collectCargo(): Promise<Entry[]> {
   return CargoAboutSchema.parse(JSON.parse(stdout)).licenses.flatMap((license) =>
     license.used_by.map(({ crate }) => ({
       name: crate.name,
-      version: crate.version,
       ecosystem: 'cargo' as const,
       license: license.id,
       url: crate.repository ?? `https://crates.io/crates/${crate.name}`,
@@ -114,7 +109,6 @@ async function collectCargo(): Promise<Entry[]> {
 function collectInter(): Entry {
   return {
     name: 'Inter',
-    version: '4.0',
     ecosystem: 'other',
     license: 'OFL-1.1',
     url: 'https://github.com/rsms/inter',
@@ -128,18 +122,24 @@ function collectInter(): Entry {
 }
 
 /**
- * One entry per package version. cargo-about lists a crate once under each
- * license of an `AND` expression, so those entries merge into one. Licenses
- * and texts are sorted, so the output does not depend on the tools' order.
+ * One entry per package, without versions, so that upgrading a dependency
+ * does not change the output unless its license changes. Several installed
+ * versions merge into one entry, and so do the per-license entries
+ * cargo-about reports for an `AND` expression. Licenses, texts, and URLs are
+ * sorted, so the output does not depend on the tools' order.
  */
 function mergeEntries(entries: Entry[]): Entry[] {
   const groups = new Map<string, Entry[]>()
   for (const entry of entries) {
-    const key = `${entry.ecosystem}:${entry.name}@${entry.version}`
+    const key = `${entry.ecosystem}:${entry.name}`
     groups.set(key, [...(groups.get(key) ?? []), entry])
   }
   return [...groups.values()].map((group) => ({
     ...group[0]!,
+    url: group
+      .map((entry) => entry.url)
+      .filter((url) => url !== undefined)
+      .toSorted()[0],
     license: [...new Set(group.map((entry) => entry.license))].toSorted().join(' AND '),
     texts: [...new Set(group.flatMap((entry) => entry.texts))].toSorted(),
   }))
@@ -148,8 +148,7 @@ function mergeEntries(entries: Entry[]): Entry[] {
 function compareEntries(a: Entry, b: Entry): number {
   return (
     a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }) ||
-    a.ecosystem.localeCompare(b.ecosystem) ||
-    a.version.localeCompare(b.version, 'en', { numeric: true })
+    a.ecosystem.localeCompare(b.ecosystem)
   )
 }
 
