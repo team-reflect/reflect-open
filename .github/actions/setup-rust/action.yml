@@ -74,7 +74,7 @@ runs:
     # https://github.com/pykeio/ort/releases/tag/v2.0.0-rc.11
     - name: Set the ONNX Runtime cache dir
       shell: bash
-      run: echo "ORT_CACHE_DIR=$RUNNER_TEMP/ort" >> "$GITHUB_ENV"
+      run: echo "ORT_CACHE_DIR=$RUNNER_TEMP/ort_cache" >> "$GITHUB_ENV"
 
     # `env-vars` puts ORT_CACHE_DIR into the cache key, so changing the path
     # starts from a cold cache instead of a target/ that points to the old one.
