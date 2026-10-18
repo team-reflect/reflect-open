@@ -9,58 +9,6 @@ permissions:
   contents: read
 
 jobs:
-  linux:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-rust
-        with:
-          components: clippy
-          targets: aarch64-apple-ios
-          cache-key: ios-probe-linux
-
-      - name: Stage stub sidecars
-        run: |
-          mkdir -p apps/desktop/src-tauri/binaries
-          for name in reflect reflect-capture-host; do
-            for triple in aarch64-apple-ios x86_64-unknown-linux-gnu; do
-              cp /bin/true "apps/desktop/src-tauri/binaries/$name-$triple"
-            done
-          done
-
-      - name: Clippy each crate for aarch64-apple-ios
-        shell: bash
-        run: |
-          mkdir -p logs
-          echo "| crate | exit | errors | warnings | first error |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| --- | --- | --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
-          for crate in reflect-types reflect-graph-paths reflect-index-schema reflect-index reflect-graph-io reflect-git reflect-cli reflect-capture-host tauri-plugin-app-store tauri-plugin-keyboard tauri-plugin-mobile-haptics tauri-plugin-recording tauri-plugin-web-auth reflect-open; do
-            set +e
-            cargo clippy -p "$crate" --all-targets --target aarch64-apple-ios --message-format short > "logs/$crate.log" 2>&1
-            code=$?
-            set -e
-            errors=$(grep -c '^error' "logs/$crate.log" || true)
-            warnings=$(grep -c '^warning' "logs/$crate.log" || true)
-            first=$(grep -m1 -E '^error|error occurred|failed to run custom build command' "logs/$crate.log" | cut -c1-160 | tr '|' '/' || true)
-            echo "| $crate | $code | $errors | $warnings | $first |" >> "$GITHUB_STEP_SUMMARY"
-            echo "::group::$crate (exit $code)"
-            tail -40 "logs/$crate.log"
-            echo "::endgroup::"
-          done
-
-      - name: Clippy the whole workspace for aarch64-apple-ios
-        continue-on-error: true
-        run: cargo clippy --workspace --all-targets --target aarch64-apple-ios -- -D warnings 2>&1 | tee logs/workspace.log
-
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
-        with:
-          name: linux-logs
-          path: logs/
-
   macos:
     runs-on: macos-26
     steps:
@@ -86,14 +34,8 @@ jobs:
       - name: Clippy for aarch64-apple-ios
         id: ios
         continue-on-error: true
-        run: cargo clippy --workspace --all-targets --target aarch64-apple-ios -- -D warnings
-
-      - name: Clippy for the macOS host
-        id: host
-        continue-on-error: true
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --all-targets --target aarch64-apple-ios -p reflect-open -p reflect-types -p reflect-graph-paths -p reflect-index-schema -p reflect-index -p reflect-graph-io -p reflect-git -p tauri-plugin-app-store -p tauri-plugin-keyboard -p tauri-plugin-mobile-haptics -p tauri-plugin-recording -p tauri-plugin-web-auth -- -D warnings
 
       - name: Summary
         run: |
           echo "iOS clippy: ${{ steps.ios.outcome }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "macOS host clippy: ${{ steps.host.outcome }}" >> "$GITHUB_STEP_SUMMARY"
