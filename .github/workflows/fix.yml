@@ -24,9 +24,7 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
-        with:
-          components: rustfmt
+        run: rustup toolchain install --no-self-update
 
       - name: Fix (TypeScript)
         run: pnpm run fix

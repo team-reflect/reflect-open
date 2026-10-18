@@ -33,7 +33,6 @@ jobs:
             command: pnpm release:macos --target=universal-apple-darwin --no-sign
           - name: ios
             os: macos-26
-            target: aarch64-apple-ios
             command: pnpm release:ios --build-number=1 --no-sign
           - name: windows
             os: windows-2025

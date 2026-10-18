@@ -2,12 +2,8 @@ name: Set up Rust
 description: Installs the Rust toolchain, the cargo build cache, and on Linux the Tauri system dependencies.
 
 inputs:
-  components:
-    description: Comma-separated rustup components to install alongside the toolchain.
-    required: false
-    default: ''
   targets:
-    description: Comma-separated rustup targets to install alongside the host target.
+    description: Comma-separated rustup targets to install on top of the ones `rust-toolchain.toml` lists.
     required: false
     default: ''
   cache-key:
@@ -49,11 +45,21 @@ runs:
           sudo apt-get install -y $PACKAGES
         fi
 
+    # `rust-toolchain.toml` pins the version, components, and iOS targets;
+    # `rustup toolchain install` with no argument installs what it lists.
     - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
-      with:
-        components: ${{ inputs.components }}
-        targets: ${{ inputs.targets }}
+      shell: bash
+      env:
+        RUSTUP_PERMIT_COPY_RENAME: 1
+        TARGETS: ${{ inputs.targets }}
+      run: |
+        rustup toolchain install --no-self-update
+        if [ -n "$TARGETS" ]; then
+          rustup target add ${TARGETS//,/ }
+        fi
+        echo CARGO_INCREMENTAL=0 >> "$GITHUB_ENV"
+        echo CARGO_TERM_COLOR=always >> "$GITHUB_ENV"
+        rustc --version --verbose
 
     # Build scripts (ort-sys, swift-rs) write the path of Xcode's clang runtime
     # into their cached output, and cargo does not rerun them when Xcode
