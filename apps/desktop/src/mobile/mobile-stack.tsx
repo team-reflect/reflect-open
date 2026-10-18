@@ -39,7 +39,12 @@ interface StackLayer {
  * else (daily, All, search-as-All) is a root.
  */
 function isStacked(route: Route): boolean {
-  return route.kind === 'note' || route.kind === 'settings' || route.kind === 'graphs'
+  return (
+    route.kind === 'note' ||
+    route.kind === 'settings' ||
+    route.kind === 'graphs' ||
+    route.kind === 'licenses'
+  )
 }
 
 /**
@@ -56,6 +61,8 @@ function layerKey(route: Route): string {
       return 'settings'
     case 'graphs':
       return 'graphs'
+    case 'licenses':
+      return 'licenses'
     case 'allNotes':
     case 'search':
       return 'all'

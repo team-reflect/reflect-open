@@ -22,6 +22,9 @@ export type Route =
   // The graph-switcher screen — a mobile settings sub-screen; desktop renders
   // it as the settings screen (its switcher lives in the sidebar footer).
   | { kind: 'graphs' }
+  // The Open Source Licenses screen: a mobile settings sub-screen. Desktop
+  // shows licenses in a dialog and renders this route as the settings screen.
+  | { kind: 'licenses' }
 
 /**
  * A route that addresses one concrete note, including a dated daily note.
@@ -41,6 +44,7 @@ export function routesEqual(a: Route, b: Route): boolean {
     case 'chat':
     case 'settings':
     case 'graphs':
+    case 'licenses':
       return true
     case 'daily':
       return a.date === (b as Extract<Route, { kind: 'daily' }>).date

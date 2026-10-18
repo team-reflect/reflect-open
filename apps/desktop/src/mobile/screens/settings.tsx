@@ -490,6 +490,10 @@ export function MobileSettings(): ReactElement {
               value={version === null ? '…' : marketingVersion(version)}
               onPress={versionTap}
             />
+            <SettingsNavRow
+              label="Open Source Licenses"
+              onPress={() => navigate({ kind: 'licenses' })}
+            />
             <SettingsActionRow
               label="Privacy Policy"
               onPress={() => {

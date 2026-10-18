@@ -120,6 +120,16 @@ describe('MobileSettings', () => {
     ])
   })
 
+  it('discloses Open Source Licenses into the Licenses screen', async () => {
+    const view = await mount()
+
+    await userEvent.click(page.getByRole('button', { name: 'Open Source Licenses' }))
+
+    expect(view.appServices.navigation.navigations()).toEqual([
+      { route: { kind: 'licenses' }, options: undefined },
+    ])
+  })
+
   it('opens the privacy policy from the About group', async () => {
     const user = userEvent
     const view = await mount()
