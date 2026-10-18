@@ -211,6 +211,22 @@ describe('PageDescriberService', () => {
     expect(isDescriptionRejected(failure)).toBe(true)
   })
 
+  it('a filtered answer with no text becomes DescriptionRejectedError', async () => {
+    languageModelService.setModel(
+      new MockLanguageModelV3({
+        doGenerate: () =>
+          Promise.resolve({
+            content: [],
+            finishReason: { unified: 'content-filter' as const, raw: undefined },
+            usage: USAGE,
+            warnings: [],
+          }),
+      }),
+    )
+    const failure = await request().catch((cause: unknown) => cause)
+    expect(isDescriptionRejected(failure)).toBe(true)
+  })
+
   it('a timeout reads as a network error', async () => {
     modelThrowing(new DOMException('timed out', 'TimeoutError'))
     await expect(request()).rejects.toMatchObject({ kind: 'network' })

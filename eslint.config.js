@@ -341,7 +341,6 @@ export default defineESLintConfig(
       '@typescript-eslint/no-base-to-string': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       'no-var': 'off',
-      'unicorn/no-computed-property-existence-check': 'off',
     },
   },
   {

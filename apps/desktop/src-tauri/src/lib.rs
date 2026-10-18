@@ -27,6 +27,7 @@ mod error;
 mod fs;
 mod git;
 mod graph_gitignore;
+mod hash;
 mod icloud;
 mod link_preview;
 mod logging;

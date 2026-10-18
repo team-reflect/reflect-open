@@ -32,6 +32,7 @@
     "typescript": "~6.0.3",
     "vite": "^8.3.4",
     "vitest": "^5.0.5",
+    "vitest-fail-on-console": "^0.10.1",
     "wxt": "^0.21.4"
   }
 }

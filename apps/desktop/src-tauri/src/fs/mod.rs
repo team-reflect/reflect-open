@@ -35,6 +35,7 @@ use self::io::{
     atomic_create, atomic_write, bootstrap, collect_files, initialize_runtime, AtomicCreateOutcome,
 };
 use self::resolve::resolve;
+pub use reflect_types::FileMeta;
 
 /// Cancellation flag for the running Reflect V1 import, managed as Tauri
 /// state in `lib.rs` (`graph_import_cancel` trips it).
@@ -106,25 +107,6 @@ pub struct GraphInfo {
     pub generation: u64,
 }
 
-/// Metadata for a file inside the graph.
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FileMeta {
-    /// Graph-relative path, forward-slashed.
-    pub path: String,
-    pub size: u64,
-    /// Last-modified time in epoch milliseconds.
-    pub modified_ms: u64,
-    /// True when the file is iCloud-evicted: the note exists but its content
-    /// is not on disk until re-downloaded. Consumers must not read it — a
-    /// read blocks on an on-demand download — and must not treat it as
-    /// deleted (Plan 21). Covers both eviction forms: for a legacy `.icloud`
-    /// stub, `size` and `modified_ms` describe the stub; for a modern
-    /// dataless file they are the real (preserved) values.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub placeholder: bool,
-}
-
 /// Result of claiming a note path without overwriting an existing file.
 #[derive(Debug, Serialize)]
 #[serde(
@@ -155,7 +137,7 @@ fn graph_info(root: &Path, generation: u64) -> GraphInfo {
 
 /// Set the active root (bumping the generation atomically), record it in
 /// recents, and return its info.
-fn activate(state: &State<GraphState>, root: &Path) -> AppResult<GraphInfo> {
+fn activate(state: &GraphState, root: &Path) -> AppResult<GraphInfo> {
     let generation = {
         let mut inner = lock_graph(state)?;
         inner.generation += 1;
@@ -183,7 +165,7 @@ fn lock_graph(state: &GraphState) -> AppResult<std::sync::MutexGuard<'_, GraphIn
     })
 }
 
-pub(crate) fn current_root(state: &State<GraphState>) -> AppResult<PathBuf> {
+pub(crate) fn current_root(state: &GraphState) -> AppResult<PathBuf> {
     lock_graph(state)?
         .root
         .clone()
@@ -194,7 +176,7 @@ pub(crate) fn current_root(state: &State<GraphState>) -> AppResult<PathBuf> {
 /// (`windows::window_bootstrap`) must *adopt* the session, never re-open it:
 /// a generation bump here would strand every command the main window has
 /// pinned to the current one.
-pub(crate) fn current_graph_info(state: &State<GraphState>) -> AppResult<GraphInfo> {
+pub(crate) fn current_graph_info(state: &GraphState) -> AppResult<GraphInfo> {
     let inner = lock_graph(state)?;
     let root = inner.root.clone().ok_or_else(AppError::no_graph)?;
     Ok(graph_info(&root, inner.generation))
@@ -204,10 +186,7 @@ pub(crate) fn current_graph_info(state: &State<GraphState>) -> AppResult<GraphIn
 /// issued for. A stale generation means the graph was switched after the
 /// command was enqueued — the mutation must be rejected (loudly), or it would
 /// land in the *new* graph's same-named file.
-pub(crate) fn root_for_generation(
-    state: &State<GraphState>,
-    generation: u64,
-) -> AppResult<PathBuf> {
+pub(crate) fn root_for_generation(state: &GraphState, generation: u64) -> AppResult<PathBuf> {
     let inner = lock_graph(state)?;
     if inner.generation != generation {
         return Err(AppError::io(
@@ -221,7 +200,7 @@ pub(crate) fn root_for_generation(
 /// command. Read commands take an optional pin: UI reads for the open graph
 /// omit it, background passes (audio-memo reconcile) that can span a graph
 /// switch must supply it so every step of a pass sees one graph.
-fn root_for(state: &State<GraphState>, generation: Option<u64>) -> AppResult<PathBuf> {
+fn root_for(state: &GraphState, generation: Option<u64>) -> AppResult<PathBuf> {
     match generation {
         Some(generation) => root_for_generation(state, generation),
         None => current_root(state),

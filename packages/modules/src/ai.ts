@@ -1,9 +1,9 @@
 export {
   APICallError,
-  generateObject,
   generateText,
   isStepCount,
   NoObjectGeneratedError,
+  NoOutputGeneratedError,
   Output,
   simulateReadableStream,
   streamText,

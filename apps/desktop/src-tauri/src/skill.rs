@@ -13,7 +13,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 use tauri::State;
 
 use crate::capture::atomic_write_to;
@@ -103,15 +102,8 @@ fn render_skill(skill_name: &str, graph_name: &str, graph_root: &str, cli_path: 
         .replace("{{CLI_PATH}}", cli_path)
 }
 
-/// Lowercase hex sha256 (same encoding as the CLI's `hash.rs`).
 fn content_hash(content: &str) -> String {
-    use std::fmt::Write;
-    let digest = Sha256::digest(content.as_bytes());
-    let mut hex = String::with_capacity(digest.len() * 2);
-    for byte in digest {
-        let _ = write!(hex, "{byte:02x}");
-    }
-    hex
+    crate::hash::sha256_hex(content.as_bytes())
 }
 
 /// Insert the managed marker after the YAML frontmatter (agent runtimes parse

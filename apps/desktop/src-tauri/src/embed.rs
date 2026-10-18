@@ -86,9 +86,7 @@ enum Runtime {
 #[derive(Default)]
 pub struct EmbedState(Mutex<Runtime>);
 
-fn lock_state<'a>(
-    state: &'a State<'a, EmbedState>,
-) -> AppResult<std::sync::MutexGuard<'a, Runtime>> {
+fn lock_state<'a>(state: &'a EmbedState) -> AppResult<std::sync::MutexGuard<'a, Runtime>> {
     state.0.lock().map_err(|err| {
         tracing::error!(?err, "embed state lock poisoned by an earlier panic");
         AppError::io("embed state lock poisoned")

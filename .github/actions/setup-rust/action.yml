@@ -1,5 +1,5 @@
 name: Set up Rust
-description: Installs the Rust toolchain and the cargo build cache. On Linux it also installs the Tauri system dependencies and caches the ONNX Runtime binaries.
+description: Installs the Rust toolchain, the cargo build cache, and on Linux the Tauri system dependencies.
 
 inputs:
   components:
@@ -64,29 +64,23 @@ runs:
       shell: bash
       run: echo "RUST_CACHE_CLANG_DIR=$(xcrun clang --print-resource-dir)" >> "$GITHUB_ENV"
 
+    # ort-sys (fastembed → ort) downloads prebuilt ONNX Runtime binaries at
+    # build time into $ORT_CACHE_DIR/dfbin/<target>/<hash> and writes that
+    # absolute path into its build script output in target/. Cargo does not
+    # rerun the build script when the directory is missing, so the binaries
+    # must live in the same cache entry as target/, or a restored target/ fails
+    # to link with "could not find native static library onnxruntime".
+    # ORT_CACHE_DIR is documented in the v2.0.0-rc.11 release notes:
+    # https://github.com/pykeio/ort/releases/tag/v2.0.0-rc.11
+    - name: Set the ONNX Runtime cache dir
+      shell: bash
+      run: echo "ORT_CACHE_DIR=$RUNNER_TEMP/ort_cache" >> "$GITHUB_ENV"
+
+    # `env-vars` puts ORT_CACHE_DIR into the cache key, so changing the path
+    # starts from a cold cache instead of a target/ that points to the old one.
     - name: Cache cargo build
       uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       with:
         key: ${{ inputs.cache-key }}
-
-    # ort-sys (fastembed → ort) downloads prebuilt ONNX Runtime binaries at
-    # build time and extracts them to ~/.cache/ort.pyke.io — outside target/,
-    # so rust-cache never captures them and every run re-downloads. The build
-    # script skips the download when the extracted dir is already present.
-    # Entries are content-addressed (dfbin/<target>/<hash>), so restoring a
-    # stale cache after an ort upgrade is safe — it just downloads anew.
-    - name: Cache ONNX Runtime binaries
-      if: runner.os == 'Linux'
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: ~/.cache/ort.pyke.io
-        key: ort-bin-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-        restore-keys: |
-          ort-bin-${{ runner.os }}-
-
-    # Without this, actions/cache warns at save time on builds that never
-    # trigger the ort download (the path wouldn't exist).
-    - name: Ensure ort cache dir exists
-      if: runner.os == 'Linux'
-      shell: bash
-      run: mkdir -p ~/.cache/ort.pyke.io
+        env-vars: ORT_CACHE_DIR
+        cache-directories: ${{ env.ORT_CACHE_DIR }}

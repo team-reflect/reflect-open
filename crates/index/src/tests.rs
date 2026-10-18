@@ -7,14 +7,15 @@ use rusqlite::Connection;
 use serde_json::Value;
 
 use super::chat_write::{delete_conversation, save_message, ChatConversation, ChatMessageRow};
+use super::connections::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
 use super::embed_write::{apply_chunks, remove_chunks, EmbeddedChunk};
-use super::migrations::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
 use super::query::run_query;
 use super::scan::scan_reconcile;
 use super::write::{
     apply_note, claim_tier, clear_index, move_note, touch_note, IndexedAlias, IndexedClaim,
     IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, MovedNoteAddress,
 };
+use super::{Applied, FileIndexConnections, IndexConnections, IndexSession};
 
 fn migrated() -> Connection {
     // Registers sqlite-vec before migrating — the 0002 migration creates a
@@ -698,7 +699,7 @@ fn reconcile_scan_classifies_candidates_orphans_and_skips() {
     indexed("notes/evicted-current.md", 9_000, "current-hash");
     indexed("notes/gone.md", 1_000, "gone-hash");
 
-    let meta = |path: &str, modified_ms: u64, placeholder: bool| crate::fs::FileMeta {
+    let meta = |path: &str, modified_ms: u64, placeholder: bool| reflect_types::FileMeta {
         path: path.to_string(),
         size: 1,
         modified_ms,
@@ -1119,160 +1120,6 @@ fn open_index_at_creates_migrates_and_reopens() {
     assert_eq!(rows[0]["n"], Value::from(1));
 }
 
-/// The note-window adoption contract (`windows::window_bootstrap`): reading
-/// the open sessions must never bump either generation — a bump here would
-/// strand every command the main window has pinned to the current ones.
-#[test]
-fn session_adoption_reads_never_bump_generations() {
-    use tauri::Manager;
-    let app = tauri::test::mock_builder()
-        .build(tauri::test::mock_context(tauri::test::noop_assets()))
-        .expect("mock app");
-    app.manage(crate::fs::GraphState::default());
-    app.manage(super::IndexState::default());
-    app.manage(crate::background_task::BackgroundTaskState::default());
-
-    let graph_dir = tempfile::tempdir().expect("tempdir");
-    {
-        let state: tauri::State<crate::fs::GraphState> = app.state();
-        let mut inner = state.0.lock().unwrap();
-        inner.generation = 3;
-        inner.root = Some(graph_dir.path().to_path_buf());
-    }
-
-    // Before any index opens, adoption reports that honestly (None), rather
-    // than opening one itself.
-    assert_eq!(super::current_generation(&app.state()).unwrap(), None);
-
-    let opened = super::index_open(app.state(), app.state(), app.state()).expect("open");
-    for _ in 0..2 {
-        let info = crate::fs::current_graph_info(&app.state()).expect("graph info");
-        assert_eq!(info.generation, 3);
-        assert_eq!(
-            super::current_generation(&app.state()).unwrap(),
-            Some(opened)
-        );
-    }
-
-    // Both counters sit exactly where the main window left them.
-    let graph: tauri::State<crate::fs::GraphState> = app.state();
-    assert_eq!(graph.0.lock().unwrap().generation, 3);
-}
-
-/// Command-level integration: the generation gate that every TS write relies on.
-/// A write carrying a stale generation (issued before the index was reopened)
-/// must silently no-op rather than mutate the newly-opened index.
-#[test]
-fn stale_generation_writes_are_dropped_end_to_end() {
-    use tauri::Manager;
-    let app = tauri::test::mock_builder()
-        .build(tauri::test::mock_context(tauri::test::noop_assets()))
-        .expect("mock app");
-    app.manage(crate::fs::GraphState::default());
-    app.manage(super::IndexState::default());
-    app.manage(crate::background_task::BackgroundTaskState::default());
-
-    let graph_dir = tempfile::tempdir().expect("tempdir");
-    {
-        let state: tauri::State<crate::fs::GraphState> = app.state();
-        let mut inner = state.0.lock().unwrap();
-        inner.generation = 1;
-        inner.root = Some(graph_dir.path().to_path_buf());
-    }
-
-    let count = |label: &str| -> Value {
-        let rows = tauri::async_runtime::block_on(super::db_query(
-            "SELECT count(*) AS n FROM notes".to_string(),
-            vec![],
-            app.handle().clone(),
-        ))
-        .unwrap_or_else(|err| panic!("{label}: {err:?}"));
-        rows[0]["n"].clone()
-    };
-
-    let stale = super::index_open(app.state(), app.state(), app.state()).expect("first open");
-    super::index_apply(
-        note("notes/a.md", "A", vec![]),
-        stale,
-        app.handle().clone(),
-        app.state(),
-        app.state(),
-    )
-    .expect("apply");
-    assert_eq!(count("after first apply"), Value::from(1));
-
-    // Reopening (graph switch / reload) bumps the generation; the old one is stale.
-    let fresh = super::index_open(app.state(), app.state(), app.state()).expect("reopen");
-    assert_ne!(stale, fresh);
-
-    super::index_apply(
-        note("notes/b.md", "B", vec![]),
-        stale,
-        app.handle().clone(),
-        app.state(),
-        app.state(),
-    )
-    .expect("stale apply returns Ok");
-    assert_eq!(count("after stale apply"), Value::from(1)); // dropped, not applied
-
-    super::index_remove(
-        "notes/a.md".to_string(),
-        stale,
-        app.handle().clone(),
-        app.state(),
-        app.state(),
-    )
-    .expect("stale remove returns Ok");
-    assert_eq!(count("after stale remove"), Value::from(1)); // also dropped
-
-    super::index_apply(
-        note("notes/b.md", "B", vec![]),
-        fresh,
-        app.handle().clone(),
-        app.state(),
-        app.state(),
-    )
-    .expect("fresh apply");
-    assert_eq!(count("after fresh apply"), Value::from(2));
-
-    // index_meta_set rides the same gate: stale stamps vanish, fresh ones land
-    // (and upsert — the projection-version stamp is written after every rebuild).
-    let meta = |label: &str| -> Vec<serde_json::Map<String, Value>> {
-        tauri::async_runtime::block_on(super::db_query(
-            "SELECT value FROM index_meta WHERE key = 'k'".to_string(),
-            vec![],
-            app.handle().clone(),
-        ))
-        .unwrap_or_else(|err| panic!("{label}: {err:?}"))
-    };
-    super::index_meta_set(
-        "k".to_string(),
-        "stale".to_string(),
-        stale,
-        app.state(),
-        app.state(),
-    )
-    .expect("stale meta set returns Ok");
-    assert!(meta("after stale meta set").is_empty());
-    super::index_meta_set(
-        "k".to_string(),
-        "v1".to_string(),
-        fresh,
-        app.state(),
-        app.state(),
-    )
-    .expect("fresh meta set");
-    super::index_meta_set(
-        "k".to_string(),
-        "v2".to_string(),
-        fresh,
-        app.state(),
-        app.state(),
-    )
-    .expect("meta upsert");
-    assert_eq!(meta("after meta upsert")[0]["value"], Value::from("v2"));
-}
-
 #[test]
 fn fts5_is_compiled_in() {
     let conn = Connection::open_in_memory().expect("open");
@@ -1629,7 +1476,7 @@ fn apply_chunks_for_an_unindexed_path_is_a_cleaning_no_op() {
 
 // ---- note_move (Plan 17) ----------------------------------------------------
 
-fn move_in_txn(conn: &mut Connection, from: &str, to: &str) -> crate::error::AppResult<()> {
+fn move_in_txn(conn: &mut Connection, from: &str, to: &str) -> reflect_types::AppResult<()> {
     let tx = conn.transaction()?;
     tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
     move_note(&tx, from, to, &moved_address(to))?;
@@ -2115,50 +1962,212 @@ fn a_move_restates_the_path_derived_claims() {
     .unwrap();
     assert_eq!(path_key[0]["path_key"], Value::from("notes/new-name.md"));
 }
+/// A session over a real index file: the file-backed connections, a writer
+/// and a reader.
+fn file_session(root: &std::path::Path) -> (IndexSession, u64) {
+    let session = IndexSession::new();
+    let generation = session
+        .open(root, &FileIndexConnections)
+        .expect("open index");
+    (session, generation)
+}
 
-/// The reconcile scan must list the root its index generation was opened
-/// for. Async commands have no main-thread ordering against `graph_open`,
-/// so a scan queued across a graph switch could otherwise walk the freshly
-/// swapped root and diff another graph's files against this index — in the
-/// window before the switch's `index_open` bumps the generation, that delta
-/// would pass the staleness gate.
+fn note_count(session: &IndexSession) -> Value {
+    let requested = session.read_generation().unwrap();
+    let rows = session
+        .query(requested, "SELECT count(*) AS n FROM notes", &[])
+        .expect("count");
+    rows[0]["n"].clone()
+}
+
+/// The note-window adoption contract: reading the open session must never
+/// bump the generation. A bump here would strand every write the main window
+/// has pinned to the current one.
 #[test]
-fn reconcile_scan_walks_the_index_sessions_root_not_the_current_graph() {
-    use tauri::Manager;
-    let app = tauri::test::mock_builder()
-        .build(tauri::test::mock_context(tauri::test::noop_assets()))
-        .expect("mock app");
-    app.manage(crate::fs::GraphState::default());
-    app.manage(super::IndexState::default());
-    app.manage(crate::background_task::BackgroundTaskState::default());
+fn session_adoption_reads_never_bump_generations() {
+    let graph_dir = tempfile::tempdir().expect("tempdir");
+    let session = IndexSession::new();
 
+    // Before any index opens, adoption reports that honestly (None), rather
+    // than opening one itself.
+    assert_eq!(session.current_generation().unwrap(), None);
+
+    let opened = session
+        .open(graph_dir.path(), &FileIndexConnections)
+        .expect("open");
+    for _ in 0..2 {
+        assert_eq!(session.current_generation().unwrap(), Some(opened));
+        assert_eq!(session.read_generation().unwrap(), opened);
+    }
+}
+
+/// The generation gate that every TS write relies on: a write carrying a
+/// stale generation (issued before the index was reopened) must report
+/// `Stale` and leave the newly opened index untouched.
+#[test]
+fn stale_generation_writes_are_dropped_end_to_end() {
+    let graph_dir = tempfile::tempdir().expect("tempdir");
+    let (session, stale) = file_session(graph_dir.path());
+    assert_eq!(
+        session
+            .apply(stale, &[note("notes/a.md", "A", vec![])])
+            .unwrap(),
+        Applied::Committed
+    );
+    assert_eq!(note_count(&session), Value::from(1));
+
+    // Reopening (graph switch / reload) bumps the generation; the old one is stale.
+    let fresh = session
+        .open(graph_dir.path(), &FileIndexConnections)
+        .expect("reopen");
+    assert_ne!(stale, fresh);
+
+    assert_eq!(
+        session
+            .apply(stale, &[note("notes/b.md", "B", vec![])])
+            .unwrap(),
+        Applied::Stale
+    );
+    assert_eq!(note_count(&session), Value::from(1));
+    assert_eq!(session.remove(stale, "notes/a.md").unwrap(), Applied::Stale);
+    assert_eq!(note_count(&session), Value::from(1));
+    assert_eq!(
+        session
+            .apply(fresh, &[note("notes/b.md", "B", vec![])])
+            .unwrap(),
+        Applied::Committed
+    );
+    assert_eq!(note_count(&session), Value::from(2));
+
+    // set_meta rides the same gate: stale stamps vanish, fresh ones land
+    // (and upsert — the projection-version stamp is written after every rebuild).
+    let meta = || {
+        session
+            .query(fresh, "SELECT value FROM index_meta WHERE key = 'k'", &[])
+            .expect("meta")
+    };
+    assert_eq!(
+        session.set_meta(stale, "k", "stale").unwrap(),
+        Applied::Stale
+    );
+    assert!(meta().is_empty());
+    assert_eq!(
+        session.set_meta(fresh, "k", "v1").unwrap(),
+        Applied::Committed
+    );
+    assert_eq!(
+        session.set_meta(fresh, "k", "v2").unwrap(),
+        Applied::Committed
+    );
+    assert_eq!(meta()[0]["value"], Value::from("v2"));
+}
+
+/// A query pinned to the generation it was issued for must error, not answer
+/// with another graph's rows, when the session is reopened in between.
+#[test]
+fn a_query_issued_before_a_reopen_errors_instead_of_crossing_graphs() {
+    let graph_dir = tempfile::tempdir().expect("tempdir");
+    let (session, _) = file_session(graph_dir.path());
+    let requested = session.read_generation().unwrap();
+    session
+        .open(graph_dir.path(), &FileIndexConnections)
+        .expect("reopen");
+    let err = session
+        .query(requested, "SELECT count(*) AS n FROM notes", &[])
+        .expect_err("stale query");
+    assert_eq!(err.message(), "index reopened during query");
+}
+
+/// A host with one connection (no reader) still answers queries, on the
+/// writer, under the same generation pin.
+#[test]
+fn a_single_connection_host_queries_on_the_writer() {
+    struct OneConnection;
+    impl IndexConnections for OneConnection {
+        fn open_writer(&self, _root: &std::path::Path) -> reflect_types::AppResult<Connection> {
+            Ok(migrated())
+        }
+        fn open_reader(
+            &self,
+            _root: &std::path::Path,
+        ) -> reflect_types::AppResult<Option<Connection>> {
+            Ok(None)
+        }
+    }
+    let session = IndexSession::new();
+    let generation = session
+        .open(std::path::Path::new("/unused"), &OneConnection)
+        .unwrap();
+    session
+        .apply(generation, &[note("notes/a.md", "A", vec![])])
+        .unwrap();
+    assert_eq!(note_count(&session), Value::from(1));
+}
+
+/// The root the shell walks for a reconcile scan comes from the session, not
+/// from the caller: `root_for_generation` answers the root the generation was
+/// opened for, `None` once the session moved on, and `reconcile_scan` itself
+/// re-checks the generation under the lock.
+#[test]
+fn root_for_generation_and_reconcile_scan_follow_the_sessions_generation() {
     let graph_a = tempfile::tempdir().expect("tempdir");
     let graph_b = tempfile::tempdir().expect("tempdir");
-    std::fs::write(graph_a.path().join("one.md"), "# one\n").unwrap();
-    std::fs::write(graph_b.path().join("two.md"), "# two\n").unwrap();
-    std::fs::write(graph_b.path().join("three.md"), "# three\n").unwrap();
 
-    {
-        let state: tauri::State<crate::fs::GraphState> = app.state();
-        let mut inner = state.0.lock().unwrap();
-        inner.generation = 1;
-        inner.root = Some(graph_a.path().to_path_buf());
+    let (session, generation) = file_session(graph_a.path());
+    assert_eq!(
+        session.root_for_generation(generation).unwrap().as_deref(),
+        Some(graph_a.path())
+    );
+    let listed = |path: &str| reflect_types::FileMeta {
+        path: path.to_string(),
+        size: 6,
+        modified_ms: 1,
+        placeholder: false,
+    };
+    let scan = session
+        .reconcile_scan(generation, &[listed("one.md")], 10_000)
+        .expect("scan");
+    assert_eq!(scan.total, 1);
+
+    // The switch's second half: a new generation opened for graph B. The
+    // old generation now resolves to no root, and a scan queued for it gets
+    // the empty delta, never graph B's rows.
+    session
+        .open(graph_b.path(), &FileIndexConnections)
+        .expect("open b");
+    assert_eq!(session.root_for_generation(generation).unwrap(), None);
+    let scan = session
+        .reconcile_scan(generation, &[listed("one.md")], 10_000)
+        .expect("stale scan");
+    assert_eq!(scan.total, 0);
+}
+
+/// A reader that fails to open must not leave a half-open session behind: the
+/// writer is dropped too, so every later call reports `no_graph`.
+#[test]
+fn a_failed_reader_open_unbinds_the_writer() {
+    struct ReaderFails;
+    impl IndexConnections for ReaderFails {
+        fn open_writer(&self, _root: &std::path::Path) -> reflect_types::AppResult<Connection> {
+            Ok(migrated())
+        }
+        fn open_reader(
+            &self,
+            _root: &std::path::Path,
+        ) -> reflect_types::AppResult<Option<Connection>> {
+            Err(reflect_types::AppError::io("reader refused"))
+        }
     }
-    let generation = super::index_open(app.state(), app.state(), app.state()).expect("open");
-
-    // The switch's first half: `graph_open` swapped the root, `index_open`
-    // hasn't run yet — the exact window a queued scan can land in.
-    {
-        let state: tauri::State<crate::fs::GraphState> = app.state();
-        let mut inner = state.0.lock().unwrap();
-        inner.generation = 2;
-        inner.root = Some(graph_b.path().to_path_buf());
-    }
-
-    let scan = tauri::async_runtime::block_on(super::index_reconcile_scan(
-        generation,
-        app.handle().clone(),
-    ))
-    .expect("scan");
-    assert_eq!(scan.total, 1, "must list graph A, the index session's root");
+    let session = IndexSession::new();
+    let err = session
+        .open(std::path::Path::new("/unused"), &ReaderFails)
+        .expect_err("open fails");
+    assert_eq!(err.message(), "reader refused");
+    assert_eq!(session.current_generation().unwrap(), None);
+    // The first open bumped the writer to generation 1; a write for it must
+    // report no graph rather than land in the unbound index.
+    let err = session
+        .apply(1, &[note("notes/a.md", "A", vec![])])
+        .expect_err("no index");
+    assert_eq!(err.message(), "No graph is open");
 }

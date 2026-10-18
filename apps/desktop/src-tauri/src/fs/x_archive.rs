@@ -1,6 +1,8 @@
 use super::x_archive_store as archive;
 use super::GraphState;
 use crate::error::{AppError, AppResult};
+use reflect_types::events::INDEX_CHANGED;
+use reflect_types::FileChange;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use tauri::{Emitter, Manager, State};
@@ -27,7 +29,8 @@ fn download_media<R: tauri::Runtime>(
             match super::x_download::download(root, url).await {
                 Ok(receipt) => {
                     if super::root_for_generation(&app.state::<GraphState>(), generation).is_ok() {
-                        let _ = app.emit("index:changed", json!([{ "path": format!("assets/x/{}", receipt.name), "kind": "upsert" }]));
+                        let change = FileChange::upsert(format!("assets/x/{}", receipt.name), None);
+                        let _ = app.emit(INDEX_CHANGED, vec![change]);
                     }
                 }
 

@@ -139,37 +139,17 @@ function dailyRow(date: string, overrides: Partial<DailyNoteRow> = {}): DailyNot
   }
 }
 
-function isAsyncIterable(value: object): value is AsyncIterable<unknown> {
-  return Symbol.asyncIterator in value
-}
-
-/** Execute `search_notes` directly, asserting a non-streaming output. */
+/** Execute `search_notes` directly. */
 async function runSearch(
   tools: NoteTools,
   input: { query: string; limit?: number },
 ): Promise<SearchNotesOutput> {
-  const execute = tools.search_notes.execute
-  if (!execute) {
-    throw new Error('search_notes has no execute')
-  }
-  const output = await execute(input, CALL)
-  if (isAsyncIterable(output)) {
-    throw new Error('unexpected streaming tool output')
-  }
-  return output
+  return await tools.search_notes.execute(input, CALL)
 }
 
-/** Execute `read_notes` directly, asserting a non-streaming output. */
+/** Execute `read_notes` directly. */
 async function runReadNotes(tools: NoteTools, paths: string[]): Promise<ReadNotesOutput> {
-  const execute = tools.read_notes.execute
-  if (!execute) {
-    throw new Error('read_notes has no execute')
-  }
-  const output = await execute({ paths }, CALL)
-  if (isAsyncIterable(output)) {
-    throw new Error('unexpected streaming tool output')
-  }
-  return output
+  return await tools.read_notes.execute({ paths }, CALL)
 }
 
 /** Read a single path via `read_notes`, returning its lone result. */
@@ -181,17 +161,9 @@ async function runRead(tools: NoteTools, path: string): Promise<ReadNoteResult> 
   return note
 }
 
-/** Execute `read_assets` directly, asserting a non-streaming output. */
+/** Execute `read_assets` directly. */
 async function runReadAssets(tools: NoteTools, paths: string[]): Promise<ReadAssetsOutput> {
-  const execute = tools.read_assets.execute
-  if (!execute) {
-    throw new Error('read_assets has no execute')
-  }
-  const output = await execute({ paths }, CALL)
-  if (isAsyncIterable(output)) {
-    throw new Error('unexpected streaming tool output')
-  }
-  return output
+  return await tools.read_assets.execute({ paths }, CALL)
 }
 
 /** Read a single asset via `read_assets`, returning its lone result. */
@@ -203,36 +175,20 @@ async function runReadAsset(tools: NoteTools, path: string): Promise<ReadAssetRe
   return asset
 }
 
-/** Execute `list_recent_notes` directly, asserting a non-streaming output. */
+/** Execute `list_recent_notes` directly. */
 async function runRecents(
   tools: NoteTools,
   input: { limit?: number; tag?: string | null },
 ): Promise<ListRecentNotesOutput> {
-  const execute = tools.list_recent_notes.execute
-  if (!execute) {
-    throw new Error('list_recent_notes has no execute')
-  }
-  const output = await execute(input, CALL)
-  if (isAsyncIterable(output)) {
-    throw new Error('unexpected streaming tool output')
-  }
-  return output
+  return await tools.list_recent_notes.execute(input, CALL)
 }
 
-/** Execute `list_daily_notes` directly, asserting a non-streaming output. */
+/** Execute `list_daily_notes` directly. */
 async function runDailies(
   tools: NoteTools,
   input: { start: string; end: string },
 ): Promise<ListDailyNotesOutput> {
-  const execute = tools.list_daily_notes.execute
-  if (!execute) {
-    throw new Error('list_daily_notes has no execute')
-  }
-  const output = await execute(input, CALL)
-  if (isAsyncIterable(output)) {
-    throw new Error('unexpected streaming tool output')
-  }
-  return output
+  return await tools.list_daily_notes.execute(input, CALL)
 }
 
 describe('search_notes', () => {
