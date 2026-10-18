@@ -1,4 +1,4 @@
-import { Suspense, use, useState, type ReactElement } from 'react'
+import { Suspense, use, useRef, useState, type ReactElement } from 'react'
 import { ArrowUpRight, ChevronRight } from 'lucide-react'
 import { Virtualizer } from 'virtua'
 import { Spinner } from '@/components/ui/spinner.tsx'
@@ -47,6 +47,7 @@ export function LicenseEntries({
   className?: string | undefined
 }): ReactElement {
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set())
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   function toggle(key: string): void {
     setOpen((current) => {
@@ -59,9 +60,10 @@ export function LicenseEntries({
   }
 
   return (
-    <div className={cn('min-h-0 overflow-y-auto', className)}>
+    <div ref={scrollRef} className={cn('min-h-0 scroll-fade overflow-y-auto', className)}>
       <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-        <Virtualizer data={licenses.entries}>
+        {/* The card is the direct parent, so the scroll container is passed explicitly. */}
+        <Virtualizer data={licenses.entries} scrollRef={scrollRef} bufferSize={600}>
           {(entry, index) => {
             const key = getEntryKey(entry)
             const expanded = open.has(key)
@@ -71,7 +73,7 @@ export function LicenseEntries({
                   type="button"
                   aria-expanded={expanded}
                   onClick={() => toggle(key)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors outline-none hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
                 >
                   <span className="min-w-0 flex-1 truncate text-sm text-text">{entry.name}</span>
                   <span className="shrink-0 text-xs text-text-muted">{entry.license}</span>
@@ -122,7 +124,7 @@ function LicenseDetail({
         entry.texts.map((key) => (
           <pre
             key={key}
-            className="font-mono text-[11px] leading-[1.7] whitespace-pre-wrap text-text-secondary select-text"
+            className="font-mono text-xs leading-relaxed whitespace-pre-wrap text-text-secondary select-text"
           >
             {licenses.texts[key]}
           </pre>
