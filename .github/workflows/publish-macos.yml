@@ -64,11 +64,9 @@ jobs:
           - name: arm64
             runner: macos-26
             target: aarch64-apple-darwin
-            rust-targets: aarch64-apple-darwin
           - name: universal
             runner: macos-26
             target: universal-apple-darwin
-            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -111,8 +109,12 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
         with:
-          targets: ${{ matrix.rust-targets }}
           cache-key: ${{ matrix.target }}
+
+      # The universal build also compiles the x86_64 slice on this arm64 runner.
+      - name: Add the x86_64 macOS target
+        if: matrix.target == 'universal-apple-darwin'
+        run: rustup target add x86_64-apple-darwin
 
       # Tauri signs the .app; the script then repairs sidecar signatures,
       # notarizes + staples the app and DMG, signs the updater archive, and

@@ -2,10 +2,6 @@ name: Set up Rust
 description: Installs the Rust toolchain, the cargo build cache, and on Linux the Tauri system dependencies.
 
 inputs:
-  targets:
-    description: Comma-separated rustup targets to install on top of the ones `rust-toolchain.toml` lists.
-    required: false
-    default: ''
   cache-key:
     description: An extra key for the cargo build cache, for jobs that must not share one.
     required: false
@@ -47,18 +43,14 @@ runs:
 
     # `rust-toolchain.toml` pins the version, components, and iOS targets;
     # `rustup toolchain install` with no argument installs what it lists.
+    # rust-cache sets `CARGO_INCREMENTAL=0` itself.
     - name: Install Rust toolchain
       shell: bash
-      env:
-        RUSTUP_PERMIT_COPY_RENAME: 1
-        TARGETS: ${{ inputs.targets }}
       run: |
         rustup toolchain install --no-self-update
-        if [ -n "$TARGETS" ]; then
-          rustup target add ${TARGETS//,/ }
+        if [ -z "${CARGO_TERM_COLOR+set}" ]; then
+          echo CARGO_TERM_COLOR=always >> "$GITHUB_ENV"
         fi
-        echo CARGO_INCREMENTAL=0 >> "$GITHUB_ENV"
-        echo CARGO_TERM_COLOR=always >> "$GITHUB_ENV"
         rustc --version --verbose
 
     # Build scripts (ort-sys, swift-rs) write the path of Xcode's clang runtime
