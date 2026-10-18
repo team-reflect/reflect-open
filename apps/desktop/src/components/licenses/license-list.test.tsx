@@ -66,7 +66,7 @@ describe('LicenseEntries', () => {
     await userEvent.click(page.getByRole('button', { name: /^gamma/ }))
 
     await expect
-      .element(page.getByText('This package ships no license file. It is licensed under ISC.'))
+      .element(page.getByText('No license file is included. Licensed under ISC.'))
       .toBeVisible()
   })
 

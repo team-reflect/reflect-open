@@ -1,24 +1,36 @@
-export interface LicenseEntry {
-  name: string
-  ecosystem: 'npm' | 'cargo' | 'other'
-  license: string
-  url?: string | undefined
-  /** Keys into {@link Licenses.texts}; empty when the package ships no license file. */
-  texts: string[]
-}
+import { once } from '@ocavue/utils'
+import { z } from 'zod'
 
-export interface Licenses {
-  entries: LicenseEntry[]
+const LicenseEntrySchema = z.object({
+  name: z.string(),
+  ecosystem: z.enum(['npm', 'cargo', 'other']),
+  license: z.string(),
+  url: z.string().optional(),
+  /** Keys into {@link Licenses.texts}; empty when the package ships no license file. */
+  texts: z.array(z.string()),
+})
+
+const LicensesSchema = z.object({
+  entries: z.array(LicenseEntrySchema),
   /** License texts keyed by a hash of their content. */
-  texts: Record<string, string>
-}
+  texts: z.record(z.string(), z.string()),
+})
+
+export type LicenseEntry = z.infer<typeof LicenseEntrySchema>
+export type Licenses = z.infer<typeof LicensesSchema>
 
 /** Loads the generated notices, which Vite splits into their own lazy chunk. */
-export async function loadLicenses(): Promise<Licenses> {
+async function loadLicenses(): Promise<Licenses> {
   const { default: data } = await import('./licenses.gen.json')
-  return data as Licenses
+  return LicensesSchema.parse(data)
 }
 
-export function entryKey(entry: LicenseEntry): string {
+/**
+ * The notices, loaded on the first call. Every call returns the same promise,
+ * so it can be passed to React's `use`.
+ */
+export const getLicenses: () => Promise<Licenses> = /* @__PURE__ */ once(loadLicenses)
+
+export function getEntryKey(entry: LicenseEntry): string {
   return `${entry.ecosystem}:${entry.name}`
 }

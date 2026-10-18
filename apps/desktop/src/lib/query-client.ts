@@ -126,7 +126,6 @@ export const queryKeys = {
     all: ['mobile'] as const,
     storage: ['mobile', 'storage'] as const,
   },
-  licenses: ['licenses'] as const,
 } as const
 
 /**

@@ -15,7 +15,7 @@ export function MobileLicenses(): ReactElement {
         title="Licenses"
         onBack={() => (canBack ? back() : navigate({ kind: 'settings' }))}
       />
-      <LicenseList className="flex-1 px-4" />
+      <LicenseList className="flex-1 px-4 py-3" />
     </div>
   )
 }

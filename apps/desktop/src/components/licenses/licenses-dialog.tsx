@@ -12,14 +12,16 @@ export function LicensesDialog({
 }): ReactElement {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(720px,85vh)] flex-col gap-0 p-0 sm:max-w-3xl">
-        <div className="border-b border-border px-5 pt-4 pb-3">
-          <DialogTitle>Open Source Licenses</DialogTitle>
-          <DialogDescription className="mt-1.5">
-            Reflect Open is built on these open source components.
-          </DialogDescription>
+      <DialogContent className="flex h-[min(680px,85vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+        <div className="flex min-h-0 flex-1 flex-col bg-muted/50">
+          <div className="px-6 pt-6 pb-3">
+            <DialogTitle className="text-[15px] font-semibold">Open Source Licenses</DialogTitle>
+            <DialogDescription className="mt-1 text-[13px] text-text-muted">
+              Reflect Open is built on these open source components.
+            </DialogDescription>
+          </div>
+          <LicenseList className="flex-1 px-6 pb-6 [mask-image:linear-gradient(to_bottom,black_calc(100%-2rem),transparent)]" />
         </div>
-        <LicenseList className="flex-1 px-5" />
       </DialogContent>
     </Dialog>
   )

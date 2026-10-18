@@ -1,16 +1,13 @@
-import { useState, type ReactElement } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { ChevronRight, ExternalLink } from 'lucide-react'
+import { Suspense, use, useState, type ReactElement } from 'react'
+import { ArrowUpRight, ChevronRight } from 'lucide-react'
 import { Virtualizer } from 'virtua'
-import { Badge } from '@/components/ui/badge.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import {
-  entryKey,
-  loadLicenses,
+  getEntryKey,
+  getLicenses,
   type LicenseEntry,
   type Licenses,
 } from '@/lib/licenses/licenses.ts'
-import { queryKeys } from '@/lib/query-client.ts'
 import { cn } from '@/lib/utils.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
 
@@ -19,25 +16,28 @@ import { useAppServices } from '@/services/services-provider.tsx'
  * this element a bounded height.
  */
 export function LicenseList({ className }: { className?: string | undefined }): ReactElement {
-  const { data: licenses } = useQuery({
-    queryKey: queryKeys.licenses,
-    queryFn: loadLicenses,
-    staleTime: Infinity,
-  })
-  if (licenses === undefined) {
-    return (
-      <div className={cn('flex items-center justify-center', className)}>
-        <Spinner />
-      </div>
-    )
-  }
-  return <LicenseEntries licenses={licenses} className={className} />
+  return (
+    <Suspense
+      fallback={
+        <div className={cn('flex items-center justify-center', className)}>
+          <Spinner />
+        </div>
+      }
+    >
+      <LoadedLicenseList className={className} />
+    </Suspense>
+  )
+}
+
+function LoadedLicenseList({ className }: { className?: string | undefined }): ReactElement {
+  return <LicenseEntries licenses={use(getLicenses())} className={className} />
 }
 
 /**
- * One row per component, in file order. A row expands in place to show the
- * license text. The list is virtualized and only expanded rows render their
- * text, because rendering every text puts over a megabyte of text in the DOM.
+ * One card with a row per component, in file order. A row expands in place to
+ * show the license text. The list is virtualized and only expanded rows render
+ * their text, because rendering every text puts over a megabyte of text in the
+ * DOM.
  */
 export function LicenseEntries({
   licenses,
@@ -60,35 +60,35 @@ export function LicenseEntries({
 
   return (
     <div className={cn('min-h-0 overflow-y-auto', className)}>
-      <Virtualizer as="ul" item="li" data={licenses.entries}>
-        {(entry) => {
-          const key = entryKey(entry)
-          const expanded = open.has(key)
-          return (
-            <div key={key} className="border-b border-border">
-              <button
-                type="button"
-                aria-expanded={expanded}
-                onClick={() => toggle(key)}
-                className="flex min-h-10 w-full items-center gap-3 py-2 text-left text-sm"
-              >
-                <ChevronRight
-                  aria-hidden
-                  className={cn(
-                    'size-4 shrink-0 text-text-muted transition-transform',
-                    expanded && 'rotate-90',
-                  )}
-                />
-                <span className="min-w-0 flex-1 truncate text-text">{entry.name}</span>
-                <Badge variant="secondary" className="font-mono text-[11px]">
-                  {entry.license}
-                </Badge>
-              </button>
-              {expanded ? <LicenseDetail entry={entry} licenses={licenses} /> : null}
-            </div>
-          )
-        }}
-      </Virtualizer>
+      <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+        <Virtualizer data={licenses.entries}>
+          {(entry, index) => {
+            const key = getEntryKey(entry)
+            const expanded = open.has(key)
+            return (
+              <div key={key} className={cn(index > 0 && 'border-t border-border')}>
+                <button
+                  type="button"
+                  aria-expanded={expanded}
+                  onClick={() => toggle(key)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm text-text">{entry.name}</span>
+                  <span className="shrink-0 text-xs text-text-muted">{entry.license}</span>
+                  <ChevronRight
+                    aria-hidden
+                    className={cn(
+                      'size-3.5 shrink-0 text-text-muted transition-transform',
+                      expanded && 'rotate-90',
+                    )}
+                  />
+                </button>
+                {expanded ? <LicenseDetail entry={entry} licenses={licenses} /> : null}
+              </div>
+            )
+          }}
+        </Virtualizer>
+      </div>
     </div>
   )
 }
@@ -103,26 +103,26 @@ function LicenseDetail({
   const { opener } = useAppServices()
   const { url } = entry
   return (
-    <div className="flex min-w-0 flex-col gap-3 pb-4 pl-7">
+    <div className="flex flex-col gap-3 border-t border-border bg-muted/40 px-4 py-4">
       {url !== undefined ? (
         <button
           type="button"
           onClick={() => opener.openUrlSync(url)}
-          className="inline-flex w-fit items-center gap-1 text-xs text-text-secondary hover:text-text"
+          className="inline-flex w-fit items-center gap-0.5 text-xs text-text-muted hover:text-text"
         >
           Homepage
-          <ExternalLink aria-hidden className="size-3" />
+          <ArrowUpRight aria-hidden className="size-3" />
         </button>
       ) : null}
       {entry.texts.length === 0 ? (
         <p className="text-xs text-text-muted">
-          This package ships no license file. It is licensed under {entry.license}.
+          No license file is included. Licensed under {entry.license}.
         </p>
       ) : (
         entry.texts.map((key) => (
           <pre
             key={key}
-            className="rounded-lg bg-muted p-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap text-text-secondary select-text"
+            className="font-mono text-[11px] leading-[1.7] whitespace-pre-wrap text-text-secondary select-text"
           >
             {licenses.texts[key]}
           </pre>
