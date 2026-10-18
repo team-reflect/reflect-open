@@ -109,7 +109,10 @@ export function isDescriptionRejected(value: unknown): value is DescriptionRejec
 
 function classify(
   cause: unknown,
-  sdk: Pick<typeof import('@reflect/modules/ai'), 'APICallError' | 'NoObjectGeneratedError'>,
+  sdk: Pick<
+    typeof import('@reflect/modules/ai'),
+    'APICallError' | 'NoObjectGeneratedError' | 'NoOutputGeneratedError'
+  >,
 ): Error {
   if (sdk.APICallError.isInstance(cause)) {
     const status = cause.statusCode ?? 0
@@ -123,7 +126,10 @@ function classify(
       return new DescriptionRejectedError(cause.message)
     }
   }
-  if (sdk.NoObjectGeneratedError.isInstance(cause)) {
+  if (
+    sdk.NoObjectGeneratedError.isInstance(cause) ||
+    sdk.NoOutputGeneratedError.isInstance(cause)
+  ) {
     return new DescriptionRejectedError(cause.message)
   }
   if (cause instanceof DOMException && cause.name === 'TimeoutError') {
@@ -206,9 +212,9 @@ class PageDescriberServiceImpl implements PageDescriberService {
       })
     }
     try {
-      const result = await sdk.generateObject({
+      const result = await sdk.generateText({
         model: await this.#deps.languageModel.create(request.config, request.apiKey),
-        schema: pageDescriptionSchema,
+        output: sdk.Output.object({ schema: pageDescriptionSchema }),
         messages: [{ role: 'user', content }],
         abortSignal: AbortSignal.timeout(DESCRIBE_TIMEOUT_MS),
         // The enrichment pass is the retry layer (next trigger re-runs pending
@@ -216,8 +222,8 @@ class PageDescriberServiceImpl implements PageDescriberService {
         maxRetries: 0,
       })
       return {
-        title: result.object.title === null ? null : normalizedPageTitle(result.object.title),
-        description: result.object.description.trim(),
+        title: result.output.title === null ? null : normalizedPageTitle(result.output.title),
+        description: result.output.description.trim(),
       }
     } catch (cause) {
       throw classify(cause, sdk)
