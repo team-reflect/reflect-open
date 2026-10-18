@@ -41,16 +41,10 @@ runs:
           sudo apt-get install -y $PACKAGES
         fi
 
-    # `rust-toolchain.toml` pins the version, components, and iOS targets;
-    # `rustup toolchain install` with no argument installs what it lists.
-    # rust-cache sets `CARGO_INCREMENTAL=0` itself.
     - name: Install Rust toolchain
       shell: bash
       run: |
         rustup toolchain install --no-self-update
-        if [ -z "${CARGO_TERM_COLOR+set}" ]; then
-          echo CARGO_TERM_COLOR=always >> "$GITHUB_ENV"
-        fi
         rustc --version --verbose
 
     # Build scripts (ort-sys, swift-rs) write the path of Xcode's clang runtime
