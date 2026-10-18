@@ -1,26 +1,22 @@
-import { z } from 'zod'
+export interface LicenseEntry {
+  name: string
+  ecosystem: 'npm' | 'cargo' | 'other'
+  license: string
+  url?: string | undefined
+  /** Keys into {@link Licenses.texts}; empty when the package ships no license file. */
+  texts: string[]
+}
 
-const LicenseEntrySchema = z.object({
-  name: z.string(),
-  ecosystem: z.enum(['npm', 'cargo', 'other']),
-  license: z.string(),
-  url: z.string().optional(),
-  /** Indexes into {@link Licenses.texts}; empty when the package ships no license file. */
-  texts: z.array(z.number()),
-})
-
-const LicensesSchema = z.object({
-  entries: z.array(LicenseEntrySchema),
-  texts: z.array(z.string()),
-})
-
-export type LicenseEntry = z.infer<typeof LicenseEntrySchema>
-export type Licenses = z.infer<typeof LicensesSchema>
+export interface Licenses {
+  entries: LicenseEntry[]
+  /** License texts keyed by a hash of their content. */
+  texts: Record<string, string>
+}
 
 /** Loads the generated notices, which Vite splits into their own lazy chunk. */
 export async function loadLicenses(): Promise<Licenses> {
   const { default: data } = await import('./licenses.gen.json')
-  return LicensesSchema.parse(data)
+  return data as Licenses
 }
 
 export function entryKey(entry: LicenseEntry): string {

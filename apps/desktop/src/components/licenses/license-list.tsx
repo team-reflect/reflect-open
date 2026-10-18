@@ -119,12 +119,12 @@ function LicenseDetail({
           This package ships no license file. It is licensed under {entry.license}.
         </p>
       ) : (
-        entry.texts.map((index) => (
+        entry.texts.map((key) => (
           <pre
-            key={index}
+            key={key}
             className="rounded-lg bg-muted p-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap text-text-secondary select-text"
           >
-            {licenses.texts[index]}
+            {licenses.texts[key]}
           </pre>
         ))
       )}
