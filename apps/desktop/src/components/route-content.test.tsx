@@ -120,7 +120,10 @@ async function renderRoute(route: Route, platform?: TestPlatformOptions) {
   })
   return await renderInApp(
     <PaletteProvider>
-      <RouteContent />
+      {/* A bounded viewport, like the app shell's: the stream virtualizes its rows. */}
+      <div style={{ height: 800 }}>
+        <RouteContent />
+      </div>
       <PaletteProbe />
     </PaletteProvider>,
     {
