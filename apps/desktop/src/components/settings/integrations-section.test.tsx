@@ -11,6 +11,7 @@ import {
   type TestSettingsService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { IntegrationsSection } from './integrations-section.tsx'
 
 let contacts: TestContactsService
@@ -25,7 +26,11 @@ let settings: TestSettingsService
  * Render the section over a settings document that starts as `stored`.
  */
 async function renderSection(stored: Partial<Settings> = {}): Promise<void> {
-  const app = createTestCoreServices({ contacts, platform: createTestPlatformService(platform) })
+  const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    contacts,
+    platform: createTestPlatformService(platform),
+  })
   ;({ settings } = app)
   const view = await renderInApp(<IntegrationsSection />, { app, settings: stored })
   opener = view.appServices.opener

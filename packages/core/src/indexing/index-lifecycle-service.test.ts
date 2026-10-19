@@ -4,7 +4,7 @@ import { createGraphSession, type GraphRole, type GraphSession } from '../graph/
 import type { AppPlatform } from '../ports/platform-facts.ts'
 import { createTestXArchiveService } from '../testing/capture.ts'
 import { createTestClockService } from '../testing/clock.ts'
-import { createTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
+import { createNodeTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
 import { createTestFileChangeService } from '../testing/file-change.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
@@ -78,7 +78,7 @@ function setup(options?: {
   role?: GraphRole
   hidden?: boolean
 }) {
-  const database = createTestDatabaseService()
+  const database = createNodeTestDatabaseService()
   databases.push(database)
   seedNotes(database, options?.indexed ?? [])
   const steps: string[] = []

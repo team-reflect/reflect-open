@@ -7,6 +7,7 @@ import { useSettings } from '@/providers/settings-provider.tsx'
 import { useSyncContext } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useGraphServices } from '@/services/services-provider.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MOBILE_PLATFORM, renderHookInApp, renderInApp } from './render-in-app.tsx'
 
 function Probe(): ReactElement {
@@ -108,7 +109,7 @@ describe('renderInApp', () => {
   })
 
   it('uses the given app, so a test can spy on a service before the first render', async () => {
-    const app = createTestCoreServices()
+    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
     const view = await renderInApp(<Probe />, { app })
 
     expect(view.app).toBe(app)

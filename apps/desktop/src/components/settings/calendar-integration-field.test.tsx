@@ -9,6 +9,7 @@ import {
   type TestSettingsService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { CalendarIntegrationField } from './calendar-integration-field.tsx'
 
 const CALENDARS = [
@@ -25,7 +26,7 @@ let settings: TestSettingsService
 
 // The field renders only on macOS desktop, which is the test platform.
 async function renderSection(): Promise<void> {
-  const app = createTestCoreServices({ calendar })
+  const app = createTestCoreServices({ database: createWasmTestDatabaseService(), calendar })
   settings = app.settings
   const view = await renderInApp(<CalendarIntegrationField />, { app, settings: stored })
   opener = view.appServices.opener

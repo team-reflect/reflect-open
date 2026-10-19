@@ -11,6 +11,7 @@ import {
   type TestStorageService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ThemeEffect, useTheme } from './theme-provider.tsx'
 
 /**
@@ -40,7 +41,12 @@ function install(stored: Partial<Settings>, options: { gateLoad?: boolean } = {}
   storage = createTestStorageService()
   const platform = createTestPlatformService({ colorScheme: 'light' })
   theme = createThemeService({ settings, storage, platform })
-  app = createTestCoreServices({ settings, storage, platform })
+  app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    settings,
+    storage,
+    platform,
+  })
 }
 
 /**

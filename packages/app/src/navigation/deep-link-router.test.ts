@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { CaptureInboxService } from '@reflect/core'
 import {
+  createNodeTestDatabaseService,
   createTestCaptureInboxService,
   createTestCoreServices,
   createTestDeepLinkIntakeService,
@@ -19,7 +20,7 @@ function setup(overrides?: SetupOverrides) {
   const operations = createTestProgressPort()
   const captureInbox = createTestCaptureInboxService()
   const logger = createTestLoggerService()
-  const { indexQuery } = createTestCoreServices()
+  const { indexQuery } = createTestCoreServices({ database: createNodeTestDatabaseService() })
   const resolveNoteTarget = vi.spyOn(indexQuery, 'resolveNoteTarget')
   const navigate = vi.fn<(route: Route) => void>()
   const graphSession = createTestGraphSessionService({ graph: { generation: 3 } })

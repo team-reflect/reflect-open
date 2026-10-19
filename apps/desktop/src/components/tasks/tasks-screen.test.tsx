@@ -14,6 +14,7 @@ import { fireEvent } from '@/test-utils/fire-event.ts'
 import { MOD_KEY } from '@/test-utils/mod-key.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { TasksScreen } from './tasks-screen.tsx'
 import { deepLinkForRoute } from '@reflect/app'
 
@@ -222,7 +223,7 @@ let noteWindows: TestWindowService
 
 beforeEach(() => {
   // A fresh app per test, so its task service's recently-completed set starts empty.
-  app = createTestCoreServices()
+  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
   noteWindows = createTestWindowService()
   operations = app.progress
   storage = app.storage

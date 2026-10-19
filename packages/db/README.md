@@ -9,7 +9,7 @@ TypeScript a typed query *builder* over it. `createDb(runQuery)` returns a
 Kysely instance whose dialect compiles each query to `{ sql, parameters }` and
 hands it to the injected runner — in the app that's `@reflect/core`'s
 `DatabaseService` over the `db_query` IPC command, in tests a real in-memory
-SQLite index (`createTestDatabaseService()` from `@reflect/core/testing`). The
+SQLite index (`createNodeTestDatabaseService()` from `@reflect/core/testing`). The
 package itself has no transport dependency.
 
 Two properties are load-bearing:

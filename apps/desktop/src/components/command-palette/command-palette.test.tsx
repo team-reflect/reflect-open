@@ -15,6 +15,7 @@ import type { CommandContext } from '@/lib/commands/types.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { CommandPalette } from './command-palette.tsx'
 import { PaletteProvider, usePalette } from './palette-provider.tsx'
 
@@ -81,6 +82,7 @@ function RouteProbe(): ReactNode {
 async function renderPalette(query: string, context?: Partial<CommandContext>) {
   const navigate = vi.fn()
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     suggestions: {
       suggestWikiTargets,
       suggestWikiLinkTargets: () => ({

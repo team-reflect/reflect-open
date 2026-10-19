@@ -12,6 +12,7 @@ import {
 } from '@reflect/core/testing'
 import { useChatSession, type ChatContextValue } from '@/providers/chat-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 
 /**
  * The hook as a shell over the open graph's chat session: it publishes the
@@ -67,6 +68,7 @@ async function renderProvider(options?: {
     { type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] },
   ])
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     settings,
     secretStore: createTestSecretStoreService({ [aiKeySecretName(MODEL.id)]: 'sk-test' }),
     chatHistory,

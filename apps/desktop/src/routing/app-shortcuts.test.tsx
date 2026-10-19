@@ -34,6 +34,7 @@ import { ShortcutsProvider, useShortcuts } from '@/providers/shortcuts-provider.
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
 import { MOD_KEY, NON_MOD_KEY } from '@/test-utils/mod-key.ts'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useAppShortcuts } from './app-shortcuts.ts'
 import { useRouter } from './router.tsx'
 
@@ -88,6 +89,7 @@ beforeEach(() => {
 async function shortcutsHook() {
   const readSource = (): Promise<string> => Promise.resolve('# A\n')
   const services = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     platform: createTestPlatformService(platform),
     noteDocuments: {
       readSource,
@@ -232,7 +234,9 @@ describe('app shortcuts', () => {
   })
 
   it('registers the command keybindings in the central keymap registry', () => {
-    const { keymap } = createTestAppServices()
+    const { keymap } = createTestAppServices(
+      createTestCoreServices({ database: createWasmTestDatabaseService() }),
+    )
     registerAppKeymaps(keymap)
     const bindings = keymap.list()
     for (const key of [

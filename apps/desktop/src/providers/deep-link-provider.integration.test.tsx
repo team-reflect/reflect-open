@@ -7,18 +7,20 @@ import {
   createTestGraphSessionService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DeepLinkProvider } from './deep-link-provider.tsx'
 
 describe('DeepLinkProvider navigation intent integration', () => {
   it('keeps a deferred note resolution current when a capture arrives', async () => {
     const pendingResolution = Promise.withResolvers<string>()
-    const { indexQuery } = createTestCoreServices()
+    const { indexQuery } = createTestCoreServices({ database: createWasmTestDatabaseService() })
     const resolveNoteTarget = vi
       .spyOn(indexQuery, 'resolveNoteTarget')
       .mockImplementation(() => pendingResolution.promise)
     const captureInbox = createTestCaptureInboxService()
     const graphSession = createTestGraphSessionService()
     const app = createTestCoreServices({
+      database: createWasmTestDatabaseService(),
       captureInbox,
       graphSession,
       deepLinkIntake: createTestDeepLinkIntakeService({

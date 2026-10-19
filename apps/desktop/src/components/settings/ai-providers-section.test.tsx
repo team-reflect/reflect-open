@@ -11,6 +11,7 @@ import {
 } from '@reflect/core/testing'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AiProvidersSection } from './ai-providers-section.tsx'
 
 // The dialog verifies keys through the key validation service; the default
@@ -29,6 +30,7 @@ async function renderSection(): Promise<void> {
     settings.failLoad()
   }
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     settings,
     secretStore: secrets,
   })

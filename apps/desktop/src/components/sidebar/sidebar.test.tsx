@@ -28,6 +28,7 @@ import { UpdateProvider } from '@/providers/update-provider.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { deepLinkForRoute } from '@reflect/app'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { Sidebar } from './sidebar.tsx'
 
 const openNativeContextMenu = vi.fn((options: NativeContextMenuOptions) =>
@@ -61,7 +62,9 @@ let operations: TestOperationsService
  * A fresh untitled placeholder path, as the new-note route has it.
  */
 function untitledNotePath(): string {
-  return createTestCoreServices().noteCreation.untitledNotePath()
+  return createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+  }).noteCreation.untitledNotePath()
 }
 
 let openRecent: MockInstance<GraphSessionService['openRecent']>
@@ -83,6 +86,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
   const readSource = (): Promise<string> => Promise.resolve('# Rust\n')
   operations = createTestOperationsService()
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     progress: operations,
     noteDocuments: {
       readSource,

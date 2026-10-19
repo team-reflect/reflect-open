@@ -2,6 +2,7 @@ import { page, type Locator } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
 import { createTestCoreServices } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { RebuildIndexField } from './rebuild-index-field.tsx'
 
 function rebuildButton(): Locator {
@@ -18,7 +19,7 @@ describe('RebuildIndexField', () => {
   })
 
   it('disables the button while a rebuild is in flight, then re-enables it', async () => {
-    const app = createTestCoreServices()
+    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
     const rebuild = Promise.withResolvers<void>()
     vi.spyOn(app.indexLifecycle, 'rebuildVisibly').mockReturnValueOnce(rebuild.promise)
     await renderInApp(<RebuildIndexField />, { app, graph: { indexGeneration: 7 } })

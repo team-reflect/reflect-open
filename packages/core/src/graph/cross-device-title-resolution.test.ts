@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createWikiResolverService } from '../indexing/wiki-resolver-service.ts'
-import { createTestDatabaseService, seedNotes } from '../testing/database.ts'
+import { createNodeTestDatabaseService, seedNotes } from '../testing/database.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import { createTestIdService } from '../testing/id.ts'
 import { createNoteCreationService } from './note-creation-service.ts'
@@ -14,7 +14,7 @@ describe('cross-device emoji title resolution', () => {
       [emojiPath]: '# 🧠 Business ideas\n',
       [linkingPath]: 'An external edit linked [[Business ideas]].\n',
     }
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     seedNotes(
       database,
       Object.entries(files).map(([path, markdown]) => ({ path, markdown })),

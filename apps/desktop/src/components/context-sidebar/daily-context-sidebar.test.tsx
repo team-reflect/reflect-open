@@ -20,6 +20,7 @@ import { useRouter } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyContextSidebar } from './daily-context-sidebar.tsx'
 
 // What the app's fakes answer; each test sets them before `renderSidebar`.
@@ -49,6 +50,7 @@ function sidebar(date: string): ReactNode {
 function createApp(storage: TestStorageService = createTestStorageService()) {
   noteFile = createTestNoteFileService({ files: { 'daily/2026-06-09.md': dailySource } })
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     noteFile,
     storage,
     retrieval: createTestRetrievalService({ relatedNotes }),

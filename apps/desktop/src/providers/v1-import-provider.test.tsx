@@ -9,6 +9,7 @@ import {
 } from '@reflect/core/testing'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useV1Import, V1ImportProvider } from './v1-import-provider.tsx'
 
 const GRAPH: GraphInfo = { root: '/graphs/notes', name: 'Notes', generation: 42 }
@@ -54,7 +55,11 @@ async function renderProvider(result?: GraphImportSummary | Error) {
   })
   const session = createTestGraphSessionService({ state: { status: 'ready', graph: GRAPH } })
   const refreshIndex = vi.spyOn(session, 'refreshIndex').mockImplementation(() => {})
-  const app = createTestCoreServices({ ipc, graphSession: session })
+  const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    ipc,
+    graphSession: session,
+  })
   const view = await renderInApp(
     <V1ImportProvider>
       <Probe />

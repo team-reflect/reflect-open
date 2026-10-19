@@ -10,6 +10,7 @@ import {
   createTestSecretStoreService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ConnectGithubDialog } from './connect-github-dialog.tsx'
 
 // The connect actions of the graph's backup service, scripted per test.
@@ -64,6 +65,7 @@ async function renderWizard(onClose = vi.fn()): Promise<ReturnType<typeof vi.fn>
   backup.onConnectNewRepo(sync.connectNewRepo)
   backup.onConnectExistingRepo(sync.connectExistingRepo)
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     backup,
     // The wizard polls on the clock: real time, so `pollIntervalMs` elapses.
     clock: createSystemClock(),

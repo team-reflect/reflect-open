@@ -12,6 +12,7 @@ import { useState, type ReactElement, type ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
 import { pointer, swipe, translateX } from '@/test-utils/swipe.ts'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteRowList } from './note-row-list.tsx'
 import { SwipeableNoteRow, type NoteRowModel } from './swipeable-note-row.tsx'
 
@@ -23,6 +24,7 @@ const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
 function mount(ui: ReactNode): Promise<InAppRenderResult<CoreServices>> {
   const readSource = (): Promise<string> => Promise.resolve('# A\n')
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     platform: createTestPlatformService({ reducedMotion: true }),
     noteDocuments: {
       readSource,

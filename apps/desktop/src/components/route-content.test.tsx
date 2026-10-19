@@ -20,6 +20,7 @@ import { V1ImportProvider } from '@/providers/v1-import-provider.tsx'
 import type { Route } from '@/routing/route.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import '@/test-utils/locator.ts'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { RouteContent } from './route-content.tsx'
 
 /**
@@ -111,6 +112,7 @@ function PaletteProbe(): ReactElement {
 async function renderRoute(route: Route, platform?: TestPlatformOptions) {
   noteFile = createTestNoteFileService({ files })
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     noteFile,
     // A seeded id service mints note ids that read as ULIDs, not as numbers.
     id: createTestIdService({ seed: 'route-content' }),

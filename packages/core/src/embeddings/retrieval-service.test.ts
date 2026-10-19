@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createTestDatabaseService,
+  createNodeTestDatabaseService,
   createTestEmbeddingIndexService,
   createTestEmbeddingRuntimeService,
   createTestLoggerService,
@@ -57,7 +57,7 @@ const NOTES: readonly TestNote[] = [
  * A retrieval service over a graph of {@link NOTES}, embedded through the real pipeline.
  */
 async function setup(options?: { status?: EmbedStatus; embedded?: boolean }) {
-  const database = createTestDatabaseService()
+  const database = createNodeTestDatabaseService()
   seedNotes(database, NOTES)
   const noteFile = createTestNoteFileService({
     files: Object.fromEntries(NOTES.map((note) => [note.path, note.markdown])),

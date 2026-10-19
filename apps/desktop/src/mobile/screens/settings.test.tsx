@@ -10,6 +10,7 @@ import {
 } from '@reflect/core/testing'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileSettings } from './settings.tsx'
 
 /**
@@ -61,6 +62,7 @@ async function mount(options?: MountOptions) {
     state: options?.backup ?? connected({ state: 'idle' }),
   })
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     appInfo: createTestAppInfoService('1.2.3-beta.4'),
     backup,
     // A note window's graph runs no backup.

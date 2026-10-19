@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createTestDatabaseService, seedNotes } from '../testing/database.ts'
+import { createNodeTestDatabaseService, seedNotes } from '../testing/database.ts'
 import { createGraphStatsService } from './graph-stats-service.ts'
 
 describe('loadGraphStats', () => {
   it('computes counts, daily span, and tag facets, excluding private notes throughout', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     seedNotes(database, [
       { path: 'notes/a.md', markdown: '# A\n#Book #health\n' },
       { path: 'notes/b.md', markdown: '# B\n#book\n' },
@@ -32,7 +32,7 @@ describe('loadGraphStats', () => {
   })
 
   it('caps the facets at the limit, most-used first, and flags the truncation', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     seedNotes(database, [
       { path: 'notes/one.md', markdown: '# One\n#a #b #c\n' },
       { path: 'notes/two.md', markdown: '# Two\n#a #b\n' },
@@ -49,7 +49,7 @@ describe('loadGraphStats', () => {
   })
 
   it('maps an empty graph to zero counts, a null span, and no tags', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
 
     await expect(
       createGraphStatsService({ database }).loadGraphStats({ tagLimit: 40 }),

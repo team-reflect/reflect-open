@@ -9,6 +9,7 @@ import {
   type TestNoteFileService,
 } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { queryKeys } from './query-client.ts'
 import { useSimilarNotes } from './use-similar-notes.ts'
 
@@ -42,6 +43,7 @@ async function mount(path: string, client: QueryClient) {
   // The runtime has reported before the mount, as on a second visit to a note.
   await embeddingRuntime.status()
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     noteFile,
     retrieval: createTestRetrievalService({ relatedNotes }),
     embeddingRuntime,

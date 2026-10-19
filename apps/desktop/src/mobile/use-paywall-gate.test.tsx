@@ -16,6 +16,7 @@ import {
 } from '@reflect/core/testing'
 import { usePaywallRequested } from '@/hooks/use-paywall-requested.ts'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { usePaywallGate } from './use-paywall-gate.ts'
 
 /**
@@ -28,7 +29,10 @@ afterEach(() => {
 })
 
 function iosServices() {
-  return createTestCoreServices({ platform: createTestPlatformService({ appPlatform: 'ios' }) })
+  return createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    platform: createTestPlatformService({ appPlatform: 'ios' }),
+  })
 }
 
 describe('usePaywallGate', () => {

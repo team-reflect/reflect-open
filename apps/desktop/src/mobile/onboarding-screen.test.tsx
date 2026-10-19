@@ -10,6 +10,7 @@ import {
 } from '@reflect/core/testing'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileOnboardingScreen } from './onboarding-screen.tsx'
 
 const STORAGE: MobileStorageInfo = {
@@ -29,6 +30,7 @@ async function mount(options?: {
 }): Promise<void> {
   const storage = options?.storage ?? STORAGE
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     platform: createTestPlatformService(MOBILE_PLATFORM),
     mobileStorage: createTestMobileStorageService({ storage }),
   })

@@ -8,7 +8,11 @@ import {
   type WebFetchService,
   AppError,
 } from '@reflect/core'
-import { createTestCoreServices, createTestGraphSessionService } from '@reflect/core/testing'
+import {
+  createNodeTestDatabaseService,
+  createTestCoreServices,
+  createTestGraphSessionService,
+} from '@reflect/core/testing'
 
 /**
  * The boundaries of the resolver pipeline that `useLinkPreview` gets from `LinkPreviewService`.
@@ -40,7 +44,9 @@ function createNoteLinkPreviewResolver(
   currentSession: () => LinkPreviewSession | null,
   dependencies: LinkPreviewResolverDependencies,
 ): LinkPreviewResolver {
-  const { noteDocuments, privacy, webFetch } = createTestCoreServices()
+  const { noteDocuments, privacy, webFetch } = createTestCoreServices({
+    database: createNodeTestDatabaseService(),
+  })
   vi.spyOn(noteDocuments, 'readExisting').mockImplementation(dependencies.readSource)
   vi.spyOn(webFetch, 'fetchLinkPreviewHtml').mockImplementation(dependencies.fetchHtml)
   vi.spyOn(webFetch, 'fetchLinkPreviewIcon').mockImplementation(dependencies.fetchIcon)

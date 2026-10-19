@@ -12,6 +12,7 @@ import {
   type TestContactsService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AttendeeCombobox } from './attendee-combobox.tsx'
 
 // The note suggestions are the seam: one case needs a fetch that never settles.
@@ -30,10 +31,12 @@ function contact(fullName: string, email: string): ContactMatch {
 const onAdd = vi.fn<(attendee: MeetingAttendee) => void>()
 
 async function renderCombobox(attendees: MeetingAttendee[] = []): Promise<Locator> {
-  const base = createTestCoreServices()
+  const base = createTestCoreServices({ database: createWasmTestDatabaseService() })
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     contacts,
     meetings: createTestCoreServices({
+      database: createWasmTestDatabaseService(),
       suggestions: { ...base.suggestions, suggestWikiTargets },
       contacts,
     }).meetings,

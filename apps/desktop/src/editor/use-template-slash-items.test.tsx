@@ -6,13 +6,15 @@ import {
   createTestProgressPort,
 } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import type { NoteEditorHandle } from './note-editor.tsx'
 import { useTemplateSlashItems } from './use-template-slash-items.ts'
 
 function setup() {
   const operations = createTestProgressPort()
-  const base = createTestCoreServices()
+  const base = createTestCoreServices({ database: createWasmTestDatabaseService() })
   const { templates } = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     graphSession: createTestGraphSessionService({ graph: {} }),
     noteFile: createTestNoteFileService({
       files: {
@@ -29,7 +31,11 @@ function setup() {
     },
     progress: operations,
   })
-  const app = createTestCoreServices({ templates, progress: operations })
+  const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    templates,
+    progress: operations,
+  })
   return { app, operations }
 }
 

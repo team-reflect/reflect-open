@@ -5,6 +5,7 @@ import { createTestCoreServices, createTestRetrievalService } from '@reflect/cor
 import type { ReactNode } from 'react'
 import { useRouter } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteContextSidebar } from './note-context-sidebar.tsx'
 
 const relatedNotes = vi.fn<RetrievalService['relatedNotes']>()
@@ -21,7 +22,10 @@ async function renderSidebar(path: string) {
       <RouteProbe />
     </>,
     {
-      app: createTestCoreServices({ retrieval: createTestRetrievalService({ relatedNotes }) }),
+      app: createTestCoreServices({
+        database: createWasmTestDatabaseService(),
+        retrieval: createTestRetrievalService({ relatedNotes }),
+      }),
       graph: { root: '/g', name: 'g' },
       settings: { semanticSearchEnabled: true },
     },

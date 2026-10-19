@@ -15,6 +15,7 @@ import {
 import type { MaybePromise } from '@reflect/utils'
 import { createRef, useLayoutEffect, type ReactNode, type RefObject } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useWikiLinkNavigation, type WikiLinkNavigation } from './use-wiki-link-navigation.ts'
 
 const resolveWikiTarget = vi.fn()
@@ -61,11 +62,16 @@ function RouteProbe(): ReactNode {
  * Render `ui` in an app whose link navigation runs on the scripted resolvers above.
  */
 function renderWithLinkNavigation(ui: ReactNode, graph?: TestOpenGraph | null) {
-  const base = createTestCoreServices()
+  const base = createTestCoreServices({ database: createWasmTestDatabaseService() })
   const graphSession = createTestGraphSessionService()
-  const app = createTestCoreServices({ progress: operations, graphSession })
+  const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    progress: operations,
+    graphSession,
+  })
   const linkNavigation = createTestAppServices(
     createTestCoreServices({
+      database: createWasmTestDatabaseService(),
       graphSession,
       wikiResolver: { ...base.wikiResolver, resolveWikiTarget },
       noteLinkResolver: {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
+import { createNodeTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
 import { createIndexQueryService } from '../indexing/index-query-service.ts'
 import { createNotePathService } from '../indexing/note-path-service.ts'
 import { createTestNoteMoveService, createTestNoteSession } from '../testing/documents.ts'
@@ -13,7 +13,7 @@ import { createTemplateService, type TemplateInsertTarget } from './template-ser
 
 function setup(options?: { files?: Record<string, string>; indexed?: readonly TestNote[] }) {
   const noteFile = createTestNoteFileService({ files: options?.files ?? {} })
-  const database = createTestDatabaseService()
+  const database = createNodeTestDatabaseService()
   seedNotes(
     database,
     options?.indexed ??

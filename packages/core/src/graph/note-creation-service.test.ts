@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
 import { createWikiResolverService } from '../indexing/wiki-resolver-service.ts'
-import { createTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
+import { createNodeTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import { createTestIdService } from '../testing/id.ts'
 import {
@@ -35,7 +35,7 @@ const FIRST_ID = ids.noteId()
 const SECOND_ID = ids.noteId()
 
 function setup({ indexed = [], files = {}, placeholders = [], readErrors = [] }: Graph = {}) {
-  const database = createTestDatabaseService()
+  const database = createNodeTestDatabaseService()
   seedNotes(database, indexed)
   const noteFile = createTestNoteFileService({ files, evicted: placeholders })
   for (const path of [...placeholders, ...readErrors]) {

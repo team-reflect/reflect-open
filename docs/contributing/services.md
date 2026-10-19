@@ -245,8 +245,8 @@ Rules:
 - `TestXxxService extends XxxService`. The extra members only observe or seed
   and drive. They never change what the real methods mean.
 - A core double goes in the test factory table of
-  `packages/core/src/testing/services.ts`, so `createTestCoreServices()` builds
-  it. An app double goes in `packages/app/src/testing/`, exported from its
+  `packages/core/src/testing/services.ts`, so `createTestCoreServices({ database })`
+  builds it. An app double goes in `packages/app/src/testing/`, exported from its
   `index.ts`, and `createTestAppServices` uses it.
 
 ## 7. The test

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { BackupState } from '@reflect/core'
 import { createTestCoreServices, createTestBackupService } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { SyncStatusPill } from './sync-status-pill.tsx'
 
 /**
@@ -20,7 +21,10 @@ function connected(status: Extract<BackupState, { phase: 'connected' }>['status'
 }
 
 async function mount(backup: BackupState = connected({ state: 'idle' })): Promise<void> {
-  const app = createTestCoreServices({ backup: createTestBackupService({ state: backup }) })
+  const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    backup: createTestBackupService({ state: backup }),
+  })
   await renderInApp(<SyncStatusPill />, { app, graph: { root: '/g', name: 'G', generation: 3 } })
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createTestCoreServices, createTestSettingsService } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { EmbeddingsSync } from './embeddings-sync.tsx'
 
 // The sync itself is `SemanticSearchService.start`, covered in `@reflect/core`.
@@ -17,7 +18,7 @@ describe('EmbeddingsSync', () => {
   it('backfills and follows the open graph while enabled and ready', async () => {
     const settings = createTestSettingsService({ semanticSearchEnabled: true })
     await settings.whenLoaded()
-    const app = createTestCoreServices({ settings })
+    const app = createTestCoreServices({ database: createWasmTestDatabaseService(), settings })
     app.graphSession.setState({
       graph: { root: '/g', name: 'g', generation: 1 },
       indexGeneration: 7,

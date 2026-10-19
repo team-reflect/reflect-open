@@ -18,6 +18,7 @@ import { createDayWindow, dateAtIndex, indexOfDate } from '@/lib/day-window.ts'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyStream, ESTIMATED_DAY_HEIGHT } from './daily-stream.tsx'
 
 /**
@@ -47,7 +48,7 @@ function Stream({ children }: { children: ReactNode }): ReactElement {
  * Render `children` in a stream-sized box; the app runs on `clock` (the system clock by default).
  */
 async function renderStream(children: ReactNode, clock: ClockService = createSystemClock()) {
-  const app = createTestCoreServices({ clock })
+  const app = createTestCoreServices({ database: createWasmTestDatabaseService(), clock })
   // Reads never resolve: every day stays a loading placeholder.
   vi.spyOn(app.noteFile, 'read').mockReturnValue(new Promise(() => {}))
   return await renderInApp(<Stream>{children}</Stream>, {

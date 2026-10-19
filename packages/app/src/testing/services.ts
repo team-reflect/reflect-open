@@ -1,9 +1,5 @@
 import type { CoreServices, GraphRole } from '@reflect/core'
-import {
-  createTestCoreServices,
-  type TestActivityPort,
-  type TestPlatformService,
-} from '@reflect/core/testing'
+import type { TestActivityPort, TestPlatformService } from '@reflect/core/testing'
 import type { OperationsService } from '../app/operations-service.ts'
 import { createPlatformService, type PlatformService } from '../app/platform-service.ts'
 import { createThemeService } from '../settings/theme-service.ts'
@@ -64,8 +60,8 @@ function isTestPlatform(platform: CoreServices['platform']): platform is TestPla
 }
 
 /**
- * The app layer over test core services. Pass the core services a test built
- * (and observes) to share them with the app layer; their `progress` port, when
+ * The app layer over test core services. `core` is the core services a test built
+ * (and observes), shared with the app layer; their `progress` port, when
  * there is one, is the app's operations list, their test platform is the app's
  * platform, and their `role` picks the default test window (`note-1` for a
  * note window). `overrides` replace fields of the result and reach the app
@@ -75,7 +71,7 @@ export function createTestAppServices(
   core: CoreServices & {
     readonly progress?: OperationsService
     readonly role?: GraphRole
-  } = createTestCoreServices(),
+  },
   overrides: Partial<AppServices> = {},
 ): TestAppServices {
   const operations = overrides.operations ?? core.progress ?? createTestOperationsService()

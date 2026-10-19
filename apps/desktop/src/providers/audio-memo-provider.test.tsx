@@ -17,6 +17,7 @@ import {
 import { toast } from '@/components/ui/toast.tsx'
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AudioMemoProvider, useAudioMemo } from './audio-memo-provider.tsx'
 
 const GRAPH: GraphInfo = { root: '/notes', name: 'Notes', generation: 3 }
@@ -54,7 +55,10 @@ async function setup(provider: AiProviderConfig = OPENAI) {
     defaultAiProviderId: provider.id,
   })
   await settings.whenLoaded()
-  const app: TestCoreServices = createTestCoreServices({ settings })
+  const app: TestCoreServices = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    settings,
+  })
   app.audioRecorder.setStopResult(RECORDING)
 
   const hook = await renderHookInApp(() => ({ memo: useAudioMemo(), sidebar: useSidebar() }), {

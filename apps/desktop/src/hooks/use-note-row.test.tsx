@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { IndexQueryService, NoteRow } from '@reflect/core'
 import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useNoteRow } from './use-note-row.ts'
 
 const GENERATION = 5
@@ -33,7 +34,7 @@ async function mount() {
 }
 
 beforeEach(() => {
-  app = createTestCoreServices()
+  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
   getNote = vi.spyOn(app.indexQuery, 'getNote')
 })
 

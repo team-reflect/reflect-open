@@ -3,13 +3,17 @@ import { describe, expect, it } from 'vitest'
 import type { ReactElement } from 'react'
 import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
 import { renderHookInApp, renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import type { Route } from './route.ts'
 import { RouterFreeze, useRouter } from './router.tsx'
 
 /**
  * `useRouter()` under the app's `RouterProvider`, mounted on `initialRoute`.
  */
-function routerHook(initialRoute?: Route, app: TestCoreServices = createTestCoreServices()) {
+function routerHook(
+  initialRoute?: Route,
+  app: TestCoreServices = createTestCoreServices({ database: createWasmTestDatabaseService() }),
+) {
   return renderHookInApp(() => useRouter(), {
     app,
     ...(initialRoute === undefined ? {} : { route: initialRoute }),

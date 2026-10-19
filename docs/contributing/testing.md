@@ -51,12 +51,14 @@ the service plus members that seed, drive or observe it.
   use the real `NoteDocumentService` and fake only the files.
 - Do not use `vi.useFakeTimers`. The test clock starts at epoch 0, and
   `clock.advance(ms)` runs the due timers.
-- `createTestDatabaseService()` is a real in-memory SQLite index built from the
-  production migrations. Seed notes and assert query results, not SQL.
+- `createNodeTestDatabaseService()` (Node.js) and `createWasmTestDatabaseService()`
+  (desktop browser tests, `@/test-utils/test-database.ts`) are real in-memory
+  SQLite indexes built from the production migrations. Seed notes and assert
+  query results, not SQL.
 
 ## The service containers
 
-`createTestCoreServices(overrides)` (`packages/core/src/testing/services.ts`)
+`createTestCoreServices({ database, ...overrides })` (`packages/core/src/testing/services.ts`)
 builds `CoreServices` through the production root, `composeCoreServices`, over
 test adapters. Services with a double get the double, every other service is
 real. The result also holds `CoreInternalServices` (e.g. `app.database`), the
@@ -70,7 +72,7 @@ const app = createTestCoreServices({ noteFile })
 ```
 
 `createTestAppServices(core, overrides)` (`packages/app/src/testing/services.ts`)
-builds `AppServices` over `core` (default: a fresh `createTestCoreServices()`).
+builds `AppServices` over `core`.
 It shares the core's test platform, activity port and `progress` port, and
 picks a note-window test window when `core.role` is `'note-window'`.
 
@@ -85,7 +87,8 @@ register the app commands, as `main.tsx` does. The options are documented on
 
 The result holds two containers:
 
-- `app`: the core container (default: `createTestCoreServices()`). Drive and
+- `app`: the core container (default: `createTestCoreServices()` over a wasm
+  database). Drive and
   observe the graph, settings and progress here: `app.graphSession.setGraph()`,
   `app.settings.saves()`, `app.progress.getAll()`.
 - `appServices`: the app layer, built with `createTestAppServices(app, options.appServices)`.
@@ -103,7 +106,7 @@ the function the component calls. So build your own `app`, spy on it, and pass
 it in:
 
 ```tsx
-const app = createTestCoreServices()
+const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
 const rebuild = Promise.withResolvers<void>()
 vi.spyOn(app.indexLifecycle, 'rebuildVisibly').mockReturnValueOnce(rebuild.promise)
 await renderInApp(<RebuildIndexField />, { app, graph: { indexGeneration: 7 } })
@@ -112,11 +115,10 @@ await renderInApp(<RebuildIndexField />, { app, graph: { indexGeneration: 7 } })
 With your own `app`, put the platform and the backup in it yourself. The
 helper throws if you also pass `platform` or `sync`.
 
-In browser tests, `createTestDatabaseService()` returns a lazy wasm database
-(`test-utils/setup-browser.ts`), which opens on the first query. Wait for index
-reads with `expect.element` or `vi.waitFor`. When a test needs the index open
-before its first query, pass `createWasmTestDatabaseService()` from
-`@/test-utils/test-database.ts` as the `database` override.
+`database` is required: a Node.js test passes
+`createNodeTestDatabaseService()`, a desktop browser test passes
+`createWasmTestDatabaseService()`. `renderInApp` passes a wasm database when it
+builds the app itself.
 
 ## `vi.mock`
 

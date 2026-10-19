@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createTestCoreServices } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AiChatSection } from './ai-chat-section.tsx'
 
 describe('AiChatSection', () => {
   it('persists a dirty prompt when keyboard navigation unmounts Settings before blur', async () => {
-    const app = createTestCoreServices()
+    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
     const update = vi.spyOn(app.settings, 'update')
     const view = await renderInApp(<AiChatSection />, { app, settings: { chatSystemPrompt: '' } })
     const textarea = view.getByRole('textbox', { name: 'System prompt' })

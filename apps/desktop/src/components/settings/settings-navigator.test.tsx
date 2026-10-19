@@ -7,6 +7,7 @@ import {
 } from '@reflect/core/testing'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { SETTINGS_SECTIONS, settingsSectionDomId } from './sections.ts'
 import { SettingsNavigator } from './settings-navigator.tsx'
 
@@ -35,6 +36,7 @@ function sectionTop(index: number): number {
 
 async function renderNavigatorPage(): Promise<HTMLElement> {
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     platform: createTestPlatformService({ isMacosDesktop: false }),
     contacts: createTestContactsService({ status: 'unavailable' }),
   })

@@ -5,6 +5,7 @@ import type { GistPublishService, NoteRow } from '@reflect/core'
 import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
 import { queryKeys } from '@/lib/query-client.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteGistAction } from './note-gist-action.tsx'
 
 const GIST_URL = 'https://gist.github.com/alex/g1'
@@ -53,7 +54,7 @@ async function waitForReads(queryClient: QueryClient): Promise<void> {
 beforeEach(() => {
   connected = true
   row = null
-  app = createTestCoreServices()
+  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
   vi.spyOn(app.indexQuery, 'getNote').mockImplementation(() => Promise.resolve(row ?? undefined))
   publish = vi.spyOn(app.gistPublish, 'publish').mockResolvedValue({ url: GIST_URL, stale: false })
   unpublish = vi.spyOn(app.gistPublish, 'unpublish').mockResolvedValue({ url: null, stale: false })

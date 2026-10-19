@@ -18,6 +18,7 @@ import { monthLabel, monthOf } from '@/lib/month-grid.ts'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { createWeekWindow, weekOf } from './calendar.ts'
 import { MobileShell } from './mobile-shell.tsx'
 
@@ -129,7 +130,7 @@ let dailyDatesInRange: MockInstance<DailyNoteService['dailyDatesInRange']>
 
 beforeEach(async () => {
   await page.viewport(375, 700)
-  app = createTestCoreServices()
+  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
   appServices = createTestAppServices(app)
   // The tests compute dates from the real clock.
   app.clock.setNow(Date.now())

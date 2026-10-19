@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
+import { createNodeTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
 import { createNoteListService, type NoteListService } from './note-list-service.ts'
 
 const NOTES: TestNote[] = [
@@ -26,7 +26,7 @@ const NOTES: TestNote[] = [
 ]
 
 function setup(notes: TestNote[] = NOTES): NoteListService {
-  const database = createTestDatabaseService()
+  const database = createNodeTestDatabaseService()
   seedNotes(database, notes)
   return createNoteListService({ database })
 }
@@ -70,7 +70,7 @@ describe('listNotes', () => {
   })
 
   it('skips the tag fetch entirely when no notes match', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     seedNotes(database, NOTES)
 
     await expect(

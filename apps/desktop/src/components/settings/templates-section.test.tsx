@@ -8,6 +8,7 @@ import { deepLinkForRoute } from '@reflect/app'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { TemplatesSection } from './templates-section.tsx'
 
 const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
@@ -22,7 +23,7 @@ function RouteProbe(): ReactElement {
 }
 
 async function renderSection(): Promise<void> {
-  const app = createTestCoreServices()
+  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
   vi.spyOn(app.indexQuery, 'listTemplates').mockResolvedValue([
     { path: 'templates/weekly-review.md', title: 'Weekly review', mtime: 1 },
   ])

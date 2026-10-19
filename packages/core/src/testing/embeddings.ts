@@ -32,7 +32,7 @@ import type { Unlisten } from '../unlisten.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
-import { createTestDatabaseService } from './database.ts'
+import { createNodeTestDatabaseService } from './database.ts'
 import { createTestNoteFileService } from './graph.ts'
 import { createTestGraphSessionService } from './graph-session.ts'
 import { createTestIndexLifecycleService } from './index-lifecycle.ts'
@@ -384,7 +384,7 @@ class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
   readonly #followLog: { generation: number; modelId: string }[] = []
 
   constructor(options?: TestEmbeddingIndexServiceOptions) {
-    const database = options?.database ?? createTestDatabaseService()
+    const database = options?.database ?? createNodeTestDatabaseService()
     this.#backfillOverride = options?.backfill
     const ipc = createTestIpcBridgeService({
       commands: {

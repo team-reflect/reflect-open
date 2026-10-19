@@ -15,6 +15,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteActionsMenu } from './note-actions-menu.tsx'
 
 // What the app's fakes answer; each test sets them before `mount`.
@@ -138,6 +139,7 @@ afterEach(() => {
 
 async function mount(path = 'notes/meeting.md', onDeleted = vi.fn()) {
   const created = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     noteDocuments: {
       readSource: readNoteSource,
       readExisting: async (notePath) => await readNoteSource(notePath),

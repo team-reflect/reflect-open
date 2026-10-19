@@ -7,6 +7,7 @@ import {
   type TestOpenGraph,
 } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useNoteTrash } from './use-note-trash.ts'
 
 const GRAPH: TestOpenGraph = { root: '/g', name: 'g', generation: 1 }
@@ -21,7 +22,7 @@ beforeEach(() => {
 
 async function mount(graph: TestOpenGraph | null = GRAPH) {
   return await renderHookInApp(() => useNoteTrash(), {
-    app: createTestCoreServices({ noteFile }),
+    app: createTestCoreServices({ database: createWasmTestDatabaseService(), noteFile }),
     graph,
   })
 }

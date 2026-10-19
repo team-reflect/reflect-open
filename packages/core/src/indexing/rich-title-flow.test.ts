@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createTestDatabaseService } from '../testing/database.ts'
+import { createNodeTestDatabaseService } from '../testing/database.ts'
 import {
   connectIndex,
   expectSuggestionOpensItsPath,
@@ -17,7 +17,7 @@ import { rewriteLinksForTitleChange } from './rename.ts'
  */
 describe('rich title flow', () => {
   it('projects a derived alias and serves search, insertion, and resolution', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     const rich = project('notes/meeting-with-ada.md', '# Meeting with [[Ada Lovelace|Ada]]\n', 20)
     expect(rich.aliases).toEqual([{ alias: 'Meeting with Ada', aliasKey: 'meeting with ada' }])
     database.applyProjection(rich)
@@ -48,7 +48,7 @@ describe('rich title flow', () => {
   })
 
   it('drops the derived address when a real title claims the same key', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     database.applyProjection(
       project('notes/meeting-with-ada.md', '# Meeting with [[Ada Lovelace|Ada]]\n', 20),
     )
@@ -81,7 +81,7 @@ describe('rich title flow', () => {
   })
 
   it('rename refuses a derived destination another note already owns', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     database.applyProjection(project('notes/a.md', '# Old Meeting\n', 10))
     database.applyProjection(project('notes/plain.md', '# Meeting with Ada\n', 20))
     database.applyProjection(project('notes/source.md', 'See [[Old Meeting]].\n', 30))
@@ -118,7 +118,7 @@ describe('rich title flow', () => {
   })
 
   it('a degenerate rich title falls back to a path address and stays navigable', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     const degenerate = project('notes/degenerate.md', '# [[ [ ]]\n', 10)
     expect(degenerate.aliases).toEqual([]) // derived form falls back to the raw title
     database.applyProjection(degenerate)
@@ -143,7 +143,7 @@ describe('rich title flow', () => {
 
 describe('path-address fallback flow', () => {
   it('offers each duplicate-titled note its own path address', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     database.applyProjection(project('a/Plan.md', '# Plan\n', 20))
     database.applyProjection(project('b/Plan.md', '# Plan\n', 10))
     const index = connectIndex(database)
@@ -159,7 +159,7 @@ describe('path-address fallback flow', () => {
   })
 
   it('keeps the plain title when it is unambiguous', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     database.applyProjection(project('notes/unique.md', '# Unique\n', 20))
     const index = connectIndex(database)
     try {
@@ -171,7 +171,7 @@ describe('path-address fallback flow', () => {
   })
 
   it('drops a row whose path has no wiki spelling', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     database.applyProjection(project('notes/c#-notes.md', '# Plan\n', 20))
     // A trim-unstable slash segment reads back as a *name*, not a path, so
     // the round-trip proof refuses it too.

@@ -216,7 +216,7 @@ The short version:
 - Rust-boundary wrappers (`NoteFileService`) take an explicit `generation`. User-facing
   services read the `GraphSession` once at method entry and pass its generations down.
 - Tests build services over `@reflect/core/testing` and `@reflect/app/testing`
-  (`createTestCoreServices()`, `createTestAppServices(core)`); desktop tests render with
+  (`createTestCoreServices({ database })`, `createTestAppServices(core)`); desktop tests render with
   `renderInApp`. `vi.mock` only for the allowlist in `eslint.config.js`. See
   [docs/contributing/testing.md](docs/contributing/testing.md).
 

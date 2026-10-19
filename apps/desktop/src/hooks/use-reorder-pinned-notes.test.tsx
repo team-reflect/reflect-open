@@ -7,6 +7,7 @@ import {
   type TestOpenGraph,
 } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useReorderPinnedNotes } from './use-reorder-pinned-notes.ts'
 
 const GRAPH: TestOpenGraph = { generation: 7, root: '/graphs/personal' }
@@ -31,7 +32,7 @@ function renderReorder(pinned: readonly PinnedNote[] = NOTES) {
 }
 
 beforeEach(() => {
-  app = createTestCoreServices()
+  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
   reorderPinnedNotes = vi.spyOn(app.noteActions, 'reorderPinned')
 })
 

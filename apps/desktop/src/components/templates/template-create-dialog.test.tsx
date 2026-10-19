@@ -6,6 +6,7 @@ import { createTestCoreServices, type TestCoreServices } from '@reflect/core/tes
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { NoteTemplatesProvider, useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { TemplateCreateDialog } from './template-create-dialog.tsx'
 
 function Opener(): ReactElement {
@@ -18,7 +19,7 @@ function Opener(): ReactElement {
 }
 
 async function renderDialog(): Promise<{ context: CommandContext; app: TestCoreServices }> {
-  const app = createTestCoreServices()
+  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
   app.graphSession.setGraph({ generation: 1 })
   const context: CommandContext = {
     services: app,

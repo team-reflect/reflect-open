@@ -24,7 +24,7 @@ import { buildIndexedNote } from '../indexing/indexed-note.ts'
 import type { SnippetTask } from '../indexing/snippet-tasks.ts'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
 import {
-  createTestDatabaseService,
+  createNodeTestDatabaseService,
   seedNotes,
   type TestDatabaseService,
 } from '../testing/database.ts'
@@ -160,7 +160,7 @@ function openSession(session: TestNoteSession): void {
 }
 
 beforeEach(() => {
-  database = createTestDatabaseService()
+  database = createNodeTestDatabaseService()
   noteFile = createTestNoteFileService()
   openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
   progress = createTestProgressPort()

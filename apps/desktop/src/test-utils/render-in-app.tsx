@@ -32,6 +32,7 @@ import { GraphProvider } from '@/providers/graph-provider.tsx'
 import type { Route } from '@/routing/route.ts'
 import { RouterProvider } from '@/routing/router.tsx'
 import { AppServicesProvider, CoreServicesProvider } from '@/services/services-provider.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 
 /**
  * The platform facts of the mobile app: pass as `platform` to render a mobile surface.
@@ -136,6 +137,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
   }
   const clock = createTestClockService()
   const overrides: TestCoreServiceOverrides = {
+    database: createWasmTestDatabaseService(),
     clock,
     // The app layer's operations list is the port the core services report to.
     progress: createTestOperationsService(clock),

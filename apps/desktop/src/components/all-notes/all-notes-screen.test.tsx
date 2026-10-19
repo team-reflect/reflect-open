@@ -8,6 +8,7 @@ import { queryKeys } from '@/lib/query-client.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AllNotesScreen } from './all-notes-screen.tsx'
 import { deepLinkForRoute } from '@reflect/app'
 
@@ -105,6 +106,7 @@ interface RenderScreenOptions {
 async function renderScreen(options: RenderScreenOptions = {}) {
   const notes = options.notes ?? [...noteRows, taggedDailyRow]
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     noteFile: createTestNoteFileService({
       files: Object.fromEntries(notes.map((note) => [note.path, noteMarkdown(note)])),
       // A delete pinned to another generation rejects.

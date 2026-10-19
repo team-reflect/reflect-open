@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
-import { createTestDatabaseService, seedNotes } from '../testing/database.ts'
+import { createNodeTestDatabaseService, seedNotes } from '../testing/database.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import { createIndexQueryService } from './index-query-service.ts'
 import { createMoveHealing } from './move-healing.ts'
@@ -24,7 +24,7 @@ const CONTENT = `---\nid: ${ID}\n---\n# Meeting Notes\n`
  * the id lookup.
  */
 function setup(options?: { read?: () => void; lookup?: () => void }) {
-  const database = createTestDatabaseService()
+  const database = createNodeTestDatabaseService()
   databases.push(database)
   seedNotes(database, [{ path: ORPHAN, markdown: CONTENT }])
   const files = createTestNoteFileService({ files: { [ARRIVAL]: CONTENT } })

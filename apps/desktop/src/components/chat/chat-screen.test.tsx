@@ -24,6 +24,7 @@ import { useChatSession, type ChatContextValue } from '@/providers/chat-provider
 import type { Route } from '@/routing/route.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ChatScreen } from './chat-screen.tsx'
 import { deepLinkForRoute } from '@reflect/app'
 
@@ -137,6 +138,7 @@ async function renderChat() {
   probedSendRef.current = null
   probedRouteRef.current = null
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     secretStore: createTestSecretStoreService(
       settingsState.apiKey === null ? {} : { [aiKeySecretName(MODEL.id)]: settingsState.apiKey },
     ),

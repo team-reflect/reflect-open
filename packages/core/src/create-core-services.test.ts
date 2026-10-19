@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { parseSearchQuery } from './indexing/filter-query.ts'
 import { createTestClockService } from './testing/clock.ts'
-import { createTestDatabaseService, seedNotes } from './testing/database.ts'
+import { createNodeTestDatabaseService, seedNotes } from './testing/database.ts'
 import { createTestNoteFileService } from './testing/graph.ts'
 import { createTestHttpService } from './testing/http.ts'
 import { createTestIpcBridgeService } from './testing/ipc.ts'
@@ -145,7 +145,7 @@ describe('createCoreServices', () => {
 
 describe('createTestCoreServices', () => {
   it('builds the index reads over the test database and note files', async () => {
-    const services = createTestCoreServices()
+    const services = createTestCoreServices({ database: createNodeTestDatabaseService() })
     seedNotes(services.database, [{ path: 'notes/plan.md', markdown: '# Plan\n' }])
     await services.noteFile.write('notes/plan-2.md', '# Plan\n', 1)
 
@@ -159,7 +159,7 @@ describe('createTestCoreServices', () => {
   })
 
   it('builds the index reads over an overriding database', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     seedNotes(database, [{ path: 'notes/other.md', markdown: '# Other\n' }])
     const services = createTestCoreServices({ database })
 

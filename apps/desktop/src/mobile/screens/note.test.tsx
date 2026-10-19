@@ -5,6 +5,7 @@ import { createTestCoreServices, createTestNoteFileService } from '@reflect/core
 import { useRouter, type NavigateOptions } from '@/routing/router.tsx'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileNote } from './note.tsx'
 
 const pmRoot = page.locate('.ProseMirror')
@@ -34,6 +35,7 @@ function Arrival({
 
 async function renderArrival(path: string, options?: NavigateOptions): Promise<void> {
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     noteFile: createTestNoteFileService({ files: { 'notes/target.md': '# Target\n' } }),
   })
   await renderInApp(<Arrival path={path} options={options} />, { app })
@@ -62,7 +64,11 @@ describe('MobileNote focus contract', () => {
   })
 
   it('autofocuses a fresh untitled note (the + flow)', async () => {
-    await renderArrival(createTestCoreServices().noteCreation.untitledNotePath())
+    await renderArrival(
+      createTestCoreServices({
+        database: createWasmTestDatabaseService(),
+      }).noteCreation.untitledNotePath(),
+    )
     await expect.element(page.getByRole('heading', { name: 'New note' })).toBeVisible()
     await expect.element(pmRoot).toHaveFocus()
   })

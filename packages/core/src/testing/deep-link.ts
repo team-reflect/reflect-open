@@ -10,7 +10,7 @@ import { createIndexQueryService } from '../indexing/index-query-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { createTestCaptureInboxService } from './capture.ts'
 import { createTestClockService } from './clock.ts'
-import { createTestDatabaseService } from './database.ts'
+import { createNodeTestDatabaseService } from './database.ts'
 import { createTestGraphSessionService } from './graph-session.ts'
 import { createTestIdService } from './id.ts'
 import { createTestProgressPort } from './ports.ts'
@@ -127,7 +127,7 @@ export function createTestDeepLinkIntakeService(
       source: options?.source ?? createTestDeepLinkSource(),
       indexQuery:
         options?.indexQuery ??
-        Object.assign(createIndexQueryService({ database: createTestDatabaseService() }), {
+        Object.assign(createIndexQueryService({ database: createNodeTestDatabaseService() }), {
           resolveNoteTarget: (target: string) => Promise.resolve(notes[target] ?? null),
         }),
       captureInbox: options?.captureInbox ?? createTestCaptureInboxService(),

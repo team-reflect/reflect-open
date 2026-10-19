@@ -6,6 +6,7 @@ import {
   type TestStorageService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { SidebarSection } from './sidebar-section.tsx'
 
 // One session per test: every mount reads the same storage.
@@ -16,7 +17,7 @@ async function renderSection() {
     <SidebarSection storageKey="probe" title="Probe">
       <p>section body</p>
     </SidebarSection>,
-    { app: createTestCoreServices({ storage }) },
+    { app: createTestCoreServices({ database: createWasmTestDatabaseService(), storage }) },
   )
 }
 

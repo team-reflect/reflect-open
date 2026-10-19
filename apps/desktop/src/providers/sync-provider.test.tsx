@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { page } from 'vitest/browser'
 import { createTestCoreServices } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useSync, useSyncContext } from './sync-provider.tsx'
 
 function Probe(): ReactElement {
@@ -37,7 +38,10 @@ describe('useSync', () => {
   })
 
   it('reads loading, and no context, where the graph runs no backup', async () => {
-    const app = createTestCoreServices({ role: 'note-window' })
+    const app = createTestCoreServices({
+      database: createWasmTestDatabaseService(),
+      role: 'note-window',
+    })
     await renderInApp(<Probe />, { app })
 
     const button = page.getByRole('button', { name: 'loading' })

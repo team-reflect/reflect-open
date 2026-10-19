@@ -6,6 +6,7 @@ import { PaletteProvider } from '@/components/command-palette/palette-provider.t
 import { queryClient } from '@/lib/query-client.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import '@/test-utils/locator.ts'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { RouteContent } from './route-content.tsx'
 
 type ResolvedArchive = ResolvedArchivedPost | null
@@ -32,6 +33,7 @@ async function renderNote(
   resolveArchive: (postId: string) => Promise<ResolvedArchive>,
 ) {
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     noteFile: createTestNoteFileService({ files: { [path]: source } }),
   })
   vi.spyOn(app.xArchive, 'resolve').mockImplementation(

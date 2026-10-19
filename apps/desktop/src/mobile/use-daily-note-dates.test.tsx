@@ -2,12 +2,13 @@ import { act } from '@/test-utils/act.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { createTestCoreServices } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useDailyNoteDates } from './use-daily-note-dates.ts'
 
 describe('useDailyNoteDates', () => {
   it('keeps previous markers while a new range loads', async () => {
     const pendingNextRange = Promise.withResolvers<string[]>()
-    const app = createTestCoreServices()
+    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
     const dailyDatesInRange = vi
       .spyOn(app.dailyNotes, 'dailyDatesInRange')
       .mockResolvedValueOnce(['2026-07-14'])

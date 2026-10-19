@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createTestDatabaseService } from '../testing/database.ts'
+import { createNodeTestDatabaseService } from '../testing/database.ts'
 import { connectIndex, disconnectIndex, project } from './flow-test-harness.ts'
 
 /**
@@ -9,7 +9,7 @@ import { connectIndex, disconnectIndex, project } from './flow-test-harness.ts'
  */
 describe('link usage flow', () => {
   it('surfaces a much-linked note that many newer matches would bury', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     database.applyProjection(project('notes/sam-brown.md', '# Sam Brown\n', 1))
     for (let index = 0; index < 250; index++) {
       database.applyProjection(
@@ -35,7 +35,7 @@ describe('link usage flow', () => {
   })
 
   it('counts links written through an alias', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     database.applyProjection(
       project('notes/john-smith.md', '---\naliases: [JS]\n---\n# John Smith\n', 1),
     )
@@ -52,7 +52,7 @@ describe('link usage flow', () => {
   })
 
   it('fills the unqueried list with the most-linked notes and no dailies', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     database.applyProjection(project('notes/hub.md', '# Hub\n', 1))
     database.applyProjection(project('notes/fresh.md', '# Fresh\n', 900))
     database.applyProjection(project('daily/2026-01-10.md', '[[Hub]] [[2026-01-11]]\n', 5000))

@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { act } from '@/test-utils/act.ts'
 import { createTestCoreServices, createTestClockService } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useToday } from './use-today.ts'
 
 describe('useToday', () => {
   it('follows the clock when the local date changes', async () => {
     const clock = createTestClockService({ today: '2026-06-09' })
-    const app = createTestCoreServices({ clock })
+    const app = createTestCoreServices({ database: createWasmTestDatabaseService(), clock })
     const { result, unmount } = await renderHookInApp(() => useToday(), { app })
     expect(result.current).toBe('2026-06-09')
 
@@ -25,7 +26,7 @@ describe('useToday', () => {
 
   it('rolls over when time advances past local midnight', async () => {
     const clock = createTestClockService({ now: new Date(2026, 5, 9, 23, 59, 0).getTime() })
-    const app = createTestCoreServices({ clock })
+    const app = createTestCoreServices({ database: createWasmTestDatabaseService(), clock })
     const { result, unmount } = await renderHookInApp(() => useToday(), { app })
     expect(result.current).toBe('2026-06-09')
 
@@ -38,7 +39,7 @@ describe('useToday', () => {
 
   it('mounted hooks share the same date', async () => {
     const clock = createTestClockService({ today: '2026-06-09' })
-    const app = createTestCoreServices({ clock })
+    const app = createTestCoreServices({ database: createWasmTestDatabaseService(), clock })
     const first = await renderHookInApp(() => useToday(), { app })
     const second = await renderHookInApp(() => useToday(), { app })
 

@@ -19,6 +19,7 @@ import type { Route } from '@/routing/route.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileChat } from './chat.tsx'
 
 /**
@@ -107,6 +108,7 @@ function Harness(): ReactElement {
 
 async function renderHarness() {
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     secretStore: createTestSecretStoreService({ [aiKeySecretName(MODEL.id)]: 'sk-test' }),
     chatEngine,
   })

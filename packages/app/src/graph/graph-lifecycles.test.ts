@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createGraphSession, type GraphRole, type GraphServicesDeps } from '@reflect/core'
 import {
+  createNodeTestDatabaseService,
   createTestCoreServices,
   createTestPlatformService,
   trackAssetDescriptionSessions,
@@ -53,7 +54,7 @@ function graphDeps(core: TestCoreServices): GraphServicesDeps {
 }
 
 function setup(options?: { role?: GraphRole; root?: string; platform?: TestPlatformOptions }) {
-  const core = createTestCoreServices()
+  const core = createTestCoreServices({ database: createNodeTestDatabaseService() })
   const sessions = trackAssetDescriptionSessions(core.assetDescription)
   const platform = createTestPlatformService(options?.platform)
   const mobileOnboarding = createTestMobileOnboardingService()
@@ -134,7 +135,7 @@ describe('createAppGraphServices', () => {
   it('leaves nothing running for a session that already ended', () => {
     const context = setup()
     context.controller.abort()
-    const core = createTestCoreServices()
+    const core = createTestCoreServices({ database: createNodeTestDatabaseService() })
     const sessions = trackAssetDescriptionSessions(core.assetDescription)
     const ended = new AbortController()
     ended.abort()

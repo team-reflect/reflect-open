@@ -8,7 +8,7 @@ import {
 } from '@reflect/core'
 import {
   createTestAttachmentService,
-  createTestDatabaseService,
+  createNodeTestDatabaseService,
   createTestGraphSessionService,
   createTestLoggerService,
   createTestNoteCreationService,
@@ -74,7 +74,7 @@ function setup(options?: {
       options.resolveOrCreateNoteWithTitle,
     )
   }
-  const wikiResolver = createWikiResolverService({ database: createTestDatabaseService() })
+  const wikiResolver = createWikiResolverService({ database: createNodeTestDatabaseService() })
   if (options?.resolveWikiTarget !== undefined) {
     vi.spyOn(wikiResolver, 'resolveWikiTarget').mockImplementation(options.resolveWikiTarget)
   }

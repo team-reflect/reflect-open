@@ -89,12 +89,11 @@ function createApp(database: TestDatabaseService) {
   })
 }
 
-beforeEach(async () => {
+beforeEach(() => {
   clock = createTestClockService()
   logger = createTestLoggerService()
   noteFile = createTestNoteFileService({ files: { 'notes/a.md': '# Hello\n' } })
-  // Opened here, so every index read of a rename settles in microtasks.
-  app = createApp(await createWasmTestDatabaseService())
+  app = createApp(createWasmTestDatabaseService())
 })
 
 /**

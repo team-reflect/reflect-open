@@ -7,6 +7,7 @@ import {
   type TestCoreServices,
 } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useRecentlyCompleted } from './recently-completed.ts'
 
 /**
@@ -21,7 +22,7 @@ let tasks: TaskService
 
 // A fresh service per test, so its recently-completed set starts empty.
 beforeEach(() => {
-  app = createTestCoreServices()
+  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
   tasks = app.tasks
 })
 

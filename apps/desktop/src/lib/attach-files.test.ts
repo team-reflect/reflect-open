@@ -1,6 +1,10 @@
 import { createTestAppServices, type TestAppServices } from '@reflect/app/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import {
+  createNodeTestDatabaseService,
+  createTestCoreServices,
+  type TestCoreServices,
+} from '@reflect/core/testing'
 import {
   registerNoteEditorHandle,
   unregisterNoteEditorHandle,
@@ -13,7 +17,7 @@ let app: TestCoreServices
 let appLayer: TestAppServices
 
 beforeEach(() => {
-  app = createTestCoreServices()
+  app = createTestCoreServices({ database: createNodeTestDatabaseService() })
   appLayer = createTestAppServices(app)
   app.graphSession.setGraph({ generation: 4 })
 })

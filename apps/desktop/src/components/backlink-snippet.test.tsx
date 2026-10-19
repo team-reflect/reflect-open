@@ -3,6 +3,7 @@ import { userEvent } from 'vitest/browser'
 import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { SnippetTask, TaskService } from '@reflect/core'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { BacklinkSnippet } from './backlink-snippet.tsx'
 
 /**
@@ -42,7 +43,7 @@ async function renderSnippet(
   text: string = SNIPPET,
   onWikilinkClick: () => void = () => {},
 ) {
-  const app = createTestCoreServices()
+  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
   operations = app.progress
   writeTask = vi
     .spyOn(app.tasks, 'writeTask')

@@ -10,6 +10,7 @@ import {
 } from '@reflect/core/testing'
 import { act } from '@/test-utils/act.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DeepLinkProvider } from './deep-link-provider.tsx'
 
 // The handler itself is covered in `@reflect/app`; these cover how the
@@ -18,7 +19,7 @@ import { DeepLinkProvider } from './deep-link-provider.tsx'
 const GRAPH = { root: '/g', name: 'g', generation: 7 }
 
 function setup() {
-  const { indexQuery } = createTestCoreServices()
+  const { indexQuery } = createTestCoreServices({ database: createWasmTestDatabaseService() })
   const resolveNoteTarget = vi.spyOn(indexQuery, 'resolveNoteTarget')
   const captureInbox = createTestCaptureInboxService()
   const operations = createTestProgressPort()
@@ -30,6 +31,7 @@ function setup() {
     graphSession,
   })
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     captureInbox,
     progress: operations,
     graphSession,

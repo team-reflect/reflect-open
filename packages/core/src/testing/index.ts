@@ -50,11 +50,8 @@ export {
   type TestContactsServiceOptions,
 } from './contacts.ts'
 export {
-  createLazyTestDatabaseService,
-  createTestDatabaseService,
+  createNodeTestDatabaseService,
   seedNotes,
-  setTestDatabaseOpener,
-  type TestDatabaseOpener,
   type TestDatabaseQuery,
   type TestDatabaseService,
   type TestNote,

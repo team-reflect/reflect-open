@@ -4,7 +4,7 @@ import { createNotePathService } from '../indexing/note-path-service.ts'
 import { createWikiResolverService } from '../indexing/wiki-resolver-service.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { createTestClockService } from '../testing/clock.ts'
-import { createTestDatabaseService, seedNotes } from '../testing/database.ts'
+import { createNodeTestDatabaseService, seedNotes } from '../testing/database.ts'
 import {
   createTestNoteMoveService,
   createTestNoteSession,
@@ -96,7 +96,7 @@ function setup(options?: SetupOptions) {
   const progress = createTestProgressPort()
   const logger = createTestLoggerService()
   const noteFile = createTestNoteFileService({ files })
-  const database = createTestDatabaseService()
+  const database = createNodeTestDatabaseService()
   seedNotes(
     database,
     Object.entries({ ...files, ...options?.indexed }).map(([notePath, markdown]) => ({

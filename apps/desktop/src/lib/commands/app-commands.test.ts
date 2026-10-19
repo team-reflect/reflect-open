@@ -6,6 +6,7 @@ import {
 } from '@reflect/app/testing'
 import { buildIndexedNote, parseNote } from '@reflect/core'
 import {
+  createNodeTestDatabaseService,
   createTestCoreServices,
   createTestEmbeddingIndexService,
   createTestEmbeddingRuntimeService,
@@ -28,7 +29,11 @@ function createApp() {
   const embeddingIndex: TestEmbeddingIndexService = createTestEmbeddingIndexService({
     backfill: () => Promise.resolve('completed'),
   })
-  return createTestCoreServices({ embeddingRuntime, embeddingIndex })
+  return createTestCoreServices({
+    database: createNodeTestDatabaseService(),
+    embeddingRuntime,
+    embeddingIndex,
+  })
 }
 
 let app: ReturnType<typeof createApp>
@@ -437,6 +442,7 @@ describe('app commands', () => {
 
   it('dev.toggleDevtools no-ops without a native shell (plain-browser dev)', async () => {
     const browser = createTestCoreServices({
+      database: createNodeTestDatabaseService(),
       platform: createTestPlatformService({ isNativeShell: false }),
     })
     const { context } = fakeContext({ services: browser })

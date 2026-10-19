@@ -4,7 +4,7 @@ import { AppError } from '../errors.ts'
 import { parseNote } from '../markdown/index.ts'
 import { createTestXArchiveService } from '../testing/capture.ts'
 import { createTestClockService } from '../testing/clock.ts'
-import { createTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
+import { createNodeTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
 import { createTestFileChangeService } from '../testing/file-change.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import {
@@ -66,7 +66,7 @@ function setup(options?: {
   stored?: readonly StoredNote[]
   read?: (path: string) => void
 }) {
-  const database = createTestDatabaseService()
+  const database = createNodeTestDatabaseService()
   databases.push(database)
   seedNotes(database, options?.indexed ?? [])
   for (const { path, markdown, fileHash, mtime } of options?.stored ?? []) {

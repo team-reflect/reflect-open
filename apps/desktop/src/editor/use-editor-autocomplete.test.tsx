@@ -13,6 +13,7 @@ import {
 import { createTestOperationsService } from '@reflect/app/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useEditorAutocomplete } from './use-editor-autocomplete.ts'
 
 const ADA: ContactMatch = {
@@ -60,7 +61,7 @@ async function setup(options?: SetupOptions) {
     status: options?.authorization ?? 'authorized',
     contacts: [ADA],
   })
-  const base = createTestCoreServices()
+  const base = createTestCoreServices({ database: createWasmTestDatabaseService() })
   const personNotes: typeof base.personNotes = {
     ...base.personNotes,
     resolvePersonContact: (contact) => ({
@@ -73,6 +74,7 @@ async function setup(options?: SetupOptions) {
   }
   const graphSession = createTestGraphSessionService()
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     graphSession,
     suggestions: {
       ...base.suggestions,

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppError, type GithubAuth, type GithubAuthService } from '@reflect/core'
 import { createTestCoreServices } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useDeviceFlowAuth } from './use-device-flow-auth.ts'
 
 const mockFlow = vi.fn<GithubAuthService['runDeviceFlow']>()
@@ -12,7 +13,7 @@ const AUTH: GithubAuth = { kind: 'pat', token: 'ghp_abc' }
  * Render the hook over an app whose GitHub device flow is `mockFlow`.
  */
 async function mount() {
-  const app = createTestCoreServices()
+  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
   app.githubAuth.onRunDeviceFlow(mockFlow)
   return await renderHookInApp(() => useDeviceFlowAuth(), { app })
 }

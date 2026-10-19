@@ -18,6 +18,7 @@ import { UpdateProvider } from '@/providers/update-provider.tsx'
 import { V1ImportProvider } from '@/providers/v1-import-provider.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ShortcutsDialog } from './shortcuts-dialog.tsx'
 import { SettingsScreen } from './settings-screen.tsx'
 
@@ -42,6 +43,7 @@ function saved(): Settings[] {
 // a graph open and its backup disconnected.
 function createApp() {
   return createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     embeddingRuntime: embedRuntime,
     platform: createTestPlatformService({ isMacosDesktop: false, hasMacosTitleBarOverlay: false }),
     backup: createTestBackupService({ state: { phase: 'disconnected' } }),

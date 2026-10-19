@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { createTestCoreServices, type TestAiKeyValidationService } from '@reflect/core/testing'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 
 /**
  * The mobile add-provider sheet over the shared submit flow: a verified key
@@ -34,7 +35,7 @@ beforeEach(() => {
 })
 
 async function renderSheet(): Promise<void> {
-  const app = createTestCoreServices()
+  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
   keyValidation = app.aiKeyValidation
   await renderInApp(<AddAiProviderDrawer open onOpenChange={onOpenChange} onAdd={onAdd} />, {
     app,

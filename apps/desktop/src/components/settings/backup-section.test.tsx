@@ -13,6 +13,7 @@ import {
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { BackupSettingsField } from './backup-section.tsx'
 
 // The section's GitHub-vs-generic split (Plan 16): a hand-wired remote must
@@ -38,7 +39,7 @@ beforeEach(() => {
 
 async function renderSection(state: BackupState, graph?: TestOpenGraph): Promise<TestCoreServices> {
   backup.setState(state)
-  const app = createTestCoreServices({ backup })
+  const app = createTestCoreServices({ database: createWasmTestDatabaseService(), backup })
   if (githubConnected) {
     await app.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
   }

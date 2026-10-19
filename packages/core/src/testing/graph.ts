@@ -24,7 +24,7 @@ import {
   type WikiResolverService,
 } from '../indexing/wiki-resolver-service.ts'
 import { bytesToBase64, base64ToBytes } from '@reflect/utils'
-import { createTestDatabaseService } from './database.ts'
+import { createNodeTestDatabaseService } from './database.ts'
 import { createTestIdService } from './id.ts'
 
 function notFound(what: string): AppError {
@@ -621,7 +621,7 @@ export function createTestAssetStoreService(
 
 export interface TestNoteLinkResolverServiceOptions {
   /**
-   * The index the resolver's tiers read; defaults to one over an empty test database.
+   * The index the resolver's tiers read; defaults to one over an empty Node.js test database.
    */
   wikiResolver?: WikiResolverService
   /**
@@ -704,7 +704,7 @@ export function createTestNoteLinkResolverService(
     createNoteLinkResolverService({
       wikiResolver:
         options?.wikiResolver ??
-        createWikiResolverService({ database: createTestDatabaseService() }),
+        createWikiResolverService({ database: createNodeTestDatabaseService() }),
       noteFile: options?.noteFile ?? createTestNoteFileService(),
     }),
   )

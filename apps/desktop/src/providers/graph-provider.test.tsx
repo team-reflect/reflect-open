@@ -12,6 +12,7 @@ import {
 } from '@reflect/core/testing'
 import { useGraphServices } from '@/services/services-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { GraphProvider, useGraph } from './graph-provider.tsx'
 
 /**
@@ -58,7 +59,9 @@ async function renderGraph<App extends CoreServices>(
 
 describe('GraphProvider', () => {
   it('starts at the chooser when there are no recents', async () => {
-    const { result } = await renderGraph(createTestCoreServices())
+    const { result } = await renderGraph(
+      createTestCoreServices({ database: createWasmTestDatabaseService() }),
+    )
     await vi.waitFor(() => expect(result.current.status).toBe('choosing'))
     expect(result.current.graph).toBeNull()
   })
@@ -67,7 +70,10 @@ describe('GraphProvider', () => {
     const recents: RecentGraph[] = [{ root: '/known', name: 'known', openedMs: 1 }]
     const dialog = createTestDialogService()
     const { result } = await renderGraph(
-      createTestCoreServices({ graphSession: createTestGraphSessionService({ recents }) }),
+      createTestCoreServices({
+        database: createWasmTestDatabaseService(),
+        graphSession: createTestGraphSessionService({ recents }),
+      }),
       undefined,
       { dialog },
     )
@@ -86,7 +92,9 @@ describe('GraphProvider', () => {
   })
 
   it('opens a picked folder and seeds the empty graph', async () => {
-    const { app, appServices, result } = await renderGraph(createTestCoreServices())
+    const { app, appServices, result } = await renderGraph(
+      createTestCoreServices({ database: createWasmTestDatabaseService() }),
+    )
     appServices.dialog.setFolder('/fresh')
     await vi.waitFor(() => expect(result.current.status).toBe('choosing'))
 
@@ -102,7 +110,9 @@ describe('GraphProvider', () => {
   })
 
   it('boots the app’s graph session and passes its actions through', async () => {
-    const { app, result } = await renderGraph(createTestCoreServices())
+    const { app, result } = await renderGraph(
+      createTestCoreServices({ database: createWasmTestDatabaseService() }),
+    )
     await vi.waitFor(() => expect(result.current.status).toBe('choosing'))
 
     await act(async () => {
@@ -139,7 +149,7 @@ describe('GraphProvider', () => {
         </button>
       )
     }
-    const app = createTestCoreServices()
+    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
     const screen = await renderInApp(tree(<Probe />), { app, servicesOnly: true })
 
     await screen.getByRole('button', { name: 'Open' }).click()
@@ -158,6 +168,7 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
     }
     const { app, result } = await renderGraph(
       createTestCoreServices({
+        database: createWasmTestDatabaseService(),
         platform: createTestPlatformService({ appPlatform: 'ios' }),
         mobileStorage: createTestMobileStorageService({ storage }),
       }),
@@ -175,6 +186,7 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
   it('publishes the app’s mobile onboarding and passes completeOnboarding through', async () => {
     const { app, appServices, result } = await renderGraph(
       createTestCoreServices({
+        database: createWasmTestDatabaseService(),
         platform: createTestPlatformService({ appPlatform: 'ios' }),
       }),
       'ios',

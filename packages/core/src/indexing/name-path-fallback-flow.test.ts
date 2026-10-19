@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createTestDatabaseService } from '../testing/database.ts'
+import { createNodeTestDatabaseService } from '../testing/database.ts'
 import {
   connectIndex,
   expectSuggestionOpensItsPath,
@@ -10,7 +10,7 @@ import {
 
 describe('colon and slash title flow', () => {
   it('projects, resolves, backlinks, and autocompletes a colon title', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     const targetPath = 'notes/test-long-with-parens-ampersand-follow-up.md'
     database.applyProjection(
       project(targetPath, '# Test: Long With Parens & Ampersand Follow-up\n', 20),
@@ -42,7 +42,7 @@ describe('colon and slash title flow', () => {
   })
 
   it('resolves and backlinks a slash title when no file matches the path reading', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     const targetPath = 'notes/johnsally-meeting-notes.md'
     database.applyProjection(project(targetPath, '# john/sally meeting notes\n', 20))
     database.applyProjection(
@@ -70,7 +70,7 @@ describe('colon and slash title flow', () => {
   })
 
   it('keeps the exact file win over a same-spelled title, in resolution and backlinks', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     database.applyProjection(project('Projects/Plan.md', '# Weekly Planning\n', 20))
     database.applyProjection(project('notes/imposter.md', '# Projects/Plan\n', 30))
     database.applyProjection(project('daily/2026-08-04.md', 'See [[Projects/Plan]].\n', 10))
@@ -93,7 +93,7 @@ describe('colon and slash title flow', () => {
   })
 
   it('gives a rooted path no name fallback, in resolution or backlinks', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     database.applyProjection(project('notes/missing.md', '# /Missing\n', 20))
     database.applyProjection(project('daily/2026-08-04.md', 'See [[/Missing]].\n', 10))
     const index = connectIndex(database)
@@ -112,7 +112,7 @@ describe('colon and slash title flow', () => {
   })
 
   it('backlinks a fragment-carrying slashed target through its name fallback', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     const targetPath = 'notes/missingplan.md'
     database.applyProjection(project(targetPath, '# Missing/Plan\n', 20))
     database.applyProjection(project('daily/2026-08-04.md', 'See [[Missing/Plan#Next]].\n', 10))
@@ -134,7 +134,7 @@ describe('colon and slash title flow', () => {
   })
 
   it('backlinks a .md-suffixed slashed target through its name fallback', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     const targetPath = 'notes/missingplan.md'
     database.applyProjection(project(targetPath, '# Missing/Plan\n', 20))
     database.applyProjection(project('daily/2026-08-04.md', 'See [[Missing/Plan.md]].\n', 10))

@@ -12,6 +12,7 @@ import {
 import { createTestCoreServices } from '@reflect/core/testing'
 import { queryKeys } from '@/lib/query-client.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { PublishedUrlSection } from './published-url-section.tsx'
 
 // What the index answers for the note; each test sets it before `renderSection`.
@@ -39,7 +40,10 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
 
 async function renderSection(path = 'notes/a.md') {
   operations = createTestOperationsService()
-  const app = createTestCoreServices({ progress: operations })
+  const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    progress: operations,
+  })
   vi.spyOn(app.indexQuery, 'getNote').mockImplementation(() => Promise.resolve(row ?? undefined))
   publish = vi
     .spyOn(app.gistPublish, 'publish')

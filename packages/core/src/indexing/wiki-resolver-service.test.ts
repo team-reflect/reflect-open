@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createTestDatabaseService,
+  createNodeTestDatabaseService,
   seedNotes,
   type TestDatabaseService,
   type TestNote,
@@ -8,7 +8,7 @@ import {
 import { createWikiResolverService } from './wiki-resolver-service.ts'
 
 function seeded(notes: readonly TestNote[]): TestDatabaseService {
-  const database = createTestDatabaseService()
+  const database = createNodeTestDatabaseService()
   seedNotes(database, notes)
   return database
 }
@@ -72,7 +72,7 @@ describe('resolveWikiTarget', () => {
   })
 
   it('short-circuits a blank target before querying the index', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
 
     await expect(createWikiResolverService({ database }).resolveWikiTarget('   ')).resolves.toEqual(
       { kind: 'unresolved', text: '' },
@@ -99,7 +99,7 @@ describe('findWikiTargetMatch', () => {
   })
 
   it('reports an unclaimed key as tier 0 and never queries when the key is blank', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     const wikiResolver = createWikiResolverService({ database })
 
     await expect(wikiResolver.findWikiTargetMatch('missing')).resolves.toEqual({

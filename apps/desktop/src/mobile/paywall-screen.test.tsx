@@ -21,6 +21,7 @@ import {
 } from '@reflect/core/testing'
 import { mutationKeys, mutationScopeIds } from '@/lib/query-client.ts'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { PaywallScreen } from './paywall-screen.tsx'
 
 const YEARLY_PRODUCT = {
@@ -72,6 +73,7 @@ beforeEach(() => {
   syncs = 0
   redeems = 0
   const base = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     platform: createTestPlatformService({ appPlatform: 'ios' }),
   })
   logger = base.logger

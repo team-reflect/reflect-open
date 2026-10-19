@@ -11,6 +11,7 @@ import type { Route } from '@/routing/route.ts'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyStream } from './daily-stream.tsx'
 
 /**
@@ -117,7 +118,10 @@ async function renderStream() {
     </div>,
     {
       // The tests name days by the real date, so the app runs on the system clock.
-      app: createTestCoreServices({ clock: createSystemClock() }),
+      app: createTestCoreServices({
+        database: createWasmTestDatabaseService(),
+        clock: createSystemClock(),
+      }),
       settings: { dateFormat: 'mdy' },
       route: { kind: 'today' },
     },

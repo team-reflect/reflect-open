@@ -7,6 +7,7 @@ import { useRouter } from '@/routing/router.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { IncomingBacklinks } from './incoming-backlinks.tsx'
 
 let app: TestCoreServices
@@ -50,7 +51,7 @@ function renderSection(path: string) {
 
 beforeEach(async () => {
   await page.viewport(375, 700)
-  app = createTestCoreServices()
+  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
   getBacklinksWithContext = vi.spyOn(app.backlinks, 'getBacklinksWithContext')
 })
 

@@ -19,6 +19,7 @@ import {
 import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 
 const dispatchDeepLink = vi.fn<(url: string) => void>()
 const resolveMarkdownHref = vi.fn()
@@ -36,9 +37,14 @@ let onLinkClick: LinkClickHandler
 
 async function mount(sourcePath: string | null): Promise<void> {
   const graphSession = createTestGraphSessionService()
-  const app = createTestCoreServices({ attachments, graphSession })
+  const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    attachments,
+    graphSession,
+  })
   const linkNavigation = createTestAppServices(
     createTestCoreServices({
+      database: createWasmTestDatabaseService(),
       graphSession,
       noteLinkResolver: { resolveWikiTarget: vi.fn(), resolveMarkdownHref },
       attachments,
@@ -46,9 +52,13 @@ async function mount(sourcePath: string | null): Promise<void> {
     {
       window: createTestWindowService({ openNoteWindow }),
       opener,
-      deepLinkRouter: Object.assign(createTestAppServices().deepLinkRouter, {
-        dispatch: dispatchDeepLink,
-      }),
+      deepLinkRouter: Object.assign(
+        createTestAppServices(createTestCoreServices({ database: createWasmTestDatabaseService() }))
+          .deepLinkRouter,
+        {
+          dispatch: dispatchDeepLink,
+        },
+      ),
     },
   ).linkNavigation
   const { result } = await renderHookInApp(() => useMarkdownLinkClick(sourcePath), {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createTestDatabaseService,
+  createNodeTestDatabaseService,
   seedNotes,
   type TestDatabaseService,
   type TestNote,
@@ -8,7 +8,7 @@ import {
 import { createIndexQueryService, type IndexQueryService } from './index-query-service.ts'
 
 function seeded(notes: readonly TestNote[]): TestDatabaseService {
-  const database = createTestDatabaseService()
+  const database = createNodeTestDatabaseService()
   seedNotes(database, notes)
   return database
 }
@@ -79,7 +79,7 @@ describe('getDuplicateNoteIds', () => {
 
 describe('getNoteIdsByPath', () => {
   it('asks nothing for no paths', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     await expect(createIndexQueryService({ database }).getNoteIdsByPath([])).resolves.toEqual(
       new Map(),
     )
@@ -120,7 +120,7 @@ describe('getIndexedFileFactsByPath', () => {
 })
 
 function setup(): IndexQueryService {
-  const database = createTestDatabaseService()
+  const database = createNodeTestDatabaseService()
   seedNotes(database, [
     {
       path: 'notes/project-x.md',
@@ -168,7 +168,7 @@ describe('resolveNoteTarget', () => {
 
 describe('listTemplates', () => {
   it('lists only template-kind rows, A→Z by folded title', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     seedNotes(database, [
       { path: 'templates/person.md', markdown: '# person\n', mtime: 2 },
       { path: 'templates/journal.md', markdown: '# Journal\n', mtime: 1 },

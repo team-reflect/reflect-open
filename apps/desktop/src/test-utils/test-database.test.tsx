@@ -13,7 +13,7 @@ function projection(path: string, source: string) {
 
 describe('createWasmTestDatabaseService', () => {
   it('answers the shared queries from seeded projections', async () => {
-    const database = await createWasmTestDatabaseService()
+    const database = createWasmTestDatabaseService()
     database.applyProjection(projection('notes/hub.md', '# Hub\n'))
     database.applyProjection(projection('daily/2026-01-10.md', '[[Hub]]\n'))
     const suggestionService = createSuggestionService({ database })
@@ -26,15 +26,15 @@ describe('createWasmTestDatabaseService', () => {
   })
 
   it('rejects queries after close', async () => {
-    const database = await createWasmTestDatabaseService()
+    const database = createWasmTestDatabaseService()
     database.close()
     await expect(database.runQuery('select 1', [])).rejects.toMatchObject({ kind: 'unknown' })
   })
 })
 
 describe('createTestCoreServices in the browser', () => {
-  it('reads the index through the wasm database by default', async () => {
-    const app = createTestCoreServices()
+  it('reads the index through the wasm database it is given', async () => {
+    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
     seedNotes(app.database, [{ path: 'notes/hub.md', markdown: '# Hub\n' }])
     try {
       await expect(app.wikiResolver.resolveWikiTarget('Hub')).resolves.toEqual({

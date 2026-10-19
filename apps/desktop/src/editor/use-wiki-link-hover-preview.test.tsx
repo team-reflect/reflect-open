@@ -7,6 +7,7 @@ import {
   type TestOpenGraph,
 } from '@reflect/core/testing'
 import { renderHookInApp, renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useWikiLinkHoverPreview } from './use-wiki-link-hover-preview.tsx'
 
 const markdownPreview = vi.hoisted(() => vi.fn())
@@ -43,7 +44,7 @@ async function setupRenderer(
 
 describe('useWikiLinkHoverPreview', () => {
   beforeEach(() => {
-    app = createTestCoreServices()
+    app = createTestCoreServices({ database: createWasmTestDatabaseService() })
     markdownPreview.mockReset()
   })
 

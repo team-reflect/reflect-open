@@ -1,4 +1,8 @@
-import sqlite3InitModule, { type Database, type SqlValue } from '@sqlite.org/sqlite-wasm'
+import sqlite3InitModule, {
+  type Database,
+  type Sqlite3Static,
+  type SqlValue,
+} from '@sqlite.org/sqlite-wasm'
 import {
   CLAIM_TIER,
   dateFromDailyPath,
@@ -101,9 +105,13 @@ function run(db: Database, sql: string, params: readonly unknown[] = []): void {
   db.exec({ sql, bind: params.map(bindValue) })
 }
 
-/** Open an in-memory index database and apply every migration in order. */
+/** Load SQLite wasm and open an index database over it. */
 export async function createDevIndexDb(): Promise<DevIndexDb> {
-  const sqlite3 = await sqlite3InitModule()
+  return openDevIndexDb(await sqlite3InitModule())
+}
+
+/** Open an in-memory index database over `sqlite3` and apply every migration in order. */
+export function openDevIndexDb(sqlite3: Sqlite3Static): DevIndexDb {
   const db = new sqlite3.oo1.DB()
   // The schema relies on ON DELETE CASCADE (removing a `notes` row clears its
   // child tables); SQLite ships with foreign keys off per connection.

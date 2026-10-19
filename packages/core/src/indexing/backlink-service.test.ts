@@ -2,7 +2,7 @@ import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { describe, expect, it, vi } from 'vitest'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import {
-  createTestDatabaseService,
+  createNodeTestDatabaseService,
   seedNotes,
   type TestDatabaseService,
   type TestNote,
@@ -11,7 +11,7 @@ import { createTestNoteFileService } from '../testing/graph.ts'
 import { createBacklinkService, type BacklinkService } from './backlink-service.ts'
 
 function seeded(notes: readonly TestNote[]): TestDatabaseService {
-  const database = createTestDatabaseService()
+  const database = createNodeTestDatabaseService()
   seedNotes(database, notes)
   return database
 }

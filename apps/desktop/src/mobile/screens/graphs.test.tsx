@@ -10,6 +10,7 @@ import {
   createTestPlatformService,
 } from '@reflect/core/testing'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileGraphs } from './graphs.tsx'
 
 /**
@@ -53,6 +54,7 @@ let completeOnboarding: MockInstance<CompleteOnboarding>
  */
 async function mount(storage: MobileStorageInfo = STORAGE): Promise<void> {
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     platform: createTestPlatformService(MOBILE_PLATFORM),
     mobileStorage: createTestMobileStorageService({ storage }),
   })

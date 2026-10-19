@@ -13,6 +13,7 @@ import type { ReactNode } from 'react'
 import { useRouter } from '@/routing/router.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { BacklinksPanel } from './backlinks-panel.tsx'
 import { deepLinkForRoute } from '@reflect/app'
 
@@ -27,7 +28,7 @@ function wrapBacklinkContexts(contexts: BacklinkContext[]): BacklinkContextPage 
 }
 
 function createApp() {
-  const services = createTestCoreServices()
+  const services = createTestCoreServices({ database: createWasmTestDatabaseService() })
   vi.spyOn(services.backlinks, 'getBacklinksWithContext').mockImplementation(
     getBacklinksWithContext,
   )

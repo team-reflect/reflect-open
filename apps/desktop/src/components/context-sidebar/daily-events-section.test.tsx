@@ -60,13 +60,11 @@ async function renderSection(): Promise<HTMLElement> {
   return container
 }
 
-beforeEach(async () => {
+beforeEach(() => {
   stored = { calendarEnabled: true, calendarIds: ['cal-work'] }
   calendar = createTestCalendarService()
   contacts = createTestContactsService({ status: 'unavailable' })
-  // Already open: the attendee field ignores Enter while its suggestions
-  // load, and the default test database opens on its first query.
-  database = await createWasmTestDatabaseService()
+  database = createWasmTestDatabaseService()
   app = createTestCoreServices({ calendar, contacts, database })
   addMeetingToDaily = vi.spyOn(app.meetings, 'addMeetingToDaily')
   return () => database.close()

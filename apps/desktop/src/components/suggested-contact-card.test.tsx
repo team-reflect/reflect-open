@@ -9,6 +9,7 @@ import {
 } from '@reflect/core/testing'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { SuggestedContactCard } from './suggested-contact-card.tsx'
 
 const PATH = 'notes/Ada Lovelace.md'
@@ -29,7 +30,7 @@ let contacts: TestContactsService
  */
 async function renderCard(contactsEnabled = true): Promise<void> {
   await renderInApp(<SuggestedContactCard path={PATH} />, {
-    app: createTestCoreServices({ noteFile, contacts }),
+    app: createTestCoreServices({ database: createWasmTestDatabaseService(), noteFile, contacts }),
     // The card writes with the generation of the open graph.
     graph: { root: '/g', generation: 3 },
     settings: { contactsEnabled },

@@ -290,15 +290,6 @@ export default defineESLintConfig(
       'no-restricted-syntax': ['error', ...MODULE_LET_SELECTORS, ...CODE_SHAPE_SELECTORS],
     },
   },
-  {
-    // `setTestDatabaseOpener`: the one process-wide test hook. The browser
-    // projects install the wasm database once per page, before any test
-    // builds its services. It is exported from `@reflect/core/testing` only.
-    files: ['packages/core/src/testing/database.ts'],
-    rules: {
-      'no-restricted-syntax': ['error', ...CODE_SHAPE_SELECTORS],
-    },
-  },
 
   // Rule: the desktop app reaches the platform through the adapters in
   // `services/`. Everything else gets a service from `useCoreServices()` / `ctx`.

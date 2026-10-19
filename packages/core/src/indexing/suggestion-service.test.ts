@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createTestDatabaseService,
+  createNodeTestDatabaseService,
   seedNotes,
   type TestDatabaseService,
   type TestNote,
@@ -8,7 +8,7 @@ import {
 import { createSuggestionService } from './suggestion-service.ts'
 
 function seeded(notes: readonly TestNote[]): TestDatabaseService {
-  const database = createTestDatabaseService()
+  const database = createNodeTestDatabaseService()
   seedNotes(database, notes)
   return database
 }
@@ -39,7 +39,7 @@ describe('suggestWikiTargets', () => {
   const clock = { today: '2020-01-01', dateFormat: 'dmy' as const, weekStartDay: 'monday' as const }
 
   it('synthesises a daily target from a fuzzy query when given a clock', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
 
     await expect(
       createSuggestionService({ database }).suggestWikiTargets('3 days ago', 8, clock),
@@ -70,14 +70,14 @@ describe('suggestWikiTargets', () => {
   })
 
   it('does not synthesise dates without a clock', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     await expect(
       createSuggestionService({ database }).suggestWikiTargets('today'),
     ).resolves.toEqual([])
   })
 
   it('still injects the bare daily for a full ISO query without a clock', async () => {
-    const database = createTestDatabaseService()
+    const database = createNodeTestDatabaseService()
     await expect(
       createSuggestionService({ database }).suggestWikiTargets('2020-01-01'),
     ).resolves.toEqual([

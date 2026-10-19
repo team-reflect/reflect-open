@@ -19,6 +19,7 @@ import {
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { GithubAuthStep } from './github-auth-step.tsx'
 
 // The device flow leads and the PAT path sits behind a "use a personal access
@@ -50,6 +51,7 @@ beforeEach(() => {
  */
 async function renderStep(step: ReactNode): Promise<void> {
   const app = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
     http,
     secretStore: keychain,
     platform: createTestPlatformService({ isMacosDesktop: false, hasMacosTitleBarOverlay: false }),
