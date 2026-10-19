@@ -309,7 +309,7 @@ const NO_CONSOLE = [
 export default defineESLintConfig(
   {
     react: {
-      version: '19.2',
+      version: '19.3',
       reactCompiler: true,
       files: ['**/*.tsx', './apps/desktop/src/**/*.ts'],
     },
