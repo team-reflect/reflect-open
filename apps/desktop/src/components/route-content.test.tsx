@@ -90,9 +90,9 @@ vi.mock('@/components/settings-screen.tsx', () => ({
 }))
 // The chat screen needs a chat session (covered by its own tests);
 // here only the route → view mapping is under test.
-vi.mock('@/components/chat/chat-screen.tsx', () => ({
-  ChatScreen: () => <div data-testid="chat-screen" />,
-}))
+// vi.mock('@/components/chat/chat-screen.tsx', () => ({
+//   ChatScreen: () => <div data-testid="chat-screen" />,
+// })) // FIXME: notice that we don't really need to mock this. We can add data-testid to chat-screen.tsx, and then we just assert that. Remove "components/chat/chat-screen.tsx" in the eslint.config.js; remove this vi.mock. Notice that we're allow to add data-testid to production components. It's okay to have extra data-testid in production code that's only used for test.
 
 /**
  * The note files a test seeds before it renders.

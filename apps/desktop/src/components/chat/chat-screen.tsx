@@ -24,7 +24,7 @@ export function ChatScreen(): ReactElement {
 
   if (providers.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center px-6">
+      <div className="flex h-full items-center justify-center px-6" data-testid="chat-screen">
         <div className="flex max-w-sm flex-col items-center text-center">
           <MessageSquare aria-hidden strokeWidth={1.5} className="size-8 text-text-muted" />
           <h2 className="mt-4 text-lg font-semibold text-text">Chat with your notes</h2>
@@ -60,6 +60,7 @@ export function ChatScreen(): ReactElement {
           void attachImages(files)
         }
       }}
+      data-testid="chat-screen"
     >
       <ChatTurnList />
       <ChatInput />
