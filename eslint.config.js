@@ -342,7 +342,7 @@ export default defineESLintConfig(
     plugins: { architecture: architecturePlugin },
     rules: { 'architecture/maybe-promise': 'error' },
   },
-  // Rule: core is platform-agnostic. It imports no Tauri, React, TanStack or app code.
+  // Rule: core is platform-agnostic. It imports no Tauri, React, TanStack or app code. // FIXME: our tsconfig.json and package.json already ensure that we cannot import `@reflect/app` from `@reflect/core`. This rule (and rules similar) is redundant and should be removed.
   {
     files: [`packages/core/**/*.${SOURCE_EXTENSIONS}`],
     rules: {
