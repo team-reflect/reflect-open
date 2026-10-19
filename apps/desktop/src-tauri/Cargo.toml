@@ -58,13 +58,7 @@ git2 = { workspace = true }
 # the plugin treats as "send no Origin header" (see providerFetch's doc).
 tauri-plugin-http = { workspace = true, features = ["unsafe-headers"] }
 # Link capture (Plan 11): screenshot downscale + the bounded meta-scrape fetch.
-image = { workspace = true, features = [
-  "gif",
-  "ico",
-  "jpeg",
-  "png",
-  "webp",
-] }
+image = { workspace = true, features = ["gif", "ico", "jpeg", "png", "webp"] }
 reqwest = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -136,11 +130,7 @@ block2 = { workspace = true }
 # Finite-length execution assertions around iOS persistence. UIKit's begin/end
 # methods keep file and SQLite locks from surviving process suspension.
 [target.'cfg(target_os = "ios")'.dependencies]
-objc2-ui-kit = { workspace = true, features = [
-  "std",
-  "UIApplication",
-  "block2",
-] }
+objc2-ui-kit = { workspace = true, features = ["std", "UIApplication", "block2"] }
 tauri-plugin-iap = { workspace = true }
 tauri-plugin-app-store = { workspace = true }
 tauri-plugin-web-auth = { workspace = true }
