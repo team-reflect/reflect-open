@@ -122,7 +122,7 @@ the affected behavior. A `chore` commit alone does not trigger a release.
 
 ### Configuration
 
-The workflow reads repository Actions secrets `CHROME_PUBLISHER_ID`,
+The workflow reads the `release_extension` environment secrets `CHROME_PUBLISHER_ID`,
 `CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL`, and `CHROME_SERVICE_ACCOUNT_PRIVATE_KEY`.
 The service account must be linked to the existing publisher in the Chrome Web
 Store dashboard. See [Google's setup instructions](https://developer.chrome.com/docs/webstore/service-accounts).

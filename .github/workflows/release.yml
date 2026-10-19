@@ -85,10 +85,6 @@ jobs:
     with:
       tag: ${{ needs.release-please.outputs.extension_tag }}
       commit: ${{ needs.release-please.outputs.extension_commit }}
-    secrets:
-      CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
-      CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
-      CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
 
   # Merging a Release PR makes its channel's pass above create a draft release
   # and output its tag. Chain straight into the desktop pipeline with the tag
@@ -104,16 +100,6 @@ jobs:
     with:
       tag: ${{ needs.release-please.outputs.stable_tag }}
       commit: ${{ needs.release-please.outputs.stable_commit }}
-    secrets:
-      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-      APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
-      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
   publish-desktop-beta:
     name: Publish the beta desktop release
@@ -125,13 +111,3 @@ jobs:
     with:
       tag: ${{ needs.release-please.outputs.beta_tag }}
       commit: ${{ needs.release-please.outputs.beta_commit }}
-    secrets:
-      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-      APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
-      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}

@@ -11,25 +11,6 @@ on:
         description: Immutable commit targeted by the release tag
         type: string
         required: true
-    secrets:
-      APPLE_SIGNING_IDENTITY:
-        required: true
-      APPLE_CERTIFICATE:
-        required: true
-      APPLE_CERTIFICATE_PASSWORD:
-        required: true
-      APPLE_API_KEY:
-        required: true
-      APPLE_API_ISSUER:
-        required: true
-      APPLE_API_KEY_CONTENT:
-        required: true
-      SENTRY_AUTH_TOKEN:
-        required: true
-      SENTRY_DSN:
-        required: true
-      TAURI_SIGNING_PRIVATE_KEY:
-        required: true
 
 concurrency:
   group: publish-macos
@@ -46,6 +27,7 @@ jobs:
   macos:
     name: Build macOS ${{ matrix.name }}
     if: github.repository == 'team-reflect/reflect-open'
+    environment: release_app
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     strategy:

@@ -11,13 +11,6 @@ on:
         description: Immutable commit targeted by the release tag
         type: string
         required: true
-    secrets:
-      CHROME_PUBLISHER_ID:
-        required: true
-      CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL:
-        required: true
-      CHROME_SERVICE_ACCOUNT_PRIVATE_KEY:
-        required: true
 
 concurrency:
   group: publish-browser-extension
@@ -31,6 +24,7 @@ jobs:
   release:
     name: Build browser extension
     if: github.repository == 'team-reflect/reflect-open' && github.ref == 'refs/heads/master'
+    environment: release_extension
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

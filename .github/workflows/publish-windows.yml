@@ -11,9 +11,6 @@ on:
         description: Immutable commit targeted by the release tag.
         required: true
         type: string
-    secrets:
-      TAURI_SIGNING_PRIVATE_KEY:
-        required: false
 
 concurrency:
   group: publish-windows
@@ -30,6 +27,7 @@ jobs:
   windows:
     name: Build Windows ${{ matrix.name }}
     if: github.repository == 'team-reflect/reflect-open'
+    environment: release_app
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     strategy:
