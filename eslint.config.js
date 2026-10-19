@@ -357,14 +357,9 @@ export default defineESLintConfig(
     // builds its services. It is exported from `@reflect/core/testing` only.
     files: ['packages/core/src/testing/database.ts'],
     rules: {
-      'no-restricted-syntax': [
-        'error',
-        ...DEFAULT_INSTANCE_SELECTORS,
-        ...CODE_SHAPE_SELECTORS,
-      ],
+      'no-restricted-syntax': ['error', ...DEFAULT_INSTANCE_SELECTORS, ...CODE_SHAPE_SELECTORS],
     },
   },
-
 
   // Rule: the desktop app reaches the platform through the adapters in
   // `services/`. Everything else gets a service from `useCoreServices()` / `ctx`.
