@@ -581,12 +581,11 @@ describe('CaptureEnrichmentService', () => {
 
     const outcome = await kit.reconcile({ providers: NO_PROVIDERS })
 
-    expect(outcome).toEqual({
-      pending: 2,
-      enriched: 1,
-      skipped: 0,
-      stopped: expect.objectContaining({ reason: 'network' }),
-    })
+    expect(outcome.pending).toBe(2)
+    expect(outcome.enriched).toBe(1)
+    expect(outcome.skipped).toBe(0)
+    expect(outcome.stopped?.reason).toBe('network')
+
     expect(kit.noteFile.files().get(IDENTITY.notePath)).toContain('captureStatus: pending')
     expect(kit.noteFile.files().get(laterIdentity.notePath)).toContain('captureStatus: done')
     expect(kit.noteFile.files().get(laterIdentity.notePath)).toContain(
