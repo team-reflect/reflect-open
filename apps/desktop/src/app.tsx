@@ -11,7 +11,7 @@ import { useEffect, type ReactElement } from 'react'
  */
 export function App(): ReactElement {
   const { quitPolicy, window } = useAppServices()
-  const { status, graph, error } = useGraph()
+  const { graph, status, error } = useGraph()
 
   // Quit-time persistence: flush dirty note buffers when exiting, awaiting
   // persistence before destruction but hiding the macOS main window first.
