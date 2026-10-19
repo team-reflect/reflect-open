@@ -25,15 +25,6 @@ Choose one format:
 A Linux build failure does not block a release, so a release can lack some or
 all Linux packages.
 
-To test a build that is not a release, use GitHub Actions:
-
-1. Open the repo's **Actions** tab and select the **Publish Linux** workflow.
-2. Open the newest successful run.
-3. Download the `reflect-linux-x64` or `reflect-linux-arm64` artifact and
-   unzip it. It contains the AppImage and the `.deb`.
-
-Artifacts expire after 30 days.
-
 ## What to expect
 
 - **Supported systems:** glibc 2.39 or newer, for example Ubuntu 24.04+,

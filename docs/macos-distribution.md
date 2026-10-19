@@ -163,10 +163,7 @@ failed jobs of the Release run.
 ### Hotfix
 
 A hotfix is a normal PR: land the `fix:` on `master`, then merge the stable Release
-PR that now offers the patch release. If `master` already carries unreleased work
-that must not ship in the fix, there is no shortcut: the publish workflows run only
-when a Release PR merges on `master`, so revert that work on `master` first or ship it
-with the fix.
+PR that now offers the patch release.
 
 ### Release automation files
 

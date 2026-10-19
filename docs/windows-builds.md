@@ -13,15 +13,6 @@ Every release lists two NSIS installers on its GitHub release page:
 A Windows build failure does not block a release, so a release can lack one or
 both installers.
 
-To test a build that is not a release, use GitHub Actions:
-
-1. Open the repo's **Actions** tab and select the **Publish Windows** workflow.
-2. Open the newest successful run.
-3. Download the `reflect-windows-x64` or `reflect-windows-arm64` artifact and
-   unzip it. It contains the NSIS installer (`*-setup.exe`).
-
-Artifacts expire after 30 days.
-
 ## What to expect
 
 - **Supported OS:** Windows 10 22H2 (x64) or Windows 11 (x64 or arm64). The
