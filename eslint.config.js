@@ -211,12 +211,6 @@ function viMockBlock(files, allow) {
 // Imports
 // ---------------------------------------------------------------------------
 
-const CORE_IMPORT_MESSAGE =
-  '`@reflect/core` is platform-agnostic: no Tauri, no React, no TanStack, nothing from `apps/`. A platform adapter lives in `apps/desktop/src/services/` and reaches core through `createCoreServices(adapters)`.'
-
-const APP_IMPORT_MESSAGE =
-  '`@reflect/app` is the app layer over `@reflect/core`: no Tauri, no React, no TanStack, nothing from `apps/`. A platform adapter lives in `apps/desktop/src/services/` and reaches the app layer through `createAppServices(core, host)`.'
-
 const TAURI_IMPORT_MESSAGE =
   'Only the platform adapters in `apps/desktop/src/services/` (and `boot.ts`, `main.tsx`) import `@tauri-apps/*`. Read the service from `useCoreServices()` or take it in `ctx`.'
 
@@ -263,13 +257,6 @@ const MODULE_LET_SELECTORS = [
     message:
       'No module-level mutable state in `@reflect/core`: state lives in the `#` fields of the service that `createXxxService(deps)` builds, so each `createCoreServices()` (and each test) gets its own.',
   },
-]
-
-const CORE_DYNAMIC_IMPORT_SELECTORS = [
-  dynamicImportSelector(
-    String.raw`^(?:@tauri-apps\/|@tanstack\/|react(?:-dom)?(?:\/|$))`,
-    CORE_IMPORT_MESSAGE,
-  ),
 ]
 
 // ---------------------------------------------------------------------------
@@ -342,41 +329,10 @@ export default defineESLintConfig(
     plugins: { architecture: architecturePlugin },
     rules: { 'architecture/maybe-promise': 'error' },
   },
-  // Rule: core is platform-agnostic. It imports no Tauri, React, TanStack or app code. // FIXME: our tsconfig.json and package.json already ensure that we cannot import `@reflect/app` from `@reflect/core`. This rule (and rules similar) is redundant and should be removed.
   {
     files: [`packages/core/**/*.${SOURCE_EXTENSIONS}`],
     rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: [
-                '@tauri-apps/*',
-                '@tanstack/*',
-                'react',
-                'react/*',
-                'react-dom',
-                'react-dom/*',
-              ],
-              message: CORE_IMPORT_MESSAGE,
-            },
-            {
-              group: [
-                '@/*',
-                '@reflect/app',
-                '@reflect/app/*',
-                '@reflect/desktop',
-                '@reflect/desktop/*',
-                '@reflect/extension',
-                '**/apps/**',
-              ],
-              message: CORE_IMPORT_MESSAGE,
-            },
-          ],
-        },
-      ],
-      'no-restricted-syntax': ['error', ...CORE_DYNAMIC_IMPORT_SELECTORS, ...CODE_SHAPE_SELECTORS],
+      'no-restricted-syntax': ['error', ...CODE_SHAPE_SELECTORS],
     },
   },
 
@@ -389,7 +345,6 @@ export default defineESLintConfig(
     rules: {
       'no-restricted-syntax': [
         'error',
-        ...CORE_DYNAMIC_IMPORT_SELECTORS,
         ...DEFAULT_INSTANCE_SELECTORS,
         ...MODULE_LET_SELECTORS,
         ...CODE_SHAPE_SELECTORS,
@@ -404,7 +359,6 @@ export default defineESLintConfig(
     rules: {
       'no-restricted-syntax': [
         'error',
-        ...CORE_DYNAMIC_IMPORT_SELECTORS,
         ...DEFAULT_INSTANCE_SELECTORS,
         ...CODE_SHAPE_SELECTORS,
       ],
