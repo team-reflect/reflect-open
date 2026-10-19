@@ -39,5 +39,4 @@ ExtensionClass.prototype = {
 }
 
 // The global Safari looks up by name to run the preprocessor.
-// eslint-disable-next-line no-unused-vars
 var ExtensionPreprocessingJS = new ExtensionClass()

@@ -1,3 +1,7 @@
+apps/desktop/src-tauri/gen/apple/xcuserdata/
+apps/desktop/src-tauri/gen/apple/build/
+apps/desktop/src-tauri/gen/apple/Externals/
+
 # Logs
 logs
 *.log

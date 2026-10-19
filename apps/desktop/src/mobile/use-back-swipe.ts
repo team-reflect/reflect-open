@@ -176,7 +176,6 @@ export function useBackSwipe({
   // never paints a dragged frame. The ref write must be visible to this same
   // render (the router's currentId does the same; see router.tsx).
   if (!enabled && state.phase !== 'idle') {
-    // eslint-disable-next-line react-hooks/refs
     stateRef.current = IDLE
     setState(IDLE)
   }

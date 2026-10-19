@@ -105,7 +105,6 @@ export function RouterProvider({
   // effects read this (through saveScrollState/savedScroll) on the same
   // commit, and React runs effects child-before-parent — so updating it in an
   // effect here would lag a frame and restore or save the wrong entry's offset.
-  // eslint-disable-next-line react-hooks/refs
   renderedRef.current = state
 
   useEffect(() => {
