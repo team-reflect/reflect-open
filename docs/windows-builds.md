@@ -15,9 +15,8 @@ both installers.
 
 To test a build that is not a release, use GitHub Actions:
 
-1. Open the repo's **Actions** tab and select the **Windows** workflow.
-2. Open the newest successful run (anyone with write access can also start one
-   with **Run workflow**).
+1. Open the repo's **Actions** tab and select the **Publish Windows** workflow.
+2. Open the newest successful run.
 3. Download the `reflect-windows-x64` or `reflect-windows-arm64` artifact and
    unzip it. It contains the NSIS installer (`*-setup.exe`).
 

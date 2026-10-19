@@ -165,10 +165,9 @@ appropriate.
 
 A hotfix is a normal PR: land the `fix:` on `master`, then merge the stable Release
 PR that now offers the patch release. If `master` already carries unreleased work
-that must not ship in the fix, there is no Release PR shortcut: branch from the
-released tag, cherry-pick the fix, bump `version` in `apps/desktop/package.json` on
-that branch, run the manual fallback below on it, and land the fix on `master` as
-usual.
+that must not ship in the fix, there is no shortcut: the publish workflows run only
+when a Release PR merges on `master`, so revert that work on `master` first or ship it
+with the fix.
 
 ### Release automation files
 
@@ -188,19 +187,16 @@ Release PRs write `apps/desktop/package.json` (`version`); whichever merges seco
 regenerated on the next push, so there is nothing to reconcile by hand. Do not
 hand-edit the changelogs or manifests outside the flows above, and do not use
 `Release-As:` commit footers: human version interventions go through the manifest
-files (the no-Release-PR fallback below is the explicit exception), and a major
+files, and a major
 graduation such as `1.0.0` is a one-time `release-as` in both config files. The first beta of
 a new cycle is tagged without a number (`v0.6.0-beta`, then `-beta.1`, `-beta.2`, …)
 — a release-please naming quirk, not a bug.
 
-### Manual fallback (no Release PR)
+### Retrying a release
 
-For this exceptional recovery path, merge a PR that sets `version` in
-`apps/desktop/package.json` and create a draft release tagged `v<version>` at that
-commit. Run **Actions → Publish desktop → Run workflow** with the tag and the full
-commit SHA to build every platform, upload the assets, and publish the release. Afterwards,
-sync that channel's manifest file with a follow-up PR so release-please continues from
-the right version.
+The publish workflows run only from `release.yml`; there is no manual entry point. To
+retry, re-run the failed jobs of the Release run. A re-run uses the workflow files of the
+original run, and GitHub allows it for 30 days.
 
 ## Publishing to GitHub Releases
 
@@ -338,11 +334,11 @@ under **Settings → Secrets and variables → Actions**:
 
 Notes:
 
-- Apple ID notarization works instead of the API key: set `APPLE_ID` +
-  `APPLE_PASSWORD` (an app-specific password), plus `APPLE_TEAM_ID` if the signing
-  identity doesn't end in `(TEAMID)`.
-- Leave `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` unset: the key has no password, GitHub
-  rejects empty-string secrets, and the workflow defaults it to empty.
+- CI notarizes with the API key only. Apple ID notarization (`APPLE_ID` +
+  `APPLE_PASSWORD`, plus `APPLE_TEAM_ID` if the signing identity doesn't end in
+  `(TEAMID)`) is for local releases only.
+- The updater key has no password. The release scripts default
+  `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` to empty, so CI does not pass it.
 - No PAT is needed — the release is published with the workflow's own `GITHUB_TOKEN`.
 
 The workflow verifies the secrets before building, so a misconfigured runner fails in

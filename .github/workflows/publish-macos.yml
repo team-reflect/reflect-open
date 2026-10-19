@@ -1,7 +1,6 @@
 name: Publish macOS
 
 on:
-  workflow_dispatch:
   workflow_call:
     inputs:
       tag:
@@ -20,25 +19,17 @@ on:
       APPLE_CERTIFICATE_PASSWORD:
         required: true
       APPLE_API_KEY:
-        required: false
+        required: true
       APPLE_API_ISSUER:
-        required: false
+        required: true
       APPLE_API_KEY_CONTENT:
-        required: false
-      APPLE_ID:
-        required: false
-      APPLE_PASSWORD:
-        required: false
-      APPLE_TEAM_ID:
-        required: false
+        required: true
       SENTRY_AUTH_TOKEN:
         required: true
       SENTRY_DSN:
         required: true
       TAURI_SIGNING_PRIVATE_KEY:
         required: true
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
-        required: false
 
 concurrency:
   group: publish-macos
@@ -72,7 +63,7 @@ jobs:
         with:
           # Reusable workflows inherit the caller SHA, which may be newer or
           # older than the release. Build the verified immutable tag commit.
-          ref: ${{ inputs.commit || github.sha }}
+          ref: ${{ inputs.commit }}
           persist-credentials: false
 
       # Without the certificate, signing only fails at codesign time — after
@@ -86,20 +77,14 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           missing=()
-          for name in APPLE_SIGNING_IDENTITY APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD SENTRY_AUTH_TOKEN SENTRY_DSN TAURI_SIGNING_PRIVATE_KEY; do
+          for name in APPLE_SIGNING_IDENTITY APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_API_KEY APPLE_API_ISSUER APPLE_API_KEY_CONTENT SENTRY_AUTH_TOKEN SENTRY_DSN TAURI_SIGNING_PRIVATE_KEY; do
             [ -n "${!name}" ] || missing+=("$name")
           done
-          if { [ -z "$APPLE_API_KEY" ] || [ -z "$APPLE_API_ISSUER" ] || [ -z "$APPLE_API_KEY_CONTENT" ]; } &&
-            { [ -z "$APPLE_ID" ] || [ -z "$APPLE_PASSWORD" ]; }; then
-            missing+=("APPLE_API_KEY+APPLE_API_ISSUER+APPLE_API_KEY_CONTENT (or APPLE_ID+APPLE_PASSWORD)")
-          fi
           if [ "${#missing[@]}" -gt 0 ]; then
             echo "::error::missing release secret(s): ${missing[*]} — see docs/macos-distribution.md"
             exit 1
@@ -127,12 +112,8 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: pnpm release:macos --target=${{ matrix.target }} --artifact-dir="$RUNNER_TEMP/macos-artifacts"
 
@@ -149,7 +130,6 @@ jobs:
 
       # Uploads clobber, so a failed run can be retried.
       - name: Upload the assets to the draft release
-        if: inputs.tag != ''
         working-directory: ${{ runner.temp }}/macos-artifacts
         env:
           GH_TOKEN: ${{ github.token }}

@@ -2,8 +2,7 @@ name: Publish desktop
 
 # Builds, uploads, and publishes one desktop release (macOS, Windows, Linux,
 # and TestFlight) for a tag created by release-please. Called once per channel
-# by release.yml. Run it by hand to retry a release, or to publish a draft
-# release created without a Release PR.
+# by release.yml. To retry, re-run the failed jobs of the Release run.
 
 on:
   workflow_call:
@@ -29,29 +28,11 @@ on:
         required: true
       APPLE_API_KEY_CONTENT:
         required: true
-      APPLE_ID:
-        required: false
-      APPLE_PASSWORD:
-        required: false
-      APPLE_TEAM_ID:
-        required: false
       SENTRY_AUTH_TOKEN:
         required: true
       SENTRY_DSN:
         required: true
       TAURI_SIGNING_PRIVATE_KEY:
-        required: true
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
-        required: false
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: The tag (v<version>) of the draft release to build and publish
-        type: string
-        required: true
-      commit:
-        description: Full SHA of the commit the release targets
-        type: string
         required: true
 
 permissions:
@@ -71,13 +52,9 @@ jobs:
       APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
       APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   windows:
     name: Build the Windows installer
@@ -87,7 +64,6 @@ jobs:
       commit: ${{ inputs.commit }}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   linux:
     name: Build the Linux packages
@@ -97,7 +73,6 @@ jobs:
       commit: ${{ inputs.commit }}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   # Every release also ships to TestFlight. iOS needs no version bump of its
   # own: the marketing version follows apps/desktop/package.json with the
