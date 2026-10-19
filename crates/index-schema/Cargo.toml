@@ -2,6 +2,7 @@
 name = "reflect-index-schema"
 version = "0.1.0"
 description = "Shared schema + migrations for the graph's SQLite index projection"
+authors.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true

@@ -5,12 +5,10 @@ name = "reflect-open"
 # has no consumer — freezing it keeps Cargo.lock out of every release diff.
 version = "0.0.0"
 description = "The Reflect desktop and iOS app"
-authors = ["Reflect App, LLC"]
+authors.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
@@ -20,9 +18,6 @@ name = "reflect_open_lib"
 # `staticlib` links into the iOS app as `libapp.a`; `rlib` serves the desktop
 # binary. There is no Android target, so no `cdylib`.
 crate-type = ["staticlib", "rlib"]
-
-[build-dependencies]
-tauri-build = { workspace = true }
 
 [dependencies]
 http-range-header = { workspace = true }
@@ -192,6 +187,9 @@ windows-native-keyring-store = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 dbus-secret-service-keyring-store = { workspace = true, features = ["crypto-rust"] }
+
+[build-dependencies]
+tauri-build = { workspace = true }
 
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }

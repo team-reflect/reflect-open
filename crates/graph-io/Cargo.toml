@@ -1,10 +1,15 @@
 [package]
 name = "reflect-graph-io"
 version = "0.0.0"
+description = "Graph file IO with no Tauri in it: the open graph session, atomic note writes, the traversal guard, the per-graph lock, the Reflect V1 import, the X archive store and the conflict ladder."
+authors.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
-description = "Graph file IO with no Tauri in it: the open graph session, atomic note writes, the traversal guard, the per-graph lock, the Reflect V1 import, the X archive store and the conflict ladder."
+
+[features]
+# Test-only helpers that bypass the revision check and the graph lock.
+test-support = []
 
 [dependencies]
 serde = { workspace = true }
@@ -35,10 +40,6 @@ core-foundation = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 xattr = { workspace = true }
-
-[features]
-# Test-only helpers that bypass the revision check and the graph lock.
-test-support = []
 
 [dev-dependencies]
 proptest = { workspace = true }
