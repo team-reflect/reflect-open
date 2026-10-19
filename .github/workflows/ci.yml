@@ -155,6 +155,16 @@ jobs:
       - name: Format check
         run: cargo fmt --all -- --check
 
+      - name: Install cargo-shear
+        uses: taiki-e/install-action@861a07ce7084f55488e375df125cdc99bba60eb7 # v2.87.23
+        with:
+          tool: cargo-shear@1.14.0
+
+      # Fails on a dependency that no code uses, in a member or in the root
+      # `[workspace.dependencies]`.
+      - name: Unused dependencies
+        run: cargo shear
+
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
