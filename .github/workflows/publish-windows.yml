@@ -11,6 +11,9 @@ on:
         description: Immutable commit targeted by the release tag.
         required: true
         type: string
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
 
 concurrency:
   group: publish-windows
