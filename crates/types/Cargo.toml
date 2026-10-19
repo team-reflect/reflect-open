@@ -10,7 +10,7 @@ description = "The wire types every Rust crate and the TypeScript frontend share
 serde = { workspace = true }
 # Error conversions for the crates that own these dependencies. Each stays
 # optional so a host without libgit2 or SQLite (a wasm build) never links them.
-git2 = { version = "0.21.0", default-features = false, optional = true }
+git2 = { workspace = true, optional = true }
 rusqlite = { workspace = true, optional = true }
 
 [features]

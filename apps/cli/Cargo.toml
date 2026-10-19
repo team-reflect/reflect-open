@@ -14,15 +14,15 @@ path = "src/main.rs"
 rusqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-reflect-index-schema = { path = "../../crates/index-schema", default-features = false }
+reflect-index-schema = { workspace = true }
 reflect-graph-paths = { workspace = true }
-clap = { version = "4.6.7", features = ["derive"] }
-jiff = "0.2.38"
+clap = { workspace = true, features = ["derive"] }
+jiff = { workspace = true, features = ["default"] }
 sha2 = { workspace = true }
-pulldown-cmark = "0.13.4"
-saphyr = "0.2.2"
-unicode-normalization = "0.1.26"
+pulldown-cmark = { workspace = true }
+saphyr = { workspace = true }
+unicode-normalization = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
-reflect-index-schema = { path = "../../crates/index-schema" }
+reflect-index-schema = { workspace = true, features = ["default"] }
