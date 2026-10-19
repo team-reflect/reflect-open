@@ -20,8 +20,8 @@ import {
   createTestCoreServices,
   createTestPlatformService,
   createTestBackupService,
-  type TestCoreServiceOverrides,
   type TestCoreServices,
+  type TestDatabaseService,
   type TestBackupService,
   type TestOpenGraph,
   type TestPlatformOptions,
@@ -120,6 +120,25 @@ export interface InAppRenderHookResult<Result, Props, App extends CoreServices>
 type AnyOptions = RenderInAppOptions & { app?: CoreServices | undefined }
 
 /**
+ * The test core services over `database`, reporting to an app-layer operations list.
+ */
+function createApp(
+  database: TestDatabaseService,
+  backup: TestBackupService | null,
+  platform: TestPlatformOptions | undefined,
+): TestCoreServices {
+  const clock = createTestClockService()
+  return createTestCoreServices({
+    database,
+    clock,
+    // The app layer's operations list is the port the core services report to.
+    progress: createTestOperationsService(clock),
+    ...(platform === undefined ? {} : { platform: createTestPlatformService(platform) }),
+    ...(backup === null ? {} : { backup }),
+  })
+}
+
+/**
  * Prepare `app` and the provider tree; the caller renders `wrap(ui)` and calls `dispose` after.
  */
 async function prepare(options: AnyOptions | undefined): Promise<
@@ -135,18 +154,15 @@ async function prepare(options: AnyOptions | undefined): Promise<
       'renderInApp: with your own `app`, give it the platform and the backup service yourself',
     )
   }
-  const clock = createTestClockService()
-  const overrides: TestCoreServiceOverrides = {
-    database: createWasmTestDatabaseService(),
-    clock,
-    // The app layer's operations list is the port the core services report to.
-    progress: createTestOperationsService(clock),
-    ...(options?.platform === undefined
-      ? {}
-      : { platform: createTestPlatformService(options.platform) }),
-    ...(backup === null ? {} : { backup }),
+  // The database of an app this helper builds; `dispose` closes it. A caller's `app` keeps its own.
+  let database: TestDatabaseService | null = null
+  let app: CoreServices
+  if (options?.app === undefined) {
+    database = createWasmTestDatabaseService()
+    app = createApp(database, backup, options?.platform)
+  } else {
+    app = options.app
   }
-  const app: CoreServices = options?.app ?? createTestCoreServices(overrides)
   const servicesOnly = options?.servicesOnly ?? false
   if (
     servicesOnly &&
@@ -228,6 +244,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
     wrap,
     dispose: () => {
       queryClient.clear()
+      database?.close()
     },
   }
 }

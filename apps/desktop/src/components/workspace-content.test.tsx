@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ReactElement } from 'react'
 import type { Route } from '@reflect/app'
 import type { GraphInfo } from '@reflect/core'
+import { createTestCoreServices, seedNotes } from '@reflect/core/testing'
 import { PaletteProvider } from '@/components/command-palette/palette-provider.tsx'
 import { formatDayLabel } from '@/lib/dates.ts'
 import { AudioMemoProvider } from '@/providers/audio-memo-provider.tsx'
@@ -14,6 +15,7 @@ import { ShortcutsProvider } from '@/providers/shortcuts-provider.tsx'
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
 import { V1ImportProvider } from '@/providers/v1-import-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { WorkspaceContent } from './workspace-content.tsx'
 
 const GRAPH: GraphInfo = { root: '/notes', name: 'Notes', generation: 1 }
@@ -31,6 +33,11 @@ function SidebarToggle(): ReactElement {
 }
 
 function renderWorkspace(route: Route) {
+  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  // Pinned, so the sidebar of this note (and only this note) offers "Un-pin this note".
+  seedNotes(app.database, [
+    { path: 'notes/project.md', markdown: '---\npinned: true\n---\n# Project\n' },
+  ])
   // The providers of `GraphWorkspace`, inside the router of `renderInApp`.
   return renderInApp(
     <PaletteProvider>
@@ -54,6 +61,7 @@ function renderWorkspace(route: Route) {
       </ShortcutsProvider>
     </PaletteProvider>,
     {
+      app,
       graph: GRAPH,
       route,
       // The AppShell asides mount resize handles, which read the persisted widths.
@@ -100,10 +108,10 @@ describe('WorkspaceContent', () => {
 
   it('applies the same collapsed state to ordinary note context', async () => {
     const view = await renderWorkspace({ kind: 'note', path: 'notes/project.md' })
+    const context = view.getByRole('complementary', { name: 'Context' })
+    await expect.element(context.getByTestId('note-context-sidebar')).toBeInTheDocument()
     await expect
-      .element(
-        view.getByRole('complementary', { name: 'Context' }).getByTestId('note-context-sidebar'),
-      )
+      .element(context.getByRole('button', { name: 'Un-pin this note' }))
       .toBeInTheDocument()
 
     await view.getByRole('button', { name: 'Toggle sidebar' }).click()
