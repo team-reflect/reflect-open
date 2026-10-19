@@ -132,12 +132,6 @@ const DESKTOP_VI_MOCK_ALLOW_BY_FILE = {
   'apps/desktop/src/services/*.test.ts': ['@tauri-apps/*'],
 
   // Shell tests about layout and routing: the sibling screens are probes.
-  'apps/desktop/src/mobile/screens/note.test.tsx': [
-    '@/components/note-pane.tsx',
-    '@/mobile/incoming-backlinks.tsx',
-    '@/mobile/note-actions-menu.tsx',
-  ],
-  'apps/desktop/src/mobile/note-conflict.test.tsx': ['@/mobile/note-actions-menu.tsx'],
   'apps/desktop/src/mobile/screens/settings.test.tsx': ['@/mobile/connect-github-drawer.tsx'],
 
   // Heavy children: the pane and the task row mount the editor.
