@@ -139,18 +139,18 @@ jobs:
     needs: classify
     if: needs.classify.outputs.stack-middle == 'false'
     runs-on: ubuntu-24.04
+    # Clippy and the tests never run the desktop sidecars, so drop them from the
+    # Tauri config instead of building them (tauri-build and tauri-codegen merge
+    # this JSON into the config). `pnpm sidecar` still stages them for dev and
+    # release builds.
+    env:
+      TAURI_CONFIG: '{"bundle":{"externalBin":null}}'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-rust
-
-      - uses: ./.github/actions/setup-node
-
-      # tauri-build requires the sidecars before the desktop crate compiles.
-      - name: Stage desktop sidecars
-        run: node apps/desktop/scripts/build-sidecar.ts
 
       - name: Format check
         run: cargo fmt --all -- --check
@@ -172,18 +172,18 @@ jobs:
     needs: classify
     if: needs.classify.outputs.stack-middle == 'false'
     runs-on: ubuntu-24.04
+    # Clippy and the tests never run the desktop sidecars, so drop them from the
+    # Tauri config instead of building them (tauri-build and tauri-codegen merge
+    # this JSON into the config). `pnpm sidecar` still stages them for dev and
+    # release builds.
+    env:
+      TAURI_CONFIG: '{"bundle":{"externalBin":null}}'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-rust
-
-      - uses: ./.github/actions/setup-node
-
-      # tauri-build requires the sidecars before the desktop crate compiles.
-      - name: Stage desktop sidecars
-        run: node apps/desktop/scripts/build-sidecar.ts
 
       - name: Test
         run: cargo test --workspace
