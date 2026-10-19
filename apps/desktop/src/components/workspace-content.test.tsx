@@ -101,7 +101,9 @@ describe('WorkspaceContent', () => {
   it('applies the same collapsed state to ordinary note context', async () => {
     const view = await renderWorkspace({ kind: 'note', path: 'notes/project.md' })
     await expect
-      .element(view.getByRole('complementary', { name: 'Context' }).getByTestId('note-context-sidebar'))
+      .element(
+        view.getByRole('complementary', { name: 'Context' }).getByTestId('note-context-sidebar'),
+      )
       .toBeInTheDocument()
 
     await view.getByRole('button', { name: 'Toggle sidebar' }).click()

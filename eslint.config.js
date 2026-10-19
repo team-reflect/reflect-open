@@ -131,8 +131,6 @@ const DESKTOP_VI_MOCK_ALLOW_BY_FILE = {
   // Platform adapters: the test stands in for the Tauri API under the adapter.
   'apps/desktop/src/services/*.test.ts': ['@tauri-apps/*'],
 
-  // Shell tests about layout and routing: the sibling screens are probes.
-
   // Heavy children: the pane and the task row mount the editor.
   'apps/desktop/src/components/daily-stream.focus.test.tsx': ['@/components/note-pane.tsx'],
   'apps/desktop/src/components/tasks/tasks-screen.test.tsx': ['./task-editor'],

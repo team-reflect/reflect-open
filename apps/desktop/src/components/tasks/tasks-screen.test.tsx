@@ -542,7 +542,9 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     // The preview hides the `**` marks; they stay in the DOM as `.md-mark`.
-    const strong = view.getByRole('button', { name: /^ship/ }).locate('[data-mark-mode="hide"] strong')
+    const strong = view
+      .getByRole('button', { name: /^ship/ })
+      .locate('[data-mark-mode="hide"] strong')
     await expect.element(strong).toBeInTheDocument()
     expect(strong.element().textContent?.replaceAll('**', '')).toBe('bold')
     await view.unmount()
