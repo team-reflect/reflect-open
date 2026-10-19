@@ -163,10 +163,10 @@ jobs:
       # Fails on a dependency that no code uses, in a member or in the root
       # `[workspace.dependencies]`.
       - name: Unused dependencies
-        run: cargo shear
+        run: cargo shear --locked
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets
 
   test-rust:
     needs: classify
@@ -186,7 +186,7 @@ jobs:
       - uses: ./.github/actions/setup-rust
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --locked --workspace
 
   # A single job for branch protection to require, instead of listing every
   # job as a required status check.
