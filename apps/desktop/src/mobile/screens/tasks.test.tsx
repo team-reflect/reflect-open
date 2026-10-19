@@ -28,14 +28,6 @@ let haptics: TestHapticsService
  * rules are unit-tested in task-visibility.test.ts.
  */
 
-// TaskText rendering is covered separately, so this suite keeps a small preview stub.
-vi.mock('@/editor/markdown-preview.tsx', () => ({
-  MarkdownPreview: ({ content, className }: { content: string; className?: string }) => (
-    <span data-testid="markdown-preview" className={className}>
-      {content}
-    </span>
-  ),
-}))
 const editorProbe = vi.hoisted(() => ({ focusCalls: 0 }))
 
 // The sheet hosts the real markdown editor (desktop's inline task-editor
