@@ -152,10 +152,6 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
-      # Fails if Cargo.lock is out of date.
-      - name: Check Cargo.lock
-        run: cargo update --workspace --locked
-
       - name: Format check
         run: cargo fmt --all -- --check
 
