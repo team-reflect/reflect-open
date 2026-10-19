@@ -29,13 +29,6 @@ vi.mock('@/components/ui/drawer.tsx', () => ({
   DrawerTitle: ({ children }: { children?: import('react').ReactNode }) => <h2>{children}</h2>,
 }))
 
-// The sheet itself is covered by connect-github-drawer.test.tsx; the screen
-// test only cares that Settings opens it.
-vi.mock('@/mobile/connect-github-drawer.tsx', () => ({
-  ConnectGithubDrawer: ({ open }: { open: boolean }) =>
-    open ? <div>connect-github-sheet</div> : null,
-}))
-
 function connected(status: Extract<BackupState, { phase: 'connected' }>['status']): BackupState {
   return {
     phase: 'connected',
@@ -383,7 +376,7 @@ describe('MobileSettings', () => {
       .toBeVisible()
     await user.click(page.getByRole('button', { name: 'Connect GitHub' }))
 
-    await expect.element(page.getByText('connect-github-sheet')).toBeVisible()
+    await expect.element(page.getByRole('heading', { name: 'Connect GitHub' })).toBeVisible()
   })
 
   it('hides the connect row once the local graph is connected', async () => {
