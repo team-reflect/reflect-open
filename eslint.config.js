@@ -132,21 +132,6 @@ const DESKTOP_VI_MOCK_ALLOW_BY_FILE = {
   'apps/desktop/src/services/*.test.ts': ['@tauri-apps/*'],
 
   // Shell tests about layout and routing: the sibling screens are probes.
-  'apps/desktop/src/components/workspace-content.test.tsx': [
-    '@/components/command-palette/command-palette.tsx',
-    '@/components/context-sidebar/daily-context-sidebar.tsx',
-    '@/components/context-sidebar/note-context-sidebar.tsx',
-    '@/components/embeddings-sync.tsx',
-    '@/components/note-find-bar.tsx',
-    '@/components/route-content.tsx',
-    '@/components/shortcuts-dialog.tsx',
-    '@/components/sidebar/sidebar.tsx',
-    '@/components/templates/template-create-dialog.tsx',
-    '@/components/templates/template-picker.tsx',
-    // The command registry hook needs every workspace provider; the shell
-    // only passes its result to the (mocked) sidebar.
-    '@/routing/app-shortcuts.ts',
-  ],
   'apps/desktop/src/mobile/screens/note.test.tsx': [
     '@/components/note-pane.tsx',
     '@/mobile/incoming-backlinks.tsx',

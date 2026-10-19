@@ -16,7 +16,7 @@ interface NoteContextSidebarProps {
  */
 export function NoteContextSidebar({ path }: NoteContextSidebarProps): ReactElement {
   return (
-    <div className="flex flex-col py-2 text-text">
+    <div className="flex flex-col py-2 text-text" data-testid="note-context-sidebar">
       <div className="my-4 space-y-4 pb-4">
         <NoteActionsSection path={path} showTrash />
         <PublishedUrlSection path={path} />

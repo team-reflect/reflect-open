@@ -28,6 +28,7 @@ export function DailyContextSidebar({ date }: DailyContextSidebarProps): ReactEl
 
   return (
     <div
+      data-testid="daily-context-sidebar"
       className={cn(
         'flex flex-col text-text',
         // The calendar's controls must clear the WindowDragRegion strip when
