@@ -331,10 +331,6 @@ export default defineESLintConfig(
   },
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.mjs'],
-    // Disable some rules temporarily
-    linterOptions: {
-      reportUnusedDisableDirectives: 'off',
-    },
     /// keep-sorted
     rules: {
       '@eslint-react/set-state-in-effect': 'off',
