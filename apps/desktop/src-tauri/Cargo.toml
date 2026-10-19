@@ -34,14 +34,12 @@ percent-encoding = { workspace = true }
 tokio = { workspace = true, features = ["time", "sync", "fs", "io-util"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-reflect-index-schema = { workspace = true, features = ["default"] }
 reflect-graph-paths = { workspace = true }
 reflect-types = { workspace = true, features = ["git2", "rusqlite"] }
 reflect-index = { workspace = true }
 reflect-graph-io = { workspace = true }
 reflect-git = { workspace = true }
 tempfile = { workspace = true }
-sha2 = { workspace = true }
 dirs = { workspace = true }
 tauri-plugin-dialog = { workspace = true }
 base64 = { workspace = true }
@@ -51,9 +49,6 @@ tracing = { workspace = true, features = ["log"] }
 log = { workspace = true }
 tauri-plugin-log = { workspace = true }
 keyring-core = { workspace = true }
-# Git backup/sync primitives (Plan 12) + SSH transport for generic remotes
-# (Plan 16 V1: agent auth only).
-git2 = { workspace = true }
 # unsafe-headers lets provider-fetch.ts pass an explicit empty Origin, which
 # the plugin treats as "send no Origin header" (see providerFetch's doc).
 tauri-plugin-http = { workspace = true, features = ["unsafe-headers"] }
@@ -62,7 +57,6 @@ image = { workspace = true, features = ["gif", "ico", "jpeg", "png", "webp"] }
 reqwest = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-xattr = { workspace = true }
 apple-native-keyring-store = { workspace = true, features = ["keychain"] }
 # Apple Calendar read-only bridge (`src/calendar.rs`): EventKit through the
 # objc2 bindings, trimmed to the classes the modules touch. objc2-app-kit
@@ -109,12 +103,9 @@ objc2-app-kit = { workspace = true, features = [
 # Apple Contacts integration (`contacts.rs`): live CNContactStore lookups on
 # macOS and iOS — never a mirrored copy of the address book. block2 bridges the
 # requestAccessForEntityType completion handler back into blocking Rust.
-# core-foundation backs the iCloud/backup sync-exclusion resource keys on
-# `.reflect/` and `.git/` (`fs/io.rs`), which matter on both Apple targets.
 # dispatch2 supplies MainThreadBound, keeping the iCloud metadata query's
 # non-Send Objective-C handles pinned to the main thread (`icloud/watch.rs`).
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
-core-foundation = { workspace = true }
 dispatch2 = { workspace = true }
 objc2 = { workspace = true }
 objc2-foundation = { workspace = true, features = ["default"] }
@@ -184,4 +175,3 @@ tauri-build = { workspace = true }
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }
 reflect-graph-io = { workspace = true, features = ["test-support"] }
-proptest = { workspace = true }
