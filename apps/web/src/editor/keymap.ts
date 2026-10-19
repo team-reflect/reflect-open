@@ -34,6 +34,9 @@ const EDITOR_BINDINGS = Object.fromEntries(
 /** The editor-scope binding that opens the AI menu on the current selection. */
 export const AI_MENU_BINDING = 'Mod-Shift-j'
 
+/** The editor-scope binding that opens the language picker of the code block under the caret. */
+export const CODE_BLOCK_LANGUAGE_BINDING = 'Mod-p'
+
 /**
  * Reflect's own editor-scope bindings (bound via `useKeymap` inside the
  * editor, not by meowdown's engine). Declared here, next to meowdown's, so
@@ -42,6 +45,7 @@ export const AI_MENU_BINDING = 'Mod-Shift-j'
  */
 const REFLECT_EDITOR_BINDINGS: Record<string, string> = {
   [AI_MENU_BINDING]: 'Open the AI menu on the selection',
+  [CODE_BLOCK_LANGUAGE_BINDING]: 'Change the language of the code block',
 }
 
 export const EDITOR_BINDING_DESCRIPTIONS: Record<string, string> = {
