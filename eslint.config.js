@@ -344,15 +344,6 @@ export default defineESLintConfig(
     plugins: { architecture: architecturePlugin },
     rules: { 'architecture/maybe-promise': 'error' },
   },
-  {
-    // Vitest types its asymmetric matchers (`expect.any`, `expect.objectContaining`, ...)
-    // as `any`, so a matcher used as a property value in `toEqual` or
-    // `toHaveBeenCalledWith` is an unsafe assignment.
-    files: [`**/*.test.${SOURCE_EXTENSIONS}`],
-    rules: {
-      '@typescript-eslint/no-unsafe-assignment': 'off',
-    },
-  },
   // Rule: core is platform-agnostic. It imports no Tauri, React, TanStack or app code.
   {
     files: [`packages/core/**/*.${SOURCE_EXTENSIONS}`],
