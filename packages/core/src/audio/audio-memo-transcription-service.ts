@@ -232,8 +232,7 @@ function transcriptionNote(
  */
 function recordingLinks(session: AudioMemoSession): string {
   return session.parts
-    .map((part, index) =>
-      index === 0 ? `[Recording](${part.path})` : `[Part ${index + 1}](${part.path})`,
+    .map((part, index) => { return index === 0 ? `[Recording](${part.path})` : `[Part ${index + 1}](${part.path})` },
     )
     .join(' · ')
 }

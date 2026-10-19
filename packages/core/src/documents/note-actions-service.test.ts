@@ -130,8 +130,7 @@ function setup(options?: {
   vi.spyOn(indexQuery, 'getPinnedNotes').mockImplementation(
     typeof pinned === 'function' ? pinned : () => Promise.resolve([...pinned]),
   )
-  vi.spyOn(indexQuery, 'getNote').mockImplementation((path) =>
-    Promise.resolve(options?.rows?.[path]),
+  vi.spyOn(indexQuery, 'getNote').mockImplementation((path) => { return Promise.resolve(options?.rows?.[path]) },
   )
   const { actions, openDocuments } = createNoteActions({
     noteFile: options?.wrapNoteFile?.(files) ?? files,
@@ -164,13 +163,11 @@ function indexRow(path: string, overrides: Partial<NoteRow> = {}): NoteRow {
 }
 
 function failing(method: 'read' | 'write' | 'delete', error: unknown) {
-  return (files: NoteFileService): NoteFileService =>
-    overrideNoteFileService(files, {
-      [method]: () =>
-        Promise.try(() => {
+  return (files: NoteFileService): NoteFileService => { return overrideNoteFileService(files, {
+      [method]: () => { return Promise.try(() => {
           throw error
-        }),
-    })
+        }) },
+    }) }
 }
 
 describe('togglePinned', () => {
@@ -328,15 +325,14 @@ describe('togglePinned', () => {
     let fail = true
     const { actions, files, progress, noteRows } = setup({
       files: { 'notes/a.md': '# A\n' },
-      wrapNoteFile: (inner) =>
-        overrideNoteFileService(inner, {
+      wrapNoteFile: (inner) => { return overrideNoteFileService(inner, {
           read: async (...args) => {
             if (fail) {
               throw new AppError('io', 'disk on fire')
             }
             return await inner.read(...args)
           },
-        }),
+        }) },
     })
 
     await expect(actions.togglePinned('notes/a.md')).resolves.toEqual({ status: 'failed' })
@@ -418,13 +414,12 @@ describe('reorderPinned', () => {
     const gate = Promise.withResolvers<void>()
     const { actions, files, noteRows } = setup({
       files: { 'notes/a.md': '# A\n' },
-      wrapNoteFile: (inner) =>
-        overrideNoteFileService(inner, {
+      wrapNoteFile: (inner) => { return overrideNoteFileService(inner, {
           write: async (...args) => {
             await gate.promise
             return await inner.write(...args)
           },
-        }),
+        }) },
     })
 
     const first = actions.reorderPinned([{ path: 'notes/a.md', pinnedOrder: 1024 }])
@@ -527,13 +522,12 @@ describe('togglePrivate', () => {
     const gate = Promise.withResolvers<void>()
     const { actions, files } = setup({
       files: { 'notes/a.md': '# A\n' },
-      wrapNoteFile: (inner) =>
-        overrideNoteFileService(inner, {
+      wrapNoteFile: (inner) => { return overrideNoteFileService(inner, {
           read: async (...args) => {
             await gate.promise
             return await inner.read(...args)
           },
-        }),
+        }) },
     })
     const first = actions.togglePrivate('notes/a.md')
     const second = actions.togglePrivate('notes/a.md')
@@ -783,15 +777,14 @@ describe('trashMany', () => {
   it('keeps going past a failure and fails the operation with the last error', async () => {
     const { actions, files, progress, noteRows } = setup({
       files: { 'notes/a.md': '# A\n', 'notes/b.md': '# B\n', 'notes/c.md': '# C\n' },
-      wrapNoteFile: (inner) =>
-        overrideNoteFileService(inner, {
+      wrapNoteFile: (inner) => { return overrideNoteFileService(inner, {
           delete: async (path, generation) => {
             if (path === 'notes/b.md') {
               throw new Error('locked')
             }
             await inner.delete(path, generation)
           },
-        }),
+        }) },
     })
     const result = await actions.trashMany([
       'notes/a.md',

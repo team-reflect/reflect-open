@@ -8,15 +8,12 @@ interface SubmenuOptionsForTest {
 
 const calls = vi.hoisted((): string[] => [])
 const popup = vi.hoisted(() => vi.fn(async () => {}))
-const setAsAppMenu = vi.hoisted(() =>
-  vi.fn(() => {
+const setAsAppMenu = vi.hoisted(() => { return vi.fn(() => {
     calls.push('setAsAppMenu')
     return Promise.resolve()
-  }),
+  }) },
 )
-const submenuNew = vi.hoisted(() =>
-  vi.fn((options: SubmenuOptionsForTest) =>
-    Promise.resolve({
+const submenuNew = vi.hoisted(() => { return vi.fn((options: SubmenuOptionsForTest) => { return Promise.resolve({
       setAsWindowsMenuForNSApp: () => {
         calls.push(`windows:${options.text}`)
         return Promise.resolve()
@@ -25,14 +22,12 @@ const submenuNew = vi.hoisted(() =>
         calls.push(`help:${options.text}`)
         return Promise.resolve()
       },
-    }),
-  ),
+    }) },
+  ) },
 )
-const menuNew = vi.hoisted(() =>
-  vi.fn((_options: unknown) => Promise.resolve({ setAsAppMenu, popup })),
+const menuNew = vi.hoisted(() => { return vi.fn((_options: unknown) => Promise.resolve({ setAsAppMenu, popup })) },
 )
-const menuItemNew = vi.hoisted(() =>
-  vi.fn((options: object) => Promise.resolve({ ...options, built: true })),
+const menuItemNew = vi.hoisted(() => { return vi.fn((options: object) => Promise.resolve({ ...options, built: true })) },
 )
 
 vi.mock('@tauri-apps/api/menu', () => ({

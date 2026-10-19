@@ -114,14 +114,13 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
         : Promise.resolve<PersonContactResolution[]>([]),
     ])
     const contactCandidates = contactResolutions
-      .map((resolution) =>
-        resolution.kind === 'blocked'
+      .map((resolution) => { return resolution.kind === 'blocked'
           ? null
           : {
               contact: resolution.contact,
               target: resolution.insertText,
               ownerPath: resolution.kind === 'existing' ? resolution.path : null,
-            },
+            } },
       )
       .filter(isNotNullish)
     const blockedContactNames = contactResolutions

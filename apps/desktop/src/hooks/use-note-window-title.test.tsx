@@ -5,8 +5,7 @@ import { useNoteWindowTitle } from './use-note-window-title.ts'
 describe('useNoteWindowTitle', () => {
   it('sets the title and follows changes (a rename)', async () => {
     const view = await renderHookInApp(
-      ({ title }: { title: string | null } = { title: 'Meeting Notes' }) =>
-        useNoteWindowTitle(title),
+      ({ title }: { title: string | null } = { title: 'Meeting Notes' }) => { return useNoteWindowTitle(title) },
       {
         initialProps: { title: 'Meeting Notes' },
       },

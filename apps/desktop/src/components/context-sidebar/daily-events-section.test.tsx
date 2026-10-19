@@ -143,15 +143,14 @@ describe('DailyEventsSection', () => {
     await userEvent.keyboard('{Enter}')
     await page.getByRole('button', { name: /add to daily note/i }).click()
 
-    await vi.waitFor(() =>
-      expect(addMeetingToDaily).toHaveBeenCalledWith({
+    await vi.waitFor(() => { return expect(addMeetingToDaily).toHaveBeenCalledWith({
         date: DATE,
         title: 'Standup',
         attendees: [{ name: 'Grace Hopper' }],
         backlinkMeeting: false,
         lookupContacts: false,
         startTime: '9:00am',
-      }),
+      }) },
     )
     await expectLocatorToHaveCount(page.getByLabelText('Meeting name'), 0)
   })
@@ -179,13 +178,12 @@ describe('DailyEventsSection', () => {
     await expect.element(page.getByText('Ada Lovelace')).toBeInTheDocument()
     await page.getByRole('button', { name: /add to daily note/i }).click()
 
-    await vi.waitFor(() =>
-      expect(addMeetingToDaily).toHaveBeenCalledWith(
+    await vi.waitFor(() => { return expect(addMeetingToDaily).toHaveBeenCalledWith(
         expect.objectContaining({
           attendees: [{ name: 'Ada Lovelace', emails: ['ada@example.com'] }],
           lookupContacts: true,
         }),
-      ),
+      ) },
     )
   })
 
@@ -217,12 +215,11 @@ describe('DailyEventsSection', () => {
     expect(page.getByText('ada@example.com').query()).toBeNull()
 
     await page.getByRole('button', { name: /add to daily note/i }).click()
-    await vi.waitFor(() =>
-      expect(addMeetingToDaily).toHaveBeenCalledWith(
+    await vi.waitFor(() => { return expect(addMeetingToDaily).toHaveBeenCalledWith(
         expect.objectContaining({
           attendees: [{ name: 'Ada Lovelace', emails: ['ada@example.com'] }],
         }),
-      ),
+      ) },
     )
   })
 
@@ -241,8 +238,7 @@ describe('DailyEventsSection', () => {
     await page.getByRole('button', { name: 'Remove Ada Lovelace' }).click()
     await page.getByRole('button', { name: /add to daily note/i }).click()
 
-    await vi.waitFor(() =>
-      expect(addMeetingToDaily).toHaveBeenCalledWith(expect.objectContaining({ attendees: [] })),
+    await vi.waitFor(() => { return expect(addMeetingToDaily).toHaveBeenCalledWith(expect.objectContaining({ attendees: [] })) },
     )
   })
 

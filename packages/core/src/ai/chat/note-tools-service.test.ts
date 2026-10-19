@@ -219,11 +219,10 @@ describe('search_notes', () => {
 
   it('drops private hits entirely — not even the title goes out', async () => {
     const tools = buildNoteTools({
-      retrieveFn: () =>
-        Promise.resolve([
+      retrieveFn: () => { return Promise.resolve([
           hit({}),
           hit({ path: PRIVATE_PATH, title: PRIVATE_TITLE, snippet: '', isPrivate: true }),
-        ]),
+        ]) },
       readNoteFn: () => Promise.resolve('a public body\n'),
     })
     const output = await runSearch(tools, { query: 'diary' })
@@ -293,8 +292,7 @@ describe('read_notes', () => {
 
   it('returns the body without frontmatter, titled from the note', async () => {
     const tools = buildNoteTools({
-      readNoteFn: () =>
-        Promise.resolve('---\npinned: true\n---\n# Project Atlas\n\nLaunch plan.\n'),
+      readNoteFn: () => { return Promise.resolve('---\npinned: true\n---\n# Project Atlas\n\nLaunch plan.\n') },
     })
     const output = await runRead(tools, 'notes/atlas.md')
     if (!output.ok) {
@@ -635,11 +633,10 @@ describe('list_recent_notes', () => {
 
   it('drops an indexed-private row entirely — not even the title goes out', async () => {
     const tools = buildNoteTools({
-      listRecentNotesFn: () =>
-        Promise.resolve([
+      listRecentNotesFn: () => { return Promise.resolve([
           recentRow({}),
           recentRow({ path: PRIVATE_PATH, title: PRIVATE_TITLE, isPrivate: true }),
-        ]),
+        ]) },
       readNoteFn: () => Promise.resolve('a public body\n'),
     })
     const output = await runRecents(tools, {})
@@ -654,8 +651,7 @@ describe('list_recent_notes', () => {
 
   it('drops a row whose live frontmatter turned private before reindex (TOCTOU)', async () => {
     const tools = buildNoteTools({
-      listRecentNotesFn: () =>
-        Promise.resolve([recentRow({ path: PRIVATE_PATH, title: PRIVATE_TITLE })]),
+      listRecentNotesFn: () => { return Promise.resolve([recentRow({ path: PRIVATE_PATH, title: PRIVATE_TITLE })]) },
       readNoteFn: () => Promise.resolve('---\nprivate: true\n---\n# Diary\n'),
     })
     const output = await runRecents(tools, {})
@@ -706,8 +702,7 @@ describe('list_daily_notes', () => {
   })
 
   it('cuts an over-cap range to the cap and flags the truncation', async () => {
-    const days = Array.from({ length: MAX_DAILY_NOTE_DAYS + 1 }, (_, index) =>
-      dailyRow(`2026-05-${String(index + 1).padStart(2, '0')}`),
+    const days = Array.from({ length: MAX_DAILY_NOTE_DAYS + 1 }, (_, index) => { return dailyRow(`2026-05-${String(index + 1).padStart(2, '0')}`) },
     )
     const tools = buildNoteTools({
       listDailyNotesFn: () => Promise.resolve(days),
@@ -720,8 +715,7 @@ describe('list_daily_notes', () => {
 
   it('drops a daily whose live frontmatter turned private before reindex (TOCTOU)', async () => {
     const tools = buildNoteTools({
-      listDailyNotesFn: () =>
-        Promise.resolve([dailyRow('2026-06-10', { path: PRIVATE_PATH, title: PRIVATE_TITLE })]),
+      listDailyNotesFn: () => { return Promise.resolve([dailyRow('2026-06-10', { path: PRIVATE_PATH, title: PRIVATE_TITLE })]) },
       readNoteFn: () => Promise.resolve('---\nprivate: true\n---\n# Diary\n'),
     })
     const output = await runDailies(tools, { start: '2026-06-01', end: '2026-06-30' })

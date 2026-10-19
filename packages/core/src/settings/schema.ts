@@ -473,11 +473,10 @@ export const chatSystemPromptSchema = z.string().catch('').transform(normalizeCh
 export const aiProvidersSchema = z
   .array(z.unknown())
   .catch([])
-  .transform((entries) =>
-    entries.flatMap((entry) => {
+  .transform((entries) => { return entries.flatMap((entry) => {
       const parsed = aiProviderConfigSchema.safeParse(entry)
       return parsed.success ? [parsed.data] : []
-    }),
+    }) },
   )
 
 /**
@@ -514,11 +513,10 @@ export type AiPrompt = z.infer<typeof aiPromptSchema>
 export const aiPromptsSchema = z
   .array(z.unknown())
   .catch([])
-  .transform((entries) =>
-    entries.flatMap((entry) => {
+  .transform((entries) => { return entries.flatMap((entry) => {
       const parsed = aiPromptSchema.safeParse(entry)
       return parsed.success ? [parsed.data] : []
-    }),
+    }) },
   )
 
 export const settingsSchema = z.looseObject({

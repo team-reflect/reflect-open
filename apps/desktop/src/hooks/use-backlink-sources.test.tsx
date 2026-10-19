@@ -38,8 +38,7 @@ describe('useBacklinkSources', () => {
   it('loads source pages, deduplicates overlapping contexts, and preserves the indexed count', async () => {
     const nextCursor = { recencyMs: 100, sourcePath: 'notes/a.md' }
     const nextPage = Promise.withResolvers<BacklinkContextPage>()
-    getBacklinksWithContext.mockImplementation((_path, options) =>
-      options.cursor === null
+    getBacklinksWithContext.mockImplementation((_path, options) => { return options.cursor === null
         ? Promise.resolve({
             contexts: [
               context('notes/a.md', 'shared context', 1),
@@ -48,7 +47,7 @@ describe('useBacklinkSources', () => {
             nextCursor,
             indexedLinkCount: 12,
           })
-        : nextPage.promise,
+        : nextPage.promise },
     )
 
     const { result } = await mount()

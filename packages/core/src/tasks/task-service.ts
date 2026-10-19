@@ -620,11 +620,10 @@ class TaskServiceImpl implements TaskService {
     const session = this.#begin()
     this.#snapshot()
     // The row keeps its bucket until the reindex re-derives the due date.
-    const patch: TaskListPatch = (rows) =>
-      tasks.reduce(
+    const patch: TaskListPatch = (rows) => { return tasks.reduce(
         (acc, task) => withEditedTask(acc, task, getScheduledMarkdown(task, isoDate)),
         rows,
-      )
+      ) }
     this.#patch(patch, patch)
     try {
       await this.#writeEach(session, tasks, (task) => [
@@ -718,12 +717,11 @@ class TaskServiceImpl implements TaskService {
     const session = this.#begin()
     const snapshot = this.#snapshot()
     // The anchor resolves in the same write: a cleared row leaves, an edited one shows its text.
-    const patch: TaskListPatch = (rows) =>
-      content === ''
+    const patch: TaskListPatch = (rows) => { return content === ''
         ? withoutTasks(rows, [task])
         : content === null
           ? rows
-          : withEditedTask(rows, task, content)
+          : withEditedTask(rows, task, content) }
     this.#patch(patch, patch)
     let result: InsertedTask
     try {

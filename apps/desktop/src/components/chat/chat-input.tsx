@@ -62,10 +62,9 @@ export function ChatInput(): ReactElement {
     [modelOptions, providers],
   )
   const activeIndex = modelOptions.findIndex(
-    (option) =>
-      activeModel !== null &&
+    (option) => { return activeModel !== null &&
       option.configId === activeModel.id &&
-      option.modelId === activeModel.model,
+      option.modelId === activeModel.model },
   )
 
   // The draft lives in the provider (it must survive the screen unmounting —

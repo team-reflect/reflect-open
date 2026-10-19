@@ -232,8 +232,7 @@ async function transcribeWithGemini(
   const instruction = request.prompt
     ? `${GEMINI_INSTRUCTION}\n${request.prompt}`
     : GEMINI_INSTRUCTION
-  const attempt = (model: string): Promise<Response> =>
-    send(
+  const attempt = (model: string): Promise<Response> => { return send(
       fetchFn,
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
@@ -251,7 +250,7 @@ async function transcribeWithGemini(
         }),
       },
       { timeoutMs: TRANSCRIPTION_TRANSFER_TIMEOUT_MS, isStale: request.isStale },
-    )
+    ) }
 
   let response = await attempt(GOOGLE_TRANSCRIPTION_MODEL)
   let body = await response.text()

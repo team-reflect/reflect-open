@@ -7,10 +7,9 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 export function useToday(): string {
   const { clock } = useCoreServices()
   const subscribe = useCallback(
-    (listener: () => void) =>
-      clock.subscribeToday(() => {
+    (listener: () => void) => { return clock.subscribeToday(() => {
         listener()
-      }),
+      }) },
     [clock],
   )
   const getSnapshot = useCallback(() => clock.today(), [clock])

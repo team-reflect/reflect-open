@@ -287,8 +287,7 @@ export function createIndexApplyBatchWriter(
   generation: number,
   onSkippedNote?: (note: SkippedIndexedNote) => void,
 ): IndexApplyBatch {
-  return new BatchWriter((notes: IndexedNote[]) =>
-    applySplitBatch(applyBatch, notes, generation, onSkippedNote),
+  return new BatchWriter((notes: IndexedNote[]) => { return applySplitBatch(applyBatch, notes, generation, onSkippedNote) },
   )
 }
 

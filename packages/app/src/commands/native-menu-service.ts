@@ -111,8 +111,7 @@ export interface NativeMenuHost {
  * A host without native menus: every operation rejects.
  */
 export function createUnsupportedNativeMenuHost(): NativeMenuHost {
-  const unsupported = async (): Promise<never> =>
-    await Promise.reject(new Error('native menus are not supported on this host'))
+  const unsupported = async (): Promise<never> => { return await Promise.reject(new Error('native menus are not supported on this host')) }
   return { buildAppMenu: unsupported, popup: unsupported }
 }
 

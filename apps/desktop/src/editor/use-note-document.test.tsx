@@ -251,8 +251,7 @@ describe('useNoteDocument', () => {
     seedGraph({ 'notes/a.md': managedNote('# Old Title\n') })
 
     const hook = await mount(
-      ({ path }: { path: string } = { path: 'notes/a.md' }) =>
-        useNoteDocument(path, { trackRenames: true }),
+      ({ path }: { path: string } = { path: 'notes/a.md' }) => { return useNoteDocument(path, { trackRenames: true }) },
       { initialProps: { path: 'notes/a.md' } },
     )
     await act(() => clock.advance(0))
@@ -319,8 +318,7 @@ describe('useNoteDocument', () => {
 
   it('reconciles pending editor input during a same-path session rebind', async () => {
     const hook = await mount(
-      ({ createIfMissing }: { createIfMissing: boolean } = { createIfMissing: false }) =>
-        useNoteDocument('notes/a.md', { createIfMissing }),
+      ({ createIfMissing }: { createIfMissing: boolean } = { createIfMissing: false }) => { return useNoteDocument('notes/a.md', { createIfMissing }) },
       { initialProps: { createIfMissing: false } },
     )
     await act(() => clock.advance(0))

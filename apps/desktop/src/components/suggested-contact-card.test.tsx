@@ -84,8 +84,7 @@ describe('SuggestedContactCard', () => {
     noteFile.set(PATH, '---\nignoredContacts:\n  - ada lovelace\n---\n# Ada Lovelace\n')
     await renderCard()
     // The dismissal check needs the match's name, so the lookup does run.
-    await vi.waitFor(() =>
-      expect(contacts.lookups()).toEqual([{ kind: 'name', name: 'Ada Lovelace' }]),
+    await vi.waitFor(() => { return expect(contacts.lookups()).toEqual([{ kind: 'name', name: 'Ada Lovelace' }]) },
     )
     expect(page.getByText('ada@example.com · +1 555 0100').query()).toBeNull()
   })

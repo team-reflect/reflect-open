@@ -230,8 +230,7 @@ class AiProviderConfigServiceImpl implements AiProviderConfigService {
       return
     }
     this.#deps.settings.updateWith((current) => ({
-      aiProviders: current.aiProviders.map((provider) =>
-        provider.id === id ? { ...provider, model: normalizedModel } : provider,
+      aiProviders: current.aiProviders.map((provider) => { return provider.id === id ? { ...provider, model: normalizedModel } : provider },
       ),
     }))
   }

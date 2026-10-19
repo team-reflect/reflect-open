@@ -81,10 +81,9 @@ export function appendEvent(parts: AssistantPart[], event: ChatStreamEvent): Ass
     case 'tool-call':
       return [...parts, { kind: 'tool', call: event.call, result: null, error: null }]
     case 'tool-result':
-      return parts.map((part) =>
-        part.kind === 'tool' && part.call.toolCallId === event.result.toolCallId
+      return parts.map((part) => { return part.kind === 'tool' && part.call.toolCallId === event.result.toolCallId
           ? { ...part, result: event.result }
-          : part,
+          : part },
       )
     case 'tool-error':
       return [
@@ -120,12 +119,11 @@ function settleTools(
   message: string,
   toolCallId?: string,
 ): AssistantPart[] {
-  return parts.map((part): AssistantPart =>
-    part.kind === 'tool' &&
+  return parts.map((part): AssistantPart => { return part.kind === 'tool' &&
     isToolPending(part) &&
     (toolCallId === undefined || part.call.toolCallId === toolCallId)
       ? { ...part, error: message }
-      : part,
+      : part },
   )
 }
 

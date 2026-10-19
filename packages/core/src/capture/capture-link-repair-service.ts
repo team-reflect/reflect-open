@@ -31,8 +31,7 @@ export function repairCaptureLinks(
   source: string,
   repairs: ReadonlyMap<string, CaptureLinkRepair>,
 ): string {
-  const mentioned = [...repairs].some(([base, { placeholder }]) =>
-    source.includes(`[[${base}|${placeholder}`),
+  const mentioned = [...repairs].some(([base, { placeholder }]) => { return source.includes(`[[${base}|${placeholder}`) },
   )
   if (!mentioned) {
     return source
@@ -170,8 +169,7 @@ class CaptureLinkRepairServiceImpl implements CaptureLinkRepairService {
     const session = openDocuments.sessionFor(path)
     if (session !== null) {
       // Edit the live buffer so unsaved typing survives; a busy session retries next pass.
-      await session.commitSourceEdit((current) =>
-        current === source ? next : repairCaptureLinks(current, repairs),
+      await session.commitSourceEdit((current) => { return current === source ? next : repairCaptureLinks(current, repairs) },
       )
       return
     }

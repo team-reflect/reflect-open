@@ -151,8 +151,7 @@ describe('useTaskSheetFinalizer', () => {
   it('resolves against the live surface when readDraft is fresher than the mirrored state', async () => {
     // An uncontrolled editor can hold a change whose onChange hasn't
     // re-rendered into the draft state yet — the commit must not drop it.
-    const { result } = await renderHook(() =>
-      useTaskSheetFinalizer(deps({ readDraft: () => 'alpha typed live' })),
+    const { result } = await renderHook(() => { return useTaskSheetFinalizer(deps({ readDraft: () => 'alpha typed live' })) },
     )
 
     await act(() => result.current.handleOpenChange(false))
@@ -162,8 +161,7 @@ describe('useTaskSheetFinalizer', () => {
   })
 
   it('falls back to the mirrored draft when readDraft cannot answer', async () => {
-    const { result } = await renderHook(() =>
-      useTaskSheetFinalizer(deps({ readDraft: () => null })),
+    const { result } = await renderHook(() => { return useTaskSheetFinalizer(deps({ readDraft: () => null })) },
     )
 
     await act(() => result.current.setDraft('alpha edited'))
@@ -177,8 +175,7 @@ describe('useTaskSheetFinalizer', () => {
     // readDraft is contractually fed by the surface's own onChange stream
     // (never an imperative editor read), so its value — including a genuine
     // clear — is authoritative even while the tree unmounts.
-    const { result, unmount } = await renderHook(() =>
-      useTaskSheetFinalizer(deps({ readDraft: () => 'alpha typed live' })),
+    const { result, unmount } = await renderHook(() => { return useTaskSheetFinalizer(deps({ readDraft: () => 'alpha typed live' })) },
     )
 
     await act(() => result.current.setDraft('alpha edited'))

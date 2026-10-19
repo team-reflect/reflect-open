@@ -174,10 +174,9 @@ export function stitchSessionTranscript(results: AudioMemoPartResult[]): string 
     return 'rejected' in only ? `Transcription failed: ${only.rejected}` : only.text
   }
   return results
-    .map((result, index) =>
-      'rejected' in result
+    .map((result, index) => { return 'rejected' in result
         ? `Part ${index + 1} transcription failed: ${result.rejected}`
-        : result.text,
+        : result.text },
     )
     .filter((section) => section !== '')
     .join('\n\n')

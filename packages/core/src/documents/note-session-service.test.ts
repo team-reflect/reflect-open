@@ -283,8 +283,7 @@ describe('createNoteSession', () => {
   })
 
   it('re-gates protection when external content stops being representable', async () => {
-    const lossyWhenTasks = (markdown: string): RoundTripFidelity =>
-      markdown.includes('+ [ ]') ? 'lossy' : 'exact'
+    const lossyWhenTasks = (markdown: string): RoundTripFidelity => { return markdown.includes('+ [ ]') ? 'lossy' : 'exact' }
     const { session, snapshots, setDisk } = harness({ classify: lossyWhenTasks })
     session.load()
     await settled()
@@ -374,8 +373,7 @@ describe('external changes and saves', () => {
   })
 
   it('a lossy merged result opens protected', async () => {
-    const lossyWhenTasks = (markdown: string): RoundTripFidelity =>
-      markdown.includes('+ [ ]') ? 'lossy' : 'exact'
+    const lossyWhenTasks = (markdown: string): RoundTripFidelity => { return markdown.includes('+ [ ]') ? 'lossy' : 'exact' }
     const h = harness({ classify: lossyWhenTasks })
     h.session.load()
     await settled()

@@ -177,8 +177,7 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
     return this.#inner.onStalePlaceholders(listener)
   }
 
-  readonly fileProgress = (): IndexFileProgress | null =>
-    this.#seeded !== null ? this.#seeded.progress : this.#inner.fileProgress()
+  readonly fileProgress = (): IndexFileProgress | null => { return this.#seeded !== null ? this.#seeded.progress : this.#inner.fileProgress() }
 
   readonly subscribeFileProgress = (listener: () => void): Unlisten => {
     const unlisten = this.#inner.subscribeFileProgress(listener)

@@ -57,10 +57,9 @@ export interface TestClassicAccessService extends ClassicAccessService {
 
 class TestClassicAccessServiceImpl implements TestClassicAccessService {
   #current: ClassicAccessState
-  #signIn: (options: ClassicSignInOptions) => Promise<ClassicSignInResult> = () =>
-    Promise.resolve({
+  #signIn: (options: ClassicSignInOptions) => Promise<ClassicSignInResult> = () => { return Promise.resolve({
       kind: 'cancelled',
-    })
+    }) }
   readonly #log: ClassicAccessCall[] = []
   readonly #signInLog: ClassicSignInOptions[] = []
   readonly #listeners = new Listeners()

@@ -38,8 +38,7 @@ export function headingNamesSection(
   return (
     keys.includes(foldKey(renderInlineText(heading.text))) ||
     wikiLinks.some(
-      (link) =>
-        link.from >= heading.from && link.to <= heading.to && keys.includes(foldKey(link.target)),
+      (link) => { return link.from >= heading.from && link.to <= heading.to && keys.includes(foldKey(link.target)) },
     )
   )
 }

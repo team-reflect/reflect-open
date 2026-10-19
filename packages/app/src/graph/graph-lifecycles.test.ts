@@ -74,8 +74,7 @@ function setup(options?: { role?: GraphRole; root?: string; platform?: TestPlatf
     settings: core.settings,
     mobileOnboarding,
   })
-  const downloads = () =>
-    core.icloudNative.calls().filter((call) => call.method === 'downloadPending').length
+  const downloads = () => { return core.icloudNative.calls().filter((call) => call.method === 'downloadPending').length }
   return { core, controller, session, graph, mobileOnboarding, downloads, sessions }
 }
 

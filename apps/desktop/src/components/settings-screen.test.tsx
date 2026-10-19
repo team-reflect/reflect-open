@@ -148,8 +148,7 @@ describe('SettingsScreen', () => {
     await textarea.fill('  Names:\nOcavue  ')
     await userEvent.tab()
 
-    await vi.waitFor(() =>
-      expect(saved().at(-1)).toMatchObject({ transcriptionPrompt: 'Names:\nOcavue' }),
+    await vi.waitFor(() => { return expect(saved().at(-1)).toMatchObject({ transcriptionPrompt: 'Names:\nOcavue' }) },
     )
   })
 
@@ -176,8 +175,7 @@ describe('SettingsScreen', () => {
 
     await userEvent.tab()
 
-    await vi.waitFor(() =>
-      expect(saved().at(-1)).toMatchObject({ transcriptionPrompt: 'x'.repeat(500) }),
+    await vi.waitFor(() => { return expect(saved().at(-1)).toMatchObject({ transcriptionPrompt: 'x'.repeat(500) }) },
     )
   })
 
@@ -237,13 +235,12 @@ describe('SettingsScreen', () => {
 
     await pickRadio(/^show/i)
 
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           editorMarkdownSyntax: 'show',
         },
-      ]),
+      ]) },
     )
     await expect.element(radio(/^show/i)).toBeChecked()
     await expect.element(radio(/^hide/i)).not.toBeChecked()
@@ -262,13 +259,12 @@ describe('SettingsScreen', () => {
 
     await pickRadio(/^large/i)
 
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           editorTextSize: 'large',
         },
-      ]),
+      ]) },
     )
     await expect.element(radio(/^large/i)).toBeChecked()
     await expect.element(radio(/^medium/i)).not.toBeChecked()
@@ -301,13 +297,12 @@ describe('SettingsScreen', () => {
     await toggle.click()
 
     await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           editorSpellCheck: false,
         },
-      ]),
+      ]) },
     )
   })
 
@@ -326,8 +321,7 @@ describe('SettingsScreen', () => {
     await toggle.click()
 
     await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
-    await vi.waitFor(() =>
-      expect(saved().at(-1)).toMatchObject({ editorSmoothCaretAnimation: false }),
+    await vi.waitFor(() => { return expect(saved().at(-1)).toMatchObject({ editorSmoothCaretAnimation: false }) },
     )
   })
 
@@ -347,13 +341,12 @@ describe('SettingsScreen', () => {
     await toggle.click()
 
     await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           editorDefaultBullet: false,
         },
-      ]),
+      ]) },
     )
   })
 
@@ -372,13 +365,12 @@ describe('SettingsScreen', () => {
     await toggle.click()
 
     await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           editorBulletAfterHeading: false,
         },
-      ]),
+      ]) },
     )
   })
 
@@ -390,13 +382,12 @@ describe('SettingsScreen', () => {
     await pickRadio(/^light/i)
 
     await expect.element(radio(/^light/i)).toBeChecked()
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           theme: 'light',
         },
-      ]),
+      ]) },
     )
   })
 
@@ -417,13 +408,12 @@ describe('SettingsScreen', () => {
     await page.getByRole('option', { name: formatFullDate(new Date(), 'dmy') }).click()
 
     await expect.element(trigger).toMatchTextContent(formatFullDate(new Date(), 'dmy'))
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           dateFormat: 'dmy',
         },
-      ]),
+      ]) },
     )
   })
 
@@ -441,13 +431,12 @@ describe('SettingsScreen', () => {
     await page.getByRole('option', { name: isoLabel }).click()
 
     await expect.element(trigger).toMatchTextContent(isoLabel)
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           dateFormat: 'iso',
         },
-      ]),
+      ]) },
     )
   })
 
@@ -471,13 +460,12 @@ describe('SettingsScreen', () => {
     await page.getByRole('option', { name: 'Sunday' }).click()
 
     await expect.element(trigger).toMatchTextContent('Sunday')
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           weekStartDay: 'sunday',
         },
-      ]),
+      ]) },
     )
   })
 
@@ -507,13 +495,12 @@ describe('SettingsScreen', () => {
     await page.getByRole('option', { name: '24-hour' }).click()
 
     await expect.element(trigger).toMatchTextContent('24-hour')
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           timeFormat: '24h',
         },
-      ]),
+      ]) },
     )
   })
 
@@ -525,13 +512,12 @@ describe('SettingsScreen', () => {
     await page.getByRole('button', { name: 'Add', exact: true }).click()
 
     await expect.element(page.getByText('#meeting')).toBeInTheDocument()
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           allNotesFilterTags: ['book', 'link', 'person', 'meeting'],
         },
-      ]),
+      ]) },
     )
   })
 
@@ -572,13 +558,12 @@ describe('SettingsScreen', () => {
     await page.getByRole('button', { name: 'Remove book' }).click()
 
     expect(page.getByText('#book').query()).toBeNull()
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           allNotesFilterTags: ['person'],
         },
-      ]),
+      ]) },
     )
   })
 
@@ -588,13 +573,12 @@ describe('SettingsScreen', () => {
 
     await enable.click()
 
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           semanticSearchEnabled: true,
         },
-      ]),
+      ]) },
     )
     // The control flips to the loading state (EmbeddingsSync owns the actual
     // download; the runtime here still reports `uninitialized`).
@@ -629,12 +613,11 @@ describe('SettingsScreen', () => {
 
     await page.getByRole('button', { name: /disable/i }).click()
 
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
         },
-      ]),
+      ]) },
     )
     await expect
       .element(page.getByRole('button', { name: /enable semantic search/i }))
@@ -668,13 +651,12 @@ describe('SettingsScreen', () => {
     // EmbeddingsSync only loads `uninitialized` runtimes, so the explicit
     // action carries the retry.
     await vi.waitFor(() => expect(embedRuntime.ensureCalls()).toBeGreaterThan(0))
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           semanticSearchEnabled: true,
         },
-      ]),
+      ]) },
     )
   })
 
@@ -690,12 +672,11 @@ describe('SettingsScreen', () => {
     // Backing out after a failure must work too — the opt-in isn't a trap.
     await page.getByRole('button', { name: /disable/i }).click()
 
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
         },
-      ]),
+      ]) },
     )
     await expect
       .element(page.getByRole('button', { name: /enable semantic search/i }))
@@ -747,10 +728,9 @@ describe('SettingsScreen', () => {
     await textarea.fill('  Challenge my assumptions.\nKeep the recommendation short.  ')
     await userEvent.tab()
 
-    await vi.waitFor(() =>
-      expect(saved().at(-1)).toMatchObject({
+    await vi.waitFor(() => { return expect(saved().at(-1)).toMatchObject({
         chatSystemPrompt: 'Challenge my assumptions.\nKeep the recommendation short.',
-      }),
+      }) },
     )
   })
 
@@ -794,8 +774,7 @@ describe('SettingsScreen', () => {
       .fill('Translate to French.\n\n{{selectedText}}')
     await dialog.getByRole('button', { name: /add prompt/i }).click()
 
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           aiPrompts: [
@@ -807,7 +786,7 @@ describe('SettingsScreen', () => {
             },
           ],
         },
-      ]),
+      ]) },
     )
     await expect
       .element(section.getByText('Translate to French', { exact: true }))
@@ -828,12 +807,11 @@ describe('SettingsScreen', () => {
 
     await remove.click()
 
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
         },
-      ]),
+      ]) },
     )
   })
 
@@ -852,15 +830,14 @@ describe('SettingsScreen', () => {
     await dialog.getByPlaceholder('Translate to French').fill('Translate to German')
     await dialog.getByRole('button', { name: /^save$/i }).click()
 
-    await vi.waitFor(() =>
-      expect(saved()).toEqual([
+    await vi.waitFor(() => { return expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           aiPrompts: [
             { id: 'p1', label: 'Translate to German', body: '{{selectedText}}', mode: 'replace' },
           ],
         },
-      ]),
+      ]) },
     )
   })
 })

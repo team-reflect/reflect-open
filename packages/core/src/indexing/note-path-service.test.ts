@@ -51,8 +51,7 @@ describe('templateSlugPathForTitle', () => {
   it('suffixes around occupied candidates', async () => {
     const occupied = new Set(['templates/log.md'])
     await expect(
-      paths.templateSlugPathForTitle('templates/journal.md', 'Log', (path) =>
-        Promise.resolve(occupied.has(path)),
+      paths.templateSlugPathForTitle('templates/journal.md', 'Log', (path) => { return Promise.resolve(occupied.has(path)) },
       ),
     ).resolves.toBe('templates/log-2.md')
   })

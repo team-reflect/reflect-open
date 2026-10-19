@@ -77,11 +77,10 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const orderedPaths = useMemo(() => (notes ?? []).map((note) => note.path), [notes])
   const selection = useListSelection(orderedPaths)
   const openNote = useCallback(
-    (path: string, event?: ModClickEvent) =>
-      navigateNoteLink({
+    (path: string, event?: ModClickEvent) => { return navigateNoteLink({
         target: routeForPath(path),
         openInNewWindow: event !== undefined && isModEvent(event),
-      }),
+      }) },
     [navigateNoteLink],
   )
   const handleFilterSelect = useCallback(

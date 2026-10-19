@@ -34,8 +34,7 @@ export function useSnippetTaskToggle(
   const { mutate, isPending } = useMutation({
     mutationKey: mutationKeys.tasks.snippetToggle(graph?.root),
     // The service reports a failed write itself.
-    mutationFn: ({ notePath: path, locator, checked }: SnippetToggleInput) =>
-      taskService.toggleSnippetTask(path, { locator, checked }),
+    mutationFn: ({ notePath: path, locator, checked }: SnippetToggleInput) => { return taskService.toggleSnippetTask(path, { locator, checked }) },
   })
 
   const handler = useCallback<TaskClickHandler>(

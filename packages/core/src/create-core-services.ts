@@ -1004,8 +1004,7 @@ export function composeCoreServices(
     noteMove,
     icloudNative,
     logger,
-    createServices: (session) =>
-      adapters.createGraphServices(session, {
+    createServices: (session) => { return adapters.createGraphServices(session, {
         backup: backupDeps,
         icloudSync: icloudSyncDeps,
         icloudDownload: icloudDownloadDeps,
@@ -1014,7 +1013,7 @@ export function composeCoreServices(
         chatSessions: services.chatSessions,
         attachments,
         graphSession,
-      }),
+      }) },
   })
   const attachments = create.attachments({
     assetStore,

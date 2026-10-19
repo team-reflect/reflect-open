@@ -61,12 +61,11 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
       weekStartDay: settings.weekStartDay,
       today,
     }),
-    queryFn: () =>
-      paletteSearch.suggestTitles(trimmed, {
+    queryFn: () => { return paletteSearch.suggestTitles(trimmed, {
         today,
         dateFormat: settings.dateFormat,
         weekStartDay: settings.weekStartDay,
-      }),
+      }) },
     enabled: searching && !parsed.filtered,
   })
   const useHybrid = hybrid && !parsed.filtered
@@ -90,14 +89,13 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   const searchFailed = suggestionsError || hitsError
 
   const sections = useMemo(
-    () =>
-      paletteSearch.sections({
+    () => { return paletteSearch.sections({
         query,
         dataQuery: trimmed,
         suggestions: suggestions ?? [],
         hits: hits ?? [],
         filtered: parsed.filtered,
-      }),
+      }) },
     [paletteSearch, query, trimmed, suggestions, hits, parsed.filtered],
   )
 

@@ -483,8 +483,7 @@ describe('streamChatTurn', () => {
     // Every gathering step calls a tool; the model only writes its answer
     // once tools are disabled on the last permitted step. Without that force,
     // the turn would end on a tool result with no reply.
-    const gathering = Array.from({ length: MAX_STEPS - 1 }, (_unused, index) =>
-      toolCallTurn(`query-${index}`, `call-${index}`),
+    const gathering = Array.from({ length: MAX_STEPS - 1 }, (_unused, index) => { return toolCallTurn(`query-${index}`, `call-${index}`) },
     )
     const model = new MockLanguageModelV3({
       doStream: sequence([...gathering, textTurn('Summary: [[Atlas Launch Plan]]')]),

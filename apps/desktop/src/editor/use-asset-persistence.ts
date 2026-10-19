@@ -101,8 +101,7 @@ export function useAssetPersistence(path: string): AssetPersistence {
   )
 
   const resolveFileInfo = useCallback(
-    async (href: string): Promise<FileInfo | undefined> =>
-      await attachments.resolveFileInfo(path, href),
+    async (href: string): Promise<FileInfo | undefined> => { return await attachments.resolveFileInfo(path, href) },
     [attachments, path],
   )
 

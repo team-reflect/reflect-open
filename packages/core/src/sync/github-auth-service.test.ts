@@ -403,8 +403,7 @@ describe('GithubAuthService.runDeviceFlow', () => {
   function scripted(polls: unknown[]) {
     const context = setup()
     context.http.on('POST', DEVICE_CODE_URL, jsonResponse(START_RESPONSE))
-    context.http.on('POST', TOKEN_URL, () =>
-      jsonResponse(polls.shift() ?? { error: 'authorization_pending' }),
+    context.http.on('POST', TOKEN_URL, () => { return jsonResponse(polls.shift() ?? { error: 'authorization_pending' }) },
     )
     /**
      * Resolves once the flow waits for its next poll.
@@ -414,8 +413,7 @@ describe('GithubAuthService.runDeviceFlow', () => {
         expect(context.clock.pendingTimers()).toBe(1)
       })
     }
-    const pollCount = (): number =>
-      context.http.requests().filter((request) => request.url === TOKEN_URL).length
+    const pollCount = (): number => { return context.http.requests().filter((request) => request.url === TOKEN_URL).length }
     return { ...context, sleeping, pollCount }
   }
 

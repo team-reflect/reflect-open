@@ -605,8 +605,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
 
   readonly fileProgress = (): IndexFileProgress | null => this.#currentFileProgress
 
-  readonly subscribeFileProgress = (listener: () => void): Unlisten =>
-    attach(this.#fileProgressStoreListeners, listener)
+  readonly subscribeFileProgress = (listener: () => void): Unlisten => { return attach(this.#fileProgressStoreListeners, listener) }
 
   rebuildVisibly(): Promise<void> {
     const { session } = this.#deps.graphSession.getState()

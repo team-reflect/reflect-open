@@ -68,8 +68,7 @@ beforeEach(() => {
 describe('PublishedUrlSection', () => {
   it('renders nothing for an unpublished note', async () => {
     const view = await renderSection()
-    await vi.waitFor(() =>
-      expect(view.queryClient.getQueryData(queryKeys.index.note('/g', 'notes/a.md'))).toBeNull(),
+    await vi.waitFor(() => { return expect(view.queryClient.getQueryData(queryKeys.index.note('/g', 'notes/a.md'))).toBeNull() },
     )
     expect(view.getByText('Published URL').query()).toBeNull()
   })
@@ -139,8 +138,7 @@ describe('PublishedUrlSection', () => {
     const view = await renderSection()
     await userEvent.click(view.getByRole('button', { name: 'Copy published URL' }))
 
-    await vi.waitFor(() =>
-      expect(operations.findByLabel('Copying the published URL')?.status).toBe('failed'),
+    await vi.waitFor(() => { return expect(operations.findByLabel('Copying the published URL')?.status).toBe('failed') },
     )
   })
 })

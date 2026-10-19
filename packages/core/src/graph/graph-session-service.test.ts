@@ -544,9 +544,8 @@ describe('GraphSessionService index following', () => {
     const context = await start()
     await context.session.openRecent('/a')
     await settleIndex(context)
-    const passes = (): number =>
-      context.indexCalls().filter((method) => method === 'reconcileScan' || method === 'clear')
-        .length
+    const passes = (): number => { return context.indexCalls().filter((method) => method === 'reconcileScan' || method === 'clear')
+        .length }
     const before = passes()
 
     context.session.refreshIndex()

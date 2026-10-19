@@ -363,8 +363,7 @@ describe('MobileOnboardingService boot', () => {
     const context = setup()
     context.settings.failLoad()
     context.service.boot()
-    const loads = () =>
-      context.settings.ipc.calls().filter((call) => call.command === 'settings_load').length
+    const loads = () => { return context.settings.ipc.calls().filter((call) => call.command === 'settings_load').length }
     await expect.poll(context.focusSubscriptions).toBe(1)
     expect(loads()).toBe(1)
 

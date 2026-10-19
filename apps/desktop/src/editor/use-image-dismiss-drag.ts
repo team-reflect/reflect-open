@@ -267,8 +267,7 @@ export function useImageDismissDrag({
       if (current.phase !== 'armed' && current.phase !== 'dragging') {
         return
       }
-      const step = drag.move(event, (travelX, travelY) =>
-        dragDistance(travelX, travelY) < DRAG_ACTIVATE_PX ? 'wait' : 'start',
+      const step = drag.move(event, (travelX, travelY) => { return dragDistance(travelX, travelY) < DRAG_ACTIVATE_PX ? 'wait' : 'start' },
       )
 
       if (step === 'started') {

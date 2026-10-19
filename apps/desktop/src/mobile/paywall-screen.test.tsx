@@ -411,8 +411,7 @@ describe('PaywallScreen Reflect Classic verification', () => {
       .element(view.getByText('No paid Reflect Classic subscription on this account'))
       .toBeVisible()
     await view.getByRole('button', { name: 'Use a different account' }).click()
-    await vi.waitFor(() =>
-      expect(classicAccess.signIns().at(-1)).toEqual(expect.objectContaining({ ephemeral: true })),
+    await vi.waitFor(() => { return expect(classicAccess.signIns().at(-1)).toEqual(expect.objectContaining({ ephemeral: true })) },
     )
   })
 

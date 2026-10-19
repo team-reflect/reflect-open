@@ -14,8 +14,7 @@ describe('AiProviderConsent', () => {
     )
 
     await view.getByRole('button', { name: 'Privacy policy' }).click()
-    await vi.waitFor(() =>
-      expect(view.appServices.opener.openedUrls()).toEqual(['https://reflect.app/privacy']),
+    await vi.waitFor(() => { return expect(view.appServices.opener.openedUrls()).toEqual(['https://reflect.app/privacy']) },
     )
   })
 

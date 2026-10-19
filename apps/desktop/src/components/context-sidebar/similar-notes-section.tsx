@@ -39,11 +39,10 @@ export function SimilarNotesSection({ path }: SimilarNotesSectionProps): ReactEl
           <li key={hit.path}>
             <button
               type="button"
-              onClick={(event) =>
-                navigateNoteLink({
+              onClick={(event) => { return navigateNoteLink({
                   target: routeForPath(hit.path),
                   openInNewWindow: isModEvent(event),
-                })
+                }) }
               }
               className="flex w-full items-center space-x-1 rounded-md px-3 py-1 leading-5 text-text-secondary hover:bg-surface-hover hover:text-text"
             >

@@ -26,14 +26,13 @@ describe('useDeviceFlowAuth', () => {
   it('surfaces the user code and resolves true on success', async () => {
     // No browser side effects here: the surface opens GitHub only after the
     // user has the code (copy first, then hand off).
-    mockFlow.mockImplementation((options) =>
-      Promise.try(() => {
+    mockFlow.mockImplementation((options) => { return Promise.try(() => {
         options.onCode({
           userCode: 'ABCD-1234',
           verificationUri: 'https://github.com/login/device',
         })
         return AUTH
-      }),
+      }) },
     )
     const { result } = await mount()
 
@@ -53,14 +52,13 @@ describe('useDeviceFlowAuth', () => {
   })
 
   it('returns to the idle view with a message when the flow fails', async () => {
-    mockFlow.mockImplementation((options) =>
-      Promise.try(() => {
+    mockFlow.mockImplementation((options) => { return Promise.try(() => {
         options.onCode({
           userCode: 'ABCD-1234',
           verificationUri: 'https://github.com/login/device',
         })
         throw new AppError('auth', 'GitHub sign-in was denied.')
-      }),
+      }) },
     )
     const { result } = await mount()
 

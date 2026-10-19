@@ -102,8 +102,7 @@ class TestContactsServiceImpl implements TestContactsService {
     this.#log.push({ kind: 'email', email })
     const wanted = email.toLowerCase()
     return Promise.resolve(
-      this.#contacts.filter((contact) =>
-        contact.emails.some((address) => address.toLowerCase() === wanted),
+      this.#contacts.filter((contact) => { return contact.emails.some((address) => address.toLowerCase() === wanted) },
       ),
     )
   }

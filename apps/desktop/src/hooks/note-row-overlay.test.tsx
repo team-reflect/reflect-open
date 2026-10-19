@@ -49,13 +49,11 @@ describe('useNoteRowOverlay', () => {
     const { result } = await mount('notes/a.md')
     await act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL, gistStale: false }))
 
-    await act(() =>
-      app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: true })),
+    await act(() => { return app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: true })) },
     )
     expect(result.current).toEqual({ gistStale: false })
 
-    await act(() =>
-      app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: false })),
+    await act(() => { return app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: false })) },
     )
     expect(result.current).toBeNull()
   })

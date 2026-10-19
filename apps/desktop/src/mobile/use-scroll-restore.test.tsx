@@ -110,8 +110,7 @@ async function mountRestore(options: MountOptions = {}) {
   scrollable.element.appendChild(content)
   const containerRef = { current: scrollable.element }
   const contentRef = { current: content }
-  const hook = await renderHook(() =>
-    useScrollRestore({ key: KEY, memory, containerRef, contentRef }),
+  const hook = await renderHook(() => { return useScrollRestore({ key: KEY, memory, containerRef, contentRef }) },
   )
   return { memory, scrollable, content, hook }
 }

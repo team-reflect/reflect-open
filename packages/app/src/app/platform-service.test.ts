@@ -111,8 +111,7 @@ describe('createPlatformService', () => {
     const list = {
       matches: false,
       addListener: (listener: (event: MediaQueryListEvent) => void) => listeners.add(listener),
-      removeListener: (listener: (event: MediaQueryListEvent) => void) =>
-        listeners.delete(listener),
+      removeListener: (listener: (event: MediaQueryListEvent) => void) => { return listeners.delete(listener) },
     }
     const platform = createPlatformService({
       facts: FACTS,

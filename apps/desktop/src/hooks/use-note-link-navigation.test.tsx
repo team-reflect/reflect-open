@@ -24,22 +24,20 @@ function Links({ scopeKey }: { readonly scopeKey: string | undefined }): ReactEl
     <>
       <button
         type="button"
-        onClick={(event) =>
-          openNoteLink({
+        onClick={(event) => { return openNoteLink({
             target: { kind: 'note', path: 'notes/alpha.md' },
             openInNewWindow: isModEvent(event),
-          })
+          }) }
         }
       >
         Alpha
       </button>
       <button
         type="button"
-        onClick={(event) =>
-          openNoteLink({
+        onClick={(event) => { return openNoteLink({
             target: { kind: 'note', path: 'notes/bravo.md' },
             openInNewWindow: isModEvent(event),
-          })
+          }) }
         }
       >
         Bravo
@@ -155,10 +153,9 @@ describe('useNoteLinkNavigation', () => {
     let rejectOpen: (cause: Error) => void = () => {}
     openNoteWindow
       .mockImplementationOnce(
-        () =>
-          new Promise((_resolve, reject) => {
+        () => { return new Promise((_resolve, reject) => {
             rejectOpen = reject
-          }),
+          }) },
       )
       .mockResolvedValueOnce(true)
     const view = await mount(<Harness />)

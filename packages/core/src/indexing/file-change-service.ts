@@ -114,8 +114,7 @@ class FileChangeServiceImpl implements FileChangeService {
   constructor(deps: FileChangeServiceDeps) {
     this.#deps = deps
     // Every subscriber shares one native registration; the payload is parsed once.
-    this.#batches = createFanOut<FileChangeBatch>((emit) =>
-      this.#listenNative(FILE_CHANGES_EVENT, (payload) => {
+    this.#batches = createFanOut<FileChangeBatch>((emit) => { return this.#listenNative(FILE_CHANGES_EVENT, (payload) => {
         const parsed = fileChangesSchema.safeParse(payload)
         if (parsed.success) {
           emit({ changes: parsed.data, source: 'external' })
@@ -124,7 +123,7 @@ class FileChangeServiceImpl implements FileChangeService {
           // indexes and editors.
           deps.logger.error(`invalid ${FILE_CHANGES_EVENT} payload:`, parsed.error)
         }
-      }),
+      }) },
     )
   }
 

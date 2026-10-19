@@ -195,8 +195,7 @@ class NoteToolsServiceImpl implements NoteToolsService {
       assetPrivacy,
       xArchive,
     } = this.#deps
-    const readNote = async (path: string): Promise<string> =>
-      await noteFile.read(path, options.generation)
+    const readNote = async (path: string): Promise<string> => { return await noteFile.read(path, options.generation) }
     const readOneNote = buildReadOneNote({ readNote, privacy })
     const readOneAsset = buildReadOneAsset({
       readNote,
@@ -435,20 +434,18 @@ export function noteToolResult(part: TypedToolResult<NoteTools>): NoteToolResult
       return {
         tool: 'read',
         toolCallId: part.toolCallId,
-        notes: part.output.notes.map((entry) =>
-          entry.ok
+        notes: part.output.notes.map((entry) => { return entry.ok
             ? { path: entry.note.path, title: entry.note.title, error: null }
-            : { path: entry.path, title: null, error: entry.error },
+            : { path: entry.path, title: null, error: entry.error } },
         ),
       }
     case 'read_assets':
       return {
         tool: 'assets',
         toolCallId: part.toolCallId,
-        assets: part.output.assets.map((entry) =>
-          entry.ok
+        assets: part.output.assets.map((entry) => { return entry.ok
             ? { path: entry.asset.path, error: null }
-            : { path: entry.path, error: entry.error },
+            : { path: entry.path, error: entry.error } },
         ),
       }
     case 'list_recent_notes': {

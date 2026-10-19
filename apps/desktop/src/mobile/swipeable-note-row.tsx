@@ -35,14 +35,13 @@ interface SwipeableNoteRowProps {
 }
 
 function renderHighlightedSegments(segments: HighlightSegment[]): ReactNode {
-  return segments.map((segment, index) =>
-    segment.highlighted ? (
+  return segments.map((segment, index) => { return segment.highlighted ? (
       <mark key={index} className="rounded-sm bg-primary/15 text-text">
         {segment.text}
       </mark>
     ) : (
       <span key={index}>{segment.text}</span>
-    ),
+    ) },
   )
 }
 

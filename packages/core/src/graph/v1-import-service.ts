@@ -196,15 +196,14 @@ class V1ImportServiceImpl implements V1ImportService {
   #subscribeProgress(handler: (progress: GraphImportProgress) => void): Unlisten {
     const { ipc, logger } = this.#deps
     return listenNow(
-      () =>
-        ipc.listen(IMPORT_PROGRESS_EVENT, (payload) => {
+      () => { return ipc.listen(IMPORT_PROGRESS_EVENT, (payload) => {
           const parsed = graphImportProgressSchema.safeParse(payload)
           if (parsed.success) {
             handler(parsed.data)
           } else {
             logger.error('invalid import:progress payload:', parsed.error)
           }
-        }),
+        }) },
       (cause) => {
         logger.warn(`failed to listen for "${IMPORT_PROGRESS_EVENT}"`, cause)
       },

@@ -129,10 +129,9 @@ describe('fitToContextWindow', () => {
     })
     // The pairing survives elision: the call part is still there.
     const calls = fitted.filter(
-      (message) =>
-        message.role === 'assistant' &&
+      (message) => { return message.role === 'assistant' &&
         typeof message.content !== 'string' &&
-        message.content.some((part) => part.type === 'tool-call'),
+        message.content.some((part) => part.type === 'tool-call') },
     )
     expect(calls).toHaveLength(2)
   })

@@ -9,8 +9,7 @@ afterEach(() => {
 describe('createBrowserHttpService', () => {
   it('delegates to the global fetch read at call time', async () => {
     const service = createBrowserHttpService()
-    const globalFetch = vi.fn<typeof fetch>(() =>
-      Promise.resolve(new Response('ok', { status: 201 })),
+    const globalFetch = vi.fn<typeof fetch>(() => { return Promise.resolve(new Response('ok', { status: 201 })) },
     )
     vi.stubGlobal('fetch', globalFetch)
     const init: RequestInit = { method: 'POST', body: 'payload' }

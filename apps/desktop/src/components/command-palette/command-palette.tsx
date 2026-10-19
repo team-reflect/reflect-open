@@ -36,14 +36,13 @@ interface CommandPaletteProps {
 const Snippet = memo(function Snippet({ snippet }: { snippet: string }): ReactElement {
   return (
     <span className="block truncate text-xs text-text-muted">
-      {parseHighlights(snippet).map((segment, i) =>
-        segment.highlighted ? (
+      {parseHighlights(snippet).map((segment, i) => { return segment.highlighted ? (
           <mark key={i} className="rounded-sm bg-accent-soft px-0.5">
             {segment.text}
           </mark>
         ) : (
           <span key={i}>{segment.text}</span>
-        ),
+        ) },
       )}
     </span>
   )

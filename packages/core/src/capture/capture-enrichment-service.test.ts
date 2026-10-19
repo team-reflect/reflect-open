@@ -314,11 +314,9 @@ describe('CaptureEnrichmentService', () => {
     })
     let finishProvider: (() => void) | undefined
     kit.describeMock.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          finishProvider = () =>
-            resolve({ title: 'A title from AI', description: 'A description from AI.' })
-        }),
+      () => { return new Promise((resolve) => {
+          finishProvider = () => { return resolve({ title: 'A title from AI', description: 'A description from AI.' }) }
+        }) },
     )
 
     const running = kit.reconcile()

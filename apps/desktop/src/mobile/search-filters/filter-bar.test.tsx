@@ -15,8 +15,7 @@ import { EMPTY_ALL_NOTES_FILTERS, type AllNotesFilters } from './filter-state.ts
  */
 
 vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ children, open }: { children?: ReactNode; open?: boolean }) =>
-    open ? <>{children}</> : null,
+  Drawer: ({ children, open }: { children?: ReactNode; open?: boolean }) => { return open ? <>{children}</> : null },
   DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,

@@ -147,10 +147,9 @@ describe('watchAuthorization', () => {
 
     service.watchAuthorization()
 
-    await vi.waitFor(() =>
-      expect(logger.getErrors()).toEqual([
+    await vi.waitFor(() => { return expect(logger.getErrors()).toEqual([
         { message: 'calendar authorization read failed:', cause: failure },
-      ]),
+      ]) },
     )
     expect(service.getState().authorization).toBeNull()
   })

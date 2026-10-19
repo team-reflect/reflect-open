@@ -45,13 +45,12 @@ export function createDemoModel(): LanguageModelV3 {
     provider: 'reflect-demo',
     modelId: 'reflect-demo',
     supportedUrls: {},
-    doGenerate: () =>
-      Promise.resolve({
+    doGenerate: () => { return Promise.resolve({
         content: [{ type: 'text' as const, text: DEMO_REPLY_TEXT }],
         finishReason: { unified: 'stop' as const, raw: undefined },
         usage: DEMO_USAGE,
         warnings: [],
-      }),
+      }) },
     doStream: async () => {
       const { simulateReadableStream } = await import('@reflect/modules/ai')
       return {

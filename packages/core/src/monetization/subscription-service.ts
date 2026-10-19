@@ -247,8 +247,7 @@ class SubscriptionServiceImpl implements SubscriptionService {
 
   async #lookupOnce(): Promise<ActiveSubscription> {
     return await resolveActiveSubscription([
-      this.#withEntitlementTimeout(this.#lookupEntitlement(IAP_PRODUCT_IDS.yearly)).then((owned) =>
-        owned ? 'yearly' : null,
+      this.#withEntitlementTimeout(this.#lookupEntitlement(IAP_PRODUCT_IDS.yearly)).then((owned) => { return owned ? 'yearly' : null },
       ),
       this.#withEntitlementTimeout(this.#lookupEntitlement(IAP_PRODUCT_IDS.monthly)).then(
         (owned) => (owned ? 'monthly' : null),

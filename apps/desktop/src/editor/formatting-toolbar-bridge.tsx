@@ -91,8 +91,7 @@ export function FormattingToolbarBridge({
         dedent: () => run(() => editor.commands.dedentList()),
         moveUp: () => run(() => editor.commands.moveList('up')),
         moveDown: () => run(() => editor.commands.moveList('down')),
-        insertTrigger: (text: FormattingTriggerText) =>
-          run(() => editor.commands.insertTrigger(text)),
+        insertTrigger: (text: FormattingTriggerText) => { return run(() => editor.commands.insertTrigger(text)) },
         dismissKeyboard: () => editor.blur(),
         attachFiles: async (files: File[]) => {
           const save = saveFileRef.current

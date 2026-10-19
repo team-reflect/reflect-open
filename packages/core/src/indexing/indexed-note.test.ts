@@ -158,12 +158,11 @@ describe('buildIndexedNote', () => {
   })
 
   it('flags a note as empty only when nothing would render', () => {
-    const hasContentOf = (source: string): boolean =>
-      buildIndexedNote(parseNote({ path: 'daily/2026-06-09.md', source }), {
+    const hasContentOf = (source: string): boolean => { return buildIndexedNote(parseNote({ path: 'daily/2026-06-09.md', source }), {
         fileHash: 'h',
         mtime: 0,
         source,
-      }).hasContent
+      }).hasContent }
 
     expect(hasContentOf('')).toBe(false)
     expect(hasContentOf('\n  \n')).toBe(false)
@@ -199,12 +198,11 @@ describe('buildIndexedNote', () => {
   })
 
   it('derives the note kind from the path', () => {
-    const kindOf = (path: string): string =>
-      buildIndexedNote(parseNote({ path, source: 'body' }), {
+    const kindOf = (path: string): string => { return buildIndexedNote(parseNote({ path, source: 'body' }), {
         fileHash: 'h',
         mtime: 0,
         source: 'body',
-      }).kind
+      }).kind }
     expect(kindOf('daily/2026-06-09.md')).toBe('daily')
     expect(kindOf('notes/n.md')).toBe('note')
     expect(kindOf('templates/journal.md')).toBe('template')
@@ -234,8 +232,7 @@ describe('buildIndexedNote', () => {
 
   it('projects the gist url and computes staleness from the body hash', () => {
     const body = '# N\n\npublished body\n'
-    const block = (hash: string): string =>
-      `---\ngist:\n  id: g1\n  url: https://gist.github.com/alex/g1\n  file: N.md\n  hash: ${hash}\n---\n`
+    const block = (hash: string): string => { return `---\ngist:\n  id: g1\n  url: https://gist.github.com/alex/g1\n  file: N.md\n  hash: ${hash}\n---\n` }
 
     const fresh = block(gistBodyHash(body)) + body
     const indexedFresh = buildIndexedNote(parseNote({ path: 'notes/n.md', source: fresh }), {

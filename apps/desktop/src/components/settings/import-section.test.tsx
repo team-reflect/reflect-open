@@ -47,8 +47,7 @@ describe('ImportSection', () => {
 
     await importButton().click()
 
-    await vi.waitFor(() =>
-      expect(dialog.calls()).toEqual([
+    await vi.waitFor(() => { return expect(dialog.calls()).toEqual([
         {
           kind: 'files',
           options: {
@@ -57,12 +56,11 @@ describe('ImportSection', () => {
             filters: [{ name: 'Zip archives', extensions: ['zip'] }],
           },
         },
-      ]),
+      ]) },
     )
-    await vi.waitFor(() =>
-      expect(importCalls(app)).toEqual([
+    await vi.waitFor(() => { return expect(importCalls(app)).toEqual([
         { path: '/Users/alex/Downloads/reflect-v1.zip', generation: 4 },
-      ]),
+      ]) },
     )
   })
 

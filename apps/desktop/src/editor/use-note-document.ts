@@ -75,8 +75,7 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
    * The pane's lifecycle policy object — one per hook instance.
    */
   const { noteSessions, openDocuments, titleRename } = useCoreServices()
-  const [binding] = useState<DocumentBinding<RenameCoordinator>>(() =>
-    createDocumentBinding({ openDocuments }),
+  const [binding] = useState<DocumentBinding<RenameCoordinator>>(() => { return createDocumentBinding({ openDocuments }) },
   )
 
   // The session is keyed on whether a graph is open, not on its generation:
@@ -92,8 +91,7 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
       // The auto-rename lifecycle (Plan 07b/17) is owned by the coordinator —
       // the tracker, the rewrite chain, alias placement, and the file move.
       coordinator: () => (trackRenames ? titleRename.createCoordinator({ path }) : null),
-      session: (coordinator) =>
-        noteSessions.create({
+      session: (coordinator) => { return noteSessions.create({
           path,
           readOnly: !canWrite,
           classify: checkRoundTrip,
@@ -111,7 +109,7 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
             : undefined,
           createIfMissing,
           missingSeed,
-        }),
+        }) },
     })
     if (created) {
       session.load()

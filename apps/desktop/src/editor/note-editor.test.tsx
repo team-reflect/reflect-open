@@ -164,11 +164,10 @@ describe('NoteEditor wiki-link chips', () => {
 
 describe('NoteEditor link preview', () => {
   it('forwards host-resolved metadata to the link popup', async () => {
-    const resolveLinkPreview = vi.fn(() =>
-      Promise.resolve({
+    const resolveLinkPreview = vi.fn(() => { return Promise.resolve({
         title: 'Example Domain',
         description: 'An example description.',
-      }),
+      }) },
     )
     // Park the mouse first, for the same reason as the wiki-link hover card.
     await unhover()

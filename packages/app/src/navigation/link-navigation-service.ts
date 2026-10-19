@@ -205,8 +205,7 @@ class LinkNavigationServiceImpl implements LinkNavigationService {
     this.#latestIntent += 1
     const intent = this.#latestIntent
     const startedAtRevision = navigation.navigationRevision()
-    return () =>
-      this.#latestIntent !== intent || navigation.navigationRevision() !== startedAtRevision
+    return () => { return this.#latestIntent !== intent || navigation.navigationRevision() !== startedAtRevision }
   }
 
   async openRouteInNewWindow(route: Route): Promise<boolean> {

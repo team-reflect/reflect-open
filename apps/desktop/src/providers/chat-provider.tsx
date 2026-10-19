@@ -39,8 +39,7 @@ export function useMaybeChatSession(): ChatContextValue | null {
   const store = session ?? NO_CHAT
   const state = useServiceState<ChatSessionState | null>(store, store.getState)
   const value = useMemo(
-    (): ChatContextValue | null =>
-      session === null || state === null
+    (): ChatContextValue | null => { return session === null || state === null
         ? null
         : {
             ...state,
@@ -53,7 +52,7 @@ export function useMaybeChatSession(): ChatContextValue | null {
             newChat: () => session.newChat(),
             openConversation: (id) => session.openConversation(id),
             deleteConversation: (id) => session.deleteConversation(id),
-          },
+          } },
     [state, session],
   )
   return value

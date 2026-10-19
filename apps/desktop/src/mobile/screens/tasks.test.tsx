@@ -135,15 +135,14 @@ vi.mock('@/components/ui/drawer.tsx', () => ({
     open?: boolean
     onOpenChange?: (open: boolean) => void
     children?: ReactNode
-  }) =>
-    open ? (
+  }) => { return open ? (
       <div data-testid="drawer">
         {children}
         <button type="button" onClick={() => onOpenChange?.(false)}>
           dismiss-drawer
         </button>
       </div>
-    ) : null,
+    ) : null },
   DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
@@ -193,10 +192,8 @@ function renderScreen() {
       },
       findByRole: (...args: Parameters<typeof view.getByRole>) => find(view.getByRole(...args)),
       findByText: (...args: Parameters<typeof view.getByText>) => find(view.getByText(...args)),
-      getAllByText: (...args: Parameters<typeof view.getByText>) =>
-        view.getByText(...args).elements(),
-      queryByLabelText: (...args: Parameters<typeof view.getByLabelText>) =>
-        view.getByLabelText(...args).query(),
+      getAllByText: (...args: Parameters<typeof view.getByText>) => { return view.getByText(...args).elements() },
+      queryByLabelText: (...args: Parameters<typeof view.getByLabelText>) => { return view.getByLabelText(...args).query() },
       queryByRole: (...args: Parameters<typeof view.getByRole>) => view.getByRole(...args).query(),
       queryByText: (...args: Parameters<typeof view.getByText>) => view.getByText(...args).query(),
     })
@@ -704,8 +701,7 @@ describe('MobileTasks', () => {
     expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
       { kind: 'setMarkdown', markdown: 'buy oat milk' },
     ])
-    await waitFor(() =>
-      expect(view.getByTestId('route').element().textContent).toContain('notes/other.md'),
+    await waitFor(() => { return expect(view.getByTestId('route').element().textContent).toContain('notes/other.md') },
     )
     await view.unmount()
   })
@@ -875,8 +871,7 @@ describe('MobileTasks', () => {
     await revealSwipeActions(view, 'buy milk')
     await view.getByRole('button', { name: 'Open note: buy milk' }).click()
 
-    await waitFor(() =>
-      expect(view.getByTestId('route').element().textContent).toContain('notes/n.md'),
+    await waitFor(() => { return expect(view.getByTestId('route').element().textContent).toContain('notes/n.md') },
     )
     expect(view.queryByText('dismiss-drawer')).toBeNull()
     await view.unmount()

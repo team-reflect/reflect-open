@@ -28,10 +28,8 @@ const viMockAllowlistRule = {
   },
   create(context) {
     const allow = context.options[0]?.allow ?? []
-    const isAllowed = (specifier) =>
-      allow.some((entry) =>
-        entry.endsWith('*') ? specifier.startsWith(entry.slice(0, -1)) : specifier === entry,
-      )
+    const isAllowed = (specifier) => { return allow.some((entry) => { return entry.endsWith('*') ? specifier.startsWith(entry.slice(0, -1)) : specifier === entry },
+      ) }
     return {
       CallExpression(node) {
         const { callee } = node
@@ -73,10 +71,9 @@ const maybePromiseRule = {
   },
   create(context) {
     const text = (node) => context.sourceCode.getText(node)
-    const isDefinition = (union, value) =>
-      union.parent.type === 'TSTypeAliasDeclaration' &&
+    const isDefinition = (union, value) => { return union.parent.type === 'TSTypeAliasDeclaration' &&
       union.types.length === 2 &&
-      union.parent.typeParameters?.params.some((param) => param.name.name === text(value))
+      union.parent.typeParameters?.params.some((param) => param.name.name === text(value)) }
     return {
       TSUnionType(node) {
         const members = new Set(node.types.map(text))
@@ -351,8 +348,7 @@ export default defineESLintConfig(
   // thin shell over a service are never on the list.
   viMockBlock([`packages/**/*.${SOURCE_EXTENSIONS}`], []),
   viMockBlock([`apps/desktop/**/*.${SOURCE_EXTENSIONS}`], DESKTOP_VI_MOCK_ALLOW),
-  ...Object.entries(DESKTOP_VI_MOCK_ALLOW_BY_FILE).map(([file, allow]) =>
-    viMockBlock([file], [...DESKTOP_VI_MOCK_ALLOW, ...allow]),
+  ...Object.entries(DESKTOP_VI_MOCK_ALLOW_BY_FILE).map(([file, allow]) => { return viMockBlock([file], [...DESKTOP_VI_MOCK_ALLOW, ...allow]) },
   ),
   viMockBlock([`apps/extension/**/*.${SOURCE_EXTENSIONS}`], EXTENSION_VI_MOCK_ALLOW),
 )

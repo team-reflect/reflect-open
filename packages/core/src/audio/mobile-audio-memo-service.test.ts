@@ -158,13 +158,11 @@ async function setup(options?: SetupOptions) {
     platform,
     logger,
   })
-  const deleted = (): string[] =>
-    recorder
+  const deleted = (): string[] => { return recorder
       .calls()
       .filter((call) => call.method === 'deleteStaged')
-      .map((call) => call.path)
-  const count = (method: string): number =>
-    recorder.calls().filter((call) => call.method === method).length
+      .map((call) => call.path) }
+  const count = (method: string): number => { return recorder.calls().filter((call) => call.method === method).length }
   return {
     settings,
     noteFile,

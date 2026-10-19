@@ -137,8 +137,7 @@ export async function createAudioMemoTestKit(
   const transcription = createTestTranscriptionService('memo transcript')
   const enrichMock = vi
     .fn<TranscriptEnrichmentService['enrich']>()
-    .mockImplementation((input) =>
-      Promise.resolve({ title: 'Memo Transcript', body: input.transcript }),
+    .mockImplementation((input) => { return Promise.resolve({ title: 'Memo Transcript', body: input.transcript }) },
     )
   const transcriptEnrichment = createTranscriptEnrichmentService({
     languageModel: createTestLanguageModelService(),
@@ -197,12 +196,11 @@ export async function createAudioMemoTestKit(
       noteFile.set(path, 'x', { modifiedMs: recordingOptions?.modifiedMs ?? 0 })
       assets.set(path, 'audio-bytes')
     },
-    reconcile: (overrides = {}) =>
-      service.reconcile({
+    reconcile: (overrides = {}) => { return service.reconcile({
         generation: 3,
         formatTranscript: false,
         transcriptionPrompt: '',
         ...overrides,
-      }),
+      }) },
   }
 }

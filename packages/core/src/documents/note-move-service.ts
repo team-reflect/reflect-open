@@ -132,8 +132,7 @@ class NoteMoveServiceImpl implements NoteMoveService {
   followNativeMoves(): Unlisten {
     const { ipc, logger } = this.#deps
     return listenNow(
-      () =>
-        ipc.listen(NOTE_MOVED_EVENT, (payload) => {
+      () => { return ipc.listen(NOTE_MOVED_EVENT, (payload) => {
           const parsed = noteMovedSchema.safeParse(payload)
           if (parsed.success) {
             this.followHealedMove(parsed.data.from, parsed.data.to)
@@ -142,7 +141,7 @@ class NoteMoveServiceImpl implements NoteMoveService {
             // move leaves an open editor writing to a dead path.
             logger.error('invalid note:moved payload:', parsed.error)
           }
-        }),
+        }) },
       (cause) => {
         logger.warn(`failed to listen for "${NOTE_MOVED_EVENT}"`, cause)
       },

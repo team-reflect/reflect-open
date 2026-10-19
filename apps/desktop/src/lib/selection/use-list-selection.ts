@@ -66,10 +66,9 @@ export function useListSelection(orderedKeys: readonly string[]): ListSelection 
     // returns the same Set when nothing vanished, so steady-state renders never
     // cascade.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelected((current) =>
-      [...current].every((key) => valid.has(key))
+    setSelected((current) => { return [...current].every((key) => valid.has(key))
         ? current
-        : new Set([...current].filter((key) => valid.has(key))),
+        : new Set([...current].filter((key) => valid.has(key))) },
     )
     if (anchorRef.current !== null && !valid.has(anchorRef.current)) {
       anchorRef.current = null

@@ -495,8 +495,7 @@ class TestBackupServiceImpl implements TestBackupService {
   readonly #listeners = new Set<() => void>()
   readonly #log: BackupCall[] = []
   #connectNew: BackupService['connectNewRepo'] = () => Promise.resolve('connected')
-  #connectExisting: BackupService['connectExistingRepo'] = (): Promise<ConnectExistingResult> =>
-    Promise.resolve('connected')
+  #connectExisting: BackupService['connectExistingRepo'] = (): Promise<ConnectExistingResult> => { return Promise.resolve('connected') }
 
   constructor(options?: { state?: BackupState }) {
     this.#state = options?.state ?? { phase: 'loading' }

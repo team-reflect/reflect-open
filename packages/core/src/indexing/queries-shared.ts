@@ -103,10 +103,9 @@ async function winningAliasesByPath(
   for (const chunk of inClauseChunks([...paths])) {
     const rows = await db
       .selectFrom('aliases')
-      .innerJoin('noteKeys', (join) =>
-        join
+      .innerJoin('noteKeys', (join) => { return join
           .onRef('noteKeys.key', '=', 'aliases.aliasKey')
-          .onRef('noteKeys.notePath', '=', 'aliases.notePath'),
+          .onRef('noteKeys.notePath', '=', 'aliases.notePath') },
       )
       .where('aliases.notePath', 'in', chunk)
       .select(['aliases.notePath', 'aliases.alias', 'noteKeys.claimCount'])

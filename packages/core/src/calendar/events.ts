@@ -48,8 +48,7 @@ export function displayEvents(events: CalendarEvent[]): CalendarEvent[] {
       return true
     })
     .sort(
-      (first, second) =>
-        first.startsAt - second.startsAt || first.title.localeCompare(second.title),
+      (first, second) => { return first.startsAt - second.startsAt || first.title.localeCompare(second.title) },
     )
 }
 

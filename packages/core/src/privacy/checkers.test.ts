@@ -40,8 +40,7 @@ describe('cloudSafeLinkHref', () => {
   })
 
   it('refuses a private note before the destination can be fetched', () => {
-    expect(() =>
-      cloudSafeLinkHref({ path: PRIVATE_PATH, isPrivate: true }, 'https://example.com'),
+    expect(() => { return cloudSafeLinkHref({ path: PRIVATE_PATH, isPrivate: true }, 'https://example.com') },
     ).toThrow(PrivateNoteError)
   })
 })
@@ -202,14 +201,13 @@ describe('cloudSafeNoteContent', () => {
   })
 
   it('refuses to mint a private note before any content escapes', () => {
-    expect(() =>
-      cloudSafeNoteContent({
+    expect(() => { return cloudSafeNoteContent({
         path: PRIVATE_PATH,
         isPrivate: true,
         title: PRIVATE_TITLE,
         content: PRIVATE_BODY,
         truncated: false,
-      }),
+      }) },
     ).toThrow(PrivateNoteError)
   })
 })
@@ -231,13 +229,12 @@ describe('cloudSafeAssetDescription', () => {
   })
 
   it('refuses to mint a blocked asset before any description escapes', () => {
-    expect(() =>
-      cloudSafeAssetDescription({
+    expect(() => { return cloudSafeAssetDescription({
         path: 'assets/secret.png',
         isPrivate: true,
         description: PRIVATE_BODY,
         truncated: false,
-      }),
+      }) },
     ).toThrow(PrivateNoteError)
   })
 })

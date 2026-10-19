@@ -135,8 +135,7 @@ export function CalendarIntegrationField(): ReactElement | null {
                             <label className="flex cursor-pointer items-center gap-2 text-sm text-text-secondary">
                               <Checkbox
                                 checked={settings.calendarIds.includes(calendar.id)}
-                                onCheckedChange={(checked) =>
-                                  calendarEvents.toggleCalendar(calendar.id, checked === true)
+                                onCheckedChange={(checked) => { return calendarEvents.toggleCalendar(calendar.id, checked === true) }
                                 }
                                 aria-label={calendar.title}
                               />

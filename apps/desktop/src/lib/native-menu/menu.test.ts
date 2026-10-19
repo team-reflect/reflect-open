@@ -4,10 +4,9 @@ import { APP_COMMANDS, keybindingFor } from '@/lib/commands/app-commands.ts'
 import { appMenuLayout } from './menu.ts'
 
 function referencedCommandIds(): string[] {
-  return appMenuLayout().flatMap((submenu) =>
-    submenu.entries
+  return appMenuLayout().flatMap((submenu) => { return submenu.entries
       .map((entry) => (entry.kind === 'command' ? entry.commandId : null))
-      .filter(isNotNullish),
+      .filter(isNotNullish) },
   )
 }
 

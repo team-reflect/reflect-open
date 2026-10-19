@@ -69,8 +69,7 @@ async function setup(options?: SetupOptions) {
       contact,
       insertText: contact.fullName,
     }),
-    ensurePersonNote: async (input) =>
-      await noteCreation.resolveOrCreateNoteWithTitle(input.title, input.generation),
+    ensurePersonNote: async (input) => { return await noteCreation.resolveOrCreateNoteWithTitle(input.title, input.generation) },
   }
   const graphSession = createTestGraphSessionService()
   const app = createTestCoreServices({
@@ -78,8 +77,7 @@ async function setup(options?: SetupOptions) {
     graphSession,
     suggestions: {
       ...base.suggestions,
-      suggestWikiLinkTargets: () =>
-        options?.wikiLinks ?? { suggestions: [], claimedTargetKeys: [], queryReadsAsDate: false },
+      suggestWikiLinkTargets: () => { return options?.wikiLinks ?? { suggestions: [], claimedTargetKeys: [], queryReadsAsDate: false } },
       suggestTags: () => [
         { tag: 'work', count: 2 },
         { tag: 'home', count: 1 },
@@ -121,12 +119,11 @@ describe('useEditorAutocomplete', () => {
 
     items[0]!.onSelect?.()
 
-    await vi.waitFor(() =>
-      expect(operations.findByLabel('Creating note')).toMatchObject({
+    await vi.waitFor(() => { return expect(operations.findByLabel('Creating note')).toMatchObject({
         status: 'failed',
         message:
           'Couldn’t safely choose one note matching “Business ideas”. Rename conflicting notes or wait for unavailable notes to become available, then try again.',
-      }),
+      }) },
     )
   })
 
@@ -140,10 +137,9 @@ describe('useEditorAutocomplete', () => {
   it('adds Contact rows once the integration is on and the permission readable', async () => {
     const { result } = await setup({ contactsEnabled: true })
     // The permission state arrives through a query; the row joins once it settles.
-    await vi.waitFor(async () =>
-      expect(await result.current.onWikilinkSearch('Ada Lovelace')).toMatchObject([
+    await vi.waitFor(async () => { return expect(await result.current.onWikilinkSearch('Ada Lovelace')).toMatchObject([
         { target: 'Ada Lovelace', label: 'Ada Lovelace', detail: 'ada@example.com' },
-      ]),
+      ]) },
     )
   })
 

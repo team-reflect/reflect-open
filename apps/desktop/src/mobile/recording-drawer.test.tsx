@@ -26,8 +26,7 @@ const memo = vi.hoisted((): Mutable<MobileAudioMemoContextValue> => ({
 }))
 
 vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ open, children }: { open?: boolean; children?: ReactNode }) =>
-    open ? <div data-testid="drawer">{children}</div> : null,
+  Drawer: ({ open, children }: { open?: boolean; children?: ReactNode }) => { return open ? <div data-testid="drawer">{children}</div> : null },
   DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,

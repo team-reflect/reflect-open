@@ -60,14 +60,13 @@ const SENTRY_DSN_SCHEMA = z
   .url()
   .transform((value) => new URL(value))
   .refine(
-    (url) =>
-      url.protocol === 'https:' &&
+    (url) => { return url.protocol === 'https:' &&
       url.hostname === 'o463484.ingest.us.sentry.io' &&
       url.pathname === '/4511705649971200' &&
       /^[a-f0-9]{32}$/.test(url.username) &&
       !url.password &&
       !url.search &&
-      !url.hash,
+      !url.hash },
   )
   .transform((url) => url.href)
 

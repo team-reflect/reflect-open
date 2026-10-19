@@ -37,13 +37,10 @@ export function createNoteAttachments(
   attachments: AttachmentService,
   graphSession: GraphSessionService,
 ): NoteAttachments {
-  const isCurrent = (): boolean =>
-    graph !== null && graphSession.getState().session?.generation === graph.generation
+  const isCurrent = (): boolean => { return graph !== null && graphSession.getState().session?.generation === graph.generation }
   return {
-    resolveAttachmentPath: (destination) =>
-      isCurrent() ? attachments.resolveAttachmentPath(notePath, destination) : null,
-    resolveImageUrl: (source) =>
-      graph === null || isCurrent() ? attachments.resolveImageUrl(notePath, source) : undefined,
+    resolveAttachmentPath: (destination) => { return isCurrent() ? attachments.resolveAttachmentPath(notePath, destination) : null },
+    resolveImageUrl: (source) => { return graph === null || isCurrent() ? attachments.resolveImageUrl(notePath, source) : undefined },
     resolveWikiEmbed: ({ target }) => attachments.resolveWikiEmbed(target),
   }
 }

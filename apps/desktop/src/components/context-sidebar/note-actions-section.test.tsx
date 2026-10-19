@@ -85,10 +85,9 @@ beforeEach(() => {
   getNote.mockReset().mockResolvedValue(noteRow('notes/a.md', false))
   noteSource = '# A\n'
   readNoteSource.mockReset().mockImplementation(() => Promise.resolve(noteSource))
-  commitNoteFrontmatter.mockReset().mockImplementation((_path, patch) =>
-    Promise.try(() => {
+  commitNoteFrontmatter.mockReset().mockImplementation((_path, patch) => { return Promise.try(() => {
       noteSource = upsertFrontmatter(noteSource, frontmatterPatchToYaml(patch))
-    }),
+    }) },
   )
 })
 
@@ -165,10 +164,9 @@ describe('NoteActionsSection pin toggle', () => {
   it('reverts the pin when the write fails', async () => {
     let rejectToggle!: (cause: unknown) => void
     commitNoteFrontmatter.mockImplementationOnce(
-      () =>
-        new Promise<void>((_resolve, reject) => {
+      () => { return new Promise<void>((_resolve, reject) => {
           rejectToggle = reject
-        }),
+        }) },
     )
     const view = await renderSection('notes/a.md')
     await vi.waitFor(() => expect(getPinnedNotes).toHaveBeenCalledTimes(1))

@@ -39,8 +39,7 @@ interface V1ImportProviderProps {
  */
 export function V1ImportProvider({ children }: V1ImportProviderProps): ReactElement {
   const { ipc, fileChanges, graphSession, clock, logger } = useCoreServices()
-  const [service] = useState(() =>
-    createV1ImportService({ ipc, fileChanges, graphSession, clock, logger }),
+  const [service] = useState(() => { return createV1ImportService({ ipc, fileChanges, graphSession, clock, logger }) },
   )
   const state = useServiceState(service, service.getState)
 

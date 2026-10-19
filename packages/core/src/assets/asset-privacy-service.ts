@@ -92,8 +92,7 @@ class AssetPrivacyServiceImpl implements AssetPrivacyService {
       }
       const parsed = parseNote({ path: notePath, source })
       if (
-        !parsed.assets.some((ref) =>
-          references.some((path) => assetReferenceMatches(ref.path, path)),
+        !parsed.assets.some((ref) => { return references.some((path) => assetReferenceMatches(ref.path, path)) },
         )
       ) {
         continue

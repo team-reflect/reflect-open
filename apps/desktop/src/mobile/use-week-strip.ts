@@ -50,8 +50,7 @@ export interface WeekStrip {
  * follow effect reinitializes Embla onto the anchor index uniformly.
  */
 export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStrip {
-  const [weekWindow, setWeekWindow] = useState<WeekWindow>(() =>
-    createWeekWindow(date, weekStartDay),
+  const [weekWindow, setWeekWindow] = useState<WeekWindow>(() => { return createWeekWindow(date, weekStartDay) },
   )
   const [emblaRef, emblaApi] = useEmblaCarousel({ startIndex: weekWindow.anchorIndex })
   const [displayedIndex, setDisplayedIndex] = useState(weekWindow.anchorIndex)

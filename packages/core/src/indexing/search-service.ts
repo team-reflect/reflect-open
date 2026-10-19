@@ -303,8 +303,7 @@ class SearchServiceImpl implements SearchService {
     // graph scale, and the FTS pass stays a single MATCH.
     const lexicalDb = db.with(
       (cte) => cte('lexical').materialized(),
-      (queryDb) =>
-        queryDb
+      (queryDb) => { return queryDb
           .selectFrom('searchFts')
           .select([
             'searchFts.path',
@@ -316,7 +315,7 @@ class SearchServiceImpl implements SearchService {
             ),
             sql<number>`bm25(search_fts, 0, 10.0, 1.0)`.as('rank'),
           ])
-          .where(sql<boolean>`search_fts MATCH ${match}`),
+          .where(sql<boolean>`search_fts MATCH ${match}`) },
     )
     const filteredNotes = query.select('notes.titleKey').as('filteredNotes')
     const titleMatch = buildTitleMatchSql(sql.ref<string>('filteredNotes.titleKey'), parsed.text)

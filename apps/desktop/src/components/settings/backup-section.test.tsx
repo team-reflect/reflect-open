@@ -220,10 +220,9 @@ describe('BackupSettingsField', () => {
     let rejectFirstOpen: (reason?: unknown) => void = () => {}
     openUrl
       .mockImplementationOnce(
-        () =>
-          new Promise<void>((_resolve, reject) => {
+        () => { return new Promise<void>((_resolve, reject) => {
             rejectFirstOpen = reject
-          }),
+          }) },
       )
       .mockResolvedValueOnce()
     await renderSection({

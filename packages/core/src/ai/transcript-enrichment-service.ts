@@ -164,8 +164,7 @@ function normalizedTranscriptContent(value: string): string {
 }
 
 function numberSignatures(value: string): readonly string[] {
-  return (value.normalize('NFC').match(NUMBER_SIGNATURE_PATTERN) ?? []).map((match) =>
-    match.replaceAll(/\s/gu, ''),
+  return (value.normalize('NFC').match(NUMBER_SIGNATURE_PATTERN) ?? []).map((match) => { return match.replaceAll(/\s/gu, '') },
   )
 }
 

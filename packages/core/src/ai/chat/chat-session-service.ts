@@ -378,8 +378,7 @@ class ChatSessionImpl implements ChatSession {
 
     const updateTurn = (updater: (turn: ChatTurn) => ChatTurn) => {
       localTurn = updater(localTurn)
-      this.#setTurns((current) =>
-        current.map((turn) => (turn.id === turnId ? updater(turn) : turn)),
+      this.#setTurns((current) => { return current.map((turn) => (turn.id === turnId ? updater(turn) : turn)) },
       )
     }
     const applyEvent = (event: ChatStreamEvent) => {

@@ -193,8 +193,7 @@ export async function chunkAssetDescriptions(
     const text = body.slice(0, budget)
     budget -= text.length
     const heading = assetBasename(assetPath)
-    const bodyChunks = await mergeRuntTail(await chunkRun(text, offset, heading), (from, to) =>
-      text.slice(from - offset, to - offset),
+    const bodyChunks = await mergeRuntTail(await chunkRun(text, offset, heading), (from, to) => { return text.slice(from - offset, to - offset) },
     )
     chunks.push(...bodyChunks)
     offset += text.length + 2 // as if joined by the FTS fold's blank line

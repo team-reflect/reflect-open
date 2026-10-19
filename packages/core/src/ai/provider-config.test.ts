@@ -126,9 +126,7 @@ describe('defaultAiProvider', () => {
 
 describe('resolveTranscriptionTarget', () => {
   const keyed =
-    (available: Record<string, string>) =>
-    (id: string): Promise<string | null> =>
-      Promise.resolve(available[id] ?? null)
+    (available: Record<string, string>) => { return (id: string): Promise<string | null> => { return Promise.resolve(available[id] ?? null) } }
 
   it('answers no-provider when nothing transcription-capable is configured', async () => {
     const target = await resolveTranscriptionTarget(

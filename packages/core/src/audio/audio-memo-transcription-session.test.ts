@@ -191,8 +191,7 @@ describe('AudioMemoTranscriptionService.openSession', () => {
   it('surfaces a stop that needs attention once, deduped across retries', async () => {
     const { kit, subject } = await open()
     kit.addRecording(MEMO.audioPath)
-    kit.transcription.setResult(() =>
-      Promise.reject(new AppError('auth', 'openai rejected the API key (401)')),
+    kit.transcription.setResult(() => { return Promise.reject(new AppError('auth', 'openai rejected the API key (401)')) },
     )
     subject.start()
     await flush()

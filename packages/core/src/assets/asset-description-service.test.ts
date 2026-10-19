@@ -210,13 +210,12 @@ function setup(options?: { provider?: AiProviderConfig | null; secretStore?: Sec
     index,
     indexedEvents: () => indexedEvents,
     addAsset,
-    reconcile: async (overrides: Partial<ReconcileAssetDescriptionsInput> = {}) =>
-      await service.reconcile({
+    reconcile: async (overrides: Partial<ReconcileAssetDescriptionsInput> = {}) => { return await service.reconcile({
         generation: GENERATION,
         mode: 'incremental',
         changed: ['assets/a.png'],
         ...overrides,
-      }),
+      }) },
   }
 }
 

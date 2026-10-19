@@ -31,10 +31,9 @@ import { deepLinkForRoute } from '@reflect/app'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { Sidebar } from './sidebar.tsx'
 
-const openNativeContextMenu = vi.fn((options: NativeContextMenuOptions) =>
-  Promise.try(() => {
+const openNativeContextMenu = vi.fn((options: NativeContextMenuOptions) => { return Promise.try(() => {
     options.items[0]?.action()
-  }),
+  }) },
 )
 
 const GRAPH = { root: '/notes', name: 'Notes', generation: 1 }
@@ -173,8 +172,7 @@ describe('Sidebar', () => {
     // `restoreSurfaceScroll` makes even an off-surface return discard the
     // stream's saved position and re-anchor on today.
     await view.getByRole('button', { name: /daily notes/i }).click()
-    await vi.waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith({ kind: 'today' }, { focusEditor: true }),
+    await vi.waitFor(() => { return expect(navigate).toHaveBeenCalledWith({ kind: 'today' }, { focusEditor: true }) },
     )
 
     await view.getByRole('button', { name: /settings/i }).click()
@@ -197,13 +195,12 @@ describe('Sidebar', () => {
     await expect.element(newNote).toHaveAttribute('aria-current', 'page')
 
     await newNote.click()
-    await vi.waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith(
+    await vi.waitFor(() => { return expect(navigate).toHaveBeenCalledWith(
         expect.objectContaining({
           kind: 'note',
           path: expect.stringMatching(/^notes\/.+\.md$/) as string,
         }),
-      ),
+      ) },
     )
   })
 
@@ -242,8 +239,7 @@ describe('Sidebar', () => {
   it('the mic button starts an audio memo', async () => {
     const { view, app } = await renderSidebar()
     await view.getByRole('button', { name: /record audio memo/i }).click()
-    await vi.waitFor(() =>
-      expect(app.audioRecorder.calls().some((call) => call.method === 'start')).toBe(true),
+    await vi.waitFor(() => { return expect(app.audioRecorder.calls().some((call) => call.method === 'start')).toBe(true) },
     )
   })
 
@@ -287,13 +283,12 @@ describe('Sidebar', () => {
 
     await roadmap.click({ modifiers: ['ControlOrMeta'] })
 
-    await vi.waitFor(() =>
-      expect(openNoteWindow).toHaveBeenCalledWith(
+    await vi.waitFor(() => { return expect(openNoteWindow).toHaveBeenCalledWith(
         deepLinkForRoute({
           kind: 'note',
           path: 'notes/roadmap.md',
         }),
-      ),
+      ) },
     )
     expect(openNoteWindow).toHaveBeenCalledTimes(1)
     await expect.element(roadmap).not.toHaveAttribute('aria-current')
@@ -338,14 +333,13 @@ describe('Sidebar', () => {
 
     await rust.click({ button: 'right' })
 
-    await vi.waitFor(() =>
-      expect(openNativeContextMenu).toHaveBeenCalledWith({
+    await vi.waitFor(() => { return expect(openNativeContextMenu).toHaveBeenCalledWith({
         items: [
           expect.objectContaining({
             text: 'Unpin Note',
           }),
         ],
-      }),
+      }) },
     )
     await expectLocatorToHaveCount(view.getByRole('button', { name: 'Rust' }), 0)
     expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1)
@@ -359,8 +353,7 @@ describe('Sidebar', () => {
 
     await rust.click({ button: 'right' })
 
-    await vi.waitFor(() =>
-      expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1),
+    await vi.waitFor(() => { return expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1) },
     )
     await expect.element(view.getByRole('button', { name: 'Rust' })).toBeInTheDocument()
     expect(operations.snapshot()).toMatchObject([

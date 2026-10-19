@@ -26,8 +26,7 @@ const capability = JSON.parse(
 ) as { permissions: (string | Permission)[] }
 
 const httpPermission = capability.permissions.find(
-  (permission): permission is Permission =>
-    typeof permission === 'object' && permission.identifier === 'http:default',
+  (permission): permission is Permission => { return typeof permission === 'object' && permission.identifier === 'http:default' },
 )
 
 const patterns = (httpPermission?.allow ?? []).map((entry) => new URLPattern(entry.url))

@@ -234,8 +234,7 @@ describe('DeepLinkRouter.serve', () => {
 
     service.dispatch('reflect://today')
 
-    await vi.waitFor(() =>
-      expect(logger.getErrors()).toEqual([{ message: 'deep link failed: reflect://today', cause }]),
+    await vi.waitFor(() => { return expect(logger.getErrors()).toEqual([{ message: 'deep link failed: reflect://today', cause }]) },
     )
   })
 })

@@ -409,11 +409,10 @@ describe('followWikiLink', () => {
 
   it('routes a resolved daily alias through the daily view', async () => {
     const { linkNavigation, host } = setup({
-      resolveOrCreateNoteWithTitle: () =>
-        Promise.resolve({
+      resolveOrCreateNoteWithTitle: () => { return Promise.resolve({
           kind: 'resolved',
           path: 'daily/2026-06-09.md',
-        }),
+        }) },
     })
     linkNavigation.followWikiLink({ target: 'Project log', openInNewWindow: false }, host)
     await settle()
@@ -552,10 +551,9 @@ describe('followWikiLink', () => {
   it('drops an older resolution after a newer wiki-link activation', async () => {
     const pendingOlder = Promise.withResolvers<{ kind: 'resolved'; path: string }>()
     const { linkNavigation, host } = setup({
-      resolveOrCreateNoteWithTitle: (title) =>
-        title === 'Older'
+      resolveOrCreateNoteWithTitle: (title) => { return title === 'Older'
           ? pendingOlder.promise
-          : Promise.resolve({ kind: 'resolved', path: 'notes/newer.md' }),
+          : Promise.resolve({ kind: 'resolved', path: 'notes/newer.md' }) },
     })
     linkNavigation.followWikiLink({ target: 'Older', openInNewWindow: false }, host)
     linkNavigation.followWikiLink({ target: 'Newer', openInNewWindow: false }, host)

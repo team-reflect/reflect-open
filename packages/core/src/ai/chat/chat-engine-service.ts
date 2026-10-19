@@ -219,10 +219,9 @@ export async function* streamChatTurn(
   let stepMessages: ModelMessage[] = []
   // …and the text streamed so far in the step still in flight.
   let pendingText = ''
-  const partialMessages = (): ModelMessage[] =>
-    pendingText === ''
+  const partialMessages = (): ModelMessage[] => { return pendingText === ''
       ? stepMessages
-      : [...stepMessages, { role: 'assistant', content: pendingText }]
+      : [...stepMessages, { role: 'assistant', content: pendingText }] }
 
   try {
     const { isStepCount, streamText } = await import('@reflect/modules/ai')

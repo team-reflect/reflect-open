@@ -54,11 +54,10 @@ export function createTauriNativeMenuHost(): NativeMenuHost {
     async buildAppMenu(layouts) {
       const submenus = await Promise.all(
         layouts.map(
-          async (layout) =>
-            await Submenu.new({
+          async (layout) => { return await Submenu.new({
               text: layout.text,
               items: await Promise.all(layout.items.map(menuEntry)),
-            }),
+            }) },
         ),
       )
       const menu = await Menu.new({ items: submenus })

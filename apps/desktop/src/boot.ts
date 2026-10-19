@@ -45,12 +45,11 @@ export const coreServices = createCoreServices({
   activity: host.lifecycle,
   progress: host.operations,
   // Called when a graph opens, after both layers below exist.
-  createGraphServices: (session, deps) =>
-    createAppGraphServices(session, deps, {
+  createGraphServices: (session, deps) => { return createAppGraphServices(session, deps, {
       platform: coreServices.platform,
       settings: coreServices.settings,
       mobileOnboarding: appServices.mobileOnboarding,
-    }),
+    }) },
 })
 
 export const appServices = createAppServices(coreServices, host)
