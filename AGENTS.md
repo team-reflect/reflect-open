@@ -122,8 +122,8 @@ Otherwise tauri-build fails with `resource path binaries/<name>-<triple> doesn't
 Clippy and the tests never run the sidecars, so they can skip them instead, as CI does:
 `TAURI_CONFIG='{"bundle":{"externalBin":null}}' cargo clippy --workspace --all-targets`.
 
-`.cargo/config.toml` sets `build.warnings = "deny"`: any rustc or clippy warning fails
-the command (after all warnings are printed). Use `CARGO_BUILD_WARNINGS=warn` while iterating.
+`.cargo/config.toml` sets `build.warnings = "deny"`: lint warnings in workspace crates
+fail the build. Use `CARGO_BUILD_WARNINGS=warn` while iterating.
 
 ### Repo layout
 

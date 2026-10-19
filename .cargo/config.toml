@@ -1,8 +1,4 @@
-# Any rustc or clippy warning in a workspace crate fails the command, locally
-# and in CI, after cargo prints every warning. Unlike `-D warnings` in
-# RUSTFLAGS, this does not change the compiler flags, so it rebuilds nothing.
-# Warnings from dependencies and `cargo:warning` lines from build scripts do
-# not count. To get a warning-tolerant build while iterating, run
-# `CARGO_BUILD_WARNINGS=warn cargo ...`.
+# Lint warnings in workspace crates fail the build. Use
+# `CARGO_BUILD_WARNINGS=warn` to allow them while iterating.
 [build]
 warnings = "deny"
