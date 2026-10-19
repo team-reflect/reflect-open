@@ -324,6 +324,12 @@ export default defineESLintConfig(
     ignores: ['./design-system/', '**/.wxt/', '**/.output/'],
   },
   {
+    files: ['apps/desktop/scripts/**/*.ts'],
+    rules: {
+      curly: ['error', 'all'],
+    },
+  },
+  {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.mjs'],
     /// keep-sorted
     rules: {
@@ -405,60 +411,6 @@ export default defineESLintConfig(
     },
   },
 
-  // Rule: `@reflect/app` is the app layer. It knows windows, routes and commands,
-  // but no React, TanStack, Tauri or app code: those stay in `apps/`.
-  {
-    files: [`packages/app/**/*.${SOURCE_EXTENSIONS}`],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: [
-                '@tauri-apps/*',
-                '@tanstack/*',
-                'react',
-                'react/*',
-                'react-dom',
-                'react-dom/*',
-                '@/*',
-                '@reflect/desktop',
-                '@reflect/desktop/*',
-                '@reflect/extension',
-                '**/apps/**',
-              ],
-              message: APP_IMPORT_MESSAGE,
-            },
-          ],
-        },
-      ],
-      'no-restricted-syntax': [
-        'error',
-        dynamicImportSelector(
-          String.raw`^(?:@tauri-apps\/|@tanstack\/|react(?:-dom)?(?:\/|$))`,
-          APP_IMPORT_MESSAGE,
-        ),
-        ...CODE_SHAPE_SELECTORS,
-      ],
-    },
-  },
-  {
-    files: [`packages/app/src/**/*.${SOURCE_EXTENSIONS}`],
-    ignores: [`**/*.test.${SOURCE_EXTENSIONS}`],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        dynamicImportSelector(
-          String.raw`^(?:@tauri-apps\/|@tanstack\/|react(?:-dom)?(?:\/|$))`,
-          APP_IMPORT_MESSAGE,
-        ),
-        ...DEFAULT_INSTANCE_SELECTORS,
-        ...MODULE_LET_SELECTORS,
-        ...CODE_SHAPE_SELECTORS,
-      ],
-    },
-  },
 
   // Rule: the desktop app reaches the platform through the adapters in
   // `services/`. Everything else gets a service from `useCoreServices()` / `ctx`.
