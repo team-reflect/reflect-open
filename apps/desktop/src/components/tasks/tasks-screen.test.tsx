@@ -478,7 +478,7 @@ describe('TasksScreen', () => {
     })
 
     await waitFor(() => {
-      return expect(noteWindows.openedNoteWindows()).toEqual([
+      expect(noteWindows.openedNoteWindows()).toEqual([
         deepLinkForRoute({
           kind: 'note',
           path: 'notes/p.md',
@@ -502,7 +502,7 @@ describe('TasksScreen', () => {
     })
 
     await waitFor(() => {
-      return expect(noteWindows.openedNoteWindows()).toEqual([
+      expect(noteWindows.openedNoteWindows()).toEqual([
         deepLinkForRoute({
           kind: 'note',
           path: 'notes/p.md',
@@ -628,7 +628,7 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await userEvent.click(view.getByText('commit-edit'))
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/p.md', astPath: [2] }),
         [{ kind: 'setMarkdown', markdown: 'edited content' }],
       )
@@ -662,7 +662,7 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await userEvent.click(view.getByText('flush-edit'))
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/p.md', astPath: [2] }),
         [{ kind: 'setMarkdown', markdown: 'edited content' }],
       )
@@ -688,7 +688,7 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await userEvent.click(view.getByText('complete-edited'))
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/p.md', astPath: [2] }),
         [{ kind: 'setMarkdown', markdown: 'edited content' }, { kind: 'toggle' }],
       )
@@ -899,7 +899,7 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'later' }))
     await userEvent.click(view.getByRole('button', { name: 'delete-edit' }))
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/proj.md', astPath: [2] }),
         [{ kind: 'remove' }],
       )
@@ -967,7 +967,7 @@ describe('TasksScreen', () => {
     // through, deleting the freshly written daily-note line, not some other row.
     await userEvent.click(view.getByRole('button', { name: 'delete-edit' }))
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'daily/2026-06-14.md' }),
         [{ kind: 'remove' }],
       )
@@ -1000,10 +1000,9 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'delete-empty-edit' }))
 
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'notes/b.md' }),
-        [{ kind: 'remove' }],
-      )
+      expect(writeTask).toHaveBeenCalledWith(expect.objectContaining({ notePath: 'notes/b.md' }), [
+        { kind: 'remove' },
+      ])
     })
     // Lands on the previous row, whose editor now opens.
     await view.findByText('editing: first')
@@ -1056,7 +1055,7 @@ describe('TasksScreen', () => {
 
     // One write persists this row's edit and adds the next task after it.
     await waitFor(() => {
-      return expect(continueTaskInContext).toHaveBeenCalledWith(
+      expect(continueTaskInContext).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/a.md', astPath: [2] }),
         'edited content',
       )
@@ -1105,7 +1104,7 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
 
     await waitFor(() => {
-      return expect(continueTaskInContext).toHaveBeenCalledWith(
+      expect(continueTaskInContext).toHaveBeenCalledWith(
         expect.objectContaining({
           notePath: 'notes/a.md',
           breadcrumbs: ['StartupToolbox', 'Reflections'],
@@ -1140,7 +1139,7 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
 
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/a.md', markdown: 'first' }),
         [{ kind: 'setMarkdown', markdown: 'edited content' }],
       )
@@ -1171,7 +1170,7 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'continue-unchanged' }))
 
     await waitFor(() => {
-      return expect(continueTaskInContext).toHaveBeenCalledWith(
+      expect(continueTaskInContext).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/a.md', breadcrumbs: ['Project'] }),
         null,
       )
@@ -1197,7 +1196,7 @@ describe('TasksScreen', () => {
     // The cleared row is removed by the same write that adds the next one; it
     // is never edited to a bare `+ [ ]`.
     await waitFor(() => {
-      return expect(continueTaskInContext).toHaveBeenCalledWith(
+      expect(continueTaskInContext).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/a.md' }),
         '',
       )
@@ -1382,7 +1381,7 @@ describe('TasksScreen', () => {
 
     // Edit first (persist the draft), then convert the rewritten line.
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/a.md', astPath: [2] }),
         [{ kind: 'setMarkdown', markdown: 'edited content' }, { kind: 'toBullet' }],
       )
@@ -1406,7 +1405,7 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'plan' }))
     await userEvent.click(view.getByRole('button', { name: 'convert-edited' }))
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
+      expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
         { kind: 'setMarkdown', markdown: 'edited content' },
         { kind: 'toBullet' },
       ])
@@ -1485,7 +1484,7 @@ describe('TasksScreen', () => {
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
@@ -1579,7 +1578,7 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'Complete: project task' }))
 
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
@@ -1685,7 +1684,7 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'Complete: project task' }))
 
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
@@ -1748,7 +1747,7 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'Reopen: project task' }))
 
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenLastCalledWith(
+      expect(writeTask).toHaveBeenLastCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
@@ -1779,7 +1778,7 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'Reopen: project task' }))
 
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
@@ -1848,7 +1847,7 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'Reopen: project task' }))
 
     await waitFor(() => {
-      return expect(operations.snapshot()).toContainEqual(
+      expect(operations.snapshot()).toContainEqual(
         expect.objectContaining({
           label: 'Reopening task',
           status: 'failed',
@@ -1880,7 +1879,7 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'Reopen: project task' }))
 
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
@@ -1912,7 +1911,7 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'Reopen: project task' }))
 
     await waitFor(() => {
-      return expect(writeTask).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({
           notePath: 'notes/p.md',
           astPath: [5],
@@ -1946,7 +1945,7 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'Reopen: project task' }))
 
     await waitFor(() => {
-      return expect(operations.snapshot()).toContainEqual(
+      expect(operations.snapshot()).toContainEqual(
         expect.objectContaining({
           label: 'Reopening task',
           status: 'failed',
@@ -2060,7 +2059,7 @@ describe('TasksScreen', () => {
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     await waitFor(() => {
-      return expect(operations.snapshot()).toContainEqual(
+      expect(operations.snapshot()).toContainEqual(
         expect.objectContaining({
           label: 'Completing task',
           status: 'failed',
@@ -2097,7 +2096,7 @@ describe('TasksScreen', () => {
     await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}')
     await userEvent.keyboard('{ControlOrMeta>}{Enter}{/ControlOrMeta}')
     await waitFor(() => {
-      return expect(operations.snapshot()).toContainEqual(
+      expect(operations.snapshot()).toContainEqual(
         expect.objectContaining({ status: 'failed', message: 'stale index' }),
       )
     })

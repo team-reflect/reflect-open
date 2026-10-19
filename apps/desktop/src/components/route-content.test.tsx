@@ -274,7 +274,7 @@ describe('RouteContent', () => {
     const view = await renderRoute({ kind: 'search', query: 'roadmap' })
     await expect.element(page.getByTestId('daily-stream')).toBeInTheDocument()
     await vi.waitFor(() => {
-      return expect(JSON.parse(page.getByTestId('palette').element().textContent ?? '')).toEqual({
+      expect(JSON.parse(page.getByTestId('palette').element().textContent ?? '')).toEqual({
         open: true,
         query: 'roadmap',
       })

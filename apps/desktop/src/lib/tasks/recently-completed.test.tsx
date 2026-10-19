@@ -49,7 +49,7 @@ describe('recently-completed', () => {
   it('forgets dropped keys and clears on archive', async () => {
     const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
     await act(() => {
-      return tasks.markRecentlyCompleted('/g', [
+      tasks.markRecentlyCompleted('/g', [
         task({ notePath: 'a.md', astPath: [2] }),
         task({ notePath: 'b.md', astPath: [2] }),
       ])
@@ -64,14 +64,14 @@ describe('recently-completed', () => {
   it('relocates struck rows a note write moved', async () => {
     const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
     await act(() => {
-      return tasks.markRecentlyCompleted('/g', [
+      tasks.markRecentlyCompleted('/g', [
         task({ notePath: 'a.md', astPath: [4], markdown: 'done' }),
         task({ notePath: 'b.md', astPath: [4], markdown: 'other' }),
       ])
     })
 
     await act(() => {
-      return tasks.relocateRecentlyCompleted('/g', 'a.md', [
+      tasks.relocateRecentlyCompleted('/g', 'a.md', [
         { from: snapshot([4], 'done'), to: snapshot([5], 'done') },
       ])
     })
@@ -85,9 +85,7 @@ describe('recently-completed', () => {
     await act(() => tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [1] })]))
 
     await act(() => {
-      return tasks.relocateRecentlyCompleted('/g', 'a.md', [
-        { from: snapshot([1], 'do it'), to: null },
-      ])
+      tasks.relocateRecentlyCompleted('/g', 'a.md', [{ from: snapshot([1], 'do it'), to: null }])
     })
 
     expect(result.current).toEqual([])
@@ -96,13 +94,11 @@ describe('recently-completed', () => {
   it('refreshes an edited struck row from its persisted Markdown', async () => {
     const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
     await act(() => {
-      return tasks.markRecentlyCompleted('/g', [
-        task({ notePath: 'a.md', astPath: [2], markdown: 'old' }),
-      ])
+      tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [2], markdown: 'old' })])
     })
 
     await act(() => {
-      return tasks.relocateRecentlyCompleted('/g', 'a.md', [
+      tasks.relocateRecentlyCompleted('/g', 'a.md', [
         { from: snapshot([2], 'old'), to: snapshot([2], 'edited [[2026-07-01]]') },
       ])
     })
@@ -117,13 +113,11 @@ describe('recently-completed', () => {
   it('leaves a struck row alone when the write did not know its task', async () => {
     const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
     await act(() => {
-      return tasks.markRecentlyCompleted('/g', [
-        task({ notePath: 'a.md', astPath: [1], markdown: 'dup' }),
-      ])
+      tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [1], markdown: 'dup' })])
     })
 
     await act(() => {
-      return tasks.relocateRecentlyCompleted('/g', 'a.md', [
+      tasks.relocateRecentlyCompleted('/g', 'a.md', [
         { from: snapshot([2], 'other'), to: snapshot([3], 'other') },
       ])
     })
@@ -134,16 +128,14 @@ describe('recently-completed', () => {
   it('drops a struck copy when the index reports the task open again with a newer updatedAt', async () => {
     const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
     await act(() => {
-      return tasks.markRecentlyCompleted('/g', [
-        task({ notePath: 'a.md', astPath: [2], updatedAt: 100 }),
-      ])
+      tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [2], updatedAt: 100 })])
     })
     expect(result.current).toHaveLength(1)
 
     // The source note was rewritten (checkbox flipped back to [ ]) and reindexed:
     // the live open row supersedes the session's struck shadow.
     await act(() => {
-      return tasks.reconcileRecentlyCompleted('/g', [
+      tasks.reconcileRecentlyCompleted('/g', [
         task({ notePath: 'a.md', astPath: [2], updatedAt: 200 }),
       ])
     })
@@ -153,15 +145,13 @@ describe('recently-completed', () => {
   it('keeps the struck copy when the open row is the pre-completion index state', async () => {
     const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
     await act(() => {
-      return tasks.markRecentlyCompleted('/g', [
-        task({ notePath: 'a.md', astPath: [2], updatedAt: 100 }),
-      ])
+      tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [2], updatedAt: 100 })])
     })
 
     // A refetch racing the completion's reindex restores the row unchanged
     // (same updatedAt) — the shadow must hold or the row flickers back open.
     await act(() => {
-      return tasks.reconcileRecentlyCompleted('/g', [
+      tasks.reconcileRecentlyCompleted('/g', [
         task({ notePath: 'a.md', astPath: [2], updatedAt: 100 }),
       ])
     })
@@ -171,21 +161,21 @@ describe('recently-completed', () => {
   it('reconciles only the active graph root, and leaves unrelated struck tasks alone', async () => {
     const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
     await act(() => {
-      return tasks.markRecentlyCompleted('/g', [
+      tasks.markRecentlyCompleted('/g', [
         task({ notePath: 'a.md', astPath: [2], updatedAt: 100 }),
         task({ notePath: 'b.md', astPath: [2], updatedAt: 100 }),
       ])
     })
 
     await act(() => {
-      return tasks.reconcileRecentlyCompleted('/other', [
+      tasks.reconcileRecentlyCompleted('/other', [
         task({ notePath: 'a.md', astPath: [2], updatedAt: 200 }),
       ])
     })
     expect(result.current).toHaveLength(2)
 
     await act(() => {
-      return tasks.reconcileRecentlyCompleted('/g', [
+      tasks.reconcileRecentlyCompleted('/g', [
         task({ notePath: 'a.md', astPath: [2], updatedAt: 200 }),
       ])
     })
@@ -202,9 +192,7 @@ describe('recently-completed', () => {
       { app, initialProps: { open: undefined as readonly OpenTask[] | undefined } },
     )
     await act(() => {
-      return tasks.markRecentlyCompleted('/g', [
-        task({ notePath: 'a.md', astPath: [2], updatedAt: 100 }),
-      ])
+      tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [2], updatedAt: 100 })])
     })
     expect(result.current).toHaveLength(1)
 
@@ -236,9 +224,7 @@ describe('recently-completed', () => {
       { app, initialProps: { open: undefined as readonly OpenTask[] | undefined } },
     )
     await act(() => {
-      return tasks.markRecentlyCompleted('/g', [
-        task({ notePath: 'a.md', astPath: [2], updatedAt: 100 }),
-      ])
+      tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [2], updatedAt: 100 })])
     })
     const renders = lengths.length
 
@@ -262,7 +248,7 @@ describe('recently-completed', () => {
 
     // Completing in the other graph discards the first graph's set entirely.
     await act(() => {
-      return tasks.markRecentlyCompleted('/other', [task({ notePath: 'z.md', astPath: [2] })])
+      tasks.markRecentlyCompleted('/other', [task({ notePath: 'z.md', astPath: [2] })])
     })
     expect(result.current).toHaveLength(1)
     await rerender({ root: '/g' })

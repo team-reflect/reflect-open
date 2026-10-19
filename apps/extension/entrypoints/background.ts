@@ -71,7 +71,7 @@ export default defineBackground(() => {
         saveXPost(save.data.tabId, save.data.postId).then(
           () => sendResponse({ ok: true }),
           (error: unknown) => {
-            return sendResponse({
+            sendResponse({
               ok: false,
               message: error instanceof Error ? error.message : 'capture-failed',
             })
@@ -86,7 +86,7 @@ export default defineBackground(() => {
       void enqueueCapture(enqueue.data.wire).then(
         () => sendResponse({ ok: true }),
         (cause: unknown) => {
-          return sendResponse({
+          sendResponse({
             ok: false,
             message: cause instanceof Error ? cause.message : 'Capture failed',
           })

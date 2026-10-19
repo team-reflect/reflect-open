@@ -78,7 +78,7 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const selection = useListSelection(orderedPaths)
   const openNote = useCallback(
     (path: string, event?: ModClickEvent) => {
-      return navigateNoteLink({
+      navigateNoteLink({
         target: routeForPath(path),
         openInNewWindow: event !== undefined && isModEvent(event),
       })

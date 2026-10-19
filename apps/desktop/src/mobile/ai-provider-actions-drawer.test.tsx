@@ -90,7 +90,7 @@ describe('AiProviderActionsDrawer', () => {
     await page.getByRole('button', { name: 'Remove provider' }).click()
 
     await vi.waitFor(() => {
-      return expect(app.logger.getErrors()).toEqual([
+      expect(app.logger.getErrors()).toEqual([
         { message: 'AI provider removal failed:', cause: 'keychain unavailable' },
       ])
     })

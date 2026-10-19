@@ -157,7 +157,7 @@ describe('SimilarNotesSection', () => {
     await view.getByRole('button', { name: 'Gardening' }).click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() => {
-      return expect(openNoteWindow).toHaveBeenCalledWith(
+      expect(openNoteWindow).toHaveBeenCalledWith(
         deepLinkForRoute({
           kind: 'note',
           path: 'notes/gardening.md',

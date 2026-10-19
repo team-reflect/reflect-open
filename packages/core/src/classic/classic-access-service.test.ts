@@ -600,7 +600,7 @@ describe('start', () => {
     service().start()
 
     await vi.waitFor(() => {
-      return expect(logger.getErrors()).toEqual([
+      expect(logger.getErrors()).toEqual([
         { message: 'Reading the Reflect Classic access failed', cause: new Error('locked') },
       ])
     })

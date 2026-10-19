@@ -58,7 +58,7 @@ describe('MobileOnboardingScreen', () => {
     await page.getByRole('button', { name: 'Setup graph' }).click()
 
     await vi.waitFor(() => {
-      return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal')
+      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal')
     })
   })
 
@@ -80,7 +80,7 @@ describe('MobileOnboardingScreen', () => {
     await page.getByRole('button', { name: 'Continue with Work' }).click()
 
     await vi.waitFor(() => {
-      return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Work')
+      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Work')
     })
   })
 
@@ -97,7 +97,7 @@ describe('MobileOnboardingScreen', () => {
     await page.getByRole('button', { name: 'Setup graph' }).click()
 
     await vi.waitFor(() => {
-      return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal')
+      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal')
     })
   })
 

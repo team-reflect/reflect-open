@@ -76,7 +76,7 @@ describe('createEmbeddingRuntimeService', () => {
 
       const pending = runtime.awaitTerminalStatus(LOADING)
       await vi.waitFor(() => {
-        return expect(ipc.calls().map((call) => call.command)).toContain('embed_status')
+        expect(ipc.calls().map((call) => call.command)).toContain('embed_status')
       })
       ipc.emit('embed:status', READY)
 

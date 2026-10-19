@@ -25,7 +25,7 @@ function Links({ scopeKey }: { readonly scopeKey: string | undefined }): ReactEl
       <button
         type="button"
         onClick={(event) => {
-          return openNoteLink({
+          openNoteLink({
             target: { kind: 'note', path: 'notes/alpha.md' },
             openInNewWindow: isModEvent(event),
           })
@@ -36,7 +36,7 @@ function Links({ scopeKey }: { readonly scopeKey: string | undefined }): ReactEl
       <button
         type="button"
         onClick={(event) => {
-          return openNoteLink({
+          openNoteLink({
             target: { kind: 'note', path: 'notes/bravo.md' },
             openInNewWindow: isModEvent(event),
           })

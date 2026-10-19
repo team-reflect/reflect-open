@@ -124,7 +124,7 @@ describe('usePaywallGate', () => {
         { app: services },
       )
       await vi.waitFor(() => {
-        return expect(services.mobile.appStoreEnvironment.getState().value).toBe('Sandbox')
+        expect(services.mobile.appStoreEnvironment.getState().value).toBe('Sandbox')
       })
       expect(result.current.gate).toBe('hide')
 

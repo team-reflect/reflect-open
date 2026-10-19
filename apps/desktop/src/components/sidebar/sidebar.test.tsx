@@ -174,7 +174,7 @@ describe('Sidebar', () => {
     // stream's saved position and re-anchor on today.
     await view.getByRole('button', { name: /daily notes/i }).click()
     await vi.waitFor(() => {
-      return expect(navigate).toHaveBeenCalledWith({ kind: 'today' }, { focusEditor: true })
+      expect(navigate).toHaveBeenCalledWith({ kind: 'today' }, { focusEditor: true })
     })
 
     await view.getByRole('button', { name: /settings/i }).click()
@@ -198,7 +198,7 @@ describe('Sidebar', () => {
 
     await newNote.click()
     await vi.waitFor(() => {
-      return expect(navigate).toHaveBeenCalledWith(
+      expect(navigate).toHaveBeenCalledWith(
         expect.objectContaining({
           kind: 'note',
           path: expect.stringMatching(/^notes\/.+\.md$/) as string,
@@ -243,7 +243,7 @@ describe('Sidebar', () => {
     const { view, app } = await renderSidebar()
     await view.getByRole('button', { name: /record audio memo/i }).click()
     await vi.waitFor(() => {
-      return expect(app.audioRecorder.calls().some((call) => call.method === 'start')).toBe(true)
+      expect(app.audioRecorder.calls().some((call) => call.method === 'start')).toBe(true)
     })
   })
 
@@ -288,7 +288,7 @@ describe('Sidebar', () => {
     await roadmap.click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() => {
-      return expect(openNoteWindow).toHaveBeenCalledWith(
+      expect(openNoteWindow).toHaveBeenCalledWith(
         deepLinkForRoute({
           kind: 'note',
           path: 'notes/roadmap.md',
@@ -339,7 +339,7 @@ describe('Sidebar', () => {
     await rust.click({ button: 'right' })
 
     await vi.waitFor(() => {
-      return expect(openNativeContextMenu).toHaveBeenCalledWith({
+      expect(openNativeContextMenu).toHaveBeenCalledWith({
         items: [
           expect.objectContaining({
             text: 'Unpin Note',
@@ -360,11 +360,7 @@ describe('Sidebar', () => {
     await rust.click({ button: 'right' })
 
     await vi.waitFor(() => {
-      return expect(commitNoteFrontmatter).toHaveBeenCalledWith(
-        'notes/rust.md',
-        { pinned: false },
-        1,
-      )
+      expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1)
     })
     await expect.element(view.getByRole('button', { name: 'Rust' })).toBeInTheDocument()
     expect(operations.snapshot()).toMatchObject([

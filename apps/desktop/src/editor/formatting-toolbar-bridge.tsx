@@ -92,7 +92,7 @@ export function FormattingToolbarBridge({
         moveUp: () => run(() => editor.commands.moveList('up')),
         moveDown: () => run(() => editor.commands.moveList('down')),
         insertTrigger: (text: FormattingTriggerText) => {
-          return run(() => editor.commands.insertTrigger(text))
+          run(() => editor.commands.insertTrigger(text))
         },
         dismissKeyboard: () => editor.blur(),
         attachFiles: async (files: File[]) => {

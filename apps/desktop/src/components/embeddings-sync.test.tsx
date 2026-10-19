@@ -27,9 +27,7 @@ describe('EmbeddingsSync', () => {
     await renderInApp(<EmbeddingsSync />, { app, servicesOnly: true })
 
     await vi.waitFor(() => {
-      return expect(app.embeddingIndex.follows()).toEqual([
-        { generation: 7, modelId: 'all-MiniLM-L6-v2' },
-      ])
+      expect(app.embeddingIndex.follows()).toEqual([{ generation: 7, modelId: 'all-MiniLM-L6-v2' }])
     })
   })
 

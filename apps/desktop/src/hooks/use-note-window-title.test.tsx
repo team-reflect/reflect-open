@@ -6,7 +6,7 @@ describe('useNoteWindowTitle', () => {
   it('sets the title and follows changes (a rename)', async () => {
     const view = await renderHookInApp(
       ({ title }: { title: string | null } = { title: 'Meeting Notes' }) => {
-        return useNoteWindowTitle(title)
+        useNoteWindowTitle(title)
       },
       {
         initialProps: { title: 'Meeting Notes' },

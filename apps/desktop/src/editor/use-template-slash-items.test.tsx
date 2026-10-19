@@ -92,7 +92,7 @@ describe('useTemplateSlashItems', () => {
     const items = await result.current('')
     items[0]!.onSelect()
     await vi.waitFor(() => {
-      return expect(operations.snapshot()).toMatchObject([
+      expect(operations.snapshot()).toMatchObject([
         { label: 'Inserting template', status: 'failed', message: 'No open note to insert into' },
       ])
     })

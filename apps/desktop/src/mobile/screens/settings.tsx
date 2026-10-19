@@ -287,7 +287,7 @@ export function MobileSettings(): ReactElement {
               label="Smooth caret animation"
               checked={settings.editorSmoothCaretAnimation}
               onCheckedChange={(editorSmoothCaretAnimation) => {
-                return updateSettings({ editorSmoothCaretAnimation })
+                updateSettings({ editorSmoothCaretAnimation })
               }}
             />
             <SettingsSwitchRow
@@ -299,7 +299,7 @@ export function MobileSettings(): ReactElement {
               label="Bullet after a heading"
               checked={settings.editorBulletAfterHeading}
               onCheckedChange={(editorBulletAfterHeading) => {
-                return updateSettings({ editorBulletAfterHeading })
+                updateSettings({ editorBulletAfterHeading })
               }}
             />
           </SettingsGroup>

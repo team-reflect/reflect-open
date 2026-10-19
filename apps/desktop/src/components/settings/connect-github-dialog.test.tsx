@@ -97,7 +97,7 @@ describe('ConnectGithubDialog', () => {
 
     // The owner is the verified sign-in — never typed.
     await vi.waitFor(() => {
-      return expect(sync.connectExistingRepo).toHaveBeenCalledWith(
+      expect(sync.connectExistingRepo).toHaveBeenCalledWith(
         { owner: 'alex', name: 'my-notes' },
         { allowPublic: false },
       )
@@ -132,7 +132,7 @@ describe('ConnectGithubDialog', () => {
 
     // Once the repo exists, a poll connects it — the user clicks nothing.
     await vi.waitFor(() => {
-      return expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
+      expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
         { owner: 'alex', name: 'g-backup' },
         { allowPublic: false },
       )
@@ -209,7 +209,7 @@ describe('ConnectGithubDialog', () => {
     await page.getByRole('button', { name: 'Back up to a public repo' }).click()
 
     await vi.waitFor(() => {
-      return expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
+      expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
         { owner: 'alex', name: 'public-notes' },
         { allowPublic: true },
       )
@@ -249,7 +249,7 @@ describe('ConnectGithubDialog', () => {
     await page.getByRole('button', { name: 'Continue' }).click()
 
     await vi.waitFor(() => {
-      return expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
+      expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
         { owner: 'alex', name: 'notes' },
         { allowPublic: false },
       )
@@ -302,7 +302,7 @@ describe('ConnectGithubDialog', () => {
 
     // Back from the browser with access granted — the poll connects, no click.
     await vi.waitFor(() => {
-      return expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
+      expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
         { owner: 'alex', name: 'notes' },
         { allowPublic: false },
       )

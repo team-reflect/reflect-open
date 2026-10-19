@@ -72,7 +72,7 @@ describe('IntegrationsSection', () => {
 
     await page.getByRole('button', { name: 'Open System Settings' }).click()
     await vi.waitFor(() => {
-      return expect(opener.openedUrls()).toEqual([
+      expect(opener.openedUrls()).toEqual([
         'x-apple.systempreferences:com.apple.preference.security?Privacy_Contacts',
       ])
     })

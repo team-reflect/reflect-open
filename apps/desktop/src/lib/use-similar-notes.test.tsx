@@ -172,7 +172,7 @@ describe('useSimilarNotes', () => {
     relatedNotes.mockResolvedValue([hit('notes/c.md')])
     const refilled = await mount('daily/2026-06-09.md', client)
     await vi.waitFor(() => {
-      return expect(refilled.result.current.map((h) => h.path)).toEqual(['notes/c.md'])
+      expect(refilled.result.current.map((h) => h.path)).toEqual(['notes/c.md'])
     })
     expect(relatedNotes).toHaveBeenCalledTimes(2)
   })

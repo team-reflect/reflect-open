@@ -85,7 +85,7 @@ describe('SuggestedContactCard', () => {
     await renderCard()
     // The dismissal check needs the match's name, so the lookup does run.
     await vi.waitFor(() => {
-      return expect(contacts.lookups()).toEqual([{ kind: 'name', name: 'Ada Lovelace' }])
+      expect(contacts.lookups()).toEqual([{ kind: 'name', name: 'Ada Lovelace' }])
     })
     expect(page.getByText('ada@example.com · +1 555 0100').query()).toBeNull()
   })

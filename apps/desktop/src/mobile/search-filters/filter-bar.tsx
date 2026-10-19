@@ -120,7 +120,7 @@ export function FilterBar({
         facets={facets}
         selected={filters.tags}
         onToggle={(tagKey) => {
-          return patch({
+          patch({
             tags: filters.tags.includes(tagKey)
               ? filters.tags.filter((key) => key !== tagKey)
               : [...filters.tags, tagKey],

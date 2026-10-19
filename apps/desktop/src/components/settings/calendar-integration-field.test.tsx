@@ -55,7 +55,7 @@ describe('CalendarIntegrationField', () => {
     await calendarSwitch().click()
 
     await vi.waitFor(() => {
-      return expect(settings.saves().at(-1)).toMatchObject({
+      expect(settings.saves().at(-1)).toMatchObject({
         calendarEnabled: true,
         calendarIds: [],
       })
@@ -102,7 +102,7 @@ describe('CalendarIntegrationField', () => {
     await page.getByRole('checkbox', { name: 'Work' }).click()
 
     await vi.waitFor(() => {
-      return expect(settings.saves().at(-1)).toMatchObject({ calendarIds: ['cal-work'] })
+      expect(settings.saves().at(-1)).toMatchObject({ calendarIds: ['cal-work'] })
     })
     await expect.element(page.getByText('1/2 calendars selected')).toBeInTheDocument()
   })
@@ -125,7 +125,7 @@ describe('CalendarIntegrationField', () => {
 
     await open.click()
     await vi.waitFor(() => {
-      return expect(opener.openedUrls()).toEqual([
+      expect(opener.openedUrls()).toEqual([
         'x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars',
       ])
     })

@@ -133,7 +133,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
                     aria-current={isToday ? 'date' : undefined}
                     aria-pressed={isSelected}
                     onClick={(event) => {
-                      return navigateNoteLink({
+                      navigateNoteLink({
                         target: { kind: 'daily', date: cell.date },
                         openInNewWindow: isModEvent(event),
                       })

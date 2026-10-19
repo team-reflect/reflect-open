@@ -316,7 +316,7 @@ describe('CaptureEnrichmentService', () => {
     kit.describeMock.mockImplementation(() => {
       return new Promise((resolve) => {
         finishProvider = () => {
-          return resolve({ title: 'A title from AI', description: 'A description from AI.' })
+          resolve({ title: 'A title from AI', description: 'A description from AI.' })
         }
       })
     })

@@ -116,7 +116,7 @@ describe('DailyStream', () => {
 
     const expected = indexOfDate(dayWindow, '2026-06-28') * ESTIMATED_DAY_HEIGHT
     await vi.waitFor(() => {
-      return expect(page.getByTestId('daily-stream').element().scrollTop).toBeGreaterThan(
+      expect(page.getByTestId('daily-stream').element().scrollTop).toBeGreaterThan(
         expected - ESTIMATED_DAY_HEIGHT,
       )
     })
@@ -153,7 +153,7 @@ describe('DailyStream', () => {
     const dayWindow = createDayWindow('2026-06-27')
     const expected = indexOfDate(dayWindow, '2026-06-28') * ESTIMATED_DAY_HEIGHT
     await vi.waitFor(() => {
-      return expect(page.getByTestId('daily-stream').element().scrollTop).toBeGreaterThan(
+      expect(page.getByTestId('daily-stream').element().scrollTop).toBeGreaterThan(
         expected - ESTIMATED_DAY_HEIGHT,
       )
     })
@@ -171,7 +171,7 @@ describe('DailyStream', () => {
     )
 
     await vi.waitFor(() => {
-      return expect(page.getByTestId('daily-stream').element().scrollTop).toBeCloseTo(4321, -1)
+      expect(page.getByTestId('daily-stream').element().scrollTop).toBeCloseTo(4321, -1)
     })
     await view.unmount()
   })
@@ -221,7 +221,7 @@ describe('DailyStream', () => {
     const view = await renderStream(<DailyStream target={{ kind: 'today' }} />)
 
     await vi.waitFor(() => {
-      return expect(document.querySelectorAll('.reflect-note-loading').length).toBeGreaterThan(0)
+      expect(document.querySelectorAll('.reflect-note-loading').length).toBeGreaterThan(0)
     })
     const placeholders = document.querySelectorAll('.reflect-note-loading')
     expect(placeholders.length).toBeGreaterThan(0)

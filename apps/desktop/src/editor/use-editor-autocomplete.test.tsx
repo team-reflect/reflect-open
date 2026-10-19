@@ -126,7 +126,7 @@ describe('useEditorAutocomplete', () => {
     items[0]!.onSelect?.()
 
     await vi.waitFor(() => {
-      return expect(operations.findByLabel('Creating note')).toMatchObject({
+      expect(operations.findByLabel('Creating note')).toMatchObject({
         status: 'failed',
         message:
           'Couldn’t safely choose one note matching “Business ideas”. Rename conflicting notes or wait for unavailable notes to become available, then try again.',
@@ -145,7 +145,7 @@ describe('useEditorAutocomplete', () => {
     const { result } = await setup({ contactsEnabled: true })
     // The permission state arrives through a query; the row joins once it settles.
     await vi.waitFor(async () => {
-      return expect(await result.current.onWikilinkSearch('Ada Lovelace')).toMatchObject([
+      expect(await result.current.onWikilinkSearch('Ada Lovelace')).toMatchObject([
         { target: 'Ada Lovelace', label: 'Ada Lovelace', detail: 'ada@example.com' },
       ])
     })

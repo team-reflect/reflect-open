@@ -128,7 +128,7 @@ describe('NoteRowList', () => {
     )
     await view.getByRole('button', { name: 'Pin Alpha', exact: true }).click()
     await vi.waitFor(() => {
-      return expect(view.app.noteRows.getOverlay('notes/alpha.md')).toMatchObject({
+      expect(view.app.noteRows.getOverlay('notes/alpha.md')).toMatchObject({
         isPinned: true,
       })
     })

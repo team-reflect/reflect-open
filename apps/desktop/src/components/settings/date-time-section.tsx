@@ -91,7 +91,7 @@ export function DateTimeSection(): ReactElement {
             value={settings.weekStartDay}
             items={WEEK_START_OPTIONS}
             onValueChange={(value) => {
-              return updateSettings({ weekStartDay: weekStartDaySchema.parse(value) })
+              updateSettings({ weekStartDay: weekStartDaySchema.parse(value) })
             }}
           >
             <SelectTrigger aria-label="Start week on" className="w-36">

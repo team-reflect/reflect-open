@@ -154,9 +154,9 @@ describe('AgentsSection', () => {
     const nextGraph = { root: '/graphs/Work', name: 'Work', generation: 11 }
     graphSession.setGraph(nextGraph)
     await vi.waitFor(() => {
-      return expect(
-        queryClient.getQueryState(queryKeys.agentSkill.status(nextGraph.root))?.status,
-      ).toBe('success')
+      expect(queryClient.getQueryState(queryKeys.agentSkill.status(nextGraph.root))?.status).toBe(
+        'success',
+      )
     })
     await expect.element(page.getByRole('button', { name: 'Install skill' })).toBeEnabled()
     const nextStatus = { ...statusPayload(), skillPath: '/work/SKILL.md' }
@@ -165,7 +165,7 @@ describe('AgentsSection', () => {
     installState = 'current'
     pendingInstall.resolve(statusPayload())
     await vi.waitFor(() => {
-      return expect(queryClient.getQueryData(queryKeys.agentSkill.status(GRAPH.root))).toEqual(
+      expect(queryClient.getQueryData(queryKeys.agentSkill.status(GRAPH.root))).toEqual(
         statusPayload(),
       )
     })

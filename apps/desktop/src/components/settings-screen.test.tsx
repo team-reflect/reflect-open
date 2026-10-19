@@ -149,7 +149,7 @@ describe('SettingsScreen', () => {
     await userEvent.tab()
 
     await vi.waitFor(() => {
-      return expect(saved().at(-1)).toMatchObject({ transcriptionPrompt: 'Names:\nOcavue' })
+      expect(saved().at(-1)).toMatchObject({ transcriptionPrompt: 'Names:\nOcavue' })
     })
   })
 
@@ -177,7 +177,7 @@ describe('SettingsScreen', () => {
     await userEvent.tab()
 
     await vi.waitFor(() => {
-      return expect(saved().at(-1)).toMatchObject({ transcriptionPrompt: 'x'.repeat(500) })
+      expect(saved().at(-1)).toMatchObject({ transcriptionPrompt: 'x'.repeat(500) })
     })
   })
 
@@ -238,7 +238,7 @@ describe('SettingsScreen', () => {
     await pickRadio(/^show/i)
 
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           editorMarkdownSyntax: 'show',
@@ -263,7 +263,7 @@ describe('SettingsScreen', () => {
     await pickRadio(/^large/i)
 
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           editorTextSize: 'large',
@@ -302,7 +302,7 @@ describe('SettingsScreen', () => {
 
     await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           editorSpellCheck: false,
@@ -327,7 +327,7 @@ describe('SettingsScreen', () => {
 
     await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
     await vi.waitFor(() => {
-      return expect(saved().at(-1)).toMatchObject({ editorSmoothCaretAnimation: false })
+      expect(saved().at(-1)).toMatchObject({ editorSmoothCaretAnimation: false })
     })
   })
 
@@ -348,7 +348,7 @@ describe('SettingsScreen', () => {
 
     await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           editorDefaultBullet: false,
@@ -373,7 +373,7 @@ describe('SettingsScreen', () => {
 
     await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           editorBulletAfterHeading: false,
@@ -391,7 +391,7 @@ describe('SettingsScreen', () => {
 
     await expect.element(radio(/^light/i)).toBeChecked()
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           theme: 'light',
@@ -418,7 +418,7 @@ describe('SettingsScreen', () => {
 
     await expect.element(trigger).toMatchTextContent(formatFullDate(new Date(), 'dmy'))
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           dateFormat: 'dmy',
@@ -442,7 +442,7 @@ describe('SettingsScreen', () => {
 
     await expect.element(trigger).toMatchTextContent(isoLabel)
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           dateFormat: 'iso',
@@ -472,7 +472,7 @@ describe('SettingsScreen', () => {
 
     await expect.element(trigger).toMatchTextContent('Sunday')
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           weekStartDay: 'sunday',
@@ -508,7 +508,7 @@ describe('SettingsScreen', () => {
 
     await expect.element(trigger).toMatchTextContent('24-hour')
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           timeFormat: '24h',
@@ -526,7 +526,7 @@ describe('SettingsScreen', () => {
 
     await expect.element(page.getByText('#meeting')).toBeInTheDocument()
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           allNotesFilterTags: ['book', 'link', 'person', 'meeting'],
@@ -573,7 +573,7 @@ describe('SettingsScreen', () => {
 
     expect(page.getByText('#book').query()).toBeNull()
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           allNotesFilterTags: ['person'],
@@ -589,7 +589,7 @@ describe('SettingsScreen', () => {
     await enable.click()
 
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           semanticSearchEnabled: true,
@@ -630,7 +630,7 @@ describe('SettingsScreen', () => {
     await page.getByRole('button', { name: /disable/i }).click()
 
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
         },
@@ -669,7 +669,7 @@ describe('SettingsScreen', () => {
     // action carries the retry.
     await vi.waitFor(() => expect(embedRuntime.ensureCalls()).toBeGreaterThan(0))
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           semanticSearchEnabled: true,
@@ -691,7 +691,7 @@ describe('SettingsScreen', () => {
     await page.getByRole('button', { name: /disable/i }).click()
 
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
         },
@@ -748,7 +748,7 @@ describe('SettingsScreen', () => {
     await userEvent.tab()
 
     await vi.waitFor(() => {
-      return expect(saved().at(-1)).toMatchObject({
+      expect(saved().at(-1)).toMatchObject({
         chatSystemPrompt: 'Challenge my assumptions.\nKeep the recommendation short.',
       })
     })
@@ -795,7 +795,7 @@ describe('SettingsScreen', () => {
     await dialog.getByRole('button', { name: /add prompt/i }).click()
 
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           aiPrompts: [
@@ -829,7 +829,7 @@ describe('SettingsScreen', () => {
     await remove.click()
 
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
         },
@@ -853,7 +853,7 @@ describe('SettingsScreen', () => {
     await dialog.getByRole('button', { name: /^save$/i }).click()
 
     await vi.waitFor(() => {
-      return expect(saved()).toEqual([
+      expect(saved()).toEqual([
         {
           ...DEFAULT_SETTINGS,
           aiPrompts: [

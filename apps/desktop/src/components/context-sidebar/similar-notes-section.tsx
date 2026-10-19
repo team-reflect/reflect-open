@@ -40,7 +40,7 @@ export function SimilarNotesSection({ path }: SimilarNotesSectionProps): ReactEl
             <button
               type="button"
               onClick={(event) => {
-                return navigateNoteLink({
+                navigateNoteLink({
                   target: routeForPath(hit.path),
                   openInNewWindow: isModEvent(event),
                 })

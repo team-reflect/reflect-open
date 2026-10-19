@@ -119,7 +119,7 @@ describe('DailyContextSidebar calendar', () => {
     fireEvent.click(day, { metaKey: true, ctrlKey: true })
 
     await vi.waitFor(() => {
-      return expect(openNoteWindow).toHaveBeenCalledWith(
+      expect(openNoteWindow).toHaveBeenCalledWith(
         deepLinkForRoute({
           kind: 'daily',
           date: '2026-06-18',
@@ -180,7 +180,7 @@ describe('DailyContextSidebar related notes', () => {
     dailySource = '- \n'
     await renderSidebar('2026-06-09')
     await vi.waitFor(() => {
-      return expect(noteFile.getReads().map((read) => read.path)).toContain('daily/2026-06-09.md')
+      expect(noteFile.getReads().map((read) => read.path)).toContain('daily/2026-06-09.md')
     })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(relatedNotes).not.toHaveBeenCalled()

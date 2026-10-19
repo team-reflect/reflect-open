@@ -48,7 +48,7 @@ describe('ImportSection', () => {
     await importButton().click()
 
     await vi.waitFor(() => {
-      return expect(dialog.calls()).toEqual([
+      expect(dialog.calls()).toEqual([
         {
           kind: 'files',
           options: {
@@ -60,7 +60,7 @@ describe('ImportSection', () => {
       ])
     })
     await vi.waitFor(() => {
-      return expect(importCalls(app)).toEqual([
+      expect(importCalls(app)).toEqual([
         { path: '/Users/alex/Downloads/reflect-v1.zip', generation: 4 },
       ])
     })

@@ -52,7 +52,7 @@ export function TemplatesSection(): ReactElement {
                 <button
                   type="button"
                   onClick={(event) => {
-                    return navigateNoteLink({
+                    navigateNoteLink({
                       target: { kind: 'note', path: template.path },
                       openInNewWindow: isModEvent(event),
                     })

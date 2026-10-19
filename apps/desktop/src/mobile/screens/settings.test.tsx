@@ -133,7 +133,7 @@ describe('MobileSettings', () => {
     await user.click(page.getByRole('button', { name: 'Privacy Policy' }))
 
     await vi.waitFor(() => {
-      return expect(view.appServices.opener.openedUrls()).toEqual(['https://reflect.app/privacy'])
+      expect(view.appServices.opener.openedUrls()).toEqual(['https://reflect.app/privacy'])
     })
   })
 
@@ -302,7 +302,7 @@ describe('MobileSettings', () => {
     await user.click(sheet.getByRole('button', { name: 'Add prompt' }))
 
     await vi.waitFor(() => {
-      return expect(view.app.settings.get().aiPrompts).toEqual([
+      expect(view.app.settings.get().aiPrompts).toEqual([
         expect.objectContaining({
           label: 'Shorten',
           body: 'Shorten: {{selectedText}}',
@@ -328,7 +328,7 @@ describe('MobileSettings', () => {
     await user.click(sheet.getByRole('button', { name: 'Save' }))
 
     await vi.waitFor(() => {
-      return expect(view.app.settings.get().aiPrompts).toEqual([
+      expect(view.app.settings.get().aiPrompts).toEqual([
         { ...saved, label: 'Translate to German' },
       ])
     })

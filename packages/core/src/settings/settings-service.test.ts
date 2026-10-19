@@ -398,7 +398,7 @@ describe('createSettingsService', () => {
 
     settings.update({ editorMarkdownSyntax: 'show' })
     await vi.waitFor(() => {
-      return expect(progress.snapshot()).toMatchObject([
+      expect(progress.snapshot()).toMatchObject([
         { label: 'Saving settings', status: 'failed', message: 'disk full' },
       ])
     })

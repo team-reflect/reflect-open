@@ -182,7 +182,7 @@ describe('app shortcuts', () => {
     await act(() => result.current.router.navigate({ kind: 'note', path: 'notes/a.md' }))
     await act(() => press('o'))
     await vi.waitFor(() => {
-      return expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/a.md', { pinned: 1024 }, 1)
+      expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/a.md', { pinned: 1024 }, 1)
     })
     expect(app.noteRows.getOverlay('notes/a.md')).toEqual({ isPinned: true, pinnedOrder: 1024 })
     await act(() => press('o'))
@@ -210,7 +210,7 @@ describe('app shortcuts', () => {
     await act(() => result.current.setFocusedDailyDate('2026-09-07'))
     const action = result.current.context.togglePrivate()
     await vi.waitFor(() => {
-      return expect(commitNoteFrontmatter).toHaveBeenCalledWith(
+      expect(commitNoteFrontmatter).toHaveBeenCalledWith(
         'daily/2026-09-07.md',
         { private: true },
         1,

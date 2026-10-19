@@ -412,9 +412,7 @@ describe('PaywallScreen Reflect Classic verification', () => {
       .toBeVisible()
     await view.getByRole('button', { name: 'Use a different account' }).click()
     await vi.waitFor(() => {
-      return expect(classicAccess.signIns().at(-1)).toEqual(
-        expect.objectContaining({ ephemeral: true }),
-      )
+      expect(classicAccess.signIns().at(-1)).toEqual(expect.objectContaining({ ephemeral: true }))
     })
   })
 

@@ -291,7 +291,7 @@ describe('ChatScreen', () => {
       .click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() => {
-      return expect(noteWindows.openedNoteWindows()).toEqual([
+      expect(noteWindows.openedNoteWindows()).toEqual([
         deepLinkForRoute({ kind: 'note', path: 'notes/atlas.md' }),
         deepLinkForRoute({ kind: 'note', path: 'notes/brief.md' }),
       ])
@@ -314,7 +314,7 @@ describe('ChatScreen', () => {
     await view.getByTestId('wikilink').click()
 
     await vi.waitFor(() => {
-      return expect(probedRouteRef.current).toEqual({ kind: 'note', path: 'notes/atlas.md' })
+      expect(probedRouteRef.current).toEqual({ kind: 'note', path: 'notes/atlas.md' })
     })
   })
 
@@ -333,7 +333,7 @@ describe('ChatScreen', () => {
     await view.getByTestId('wikilink').click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() => {
-      return expect(noteWindows.openedNoteWindows()).toContain(
+      expect(noteWindows.openedNoteWindows()).toContain(
         deepLinkForRoute({
           kind: 'note',
           path: 'notes/atlas.md',

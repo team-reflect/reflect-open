@@ -179,11 +179,7 @@ describe('BacklinksPanel', () => {
     await view.getByRole('link', { name: 'plan' }).click()
 
     await vi.waitFor(() => {
-      return expect(resolveMarkdownHref).toHaveBeenCalledWith(
-        'projects/TASKS.md',
-        './roadmap/plan.md',
-        1,
-      )
+      expect(resolveMarkdownHref).toHaveBeenCalledWith('projects/TASKS.md', './roadmap/plan.md', 1)
     })
     await expect
       .element(view.getByTestId('route'))
@@ -253,7 +249,7 @@ describe('BacklinksPanel', () => {
     await view.getByText('Meeting Notes').click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() => {
-      return expect(openNoteWindow).toHaveBeenCalledWith(
+      expect(openNoteWindow).toHaveBeenCalledWith(
         deepLinkForRoute({
           kind: 'note',
           path: 'notes/meeting.md',

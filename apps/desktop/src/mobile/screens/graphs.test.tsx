@@ -86,7 +86,7 @@ describe('MobileGraphs', () => {
 
     await userEvent.click(page.getByRole('button', { name: 'Work' }))
     await vi.waitFor(() => {
-      return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Work')
+      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Work')
     })
   })
 
@@ -112,7 +112,7 @@ describe('MobileGraphs', () => {
     await userEvent.click(page.getByRole('button', { name: 'Create' }))
 
     await vi.waitFor(() => {
-      return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal')
+      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal')
     })
   })
 

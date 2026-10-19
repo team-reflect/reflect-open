@@ -76,14 +76,14 @@ describe('ConnectGithubDrawer', () => {
     await page.getByRole('button', { name: 'Continue' }).click()
 
     await vi.waitFor(() => {
-      return expect(backup.calls()).toContainEqual({
+      expect(backup.calls()).toContainEqual({
         method: 'connectExistingRepo',
         ref: { owner: 'alex', name: 'reflect-backup' },
         allowPublic: false,
       })
     })
     await vi.waitFor(() => {
-      return expect(backup.calls()).toContainEqual({
+      expect(backup.calls()).toContainEqual({
         method: 'connectNewRepo',
         name: 'reflect-backup',
       })
@@ -104,7 +104,7 @@ describe('ConnectGithubDrawer', () => {
     await page.getByRole('button', { name: 'Continue' }).click()
 
     await vi.waitFor(() => {
-      return expect(backup.calls()).toContainEqual({
+      expect(backup.calls()).toContainEqual({
         method: 'connectExistingRepo',
         ref: { owner: 'alex', name: 'notes' },
         allowPublic: false,

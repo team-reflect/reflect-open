@@ -108,7 +108,7 @@ describe('NoteGistAction', () => {
     await userEvent.click(view.getByRole('button', { name: /Share with private link/ }))
 
     await vi.waitFor(() => {
-      return expect(app.progress.findByLabel('Copying the gist link')).toMatchObject({
+      expect(app.progress.findByLabel('Copying the gist link')).toMatchObject({
         status: 'failed',
         message: 'denied',
       })

@@ -221,7 +221,7 @@ describe('AllNotesScreen', () => {
       .click({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() => {
-      return expect(openedNoteWindows(view)).toContain(
+      expect(openedNoteWindows(view)).toContain(
         deepLinkForRoute({ kind: 'note', path: 'notes/health.md' }),
       )
     })
@@ -237,7 +237,7 @@ describe('AllNotesScreen', () => {
     await subject.dblClick({ modifiers: ['ControlOrMeta'] })
 
     await vi.waitFor(() => {
-      return expect(openedNoteWindows(view)).toContain(
+      expect(openedNoteWindows(view)).toContain(
         deepLinkForRoute({ kind: 'note', path: 'notes/health.md' }),
       )
     })
@@ -460,7 +460,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await userEvent.keyboard('{ControlOrMeta>}{Enter}{/ControlOrMeta}')
 
     await vi.waitFor(() => {
-      return expect(openedNoteWindows(view)).toContain(
+      expect(openedNoteWindows(view)).toContain(
         deepLinkForRoute({ kind: 'note', path: 'notes/health.md' }),
       )
     })
@@ -564,7 +564,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     // The confirm closes either way; the reason lands in the operations toast.
     await expectLocatorToHaveCount(page.getByText('Trash 1 note?'), 0)
     await vi.waitFor(() => {
-      return expect(
+      expect(
         view.app.progress
           .getAll()
           .map((operation) => `${operation.status}:${operation.message ?? ''}`),

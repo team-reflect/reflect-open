@@ -144,7 +144,7 @@ describe('DailyEventsSection', () => {
     await page.getByRole('button', { name: /add to daily note/i }).click()
 
     await vi.waitFor(() => {
-      return expect(addMeetingToDaily).toHaveBeenCalledWith({
+      expect(addMeetingToDaily).toHaveBeenCalledWith({
         date: DATE,
         title: 'Standup',
         attendees: [{ name: 'Grace Hopper' }],
@@ -180,7 +180,7 @@ describe('DailyEventsSection', () => {
     await page.getByRole('button', { name: /add to daily note/i }).click()
 
     await vi.waitFor(() => {
-      return expect(addMeetingToDaily).toHaveBeenCalledWith(
+      expect(addMeetingToDaily).toHaveBeenCalledWith(
         expect.objectContaining({
           attendees: [{ name: 'Ada Lovelace', emails: ['ada@example.com'] }],
           lookupContacts: true,
@@ -218,7 +218,7 @@ describe('DailyEventsSection', () => {
 
     await page.getByRole('button', { name: /add to daily note/i }).click()
     await vi.waitFor(() => {
-      return expect(addMeetingToDaily).toHaveBeenCalledWith(
+      expect(addMeetingToDaily).toHaveBeenCalledWith(
         expect.objectContaining({
           attendees: [{ name: 'Ada Lovelace', emails: ['ada@example.com'] }],
         }),
@@ -242,9 +242,7 @@ describe('DailyEventsSection', () => {
     await page.getByRole('button', { name: /add to daily note/i }).click()
 
     await vi.waitFor(() => {
-      return expect(addMeetingToDaily).toHaveBeenCalledWith(
-        expect.objectContaining({ attendees: [] }),
-      )
+      expect(addMeetingToDaily).toHaveBeenCalledWith(expect.objectContaining({ attendees: [] }))
     })
   })
 

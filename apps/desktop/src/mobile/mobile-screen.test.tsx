@@ -266,7 +266,7 @@ describe('MobileShell', () => {
 
     await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
     await waitFor(() => {
-      return expect(
+      expect(
         view
           .getByRole('button', { name: dayCellLabel(other) })
           .element()
@@ -365,7 +365,7 @@ describe('MobileShell', () => {
 
     expect(view.getByTestId('drawer').query()).toBeNull()
     await waitFor(() => {
-      return expect(
+      expect(
         view
           .getByRole('button', { name: dayCellLabel(today) })
           .element()
@@ -460,7 +460,7 @@ describe('MobileShell', () => {
 
     await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
     await waitFor(() => {
-      return expect(
+      expect(
         view
           .getByRole('button', { name: dayCellLabel(other) })
           .element()
@@ -475,7 +475,7 @@ describe('MobileShell', () => {
     await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
     await waitFor(
       () => {
-        return expect(
+        expect(
           view
             .getByRole('button', { name: dayCellLabel(other) })
             .element()
@@ -557,7 +557,7 @@ describe('MobileShell', () => {
 
     await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
     await waitFor(() => {
-      return expect(
+      expect(
         view
           .getByRole('button', { name: dayCellLabel(other) })
           .element()
@@ -636,7 +636,7 @@ describe('MobileShell', () => {
     expect(view.getByRole('toolbar', { name: 'Formatting' }).query()).toBeNull()
 
     await act(() => {
-      return publishFormattingToolbar(owner, {
+      publishFormattingToolbar(owner, {
         capabilities: {
           canIndent: true,
           canDedent: false,

@@ -708,7 +708,7 @@ describe('MobileTasks', () => {
       { kind: 'setMarkdown', markdown: 'buy oat milk' },
     ])
     await waitFor(() => {
-      return expect(view.getByTestId('route').element().textContent).toContain('notes/other.md')
+      expect(view.getByTestId('route').element().textContent).toContain('notes/other.md')
     })
     await view.unmount()
   })
@@ -879,7 +879,7 @@ describe('MobileTasks', () => {
     await view.getByRole('button', { name: 'Open note: buy milk' }).click()
 
     await waitFor(() => {
-      return expect(view.getByTestId('route').element().textContent).toContain('notes/n.md')
+      expect(view.getByTestId('route').element().textContent).toContain('notes/n.md')
     })
     expect(view.queryByText('dismiss-drawer')).toBeNull()
     await view.unmount()

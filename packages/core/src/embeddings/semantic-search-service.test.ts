@@ -152,7 +152,7 @@ describe('start', () => {
     indexLifecycle.emitApplied([{ kind: 'remove', path: 'notes/a.md' }], 7)
 
     await vi.waitFor(() => {
-      return expect(embeddingIndex.removed()).toEqual([{ path: 'notes/a.md', generation: 7 }])
+      expect(embeddingIndex.removed()).toEqual([{ path: 'notes/a.md', generation: 7 }])
     })
     stop()
   })
