@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { saveXPost } from './x-save.ts'
 import { enqueueCapture, flushQueue } from './flush.ts'
 
-const { get, sendMessage } = vi.hoisted(() => ({ get: vi.fn(), sendMessage: vi.fn() }))
+const { sendMessage, get } = vi.hoisted(() => ({ get: vi.fn(), sendMessage: vi.fn() }))
 vi.mock('wxt/browser', () => ({ browser: { tabs: { get, sendMessage } } }))
 vi.mock('./flush', () => ({ enqueueCapture: vi.fn(), flushQueue: vi.fn() }))
 const pageUrl = 'https://x.com/home'
