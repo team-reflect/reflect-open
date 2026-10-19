@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createTestHttpService, type TestHttpReply } from '../testing/index.ts'
 import { createGistService } from './gist-service.ts'
+import { isAppError, type AppError } from '../errors.ts'
 
 const GIST = { id: 'g1', html_url: 'https://gist.github.com/alex/g1' }
 
@@ -46,12 +47,19 @@ describe('GistService.create', () => {
 
   it('surfaces other failures with the response body', async () => {
     const http = github(new Response('Validation Failed', { status: 422 }))
-    await expect(
-      createGistService({ http }).create('tok', { name: 'A.md', content: 'x' }),
-    ).rejects.toMatchObject({
-      kind: 'io',
-      message: expect.stringContaining('422'),
+    const service = createGistService({ http })
+    const promise = service.create('tok', { name: 'A.md', content: 'x' }) // Let's write `service` and `promise` variables explicitly to reduce the cognitive load of the `expect` call below, which is already long and complex. FIXME
+    await expect(promise).rejects.toSatisfy((error: unknown) => {
+      // FIXME: for code like `rejects.toMatchObject({ errorShape })`, let's use rejects.toSatisfy and explicitly check the type of the error to ensure that it's AppError
+      return isAppError(error) && error.kind === 'io' && error.message.includes('422')
     })
+
+    // await expect( // FIXME: delete this commented-out code
+    //   createGistService({ http }).create('tok', { name: 'A.md', content: 'x' }),
+    // ).rejects.toMatchObject({
+    //   kind: 'io',
+    //   message: expect.stringContaining('422'),
+    // })
   })
 })
 
