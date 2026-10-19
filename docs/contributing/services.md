@@ -52,9 +52,9 @@ Two rules settle the hard cases:
   `ProgressPort` (the app's `OperationsService`). `ExceptionTelemetryService`
   has no caller in core, so it lives in app.
 
-Code in `packages/app` uses the same service shape as core. Lint stops both
-packages from importing React, TanStack or Tauri, and core from importing
-`@reflect/app`.
+Code in `packages/app` uses the same service shape as core. Neither package
+depends on React, TanStack or Tauri, and core does not depend on `@reflect/app`,
+so `package.json` stops those imports.
 
 ## 1. The interface, the class and the factory
 

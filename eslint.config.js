@@ -198,27 +198,8 @@ function dynamicImportSelector(pattern, message) {
 }
 
 // ---------------------------------------------------------------------------
-// The default-instance pattern
+// Module-level state
 // ---------------------------------------------------------------------------
-
-// The two names are domain functions over a value (`defaultAiProvider(state)`,
-// `defaultAttendees(event)`), not service instances.
-const DEFAULT_INSTANCE_NAME =
-  '/^(?!(?:defaultAiProvider|defaultAttendees)$)(?:default|setDefault)[A-Z]/'
-
-const DEFAULT_INSTANCE_MESSAGE =
-  'No process-wide service instances: `createCoreServices(adapters)` builds every service once, and a caller gets a service through `deps`, `useCoreServices()` or `ctx`. Do not export `defaultXxx()` / `setDefaultXxx()`.' // FIXME: is this rule still needed? Remove all ESLint rules that was useful during previous migration but is not needed anymore.
-
-const DEFAULT_INSTANCE_SELECTORS = [
-  {
-    selector: `ExportNamedDeclaration > FunctionDeclaration[id.name=${DEFAULT_INSTANCE_NAME}]`,
-    message: DEFAULT_INSTANCE_MESSAGE,
-  },
-  {
-    selector: `ExportNamedDeclaration > VariableDeclaration > VariableDeclarator[id.name=${DEFAULT_INSTANCE_NAME}][init.type=/^(?:ArrowFunctionExpression|FunctionExpression)$/]`,
-    message: DEFAULT_INSTANCE_MESSAGE,
-  },
-]
 
 const MODULE_LET_SELECTORS = [
   {
@@ -280,14 +261,6 @@ export default defineESLintConfig(
   {
     ignores: ['./design-system/', '**/.wxt/', '**/.output/'],
   },
-  // FIXME: delete rule below
-  {
-    files: ['apps/desktop/scripts/**/*.ts'],
-    rules: {
-      curly: ['error', 'all'],
-    },
-  },
-  // FIXME: delete rule above
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.mjs'],
     /// keep-sorted
@@ -308,19 +281,13 @@ export default defineESLintConfig(
     },
   },
 
-  // Rule: no default instances and no module-level state in core. Every
-  // service is built by `createCoreServices(adapters)` and holds its state in
-  // its own `#` fields.
+  // Rule: no module-level state in core. Every service is built by
+  // `createCoreServices(adapters)` and holds its state in its own `#` fields.
   {
     files: [`packages/core/src/**/*.${SOURCE_EXTENSIONS}`],
     ignores: [`**/*.test.${SOURCE_EXTENSIONS}`],
     rules: {
-      'no-restricted-syntax': [
-        'error',
-        ...DEFAULT_INSTANCE_SELECTORS,
-        ...MODULE_LET_SELECTORS,
-        ...CODE_SHAPE_SELECTORS,
-      ],
+      'no-restricted-syntax': ['error', ...MODULE_LET_SELECTORS, ...CODE_SHAPE_SELECTORS],
     },
   },
   {
@@ -329,7 +296,7 @@ export default defineESLintConfig(
     // builds its services. It is exported from `@reflect/core/testing` only.
     files: ['packages/core/src/testing/database.ts'],
     rules: {
-      'no-restricted-syntax': ['error', ...DEFAULT_INSTANCE_SELECTORS, ...CODE_SHAPE_SELECTORS],
+      'no-restricted-syntax': ['error', ...CODE_SHAPE_SELECTORS],
     },
   },
 
