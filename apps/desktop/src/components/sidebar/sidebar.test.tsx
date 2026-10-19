@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import {
   DEFAULT_SETTINGS,
   isOstensiblyEmptyNoteSource,
+  type AiProviderConfig,
   type GraphSessionService,
   type NoteDocumentService,
   type PinnedNote,
@@ -21,6 +22,8 @@ import {
 import { createTestCoreServices, createTestBackupService } from '@reflect/core/testing'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import type { Route } from '@/routing/route.ts'
+import { AudioMemoProvider } from '@/providers/audio-memo-provider.tsx'
+import { SidebarProvider } from '@/providers/sidebar-provider.tsx'
 import { UpdateProvider } from '@/providers/update-provider.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -33,29 +36,23 @@ const openNativeContextMenu = vi.fn((options: NativeContextMenuOptions) =>
   }),
 )
 
-const audioMemo = vi.hoisted(() => ({
-  phase: 'idle' as const,
-  elapsedMs: 0,
-  stream: null,
-  available: true,
-  unavailableReason: null as string | null,
-  error: null,
-  canRetry: false,
-  toggle: vi.fn(),
-  cancel: vi.fn(),
-  retry: vi.fn(),
-  discard: vi.fn(),
-}))
-vi.mock('@/providers/audio-memo-provider.tsx', () => ({
-  useAudioMemo: () => audioMemo,
-}))
-
 const GRAPH = { root: '/notes', name: 'Notes', generation: 1 }
+
+/**
+ * A provider that can transcribe audio memos.
+ */
+const OPENAI: AiProviderConfig = {
+  id: 'cfg-openai',
+  provider: 'openai',
+  model: 'gpt-5.1',
+  keyHint: 'wxyz1',
+}
 
 // What the app's fakes answer; each test sets them before `renderSidebar`.
 const getPinnedNotes = vi.fn<() => Promise<PinnedNote[]>>()
 const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
 const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
+let aiProviders: AiProviderConfig[]
 
 // The services of the rendered app; set by `renderSidebar`.
 let opener: TestOpenerService
@@ -76,11 +73,7 @@ beforeEach(() => {
   getPinnedNotes.mockReset().mockResolvedValue([])
   commitNoteFrontmatter.mockReset().mockResolvedValue(undefined)
   openNoteWindow.mockReset().mockResolvedValue(true)
-  // The hoisted mock is shared module state — restore it so mic-related cases
-  // can't inherit mutations from earlier tests.
-  audioMemo.available = true
-  audioMemo.unavailableReason = null
-  audioMemo.toggle.mockReset()
+  aiProviders = [OPENAI]
   openNativeContextMenu.mockClear()
 })
 
@@ -148,15 +141,24 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
         { root: '/work', name: 'Work', openedMs: 1 },
       ],
     },
-    settings: { dateFormat: 'mdy', graphColors: {} },
+    settings: {
+      dateFormat: 'mdy',
+      graphColors: {},
+      aiProviders,
+      defaultAiProviderId: aiProviders[0]?.id ?? null,
+    },
     ...(initialRoute === undefined ? {} : { route: initialRoute }),
     wrapper: (children: ReactNode) => (
       <div style={{ width: 260, height: 560 }}>
-        <UpdateProvider autoCheck={false}>{children}</UpdateProvider>
+        <UpdateProvider autoCheck={false}>
+          <SidebarProvider>
+            <AudioMemoProvider graph={GRAPH}>{children}</AudioMemoProvider>
+          </SidebarProvider>
+        </UpdateProvider>
       </div>
     ),
   })
-  return { view, navigate, openPalette, context }
+  return { view, navigate, openPalette, context, app }
 }
 
 describe('Sidebar', () => {
@@ -234,21 +236,22 @@ describe('Sidebar', () => {
   })
 
   it('the mic button starts an audio memo', async () => {
-    const { view } = await renderSidebar()
+    const { view, app } = await renderSidebar()
     await view.getByRole('button', { name: /record audio memo/i }).click()
-    expect(audioMemo.toggle).toHaveBeenCalled()
+    await vi.waitFor(() =>
+      expect(app.audioRecorder.calls().some((call) => call.method === 'start')).toBe(true),
+    )
   })
 
   it('the mic button disables (without vanishing) when no provider can transcribe', async () => {
-    audioMemo.available = false
-    audioMemo.unavailableReason = 'Add an OpenAI or Gemini model in Settings to record audio memos'
-    const { view } = await renderSidebar()
+    aiProviders = []
+    const { view, app } = await renderSidebar()
     const micButton = view.getByRole('button', { name: /record audio memo/i })
     await expect.element(micButton).toHaveAttribute('aria-disabled', 'true')
     // `aria-disabled` fails Playwright's enabled actionability check, but the
     // element still receives real clicks — force past the check.
     await micButton.click({ force: true })
-    expect(audioMemo.toggle).not.toHaveBeenCalled()
+    expect(app.audioRecorder.calls().some((call) => call.method === 'start')).toBe(false)
   })
 
   it('pinned notes render their own section', async () => {

@@ -147,7 +147,6 @@ const DESKTOP_VI_MOCK_ALLOW_BY_FILE = {
   'apps/desktop/src/components/audio-memo/audio-memo-button.test.tsx': [
     '@/providers/audio-memo-provider.tsx',
   ],
-  'apps/desktop/src/components/sidebar/sidebar.test.tsx': ['@/providers/audio-memo-provider.tsx'],
   'apps/desktop/src/mobile/daily-capture-menu.test.tsx': ['@/mobile/audio-memo-provider.tsx'],
   'apps/desktop/src/mobile/recording-drawer.test.tsx': ['@/mobile/audio-memo-provider.tsx'],
   'apps/desktop/src/mobile/mobile-screen.test.tsx': ['@/mobile/audio-memo-provider.tsx'],
