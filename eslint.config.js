@@ -256,7 +256,6 @@ export default defineESLintConfig(
     command: true,
     perfectionist: false,
     jsdoc: false,
-    ocavue: false,
   },
   {
     ignores: ['./design-system/', '**/.wxt/', '**/.output/'],
