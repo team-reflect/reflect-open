@@ -77,14 +77,11 @@ production project is a release error. The helper then uploads the IPA with
 `xcrun altool --upload-package --wait`, which returns after App Store Connect has
 processed the build.
 
-Pass `--export-method=release-testing` if App Store Connect or Xcode starts
-requiring the TestFlight-specific export method. The default remains
-`app-store-connect`, matching Tauri's App Store Connect distribution docs and
-the upload flow.
-
 ## GitHub Action
 
-Use **Actions -> TestFlight -> Run workflow**. The workflow builds on
+The TestFlight workflow runs as part of every release, called from
+`.github/workflows/publish-desktop.yml`. To retry it, re-run its failed job in
+the Release run. The workflow builds on
 `macos-26`, uploads the IPA to App Store Connect, and serializes runs so two
 uploads do not race each other. It keeps both the exported IPA and a
 metadata-preserving ZIP of the exact `.xcarchive` for 30 days. The archive holds

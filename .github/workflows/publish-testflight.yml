@@ -1,27 +1,12 @@
 name: Publish TestFlight
 
 on:
-  workflow_dispatch:
-    inputs:
-      export_method:
-        description: Xcode export method for the IPA.
-        required: true
-        type: choice
-        default: app-store-connect
-        options:
-          - app-store-connect
-          - release-testing
   workflow_call:
     inputs:
       commit:
         description: Immutable commit targeted by the release tag.
         required: true
         type: string
-      export_method:
-        description: Xcode export method for the IPA (app-store-connect or release-testing).
-        required: false
-        type: string
-        default: app-store-connect
     secrets:
       APPLE_API_KEY:
         required: true
@@ -52,7 +37,7 @@ jobs:
         with:
           # Reusable workflows inherit the caller SHA, which may not be the
           # release snapshot. Always build the verified immutable tag commit.
-          ref: ${{ inputs.commit || github.sha }}
+          ref: ${{ inputs.commit }}
           persist-credentials: false
 
       - name: Verify TestFlight secrets are configured
@@ -91,10 +76,9 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
-          EXPORT_METHOD: ${{ inputs.export_method }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-        run: pnpm release:ios --build-number="$BUILD_NUMBER" --export-method="$EXPORT_METHOD"
+        run: pnpm release:ios --build-number="$BUILD_NUMBER"
 
       # Xcode Organizer symbolicates a TestFlight crash report from the local
       # archive, which a CI runner throws away. Keep it so an Apple `.ips` that

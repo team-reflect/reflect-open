@@ -157,9 +157,8 @@ include commits that never shipped in a beta. To ship a beta-tested snapshot, me
 the stable Release PR right after a healthy beta, before landing new work.
 
 If macOS publishing or TestFlight fails after a Release PR merged, the tag and GitHub
-release record already exist (the release may still be a draft): rerun
-**Actions → Release** or **Actions → TestFlight** on the release commit as
-appropriate.
+release record already exist (the release may still be a draft): re-run the
+failed jobs of the Release run.
 
 ### Hotfix
 

@@ -1,9 +1,8 @@
 // Builds the iOS app, checks it, and uploads it to TestFlight. See docs/ios-testflight.md.
 //
-//   pnpm release:ios --build-number=<digits> [--export-method=<name>]
+//   pnpm release:ios --build-number=<digits>
 //
 //   --build-number=<digits>   Required
-//   --export-method=<name>    Default: app-store-connect
 //   --no-sign                 Unsigned build without credentials: nothing is uploaded
 
 import { existsSync, readdirSync } from 'node:fs'
@@ -42,11 +41,6 @@ const DSYM_BINARY_PATH = join(
 interface Credentials {
   readonly altoolArgs: readonly string[]
   readonly env: NodeJS.ProcessEnv
-}
-
-interface Options {
-  readonly buildNumber: string
-  readonly exportMethod: string
 }
 
 /** The App Store Connect API key, as altool arguments and as the environment Tauri reads. */
@@ -144,16 +138,16 @@ async function uploadDebugFiles(): Promise<void> {
   await exec(sentryCli, ['debug-files', 'upload', ...project, ...upload], INHERIT)
 }
 
-async function build(
-  { buildNumber, exportMethod }: Options,
-  credentials: Credentials,
-): Promise<void> {
+async function build(buildNumber: string, credentials: Credentials): Promise<void> {
   const config = JSON.stringify({ bundle: { iOS: { bundleVersion: buildNumber } } })
-  await runTauri(['ios', 'build', '--export-method', exportMethod, '--ci', '--config', config], {
-    // Without line tables the dSYM cannot symbolicate Rust frames.
-    CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only',
-    ...credentials.env,
-  })
+  await runTauri(
+    ['ios', 'build', '--export-method', 'app-store-connect', '--ci', '--config', config],
+    {
+      // Without line tables the dSYM cannot symbolicate Rust frames.
+      CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only',
+      ...credentials.env,
+    },
+  )
   await assertIpa()
   await assertArchiveSymbols()
   await uploadDebugFiles()
@@ -182,7 +176,6 @@ async function main(): Promise<void> {
   const { values } = parseArgs({
     options: {
       'build-number': { type: 'string', default: '' },
-      'export-method': { type: 'string', default: 'app-store-connect' },
       'no-sign': { type: 'boolean', default: false },
     },
   })
@@ -198,7 +191,7 @@ async function main(): Promise<void> {
 
   await runWithTempDir(async (tempDir) => {
     const credentials = resolveCredentials(tempDir)
-    await build({ buildNumber, exportMethod: values['export-method'] }, credentials)
+    await build(buildNumber, credentials)
     // --wait blocks until App Store Connect has processed the build.
     await runAltool(['--upload-package', IPA_PATH, '--show-progress', '--wait'], credentials)
   })
