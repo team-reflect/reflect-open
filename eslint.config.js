@@ -335,8 +335,6 @@ export default defineESLintConfig(
     rules: {
       '@eslint-react/set-state-in-effect': 'off',
       '@typescript-eslint/no-base-to-string': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
-      'no-var': 'off',
     },
   },
   {

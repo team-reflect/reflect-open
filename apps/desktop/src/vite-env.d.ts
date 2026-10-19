@@ -10,5 +10,8 @@ interface ImportMetaEnv {
   readonly VITE_SENTRY_DSN?: string
 }
 
-/** App version injected from the canonical Tauri configuration by Vite. */
+/**
+ * App version injected by Vite.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare const __REFLECT_VERSION__: string
