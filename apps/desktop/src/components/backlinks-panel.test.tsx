@@ -2,6 +2,7 @@ import type { MaybePromise } from '@reflect/utils'
 import { createTestWindowService } from '@reflect/app/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
+  BacklinkContext,
   BacklinkContextPage,
   BacklinkService,
   NoteCreationService,
@@ -16,16 +17,21 @@ import { BacklinksPanel } from './backlinks-panel.tsx'
 import { deepLinkForRoute } from '@reflect/app'
 
 // What the app's fakes answer; each test sets them before `renderPanel`.
-const getBacklinksWithContext = vi.fn()
+const getBacklinksWithContext = vi.fn() // FIXME: TODO 2: const getBacklinksWithContext = vi.fn<BacklinkService['getBacklinksWithContext']>()
 const resolveOrCreateNoteWithTitle = vi.fn<NoteCreationService['resolveOrCreateNoteWithTitle']>()
 const resolveMarkdownHref = vi.fn<NoteLinkResolverService['resolveMarkdownHref']>()
 const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 
+// FIXME: TODO 1: just remove `getBacklinksPage`, let's use getBacklinksWithContext directly.
 const getBacklinksPage: BacklinkService['getBacklinksWithContext'] = async (path, options) => {
   const result: unknown = await getBacklinksWithContext(path, options)
   return Array.isArray(result)
-    ? { contexts: result, nextCursor: null, indexedLinkCount: result.length }
+    ? wrapBacklinkContexts(result as BacklinkContext[])
     : (result as BacklinkContextPage)
+}
+
+function wrapBacklinkContexts(contexts: BacklinkContext[]): BacklinkContextPage {
+  return { contexts, nextCursor: null, indexedLinkCount: contexts.length }
 }
 
 function createApp() {
@@ -92,7 +98,7 @@ describe('BacklinksPanel', () => {
   })
 
   it('uses the singular header for one inbound link', async () => {
-    getBacklinksWithContext.mockResolvedValue([
+    getBacklinksWithContext.mockResolvedValue(wrapBacklinkContexts([ // FIXME: TODO 3: for all getBacklinksWithContext calls that return an array, just wrap it in wrapBacklinkContexts() instead of returning an array directly.
       {
         sourcePath: 'notes/meeting.md',
         sourceTitle: 'Meeting Notes',
@@ -100,7 +106,7 @@ describe('BacklinksPanel', () => {
         posFrom: 12,
         tasks: [],
       },
-    ])
+    ]))
     const view = await renderPanel('notes/roadmap.md')
     await expect.element(view.getByText('Incoming backlink (1)')).toBeInTheDocument()
     await view.unmount()
