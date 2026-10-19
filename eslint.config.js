@@ -237,7 +237,7 @@ const DEFAULT_INSTANCE_NAME =
   '/^(?!(?:defaultAiProvider|defaultAttendees)$)(?:default|setDefault)[A-Z]/'
 
 const DEFAULT_INSTANCE_MESSAGE =
-  'No process-wide service instances: `createCoreServices(adapters)` builds every service once, and a caller gets a service through `deps`, `useCoreServices()` or `ctx`. Do not export `defaultXxx()` / `setDefaultXxx()`.'
+  'No process-wide service instances: `createCoreServices(adapters)` builds every service once, and a caller gets a service through `deps`, `useCoreServices()` or `ctx`. Do not export `defaultXxx()` / `setDefaultXxx()`.' // FIXME: is this rule still needed? Remove all ESLint rules that was useful during previous migration but is not needed anymore.
 
 const DEFAULT_INSTANCE_SELECTORS = [
   {
