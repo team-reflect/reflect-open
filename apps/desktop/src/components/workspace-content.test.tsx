@@ -1,5 +1,5 @@
 import { page } from 'vitest/browser'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished } from 'vitest'
 import type { ReactElement } from 'react'
 import type { Route } from '@reflect/app'
 import type { GraphInfo } from '@reflect/core'
@@ -34,6 +34,7 @@ function SidebarToggle(): ReactElement {
 
 function renderWorkspace(route: Route) {
   const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  onTestFinished(() => app.database.close())
   // Pinned, so the sidebar of this note (and only this note) offers "Un-pin this note".
   seedNotes(app.database, [
     { path: 'notes/project.md', markdown: '---\npinned: true\n---\n# Project\n' },

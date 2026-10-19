@@ -154,15 +154,6 @@ async function prepare(options: AnyOptions | undefined): Promise<
       'renderInApp: with your own `app`, give it the platform and the backup service yourself',
     )
   }
-  // The database of an app this helper builds; `dispose` closes it. A caller's `app` keeps its own.
-  let database: TestDatabaseService | null = null
-  let app: CoreServices
-  if (options?.app === undefined) {
-    database = createWasmTestDatabaseService()
-    app = createApp(database, backup, options?.platform)
-  } else {
-    app = options.app
-  }
   const servicesOnly = options?.servicesOnly ?? false
   if (
     servicesOnly &&
@@ -172,6 +163,15 @@ async function prepare(options: AnyOptions | undefined): Promise<
       options?.sync !== undefined)
   ) {
     throw new Error('renderInApp: `servicesOnly` mounts no graph, router or sync')
+  }
+  // The database of an app this helper builds; `dispose` closes it. A caller's `app` keeps its own.
+  let database: TestDatabaseService | null = null
+  let app: CoreServices
+  if (options?.app === undefined) {
+    database = createWasmTestDatabaseService()
+    app = createApp(database, backup, options?.platform)
+  } else {
+    app = options.app
   }
 
   const { graphSession, settings } = app
@@ -264,12 +264,18 @@ export async function renderInApp<App extends CoreServices = TestCoreServices>(
   options?: RenderInAppOptions & { app?: App },
 ): Promise<InAppRenderResult<App>> {
   const { wrap, dispose, ...handles } = await prepare(options)
-  const screen = await render(ui, { wrapper: ({ children }) => wrap(children) })
-  onTestFinished(async () => {
-    await screen.unmount()
+  try {
+    const screen = await render(ui, { wrapper: ({ children }) => wrap(children) })
+    onTestFinished(async () => {
+      await screen.unmount()
+      dispose()
+    })
+    return Object.assign(screen, handles as InAppHandles<App>)
+  } catch (error) {
+    // A render that throws still releases the database.
     dispose()
-  })
-  return Object.assign(screen, handles as InAppHandles<App>)
+    throw error
+  }
 }
 
 /**
@@ -284,13 +290,19 @@ export async function renderHookInApp<
   options?: RenderInAppOptions & { app?: App; initialProps?: Props },
 ): Promise<InAppRenderHookResult<Result, Props, App>> {
   const { wrap, dispose, ...handles } = await prepare(options)
-  const rendered = await renderHook<Props, Result>(hook, {
-    wrapper: ({ children }) => wrap(children),
-    initialProps: options?.initialProps,
-  })
-  onTestFinished(async () => {
-    await rendered.unmount()
+  try {
+    const rendered = await renderHook<Props, Result>(hook, {
+      wrapper: ({ children }) => wrap(children),
+      initialProps: options?.initialProps,
+    })
+    onTestFinished(async () => {
+      await rendered.unmount()
+      dispose()
+    })
+    return Object.assign(rendered, handles as InAppHandles<App>)
+  } catch (error) {
+    // A render that throws still releases the database.
     dispose()
-  })
-  return Object.assign(rendered, handles as InAppHandles<App>)
+    throw error
+  }
 }
