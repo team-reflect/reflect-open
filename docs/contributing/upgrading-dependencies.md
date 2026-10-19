@@ -32,7 +32,7 @@ pnpm install && pnpm dedupe && pnpm typecheck && pnpm lint && pnpm build
 
 node apps/desktop/scripts/build-sidecar.ts
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --all-targets
 cargo build --workspace
 ```
 

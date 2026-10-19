@@ -119,6 +119,11 @@ pnpm --filter @reflect/desktop sidecar
 
 Otherwise tauri-build fails with `resource path binaries/<name>-<triple> doesn't exist`
 (`pnpm tauri dev`/`build` stage them automatically; details in [docs/cli.md](docs/cli.md)).
+Clippy and the tests never run the sidecars, so they can skip them instead, as CI does:
+`TAURI_CONFIG='{"bundle":{"externalBin":null}}' cargo clippy --workspace --all-targets`.
+
+`.cargo/config.toml` sets `build.warnings = "deny"`: any rustc or clippy warning fails
+the command (after all warnings are printed). Use `CARGO_BUILD_WARNINGS=warn` while iterating.
 
 ### Repo layout
 
