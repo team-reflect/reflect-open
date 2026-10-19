@@ -103,8 +103,9 @@ async function searchHitsWithProbe(
   const liveFlags = await Promise.all(indexedPublic.map((hit) => isPrivateLive(hit.path)))
   return indexedPublic
     .filter((_, index) => liveFlags[index] === false)
-    .map((hit) => { return mint({ path: hit.path, title: hit.title, snippet: hit.snippet, heading: hit.heading }) },
-    )
+    .map((hit) => {
+      return mint({ path: hit.path, title: hit.title, snippet: hit.snippet, heading: hit.heading })
+    })
 }
 
 /**
@@ -135,14 +136,15 @@ async function noteListingsWithProbe(
   const liveFlags = await Promise.all(indexedPublic.map((entry) => isPrivateLive(entry.path)))
   return indexedPublic
     .filter((_, index) => liveFlags[index] === false)
-    .map((entry) => { return mint({
+    .map((entry) => {
+      return mint({
         path: entry.path,
         title: entry.title,
         dailyDate: entry.dailyDate,
         snippet: entry.snippet,
         modifiedAt: entry.modifiedAt,
-      }) },
-    )
+      })
+    })
 }
 
 /**

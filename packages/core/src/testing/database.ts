@@ -194,7 +194,8 @@ class NodeTestDatabaseServiceImpl implements TestDatabaseService {
     this.db = createDb(this.runQuery)
   }
 
-  readonly runQuery = (sql: string, params: readonly unknown[]): Promise<unknown> => { return Promise.try(() => {
+  readonly runQuery = (sql: string, params: readonly unknown[]): Promise<unknown> => {
+    return Promise.try(() => {
       this.#queries.push({ sql, params: [...params] })
       try {
         return this.#open()
@@ -203,7 +204,8 @@ class NodeTestDatabaseServiceImpl implements TestDatabaseService {
       } catch (error) {
         throw toAppError(error)
       }
-    }) }
+    })
+  }
 
   applyProjection(note: IndexedNote): void {
     insertProjection(this.#open(), note)

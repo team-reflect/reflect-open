@@ -52,9 +52,11 @@ function modelAnswering(text: string): LanguageModelV3CallOptions[] {
 function modelThrowing(error: unknown): void {
   languageModelService.setModel(
     new MockLanguageModelV3({
-      doGenerate: () => { return Promise.try(() => {
+      doGenerate: () => {
+        return Promise.try(() => {
           throw error
-        }) },
+        })
+      },
     }),
   )
 }

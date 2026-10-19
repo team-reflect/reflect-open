@@ -38,8 +38,9 @@ describe('router', () => {
   it('renders the navigation service through navigate, back, and forward', async () => {
     const { result, appServices } = await routerHook()
     await act(() => result.current.navigate({ kind: 'daily', date: '2026-06-08' }))
-    await act(() => { return result.current.navigate({ kind: 'note', path: 'notes/a.md' }, { focusEditor: true }) },
-    )
+    await act(() => {
+      return result.current.navigate({ kind: 'note', path: 'notes/a.md' }, { focusEditor: true })
+    })
     expect(result.current.route).toEqual({ kind: 'note', path: 'notes/a.md' })
     expect(result.current.arrivalSeq).toBe(2)
     expect(result.current.arrivalFocusEditor).toBe(true)

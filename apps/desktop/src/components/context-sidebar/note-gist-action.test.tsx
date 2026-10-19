@@ -107,11 +107,12 @@ describe('NoteGistAction', () => {
     view.appServices.clipboard.failWith(new Error('denied'))
     await userEvent.click(view.getByRole('button', { name: /Share with private link/ }))
 
-    await vi.waitFor(() => { return expect(app.progress.findByLabel('Copying the gist link')).toMatchObject({
+    await vi.waitFor(() => {
+      return expect(app.progress.findByLabel('Copying the gist link')).toMatchObject({
         status: 'failed',
         message: 'denied',
-      }) },
-    )
+      })
+    })
   })
 
   it('unpublishes the open note on click once it carries a gist', async () => {

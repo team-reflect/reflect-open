@@ -44,8 +44,9 @@ export function updatePinOrder(shelf: readonly PinnedNote[], movedPath: string):
     getSafePinnedOrder(shelf[moved - 1]),
     getSafePinnedOrder(shelf[moved + 1]),
   )
-  const next = shelf.map((note, index) => { return index === moved && order !== null ? { ...note, pinnedOrder: order } : note },
-  )
+  const next = shelf.map((note, index) => {
+    return index === moved && order !== null ? { ...note, pinnedOrder: order } : note
+  })
   return isSorted(next) ? next : renumberPinOrder(next)
 }
 

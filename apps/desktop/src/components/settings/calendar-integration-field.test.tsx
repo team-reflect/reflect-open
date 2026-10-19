@@ -54,8 +54,12 @@ describe('CalendarIntegrationField', () => {
 
     await calendarSwitch().click()
 
-    await vi.waitFor(() => { return expect(settings.saves().at(-1)).toMatchObject({ calendarEnabled: true, calendarIds: [] }) },
-    )
+    await vi.waitFor(() => {
+      return expect(settings.saves().at(-1)).toMatchObject({
+        calendarEnabled: true,
+        calendarIds: [],
+      })
+    })
     await expect.element(page.getByText('0/2 calendars selected')).toBeInTheDocument()
     expect(page.getByText('Google').query()).toBeNull()
     expect(page.getByText('iCloud').query()).toBeNull()
@@ -97,8 +101,9 @@ describe('CalendarIntegrationField', () => {
 
     await page.getByRole('checkbox', { name: 'Work' }).click()
 
-    await vi.waitFor(() => { return expect(settings.saves().at(-1)).toMatchObject({ calendarIds: ['cal-work'] }) },
-    )
+    await vi.waitFor(() => {
+      return expect(settings.saves().at(-1)).toMatchObject({ calendarIds: ['cal-work'] })
+    })
     await expect.element(page.getByText('1/2 calendars selected')).toBeInTheDocument()
   })
 
@@ -119,10 +124,11 @@ describe('CalendarIntegrationField', () => {
     await expect.element(page.getByText(/can’t read your calendars/i)).toBeInTheDocument()
 
     await open.click()
-    await vi.waitFor(() => { return expect(opener.openedUrls()).toEqual([
+    await vi.waitFor(() => {
+      return expect(opener.openedUrls()).toEqual([
         'x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars',
-      ]) },
-    )
+      ])
+    })
   })
 
   it('not-yet-asked access shows a Grant button that prompts and recovers', async () => {

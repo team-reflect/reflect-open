@@ -32,12 +32,14 @@ beforeEach(() => {
 
 function modelAnswering(output: { title: string; body: string }): MockLanguageModelV3 {
   const model = new MockLanguageModelV3({
-    doGenerate: () => { return Promise.resolve({
+    doGenerate: () => {
+      return Promise.resolve({
         content: [{ type: 'text', text: JSON.stringify(output) }],
         finishReason: { unified: 'stop' as const, raw: undefined },
         usage: USAGE,
         warnings: [],
-      }) },
+      })
+    },
   })
   languageModelService.setModel(model)
   return model

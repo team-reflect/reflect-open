@@ -127,8 +127,11 @@ describe('NoteRowList', () => {
       { x: rect.right - 120, y: rect.top + 32 },
     )
     await view.getByRole('button', { name: 'Pin Alpha', exact: true }).click()
-    await vi.waitFor(() => { return expect(view.app.noteRows.getOverlay('notes/alpha.md')).toMatchObject({ isPinned: true }) },
-    )
+    await vi.waitFor(() => {
+      return expect(view.app.noteRows.getOverlay('notes/alpha.md')).toMatchObject({
+        isPinned: true,
+      })
+    })
     await expect.element(view.getByText('Pinned', { exact: true })).toBeInTheDocument()
     expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/alpha.md', { pinned: 1024 }, 1)
     write.resolve()

@@ -106,12 +106,13 @@ describe('flushQueue', () => {
 
   it('reports rejected ids so a stale drop cannot masquerade as the new save failing', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    sendMock.mockImplementation((sent) => { return Promise.resolve(
+    sendMock.mockImplementation((sent) => {
+      return Promise.resolve(
         sent.envelope.id === FIRST
           ? { kind: 'rejected', message: 'invalid payload' }
           : { kind: 'queued' },
-      ) },
-    )
+      )
+    })
     await enqueueCapture(wire(FIRST))
     await enqueueCapture(wire(SECOND))
 

@@ -131,8 +131,9 @@ export function MobileTaskGroup({
                   revealed={revealedTaskKey === key}
                   onReveal={() => setRevealedTaskKey(key)}
                   onClose={() => setRevealedTaskKey(null)}
-                  onBeginInteraction={() => { return setRevealedTaskKey((current) => (current === key ? current : null)) }
-                  }
+                  onBeginInteraction={() => {
+                    return setRevealedTaskKey((current) => (current === key ? current : null))
+                  }}
                   onOpenNote={() => onOpen(task.notePath)}
                   onDelete={() => onDelete(task)}
                 />

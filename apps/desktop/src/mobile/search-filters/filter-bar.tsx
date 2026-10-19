@@ -53,7 +53,9 @@ export function FilterBar({
   const noteLabel = useNoteLabel()
 
   /** A link chip's label: the direction word plus the chosen note. */
-  const linkLabel = (word: string, note: NoteFilterRef | null): string => { return note === null ? word : `${word}: ${noteLabel(note)}` }
+  const linkLabel = (word: string, note: NoteFilterRef | null): string => {
+    return note === null ? word : `${word}: ${noteLabel(note)}`
+  }
 
   const patch = (changes: Partial<AllNotesFilters>): void => {
     onFiltersChange({ ...filters, ...changes })
@@ -117,12 +119,13 @@ export function FilterBar({
         onOpenChange={(open) => setOpenDrawer(open ? 'tags' : null)}
         facets={facets}
         selected={filters.tags}
-        onToggle={(tagKey) => { return patch({
+        onToggle={(tagKey) => {
+          return patch({
             tags: filters.tags.includes(tagKey)
               ? filters.tags.filter((key) => key !== tagKey)
               : [...filters.tags, tagKey],
-          }) }
-        }
+          })
+        }}
       />
       <NotePickerDrawer
         open={openDrawer === 'linkedTo'}

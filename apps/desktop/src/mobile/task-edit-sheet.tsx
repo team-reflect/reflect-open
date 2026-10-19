@@ -82,9 +82,11 @@ export function MobileTaskEditSheet({
   // and "torn down" into '', indistinguishable from a genuine clear, and an
   // empty draft means delete.
   const liveDraftRef = useRef<{ seed: number; markdown: string } | null>(null)
-  const readLiveDraft = (): string | null => { return liveDraftRef.current !== null && liveDraftRef.current.seed === editorSeed
+  const readLiveDraft = (): string | null => {
+    return liveDraftRef.current !== null && liveDraftRef.current.seed === editorSeed
       ? liveDraftRef.current.markdown
-      : null }
+      : null
+  }
   // The commit/cancel/delete rules — baseline frozen at open, reseed on
   // reopen, dismissal vs navigate vs unmount — live in the finalizer. It
   // resolves against the live mirror (readDraft) with the state as fallback.

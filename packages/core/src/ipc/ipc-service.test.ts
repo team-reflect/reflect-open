@@ -31,10 +31,12 @@ describe('call', () => {
 
   it('passes a well-formed Rust error through as an AppError', async () => {
     const { ipc } = serviceOver({
-      invoke: () => { return Promise.try(() => {
+      invoke: () => {
+        return Promise.try(() => {
           const rustError: unknown = { kind: 'notFound', message: 'missing' }
           throw rustError
-        }) },
+        })
+      },
       listen: () => Promise.resolve(() => {}),
     })
 

@@ -91,10 +91,11 @@ describe('useTemplateSlashItems', () => {
     const { result } = await renderHookInApp(() => useTemplateSlashItems(() => null), { app })
     const items = await result.current('')
     items[0]!.onSelect()
-    await vi.waitFor(() => { return expect(operations.snapshot()).toMatchObject([
+    await vi.waitFor(() => {
+      return expect(operations.snapshot()).toMatchObject([
         { label: 'Inserting template', status: 'failed', message: 'No open note to insert into' },
-      ]) },
-    )
+      ])
+    })
   })
 
   it('returns nothing without an open graph', async () => {

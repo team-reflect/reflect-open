@@ -247,7 +247,8 @@ export function createTestGraphSessionService<Services = never>(
 ): TestGraphSessionService<Services> {
   let recents = [...(options?.recents ?? [])]
   let generation = 0
-  const createDefaultIpc = (): GraphSessionServiceDeps['ipc'] => { return createTestIpcBridgeService({
+  const createDefaultIpc = (): GraphSessionServiceDeps['ipc'] => {
+    return createTestIpcBridgeService({
       commands: {
         recent_graphs: () => recents,
         forget_recent: (args) => {
@@ -261,7 +262,8 @@ export function createTestGraphSessionService<Services = never>(
         },
         graph_delete: () => null,
       },
-    }) }
+    })
+  }
   const indexStore = options?.indexStore ?? createTestIndexStoreService()
   const noteFile = options?.noteFile ?? createTestNoteFileService()
   const fileChanges = createTestFileChangeService()

@@ -116,8 +116,9 @@ export function fitToContextWindow(
   }
 
   const segments = splitIntoTurnSegments(messages)
-  const elided = segments.map((segment, index) => { return index < segments.length - KEEP_INTACT_SEGMENTS ? segment.map(elideToolResults) : segment },
-  )
+  const elided = segments.map((segment, index) => {
+    return index < segments.length - KEEP_INTACT_SEGMENTS ? segment.map(elideToolResults) : segment
+  })
 
   // Keep the longest newest-first run of whole segments that fits.
   const kept: ModelMessage[][] = []
@@ -165,9 +166,10 @@ function elideToolResults(message: ModelMessage): ModelMessage {
   }
   return {
     ...message,
-    content: message.content.map((part) => { return part.type === 'tool-result'
+    content: message.content.map((part) => {
+      return part.type === 'tool-result'
         ? { ...part, output: { type: 'text' as const, value: ELIDED_TOOL_RESULT } }
-        : part },
-    ),
+        : part
+    }),
   }
 }

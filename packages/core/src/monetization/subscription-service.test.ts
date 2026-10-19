@@ -83,7 +83,9 @@ describe('SubscriptionService', () => {
   })
 
   it('takes either confirmed plan without waiting on its sibling', async () => {
-    owned = (productId) => { return productId === IAP_PRODUCT_IDS.yearly ? Promise.resolve(true) : never<boolean>() }
+    owned = (productId) => {
+      return productId === IAP_PRODUCT_IDS.yearly ? Promise.resolve(true) : never<boolean>()
+    }
     await expect(service().activeSubscription()).resolves.toBe('yearly')
   })
 
@@ -147,9 +149,11 @@ describe('SubscriptionService', () => {
 
   it('does not remember null when one lookup fails and the sibling is negative', async () => {
     seed('yearly', NOW)
-    owned = (productId) => { return productId === IAP_PRODUCT_IDS.yearly
+    owned = (productId) => {
+      return productId === IAP_PRODUCT_IDS.yearly
         ? Promise.reject(new Error('StoreKit unavailable'))
-        : Promise.resolve(false) }
+        : Promise.resolve(false)
+    }
     const subscription = service()
 
     const answer = subscription.activeSubscription()

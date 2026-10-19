@@ -112,8 +112,9 @@ class TestProgressPortImpl implements TestProgressPort {
   }
 
   #patch(id: number, change: Partial<Operation>): void {
-    this.#operations = this.#operations.map((operation) => { return operation.id === id ? { ...operation, ...change } : operation },
-    )
+    this.#operations = this.#operations.map((operation) => {
+      return operation.id === id ? { ...operation, ...change } : operation
+    })
     const started = this.#started.get(id)
     if (started !== undefined) {
       this.#started.set(id, { ...started, ...change })

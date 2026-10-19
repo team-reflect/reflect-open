@@ -43,7 +43,9 @@ class IpcConnection implements DatabaseConnection {
 
   streamQuery<R>(): AsyncIterableIterator<QueryResult<R>> {
     return {
-      next: () => { return Promise.reject(new Error('streaming is not supported over the IPC SQLite bridge')) },
+      next: () => {
+        return Promise.reject(new Error('streaming is not supported over the IPC SQLite bridge'))
+      },
       [Symbol.asyncIterator]() {
         return this
       },

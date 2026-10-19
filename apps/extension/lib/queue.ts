@@ -26,8 +26,10 @@ export const QUEUE_CAP = 50
 
 /** Oldest captures are delivered first. */
 export function sortQueue(entries: QueuedCapture[]): QueuedCapture[] {
-  return [...entries].sort(
-    (first, second) => { return first.queuedAt - second.queuedAt ||
-      first.wire.envelope.id.localeCompare(second.wire.envelope.id) },
-  )
+  return [...entries].sort((first, second) => {
+    return (
+      first.queuedAt - second.queuedAt ||
+      first.wire.envelope.id.localeCompare(second.wire.envelope.id)
+    )
+  })
 }

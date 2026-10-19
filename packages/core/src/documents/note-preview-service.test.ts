@@ -165,8 +165,9 @@ describe('previewWikiTarget', () => {
     await expect(failingResolution.previewWikiTarget('Alpha')).resolves.toBeNull()
 
     const failingRead = notePreviewOver({
-      noteLinkResolver: resolverWith(() => { return Promise.resolve({ kind: 'resolved', path: 'notes/alpha.md' }) },
-      ),
+      noteLinkResolver: resolverWith(() => {
+        return Promise.resolve({ kind: 'resolved', path: 'notes/alpha.md' })
+      }),
       noteDocuments: documentsWith(() => Promise.reject(new AppError('notFound', 'gone'))),
     })
     await expect(failingRead.previewWikiTarget('Alpha')).resolves.toBeNull()
@@ -191,11 +192,12 @@ describe('previewWikiTarget', () => {
 
   it("resolves the target note's images and embeds from its own folder", async () => {
     const notePreview = createNotePreviewService({
-      noteLinkResolver: resolverWith(() => { return Promise.resolve({
+      noteLinkResolver: resolverWith(() => {
+        return Promise.resolve({
           kind: 'resolved',
           path: 'Projects/Garden redesign.md',
-        }) },
-      ),
+        })
+      }),
       noteDocuments: documentsWith(() => Promise.resolve('![[garden-budget.png]]')),
       attachments: attachmentsOver(() => Promise.resolve([])),
       graphSession: openGraph(),

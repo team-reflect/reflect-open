@@ -154,9 +154,11 @@ class LifecycleServiceImpl implements AppLifecycleService {
   subscribeQuitRequested(listener: () => void): Unlisten {
     const { ipc, logger } = this.#deps
     return listenNow(
-      () => { return ipc.listen(QUIT_REQUESTED_EVENT, () => {
+      () => {
+        return ipc.listen(QUIT_REQUESTED_EVENT, () => {
           listener()
-        }) },
+        })
+      },
       (cause) => {
         logger.error(`${QUIT_REQUESTED_EVENT} listener failed:`, cause)
       },

@@ -76,10 +76,12 @@ export function useBacklinkSources(path: string): BacklinkSources {
     isFetchNextPageError,
   } = useInfiniteQuery({
     queryKey: queryKeys.index.backlinks(graph?.root, path),
-    queryFn: ({ pageParam }) => { return backlinks.getBacklinksWithContext(path, {
+    queryFn: ({ pageParam }) => {
+      return backlinks.getBacklinksWithContext(path, {
         cursor: pageParam,
         limit: BACKLINK_SOURCES_PER_PAGE,
-      }) },
+      })
+    },
     initialPageParam: null as BacklinkSourceCursor | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: graph !== null,

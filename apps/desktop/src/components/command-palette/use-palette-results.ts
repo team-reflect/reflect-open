@@ -61,11 +61,13 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
       weekStartDay: settings.weekStartDay,
       today,
     }),
-    queryFn: () => { return paletteSearch.suggestTitles(trimmed, {
+    queryFn: () => {
+      return paletteSearch.suggestTitles(trimmed, {
         today,
         dateFormat: settings.dateFormat,
         weekStartDay: settings.weekStartDay,
-      }) },
+      })
+    },
     enabled: searching && !parsed.filtered,
   })
   const useHybrid = hybrid && !parsed.filtered
@@ -88,16 +90,15 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   // An errored query is "settled" to TanStack but not an answer.
   const searchFailed = suggestionsError || hitsError
 
-  const sections = useMemo(
-    () => { return paletteSearch.sections({
-        query,
-        dataQuery: trimmed,
-        suggestions: suggestions ?? [],
-        hits: hits ?? [],
-        filtered: parsed.filtered,
-      }) },
-    [paletteSearch, query, trimmed, suggestions, hits, parsed.filtered],
-  )
+  const sections = useMemo(() => {
+    return paletteSearch.sections({
+      query,
+      dataQuery: trimmed,
+      suggestions: suggestions ?? [],
+      hits: hits ?? [],
+      filtered: parsed.filtered,
+    })
+  }, [paletteSearch, query, trimmed, suggestions, hits, parsed.filtered])
 
   return { sections, resultsSettled, searchFailed }
 }

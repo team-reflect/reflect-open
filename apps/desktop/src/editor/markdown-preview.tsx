@@ -88,7 +88,9 @@ export function MarkdownPreview({
   const navigates = interactive && onWikiLinkClick != null
 
   const onWikilinkClickStable = useCallback(
-    (payload: { target: string; event: MouseEvent | KeyboardEvent; mod: boolean }) => { return navigateRef.current?.({ target: payload.target, openInNewWindow: payload.mod }) },
+    (payload: { target: string; event: MouseEvent | KeyboardEvent; mod: boolean }) => {
+      return navigateRef.current?.({ target: payload.target, openInNewWindow: payload.mod })
+    },
     [],
   )
 

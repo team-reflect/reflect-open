@@ -38,22 +38,21 @@ export function useMaybeChatSession(): ChatContextValue | null {
   const session = useMaybeGraphServices()?.chat ?? null
   const store = session ?? NO_CHAT
   const state = useServiceState<ChatSessionState | null>(store, store.getState)
-  const value = useMemo(
-    (): ChatContextValue | null => { return session === null || state === null
-        ? null
-        : {
-            ...state,
-            selectModel: (selection) => session.selectModel(selection),
-            setDraft: (text) => session.setDraft(text),
-            attachImages: (files) => session.attachImages(files),
-            removeAttachment: (id) => session.removeAttachment(id),
-            send: (text) => session.send(text),
-            stop: () => session.stop(),
-            newChat: () => session.newChat(),
-            openConversation: (id) => session.openConversation(id),
-            deleteConversation: (id) => session.deleteConversation(id),
-          } },
-    [state, session],
-  )
+  const value = useMemo((): ChatContextValue | null => {
+    return session === null || state === null
+      ? null
+      : {
+          ...state,
+          selectModel: (selection) => session.selectModel(selection),
+          setDraft: (text) => session.setDraft(text),
+          attachImages: (files) => session.attachImages(files),
+          removeAttachment: (id) => session.removeAttachment(id),
+          send: (text) => session.send(text),
+          stop: () => session.stop(),
+          newChat: () => session.newChat(),
+          openConversation: (id) => session.openConversation(id),
+          deleteConversation: (id) => session.deleteConversation(id),
+        }
+  }, [state, session])
   return value
 }

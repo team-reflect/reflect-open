@@ -134,9 +134,11 @@ export function useTaskKeyboard({
         scrollToKey(key)
       }
       const mod = isModEvent(event)
-      const selectedTasks = (): OpenTask[] => { return [...selection.selected]
+      const selectedTasks = (): OpenTask[] => {
+        return [...selection.selected]
           .map((key) => tasksByKey.get(key))
-          .filter((task): task is OpenTask => task !== undefined) }
+          .filter((task): task is OpenTask => task !== undefined)
+      }
 
       if (inSearch) {
         if (event.key === 'Escape') {

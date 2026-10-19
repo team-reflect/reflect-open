@@ -341,7 +341,9 @@ export function NoteEditor({
       setSelection: (position) => innerRef.current?.setSelection(position),
       getSelectedText: () => innerRef.current?.getSelectedText() ?? '',
       openSelectionMenu: () => innerRef.current?.openSelectionMenu(),
-      startPendingReplacement: (options) => { return innerRef.current?.startPendingReplacement(options) ?? false },
+      startPendingReplacement: (options) => {
+        return innerRef.current?.startPendingReplacement(options) ?? false
+      },
       appendPendingReplacementText: (text) => innerRef.current?.appendPendingReplacementText(text),
       acceptPendingReplacement: (options) => innerRef.current?.acceptPendingReplacement(options),
       discardPendingReplacement: () => innerRef.current?.discardPendingReplacement(),
@@ -361,7 +363,9 @@ export function NoteEditor({
   )
 
   const handleWikilinkClick = useCallback(
-    (payload: { target: string; event: MouseEvent | KeyboardEvent; mod: boolean }) => { return onWikiLinkClickRef.current?.({ target: payload.target, openInNewWindow: payload.mod }) },
+    (payload: { target: string; event: MouseEvent | KeyboardEvent; mod: boolean }) => {
+      return onWikiLinkClickRef.current?.({ target: payload.target, openInNewWindow: payload.mod })
+    },
     [],
   )
   const handleTagClick = useCallback(
@@ -395,14 +399,15 @@ export function NoteEditor({
         }
         const openPath = resolveAssetOpenPathRef.current?.(src) ?? null
         const openImage = openAssetRef.current ?? null
-        setOpenLightboxImage(() => { return openPath !== null && openImage !== null
+        setOpenLightboxImage(() => {
+          return openPath !== null && openImage !== null
             ? () => {
                 void Promise.resolve(openImage(openPath)).catch((cause) => {
                   logger.error('open image failed:', errorMessage(cause))
                 })
               }
-            : null },
-        )
+            : null
+        })
         openLightbox({ type: 'image', src: displayUrl, alt }, element)
       })
     },

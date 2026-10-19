@@ -51,12 +51,13 @@ class AssetReferencesImpl implements AssetReferences {
     const basename = assetPath.split('/').at(-1) ?? assetPath
     const rows = await database.db
       .selectFrom('assets')
-      .where((eb) => { return eb.or([
+      .where((eb) => {
+        return eb.or([
           eb('assetPath', '=', assetPath),
           eb('assetPath', '=', basename),
           ...(owners.length > 0 ? [eb('assetPath', 'in', owners)] : []),
-        ]) },
-      )
+        ])
+      })
       .select('notePath')
       .distinct()
       .execute()

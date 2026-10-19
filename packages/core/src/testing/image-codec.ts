@@ -138,6 +138,8 @@ export function createTestImageCodec(options?: {
 }): TestImageCodecService {
   return new TestImageCodecServiceImpl(
     options?.size ??
-      ((file: Blob): TestImageSize | null => { return file.type.startsWith('image/') ? { width: 1, height: 1 } : null }),
+      ((file: Blob): TestImageSize | null => {
+        return file.type.startsWith('image/') ? { width: 1, height: 1 } : null
+      }),
   )
 }

@@ -85,8 +85,9 @@ describe('MobileGraphs', () => {
       .toHaveAttribute('aria-current', 'true')
 
     await userEvent.click(page.getByRole('button', { name: 'Work' }))
-    await vi.waitFor(() => { return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Work') },
-    )
+    await vi.waitFor(() => {
+      return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Work')
+    })
   })
 
   it('ignores a tap on the graph that is already open', async () => {
@@ -110,8 +111,9 @@ describe('MobileGraphs', () => {
     await userEvent.fill(page.getByLabelText('Name'), 'Journal')
     await userEvent.click(page.getByRole('button', { name: 'Create' }))
 
-    await vi.waitFor(() => { return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal') },
-    )
+    await vi.waitFor(() => {
+      return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal')
+    })
   })
 
   it('rejects a colliding name before it ever reaches the backend', async () => {

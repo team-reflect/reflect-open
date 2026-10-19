@@ -37,8 +37,10 @@ export function headingNamesSection(
   const keys = titles.map((title) => foldKey(title))
   return (
     keys.includes(foldKey(renderInlineText(heading.text))) ||
-    wikiLinks.some(
-      (link) => { return link.from >= heading.from && link.to <= heading.to && keys.includes(foldKey(link.target)) },
-    )
+    wikiLinks.some((link) => {
+      return (
+        link.from >= heading.from && link.to <= heading.to && keys.includes(foldKey(link.target))
+      )
+    })
   )
 }

@@ -58,9 +58,11 @@ function modelAnsweringObject(title: string, description: string): LanguageModel
 function modelThrowing(error: unknown): void {
   languageModelService.setModel(
     new MockLanguageModelV3({
-      doGenerate: () => { return Promise.try(() => {
+      doGenerate: () => {
+        return Promise.try(() => {
           throw error
-        }) },
+        })
+      },
     }),
   )
 }
@@ -213,12 +215,14 @@ describe('PageDescriberService', () => {
   it('a filtered answer with no text becomes DescriptionRejectedError', async () => {
     languageModelService.setModel(
       new MockLanguageModelV3({
-        doGenerate: () => { return Promise.resolve({
+        doGenerate: () => {
+          return Promise.resolve({
             content: [],
             finishReason: { unified: 'content-filter' as const, raw: undefined },
             usage: USAGE,
             warnings: [],
-          }) },
+          })
+        },
       }),
     )
     const failure = await request().catch((cause: unknown) => cause)

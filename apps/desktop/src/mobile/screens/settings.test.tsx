@@ -23,7 +23,9 @@ import { MobileSettings } from './settings.tsx'
 
 // The prompt editor's state and save wiring render through this open-state shell.
 vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ open, children }: { open?: boolean; children?: import('react').ReactNode }) => { return open ? <div data-testid="drawer">{children}</div> : null },
+  Drawer: ({ open, children }: { open?: boolean; children?: import('react').ReactNode }) => {
+    return open ? <div data-testid="drawer">{children}</div> : null
+  },
   DrawerContent: ({ children }: { children?: import('react').ReactNode }) => <div>{children}</div>,
   DrawerBody: ({ children }: { children?: import('react').ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children?: import('react').ReactNode }) => <h2>{children}</h2>,
@@ -130,8 +132,9 @@ describe('MobileSettings', () => {
 
     await user.click(page.getByRole('button', { name: 'Privacy Policy' }))
 
-    await vi.waitFor(() => { return expect(view.appServices.opener.openedUrls()).toEqual(['https://reflect.app/privacy']) },
-    )
+    await vi.waitFor(() => {
+      return expect(view.appServices.opener.openedUrls()).toEqual(['https://reflect.app/privacy'])
+    })
   })
 
   it('writes appearance choices to the settings document', async () => {
@@ -298,14 +301,15 @@ describe('MobileSettings', () => {
     await user.fill(sheet.getByRole('textbox', { name: 'Prompt' }), 'Shorten: {{selectedText}}')
     await user.click(sheet.getByRole('button', { name: 'Add prompt' }))
 
-    await vi.waitFor(() => { return expect(view.app.settings.get().aiPrompts).toEqual([
+    await vi.waitFor(() => {
+      return expect(view.app.settings.get().aiPrompts).toEqual([
         expect.objectContaining({
           label: 'Shorten',
           body: 'Shorten: {{selectedText}}',
           mode: 'replace',
         }),
-      ]) },
-    )
+      ])
+    })
   })
 
   it('edits a saved AI prompt through its row', async () => {
@@ -323,10 +327,11 @@ describe('MobileSettings', () => {
     await user.fill(sheet.getByRole('textbox', { name: 'Label' }), 'Translate to German')
     await user.click(sheet.getByRole('button', { name: 'Save' }))
 
-    await vi.waitFor(() => { return expect(view.app.settings.get().aiPrompts).toEqual([
+    await vi.waitFor(() => {
+      return expect(view.app.settings.get().aiPrompts).toEqual([
         { ...saved, label: 'Translate to German' },
-      ]) },
-    )
+      ])
+    })
   })
 
   it('removes a saved AI prompt from the edit sheet', async () => {

@@ -53,10 +53,12 @@ describe('definePluginCommand', () => {
 
   it('coerces a rejection into an AppError like call()', async () => {
     const ipc = serviceOver({
-      invoke: () => { return Promise.try(() => {
+      invoke: () => {
+        return Promise.try(() => {
           const rejection: unknown = 'microphone access denied'
           throw rejection
-        }) },
+        })
+      },
       listen: () => Promise.resolve(() => {}),
     })
 

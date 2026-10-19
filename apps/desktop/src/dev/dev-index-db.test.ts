@@ -110,7 +110,8 @@ interface IndexServices {
 function connectIndex(db: DevIndexDb, captured: CapturedQuery[] = []): IndexServices {
   const ipc = createIpcBridgeService({
     transport: {
-      invoke: (command, args) => { return Promise.try(() => {
+      invoke: (command, args) => {
+        return Promise.try(() => {
           if (command !== 'db_query') {
             throw new Error(`Unexpected command: ${command}`)
           }
@@ -118,7 +119,8 @@ function connectIndex(db: DevIndexDb, captured: CapturedQuery[] = []): IndexServ
           const params = (args['params'] as readonly unknown[]) ?? []
           captured.push({ sql, params })
           return db.query(sql, params)
-        }) },
+        })
+      },
       listen: () => Promise.resolve(() => {}),
     },
     logger: createTestLoggerService(),

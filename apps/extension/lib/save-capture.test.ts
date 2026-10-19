@@ -73,14 +73,15 @@ describe('saveCapture', () => {
   })
 
   it('reports rejected by matching this capture id, not aggregate counts', async () => {
-    const outcome = await saveCapture(captureInput(), () => { return Promise.resolve({
+    const outcome = await saveCapture(captureInput(), () => {
+      return Promise.resolve({
         sent: 0,
         failed: 1,
         rejectedIds: [ID],
         held: 0,
         holdReason: null,
-      }) },
-    )
+      })
+    })
 
     expect(outcome).toEqual({ fate: 'rejected' })
   })
@@ -88,13 +89,14 @@ describe('saveCapture', () => {
 
 it('serializes concurrent admission and preserves every accepted capture at capacity', async () => {
   const results = await Promise.allSettled(
-    Array.from({ length: 51 }, (_, index) => { return enqueueCapture(
+    Array.from({ length: 51 }, (_, index) => {
+      return enqueueCapture(
         buildWireMessage({
           ...captureInput(),
           id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
         }),
-      ) },
-    ),
+      )
+    }),
   )
   expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(50)
   expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1)

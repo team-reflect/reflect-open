@@ -69,7 +69,9 @@ async function setup(provider: AiProviderConfig = OPENAI) {
       <MobileAudioMemoProvider graph={GRAPH}>{children}</MobileAudioMemoProvider>
     ),
   })
-  const count = (method: string): number => { return audioRecorder.calls().filter((call) => call.method === method).length }
+  const count = (method: string): number => {
+    return audioRecorder.calls().filter((call) => call.method === method).length
+  }
   return { ...hook, audioRecorder, assetStore, count }
 }
 

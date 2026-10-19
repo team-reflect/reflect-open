@@ -56,9 +56,9 @@ export function matchContactForTitle(
   if (exact.length === 0) {
     return null
   }
-  const detailed = [...exact].sort(
-    (left, right) => { return right.emails.length + right.phones.length - (left.emails.length + left.phones.length) },
-  )
+  const detailed = [...exact].sort((left, right) => {
+    return right.emails.length + right.phones.length - (left.emails.length + left.phones.length)
+  })
   return detailed[0] ?? null
 }
 

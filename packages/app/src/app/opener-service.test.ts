@@ -34,10 +34,11 @@ describe('createOpenerService', () => {
     })
 
     expect(() => opener.openUrlSync('https://example.com')).not.toThrow()
-    await vi.waitFor(() => { return expect(logger.getErrors()).toEqual([
+    await vi.waitFor(() => {
+      return expect(logger.getErrors()).toEqual([
         { message: 'failed to open https://example.com:', cause: 'no handler' },
-      ]) },
-    )
+      ])
+    })
   })
 
   it('opens the macOS privacy panes', () => {

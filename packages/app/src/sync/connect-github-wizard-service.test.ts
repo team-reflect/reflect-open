@@ -329,8 +329,9 @@ describe('createConnectGithubWizardService', () => {
   })
 
   it('captures a failed connect as a display message', async () => {
-    backup.onConnectExistingRepo(() => { return Promise.reject(new AppError('auth', 'Connect GitHub first (no credential stored)')) },
-    )
+    backup.onConnectExistingRepo(() => {
+      return Promise.reject(new AppError('auth', 'Connect GitHub first (no credential stored)'))
+    })
     const wizard = createWizard()
     await signIn(wizard)
 

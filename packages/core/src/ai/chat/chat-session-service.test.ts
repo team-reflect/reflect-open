@@ -187,12 +187,14 @@ describe('ChatSession persistence', () => {
     let loads = 0
     const { session } = await setup({
       conversations: [stored({ updatedMs: NOW - CHAT_IDLE_CUTOFF_MS - 1 })],
-      history: (history) => { return overrideHistory(history, {
+      history: (history) => {
+        return overrideHistory(history, {
           loadConversation: async (id) => {
             loads += 1
             return await history.loadConversation(id)
           },
-        }) },
+        })
+      },
     })
     session.attach()
     await flush()
@@ -404,7 +406,9 @@ describe('ChatSession persistence', () => {
     // streamed into the on-screen conversation.
     const pendingLoad = Promise.withResolvers<ChatTurn[]>()
     const { session } = await setup({
-      history: (history) => { return overrideHistory(history, { loadConversation: () => pendingLoad.promise }) },
+      history: (history) => {
+        return overrideHistory(history, { loadConversation: () => pendingLoad.promise })
+      },
     })
     const homeConversation = session.getState().activeConversationId
 
@@ -464,12 +468,14 @@ describe('ChatSession persistence', () => {
     // conversation's save chain settles, or the upsert could resurrect it.
     const pendingSave = Promise.withResolvers<void>()
     const { session, chatHistory } = await setup({
-      history: (history) => { return overrideHistory(history, {
+      history: (history) => {
+        return overrideHistory(history, {
           saveTurn: async (input) => {
             await pendingSave.promise
             await history.saveTurn(input)
           },
-        }) },
+        })
+      },
     })
 
     await session.send('hello')
@@ -486,9 +492,11 @@ describe('ChatSession persistence', () => {
 
   it('logs a failed save and keeps the conversation in memory', async () => {
     const { session, logger } = await setup({
-      history: (history) => { return overrideHistory(history, {
+      history: (history) => {
+        return overrideHistory(history, {
           saveTurn: () => Promise.reject(new Error('disk full')),
-        }) },
+        })
+      },
     })
 
     await session.send('hello')

@@ -66,8 +66,9 @@ describe('Toaster', () => {
     expect(getComputedStyle(viewport()).bottom).toBe('16px')
 
     await vi.waitFor(() => {
-      const bottoms = toastElements().map((element) => { return Math.round(element.getBoundingClientRect().bottom) },
-      )
+      const bottoms = toastElements().map((element) => {
+        return Math.round(element.getBoundingClientRect().bottom)
+      })
       expect(bottoms).toHaveLength(SAMPLE_COUNT)
       expect(bottoms.at(0)).toBe(window.innerHeight - 16)
       expectAscending([...bottoms].reverse())

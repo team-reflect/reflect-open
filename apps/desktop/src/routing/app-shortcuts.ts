@@ -113,7 +113,9 @@ export function useAppShortcuts(): CommandContext {
       // Resolve through the focused stream day so a note-scoped command targets
       // the same day the context sidebar shows (see `effectiveDailyDate`); off
       // the daily views it falls back to the routed note.
-      notePath: () => { return focusedNotePathForRoute(routeRef.current, todayIso(), focusedDailyDateRef.current) },
+      notePath: () => {
+        return focusedNotePathForRoute(routeRef.current, todayIso(), focusedDailyDateRef.current)
+      },
       togglePin: async () => {
         const path = focusedNotePathForRoute(
           routeRef.current,

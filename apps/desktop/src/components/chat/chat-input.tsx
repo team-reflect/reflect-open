@@ -61,11 +61,13 @@ export function ChatInput(): ReactElement {
     () => groupModelOptions(modelOptions, providers),
     [modelOptions, providers],
   )
-  const activeIndex = modelOptions.findIndex(
-    (option) => { return activeModel !== null &&
+  const activeIndex = modelOptions.findIndex((option) => {
+    return (
+      activeModel !== null &&
       option.configId === activeModel.id &&
-      option.modelId === activeModel.model },
-  )
+      option.modelId === activeModel.model
+    )
+  })
 
   // The draft lives in the provider (it must survive the screen unmounting —
   // on mobile every tab switch does that), and a send that goes through

@@ -24,11 +24,13 @@ function setup(options?: {
     stats === undefined
       ? files
       : overrideNoteFileService(files, {
-          vaultScanStats: () => { return Promise.resolve({
+          vaultScanStats: () => {
+            return Promise.resolve({
               notes: stats.notes ?? 0,
               attachments: stats.attachments ?? 0,
               skipped: stats.skipped ?? 0,
-            }) },
+            })
+          },
         })
   const id = createTestIdService()
   return { indexStore, files, ctx: { indexStore, noteFile, id }, id }

@@ -47,9 +47,9 @@ export function displayEvents(events: CalendarEvent[]): CalendarEvent[] {
       seen.add(key)
       return true
     })
-    .sort(
-      (first, second) => { return first.startsAt - second.startsAt || first.title.localeCompare(second.title) },
-    )
+    .sort((first, second) => {
+      return first.startsAt - second.startsAt || first.title.localeCompare(second.title)
+    })
 }
 
 /** Is `attendee` someone to suggest a person note for? */

@@ -178,8 +178,13 @@ describe('BacklinksPanel', () => {
 
     await view.getByRole('link', { name: 'plan' }).click()
 
-    await vi.waitFor(() => { return expect(resolveMarkdownHref).toHaveBeenCalledWith('projects/TASKS.md', './roadmap/plan.md', 1) },
-    )
+    await vi.waitFor(() => {
+      return expect(resolveMarkdownHref).toHaveBeenCalledWith(
+        'projects/TASKS.md',
+        './roadmap/plan.md',
+        1,
+      )
+    })
     await expect
       .element(view.getByTestId('route'))
       .toMatchTextContent('{"kind":"note","path":"projects/roadmap/plan.md"}')
@@ -247,13 +252,14 @@ describe('BacklinksPanel', () => {
 
     await view.getByText('Meeting Notes').click({ modifiers: ['ControlOrMeta'] })
 
-    await vi.waitFor(() => { return expect(openNoteWindow).toHaveBeenCalledWith(
+    await vi.waitFor(() => {
+      return expect(openNoteWindow).toHaveBeenCalledWith(
         deepLinkForRoute({
           kind: 'note',
           path: 'notes/meeting.md',
         }),
-      ) },
-    )
+      )
+    })
     await expect.element(view.getByTestId('route')).toMatchTextContent('"today"')
     await view.unmount()
   })

@@ -201,13 +201,15 @@ export function rankWikiSuggestions(
     ...aliases.map((row) => toScored(row, row.alias, matchRank(key, row.aliasKey) || 1)),
   ]
 
-  scored.sort(
-    (a, b) => { return a.rank - b.rank ||
+  scored.sort((a, b) => {
+    return (
+      a.rank - b.rank ||
       b.usage - a.usage ||
       Number(a.isAlias) - Number(b.isAlias) ||
       b.mtime - a.mtime ||
-      a.suggestion.title.localeCompare(b.suggestion.title) },
-  )
+      a.suggestion.title.localeCompare(b.suggestion.title)
+    )
+  })
 
   const seen = new Set<string>()
   const result: WikiSuggestion[] = []
@@ -273,11 +275,13 @@ export function mergeDateSuggestions(
   })
 
   const rest = ranked.filter((suggestion) => !reused.has(suggestion))
-  const exactIndex = rest.findIndex(
-    (suggestion) => { return foldKey(suggestion.target) === options.key ||
+  const exactIndex = rest.findIndex((suggestion) => {
+    return (
+      foldKey(suggestion.target) === options.key ||
       foldKey(suggestion.title) === options.key ||
-      (suggestion.alias !== null && foldKey(suggestion.alias) === options.key) },
-  )
+      (suggestion.alias !== null && foldKey(suggestion.alias) === options.key)
+    )
+  })
   const exact = rest[exactIndex]
   const ordered = exact
     ? [exact, ...dateRows, ...rest.filter((_, index) => index !== exactIndex)]

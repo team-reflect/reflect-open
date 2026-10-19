@@ -219,11 +219,11 @@ describe('BackupSettingsField', () => {
   it('ignores an older open-repo failure after a newer retry succeeds', async () => {
     let rejectFirstOpen: (reason?: unknown) => void = () => {}
     openUrl
-      .mockImplementationOnce(
-        () => { return new Promise<void>((_resolve, reject) => {
-            rejectFirstOpen = reject
-          }) },
-      )
+      .mockImplementationOnce(() => {
+        return new Promise<void>((_resolve, reject) => {
+          rejectFirstOpen = reject
+        })
+      })
       .mockResolvedValueOnce()
     await renderSection({
       phase: 'connected',

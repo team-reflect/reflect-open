@@ -127,14 +127,16 @@ function setup(options?: SetupOptions) {
     /**
      * The gist requests sent with `method`, each with its JSON body.
      */
-    sent: (method: string) => { return http
+    sent: (method: string) => {
+      return http
         .requests()
         .filter((request) => request.method === method)
         .map((request) => ({
           url: request.url,
           token: request.headers.get('Authorization'),
           body: request.body === null ? null : (JSON.parse(request.body) as unknown),
-        })) },
+        }))
+    },
   }
 }
 

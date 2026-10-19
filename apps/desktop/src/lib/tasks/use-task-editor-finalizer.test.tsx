@@ -12,7 +12,8 @@ async function setup(initial = 'milk') {
   const onCheckboxToggle = vi.fn()
   const onConvertToBullet = vi.fn()
   const onFlush = vi.fn()
-  const { result, unmount } = await renderHook(() => { return useTaskEditorFinalizer({
+  const { result, unmount } = await renderHook(() => {
+    return useTaskEditorFinalizer({
       initial,
       onCommit,
       onContinue,
@@ -23,8 +24,8 @@ async function setup(initial = 'milk') {
       onCheckboxToggle,
       onConvertToBullet,
       onFlush,
-    }) },
-  )
+    })
+  })
   const api = () => result.current.apiRef.current
   const type = (markdown: string) => result.current.onChange(markdown)
   return {
@@ -202,7 +203,8 @@ describe('useTaskEditorFinalizer', () => {
     const onFlushA = vi.fn()
     const onFlushB = vi.fn()
     const { result, rerender, unmount } = await renderHook(
-      (props: { onFlush: (content: string) => void } = { onFlush: onFlushA }) => { return useTaskEditorFinalizer({
+      (props: { onFlush: (content: string) => void } = { onFlush: onFlushA }) => {
+        return useTaskEditorFinalizer({
           initial: 'milk',
           onCommit: vi.fn(),
           onContinue: vi.fn(),
@@ -213,7 +215,8 @@ describe('useTaskEditorFinalizer', () => {
           onCheckboxToggle: vi.fn(),
           onConvertToBullet: vi.fn(),
           onFlush: props.onFlush,
-        }) },
+        })
+      },
       { initialProps: { onFlush: onFlushA } },
     )
     result.current.onChange('oat milk')

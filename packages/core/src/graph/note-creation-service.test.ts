@@ -71,7 +71,9 @@ function setup({ indexed = [], files = {}, placeholders = [], readErrors = [] }:
     /**
      * How many `note_claims` lookups ran.
      */
-    claimLookups: () => { return database.getQueries().filter((query) => query.sql.includes('note_claims')).length },
+    claimLookups: () => {
+      return database.getQueries().filter((query) => query.sql.includes('note_claims')).length
+    },
   }
 }
 
@@ -328,11 +330,12 @@ describe('resolveOrCreateNoteWithTitle', () => {
 
   it('re-resolves after the disk scan before creating', async () => {
     const graph = setup()
-    graph.listNotes.mockImplementationOnce(() => { return Promise.try(() => {
+    graph.listNotes.mockImplementationOnce(() => {
+      return Promise.try(() => {
         seedNotes(graph.database, [{ path: 'notes/synced.md', markdown: '# Synced\n' }])
         return []
-      }) },
-    )
+      })
+    })
 
     await expect(graph.creation.resolveOrCreateNoteWithTitle('Synced', 7)).resolves.toEqual({
       kind: 'resolved',

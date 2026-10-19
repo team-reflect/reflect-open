@@ -80,8 +80,9 @@ export function MobileOnboardingScreen(): ReactElement {
               busy={action.pending}
               pendingChoice={pendingChoice}
               onOpen={(root) => runChoice(root, () => completeOnboarding('icloud', root))}
-              onCreate={(root) => { return runChoice('icloud-create', () => completeOnboarding('icloud', root)) }
-              }
+              onCreate={(root) => {
+                return runChoice('icloud-create', () => completeOnboarding('icloud', root))
+              }}
             />
           ) : (
             <IcloudUnavailableSection />

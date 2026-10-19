@@ -220,10 +220,11 @@ describe('AllNotesScreen', () => {
       .getByRole('button', { name: 'Health Stacked' })
       .click({ modifiers: ['ControlOrMeta'] })
 
-    await vi.waitFor(() => { return expect(openedNoteWindows(view)).toContain(
+    await vi.waitFor(() => {
+      return expect(openedNoteWindows(view)).toContain(
         deepLinkForRoute({ kind: 'note', path: 'notes/health.md' }),
-      ) },
-    )
+      )
+    })
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: null })
     expect(view.getByRole('button', { name: /Trash \(/ }).query()).toBeNull()
     await view.unmount()
@@ -235,10 +236,11 @@ describe('AllNotesScreen', () => {
 
     await subject.dblClick({ modifiers: ['ControlOrMeta'] })
 
-    await vi.waitFor(() => { return expect(openedNoteWindows(view)).toContain(
+    await vi.waitFor(() => {
+      return expect(openedNoteWindows(view)).toContain(
         deepLinkForRoute({ kind: 'note', path: 'notes/health.md' }),
-      ) },
-    )
+      )
+    })
     expect(openedNoteWindows(view)).toHaveLength(1)
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: null })
     await view.unmount()
@@ -457,10 +459,11 @@ describe('AllNotesScreen — selection and bulk trash', () => {
 
     await userEvent.keyboard('{ControlOrMeta>}{Enter}{/ControlOrMeta}')
 
-    await vi.waitFor(() => { return expect(openedNoteWindows(view)).toContain(
+    await vi.waitFor(() => {
+      return expect(openedNoteWindows(view)).toContain(
         deepLinkForRoute({ kind: 'note', path: 'notes/health.md' }),
-      ) },
-    )
+      )
+    })
     expect(openedNoteWindows(view)).toHaveLength(1)
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: null })
     await view.unmount()
@@ -560,12 +563,13 @@ describe('AllNotesScreen — selection and bulk trash', () => {
 
     // The confirm closes either way; the reason lands in the operations toast.
     await expectLocatorToHaveCount(page.getByText('Trash 1 note?'), 0)
-    await vi.waitFor(() => { return expect(
+    await vi.waitFor(() => {
+      return expect(
         view.app.progress
           .getAll()
           .map((operation) => `${operation.status}:${operation.message ?? ''}`),
-      ).toContain('failed:disk on fire') },
-    )
+      ).toContain('failed:disk on fire')
+    })
     // The note that failed to trash is left in the list and stays selected, so
     // the bulk action is still available for an immediate retry (no re-select).
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()

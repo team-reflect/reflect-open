@@ -27,8 +27,9 @@ export function pickContactForEmail(
   if (wanted === '') {
     return null
   }
-  const owners = candidates.filter((candidate) => { return candidate.emails.some((candidateEmail) => normalizeEmail(candidateEmail) === wanted) },
-  )
+  const owners = candidates.filter((candidate) => {
+    return candidate.emails.some((candidateEmail) => normalizeEmail(candidateEmail) === wanted)
+  })
   if (owners.length === 0) {
     return null
   }

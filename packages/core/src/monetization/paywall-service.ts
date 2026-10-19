@@ -117,7 +117,9 @@ class PaywallServiceImpl implements PaywallService {
     }
   }
 
-  readonly requested = (): boolean => { return this.#deps.storage.session.get(PAYWALL_REQUESTED_STORAGE_KEY) === 'true' }
+  readonly requested = (): boolean => {
+    return this.#deps.storage.session.get(PAYWALL_REQUESTED_STORAGE_KEY) === 'true'
+  }
 
   readonly setRequested = (next: boolean): void => {
     this.#deps.storage.session.set(PAYWALL_REQUESTED_STORAGE_KEY, next ? 'true' : 'false')

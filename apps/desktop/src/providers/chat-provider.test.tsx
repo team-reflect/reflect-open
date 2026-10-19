@@ -134,8 +134,9 @@ describe('useChatSession', () => {
 
     sessionRef.current?.selectModel({ configId: 'm1', modelId: 'gpt-5.5' })
 
-    await vi.waitFor(() => { return expect(sessionRef.current?.activeModel).toEqual({ ...MODEL, model: 'gpt-5.5' }) },
-    )
+    await vi.waitFor(() => {
+      return expect(sessionRef.current?.activeModel).toEqual({ ...MODEL, model: 'gpt-5.5' })
+    })
     expect(app.settings.get().chatModelSelection).toEqual({ configId: 'm1', modelId: 'gpt-5.5' })
   })
 

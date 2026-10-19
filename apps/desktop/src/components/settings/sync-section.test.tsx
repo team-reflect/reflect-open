@@ -63,8 +63,9 @@ async function renderSection(): Promise<void> {
     backup,
     platform: createTestPlatformService(platform),
   })
-  vi.spyOn(app.indexQuery, 'getDuplicateNoteIds').mockImplementation(() => { return Promise.resolve(duplicateIds) },
-  )
+  vi.spyOn(app.indexQuery, 'getDuplicateNoteIds').mockImplementation(() => {
+    return Promise.resolve(duplicateIds)
+  })
   openRecent = vi
     .spyOn(app.graphSession, 'openRecent')
     .mockImplementation(() => Promise.resolve(reopens))

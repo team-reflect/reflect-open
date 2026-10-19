@@ -36,6 +36,7 @@ it('tracks status changes while mounted', async () => {
   await vi.waitFor(() => expect(view.result.current).toEqual({ status: 'loading' }))
 
   runtime.setStatus({ status: 'ready', model: 'all-MiniLM-L6-v2' })
-  await vi.waitFor(() => { return expect(view.result.current).toEqual({ status: 'ready', model: 'all-MiniLM-L6-v2' }) },
-  )
+  await vi.waitFor(() => {
+    return expect(view.result.current).toEqual({ status: 'ready', model: 'all-MiniLM-L6-v2' })
+  })
 })

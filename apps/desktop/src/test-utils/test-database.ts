@@ -17,7 +17,8 @@ export function createWasmTestDatabaseService(): TestDatabaseService {
   let closed = false
   const queries: TestDatabaseQuery[] = []
 
-  const runQuery = (sql: string, params: readonly unknown[]): Promise<unknown> => { return Promise.try(() => {
+  const runQuery = (sql: string, params: readonly unknown[]): Promise<unknown> => {
+    return Promise.try(() => {
       queries.push({ sql, params: [...params] })
       try {
         if (closed) {
@@ -27,7 +28,8 @@ export function createWasmTestDatabaseService(): TestDatabaseService {
       } catch (error) {
         throw toAppError(error)
       }
-    }) }
+    })
+  }
 
   return {
     db: createDb(runQuery),

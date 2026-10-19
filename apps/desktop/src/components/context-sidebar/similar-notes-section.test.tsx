@@ -156,13 +156,14 @@ describe('SimilarNotesSection', () => {
 
     await view.getByRole('button', { name: 'Gardening' }).click({ modifiers: ['ControlOrMeta'] })
 
-    await vi.waitFor(() => { return expect(openNoteWindow).toHaveBeenCalledWith(
+    await vi.waitFor(() => {
+      return expect(openNoteWindow).toHaveBeenCalledWith(
         deepLinkForRoute({
           kind: 'note',
           path: 'notes/gardening.md',
         }),
-      ) },
-    )
+      )
+    })
     await expect.element(view.getByTestId('route')).toMatchTextContent('"kind":"today"')
   })
 })

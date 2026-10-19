@@ -24,21 +24,23 @@ function Links({ scopeKey }: { readonly scopeKey: string | undefined }): ReactEl
     <>
       <button
         type="button"
-        onClick={(event) => { return openNoteLink({
+        onClick={(event) => {
+          return openNoteLink({
             target: { kind: 'note', path: 'notes/alpha.md' },
             openInNewWindow: isModEvent(event),
-          }) }
-        }
+          })
+        }}
       >
         Alpha
       </button>
       <button
         type="button"
-        onClick={(event) => { return openNoteLink({
+        onClick={(event) => {
+          return openNoteLink({
             target: { kind: 'note', path: 'notes/bravo.md' },
             openInNewWindow: isModEvent(event),
-          }) }
-        }
+          })
+        }}
       >
         Bravo
       </button>
@@ -152,11 +154,11 @@ describe('useNoteLinkNavigation', () => {
   it('does not let an older rejected open override a newer note-link intent', async () => {
     let rejectOpen: (cause: Error) => void = () => {}
     openNoteWindow
-      .mockImplementationOnce(
-        () => { return new Promise((_resolve, reject) => {
-            rejectOpen = reject
-          }) },
-      )
+      .mockImplementationOnce(() => {
+        return new Promise((_resolve, reject) => {
+          rejectOpen = reject
+        })
+      })
       .mockResolvedValueOnce(true)
     const view = await mount(<Harness />)
 

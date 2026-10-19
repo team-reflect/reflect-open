@@ -205,8 +205,9 @@ class NoteActionsServiceImpl implements NoteActionsService {
       return NO_GRAPH
     }
     const { generation } = session
-    return await this.#dedupe(this.#pendingPins, path, generation, () => { return this.#updatePin(path, generation, 'toggle') },
-    )
+    return await this.#dedupe(this.#pendingPins, path, generation, () => {
+      return this.#updatePin(path, generation, 'toggle')
+    })
   }
 
   async unpin(path: string): Promise<NoteActionOutcome<NotePinResult>> {
@@ -215,8 +216,9 @@ class NoteActionsServiceImpl implements NoteActionsService {
       return NO_GRAPH
     }
     const { generation } = session
-    return await this.#dedupe(this.#pendingPins, path, generation, () => { return this.#updatePin(path, generation, 'unpin') },
-    )
+    return await this.#dedupe(this.#pendingPins, path, generation, () => {
+      return this.#updatePin(path, generation, 'unpin')
+    })
   }
 
   async reorderPinned(
@@ -248,8 +250,9 @@ class NoteActionsServiceImpl implements NoteActionsService {
       return NO_GRAPH
     }
     const { generation } = session
-    return await this.#dedupe(this.#pendingPrivacy, path, generation, () => { return this.#togglePrivate(path, generation) },
-    )
+    return await this.#dedupe(this.#pendingPrivacy, path, generation, () => {
+      return this.#togglePrivate(path, generation)
+    })
   }
 
   canTrash(path: string): boolean {

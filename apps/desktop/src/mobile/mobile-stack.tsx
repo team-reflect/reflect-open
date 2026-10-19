@@ -275,7 +275,9 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     if (!node) {
       return
     }
-    const isStackLayer = (target: EventTarget | null): boolean => { return target instanceof HTMLElement && target.classList.contains('mobile-stack-layer') }
+    const isStackLayer = (target: EventTarget | null): boolean => {
+      return target instanceof HTMLElement && target.classList.contains('mobile-stack-layer')
+    }
     const onAnimationEnd = (event: Event): void => {
       if (isStackLayer(event.target)) {
         finishTransition()

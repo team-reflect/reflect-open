@@ -161,12 +161,11 @@ export function TasksScreen(): ReactElement {
   // The tasks behind the current selection's keys, in selection order — what the
   // toolbar actions (schedule, convert) act on. A row whose key no longer
   // resolves (pruned by a reindex) is dropped rather than acted on.
-  const selectedTasks = useCallback(
-    (): OpenTask[] => { return [...selection.selected]
-        .map((key) => tasksByKey.get(key))
-        .filter((task): task is OpenTask => task !== undefined) },
-    [selection, tasksByKey],
-  )
+  const selectedTasks = useCallback((): OpenTask[] => {
+    return [...selection.selected]
+      .map((key) => tasksByKey.get(key))
+      .filter((task): task is OpenTask => task !== undefined)
+  }, [selection, tasksByKey])
   const onSelectionCheckboxToggle = useCallback(
     (task: OpenTask) => {
       const tasks = selectedTasks()
@@ -207,10 +206,12 @@ export function TasksScreen(): ReactElement {
     }
   }, [actions, selection, selectedTasks])
   const openNote = useCallback(
-    (path: string, event?: ModClickEvent) => { return navigateNoteLink({
+    (path: string, event?: ModClickEvent) => {
+      return navigateNoteLink({
         target: routeForPath(path),
         openInNewWindow: event !== undefined && isModEvent(event),
-      }) },
+      })
+    },
     [navigateNoteLink],
   )
   useTaskKeyboard({

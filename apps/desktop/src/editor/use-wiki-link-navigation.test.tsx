@@ -186,8 +186,11 @@ describe('useWikiLinkNavigation', () => {
 
     lastHandlerRef.current?.({ target: '2026-06-09', openInNewWindow: false })
 
-    await vi.waitFor(() => { return expect(operations.snapshot()).toContainEqual(expect.objectContaining({ status: 'failed' })) },
-    )
+    await vi.waitFor(() => {
+      return expect(operations.snapshot()).toContainEqual(
+        expect.objectContaining({ status: 'failed' }),
+      )
+    })
     expect(currentRoute(view)).toContain('"today"')
     expect(resolveOrCreateNoteWithTitle).not.toHaveBeenCalled()
   })
@@ -201,13 +204,14 @@ describe('useWikiLinkNavigation', () => {
 
     lastHandlerRef.current?.({ target: '2026-06-09', openInNewWindow: false })
 
-    await vi.waitFor(() => { return expect(operations.snapshot()).toContainEqual(
+    await vi.waitFor(() => {
+      return expect(operations.snapshot()).toContainEqual(
         expect.objectContaining({
           status: 'failed',
           message: expect.stringContaining('currently unavailable') as string,
         }),
-      ) },
-    )
+      )
+    })
     expect(currentRoute(view)).toContain('"today"')
   })
 
@@ -270,8 +274,9 @@ describe('useWikiLinkNavigation', () => {
     })
     const view = await renderHost()
     lastHandlerRef.current?.({ target: 'Target', openInNewWindow: true })
-    await vi.waitFor(() => { return expect(openNoteWindow).toHaveBeenCalledWith('reflect://note/notes%2Ftarget.md') },
-    )
+    await vi.waitFor(() => {
+      return expect(openNoteWindow).toHaveBeenCalledWith('reflect://note/notes%2Ftarget.md')
+    })
     expect(currentRoute(view)).toContain('"today"') // this window stays put
   })
 
@@ -282,8 +287,9 @@ describe('useWikiLinkNavigation', () => {
     })
     const view = await renderHost({ graph: { generation: 7 } })
     lastHandlerRef.current?.({ target: 'Brand New', openInNewWindow: true })
-    await vi.waitFor(() => { return expect(openNoteWindow).toHaveBeenCalledWith('reflect://note/notes%2Fcreated.md') },
-    )
+    await vi.waitFor(() => {
+      return expect(openNoteWindow).toHaveBeenCalledWith('reflect://note/notes%2Fcreated.md')
+    })
     expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Brand New', 7)
     expect(currentRoute(view)).toContain('"today"')
   })
@@ -314,13 +320,14 @@ describe('useWikiLinkNavigation', () => {
 
     lastHandlerRef.current?.({ target: 'Business ideas', openInNewWindow: false })
 
-    await vi.waitFor(() => { return expect(operations.snapshot()).toContainEqual(
+    await vi.waitFor(() => {
+      return expect(operations.snapshot()).toContainEqual(
         expect.objectContaining({
           status: 'failed',
           message: expect.stringContaining('currently unavailable') as string,
         }),
-      ) },
-    )
+      )
+    })
     expect(currentRoute(view)).toContain('"today"')
     expect(resolveWikiTarget).not.toHaveBeenCalled()
   })
@@ -332,11 +339,12 @@ describe('useWikiLinkNavigation', () => {
 
     lastHandlerRef.current?.({ target: 'Business ideas', openInNewWindow: false })
 
-    await vi.waitFor(() => { return expect(operations.findByLabel('Opening link')).toMatchObject({
+    await vi.waitFor(() => {
+      return expect(operations.findByLabel('Opening link')).toMatchObject({
         status: 'failed',
         message: 'index unavailable',
-      }) },
-    )
+      })
+    })
     expect(currentRoute(view)).toContain('"today"')
     expect(logger.getErrors()).toContainEqual({
       message: 'wiki-link resolution failed:',
@@ -422,8 +430,9 @@ describe('useWikiLinkNavigation', () => {
     const view = await renderHost({ graph: { generation: 7 } })
 
     lastHandlerRef.current?.({ target: 'Brand New', openInNewWindow: false })
-    await vi.waitFor(() => { return expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Brand New', 7) },
-    )
+    await vi.waitFor(() => {
+      return expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Brand New', 7)
+    })
     navigateRef.current?.({ kind: 'settings' })
     await vi.waitFor(() => expect(currentRoute(view)).toContain('"settings"'))
 

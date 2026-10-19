@@ -70,10 +70,12 @@ export default defineBackground(() => {
       if (save.success) {
         saveXPost(save.data.tabId, save.data.postId).then(
           () => sendResponse({ ok: true }),
-          (error: unknown) => { return sendResponse({
+          (error: unknown) => {
+            return sendResponse({
               ok: false,
               message: error instanceof Error ? error.message : 'capture-failed',
-            }) },
+            })
+          },
         )
         return true
       }
@@ -83,10 +85,12 @@ export default defineBackground(() => {
     if (enqueue.success) {
       void enqueueCapture(enqueue.data.wire).then(
         () => sendResponse({ ok: true }),
-        (cause: unknown) => { return sendResponse({
+        (cause: unknown) => {
+          return sendResponse({
             ok: false,
             message: cause instanceof Error ? cause.message : 'Capture failed',
-          }) },
+          })
+        },
       )
       return true
     }

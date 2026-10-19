@@ -71,10 +71,11 @@ describe('IntegrationsSection', () => {
     await renderSection({ contactsEnabled: true })
 
     await page.getByRole('button', { name: 'Open System Settings' }).click()
-    await vi.waitFor(() => { return expect(opener.openedUrls()).toEqual([
+    await vi.waitFor(() => {
+      return expect(opener.openedUrls()).toEqual([
         'x-apple.systempreferences:com.apple.preference.security?Privacy_Contacts',
-      ]) },
-    )
+      ])
+    })
   })
 
   it('renders nothing where the Contacts framework does not exist', async () => {

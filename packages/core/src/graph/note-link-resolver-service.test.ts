@@ -55,7 +55,9 @@ function setup({ indexed = [], files = {}, placeholders = [], readErrors = [] }:
     /**
      * How many `note_claims` lookups the resolver ran.
      */
-    claimLookups: () => { return database.getQueries().filter((query) => query.sql.includes('note_claims')).length },
+    claimLookups: () => {
+      return database.getQueries().filter((query) => query.sql.includes('note_claims')).length
+    },
     expectNoWrites: () => {
       expect(noteFile.writes()).toEqual([])
       expect(noteFile.trashed()).toEqual([])
@@ -254,13 +256,14 @@ describe('resolveWikiTarget', () => {
 
   it('rechecks the index after a disk miss to close the indexing race', async () => {
     const graph = setup()
-    graph.listNotes.mockImplementationOnce(() => { return Promise.try(() => {
+    graph.listNotes.mockImplementationOnce(() => {
+      return Promise.try(() => {
         seedNotes(graph.database, [
           { path: 'notes/newly-indexed.md', markdown: '# Newly indexed\n' },
         ])
         return []
-      }) },
-    )
+      })
+    })
 
     await expect(graph.resolver.resolveWikiTarget('Newly indexed', 7)).resolves.toEqual({
       kind: 'resolved',

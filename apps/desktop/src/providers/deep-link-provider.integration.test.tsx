@@ -40,9 +40,10 @@ describe('DeepLinkProvider navigation intent integration', () => {
 
     pendingResolution.resolve('notes/project-x.md')
 
-    await vi.waitFor(() => { return expect(appServices.navigation.navigations().map((call) => call.route)).toEqual([
+    await vi.waitFor(() => {
+      return expect(appServices.navigation.navigations().map((call) => call.route)).toEqual([
         { kind: 'note', path: 'notes/project-x.md' },
-      ]) },
-    )
+      ])
+    })
   })
 })

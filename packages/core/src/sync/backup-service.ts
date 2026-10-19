@@ -473,8 +473,11 @@ class BackupServiceImpl implements BackupService {
     // the index and embeddings take markdown notes, the audio-memo
     // reconciler takes recordings) — and the index additionally gets a
     // direct apply (idempotent if a live watcher subscription double-applies).
-    const fileChangeBatch = changes.map(({ path, kind, modifiedMs }) => { return modifiedMs === null || modifiedMs === undefined ? { path, kind } : { path, kind, modifiedMs } },
-    )
+    const fileChangeBatch = changes.map(({ path, kind, modifiedMs }) => {
+      return modifiedMs === null || modifiedMs === undefined
+        ? { path, kind }
+        : { path, kind, modifiedMs }
+    })
     fileChanges.emit({ changes: fileChangeBatch, source: 'pull' })
     const indexable = fileChangeBatch.filter((change) => isNotePath(change.path))
     const indexGeneration = this.#indexGeneration
@@ -524,8 +527,9 @@ class BackupServiceImpl implements BackupService {
     // Quit-time commit (local only — never a network push on the way out),
     // queued behind any running cycle so it can never land between a pull's
     // ref move and its checkout.
-    this.#unregisterBackupFlusher = persistenceFlush.registerFlusher('backup', () => { return next.commitNow() },
-    )
+    this.#unregisterBackupFlusher = persistenceFlush.registerFlusher('backup', () => {
+      return next.commitNow()
+    })
   }
 
   /**

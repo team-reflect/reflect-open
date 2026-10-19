@@ -67,10 +67,11 @@ describe('AddAiProviderDrawer', () => {
     await selectAnthropic()
     await typeKeyAndSubmit('sk-ant-key')
 
-    await vi.waitFor(() => { return expect(onAdd).toHaveBeenCalledWith(
+    await vi.waitFor(() => {
+      return expect(onAdd).toHaveBeenCalledWith(
         expect.objectContaining({ provider: 'anthropic', apiKey: 'sk-ant-key' }),
-      ) },
-    )
+      )
+    })
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
@@ -94,8 +95,9 @@ describe('AddAiProviderDrawer', () => {
     expect(onAdd).not.toHaveBeenCalled()
 
     await page.getByRole('button', { name: 'Save anyway' }).click()
-    await vi.waitFor(() => { return expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-offline' })) },
-    )
+    await vi.waitFor(() => {
+      return expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-offline' }))
+    })
     // The unverified key was saved once, without a second validation probe.
     expect(keyValidation.calls()).toHaveLength(1)
   })
@@ -144,10 +146,11 @@ describe('AddAiProviderDrawer', () => {
     await consentCheckbox().click()
     await page.getByRole('button', { name: 'Add provider' }).click()
 
-    await vi.waitFor(() => { return expect(keyValidation.calls()).toEqual([
+    await vi.waitFor(() => {
+      return expect(keyValidation.calls()).toEqual([
         { provider: 'openai-compatible', apiKey: '', baseUrl: 'http://localhost:1234/v1' },
-      ]) },
-    )
+      ])
+    })
     expect(onAdd).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: 'openai-compatible',

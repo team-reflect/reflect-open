@@ -164,9 +164,11 @@ class CalendarServiceImpl implements CalendarService {
   subscribeChanged(listener: () => void): Unlisten {
     const { ipc, logger } = this.#deps
     return listenNow(
-      () => { return ipc.listen(CHANGED_EVENT, () => {
+      () => {
+        return ipc.listen(CHANGED_EVENT, () => {
           listener()
-        }) },
+        })
+      },
       (cause) => {
         logger.warn(`failed to listen for "${CHANGED_EVENT}"`, cause)
       },

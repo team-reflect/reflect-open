@@ -57,8 +57,9 @@ describe('MobileOnboardingScreen', () => {
     fireEvent.change(page.getByLabelText('Graph name'), { target: { value: 'Journal' } })
     await page.getByRole('button', { name: 'Setup graph' }).click()
 
-    await vi.waitFor(() => { return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal') },
-    )
+    await vi.waitFor(() => {
+      return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal')
+    })
   })
 
   it('lists every container graph while keeping create available', async () => {
@@ -78,8 +79,9 @@ describe('MobileOnboardingScreen', () => {
     await expect.element(page.getByRole('button', { name: 'Setup graph' })).toBeDisabled()
     await page.getByRole('button', { name: 'Continue with Work' }).click()
 
-    await vi.waitFor(() => { return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Work') },
-    )
+    await vi.waitFor(() => {
+      return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Work')
+    })
   })
 
   it('creates a new iCloud graph alongside existing ones', async () => {
@@ -94,8 +96,9 @@ describe('MobileOnboardingScreen', () => {
     fireEvent.change(page.getByLabelText('Graph name'), { target: { value: 'Journal' } })
     await page.getByRole('button', { name: 'Setup graph' }).click()
 
-    await vi.waitFor(() => { return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal') },
-    )
+    await vi.waitFor(() => {
+      return expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal')
+    })
   })
 
   it('keeps the on-device choice as a quiet secondary path', async () => {

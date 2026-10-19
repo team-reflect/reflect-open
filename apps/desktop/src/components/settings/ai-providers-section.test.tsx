@@ -255,11 +255,12 @@ describe('AiProvidersSection', () => {
 
     await page.getByRole('button', { name: 'Remove Anthropic — Claude Opus 4.8' }).click()
 
-    await vi.waitFor(() => { return expect(lastSavedDoc()).toMatchObject({
+    await vi.waitFor(() => {
+      return expect(lastSavedDoc()).toMatchObject({
         aiProviders: [entry({ id: 'b', provider: 'openai', model: 'gpt-5.5', keyHint: 'abcd2' })],
         defaultAiProviderId: 'b',
-      }) },
-    )
+      })
+    })
     expect(secrets.snapshot()).not.toHaveProperty('ai-api-key:a')
   })
 
@@ -283,8 +284,9 @@ describe('AiProvidersSection', () => {
       page.getByRole('button', { name: 'Remove OpenAI — GPT-5.5' }).element() as HTMLElement
     ).click()
 
-    await vi.waitFor(() => { return expect(lastSavedDoc()).toMatchObject({ aiProviders: [], defaultAiProviderId: null }) },
-    )
+    await vi.waitFor(() => {
+      return expect(lastSavedDoc()).toMatchObject({ aiProviders: [], defaultAiProviderId: null })
+    })
     expect(secrets.snapshot()).toEqual({})
   })
 

@@ -540,8 +540,13 @@ describe('batch writes', () => {
   it('writes in order and re-addresses the rest of the batch after each write', async () => {
     const source = '+ [ ] one\n+ [ ] two\n+ [ ] three\n'
     noteFile.set('notes/a.md', source)
-    const rows = projectTasks(source).map((row) => { return makeOpenTask({ notePath: 'notes/a.md', astPath: [...row.astPath], markdown: row.markdown }) },
-    )
+    const rows = projectTasks(source).map((row) => {
+      return makeOpenTask({
+        notePath: 'notes/a.md',
+        astPath: [...row.astPath],
+        markdown: row.markdown,
+      })
+    })
 
     await tasks.deleteTasks([rows[0]!, rows[2]!])
 

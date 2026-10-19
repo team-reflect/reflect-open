@@ -677,26 +677,29 @@ describe('applyTaskEdits: batches', () => {
 
   it('refuses a context insert into a parent removed earlier in the batch', () => {
     const source = '+ [ ] parent\n  + [ ] child\n'
-    expect(() => { return applyTaskEdits(ctx, source, [
+    expect(() => {
+      return applyTaskEdits(ctx, source, [
         { kind: 'remove', task: locate(source, 0) },
         { kind: 'insert', at: { kind: 'contextEnd', task: locate(source, 1) }, markdown: '' },
-      ]) },
-    ).toThrow(TaskStaleError)
+      ])
+    }).toThrow(TaskStaleError)
   })
 
   it('refuses a later edit on a task removed earlier in the batch', () => {
     const source = '+ [ ] a\n'
     const task = locate(source)
-    expect(() => { return applyTaskEdits(ctx, source, [
+    expect(() => {
+      return applyTaskEdits(ctx, source, [
         { kind: 'remove', task },
         { kind: 'toggle', task },
-      ]) },
-    ).toThrow(TaskStaleError)
-    expect(() => { return applyTaskEdits(ctx, source, [
+      ])
+    }).toThrow(TaskStaleError)
+    expect(() => {
+      return applyTaskEdits(ctx, source, [
         { kind: 'remove', task },
         { kind: 'remove', task },
-      ]) },
-    ).toThrow(TaskStaleError)
+      ])
+    }).toThrow(TaskStaleError)
   })
 })
 

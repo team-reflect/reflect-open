@@ -71,7 +71,9 @@ export function IcloudSettingsField(): ReactElement | null {
   })
   const pendingNotes = useQuery({
     queryKey: queryKeys.icloud.pendingNotes(graph?.root),
-    queryFn: () => { return graph === null ? Promise.resolve(0) : icloudNative.pendingCount(graph.root, 'notes') },
+    queryFn: () => {
+      return graph === null ? Promise.resolve(0) : icloudNative.pendingCount(graph.root, 'notes')
+    },
     enabled: platform.isMacosDesktop && hosted,
     staleTime: PENDING_NOTES_REFETCH_MS,
     refetchInterval: (query) => {

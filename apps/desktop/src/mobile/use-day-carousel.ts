@@ -124,9 +124,11 @@ function adoptSelection(
   navigationKey: string,
   index: number,
 ): (current: CarouselSelectionState) => CarouselSelectionState {
-  return (current) => { return current.navigationKey === navigationKey && current.index === index
+  return (current) => {
+    return current.navigationKey === navigationKey && current.index === index
       ? current
-      : { navigationKey, index } }
+      : { navigationKey, index }
+  }
 }
 
 interface CarouselNavigationState {
@@ -155,8 +157,9 @@ export function useDayCarousel(
   onTarget: (date: string, navigationKey: string) => void,
 ): DayCarousel {
   const { keyboard } = useAppServices()
-  const [dayWindow, setDayWindow] = useState<DayWindow>(() => { return createDayWindow(date, CAROUSEL_WINDOW) },
-  )
+  const [dayWindow, setDayWindow] = useState<DayWindow>(() => {
+    return createDayWindow(date, CAROUSEL_WINDOW)
+  })
   // Frozen at mount: `embla-carousel-react` reinitializes whenever the options
   // object stops comparing equal, and `reInit` snaps to `startIndex` with no
   // animation — a render-derived `startIndex` would let every swipe's route
@@ -221,8 +224,9 @@ export function useDayCarousel(
       }
       const index = api.selectedScrollSnap()
       startTransition(() => {
-        setSelection((current) => { return current.navigationKey === navigationKey ? { ...current, index } : current },
-        )
+        setSelection((current) => {
+          return current.navigationKey === navigationKey ? { ...current, index } : current
+        })
         onTarget(dateAtIndex(dayWindow, index), navigationKey)
       })
     },

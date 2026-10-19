@@ -52,8 +52,9 @@ it('keeps private tweet references when the same media has a public direct refer
     ['private.md', '---\nprivate: true\n---\n![](https://x.com/jack/status/123)'],
   ])
   expect(
-    await privacy.classifyAssetFromNotes(asset, [...sources.keys()], (path) => { return Promise.resolve(sources.get(path)!) },
-    ),
+    await privacy.classifyAssetFromNotes(asset, [...sources.keys()], (path) => {
+      return Promise.resolve(sources.get(path)!)
+    }),
   ).toBe('skip-private')
 })
 
@@ -63,23 +64,26 @@ it('checks live ownership instead of treating every private candidate as a refer
     ['private.md', '---\nprivate: true\n---\n![](https://x.com/jack/status/456)'],
   ])
   expect(
-    await privacy.classifyAssetFromNotes(asset, [...sources.keys()], (path) => { return Promise.resolve(sources.get(path)!) },
-    ),
+    await privacy.classifyAssetFromNotes(asset, [...sources.keys()], (path) => {
+      return Promise.resolve(sources.get(path)!)
+    }),
   ).toBe('send')
 })
 
 it('recognizes a public tweet reference without a direct media link', async () => {
   expect(
-    await privacy.classifyAssetFromNotes(asset, ['public.md'], () => { return Promise.resolve('![](https://x.com/jack/status/123)') },
-    ),
+    await privacy.classifyAssetFromNotes(asset, ['public.md'], () => {
+      return Promise.resolve('![](https://x.com/jack/status/123)')
+    }),
   ).toBe('send')
 })
 
 it('does not return a send verdict when archive ownership cannot be read', async () => {
   ownersError = new Error('unreadable archive')
   await expect(
-    privacy.classifyAssetFromNotes(asset, ['public.md'], () => { return Promise.resolve(`![Image](${asset})`) },
-    ),
+    privacy.classifyAssetFromNotes(asset, ['public.md'], () => {
+      return Promise.resolve(`![Image](${asset})`)
+    }),
   ).rejects.toThrow('unreadable archive')
 })
 
@@ -87,22 +91,25 @@ describe('classifyAssetFromNotes: vault-wide references', () => {
   it('blocks an asset a private note embeds by bare filename', async () => {
     // The index stored `photo.png`; the file is `Media/photo.png`.
     await expect(
-      privacy.classifyAssetFromNotes('Media/photo.png', ['private.md'], () => { return Promise.resolve('---\nprivate: true\n---\n\n![[photo.png]]\n') },
-      ),
+      privacy.classifyAssetFromNotes('Media/photo.png', ['private.md'], () => {
+        return Promise.resolve('---\nprivate: true\n---\n\n![[photo.png]]\n')
+      }),
     ).resolves.toBe('skip-private')
   })
 
   it('authorizes an asset a public note embeds by bare filename', async () => {
     await expect(
-      privacy.classifyAssetFromNotes('Media/photo.png', ['public.md'], () => { return Promise.resolve('![[photo.png]]\n') },
-      ),
+      privacy.classifyAssetFromNotes('Media/photo.png', ['public.md'], () => {
+        return Promise.resolve('![[photo.png]]\n')
+      }),
     ).resolves.toBe('send')
   })
 
   it('still blocks an asset a private note references by an old vault-root href', async () => {
     await expect(
-      privacy.classifyAssetFromNotes('assets/a.png', ['notes/private.md'], () => { return Promise.resolve('---\nprivate: true\n---\n\n![](assets/a.png)\n') },
-      ),
+      privacy.classifyAssetFromNotes('assets/a.png', ['notes/private.md'], () => {
+        return Promise.resolve('---\nprivate: true\n---\n\n![](assets/a.png)\n')
+      }),
     ).resolves.toBe('skip-private')
   })
 })

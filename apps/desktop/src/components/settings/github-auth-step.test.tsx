@@ -101,8 +101,9 @@ describe('GithubAuthStep', () => {
     const onAuthed = vi.fn()
     await renderStep(<GithubAuthStep onAuthed={onAuthed} />)
 
-    await vi.waitFor(() => { return expect(onAuthed).toHaveBeenCalledWith({ login: 'alex', avatarUrl: null }) },
-    )
+    await vi.waitFor(() => {
+      return expect(onAuthed).toHaveBeenCalledWith({ login: 'alex', avatarUrl: null })
+    })
   })
 
   it('stores a pasted PAT, verifies it against GitHub, and reports the identity', async () => {
@@ -117,8 +118,9 @@ describe('GithubAuthStep', () => {
     })
     await userEvent.click(page.getByRole('button', { name: 'Save token' }))
 
-    await vi.waitFor(() => { return expect(onAuthed).toHaveBeenCalledWith({ login: 'alex', avatarUrl: null }) },
-    )
+    await vi.waitFor(() => {
+      return expect(onAuthed).toHaveBeenCalledWith({ login: 'alex', avatarUrl: null })
+    })
     expect(JSON.parse(store.snapshot()['github-auth'] ?? '{}')).toEqual({
       kind: 'pat',
       token: 'github_pat_abc',
@@ -210,8 +212,9 @@ describe('GithubAuthStep', () => {
 
     await userEvent.click(page.getByRole('button', { name: 'Copy code and open GitHub' }))
 
-    await vi.waitFor(() => { return expect(openedUrls).toHaveBeenCalledWith('https://github.com/login/device') },
-    )
+    await vi.waitFor(() => {
+      return expect(openedUrls).toHaveBeenCalledWith('https://github.com/login/device')
+    })
     expect(writeText).toHaveBeenCalledWith('ABCD-1234')
     expect(writeText.mock.invocationCallOrder[0]!).toBeLessThan(
       openedUrls.mock.invocationCallOrder[0]!,
@@ -244,7 +247,8 @@ describe('GithubAuthStep', () => {
     expect(openedUrls).not.toHaveBeenCalled()
 
     await userEvent.click(page.getByRole('button', { name: 'Open GitHub' }))
-    await vi.waitFor(() => { return expect(openedUrls).toHaveBeenCalledWith('https://github.com/login/device') },
-    )
+    await vi.waitFor(() => {
+      return expect(openedUrls).toHaveBeenCalledWith('https://github.com/login/device')
+    })
   })
 })

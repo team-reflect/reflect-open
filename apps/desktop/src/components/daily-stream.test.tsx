@@ -115,10 +115,11 @@ describe('DailyStream', () => {
     })
 
     const expected = indexOfDate(dayWindow, '2026-06-28') * ESTIMATED_DAY_HEIGHT
-    await vi.waitFor(() => { return expect(page.getByTestId('daily-stream').element().scrollTop).toBeGreaterThan(
+    await vi.waitFor(() => {
+      return expect(page.getByTestId('daily-stream').element().scrollTop).toBeGreaterThan(
         expected - ESTIMATED_DAY_HEIGHT,
-      ) },
-    )
+      )
+    })
     await expect.element(page.getByText(formatDayLabel('2026-06-28', 'mdy'))).toBeVisible()
     await view.unmount()
   })
@@ -151,10 +152,11 @@ describe('DailyStream', () => {
 
     const dayWindow = createDayWindow('2026-06-27')
     const expected = indexOfDate(dayWindow, '2026-06-28') * ESTIMATED_DAY_HEIGHT
-    await vi.waitFor(() => { return expect(page.getByTestId('daily-stream').element().scrollTop).toBeGreaterThan(
+    await vi.waitFor(() => {
+      return expect(page.getByTestId('daily-stream').element().scrollTop).toBeGreaterThan(
         expected - ESTIMATED_DAY_HEIGHT,
-      ) },
-    )
+      )
+    })
     await expect.element(page.getByText(formatDayLabel('2026-06-28', 'mdy'))).toBeVisible()
     await view.unmount()
   })
@@ -168,8 +170,9 @@ describe('DailyStream', () => {
       </Stream>,
     )
 
-    await vi.waitFor(() => { return expect(page.getByTestId('daily-stream').element().scrollTop).toBeCloseTo(4321, -1) },
-    )
+    await vi.waitFor(() => {
+      return expect(page.getByTestId('daily-stream').element().scrollTop).toBeCloseTo(4321, -1)
+    })
     await view.unmount()
   })
 
@@ -217,8 +220,9 @@ describe('DailyStream', () => {
   it('reserves the editor’s space on loading placeholders, with the hint delayed', async () => {
     const view = await renderStream(<DailyStream target={{ kind: 'today' }} />)
 
-    await vi.waitFor(() => { return expect(document.querySelectorAll('.reflect-note-loading').length).toBeGreaterThan(0) },
-    )
+    await vi.waitFor(() => {
+      return expect(document.querySelectorAll('.reflect-note-loading').length).toBeGreaterThan(0)
+    })
     const placeholders = document.querySelectorAll('.reflect-note-loading')
     expect(placeholders.length).toBeGreaterThan(0)
     for (const placeholder of placeholders) {

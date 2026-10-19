@@ -51,9 +51,11 @@ async function setup(options?: {
     progress,
     graphSession: { getState: () => ({ session }), subscribe: () => () => {} },
     indexStore: createTestIndexStoreService({
-      fail: (call) => { return options?.failClear === true && call.method === 'clear'
+      fail: (call) => {
+        return options?.failClear === true && call.method === 'clear'
           ? new Error('index on fire')
-          : undefined },
+          : undefined
+      },
     }),
   })
   const embeddingIndex = createTestEmbeddingIndexService({
@@ -149,8 +151,9 @@ describe('start', () => {
 
     indexLifecycle.emitApplied([{ kind: 'remove', path: 'notes/a.md' }], 7)
 
-    await vi.waitFor(() => { return expect(embeddingIndex.removed()).toEqual([{ path: 'notes/a.md', generation: 7 }]) },
-    )
+    await vi.waitFor(() => {
+      return expect(embeddingIndex.removed()).toEqual([{ path: 'notes/a.md', generation: 7 }])
+    })
     stop()
   })
 

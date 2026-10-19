@@ -88,13 +88,15 @@ function extractUnit(tokens: readonly string[]): Unit | null {
 
 function extractDirection(tokens: readonly string[]): Direction | null {
   const hasPast = tokens.includes('ago')
-  const hasFuture = tokens.some(
-    (token) => { return token === 'from' ||
+  const hasFuture = tokens.some((token) => {
+    return (
+      token === 'from' ||
       token === 'now' ||
       token === 'later' ||
       token === 'in' ||
-      token === 'hence' },
-  )
+      token === 'hence'
+    )
+  })
   if (hasPast && !hasFuture) {
     return 'past'
   }
@@ -236,13 +238,17 @@ const NL_UNITS: readonly NlUnit[] = [
     word: 'week',
     display: 'Week',
     order: 7,
-    resolve: (context, modifier) => { return resolveFromAnchor(firstOfWeek(context.today, context.weekStartDay), modifier, 7) },
+    resolve: (context, modifier) => {
+      return resolveFromAnchor(firstOfWeek(context.today, context.weekStartDay), modifier, 7)
+    },
   },
   {
     word: 'weekend',
     display: 'Weekend',
     order: 8,
-    resolve: (context, modifier) => { return resolveFromAnchor(weekendOf(context.today, context.weekStartDay), modifier, 7) },
+    resolve: (context, modifier) => {
+      return resolveFromAnchor(weekendOf(context.today, context.weekStartDay), modifier, 7)
+    },
   },
   {
     word: 'month',

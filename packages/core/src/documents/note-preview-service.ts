@@ -73,7 +73,9 @@ class NotePreviewServiceImpl implements NotePreviewService {
       return {
         path,
         markdown: splitFrontmatter(source).body,
-        resolveImageUrl: (imageSource) => { return attachments.resolvePreviewImageUrl(path, imageSource, generation) },
+        resolveImageUrl: (imageSource) => {
+          return attachments.resolvePreviewImageUrl(path, imageSource, generation)
+        },
         resolveWikiEmbed: (embedTarget) => attachments.resolveWikiEmbed(embedTarget),
       }
     } catch {

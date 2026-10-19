@@ -95,14 +95,15 @@ async function collectCargo(): Promise<Entry[]> {
     throwOnError: true,
     nodeOptions: { cwd: ROOT_DIR },
   })
-  return CargoAboutSchema.parse(JSON.parse(stdout)).licenses.flatMap((license) => { return license.used_by.map(({ crate }) => ({
+  return CargoAboutSchema.parse(JSON.parse(stdout)).licenses.flatMap((license) => {
+    return license.used_by.map(({ crate }) => ({
       name: crate.name,
       ecosystem: 'cargo' as const,
       license: license.id,
       url: crate.repository ?? `https://crates.io/crates/${crate.name}`,
       texts: [license.text.trim()],
-    })) },
-  )
+    }))
+  })
 }
 
 /** The bundled Inter font, which comes from neither npm nor crates.io. */

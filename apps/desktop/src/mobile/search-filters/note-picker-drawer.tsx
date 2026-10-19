@@ -41,7 +41,9 @@ export function NotePickerDrawer({
 
   const { data: hits } = useQuery({
     queryKey: queryKeys.index.mobileNotePicker(graph?.root, deferredQuery),
-    queryFn: () => { return search.searchWithFilters(parseSearchQuery(deferredQuery), { limit: PICKER_LIMIT }) },
+    queryFn: () => {
+      return search.searchWithFilters(parseSearchQuery(deferredQuery), { limit: PICKER_LIMIT })
+    },
     enabled: open && graph !== null,
     // Typing re-keys the query as the deferred value settles; holding the
     // previous rows avoids a "No matches" flash between keystrokes.

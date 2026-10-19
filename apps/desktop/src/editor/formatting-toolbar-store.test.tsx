@@ -71,18 +71,20 @@ describe('formatting toolbar store', () => {
 
     // A caret move that changes nothing must keep the same snapshot object,
     // so the toolbar component never re-renders for it.
-    await act(() => { return publishFormattingToolbar(owner, {
+    await act(() => {
+      return publishFormattingToolbar(owner, {
         capabilities: { ...toolbar.capabilities },
         commands: toolbar.commands,
-      }) },
-    )
+      })
+    })
     expect(view.result.current).toBe(toolbar)
 
-    await act(() => { return publishFormattingToolbar(owner, {
+    await act(() => {
+      return publishFormattingToolbar(owner, {
         capabilities: { ...toolbar.capabilities, canIndent: true },
         commands: toolbar.commands,
-      }) },
-    )
+      })
+    })
     expect(view.result.current).not.toBe(toolbar)
     expect(view.result.current?.capabilities.canIndent).toBe(true)
   })

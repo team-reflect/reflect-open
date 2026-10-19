@@ -92,7 +92,10 @@ describe('attachOperationToasts', () => {
 
     const options = toast.add.mock.lastCall?.[0]
     options?.actionProps?.onClick()
-    await vi.waitFor(() => { return expect(logger.getErrors()).toEqual([{ message: 'operation action failed:', cause: error }]) },
-    )
+    await vi.waitFor(() => {
+      return expect(logger.getErrors()).toEqual([
+        { message: 'operation action failed:', cause: error },
+      ])
+    })
   })
 })

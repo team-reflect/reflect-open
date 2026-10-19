@@ -162,13 +162,15 @@ export function useTaskActions(): TaskActions {
       void run('edit', 'Editing task', () => taskService.editTask(task, content))
     },
     checkboxToggle: (task) => {
-      void run('editAndToggle', task.checked ? 'Reopening task' : 'Completing task', () => { return taskService.editAndToggleTask(task, null) },
-      )
+      void run('editAndToggle', task.checked ? 'Reopening task' : 'Completing task', () => {
+        return taskService.editAndToggleTask(task, null)
+      })
     },
     insert: (target) => run('insert', 'Adding task', () => taskService.addTask(target)),
     insertAfter: async (task, content) => {
-      const created = await run('insert', 'Adding task', () => { return taskService.addTaskAfter(task, content) },
-      )
+      const created = await run('insert', 'Adding task', () => {
+        return taskService.addTaskAfter(task, content)
+      })
       if (created !== null) {
         return created
       }
@@ -177,8 +179,9 @@ export function useTaskActions(): TaskActions {
       return null
     },
     editAndToggle: (task, content) => {
-      void run('editAndToggle', task.checked ? 'Reopening task' : 'Completing task', () => { return taskService.editAndToggleTask(task, content) },
-      )
+      void run('editAndToggle', task.checked ? 'Reopening task' : 'Completing task', () => {
+        return taskService.editAndToggleTask(task, content)
+      })
     },
     schedule: (tasks, isoDate) => {
       if (tasks.length > 0 && !isPending('schedule')) {
@@ -192,8 +195,9 @@ export function useTaskActions(): TaskActions {
     },
     editAndConvertToBullet: (task, content) => {
       if (!isPending('editAndConvert')) {
-        void run('editAndConvert', 'Converting task', () => { return taskService.editAndConvertTask(task, content) },
-        )
+        void run('editAndConvert', 'Converting task', () => {
+          return taskService.editAndConvertTask(task, content)
+        })
       }
     },
     archive: () => taskService.archiveRecentlyCompleted(root),

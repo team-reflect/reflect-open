@@ -196,9 +196,11 @@ function createTestServiceFactories(overrides: TestCoreServiceOverrides) {
     assetDescriber: () => createTestAssetDescriberService(),
     indexLifecycle: (deps) => createTestIndexLifecycleService(deps),
     // The test graph session answers the graph commands on its own bridge unless a test gives one.
-    graphSession: ({ ipc: _ipc, ...deps }) => { return createTestGraphSessionService(
+    graphSession: ({ ipc: _ipc, ...deps }) => {
+      return createTestGraphSessionService(
         overrides.ipc === undefined ? deps : { ...deps, ipc: overrides.ipc },
-      ) },
+      )
+    },
     attachments: ({ graphSession }) => createTestAttachmentService({ graphSession }),
     persistenceFlush: ({ openDocuments }) => createTestPersistenceFlushService({ openDocuments }),
     gitRepository: () => createTestGitRepositoryService(),
@@ -288,12 +290,14 @@ export function createTestCoreServices<
     imageCodec: edge.imageCodec,
     createGraphServices:
       edge.createGraphServices ??
-      ((session, deps) => { return createGraphServices(
+      ((session, deps) => {
+        return createGraphServices(
           session,
           deps,
           testGraphLifecycles(session, platform),
           backup === undefined ? {} : { backup: () => backup },
-        ) }),
+        )
+      }),
   }
   const fixed: Record<string, () => unknown> = {}
   for (const [key, service] of Object.entries(overrides)) {

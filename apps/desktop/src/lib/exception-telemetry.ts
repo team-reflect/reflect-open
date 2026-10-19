@@ -59,15 +59,17 @@ const SAFE_DEBUG_ID = /^(?:[a-f0-9]{32}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{
 const SENTRY_DSN_SCHEMA = z
   .url()
   .transform((value) => new URL(value))
-  .refine(
-    (url) => { return url.protocol === 'https:' &&
+  .refine((url) => {
+    return (
+      url.protocol === 'https:' &&
       url.hostname === 'o463484.ingest.us.sentry.io' &&
       url.pathname === '/4511705649971200' &&
       /^[a-f0-9]{32}$/.test(url.username) &&
       !url.password &&
       !url.search &&
-      !url.hash },
-  )
+      !url.hash
+    )
+  })
   .transform((url) => url.href)
 
 /**
