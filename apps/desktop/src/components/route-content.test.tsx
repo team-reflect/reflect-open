@@ -13,6 +13,10 @@ import {
 } from '@reflect/core/testing'
 import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider.tsx'
 import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
+import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
+import { ShortcutsProvider } from '@/providers/shortcuts-provider.tsx'
+import { UpdateProvider } from '@/providers/update-provider.tsx'
+import { V1ImportProvider } from '@/providers/v1-import-provider.tsx'
 import type { Route } from '@/routing/route.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import '@/test-utils/locator.ts'
@@ -82,18 +86,6 @@ vi.mock('@/editor/note-editor.tsx', async () => {
   }
 })
 
-vi.mock('@/components/daily-stream.tsx', () => ({
-  DailyStream: () => <div data-testid="daily-stream" />,
-}))
-vi.mock('@/components/settings-screen.tsx', () => ({
-  SettingsScreen: () => <div data-testid="settings-screen" />,
-}))
-// The chat screen needs a chat session (covered by its own tests);
-// here only the route → view mapping is under test.
-// vi.mock('@/components/chat/chat-screen.tsx', () => ({
-//   ChatScreen: () => <div data-testid="chat-screen" />,
-// })) // FIXME: notice that we don't really need to mock this. We can add data-testid to chat-screen.tsx, and then we just assert that. Remove "components/chat/chat-screen.tsx" in the eslint.config.js; remove this vi.mock. Notice that we're allow to add data-testid to production components. It's okay to have extra data-testid in production code that's only used for test.
-
 /**
  * The note files a test seeds before it renders.
  */
@@ -134,6 +126,16 @@ async function renderRoute(route: Route, platform?: TestPlatformOptions) {
       graph: { root: '/g', name: 'g', generation: 1 },
       settings: { editorMarkdownSyntax: 'hide', allNotesFilterTags: ['book', 'link', 'person'] },
       route,
+      // The providers the settings screen reads.
+      wrapper: (children) => (
+        <UpdateProvider autoCheck={false}>
+          <ShortcutsProvider>
+            <NoteTemplatesProvider>
+              <V1ImportProvider>{children}</V1ImportProvider>
+            </NoteTemplatesProvider>
+          </ShortcutsProvider>
+        </UpdateProvider>
+      ),
     },
   )
 }

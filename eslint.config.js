@@ -147,11 +147,6 @@ const DESKTOP_VI_MOCK_ALLOW_BY_FILE = {
     // only passes its result to the (mocked) sidebar.
     '@/routing/app-shortcuts.ts',
   ],
-  'apps/desktop/src/components/route-content.test.tsx': [
-    '@/components/chat/chat-screen.tsx',
-    '@/components/daily-stream.tsx',
-    '@/components/settings-screen.tsx',
-  ],
   'apps/desktop/src/mobile/screens/note.test.tsx': [
     '@/components/note-pane.tsx',
     '@/mobile/incoming-backlinks.tsx',
