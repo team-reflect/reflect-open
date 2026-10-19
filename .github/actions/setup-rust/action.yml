@@ -80,4 +80,4 @@ runs:
     # Fails if Cargo.lock is out of date, like `pnpm install --frozen-lockfile`.
     - name: Check Cargo.lock
       shell: bash
-      run: cargo metadata --locked --format-version 1 --filter-platform "$(rustc --print host-tuple)" > /dev/null
+      run: cargo update --workspace --locked
