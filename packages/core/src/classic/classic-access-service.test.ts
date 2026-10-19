@@ -337,7 +337,7 @@ describe('signIn', () => {
     expect(logger.getWarnings()).toEqual([
       {
         message: 'Reflect Classic returned a body that is not JSON (/api/users/me)',
-        cause: expect.any(SyntaxError),
+        cause: expect.any(SyntaxError) as SyntaxError,
       },
     ])
   })
@@ -349,12 +349,10 @@ describe('signIn', () => {
     })
 
     await expect(service().signIn({ ephemeral: false })).rejects.toMatchObject({ kind: 'parse' })
-    expect(logger.getWarnings()).toEqual([
-      {
-        message: 'Reflect Classic returned an unexpected body (/api/users/me)',
-        cause: expect.anything(),
-      },
-    ])
+    const warnings = logger.getWarnings()
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]?.message).toBe('Reflect Classic returned an unexpected body (/api/users/me)')
+    expect(warnings[0]?.cause).toBeDefined()
   })
 
   it('reports and logs an invoice period end that is not a date as a parse failure', async () => {
@@ -365,12 +363,12 @@ describe('signIn', () => {
     })
 
     await expect(service().signIn({ ephemeral: false })).rejects.toMatchObject({ kind: 'parse' })
-    expect(logger.getWarnings()).toEqual([
-      {
-        message: 'Reflect Classic returned an unexpected body (/api/users/me/invoices)',
-        cause: expect.anything(),
-      },
-    ])
+    const warnings = logger.getWarnings()
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]?.message).toBe(
+      'Reflect Classic returned an unexpected body (/api/users/me/invoices)',
+    )
+    expect(warnings[0]?.cause).toBeDefined()
   })
 
   it('reports a request that cannot be sent as a network failure', async () => {

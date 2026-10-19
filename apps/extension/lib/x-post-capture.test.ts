@@ -82,7 +82,7 @@ describe('captureXPostRequest', () => {
     await captureXPostRequest(request())
     expect(saveXPost).toHaveBeenCalledWith(1, '20', '2026-09-09T04:00:00.000Z', {
       kind: 'x-bookmark',
-      shouldAdmit: expect.any(Function),
+      shouldAdmit: expect.any(Function) as () => Promise<boolean>,
     })
   })
   it('ignores incognito tabs', async () => {
@@ -110,7 +110,7 @@ it('captures likes independently and ignores unlike requests', async () => {
   })
   expect(saveXPost).toHaveBeenCalledWith(1, '20', '2026-09-09T04:00:00.000Z', {
     kind: 'x-like',
-    shouldAdmit: expect.any(Function),
+    shouldAdmit: expect.any(Function) as () => Promise<boolean>,
   })
   vi.mocked(saveXPost).mockClear()
   await captureXPostRequest({

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AppError } from '../errors.ts'
+import { AppError, isAppError } from '../errors.ts'
 import type { NoteCreationService } from '../graph/note-creation-service.ts'
 import {
   createTestNoteCreationService,
@@ -102,9 +102,13 @@ describe('BacklinkTargetService', () => {
   it('rejects an impossible ambiguous result without any target paths', async () => {
     resolveOrCreateMock.mockResolvedValue({ kind: 'ambiguous', paths: [] })
 
-    await expect(backlinkTarget.ensure('Links', 3)).rejects.toMatchObject({
-      kind: 'unknown',
-      message: expect.stringContaining('could not be resolved'),
+    const promise = backlinkTarget.ensure('Links', 3)
+    await expect(promise).rejects.toSatisfy((error: unknown) => {
+      return (
+        isAppError(error) &&
+        error.kind === 'unknown' &&
+        error.message.includes('could not be resolved')
+      )
     })
     expect(noteFile.getReads()).toEqual([])
   })

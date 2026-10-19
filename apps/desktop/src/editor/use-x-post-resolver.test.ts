@@ -134,15 +134,11 @@ it('fetches, saves, and renders a post that has no archive', async () => {
 
   expect(post).toMatchObject({ id: '123' })
   expect(xArchive.syndicationRequests()).toEqual(['123'])
-  expect(xArchive.writes()).toEqual([
-    {
-      generation: 7,
-      post: expect.objectContaining({
-        kind: 'x-post',
-        data: expect.objectContaining({ id: '123' }),
-      }),
-    },
-  ])
+  const writes = xArchive.writes()
+  expect(writes).toHaveLength(1)
+  expect(writes[0]?.generation).toBe(7)
+  expect(writes[0]?.post.kind).toBe('x-post')
+  expect(writes[0]?.post.data.id).toBe('123')
 })
 
 it('asks X once for a post that does not exist', async () => {

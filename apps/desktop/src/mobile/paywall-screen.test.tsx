@@ -421,7 +421,7 @@ describe('PaywallScreen Reflect Classic verification', () => {
     await expect.element(view.getByText(/Couldn't check your subscription/)).toBeVisible()
     expect(logger.getErrors()).toContainEqual({
       message: 'Verifying the Reflect Classic subscription failed',
-      cause: expect.any(Error),
+      cause: expect.any(Error) as Error,
     })
     await view.getByRole('button', { name: 'Back' }).click()
     await vi.waitFor(() => expect(progressScreen()).toBeNull())

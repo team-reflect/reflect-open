@@ -798,7 +798,7 @@ describe('SettingsScreen', () => {
           ...DEFAULT_SETTINGS,
           aiPrompts: [
             {
-              id: expect.any(String) as string , // FIXME: for some known types, like expect.any(String), we can just use type assertion. Notice: avoid `as unknown`, `as any`, `as never` and `as unknown as string`. We perfer to use explicy types
+              id: expect.any(String) as string,
               label: 'Translate to French',
               body: 'Translate to French.\n\n{{selectedText}}',
               mode: 'replace',

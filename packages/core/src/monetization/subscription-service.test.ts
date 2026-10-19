@@ -129,7 +129,10 @@ describe('SubscriptionService', () => {
     await expect(answer).resolves.toBeNull()
     expect(subscription.getState()).toEqual({ value: null, isLoading: false, isError: true })
     expect(logger.getWarnings()).toEqual([
-      { message: 'Looking up the App Store subscription failed', cause: expect.any(Error) },
+      {
+        message: 'Looking up the App Store subscription failed',
+        cause: expect.any(Error) as Error,
+      },
     ])
     expect(lookups).toHaveLength(2)
     expect(storage.local.get(ACTIVE_SUBSCRIPTION_STORAGE_KEY)).toBeNull()

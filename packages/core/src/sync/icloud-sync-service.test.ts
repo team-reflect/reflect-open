@@ -487,7 +487,7 @@ describe('createICloudSyncService', () => {
     await settleScan(INGEST_SETTLE_MS)
     expect(scanCalls()[2]).toMatchObject({
       scope: 'full',
-      ingestedPaths: expect.arrayContaining(['notes/one.md', 'notes/two.md']),
+      ingestedPaths: expect.arrayContaining(['notes/one.md', 'notes/two.md']) as string[],
     })
   })
 

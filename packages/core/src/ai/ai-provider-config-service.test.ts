@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { AppError } from '../errors.ts'
+import { AppError, isAppError } from '../errors.ts'
 import type { HostedAiProviderConfig, Settings } from '../settings/schema.ts'
 import {
   createTestAiKeyValidationService,
@@ -184,9 +184,9 @@ describe('AiProviderConfigService', () => {
   it('refuses to add when the settings failed to load, storing no key', async () => {
     const { service, secretStore } = await createService({}, { failLoad: true })
 
-    await expect(service.add(draft())).rejects.toMatchObject({
-      kind: 'io',
-      message: expect.stringMatching(/could not be loaded/),
+    const promise = service.add(draft())
+    await expect(promise).rejects.toSatisfy((error: unknown) => {
+      return isAppError(error) && error.kind === 'io' && /could not be loaded/.test(error.message)
     })
 
     expect(secretStore.snapshot()).toEqual({})

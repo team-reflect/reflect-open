@@ -63,8 +63,9 @@ describe('TranscriptEnrichmentService.formatTranscript', () => {
       title: 'Launch planning',
       body: 'We reviewed the launch.\n\n## Next steps\n\n- Invite beta users',
     })
-    expect(languageModelService.calls()).toContainEqual({
-      config: expect.objectContaining({ model: 'gpt-5.4-nano' }),
+    const calls = languageModelService.calls()
+    expect(calls.map(({ config, apiKey }) => ({ model: config.model, apiKey }))).toContainEqual({
+      model: 'gpt-5.4-nano',
       apiKey: 'sk-live-key',
     })
   })

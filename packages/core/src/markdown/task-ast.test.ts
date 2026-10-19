@@ -247,7 +247,7 @@ describe('applyTaskEdits: toggle', () => {
       '+ [x] same\n+ [ ] same\n',
     )
     expect(logger.getWarnings()).toEqual([
-      { message: expect.stringContaining('taking the first of 2'), cause: undefined },
+      { message: expect.stringContaining('taking the first of 2') as string, cause: undefined },
     ])
   })
 

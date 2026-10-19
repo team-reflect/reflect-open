@@ -90,7 +90,7 @@ async function deriveExpectations(): Promise<ExpectedParity> {
     }
   }
 
-  const scalars: ScalarInputs = JSON.parse(readFileSync(join(corpusDir, 'scalars.json'), 'utf8'))
+  const scalars = JSON.parse(readFileSync(join(corpusDir, 'scalars.json'), 'utf8')) as ScalarInputs
   return {
     notes,
     foldKey: Object.fromEntries(scalars.foldKey.map((input) => [input, foldKey(input)])),
@@ -104,7 +104,7 @@ describe('TS↔Rust parity corpus', () => {
     if (process.env['UPDATE_PARITY']) {
       writeFileSync(expectedFile, `${JSON.stringify(derived, null, 2)}\n`)
     }
-    const committed: ExpectedParity = JSON.parse(readFileSync(expectedFile, 'utf8'))
+    const committed = JSON.parse(readFileSync(expectedFile, 'utf8')) as ExpectedParity
     expect(committed).toEqual(derived)
   })
 })

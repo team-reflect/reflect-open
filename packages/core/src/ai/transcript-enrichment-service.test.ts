@@ -106,12 +106,16 @@ describe('TranscriptEnrichmentService.generateTitle', () => {
     })
 
     expect(config.model).toBe(originalModel)
-    expect(languageModelService.calls()).toContainEqual({
-      config: expect.objectContaining({
-        id: config.id,
-        provider: config.provider,
-        model: titleModel,
-      }),
+    const calls = languageModelService.calls().map((call) => ({
+      id: call.config.id,
+      provider: call.config.provider,
+      model: call.config.model,
+      apiKey: call.apiKey,
+    }))
+    expect(calls).toContainEqual({
+      id: config.id,
+      provider: config.provider,
+      model: titleModel,
       apiKey: 'sk-live-key',
     })
   })

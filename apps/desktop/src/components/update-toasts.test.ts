@@ -30,11 +30,11 @@ describe('attachUpdateToasts', () => {
         description: 'Reflect 1.2.3 is ready to install.',
         timeout: 0,
         data: { dismissible: false },
-        actionProps: expect.objectContaining({ children: 'Install' }),
       }),
     )
 
     const options = toast.add.mock.lastCall?.[0]
+    expect(options?.actionProps?.children).toBe('Install')
     options?.actionProps?.onClick()
     expect(update.calls).toEqual(['install'])
   })
@@ -68,9 +68,9 @@ describe('attachUpdateToasts', () => {
         id: 'reflect-update',
         title: 'Update ready',
         type: 'success',
-        actionProps: expect.objectContaining({ children: 'Restart' }),
       }),
     )
+    expect(toast.add.mock.lastCall?.[0]?.actionProps?.children).toBe('Restart')
   })
 
   it('surfaces install errors but ignores check-only failures', () => {
@@ -88,11 +88,12 @@ describe('attachUpdateToasts', () => {
         title: 'Update failed',
         description: 'signature failed',
         type: 'error',
-        actionProps: expect.objectContaining({ children: 'Retry install' }),
       }),
     )
 
-    toast.add.mock.lastCall?.[0]?.actionProps?.onClick()
+    const options = toast.add.mock.lastCall?.[0]
+    expect(options?.actionProps?.children).toBe('Retry install')
+    options?.actionProps?.onClick()
     expect(update.calls).toEqual(['retryAction', 'install'])
   })
 

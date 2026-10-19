@@ -7,6 +7,7 @@ import {
   createTranscriptionService,
   type TranscriptionRequest,
 } from './transcription-service.ts'
+import { isAppError } from '../errors.ts'
 import { APP_REVIEW_STUB_KEY } from './app-review-demo.ts'
 import { isTranscriptionOversize, isTranscriptionRejected } from './transcribe-http.ts'
 
@@ -120,8 +121,8 @@ describe('TranscriptionService (openai)', () => {
 
     const failure: unknown = await transcribe(fetchFn, request()).catch((cause: unknown) => cause)
 
-    expect(isTranscriptionRejected(failure)).toBe(true)
-    expect(failure).toMatchObject({ message: expect.stringContaining('Invalid file format.') })
+    expect.assert(isTranscriptionRejected(failure))
+    expect(failure.message).toContain('Invalid file format.')
     expect(calls).toHaveLength(1)
   })
 
@@ -195,9 +196,9 @@ describe('TranscriptionService (openai)', () => {
     const fetchFn: typeof fetch = () =>
       Promise.reject(new DOMException('The operation timed out.', 'TimeoutError'))
 
-    await expect(transcribe(fetchFn, request())).rejects.toMatchObject({
-      kind: 'network',
-      message: expect.stringContaining('timed out'),
+    const promise = transcribe(fetchFn, request())
+    await expect(promise).rejects.toSatisfy((error: unknown) => {
+      return isAppError(error) && error.kind === 'network' && error.message.includes('timed out')
     })
   })
 })
@@ -276,9 +277,11 @@ describe('TranscriptionService (google)', () => {
       jsonResponse(429, { error: { message: 'quota exhausted' } }),
     )
 
-    await expect(transcribe(fetchFn, request({ provider: 'google' }))).rejects.toMatchObject({
-      kind: 'network',
-      message: expect.stringContaining('quota exhausted'),
+    const promise = transcribe(fetchFn, request({ provider: 'google' }))
+    await expect(promise).rejects.toSatisfy((error: unknown) => {
+      return (
+        isAppError(error) && error.kind === 'network' && error.message.includes('quota exhausted')
+      )
     })
     expect(calls).toHaveLength(1)
   })

@@ -101,16 +101,12 @@ describe('EmbedMediaService.loadXPost', () => {
 
     expect(post).toMatchObject({ id: '123' })
     expect(xArchive.syndicationRequests()).toEqual(['123'])
-    expect(xArchive.writes()).toEqual([
-      {
-        generation: 7,
-        post: expect.objectContaining({
-          kind: 'x-post',
-          capturedAt: '2026-10-13T08:00:00.000Z',
-          data: expect.objectContaining({ id: '123' }),
-        }),
-      },
-    ])
+    const writes = xArchive.writes()
+    expect(writes).toHaveLength(1)
+    expect(writes[0]?.generation).toBe(7)
+    expect(writes[0]?.post.kind).toBe('x-post')
+    expect(writes[0]?.post.capturedAt).toBe('2026-10-13T08:00:00.000Z')
+    expect(writes[0]?.post.data.id).toBe('123')
   })
 
   it('asks X once for a post that does not exist', async () => {
@@ -289,14 +285,12 @@ describe('EmbedMediaService.resolveYouTubeVideo', () => {
   it('logs an answer that is not an object and asks again', async () => {
     const { embedMedia, logger } = setup('null', JSON.stringify(ANSWER))
     expect(await embedMedia.resolveYouTubeVideo(URL)).toBeUndefined()
-    expect(logger.getErrors()).toEqual([
-      {
-        message: `YouTube video fetch failed: ${URL}`,
-        cause: expect.objectContaining({
-          message: expect.stringContaining('invalid oEmbed answer'),
-        }),
-      },
-    ])
+    const errors = logger.getErrors()
+    expect(errors).toHaveLength(1)
+    expect(errors[0]?.message).toBe(`YouTube video fetch failed: ${URL}`)
+    expect(errors[0]?.cause).toSatisfy((cause: unknown) => {
+      return cause instanceof Error && cause.message.includes('invalid oEmbed answer')
+    })
     expect(await embedMedia.resolveYouTubeVideo(URL)).toEqual(VIDEO)
   })
 })

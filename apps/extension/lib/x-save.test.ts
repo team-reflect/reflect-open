@@ -1,3 +1,4 @@
+import type { ExtensionCaptureWire } from '@reflect/core/capture-envelope'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { saveXPost } from './x-save.ts'
 import { enqueueCapture, flushQueue } from './flush.ts'
@@ -16,7 +17,7 @@ beforeEach(() => {
 it('queues authenticated post data when the lookup succeeds', async () => {
   await saveXPost(1, '123')
   expect(enqueueCapture).toHaveBeenCalledWith(
-    { envelope: expect.objectContaining({ data: post }) },
+    { envelope: expect.objectContaining({ data: post }) as ExtensionCaptureWire['envelope'] },
     undefined,
   )
   expect(flushQueue).toHaveBeenCalledOnce()
@@ -39,7 +40,7 @@ it.each(['not-observed', 'page-changed', 'timeout', 'missing-bridge', 'wrong-pos
           version: 2,
           kind: 'x-bookmark',
           source: 'extension',
-          id: expect.any(String),
+          id: expect.any(String) as string,
           capturedAt: '2026-09-14T00:00:00Z',
           postId: '123',
         },
@@ -65,7 +66,7 @@ it.each([true, false])('preserves the like kind with snapshot available=%s', asy
       envelope: expect.objectContaining({
         kind: 'x-like',
         ...(available ? { data: post } : { postId: '123' }),
-      }),
+      }) as ExtensionCaptureWire['envelope'],
     },
     shouldAdmit,
   )

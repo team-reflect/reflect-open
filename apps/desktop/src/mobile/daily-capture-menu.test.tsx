@@ -98,15 +98,13 @@ describe('DailyCaptureMenu', () => {
 
     await view.getByRole('button', { name: 'New note' }).click()
 
-    expect(view.appServices.navigation.navigations()).toEqual([
-      {
-        route: expect.objectContaining({
-          kind: 'note',
-          path: expect.stringMatching(/^notes\/.+\.md$/),
-        }),
-        options: undefined,
-      },
-    ])
+    const navigations = view.appServices.navigation.navigations()
+    expect(navigations).toHaveLength(1)
+    expect(navigations[0]?.route).toMatchObject({
+      kind: 'note',
+      path: expect.stringMatching(/^notes\/.+\.md$/) as string,
+    })
+    expect(navigations[0]?.options).toBeUndefined()
     await expect
       .element(view.getByRole('button', { name: 'Show capture actions' }))
       .toHaveAttribute('aria-expanded', 'false')

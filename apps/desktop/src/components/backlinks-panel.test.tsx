@@ -17,18 +17,10 @@ import { BacklinksPanel } from './backlinks-panel.tsx'
 import { deepLinkForRoute } from '@reflect/app'
 
 // What the app's fakes answer; each test sets them before `renderPanel`.
-const getBacklinksWithContext = vi.fn() // FIXME: TODO 2: const getBacklinksWithContext = vi.fn<BacklinkService['getBacklinksWithContext']>()
+const getBacklinksWithContext = vi.fn<BacklinkService['getBacklinksWithContext']>()
 const resolveOrCreateNoteWithTitle = vi.fn<NoteCreationService['resolveOrCreateNoteWithTitle']>()
 const resolveMarkdownHref = vi.fn<NoteLinkResolverService['resolveMarkdownHref']>()
 const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
-
-// FIXME: TODO 1: just remove `getBacklinksPage`, let's use getBacklinksWithContext directly.
-const getBacklinksPage: BacklinkService['getBacklinksWithContext'] = async (path, options) => {
-  const result: unknown = await getBacklinksWithContext(path, options)
-  return Array.isArray(result)
-    ? wrapBacklinkContexts(result as BacklinkContext[])
-    : (result as BacklinkContextPage)
-}
 
 function wrapBacklinkContexts(contexts: BacklinkContext[]): BacklinkContextPage {
   return { contexts, nextCursor: null, indexedLinkCount: contexts.length }
@@ -36,7 +28,9 @@ function wrapBacklinkContexts(contexts: BacklinkContext[]): BacklinkContextPage 
 
 function createApp() {
   const services = createTestCoreServices()
-  vi.spyOn(services.backlinks, 'getBacklinksWithContext').mockImplementation(getBacklinksPage)
+  vi.spyOn(services.backlinks, 'getBacklinksWithContext').mockImplementation(
+    getBacklinksWithContext,
+  )
   vi.spyOn(services.noteCreation, 'resolveOrCreateNoteWithTitle').mockImplementation(
     resolveOrCreateNoteWithTitle,
   )
@@ -83,7 +77,7 @@ beforeEach(() => {
 
 describe('BacklinksPanel', () => {
   it('renders nothing when the note has no inbound links', async () => {
-    getBacklinksWithContext.mockResolvedValue([])
+    getBacklinksWithContext.mockResolvedValue(wrapBacklinkContexts([]))
     const view = await renderPanel('notes/lonely.md')
     await vi.waitFor(() => expect(getBacklinksWithContext).toHaveBeenCalled())
     expect(view.getByText(/Incoming backlink/).query()).toBeNull()
@@ -98,30 +92,34 @@ describe('BacklinksPanel', () => {
   })
 
   it('uses the singular header for one inbound link', async () => {
-    getBacklinksWithContext.mockResolvedValue(wrapBacklinkContexts([ // FIXME: TODO 3: for all getBacklinksWithContext calls that return an array, just wrap it in wrapBacklinkContexts() instead of returning an array directly.
-      {
-        sourcePath: 'notes/meeting.md',
-        sourceTitle: 'Meeting Notes',
-        snippet: 'discussed [[Roadmap]] follow-ups',
-        posFrom: 12,
-        tasks: [],
-      },
-    ]))
+    getBacklinksWithContext.mockResolvedValue(
+      wrapBacklinkContexts([
+        {
+          sourcePath: 'notes/meeting.md',
+          sourceTitle: 'Meeting Notes',
+          snippet: 'discussed [[Roadmap]] follow-ups',
+          posFrom: 12,
+          tasks: [],
+        },
+      ]),
+    )
     const view = await renderPanel('notes/roadmap.md')
     await expect.element(view.getByText('Incoming backlink (1)')).toBeInTheDocument()
     await view.unmount()
   })
 
   it('renders a snippet wiki link as a clickable chip that navigates to its target', async () => {
-    getBacklinksWithContext.mockResolvedValue([
-      {
-        sourcePath: 'notes/meeting.md',
-        sourceTitle: 'Meeting Notes',
-        snippet: 'discussed [[Roadmap]] follow-ups',
-        posFrom: 12,
-        tasks: [],
-      },
-    ])
+    getBacklinksWithContext.mockResolvedValue(
+      wrapBacklinkContexts([
+        {
+          sourcePath: 'notes/meeting.md',
+          sourceTitle: 'Meeting Notes',
+          snippet: 'discussed [[Roadmap]] follow-ups',
+          posFrom: 12,
+          tasks: [],
+        },
+      ]),
+    )
     resolveOrCreateNoteWithTitle.mockResolvedValue({
       kind: 'resolved',
       path: 'notes/roadmap.md',
@@ -139,15 +137,17 @@ describe('BacklinksPanel', () => {
   })
 
   it('names a daily-note source and a date chip by their day, not the ISO date', async () => {
-    getBacklinksWithContext.mockResolvedValue([
-      {
-        sourcePath: 'daily/2026-06-09.md',
-        sourceTitle: '2026-06-09',
-        snippet: 'moved from [[2026-06-08]]',
-        posFrom: 12,
-        tasks: [],
-      },
-    ])
+    getBacklinksWithContext.mockResolvedValue(
+      wrapBacklinkContexts([
+        {
+          sourcePath: 'daily/2026-06-09.md',
+          sourceTitle: '2026-06-09',
+          snippet: 'moved from [[2026-06-08]]',
+          posFrom: 12,
+          tasks: [],
+        },
+      ]),
+    )
     const view = await renderPanel('notes/roadmap.md')
 
     await expect
@@ -158,15 +158,17 @@ describe('BacklinksPanel', () => {
   })
 
   it('opens a relative Markdown link in a snippet from its source note', async () => {
-    getBacklinksWithContext.mockResolvedValue([
-      {
-        sourcePath: 'projects/TASKS.md',
-        sourceTitle: 'Project Tasks',
-        snippet: '- [[Roadmap]]\n  - [plan](./roadmap/plan.md)',
-        posFrom: 0,
-        tasks: [],
-      },
-    ])
+    getBacklinksWithContext.mockResolvedValue(
+      wrapBacklinkContexts([
+        {
+          sourcePath: 'projects/TASKS.md',
+          sourceTitle: 'Project Tasks',
+          snippet: '- [[Roadmap]]\n  - [plan](./roadmap/plan.md)',
+          posFrom: 0,
+          tasks: [],
+        },
+      ]),
+    )
     resolveMarkdownHref.mockResolvedValue({
       kind: 'resolved',
       path: 'projects/roadmap/plan.md',
@@ -185,29 +187,31 @@ describe('BacklinksPanel', () => {
   })
 
   it('groups references by source note and navigates on title click', async () => {
-    getBacklinksWithContext.mockResolvedValue([
-      {
-        sourcePath: 'notes/meeting.md',
-        sourceTitle: 'Meeting Notes',
-        snippet: 'discussed [[Roadmap]] follow-ups',
-        posFrom: 12,
-        tasks: [],
-      },
-      {
-        sourcePath: 'notes/meeting.md',
-        sourceTitle: 'Meeting Notes',
-        snippet: 'revisit [[Roadmap]] next week',
-        posFrom: 80,
-        tasks: [],
-      },
-      {
-        sourcePath: 'notes/planning.md',
-        sourceTitle: 'Planning',
-        snippet: 'ship the [[Roadmap]]',
-        posFrom: 3,
-        tasks: [],
-      },
-    ])
+    getBacklinksWithContext.mockResolvedValue(
+      wrapBacklinkContexts([
+        {
+          sourcePath: 'notes/meeting.md',
+          sourceTitle: 'Meeting Notes',
+          snippet: 'discussed [[Roadmap]] follow-ups',
+          posFrom: 12,
+          tasks: [],
+        },
+        {
+          sourcePath: 'notes/meeting.md',
+          sourceTitle: 'Meeting Notes',
+          snippet: 'revisit [[Roadmap]] next week',
+          posFrom: 80,
+          tasks: [],
+        },
+        {
+          sourcePath: 'notes/planning.md',
+          sourceTitle: 'Planning',
+          snippet: 'ship the [[Roadmap]]',
+          posFrom: 3,
+          tasks: [],
+        },
+      ]),
+    )
     const view = await renderPanel('notes/roadmap.md')
 
     await expect.element(view.getByText('Incoming backlinks (3)')).toBeInTheDocument()
@@ -228,15 +232,17 @@ describe('BacklinksPanel', () => {
   })
 
   it('opens a ⌘-clicked backlink source in a new window', async () => {
-    getBacklinksWithContext.mockResolvedValue([
-      {
-        sourcePath: 'notes/meeting.md',
-        sourceTitle: 'Meeting Notes',
-        snippet: 'discussed [[Roadmap]] follow-ups',
-        posFrom: 12,
-        tasks: [],
-      },
-    ])
+    getBacklinksWithContext.mockResolvedValue(
+      wrapBacklinkContexts([
+        {
+          sourcePath: 'notes/meeting.md',
+          sourceTitle: 'Meeting Notes',
+          snippet: 'discussed [[Roadmap]] follow-ups',
+          posFrom: 12,
+          tasks: [],
+        },
+      ]),
+    )
     const view = await renderPanel('notes/roadmap.md')
 
     await view.getByText('Meeting Notes').click({ modifiers: ['ControlOrMeta'] })
@@ -254,15 +260,17 @@ describe('BacklinksPanel', () => {
   })
 
   it('collapses snippets but keeps source titles on header toggle, for the session', async () => {
-    getBacklinksWithContext.mockResolvedValue([
-      {
-        sourcePath: 'notes/meeting.md',
-        sourceTitle: 'Meeting Notes',
-        snippet: 'discussed [[Roadmap]] follow-ups',
-        posFrom: 12,
-        tasks: [],
-      },
-    ])
+    getBacklinksWithContext.mockResolvedValue(
+      wrapBacklinkContexts([
+        {
+          sourcePath: 'notes/meeting.md',
+          sourceTitle: 'Meeting Notes',
+          snippet: 'discussed [[Roadmap]] follow-ups',
+          posFrom: 12,
+          tasks: [],
+        },
+      ]),
+    )
     const view = await renderPanel('notes/roadmap.md')
 
     const header = view.getByRole('button', { name: /Incoming backlink \(1\)/ })
@@ -283,15 +291,17 @@ describe('BacklinksPanel', () => {
   })
 
   it('resets a collapsed group when navigating to another note with the same source', async () => {
-    getBacklinksWithContext.mockResolvedValue([
-      {
-        sourcePath: 'notes/shared.md',
-        sourceTitle: 'Shared Source',
-        snippet: 'links [[A]] and [[B]]',
-        posFrom: 5,
-        tasks: [],
-      },
-    ])
+    getBacklinksWithContext.mockResolvedValue(
+      wrapBacklinkContexts([
+        {
+          sourcePath: 'notes/shared.md',
+          sourceTitle: 'Shared Source',
+          snippet: 'links [[A]] and [[B]]',
+          posFrom: 5,
+          tasks: [],
+        },
+      ]),
+    )
     const view = await renderInGraph(<BacklinksPanel path="notes/a.md" />)
 
     await expect.element(view.getByText(/links/)).toBeInTheDocument()
@@ -304,15 +314,17 @@ describe('BacklinksPanel', () => {
   })
 
   it('keeps simultaneously mounted panels in sync (one per day in the stream)', async () => {
-    getBacklinksWithContext.mockResolvedValue([
-      {
-        sourcePath: 'notes/meeting.md',
-        sourceTitle: 'Meeting Notes',
-        snippet: 'discussed [[Roadmap]] follow-ups',
-        posFrom: 12,
-        tasks: [],
-      },
-    ])
+    getBacklinksWithContext.mockResolvedValue(
+      wrapBacklinkContexts([
+        {
+          sourcePath: 'notes/meeting.md',
+          sourceTitle: 'Meeting Notes',
+          snippet: 'discussed [[Roadmap]] follow-ups',
+          posFrom: 12,
+          tasks: [],
+        },
+      ]),
+    )
     const view = await renderInGraph(
       <>
         <BacklinksPanel path="daily/2026-06-09.md" />
@@ -331,22 +343,24 @@ describe('BacklinksPanel', () => {
   })
 
   it('lets one group be peeked at after the header collapse (old Reflect behavior)', async () => {
-    getBacklinksWithContext.mockResolvedValue([
-      {
-        sourcePath: 'notes/meeting.md',
-        sourceTitle: 'Meeting Notes',
-        snippet: 'discussed [[Roadmap]] follow-ups',
-        posFrom: 12,
-        tasks: [],
-      },
-      {
-        sourcePath: 'notes/planning.md',
-        sourceTitle: 'Planning',
-        snippet: 'ship the [[Roadmap]]',
-        posFrom: 3,
-        tasks: [],
-      },
-    ])
+    getBacklinksWithContext.mockResolvedValue(
+      wrapBacklinkContexts([
+        {
+          sourcePath: 'notes/meeting.md',
+          sourceTitle: 'Meeting Notes',
+          snippet: 'discussed [[Roadmap]] follow-ups',
+          posFrom: 12,
+          tasks: [],
+        },
+        {
+          sourcePath: 'notes/planning.md',
+          sourceTitle: 'Planning',
+          snippet: 'ship the [[Roadmap]]',
+          posFrom: 3,
+          tasks: [],
+        },
+      ]),
+    )
     const view = await renderPanel('notes/roadmap.md')
 
     const header = view.getByRole('button', { name: /Incoming backlinks \(2\)/ })
@@ -364,22 +378,24 @@ describe('BacklinksPanel', () => {
   })
 
   it('collapses one source group via its own chevron', async () => {
-    getBacklinksWithContext.mockResolvedValue([
-      {
-        sourcePath: 'notes/meeting.md',
-        sourceTitle: 'Meeting Notes',
-        snippet: 'discussed [[Roadmap]] follow-ups',
-        posFrom: 12,
-        tasks: [],
-      },
-      {
-        sourcePath: 'notes/planning.md',
-        sourceTitle: 'Planning',
-        snippet: 'ship the [[Roadmap]]',
-        posFrom: 3,
-        tasks: [],
-      },
-    ])
+    getBacklinksWithContext.mockResolvedValue(
+      wrapBacklinkContexts([
+        {
+          sourcePath: 'notes/meeting.md',
+          sourceTitle: 'Meeting Notes',
+          snippet: 'discussed [[Roadmap]] follow-ups',
+          posFrom: 12,
+          tasks: [],
+        },
+        {
+          sourcePath: 'notes/planning.md',
+          sourceTitle: 'Planning',
+          snippet: 'ship the [[Roadmap]]',
+          posFrom: 3,
+          tasks: [],
+        },
+      ]),
+    )
     const view = await renderPanel('notes/roadmap.md')
     await expect.element(view.getByText('Incoming backlinks (2)')).toBeInTheDocument()
 

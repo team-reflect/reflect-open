@@ -682,7 +682,7 @@ describe('createBackupService', () => {
     expect(calls).not.toContain('push')
     expect(logger.getErrors()).toContainEqual({
       message: 'reading the GitHub credential failed:',
-      cause: expect.any(String),
+      cause: expect.any(String) as string,
     })
     backup.dispose()
   })
