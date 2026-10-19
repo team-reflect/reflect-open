@@ -310,12 +310,14 @@ export default defineESLintConfig(
   {
     ignores: ['./design-system/', '**/.wxt/', '**/.output/'],
   },
+  // FIXME: delete rule below
   {
     files: ['apps/desktop/scripts/**/*.ts'],
     rules: {
       curly: ['error', 'all'],
     },
   },
+  // FIXME: delete rule above
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.mjs'],
     /// keep-sorted
