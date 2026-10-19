@@ -86,6 +86,6 @@ class AppStorePlugin: Plugin {
 }
 
 @_cdecl("init_plugin_app_store")
-func initPlugin() -> Plugin {
+public func initPlugin() -> Plugin {
   return AppStorePlugin()
 }

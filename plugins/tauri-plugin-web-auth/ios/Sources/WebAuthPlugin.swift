@@ -71,6 +71,6 @@ class WebAuthPlugin: Plugin, ASWebAuthenticationPresentationContextProviding {
 }
 
 @_cdecl("init_plugin_web_auth")
-func initPlugin() -> Plugin {
+public func initPlugin() -> Plugin {
   return WebAuthPlugin()
 }

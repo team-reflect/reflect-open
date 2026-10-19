@@ -966,6 +966,6 @@ private class RecorderDelegateProxy: NSObject, AVAudioRecorderDelegate {
 }
 
 @_cdecl("init_plugin_recording")
-func initPlugin() -> Plugin {
+public func initPlugin() -> Plugin {
   return RecordingPlugin()
 }

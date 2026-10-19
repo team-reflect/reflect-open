@@ -99,6 +99,6 @@ class KeyboardPlugin: Plugin {
 }
 
 @_cdecl("init_plugin_keyboard")
-func initPlugin() -> Plugin {
+public func initPlugin() -> Plugin {
   return KeyboardPlugin()
 }
