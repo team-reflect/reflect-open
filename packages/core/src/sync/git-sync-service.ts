@@ -20,7 +20,7 @@ import type { CredentialResolver } from './credential-resolver.ts'
 import type { GitHostCredentialService } from './git-host-credential-service.ts'
 import type { ChangedFile, GitCredential, GitRepositoryService } from './git-repository-service.ts'
 import type { GithubAuthService } from './github-auth-service.ts'
-import { classifyForbiddenStatus } from './github-connector.ts'
+import { classifyForbiddenStatus } from './github-forbidden.ts'
 import { classifyRemote, type GitRemote } from './remote-url.ts'
 
 /**

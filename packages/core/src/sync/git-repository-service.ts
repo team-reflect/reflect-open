@@ -143,7 +143,7 @@ export interface GitRepositoryService {
   remoteHead(
     credential: GitCredential | null,
     generation: number,
-    url?: string | undefined,
+    url?: string  ,
   ): Promise<RemoteTip>
   /**
    * Push to `origin`; rejections come back as data, not thrown errors.
@@ -195,7 +195,7 @@ class GitRepositoryServiceImpl implements GitRepositoryService {
   remoteHead(
     credential: GitCredential | null,
     generation: number,
-    url?: string | undefined,
+    url?: string  ,
   ): Promise<RemoteTip> {
     return this.#deps.ipc.call(
       'git_remote_head',
