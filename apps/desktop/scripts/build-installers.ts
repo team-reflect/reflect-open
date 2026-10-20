@@ -1,5 +1,5 @@
-// Builds the installers of the platform this runs on: the NSIS installer on
-// Windows, the AppImage and `.deb` on Linux. None of them is code-signed. With
+// Builds the installers of the target platform: the NSIS installer for
+// Windows, the AppImage and `.deb` for Linux. None of them is code-signed. With
 // TAURI_SIGNING_PRIVATE_KEY set, Tauri also writes the updater signature
 // (`.sig`) of each one. See docs/windows-builds.md and docs/linux-builds.md.
 //
@@ -19,18 +19,30 @@ import {
   TARGET_DIR,
 } from './helpers.ts'
 
-const BUNDLES =
-  process.platform === 'win32'
-    ? // NSIS only: WiX rejects prerelease versions such as 0.11.0-beta.
-      [{ name: 'nsis', suffix: '-setup.exe' }]
-    : [
-        { name: 'appimage', suffix: '.AppImage' },
-        { name: 'deb', suffix: '.deb' },
-      ]
+interface BundleKind {
+  readonly name: string
+  readonly suffix: string
+}
+
+/** The Tauri bundles of a target triple. */
+function resolveBundleKinds(target: string): BundleKind[] {
+  if (target.includes('-windows-')) {
+    // NSIS only: WiX rejects prerelease versions such as 0.11.0-beta.
+    return [{ name: 'nsis', suffix: '-setup.exe' }]
+  }
+  if (target.includes('-linux-')) {
+    return [
+      { name: 'appimage', suffix: '.AppImage' },
+      { name: 'deb', suffix: '.deb' },
+    ]
+  }
+  throw new Error(`unsupported target "${target}"`)
+}
 
 /** Builds the installers and returns their paths. */
 async function buildInstallers(target: string, tempDir: string): Promise<string[]> {
-  const bundleNames = BUNDLES.map((bundle) => bundle.name).join(',')
+  const kinds = resolveBundleKinds(target)
+  const bundleNames = kinds.map((kind) => kind.name).join(',')
   const args = ['build', '--target', target, '--bundles', bundleNames, ...getFlavorConfigArgs()]
   const env: NodeJS.ProcessEnv = {}
   if (process.env.TAURI_SIGNING_PRIVATE_KEY) {
@@ -41,7 +53,7 @@ async function buildInstallers(target: string, tempDir: string): Promise<string[
     // Without a password variable, Tauri asks for the password on stdin.
     env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD = process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? ''
   }
-  const bundles = BUNDLES.map(({ name, suffix }) => ({
+  const bundles = kinds.map(({ name, suffix }) => ({
     dir: join(TARGET_DIR, target, 'release', 'bundle', name),
     suffix,
   }))

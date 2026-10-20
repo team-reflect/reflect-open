@@ -117,21 +117,10 @@ if (links.length === 0) {
     `no installer among the asset names. Expected: ${INSTALLERS.map((item) => item.file).join(', ')}`,
   )
 }
-links.push(
-  version.includes('-')
-    ? {
-        os: 'iOS',
-        chip: 'TestFlight',
-        color: '0EA5E9',
-        url: 'https://testflight.apple.com/join/j2eEz43d',
-      }
-    : {
-        os: 'iOS',
-        chip: 'App Store',
-        color: '0EA5E9',
-        url: 'https://apps.apple.com/us/app/reflect-open/id6787385615',
-      },
-)
+const ios = version.includes('-')
+  ? { chip: 'TestFlight', url: 'https://testflight.apple.com/join/j2eEz43d' }
+  : { chip: 'App Store', url: 'https://apps.apple.com/us/app/reflect-open/id6787385615' }
+links.push({ os: 'iOS', color: '0EA5E9', ...ios })
 
 let markdown = '## Download\n'
 for (const { os, heading, icon } of PLATFORMS) {

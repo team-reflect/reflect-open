@@ -71,11 +71,17 @@ const TauriConfigSchema = z.object({
   }),
 })
 
+interface Dsym {
+  /** The target triple whose build wrote the dSYM. */
+  readonly triple: string
+  readonly path: string
+}
+
 interface Executable {
   readonly path: string
   readonly symbol: string
   /** One dSYM per architecture. */
-  readonly dsyms: readonly string[]
+  readonly dsyms: readonly Dsym[]
 }
 
 interface Bundle {
@@ -130,7 +136,10 @@ function resolveBundle(target: string): Bundle {
     if (!symbol) {
       throw new Error(`no crate symbol for ${name}`)
     }
-    const dsyms = triples.map((triple) => join(TARGET_DIR, triple, 'release', `${name}.dSYM`))
+    const dsyms = triples.map((triple) => ({
+      triple,
+      path: join(TARGET_DIR, triple, 'release', `${name}.dSYM`),
+    }))
     return { path, symbol, dsyms }
   })
   return {
@@ -177,7 +186,11 @@ async function buildApp(bundle: Bundle): Promise<void> {
     CARGO_PROFILE_RELEASE_STRIP: 'symbols',
   })
   for (const { path, dsyms, symbol } of bundle.executables) {
-    await assertDsyms(path, dsyms, symbol)
+    await assertDsyms(
+      path,
+      dsyms.map((dsym) => dsym.path),
+      symbol,
+    )
   }
 }
 
@@ -442,9 +455,10 @@ async function exportArtifacts(bundle: Bundle, artifactDir: string): Promise<voi
   copyFileSync(`${bundle.updaterArchive}.sig`, join(artifactDir, `${prefix}.app.tar.gz.sig`))
   await runWithTempDir(async (tempDir) => {
     // `<triple>/<binary>.dSYM`: a universal build has one dSYM per architecture.
-    for (const dsym of bundle.executables.flatMap((executable) => executable.dsyms)) {
-      const triple = basename(dirname(dirname(dsym)))
-      await exec('ditto', [realpathSync(dsym), join(tempDir, triple, basename(dsym))], INHERIT)
+    for (const { triple, path } of bundle.executables.flatMap((executable) => executable.dsyms)) {
+      // Cargo writes `<binary>.dSYM` as a symlink into `deps/`, and `ditto`
+      // copies a symlink as a symlink, so copy the bundle it points to.
+      await exec('ditto', [realpathSync(path), join(tempDir, triple, basename(path))], INHERIT)
     }
     await exec('ditto', ['-c', '-k', tempDir, join(artifactDir, `${prefix}.dSYMs.zip`)], INHERIT)
   })

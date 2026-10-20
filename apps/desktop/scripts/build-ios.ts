@@ -79,6 +79,7 @@ async function main(): Promise<void> {
     },
   })
   const buildNumber = values['build-number']
+  const noSign = values['no-sign']
   if (!/^\d+$/.test(buildNumber)) {
     throw new Error(`invalid build number "${buildNumber}"`)
   }
@@ -89,7 +90,7 @@ async function main(): Promise<void> {
     const args = ['ios', 'build', '--ci', '--config', config]
     // Without line tables the dSYM cannot symbolicate Rust frames.
     const env: NodeJS.ProcessEnv = { CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only' }
-    if (values['no-sign']) {
+    if (noSign) {
       args.push('--no-sign')
     } else {
       const apiKey = resolveApiKey(tempDir)
@@ -101,11 +102,11 @@ async function main(): Promise<void> {
     }
     await runTauri(args, env)
   })
-  if (!values['no-sign']) {
+  if (!noSign) {
     await assertIpa()
   }
   await assertDsyms(APP_BINARY_PATH, [DSYM_PATH], '_reflect_start_native_diagnostics')
-  log(`built ${values['no-sign'] ? IOS_ARCHIVE_PATH : IOS_IPA_PATH} (build ${buildNumber})`)
+  log(`built ${noSign ? IOS_ARCHIVE_PATH : IOS_IPA_PATH} (build ${buildNumber})`)
 }
 
 await main()
