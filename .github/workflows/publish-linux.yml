@@ -53,11 +53,14 @@ jobs:
           ref: ${{ inputs.commit }}
           persist-credentials: false
 
+      # Any master job can write the caches, so a release build starts cold.
       - uses: ./.github/actions/setup-node
+        with:
+          cache: false
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache-key: ${{ matrix.target }}
+          cache: false
 
       - name: Build Linux packages
         env:

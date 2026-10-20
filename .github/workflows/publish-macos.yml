@@ -91,11 +91,14 @@ jobs:
             exit 1
           fi
 
+      # Any master job can write the caches, so a release build starts cold.
       - uses: ./.github/actions/setup-node
+        with:
+          cache: false
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache-key: ${{ matrix.target }}
+          cache: false
 
       # The universal build also compiles the x86_64 slice on this arm64 runner.
       - name: Add the x86_64 macOS target

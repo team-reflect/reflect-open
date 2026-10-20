@@ -58,11 +58,14 @@ jobs:
             exit 1
           fi
 
+      # Any master job can write the caches, so a release build starts cold.
       - uses: ./.github/actions/setup-node
+        with:
+          cache: false
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache-key: aarch64-apple-ios
+          cache: false
 
       - name: Resolve build number
         id: build_number

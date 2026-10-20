@@ -1,6 +1,12 @@
 name: Set up Node.js and pnpm
 description: Installs Node.js, pnpm, and dependencies.
 
+inputs:
+  cache:
+    description: Whether to restore and save the pnpm store cache.
+    required: false
+    default: 'true'
+
 runs:
   using: composite
   steps:
@@ -17,7 +23,7 @@ runs:
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: 24
-        cache: pnpm
+        cache: ${{ inputs.cache == 'true' && 'pnpm' || '' }}
 
     - name: Install dependencies
       shell: bash

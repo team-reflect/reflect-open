@@ -2,6 +2,10 @@ name: Set up Rust
 description: Installs the Rust toolchain, the cargo build cache, and on Linux the Tauri system dependencies.
 
 inputs:
+  cache:
+    description: Whether to restore and save the cargo build cache.
+    required: false
+    default: 'true'
   cache-key:
     description: An extra key for the cargo build cache, for jobs that must not share one.
     required: false
@@ -71,6 +75,7 @@ runs:
     # `env-vars` puts ORT_CACHE_DIR into the cache key, so changing the path
     # starts from a cold cache instead of a target/ that points to the old one.
     - name: Cache cargo build
+      if: inputs.cache == 'true'
       uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       with:
         key: ${{ inputs.cache-key }}
