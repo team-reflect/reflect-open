@@ -177,9 +177,14 @@ pub fn fetch(root: &Path, credential: Option<GitCredential>) -> AppResult<Remote
     remote::fetch(root, credential)
 }
 
-/// Read the remote tip of the current branch without fetching.
-pub fn remote_head(root: &Path, credential: Option<GitCredential>) -> AppResult<RemoteTip> {
-    remote::remote_head(root, credential)
+/// Read the remote tip of the current branch without fetching. `url` probes
+/// a remote other than `origin`.
+pub fn remote_head(
+    root: &Path,
+    url: Option<&str>,
+    credential: Option<GitCredential>,
+) -> AppResult<RemoteTip> {
+    remote::remote_head(root, url, credential)
 }
 
 /// Push the current branch to `origin`; rejections come back as data.

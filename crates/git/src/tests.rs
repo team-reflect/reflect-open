@@ -1695,22 +1695,72 @@ fn remote_head_reports_the_bare_repo_tip() {
     commit_all(&other, "second", MAX_FILE_BYTES).unwrap();
     assert!(push(&other, None).unwrap().pushed);
 
-    let tip = remote_head(root, None).unwrap();
+    let tip = remote_head(root, None, None).unwrap();
     assert!(tip.remote_oid.is_some());
     assert!(tip.tracking_oid.is_some());
     assert_ne!(tip.remote_oid, tip.tracking_oid);
 
     fetch(root, None).unwrap();
-    let tip = remote_head(root, None).unwrap();
+    let tip = remote_head(root, None, None).unwrap();
     assert_eq!(tip.remote_oid, tip.tracking_oid);
 }
 
 #[test]
 fn remote_head_on_an_unborn_remote_is_none() {
     let fixture = fixture();
-    let tip = remote_head(&fixture.graph_a, None).unwrap();
+    let tip = remote_head(&fixture.graph_a, None, None).unwrap();
     assert_eq!(tip.remote_oid, None);
     assert_eq!(tip.tracking_oid, None);
+}
+
+#[test]
+fn remote_head_probes_a_url_that_is_not_origin() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n");
+    commit_all(root, "first", MAX_FILE_BYTES).unwrap();
+    assert!(push(root, None).unwrap().pushed);
+
+    // A graph with no remote at all probes the URL a connect is about to use.
+    let probe = fixture._dir.path().join("probe");
+    scaffold_graph(&probe);
+    setup(&probe, None, None).unwrap();
+    let tip = remote_head(&probe, Some(&fixture.remote_url), None).unwrap();
+    assert!(tip.remote_oid.is_some());
+    assert_eq!(tip.tracking_oid, None);
+    assert_eq!(tip.default_branch.as_deref(), Some("main"));
+    // The probe wrote nothing: `origin` is still absent.
+    assert!(super::status(&probe).unwrap().remote_url.is_none());
+
+    // An unreachable URL fails instead of being adopted.
+    let missing = fixture._dir.path().join("missing.git");
+    assert!(remote_head(&probe, Some(missing.to_str().unwrap()), None).is_err());
+}
+
+#[test]
+fn remote_head_reports_no_default_branch_for_an_empty_remote() {
+    let fixture = fixture();
+    let tip = remote_head(&fixture.graph_a, Some(&fixture.remote_url), None).unwrap();
+    assert_eq!(tip.default_branch, None);
+}
+
+#[test]
+fn http_host_extracts_the_host_only() {
+    use super::remote::http_host;
+    assert_eq!(
+        http_host("https://gitlab.com/a/b.git").as_deref(),
+        Some("gitlab.com")
+    );
+    assert_eq!(
+        http_host("https://alex:tok@GitLab.com:8443/a/b.git").as_deref(),
+        Some("gitlab.com")
+    );
+    assert_eq!(
+        http_host("http://gitea.local/a/b").as_deref(),
+        Some("gitea.local")
+    );
+    assert_eq!(http_host("git@gitlab.com:a/b.git"), None);
+    assert_eq!(http_host("/Volumes/NAS/notes.git"), None);
 }
 
 #[test]
