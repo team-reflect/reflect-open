@@ -1,4 +1,3 @@
-import type { MaybePromise } from '@reflect/utils'
 import { useState, type ReactElement } from 'react'
 import { Button } from '@/components/ui/button.tsx'
 import {
@@ -12,10 +11,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface GithubSignOutRowProps {
-  /** Remove the machine's GitHub credential (every connected graph stops syncing). */
-  signOut: () => MaybePromise<void>
   /** The one-line explanation shown beside the button, tuned to the caller. */
   description: string
 }
@@ -27,7 +25,8 @@ interface GithubSignOutRowProps {
  * reached: beside a connected repo, and (with no connected graph) on its own,
  * so the credential can still be cleared to switch to another account.
  */
-export function GithubSignOutRow({ signOut, description }: GithubSignOutRowProps): ReactElement {
+export function GithubSignOutRow({ description }: GithubSignOutRowProps): ReactElement {
+  const { githubAuth } = useCoreServices()
   const [open, setOpen] = useState(false)
   const action = useAsyncAction()
 
@@ -39,8 +38,9 @@ export function GithubSignOutRow({ signOut, description }: GithubSignOutRowProps
   }
 
   async function confirmSignOut(): Promise<void> {
+    // Clearing the sign-in restarts every graph's git sync by itself.
     await action.run(async () => {
-      await signOut()
+      await githubAuth.clear()
       setOpen(false)
     })
   }

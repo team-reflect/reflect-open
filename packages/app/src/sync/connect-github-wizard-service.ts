@@ -3,7 +3,7 @@ import {
   githubAppInstallUrl,
   newRepoUrl,
   parseRepoInput,
-  type GitSyncService,
+  type GithubConnector,
   type ClockService,
   type GithubRepoRef,
   type GithubAuthService,
@@ -139,7 +139,7 @@ export interface ConnectGithubWizardService {
  * The services a {@link ConnectGithubWizardService} runs on.
  */
 export interface ConnectGithubWizardDeps {
-  readonly connect: Pick<GitSyncService, 'connectNewRepo' | 'connectExistingRepo'>
+  readonly connect: Pick<GithubConnector, 'connectNewRepo' | 'connectExistingRepo'>
   readonly githubAuth: GithubAuthService
   readonly opener: OpenerService
   readonly lifecycle: AppLifecycleService

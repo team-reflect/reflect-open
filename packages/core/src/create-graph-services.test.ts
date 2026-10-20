@@ -64,7 +64,6 @@ function sessionDeps(app: TestCoreServices) {
       credentials: app.credentials,
       githubAuth: app.githubAuth,
       hostCredentials: app.hostCredentials,
-      githubRepos: app.githubRepos,
       fileChanges,
       indexLifecycle,
       progress: app.progress,
@@ -75,6 +74,8 @@ function sessionDeps(app: TestCoreServices) {
       icloudNative,
       logger,
     },
+    githubConnector: { githubAuth: app.githubAuth, githubRepos: app.githubRepos },
+    hostConnector: { git: app.gitRepository, hostCredentials: app.hostCredentials },
     icloudSync: {
       icloudNative,
       fileChanges,

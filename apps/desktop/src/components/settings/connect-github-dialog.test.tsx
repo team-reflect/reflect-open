@@ -1,22 +1,23 @@
 import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import { createSystemClock, type GitSyncService, type ConnectExistingResult } from '@reflect/core'
+import { createSystemClock, type GithubConnector, type ConnectExistingResult } from '@reflect/core'
 import { createTestOpenerService, type TestOpenerService } from '@reflect/app/testing'
 import {
   createTestCoreServices,
   createTestHttpService,
   createTestPlatformService,
   createTestGitSyncService,
+  createTestGithubConnector,
   createTestSecretStoreService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ConnectGithubDialog } from './connect-github-dialog.tsx'
 
-// The connect actions of the graph's git sync service, scripted per test.
+// The connect actions of the graph's GitHub connector, scripted per test.
 const sync = {
-  connectNewRepo: vi.fn<GitSyncService['connectNewRepo']>(),
-  connectExistingRepo: vi.fn<GitSyncService['connectExistingRepo']>(),
+  connectNewRepo: vi.fn<GithubConnector['connectNewRepo']>(),
+  connectExistingRepo: vi.fn<GithubConnector['connectExistingRepo']>(),
 }
 
 let opener: TestOpenerService
@@ -62,11 +63,13 @@ afterEach(() => {
 
 async function renderWizard(onClose = vi.fn()): Promise<ReturnType<typeof vi.fn>> {
   const gitSync = createTestGitSyncService({ state: { phase: 'disconnected' } })
-  gitSync.onConnectNewRepo(sync.connectNewRepo)
-  gitSync.onConnectExistingRepo(sync.connectExistingRepo)
+  const githubConnector = createTestGithubConnector()
+  githubConnector.onConnectNewRepo(sync.connectNewRepo)
+  githubConnector.onConnectExistingRepo(sync.connectExistingRepo)
   const app = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     gitSync,
+    githubConnector,
     // The wizard polls on the clock: real time, so `pollIntervalMs` elapses.
     clock: createSystemClock(),
     platform: createTestPlatformService({ isMacosDesktop: false, hasMacosTitleBarOverlay: false }),

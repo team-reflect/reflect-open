@@ -2,7 +2,7 @@ import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { createTestOpenerService, type TestOpenerService } from '@reflect/app/testing'
 import type { OpenerService } from '@reflect/app'
-import type { GitSyncService, GitSyncState } from '@reflect/core'
+import type { GithubAuthService, GitSyncState } from '@reflect/core'
 import {
   type TestOpenGraph,
   createTestCoreServices,
@@ -27,14 +27,13 @@ let githubConnected: boolean
 let opener: TestOpenerService
 let gitSync: TestGitSyncService
 let openUrl: MockInstance<OpenerService['openUrl']>
-let signOut: MockInstance<GitSyncService['signOut']>
+let signOut: MockInstance<GithubAuthService['clear']>
 
 beforeEach(() => {
   githubConnected = false
   opener = createTestOpenerService()
   openUrl = vi.spyOn(opener, 'openUrl')
   gitSync = createTestGitSyncService()
-  signOut = vi.spyOn(gitSync, 'signOut')
 })
 
 async function renderSection(
@@ -43,6 +42,7 @@ async function renderSection(
 ): Promise<TestCoreServices> {
   gitSync.setState(state)
   const app = createTestCoreServices({ database: createWasmTestDatabaseService(), gitSync })
+  signOut = vi.spyOn(app.githubAuth, 'clear')
   if (githubConnected) {
     await app.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
   }
@@ -330,7 +330,6 @@ describe('GitSyncSettingsField', () => {
   })
 
   it('shows sign-out failures inside the confirmation dialog', async () => {
-    signOut.mockRejectedValueOnce(new Error('Keychain denied'))
     await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
@@ -338,6 +337,7 @@ describe('GitSyncSettingsField', () => {
       isPrimaryChannel: true,
       status: { state: 'idle' },
     })
+    signOut.mockRejectedValueOnce(new Error('Keychain denied'))
 
     await userEvent.click(page.getByRole('button', { name: /Sign out of GitHub/ }))
     await userEvent.click(page.getByRole('button', { name: 'Sign out' }))
@@ -349,7 +349,6 @@ describe('GitSyncSettingsField', () => {
 
   it('does not close the sign-out dialog while sign-out is pending', async () => {
     const pendingSignOut = Promise.withResolvers<void>()
-    signOut.mockImplementationOnce(() => pendingSignOut.promise)
     await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
@@ -357,6 +356,7 @@ describe('GitSyncSettingsField', () => {
       isPrimaryChannel: true,
       status: { state: 'idle' },
     })
+    signOut.mockImplementationOnce(() => pendingSignOut.promise)
 
     await userEvent.click(page.getByRole('button', { name: /Sign out of GitHub/ }))
     await userEvent.click(page.getByRole('button', { name: 'Sign out' }))

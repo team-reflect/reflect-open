@@ -367,7 +367,7 @@ describe('MobileSettings', () => {
     await vi.waitFor(() => {
       const methods = view.gitSync.calls().map((call) => call.method)
       expect(methods.filter((method) => method === 'disconnectGraph')).toHaveLength(1)
-      expect(methods.filter((method) => method === 'signOut')).toHaveLength(1)
+      expect(view.app.githubAuth.getState().connected).toBe(false)
     })
   })
 

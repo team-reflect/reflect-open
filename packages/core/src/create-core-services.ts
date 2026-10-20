@@ -1022,6 +1022,8 @@ export function composeCoreServices(
     createServices: (session) => {
       return adapters.createGraphServices(session, {
         gitSync: gitSyncDeps,
+        githubConnector: { githubAuth, githubRepos },
+        hostConnector: { git: gitRepository, hostCredentials },
         icloudSync: icloudSyncDeps,
         icloudDownload: icloudDownloadDeps,
         capture: services.capture,
@@ -1126,7 +1128,6 @@ export function composeCoreServices(
     credentials,
     githubAuth,
     hostCredentials,
-    githubRepos,
     fileChanges,
     indexLifecycle,
     progress,

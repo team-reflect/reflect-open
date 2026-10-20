@@ -10,11 +10,9 @@ import type {
 } from '../ipc/icloud-native-service.ts'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { HttpService } from '../ports/http-service.ts'
-import type {
-  GitSyncService,
-  GitSyncState,
-  ConnectExistingResult,
-} from '../sync/git-sync-service.ts'
+import type { GitSyncService, GitSyncState } from '../sync/git-sync-service.ts'
+import type { ConnectExistingResult, GithubConnector } from '../sync/github-connector.ts'
+import type { ConnectHostInput, HostConnector } from '../sync/host-connector.ts'
 import type { ICloudSyncService } from '../sync/icloud-sync-service.ts'
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
 import type {
@@ -102,7 +100,7 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
       skippedLargeFiles: [],
     }),
     fetch: (): RemoteDelta => ({ ahead: 0, behind: 0 }),
-    remoteHead: (): RemoteTip => ({ remoteOid: null, trackingOid: null }),
+    remoteHead: (): RemoteTip => ({ remoteOid: null, trackingOid: null, defaultBranch: null }),
     push: (): PushOutcome => ({ pushed: true, nonFastForward: false, rejectionMessage: null }),
     pull: (): PullOutcome => ({
       committed: false,
@@ -153,9 +151,13 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
     return await this.#handlers.fetch(credential, generation)
   }
 
-  async remoteHead(credential: GitCredential | null, generation: number): Promise<RemoteTip> {
-    this.#log.push({ method: 'remoteHead', args: [credential, generation] })
-    return await this.#handlers.remoteHead(credential, generation)
+  async remoteHead(
+    credential: GitCredential | null,
+    generation: number,
+    url?: string | undefined,
+  ): Promise<RemoteTip> {
+    this.#log.push({ method: 'remoteHead', args: [credential, generation, url] })
+    return await this.#handlers.remoteHead(credential, generation, url)
   }
 
   async push(credential: GitCredential | null, generation: number): Promise<PushOutcome> {
@@ -462,31 +464,18 @@ export function createTestGithubAuthService(
  * One recorded {@link TestGitSyncService} action.
  */
 export type GitSyncCall =
-  | { readonly method: 'start' | 'disconnectGraph' | 'signOut' | 'syncNow' | 'dispose' }
-  | { readonly method: 'connectNewRepo'; readonly name: string }
-  | {
-      readonly method: 'connectExistingRepo'
-      readonly ref: GithubRepoRef
-      readonly allowPublic: boolean
-    }
+  | { readonly method: 'start' | 'disconnectGraph' | 'syncNow' | 'dispose' }
+  | { readonly method: 'connectRemote'; readonly remoteUrl: string; readonly branch: string | null }
 
 export interface TestGitSyncService extends GitSyncService {
   /**
-   * Publish `state` as the backup state and notify subscribers.
+   * Publish `state` and notify subscribers.
    */
   setState(state: GitSyncState): void
   /**
    * Every action called, in order.
    */
   calls(): readonly GitSyncCall[]
-  /**
-   * Answer `connectNewRepo`; it resolves `connected` by default.
-   */
-  onConnectNewRepo(handler: GitSyncService['connectNewRepo']): void
-  /**
-   * Answer `connectExistingRepo`; it resolves `connected` by default.
-   */
-  onConnectExistingRepo(handler: GitSyncService['connectExistingRepo']): void
 }
 
 /**
@@ -498,10 +487,6 @@ class TestGitSyncServiceImpl implements TestGitSyncService {
   #state: GitSyncState
   readonly #listeners = new Set<() => void>()
   readonly #log: GitSyncCall[] = []
-  #connectNew: GitSyncService['connectNewRepo'] = () => Promise.resolve('connected')
-  #connectExisting: GitSyncService['connectExistingRepo'] = (): Promise<ConnectExistingResult> => {
-    return Promise.resolve('connected')
-  }
 
   constructor(options?: { state?: GitSyncState }) {
     this.#state = options?.state ?? { phase: 'loading' }
@@ -524,29 +509,13 @@ class TestGitSyncServiceImpl implements TestGitSyncService {
     }
   }
 
-  async connectNewRepo(name: string): Promise<'connected' | 'manualCreateNeeded'> {
-    this.#log.push({ method: 'connectNewRepo', name })
-    return await this.#connectNew(name)
-  }
-
-  async connectExistingRepo(
-    ref: GithubRepoRef,
-    connectOptions?: { allowPublic?: boolean },
-  ): Promise<ConnectExistingResult> {
-    this.#log.push({
-      method: 'connectExistingRepo',
-      ref,
-      allowPublic: connectOptions?.allowPublic ?? false,
-    })
-    return await this.#connectExisting(ref, connectOptions)
+  connectRemote(remoteUrl: string, branch: string | null): Promise<void> {
+    this.#log.push({ method: 'connectRemote', remoteUrl, branch })
+    return Promise.resolve()
   }
 
   disconnectGraph(): void {
     this.#log.push({ method: 'disconnectGraph' })
-  }
-
-  signOut(): void {
-    this.#log.push({ method: 'signOut' })
   }
 
   syncNow(): void {
@@ -567,18 +536,116 @@ class TestGitSyncServiceImpl implements TestGitSyncService {
   calls(): readonly GitSyncCall[] {
     return [...this.#log]
   }
-
-  onConnectNewRepo(handler: GitSyncService['connectNewRepo']): void {
-    this.#connectNew = handler
-  }
-
-  onConnectExistingRepo(handler: GitSyncService['connectExistingRepo']): void {
-    this.#connectExisting = handler
-  }
 }
 
 export function createTestGitSyncService(options?: { state?: GitSyncState }): TestGitSyncService {
   return new TestGitSyncServiceImpl(options)
+}
+
+/**
+ * One recorded {@link TestGithubConnector} action.
+ */
+export type GithubConnectorCall =
+  | { readonly method: 'connectNewRepo'; readonly name: string }
+  | {
+      readonly method: 'connectExistingRepo'
+      readonly ref: GithubRepoRef
+      readonly allowPublic: boolean
+    }
+
+export interface TestGithubConnector extends GithubConnector {
+  /**
+   * Every action called, in order.
+   */
+  calls(): readonly GithubConnectorCall[]
+  /**
+   * Answer `connectNewRepo`; it resolves `connected` by default.
+   */
+  onConnectNewRepo(handler: GithubConnector['connectNewRepo']): void
+  /**
+   * Answer `connectExistingRepo`; it resolves `connected` by default.
+   */
+  onConnectExistingRepo(handler: GithubConnector['connectExistingRepo']): void
+}
+
+/**
+ * A scripted {@link GithubConnector}: it calls no API and records every action.
+ */
+class TestGithubConnectorImpl implements TestGithubConnector {
+  readonly #log: GithubConnectorCall[] = []
+  #connectNew: GithubConnector['connectNewRepo'] = () => Promise.resolve('connected')
+  #connectExisting: GithubConnector['connectExistingRepo'] = (): Promise<ConnectExistingResult> => {
+    return Promise.resolve('connected')
+  }
+
+  async connectNewRepo(name: string): Promise<'connected' | 'manualCreateNeeded'> {
+    this.#log.push({ method: 'connectNewRepo', name })
+    return await this.#connectNew(name)
+  }
+
+  async connectExistingRepo(
+    ref: GithubRepoRef,
+    connectOptions?: { allowPublic?: boolean | undefined },
+  ): Promise<ConnectExistingResult> {
+    this.#log.push({
+      method: 'connectExistingRepo',
+      ref,
+      allowPublic: connectOptions?.allowPublic ?? false,
+    })
+    return await this.#connectExisting(ref, connectOptions)
+  }
+
+  calls(): readonly GithubConnectorCall[] {
+    return [...this.#log]
+  }
+
+  onConnectNewRepo(handler: GithubConnector['connectNewRepo']): void {
+    this.#connectNew = handler
+  }
+
+  onConnectExistingRepo(handler: GithubConnector['connectExistingRepo']): void {
+    this.#connectExisting = handler
+  }
+}
+
+export function createTestGithubConnector(): TestGithubConnector {
+  return new TestGithubConnectorImpl()
+}
+
+export interface TestHostConnector extends HostConnector {
+  /**
+   * Every `connectHost` input, in order.
+   */
+  calls(): readonly ConnectHostInput[]
+  /**
+   * Answer `connectHost`; it resolves by default.
+   */
+  onConnectHost(handler: HostConnector['connectHost']): void
+}
+
+/**
+ * A scripted {@link HostConnector}: it probes nothing and records every input.
+ */
+class TestHostConnectorImpl implements TestHostConnector {
+  readonly #log: ConnectHostInput[] = []
+  #connect: HostConnector['connectHost'] = () => Promise.resolve()
+
+  async connectHost(input: ConnectHostInput): Promise<void> {
+    this.#log.push(input)
+    await this.#connect(input)
+  }
+
+  calls(): readonly ConnectHostInput[] {
+    return [...this.#log]
+  }
+
+  onConnectHost(handler: HostConnector['connectHost']): void {
+    this.#connect = handler
+  }
+}
+
+export function createTestHostConnector(): TestHostConnector {
+  return new TestHostConnectorImpl()
 }
 
 export interface TestICloudSyncService extends ICloudSyncService {

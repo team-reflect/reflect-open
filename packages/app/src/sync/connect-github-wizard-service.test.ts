@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError, type ConnectExistingResult, type GithubAuth } from '@reflect/core'
 import {
-  createTestGitSyncService,
+  createTestGithubConnector,
   createTestClockService,
   createTestGithubAuthService,
-  type TestGitSyncService,
+  type TestGithubConnector,
   type TestClockService,
 } from '@reflect/core/testing'
 import { createTestLifecycleService, type TestLifecycleService } from '../testing/lifecycle.ts'
@@ -27,14 +27,14 @@ const POLL_MS = 3000
 let clock: TestClockService
 let lifecycle: TestLifecycleService
 let opener: TestOpenerService
-let gitSync: TestGitSyncService
+let connector: TestGithubConnector
 let onClose: ReturnType<typeof vi.fn<() => void>>
 
 beforeEach(() => {
   clock = createTestClockService()
   lifecycle = createTestLifecycleService()
   opener = createTestOpenerService()
-  gitSync = createTestGitSyncService()
+  connector = createTestGithubConnector()
   onClose = vi.fn<() => void>()
 })
 
@@ -43,7 +43,7 @@ beforeEach(() => {
  */
 function scriptExisting(...results: ConnectExistingResult[]): void {
   let call = 0
-  gitSync.onConnectExistingRepo(() => {
+  connector.onConnectExistingRepo(() => {
     const result = results[Math.min(call, results.length - 1)] ?? 'connected'
     call += 1
     return Promise.resolve(result)
@@ -51,13 +51,13 @@ function scriptExisting(...results: ConnectExistingResult[]): void {
 }
 
 function existingCalls(): unknown[] {
-  return gitSync.calls().filter((call) => call.method === 'connectExistingRepo')
+  return connector.calls().filter((call) => call.method === 'connectExistingRepo')
 }
 
 function createWizard(auth: GithubAuth = PAT): ConnectGithubWizardService {
   return createConnectGithubWizardService(
     {
-      connect: gitSync,
+      connect: connector,
       githubAuth: createTestGithubAuthService({ auth }),
       opener,
       lifecycle,
@@ -147,7 +147,7 @@ describe('createConnectGithubWizardService', () => {
     await signIn(wizard)
 
     // The owner is the verified sign-in — never typed.
-    expect(gitSync.calls()).toEqual([
+    expect(connector.calls()).toEqual([
       {
         method: 'connectExistingRepo',
         ref: { owner: 'alex', name: 'my-notes' },
@@ -166,7 +166,7 @@ describe('createConnectGithubWizardService', () => {
 
   it('shows connecting while the connect is in flight', async () => {
     const gate = Promise.withResolvers<ConnectExistingResult>()
-    gitSync.onConnectExistingRepo(() => gate.promise)
+    connector.onConnectExistingRepo(() => gate.promise)
     const wizard = createWizard()
     await signIn(wizard)
 
@@ -181,13 +181,13 @@ describe('createConnectGithubWizardService', () => {
     const wizard = createWizard()
     await signIn(wizard)
 
-    expect(gitSync.calls().at(-1)).toEqual({ method: 'connectNewRepo', name: 'g-backup' })
+    expect(connector.calls().at(-1)).toEqual({ method: 'connectNewRepo', name: 'g-backup' })
     expect(onClose).toHaveBeenCalledOnce()
   })
 
   it('hands off to github.com/new and connects by polling — no button to click', async () => {
     scriptExisting('notFound', 'notFound', 'connected')
-    gitSync.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
+    connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
     const wizard = createWizard()
     const detach = wizard.attach()
     await signIn(wizard)
@@ -253,7 +253,7 @@ describe('createConnectGithubWizardService', () => {
       error: null,
       finishView: { kind: 'grantAccess', repo: { owner: 'team', name: 'notes' } },
     })
-    expect(gitSync.calls().some((call) => call.method === 'connectNewRepo')).toBe(false)
+    expect(connector.calls().some((call) => call.method === 'connectNewRepo')).toBe(false)
 
     await advance(POLL_MS)
     expect(onClose).toHaveBeenCalledOnce()
@@ -291,7 +291,7 @@ describe('createConnectGithubWizardService', () => {
 
     wizard.confirmPublic()
     await flush()
-    expect(gitSync.calls().at(-1)).toEqual({
+    expect(connector.calls().at(-1)).toEqual({
       method: 'connectExistingRepo',
       ref: { owner: 'alex', name: 'g-backup' },
       allowPublic: true,
@@ -301,7 +301,7 @@ describe('createConnectGithubWizardService', () => {
 
   it('a poll that finds a public repo stops for consent', async () => {
     scriptExisting('notFound', 'needsPublicConfirm')
-    gitSync.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
+    connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
     const wizard = createWizard()
     const detach = wizard.attach()
     await signIn(wizard)
@@ -317,7 +317,7 @@ describe('createConnectGithubWizardService', () => {
 
   it('back to the repo step clears every parked handoff', async () => {
     scriptExisting('notFound')
-    gitSync.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
+    connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
     const wizard = createWizard()
     const detach = wizard.attach()
     await signIn(wizard)
@@ -335,7 +335,7 @@ describe('createConnectGithubWizardService', () => {
   })
 
   it('captures a failed connect as a display message', async () => {
-    gitSync.onConnectExistingRepo(() => {
+    connector.onConnectExistingRepo(() => {
       return Promise.reject(new AppError('auth', 'Connect GitHub first (no credential stored)'))
     })
     const wizard = createWizard()
@@ -352,7 +352,7 @@ describe('createConnectGithubWizardService', () => {
   describe('the repo-existence poll', () => {
     async function parkOnCreateGuide(): Promise<ConnectGithubWizardService> {
       scriptExisting('notFound')
-      gitSync.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
+      connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
       const wizard = createWizard()
       await signIn(wizard)
       expect(wizard.getState().finishView).toMatchObject({ kind: 'createGuide' })
@@ -377,7 +377,7 @@ describe('createConnectGithubWizardService', () => {
     it('never overlaps ticks: the next wait starts when the tick settles', async () => {
       const wizard = await parkOnCreateGuide()
       const gate = Promise.withResolvers<ConnectExistingResult>()
-      gitSync.onConnectExistingRepo(() => gate.promise)
+      connector.onConnectExistingRepo(() => gate.promise)
       const detach = wizard.attach()
 
       await advance(POLL_MS)
@@ -394,7 +394,7 @@ describe('createConnectGithubWizardService', () => {
 
     it('a failing tick keeps the loop alive', async () => {
       const wizard = await parkOnCreateGuide()
-      gitSync.onConnectExistingRepo(() => Promise.reject(new AppError('network', 'offline')))
+      connector.onConnectExistingRepo(() => Promise.reject(new AppError('network', 'offline')))
       const detach = wizard.attach()
 
       await advance(POLL_MS)

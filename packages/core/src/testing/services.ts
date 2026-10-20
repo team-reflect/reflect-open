@@ -20,6 +20,8 @@ import { isICloudRoot } from '../sync/icloud-sync-service.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import type { GitSyncService } from '../sync/git-sync-service.ts'
+import type { GithubConnector } from '../sync/github-connector.ts'
+import type { HostConnector } from '../sync/host-connector.ts'
 import {
   createTestAiKeyValidationService,
   createTestAssetDescriberService,
@@ -97,9 +99,17 @@ import {
  */
 export type TestCoreServiceOverrides = Partial<CoreServices & CoreInternalServices> & {
   /**
-   * The backup service of every main-window graph session.
+   * The git sync service of every main-window graph session.
    */
   readonly gitSync?: GitSyncService
+  /**
+   * The GitHub connector of every main-window graph session.
+   */
+  readonly githubConnector?: GithubConnector
+  /**
+   * The host connector of every main-window graph session.
+   */
+  readonly hostConnector?: HostConnector
   /**
    * The activity signals the services follow.
    */
@@ -262,7 +272,14 @@ export type TestCoreServices = Override<
 /**
  * The overrides that go to the adapters rather than in place of a service.
  */
-const TEST_ADAPTER_KEYS = new Set(['gitSync', 'progress', 'role', 'createGraphServices'])
+const TEST_ADAPTER_KEYS = new Set([
+  'gitSync',
+  'githubConnector',
+  'hostConnector',
+  'progress',
+  'role',
+  'createGraphServices',
+])
 
 /**
  * {@link createCoreServices} over test adapters, with the test double of each
@@ -275,6 +292,8 @@ export function createTestCoreServices<
   const edge = { ...defaults, ...overrides }
   const platform = edge.platform ?? createTestPlatformService()
   const gitSync = overrides.gitSync
+  const githubConnector = overrides.githubConnector
+  const hostConnector = overrides.hostConnector
   const adapters: CoreAdapters = {
     ipc: edge.ipc ?? createTestIpcBridgeService({ logger: edge.logger }),
     platform,
@@ -291,12 +310,11 @@ export function createTestCoreServices<
     createGraphServices:
       edge.createGraphServices ??
       ((session, deps) => {
-        return createGraphServices(
-          session,
-          deps,
-          testGraphLifecycles(session, platform),
-          gitSync === undefined ? {} : { gitSync: () => gitSync },
-        )
+        return createGraphServices(session, deps, testGraphLifecycles(session, platform), {
+          ...(gitSync === undefined ? {} : { gitSync: () => gitSync }),
+          ...(githubConnector === undefined ? {} : { githubConnector: () => githubConnector }),
+          ...(hostConnector === undefined ? {} : { hostConnector: () => hostConnector }),
+        })
       }),
   }
   const fixed: Record<string, () => unknown> = {}

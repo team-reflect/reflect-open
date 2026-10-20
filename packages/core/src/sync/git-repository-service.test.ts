@@ -19,7 +19,7 @@ describe('createGitRepositoryService', () => {
         git_disconnect: () => ({ ...STATUS, remoteUrl: null }),
         git_commit_all: () => ({ committed: true, sha: 'abc', ahead: 1, skippedLargeFiles: [] }),
         git_fetch: () => ({ ahead: 1, behind: 2 }),
-        git_remote_head: () => ({ remoteOid: 'abc', trackingOid: null }),
+        git_remote_head: () => ({ remoteOid: 'abc', trackingOid: null, defaultBranch: 'main' }),
         git_push: () => ({ pushed: true, nonFastForward: false, rejectionMessage: null }),
         git_pull: () => ({
           committed: true,
@@ -37,7 +37,11 @@ describe('createGitRepositoryService', () => {
     await expect(git.disconnect(3)).resolves.toMatchObject({ remoteUrl: null })
     await expect(git.commitAll('Update notes', 3)).resolves.toMatchObject({ sha: 'abc' })
     await expect(git.fetch(CRED, 3)).resolves.toEqual({ ahead: 1, behind: 2 })
-    await expect(git.remoteHead(CRED, 3)).resolves.toEqual({ remoteOid: 'abc', trackingOid: null })
+    await expect(git.remoteHead(CRED, 3)).resolves.toEqual({
+      remoteOid: 'abc',
+      trackingOid: null,
+      defaultBranch: 'main',
+    })
     await expect(git.push(null, 3)).resolves.toMatchObject({ pushed: true })
     await expect(git.pull('Update notes', 3)).resolves.toEqual({
       committed: true,
@@ -56,7 +60,7 @@ describe('createGitRepositoryService', () => {
       { command: 'git_disconnect', args: { generation: 3 } },
       { command: 'git_commit_all', args: { message: 'Update notes', generation: 3 } },
       { command: 'git_fetch', args: { credential: CRED, generation: 3 } },
-      { command: 'git_remote_head', args: { credential: CRED, generation: 3 } },
+      { command: 'git_remote_head', args: { url: null, credential: CRED, generation: 3 } },
       { command: 'git_push', args: { credential: null, generation: 3 } },
       { command: 'git_pull', args: { message: 'Update notes', generation: 3 } },
     ])
