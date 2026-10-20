@@ -18,13 +18,8 @@ import { isSyncError, type SyncEngine, type SyncEngineFactory, type SyncStatus }
 import { describeConflictCopies } from './conflict-copies.ts'
 import type { ChangedFile, GitCredential, GitRepositoryService } from './git-repository-service.ts'
 import { githubCredential, type GithubAuthService } from './github-auth-service.ts'
-import {
-  githubRemoteUrl,
-  parseGithubRemote,
-  remoteHost,
-  type GithubRepoRef,
-  type GithubRepoService,
-} from './github-repo-service.ts'
+import type { GithubRepoRef, GithubRepoService } from './github-repo-service.ts'
+import { classifyRemote, githubRemoteUrl, githubRepoOf } from './remote-url.ts'
 
 /**
  * Git sync state as the UI sees it. `connected` means the graph has a repo and
@@ -232,7 +227,8 @@ class GitSyncServiceImpl implements GitSyncService {
         return
       }
       const remoteUrl = status.remoteUrl
-      const repo = parseGithubRemote(remoteUrl)
+      const remote = classifyRemote(remoteUrl)
+      const repo = githubRepoOf(remote)
       if (repo !== null && auth === null) {
         // A GitHub remote needs the managed sign-in; the wizard is the fix.
         // Generic remotes adopt without it — their credentials live with the
@@ -247,8 +243,8 @@ class GitSyncServiceImpl implements GitSyncService {
       // anonymously and only 401 on push, so the other device's edits arrive
       // while this one's silently never leave. `rejected` = acting (not
       // retrying) is the fix.
-      const host = repo === null ? remoteHost(remoteUrl) : null
-      if (host !== null) {
+      if (remote.kind === 'https') {
+        const host = remote.origin.replace(/^https?:\/\//, '')
         this.#setState({
           phase: 'connected',
           remoteUrl,

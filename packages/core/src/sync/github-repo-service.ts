@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { HttpService } from '../ports/http-service.ts'
 import { AppError } from '../errors.ts'
 import { apiHeaders, readJson } from './github-api.ts'
+import { classifyRemote } from './remote-url.ts'
 
 export interface GithubRepoRef {
   owner: string
@@ -28,42 +29,14 @@ export function newRepoUrl(name: string): string {
 }
 
 /**
- * Parse `https://github.com/owner/repo(.git)` → ref, or `null` for any other remote.
- */
-export function parseGithubRemote(url: string): GithubRepoRef | null {
-  const match = /^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(url)
-  if (match === null) {
-    return null
-  }
-  return { owner: match[1]!, name: match[2]! }
-}
-
-/**
- * The host of an HTTPS remote URL (lowercase, with any port), else `null`.
- */
-export function remoteHost(remoteUrl: string): string | null {
-  const match = /^https?:\/\/([^/@]+@)?([^/]+)\//i.exec(
-    remoteUrl.endsWith('/') ? remoteUrl : `${remoteUrl}/`,
-  )
-  return match === null ? null : match[2]!.toLowerCase()
-}
-
-/**
- * The canonical HTTPS remote URL for a repo (token never embedded).
- */
-export function githubRemoteUrl(ref: GithubRepoRef): string {
-  return `https://github.com/${ref.owner}/${ref.name}.git`
-}
-
-/**
  * Parse what a user types into a "which repository" field — `owner/name` or a
  * full GitHub URL — into a repo ref; `null` when it's neither.
  */
 export function parseRepoInput(input: string): GithubRepoRef | null {
   const trimmed = input.trim()
-  const fromUrl = parseGithubRemote(trimmed)
-  if (fromUrl !== null) {
-    return fromUrl
+  const remote = classifyRemote(trimmed)
+  if (remote.kind === 'github') {
+    return remote.repo
   }
   const match = /^([\w.-]+)\/([\w.-]+)$/.exec(trimmed)
   return match === null ? null : { owner: match[1]!, name: match[2]! }

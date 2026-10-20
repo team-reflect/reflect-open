@@ -2,11 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { createTestHttpService, type TestHttpReply } from '../testing/index.ts'
 import {
   createGithubRepoService,
-  githubRemoteUrl,
   newRepoUrl,
-  parseGithubRemote,
   parseRepoInput,
-  remoteHost,
   suggestRepoName,
 } from './github-repo-service.ts'
 
@@ -24,45 +21,6 @@ function jsonResponse(body: unknown, status = 200): Response {
     headers: { 'Content-Type': 'application/json' },
   })
 }
-
-describe('parseGithubRemote', () => {
-  it('parses the canonical https remote forms', () => {
-    expect(parseGithubRemote('https://github.com/alex/notes.git')).toEqual({
-      owner: 'alex',
-      name: 'notes',
-    })
-    expect(parseGithubRemote('https://github.com/alex/notes')).toEqual({
-      owner: 'alex',
-      name: 'notes',
-    })
-  })
-
-  it('returns null for non-GitHub remotes (generic core stays generic)', () => {
-    expect(parseGithubRemote('https://gitlab.com/alex/notes.git')).toBeNull()
-    expect(parseGithubRemote('git@github.com:alex/notes.git')).toBeNull()
-    expect(parseGithubRemote('/tmp/local-remote.git')).toBeNull()
-  })
-
-  it('round-trips through githubRemoteUrl', () => {
-    const url = githubRemoteUrl({ owner: 'alex', name: 'notes' })
-    expect(url).toBe('https://github.com/alex/notes.git')
-    expect(parseGithubRemote(url)).toEqual({ owner: 'alex', name: 'notes' })
-  })
-})
-
-describe('remoteHost', () => {
-  it('names the host of an HTTPS remote, lowercase, with its port', () => {
-    expect(remoteHost('https://GitLab.com/alex/notes.git')).toBe('gitlab.com')
-    expect(remoteHost('https://git.example.org:8443/team/notes')).toBe('git.example.org:8443')
-    expect(remoteHost('http://alex@gitea.local/notes.git')).toBe('gitea.local')
-  })
-
-  it('is null for ssh and path remotes', () => {
-    expect(remoteHost('git@gitlab.com:alex/notes.git')).toBeNull()
-    expect(remoteHost('ssh://git@gitlab.com/alex/notes.git')).toBeNull()
-    expect(remoteHost('/Volumes/NAS/notes.git')).toBeNull()
-  })
-})
 
 describe('parseRepoInput', () => {
   it('accepts owner/name and full GitHub URLs', () => {
