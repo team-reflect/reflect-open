@@ -1,5 +1,12 @@
 import { parseUrl } from '@reflect/utils'
-import type { GithubRepoRef } from './github-repo-service.ts'
+
+/**
+ * A GitHub repository, as `owner/name`.
+ */
+export interface GithubRepoRef {
+  owner: string
+  name: string
+}
 
 /**
  * What a graph's `origin` points at, which decides where its sign-in comes
@@ -53,4 +60,3 @@ export function githubRemoteUrl(ref: GithubRepoRef): string {
 export function githubRepoOf(remote: GitRemote): GithubRepoRef | null {
   return remote.kind === 'github' ? remote.repo : null
 }
-
