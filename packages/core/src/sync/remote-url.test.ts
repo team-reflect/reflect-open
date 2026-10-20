@@ -10,6 +10,15 @@ describe('classifyRemote', () => {
     ['https://github.com/alex/notes/', { kind: 'github', repo: { owner: 'alex', name: 'notes' } }],
     ['https://github.com/alex/notes', { kind: 'github', repo: { owner: 'alex', name: 'notes' } }],
     ['http://github.com/alex/notes.git', { kind: 'https', origin: 'http://github.com' }],
+    [
+      'HTTPS://GitHub.com/alex/notes.git',
+      { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+    ],
+    [
+      'https://alex@github.com:443/alex/notes.git',
+      { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+    ],
+    ['https://github.com/alex', { kind: 'https', origin: 'https://github.com' }],
     ['https://ghe.corp.com/alex/notes.git', { kind: 'https', origin: 'https://ghe.corp.com' }],
     [
       'https://gitlab.com:8443/alex/notes.git',
@@ -24,7 +33,11 @@ describe('classifyRemote', () => {
     ['git@gitlab.com:alex/notes.git', { kind: 'ssh', host: 'gitlab.com' }],
     ['gitlab.com:alex/notes.git', { kind: 'ssh', host: 'gitlab.com' }],
     ['ssh://git@nas:2222/notes.git', { kind: 'ssh', host: 'nas' }],
+    ['git@nas:/srv/git/notes.git', { kind: 'ssh', host: 'nas' }],
     ['/Volumes/NAS/notes.git', { kind: 'path' }],
+    ['C:/repos/notes.git', { kind: 'path' }],
+    [String.raw`C:\repos\notes.git`, { kind: 'path' }],
+    ['git://nas/notes.git', { kind: 'path' }],
     ['file:///tmp/notes.git', { kind: 'path' }],
     ['../notes.git', { kind: 'path' }],
     ['https://', { kind: 'path' }],

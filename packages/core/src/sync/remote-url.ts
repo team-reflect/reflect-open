@@ -13,25 +13,38 @@ export type GitRemote =
   | { kind: 'ssh'; host: string }
   | { kind: 'path' }
 
-const GITHUB_HTTPS = /^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/
-const SCP_LIKE = /^(?:[^@/]+@)?([^:/]+):[^/]/
+const GITHUB_PATH = /^\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/
+/** `host:path`, as `git clone` reads it; a Windows drive (`C:/…`) is a path. */
+const SCP_LIKE = /^(?![a-z]:[\\/])(?:[^@/]+@)?([^:/]+):.+$/i
+const ANY_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i
 
 /**
  * Classify a remote URL. `http://github.com/…` is not `github`: the GitHub
- * sign-in only travels over `https`.
+ * sign-in only travels over `https`. `file://`, `git://` and other schemes
+ * carry no sign-in, so they count as `path`.
  */
 export function classifyRemote(url: string): GitRemote {
-  const github = GITHUB_HTTPS.exec(url)
-  if (github !== null) {
-    return { kind: 'github', repo: { owner: github[1]!, name: github[2]! } }
-  }
   if (/^https?:\/\//i.test(url)) {
     const parsed = parseUrl(url)
-    return parsed === null ? { kind: 'path' } : { kind: 'https', origin: parsed.origin }
+    if (parsed === null) {
+      return { kind: 'path' }
+    }
+    // `URL` lower-cases the host and drops user info and a default port, so
+    // every spelling of a github.com remote lands here.
+    if (parsed.protocol === 'https:' && parsed.hostname === 'github.com') {
+      const match = GITHUB_PATH.exec(parsed.pathname)
+      if (match !== null) {
+        return { kind: 'github', repo: { owner: match[1]!, name: match[2]! } }
+      }
+    }
+    return { kind: 'https', origin: parsed.origin }
   }
   if (/^ssh:\/\//i.test(url)) {
     const parsed = parseUrl(url)
     return parsed === null ? { kind: 'path' } : { kind: 'ssh', host: parsed.hostname }
+  }
+  if (ANY_SCHEME.test(url)) {
+    return { kind: 'path' }
   }
   const scp = SCP_LIKE.exec(url)
   if (scp !== null) {
