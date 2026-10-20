@@ -79,7 +79,7 @@ describe('GitSyncSettingsField', () => {
         phase: 'connected',
         remoteUrl: 'https://github.com/alex/notes.git',
         remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
-        coexisting: false,
+        isPrimaryChannel: true,
         status: { state: 'idle' },
       },
       ICLOUD_GRAPH,
@@ -96,7 +96,7 @@ describe('GitSyncSettingsField', () => {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
-      coexisting: false,
+      isPrimaryChannel: true,
       status: { state: 'waiting', until: 2 * 60_000 + 1 },
     })
     await expect.element(page.getByText('Backs up in 2 minutes')).toBeVisible()
@@ -107,7 +107,7 @@ describe('GitSyncSettingsField', () => {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
-      coexisting: false,
+      isPrimaryChannel: true,
       status: { state: 'waiting', until: 3 * 60_000 },
     })
     await expect.element(page.getByText('Backs up in 3 minutes')).toBeVisible()
@@ -121,7 +121,7 @@ describe('GitSyncSettingsField', () => {
         phase: 'connected',
         remoteUrl: 'git@gitlab.com:alex/notes.git',
         remote: { kind: 'ssh', host: 'gitlab.com' },
-        coexisting: false,
+        isPrimaryChannel: true,
         status: { state: 'idle' },
       },
       ICLOUD_GRAPH,
@@ -137,7 +137,7 @@ describe('GitSyncSettingsField', () => {
       phase: 'connected',
       remoteUrl: 'git@gitlab.com:alex/notes.git',
       remote: { kind: 'ssh', host: 'gitlab.com' },
-      coexisting: false,
+      isPrimaryChannel: true,
       status: AUTH_ERROR,
     })
 
@@ -161,7 +161,7 @@ describe('GitSyncSettingsField', () => {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
-      coexisting: false,
+      isPrimaryChannel: true,
       status: AUTH_ERROR,
     })
 
@@ -179,7 +179,7 @@ describe('GitSyncSettingsField', () => {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
-      coexisting: false,
+      isPrimaryChannel: true,
       status: { state: 'idle' },
     })
 
@@ -194,7 +194,7 @@ describe('GitSyncSettingsField', () => {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
-      coexisting: false,
+      isPrimaryChannel: true,
       status: { state: 'idle' },
     })
 
@@ -215,7 +215,7 @@ describe('GitSyncSettingsField', () => {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
-      coexisting: false,
+      isPrimaryChannel: true,
       status: { state: 'idle' },
     })
 
@@ -241,7 +241,7 @@ describe('GitSyncSettingsField', () => {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
-      coexisting: false,
+      isPrimaryChannel: true,
       status: { state: 'idle' },
     })
 
@@ -260,7 +260,7 @@ describe('GitSyncSettingsField', () => {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
-      coexisting: false,
+      isPrimaryChannel: true,
       status: { state: 'idle' },
     })
 
@@ -286,7 +286,7 @@ describe('GitSyncSettingsField', () => {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
-      coexisting: false,
+      isPrimaryChannel: true,
       status: { state: 'idle' },
     })
 
@@ -305,7 +305,7 @@ describe('GitSyncSettingsField', () => {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
-      coexisting: false,
+      isPrimaryChannel: true,
       status: { state: 'idle' },
     })
 

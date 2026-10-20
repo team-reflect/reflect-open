@@ -43,10 +43,11 @@ export type GitSyncState =
       remoteUrl: string
       remote: GitRemote
       /**
-       * True on an iCloud-hosted graph: iCloud syncs the notes and Git keeps
-       * a history that updates after five quiet minutes.
+       * True when this repository is the channel that carries the notes
+       * between devices. False on an iCloud-hosted graph: iCloud carries
+       * them, and Git keeps a history that updates after five quiet minutes.
        */
-      coexisting: boolean
+      isPrimaryChannel: boolean
       status: SyncStatus
     }
 
@@ -66,11 +67,11 @@ export type ConnectExistingResult = 'connected' | 'needsPublicConfirm' | 'notFou
 const MOBILE_IDLE_MS = 10_000
 
 /**
- * Quiet period before the network pass on an iCloud-hosted graph with a
- * remote. iCloud and Git then both move the same files, so Git waits until
- * iCloud and the user have both stopped.
+ * Quiet period before the network pass when Git is not the primary channel
+ * (an iCloud-hosted graph with a remote). iCloud and Git then both move the
+ * same files, so Git waits until iCloud and the user have both stopped.
  */
-const COEXIST_QUIET_MS = 5 * 60_000
+const SECONDARY_CHANNEL_QUIET_MS = 5 * 60_000
 
 /**
  * How often a visible desktop window asks the remote for its branch tip.
@@ -248,14 +249,14 @@ class GitSyncServiceImpl implements GitSyncService {
         return
       }
       const getCredential = resolved.get
-      const coexisting = isICloudRoot(this.#root)
+      const isPrimaryChannel = !isICloudRoot(this.#root)
       const next = syncEngines.create({
         generation: this.#generation,
         idleMs: this.#mobile ? MOBILE_IDLE_MS : undefined,
-        quietMs: coexisting ? COEXIST_QUIET_MS : undefined,
-        networkReady: coexisting
-          ? async () => (await icloudNative.pendingCount(this.#root, 'notes')) === 0
-          : undefined,
+        quietMs: isPrimaryChannel ? undefined : SECONDARY_CHANNEL_QUIET_MS,
+        networkReady: isPrimaryChannel
+          ? undefined
+          : async () => (await icloudNative.pendingCount(this.#root, 'notes')) === 0,
         // iOS can suspend us at any await. Do not begin a launch, online, or
         // debounced Git cycle after the document is hidden; the existing
         // visible/focus trigger below replays a full cycle on foreground.
@@ -268,11 +269,11 @@ class GitSyncServiceImpl implements GitSyncService {
             phase: 'connected',
             remoteUrl,
             remote,
-            coexisting,
+            isPrimaryChannel,
             status: engineStatus,
           })
           if (remote.kind === 'github' && isForbidden(engineStatus)) {
-            void this.#classifyForbidden(engineStatus, remoteUrl, remote, coexisting)
+            void this.#classifyForbidden(engineStatus, remoteUrl, remote, isPrimaryChannel)
           }
         },
         onLargeFilesSkipped: (files) => {
@@ -287,13 +288,13 @@ class GitSyncServiceImpl implements GitSyncService {
         phase: 'connected',
         remoteUrl,
         remote,
-        coexisting,
+        isPrimaryChannel,
         status: { state: 'idle' },
       })
       this.#adoptEngine(next)
 
       this.#resumeDisposers.push(activity.subscribeResume(() => void next.syncNow()))
-      if (!coexisting && !this.#mobile && platform.isNativeShell) {
+      if (isPrimaryChannel && !this.#mobile && platform.isNativeShell) {
         this.#armProbe(next, getCredential)
       }
 
@@ -590,7 +591,7 @@ class GitSyncServiceImpl implements GitSyncService {
     status: SyncStatus,
     remoteUrl: string,
     remote: Extract<GitRemote, { kind: 'github' }>,
-    coexisting: boolean,
+    isPrimaryChannel: boolean,
   ): Promise<void> {
     const { githubAuth } = this.#deps
     const { repo } = remote
@@ -621,7 +622,7 @@ class GitSyncServiceImpl implements GitSyncService {
     }
     // Only replace the exact status this probe was asked about.
     if (this.#state.phase === 'connected' && this.#state.status === status) {
-      this.#setState({ phase: 'connected', remoteUrl, remote, coexisting, status: next })
+      this.#setState({ phase: 'connected', remoteUrl, remote, isPrimaryChannel, status: next })
     }
   }
 
@@ -663,7 +664,9 @@ function sameState(a: GitSyncState, b: GitSyncState): boolean {
     return a.phase === b.phase
   }
   return (
-    a.remoteUrl === b.remoteUrl && a.coexisting === b.coexisting && sameStatus(a.status, b.status)
+    a.remoteUrl === b.remoteUrl &&
+    a.isPrimaryChannel === b.isPrimaryChannel &&
+    sameStatus(a.status, b.status)
   )
 }
 

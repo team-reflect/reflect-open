@@ -16,7 +16,7 @@ function connected(status: Extract<GitSyncState, { phase: 'connected' }>['status
     phase: 'connected',
     remoteUrl: 'https://github.com/alex/notes.git',
     remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
-    coexisting: false,
+    isPrimaryChannel: true,
     status,
   }
 }

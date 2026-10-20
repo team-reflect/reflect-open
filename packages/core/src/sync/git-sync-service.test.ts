@@ -599,7 +599,7 @@ describe('createGitSyncService', () => {
       phase: 'connected',
       remoteUrl: 'git@gitlab.com:alex/notes.git',
       remote: { kind: 'ssh', host: 'gitlab.com' },
-      coexisting: false,
+      isPrimaryChannel: true,
     })
     const fetch = invocations.find(({ command }) => command === 'fetch')
     expect(fetch?.args).toMatchObject({ credential: null })
